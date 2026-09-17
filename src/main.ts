@@ -122,19 +122,23 @@ import {
 } from './game/voiesModule'
 import { CLE_MANQUES, inventairePool, litManques, noteManque, type Manque } from './game/manques'
 import {
+  arriveRafales,
   avancePalet,
   compteAuDela,
   estMiniJeu,
   ETAT_PALET_NEUF,
   meilleurLancer,
   notePalet,
+  noteRafales,
   noteTrait,
   phaseCouperet,
   tableauCouperet,
   tableauPalet,
+  tableauRafales,
   tireMiniJeu,
   tireTrait,
   VERDICTS_PALET,
+  VERDICTS_RAFALES,
   VERDICTS_TRAIT,
   type EtatPalet,
   type Lancer,
@@ -7089,7 +7093,7 @@ function renderDescente(): void {
     ),
     dscCran(
       'MINI-JEUX PAR MODULE',
-      'le couperet ou le palet, tirés à la graine : la précision paie en mémoire — 0 : aucun',
+      'le couperet, le palet ou les rafales, tirés à la graine : la précision paie en mémoire — 0 : aucun',
       () => voiePlan.minijeuxParModule,
       (v) => {
         voiePlan.minijeuxParModule = v
@@ -8670,6 +8674,36 @@ function drawMecanismes(vw: number, vh: number, dpr: number): void {
     paletEtat.lancers.forEach((l, i) => {
       g.fillText(`${i + 1}. ${Math.round(l.distance)} u — ${VERDICTS_PALET[l.verdict]}`, anc.sx, anc.sy + t * (1.1 + i * 0.95))
     })
+    g.restore()
+  }
+
+  // LES RAFALES : l'arrivée (un cadre), le compte à rebours du souffle et
+  // ce qu'il reste du corps contre le départ — la jauge du mini-jeu
+  if (level.minijeu?.type === 'rafales') {
+    const r = level.minijeu.regles
+    g.save()
+    const a = S(r.arrivee.minX, r.arrivee.maxY)
+    const b = S(r.arrivee.maxX, r.arrivee.minY)
+    g.strokeStyle = 'rgba(140,255,190,0.7)'
+    g.setLineDash([6, 8])
+    g.lineWidth = 2
+    g.strokeRect(a.sx, a.sy, b.sx - a.sx, b.sy - a.sy)
+    g.setLineDash([])
+    const ph = phaseCouperet(run.tableauTime, r.rythme)
+    const t = Math.max(12, Math.min(28, 90 * z))
+    const anc = S(0, 520)
+    g.textAlign = 'center'
+    g.font = `600 ${Math.round(t * 0.85)}px ui-monospace, monospace`
+    g.fillStyle = minijeuResultat ? 'rgba(140,255,190,0.95)' : ph.tombee ? 'rgba(255,110,110,0.95)' : ph.avant < 1 ? 'rgba(255,200,120,0.95)' : 'rgba(200,220,235,0.85)'
+    g.fillText(
+      minijeuResultat ? 'TRAVERSÉ' : ph.tombee ? 'RAFALE !' : `RAFALE DANS ${ph.avant.toFixed(1).replace('.', ',')} s`,
+      anc.sx,
+      anc.sy,
+    )
+    g.font = `${Math.round(t * 0.8)}px ui-monospace, monospace`
+    g.fillStyle = 'rgba(255,255,255,0.92)'
+    const part = sim.baseVolume > 0 ? Math.round((100 * sim.playerCount) / sim.baseVolume) : 0
+    g.fillText(`IL VOUS RESTE ${part} %`, anc.sx, anc.sy + t * 1.15)
     g.restore()
   }
 
@@ -12550,6 +12584,12 @@ function lanceManoeuvre(quoi: string): void {
         closeHome()
         break
       }
+      case 'rafales': {
+        lanceRafalesEssai()
+        pupitreEl.hidden = true
+        closeHome()
+        break
+      }
       case 'hub-principal': {
         const r = passeLeHub('principal')
         if (r === 'ok') {
@@ -12875,6 +12915,23 @@ function majCouperet(): void {
   }
   couperetLamePrec = ph.tombee
   laserEtat.portesOuvertes[0] = !ph.tombee
+}
+
+/** LES RAFALES, à l'image : le corps dont le centre entre dans l'arrivée a
+ *  traversé ; ce qu'il lui reste, contre son volume de départ, fait le
+ *  verdict. */
+function majRafales(): void {
+  const mj = level.minijeu
+  if (!mj || mj.type !== 'rafales' || minijeuResultat) return
+  if (!arriveRafales(sim.stats.centroidX, sim.stats.centroidY, mj.regles)) return
+  const part = sim.baseVolume > 0 ? sim.playerCount / sim.baseVolume : 0
+  const note = noteRafales(part, mj.regles.paliers)
+  minijeuResultat = {
+    note,
+    mesure: part,
+    titre: `LES RAFALES — ${VERDICTS_RAFALES[note.verdict]}`,
+    detail: `${fmtL(sim.playerCount * params.litersPerParticle)} à l'arrivée sur ${fmtL(sim.baseVolume * params.litersPerParticle)} au départ — ${Math.round(part * 100)} % gardés, en ${run.tableauTime.toFixed(1).replace('.', ',')} s`,
+  }
 }
 
 /** LE PALET, à l'image : ce que le jeu observe du corps (la glace est-elle
@@ -14990,6 +15047,7 @@ function ouvreNoeud(nature: Exclude<NatureNoeud, 'salle'>): void {
       const alea = aleaDeGraine(`${carteRun.tissage || graineRun()}@minijeu${carteRun.niveau}`)
       const quel = tireMiniJeu(alea)
       if (quel === 'palet') minijeuIntercalaire = tableauPalet()
+      else if (quel === 'rafales') minijeuIntercalaire = tableauRafales()
       else {
         const volumeL = volumeDepart(tableauCouperet(1)) * params.litersPerParticle
         minijeuIntercalaire = tableauCouperet(tireTrait(volumeL, alea))
@@ -15026,7 +15084,7 @@ function mbMontreResultatMiniJeu(r: NonNullable<typeof minijeuResultat>, suite: 
   btn.className = 'mb-carte mb-repos'
   btn.style.gridColumn = '2'
   btn.innerHTML =
-    `<i class="mb-repos-icone">${level.minijeu?.type === 'palet' ? '🥌' : '🔪'}</i><b>${r.titre.split(' — ')[1] ?? ''}</b>` +
+    `<i class="mb-repos-icone">${level.minijeu?.type === 'palet' ? '🥌' : level.minijeu?.type === 'rafales' ? '🌬️' : '🔪'}</i><b>${r.titre.split(' — ')[1] ?? ''}</b>` +
     `<small>${res.memoire > 0 ? `+${res.memoire} mémoire` : 'rien — le trait est loin'} · continuer</small>`
   let elu = false
   btn.addEventListener('click', () => {
@@ -15748,6 +15806,16 @@ function lancePaletEssai(): void {
   restart()
 }
 ;(window as unknown as { __palet: () => void }).__palet = lancePaletEssai
+// JOUER LES RAFALES EN ESSAI (le pupitre, et la sonde __rafales())
+function lanceRafalesEssai(): void {
+  if (miseEnBonbonne) fermeMiseEnBonbonne()
+  auHub = false
+  hasPlayed = true
+  document.body.classList.add('playing')
+  testLevel = tableauRafales()
+  restart()
+}
+;(window as unknown as { __rafales: () => void }).__rafales = lanceRafalesEssai
 
 function newExpedition(avecCarte = false): void {
   levelIndex = 0
@@ -17628,6 +17696,13 @@ function corpsImage(now: number): boolean {
           c.canal === undefined ||
           canalActif(cibles, c.canal, c.regle, laserEtat.recepteurs, now)
       }
+      // AUX RAFALES, les chasses sont scénarisées et c'est le rythme qui les
+      // allume — toutes ensemble, une seconde toutes les quatre — tant que
+      // la traversée n'est pas conclue
+      if (level.minijeu?.type === 'rafales') {
+        const souffle = !minijeuResultat && phaseCouperet(run.tableauTime, level.minijeu.regles.rythme).tombee
+        for (let i = 0; i < chasses.length; i++) laserEtat.chassesActives[i] = souffle
+      }
     }
   }
 
@@ -18174,7 +18249,7 @@ function corpsImage(now: number): boolean {
       effaceRun()
       newExpedition(true)
     })
-  } else if (!tableauDone && !sim.dispersed && estMiniJeu(level) && level.minijeu && (majPalet(), minijeuResultat)) {
+  } else if (!tableauDone && !sim.dispersed && estMiniJeu(level) && level.minijeu && (majPalet(), majRafales(), minijeuResultat)) {
     // LE MINI-JEU A CONCLU : la lame du couperet a pesé, le palet a fait
     // ses lancers (ou le joueur a conclu). Rien ne se consigne aux registres
     // (pas un tableau du protocole), la mémoire se gagne au barème, la

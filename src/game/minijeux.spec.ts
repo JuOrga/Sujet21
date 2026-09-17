@@ -194,10 +194,51 @@ describe('le palet — les lancers et la maison', () => {
 
   it('le tirage au catalogue rend chaque mini-jeu, et jamais autre chose', () => {
     expect(tireMiniJeu(() => 0)).toBe('couperet')
-    expect(tireMiniJeu(() => 0.99)).toBe('palet')
-    expect(tireMiniJeu(() => 1)).toBe('palet')
+    expect(tireMiniJeu(() => 0.5)).toBe('palet')
+    expect(tireMiniJeu(() => 0.99)).toBe('rafales')
+    expect(tireMiniJeu(() => 1)).toBe('rafales')
     const vus = new Set<string>()
     for (let i = 0; i < 40; i++) vus.add(tireMiniJeu(aleaDeGraine(`m${i}`)))
     expect([...vus].sort()).toEqual([...MINI_JEUX].sort())
+  })
+})
+
+import { arriveRafales, noteRafales, REGLES_RAFALES, tableauRafales, VERDICTS_RAFALES } from './minijeux'
+
+describe('les rafales — la traversée et ce qu’il en reste', () => {
+  it('le verdict suit la part gardée, au barème du trait', () => {
+    const p = REGLES_RAFALES.paliers
+    expect(noteRafales(1, p)).toMatchObject({ verdict: 'juste', memoire: 15 })
+    expect(noteRafales(0.9, p).verdict).toBe('juste')
+    expect(noteRafales(0.8, p)).toMatchObject({ verdict: 'proche', memoire: 5 })
+    expect(noteRafales(0.5, p)).toMatchObject({ verdict: 'loin', memoire: 3 })
+    expect(noteRafales(0.3, p)).toMatchObject({ verdict: 'rate', memoire: 0 })
+    expect(VERDICTS_RAFALES.juste).toBe('INTACT')
+  })
+
+  it('l’arrivée se reconnaît au centre du corps', () => {
+    expect(arriveRafales(1500, 0)).toBe(true)
+    expect(arriveRafales(1300, 0)).toBe(false)
+    expect(arriveRafales(1500, 700)).toBe(false)
+  })
+
+  it('le couloir : trois souffles scénarisés en alternance, des éponges sur les deux bords de chaque tronçon, l’arrivée à droite — et pas de sas', () => {
+    const lv = tableauRafales()
+    expect(lv.minijeu?.type).toBe('rafales')
+    expect(lv.chasses).toHaveLength(3)
+    expect(lv.chasses!.map((c) => c.angle)).toEqual([90, -90, 90])
+    for (const c of lv.chasses!) expect(c.canal).toBeLessThan(0)
+    // les tronçons se suivent sans se chevaucher, de gauche à droite
+    for (let i = 1; i < 3; i++) expect(lv.chasses![i].minX).toBeGreaterThanOrEqual(lv.chasses![i - 1].maxX)
+    expect(lv.sponges).toHaveLength(6)
+    // chaque tronçon a son éponge en haut et en bas
+    for (const c of lv.chasses!) {
+      const dedans = lv.sponges.filter((sp) => sp.minX >= c.minX - 1 && sp.minX < c.maxX)
+      expect(dedans.map((sp) => sp.minY).sort((a, b) => a - b)).toEqual([-600, 552])
+    }
+    expect(REGLES_RAFALES.arrivee.minX).toBeGreaterThan(lv.chasses![2].maxX - 1)
+    expect(lv.spawn.x).toBeLessThan(lv.chasses![0].minX)
+    expect(lv.exit.minX).toBeGreaterThan(lv.bounds.maxX)
+    expect(lv.labels.filter((l) => /^[12] · /.test(l.text))).toHaveLength(2)
   })
 })

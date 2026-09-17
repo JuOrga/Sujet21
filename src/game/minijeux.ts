@@ -40,7 +40,7 @@
 import { MAT_HYDROPHILE, MAT_HYDROPHOBE, MAT_WALL, type LevelDef, type ObstacleBox, type PorteDef } from './level'
 import type { SimParams } from '../sim/params'
 
-export type MiniJeuId = 'couperet' | 'palet'
+export type MiniJeuId = 'couperet' | 'palet' | 'rafales'
 
 /** LE COUPERET : ce que porte son tableau. */
 export interface CouperetDef {
@@ -62,13 +62,14 @@ export interface PaletDef {
 }
 
 /** Ce que porte un tableau de mini-jeu (LevelDef.minijeu). */
-export type MiniJeuDef = CouperetDef | PaletDef
+export type MiniJeuDef = CouperetDef | PaletDef | RafalesDef
 
 export const CODE_COUPERET = 'MJ-COUPERET'
 export const CODE_PALET = 'MJ-PALET'
+export const CODE_RAFALES = 'MJ-RAFALES'
 
 /** LE CATALOGUE : les mini-jeux qu'un nœud de la mini-carte peut servir. */
-export const MINI_JEUX: readonly MiniJeuId[] = ['couperet', 'palet']
+export const MINI_JEUX: readonly MiniJeuId[] = ['couperet', 'palet', 'rafales']
 
 /** LE TIRAGE du mini-jeu d'un nœud : au hasard du catalogue, à la graine. */
 export function tireMiniJeu(alea: () => number): MiniJeuId {
@@ -76,11 +77,11 @@ export function tireMiniJeu(alea: () => number): MiniJeuId {
   return MINI_JEUX[i]
 }
 
-export const NOMS_MINI_JEU: Record<MiniJeuId, string> = { couperet: 'LE COUPERET', palet: 'LE PALET' }
+export const NOMS_MINI_JEU: Record<MiniJeuId, string> = { couperet: 'LE COUPERET', palet: 'LE PALET', rafales: 'LES RAFALES' }
 
 /** Ce tableau est-il un mini-jeu ? (il n'a pas de sas : il mesure) */
 export function estMiniJeu(level: { code: string; minijeu?: MiniJeuDef }): boolean {
-  return !!level.minijeu || level.code === CODE_COUPERET || level.code === CODE_PALET
+  return !!level.minijeu || level.code === CODE_COUPERET || level.code === CODE_PALET || level.code === CODE_RAFALES
 }
 
 /** LE TRAIT : une part du volume de départ, entre 35 et 70 %, arrondie au
@@ -381,5 +382,105 @@ export function tableauPalet(regles: ReglesPalet = REGLES_PALET, reglages: Parti
       { x: maison.x, y: -560, text: `3 LANCERS · LE MEILLEUR COMPTE`, tone: 'mur' },
     ],
     minijeu: { type: 'palet', regles, reglages },
+  }
+}
+
+// ---- LES RAFALES -------------------------------------------------------------
+//
+// LES RAFALES. Un couloir traversé par des courants latéraux qui soufflent
+// EN RYTHME — le rythme de la lame du couperet, en poussée : trois secondes
+// de calme, une seconde de rafale — et des éponges sur les deux bords qui
+// boivent ce que la rafale y plaque. On traverse entre deux souffles. Le
+// corps reste liquide et piloté du début à la fin : le geste est celui du
+// jeu, avancer en éjectant, avec un rythme à lire. Mesure : le volume avec
+// lequel on arrive au bout. Une seule manche — la traversée est le lancer.
+
+export interface ReglesRafales {
+  /** l'arrivée : le corps dont le centre y entre a traversé */
+  arrivee: { minX: number; minY: number; maxX: number; maxY: number }
+  /** le rythme des rafales : calme `periode − garde`, souffle `garde` */
+  rythme: RythmeCouperet
+  /** la part du volume de départ gardée : ≥ p0 intact, ≥ p1 écorné, ≥ p2 entamé, sinon vidé */
+  paliers: [number, number, number]
+}
+
+export const REGLES_RAFALES: ReglesRafales = {
+  arrivee: { minX: 1380, minY: -600, maxX: 1600, maxY: 600 },
+  rythme: { periode: 4, garde: 1 },
+  paliers: [0.9, 0.7, 0.45],
+}
+
+export interface RafalesDef {
+  type: 'rafales'
+  regles: ReglesRafales
+  reglages?: Partial<SimParams>
+}
+
+export function noteRafales(partGardee: number, paliers: ReglesRafales['paliers'], bareme: BaremeTrait = BAREME_TRAIT): NoteTrait {
+  const verdict: NoteTrait['verdict'] =
+    partGardee >= paliers[0] ? 'juste' : partGardee >= paliers[1] ? 'proche' : partGardee >= paliers[2] ? 'loin' : 'rate'
+  const facteur = verdict === 'juste' ? bareme.juste : verdict === 'proche' ? bareme.proche : verdict === 'loin' ? bareme.loin : 0
+  return { ecart: partGardee, verdict, memoire: Math.round(bareme.base * facteur) }
+}
+
+export const VERDICTS_RAFALES: Record<NoteTrait['verdict'], string> = {
+  juste: 'INTACT',
+  proche: 'ÉCORNÉ',
+  loin: 'ENTAMÉ',
+  rate: 'VIDÉ',
+}
+
+/** Le corps a-t-il traversé ? (son centre est dans l'arrivée) */
+export function arriveRafales(x: number, y: number, r: ReglesRafales = REGLES_RAFALES): boolean {
+  const a = r.arrivee
+  return x >= a.minX && x <= a.maxX && y >= a.minY && y <= a.maxY
+}
+
+/** LE COULOIR DES RAFALES : on naît à gauche ; trois tronçons sont balayés
+ *  par des courants transversaux (haut, bas, haut) qui soufflent tous en
+ *  même temps, au rythme ; sur les deux bords, des éponges boivent ce que le
+ *  souffle y plaque ; l'arrivée est à droite. Les chasses sont scénarisées
+ *  (canal négatif) : c'est le jeu qui les allume, au rythme. Pas de sas. */
+export function tableauRafales(regles: ReglesRafales = REGLES_RAFALES): LevelDef {
+  const souffle = (minX: number, maxX: number, angle: number) => ({ minX, minY: -600, maxX, maxY: 600, angle, allure: 420, canal: -1 })
+  const eponge = (minX: number, minY: number, cols: number) => ({ minX, minY, cols, rows: 2, cellSize: 24, capacityPerCell: 6 })
+  return {
+    name: 'Les rafales',
+    code: CODE_RAFALES,
+    journal:
+      `Un couloir, trois tronçons balayés par des rafales qui soufflent toutes les ${regles.rythme.periode} secondes, une seconde durant, ` +
+      `et des éponges sur les bords qui boivent ce que le souffle y plaque. Traversez entre deux souffles. ` +
+      `Ce qui compte, c'est ce qu'il vous reste à l'arrivée : intact, la mémoire triple.`,
+    par: 4,
+    bounds: { minX: -1600, minY: -600, maxX: 1600, maxY: 600 },
+    spawn: { x: -1300, y: 0, n: 900 },
+    exit: { minX: 1700, minY: -60, maxX: 1760, maxY: 60 },
+    boxes: [
+      // les repères des tronçons : un montant court à chaque frontière, haut et bas
+      { minX: -680, minY: -600, maxX: -640, maxY: -440, material: MAT_WALL, skin: 5 },
+      { minX: -680, minY: 440, maxX: -640, maxY: 600, material: MAT_WALL, skin: 5 },
+      { minX: 20, minY: -600, maxX: 60, maxY: -440, material: MAT_WALL, skin: 5 },
+      { minX: 20, minY: 440, maxX: 60, maxY: 600, material: MAT_WALL, skin: 5 },
+      { minX: 720, minY: -600, maxX: 760, maxY: -440, material: MAT_WALL, skin: 5 },
+      { minX: 720, minY: 440, maxX: 760, maxY: 600, material: MAT_WALL, skin: 5 },
+    ],
+    // les éponges : une bande sur chaque bord des trois tronçons
+    sponges: [
+      eponge(-640, 552, 28),
+      eponge(-640, -600, 28),
+      eponge(60, 552, 27),
+      eponge(60, -600, 27),
+      eponge(760, 552, 25),
+      eponge(760, -600, 25),
+    ],
+    // les rafales : haut, bas, haut — scénarisées, allumées par le jeu au rythme
+    chasses: [souffle(-640, 20, 90), souffle(60, 720, -90), souffle(760, 1380, 90)],
+    labels: [
+      { x: -1300, y: -300, text: 'LES RAFALES', tone: 'mur' },
+      { x: -1300, y: 300, text: '1 · TRAVERSEZ ENTRE DEUX SOUFFLES', tone: 'mur' },
+      { x: 390, y: 0, text: '2 · LES ÉPONGES DES BORDS BOIVENT CE QUI S’Y PLAQUE', tone: 'mur' },
+      { x: 1490, y: -300, text: 'ARRIVÉE', tone: 'mur' },
+    ],
+    minijeu: { type: 'rafales', regles },
   }
 }
