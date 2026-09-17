@@ -52,8 +52,13 @@ import {
   CHASSE_DUREE_DEFAUT,
   PORTE_ALLURE_DEFAUT,
   PORTE_SENS_DEFAUT,
+  PUITS_FORCE_DEFAUT,
+  PUITS_RAYON_DEFAUT,
   type PorteMaterialisation,
 } from '../game/level'
+import { traceTrajectoire } from '../game/trajectoire'
+import { periodeCoeur } from '../game/puits'
+import { FluidSim, KIND_PLAYER } from '../sim/solver'
 import {
   PORTE_MATERIALISATION_NOMS,
   PORTE_PIVOT_NOMS,
@@ -327,6 +332,7 @@ type Tool =
   | { kind: 'label' }
   | { kind: 'laser' }
   | { kind: 'cible' }
+  | { kind: 'puits' }
   | { kind: 'porte' }
   | { kind: 'chasse' }
   // Le MÉTA : la pastille de condensat (la monnaie de run, bue au contact)
@@ -363,6 +369,7 @@ type Sel =
   | { kind: 'label'; index: number }
   | { kind: 'laser'; index: number }
   | { kind: 'cible'; index: number }
+  | { kind: 'puits'; index: number }
   | { kind: 'porte'; index: number }
   | { kind: 'chasse'; index: number }
   | { kind: 'condensat'; index: number }
@@ -537,6 +544,8 @@ export class LevelEditor {
         prevDy: number
       }
     | { mode: 'aim'; index: number }
+    // le puits vient d'être posé : glisser règle son rayon
+    | { mode: 'rayon'; index: number }
     // un nœud de rail au bout du doigt. `trace` : le point vient d'être
     // POSÉ à l'outil Rail (le relâcher juge alors s'il compte) ; sans lui,
     // c'est un coude existant qu'on reprend, et il reste où on le laisse.
@@ -685,6 +694,7 @@ export class LevelEditor {
     this.sel = null
     this.multi = []
     this.cutWinner = null
+    this.previsionExacte = null // le tableau a changé : la ligne exacte, comme au commit
     this.persist()
     this.syncForm()
     this.majBoutonsHistoire()
@@ -715,6 +725,9 @@ export class LevelEditor {
 
   close(): void {
     this.host.classList.remove('visible')
+    // une prévision exacte en cours s'arrête (sa boucle lit ce champ) : le
+    // jeu qui démarre n'a pas à partager sa machine avec un solveur invisible
+    this.previsionExacte = null
   }
 
   /** Le menu Biome : les biomes de la carte, et le biome COURANT même s'il
@@ -984,6 +997,11 @@ export class LevelEditor {
         ? { minX: t.x - t.r, minY: t.y - t.r, maxX: t.x + t.r, maxY: t.y + t.r }
         : null
     }
+    if (s.kind === 'puits') {
+      const pu = (this.level.puits ?? [])[s.index]
+      const r = pu?.rayon ?? PUITS_RAYON_DEFAUT
+      return pu ? { minX: pu.x - r, minY: pu.y - r, maxX: pu.x + r, maxY: pu.y + r } : null
+    }
     if (s.kind === 'condensat') {
       const c = (this.level.condensats ?? [])[s.index]
       return c
@@ -1068,6 +1086,12 @@ export class LevelEditor {
       if (t) {
         t.x += dx
         t.y += dy
+      }
+    } else if (s.kind === 'puits') {
+      const pu = (this.level.puits ?? [])[s.index]
+      if (pu) {
+        pu.x += dx
+        pu.y += dy
       }
     } else if (s.kind === 'condensat') {
       const c = (this.level.condensats ?? [])[s.index]
@@ -1292,6 +1316,12 @@ export class LevelEditor {
     for (let i = cibles.length - 1; i >= 0; i--) {
       if (Math.hypot(cibles[i].x - x, cibles[i].y - y) < cibles[i].r + 8) {
         return { kind: 'cible', index: i }
+      }
+    }
+    const puits = this.level.puits ?? []
+    for (let i = puits.length - 1; i >= 0; i--) {
+      if (Math.hypot(puits[i].x - x, puits[i].y - y) < Math.max(28, 30 / this.zoom)) {
+        return { kind: 'puits', index: i }
       }
     }
     const condensats = this.level.condensats ?? []
@@ -2366,6 +2396,14 @@ export class LevelEditor {
               oy: w.y - t.y,
               start: { minX: 0, minY: 0, maxX: 0, maxY: 0 },
             }
+          } else if (hit.kind === 'puits') {
+            const pu = (this.level.puits ?? [])[hit.index]
+            this.drag = {
+              mode: 'move',
+              ox: w.x - pu.x,
+              oy: w.y - pu.y,
+              start: { minX: 0, minY: 0, maxX: 0, maxY: 0 },
+            }
           } else if (hit.kind === 'condensat') {
             const c = (this.level.condensats ?? [])[hit.index]
             this.drag = {
@@ -2711,6 +2749,15 @@ export class LevelEditor {
         this.draw()
         return
       }
+      if (this.tool.kind === 'puits') {
+        if (!this.level.puits) this.level.puits = []
+        this.level.puits.push({ x: this.snapped(w.x), y: this.snapped(w.y) })
+        const index = this.level.puits.length - 1
+        this.sel = { kind: 'puits', index }
+        this.drag = { mode: 'rayon', index } // glisser pour régler le rayon du cœur
+        this.draw()
+        return
+      }
       if (this.tool.kind === 'rail') {
         // UN RAIL NE SE SOUDE PLUS À SON VOISIN. Auparavant, presser près
         // de l'extrémité de N'IMPORTE QUEL rail prolongeait ce rail : deux
@@ -2908,6 +2955,15 @@ export class LevelEditor {
           const a = (Math.atan2(w.y - l.y, w.x - l.x) * 180) / Math.PI
           l.angle = Math.round(((a % 360) + 360) % 360)
         }
+      } else if (d.mode === 'rayon') {
+        const pu = (this.level.puits ?? [])[d.index]
+        if (pu) {
+          const r = Math.min(1200, Math.round(Math.hypot(w.x - pu.x, w.y - pu.y) / 10) * 10)
+          // les bornes de la fiche (40…1200) ; un glisser trop court, ou qui
+          // tombe sur le défaut, laisse la clé absente — la règle de la fiche
+          if (r >= 40 && r !== PUITS_RAYON_DEFAUT) pu.rayon = r
+          else delete pu.rayon
+        }
       } else if (d.mode === 'railpt') {
         const r = (this.level.rails ?? [])[d.index]
         const p = r?.points[d.point]
@@ -2990,6 +3046,10 @@ export class LevelEditor {
           const t = (this.level.cibles ?? [])[this.sel.index]
           t.x = this.snapped(w.x - d.ox)
           t.y = this.snapped(w.y - d.oy)
+        } else if (this.sel?.kind === 'puits') {
+          const pu = (this.level.puits ?? [])[this.sel.index]
+          pu.x = this.snapped(w.x - d.ox)
+          pu.y = this.snapped(w.y - d.oy)
         } else if (this.sel?.kind === 'condensat') {
           const c = (this.level.condensats ?? [])[this.sel.index]
           c.x = this.snapped(w.x - d.ox)
@@ -3132,6 +3192,11 @@ export class LevelEditor {
         this.commit(
           'Émetteur posé — glissez depuis lui pour réorienter, ou réglez l’angle à droite.',
         )
+        return
+      }
+      if (d.mode === 'rayon') {
+        this.setTool({ kind: 'select' })
+        this.commit('Puits posé — force, rayon et portée à droite. Les orbites vivent DANS le cœur ; la lisière déchire.')
         return
       }
       if (d.mode === 'rotate') {
@@ -3695,6 +3760,7 @@ export class LevelEditor {
     else if (s.kind === 'banc') delete this.level.bancMemoires
     else if (s.kind === 'marchand') delete this.level.marchand
     else if (s.kind === 'eclat') (this.level.eclats ?? []).splice(s.index, 1)
+    else if (s.kind === 'puits') (this.level.puits ?? []).splice(s.index, 1)
     else if (s.kind === 'cible') {
       // les numéros sont LOGIQUES : avant de retirer la pastille, chaque
       // survivante fige le sien — rien ne se renumérote, les portes tiennent
@@ -3974,6 +4040,10 @@ export class LevelEditor {
         x: t.x + off,
       })
       this.sel = { kind: 'cible', index: this.level.cibles!.length - 1 }
+    } else if (s.kind === 'puits') {
+      const pu = (this.level.puits ?? [])[s.index]
+      this.level.puits!.push({ ...pu, x: pu.x + off })
+      this.sel = { kind: 'puits', index: this.level.puits!.length - 1 }
     } else if (s.kind === 'condensat') {
       const c = (this.level.condensats ?? [])[s.index]
       this.level.condensats!.push({ ...c, x: c.x + off })
@@ -4071,6 +4141,7 @@ export class LevelEditor {
   private commit(hint: string): void {
     this.histoire() // un instantané si (et seulement si) le tableau a changé
     this.hint = hint
+    this.previsionExacte = null // le tableau a changé : la ligne exacte ne vaut plus
     this.persist()
     this.syncProps()
     this.validate()
@@ -4150,6 +4221,7 @@ export class LevelEditor {
         else if (key === 'label') this.setTool({ kind: 'label' })
         else if (key === 'laser') this.setTool({ kind: 'laser' })
         else if (key === 'cible') this.setTool({ kind: 'cible' })
+        else if (key === 'puits') this.setTool({ kind: 'puits' })
         else if (key === 'condensat') this.setTool({ kind: 'condensat' })
         else if (key === 'fiole') this.setTool({ kind: 'fiole' })
         else if (key.startsWith('plot:'))
@@ -4588,6 +4660,7 @@ export class LevelEditor {
       this.hooks.play(structuredClone(this.level))
     })
     this.el('ed-quit').addEventListener('click', () => this.hooks.quit())
+    this.el('ed-prevision').addEventListener('click', () => this.lancePrevisionExacte())
 
     this.el('ed-export').addEventListener('click', () => {
       const json = serializeLevel(this.level)
@@ -5576,6 +5649,12 @@ export class LevelEditor {
         numField('Y', 'p-sy', this.level.spawn.y),
       )
       rows.push(numField('Particules', 'p-sn', this.level.spawn.n, 50))
+      const imp = this.level.spawn.impulsion
+      rows.push(rangeField('Impulsion — angle (°) : 0 est, 90 nord', 'p-sia', imp?.angle ?? 0, -180, 180, 1))
+      rows.push(numField('Impulsion — vitesse (u/s, 0 : né immobile)', 'p-siv', imp?.vitesse ?? 0, 10))
+      rows.push(
+        `<p class="ed-empty">L’IMPULSION lance le corps à sa naissance, à cette direction et cette vitesse exactes — servie à la fin du plan large de l’entrée de caméra. La ligne pointillée dessine où elle mène (les puits, les parois) ; « Prévision exacte » fait courir le vrai solveur.</p>`,
+      )
     } else if (s.kind === 'laser') {
       const l = (this.level.lasers ?? [])[s.index]
       rows.push(numField('X', 'p-lax', l.x), numField('Y', 'p-lay', l.y))
@@ -5630,6 +5709,17 @@ export class LevelEditor {
       )
       rows.push(
         `<p class="ed-empty">La HAUTEUR sculpte l'ombre : haute (≥ ${LAMPE_HAUTEUR_DEFAUT}), la lampe enjambe les blocs — ombres courtes et douces ; basse (~${LAMPE_HAUTEUR_MIN}-200), elle rase le sol — ombres longues et dramatiques. Portée 0 : proportionnelle à la cuve. Au plus ${MAX_LUMIERES} lampes par tableau ; sans lampe posée, la cuve garde sa lampe par défaut. Aperçu réel : ESSAYER.</p>`,
+      )
+    } else if (s.kind === 'puits') {
+      const pu = (this.level.puits ?? [])[s.index]
+      rows.push(rangeField('Force (u/s², au bord du cœur)', 'p-puf', pu.force ?? PUITS_FORCE_DEFAUT, 50, 3000, 10))
+      rows.push(rangeField('Rayon du cœur (u)', 'p-pur', pu.rayon ?? PUITS_RAYON_DEFAUT, 40, 1200, 10))
+      rows.push(numField('Portée (u, 0 : tout le tableau)', 'p-pup', pu.portee ?? 0, 10))
+      rows.push(numField('X', 'p-pux', pu.x), numField('Y', 'p-puy', pu.y))
+      const T = periodeCoeur(pu)
+      const vc = Math.sqrt((pu.force ?? PUITS_FORCE_DEFAUT) * (pu.rayon ?? PUITS_RAYON_DEFAUT))
+      rows.push(
+        `<p class="ed-empty">UN PUITS DE GRAVITÉ attire tout ce qui est en portée — la seule force pure du solveur, celle qui fait orbiter. Dans le cœur, toute orbite a la même période : ${T.toFixed(1).replace('.', ',')} s ; vitesse circulaire au bord ${Math.round(vc)} u/s, évasion ${Math.round(vc * Math.SQRT2)} u/s. LES ORBITES VIVENT DANS LE CŒUR (à moins de 0,8 rayon) : à la lisière, le corps se déchire. Deux cœurs ne doivent pas se recouvrir.</p>`,
       )
     } else if (s.kind === 'cible') {
       const t = (this.level.cibles ?? [])[s.index]
@@ -6090,7 +6180,9 @@ export class LevelEditor {
                     ? 'Émetteur laser'
                     : s.kind === 'lumiere'
                       ? `Lampe nº ${s.index + 1}`
-                      : s.kind === 'cible'
+                      : s.kind === 'puits'
+                        ? 'Puits de gravité'
+                        : s.kind === 'cible'
                         ? `Cible nº ${canalDeCible(this.level.cibles ?? [], s.index)}`
                         : s.kind === 'condensat'
                           ? 'Pastille de condensat'
@@ -6501,6 +6593,9 @@ export class LevelEditor {
       this.level.spawn.x = val('p-sx')
       this.level.spawn.y = val('p-sy')
       this.level.spawn.n = Math.max(50, Math.min(3000, Math.round(val('p-sn'))))
+      const vitesse = Math.round(val('p-siv'))
+      if (vitesse > 0) this.level.spawn.impulsion = { angle: Math.round(val('p-sia')), vitesse }
+      else delete this.level.spawn.impulsion
     } else if (s.kind === 'laser') {
       const l = (this.level.lasers ?? [])[s.index]
       l.x = val('p-lax')
@@ -6547,6 +6642,20 @@ export class LevelEditor {
         delete l.longueur
         delete l.angle
       }
+    } else if (s.kind === 'puits') {
+      const pu = (this.level.puits ?? [])[s.index]
+      // le défaut EFFACE la clé : le fichier ne porte que ce qui diffère du code
+      const force = Math.round(val('p-puf'))
+      if (force > 0 && force !== PUITS_FORCE_DEFAUT) pu.force = force
+      else delete pu.force
+      const rayon = Math.round(val('p-pur'))
+      if (rayon > 0 && rayon !== PUITS_RAYON_DEFAUT) pu.rayon = rayon
+      else delete pu.rayon
+      const portee = Math.round(val('p-pup'))
+      if (portee > 0) pu.portee = portee
+      else delete pu.portee
+      pu.x = val('p-pux')
+      pu.y = val('p-puy')
     } else if (s.kind === 'cible') {
       const t = (this.level.cibles ?? [])[s.index]
       // le n° est LOGIQUE : il se pose sur la pastille et les portes le
@@ -6776,6 +6885,54 @@ export class LevelEditor {
       maxX: Math.max(minX, maxX),
       maxY: Math.max(minY, maxY),
     }
+  }
+
+  /** LA DURÉE de la ligne prédite dans l'éditeur (s) : douze secondes — de
+   *  quoi voir une chaîne de puits entière (les orbites : dix). */
+  static readonly PREVISION_DUREE = 12
+  /** LA PRÉVISION EXACTE : le vrai solveur, sans écran, sur ce tableau — le
+   *  corps né au départ, lancé par l'impulsion, sous les puits. Par tranches
+   *  (setTimeout), pour que l'éditeur reste vivant pendant les secondes que
+   *  cela coûte ; la ligne pleine s'écrit à vue. Effacée à toute
+   *  modification du tableau (commit). */
+  private previsionExacte: { points: { x: number; y: number }[]; t: number; enCours: boolean; jeton: number } | null = null
+  private lancePrevisionExacte(): void {
+    const P = this.hooks.params?.() ?? DEFAULT_PARAMS
+    const sp = this.level.spawn
+    const sim = new FluidSim({ ...P }, this.level.bounds, 4096)
+    sim.setLevel(this.level.boxes, this.level.sponges)
+    const fermees = (this.level.portes ?? []).map((q) => ({ minX: q.minX, minY: q.minY, maxX: q.maxX, maxY: q.maxY }))
+    if (fermees.length > 0) sim.setDoors(fermees)
+    sim.spawnDisc(sp.x, sp.y, Math.min(3000, sp.n), KIND_PLAYER)
+    if (sp.impulsion) {
+      const a = (sp.impulsion.angle * Math.PI) / 180
+      sim.lanceCorps(Math.cos(a) * sp.impulsion.vitesse, Math.sin(a) * sp.impulsion.vitesse)
+    }
+    sim.relabel()
+    const jeton = (this.previsionExacte?.jeton ?? 0) + 1
+    const pe = { points: [{ x: sim.stats.centroidX, y: sim.stats.centroidY }], t: 0, enCours: true, jeton }
+    this.previsionExacte = pe
+    const puits = this.level.puits ?? []
+    const duree = LevelEditor.PREVISION_DUREE
+    const tranche = (): void => {
+      if (this.previsionExacte !== pe) return // effacée ou relancée : on s'arrête
+      const t0 = performance.now()
+      while (pe.t < duree && performance.now() - t0 < 24) {
+        if (puits.length > 0) sim.applyPuits(puits, P.dt)
+        sim.step(P.dt)
+        pe.t += P.dt
+        if (Math.round(pe.t / P.dt) % 4 === 0) {
+          sim.updatePlayerStats()
+          pe.points.push({ x: sim.stats.centroidX, y: sim.stats.centroidY })
+        }
+        if (sim.dispersed) pe.t = duree
+      }
+      pe.enCours = pe.t < duree
+      this.draw()
+      if (pe.enCours) window.setTimeout(tranche, 0)
+    }
+    this.hint = 'La prévision exacte s’écrit : le vrai solveur court sur ce tableau.'
+    window.setTimeout(tranche, 0)
   }
 
   private validate(): void {
@@ -8022,6 +8179,138 @@ export class LevelEditor {
       g.beginPath()
       g.arc(L * 0.7, 0, Math.max(2.5, L * 0.22), 0, Math.PI * 2)
       g.fill()
+      g.restore()
+    }
+
+    // LES PUITS DE GRAVITÉ : le cœur (un anneau plein — dedans, les orbites
+    // sont sûres), la portée en pointillé, une croix, la force écrite
+    {
+      const puits = this.level.puits ?? []
+      for (let i = 0; i < puits.length; i++) {
+        const pu = puits[i]
+        const c = this.toScreen(pu.x, pu.y)
+        const R = (pu.rayon ?? PUITS_RAYON_DEFAUT) * this.zoom
+        const sel = this.sel?.kind === 'puits' && this.sel.index === i
+        g.beginPath()
+        g.arc(c.sx, c.sy, R, 0, Math.PI * 2)
+        g.fillStyle = sel ? 'rgba(180,160,255,0.14)' : 'rgba(180,160,255,0.07)'
+        g.fill()
+        g.strokeStyle = sel ? '#d2c6ff' : 'rgba(180,160,255,0.8)'
+        g.lineWidth = sel ? 2.5 : 1.5
+        g.stroke()
+        if (pu.portee) {
+          g.beginPath()
+          g.arc(c.sx, c.sy, pu.portee * this.zoom, 0, Math.PI * 2)
+          g.strokeStyle = 'rgba(180,160,255,0.35)'
+          g.setLineDash([6, 8])
+          g.lineWidth = 1
+          g.stroke()
+          g.setLineDash([])
+        }
+        g.strokeStyle = '#d2c6ff'
+        g.lineWidth = 1.5
+        g.beginPath()
+        g.moveTo(c.sx - 7, c.sy)
+        g.lineTo(c.sx + 7, c.sy)
+        g.moveTo(c.sx, c.sy - 7)
+        g.lineTo(c.sx, c.sy + 7)
+        g.stroke()
+        g.fillStyle = 'rgba(210,198,255,0.85)'
+        g.font = LevelEditor.POLICE_LABEL
+        g.fillText(`PUITS ${pu.force ?? PUITS_FORCE_DEFAUT}`, c.sx + 10, c.sy - 10)
+      }
+    }
+    // LA LIGNE PRÉDITE depuis le départ (l'impulsion, les puits, les parois,
+    // les portes fermées) — l'outil de conception : elle se recalcule à
+    // chaque réglage. Un pointillé qui pâlit avec le temps, un cercle à
+    // chaque rebond ; l'impulsion dessinée en flèche. Et la PRÉVISION EXACTE
+    // (le bouton), en trait plein, quand on l'a demandée.
+    if (this.level.spawn.impulsion || (this.level.puits?.length ?? 0) > 0) {
+      const sp = this.level.spawn
+      const imp = sp.impulsion
+      const a = ((imp?.angle ?? 0) * Math.PI) / 180
+      const v = imp?.vitesse ?? 0
+      const P = this.hooks.params?.() ?? DEFAULT_PARAMS
+      const fermees = (this.level.portes ?? []).map((q) => ({ minX: q.minX, minY: q.minY, maxX: q.maxX, maxY: q.maxY, material: 0 }))
+      // le rayon d'un corps de n particules : ≈ 105 u pour 900, en racine
+      const rayonCorps = 105 * Math.sqrt(Math.max(50, sp.n) / 900)
+      const tr = traceTrajectoire(
+        { x: sp.x, y: sp.y, vx: Math.cos(a) * v, vy: Math.sin(a) * v },
+        { bounds: this.level.bounds, boxes: [...this.level.boxes, ...fermees], puits: this.level.puits ?? [], rayonCorps, duree: LevelEditor.PREVISION_DUREE, dt: P.dt },
+      )
+      const pts = tr.points
+      g.save()
+      g.setLineDash([6, 8])
+      g.lineWidth = 1.5
+      const tronçon = Math.max(1, Math.floor(pts.length / 16))
+      for (let k = 0; k + 1 < pts.length; k += tronçon) {
+        const fin = Math.min(pts.length - 1, k + tronçon)
+        const alpha = 0.9 * (1 - (0.8 * pts[k].t) / LevelEditor.PREVISION_DUREE)
+        g.strokeStyle = `rgba(255,230,160,${alpha.toFixed(3)})`
+        g.beginPath()
+        const p0 = this.toScreen(pts[k].x, pts[k].y)
+        g.moveTo(p0.sx, p0.sy)
+        for (let j = k + 1; j <= fin; j++) {
+          const q = this.toScreen(pts[j].x, pts[j].y)
+          g.lineTo(q.sx, q.sy)
+        }
+        g.stroke()
+      }
+      g.setLineDash([])
+      for (const ev of tr.evenements) {
+        const e = this.toScreen(ev.x, ev.y)
+        g.strokeStyle = ev.type === 'colle' ? 'rgba(120,220,255,0.9)' : 'rgba(255,200,120,0.9)'
+        g.lineWidth = 1.5
+        g.beginPath()
+        g.arc(e.sx, e.sy, 5, 0, Math.PI * 2)
+        g.stroke()
+      }
+      // les secondes, tous les 2 s, pour lire le rythme
+      g.fillStyle = 'rgba(255,230,160,0.8)'
+      g.font = LevelEditor.POLICE_LABEL
+      for (const q of pts) {
+        if (q.t > 0 && Math.abs(q.t / 2 - Math.round(q.t / 2)) < 1e-3) {
+          const e = this.toScreen(q.x, q.y)
+          g.fillText(`${Math.round(q.t)} s`, e.sx + 5, e.sy - 5)
+        }
+      }
+      if (imp && v > 0) {
+        const s0 = this.toScreen(sp.x, sp.y)
+        const lg = Math.max(30, Math.min(160, v * 0.35 * this.zoom))
+        const ex = s0.sx + Math.cos(a) * lg
+        const ey = s0.sy - Math.sin(a) * lg
+        g.strokeStyle = '#ffe58a'
+        g.lineWidth = 2
+        g.beginPath()
+        g.moveTo(s0.sx, s0.sy)
+        g.lineTo(ex, ey)
+        g.stroke()
+        g.beginPath()
+        g.moveTo(ex, ey)
+        g.lineTo(ex - Math.cos(a - 0.5) * 9, ey + Math.sin(a - 0.5) * 9)
+        g.lineTo(ex - Math.cos(a + 0.5) * 9, ey + Math.sin(a + 0.5) * 9)
+        g.closePath()
+        g.fillStyle = '#ffe58a'
+        g.fill()
+        g.fillText(`${v} u/s · ${imp.angle}°`, ex + 6, ey - 6)
+      }
+      const pe = this.previsionExacte
+      if (pe && pe.points.length > 1) {
+        g.strokeStyle = pe.enCours ? 'rgba(160,255,200,0.6)' : 'rgba(160,255,200,0.95)'
+        g.lineWidth = 2.5
+        g.beginPath()
+        const p0 = this.toScreen(pe.points[0].x, pe.points[0].y)
+        g.moveTo(p0.sx, p0.sy)
+        for (let j = 1; j < pe.points.length; j++) {
+          const q = this.toScreen(pe.points[j].x, pe.points[j].y)
+          g.lineTo(q.sx, q.sy)
+        }
+        g.stroke()
+        g.fillStyle = 'rgba(160,255,200,0.9)'
+        const d = pe.points[pe.points.length - 1]
+        const e = this.toScreen(d.x, d.y)
+        g.fillText(pe.enCours ? `EXACTE… ${pe.t.toFixed(1)} s` : `EXACTE ${pe.t.toFixed(1)} s`, e.sx + 6, e.sy + 14)
+      }
       g.restore()
     }
 

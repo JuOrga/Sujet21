@@ -194,9 +194,10 @@ describe('le palet — les lancers et la maison', () => {
 
   it('le tirage au catalogue rend chaque mini-jeu, et jamais autre chose', () => {
     expect(tireMiniJeu(() => 0)).toBe('couperet')
-    expect(tireMiniJeu(() => 0.5)).toBe('palet')
-    expect(tireMiniJeu(() => 0.99)).toBe('rafales')
-    expect(tireMiniJeu(() => 1)).toBe('rafales')
+    expect(tireMiniJeu(() => 0.3)).toBe('palet')
+    expect(tireMiniJeu(() => 0.6)).toBe('rafales')
+    expect(tireMiniJeu(() => 0.99)).toBe('orbites')
+    expect(tireMiniJeu(() => 1)).toBe('orbites')
     const vus = new Set<string>()
     for (let i = 0; i < 40; i++) vus.add(tireMiniJeu(aleaDeGraine(`m${i}`)))
     expect([...vus].sort()).toEqual([...MINI_JEUX].sort())
@@ -240,5 +241,81 @@ describe('les rafales — la traversée et ce qu’il en reste', () => {
     expect(lv.spawn.x).toBeLessThan(lv.chasses![0].minX)
     expect(lv.exit.minX).toBeGreaterThan(lv.bounds.maxX)
     expect(lv.labels.filter((l) => /^[12] · /.test(l.text))).toHaveLength(2)
+  })
+})
+
+import {
+  avanceOrbites,
+  CROISSANT_ORBITES_ANGLE,
+  croissantOrbites,
+  ETAT_ORBITES_NEUF,
+  noteOrbites,
+  REGLES_ORBITES,
+  tableauOrbites,
+  VERDICTS_ORBITES,
+} from './minijeux'
+import { traceTrajectoire } from './trajectoire'
+
+describe('les orbites — trois puits, trois anneaux, un croissant', () => {
+  const r = REGLES_ORBITES
+
+  it('LA GARDE : le point-masse lancé comme le tableau le dit passe les trois anneaux dans l’ordre et finit dans la cible avant la durée', () => {
+    const lv = tableauOrbites()
+    const a = (r.depart.impulsion.angle * Math.PI) / 180
+    const tr = traceTrajectoire(
+      { x: r.depart.x, y: r.depart.y, vx: Math.cos(a) * r.depart.impulsion.vitesse, vy: Math.sin(a) * r.depart.impulsion.vitesse },
+      { bounds: lv.bounds, boxes: lv.boxes, puits: r.puits, rayonCorps: 75, duree: r.dureeMax },
+    )
+    let e = ETAT_ORBITES_NEUF
+    for (const p of tr.points) {
+      e = avanceOrbites(e, { t: p.t, x: p.x, y: p.y }, r)
+      if (e.fini) break
+    }
+    expect(e.anneauxPasses).toBe(3)
+    expect(e.fin).toBe('cible')
+    // un rebond de bord avant la cible trahirait un lancer qui sort de la salle
+    const tCible = tr.points.find((p) => Math.hypot(p.x - r.cible.x, p.y - r.cible.y) <= r.cible.r)!.t
+    expect(tr.evenements.filter((ev) => ev.type === 'bord' && ev.t < tCible)).toEqual([])
+    expect(tCible).toBeLessThan(13)
+  })
+
+  it('les anneaux se passent dans l’ordre seulement ; la cible conclut ; le temps aussi', () => {
+    let e = avanceOrbites(ETAT_ORBITES_NEUF, { t: 0, x: r.anneaux[1].x, y: r.anneaux[1].y }, r) // le deuxième avant le premier : rien
+    expect(e.anneauxPasses).toBe(0)
+    e = avanceOrbites(e, { t: 1, x: r.anneaux[0].x, y: r.anneaux[0].y }, r)
+    expect(e.anneauxPasses).toBe(1)
+    e = avanceOrbites(e, { t: 2, x: r.anneaux[0].x, y: r.anneaux[0].y }, r) // le même deux fois : une fois
+    expect(e.anneauxPasses).toBe(1)
+    e = avanceOrbites(e, { t: 3, x: r.cible.x, y: r.cible.y }, r)
+    expect(e).toEqual({ anneauxPasses: 1, fini: true, fin: 'cible' })
+    expect(avanceOrbites(e, { t: 4, x: 0, y: 0 }, r)).toBe(e)
+    expect(avanceOrbites(ETAT_ORBITES_NEUF, { t: r.dureeMax, x: 0, y: 0 }, r)).toEqual({ anneauxPasses: 0, fini: true, fin: 'temps' })
+  })
+
+  it('le verdict : la part gardée dit le palier, chaque anneau manqué en retire un, pas de croissant vaut rien', () => {
+    expect(noteOrbites(0.95, 3, 'cible', r)).toMatchObject({ verdict: 'juste', memoire: 15 })
+    expect(noteOrbites(0.95, 2, 'cible', r)).toMatchObject({ verdict: 'proche', memoire: 5 })
+    expect(noteOrbites(0.8, 2, 'cible', r)).toMatchObject({ verdict: 'loin', memoire: 3 })
+    expect(noteOrbites(0.95, 0, 'cible', r)).toMatchObject({ verdict: 'rate', memoire: 0 })
+    expect(noteOrbites(1, 3, 'temps', r)).toMatchObject({ verdict: 'rate', memoire: 0 })
+    expect(VERDICTS_ORBITES.juste).toBe('EN ORBITE')
+  })
+
+  it('la salle : trois puits en quinconce au cœur de 450 (le vrai corps déchire à 300), le départ lancé, le croissant hydrophile au rayon de la cible, ouvert vers le corps — et pas de sas', () => {
+    const lv = tableauOrbites()
+    expect(lv.minijeu?.type).toBe('orbites')
+    expect(lv.puits).toHaveLength(3)
+    expect(lv.puits!.map((p) => Math.sign(p.x))).toEqual([-1, 1, -1])
+    expect(lv.puits!.map((p) => p.rayon)).toEqual([450, 450, 450])
+    expect(lv.spawn.impulsion).toEqual(r.depart.impulsion)
+    const c = croissantOrbites(r.cible, CROISSANT_ORBITES_ANGLE)
+    expect(lv.boxes).toEqual([c])
+    expect(c.maxX - c.minX).toBe(2 * r.cible.r)
+    expect(c.minX).toBeGreaterThan(lv.bounds.minX)
+    expect(lv.exit.minX).toBeGreaterThan(lv.bounds.maxX)
+    expect(lv.labels.filter((l) => /^[123] · /.test(l.text))).toHaveLength(3)
+    // les cœurs ne se recouvrent pas
+    for (let i = 0; i < 3; i++)
+      for (let j = i + 1; j < 3; j++) expect(Math.hypot(lv.puits![i].x - lv.puits![j].x, lv.puits![i].y - lv.puits![j].y)).toBeGreaterThan(2 * lv.puits![i].rayon!)
   })
 })

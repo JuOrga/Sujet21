@@ -10,7 +10,7 @@
 // et les VALEURS VIVES (dimensions, canal, angle…), recalculées à chaque
 // survol et ajoutées après — une modification ne les perd jamais.
 
-import type { LevelDef, ObstacleBox } from '../game/level'
+import { PUITS_FORCE_DEFAUT, PUITS_RAYON_DEFAUT, type LevelDef, type ObstacleBox } from '../game/level'
 import {
   MAT_WALL,
   MAT_HYDROPHILE,
@@ -222,6 +222,15 @@ export const FICHES_GENRES: Record<string, Fiche> = {
       { cle: '·', txt: 'Son métier : allumer les pastilles réceptrices.' },
     ],
   },
+  'genre:puits': {
+    titre: 'Puits de gravité',
+    resume: 'Un point qui attire : la seule force pure du solveur, celle qui fait orbiter.',
+    lignes: [
+      { cle: '·', txt: 'Cœur harmonique : dedans, toute orbite a la même période, le corps reste entier.' },
+      { cle: '·', txt: 'Halo au-delà : la marée étire — les orbites vivent dans le cœur, la lisière déchire.' },
+      { cle: '·', txt: 'La ligne pointillée depuis le départ dit où l’impulsion mène ; « Prévision exacte » fait courir le solveur.' },
+    ],
+  },
   'genre:cible-tor': {
     titre: 'Pastille réceptrice TOR',
     resume: 'Un verrou OUVRANT : un seul passage du faisceau suffit.',
@@ -397,6 +406,8 @@ export function cleFiche(sel: SelFiche, level: LevelDef): string | null {
       return 'genre:eponge'
     case 'laser':
       return 'genre:laser'
+    case 'puits':
+      return 'genre:puits'
     case 'cible': {
       const t = (level.cibles ?? [])[sel.index ?? -1]
       return t?.mode === 'nor' ? 'genre:cible-nor' : 'genre:cible-tor'
@@ -450,8 +461,18 @@ export function lignesVives(sel: SelFiche, level: LevelDef): FicheLigne[] {
       )
       return [{ cle: '·', txt: geo.join(' · ') }]
     }
-    case 'spawn':
-      return [{ cle: '·', txt: `${level.spawn.n} particules à l’apparition.` }]
+    case 'spawn': {
+      const imp = level.spawn.impulsion
+      return [
+        { cle: '·', txt: `${level.spawn.n} particules à l’apparition.` },
+        ...(imp ? [{ cle: '·', txt: `Lancé à ${imp.vitesse} u/s, cap ${imp.angle}°.` }] : []),
+      ]
+    }
+    case 'puits': {
+      const pu = (level.puits ?? [])[sel.index ?? -1]
+      if (!pu) return []
+      return [{ cle: '·', txt: `Force ${pu.force ?? PUITS_FORCE_DEFAUT} u/s², cœur de ${pu.rayon ?? PUITS_RAYON_DEFAUT} u${pu.portee ? `, portée ${pu.portee} u` : ''}.` }]
+    }
     case 'sponge': {
       const sp = level.sponges[sel.index ?? -1]
       return sp
