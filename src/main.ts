@@ -127,6 +127,10 @@ import {
   avancePalet,
   compteAuDela,
   estMiniJeu,
+  CODE_CIBLES,
+  CODE_ORBITES,
+  CODE_PALET,
+  CODE_RAFALES,
   ETAT_ORBITES_NEUF,
   ETAT_CIBLES_NEUF,
   avanceCibles,
@@ -157,7 +161,7 @@ import {
   type Lancer,
   type NoteTrait,
 } from './game/minijeux'
-import { sansSas, tableauRonde } from './game/ronde'
+import { CODE_RONDE, sansSas, tableauRonde } from './game/ronde'
 import { dureeChuteCoeur, grainsPuits, porteeVisible, rayonNoyau } from './game/puitsDessin'
 import {
   ditEffet,
@@ -927,6 +931,16 @@ function hubJoue(): LevelDef {
 
 function hubLevel(): LevelDef {
   return libraryLevels.find((l) => l.code === 'HUB') ?? TABLEAU_HUB
+}
+
+// LES SALLES DE MINI-JEU jouées : même règle — la copie de bibliothèque qui
+// porte le code de la salle (MJ-PALET, MJ-ORBITES…), remodelée dans
+// l'éditeur et publiée, prime sur la salle du code (le concepteur, 17/09 :
+// « si je modifie ce tableau, est-ce que cela va conserver les effets même
+// si je publie ? »). Le couperet reste au code : son trait se tire à la
+// graine. Une copie sans mini-jeu (la clé effacée) se joue telle quelle.
+function salleMiniJeu(code: string, fabrique: () => LevelDef): LevelDef {
+  return libraryLevels.find((l) => l.code === code) ?? fabrique()
 }
 
 // L'Économat joué : même règle — la copie de bibliothèque (code « ECO »),
@@ -15550,10 +15564,10 @@ function ouvreNoeud(nature: Exclude<NatureNoeud, 'salle'>): void {
       // l'essence rognée comprise
       const alea = aleaDeGraine(`${carteRun.tissage || graineRun()}@minijeu${carteRun.niveau}`)
       const quel = tireMiniJeu(alea)
-      if (quel === 'palet') minijeuIntercalaire = tableauPalet()
-      else if (quel === 'rafales') minijeuIntercalaire = tableauRafales()
-      else if (quel === 'orbites') minijeuIntercalaire = tableauOrbites()
-      else if (quel === 'cibles') minijeuIntercalaire = tableauCibles()
+      if (quel === 'palet') minijeuIntercalaire = salleMiniJeu(CODE_PALET, tableauPalet)
+      else if (quel === 'rafales') minijeuIntercalaire = salleMiniJeu(CODE_RAFALES, tableauRafales)
+      else if (quel === 'orbites') minijeuIntercalaire = salleMiniJeu(CODE_ORBITES, tableauOrbites)
+      else if (quel === 'cibles') minijeuIntercalaire = salleMiniJeu(CODE_CIBLES, tableauCibles)
       else {
         const volumeL = volumeDepart(tableauCouperet(1)) * params.litersPerParticle
         minijeuIntercalaire = tableauCouperet(tireTrait(volumeL, alea))
@@ -16308,7 +16322,7 @@ function lancePaletEssai(): void {
   auHub = false
   hasPlayed = true
   document.body.classList.add('playing')
-  testLevel = tableauPalet()
+  testLevel = salleMiniJeu(CODE_PALET, tableauPalet)
   restart()
 }
 ;(window as unknown as { __palet: () => void }).__palet = lancePaletEssai
@@ -16318,7 +16332,7 @@ function lanceRafalesEssai(): void {
   auHub = false
   hasPlayed = true
   document.body.classList.add('playing')
-  testLevel = tableauRafales()
+  testLevel = salleMiniJeu(CODE_RAFALES, tableauRafales)
   restart()
 }
 ;(window as unknown as { __rafales: () => void }).__rafales = lanceRafalesEssai
@@ -16328,7 +16342,7 @@ function lanceOrbitesEssai(): void {
   auHub = false
   hasPlayed = true
   document.body.classList.add('playing')
-  testLevel = tableauOrbites()
+  testLevel = salleMiniJeu(CODE_ORBITES, tableauOrbites)
   restart()
 }
 ;(window as unknown as { __orbites: () => void }).__orbites = lanceOrbitesEssai
@@ -16339,7 +16353,7 @@ function lanceCiblesEssai(): void {
   auHub = false
   hasPlayed = true
   document.body.classList.add('playing')
-  testLevel = tableauCibles()
+  testLevel = salleMiniJeu(CODE_CIBLES, tableauCibles)
   restart()
 }
 ;(window as unknown as { __cibles: () => void }).__cibles = lanceCiblesEssai
@@ -16351,7 +16365,7 @@ function lanceRondeEssai(): void {
   auHub = false
   hasPlayed = true
   document.body.classList.add('playing')
-  testLevel = tableauRonde()
+  testLevel = salleMiniJeu(CODE_RONDE, tableauRonde)
   restart()
 }
 ;(window as unknown as { __ronde: () => void }).__ronde = lanceRondeEssai

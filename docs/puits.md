@@ -294,4 +294,10 @@ dans le jeu — ouvrir une copie », `MJ-CIBLES — Les cibles` (les autres
 mini-jeux et la ronde y sont aussi). Le mini-jeu, ses mires et ses
 réglages suivent la copie : « Essayer » joue la salle avec son chrono et
 son compte. `levelIO` relit le mini-jeu tel quel (le type du catalogue,
-ses règles) et filtre ses réglages comme ceux du tableau.
+ses règles) et filtre ses réglages comme ceux du tableau. **Publier** :
+une copie enregistrée sous le code de la salle (`MJ-CIBLES`, `MJ-PALET`,
+`MJ-ORBITES`, `MJ-RAFALES`, `DEMO-RONDE`) **prime sur la salle du code**,
+au nœud de la descente comme au pupitre — la même règle que le hub et
+l'Économat (`salleMiniJeu`, `main.ts`). Le couperet reste au code : son
+trait se tire à la graine. Effacer le mini-jeu d'une copie en fait une
+salle ordinaire, jouée telle quelle.
