@@ -31,6 +31,19 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '17/09/2026 10:50',
+    title: 'LES PUITS DE GRAVITÉ : le corps orbite, sa trajectoire s’écrit d’avance, et LES ORBITES le prouvent',
+    notes: [
+      'LA DEMANDE : « intégrer des puits de gravité permettant d’obtenir des orbites du volume autour du ou des points de gravité… être capable au démarrage du tableau de donner la vitesse et direction précise permettant d’obtenir une trajectoire prévisible… afficher en direct la trajectoire calculée, avec ou sans point de gravité et élément rencontré ». D’abord pour les mini-jeux, l’éditeur suivra.',
+      'LA PHYSIQUE : le puits est la première ACCÉLÉRATION PURE du solveur — le sas, le vortex et les chasses sont des servos de vitesse, faits pour converger, et leurs notes disaient qu’« une force pure ferait orbiter » ; ici c’est le but. Cœur harmonique (période 2π·√(rayon/force) pour toute orbite du cœur : 4,7 s aux défauts), halo képlérien au-delà, portée optionnelle en fondu ; les puits se somment ; la glace orbite par la moyenne d’icePass, la vapeur est capturée (gasDrag). PuitsDef dans les tableaux, lu, écrit et validé par levelIO.',
+      'MESURÉ ET GRAVÉ : un corps de 400 ou 900 particules en orbite DANS le cœur garde 100 % de lui-même quatre secondes durant et tient son rayon à ±1 % — la marée harmonique comprime ; AU BORD du cœur il perd 45 % — le halo étire, la lisière cisaille. D’où la règle : une orbite se pose à moins de 0,8 rayon, le halo ne sert qu’aux transferts.',
+      'L’IMPULSION DE DÉPART (spawn.impulsion : angle, vitesse) : le corps naît lancé, à une vitesse exacte. Tenue jusqu’à la fin du plan large de l’entrée de caméra — la physique tourne pendant, lancer au spawn ferait partir le corps avant qu’on le voie — et les puits attendent avec elle.',
+      'LA TRAJECTOIRE PRÉDITE (trajectoire.ts, pur, le patron du traceur laser) : un point-masse qui suit la même intégration que le corps, parois de toutes formes, bords, rayon du corps, frottement. Calibrée sur le vrai solveur : un corps NE REBONDIT PAS sur un mur neutre (1 à 2 % revient), l’hydrophobe renvoie à 0,6-0,8, l’hydrophile colle. Dessinée à chaque image en pointillé sur six secondes. Et la PRÉVISION EXACTE (touche P) : une copie du solveur avance par tranches de 6 ms par image et écrit en trait plein la vraie trajectoire sur trois secondes.',
+      'LES ORBITES, le mini-jeu : trois puits en quinconce (alignés comme au croquis, trois lancers sur huit mille enroulent les trois puits et aucun sans rebondir ; en quinconce, des centaines aux sens alternés), le corps lancé à −50° et 310 u/s, trois anneaux à passer dans l’ordre, un croissant hydrophile où finir. Laisser porter ne coûte rien, la ligne dit où ça mène ; éjecter corrige et coûte. Le lancer, les anneaux et la cible viennent d’une RECHERCHE (orbites.recherche.spec.ts), pas de la main ; deux tests de garde les tiennent, dont le vrai solveur à 900 particules qui passe le premier anneau.',
+      'VÉRIFIÉ : 1 353 tests verts dans 124 fichiers, plus l’outil de recherche, sauté hors demande (vingt-cinq tests neufs : la loi du puits, le solveur en orbite, la copie de prévision, l’aller-retour des puits et de l’impulsion, la trajectoire prédite et sa calibration, les orbites — garde du point-masse, machine des anneaux, verdict, salle — et le corps entier), type-check à 0, build propre. Injouable ici (pas de WebGL 2) : la sensation de force, la lisibilité des deux lignes et le temps réel de la prévision exacte sont à éprouver en main.',
+    ],
+  },
+  {
     date: '15/09/2026 15:41',
     title: 'L’OUVERTURE COMMENCE DEHORS : six planches d’approche, de la planète à anneau au hublot de Méduse',
     figure: '/assets/cine/approche-3.webp',

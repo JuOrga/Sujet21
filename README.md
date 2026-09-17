@@ -37,7 +37,9 @@ dehors, vides ou vitrées, qui montrent les étoiles sous le plancher. Des chass
 courants de poussée qui balaient le corps hors d'une salle. Des faisceaux laser, des
 pastilles mémoire et des portes qui forment une algèbre complète — le cabinet
 logique en fait cinq salles de démonstration sans ajouter un seul mécanisme.
-Des rails à champ qui convoient la vapeur et l'ionisent en plasma.
+Des rails à champ qui convoient la vapeur et l'ionisent en plasma. Des puits
+de gravité autour desquels le corps orbite, sa trajectoire prédite à l'écran
+([`docs/puits.md`](docs/puits.md)).
 
 **La boucle.** Le hub du laboratoire Méduse, le sas de lancement, la carte
 de la station à routes ramifiées (un module est un biome de SIX salles ;
