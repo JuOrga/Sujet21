@@ -138,3 +138,35 @@ describe('la cérémonie — la coque et ses poignées', () => {
     expect(css).toContain('prefers-reduced-motion: reduce')
   })
 })
+
+// LA CARTE DANS LA CÉRÉMONIE : le plan ne bouge pas sous le survol. Deux
+// pannes vécues, deux garde-fous — la fiche qui passait d'une à trois
+// lignes poussait la carte vers le bas (16/09) ; une ligne en nowrap plus
+// longue que la scène élargissait la colonne « 1fr » de la grille, et la
+// carte avec elle (mesuré à 1024 × 768 : 995 → 1067 px au survol d'AUCUNE
+// TRANSFO, retour au survol suivant — le « léger décalage » à chaque
+// changement de porte, 17/09). Vitest tourne sans navigateur : on garde
+// les lignes qui tiennent la mise en page, pas les pixels.
+describe('la cérémonie — la carte ne bouge pas sous le survol', () => {
+  const HTML = readFileSync(new URL('../../index.html', import.meta.url), 'utf-8')
+  const regle = (selecteur: string): string => {
+    const debut = HTML.indexOf(`\n      ${selecteur} {`)
+    expect(debut, `la règle « ${selecteur} » manque`).toBeGreaterThan(-1)
+    return HTML.slice(debut, HTML.indexOf('}', debut))
+  }
+
+  it('la fiche réserve ses trois lignes : elle ne pousse pas la carte', () => {
+    expect(regle('.mb-station-fiche')).toMatch(/min-height:\s*calc\(3 \* 1\.55em\)/)
+    expect(regle('.mb-station-fiche span')).toMatch(/white-space:\s*nowrap/)
+    expect(regle('.mb-station-fiche span')).toMatch(/text-overflow:\s*ellipsis/)
+  })
+
+  it('la fiche ne mesure pas la colonne : une ligne trop longue se coupe, la carte garde sa largeur', () => {
+    // « 1fr » vaut minmax(auto, 1fr) : le minimum « auto » lit la largeur
+    // min-content de la fiche, donc sa ligne la plus longue en nowrap.
+    // Sans « min-width: 0 », la colonne s'élargit à cette mesure à chaque
+    // survol, et la carte (100 % de la colonne) suit.
+    expect(regle('.mb-station-fiche')).toMatch(/min-width:\s*0/)
+    expect(regle('.mb-station-fiche')).toMatch(/overflow:\s*hidden/)
+  })
+})
