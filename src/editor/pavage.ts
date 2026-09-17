@@ -73,6 +73,7 @@ export const FAMILLES_MOTIF = [
   'lumieres',
   'decals',
   'puits',
+  'mires',
 ] as const
 export type FamilleMotif = (typeof FAMILLES_MOTIF)[number]
 
@@ -195,6 +196,10 @@ export function rectDe(level: LevelDef, f: FamilleMotif, i: number): Rect | null
       const pu = (level.puits ?? [])[i]
       return pt(pu, pu?.rayon ?? PUITS_RAYON_DEFAUT)
     }
+    case 'mires': {
+      const m = (level.mires ?? [])[i]
+      return pt(m, m?.r ?? 0)
+    }
     case 'condensats':
       return pt((level.condensats ?? [])[i], R_POINT)
     case 'eclats':
@@ -298,6 +303,7 @@ export const FAMILLE_DE_SORTE: Record<string, FamilleMotif> = {
   lumiere: 'lumieres',
   decal: 'decals',
   puits: 'puits',
+  mire: 'mires',
 }
 
 export const NOMS_UNIQUES: Record<string, string> = {
@@ -691,6 +697,7 @@ export function pave(
   if (motif.lasers.length > 0)
     level.lasers = ajoute(level.lasers, points(level.lasers, motif.lasers))
   if (motif.puits.length > 0) level.puits = ajoute(level.puits, points(level.puits, motif.puits))
+  if (motif.mires.length > 0) level.mires = ajoute(level.mires, points(level.mires, motif.mires))
   if (motif.condensats.length > 0)
     level.condensats = ajoute(
       level.condensats,

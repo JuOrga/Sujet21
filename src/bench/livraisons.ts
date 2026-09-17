@@ -31,6 +31,18 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '17/09/2026 17:37',
+    title: 'LES CIBLES : le tir de glace, des mires à points, et la physique qui se choisit par tableau',
+    notes: [
+      'LA DEMANDE (croquis) : la ronde couchée, le corps en glace, « envoyer des petits morceaux de glace venir toucher les cibles », des cibles à points réglables dans l’éditeur, trente secondes ; et « pour chaque tableau on doit pouvoir forcer un preset de la physique du volume ». Précisé : le corps rétrécit à chaque tir mais ne s’épuise jamais ; une touche vaut la taille de l’éclat ; les éclats restent en glace et s’agglomèrent ; la mire reste.',
+      'LE TIR DE GLACE (solver.lanceEclat, params.glaceTir / glaceTirVitesse) : en glace, le geste du dash — viser ralentit le temps, relâcher détache un ÉCLAT (les grains les plus en avant, 10 % du corps restant, jamais moins de trois, jamais en laissant moins de trois) qui file vers le doigt à 900 u/s × la puissance. L’éclat est un bloc à part, il reste glace (processCold), il n’est ni rappelé ni dispersé. Ailleurs, glaceTir vaut 0 : rien ne part.',
+      'LES MIRES (MireDef, l’outil « Mire » : poser, glisser le rayon, les points dans la fiche ; copier-coller, pavage, bulle) : solver.touchesMires compte chaque éclat libre qui en touche une et le retire ; les points vont à la taille (pointsTouche : plein pour l’éclat du premier tir, jusqu’au double pour un amas). LE MINI-JEU (minijeux.ts, « Jouer les cibles (essai) », __cibles()) : les trois puits de la ronde couchés, tout en glace, trois mires 10 · 5 · 10 sous leurs arcs (hydrophobes aux côtés, amorphe au milieu), un sol hydrophobe qui renvoie, trente secondes, paliers 60 / 30 / 10 — une hypothèse à éprouver.',
+      'LA PHYSIQUE PAR TABLEAU (LevelDef.reglages) : dans le panneau Tableau de l’éditeur, un menu des presets du banc (livrés et enregistrés) ; choisir COPIE les valeurs dans le tableau, le fichier reste autonome ; le menu retrouve le preset qui correspond ou dit « réglages propres ». createSim recouvre le banc des réglages du tableau puis du mini-jeu, et rend tout à la salle suivante. levelIO ne relit que les clés du banc et dit celles qu’il écarte. Le preset « ⚙ Tir de glace » est livré avec le banc.',
+      'TROUVER LA SALLE DANS L’ÉDITEUR (« comment trouver la salle dans l’éditeur ? ») : le menu « Modèles gravés dans le jeu » liste maintenant les salles des cinq mini-jeux et la ronde ; et le MINI-JEU SURVIT À L’ENREGISTREMENT — levelIO relit le type (du catalogue) et ses règles tels quels, filtre ses réglages, écarte et dit un type inconnu. Avant, une salle de mini-jeu ouverte dans l’éditeur redevenait une salle ordinaire. Les réglages des cibles vivent à la racine du tableau : le menu « Physique » montre « ⚙ Tir de glace ».',
+      'VÉRIFIÉ : sim/tirGlace.spec (l’éclat part en avant à la vitesse voulue et reste glace au-delà du dégel ; mi-distance, mi-puissance ; sans réglage ou pas gelé, rien ; le corps garde son plancher après des centaines de tirs ; une mire touchée retire l’éclat et rend sa taille, le corps lui-même ne compte jamais), minijeux.spec (prorata et plafond, les touches s’ajoutent, le temps conclut, le verdict, la salle), levelIO (mires, réglages, validations, le mini-jeu qui fait l’aller-retour), pressePapier et fiches ; 1 379 tests verts, type-check à 0, build propre. Injouable ici : la visée, le ralenti et le rendu sont à éprouver en main.',
+    ],
+  },
+  {
     date: '17/09/2026 16:05',
     title: 'LE PUITS SE DESSINE : plus d’anneau en jeu — une aura, un noyau, et LA CHUTE, des grains qui tombent en cadence',
     notes: [

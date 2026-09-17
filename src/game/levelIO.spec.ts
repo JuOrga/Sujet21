@@ -1,4 +1,6 @@
 import { describe, expect, it } from 'vitest'
+import { MIRE_POINTS_DEFAUT, MIRE_R_DEFAUT } from './level'
+import { tableauCibles, tableauOrbites } from './minijeux'
 import {
   checkLevel,
   decodeCode21,
@@ -1402,5 +1404,65 @@ describe('les puits de gravité et l’impulsion de départ font l’aller-retou
     // une portée plus courte que le cœur : la gravité s'éteint avant la lisière dessinée
     expect(checkLevel({ ...lv, puits: [{ x: 0, y: 0, rayon: 300, portee: 200 }] }).some((v) => v.niveau === 'avertissement' && /portée plus courte/.test(v.message))).toBe(true)
     expect(checkLevel({ ...lv, puits: [{ x: 0, y: 0, rayon: 300, portee: 900 }] }).some((v) => /portée plus courte/.test(v.message))).toBe(false)
+  })
+})
+
+describe('les mires et les réglages du tableau', () => {
+  const base = {
+    name: 'Essai mires',
+    code: '21-TEST',
+    bounds: { minX: -1000, minY: -600, maxX: 1000, maxY: 600 },
+    spawn: { x: -800, y: 0, n: 700 },
+    exit: { minX: 860, minY: -60, maxX: 940, maxY: 60 },
+    boxes: [],
+  }
+  it('une mire se relit telle quelle, un rayon ou des points absents prennent le défaut, un centre illisible est écarté et dit', () => {
+    const { level, rejets } = parseLevel({
+      ...base,
+      mires: [
+        { x: 100, y: -200, r: 90, points: 5 },
+        { x: 300, y: 0 }, // rayon et points par défaut
+        { x: 'ici', y: 0 }, // écarté
+      ],
+    })
+    expect(rejets).toEqual(['une mire a été écartée (centre illisible)'])
+    expect(level!.mires).toEqual([
+      { x: 100, y: -200, r: 90, points: 5 },
+      { x: 300, y: 0, r: MIRE_R_DEFAUT, points: MIRE_POINTS_DEFAUT },
+    ])
+    expect(parseLevel(JSON.parse(serializeLevel(level!))).level!.mires).toEqual(level!.mires)
+    expect(JSON.parse(serializeLevel(parseLevel(base).level!)).mires).toBeUndefined()
+  })
+
+  it('les réglages : seules les clés du banc, finies, sont relues ; une clé inconnue est écartée et dite ; rien ne s’écrit sans réglage', () => {
+    const { level, rejets } = parseLevel({ ...base, reglages: { glaceTir: 0.1, ejectSpeed: 2000, inconnu: 3, thawTime: 'lent' } })
+    expect(level!.reglages).toEqual({ glaceTir: 0.1, ejectSpeed: 2000 })
+    expect(rejets).toEqual(['un réglage a été écarté (inconnu : inconnu du banc ou illisible)', 'un réglage a été écarté (thawTime : inconnu du banc ou illisible)'])
+    expect(parseLevel(JSON.parse(serializeLevel(level!))).level!.reglages).toEqual(level!.reglages)
+    expect(JSON.parse(serializeLevel(parseLevel(base).level!)).reglages).toBeUndefined()
+  })
+
+  it('la validation : une mire hors cuve est une erreur ; des mires sans le tir de glace avertissent, avec lui rien', () => {
+    const lv = parseLevel({ ...base, mires: [{ x: 0, y: 0 }] }).level!
+    expect(checkLevel({ ...lv, mires: [{ x: 9000, y: 0, r: 60, points: 1 }] }).some((v) => v.niveau === 'erreur' && /mire.*hors de la cuve/.test(v.message))).toBe(true)
+    expect(checkLevel(lv).some((v) => v.niveau === 'avertissement' && /sans le tir de glace/.test(v.message))).toBe(true)
+    expect(checkLevel({ ...lv, reglages: { glaceTir: 0.1 } }).some((v) => /sans le tir de glace/.test(v.message))).toBe(false)
+  })
+})
+
+describe('un mini-jeu survit à l’enregistrement', () => {
+  it('la salle des cibles se relit avec son mini-jeu, ses mires et ses réglages ; un type inconnu est écarté et dit', () => {
+    const lv = tableauCibles()
+    const relu = parseLevel(JSON.parse(serializeLevel(lv)))
+    expect(relu.rejets).toEqual([])
+    expect(relu.level!.minijeu).toEqual(lv.minijeu)
+    expect(relu.level!.mires).toEqual(lv.mires)
+    expect(relu.level!.reglages).toEqual(lv.reglages)
+    expect(relu.level!.puits).toEqual(lv.puits)
+    const orbites = parseLevel(JSON.parse(serializeLevel(tableauOrbites())))
+    expect(orbites.level!.minijeu?.type).toBe('orbites')
+    const faux = parseLevel({ ...JSON.parse(serializeLevel(lv)), minijeu: { type: 'flipper', regles: {} } })
+    expect(faux.level!.minijeu).toBeUndefined()
+    expect(faux.rejets).toEqual(['le mini-jeu a été écarté (type inconnu)'])
   })
 })

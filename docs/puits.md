@@ -227,3 +227,50 @@ bissection. Ce qui a été mesuré :
   mesuré : vingt-cinq tours, 336 s) : le bloc repasse par (−200 ± 0,6, 0)
   à chaque tour, vitesse droite à ±7 u/s, période 13,45 s, entier, sans se
   tasser — avec la vitesse arrondie à l'entier, celle que l'éditeur écrit.
+
+## 8. Le mini-jeu « Les cibles » — le tir de glace, les mires, la physique par tableau
+
+Le concepteur (17/09, croquis) : la ronde couchée, le corps en glace, et
+« envoyer des petits morceaux de glace venir toucher les cibles ».
+
+**Le tir de glace** (`FluidSim.lanceEclat`, `params.glaceTir`) : en glace,
+le même geste que le dash de vapeur — viser ralentit le temps
+(`gasAimSlow`), relâcher DÉTACHE UN ÉCLAT : les particules les plus en
+avant dans la direction du doigt (une part `glaceTir` du corps restant,
+jamais moins de trois, jamais en laissant moins de trois au corps)
+cessent d'être au corps, sont poussées hors du rayon de liaison et
+partent à la vitesse du corps plus `glaceTirVitesse` × la puissance (la
+distance du doigt, `gasDashRange`). L'éclat est un bloc rigide à part ;
+il **reste glace** (le concepteur : « il reste en glace dans la salle »,
+`processCold` le tient), il n'est ni rappelé ni dispersé, il rebondit sur
+les bandes et s'agglomère à ses semblables. Le corps rétrécit à chaque tir
+et **ne s'épuise jamais** : les éclats rapetissent avec lui. `glaceTir`
+vaut 0 dans le jeu : ailleurs, en glace, rien ne part.
+
+**Les mires** (`MireDef`, `LevelDef.mires` ; l'outil « Mire » de
+l'éditeur : poser, glisser le rayon, les points dans la fiche) : des
+cibles à points. `FluidSim.touchesMires` compte, à chaque image, chaque
+éclat libre dont une particule est dans une mire — le bloc entier
+disparaît (un amas compte pour sa taille entière), la mire reste. Les
+points (`pointsTouche`) : ceux de la mire × la taille de l'éclat rapportée
+à l'éclat de référence (`reference` × le corps de départ, soit le premier
+tir), plafonnés au double. Trente secondes ; verdict aux paliers 60 / 30 /
+10 — une hypothèse, à éprouver en main.
+
+**La physique par tableau** (`LevelDef.reglages`) : le concepteur, « pour
+chaque tableau on doit pouvoir forcer un preset de la physique du volume ».
+Dans le panneau Tableau de l'éditeur, un menu des presets du banc (livrés
+et enregistrés) : choisir COPIE ses valeurs dans le tableau — le fichier
+reste autonome, un preset qui change ou disparaît ne le touche pas ; le
+menu retrouve le preset dont les valeurs sont celles du tableau, ou dit
+« réglages propres ». `createSim` recouvre le banc de ces réglages puis de
+ceux du mini-jeu, le temps de la salle, et rend tout à la suivante.
+`levelIO` ne relit que les clés du banc, finies, et dit celles qu'il
+écarte. Le preset « ⚙ Tir de glace » livré avec le banc porte le geste.
+
+**Trouver la salle dans l'éditeur** : panneau de droite, « Modèles gravés
+dans le jeu — ouvrir une copie », `MJ-CIBLES — Les cibles` (les autres
+mini-jeux et la ronde y sont aussi). Le mini-jeu, ses mires et ses
+réglages suivent la copie : « Essayer » joue la salle avec son chrono et
+son compte. `levelIO` relit le mini-jeu tel quel (le type du catalogue,
+ses règles) et filtre ses réglages comme ceux du tableau.

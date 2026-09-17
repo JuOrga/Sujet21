@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { aleaDeGraine } from './voie'
-import { MAT_HYDROPHILE } from './level'
+import { MAT_HYDROPHILE, MAT_HYDROPHOBE } from './level'
 import {
   BAREME_TRAIT,
   CODE_COUPERET,
@@ -194,10 +194,11 @@ describe('le palet — les lancers et la maison', () => {
 
   it('le tirage au catalogue rend chaque mini-jeu, et jamais autre chose', () => {
     expect(tireMiniJeu(() => 0)).toBe('couperet')
-    expect(tireMiniJeu(() => 0.3)).toBe('palet')
-    expect(tireMiniJeu(() => 0.6)).toBe('rafales')
-    expect(tireMiniJeu(() => 0.99)).toBe('orbites')
-    expect(tireMiniJeu(() => 1)).toBe('orbites')
+    expect(tireMiniJeu(() => 0.25)).toBe('palet')
+    expect(tireMiniJeu(() => 0.45)).toBe('rafales')
+    expect(tireMiniJeu(() => 0.65)).toBe('orbites')
+    expect(tireMiniJeu(() => 0.99)).toBe('cibles')
+    expect(tireMiniJeu(() => 1)).toBe('cibles')
     const vus = new Set<string>()
     for (let i = 0; i < 40; i++) vus.add(tireMiniJeu(aleaDeGraine(`m${i}`)))
     expect([...vus].sort()).toEqual([...MINI_JEUX].sort())
@@ -317,5 +318,71 @@ describe('les orbites — trois puits, trois anneaux, un croissant', () => {
     // les cœurs ne se recouvrent pas
     for (let i = 0; i < 3; i++)
       for (let j = i + 1; j < 3; j++) expect(Math.hypot(lv.puits![i].x - lv.puits![j].x, lv.puits![i].y - lv.puits![j].y)).toBeGreaterThan(2 * lv.puits![i].rayon!)
+  })
+})
+
+import {
+  avanceCibles,
+  ETAT_CIBLES_NEUF,
+  MIRES_CIBLES,
+  noteCibles,
+  pointsTouche,
+  REGLAGES_CIBLES,
+  REGLES_CIBLES,
+  tableauCibles,
+  VERDICTS_CIBLES,
+} from './minijeux'
+import { sansSas } from './ronde'
+
+describe('les cibles — des éclats de glace, des mires, trente secondes', () => {
+  const r = REGLES_CIBLES
+  const mires = MIRES_CIBLES
+
+  it('une touche vaut les points de la mire au prorata de la taille : le premier éclat 100 %, un amas jusqu’au double, une miette au prorata', () => {
+    // corps de départ 900, référence 10 % : un éclat de 90 vaut plein
+    expect(pointsTouche(mires[0], 90, 900, r)).toBe(10)
+    expect(pointsTouche(mires[0], 45, 900, r)).toBe(5)
+    expect(pointsTouche(mires[0], 9, 900, r)).toBe(1)
+    expect(pointsTouche(mires[0], 180, 900, r)).toBe(20)
+    expect(pointsTouche(mires[0], 900, 900, r)).toBe(20) // le plafond
+    expect(pointsTouche(mires[1], 90, 900, r)).toBe(5)
+  })
+
+  it('les touches s’ajoutent, la mire reste, le temps conclut', () => {
+    let e = avanceCibles(ETAT_CIBLES_NEUF, 1, [], mires, 900, r)
+    expect(e).toBe(ETAT_CIBLES_NEUF) // rien ne change : le même état
+    e = avanceCibles(e, 2, [{ mire: 0, taille: 90 }], mires, 900, r)
+    expect(e).toEqual({ points: 10, touches: 1, fini: false })
+    e = avanceCibles(e, 3, [{ mire: 0, taille: 90 }, { mire: 2, taille: 45 }], mires, 900, r) // la même mire, encore
+    expect(e).toEqual({ points: 25, touches: 3, fini: false })
+    e = avanceCibles(e, 4, [{ mire: 7, taille: 90 }], mires, 900, r) // une mire qui n'existe pas : rien
+    expect(e.points).toBe(25)
+    const fin = avanceCibles(e, r.duree, [{ mire: 1, taille: 90 }], mires, 900, r)
+    expect(fin).toEqual({ points: 30, touches: 4, fini: true })
+    expect(avanceCibles(fin, 40, [{ mire: 1, taille: 90 }], mires, 900, r)).toBe(fin)
+  })
+
+  it('le verdict aux paliers', () => {
+    expect(noteCibles(60, r)).toMatchObject({ verdict: 'juste', memoire: 15 })
+    expect(noteCibles(35, r)).toMatchObject({ verdict: 'proche', memoire: 5 })
+    expect(noteCibles(10, r)).toMatchObject({ verdict: 'loin', memoire: 3 })
+    expect(noteCibles(0, r)).toMatchObject({ verdict: 'rate', memoire: 0 })
+    expect(VERDICTS_CIBLES.juste).toBe('EN PLEIN')
+  })
+
+  it('la salle : la ronde couchée, toute en glace, les trois mires du croquis sous leurs arcs, le sol qui renvoie, le tir activé par ses réglages, pas de sas', () => {
+    const lv = tableauCibles()
+    expect(lv.minijeu?.type).toBe('cibles')
+    expect(lv.puits!.map((p) => p.y)).toEqual([350, 350, 350])
+    expect(lv.spawn.impulsion).toEqual(r.depart.impulsion)
+    expect(lv.mires!.map((m) => m.points)).toEqual([10, 5, 10])
+    for (const m of lv.mires!) expect(m.y).toBeLessThan(lv.puits![0].y - 350)
+    expect(lv.zones![0].force).toBe('glace')
+    expect(lv.reglages).toBe(REGLAGES_CIBLES)
+    expect(REGLAGES_CIBLES.glaceTir).toBeGreaterThan(0)
+    expect(lv.boxes.filter((b) => b.material === MAT_HYDROPHOBE).length).toBeGreaterThanOrEqual(3)
+    expect(lv.boxes.every((b) => b.maxY < lv.puits![0].y - 350)).toBe(true) // rien ne barre la ronde
+    expect(sansSas(lv)).toBe(true)
+    expect(lv.labels.filter((l) => /^[123] · /.test(l.text))).toHaveLength(3)
   })
 })

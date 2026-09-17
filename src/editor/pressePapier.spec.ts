@@ -203,3 +203,17 @@ describe('les puits de gravité se copient et se collent comme un point', () => 
     expect(lv.puits![1]).toEqual({ x: 800, y: 200, force: 800, rayon: 120 })
   })
 })
+
+describe('les mires se copient et se collent comme un point', () => {
+  it('une mire copiée est clonée avec ses points et son rayon, collée décalée, et son emprise est son cercle', () => {
+    const lv = tableau({ mires: [{ x: 300, y: 300, r: 70, points: 10 }] })
+    const { presse, ignores } = copie(lv, [{ kind: 'mire', index: 0 }])
+    expect(ignores).toEqual([])
+    expect(presse?.copies.mires).toEqual([{ x: 300, y: 300, r: 70, points: 10 }])
+    expect(presse?.copies.mires?.[0]).not.toBe(lv.mires![0])
+    expect(presse?.emprise).toEqual({ minX: 230, minY: 230, maxX: 370, maxY: 370 })
+    const { refs } = colle(lv, presse!, 500, -100)
+    expect(refs).toEqual([{ kind: 'mire', index: 1 }])
+    expect(lv.mires![1]).toEqual({ x: 800, y: 200, r: 70, points: 10 })
+  })
+})
