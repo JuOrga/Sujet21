@@ -1019,8 +1019,11 @@ let couperetLamePrec = false
 // ou valider — une fois)
 let paletEtat: EtatPalet = ETAT_PALET_NEUF
 let paletLancersVus = 0
-// LES ORBITES en cours : les anneaux passés (avanceOrbites, pur)
+// LES ORBITES en cours : les anneaux passés (avanceOrbites, pur), et
+// l'instant du lancer — l'horloge du mini-jeu part de là, pas du plan large
+// de l'entrée de caméra, que la physique traverse immobile
 let orbitesEtat: EtatOrbites = ETAT_ORBITES_NEUF
+let orbitesT0 = 0
 // LES RÉGLAGES d'un mini-jeu en cours : les valeurs du banc qu'il a
 // remplacées, pour les rendre à la salle suivante
 let reglagesRendus: Partial<SimParams> = {}
@@ -13066,7 +13069,8 @@ function majRafales(): void {
 function majOrbites(): void {
   const mj = level.minijeu
   if (!mj || mj.type !== 'orbites' || minijeuResultat || impulsionEnAttente) return
-  orbitesEtat = avanceOrbites(orbitesEtat, { t: run.tableauTime, x: sim.stats.centroidX, y: sim.stats.centroidY }, mj.regles)
+  const t = run.tableauTime - orbitesT0
+  orbitesEtat = avanceOrbites(orbitesEtat, { t, x: sim.stats.centroidX, y: sim.stats.centroidY }, mj.regles)
   if (!orbitesEtat.fini) return
   const part = sim.baseVolume > 0 ? sim.playerCount / sim.baseVolume : 0
   const note = noteOrbites(part, orbitesEtat.anneauxPasses, orbitesEtat.fin, mj.regles)
@@ -13076,7 +13080,7 @@ function majOrbites(): void {
     titre: `LES ORBITES — ${VERDICTS_ORBITES[note.verdict]}`,
     detail:
       orbitesEtat.fin === 'cible'
-        ? `${orbitesEtat.anneauxPasses} anneau${orbitesEtat.anneauxPasses > 1 ? 'x' : ''} sur ${mj.regles.anneaux.length}, ${Math.round(part * 100)} % gardés, au croissant en ${run.tableauTime.toFixed(1).replace('.', ',')} s`
+        ? `${orbitesEtat.anneauxPasses} anneau${orbitesEtat.anneauxPasses > 1 ? 'x' : ''} sur ${mj.regles.anneaux.length}, ${Math.round(part * 100)} % gardés, au croissant en ${t.toFixed(1).replace('.', ',')} s`
         : `${orbitesEtat.anneauxPasses} anneau${orbitesEtat.anneauxPasses > 1 ? 'x' : ''} sur ${mj.regles.anneaux.length}, le croissant jamais atteint en ${mj.regles.dureeMax} s`,
   }
 }
@@ -13093,17 +13097,24 @@ function majOrbites(): void {
 const PREVISION_EXACTE_DUREE = 3
 const PREVISION_BUDGET_MS = 6
 let prevision: { copie: FluidSim; points: { x: number; y: number }[]; tFait: number } | null = null
+let previsionFreezeAvant = false
+let previsionGasAvant = false
 
-/** LANCER la prévision exacte depuis l'état présent (la commande « p »,
- *  et le départ d'un mini-jeu à puits). */
+/** LANCER la prévision exacte depuis l'état présent (la commande « p »).
+ *  Pas tant que l'impulsion de départ attend : le corps n'est pas encore
+ *  lancé et les puits se taisent — la copie tomberait dans un puits que le
+ *  vrai corps ne verra pas. */
 function lancePrevisionExacte(): void {
-  if (!document.body.classList.contains('playing') || sim.dispersed || run.ended) return
+  if (!document.body.classList.contains('playing') || sim.dispersed || run.ended || impulsionEnAttente) return
   const copie = sim.copiePourPrevision()
   copie.updatePlayerStats()
   prevision = { copie, points: [{ x: copie.stats.centroidX, y: copie.stats.centroidY }], tFait: 0 }
 }
 
-/** AVANCER la prévision exacte d'une tranche, à chaque image de rendu. */
+/** AVANCER la prévision exacte d'une tranche, à chaque image de rendu.
+ *  Seuls les puits poussent la copie : ni le souffle du sas, ni les chasses,
+ *  ni le vortex — les salles à puits n'en ont pas (les orbites), et la ligne
+ *  s'écarterait dans une salle qui les mêlerait. */
 function avancePrevisionExacte(): void {
   const pv = prevision
   if (!pv || pv.tFait >= PREVISION_EXACTE_DUREE) return
@@ -13135,6 +13146,8 @@ function sertImpulsion(): void {
   impulsionEnAttente = null
   const a = (imp.angle * Math.PI) / 180
   sim.lanceCorps(Math.cos(a) * imp.vitesse, Math.sin(a) * imp.vitesse)
+  orbitesT0 = run.tableauTime
+  prevision = null // le lancer change tout : une ligne demandée avant ne vaut plus
 }
 
 /** LE PALET, à l'image : ce que le jeu observe du corps (la glace est-elle
@@ -13265,6 +13278,7 @@ function resetLasers(): void {
   paletEtat = ETAT_PALET_NEUF
   paletLancersVus = 0
   orbitesEtat = ETAT_ORBITES_NEUF
+  orbitesT0 = 0
   laserEtat.chassesActives = (level.chasses ?? []).map(() => false)
   laserEtat.chasseBouffee = (level.chasses ?? []).map(() => 0)
   lastRailTime = 0
@@ -18841,7 +18855,11 @@ function corpsImage(now: number): boolean {
   majFpsCoin(dtReal)
   updateWorldLabels(vw, vh)
   appliqueSequence() // carte et secousse de la mise en scène
-  if (input.freezeIntent || input.gasIntent) prevision = null // un changement d'état aussi
+  // un CHANGEMENT d'état efface aussi la ligne — le changement, pas l'état :
+  // la glace qui dérive a une trajectoire, et la demander en glace doit marcher
+  if (input.freezeIntent !== previsionFreezeAvant || input.gasIntent !== previsionGasAvant) prevision = null
+  previsionFreezeAvant = input.freezeIntent
+  previsionGasAvant = input.gasIntent
   avancePrevisionExacte()
   drawMecanismes(vw, vh, dpr)
   drawFantomes(vw, vh, dpr)
