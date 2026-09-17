@@ -42,7 +42,8 @@ import {
   type ZoneDef,
   type ZoneForce,
 } from './level'
-import { IMPULSION_VITESSE_MAX, PORTE_SENS_DEFAUT, PUITS_RAYON_DEFAUT, type ChasseDef, type PuitsDef } from './level'
+import { IMPULSION_VITESSE_MAX, MIRE_POINTS_DEFAUT, MIRE_R_DEFAUT, PORTE_SENS_DEFAUT, PUITS_RAYON_DEFAUT, type ChasseDef, type MireDef, type PuitsDef } from './level'
+import { DEFAULT_PARAMS, type SimParams } from '../sim/params'
 import { ARTICLES_ETAL_IDS } from './economat'
 import { ARTICLES_COMPTOIR_IDS, ROLES_ANCRE } from './hub'
 import { REPARATIONS } from './reparations'
@@ -701,6 +702,37 @@ export function parseLevel(input: unknown): {
   }
   if (puits.length > 0) level.puits = puits
 
+  // Les MIRES (cibles à points) : un centre, un rayon, des points — un
+  // centre illisible n'est pas une mire ; rayon et points ont un défaut
+  const mires: MireDef[] = []
+  for (const raw of Array.isArray(o.mires) ? o.mires : []) {
+    const q = (raw ?? {}) as Record<string, unknown>
+    const x = num(q.x, NaN)
+    const y = num(q.y, NaN)
+    if (!Number.isFinite(x) || !Number.isFinite(y)) {
+      rejets.push('une mire a été écartée (centre illisible)')
+      continue
+    }
+    mires.push({ x, y, r: Math.max(8, Math.round(num(q.r, MIRE_R_DEFAUT))), points: Math.max(1, Math.round(num(q.points, MIRE_POINTS_DEFAUT))) })
+  }
+  if (mires.length > 0) level.mires = mires
+
+  // LES RÉGLAGES du tableau : seules les clés du banc, finies, sont lues —
+  // une clé inconnue (un banc plus ancien, une faute) est écartée, et dite
+  if (o.reglages && typeof o.reglages === 'object') {
+    const src = o.reglages as Record<string, unknown>
+    const reglages: Partial<SimParams> = {}
+    let n = 0
+    for (const k of Object.keys(src)) {
+      const v = src[k]
+      if (k in DEFAULT_PARAMS && typeof v === 'number' && Number.isFinite(v)) {
+        reglages[k as keyof SimParams] = v as never
+        n++
+      } else rejets.push(`un réglage a été écarté (${k} : inconnu du banc ou illisible)`)
+    }
+    if (n > 0) level.reglages = reglages
+  }
+
   // Cachettes : des pans voilés (brouillard ou paroi factice), levés à
   // l'entrée du corps. Formes et rotation : les mêmes règles que les boîtes.
   const caches: CacheDef[] = []
@@ -1023,6 +1055,8 @@ export function serializeLevel(level: LevelDef): string {
   if (level.portes && level.portes.length > 0) out.portes = level.portes
   if (level.chasses && level.chasses.length > 0) out.chasses = level.chasses
   if (level.puits && level.puits.length > 0) out.puits = level.puits
+  if (level.mires && level.mires.length > 0) out.mires = level.mires
+  if (level.reglages && Object.keys(level.reglages).length > 0) out.reglages = level.reglages
   if (level.rails && level.rails.length > 0) out.rails = level.rails
   if (level.caches && level.caches.length > 0) out.caches = level.caches
   if (level.condensats && level.condensats.length > 0)
@@ -1215,6 +1249,16 @@ export function checkLevel(brut: LevelDef): Verdict[] {
   // LES PUITS : un centre hors cuve n'attire que le vide ; un départ au fond
   // d'un cœur sans impulsion ne sortira qu'en éjectant ; deux cœurs qui se
   // recouvrent rendent la trajectoire entre eux illisible (la lisière déchire)
+  for (const m of level.mires ?? []) {
+    if (!inBounds(m.x, m.y)) v.push({ niveau: 'erreur', message: 'Une mire est hors de la cuve.' })
+  }
+  // des mires sans le tir de glace : rien ne pourra jamais les toucher
+  if ((level.mires?.length ?? 0) > 0 && !(level.reglages?.glaceTir ?? 0) && !(level.minijeu?.reglages?.glaceTir ?? 0)) {
+    v.push({
+      niveau: 'avertissement',
+      message: 'Des mires sans le tir de glace (le réglage glaceTir, par le preset « Tir de glace ») : rien ne pourra les toucher.',
+    })
+  }
   const puits = level.puits ?? []
   for (const p of puits) {
     if (!inBounds(p.x, p.y)) v.push({ niveau: 'erreur', message: 'Un puits de gravité est hors de la cuve.' })

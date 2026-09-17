@@ -169,6 +169,14 @@ export interface SimParams {
   hydrophobeIceKick: number // vitesse d'éjection minimale du palet (u/s) — la pichenette du bumper
   hydrophileIceDrag: number // freinage du palet au contact hydrophile (1/s)
   iceSlideDrag: number // freinage de la glace EN GLISSE LIBRE (1/s) — 0 en jeu (dans le vide, une dérive reste une trajectoire) ; le mini-jeu du palet le monte pour qu'une pierre s'arrête d'elle-même
+  // LE TIR DE GLACE (le mini-jeu des cibles, 17/09) : en glace, viser
+  // ralentit le temps comme le dash de vapeur, relâcher DÉTACHE UN ÉCLAT —
+  // une part du corps restant — qui file vers le doigt ; la distance du
+  // doigt règle la puissance (gasDashRange). Le corps rétrécit à chaque
+  // tir mais ne s'épuise jamais : les éclats rapetissent avec lui. 0 :
+  // pas de tir (le jeu) ; le tableau qui le veut l'active par ses réglages.
+  glaceTir: number // la part du corps qui part à chaque tir (0 = pas de tir)
+  glaceTirVitesse: number // la vitesse de l'éclat à pleine puissance (u/s)
   hydroGasWeight: number // poids des bandes chimiques sur la vapeur (fraction de l'effet plein)
   hydroGasReach: number // portée des bandes pour la vapeur (multiple de hydroBand)
   spongeDrag: number // traînée dans une cellule absorbante (1/s)
@@ -329,6 +337,8 @@ export const DEFAULT_PARAMS: SimParams = {
   // (avec le mordant global 1.35) — le palet s'essouffle visiblement.
   hydrophileIceDrag: 1.8,
   iceSlideDrag: 0,
+  glaceTir: 0,
+  glaceTirVitesse: 900,
   // La vapeur sent les bandes en sourdine (35 % de l'effet plein) mais de
   // LOIN (2,5 × la portée) : le nuage s'infléchit comme sous une gravité
   // légère, sans jamais être happé ni claqué.

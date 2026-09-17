@@ -185,6 +185,7 @@ const POINTS = [
   'eclats',
   'decals',
   'puits',
+  'mires',
 ] as const
 
 /** Ajoute au tableau des clones NEUFS du presse-papier, décalés de (dx, dy),

@@ -37,11 +37,11 @@
 // rendus à la sortie — une glace qui rebondit comme une bille, un gel qui
 // prend vite. C'est ce qui permet d'accorder la physique au jeu sans
 // toucher au banc.
-import { MAT_HYDROPHILE, MAT_HYDROPHOBE, MAT_WALL, type ImpulsionDef, type LevelDef, type ObstacleBox, type PorteDef, type PuitsDef } from './level'
+import { MAT_HYDROPHILE, MAT_HYDROPHOBE, MAT_WALL, type ImpulsionDef, type LevelDef, type MireDef, type ObstacleBox, type PorteDef, type PuitsDef } from './level'
 import { FORME_ARC } from './formes'
 import type { SimParams } from '../sim/params'
 
-export type MiniJeuId = 'couperet' | 'palet' | 'rafales' | 'orbites'
+export type MiniJeuId = 'couperet' | 'palet' | 'rafales' | 'orbites' | 'cibles'
 
 /** LE COUPERET : ce que porte son tableau. */
 export interface CouperetDef {
@@ -63,15 +63,16 @@ export interface PaletDef {
 }
 
 /** Ce que porte un tableau de mini-jeu (LevelDef.minijeu). */
-export type MiniJeuDef = CouperetDef | PaletDef | RafalesDef | OrbitesDef
+export type MiniJeuDef = CouperetDef | PaletDef | RafalesDef | OrbitesDef | CiblesDef
 
 export const CODE_COUPERET = 'MJ-COUPERET'
 export const CODE_PALET = 'MJ-PALET'
 export const CODE_RAFALES = 'MJ-RAFALES'
 export const CODE_ORBITES = 'MJ-ORBITES'
+export const CODE_CIBLES = 'MJ-CIBLES'
 
 /** LE CATALOGUE : les mini-jeux qu'un nœud de la mini-carte peut servir. */
-export const MINI_JEUX: readonly MiniJeuId[] = ['couperet', 'palet', 'rafales', 'orbites']
+export const MINI_JEUX: readonly MiniJeuId[] = ['couperet', 'palet', 'rafales', 'orbites', 'cibles']
 
 /** LE TIRAGE du mini-jeu d'un nœud : au hasard du catalogue, à la graine. */
 export function tireMiniJeu(alea: () => number): MiniJeuId {
@@ -79,11 +80,11 @@ export function tireMiniJeu(alea: () => number): MiniJeuId {
   return MINI_JEUX[i]
 }
 
-export const NOMS_MINI_JEU: Record<MiniJeuId, string> = { couperet: 'LE COUPERET', palet: 'LE PALET', rafales: 'LES RAFALES', orbites: 'LES ORBITES' }
+export const NOMS_MINI_JEU: Record<MiniJeuId, string> = { couperet: 'LE COUPERET', palet: 'LE PALET', rafales: 'LES RAFALES', orbites: 'LES ORBITES', cibles: 'LES CIBLES' }
 
 /** Ce tableau est-il un mini-jeu ? (il n'a pas de sas : il mesure) */
 export function estMiniJeu(level: { code: string; minijeu?: MiniJeuDef }): boolean {
-  return !!level.minijeu || level.code === CODE_COUPERET || level.code === CODE_PALET || level.code === CODE_RAFALES || level.code === CODE_ORBITES
+  return !!level.minijeu || level.code === CODE_COUPERET || level.code === CODE_PALET || level.code === CODE_RAFALES || level.code === CODE_ORBITES || level.code === CODE_CIBLES
 }
 
 /** LE TRAIT : une part du volume de départ, entre 35 et 70 %, arrondie au
@@ -649,5 +650,166 @@ export function tableauOrbites(regles: ReglesOrbites = REGLES_ORBITES, angleCroi
       { x: -900, y: -60, text: '3 · FINISSEZ DANS LE CROISSANT', tone: 'mur' },
     ],
     minijeu: { type: 'orbites', regles },
+  }
+}
+
+// ---- LES CIBLES ----------------------------------------------------------------
+//
+// LES CIBLES (le concepteur, 17/09, croquis). Le corps EN GLACE tourne sans
+// fin entre trois puits (la ronde, couchée) ; en dessous, trois MIRES — des
+// cibles à points, 10 · 5 · 10 — sous des arcs qui les coiffent (hydrophobes
+// sur les côtés, amorphe au milieu) et au-dessus d'un sol hydrophobe qui
+// renvoie. LE TIR DE GLACE : viser ralentit le temps comme le dash de
+// vapeur, relâcher détache un éclat qui file vers le doigt. Une touche vaut
+// les points de la mire AU PRORATA DE LA TAILLE de ce qui touche — l'éclat
+// du premier tir vaut 100 %, un amas d'éclats agglomérés davantage,
+// jusqu'au double — ; l'éclat disparaît, la mire reste. Le corps rétrécit à
+// chaque tir et ne s'épuise jamais (les éclats rapetissent). Trente
+// secondes ; le verdict à des paliers de points. Le geste n'existe que par
+// les RÉGLAGES du tableau (glaceTir) : ailleurs, en glace, rien ne part.
+
+export interface ReglesCibles {
+  puits: PuitsDef[]
+  depart: { x: number; y: number; impulsion: ImpulsionDef }
+  /** la durée de la partie (s), à partir du lancer */
+  duree: number
+  /** la part du corps de départ que vaut un éclat de référence (= glaceTir) : une touche vaut points × taille / (part × corps de départ) */
+  reference: number
+  /** le plafond du prorata : un amas ne vaut jamais plus que ce multiple des points */
+  plafond: number
+  /** les paliers de points : juste ≥ [0], proche ≥ [1], loin ≥ [2] */
+  paliers: [number, number, number]
+}
+
+export interface CiblesDef {
+  type: 'cibles'
+  regles: ReglesCibles
+  reglages?: Partial<SimParams>
+}
+
+export interface EtatCibles {
+  points: number
+  touches: number
+  fini: boolean
+}
+export const ETAT_CIBLES_NEUF: EtatCibles = { points: 0, touches: 0, fini: false }
+
+/** UNE TOUCHE : la mire touchée et la taille (en particules) de ce qui l'a touchée. */
+export interface ToucheMire {
+  mire: number
+  taille: number
+}
+
+/** LES POINTS D'UNE TOUCHE : au prorata de la taille, plafonné. */
+export function pointsTouche(mire: MireDef, taille: number, corpsDepart: number, r: ReglesCibles): number {
+  const reference = Math.max(1, corpsDepart * r.reference)
+  return Math.round(mire.points * Math.min(r.plafond, taille / reference))
+}
+
+/** AVANCER : les touches de l'image s'ajoutent ; le temps conclut. Pur. */
+export function avanceCibles(e: EtatCibles, t: number, touches: readonly ToucheMire[], mires: readonly MireDef[], corpsDepart: number, r: ReglesCibles): EtatCibles {
+  if (e.fini) return e
+  let points = e.points
+  let n = e.touches
+  for (const tc of touches) {
+    const m = mires[tc.mire]
+    if (!m) continue
+    points += pointsTouche(m, tc.taille, corpsDepart, r)
+    n++
+  }
+  if (t >= r.duree) return { points, touches: n, fini: true }
+  return points === e.points && n === e.touches ? e : { points, touches: n, fini: false }
+}
+
+/** LE VERDICT DES CIBLES : les points aux paliers. */
+export function noteCibles(points: number, r: ReglesCibles, bareme: BaremeTrait = BAREME_TRAIT): NoteTrait {
+  const verdict: NoteTrait['verdict'] = points >= r.paliers[0] ? 'juste' : points >= r.paliers[1] ? 'proche' : points >= r.paliers[2] ? 'loin' : 'rate'
+  const facteur = verdict === 'juste' ? bareme.juste : verdict === 'proche' ? bareme.proche : verdict === 'loin' ? bareme.loin : 0
+  return { ecart: points, verdict, memoire: Math.round(bareme.base * facteur) }
+}
+
+export const VERDICTS_CIBLES: Record<NoteTrait['verdict'], string> = {
+  juste: 'EN PLEIN',
+  proche: 'TOUCHÉ',
+  loin: 'EFFLEURÉ',
+  rate: 'MANQUÉ',
+}
+
+/** LE PRESET « TIR DE GLACE » : ce que le tableau recouvre du banc — le
+ *  geste lui-même (une part de 10 % du corps par éclat, 900 u/s à pleine
+ *  puissance), et une glace qui rebondit franchement sur les bandes. */
+export const REGLAGES_CIBLES: Partial<SimParams> = {
+  glaceTir: 0.1,
+  glaceTirVitesse: 900,
+  iceRestitution: 0.8,
+  hydrophobeIceRestitution: 1.1,
+}
+
+// LA RONDE COUCHÉE : les puits de la ronde (ronde.ts : cœur 350, force 600,
+// écart 800, lancer à 200 du puits du milieu à 451 u/s — l'orbite fermée
+// tirée le 17/09), tournée d'un quart de tour pour que les trois lobes
+// s'étalent en largeur au-dessus des mires. Le plan de la salle est celui du
+// croquis : les mires en bas, chacune sous son arc, le sol qui renvoie.
+const Y_RONDE = 350
+const Y_MIRES = -650
+export const REGLES_CIBLES: ReglesCibles = {
+  puits: [
+    { x: -800, y: Y_RONDE, force: 600, rayon: 350 },
+    { x: 0, y: Y_RONDE, force: 600, rayon: 350 },
+    { x: 800, y: Y_RONDE, force: 600, rayon: 350 },
+  ],
+  depart: { x: 0, y: Y_RONDE + 200, impulsion: { angle: 0, vitesse: 451 } },
+  duree: 30,
+  reference: 0.1,
+  plafond: 2,
+  // UNE HYPOTHÈSE, à éprouver en main : le corps passe au-dessus d'une mire
+  // toutes les quatre à cinq secondes, un tir posé vaut dix — soixante
+  // points, c'est six tirs en plein en trente secondes
+  paliers: [60, 30, 10],
+}
+export const MIRES_CIBLES: MireDef[] = [
+  { x: -800, y: Y_MIRES, r: 70, points: 10 },
+  { x: 0, y: Y_MIRES, r: 110, points: 5 },
+  { x: 800, y: Y_MIRES, r: 70, points: 10 },
+]
+
+/** L'ARC qui coiffe une mire : la bande en haut, ouverte vers le bas (les
+ *  éclats n'entrent que de biais, ou par le sol qui renvoie). */
+function arcMire(m: MireDef, material: number): ObstacleBox {
+  const R = 230
+  return { minX: m.x - R, minY: m.y - R, maxX: m.x + R, maxY: m.y + R, material, forme: FORME_ARC, p0: 0.22, p1: 75, p2: 0, angle: 90 }
+}
+
+export function tableauCibles(regles: ReglesCibles = REGLES_CIBLES, mires: MireDef[] = MIRES_CIBLES): LevelDef {
+  const b = { minX: -1300, minY: -1000, maxX: 1300, maxY: 900 }
+  return {
+    name: 'Les cibles',
+    code: CODE_CIBLES,
+    journal:
+      `En glace, lancé entre trois puits : la gravité vous porte. Visez, le temps ralentit ; relâchez, un éclat part vers le doigt — plus loin le doigt, plus vite. ` +
+      `Trois cibles en bas, sous leurs arcs : une touche vaut ses points, à la taille de l'éclat. Chaque tir vous rétrécit, jamais jusqu'au bout. ` +
+      `${regles.duree} secondes : le plus de points possible.`,
+    par: 6,
+    bounds: b,
+    spawn: { x: regles.depart.x, y: regles.depart.y, n: 900, impulsion: regles.depart.impulsion },
+    exit: { minX: 1500, minY: -60, maxX: 1560, maxY: 60 },
+    boxes: [
+      arcMire(mires[0], MAT_HYDROPHOBE),
+      arcMire(mires[1], MAT_WALL),
+      arcMire(mires[2], MAT_HYDROPHOBE),
+      // le sol qui renvoie : un tir manqué remonte sous les arcs
+      { minX: b.minX, minY: b.minY, maxX: b.maxX, maxY: b.minY + 40, material: MAT_HYDROPHOBE },
+    ],
+    sponges: [],
+    zones: [{ ...b, force: 'glace', label: 'GLACE' }],
+    puits: regles.puits,
+    mires,
+    labels: [
+      { x: -1000, y: 820, text: 'LES CIBLES', tone: 'mur' },
+      { x: 1000, y: 820, text: '1 · EN GLACE : VISEZ, LE TEMPS RALENTIT — RELÂCHEZ, UN ÉCLAT PART', tone: 'mur' },
+      { x: -400, y: -880, text: '2 · TOUCHEZ LES CIBLES : LES POINTS VONT À LA TAILLE DE L’ÉCLAT', tone: 'mur' },
+      { x: 400, y: -880, text: `3 · ${regles.duree} SECONDES — CHAQUE TIR VOUS RÉTRÉCIT`, tone: 'mur' },
+    ],
+    minijeu: { type: 'cibles', regles, reglages: REGLAGES_CIBLES },
   }
 }

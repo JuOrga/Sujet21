@@ -5,6 +5,7 @@
 
 import type { SimParams } from '../sim/params'
 import { appelle } from '../game/reseau'
+import { REGLAGES_CIBLES } from '../game/minijeux'
 
 export interface Preset {
   title: string
@@ -23,6 +24,13 @@ const HIDDEN_KEY = 'tension-de-surface-presets-masques'
 // manette. savedAt vide : si un testeur enregistre un préset du même titre,
 // SA version gagne la fusion (le livré s'efface poliment).
 export const BUILTIN_PRESETS: Preset[] = [
+  {
+    title: '⚙ Tir de glace',
+    description:
+      'Le geste du mini-jeu des cibles : en glace, viser ralentit le temps et relâcher détache un ÉCLAT qui file vers le doigt (une part de 10 % du corps, 900 u/s à pleine puissance) ; la glace rebondit franc sur les bandes. Ailleurs, en glace, rien ne part : c’est le tableau qui l’active, par ses réglages.',
+    savedAt: '',
+    params: { ...REGLAGES_CIBLES },
+  },
   {
     title: '⚙ Tempo nerveux',
     description:

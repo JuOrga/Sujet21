@@ -232,6 +232,15 @@ export const FICHES_GENRES: Record<string, Fiche> = {
       { cle: '·', txt: 'En jeu : une aura, un noyau, et des grains qui tombent vers le centre — en cadence dans le cœur, à la traîne au-delà. La gravité n’a pas de sens.' },
     ],
   },
+  'genre:mire': {
+    titre: 'Mire (cible à points)',
+    resume: 'Une cible que les éclats de glace viennent toucher : ses points, au prorata de la taille de l’éclat.',
+    lignes: [
+      { cle: '·', txt: 'Une touche vaut les points de la mire × la taille de l’éclat (le premier tir vaut plein, un amas jusqu’au double).' },
+      { cle: '·', txt: 'L’éclat qui touche disparaît ; la mire reste — on peut la toucher sans fin.' },
+      { cle: '·', txt: 'Le tir n’existe que si la physique du tableau l’active : le preset « ⚙ Tir de glace ».' },
+    ],
+  },
   'genre:cible-tor': {
     titre: 'Pastille réceptrice TOR',
     resume: 'Un verrou OUVRANT : un seul passage du faisceau suffit.',
@@ -409,6 +418,8 @@ export function cleFiche(sel: SelFiche, level: LevelDef): string | null {
       return 'genre:laser'
     case 'puits':
       return 'genre:puits'
+    case 'mire':
+      return 'genre:mire'
     case 'cible': {
       const t = (level.cibles ?? [])[sel.index ?? -1]
       return t?.mode === 'nor' ? 'genre:cible-nor' : 'genre:cible-tor'
@@ -468,6 +479,11 @@ export function lignesVives(sel: SelFiche, level: LevelDef): FicheLigne[] {
         { cle: '·', txt: `${level.spawn.n} particules à l’apparition.` },
         ...(imp ? [{ cle: '·', txt: `Lancé à ${imp.vitesse} u/s, cap ${imp.angle}°.` }] : []),
       ]
+    }
+    case 'mire': {
+      const m = (level.mires ?? [])[sel.index ?? -1]
+      if (!m) return []
+      return [{ cle: '·', txt: `${m.points} point${m.points > 1 ? 's' : ''} la touche pleine, rayon ${m.r} u.` }]
     }
     case 'puits': {
       const pu = (level.puits ?? [])[sel.index ?? -1]

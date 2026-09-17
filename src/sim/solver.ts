@@ -36,6 +36,8 @@ import {
 } from '../game/level'
 
 export const KIND_FREE = 0
+/** LE PLANCHER DU TIR DE GLACE : un éclat n'a jamais moins de particules, et le corps n'en garde jamais moins. */
+export const ECLAT_MIN = 3
 export const KIND_PLAYER = 1
 // Les bits du MILIEU rendus par milieuAt (le traceur laser les lit) :
 // la glace au contact, l'eau liquide (au sens de liquidAt), la vapeur.
@@ -1800,6 +1802,128 @@ export class FluidSim {
   // pas, il est capturé (docs/puits.md). La loi vit dans game/puits.ts, la
   // même que celle du prédicteur : ce que la ligne dit est ce que le corps
   // subit.
+  // ——— LE TIR DE GLACE (le mini-jeu des cibles, 17/09) ————————————————
+  // En glace, l'éjection est stérile (rien n'élit une particule gelée) : le
+  // tir est un AUTRE geste. Le corps entier doit être gelé ; les particules
+  // les plus EN AVANT dans la direction du doigt (une part glaceTir du corps
+  // restant, jamais moins de ECLAT_MIN, jamais en laissant moins de ECLAT_MIN
+  // au corps) cessent d'être à lui, sont poussées hors du rayon de liaison
+  // et partent à la vitesse du corps plus glaceTirVitesse × puissance —
+  // la puissance suit la distance du doigt, comme le dash (gasDashRange).
+  // L'éclat est un bloc rigide à part (icePass le tient), il reste glace
+  // (processCold), il ne se disperse pas et n'est pas rappelé. Le corps
+  // rétrécit ; à ECLAT_MIN particules, il ne tire plus — mais il a fallu
+  // trois cents tirs. Rend le nombre de particules parties.
+  lanceEclat(aimX: number, aimY: number): number {
+    const p = this.params
+    if (this.dispersed || p.glaceTir <= 0) return 0
+    this.updatePlayerStats()
+    let joueur = 0
+    let geles = 0
+    for (let i = 0; i < this.count; i++) {
+      if (this.kind[i] !== KIND_PLAYER) continue
+      joueur++
+      if (this.frozen[i] === 1) geles++
+    }
+    if (joueur === 0 || geles < joueur) return 0 // pas entièrement glace : rien
+    let dx = aimX - this.stats.centroidX
+    let dy = aimY - this.stats.centroidY
+    const d = Math.hypot(dx, dy)
+    if (d < 1e-3) return 0
+    dx /= d
+    dy /= d
+    const power = Math.min(1, d / Math.max(1, p.gasDashRange))
+    let n = Math.max(ECLAT_MIN, Math.round(joueur * p.glaceTir))
+    n = Math.min(n, joueur - ECLAT_MIN)
+    if (n < 1) return 0
+    const front: { i: number; s: number }[] = []
+    for (let i = 0; i < this.count; i++) {
+      if (this.kind[i] !== KIND_PLAYER) continue
+      const rx = this.posX[i] - this.stats.centroidX
+      const ry = this.posY[i] - this.stats.centroidY
+      front.push({ i, s: rx * dx + ry * dy })
+    }
+    front.sort((a, b) => b.s - a.s)
+    // hors du rayon de liaison, sinon icePass le recolle au pas suivant
+    const recul = p.linkRadiusFactor * p.kernelRadius * 2.2
+    const vx = this.stats.velX + dx * p.glaceTirVitesse * power
+    const vy = this.stats.velY + dy * p.glaceTirVitesse * power
+    for (let k = 0; k < n; k++) {
+      const i = front[k].i
+      this.kind[i] = KIND_FREE
+      this.playerCount--
+      this.cooldown[i] = 0
+      this.posX[i] += dx * recul
+      this.posY[i] += dy * recul
+      this.prdX[i] = this.posX[i]
+      this.prdY[i] = this.posY[i]
+      this.velX[i] = vx
+      this.velY[i] = vy
+    }
+    this.iceDirty = true
+    this.updatePlayerStats()
+    return n
+  }
+
+  /** LES TOUCHES : chaque ÉCLAT LIBRE (un bloc de glace qui n'est plus le
+   *  corps) dont une particule est dans une mire touche cette mire — le
+   *  bloc entier disparaît (un amas d'éclats agglomérés compte pour sa
+   *  taille entière) et la touche est rendue : quelle mire, combien de
+   *  particules, où. Les étiquettes de blocs sont celles du dernier
+   *  icePass ; à refaire (un gel, un tir), on attend le pas suivant. */
+  touchesMires(mires: readonly { x: number; y: number; r: number }[]): { mire: number; taille: number; x: number; y: number }[] {
+    const out: { mire: number; taille: number; x: number; y: number }[] = []
+    if (mires.length === 0 || this.iceDirty || this.iceComps === 0) return out
+    const n = this.count
+    const labels = this.iceLabels
+    const blocs = this.iceComps
+    const touche = new Int32Array(blocs).fill(-1)
+    const duCorps = new Uint8Array(blocs)
+    for (let i = 0; i < n; i++) {
+      if (this.frozen[i] !== 1) continue
+      const c = labels[i]
+      if (c < 0 || c >= blocs) continue
+      if (this.kind[i] === KIND_PLAYER) {
+        duCorps[c] = 1 // un bloc qui tient encore au corps n'est pas un éclat
+        continue
+      }
+      if (touche[c] >= 0) continue
+      for (let m = 0; m < mires.length; m++) {
+        const ddx = this.posX[i] - mires[m].x
+        const ddy = this.posY[i] - mires[m].y
+        if (ddx * ddx + ddy * ddy <= mires[m].r * mires[m].r) {
+          touche[c] = m
+          break
+        }
+      }
+    }
+    const taille = new Int32Array(blocs)
+    const sx = new Float64Array(blocs)
+    const sy = new Float64Array(blocs)
+    for (let i = 0; i < n; i++) {
+      if (this.frozen[i] !== 1 || this.kind[i] === KIND_PLAYER) continue
+      const c = labels[i]
+      if (c < 0 || c >= blocs || touche[c] < 0 || duCorps[c] === 1) continue
+      taille[c]++
+      sx[c] += this.posX[i]
+      sy[c] += this.posY[i]
+    }
+    for (let c = 0; c < blocs; c++) {
+      if (touche[c] < 0 || duCorps[c] === 1 || taille[c] === 0) continue
+      out.push({ mire: touche[c], taille: taille[c], x: sx[c] / taille[c], y: sy[c] / taille[c] })
+    }
+    if (out.length === 0) return out
+    // retirer les particules des blocs touchés, de la fin vers le début
+    // (removeParticle déplace la dernière : les indices suivants tiennent)
+    for (let i = n - 1; i >= 0; i--) {
+      if (this.frozen[i] !== 1 || this.kind[i] === KIND_PLAYER) continue
+      const c = labels[i]
+      if (c < 0 || c >= blocs || touche[c] < 0 || duCorps[c] === 1) continue
+      this.removeParticle(i)
+    }
+    return out
+  }
+
   applyPuits(puits: readonly PuitsDef[], dt: number): void {
     if (puits.length === 0) return
     const acc = this.accPuits
@@ -3413,6 +3537,11 @@ export class FluidSim {
           this.frozen[i] = 1 // la vitesse est conservée
           this.iceDirty = true // la structure des amas vient de changer
         }
+      } else if (p.glaceTir > 0 && this.frozen[i] === 1 && this.kind[i] !== KIND_PLAYER) {
+        // UN ÉCLAT TIRÉ RESTE GLACE (le concepteur, 17/09 : « il reste en
+        // glace dans la salle ») : sans l'intention, qui ne vaut que pour le
+        // corps, il fondrait en thawTime — les éclats s'accumulent, rebondissent
+        // sur les bandes, s'agglomèrent, et peuvent encore toucher une mire
       } else {
         const melt =
           heat > 0
