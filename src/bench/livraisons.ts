@@ -31,6 +31,27 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '17/09/2026 21:35',
+    title: 'LES CIBLES SE SENTENT : la jauge des paliers, la touche qui grossit et sonne, la série, la fin du compteur — et les règles dans l’éditeur',
+    notes: [
+      'LA DEMANDE : « des effets satisfaisants et gamifiés quand on fait des points et à la fin du compteur — une jauge qui se remplit ; mais je ne vois pas comment lier ces effets à l’éditeur ». La réponse : les effets appartiennent au mini-jeu et se dessinent à partir des données du tableau (les points des mires, les paliers et la durée) ; ce que l’éditeur règle, ce sont les RÈGLES.',
+      'LA JAUGE DES PALIERS (au bord droit de la salle) : graduée aux trois paliers avec leur verdict, elle se remplit en glissant avec les points, change de teinte au palier atteint et pulse au palier franchi. LA TOUCHE QUI SE SENT : le « +N » grossit avec la taille de l’éclat, la mire touchée pulse, la touche sonne d’autant plus haut qu’elle vaut (audio.toucheMire), une touche pleine secoue la cuve (body.coup) et la manette. LA SÉRIE (règles pures, avanceCibles) : des touches à moins de deux secondes se multiplient, ×2 la deuxième, ×3 au plus, et s’annoncent.',
+      'LA FIN DU COMPTEUR : les dix dernières secondes, le chrono grossit, bat et tique (audio.tic) ; à zéro, un coup (audio.coupFinal, la ponctuation de fin de course, la manette), LE MONDE SE FIGE (la physique s’arrête, la visée aussi), le total se compte chiffre à chiffre en 1,6 s, le verdict se tamponne à 2 s, la carte vient à 3,4 s.',
+      'L’ÉDITEUR : le panneau « Mini-jeu : les cibles » (durée, les trois paliers) apparaît sur un tableau de cibles ; la frappe applique, la sortie du champ grave l’historique, les paliers restent décroissants ; checkLevel exige des paliers décroissants et au moins cinq secondes.',
+      'PUBLIER (« si je modifie ce tableau, est-ce que cela va conserver les effets même si je publie ? ») : les effets suivent le mini-jeu, qui survit à l’enregistrement ; et la copie de bibliothèque qui porte le code de la salle (MJ-CIBLES, MJ-PALET, MJ-ORBITES, MJ-RAFALES, DEMO-RONDE) PRIME maintenant sur la salle du code, au nœud de la descente comme au pupitre — la règle du hub et de l’Économat (salleMiniJeu). Avant, la run construisait toujours la salle depuis le code : une copie publiée n’était jamais jouée. Le couperet reste au code, son trait se tire à la graine.',
+      'VÉRIFIÉ : minijeux.spec (la série : ×2, ×3 plafonné, remise à un après le délai, le multiplicateur), levelIO.spec (les validations des règles) ; type-check à 0, build propre. Injouable ici : la jauge, les sons, la secousse et le bilan sont à regarder en main — les durées du bilan (1,6 / 2 / 3,4 s) sont des nombres à tourner.',
+    ],
+  },
+  {
+    date: '17/09/2026 18:40',
+    title: 'LES CIBLES : le tir deux fois plus fort — 1 800 u/s, mesuré sans traversée',
+    notes: [
+      'LA DEMANDE : « il faudrait pouvoir tirer plus fort dans le mini-jeu ». La vitesse de l’éclat à pleine puissance passe de 900 à 1 800 u/s (REGLAGES_CIBLES, et le preset « ⚙ Tir de glace » du banc).',
+      'MESURÉ D’ABORD : la limite connue des projectiles rapides est la traversée des parois minces (l’éjection à 1 800 est le plafond mesuré au mur mince). Un éclat de glace tiré droit sur un sol de 40 u, neutre ou hydrophobe, ne le traverse à aucune vitesse jusqu’à 2 600 u/s — le bloc rigide tient mieux qu’une goutte. Un test de garde le tient à la vitesse du mini-jeu.',
+      'VÉRIFIÉ : tirGlace.spec (cinq tests), type-check à 0, build propre. La puissance suit toujours la distance du doigt (gasDashRange, 380 u) : à mi-distance, 900 u/s.',
+    ],
+  },
+  {
     date: '17/09/2026 17:37',
     title: 'LES CIBLES : le tir de glace, des mires à points, et la physique qui se choisit par tableau',
     notes: [

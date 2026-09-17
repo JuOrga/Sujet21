@@ -4473,6 +4473,31 @@ export class LevelEditor {
     }
     this.el('ed-exige-glace').addEventListener('change', litExige)
     this.el('ed-exige-vapeur').addEventListener('change', litExige)
+    // LES RÈGLES DU MINI-JEU DES CIBLES (le concepteur, 17/09 : la durée et
+    // les paliers sont à lui, pas au code) : la frappe applique, la sortie
+    // du champ grave l'historique ; les paliers restent décroissants
+    const litMiniJeu = (): void => {
+      const mj = this.level.minijeu
+      if (!mj || mj.type !== 'cibles') return
+      const lit = (id: string, defaut: number): number => {
+        const v = Math.round(Number((this.el(id) as HTMLInputElement).value))
+        return Number.isFinite(v) && v > 0 ? v : defaut
+      }
+      mj.regles.duree = Math.max(5, lit('ed-mj-duree', mj.regles.duree))
+      const p1 = lit('ed-mj-p1', mj.regles.paliers[0])
+      const p2 = Math.min(p1, lit('ed-mj-p2', mj.regles.paliers[1]))
+      const p3 = Math.min(p2, lit('ed-mj-p3', mj.regles.paliers[2]))
+      mj.regles.paliers = [p1, p2, p3]
+      this.persist()
+      this.validate()
+    }
+    for (const id of ['ed-mj-duree', 'ed-mj-p1', 'ed-mj-p2', 'ed-mj-p3']) {
+      this.el(id).addEventListener('input', litMiniJeu)
+      this.el(id).addEventListener('change', () => {
+        this.syncMiniJeu()
+        this.histoire()
+      })
+    }
     // Lumière générale : champ optionnel — vide, le tableau garde le niveau
     // historique (52 %). La frappe applique tout de suite (le banc d'essai
     // montre la pénombre en direct), la sortie du champ grave l'historique.
@@ -5299,6 +5324,19 @@ export class LevelEditor {
     sel.value = courant
   }
 
+  /** Le panneau du mini-jeu : visible sur un tableau de cibles, et à jour. */
+  private syncMiniJeu(): void {
+    const mj = this.level.minijeu
+    const host = this.el('ed-minijeu')
+    const cibles = !!mj && mj.type === 'cibles'
+    host.hidden = !cibles
+    if (!cibles) return
+    ;(this.el('ed-mj-duree') as HTMLInputElement).value = String(mj.regles.duree)
+    ;(this.el('ed-mj-p1') as HTMLInputElement).value = String(mj.regles.paliers[0])
+    ;(this.el('ed-mj-p2') as HTMLInputElement).value = String(mj.regles.paliers[1])
+    ;(this.el('ed-mj-p3') as HTMLInputElement).value = String(mj.regles.paliers[2])
+  }
+
   private syncForm(): void {
     ;(this.el('ed-name') as HTMLInputElement).value = this.level.name
     ;(this.el('ed-code') as HTMLInputElement).value = this.level.code
@@ -5319,6 +5357,7 @@ export class LevelEditor {
     ;(this.el('ed-dashs') as HTMLInputElement).value =
       this.level.dashBudget === undefined ? '' : String(this.level.dashBudget)
     this.syncPreset()
+    this.syncMiniJeu()
     ;(this.el('ed-etats') as HTMLSelectElement).value =
       this.level.etats === 'libres' ? 'libres' : 'cycle'
     ;(this.el('ed-exige-glace') as HTMLInputElement).checked =
