@@ -31,6 +31,15 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '17/09/2026 18:40',
+    title: 'LES CIBLES : le tir deux fois plus fort — 1 800 u/s, mesuré sans traversée',
+    notes: [
+      'LA DEMANDE : « il faudrait pouvoir tirer plus fort dans le mini-jeu ». La vitesse de l’éclat à pleine puissance passe de 900 à 1 800 u/s (REGLAGES_CIBLES, et le preset « ⚙ Tir de glace » du banc).',
+      'MESURÉ D’ABORD : la limite connue des projectiles rapides est la traversée des parois minces (l’éjection à 1 800 est le plafond mesuré au mur mince). Un éclat de glace tiré droit sur un sol de 40 u, neutre ou hydrophobe, ne le traverse à aucune vitesse jusqu’à 2 600 u/s — le bloc rigide tient mieux qu’une goutte. Un test de garde le tient à la vitesse du mini-jeu.',
+      'VÉRIFIÉ : tirGlace.spec (cinq tests), type-check à 0, build propre. La puissance suit toujours la distance du doigt (gasDashRange, 380 u) : à mi-distance, 900 u/s.',
+    ],
+  },
+  {
     date: '17/09/2026 17:37',
     title: 'LES CIBLES : le tir de glace, des mires à points, et la physique qui se choisit par tableau',
     notes: [

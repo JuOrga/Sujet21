@@ -736,11 +736,13 @@ export const VERDICTS_CIBLES: Record<NoteTrait['verdict'], string> = {
 }
 
 /** LE PRESET « TIR DE GLACE » : ce que le tableau recouvre du banc — le
- *  geste lui-même (une part de 10 % du corps par éclat, 900 u/s à pleine
- *  puissance), et une glace qui rebondit franchement sur les bandes. */
+ *  geste lui-même (une part de 10 % du corps par éclat, 1 800 u/s à pleine
+ *  puissance : « il faudrait pouvoir tirer plus fort », le concepteur, 17/09 —
+ *  mesuré : un éclat ne traverse pas un sol de 40 u jusqu'à 2 600 u/s), et
+ *  une glace qui rebondit franchement sur les bandes. */
 export const REGLAGES_CIBLES: Partial<SimParams> = {
   glaceTir: 0.1,
-  glaceTirVitesse: 900,
+  glaceTirVitesse: 1800,
   iceRestitution: 0.8,
   hydrophobeIceRestitution: 1.1,
 }

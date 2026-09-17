@@ -266,7 +266,10 @@ menu retrouve le preset dont les valeurs sont celles du tableau, ou dit
 « réglages propres ». `createSim` recouvre le banc de ces réglages puis de
 ceux du mini-jeu, le temps de la salle, et rend tout à la suivante.
 `levelIO` ne relit que les clés du banc, finies, et dit celles qu'il
-écarte. Le preset « ⚙ Tir de glace » livré avec le banc porte le geste.
+écarte. Le preset « ⚙ Tir de glace » livré avec le banc porte le geste :
+1 800 u/s à pleine puissance (« il faudrait pouvoir tirer plus fort », le
+concepteur ; mesuré sur le solveur : un éclat ne traverse pas un sol de
+40 u jusqu'à 2 600 u/s, neutre ou hydrophobe — `tirGlace.spec`).
 
 **Trouver la salle dans l'éditeur** : panneau de droite, « Modèles gravés
 dans le jeu — ouvrir une copie », `MJ-CIBLES — Les cibles` (les autres
