@@ -115,6 +115,12 @@ describe('voie — le plan de descente', () => {
 
   it('le clamp ramène tout plan dans les bornes — et les défauts comblent', () => {
     expect(clampPlanVoie(null)).toEqual(PLAN_VOIE_DEFAUTS)
+    // les réglages des voies et des rencontres se bornent : une part au-delà
+    // de 60 % ferait d'un module une lecture, pas un jeu
+    const v = clampPlanVoie({ partEvenement: 95, rangMinEvenement: -2, bifurcation: 140 })
+    expect([v.partEvenement, v.rangMinEvenement, v.bifurcation]).toEqual([60, 0, 100])
+    // un plan d'avant ces réglages les reçoit à leur défaut
+    expect(clampPlanVoie({ longueur: 12 }).partEvenement).toBe(PLAN_VOIE_DEFAUTS.partEvenement)
     expect(clampPlanVoie({ longueur: 999, diffMax: -4 })).toEqual({
       ...PLAN_VOIE_DEFAUTS,
       longueur: 40,
@@ -138,6 +144,16 @@ describe('voie — le plan de descente', () => {
     expect(ancien.respiration).toBe(3)
     expect(ancien.finale).toBe(60)
     expect(ancien.rangsSansDanger).toBe(2)
+    // ce que pèse une route : les défauts sont les anciennes constantes
+    expect(ancien.halteReserveCl).toBe(50)
+    expect(ancien.halteCondensatCl).toBe(40)
+    expect(ancien.essencePlancher).toBe(40)
+    expect(ancien.memoireParCran).toBe(100)
+    // et leurs bornes : jamais un plancher qui interdit tout sacrifice, ni sous 10 %
+    const borne = clampPlanVoie({ essencePlancher: 100, memoireParCran: 999, halteReserveCl: -5 } as Partial<PlanVoie>)
+    expect(borne.essencePlancher).toBe(90)
+    expect(borne.memoireParCran).toBe(300)
+    expect(borne.halteReserveCl).toBe(0)
     expect(ancien.cadenceLaby).toBe(2)
     expect(ancien.cadenceContraste).toBe(2)
     expect(ancien.figuresDebut).toBe(1)

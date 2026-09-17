@@ -45,6 +45,12 @@ export interface PlanVoie {
    * d'épreuve du générateur, et la façon de jouer une descente inédite
    * quand la bibliothèque est déjà connue par cœur. */
   ecrites: boolean
+  /** GÉNÉRER SI LE POOL MANQUE — ne vaut que générées coupées. Chaque
+   * porte salle de la mini-carte pioche alors un tableau écrit DE LA
+   * MÉCANIQUE DE SON NŒUD. S'il n'y en a aucun : actif, la porte se génère
+   * (et le manque se note pour le concepteur) ; coupé, elle pioche un
+   * tableau d'une autre mécanique, et ne se génère que le pool à sec. */
+  genereSiManque: boolean
   // ---- LA FORME DE LA RAMPE ----------------------------------------------
   // Ces cinq réglages étaient des nombres écrits dans le code de diffAuRang
   // et reglageAuRang. Ce ne sont pas des détails d'implémentation : ce sont
@@ -68,6 +74,47 @@ export interface PlanVoie {
   figuresDebut: number
   /** combien des trois cartes sont des FIGURES dès le milieu */
   figuresSuite: number
+  // ---- LES VOIES ET LES RENCONTRES (voiesModule.ts) ----------------------
+  // Le concepteur a trouvé « trop de points d'interrogation » dans la
+  // mini-carte (revue du 16/09) : la part des rencontres était un nombre
+  // écrit dans le code. Ce sont des décisions de rythme, elles se règlent
+  // ici, au banc, comme la rampe.
+  /** la part de nœuds RENCONTRE passé le premier rang, en pourcents — 0 : aucune */
+  partEvenement: number
+  /** le premier rang d'un module où une rencontre peut se poser (0 : dès l'entrée) */
+  rangMinEvenement: number
+  /** la chance qu'une voie bifurque aussi vers une voisine, en pourcents — 0 : voies parallèles */
+  bifurcation: number
+  /** LES HALTES PAR MODULE — l'économat, l'alcôve, la bonbonne oubliée,
+   *  posés en nœuds de la mini-carte (la cache, elle, vient de l'orbe du
+   *  module sur la carte). 0 : aucune. */
+  economatsParModule: number
+  reposParModule: number
+  donsParModule: number
+  // ---- CE QUE PÈSE UNE ROUTE ---------------------------------------------
+  // Trois nombres qui règlent l'équilibre risque · récompense d'une route,
+  // et qui étaient écrits dans le code (routes.md §4.3, « ce qui devrait
+  // rejoindre le banc ») : ils se trouvent en jouant, pas en lisant.
+  /** ce qu'une halte rend en bonbonne, en centilitres (l'alcôve, la bonbonne oubliée) */
+  halteReserveCl: number
+  /** ce qu'une halte rend en condensat, en centilitres */
+  halteCondensatCl: number
+  /** L'ESSENCE NE TOMBE JAMAIS SOUS CE PLANCHER, en pourcents du plein :
+   *  un sacrifice de trop transformerait la run en impasse */
+  essencePlancher: number
+  /** LA PRIME DE MÉMOIRE PAR CRAN, en pourcents : la mémoire du sas se
+   *  multiplie par 1 + cran × prime — 100 : ×2 au cran 1, ×3 au cran 2 */
+  memoireParCran: number
+  /** LA PART DU BIOME au tissage, en pourcents : la chance qu'une voie
+   *  prenne la mécanique favorite de son biome (la glace en cryo, la
+   *  vapeur en chaud) — jamais les trois voies d'un rang ; 0 : le biome
+   *  ne pèse pas */
+  partBiome: number
+  /** LA PART DES RANGS À PRIME, en pourcents : la chance qu'un rang de la
+   *  mini-carte porte une salle scellée (plus dure d'un cran, qui paie plus
+   *  au sas : mémoire ×2, condensat ×2 ou tirage garanti) — une par rang au
+   *  plus ; 0 : aucune */
+  partPrime: number
   // ---- L'ALGORITHME DE PIOCHE --------------------------------------------
   /** les quatre poids de l'écart au cahier (cf. poule.ts) */
   poids: PoidsPioche
@@ -79,6 +126,7 @@ export const PLAN_VOIE_DEFAUTS: PlanVoie = {
   graineDuJour: false,
   generees: true,
   ecrites: true,
+  genereSiManque: true,
   sommetRecul: 1,
   respiration: 3,
   finale: 60,
@@ -87,6 +135,18 @@ export const PLAN_VOIE_DEFAUTS: PlanVoie = {
   cadenceContraste: 2,
   figuresDebut: 1,
   figuresSuite: 2,
+  partEvenement: 20,
+  rangMinEvenement: 1,
+  bifurcation: 45,
+  economatsParModule: 1,
+  reposParModule: 1,
+  donsParModule: 0,
+  halteReserveCl: 50,
+  halteCondensatCl: 40,
+  essencePlancher: 40,
+  memoireParCran: 100,
+  partBiome: 50,
+  partPrime: 15,
   poids: { ...POIDS_PIOCHE_DEFAUTS },
 }
 
@@ -115,6 +175,8 @@ export function clampPlanVoie(p: Partial<PlanVoie> | null): PlanVoie {
     generees: p?.generees !== false,
     // idem pour les tableaux écrits : un plan d'avant ce réglage les garde
     ecrites: p?.ecrites !== false,
+    // et pour la porte générée faute de tableau : l'ordinaire, générer
+    genereSiManque: p?.genereSiManque !== false,
     // LES RÉGLAGES DE RAMPE SONT NÉS APRÈS le stockage : un plan enregistré
     // avant eux n'en porte aucun, et doit retrouver EXACTEMENT la descente
     // qu'il décrivait — d'où des défauts qui sont les anciennes constantes.
@@ -137,6 +199,23 @@ export function clampPlanVoie(p: Partial<PlanVoie> | null): PlanVoie {
     // au plus trois : le choix ne porte que trois cartes générées
     figuresDebut: entier(p?.figuresDebut, PLAN_VOIE_DEFAUTS.figuresDebut, 0, 3),
     figuresSuite: entier(p?.figuresSuite, PLAN_VOIE_DEFAUTS.figuresSuite, 0, 3),
+    // au plus 60 % : au-delà, un module ne se joue plus, il se lit
+    partEvenement: entier(p?.partEvenement, PLAN_VOIE_DEFAUTS.partEvenement, 0, 60),
+    rangMinEvenement: entier(p?.rangMinEvenement, PLAN_VOIE_DEFAUTS.rangMinEvenement, 0, 5),
+    bifurcation: entier(p?.bifurcation, PLAN_VOIE_DEFAUTS.bifurcation, 0, 100),
+    economatsParModule: entier(p?.economatsParModule, PLAN_VOIE_DEFAUTS.economatsParModule, 0, 2),
+    reposParModule: entier(p?.reposParModule, PLAN_VOIE_DEFAUTS.reposParModule, 0, 2),
+    donsParModule: entier(p?.donsParModule, PLAN_VOIE_DEFAUTS.donsParModule, 0, 2),
+    // les défauts sont les anciennes constantes : un plan d'avant ces
+    // curseurs retrouve exactement la route qu'il décrivait
+    halteReserveCl: entier(p?.halteReserveCl, PLAN_VOIE_DEFAUTS.halteReserveCl, 0, 300),
+    halteCondensatCl: entier(p?.halteCondensatCl, PLAN_VOIE_DEFAUTS.halteCondensatCl, 0, 200),
+    // jamais sous 10 % (le corps ne tiendrait plus une salle) ni à 100 % (plus de sacrifice possible)
+    essencePlancher: entier(p?.essencePlancher, PLAN_VOIE_DEFAUTS.essencePlancher, 10, 90),
+    memoireParCran: entier(p?.memoireParCran, PLAN_VOIE_DEFAUTS.memoireParCran, 0, 300),
+    partBiome: entier(p?.partBiome, PLAN_VOIE_DEFAUTS.partBiome, 0, 100),
+    // au plus 40 % : au-delà, la prime n'est plus un choix, c'est la règle
+    partPrime: entier(p?.partPrime, PLAN_VOIE_DEFAUTS.partPrime, 0, 40),
     poids: clampPoidsPioche(p?.poids ?? null),
   }
 }

@@ -20,15 +20,21 @@
 // transformation non tissée » — appliquée aux coursives.
 
 import {
+  cheminLePlusCourt,
+  estHalte,
   liensDepuis,
   moduleParId,
+  moduleRevele,
   orbeRequis,
   plusCourtVers,
+  REVELATIONS,
   type CarteStation,
   type LienCarte,
   type ModuleCarte,
+  type TypeModule,
 } from './carteStation'
 import { TRANSFOS_CYCLE, transfoTenue } from './cycle'
+import type { OptionsGen } from './generateur'
 
 /** Où en est la run sur la carte. */
 export interface EtatCarteRun {
@@ -38,14 +44,89 @@ export interface EtatCarteRun {
   niveau: number
   /** les modules traversés, dans l'ordre */
   visites: string[]
+  /** LES RÉVÉLATIONS : la nature tirée pour chaque module « ? » entré —
+   *  par id. Écrite dans la sauvegarde : un « ? » révélé ne se retire pas. */
+  revelations: Record<string, TypeModule>
+  /** LA MINI-CARTE À VOIES du module (voiesModule.ts) : la graine de son
+   *  tissage — vide : pas de voies (un outil, une carte d'avant) — et la
+   *  voie ouverte à chaque salle, dans l'ordre. */
+  tissage: string
+  trace: number[]
+  /** LA GRAINE DE LA RUN : celle dont dérive le tissage de CHAQUE module
+   *  (`graine@module`), tirée au départ — la descente du jour donne la
+   *  date. C'est ce qui permet de tisser un module AVANT d'y entrer, pour
+   *  dire au survol ce qu'on y trouvera. Vide : d'avant, ou un outil. */
+  graineRun: string
+}
+
+/** La graine du tissage d'un module, dérivée de celle de la run. */
+export function graineModule(e: EtatCarteRun, id: string): string {
+  return e.graineRun ? `${e.graineRun}@${id}` : ''
 }
 
 export function departCarte(c: CarteStation): EtatCarteRun {
-  return { module: c.regles.depart, niveau: 0, visites: [] }
+  return { module: c.regles.depart, niveau: 0, visites: [], revelations: {}, tissage: '', trace: [], graineRun: '' }
 }
 
+/** LA VOIE INCONNUE : une salle franchie sans porte ouverte — une
+ *  sauvegarde d'une autre version, une salle du pool hors voies. La trace
+ *  garde sa place pour que les suivantes restent AU BON RANG. */
+export const VOIE_INCONNUE = -1
+
+/** OUVRIR UNE PORTE de la mini-carte : la voie choisie pour la salle qui
+ *  vient s'écrit dans la trace À L'INDEX DE SON RANG — la salle suivante
+ *  ne s'ouvrira que depuis ce nœud.
+ *
+ *  Écrire « au bout » ne suffit pas : quand la trace a pris du retard sur
+ *  le niveau (une salle franchie sans porte), chaque porte ouverte
+ *  ensuite se dessinait des colonnes à gauche de la salle en cours — sur
+ *  la mini-carte, le chemin joué et les portes se sont retrouvés à trois
+ *  colonnes d'écart (revue du 16/09). Les rangs manquants se comblent
+ *  d'une voie inconnue. */
+export function choisitVoie(e: EtatCarteRun, voie: number): EtatCarteRun {
+  const trace = e.trace.slice(0, e.niveau)
+  while (trace.length < e.niveau) trace.push(VOIE_INCONNUE)
+  trace.push(Math.max(0, Math.floor(voie)))
+  return { ...e, trace }
+}
+
+/** La voie d'où l'on vient pour la salle `niveau` : null au premier rang,
+ *  ou quand la trace n'en sait rien (sauvegarde d'avant les voies, salle
+ *  franchie sans porte). */
+export function derniereVoie(e: EtatCarteRun): number | null {
+  if (e.niveau === 0) return null
+  const v = e.trace[e.niveau - 1]
+  return typeof v === 'number' && Number.isFinite(v) && v >= 0 ? v : null
+}
+
+/** LE MODULE TEL QU'IL SE JOUE : un « ? » révélé prend sa nature tirée
+ *  (moduleRevele) ; tout autre module est lui-même. */
+export function moduleEffectif(c: CarteStation, e: EtatCarteRun, m: ModuleCarte | undefined): ModuleCarte | undefined {
+  if (!m) return undefined
+  const nature = e.revelations[m.id]
+  return m.type === 'inconnu' && nature ? moduleRevele(c, m, nature) : m
+}
+
+/** Le module où l'on joue, révélé s'il y a lieu : c'est lui que lisent
+ *  moduleFini, niveauxRestants et la posture des salles. */
 export function moduleCourant(c: CarteStation, e: EtatCarteRun): ModuleCarte | undefined {
-  return moduleParId(c, e.module)
+  return moduleEffectif(c, e, moduleParId(c, e.module))
+}
+
+/** RÉVÉLER UN « ? » : sa nature se tire parmi REVELATIONS au premier
+ *  passage, et se grave dans l'état de la run. Un module déjà révélé, ou
+ *  qui n'est pas un « ? », rend l'état tel quel. `alea` vient de l'appelant :
+ *  la descente du jour tire le même « ? » pour tous les postes. */
+export function reveleInconnu(
+  c: CarteStation,
+  e: EtatCarteRun,
+  id: string,
+  alea: () => number,
+): EtatCarteRun {
+  const m = moduleParId(c, id)
+  if (!m || m.type !== 'inconnu' || e.revelations[id]) return e
+  const nature = REVELATIONS[Math.min(REVELATIONS.length - 1, Math.floor(alea() * REVELATIONS.length))]
+  return { ...e, revelations: { ...e.revelations, [id]: nature } }
 }
 
 /** Le module est-il ÉPUISÉ — toutes ses salles franchies ? Un module
@@ -129,13 +210,26 @@ export function entreModule(
   e: EtatCarteRun,
   id: string,
   orbes: readonly string[],
+  tissage = '',
 ): EtatCarteRun | null {
   const choix = choixModules(c, e, orbes).find((x) => x.module.id === id)
   if (!choix || choix.orbeManquant) return null
-  // au RETOUR, le module est déjà épuisé : ses salles ne se rejouent pas,
-  // la carte se rouvre aussitôt sur ses coursives
-  const niveau = choix.retour ? Math.max(0, choix.module.niveaux) : 0
-  return { module: id, niveau, visites: [...e.visites, e.module] }
+  // UN MODULE TRAVERSÉ EST ÉPUISÉ POUR LA RUN — au retour sur ses pas, et
+  // tout autant par une coursive ordinaire : sur une carte qui boucle, un
+  // joueur rentrait dans un secteur déjà joué et en rejouait les salles
+  // (et leur mémoire). La carte se rouvre aussitôt sur ses coursives.
+  const dejaTraverse = choix.retour || e.visites.includes(id)
+  const niveau = dejaTraverse ? Math.max(0, choix.module.niveaux) : 0
+  return {
+    module: id,
+    niveau,
+    visites: [...e.visites, e.module],
+    revelations: e.revelations,
+    // la graine du module : celle donnée, sinon dérivée de la run
+    tissage: tissage || graineModule(e, id),
+    trace: [],
+    graineRun: e.graineRun,
+  }
 }
 
 /** LA LONGUEUR DE LA RUN, déduite du trajet : les salles déjà franchies,
@@ -173,5 +267,204 @@ export function litEtatCarteRun(brut: unknown, c: CarteStation): EtatCarteRun {
   const visites = Array.isArray(o.visites)
     ? o.visites.filter((v): v is string => typeof v === 'string' && !!moduleParId(c, v))
     : []
-  return { module: o.module, niveau, visites }
+  // les révélations d'une sauvegarde : seules celles d'un « ? » encore sur
+  // la carte, vers une nature qui existe — le reste se retirera à l'entrée
+  const revelations: Record<string, TypeModule> = {}
+  if (typeof o.revelations === 'object' && o.revelations !== null)
+    for (const [id, nature] of Object.entries(o.revelations as Record<string, unknown>))
+      if (moduleParId(c, id)?.type === 'inconnu' && REVELATIONS.includes(nature as TypeModule))
+        revelations[id] = nature as TypeModule
+  const tissage = typeof o.tissage === 'string' ? o.tissage : ''
+  // la trace, une voie par salle franchie, à l'index du rang : ce qui n'est
+  // pas un nombre devient une voie inconnue (la place se garde, sinon tout
+  // le chemin glisse vers la gauche), et une trace plus courte que le
+  // niveau se comble de même
+  const trace = Array.isArray(o.trace)
+    ? o.trace.map((v) => (typeof v === 'number' && Number.isFinite(v) && v >= 0 ? Math.floor(v) : VOIE_INCONNUE))
+    : []
+  while (trace.length < niveau) trace.push(VOIE_INCONNUE)
+  const graineRun = typeof o.graineRun === 'string' ? o.graineRun : ''
+  return { module: o.module, niveau, visites, revelations, tissage, trace, graineRun }
+}
+
+// ---- LA NATURE DU MODULE COMMANDE LA SALLE -------------------------------
+// Sur le plan, la nature (combat, énigme, cache) n'était qu'un glyphe : la
+// pioche tirait la même salle sous n'importe quel fût. Un nœud typé n'a de
+// sens que s'il tient sa promesse — c'est ce qui fait qu'un joueur de Slay
+// the Spire choisit sa route en lisant les icônes. Ici la nature POSE la
+// salle générée : ses dangers, ses faisceaux, sa cachette.
+
+/** LA POSTURE DU MODULE : ce que sa nature impose aux options du
+ *  générateur, par-dessus le réglage du rang.
+ *  · COMBAT — les dangers sont FRÉQUENTS (sauf les premiers rangs sans
+ *    danger, qui restent la leçon du début), aucune énigme au faisceau ;
+ *  · ÉNIGME — aucun danger, une énigme au faisceau garde le passage ;
+ *  · CACHE — la cachette est toujours là : c'est ce qu'on vient chercher ;
+ *  · le reste (le terminal, un module d'avant les natures) — l'auto. */
+export function postureDuModule(
+  m: ModuleCarte | undefined,
+  sansDanger: boolean,
+): Partial<OptionsGen> {
+  switch (m?.type) {
+    case 'combat':
+      return { dangers: sansDanger ? 1 : 3, mecanismes: 1 }
+    case 'enigme':
+      return { dangers: 1, mecanismes: 2 }
+    case 'coffre':
+      return { cachette: 2 }
+    default:
+      return {}
+  }
+}
+
+/** LA DIFFICULTÉ SOUS CONFINEMENT : la rampe du plan, plus le cran du
+ *  module — borné à 9, le plafond de la nomenclature atelier. */
+export function difficulteSousCran(difficulte: number, m: ModuleCarte | undefined): number {
+  return Math.max(0, Math.min(9, Math.round(difficulte) + Math.max(0, m?.cran ?? 0)))
+}
+
+/** LA PRIME DE MÉMOIRE d'un module : « plus difficile, plus généreux » —
+ *  la mémoire gravée au sas de ses salles se multiplie par 1 + cran × prime
+ *  (`parCran`, 1 = +100 % par cran : ×2 au cran 1 ; le plan le règle). */
+export function primeMemoire(m: ModuleCarte | undefined, parCran = 1): number {
+  return 1 + Math.max(0, m?.cran ?? 0) * Math.max(0, parCran)
+}
+
+/** LE CLIMAT DU MODULE : sa température pose le climat des dangers des
+ *  salles générées — sous 10 °C le froid (hublots fendus), dès 45 °C le
+ *  chaud (chaudières), entre les deux l'auto. Une route froide se joue en
+ *  glace, une route chaude en vapeur : deux joueurs aux mémoires
+ *  différentes ne prennent plus la même route. */
+export function climatDuModule(m: ModuleCarte | undefined): OptionsGen['climat'] {
+  if (!m) return 0
+  return m.temp < 10 ? 1 : m.temp >= 45 ? 2 : 0
+}
+
+// ---- L'ALCÔVE DE REPOS -----------------------------------------------------
+// Une halte de la carte, un choix — comme le feu de camp de Slay the Spire
+// oppose soigner et améliorer. Trois offres, une seule se prend : le
+// souffle (une vie, la survie), la réserve (la bonbonne, la livraison), le
+// condensat (la bourse, l'achat). Puis la carte se rouvre.
+
+// Ce qu'une halte rend : les défauts d'avant le plan (le plan les règle
+// désormais — halteReserveCl, halteCondensatCl — et les passe en `dons`).
+export const REPOS_RESERVE_L = 0.5
+export const REPOS_CONDENSAT_CL = 40
+export interface DonsHalte {
+  reserveL: number
+  condensatCl: number
+}
+export const DONS_HALTE_DEFAUT: DonsHalte = { reserveL: REPOS_RESERVE_L, condensatCl: REPOS_CONDENSAT_CL }
+
+export interface OffreRepos {
+  id: 'souffle' | 'reserve' | 'condensat'
+  nom: string
+  detail: string
+  icone: string
+  /** false : l'offre ne peut rien donner (vies au plafond, bonbonne pleine) */
+  possible: boolean
+}
+
+/** Les trois offres de l'alcôve, jugées sur ce que la run possède : une
+ *  offre qui ne donnerait rien se montre grisée — le choix reste lisible,
+ *  il ne ment pas. */
+export function offresRepos(
+  run: {
+    vies: number
+    viesMax: number
+    bonbonne: number
+    cap: number
+  },
+  dons: DonsHalte = DONS_HALTE_DEFAUT,
+): OffreRepos[] {
+  return [
+    {
+      id: 'souffle',
+      nom: 'SECOND SOUFFLE',
+      detail: run.vies < run.viesMax ? '+1 échantillon de secours' : 'échantillons au plafond',
+      icone: '💠',
+      possible: run.vies < run.viesMax,
+    },
+    {
+      id: 'reserve',
+      nom: 'RÉSERVE',
+      detail: run.bonbonne < run.cap ? `+${dons.reserveL.toFixed(1).replace('.', ',')} L en bonbonne` : 'bonbonne pleine',
+      icone: '🫙',
+      possible: run.bonbonne < run.cap,
+    },
+    {
+      id: 'condensat',
+      nom: 'CONDENSAT',
+      detail: `+${Math.round(dons.condensatCl)} cL dans la bourse`,
+      icone: '💧',
+      possible: true,
+    },
+  ]
+}
+
+// ---- LE SURVOL QUI PROJETTE ------------------------------------------------
+// Compter les étages avant le boss est le geste réflexe du joueur de Slay
+// the Spire. Ici, survoler un module projette la route la plus courte
+// qui en part jusqu'à l'objectif : combien de salles, quels arrêts, quels
+// confinements — la fiche le dit, le dessin l'allume.
+
+export interface ProjectionRoute {
+  /** la suite des modules, du module survolé à l'objectif */
+  chemin: string[]
+  /** les salles à jouer, module survolé compris */
+  salles: number
+  /** les arrêts sur la route (haltes et caches), par leur nom */
+  arrets: string[]
+  /** la somme des crans de confinement sur la route */
+  crans: number
+  /** ce qui s'ouvre JUSTE APRÈS le module survolé, par leur nom — c'est là
+   *  que deux portes voisines se distinguent quand leurs routes se
+   *  rejoignent ensuite */
+  prochains: string[]
+}
+
+/** La route la plus courte depuis un module jusqu'à l'objectif, mesurée.
+ *  Null : l'objectif est hors de portée d'ici (un cul-de-sac). */
+export function projectionDepuis(c: CarteStation, id: string): ProjectionRoute | null {
+  const chemin = cheminLePlusCourt(c, id, c.regles.objectif)
+  if (!chemin) return null
+  const modules = chemin.map((m) => moduleParId(c, m)).filter((m): m is ModuleCarte => !!m)
+  return {
+    chemin,
+    salles: modules.reduce((t, m) => t + Math.max(0, m.niveaux), 0),
+    arrets: modules.filter((m) => estHalte(m) || m.type === 'coffre').map((m) => m.nom),
+    crans: modules.reduce((t, m) => t + Math.max(0, m.cran), 0),
+    prochains: liensDepuis(c, id)
+      .map((l) => moduleParId(c, l.vers))
+      .filter((m): m is ModuleCarte => !!m)
+      .map((m) => m.nom),
+  }
+}
+
+/** La projection en une ligne, pour la fiche de la carte. */
+export function ditProjection(c: CarteStation, p: ProjectionRoute): string {
+  const objectif = moduleParId(c, c.regles.objectif)?.nom ?? c.regles.objectif
+  // LES PROCHAINS d'abord : trois transformateurs mènent aux mêmes
+  // profondeurs, et la route la plus courte se confondait d'une porte à
+  // l'autre (revue du 16/09) — ce qui les distingue, c'est ce qu'ils
+  // ouvrent tout de suite après, et le reste ne vient qu'ensuite. La
+  // phrase dit ce que le plan ALLUME (« au plus court ») : le concepteur
+  // n'avait pas compris ce que « par ici » mesurait (revue du 16/09, soir).
+  const prochains = p.prochains.filter((n) => n !== objectif) // « ensuite l'objectif » ne dit rien
+  const puis = prochains.length > 0 ? `ouvre ensuite ${prochains.join(' ou ')} · ` : ''
+  return (
+    puis +
+    `au plus court (allumé) : ${p.salles} salle${p.salles > 1 ? 's' : ''} jusqu’à ${objectif}` +
+    (p.arrets.length ? ` · ${p.arrets.join(', ')}` : '') +
+    (p.crans > 0 ? ` · ${p.crans} confinement${p.crans > 1 ? 's' : ''} sur cette route` : '')
+  )
+}
+
+/** LE DON — une bonbonne oubliée : de la réserve s'il y a de la place,
+ *  sinon du condensat. Une seule offre, on la prend, la carte se rouvre. */
+export function offreDon(run: { bonbonne: number; cap: number }, dons: DonsHalte = DONS_HALTE_DEFAUT): OffreRepos {
+  const [, reserve, condensat] = offresRepos({ vies: 0, viesMax: 1, bonbonne: run.bonbonne, cap: run.cap }, dons)
+  return reserve.possible
+    ? { ...reserve, nom: 'UNE BONBONNE OUBLIÉE' }
+    : { ...condensat, nom: 'UN FÛT DE CONDENSAT' }
 }

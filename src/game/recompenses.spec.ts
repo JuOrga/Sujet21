@@ -16,7 +16,9 @@ import {
   valideRecompense,
   videAtelier,
 } from './recompenses'
-import { INSTRUMENTS, levier } from './instruments'
+import { INSTRUMENTS, levier,
+  CONTREPARTIES,
+} from './instruments'
 import { LEVIERS, valeurLevier } from './leviers'
 
 const carte = (over: Record<string, unknown> = {}): Record<string, unknown> => ({
@@ -38,7 +40,7 @@ describe('L’atelier des récompenses', () => {
     // le catalogue complet la porte, et le jeu la lit PAR LEVIER — c'est
     // toute la promesse de l'écran : une carte d'atelier n'est pas une
     // maquette, elle vaut une carte gravée
-    expect(catalogueRecompenses()).toHaveLength(INSTRUMENTS.length + 1)
+    expect(catalogueRecompenses()).toHaveLength(INSTRUMENTS.length + CONTREPARTIES.length + 1)
     expect(
       levier([faite.id], 'seuilDispersion', catalogueRecompenses()),
     ).toBeCloseTo(0.75)
@@ -156,7 +158,7 @@ describe('Les récompenses publiées — qui joue quoi', () => {
     expect(brouillonRecompensesActif()).toBe(true)
     poseRecompensesPubliees({ cartes: [carte({ id: 'publiee', nom: 'Publiée', icone: '🧿' })] })
     expect(recompensesJouees().map((c) => c.id)).toEqual(['publiee'])
-    expect(catalogueRecompenses().length).toBe(INSTRUMENTS.length + 1)
+    expect(catalogueRecompenses().length).toBe(INSTRUMENTS.length + CONTREPARTIES.length + 1)
     expect(brouillonRecompensesActif()).toBe(false)
   })
 

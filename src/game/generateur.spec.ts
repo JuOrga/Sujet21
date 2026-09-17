@@ -17,7 +17,7 @@ import {
   valideNiveau,
 } from './generateur'
 import { checkLevel } from './levelIO'
-import { MAT_GRILLE, MAT_RIDEAU } from './level'
+import { MAT_CHAUD, MAT_FROID, MAT_GRILLE, MAT_RIDEAU } from './level'
 
 describe('generateur — une graine, une salle PROUVÉE', () => {
   it('est déterministe : même graine, même salle — au caractère près', () => {
@@ -132,6 +132,13 @@ describe('generateur — une graine, une salle PROUVÉE', () => {
     const suf = encodeOptions(o)
     expect(suf).not.toBe('')
     expect(decodeOptions(suf)).toEqual(o)
+    // le CLIMAT occupe les bits hauts : un ancien code se décode inchangé,
+    // climat auto ; un code au climat fait l'aller-retour
+    expect(decodeOptions(suf)!.climat).toBe(0)
+    const froid = { ...OPTIONS_DEFAUT, dangers: 3 as const, climat: 1 as const }
+    expect(decodeOptions(encodeOptions(froid))).toEqual(froid)
+    const chaud = { ...OPTIONS_DEFAUT, climat: 2 as const }
+    expect(decodeOptions(encodeOptions(chaud))).toEqual(chaud)
     const lue = analyseSaisie(`212-K7~${suf}`)
     expect(lue && lue.type === 'atelier' && lue.options).toEqual(o)
     // la salle paramétrée porte le suffixe, et le code complet la redonne
@@ -588,5 +595,36 @@ describe('Le générateur ne fait jamais naître le corps dans un rail', () => {
     }
     // et le garde-fou n'a pas tué les rails au passage
     expect(avecRail).toBeGreaterThan(50)
+  })
+})
+
+describe('le CLIMAT des dangers — la température de la carte fait la salle', () => {
+  const dangers = (climat: 0 | 1 | 2): { froid: number; chaud: number } => {
+    let froid = 0
+    let chaud = 0
+    for (let graine = 1; graine <= 24; graine++) {
+      const lv = genereNiveau(graine * 7919, null, { ...OPTIONS_DEFAUT, dangers: 3, climat })
+      froid += lv.boxes.filter((b) => b.material === MAT_FROID).length
+      chaud += lv.boxes.filter((b) => b.material === MAT_CHAUD).length
+    }
+    return { froid, chaud }
+  }
+
+  it('en climat chaud, que des chaudières ; en climat froid, que des hublots fendus', () => {
+    const c = dangers(2)
+    expect(c.chaud).toBeGreaterThan(0)
+    expect(c.froid).toBe(0)
+    const f = dangers(1)
+    expect(f.froid).toBeGreaterThan(0)
+    expect(f.chaud).toBe(0)
+  })
+
+  it('en auto, les deux — et la salle est celle d’avant le climat, au code près', () => {
+    const a = dangers(0)
+    expect(a.froid).toBeGreaterThan(0)
+    expect(a.chaud).toBeGreaterThan(0)
+    const avant = genereNiveau(4242, null, { ...OPTIONS_DEFAUT, dangers: 3 })
+    const auto = genereNiveau(4242, null, { ...OPTIONS_DEFAUT, dangers: 3, climat: 0 })
+    expect(auto).toEqual(avant)
   })
 })
