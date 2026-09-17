@@ -188,3 +188,18 @@ describe('le décalage de collage', () => {
     expect(decalageDeCollage(emprise, null, 80)).toEqual({ dx: 80, dy: 0 })
   })
 })
+
+describe('les puits de gravité se copient et se collent comme un point', () => {
+  it('un puits copié est cloné avec ses réglages, collé décalé, et son emprise est son cœur', () => {
+    const lv = tableau({ puits: [{ x: 300, y: 300, force: 800, rayon: 120 }] })
+    const { presse, ignores } = copie(lv, [{ kind: 'puits', index: 0 }])
+    expect(ignores).toEqual([])
+    expect(presse?.total).toBe(1)
+    expect(presse?.copies.puits).toEqual([{ x: 300, y: 300, force: 800, rayon: 120 }])
+    expect(presse?.copies.puits?.[0]).not.toBe(lv.puits![0])
+    expect(presse?.emprise).toEqual({ minX: 180, minY: 180, maxX: 420, maxY: 420 })
+    const { refs } = colle(lv, presse!, 500, -100)
+    expect(refs).toEqual([{ kind: 'puits', index: 1 }])
+    expect(lv.puits![1]).toEqual({ x: 800, y: 200, force: 800, rayon: 120 })
+  })
+})

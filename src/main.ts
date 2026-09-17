@@ -123,23 +123,29 @@ import {
 import { CLE_MANQUES, inventairePool, litManques, noteManque, type Manque } from './game/manques'
 import {
   arriveRafales,
+  avanceOrbites,
   avancePalet,
   compteAuDela,
   estMiniJeu,
+  ETAT_ORBITES_NEUF,
   ETAT_PALET_NEUF,
   meilleurLancer,
+  noteOrbites,
   notePalet,
   noteRafales,
   noteTrait,
   phaseCouperet,
   tableauCouperet,
+  tableauOrbites,
   tableauPalet,
   tableauRafales,
   tireMiniJeu,
   tireTrait,
+  VERDICTS_ORBITES,
   VERDICTS_PALET,
   VERDICTS_RAFALES,
   VERDICTS_TRAIT,
+  type EtatOrbites,
   type EtatPalet,
   type Lancer,
   type NoteTrait,
@@ -311,7 +317,9 @@ import {
   zoneName,
   zoneShape,
   type DecalDef,
+  type ImpulsionDef,
   type LevelDef,
+  PUITS_RAYON_DEFAUT,
   type PupitreDef,
   type LumiereDef,
   type ObstacleBox,
@@ -827,6 +835,8 @@ function createSim(level: LevelDef): FluidSim {
     params.plasmaRailRadius,
   )
   sim.spawnDisc(level.spawn.x, level.spawn.y, volumeDepart(level), KIND_PLAYER)
+  // l'impulsion se tient jusqu'à la fin de l'entrée de caméra (voir sertImpulsion)
+  impulsionEnAttente = level.spawn.impulsion ?? null
   // né dans une zone qui impose la vapeur : le corps EST un nuage dès la
   // première image — sinon le compteur annonce des dashs qui ne partent pas,
   // le temps que la vaporisation progressive s'achève
@@ -995,6 +1005,12 @@ let minijeuForce = false
 // couperet qui tranche, le dernier lancer du palet), la salle conclut à
 // l'image — la note au barème, le titre et le détail de la carte
 let minijeuResultat: { note: NoteTrait; titre: string; detail: string; mesure: number } | null = null
+// L'IMPULSION DE DÉPART EN ATTENTE : posée par createSim, servie à la
+// première image où l'entrée de caméra est finie (la physique tourne pendant
+// le plan large : lancer au spawn ferait partir le corps avant qu'on le
+// voie). Tant qu'elle attend, les puits n'agissent pas non plus : le corps
+// reste immobile, en apesanteur, là où le tableau l'a posé.
+let impulsionEnAttente: ImpulsionDef | null = null
 // LE COUPERET en cours : la lame était-elle baissée au sous-pas précédent
 // (la pesée se fait à l'instant où elle tombe, une seule fois)
 let couperetLamePrec = false
@@ -1003,6 +1019,11 @@ let couperetLamePrec = false
 // ou valider — une fois)
 let paletEtat: EtatPalet = ETAT_PALET_NEUF
 let paletLancersVus = 0
+// LES ORBITES en cours : les anneaux passés (avanceOrbites, pur), et
+// l'instant du lancer — l'horloge du mini-jeu part de là, pas du plan large
+// de l'entrée de caméra, que la physique traverse immobile
+let orbitesEtat: EtatOrbites = ETAT_ORBITES_NEUF
+let orbitesT0 = 0
 // LES RÉGLAGES d'un mini-jeu en cours : les valeurs du banc qu'il a
 // remplacées, pour les rendre à la salle suivante
 let reglagesRendus: Partial<SimParams> = {}
@@ -7093,7 +7114,7 @@ function renderDescente(): void {
     ),
     dscCran(
       'MINI-JEUX PAR MODULE',
-      'le couperet, le palet ou les rafales, tirés à la graine : la précision paie en mémoire — 0 : aucun',
+      'le couperet, le palet, les rafales ou les orbites, tirés à la graine : la précision paie en mémoire — 0 : aucun',
       () => voiePlan.minijeuxParModule,
       (v) => {
         voiePlan.minijeuxParModule = v
@@ -8500,6 +8521,7 @@ function drawMecanismes(vw: number, vh: number, dpr: number): void {
       rails.length +
       caches.length +
       (level.chasses?.length ?? 0) + // un tableau qui n'a QU'une chasse se dessine aussi
+      (level.puits?.length ?? 0) + // les puits et la ligne prédite
       pastilles.length +
       eclatsEssai.length +
       (level.plots?.length ?? 0) +
@@ -8677,6 +8699,54 @@ function drawMecanismes(vw: number, vh: number, dpr: number): void {
     g.restore()
   }
 
+  // LES ORBITES : les anneaux (passé : vert ; le prochain : ambre qui bat ;
+  // les autres : gris), la cible (un cercle discret, le croissant est une
+  // paroi dessinée par le rendu), et la consigne du moment
+  if (level.minijeu?.type === 'orbites') {
+    const r = level.minijeu.regles
+    g.save()
+    r.anneaux.forEach((an, i) => {
+      const c = S(an.x, an.y)
+      const passe = i < orbitesEtat.anneauxPasses
+      const prochain = i === orbitesEtat.anneauxPasses && !minijeuResultat
+      const bat = prochain ? 0.7 + 0.3 * Math.sin(elapsed * 4) : 1
+      g.beginPath()
+      g.arc(c.sx, c.sy, an.r * z, 0, Math.PI * 2)
+      g.fillStyle = passe ? 'rgba(140,255,190,0.12)' : prochain ? `rgba(255,200,120,${(0.14 * bat).toFixed(3)})` : 'rgba(200,210,230,0.05)'
+      g.fill()
+      g.strokeStyle = passe ? 'rgba(140,255,190,0.9)' : prochain ? `rgba(255,200,120,${(0.95 * bat).toFixed(3)})` : 'rgba(200,210,230,0.4)'
+      g.lineWidth = prochain ? 3 : 2
+      g.stroke()
+      g.fillStyle = g.strokeStyle
+      g.font = `600 ${Math.max(11, Math.min(24, 70 * z))}px ui-monospace, monospace`
+      g.textAlign = 'center'
+      g.fillText(String(i + 1), c.sx, c.sy + 5)
+    })
+    const cc = S(r.cible.x, r.cible.y)
+    g.beginPath()
+    g.arc(cc.sx, cc.sy, r.cible.r * z, 0, Math.PI * 2)
+    g.strokeStyle = 'rgba(140,255,190,0.35)'
+    g.setLineDash([4, 10])
+    g.lineWidth = 1.5
+    g.stroke()
+    g.setLineDash([])
+    const t = Math.max(12, Math.min(28, 90 * z))
+    const anc = S(0, 930)
+    g.textAlign = 'center'
+    g.font = `600 ${Math.round(t * 0.85)}px ui-monospace, monospace`
+    g.fillStyle = 'rgba(255,255,255,0.92)'
+    const part = sim.baseVolume > 0 ? Math.round((100 * sim.playerCount) / sim.baseVolume) : 0
+    const consigne = minijeuResultat
+      ? 'FINI'
+      : impulsionEnAttente
+        ? 'LE LANCER ATTEND LA FIN DU PLAN LARGE'
+        : orbitesEtat.anneauxPasses < r.anneaux.length
+          ? `ANNEAU ${orbitesEtat.anneauxPasses + 1} / ${r.anneaux.length} — IL VOUS RESTE ${part} %`
+          : `AU CROISSANT — IL VOUS RESTE ${part} %`
+    g.fillText(consigne, anc.sx, anc.sy)
+    g.restore()
+  }
+
   // LES RAFALES : l'arrivée (un cadre), le compte à rebours du souffle et
   // ce qu'il reste du corps contre le départ — la jauge du mini-jeu
   if (level.minijeu?.type === 'rafales') {
@@ -8704,6 +8774,58 @@ function drawMecanismes(vw: number, vh: number, dpr: number): void {
     g.fillStyle = 'rgba(255,255,255,0.92)'
     const part = sim.baseVolume > 0 ? Math.round((100 * sim.playerCount) / sim.baseVolume) : 0
     g.fillText(`IL VOUS RESTE ${part} %`, anc.sx, anc.sy + t * 1.15)
+    g.restore()
+  }
+
+  // LES PUITS DE GRAVITÉ. Chaque puits : son cœur (un anneau — dedans, les
+  // orbites sont sûres ; la lisière déchire), sa portée en pointillé s'il en
+  // a une, une croix au centre. La ligne prédite du point-masse ne se
+  // dessine pas en jeu : elle est un outil de conception, dans l'éditeur (le
+  // concepteur, 17/09). En jeu, seule la PRÉVISION EXACTE se demande (P).
+  if ((level.puits?.length ?? 0) > 0) {
+    const puits = level.puits!
+    g.save()
+    for (const p of puits) {
+      const c = S(p.x, p.y)
+      const R = (p.rayon ?? PUITS_RAYON_DEFAUT) * z
+      g.beginPath()
+      g.arc(c.sx, c.sy, R, 0, Math.PI * 2)
+      g.fillStyle = 'rgba(180,160,255,0.06)'
+      g.fill()
+      g.strokeStyle = 'rgba(180,160,255,0.75)'
+      g.lineWidth = 1.5
+      g.stroke()
+      if (p.portee) {
+        g.beginPath()
+        g.arc(c.sx, c.sy, p.portee * z, 0, Math.PI * 2)
+        g.strokeStyle = 'rgba(180,160,255,0.3)'
+        g.setLineDash([4, 8])
+        g.stroke()
+        g.setLineDash([])
+      }
+      g.strokeStyle = 'rgba(220,210,255,0.9)'
+      g.lineWidth = 1.5
+      g.beginPath()
+      g.moveTo(c.sx - 6, c.sy)
+      g.lineTo(c.sx + 6, c.sy)
+      g.moveTo(c.sx, c.sy - 6)
+      g.lineTo(c.sx, c.sy + 6)
+      g.stroke()
+    }
+    // LA PRÉVISION EXACTE, en trait plein, qui grandit tant qu'elle se calcule
+    if (prevision && prevision.points.length > 1) {
+      const pts = prevision.points
+      g.strokeStyle = prevision.tFait >= PREVISION_EXACTE_DUREE ? 'rgba(160,255,200,0.9)' : 'rgba(160,255,200,0.6)'
+      g.lineWidth = Math.max(1.5, 2.5 * z)
+      g.beginPath()
+      const a = S(pts[0].x, pts[0].y)
+      g.moveTo(a.sx, a.sy)
+      for (let j = 1; j < pts.length; j++) {
+        const q = S(pts[j].x, pts[j].y)
+        g.lineTo(q.sx, q.sy)
+      }
+      g.stroke()
+    }
     g.restore()
   }
 
@@ -11488,6 +11610,7 @@ input.onCommande = (id: string): boolean => {
   else if (id === 'dossier') ouvreDossier(!dossierOuvert)
   else if (id === 'carte') ouvreStation(!!stationEl?.hidden)
   else if (id === 'recadrer') camera.resetAutoZoom()
+  else if (id === 'prevision') lancePrevisionExacte()
   else return false
   return true
 }
@@ -12590,6 +12713,12 @@ function lanceManoeuvre(quoi: string): void {
         closeHome()
         break
       }
+      case 'orbites': {
+        lanceOrbitesEssai()
+        pupitreEl.hidden = true
+        closeHome()
+        break
+      }
       case 'hub-principal': {
         const r = passeLeHub('principal')
         if (r === 'ok') {
@@ -12934,6 +13063,93 @@ function majRafales(): void {
   }
 }
 
+/** LES ORBITES, à l'image : le centre du corps passe les anneaux dans
+ *  l'ordre, la cible conclut, le temps aussi ; le verdict tient à la part du
+ *  volume gardée, un palier de moins par anneau manqué. */
+function majOrbites(): void {
+  const mj = level.minijeu
+  if (!mj || mj.type !== 'orbites' || minijeuResultat || impulsionEnAttente) return
+  const t = run.tableauTime - orbitesT0
+  orbitesEtat = avanceOrbites(orbitesEtat, { t, x: sim.stats.centroidX, y: sim.stats.centroidY }, mj.regles)
+  if (!orbitesEtat.fini) return
+  const part = sim.baseVolume > 0 ? sim.playerCount / sim.baseVolume : 0
+  const note = noteOrbites(part, orbitesEtat.anneauxPasses, orbitesEtat.fin, mj.regles)
+  minijeuResultat = {
+    note,
+    mesure: part,
+    titre: `LES ORBITES — ${VERDICTS_ORBITES[note.verdict]}`,
+    detail:
+      orbitesEtat.fin === 'cible'
+        ? `${orbitesEtat.anneauxPasses} anneau${orbitesEtat.anneauxPasses > 1 ? 'x' : ''} sur ${mj.regles.anneaux.length}, ${Math.round(part * 100)} % gardés, au croissant en ${t.toFixed(1).replace('.', ',')} s`
+        : `${orbitesEtat.anneauxPasses} anneau${orbitesEtat.anneauxPasses > 1 ? 'x' : ''} sur ${mj.regles.anneaux.length}, le croissant jamais atteint en ${mj.regles.dureeMax} s`,
+  }
+}
+
+// LA PRÉVISION EXACTE : une COPIE DU SOLVEUR, prise sur l'état du corps à
+// l'instant de la demande, avance À PART et écrit la vraie trajectoire de
+// son centre — là où la ligne pointillée (un point-masse) dévie : les
+// parois, les marées du halo, les éponges. Un pas à 900 particules coûte
+// quelques millisecondes : trois secondes prédites font ~360 pas, ~1,5 s de
+// calcul — impossible en une image. La copie avance donc par TRANCHES, un
+// budget par image de rendu, et la ligne pleine grandit à vue : l'attente
+// se lit. Effacée à toute éjection ou changement d'état (elle ne vaut que
+// depuis un état non perturbé), et à chaque salle.
+const PREVISION_EXACTE_DUREE = 3
+const PREVISION_BUDGET_MS = 6
+let prevision: { copie: FluidSim; points: { x: number; y: number }[]; tFait: number } | null = null
+let previsionFreezeAvant = false
+let previsionGasAvant = false
+
+/** LANCER la prévision exacte depuis l'état présent (la commande « p »).
+ *  Pas tant que l'impulsion de départ attend : le corps n'est pas encore
+ *  lancé et les puits se taisent — la copie tomberait dans un puits que le
+ *  vrai corps ne verra pas. */
+function lancePrevisionExacte(): void {
+  if (!document.body.classList.contains('playing') || sim.dispersed || run.ended || impulsionEnAttente) return
+  const copie = sim.copiePourPrevision()
+  copie.updatePlayerStats()
+  prevision = { copie, points: [{ x: copie.stats.centroidX, y: copie.stats.centroidY }], tFait: 0 }
+}
+
+/** AVANCER la prévision exacte d'une tranche, à chaque image de rendu.
+ *  Seuls les puits poussent la copie : ni le souffle du sas, ni les chasses,
+ *  ni le vortex — les salles à puits n'en ont pas (les orbites), et la ligne
+ *  s'écarterait dans une salle qui les mêlerait. */
+function avancePrevisionExacte(): void {
+  const pv = prevision
+  if (!pv || pv.tFait >= PREVISION_EXACTE_DUREE) return
+  const t0 = performance.now()
+  const puits = level.puits ?? []
+  let pas = 0
+  while (pv.tFait < PREVISION_EXACTE_DUREE && performance.now() - t0 < PREVISION_BUDGET_MS) {
+    if (puits.length > 0) pv.copie.applyPuits(puits, params.dt)
+    pv.copie.step(params.dt)
+    pv.tFait += params.dt
+    pas++
+    if (pas % 4 === 0) {
+      pv.copie.updatePlayerStats()
+      pv.points.push({ x: pv.copie.stats.centroidX, y: pv.copie.stats.centroidY })
+    }
+    if (pv.copie.dispersed) {
+      pv.tFait = PREVISION_EXACTE_DUREE
+      break
+    }
+  }
+}
+
+/** L'IMPULSION DE DÉPART est servie dès que l'entrée de caméra est finie
+ *  (ou coupée par le premier geste) : le corps part exactement comme le
+ *  tableau le dit, sous les yeux du joueur, et les puits s'allument. */
+function sertImpulsion(): void {
+  const imp = impulsionEnAttente
+  if (!imp || camera.introEnCours || sim.dispersed) return
+  impulsionEnAttente = null
+  const a = (imp.angle * Math.PI) / 180
+  sim.lanceCorps(Math.cos(a) * imp.vitesse, Math.sin(a) * imp.vitesse)
+  orbitesT0 = run.tableauTime
+  prevision = null // le lancer change tout : une ligne demandée avant ne vaut plus
+}
+
 /** LE PALET, à l'image : ce que le jeu observe du corps (la glace est-elle
  *  prise, où est son centre, à quelle vitesse) passe à avancePalet, qui
  *  tient les lancers. Le dernier lancer fini — ou le joueur qui conclut
@@ -13058,8 +13274,11 @@ function resetLasers(): void {
   laserEtat.doorsKey = ''
   couperetLamePrec = false
   minijeuResultat = null
+  prevision = null
   paletEtat = ETAT_PALET_NEUF
   paletLancersVus = 0
+  orbitesEtat = ETAT_ORBITES_NEUF
+  orbitesT0 = 0
   laserEtat.chassesActives = (level.chasses ?? []).map(() => false)
   laserEtat.chasseBouffee = (level.chasses ?? []).map(() => 0)
   lastRailTime = 0
@@ -15048,6 +15267,7 @@ function ouvreNoeud(nature: Exclude<NatureNoeud, 'salle'>): void {
       const quel = tireMiniJeu(alea)
       if (quel === 'palet') minijeuIntercalaire = tableauPalet()
       else if (quel === 'rafales') minijeuIntercalaire = tableauRafales()
+      else if (quel === 'orbites') minijeuIntercalaire = tableauOrbites()
       else {
         const volumeL = volumeDepart(tableauCouperet(1)) * params.litersPerParticle
         minijeuIntercalaire = tableauCouperet(tireTrait(volumeL, alea))
@@ -15084,7 +15304,7 @@ function mbMontreResultatMiniJeu(r: NonNullable<typeof minijeuResultat>, suite: 
   btn.className = 'mb-carte mb-repos'
   btn.style.gridColumn = '2'
   btn.innerHTML =
-    `<i class="mb-repos-icone">${level.minijeu?.type === 'palet' ? '🥌' : level.minijeu?.type === 'rafales' ? '🌬️' : '🔪'}</i><b>${r.titre.split(' — ')[1] ?? ''}</b>` +
+    `<i class="mb-repos-icone">${level.minijeu?.type === 'palet' ? '🥌' : level.minijeu?.type === 'rafales' ? '🌬️' : level.minijeu?.type === 'orbites' ? '🪐' : '🔪'}</i><b>${r.titre.split(' — ')[1] ?? ''}</b>` +
     `<small>${res.memoire > 0 ? `+${res.memoire} mémoire` : 'rien — le trait est loin'} · continuer</small>`
   let elu = false
   btn.addEventListener('click', () => {
@@ -15816,6 +16036,16 @@ function lanceRafalesEssai(): void {
   restart()
 }
 ;(window as unknown as { __rafales: () => void }).__rafales = lanceRafalesEssai
+// JOUER LES ORBITES EN ESSAI (le pupitre, et la sonde __orbites())
+function lanceOrbitesEssai(): void {
+  if (miseEnBonbonne) fermeMiseEnBonbonne()
+  auHub = false
+  hasPlayed = true
+  document.body.classList.add('playing')
+  testLevel = tableauOrbites()
+  restart()
+}
+;(window as unknown as { __orbites: () => void }).__orbites = lanceOrbitesEssai
 
 function newExpedition(avecCarte = false): void {
   levelIndex = 0
@@ -17500,6 +17730,7 @@ function corpsImage(now: number): boolean {
 
   sim.chill = chillNow() // le vaisseau refroidit : la physique suit
   if (input.aimActive) camera.cancelIntro() // le joueur agit : la caméra suit
+  sertImpulsion()
 
   // ---- Dash de vapeur (« air dash ») : viser RALENTIT fortement le temps
   // (physique, refroidissement, chrono — tout suit, rien ne se fige),
@@ -17616,6 +17847,7 @@ function corpsImage(now: number): boolean {
           if (rassembler) sim.rassemble(params.dt)
           else {
             sim.eject(aim.x, aim.y, params.dt)
+            prevision = null // une éjection change la trajectoire : la ligne exacte ne vaut plus
             // le geste du fantôme : vers où l'on éjecte (le corps part à l'opposé)
             pousseeFantome = Math.atan2(aim.y - sim.stats.centroidY, aim.x - sim.stats.centroidX)
           }
@@ -17638,6 +17870,9 @@ function corpsImage(now: number): boolean {
             if (laserEtat.chassesActives[i]) sim.applyChasse(chasses[i], params.dt)
           }
         }
+        // LES PUITS DE GRAVITÉ : la seule accélération pure, avant le pas comme
+        // les autres champs — muets tant que l'impulsion de départ attend
+        if (!impulsionEnAttente && (level.puits?.length ?? 0) > 0) sim.applyPuits(level.puits!, params.dt)
         // Rien ne freine le corps figé : dans le vide, une dérive reste une
         // trajectoire. Elle peut encore rencontrer une paroi, rebondir, et
         // finir dans le sas — c'est au joueur de décider quand y renoncer.
@@ -18249,7 +18484,7 @@ function corpsImage(now: number): boolean {
       effaceRun()
       newExpedition(true)
     })
-  } else if (!tableauDone && !sim.dispersed && estMiniJeu(level) && level.minijeu && (majPalet(), majRafales(), minijeuResultat)) {
+  } else if (!tableauDone && !sim.dispersed && estMiniJeu(level) && level.minijeu && (majPalet(), majRafales(), majOrbites(), minijeuResultat)) {
     // LE MINI-JEU A CONCLU : la lame du couperet a pesé, le palet a fait
     // ses lancers (ou le joueur a conclu). Rien ne se consigne aux registres
     // (pas un tableau du protocole), la mémoire se gagne au barème, la
@@ -18620,6 +18855,12 @@ function corpsImage(now: number): boolean {
   majFpsCoin(dtReal)
   updateWorldLabels(vw, vh)
   appliqueSequence() // carte et secousse de la mise en scène
+  // un CHANGEMENT d'état efface aussi la ligne — le changement, pas l'état :
+  // la glace qui dérive a une trajectoire, et la demander en glace doit marcher
+  if (input.freezeIntent !== previsionFreezeAvant || input.gasIntent !== previsionGasAvant) prevision = null
+  previsionFreezeAvant = input.freezeIntent
+  previsionGasAvant = input.gasIntent
+  avancePrevisionExacte()
   drawMecanismes(vw, vh, dpr)
   drawFantomes(vw, vh, dpr)
   drawFleche(dtReal, dpr)

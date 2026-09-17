@@ -96,6 +96,14 @@ export const MANOEUVRES: Manoeuvre[] = [
     manette: 8, // Select
   },
   {
+    id: 'prevision',
+    nom: 'Prévision exacte de la trajectoire',
+    aide: 'Une copie du solveur avance à part et écrit, en trait plein, la vraie trajectoire du corps sur trois secondes — la ligne pointillée est celle d’un point-masse. Utile près des puits de gravité.',
+    section: 'Les écrans',
+    clavier: 'p',
+    manette: null,
+  },
+  {
     id: 'legende',
     nom: 'Légende des surfaces',
     aide: 'Le panneau qui nomme chaque matière de la cuve.',

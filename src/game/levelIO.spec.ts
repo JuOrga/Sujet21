@@ -1336,3 +1336,69 @@ describe('LE MIROIR SURVIT À L’ENREGISTREMENT', () => {
     expect(level!.boxes[0].material).toBe(MAT_WALL)
   })
 })
+
+describe('les puits de gravité et l’impulsion de départ font l’aller-retour', () => {
+  const base = {
+    name: 'Essai puits',
+    code: '21-TEST',
+    bounds: { minX: -1000, minY: -600, maxX: 1000, maxY: 600 },
+    spawn: { x: -800, y: 0, n: 700 },
+    exit: { minX: 860, minY: -60, maxX: 940, maxY: 60 },
+    boxes: [],
+  }
+
+  it('un puits complet et un puits aux défauts omis relus tels quels ; un rayon nul, une force nulle ou un centre illisible écartés, et dits — chacun pour sa raison', () => {
+    const { level, rejets } = parseLevel({
+      ...base,
+      puits: [
+        { x: 0, y: 0, force: 540, rayon: 300, portee: 900 },
+        { x: 400.4, y: -100 }, // les défauts vivent dans le code : rien ne s'écrit
+        { x: 500, y: 0, rayon: 0 }, // écarté
+        { x: 600, y: 0, force: -5 }, // écarté
+        { x: 'abc', y: 0 }, // écarté
+      ],
+    })
+    expect(rejets).toEqual(['un puits a été écarté (rayon nul)', 'un puits a été écarté (force nulle)', 'un puits a été écarté (centre illisible)'])
+    expect(level!.puits).toEqual([
+      { x: 0, y: 0, force: 540, rayon: 300, portee: 900 },
+      { x: 400.4, y: -100 },
+    ])
+    const relu = parseLevel(JSON.parse(serializeLevel(level!)))
+    expect(relu.level!.puits).toEqual(level!.puits)
+    // sans puits, la clé n'existe pas
+    expect(parseLevel(base).level!.puits).toBeUndefined()
+    expect(JSON.parse(serializeLevel(parseLevel(base).level!)).puits).toBeUndefined()
+  })
+
+  it('l’impulsion de départ : angle et vitesse arrondis, relus tels quels ; une vitesse nulle n’est pas une impulsion', () => {
+    const { level, rejets } = parseLevel({ ...base, spawn: { x: -800, y: 0, n: 700, impulsion: { angle: -30.4, vitesse: 350.6 } } })
+    expect(rejets).toEqual([])
+    expect(level!.spawn.impulsion).toEqual({ angle: -30, vitesse: 351 })
+    const relu = parseLevel(JSON.parse(serializeLevel(level!)))
+    expect(relu.level!.spawn).toEqual(level!.spawn)
+    const nulle = parseLevel({ ...base, spawn: { x: -800, y: 0, n: 700, impulsion: { angle: 10, vitesse: 0 } } })
+    expect(nulle.rejets).toEqual(['l’impulsion de départ a été écartée (vitesse nulle)'])
+    expect(nulle.level!.spawn.impulsion).toBeUndefined()
+    expect(parseLevel(base).level!.spawn.impulsion).toBeUndefined()
+  })
+
+  it('la validation : un puits hors cuve est une erreur, l’impulsion trop forte aussi ; un départ au fond d’un cœur sans impulsion, deux cœurs qui se recouvrent et une portée sous le cœur avertissent', () => {
+    const lv = parseLevel({ ...base, puits: [{ x: 0, y: 0 }] }).level!
+    const propre = checkLevel(lv)
+    expect(propre.some((v) => /puits|impulsion/.test(v.message))).toBe(false)
+    expect(checkLevel({ ...lv, puits: [{ x: 5000, y: 0 }] }).some((v) => v.niveau === 'erreur' && /puits.*hors de la cuve/.test(v.message))).toBe(true)
+    expect(
+      checkLevel({ ...lv, spawn: { ...lv.spawn, impulsion: { angle: 0, vitesse: 3001 } } }).some((v) => v.niveau === 'erreur' && /impulsion/.test(v.message)),
+    ).toBe(true)
+    expect(checkLevel({ ...lv, spawn: { ...lv.spawn, x: 50, y: 0 } }).some((v) => v.niveau === 'avertissement' && /fond d’un puits/.test(v.message))).toBe(true)
+    // avec une impulsion, naître dans le cœur est un choix : rien à dire
+    expect(checkLevel({ ...lv, spawn: { ...lv.spawn, x: 50, y: 0, impulsion: { angle: 0, vitesse: 300 } } }).some((v) => /fond d’un puits/.test(v.message))).toBe(false)
+    expect(
+      checkLevel({ ...lv, puits: [{ x: 0, y: 0 }, { x: 400, y: 0 }] }).some((v) => v.niveau === 'avertissement' && /recouvrent/.test(v.message)),
+    ).toBe(true)
+    expect(checkLevel({ ...lv, puits: [{ x: -400, y: 0 }, { x: 400, y: 0, rayon: 300 }] }).some((v) => /recouvrent/.test(v.message))).toBe(false)
+    // une portée plus courte que le cœur : la gravité s'éteint avant la lisière dessinée
+    expect(checkLevel({ ...lv, puits: [{ x: 0, y: 0, rayon: 300, portee: 200 }] }).some((v) => v.niveau === 'avertissement' && /portée plus courte/.test(v.message))).toBe(true)
+    expect(checkLevel({ ...lv, puits: [{ x: 0, y: 0, rayon: 300, portee: 900 }] }).some((v) => /portée plus courte/.test(v.message))).toBe(false)
+  })
+})
