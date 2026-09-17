@@ -137,3 +137,29 @@ describe('FluidSim.applyPuits — la seule accélération pure du solveur', () =
     expect(t.posX[j]).toBeCloseTo(700, 3)
   })
 })
+
+describe('FluidSim.copiePourPrevision — une copie qui avance comme l’original', () => {
+  it('la copie prise en vol suit le même centre que l’original sur une seconde, et ne le touche pas', () => {
+    const s = makeSim()
+    s.setLevel([{ minX: 600, minY: -400, maxX: 700, maxY: 400, material: 0 }], [])
+    s.spawnDisc(150, 0, 300, KIND_PLAYER)
+    s.lanceCorps(0, vitesseCirculaire(PUITS, 150))
+    orbite(s, [PUITS], 0.5)
+    const c = s.copiePourPrevision()
+    expect(c.count).toBe(s.count)
+    expect(c.playerCount).toBe(s.playerCount)
+    const dt = s.params.dt
+    for (let k = 0; k < Math.round(1 / dt); k++) {
+      c.applyPuits([PUITS], dt)
+      c.step(dt)
+    }
+    c.updatePlayerStats()
+    const xAvant = s.posX[0]
+    orbite(s, [PUITS], 1)
+    s.updatePlayerStats()
+    // l'original n'a pas bougé pendant que la copie avançait
+    expect(s.posX[0]).not.toBe(xAvant)
+    expect(Math.hypot(c.stats.centroidX - s.stats.centroidX, c.stats.centroidY - s.stats.centroidY)).toBeLessThan(2)
+    expect(c.dispersed).toBe(false)
+  })
+})

@@ -507,6 +507,7 @@ export class FluidSim {
   private heatCarry = 0
   private gasIdleCarry = 0
   private baseBoxes: ObstacleBox[] = []
+  private spongeDefs: SpongeDef[] = []
   private grilleCarry = 0
   // Recondensation (§7.3) : chaque particule de vapeur perdue alimente une
   // réserve ; les plaques froides la rendent en rosée, avec perte.
@@ -543,6 +544,7 @@ export class FluidSim {
     const physiques = boxes.filter((b) => !sansPhysique(b.material))
     this.baseBoxes = physiques
     this.boxes = physiques
+    this.spongeDefs = sponges // gardées pour la copie de prévision
     this.sponges = sponges.map((d) => new Sponge(d))
     this.refreshBoxCaches()
     this.surchauffesVides.clear()
@@ -1807,6 +1809,56 @@ export class FluidSim {
     }
   }
   private readonly accPuits: Accel = { ax: 0, ay: 0 }
+
+  // LA COPIE DE PRÉVISION : un second solveur, sur le même tableau (parois,
+  // portes fermées, éponges et leur saturation), avec l'état exact de chaque
+  // particule à cet instant — LA LISTE DES TABLEAUX EST CELLE QUE
+  // reorderByCell PERMUTE : c'est l'état par particule complet, la seule
+  // source de vérité. Le jeu la fait avancer à part, par tranches, pour
+  // écrire la vraie trajectoire du corps (la prévision exacte). Jamais le
+  // moteur WASM : ses tampons sont un seul exemplaire partagé — la copie
+  // reste en JavaScript.
+  copiePourPrevision(): FluidSim {
+    const c = new FluidSim(this.params, this.bounds, this.capacity)
+    c.setLevel(this.baseBoxes, this.spongeDefs)
+    if (this.boxes !== this.baseBoxes) c.setDoors(this.boxes.slice(this.baseBoxes.length))
+    for (let k = 0; k < this.sponges.length && k < c.sponges.length; k++) c.sponges[k].saturation.set(this.sponges[k].saturation)
+    const n = this.count
+    c.count = n
+    const flottants: [Float32Array, Float32Array][] = [
+      [this.posX, c.posX], [this.posY, c.posY], [this.prdX, c.prdX], [this.prdY, c.prdY],
+      [this.velX, c.velX], [this.velY, c.velY], [this.cooldown, c.cooldown], [this.frost, c.frost],
+      [this.vapor, c.vapor], [this.ionise, c.ionise], [this.gasLink, c.gasLink], [this.contactTime, c.contactTime],
+      [this.contactNX, c.contactNX], [this.contactNY, c.contactNY], [this.contactVn, c.contactVn], [this.souffle, c.souffle],
+    ]
+    for (const [a, b] of flottants) b.set(a.subarray(0, n))
+    const entiers: [Uint8Array | Int8Array | Int32Array, Uint8Array | Int8Array | Int32Array][] = [
+      [this.kind, c.kind], [this.frozen, c.frozen], [this.gaseous, c.gaseous], [this.welded, c.welded],
+      [this.duCorps, c.duCorps], [this.labels, c.labels], [this.iceLabels, c.iceLabels], [this.contactMat, c.contactMat],
+    ]
+    for (const [a, b] of entiers) b.set(a.subarray(0, n))
+    c.baseVolume = this.baseVolume
+    c.playerCount = this.playerCount
+    c.freezeIntent = this.freezeIntent
+    c.gasIntent = this.gasIntent
+    c.dashBudget = this.dashBudget
+    c.dashBudgetMax = this.dashBudgetMax
+    c.chill = this.chill
+    c.exitRadiusFactor = this.exitRadiusFactor
+    c.reabsorbFactor = this.reabsorbFactor
+    c.vaporTollFactor = this.vaporTollFactor
+    c.iceBounceFactor = this.iceBounceFactor
+    c.spongeGripFactor = this.spongeGripFactor
+    c.criticalFactor = this.criticalFactor
+    c.basculeFactor = this.basculeFactor
+    c.perteGazFactor = this.perteGazFactor
+    c.perteGrilleFactor = this.perteGrilleFactor
+    c.priseSasGlaceFactor = this.priseSasGlaceFactor
+    c.glisseGlaceFactor = this.glisseGlaceFactor
+    c.iceDirty = true
+    c.relabel()
+    return c
+  }
 
   // Re-tri spatial périodique : après une séparation (gerbe, éclaboussure),
   // des particules voisines dans l'ESPACE se retrouvent éparpillées dans les

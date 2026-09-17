@@ -8786,6 +8786,20 @@ function drawMecanismes(vw: number, vh: number, dpr: number): void {
         g.stroke()
       }
     }
+    // LA PRÉVISION EXACTE, en trait plein, qui grandit tant qu'elle se calcule
+    if (prevision && prevision.points.length > 1) {
+      const pts = prevision.points
+      g.strokeStyle = prevision.tFait >= PREVISION_EXACTE_DUREE ? 'rgba(160,255,200,0.9)' : 'rgba(160,255,200,0.6)'
+      g.lineWidth = Math.max(1.5, 2.5 * z)
+      g.beginPath()
+      const a = S(pts[0].x, pts[0].y)
+      g.moveTo(a.sx, a.sy)
+      for (let j = 1; j < pts.length; j++) {
+        const q = S(pts[j].x, pts[j].y)
+        g.lineTo(q.sx, q.sy)
+      }
+      g.stroke()
+    }
     g.restore()
   }
 
@@ -11570,6 +11584,7 @@ input.onCommande = (id: string): boolean => {
   else if (id === 'dossier') ouvreDossier(!dossierOuvert)
   else if (id === 'carte') ouvreStation(!!stationEl?.hidden)
   else if (id === 'recadrer') camera.resetAutoZoom()
+  else if (id === 'prevision') lancePrevisionExacte()
   else return false
   return true
 }
@@ -13020,6 +13035,51 @@ function majRafales(): void {
  *  cœur — assez pour voir où une orbite mène, pas assez pour encombrer. */
 const PREVISION_DUREE = 6
 
+// LA PRÉVISION EXACTE : une COPIE DU SOLVEUR, prise sur l'état du corps à
+// l'instant de la demande, avance À PART et écrit la vraie trajectoire de
+// son centre — là où la ligne pointillée (un point-masse) dévie : les
+// parois, les marées du halo, les éponges. Un pas à 900 particules coûte
+// quelques millisecondes : trois secondes prédites font ~360 pas, ~1,5 s de
+// calcul — impossible en une image. La copie avance donc par TRANCHES, un
+// budget par image de rendu, et la ligne pleine grandit à vue : l'attente
+// se lit. Effacée à toute éjection ou changement d'état (elle ne vaut que
+// depuis un état non perturbé), et à chaque salle.
+const PREVISION_EXACTE_DUREE = 3
+const PREVISION_BUDGET_MS = 6
+let prevision: { copie: FluidSim; points: { x: number; y: number }[]; tFait: number } | null = null
+
+/** LANCER la prévision exacte depuis l'état présent (la commande « p »,
+ *  et le départ d'un mini-jeu à puits). */
+function lancePrevisionExacte(): void {
+  if (!document.body.classList.contains('playing') || sim.dispersed || run.ended) return
+  const copie = sim.copiePourPrevision()
+  copie.updatePlayerStats()
+  prevision = { copie, points: [{ x: copie.stats.centroidX, y: copie.stats.centroidY }], tFait: 0 }
+}
+
+/** AVANCER la prévision exacte d'une tranche, à chaque image de rendu. */
+function avancePrevisionExacte(): void {
+  const pv = prevision
+  if (!pv || pv.tFait >= PREVISION_EXACTE_DUREE) return
+  const t0 = performance.now()
+  const puits = level.puits ?? []
+  let pas = 0
+  while (pv.tFait < PREVISION_EXACTE_DUREE && performance.now() - t0 < PREVISION_BUDGET_MS) {
+    if (puits.length > 0) pv.copie.applyPuits(puits, params.dt)
+    pv.copie.step(params.dt)
+    pv.tFait += params.dt
+    pas++
+    if (pas % 4 === 0) {
+      pv.copie.updatePlayerStats()
+      pv.points.push({ x: pv.copie.stats.centroidX, y: pv.copie.stats.centroidY })
+    }
+    if (pv.copie.dispersed) {
+      pv.tFait = PREVISION_EXACTE_DUREE
+      break
+    }
+  }
+}
+
 /** LA TRAJECTOIRE PRÉDITE depuis l'état du corps à cette image : son centre,
  *  sa vitesse, son rayon ; les parois du tableau et les portes fermées ;
  *  l'état décide du reste — la glace rebondit à sa restitution, la vapeur
@@ -13191,6 +13251,7 @@ function resetLasers(): void {
   laserEtat.doorsKey = ''
   couperetLamePrec = false
   minijeuResultat = null
+  prevision = null
   paletEtat = ETAT_PALET_NEUF
   paletLancersVus = 0
   laserEtat.chassesActives = (level.chasses ?? []).map(() => false)
@@ -17750,6 +17811,7 @@ function corpsImage(now: number): boolean {
           if (rassembler) sim.rassemble(params.dt)
           else {
             sim.eject(aim.x, aim.y, params.dt)
+            prevision = null // une éjection change la trajectoire : la ligne exacte ne vaut plus
             // le geste du fantôme : vers où l'on éjecte (le corps part à l'opposé)
             pousseeFantome = Math.atan2(aim.y - sim.stats.centroidY, aim.x - sim.stats.centroidX)
           }
@@ -18757,6 +18819,8 @@ function corpsImage(now: number): boolean {
   majFpsCoin(dtReal)
   updateWorldLabels(vw, vh)
   appliqueSequence() // carte et secousse de la mise en scène
+  if (input.freezeIntent || input.gasIntent) prevision = null // un changement d'état aussi
+  avancePrevisionExacte()
   drawMecanismes(vw, vh, dpr)
   drawFantomes(vw, vh, dpr)
   drawFleche(dtReal, dpr)
