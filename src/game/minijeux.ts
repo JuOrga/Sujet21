@@ -40,7 +40,7 @@
 import { MAT_HYDROPHILE, MAT_HYDROPHOBE, MAT_WALL, type LevelDef, type ObstacleBox, type PorteDef } from './level'
 import type { SimParams } from '../sim/params'
 
-export type MiniJeuId = 'couperet' | 'palet'
+export type MiniJeuId = 'couperet' | 'palet' | 'flipper'
 
 /** LE COUPERET : ce que porte son tableau. */
 export interface CouperetDef {
@@ -62,13 +62,14 @@ export interface PaletDef {
 }
 
 /** Ce que porte un tableau de mini-jeu (LevelDef.minijeu). */
-export type MiniJeuDef = CouperetDef | PaletDef
+export type MiniJeuDef = CouperetDef | PaletDef | FlipperDef
 
 export const CODE_COUPERET = 'MJ-COUPERET'
 export const CODE_PALET = 'MJ-PALET'
+export const CODE_FLIPPER = 'MJ-FLIPPER'
 
 /** LE CATALOGUE : les mini-jeux qu'un nœud de la mini-carte peut servir. */
-export const MINI_JEUX: readonly MiniJeuId[] = ['couperet', 'palet']
+export const MINI_JEUX: readonly MiniJeuId[] = ['couperet', 'palet', 'flipper']
 
 /** LE TIRAGE du mini-jeu d'un nœud : au hasard du catalogue, à la graine. */
 export function tireMiniJeu(alea: () => number): MiniJeuId {
@@ -76,11 +77,11 @@ export function tireMiniJeu(alea: () => number): MiniJeuId {
   return MINI_JEUX[i]
 }
 
-export const NOMS_MINI_JEU: Record<MiniJeuId, string> = { couperet: 'LE COUPERET', palet: 'LE PALET' }
+export const NOMS_MINI_JEU: Record<MiniJeuId, string> = { couperet: 'LE COUPERET', palet: 'LE PALET', flipper: 'LE FLIPPER' }
 
 /** Ce tableau est-il un mini-jeu ? (il n'a pas de sas : il mesure) */
 export function estMiniJeu(level: { code: string; minijeu?: MiniJeuDef }): boolean {
-  return !!level.minijeu || level.code === CODE_COUPERET || level.code === CODE_PALET
+  return !!level.minijeu || level.code === CODE_COUPERET || level.code === CODE_PALET || level.code === CODE_FLIPPER
 }
 
 /** LE TRAIT : une part du volume de départ, entre 35 et 70 %, arrondie au
@@ -381,5 +382,167 @@ export function tableauPalet(regles: ReglesPalet = REGLES_PALET, reglages: Parti
       { x: maison.x, y: -560, text: `3 LANCERS · LE MEILLEUR COMPTE`, tone: 'mur' },
     ],
     minijeu: { type: 'palet', regles, reglages },
+  }
+}
+
+// ---- LE FLIPPER --------------------------------------------------------------
+//
+// LE FLIPPER. Le solveur a déjà un vrai bumper — un palet de glace sur une
+// paroi hydrophobe repart avec plus de vitesse qu'il n'en avait, et une
+// pichenette minimale — et personne ne jouait avec. Une table portrait : un
+// courant (chasse) tire vers le bas, c'est la gravité ; une zone de glace
+// couvre la table, le corps EST la bille ; trois bumpers ronds et deux
+// slingshots hydrophobes marquent les points ; deux flippers sont des portes
+// ÉVENTAIL scénarisées, dont le front pivotant POUSSE la bille quand le
+// joueur presse (à gauche du centre : le flipper gauche, à droite : le
+// droit) ; entre les deux, le trou. Trois billes, les points s'additionnent.
+
+export interface ReglesFlipper {
+  /** le trou : la bille dont le centre y entre est perdue */
+  trou: { minX: number; minY: number; maxX: number; maxY: number }
+  /** l'abscisse qui sépare les deux flippers (à gauche : le gauche) */
+  centre: number
+  billes: number
+  /** une bille qui traîne plus longtemps est rendue (une bille coincée) */
+  dureeMax: number
+  /** deux chocs plus rapprochés que cela sont le même coup */
+  coupMin: number
+  /** les points, du meilleur au moindre : ≥ p0 grand chelem, ≥ p1 belle partie, ≥ p2 quelques points */
+  paliers: [number, number, number]
+}
+
+export const REGLES_FLIPPER: ReglesFlipper = {
+  trou: { minX: -150, minY: -1000, maxX: 150, maxY: -880 },
+  centre: 0,
+  billes: 3,
+  dureeMax: 75,
+  coupMin: 0.12,
+  paliers: [24, 12, 4],
+}
+
+export interface FlipperDef {
+  type: 'flipper'
+  regles: ReglesFlipper
+  reglages?: Partial<SimParams>
+}
+
+export interface EtatFlipper {
+  /** les points de chaque bille jouée */
+  billes: number[]
+  /** la bille en cours : depuis quand, les points, le compte de chocs du solveur déjà lu, l'instant du dernier coup */
+  enCours: { debut: number; points: number; chocsLus: number; dernierCoup: number } | null
+  fini: boolean
+}
+
+export const ETAT_FLIPPER_NEUF: EtatFlipper = { billes: [], enCours: null, fini: false }
+
+export interface ObservationFlipper {
+  t: number
+  x: number
+  y: number
+  /** le compte cumulé des chocs de bumper du solveur */
+  chocs: number
+}
+
+export function pointsFlipper(e: EtatFlipper): number {
+  return e.billes.reduce((s, p) => s + p, 0) + (e.enCours?.points ?? 0)
+}
+
+export function noteFlipper(points: number, paliers: ReglesFlipper['paliers'], bareme: BaremeTrait = BAREME_TRAIT): NoteTrait {
+  const verdict: NoteTrait['verdict'] = points >= paliers[0] ? 'juste' : points >= paliers[1] ? 'proche' : points >= paliers[2] ? 'loin' : 'rate'
+  const facteur = verdict === 'juste' ? bareme.juste : verdict === 'proche' ? bareme.proche : verdict === 'loin' ? bareme.loin : 0
+  return { ecart: points, verdict, memoire: Math.round(bareme.base * facteur) }
+}
+
+export const VERDICTS_FLIPPER: Record<NoteTrait['verdict'], string> = {
+  juste: 'GRAND CHELEM',
+  proche: 'BELLE PARTIE',
+  loin: 'QUELQUES POINTS',
+  rate: 'BILLE PERDUE',
+}
+
+/** LE FLIPPER AVANCE d'une observation : la bille en jeu marque un point
+ *  par choc de bumper (deux chocs plus rapprochés que `coupMin` sont le
+ *  même coup) ; elle est perdue quand son centre entre dans le trou, ou
+ *  rendue après `dureeMax` (coincée) ; après la dernière bille, c'est fini.
+ *  Pur : rend un état neuf, jamais ne touche l'ancien. */
+export function avanceFlipper(e: EtatFlipper, o: ObservationFlipper, r: ReglesFlipper = REGLES_FLIPPER): EtatFlipper {
+  if (e.fini) return e
+  if (!e.enCours) return { ...e, enCours: { debut: o.t, points: 0, chocsLus: o.chocs, dernierCoup: -Infinity } }
+  const c = e.enCours
+  let points = c.points
+  let dernierCoup = c.dernierCoup
+  if (o.chocs > c.chocsLus && o.t - c.dernierCoup >= r.coupMin) {
+    points++
+    dernierCoup = o.t
+  }
+  const dansTrou = o.x >= r.trou.minX && o.x <= r.trou.maxX && o.y >= r.trou.minY && o.y <= r.trou.maxY
+  if (!dansTrou && o.t - c.debut < r.dureeMax)
+    return { billes: e.billes, enCours: { debut: c.debut, points, chocsLus: o.chocs, dernierCoup }, fini: false }
+  const billes = [...e.billes, points]
+  return { billes, enCours: null, fini: billes.length >= r.billes }
+}
+
+/** LES RÉGLAGES DU FLIPPER : la bille prend vite, rebondit franchement sur
+ *  les parois, et les bumpers claquent — plus de retour que d'aller, une
+ *  pichenette nette. Aucune glisse freinée : une bille roule. */
+export const REGLAGES_FLIPPER: Partial<SimParams> = {
+  freezeSelfTime: 0.2,
+  iceRestitution: 0.75,
+  hydrophobeIceRestitution: 1.3,
+  hydrophobeIceKick: 420,
+  iceSlideDrag: 0,
+}
+
+/** LA TABLE DU FLIPPER : portrait, la bille naît en haut, le courant la
+ *  tire vers le bas, deux guides l'amènent aux flippers. Les flippers sont
+ *  deux portes éventail sur charnière extérieure (nord-ouest à gauche, en
+ *  sens trigonométrique ; nord-est à droite, en sens horaire) : leur front
+ *  balaie du bas vers le centre et pousse la bille vers le haut. */
+export function tableauFlipper(regles: ReglesFlipper = REGLES_FLIPPER, reglages: Partial<SimParams> = REGLAGES_FLIPPER): LevelDef {
+  const bumper = (x: number, y: number, r: number): ObstacleBox => ({ minX: x - r, minY: y - r, maxX: x + r, maxY: y + r, material: MAT_HYDROPHOBE, forme: 1 })
+  const flippers: PorteDef[] = [
+    { minX: -430, minY: -900, maxX: -150, maxY: -760, canal: -1, materialisation: 'eventail', pivot: 6, allure: 3200 },
+    { minX: 150, minY: -900, maxX: 430, maxY: -760, canal: -1, materialisation: 'eventail', pivot: 4, horaire: true, allure: 3200 },
+  ]
+  return {
+    name: 'Le flipper',
+    code: CODE_FLIPPER,
+    journal:
+      `Une table, trois bumpers, deux flippers, un trou. Vous êtes la bille : la table vous gèle, le courant vous tire vers le bas. ` +
+      `Pressez à gauche du centre pour le flipper gauche, à droite pour le droit — chaque bumper touché marque un point. ` +
+      `Trois billes, les points s'additionnent. Au-delà de ${regles.paliers[0]} points, la mémoire triple.`,
+    par: 4,
+    bounds: { minX: -700, minY: -1000, maxX: 700, maxY: 1000 },
+    spawn: { x: 0, y: 820, n: 900 },
+    exit: { minX: 800, minY: -60, maxX: 860, maxY: 60 },
+    boxes: [
+      // les bumpers : trois disques hydrophobes, en triangle
+      bumper(-260, 300, 90),
+      bumper(260, 300, 90),
+      bumper(0, 540, 90),
+      // les slingshots : deux coins hydrophobes au-dessus des flippers
+      { minX: -600, minY: -560, maxX: -440, maxY: -360, material: MAT_HYDROPHOBE, forme: 3, p0: 1 },
+      { minX: 440, minY: -560, maxX: 600, maxY: -360, material: MAT_HYDROPHOBE, forme: 3, p0: 0 },
+      // les guides : deux parois inclinées qui mènent aux flippers
+      { minX: -700, minY: -700, maxX: -380, maxY: -640, material: MAT_WALL, angle: -32, skin: 5 },
+      { minX: 380, minY: -700, maxX: 700, maxY: -640, material: MAT_WALL, angle: 32, skin: 5 },
+      // le fond, de part et d'autre du trou : la bille qui manque les flippers y tombe
+      { minX: -700, minY: -1000, maxX: -150, maxY: -900, material: MAT_WALL, skin: 4 },
+      { minX: 150, minY: -1000, maxX: 700, maxY: -900, material: MAT_WALL, skin: 4 },
+    ],
+    portes: flippers,
+    // la gravité : un courant permanent vers le bas, sur toute la table
+    chasses: [{ minX: -700, minY: -1000, maxX: 700, maxY: 1000, angle: -90, allure: 260 }],
+    // la bille : la table entière impose la glace
+    zones: [{ minX: -700, minY: -1000, maxX: 700, maxY: 1000, force: 'glace' }],
+    sponges: [],
+    labels: [
+      { x: 0, y: 930, text: 'LE FLIPPER', tone: 'mur' },
+      { x: 0, y: 700, text: '1 · VOUS ÊTES LA BILLE : LE COURANT VOUS TIRE VERS LE BAS', tone: 'mur' },
+      { x: 0, y: 100, text: '2 · CHAQUE BUMPER TOUCHÉ MARQUE UN POINT', tone: 'mur' },
+      { x: 0, y: -960, text: 'PRESSEZ À GAUCHE OU À DROITE : LE FLIPPER DU MÊME CÔTÉ', tone: 'mur' },
+    ],
+    minijeu: { type: 'flipper', regles, reglages },
   }
 }

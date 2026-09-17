@@ -122,20 +122,27 @@ import {
 } from './game/voiesModule'
 import { CLE_MANQUES, inventairePool, litManques, noteManque, type Manque } from './game/manques'
 import {
+  avanceFlipper,
   avancePalet,
   compteAuDela,
   estMiniJeu,
+  ETAT_FLIPPER_NEUF,
   ETAT_PALET_NEUF,
   meilleurLancer,
+  noteFlipper,
   notePalet,
   noteTrait,
   phaseCouperet,
+  pointsFlipper,
   tableauCouperet,
+  tableauFlipper,
   tableauPalet,
   tireMiniJeu,
   tireTrait,
+  VERDICTS_FLIPPER,
   VERDICTS_PALET,
   VERDICTS_TRAIT,
+  type EtatFlipper,
   type EtatPalet,
   type Lancer,
   type NoteTrait,
@@ -999,6 +1006,12 @@ let couperetLamePrec = false
 // ou valider — une fois)
 let paletEtat: EtatPalet = ETAT_PALET_NEUF
 let paletLancersVus = 0
+// LE FLIPPER en cours : ses billes (avanceFlipper, pur), combien ont été
+// montrées, et le flipper que le joueur presse à cette image (lu au sous-pas
+// des portes, décidé à l'image d'après le point de visée)
+let flipperEtat: EtatFlipper = ETAT_FLIPPER_NEUF
+let flipperBillesVues = 0
+let flipperPresse: 'gauche' | 'droit' | null = null
 // LES RÉGLAGES d'un mini-jeu en cours : les valeurs du banc qu'il a
 // remplacées, pour les rendre à la salle suivante
 let reglagesRendus: Partial<SimParams> = {}
@@ -7089,7 +7102,7 @@ function renderDescente(): void {
     ),
     dscCran(
       'MINI-JEUX PAR MODULE',
-      'le couperet ou le palet, tirés à la graine : la précision paie en mémoire — 0 : aucun',
+      'le couperet, le palet ou le flipper, tirés à la graine : la précision paie en mémoire — 0 : aucun',
       () => voiePlan.minijeuxParModule,
       (v) => {
         voiePlan.minijeuxParModule = v
@@ -8670,6 +8683,30 @@ function drawMecanismes(vw: number, vh: number, dpr: number): void {
     paletEtat.lancers.forEach((l, i) => {
       g.fillText(`${i + 1}. ${Math.round(l.distance)} u — ${VERDICTS_PALET[l.verdict]}`, anc.sx, anc.sy + t * (1.1 + i * 0.95))
     })
+    g.restore()
+  }
+
+  // LE FLIPPER : le trou (un cadre rouge), et le tableau de bord — la bille
+  // en jeu, les points, le temps de la bille
+  if (level.minijeu?.type === 'flipper') {
+    const r = level.minijeu.regles
+    g.save()
+    const a = S(r.trou.minX, r.trou.maxY)
+    const b = S(r.trou.maxX, r.trou.minY)
+    g.strokeStyle = 'rgba(255,110,110,0.75)'
+    g.setLineDash([6, 6])
+    g.lineWidth = 2
+    g.strokeRect(a.sx, a.sy, b.sx - a.sx, b.sy - a.sy)
+    g.setLineDash([])
+    const t = Math.max(12, Math.min(28, 90 * z))
+    const anc = S(0, 870)
+    g.textAlign = 'center'
+    g.font = `600 ${Math.round(t * 0.9)}px ui-monospace, monospace`
+    g.fillStyle = 'rgba(255,255,255,0.92)'
+    const num = Math.min(r.billes, flipperEtat.billes.length + (flipperEtat.enCours ? 1 : 0))
+    const pts = pointsFlipper(flipperEtat)
+    const depuis = flipperEtat.enCours ? run.tableauTime - flipperEtat.enCours.debut : 0
+    g.fillText(minijeuResultat ? `FINI — ${pts} POINTS` : `BILLE ${num} / ${r.billes} · ${pts} POINT${pts > 1 ? 'S' : ''} · ${Math.floor(depuis)} s`, anc.sx, anc.sy)
     g.restore()
   }
 
@@ -12550,6 +12587,12 @@ function lanceManoeuvre(quoi: string): void {
         closeHome()
         break
       }
+      case 'flipper': {
+        lanceFlipperEssai()
+        pupitreEl.hidden = true
+        closeHome()
+        break
+      }
       case 'hub-principal': {
         const r = passeLeHub('principal')
         if (r === 'ok') {
@@ -12811,6 +12854,7 @@ function majPortes(dt: number): void {
       laserEtat.portesOuvertes[i] = true
   }
   majCouperet()
+  majFlipperPortes()
   // un tableau SANS émetteur n'attend rien d'un faisceau : ses portes se
   // posent dès la première image (voir posePortes)
   if (!laserEtat.portesPose && (level.lasers?.length ?? 0) === 0) posePortes()
@@ -12877,6 +12921,63 @@ function majCouperet(): void {
   laserEtat.portesOuvertes[0] = !ph.tombee
 }
 
+/** LES FLIPPERS : deux portes éventail scénarisées, fermées (le front
+ *  balaie et pousse la bille) tant que le joueur presse de leur côté,
+ *  rouvertes sinon. Une bille perdue ou la partie finie les laisse ouverts. */
+function majFlipperPortes(): void {
+  const mj = level.minijeu
+  if (!mj || mj.type !== 'flipper' || (level.portes?.length ?? 0) < 2) return
+  const actif = !minijeuResultat && flipperEtat.enCours !== null
+  laserEtat.portesOuvertes[0] = !(actif && flipperPresse === 'gauche')
+  laserEtat.portesOuvertes[1] = !(actif && flipperPresse === 'droit')
+}
+
+/** LE FLIPPER, à l'image : la bille marque aux chocs de bumper que compte
+ *  le solveur, elle est perdue dans le trou ; la bille perdue ouvre le
+ *  choix (une autre, ou valider), la dernière conclut. */
+function majFlipper(): void {
+  const mj = level.minijeu
+  if (!mj || mj.type !== 'flipper' || minijeuResultat || miseEnBonbonne) return
+  flipperEtat = avanceFlipper(
+    flipperEtat,
+    { t: run.tableauTime, x: sim.stats.centroidX, y: sim.stats.centroidY, chocs: sim.bumperHits },
+    mj.regles,
+  )
+  if (flipperEtat.billes.length <= flipperBillesVues) return
+  flipperBillesVues = flipperEtat.billes.length
+  if (flipperEtat.fini) valideFlipper()
+  else {
+    const num = flipperEtat.billes.length
+    const derniere = flipperEtat.billes[num - 1]
+    mbMontreChoixMiniJeu(
+      'LE FLIPPER',
+      `BILLE ${num} / ${mj.regles.billes} PERDUE — ${derniere} POINT${derniere > 1 ? 'S' : ''} · TOTAL ${pointsFlipper(flipperEtat)}`,
+      { icone: '🎱', titre: `BILLE ${num + 1} / ${mj.regles.billes}`, sous: 'remise en place en haut de la table, même volume de base', action: relanceFlipper },
+      { sous: `garder ${pointsFlipper(flipperEtat)} point${pointsFlipper(flipperEtat) > 1 ? 's' : ''} · ${VERDICTS_FLIPPER[noteFlipper(pointsFlipper(flipperEtat), mj.regles.paliers).verdict]}`, action: valideFlipper },
+    )
+  }
+}
+
+function valideFlipper(): void {
+  const mj = level.minijeu
+  if (!mj || mj.type !== 'flipper') return
+  const points = pointsFlipper(flipperEtat)
+  const note = noteFlipper(points, mj.regles.paliers)
+  minijeuResultat = {
+    note,
+    mesure: points,
+    titre: `LE FLIPPER — ${VERDICTS_FLIPPER[note.verdict]}`,
+    detail: `${points} point${points > 1 ? 's' : ''} en ${flipperEtat.billes.length} bille${flipperEtat.billes.length > 1 ? 's' : ''}`,
+  }
+}
+
+function relanceFlipper(): void {
+  const garde = flipperEtat
+  restart()
+  flipperEtat = { ...garde, enCours: null }
+  flipperBillesVues = garde.billes.length
+}
+
 /** LE PALET, à l'image : ce que le jeu observe du corps (la glace est-elle
  *  prise, où est son centre, à quelle vitesse) passe à avancePalet, qui
  *  tient les lancers. Le dernier lancer fini — ou le joueur qui conclut
@@ -12938,6 +13039,22 @@ function mbMontreChoixPalet(dernier: Lancer): void {
   if (!mj || mj.type !== 'palet') return
   const num = paletEtat.lancers.length
   const best = meilleurLancer(paletEtat)!
+  mbMontreChoixMiniJeu(
+    'LE PALET',
+    `LANCER ${num} / ${mj.regles.lancers} — ${Math.round(dernier.distance)} u DU CENTRE · ${VERDICTS_PALET[dernier.verdict]}`,
+    { icone: '🥌', titre: `LANCER ${num + 1} / ${mj.regles.lancers}`, sous: 'remise en place au départ, même volume de base', action: relancePalet },
+    { sous: `garder le meilleur : ${Math.round(best.distance)} u · ${VERDICTS_PALET[best.verdict]}`, action: validePalet },
+  )
+}
+
+/** LE CHOIX D'UN MINI-JEU À MANCHES (le palet, le flipper) : deux cartes sur
+ *  la scène des haltes — rejouer une manche (remise en place), ou valider. */
+function mbMontreChoixMiniJeu(
+  question: string,
+  titre: string,
+  relance: { icone: string; titre: string; sous: string; action: () => void },
+  valider: { sous: string; action: () => void },
+): void {
   miseEnBonbonne = true
   mbBilanCourant = null
   mbVeil.hidden = false
@@ -12948,8 +13065,8 @@ function mbMontreChoixPalet(dernier: Lancer): void {
   mbEl('mb-passer').hidden = true
   mbEl('mb-choix').hidden = false
   mbEtape = 'repos'
-  mbQuestion('LE PALET')
-  mbEl('mb-choix-titre').textContent = `LANCER ${num} / ${mj.regles.lancers} — ${Math.round(dernier.distance)} u DU CENTRE · ${VERDICTS_PALET[dernier.verdict]}`
+  mbQuestion(question)
+  mbEl('mb-choix-titre').textContent = titre
   const host = mbCartes()
   host.innerHTML = ''
   host.classList.add('mb-trio')
@@ -12969,8 +13086,8 @@ function mbMontreChoixPalet(dernier: Lancer): void {
     })
     host.appendChild(btn)
   }
-  carte(1, '🥌', `LANCER ${num + 1} / ${mj.regles.lancers}`, 'remise en place au départ, même volume de base', relancePalet)
-  carte(3, '✓', 'VALIDER', `garder le meilleur : ${Math.round(best.distance)} u · ${VERDICTS_PALET[best.verdict]}`, validePalet)
+  carte(1, relance.icone, relance.titre, relance.sous, relance.action)
+  carte(3, '✓', 'VALIDER', valider.sous, valider.action)
 }
 
 /** LA POSE : chaque porte prend l'état de son canal d'un coup, sans jouer
@@ -13003,6 +13120,9 @@ function resetLasers(): void {
   minijeuResultat = null
   paletEtat = ETAT_PALET_NEUF
   paletLancersVus = 0
+  flipperEtat = ETAT_FLIPPER_NEUF
+  flipperBillesVues = 0
+  flipperPresse = null
   laserEtat.chassesActives = (level.chasses ?? []).map(() => false)
   laserEtat.chasseBouffee = (level.chasses ?? []).map(() => 0)
   lastRailTime = 0
@@ -14990,6 +15110,7 @@ function ouvreNoeud(nature: Exclude<NatureNoeud, 'salle'>): void {
       const alea = aleaDeGraine(`${carteRun.tissage || graineRun()}@minijeu${carteRun.niveau}`)
       const quel = tireMiniJeu(alea)
       if (quel === 'palet') minijeuIntercalaire = tableauPalet()
+      else if (quel === 'flipper') minijeuIntercalaire = tableauFlipper()
       else {
         const volumeL = volumeDepart(tableauCouperet(1)) * params.litersPerParticle
         minijeuIntercalaire = tableauCouperet(tireTrait(volumeL, alea))
@@ -15026,7 +15147,7 @@ function mbMontreResultatMiniJeu(r: NonNullable<typeof minijeuResultat>, suite: 
   btn.className = 'mb-carte mb-repos'
   btn.style.gridColumn = '2'
   btn.innerHTML =
-    `<i class="mb-repos-icone">${level.minijeu?.type === 'palet' ? '🥌' : '🔪'}</i><b>${r.titre.split(' — ')[1] ?? ''}</b>` +
+    `<i class="mb-repos-icone">${level.minijeu?.type === 'palet' ? '🥌' : level.minijeu?.type === 'flipper' ? '🎱' : '🔪'}</i><b>${r.titre.split(' — ')[1] ?? ''}</b>` +
     `<small>${res.memoire > 0 ? `+${res.memoire} mémoire` : 'rien — le trait est loin'} · continuer</small>`
   let elu = false
   btn.addEventListener('click', () => {
@@ -15748,6 +15869,16 @@ function lancePaletEssai(): void {
   restart()
 }
 ;(window as unknown as { __palet: () => void }).__palet = lancePaletEssai
+// JOUER LE FLIPPER EN ESSAI (le pupitre, et la sonde __flipper())
+function lanceFlipperEssai(): void {
+  if (miseEnBonbonne) fermeMiseEnBonbonne()
+  auHub = false
+  hasPlayed = true
+  document.body.classList.add('playing')
+  testLevel = tableauFlipper()
+  restart()
+}
+;(window as unknown as { __flipper: () => void }).__flipper = lanceFlipperEssai
 
 function newExpedition(avecCarte = false): void {
   levelIndex = 0
@@ -17352,6 +17483,9 @@ function corpsImage(now: number): boolean {
   }
 
   const aim = camera.screenToWorld(input.aimClientX, input.aimClientY, vw, vh)
+  // AU FLIPPER, presser c'est actionner le flipper du côté de la visée
+  flipperPresse =
+    level.minijeu?.type === 'flipper' && input.aimActive ? (aim.x < level.minijeu.regles.centre ? 'gauche' : 'droit') : null
   const tableauDone = run.exitTimer > 0 || run.ended || miseEnBonbonne
 
   // Zones d'état (refonte 2026) : une zone impose un état et verrouille le
@@ -18174,7 +18308,7 @@ function corpsImage(now: number): boolean {
       effaceRun()
       newExpedition(true)
     })
-  } else if (!tableauDone && !sim.dispersed && estMiniJeu(level) && level.minijeu && (majPalet(), minijeuResultat)) {
+  } else if (!tableauDone && !sim.dispersed && estMiniJeu(level) && level.minijeu && (majPalet(), majFlipper(), minijeuResultat)) {
     // LE MINI-JEU A CONCLU : la lame du couperet a pesé, le palet a fait
     // ses lancers (ou le joueur a conclu). Rien ne se consigne aux registres
     // (pas un tableau du protocole), la mémoire se gagne au barème, la

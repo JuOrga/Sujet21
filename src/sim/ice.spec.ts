@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { DEFAULT_PARAMS, type SimParams } from './params'
 import { FluidSim, KIND_FREE, KIND_PLAYER, type Bounds } from './solver'
-import { MAT_FROID, MAT_WALL } from '../game/level'
+import { MAT_FROID, MAT_HYDROPHOBE, MAT_WALL } from '../game/level'
 
 const OPEN: Bounds = { minX: -3000, minY: -3000, maxX: 3000, maxY: 3000 }
 
@@ -293,5 +293,26 @@ describe('FluidSim — la glisse freinée (iceSlideDrag, le mini-jeu du palet)',
     // e^(−0,45) ≈ 0,64 après une seconde
     expect(freinee.stats.velX).toBeLessThan(600 * 0.72)
     expect(freinee.stats.velX).toBeGreaterThan(600 * 0.55)
+  })
+})
+
+describe('FluidSim — les coups de bumper (bumperHits, le mini-jeu du flipper)', () => {
+  it('un bloc de glace qui frappe une paroi hydrophobe compte un choc ; une paroi neutre, aucun', () => {
+    const frappe = (material: number): number => {
+      const sim = new FluidSim({ ...DEFAULT_PARAMS }, OPEN, 2048)
+      sim.setLevel([{ minX: 200, minY: -400, maxX: 300, maxY: 400, material }], [])
+      sim.spawnDisc(0, 0, 60, KIND_PLAYER)
+      sim.freezeIntent = true
+      for (let i = 0; i < sim.count; i++) {
+        sim.frozen[i] = 1
+        sim.frost[i] = 1
+        sim.velX[i] = 500
+      }
+      sim.relabel()
+      run(sim, 1.5)
+      return sim.bumperHits
+    }
+    expect(frappe(MAT_WALL)).toBe(0)
+    expect(frappe(MAT_HYDROPHOBE)).toBeGreaterThan(0)
   })
 })

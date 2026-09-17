@@ -194,10 +194,88 @@ describe('le palet — les lancers et la maison', () => {
 
   it('le tirage au catalogue rend chaque mini-jeu, et jamais autre chose', () => {
     expect(tireMiniJeu(() => 0)).toBe('couperet')
-    expect(tireMiniJeu(() => 0.99)).toBe('palet')
-    expect(tireMiniJeu(() => 1)).toBe('palet')
+    expect(tireMiniJeu(() => 0.5)).toBe('palet')
+    expect(tireMiniJeu(() => 0.99)).toBe('flipper')
+    expect(tireMiniJeu(() => 1)).toBe('flipper')
     const vus = new Set<string>()
     for (let i = 0; i < 40; i++) vus.add(tireMiniJeu(aleaDeGraine(`m${i}`)))
     expect([...vus].sort()).toEqual([...MINI_JEUX].sort())
+  })
+})
+
+import {
+  avanceFlipper,
+  ETAT_FLIPPER_NEUF,
+  noteFlipper,
+  pointsFlipper,
+  REGLAGES_FLIPPER,
+  REGLES_FLIPPER,
+  tableauFlipper,
+  VERDICTS_FLIPPER,
+} from './minijeux'
+import { MAT_HYDROPHOBE } from './level'
+
+describe('le flipper — les billes et les points', () => {
+  const r = { ...REGLES_FLIPPER, trou: { minX: -150, minY: -1000, maxX: 150, maxY: -880 }, billes: 3, dureeMax: 75, coupMin: 0.12, paliers: [24, 12, 4] as [number, number, number] }
+  const obs = (t: number, x: number, y: number, chocs: number) => ({ t, x, y, chocs })
+
+  it('le verdict suit les paliers de points, au barème du trait', () => {
+    expect(noteFlipper(30, r.paliers)).toMatchObject({ verdict: 'juste', memoire: 15 })
+    expect(noteFlipper(12, r.paliers)).toMatchObject({ verdict: 'proche', memoire: 5 })
+    expect(noteFlipper(5, r.paliers)).toMatchObject({ verdict: 'loin', memoire: 3 })
+    expect(noteFlipper(0, r.paliers)).toMatchObject({ verdict: 'rate', memoire: 0 })
+    expect(VERDICTS_FLIPPER.juste).toBe('GRAND CHELEM')
+  })
+
+  it('la bille marque un point par choc, deux chocs trop rapprochés sont le même coup, le trou la perd', () => {
+    let e = avanceFlipper(ETAT_FLIPPER_NEUF, obs(0, 0, 800, 5), r) // les chocs d'avant la bille ne comptent pas
+    expect(e.enCours).toMatchObject({ points: 0, chocsLus: 5 })
+    e = avanceFlipper(e, obs(1, 0, 300, 6), r) // un choc
+    e = avanceFlipper(e, obs(1.05, 0, 290, 8), r) // le même coup, deux pas plus tard
+    expect(pointsFlipper(e)).toBe(1)
+    e = avanceFlipper(e, obs(1.5, 100, 200, 9), r) // un autre
+    expect(pointsFlipper(e)).toBe(2)
+    e = avanceFlipper(e, obs(4, 0, -950, 9), r) // dans le trou
+    expect(e.billes).toEqual([2])
+    expect(e.enCours).toBeNull()
+    expect(e.fini).toBe(false)
+    // la bille suivante repart de zéro, le total s'additionne
+    e = avanceFlipper(e, obs(5, 0, 800, 9), r)
+    e = avanceFlipper(e, obs(6, 0, 300, 10), r)
+    expect(pointsFlipper(e)).toBe(3)
+  })
+
+  it('une bille coincée est rendue après la durée ; la dernière bille finit la partie', () => {
+    let e = ETAT_FLIPPER_NEUF
+    for (let b = 0; b < 3; b++) {
+      e = avanceFlipper(e, obs(b * 100, 0, 800, 0), r)
+      e = avanceFlipper(e, obs(b * 100 + 80, 300, 300, 0), r) // 80 s : coincée, rendue
+    }
+    expect(e.billes).toEqual([0, 0, 0])
+    expect(e.fini).toBe(true)
+    expect(avanceFlipper(e, obs(400, 0, 800, 0), r)).toBe(e)
+  })
+
+  it('la table : les bumpers sont des disques hydrophobes, les flippers deux éventails sur charnières extérieures, la glace partout, le courant vers le bas — et pas de sas', () => {
+    const lv = tableauFlipper()
+    expect(lv.minijeu?.type).toBe('flipper')
+    expect(lv.minijeu?.reglages).toEqual(REGLAGES_FLIPPER)
+    const bumpers = lv.boxes.filter((b) => b.material === MAT_HYDROPHOBE && b.forme === 1)
+    expect(bumpers).toHaveLength(3)
+    expect(lv.portes).toHaveLength(2)
+    const [g, d] = lv.portes!
+    expect(g.materialisation).toBe('eventail')
+    expect(g.pivot).toBe(6) // charnière nord-ouest, sens trigonométrique : le front monte vers le centre
+    expect(d.pivot).toBe(4) // charnière nord-est, sens horaire
+    expect(d.horaire).toBe(true)
+    expect(g.canal).toBeLessThan(0)
+    expect(g.maxX).toBeLessThanOrEqual(REGLES_FLIPPER.trou.minX)
+    expect(d.minX).toBeGreaterThanOrEqual(REGLES_FLIPPER.trou.maxX)
+    expect(lv.zones?.[0]).toMatchObject({ force: 'glace', minX: lv.bounds.minX, maxX: lv.bounds.maxX })
+    expect(lv.chasses?.[0].angle).toBe(-90)
+    expect(lv.exit.minX).toBeGreaterThan(lv.bounds.maxX)
+    expect(lv.spawn.y).toBeGreaterThan(REGLES_FLIPPER.trou.maxY)
+    for (const b of lv.boxes)
+      expect(lv.spawn.x >= b.minX && lv.spawn.x <= b.maxX && lv.spawn.y >= b.minY && lv.spawn.y <= b.maxY).toBe(false)
   })
 })
