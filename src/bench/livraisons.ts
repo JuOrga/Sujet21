@@ -31,6 +31,16 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '17/09/2026 15:47',
+    title: 'LE PUITS SE DESSINE : plus d’anneau en jeu — une aura, des lueurs en orbite qui disent le cœur, l’étendue et le sens',
+    notes: [
+      'LA DEMANDE : « supprime le cercle visible en jeu du puits, et fais un design sympa avec des particules qui tournent automatiquement autour de chaque puits afin d’identifier les puits, leur aura et leur sens — à ajouter dans l’éditeur ».',
+      'LES LUEURS (game/puitsDessin.ts, pur) : dix-huit dans le cœur, huit dans le halo, chacune tourne à LA VITESSE ANGULAIRE D’UNE ORBITE À SA DISTANCE — la loi du solveur : d’un bloc dans le cœur (il est isochrone : une roue), à la traîne au-delà (le halo) ; on voit la lisière sans la tracer. Une traîne dans le sens de la course, un centre qui bat, une aura en dégradé qui s’éteint à la portée (sinon à 1,6 rayon). Les mêmes lueurs à chaque image (un bruit déterministe), différentes d’un puits à l’autre.',
+      'LE SENS (PuitsDef.sens : 1 direct, −1 horaire) : un DÉCOR — la gravité n’a pas de sens ; le tableau dit ainsi au joueur dans quel sens il l’invite à tourner. Dans la fiche du puits de l’éditeur (un menu), écrit dans le fichier seulement s’il est horaire, relu par levelIO, dit par la bulle savante et l’étiquette ↺/↻ de l’éditeur, qui garde l’anneau du cœur et la portée (des outils de conception) et ajoute les lueurs figées.',
+      'VÉRIFIÉ : puitsDessin.spec (la vitesse angulaire du cœur et du halo, la déterminisme, jamais sur la lisière, la traîne dans le sens du mouvement, le sens horaire qui inverse, l’aura bornée à la portée), levelIO et fiches ; type-check à 0, build propre. Injouable ici : le rendu est à regarder en main — la taille des lueurs, l’éclat de l’aura et la longueur des traînes sont des nombres du dessin, à tourner.',
+    ],
+  },
+  {
     date: '17/09/2026 15:25',
     title: 'LA RONDE : en glace, le corps tourne sans fin entre trois puits — une orbite fermée tirée, pas devinée',
     notes: [

@@ -21,6 +21,7 @@ l'éditeur : ce que la ligne dit est ce que le corps subit.
 | `force` | l'accélération au bord du cœur (u/s²) | `PUITS_FORCE_DEFAUT` = 540 |
 | `rayon` | le rayon du cœur (u) | `PUITS_RAYON_DEFAUT` = 300 |
 | `portee` | au-delà, plus rien ; fondu linéaire sur le dernier quart | absente : tout le tableau |
+| `sens` | le sens des lueurs qui tournent autour du puits, `1` direct, `-1` horaire — **un décor** : la gravité n'a pas de sens, le tableau invite | absent : direct |
 
 **La loi.** Dans le cœur, harmonique : `a = force · r / rayon` — pas de
 singularité au centre, les orbites sont des ellipses centrées sur le puits,
@@ -113,6 +114,18 @@ particules coûte quelques millisecondes : la ligne se lit en train de
 s'écrire. **Elle ne joue que les puits** : la copie ne reçoit ni le
 souffle du sas, ni les chasses, ni le vortex — dans une salle qui les
 mêle aux puits, la ligne s'en écarte (à ajouter si une telle salle naît).
+
+**Le dessin en jeu** (`src/game/puitsDessin.ts`, pur ; le concepteur, 17/09 :
+« supprime le cercle visible en jeu, des particules qui tournent autour de
+chaque puits pour identifier les puits, leur aura et leur sens »). Plus
+d'anneau : une **aura** (un dégradé qui s'éteint à la portée, sinon à
+1,6 rayon), un centre qui bat, et des **lueurs en orbite** qui disent vrai
+— chacune tourne à la vitesse angulaire d'une orbite circulaire à sa
+distance : d'un bloc dans le cœur (isochrone, une roue), à la traîne
+au-delà (le halo) — on voit la lisière sans la tracer. Une traîne dans le
+sens de la course. L'éditeur garde l'anneau du cœur et la portée (des
+outils de conception) et ajoute les lueurs figées, plus le sens dans la
+fiche.
 
 ## 5. Le mini-jeu « Les orbites »
 

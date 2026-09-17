@@ -229,6 +229,7 @@ export const FICHES_GENRES: Record<string, Fiche> = {
       { cle: '·', txt: 'Cœur harmonique : dedans, toute orbite a la même période, le corps reste entier.' },
       { cle: '·', txt: 'Halo au-delà : la marée étire — les orbites vivent dans le cœur, la lisière déchire.' },
       { cle: '·', txt: 'La ligne pointillée depuis le départ dit où l’impulsion mène ; « Prévision exacte » fait courir le solveur.' },
+      { cle: '·', txt: 'En jeu : une aura et des lueurs qui tournent (d’un bloc dans le cœur, à la traîne au-delà) — leur sens est un décor, il invite.' },
     ],
   },
   'genre:cible-tor': {
@@ -471,7 +472,7 @@ export function lignesVives(sel: SelFiche, level: LevelDef): FicheLigne[] {
     case 'puits': {
       const pu = (level.puits ?? [])[sel.index ?? -1]
       if (!pu) return []
-      return [{ cle: '·', txt: `Force ${pu.force ?? PUITS_FORCE_DEFAUT} u/s², cœur de ${pu.rayon ?? PUITS_RAYON_DEFAUT} u${pu.portee ? `, portée ${pu.portee} u` : ''}.` }]
+      return [{ cle: '·', txt: `Force ${pu.force ?? PUITS_FORCE_DEFAUT} u/s², cœur de ${pu.rayon ?? PUITS_RAYON_DEFAUT} u${pu.portee ? `, portée ${pu.portee} u` : ''}, lueurs en sens ${pu.sens === -1 ? 'horaire' : 'direct'}.` }]
     }
     case 'sponge': {
       const sp = level.sponges[sel.index ?? -1]

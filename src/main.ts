@@ -151,6 +151,7 @@ import {
   type NoteTrait,
 } from './game/minijeux'
 import { sansSas, tableauRonde } from './game/ronde'
+import { lueursPuits, porteeVisible } from './game/puitsDessin'
 import {
   ditEffet,
   offresDe,
@@ -8778,40 +8779,55 @@ function drawMecanismes(vw: number, vh: number, dpr: number): void {
     g.restore()
   }
 
-  // LES PUITS DE GRAVITÉ. Chaque puits : son cœur (un anneau — dedans, les
-  // orbites sont sûres ; la lisière déchire), sa portée en pointillé s'il en
-  // a une, une croix au centre. La ligne prédite du point-masse ne se
-  // dessine pas en jeu : elle est un outil de conception, dans l'éditeur (le
-  // concepteur, 17/09). En jeu, seule la PRÉVISION EXACTE se demande (P).
+  // LES PUITS DE GRAVITÉ. Plus d'anneau en jeu (le concepteur, 17/09) : une
+  // AURA — un halo qui s'éteint avec la distance — et des LUEURS en orbite
+  // (puitsDessin.ts), qui tournent à la vitesse d'une orbite à leur
+  // distance, d'un bloc dans le cœur, à la traîne au-delà : on lit le
+  // puits, son étendue et son sens sans un trait. Chaque lueur tire une
+  // traîne dans le sens de sa course. La ligne prédite du point-masse ne se
+  // dessine pas en jeu : c'est un outil de conception, dans l'éditeur. En
+  // jeu, seule la PRÉVISION EXACTE se demande (P).
   if ((level.puits?.length ?? 0) > 0) {
     const puits = level.puits!
+    const tLueurs = performance.now() / 1000
     g.save()
-    for (const p of puits) {
+    for (let i = 0; i < puits.length; i++) {
+      const p = puits[i]
       const c = S(p.x, p.y)
       const R = (p.rayon ?? PUITS_RAYON_DEFAUT) * z
+      const aura = porteeVisible(p) * z
+      // l'aura : un dégradé, vif au centre, éteint à la portée visible
+      const grad = g.createRadialGradient(c.sx, c.sy, 0, c.sx, c.sy, aura)
+      grad.addColorStop(0, 'rgba(190,170,255,0.22)')
+      grad.addColorStop(Math.min(1, R / Math.max(1, aura)), 'rgba(180,160,255,0.07)')
+      grad.addColorStop(1, 'rgba(180,160,255,0)')
+      g.fillStyle = grad
       g.beginPath()
-      g.arc(c.sx, c.sy, R, 0, Math.PI * 2)
-      g.fillStyle = 'rgba(180,160,255,0.06)'
+      g.arc(c.sx, c.sy, aura, 0, Math.PI * 2)
       g.fill()
-      g.strokeStyle = 'rgba(180,160,255,0.75)'
-      g.lineWidth = 1.5
-      g.stroke()
-      if (p.portee) {
-        g.beginPath()
-        g.arc(c.sx, c.sy, p.portee * z, 0, Math.PI * 2)
-        g.strokeStyle = 'rgba(180,160,255,0.3)'
-        g.setLineDash([4, 8])
-        g.stroke()
-        g.setLineDash([])
-      }
-      g.strokeStyle = 'rgba(220,210,255,0.9)'
-      g.lineWidth = 1.5
+      // le centre : un point qui bat doucement
+      const battement = 0.75 + 0.25 * Math.sin(tLueurs * 2.2 + i)
+      g.fillStyle = `rgba(230,220,255,${0.9 * battement})`
       g.beginPath()
-      g.moveTo(c.sx - 6, c.sy)
-      g.lineTo(c.sx + 6, c.sy)
-      g.moveTo(c.sx, c.sy - 6)
-      g.lineTo(c.sx, c.sy + 6)
-      g.stroke()
+      g.arc(c.sx, c.sy, Math.max(2, 5 * z), 0, Math.PI * 2)
+      g.fill()
+      // les lueurs et leurs traînes (l'écran a l'axe y vers le bas)
+      for (const l of lueursPuits(p, tLueurs, i)) {
+        const q = S(l.x, l.y)
+        const rayon = Math.max(1, l.taille * z)
+        const traine = Math.min(60 * z, l.vitesse * 0.12 * z)
+        g.strokeStyle = `rgba(200,185,255,${0.45 * l.alpha})`
+        g.lineWidth = Math.max(1, rayon * 0.9)
+        g.lineCap = 'round'
+        g.beginPath()
+        g.moveTo(q.sx - l.tx * traine, q.sy + l.ty * traine)
+        g.lineTo(q.sx, q.sy)
+        g.stroke()
+        g.fillStyle = `rgba(230,220,255,${l.alpha})`
+        g.beginPath()
+        g.arc(q.sx, q.sy, rayon, 0, Math.PI * 2)
+        g.fill()
+      }
     }
     // LA PRÉVISION EXACTE, en trait plein, qui grandit tant qu'elle se calcule
     if (prevision && prevision.points.length > 1) {
