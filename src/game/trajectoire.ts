@@ -2,9 +2,10 @@
 // le corps : la loi des puits (game/puits.ts, celle que le solveur applique),
 // le même pas (1/120 s), le même ordre (la vitesse d'abord, puis la
 // position — l'Euler semi-implicite du solveur : « prd = pos + vel·dt » après
-// que les champs ont poussé la vitesse). Pure : ni écran, ni solveur — le
-// jeu l'appelle à chaque image depuis le centre du corps, l'éditeur depuis le
-// départ du tableau (le patron de laser.ts : un traceur, deux mondes).
+// que les champs ont poussé la vitesse). Pure : ni écran, ni solveur —
+// l'éditeur l'appelle depuis le départ du tableau, à chaque réglage (le
+// patron de laser.ts : un traceur sans monde). En jeu, elle ne se dessine
+// pas (le concepteur, 17/09) : seule la prévision exacte s'y demande.
 //
 // POURQUOI UN POINT-MASSE PRÉDIT UN FLUIDE. Dans le cœur harmonique d'un
 // puits, la force est linéaire en position : la somme sur le corps donne
@@ -19,8 +20,10 @@
 // NON MODÉLISÉ, à dessein : les éponges, les pertes des grilles, les portes
 // fermées (l'appelant les ajoute aux boîtes comme le jeu le fait pour les
 // lasers), la vapeur (gasDrag la fait spiraler : `frottement` l'approche).
+// La ligne est celle du corps LIQUIDE : une membrane le laisse passer (elle
+// ne bute que la glace et la vapeur), elle n'est donc pas une paroi ici.
 import type { Bounds } from '../sim/solver'
-import { MAT_HYDROPHILE, MAT_HYDROPHOBE, sansPhysique, type ObstacleBox, type PuitsDef } from './level'
+import { MAT_HYDROPHILE, MAT_HYDROPHOBE, MAT_MEMBRANE, sansPhysique, type ObstacleBox, type PuitsDef } from './level'
 import { formeContact, type FormeContact } from './formes'
 import { accelerationPuits, type Accel } from './puits'
 
@@ -103,7 +106,7 @@ export function traceTrajectoire(depart: DepartTrajectoire, monde: MondeTrajecto
   const eMur = monde.restitution ?? TRAJ_RESTITUTION_MUR
   const ePhobe = monde.restitutionHydrophobe ?? TRAJ_RESTITUTION_HYDROPHOBE
   const frein = monde.frottement && monde.frottement > 0 ? Math.exp(-monde.frottement * dt) : 1
-  const boites = monde.boxes.filter((b) => !sansPhysique(b.material))
+  const boites = monde.boxes.filter((b) => !sansPhysique(b.material) && b.material !== MAT_MEMBRANE)
   const steps = Math.max(1, Math.round(monde.duree / dt))
   const b = monde.bounds
   let x = depart.x
@@ -112,12 +115,16 @@ export function traceTrajectoire(depart: DepartTrajectoire, monde: MondeTrajecto
   let vy = depart.vy
   const points: PointTrajectoire[] = [{ x, y, t: 0 }]
   const evenements: EvenementTrajectoire[] = []
-  const passages: PassagePuits[] = monde.puits.map((_, i) => ({ puits: i, t: 0, distance: Infinity }))
+  // le départ compte : s'il est déjà la plus courte approche, c'est lui
+  const passages: PassagePuits[] = monde.puits.map((p, i) => ({ puits: i, t: 0, distance: Math.hypot(p.x - x, p.y - y) }))
   const acc: Accel = { ax: 0, ay: 0 }
   const contact: FormeContact = { dist: 0, nx: 0, ny: 1 }
   // un contact qui dure (le corps glisse le long d'une paroi) n'est qu'un
   // seul événement : on note les boîtes déjà en contact au pas précédent
   let enContact = new Set<number>()
+  // même chose pour les bords : un puits qui plaque le corps contre la cuve
+  // le ferait « rebondir » à chaque pas — un seul événement par contact
+  let bordContact = false
   let fin: Trajectoire['fin'] = 'duree'
   for (let k = 1; k <= steps; k++) {
     const t = k * dt
@@ -132,13 +139,17 @@ export function traceTrajectoire(depart: DepartTrajectoire, monde: MondeTrajecto
     vy *= frein
     x += vx * dt
     y += vy * dt
-    // les parois : la boîte englobante d'abord (elle vaut aussi pour une
-    // forme tournée), le contact exact ensuite
+    // les parois : le rejet rapide d'abord (la boîte englobante ; une boîte
+    // TOURNÉE déborde de la sienne — son cercle englobant, comme le solveur),
+    // le contact exact ensuite
     const contactsMaintenant = new Set<number>()
     let colle = false
     for (let i = 0; i < boites.length; i++) {
       const bx = boites[i]
-      if (x < bx.minX - rayon - 2 || x > bx.maxX + rayon + 2 || y < bx.minY - rayon - 2 || y > bx.maxY + rayon + 2) continue
+      if (bx.angle) {
+        const rc = Math.hypot(bx.maxX - bx.minX, bx.maxY - bx.minY) / 2 + rayon + 2
+        if (Math.abs(x - (bx.minX + bx.maxX) / 2) > rc || Math.abs(y - (bx.minY + bx.maxY) / 2) > rc) continue
+      } else if (x < bx.minX - rayon - 2 || x > bx.maxX + rayon + 2 || y < bx.minY - rayon - 2 || y > bx.maxY + rayon + 2) continue
       formeContact(x, y, bx, contact)
       if (contact.dist >= rayon) continue
       contactsMaintenant.add(i)
@@ -168,24 +179,27 @@ export function traceTrajectoire(depart: DepartTrajectoire, monde: MondeTrajecto
     }
     enContact = contactsMaintenant
     // les bords de la cuve : le même rebond amorti qu'une paroi neutre
+    let bord = false
     if (x - rayon < b.minX && vx < 0) {
       x = b.minX + rayon
       vx = -vx * eMur
-      evenements.push({ t, x, y, type: 'bord' })
+      bord = true
     } else if (x + rayon > b.maxX && vx > 0) {
       x = b.maxX - rayon
       vx = -vx * eMur
-      evenements.push({ t, x, y, type: 'bord' })
+      bord = true
     }
     if (y - rayon < b.minY && vy < 0) {
       y = b.minY + rayon
       vy = -vy * eMur
-      evenements.push({ t, x, y, type: 'bord' })
+      bord = true
     } else if (y + rayon > b.maxY && vy > 0) {
       y = b.maxY - rayon
       vy = -vy * eMur
-      evenements.push({ t, x, y, type: 'bord' })
+      bord = true
     }
+    if (bord && !bordContact) evenements.push({ t, x, y, type: 'bord' })
+    bordContact = bord
     // la plus courte approche de chaque puits
     for (let i = 0; i < monde.puits.length; i++) {
       const d = Math.hypot(monde.puits[i].x - x, monde.puits[i].y - y)

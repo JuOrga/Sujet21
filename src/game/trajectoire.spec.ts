@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { DEFAULT_PARAMS } from '../sim/params'
 import { FluidSim, KIND_PLAYER, type Bounds } from '../sim/solver'
-import { MAT_HYDROPHILE, MAT_HYDROPHOBE, MAT_WALL, type ObstacleBox, type PuitsDef } from './level'
+import { MAT_HYDROPHILE, MAT_HYDROPHOBE, MAT_MEMBRANE, MAT_WALL, type ObstacleBox, type PuitsDef } from './level'
 import { periodeCoeur, vitesseCirculaire } from './puits'
 import { traceTrajectoire, TRAJ_RESTITUTION_HYDROPHOBE, TRAJ_RESTITUTION_MUR } from './trajectoire'
 
@@ -53,6 +53,30 @@ describe('traceTrajectoire — le point qui suit la même intégration que le co
     expect(phile.fin).toBe('colle')
     expect(phile.evenements[0].type).toBe('colle')
     expect(phile.points[phile.points.length - 1].t).toBeLessThan(1.3)
+  })
+
+  it('une paroi TOURNÉE se rencontre là où sa boîte englobante ne va pas, la membrane laisse passer, un bord qui retient n’est qu’un événement', () => {
+    // une barre de 400 × 40 à 45° : sa boîte englobante (non tournée) ne
+    // couvre que ±20 en y — le point arrive de côté, en y = 120, là où la
+    // barre tournée est bel et bien (la revue du 17/09 : la ligne la traversait)
+    const barre: ObstacleBox = { minX: -200, minY: -20, maxX: 200, maxY: 20, material: MAT_WALL, angle: 45 }
+    const tr = traceTrajectoire({ x: 120, y: 500, vx: 0, vy: -600 }, { bounds: OPEN, boxes: [barre], puits: [], duree: 2, rayonCorps: 10 })
+    const rebond = tr.evenements.find((e) => e.type === 'rebond')
+    expect(rebond).toBeDefined()
+    expect(rebond!.y).toBeGreaterThan(60) // touchée sur sa longueur, pas au niveau de la boîte plate
+    // puis il glisse le long de la barre (le tangentiel reste) et la quitte par son bout
+    // la membrane : l'eau la traverse (le solveur ne bute que glace et vapeur)
+    const membrane: ObstacleBox = { minX: -20, minY: -200, maxX: 20, maxY: 200, material: MAT_MEMBRANE }
+    const tm = traceTrajectoire({ x: -300, y: 0, vx: 500, vy: 0 }, { bounds: OPEN, boxes: [membrane], puits: [], duree: 2, rayonCorps: 10 })
+    expect(tm.evenements).toHaveLength(0)
+    expect(tm.points[tm.points.length - 1].x).toBeGreaterThan(200)
+    // un puits qui plaque le corps contre le bord : le choc, le retour, puis
+    // le contact TIENT — pas un événement par pas (360 sur trois secondes)
+    const tb = traceTrajectoire(
+      { x: 380, y: 0, vx: 200, vy: 0 },
+      { bounds: { minX: -400, minY: -400, maxX: 400, maxY: 400 }, boxes: [], puits: [{ x: 900, y: 0, force: 540, rayon: 300 }], duree: 3, rayonCorps: 20 },
+    )
+    expect(tb.evenements.filter((e) => e.type === 'bord').length).toBeLessThanOrEqual(2)
   })
 
   it('les bords de la cuve renvoient comme un mur neutre, et le frottement essouffle', () => {
