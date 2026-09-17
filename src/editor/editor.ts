@@ -694,6 +694,7 @@ export class LevelEditor {
     this.sel = null
     this.multi = []
     this.cutWinner = null
+    this.previsionExacte = null // le tableau a changé : la ligne exacte, comme au commit
     this.persist()
     this.syncForm()
     this.majBoutonsHistoire()
@@ -724,6 +725,9 @@ export class LevelEditor {
 
   close(): void {
     this.host.classList.remove('visible')
+    // une prévision exacte en cours s'arrête (sa boucle lit ce champ) : le
+    // jeu qui démarre n'a pas à partager sa machine avec un solveur invisible
+    this.previsionExacte = null
   }
 
   /** Le menu Biome : les biomes de la carte, et le biome COURANT même s'il
@@ -2954,9 +2958,10 @@ export class LevelEditor {
       } else if (d.mode === 'rayon') {
         const pu = (this.level.puits ?? [])[d.index]
         if (pu) {
-          const r = Math.round(Math.hypot(w.x - pu.x, w.y - pu.y) / 10) * 10
-          // un glisser trop court laisse le défaut (la clé absente)
-          if (r >= 40) pu.rayon = r
+          const r = Math.min(1200, Math.round(Math.hypot(w.x - pu.x, w.y - pu.y) / 10) * 10)
+          // les bornes de la fiche (40…1200) ; un glisser trop court, ou qui
+          // tombe sur le défaut, laisse la clé absente — la règle de la fiche
+          if (r >= 40 && r !== PUITS_RAYON_DEFAUT) pu.rayon = r
           else delete pu.rayon
         }
       } else if (d.mode === 'railpt') {
