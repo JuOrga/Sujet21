@@ -1450,6 +1450,35 @@ describe('les mires et les réglages du tableau', () => {
   })
 })
 
+describe('les cartes imposées par un tableau', () => {
+  const base = {
+    name: 'Essai cartes',
+    code: '21-TEST',
+    bounds: { minX: -1000, minY: -600, maxX: 1000, maxY: 600 },
+    spawn: { x: -800, y: 0, n: 700 },
+    exit: { minX: 860, minY: -60, maxX: 940, maxY: 60 },
+    boxes: [],
+  }
+  it('des identifiants relus tels quels, sans doublon ni vide ; rien ne s’écrit sans carte', () => {
+    const { level } = parseLevel({ ...base, cartes: ['eclateur', 'eclateur', '', 7, 'ballast'] })
+    expect(level!.cartes).toEqual(['eclateur', 'ballast'])
+    expect(parseLevel(JSON.parse(serializeLevel(level!))).level!.cartes).toEqual(['eclateur', 'ballast'])
+    expect(JSON.parse(serializeLevel(parseLevel(base).level!)).cartes).toBeUndefined()
+    expect(parseLevel({ ...base, cartes: 'eclateur' }).level!.cartes).toBeUndefined()
+  })
+  it('la validation : une carte inconnue avertit sans être perdue ; l’Éclateur imposé suffit aux mires ; preset + carte, les parts s’additionnent et c’est dit', () => {
+    const lv = parseLevel({ ...base, cartes: ['carte-fantome'] }).level!
+    expect(lv.cartes).toEqual(['carte-fantome'])
+    expect(checkLevel(lv).some((v) => v.niveau === 'avertissement' && /carte-fantome.*inconnue/.test(v.message))).toBe(true)
+    expect(checkLevel({ ...lv, cartes: ['eclateur'] }).some((v) => /inconnue/.test(v.message))).toBe(false)
+    const mires = parseLevel({ ...base, mires: [{ x: 0, y: 0 }], cartes: ['eclateur'] }).level!
+    expect(checkLevel(mires).some((v) => /sans le tir de glace/.test(v.message))).toBe(false)
+    expect(checkLevel(mires).some((v) => /s’additionnent/.test(v.message))).toBe(false)
+    const deux = checkLevel({ ...mires, reglages: { glaceTir: 0.1 } })
+    expect(deux.some((v) => v.niveau === 'avertissement' && /s’additionnent \(20 %/.test(v.message))).toBe(true)
+  })
+})
+
 describe('un mini-jeu survit à l’enregistrement', () => {
   it('la salle des cibles se relit avec son mini-jeu, ses mires et ses réglages ; un type inconnu est écarté et dit', () => {
     const lv = tableauCibles()
