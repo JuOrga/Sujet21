@@ -591,6 +591,21 @@ export const PUITS_RAYON_DEFAUT = 300
 export const PUITS_FORCE_DEFAUT = 540
 export const PUITS_FONDU = 0.25
 
+// L'IMPULSION DE DÉPART : le corps naît LANCÉ, à une direction et une
+// vitesse exactes — ce qui rend une trajectoire prévisible, et calculable
+// avant de la jouer. Degrés trigonométriques (0 vers l'est, 90 vers le
+// nord) et u/s, la convention des chasses : le concepteur et l'éditeur
+// pensent en direction + vitesse. En jeu, l'impulsion se tient jusqu'à la
+// fin de l'entrée de caméra : la physique tourne pendant le plan large, et
+// lancer au spawn ferait partir le corps avant qu'on le voie.
+export interface ImpulsionDef {
+  angle: number
+  vitesse: number
+}
+// = maxSpeed du banc : au-delà le solveur brime la vitesse au premier pas,
+// le tableau mentirait sur ce qu'il lance
+export const IMPULSION_VITESSE_MAX = 3000
+
 // Une CACHETTE : un pan de la carte voilé tant que l'échantillon n'y est
 // pas entré — le voile se dissipe à l'entrée du corps et reste levé pour
 // l'essai (Recommencer re-voile). Purement visuel : la physique du tableau
@@ -788,7 +803,9 @@ export interface LevelDef {
   journal: string // entrée du journal de bord, affichée à l'ouverture du tableau
   figure?: string // illustration du carton de journal (public/assets)
   bounds: Bounds
-  spawn: { x: number; y: number; n: number }
+  // LE DÉPART : où le corps naît, combien de particules, et l'IMPULSION qui
+  // le lance (absente : il naît immobile, en apesanteur)
+  spawn: { x: number; y: number; n: number; impulsion?: ImpulsionDef }
   exit: { minX: number; minY: number; maxX: number; maxY: number }
   boxes: ObstacleBox[]
   sponges: SpongeDef[]

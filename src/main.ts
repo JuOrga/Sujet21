@@ -311,6 +311,7 @@ import {
   zoneName,
   zoneShape,
   type DecalDef,
+  type ImpulsionDef,
   type LevelDef,
   type PupitreDef,
   type LumiereDef,
@@ -827,6 +828,8 @@ function createSim(level: LevelDef): FluidSim {
     params.plasmaRailRadius,
   )
   sim.spawnDisc(level.spawn.x, level.spawn.y, volumeDepart(level), KIND_PLAYER)
+  // l'impulsion se tient jusqu'à la fin de l'entrée de caméra (voir sertImpulsion)
+  impulsionEnAttente = level.spawn.impulsion ?? null
   // né dans une zone qui impose la vapeur : le corps EST un nuage dès la
   // première image — sinon le compteur annonce des dashs qui ne partent pas,
   // le temps que la vaporisation progressive s'achève
@@ -995,6 +998,12 @@ let minijeuForce = false
 // couperet qui tranche, le dernier lancer du palet), la salle conclut à
 // l'image — la note au barème, le titre et le détail de la carte
 let minijeuResultat: { note: NoteTrait; titre: string; detail: string; mesure: number } | null = null
+// L'IMPULSION DE DÉPART EN ATTENTE : posée par createSim, servie à la
+// première image où l'entrée de caméra est finie (la physique tourne pendant
+// le plan large : lancer au spawn ferait partir le corps avant qu'on le
+// voie). Tant qu'elle attend, les puits n'agissent pas non plus : le corps
+// reste immobile, en apesanteur, là où le tableau l'a posé.
+let impulsionEnAttente: ImpulsionDef | null = null
 // LE COUPERET en cours : la lame était-elle baissée au sous-pas précédent
 // (la pesée se fait à l'instant où elle tombe, une seule fois)
 let couperetLamePrec = false
@@ -12934,6 +12943,17 @@ function majRafales(): void {
   }
 }
 
+/** L'IMPULSION DE DÉPART est servie dès que l'entrée de caméra est finie
+ *  (ou coupée par le premier geste) : le corps part exactement comme le
+ *  tableau le dit, sous les yeux du joueur, et les puits s'allument. */
+function sertImpulsion(): void {
+  const imp = impulsionEnAttente
+  if (!imp || camera.introEnCours || sim.dispersed) return
+  impulsionEnAttente = null
+  const a = (imp.angle * Math.PI) / 180
+  sim.lanceCorps(Math.cos(a) * imp.vitesse, Math.sin(a) * imp.vitesse)
+}
+
 /** LE PALET, à l'image : ce que le jeu observe du corps (la glace est-elle
  *  prise, où est son centre, à quelle vitesse) passe à avancePalet, qui
  *  tient les lancers. Le dernier lancer fini — ou le joueur qui conclut
@@ -17500,6 +17520,7 @@ function corpsImage(now: number): boolean {
 
   sim.chill = chillNow() // le vaisseau refroidit : la physique suit
   if (input.aimActive) camera.cancelIntro() // le joueur agit : la caméra suit
+  sertImpulsion()
 
   // ---- Dash de vapeur (« air dash ») : viser RALENTIT fortement le temps
   // (physique, refroidissement, chrono — tout suit, rien ne se fige),
@@ -17638,6 +17659,9 @@ function corpsImage(now: number): boolean {
             if (laserEtat.chassesActives[i]) sim.applyChasse(chasses[i], params.dt)
           }
         }
+        // LES PUITS DE GRAVITÉ : la seule accélération pure, avant le pas comme
+        // les autres champs — muets tant que l'impulsion de départ attend
+        if (!impulsionEnAttente && (level.puits?.length ?? 0) > 0) sim.applyPuits(level.puits!, params.dt)
         // Rien ne freine le corps figé : dans le vide, une dérive reste une
         // trajectoire. Elle peut encore rencontrer une paroi, rebondir, et
         // finir dans le sas — c'est au joueur de décider quand y renoncer.

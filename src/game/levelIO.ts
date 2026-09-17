@@ -42,7 +42,7 @@ import {
   type ZoneDef,
   type ZoneForce,
 } from './level'
-import { PORTE_SENS_DEFAUT, type ChasseDef } from './level'
+import { IMPULSION_VITESSE_MAX, PORTE_SENS_DEFAUT, PUITS_RAYON_DEFAUT, type ChasseDef, type PuitsDef } from './level'
 import { ARTICLES_ETAL_IDS } from './economat'
 import { ARTICLES_COMPTOIR_IDS, ROLES_ANCRE } from './hub'
 import { REPARATIONS } from './reparations'
@@ -661,6 +661,38 @@ export function parseLevel(input: unknown): {
   }
   if (chasses.length > 0) level.chasses = chasses
 
+  // L'IMPULSION DE DÉPART : angle et vitesse, arrondis ; une vitesse nulle
+  // ou absente n'est pas une impulsion — écartée, et dite
+  if (sp.impulsion !== undefined) {
+    const imp = (sp.impulsion ?? {}) as Record<string, unknown>
+    const vitesse = Math.round(num(imp.vitesse, 0))
+    if (typeof sp.impulsion === 'object' && sp.impulsion !== null && vitesse > 0)
+      level.spawn.impulsion = { angle: Math.round(num(imp.angle, 0)), vitesse }
+    else rejets.push('l’impulsion de départ a été écartée (vitesse nulle)')
+  }
+
+  // Les PUITS DE GRAVITÉ : un centre, et les réglages optionnels — absents,
+  // ils restent absents (le défaut vit dans le code). Un rayon ou une force
+  // qui ne serait pas strictement positif n'est pas un puits.
+  const puits: PuitsDef[] = []
+  for (const raw of Array.isArray(o.puits) ? o.puits : []) {
+    const q = (raw ?? {}) as Record<string, unknown>
+    const x = num(q.x, NaN)
+    const y = num(q.y, NaN)
+    const rayonBrut = q.rayon !== undefined ? num(q.rayon) : undefined
+    const forceBrut = q.force !== undefined ? num(q.force) : undefined
+    if (!Number.isFinite(x) || !Number.isFinite(y) || (rayonBrut !== undefined && rayonBrut <= 0) || (forceBrut !== undefined && forceBrut <= 0)) {
+      rejets.push('un puits a été écarté (rayon nul)')
+      continue
+    }
+    const p: PuitsDef = { x, y }
+    if (forceBrut !== undefined) p.force = Math.round(forceBrut)
+    if (rayonBrut !== undefined) p.rayon = Math.round(rayonBrut)
+    if (q.portee !== undefined && num(q.portee) > 0) p.portee = Math.round(num(q.portee))
+    puits.push(p)
+  }
+  if (puits.length > 0) level.puits = puits
+
   // Cachettes : des pans voilés (brouillard ou paroi factice), levés à
   // l'entrée du corps. Formes et rotation : les mêmes règles que les boîtes.
   const caches: CacheDef[] = []
@@ -982,6 +1014,7 @@ export function serializeLevel(level: LevelDef): string {
   }
   if (level.portes && level.portes.length > 0) out.portes = level.portes
   if (level.chasses && level.chasses.length > 0) out.chasses = level.chasses
+  if (level.puits && level.puits.length > 0) out.puits = level.puits
   if (level.rails && level.rails.length > 0) out.rails = level.rails
   if (level.caches && level.caches.length > 0) out.caches = level.caches
   if (level.condensats && level.condensats.length > 0)
@@ -1164,6 +1197,38 @@ export function checkLevel(brut: LevelDef): Verdict[] {
       })
     }
   }
+  // L'IMPULSION : au-delà de maxSpeed, le solveur brime — le tableau mentirait
+  if (level.spawn.impulsion && level.spawn.impulsion.vitesse > IMPULSION_VITESSE_MAX) {
+    v.push({
+      niveau: 'erreur',
+      message: `L’impulsion de départ (${level.spawn.impulsion.vitesse} u/s) dépasse ce que le solveur laisse passer (${IMPULSION_VITESSE_MAX} u/s).`,
+    })
+  }
+  // LES PUITS : un centre hors cuve n'attire que le vide ; un départ au fond
+  // d'un cœur sans impulsion ne sortira qu'en éjectant ; deux cœurs qui se
+  // recouvrent rendent la trajectoire entre eux illisible (la lisière déchire)
+  const puits = level.puits ?? []
+  for (const p of puits) {
+    if (!inBounds(p.x, p.y)) v.push({ niveau: 'erreur', message: 'Un puits de gravité est hors de la cuve.' })
+    const R = p.rayon ?? PUITS_RAYON_DEFAUT
+    if (!level.spawn.impulsion && Math.hypot(level.spawn.x - p.x, level.spawn.y - p.y) < R) {
+      v.push({
+        niveau: 'avertissement',
+        message: 'Le corps naît au fond d’un puits sans impulsion de départ : il n’en sortira qu’en éjectant.',
+      })
+    }
+  }
+  for (let i = 0; i < puits.length; i++)
+    for (let j = i + 1; j < puits.length; j++) {
+      const ri = puits[i].rayon ?? PUITS_RAYON_DEFAUT
+      const rj = puits[j].rayon ?? PUITS_RAYON_DEFAUT
+      if (Math.hypot(puits[i].x - puits[j].x, puits[i].y - puits[j].y) < ri + rj) {
+        v.push({
+          niveau: 'avertissement',
+          message: 'Deux cœurs de puits se recouvrent : la trajectoire entre eux n’est plus lisible, et la lisière déchire le corps.',
+        })
+      }
+    }
   if ((level.lasers?.length ?? 0) > 0 && nCibles === 0) {
     v.push({
       niveau: 'avertissement',
