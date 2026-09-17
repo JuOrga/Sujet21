@@ -123,23 +123,29 @@ import {
 import { CLE_MANQUES, inventairePool, litManques, noteManque, type Manque } from './game/manques'
 import {
   arriveRafales,
+  avanceOrbites,
   avancePalet,
   compteAuDela,
   estMiniJeu,
+  ETAT_ORBITES_NEUF,
   ETAT_PALET_NEUF,
   meilleurLancer,
+  noteOrbites,
   notePalet,
   noteRafales,
   noteTrait,
   phaseCouperet,
   tableauCouperet,
+  tableauOrbites,
   tableauPalet,
   tableauRafales,
   tireMiniJeu,
   tireTrait,
+  VERDICTS_ORBITES,
   VERDICTS_PALET,
   VERDICTS_RAFALES,
   VERDICTS_TRAIT,
+  type EtatOrbites,
   type EtatPalet,
   type Lancer,
   type NoteTrait,
@@ -1014,6 +1020,8 @@ let couperetLamePrec = false
 // ou valider — une fois)
 let paletEtat: EtatPalet = ETAT_PALET_NEUF
 let paletLancersVus = 0
+// LES ORBITES en cours : les anneaux passés (avanceOrbites, pur)
+let orbitesEtat: EtatOrbites = ETAT_ORBITES_NEUF
 // LES RÉGLAGES d'un mini-jeu en cours : les valeurs du banc qu'il a
 // remplacées, pour les rendre à la salle suivante
 let reglagesRendus: Partial<SimParams> = {}
@@ -7104,7 +7112,7 @@ function renderDescente(): void {
     ),
     dscCran(
       'MINI-JEUX PAR MODULE',
-      'le couperet, le palet ou les rafales, tirés à la graine : la précision paie en mémoire — 0 : aucun',
+      'le couperet, le palet, les rafales ou les orbites, tirés à la graine : la précision paie en mémoire — 0 : aucun',
       () => voiePlan.minijeuxParModule,
       (v) => {
         voiePlan.minijeuxParModule = v
@@ -8686,6 +8694,54 @@ function drawMecanismes(vw: number, vh: number, dpr: number): void {
     paletEtat.lancers.forEach((l, i) => {
       g.fillText(`${i + 1}. ${Math.round(l.distance)} u — ${VERDICTS_PALET[l.verdict]}`, anc.sx, anc.sy + t * (1.1 + i * 0.95))
     })
+    g.restore()
+  }
+
+  // LES ORBITES : les anneaux (passé : vert ; le prochain : ambre qui bat ;
+  // les autres : gris), la cible (un cercle discret, le croissant est une
+  // paroi dessinée par le rendu), et la consigne du moment
+  if (level.minijeu?.type === 'orbites') {
+    const r = level.minijeu.regles
+    g.save()
+    r.anneaux.forEach((an, i) => {
+      const c = S(an.x, an.y)
+      const passe = i < orbitesEtat.anneauxPasses
+      const prochain = i === orbitesEtat.anneauxPasses && !minijeuResultat
+      const bat = prochain ? 0.7 + 0.3 * Math.sin(elapsed * 4) : 1
+      g.beginPath()
+      g.arc(c.sx, c.sy, an.r * z, 0, Math.PI * 2)
+      g.fillStyle = passe ? 'rgba(140,255,190,0.12)' : prochain ? `rgba(255,200,120,${(0.14 * bat).toFixed(3)})` : 'rgba(200,210,230,0.05)'
+      g.fill()
+      g.strokeStyle = passe ? 'rgba(140,255,190,0.9)' : prochain ? `rgba(255,200,120,${(0.95 * bat).toFixed(3)})` : 'rgba(200,210,230,0.4)'
+      g.lineWidth = prochain ? 3 : 2
+      g.stroke()
+      g.fillStyle = g.strokeStyle
+      g.font = `600 ${Math.max(11, Math.min(24, 70 * z))}px ui-monospace, monospace`
+      g.textAlign = 'center'
+      g.fillText(String(i + 1), c.sx, c.sy + 5)
+    })
+    const cc = S(r.cible.x, r.cible.y)
+    g.beginPath()
+    g.arc(cc.sx, cc.sy, r.cible.r * z, 0, Math.PI * 2)
+    g.strokeStyle = 'rgba(140,255,190,0.35)'
+    g.setLineDash([4, 10])
+    g.lineWidth = 1.5
+    g.stroke()
+    g.setLineDash([])
+    const t = Math.max(12, Math.min(28, 90 * z))
+    const anc = S(0, 930)
+    g.textAlign = 'center'
+    g.font = `600 ${Math.round(t * 0.85)}px ui-monospace, monospace`
+    g.fillStyle = 'rgba(255,255,255,0.92)'
+    const part = sim.baseVolume > 0 ? Math.round((100 * sim.playerCount) / sim.baseVolume) : 0
+    const consigne = minijeuResultat
+      ? 'FINI'
+      : impulsionEnAttente
+        ? 'LE LANCER ATTEND LA FIN DU PLAN LARGE'
+        : orbitesEtat.anneauxPasses < r.anneaux.length
+          ? `ANNEAU ${orbitesEtat.anneauxPasses + 1} / ${r.anneaux.length} — IL VOUS RESTE ${part} %`
+          : `AU CROISSANT — IL VOUS RESTE ${part} %`
+    g.fillText(consigne, anc.sx, anc.sy)
     g.restore()
   }
 
@@ -12687,6 +12743,12 @@ function lanceManoeuvre(quoi: string): void {
         closeHome()
         break
       }
+      case 'orbites': {
+        lanceOrbitesEssai()
+        pupitreEl.hidden = true
+        closeHome()
+        break
+      }
       case 'hub-principal': {
         const r = passeLeHub('principal')
         if (r === 'ok') {
@@ -13031,6 +13093,27 @@ function majRafales(): void {
   }
 }
 
+/** LES ORBITES, à l'image : le centre du corps passe les anneaux dans
+ *  l'ordre, la cible conclut, le temps aussi ; le verdict tient à la part du
+ *  volume gardée, un palier de moins par anneau manqué. */
+function majOrbites(): void {
+  const mj = level.minijeu
+  if (!mj || mj.type !== 'orbites' || minijeuResultat || impulsionEnAttente) return
+  orbitesEtat = avanceOrbites(orbitesEtat, { t: run.tableauTime, x: sim.stats.centroidX, y: sim.stats.centroidY }, mj.regles)
+  if (!orbitesEtat.fini) return
+  const part = sim.baseVolume > 0 ? sim.playerCount / sim.baseVolume : 0
+  const note = noteOrbites(part, orbitesEtat.anneauxPasses, orbitesEtat.fin, mj.regles)
+  minijeuResultat = {
+    note,
+    mesure: part,
+    titre: `LES ORBITES — ${VERDICTS_ORBITES[note.verdict]}`,
+    detail:
+      orbitesEtat.fin === 'cible'
+        ? `${orbitesEtat.anneauxPasses} anneau${orbitesEtat.anneauxPasses > 1 ? 'x' : ''} sur ${mj.regles.anneaux.length}, ${Math.round(part * 100)} % gardés, au croissant en ${run.tableauTime.toFixed(1).replace('.', ',')} s`
+        : `${orbitesEtat.anneauxPasses} anneau${orbitesEtat.anneauxPasses > 1 ? 'x' : ''} sur ${mj.regles.anneaux.length}, le croissant jamais atteint en ${mj.regles.dureeMax} s`,
+  }
+}
+
 /** LA DURÉE de la ligne prédite (s) : six secondes, plus d'une période de
  *  cœur — assez pour voir où une orbite mène, pas assez pour encombrer. */
 const PREVISION_DUREE = 6
@@ -13125,6 +13208,9 @@ function sertImpulsion(): void {
   impulsionEnAttente = null
   const a = (imp.angle * Math.PI) / 180
   sim.lanceCorps(Math.cos(a) * imp.vitesse, Math.sin(a) * imp.vitesse)
+  // aux orbites, la vraie trajectoire s'écrit dès le lancer : elle se
+  // calcule pendant que le corps commence son premier virage
+  if (level.minijeu?.type === 'orbites') lancePrevisionExacte()
 }
 
 /** LE PALET, à l'image : ce que le jeu observe du corps (la glace est-elle
@@ -13254,6 +13340,7 @@ function resetLasers(): void {
   prevision = null
   paletEtat = ETAT_PALET_NEUF
   paletLancersVus = 0
+  orbitesEtat = ETAT_ORBITES_NEUF
   laserEtat.chassesActives = (level.chasses ?? []).map(() => false)
   laserEtat.chasseBouffee = (level.chasses ?? []).map(() => 0)
   lastRailTime = 0
@@ -15242,6 +15329,7 @@ function ouvreNoeud(nature: Exclude<NatureNoeud, 'salle'>): void {
       const quel = tireMiniJeu(alea)
       if (quel === 'palet') minijeuIntercalaire = tableauPalet()
       else if (quel === 'rafales') minijeuIntercalaire = tableauRafales()
+      else if (quel === 'orbites') minijeuIntercalaire = tableauOrbites()
       else {
         const volumeL = volumeDepart(tableauCouperet(1)) * params.litersPerParticle
         minijeuIntercalaire = tableauCouperet(tireTrait(volumeL, alea))
@@ -15278,7 +15366,7 @@ function mbMontreResultatMiniJeu(r: NonNullable<typeof minijeuResultat>, suite: 
   btn.className = 'mb-carte mb-repos'
   btn.style.gridColumn = '2'
   btn.innerHTML =
-    `<i class="mb-repos-icone">${level.minijeu?.type === 'palet' ? '🥌' : level.minijeu?.type === 'rafales' ? '🌬️' : '🔪'}</i><b>${r.titre.split(' — ')[1] ?? ''}</b>` +
+    `<i class="mb-repos-icone">${level.minijeu?.type === 'palet' ? '🥌' : level.minijeu?.type === 'rafales' ? '🌬️' : level.minijeu?.type === 'orbites' ? '🪐' : '🔪'}</i><b>${r.titre.split(' — ')[1] ?? ''}</b>` +
     `<small>${res.memoire > 0 ? `+${res.memoire} mémoire` : 'rien — le trait est loin'} · continuer</small>`
   let elu = false
   btn.addEventListener('click', () => {
@@ -16010,6 +16098,16 @@ function lanceRafalesEssai(): void {
   restart()
 }
 ;(window as unknown as { __rafales: () => void }).__rafales = lanceRafalesEssai
+// JOUER LES ORBITES EN ESSAI (le pupitre, et la sonde __orbites())
+function lanceOrbitesEssai(): void {
+  if (miseEnBonbonne) fermeMiseEnBonbonne()
+  auHub = false
+  hasPlayed = true
+  document.body.classList.add('playing')
+  testLevel = tableauOrbites()
+  restart()
+}
+;(window as unknown as { __orbites: () => void }).__orbites = lanceOrbitesEssai
 
 function newExpedition(avecCarte = false): void {
   levelIndex = 0
@@ -18448,7 +18546,7 @@ function corpsImage(now: number): boolean {
       effaceRun()
       newExpedition(true)
     })
-  } else if (!tableauDone && !sim.dispersed && estMiniJeu(level) && level.minijeu && (majPalet(), majRafales(), minijeuResultat)) {
+  } else if (!tableauDone && !sim.dispersed && estMiniJeu(level) && level.minijeu && (majPalet(), majRafales(), majOrbites(), minijeuResultat)) {
     // LE MINI-JEU A CONCLU : la lame du couperet a pesé, le palet a fait
     // ses lancers (ou le joueur a conclu). Rien ne se consigne aux registres
     // (pas un tableau du protocole), la mémoire se gagne au barème, la

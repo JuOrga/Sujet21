@@ -37,10 +37,11 @@
 // rendus à la sortie — une glace qui rebondit comme une bille, un gel qui
 // prend vite. C'est ce qui permet d'accorder la physique au jeu sans
 // toucher au banc.
-import { MAT_HYDROPHILE, MAT_HYDROPHOBE, MAT_WALL, type LevelDef, type ObstacleBox, type PorteDef } from './level'
+import { MAT_HYDROPHILE, MAT_HYDROPHOBE, MAT_WALL, type ImpulsionDef, type LevelDef, type ObstacleBox, type PorteDef, type PuitsDef } from './level'
+import { FORME_ARC } from './formes'
 import type { SimParams } from '../sim/params'
 
-export type MiniJeuId = 'couperet' | 'palet' | 'rafales'
+export type MiniJeuId = 'couperet' | 'palet' | 'rafales' | 'orbites'
 
 /** LE COUPERET : ce que porte son tableau. */
 export interface CouperetDef {
@@ -62,14 +63,15 @@ export interface PaletDef {
 }
 
 /** Ce que porte un tableau de mini-jeu (LevelDef.minijeu). */
-export type MiniJeuDef = CouperetDef | PaletDef | RafalesDef
+export type MiniJeuDef = CouperetDef | PaletDef | RafalesDef | OrbitesDef
 
 export const CODE_COUPERET = 'MJ-COUPERET'
 export const CODE_PALET = 'MJ-PALET'
 export const CODE_RAFALES = 'MJ-RAFALES'
+export const CODE_ORBITES = 'MJ-ORBITES'
 
 /** LE CATALOGUE : les mini-jeux qu'un nœud de la mini-carte peut servir. */
-export const MINI_JEUX: readonly MiniJeuId[] = ['couperet', 'palet', 'rafales']
+export const MINI_JEUX: readonly MiniJeuId[] = ['couperet', 'palet', 'rafales', 'orbites']
 
 /** LE TIRAGE du mini-jeu d'un nœud : au hasard du catalogue, à la graine. */
 export function tireMiniJeu(alea: () => number): MiniJeuId {
@@ -77,11 +79,11 @@ export function tireMiniJeu(alea: () => number): MiniJeuId {
   return MINI_JEUX[i]
 }
 
-export const NOMS_MINI_JEU: Record<MiniJeuId, string> = { couperet: 'LE COUPERET', palet: 'LE PALET', rafales: 'LES RAFALES' }
+export const NOMS_MINI_JEU: Record<MiniJeuId, string> = { couperet: 'LE COUPERET', palet: 'LE PALET', rafales: 'LES RAFALES', orbites: 'LES ORBITES' }
 
 /** Ce tableau est-il un mini-jeu ? (il n'a pas de sas : il mesure) */
 export function estMiniJeu(level: { code: string; minijeu?: MiniJeuDef }): boolean {
-  return !!level.minijeu || level.code === CODE_COUPERET || level.code === CODE_PALET || level.code === CODE_RAFALES
+  return !!level.minijeu || level.code === CODE_COUPERET || level.code === CODE_PALET || level.code === CODE_RAFALES || level.code === CODE_ORBITES
 }
 
 /** LE TRAIT : une part du volume de départ, entre 35 et 70 %, arrondie au
@@ -482,5 +484,154 @@ export function tableauRafales(regles: ReglesRafales = REGLES_RAFALES): LevelDef
       { x: 1490, y: -300, text: 'ARRIVÉE', tone: 'mur' },
     ],
     minijeu: { type: 'rafales', regles },
+  }
+}
+
+// ---- LES ORBITES ---------------------------------------------------------------
+//
+// LES ORBITES. Trois puits de gravité alignés, le corps LANCÉ à une vitesse
+// exacte, et la ligne prédite qui dit où il va : autour du premier puits,
+// entre les deux, autour du deuxième de l'autre côté, autour du troisième,
+// puis dans le croissant (le croquis du concepteur, 17/09). Trois anneaux
+// jalonnent ce chemin, dans l'ordre. À chaque seconde, l'alternative est
+// lisible : LAISSER PORTER (gratuit — la ligne dit où ça mène) ou CORRIGER
+// d'une éjection (chaque goutte coûte, la jauge et la silhouette le disent,
+// la ligne se courbe à vue). Ce qui compte : la part du volume gardée, un
+// palier de moins par anneau manqué, et rien si l'on ne finit pas dans le
+// croissant. Le corps reste liquide et pilotable : c'est lui le sujet.
+
+export interface ReglesOrbites {
+  puits: PuitsDef[]
+  depart: { x: number; y: number; impulsion: ImpulsionDef }
+  /** les anneaux à passer, DANS L'ORDRE, posés sur la trajectoire idéale */
+  anneaux: { x: number; y: number; r: number }[]
+  /** la cible : le centre du corps doit y entrer pour conclure */
+  cible: { x: number; y: number; r: number }
+  dureeMax: number
+  /** la part du volume gardée : ≥ p0 intact, ≥ p1 écorné, ≥ p2 entamé */
+  paliers: [number, number, number]
+}
+
+export interface OrbitesDef {
+  type: 'orbites'
+  regles: ReglesOrbites
+  reglages?: Partial<SimParams>
+}
+
+export interface EtatOrbites {
+  anneauxPasses: number
+  fini: boolean
+  fin: 'cible' | 'temps' | null
+}
+
+export const ETAT_ORBITES_NEUF: EtatOrbites = { anneauxPasses: 0, fini: false, fin: null }
+
+export interface ObservationOrbites {
+  t: number
+  x: number
+  y: number
+}
+
+/** LES ORBITES AVANCENT d'une observation : le prochain anneau se passe
+ *  quand le centre y entre (dans l'ordre, jamais un autre) ; la cible
+ *  conclut ; le temps aussi. Pur. */
+export function avanceOrbites(e: EtatOrbites, o: ObservationOrbites, r: ReglesOrbites): EtatOrbites {
+  if (e.fini) return e
+  let anneauxPasses = e.anneauxPasses
+  const prochain = r.anneaux[anneauxPasses]
+  if (prochain && Math.hypot(o.x - prochain.x, o.y - prochain.y) <= prochain.r) anneauxPasses++
+  if (Math.hypot(o.x - r.cible.x, o.y - r.cible.y) <= r.cible.r) return { anneauxPasses, fini: true, fin: 'cible' }
+  if (o.t >= r.dureeMax) return { anneauxPasses, fini: true, fin: 'temps' }
+  return anneauxPasses === e.anneauxPasses ? e : { anneauxPasses, fini: false, fin: null }
+}
+
+/** LE VERDICT DES ORBITES : la part gardée dit le palier, chaque anneau
+ *  manqué en retire un, et ne pas finir dans le croissant vaut rien. */
+export function noteOrbites(partGardee: number, anneauxPasses: number, fin: EtatOrbites['fin'], r: ReglesOrbites, bareme: BaremeTrait = BAREME_TRAIT): NoteTrait {
+  const ordre: NoteTrait['verdict'][] = ['juste', 'proche', 'loin', 'rate']
+  let rang = partGardee >= r.paliers[0] ? 0 : partGardee >= r.paliers[1] ? 1 : partGardee >= r.paliers[2] ? 2 : 3
+  rang = Math.min(3, rang + (r.anneaux.length - anneauxPasses))
+  if (fin !== 'cible') rang = 3
+  const verdict = ordre[rang]
+  const facteur = verdict === 'juste' ? bareme.juste : verdict === 'proche' ? bareme.proche : verdict === 'loin' ? bareme.loin : 0
+  return { ecart: partGardee, verdict, memoire: Math.round(bareme.base * facteur) }
+}
+
+export const VERDICTS_ORBITES: Record<NoteTrait['verdict'], string> = {
+  juste: 'EN ORBITE',
+  proche: 'DÉVIÉ',
+  loin: 'CAHOTÉ',
+  rate: 'PERDU',
+}
+
+/** LE CROISSANT : l'arc hydrophile qui reçoit le corps au bout du chemin —
+ *  le corps s'y colle, c'est l'arrivée. Son rayon extérieur est celui de la
+ *  cible : le centre du corps n'entre dans la cible QUE par l'ouverture (de
+ *  l'extérieur, la bande le tient à un rayon de corps du cercle). `angle`
+ *  oriente la bande : elle se pose EN FACE du corps qui arrive, l'ouverture
+ *  du côté d'où il vient. */
+export function croissantOrbites(cible: { x: number; y: number; r: number }, angle: number): ObstacleBox {
+  const R = cible.r
+  return { minX: cible.x - R, minY: cible.y - R, maxX: cible.x + R, maxY: cible.y + R, material: MAT_HYDROPHILE, forme: FORME_ARC, p0: 0.3, p1: 110, p2: 0, angle }
+}
+
+// LES PUITS DES ORBITES : trois, EN QUINCONCE (le croquis les alignait ;
+// mesuré par la recherche le 17/09 : alignés à 700 u, trois lancers sur
+// huit mille enroulent les trois puits et aucun sans rebondir sur un bord ;
+// en quinconce à ±350 u, six cents lancers propres, en moins de neuf
+// secondes, aux sens alternés — le slalom du croquis). Réglages par défaut
+// (cœur 300, force 540).
+const PUITS_ORBITES: PuitsDef[] = [
+  { x: -350, y: 650 },
+  { x: 350, y: 0 },
+  { x: -350, y: -650 },
+]
+
+export const REGLES_ORBITES: ReglesOrbites = {
+  puits: PUITS_ORBITES,
+  // L'IMPULSION, LES ANNEAUX ET LA CIBLE : trouvés par orbites.recherche.spec.ts
+  // le 17/09 (RECHERCHE_ORBITES=1 pnpm vitest run src/game/orbites.recherche.spec.ts,
+  // balayage y0 −600…900, angle −60…40°, vitesse 150…600 ; 1 742 lancers
+  // enroulent les trois puits d'un vrai virage — au moins un tiers de tour, à
+  // 0,3-0,95 rayon du centre —, celui-ci en 10,1 s : autour du premier à
+  // 187 u en sens direct, du deuxième à 283 u et du troisième à 174 u en sens
+  // horaire, puis il remonte le bord gauche). Les anneaux sont posés à
+  // mi-virage, la cible 1,2 s après le troisième. À refaire si les puits,
+  // leur force ou leur rayon changent.
+  depart: { x: -900, y: 800, impulsion: { angle: -50, vitesse: 310 } },
+  anneaux: [
+    { x: -425, y: 478, r: 90 },
+    { x: 588, y: 157, r: 90 },
+    { x: -425, y: -807, r: 90 },
+  ],
+  cible: { x: -884, y: 15, r: 260 },
+  dureeMax: 20,
+  paliers: [0.9, 0.7, 0.45],
+}
+/** L'ORIENTATION DU CROISSANT : le corps arrive en remontant (cap 86°) — la bande se pose au-dessus, l'ouverture en dessous. */
+export const CROISSANT_ORBITES_ANGLE = 86
+
+export function tableauOrbites(regles: ReglesOrbites = REGLES_ORBITES): LevelDef {
+  return {
+    name: 'Les orbites',
+    code: CODE_ORBITES,
+    journal:
+      `Trois puits de gravité, et vous êtes lancé : la ligne pointillée dit où l'orbite vous porte. ` +
+      `Passez les trois anneaux dans l'ordre et finissez dans le croissant. Laisser porter ne coûte rien ; éjecter corrige la ligne, et chaque goutte compte. ` +
+      `Intact au croissant, la mémoire triple ; chaque anneau manqué retire un palier.`,
+    par: 4,
+    bounds: { minX: -1200, minY: -1000, maxX: 1200, maxY: 1000 },
+    spawn: { x: regles.depart.x, y: regles.depart.y, n: 900, impulsion: regles.depart.impulsion },
+    exit: { minX: 1300, minY: -60, maxX: 1360, maxY: 60 },
+    boxes: [croissantOrbites(regles.cible, CROISSANT_ORBITES_ANGLE)],
+    puits: regles.puits,
+    sponges: [],
+    labels: [
+      { x: -900, y: 930, text: 'LES ORBITES', tone: 'mur' },
+      { x: -900, y: 650, text: '1 · VOUS ÊTES LANCÉ : LA LIGNE DIT OÙ VOUS ALLEZ', tone: 'mur' },
+      { x: -700, y: -200, text: '2 · PASSEZ LES TROIS ANNEAUX — ÉJECTER CORRIGE, ET COÛTE', tone: 'mur' },
+      { x: -700, y: 330, text: '3 · FINISSEZ DANS LE CROISSANT', tone: 'mur' },
+    ],
+    minijeu: { type: 'orbites', regles },
   }
 }
