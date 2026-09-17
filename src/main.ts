@@ -144,6 +144,7 @@ import {
   type Lancer,
   type NoteTrait,
 } from './game/minijeux'
+import { traceTrajectoire, type Trajectoire } from './game/trajectoire'
 import {
   ditEffet,
   offresDe,
@@ -313,6 +314,7 @@ import {
   type DecalDef,
   type ImpulsionDef,
   type LevelDef,
+  PUITS_RAYON_DEFAUT,
   type PupitreDef,
   type LumiereDef,
   type ObstacleBox,
@@ -8509,6 +8511,7 @@ function drawMecanismes(vw: number, vh: number, dpr: number): void {
       rails.length +
       caches.length +
       (level.chasses?.length ?? 0) + // un tableau qui n'a QU'une chasse se dessine aussi
+      (level.puits?.length ?? 0) + // les puits et la ligne prédite
       pastilles.length +
       eclatsEssai.length +
       (level.plots?.length ?? 0) +
@@ -8713,6 +8716,76 @@ function drawMecanismes(vw: number, vh: number, dpr: number): void {
     g.fillStyle = 'rgba(255,255,255,0.92)'
     const part = sim.baseVolume > 0 ? Math.round((100 * sim.playerCount) / sim.baseVolume) : 0
     g.fillText(`IL VOUS RESTE ${part} %`, anc.sx, anc.sy + t * 1.15)
+    g.restore()
+  }
+
+  // LES PUITS DE GRAVITÉ et LA LIGNE PRÉDITE. Chaque puits : son cœur (un
+  // anneau — dedans, les orbites sont sûres ; la lisière déchire), sa portée
+  // en pointillé s'il en a une, une croix au centre. Puis, depuis le centre
+  // du corps et à sa vitesse, la trajectoire que le point-masse annonce
+  // (traceTrajectoire, la même loi que le solveur) : un pointillé qui pâlit
+  // avec le temps, un tic à chaque rebond. C'est la jauge de la décision :
+  // laisser porter mène là ; éjecter courbe la ligne, à vue.
+  if ((level.puits?.length ?? 0) > 0) {
+    const puits = level.puits!
+    g.save()
+    for (const p of puits) {
+      const c = S(p.x, p.y)
+      const R = (p.rayon ?? PUITS_RAYON_DEFAUT) * z
+      g.beginPath()
+      g.arc(c.sx, c.sy, R, 0, Math.PI * 2)
+      g.fillStyle = 'rgba(180,160,255,0.06)'
+      g.fill()
+      g.strokeStyle = 'rgba(180,160,255,0.75)'
+      g.lineWidth = 1.5
+      g.stroke()
+      if (p.portee) {
+        g.beginPath()
+        g.arc(c.sx, c.sy, p.portee * z, 0, Math.PI * 2)
+        g.strokeStyle = 'rgba(180,160,255,0.3)'
+        g.setLineDash([4, 8])
+        g.stroke()
+        g.setLineDash([])
+      }
+      g.strokeStyle = 'rgba(220,210,255,0.9)'
+      g.lineWidth = 1.5
+      g.beginPath()
+      g.moveTo(c.sx - 6, c.sy)
+      g.lineTo(c.sx + 6, c.sy)
+      g.moveTo(c.sx, c.sy - 6)
+      g.lineTo(c.sx, c.sy + 6)
+      g.stroke()
+    }
+    if (!sim.dispersed && !impulsionEnAttente) {
+      const tr = trajectoirePrevue()
+      const pts = tr.points
+      g.lineWidth = Math.max(1, 2 * z)
+      g.setLineDash([6, 8])
+      // par tronçons, pour pâlir avec le temps
+      const tronçon = Math.max(1, Math.floor(pts.length / 12))
+      for (let k = 0; k + 1 < pts.length; k += tronçon) {
+        const fin = Math.min(pts.length - 1, k + tronçon)
+        const alpha = 0.85 * (1 - pts[k].t / PREVISION_DUREE)
+        g.strokeStyle = `rgba(255,230,160,${alpha.toFixed(3)})`
+        g.beginPath()
+        const a = S(pts[k].x, pts[k].y)
+        g.moveTo(a.sx, a.sy)
+        for (let j = k + 1; j <= fin; j++) {
+          const q = S(pts[j].x, pts[j].y)
+          g.lineTo(q.sx, q.sy)
+        }
+        g.stroke()
+      }
+      g.setLineDash([])
+      for (const ev of tr.evenements) {
+        const e = S(ev.x, ev.y)
+        g.strokeStyle = ev.type === 'colle' ? 'rgba(120,220,255,0.9)' : 'rgba(255,200,120,0.9)'
+        g.lineWidth = 2
+        g.beginPath()
+        g.arc(e.sx, e.sy, 5, 0, Math.PI * 2)
+        g.stroke()
+      }
+    }
     g.restore()
   }
 
@@ -12941,6 +13014,46 @@ function majRafales(): void {
     titre: `LES RAFALES — ${VERDICTS_RAFALES[note.verdict]}`,
     detail: `${fmtL(sim.playerCount * params.litersPerParticle)} à l'arrivée sur ${fmtL(sim.baseVolume * params.litersPerParticle)} au départ — ${Math.round(part * 100)} % gardés, en ${run.tableauTime.toFixed(1).replace('.', ',')} s`,
   }
+}
+
+/** LA DURÉE de la ligne prédite (s) : six secondes, plus d'une période de
+ *  cœur — assez pour voir où une orbite mène, pas assez pour encombrer. */
+const PREVISION_DUREE = 6
+
+/** LA TRAJECTOIRE PRÉDITE depuis l'état du corps à cette image : son centre,
+ *  sa vitesse, son rayon ; les parois du tableau et les portes fermées ;
+ *  l'état décide du reste — la glace rebondit à sa restitution, la vapeur
+ *  s'essouffle (gasDrag), l'eau ne rebondit pas (mesuré). */
+function trajectoirePrevue(): Trajectoire {
+  sim.updatePlayerStats() // le relabel ne rafraîchit les statistiques que tous les cinq pas
+  const n = sim.count
+  let gels = 0
+  let gaz = 0
+  for (let i = 0; i < n; i++) {
+    if (sim.frozen[i] === 1) gels++
+    else if (sim.gaseous[i] === 1) gaz++
+  }
+  const enGlace = n > 0 && gels / n >= 0.5
+  const enVapeur = n > 0 && gaz / n >= 0.5
+  const boxes: ObstacleBox[] = [...level.boxes]
+  const portes = level.portes ?? []
+  for (let i = 0; i < portes.length; i++) {
+    const b = porteBoite(portes[i], laserEtat.portesAvance[i] ?? (laserEtat.portesOuvertes[i] ? 0 : 1))
+    if (b) boxes.push({ ...b, material: MAT_WALL })
+  }
+  return traceTrajectoire(
+    { x: sim.stats.centroidX, y: sim.stats.centroidY, vx: sim.stats.velX, vy: sim.stats.velY },
+    {
+      bounds: level.bounds,
+      boxes,
+      puits: level.puits ?? [],
+      rayonCorps: sim.stats.rmsRadius,
+      restitution: enGlace ? params.iceRestitution : undefined,
+      frottement: enVapeur ? params.gasDrag : 0,
+      duree: PREVISION_DUREE,
+      dt: params.dt,
+    },
+  )
 }
 
 /** L'IMPULSION DE DÉPART est servie dès que l'entrée de caméra est finie
