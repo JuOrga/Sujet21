@@ -215,7 +215,7 @@ Ce qui existe, ce qui est proposé.
 | **Bonbonne oubliée (don)** | nœud de la mini-carte | de la réserve, ou du condensat si elle est pleine | bonbonnes par module |
 | **Cache** | nœud de la mini-carte | un orbe d'essence, une fois par poste | `orbe` du module (éditeur de carte) |
 | **Salle à prime** | un nœud salle, marqué d'un losange | la salle scellée : plus dure d'un cran, elle paie plus au sas — mémoire ×2, condensat ×2 ou tirage d'instrument garanti ; une par rang au plus, jamais au premier rang | salles à prime (LA DESCENTE) |
-| **Mini-jeu : la pesée** | nœud de la mini-carte, posé comme une halte | une cuve graduée, un trait tiré entre 35 et 70 % du volume de départ : on y verse exactement ce qu'elle demande — au trait la mémoire triple, proche elle vaut, loin la moitié, ratée rien ; la cuve garde ce qu'on lui donne | mini-jeux par module (LA DESCENTE) ; `BAREME_PESEE` (`minijeux.ts`) |
+| **Mini-jeu : la pesée** | nœud de la mini-carte, posé comme une halte | une cuve graduée, un trait tiré entre 35 et 70 % du volume de départ : on y verse exactement ce qu'elle demande — au trait la mémoire triple, proche elle vaut, loin la moitié, ratée rien ; la cuve garde ce qu'on lui donne. S'essaie sans run : le pupitre « Jouer la pesée (essai) », ou `__pesee(1.5)` en console | mini-jeux par module (LA DESCENTE) ; `BAREME_PESEE` (`minijeux.ts`) |
 
 Le modèle de carte garde les natures de module `economat`, `repos`, `don`,
 `inconnu` et `coffre` : l'éditeur peut encore poser une halte ou un « ? »

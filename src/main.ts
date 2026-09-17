@@ -12409,6 +12409,13 @@ function lanceManoeuvre(quoi: string): void {
         )
         break
       }
+      case 'pesee': {
+        // la salle du mini-jeu, seule : on la joue, le sas dit le verdict
+        lancePeseeEssai()
+        pupitreEl.hidden = true
+        closeHome()
+        break
+      }
       case 'hub-principal': {
         const r = passeLeHub('principal')
         if (r === 'ok') {
@@ -15440,6 +15447,24 @@ function restart(): void {
   restart()
 }
 
+// JOUER LA PESÉE EN ESSAI (le pupitre, et la sonde __pesee(cible?)) : la
+// salle du mini-jeu seule, hors run — le sas mesure et dit le verdict, rien
+// ne se gagne, retour au protocole. Le trait : celui donné, sinon tiré au
+// hasard du poste sur le volume de départ de la salle. C'est ainsi qu'on
+// éprouve un mini-jeu sans lancer de descente (le concepteur, 17/09).
+function lancePeseeEssai(cible?: number): void {
+  const gabarit = tableauPesee(1)
+  const volumeL = volumeDepart(gabarit) * params.litersPerParticle
+  const trait = cible !== undefined && Number.isFinite(cible) && cible > 0 ? Math.round(cible * 10) / 10 : tirePesee(volumeL, Math.random)
+  if (miseEnBonbonne) fermeMiseEnBonbonne()
+  auHub = false
+  hasPlayed = true
+  document.body.classList.add('playing')
+  testLevel = tableauPesee(trait)
+  restart()
+}
+;(window as unknown as { __pesee: (cible?: number) => void }).__pesee = lancePeseeEssai
+
 function newExpedition(avecCarte = false): void {
   levelIndex = 0
   voieRang = 0 // une descente neuve repart du premier rang du plan
@@ -17857,6 +17882,31 @@ function corpsImage(now: number): boolean {
       effaceRun()
       newExpedition(true)
     })
+  } else if (!tableauDone && !sim.dispersed && drunk && estMiniJeu(level) && level.minijeu) {
+    // LE SAS DE LA PESÉE mesure : ce que la cuve a bu contre le trait. Rien
+    // ne se consigne aux registres (pas un tableau du protocole), la mémoire
+    // se gagne au barème, la salle compte comme une halte — un rang de la
+    // descente, une salle du module — et le module reprend. EN ESSAI (le
+    // pupitre, __pesee) : le verdict s'affiche, rien ne se gagne, retour au
+    // protocole — c'est ainsi qu'on éprouve le mini-jeu sans lancer de run.
+    audio.collect()
+    const verseL = sim.swallowed * params.litersPerParticle
+    const res = notePesee(verseL, level.minijeu.cible)
+    bande.ponctuation(res.verdict === 'juste' ? 'sting-record' : 'sting-collecte', 0.85)
+    if (testLevel) {
+      run.ended = true
+      showOverlay(
+        `LA PESÉE — ${VERDICTS_PESEE[res.verdict]}`,
+        `${fmtL(verseL)} versés pour ${fmtL(level.minijeu.cible)} demandés — écart ${Math.round(res.ecart * 100)} %. ` +
+          `En run, cela vaudrait ${res.memoire > 0 ? `+${res.memoire} mémoire` : 'rien'} ; en essai, les registres ne bougent pas.`,
+        'success',
+        'RETOUR AU PROTOCOLE',
+      )
+    } else {
+      gagneMemoireRun(res.memoire)
+      minijeuIntercalaire = null
+      mbMontreResultatPesee(res, verseL, level.minijeu.cible, mbApresHalte)
+    }
   } else if (
     !tableauDone &&
     !sim.dispersed &&
@@ -17887,18 +17937,6 @@ function corpsImage(now: number): boolean {
     )
     // la cinématique de CONCLUSION : par-dessus le bilan, qui l'attend derrière
     if (level.cineApres) void lireCineParCode(level.cineApres)
-  } else if (!tableauDone && !sim.dispersed && drunk && estMiniJeu(level) && level.minijeu) {
-    // LE SAS DE LA PESÉE mesure : ce que la cuve a bu contre le trait. Rien
-    // ne se consigne aux registres (pas un tableau du protocole), la mémoire
-    // se gagne au barème, la salle compte comme une halte — un rang de la
-    // descente, une salle du module — et le module reprend.
-    audio.collect()
-    const verseL = sim.swallowed * params.litersPerParticle
-    const res = notePesee(verseL, level.minijeu.cible)
-    bande.ponctuation(res.verdict === 'juste' ? 'sting-record' : 'sting-collecte', 0.85)
-    gagneMemoireRun(res.memoire)
-    minijeuIntercalaire = null
-    mbMontreResultatPesee(res, verseL, level.minijeu.cible, mbApresHalte)
   } else if (
     !tableauDone &&
     !sim.dispersed &&
