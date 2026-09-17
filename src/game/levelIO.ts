@@ -1283,6 +1283,12 @@ export function checkLevel(brut: LevelDef): Verdict[] {
       message: 'Des mires sans le tir de glace (le réglage glaceTir, par le preset « Tir de glace ») : rien ne pourra les toucher.',
     })
   }
+  // les règles des cibles : des paliers décroissants, une durée qui laisse jouer
+  if (level.minijeu?.type === 'cibles') {
+    const [p1, p2, p3] = level.minijeu.regles.paliers
+    if (!(p1 >= p2 && p2 >= p3 && p3 > 0)) v.push({ niveau: 'erreur', message: 'Les paliers des cibles doivent décroître (EN PLEIN ≥ TOUCHÉ ≥ EFFLEURÉ > 0).' })
+    if (level.minijeu.regles.duree < 5) v.push({ niveau: 'erreur', message: 'La partie des cibles dure moins de cinq secondes.' })
+  }
   const puits = level.puits ?? []
   for (const p of puits) {
     if (!inBounds(p.x, p.y)) v.push({ niveau: 'erreur', message: 'Un puits de gravité est hors de la cuve.' })

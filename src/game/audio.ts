@@ -560,6 +560,21 @@ export class AudioFx {
     this.blip(1320, 1320, 0.4, 0.045, 'sine', 0.36, pan)
   }
 
+  // LES CIBLES (le mini-jeu, 17/09) : une touche sonne d'autant plus haut
+  // qu'elle vaut (force 0…1), le tic des dernières secondes, le coup final
+  toucheMire(force: number, pan = 0): void {
+    const f = 440 + 660 * Math.max(0, Math.min(1, force))
+    this.blip(f, f * 1.5, 0.16, 0.1, 'triangle', 0, pan)
+    this.blip(f * 2, f * 2, 0.32, 0.05, 'sine', 0.07, pan)
+  }
+  tic(): void {
+    this.blip(1600, 1000, 0.045, 0.07, 'square')
+  }
+  coupFinal(): void {
+    this.blip(220, 40, 0.5, 0.26, 'sawtooth')
+    this.blip(110, 28, 0.75, 0.2, 'square', 0.04)
+  }
+
   // LE DERNIER SOUFFLE (agonie, E3) : une note mince tenue le temps que
   // l'œil cherche ses fragments, puis COUPÉE net quand il se ferme — pas
   // un fondu : la lumière s'arrête

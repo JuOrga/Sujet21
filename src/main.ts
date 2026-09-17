@@ -130,6 +130,7 @@ import {
   ETAT_ORBITES_NEUF,
   ETAT_CIBLES_NEUF,
   avanceCibles,
+  multiplicateurSerie,
   noteCibles,
   tableauCibles,
   VERDICTS_CIBLES,
@@ -1039,7 +1040,20 @@ let orbitesT0 = 0
 // LES CIBLES en cours : les points et les touches (avanceCibles, pur), et
 // les dernières touches pour l'éclair du dessin (où, quand, combien)
 let ciblesEtat: EtatCibles = ETAT_CIBLES_NEUF
-let ciblesEclairs: { x: number; y: number; t: number; points: number }[] = []
+let ciblesEclairs: { x: number; y: number; t: number; points: number; force: number; serie: number }[] = []
+// LA JAUGE des paliers : ce qu'elle montre (elle glisse vers les points),
+// l'instant du dernier palier franchi (elle pulse), l'instant de la
+// dernière touche par mire (la mire pulse), la dernière seconde tiquée
+let ciblesJauge = 0
+let ciblesPalierT = -Infinity
+let ciblesMireT: number[] = []
+let ciblesTic = -1
+// LE BILAN : à zéro, le monde se fige, le total se compte, le verdict se
+// tamponne — puis seulement la carte (BILAN_COMPTE, BILAN_TAMPON, BILAN_FIN en s)
+let ciblesBilan: { t0: number } | null = null
+const BILAN_COMPTE = 1.6
+const BILAN_TAMPON = 2.0
+const BILAN_FIN = 3.4
 // LES RÉGLAGES d'un mini-jeu en cours : les valeurs du banc qu'il a
 // remplacées, pour les rendre à la salle suivante
 let reglagesRendus: Partial<SimParams> = {}
@@ -8791,37 +8805,119 @@ function drawMecanismes(vw: number, vh: number, dpr: number): void {
       g.textAlign = 'center'
       g.fillText(String(m.points), c.sx, c.sy + Math.max(4, 28 * z))
     }
-    // les éclairs des touches : un cercle qui s'ouvre et les points qui montent
+    // la mire touchée pulse : un anneau qui gonfle et s'éteint en un tiers de seconde
+    level.mires!.forEach((m, i) => {
+      const age = elapsed - (ciblesMireT[i] ?? -Infinity)
+      if (age < 0 || age > 0.35) return
+      const c = S(m.x, m.y)
+      const k = age / 0.35
+      g.beginPath()
+      g.arc(c.sx, c.sy, m.r * z * (1 + 0.35 * k), 0, Math.PI * 2)
+      g.strokeStyle = `rgba(255,220,150,${(0.9 * (1 - k)).toFixed(3)})`
+      g.lineWidth = 4 * (1 - k) + 1
+      g.stroke()
+    })
+    // les éclairs des touches : un cercle qui s'ouvre et les points qui
+    // montent — le chiffre grossit avec la touche, la série s'annonce
     for (const e of ciblesEclairs) {
       const age = elapsed - e.t
-      if (age < 0 || age > 1) continue
+      if (age < 0 || age > 1.1) continue
       const c = S(e.x, e.y)
       g.beginPath()
-      g.arc(c.sx, c.sy, (20 + 140 * age) * z, 0, Math.PI * 2)
-      g.strokeStyle = `rgba(255,230,160,${(1 - age).toFixed(3)})`
-      g.lineWidth = 3
+      g.arc(c.sx, c.sy, (20 + (100 + 160 * e.force) * age) * z, 0, Math.PI * 2)
+      g.strokeStyle = `rgba(255,230,160,${(1 - age / 1.1).toFixed(3)})`
+      g.lineWidth = 2 + 3 * e.force
       g.stroke()
       if (e.points > 0) {
-        g.fillStyle = `rgba(255,240,180,${(1 - age).toFixed(3)})`
-        g.font = `700 ${Math.max(14, Math.min(34, 110 * z))}px ui-monospace, monospace`
+        const taille = Math.max(14, Math.min(48, (90 + 110 * e.force) * z)) * (age < 0.12 ? 1 + (0.12 - age) * 4 : 1)
+        g.fillStyle = `rgba(255,240,180,${(1 - age / 1.1).toFixed(3)})`
+        g.font = `800 ${Math.round(taille)}px ui-monospace, monospace`
         g.textAlign = 'center'
         g.fillText(`+${e.points}`, c.sx, c.sy - (30 + 90 * age) * z)
+        if (e.serie >= 2) {
+          g.font = `700 ${Math.round(taille * 0.6)}px ui-monospace, monospace`
+          g.fillStyle = `rgba(255,150,120,${(1 - age / 1.1).toFixed(3)})`
+          g.fillText(`SÉRIE ×${e.serie}`, c.sx, c.sy - (30 + 90 * age) * z - taille * 0.9)
+        }
       }
     }
     if (level.minijeu?.type === 'cibles') {
       const r = level.minijeu.regles
       const t = Math.max(12, Math.min(28, 90 * z))
-      const anc = S(0, level.bounds.maxY - 60)
+      const tJeu = run.tableauTime - orbitesT0
+      const reste = Math.max(0, r.duree - tJeu)
+      // LA JAUGE DES PALIERS, au bord droit de la salle : graduée aux trois
+      // paliers avec leur verdict, elle se remplit avec les points (en
+      // glissant), pulse au palier franchi ; le haut vaut le premier palier
+      // et un quart de plus — au-delà, elle déborde et le dit
+      const plein = r.paliers[0] * 1.25
+      ciblesJauge += (ciblesEtat.points - ciblesJauge) * Math.min(1, dtFx * 6)
+      const bas = S(level.bounds.maxX - 70, level.bounds.minY + 120)
+      const haut = S(level.bounds.maxX - 70, level.bounds.maxY - 140)
+      const larg = Math.max(8, 36 * z)
+      const H = bas.sy - haut.sy
+      g.fillStyle = 'rgba(255,255,255,0.08)'
+      g.fillRect(bas.sx - larg / 2, haut.sy, larg, H)
+      const part = Math.min(1, ciblesJauge / plein)
+      const pulse = elapsed - ciblesPalierT < 0.5 ? 1 + 0.6 * (1 - (elapsed - ciblesPalierT) / 0.5) : 1
+      const teinte = ciblesJauge >= r.paliers[0] ? '140,255,190' : ciblesJauge >= r.paliers[1] ? '255,200,120' : '255,150,150'
+      g.fillStyle = `rgba(${teinte},${(0.55 + 0.4 * (pulse - 1)).toFixed(3)})`
+      g.fillRect(bas.sx - (larg * pulse) / 2, bas.sy - H * part, larg * pulse, H * part)
+      g.strokeStyle = 'rgba(255,255,255,0.35)'
+      g.lineWidth = 1
+      g.strokeRect(bas.sx - larg / 2, haut.sy, larg, H)
+      g.font = `600 ${Math.round(t * 0.6)}px ui-monospace, monospace`
+      g.textAlign = 'right'
+      const verdicts = [VERDICTS_CIBLES.juste, VERDICTS_CIBLES.proche, VERDICTS_CIBLES.loin]
+      r.paliers.forEach((p, i) => {
+        const y = bas.sy - H * Math.min(1, p / plein)
+        const atteint = ciblesEtat.points >= p
+        g.strokeStyle = atteint ? 'rgba(255,255,255,0.9)' : 'rgba(255,255,255,0.4)'
+        g.beginPath()
+        g.moveTo(bas.sx - larg / 2 - 6, y)
+        g.lineTo(bas.sx + larg / 2, y)
+        g.stroke()
+        g.fillStyle = atteint ? 'rgba(255,255,255,0.95)' : 'rgba(255,255,255,0.5)'
+        g.fillText(`${verdicts[i]} ${p}`, bas.sx - larg / 2 - 10, y + t * 0.22)
+      })
       g.textAlign = 'center'
-      g.font = `600 ${Math.round(t * 0.85)}px ui-monospace, monospace`
-      g.fillStyle = 'rgba(255,255,255,0.92)'
-      const reste = Math.max(0, r.duree - (run.tableauTime - orbitesT0))
-      const consigne = minijeuResultat
-        ? `FINI — ${ciblesEtat.points} POINTS`
-        : impulsionEnAttente
-          ? 'LE LANCER ATTEND LA FIN DU PLAN LARGE'
-          : `${ciblesEtat.points} POINTS — ${Math.ceil(reste)} s`
-      g.fillText(consigne, anc.sx, anc.sy)
+      g.font = `800 ${Math.round(t * 0.9)}px ui-monospace, monospace`
+      g.fillStyle = 'rgba(255,255,255,0.95)'
+      g.fillText(String(ciblesEtat.points), bas.sx, bas.sy + t * 1.1)
+      // LE CHRONO en tête de salle : les dix dernières secondes grossissent et battent
+      const anc = S(0, level.bounds.maxY - 60)
+      if (ciblesBilan) {
+        // LE BILAN : le total se compte chiffre à chiffre, puis le verdict se tamponne
+        const age = elapsed - ciblesBilan.t0
+        const compte = Math.round(ciblesEtat.points * Math.min(1, age / BILAN_COMPTE))
+        const gros = Math.max(28, Math.min(120, 320 * z))
+        g.font = `800 ${Math.round(gros)}px ui-monospace, monospace`
+        g.fillStyle = 'rgba(255,255,255,0.96)'
+        const centre = S(0, level.bounds.minY + (level.bounds.maxY - level.bounds.minY) * 0.55)
+        g.fillText(`${compte}`, centre.sx, centre.sy)
+        g.font = `600 ${Math.round(gros * 0.32)}px ui-monospace, monospace`
+        g.fillText(`POINT${compte > 1 ? 'S' : ''} · ${ciblesEtat.touches} TOUCHE${ciblesEtat.touches > 1 ? 'S' : ''}`, centre.sx, centre.sy + gros * 0.5)
+        if (age >= BILAN_TAMPON) {
+          const k = Math.min(1, (age - BILAN_TAMPON) / 0.25)
+          const note = noteCibles(ciblesEtat.points, r)
+          const echelle = 2.2 - 1.2 * k
+          g.save()
+          g.translate(centre.sx, centre.sy - gros * 0.95)
+          g.rotate(-0.08)
+          g.scale(echelle, echelle)
+          g.font = `900 ${Math.round(gros * 0.42)}px ui-monospace, monospace`
+          g.fillStyle = `rgba(${note.verdict === 'juste' ? '140,255,190' : note.verdict === 'rate' ? '255,120,120' : '255,200,120'},${(0.35 + 0.6 * k).toFixed(3)})`
+          g.fillText(VERDICTS_CIBLES[note.verdict], 0, 0)
+          g.restore()
+        }
+      } else {
+        const dernieres = reste <= 10 && reste > 0
+        const bat = dernieres ? 1.25 + 0.25 * Math.max(0, 1 - (Math.ceil(reste) - reste) * 4) : 1
+        g.font = `${dernieres ? 800 : 600} ${Math.round(t * 0.85 * bat)}px ui-monospace, monospace`
+        g.fillStyle = dernieres ? 'rgba(255,170,150,0.96)' : 'rgba(255,255,255,0.92)'
+        const consigne = impulsionEnAttente ? 'LE LANCER ATTEND LA FIN DU PLAN LARGE' : dernieres ? `${Math.ceil(reste)}` : `${Math.ceil(reste)} s`
+        g.fillText(consigne, anc.sx, anc.sy)
+      }
     }
     g.restore()
   }
@@ -13203,25 +13299,66 @@ function majOrbites(): void {
 function majCibles(): void {
   const mj = level.minijeu
   if (!mj || mj.type !== 'cibles' || minijeuResultat || impulsionEnAttente) return
+  const r = mj.regles
+  // LE BILAN en cours : le monde est figé, le compte s'écrit ; à la fin, la carte
+  if (ciblesBilan) {
+    if (elapsed - ciblesBilan.t0 < BILAN_FIN) return
+    const note = noteCibles(ciblesEtat.points, r)
+    minijeuResultat = {
+      note,
+      mesure: ciblesEtat.points,
+      titre: `LES CIBLES — ${VERDICTS_CIBLES[note.verdict]}`,
+      detail: `${ciblesEtat.points} point${ciblesEtat.points > 1 ? 's' : ''} en ${ciblesEtat.touches} touche${ciblesEtat.touches > 1 ? 's' : ''}, ${Math.round((100 * sim.playerCount) / Math.max(1, sim.baseVolume))} % du corps gardés`,
+    }
+    return
+  }
   const t = run.tableauTime - orbitesT0
   const mires = level.mires ?? []
   const touches = sim.touchesMires(mires)
-  const avant = ciblesEtat.points
-  ciblesEtat = avanceCibles(ciblesEtat, t, touches, mires, sim.baseVolume, mj.regles)
+  const avant = ciblesEtat
+  ciblesEtat = avanceCibles(ciblesEtat, t, touches, mires, sim.baseVolume, r)
   if (touches.length > 0) {
-    const gagne = ciblesEtat.points - avant
-    for (const tc of touches) ciblesEclairs.push({ x: tc.x, y: tc.y, t: elapsed, points: touches.length === 1 ? gagne : 0 })
+    // chaque touche : ses points (la taille, la série), son éclair, sa mire qui pulse, son son
+    let serie = avant.serie
+    let derniere = avant.derniereTouche
+    const reference = Math.max(1, sim.baseVolume * r.reference)
+    for (const tc of touches) {
+      const m = mires[tc.mire]
+      if (!m) continue
+      serie = t - derniere <= r.serieDelai ? serie + 1 : 1
+      derniere = t
+      const force = Math.min(r.plafond, tc.taille / reference) / r.plafond
+      const pts = Math.round(m.points * Math.min(r.plafond, tc.taille / reference)) * multiplicateurSerie(serie, r)
+      ciblesEclairs.push({ x: tc.x, y: tc.y, t: elapsed, points: pts, force, serie })
+      ciblesMireT[tc.mire] = elapsed
+      audio.toucheMire(force)
+      if (force >= 0.5) {
+        // une touche pleine se sent : la cuve tremble un instant
+        document.body.classList.remove('coup')
+        void document.body.offsetWidth
+        document.body.classList.add('coup')
+        manette.rumble(0.7, 90)
+      }
+    }
     if (ciblesEclairs.length > 12) ciblesEclairs.splice(0, ciblesEclairs.length - 12)
-    audio.collect()
+    // un palier franchi : la jauge pulse
+    for (const p of r.paliers) if (avant.points < p && ciblesEtat.points >= p) ciblesPalierT = elapsed
+  }
+  // les dix dernières secondes tiquent, une fois par seconde
+  const reste = r.duree - t
+  if (reste <= 10 && reste > 0) {
+    const s = Math.ceil(reste)
+    if (s !== ciblesTic) {
+      ciblesTic = s
+      audio.tic()
+    }
   }
   if (!ciblesEtat.fini) return
-  const note = noteCibles(ciblesEtat.points, mj.regles)
-  minijeuResultat = {
-    note,
-    mesure: ciblesEtat.points,
-    titre: `LES CIBLES — ${VERDICTS_CIBLES[note.verdict]}`,
-    detail: `${ciblesEtat.points} point${ciblesEtat.points > 1 ? 's' : ''} en ${ciblesEtat.touches} touche${ciblesEtat.touches > 1 ? 's' : ''}, ${Math.round((100 * sim.playerCount) / Math.max(1, sim.baseVolume))} % du corps gardés`,
-  }
+  // ZÉRO : le coup, le monde se fige, le compte commence
+  ciblesBilan = { t0: elapsed }
+  audio.coupFinal()
+  manette.rumble(1, 220)
+  bande.ponctuation('fin-de-course', 0.8)
 }
 
 // LA PRÉVISION EXACTE : une COPIE DU SOLVEUR, prise sur l'état du corps à
@@ -13420,6 +13557,12 @@ function resetLasers(): void {
   orbitesT0 = 0
   ciblesEtat = ETAT_CIBLES_NEUF
   ciblesEclairs = []
+  ciblesJauge = 0
+  ciblesPalierT = -Infinity
+  ciblesMireT = []
+  ciblesTic = -1
+  ciblesBilan = null
+  document.body.classList.remove('coup')
   tir.aiming = false
   laserEtat.chassesActives = (level.chasses ?? []).map(() => false)
   laserEtat.chasseBouffee = (level.chasses ?? []).map(() => 0)
@@ -17902,7 +18045,7 @@ function corpsImage(now: number): boolean {
   // (physique, refroidissement, chrono — tout suit, rien ne se fige),
   // relâcher lance le nuage vers le point visé. Une impulsion unique — pas
   // de recul, pas d'éjection ; la DISTANCE du doigt règle la puissance.
-  const vif = !input.paused && !tableauDone && !sim.dispersed && !endgame.spent
+  const vif = !input.paused && !tableauDone && !sim.dispersed && !endgame.spent && !ciblesBilan
   const dashAiming = vif && input.gasIntent && input.aimActive
   // LE TIR DE GLACE (le mini-jeu des cibles) : le même geste que le dash, en
   // glace, seulement quand le tableau l'active — la visée ralentit le temps,
@@ -17959,7 +18102,7 @@ function corpsImage(now: number): boolean {
 
   if (rejeu) {
     avanceRejeu(dtReal)
-  } else if (!input.paused && !tableauDone) {
+  } else if (!input.paused && !tableauDone && !ciblesBilan) {
     // Budget CPU des pas physiques : ~60 % du temps d'image, borné à 5-12 ms.
     // Sans cette borne, une image en retard impose plus de pas, coûte plus
     // cher, prend plus de retard — et la machine s'installe à 15-20 fps.

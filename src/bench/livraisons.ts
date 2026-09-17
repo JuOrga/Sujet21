@@ -31,6 +31,17 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '17/09/2026 21:35',
+    title: 'LES CIBLES SE SENTENT : la jauge des paliers, la touche qui grossit et sonne, la série, la fin du compteur — et les règles dans l’éditeur',
+    notes: [
+      'LA DEMANDE : « des effets satisfaisants et gamifiés quand on fait des points et à la fin du compteur — une jauge qui se remplit ; mais je ne vois pas comment lier ces effets à l’éditeur ». La réponse : les effets appartiennent au mini-jeu et se dessinent à partir des données du tableau (les points des mires, les paliers et la durée) ; ce que l’éditeur règle, ce sont les RÈGLES.',
+      'LA JAUGE DES PALIERS (au bord droit de la salle) : graduée aux trois paliers avec leur verdict, elle se remplit en glissant avec les points, change de teinte au palier atteint et pulse au palier franchi. LA TOUCHE QUI SE SENT : le « +N » grossit avec la taille de l’éclat, la mire touchée pulse, la touche sonne d’autant plus haut qu’elle vaut (audio.toucheMire), une touche pleine secoue la cuve (body.coup) et la manette. LA SÉRIE (règles pures, avanceCibles) : des touches à moins de deux secondes se multiplient, ×2 la deuxième, ×3 au plus, et s’annoncent.',
+      'LA FIN DU COMPTEUR : les dix dernières secondes, le chrono grossit, bat et tique (audio.tic) ; à zéro, un coup (audio.coupFinal, la ponctuation de fin de course, la manette), LE MONDE SE FIGE (la physique s’arrête, la visée aussi), le total se compte chiffre à chiffre en 1,6 s, le verdict se tamponne à 2 s, la carte vient à 3,4 s.',
+      'L’ÉDITEUR : le panneau « Mini-jeu : les cibles » (durée, les trois paliers) apparaît sur un tableau de cibles ; la frappe applique, la sortie du champ grave l’historique, les paliers restent décroissants ; checkLevel exige des paliers décroissants et au moins cinq secondes.',
+      'VÉRIFIÉ : minijeux.spec (la série : ×2, ×3 plafonné, remise à un après le délai, le multiplicateur), levelIO.spec (les validations des règles) ; type-check à 0, build propre. Injouable ici : la jauge, les sons, la secousse et le bilan sont à regarder en main — les durées du bilan (1,6 / 2 / 3,4 s) sont des nombres à tourner.',
+    ],
+  },
+  {
     date: '17/09/2026 18:40',
     title: 'LES CIBLES : le tir deux fois plus fort — 1 800 u/s, mesuré sans traversée',
     notes: [

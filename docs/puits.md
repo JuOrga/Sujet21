@@ -271,6 +271,24 @@ ceux du mini-jeu, le temps de la salle, et rend tout à la suivante.
 concepteur ; mesuré sur le solveur : un éclat ne traverse pas un sol de
 40 u jusqu'à 2 600 u/s, neutre ou hydrophobe — `tirGlace.spec`).
 
+**Ce qui se sent** (le concepteur : « des effets satisfaisants et
+gamifiés »). Une **jauge des paliers** au bord droit de la salle, graduée
+aux trois paliers avec leur verdict, qui se remplit en glissant avec les
+points et pulse au palier franchi (le haut vaut le premier palier et un
+quart). Une **touche qui se sent** : le « +N » grossit avec la taille de
+l'éclat, la mire touchée pulse, la touche sonne d'autant plus haut
+qu'elle vaut, une touche pleine secoue la cuve et la manette ; une
+**série** de touches à moins de deux secondes multiplie (×2 la deuxième,
+×3 au plus) et s'annonce. **La fin du compteur** : les dix dernières
+secondes, le chrono grossit, bat et tique ; à zéro, un coup, le monde se
+fige, le total se compte chiffre à chiffre, le verdict se tamponne, puis
+seulement la carte. Ces effets appartiennent au mini-jeu et se dessinent
+à partir des données du tableau (les points des mires, les paliers et la
+durée des règles) : rien à poser dans l'éditeur. Ce que l'éditeur règle,
+lui, c'est les **règles** : le panneau « Mini-jeu : les cibles » (durée,
+trois paliers) apparaît sur un tableau de cibles ; `checkLevel` exige des
+paliers décroissants et au moins cinq secondes.
+
 **Trouver la salle dans l'éditeur** : panneau de droite, « Modèles gravés
 dans le jeu — ouvrir une copie », `MJ-CIBLES — Les cibles` (les autres
 mini-jeux et la ronde y sont aussi). Le mini-jeu, ses mires et ses

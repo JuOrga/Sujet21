@@ -4047,6 +4047,18 @@
         80% { transform: translate(5px, 4px); }
       }
 
+      /* le coup d'une touche pleine (les cibles) : un tremblement bref de la cuve */
+      body.coup #app,
+      body.coup #fx-canvas {
+        animation: coup-secousse 0.22s linear 1;
+      }
+      @keyframes coup-secousse {
+        0%, 100% { transform: translate(0, 0); }
+        25% { transform: translate(-6px, 4px); }
+        50% { transform: translate(5px, -5px); }
+        75% { transform: translate(-3px, -3px); }
+      }
+
       /* ---- La bibliothèque d'images ---- */
       #imagerie {
         position: fixed;
@@ -9603,6 +9615,13 @@
               <label style="display:flex;gap:4px;align-items:center"><input type="checkbox" id="ed-exige-glace" /> glace</label>
               <label style="display:flex;gap:4px;align-items:center"><input type="checkbox" id="ed-exige-vapeur" /> vapeur</label>
             </span></label>
+          <div id="ed-minijeu" hidden>
+            <span class="k" title="Les règles du mini-jeu des cibles : la durée de la partie et les trois paliers de points (EN PLEIN, TOUCHÉ, EFFLEURÉ). La jauge et le chrono du jeu suivent.">Mini-jeu : les cibles</span>
+            <label class="ed-f"><span>Durée (s)</span><input type="number" id="ed-mj-duree" min="5" step="1" /></label>
+            <label class="ed-f"><span>Palier EN PLEIN (points)</span><input type="number" id="ed-mj-p1" min="1" step="1" /></label>
+            <label class="ed-f"><span>Palier TOUCHÉ</span><input type="number" id="ed-mj-p2" min="1" step="1" /></label>
+            <label class="ed-f"><span>Palier EFFLEURÉ</span><input type="number" id="ed-mj-p3" min="1" step="1" /></label>
+          </div>
           <p class="edg-note">« Exige au bouton » prévient la VOIE : tant que le lien manuel
             (solidification, vaporisation) n’est pas tissé aux mémoires, la descente
             n’offre pas ce tableau en suite écrite.</p>

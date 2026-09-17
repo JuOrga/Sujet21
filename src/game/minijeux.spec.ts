@@ -325,6 +325,7 @@ import {
   avanceCibles,
   ETAT_CIBLES_NEUF,
   MIRES_CIBLES,
+  multiplicateurSerie,
   noteCibles,
   pointsTouche,
   REGLAGES_CIBLES,
@@ -348,18 +349,29 @@ describe('les cibles — des éclats de glace, des mires, trente secondes', () =
     expect(pointsTouche(mires[1], 90, 900, r)).toBe(5)
   })
 
-  it('les touches s’ajoutent, la mire reste, le temps conclut', () => {
+  it('les touches s’ajoutent, la mire reste, une série rapprochée multiplie (×2, ×3 au plus), une touche tardive la remet à un, le temps conclut', () => {
     let e = avanceCibles(ETAT_CIBLES_NEUF, 1, [], mires, 900, r)
     expect(e).toBe(ETAT_CIBLES_NEUF) // rien ne change : le même état
     e = avanceCibles(e, 2, [{ mire: 0, taille: 90 }], mires, 900, r)
-    expect(e).toEqual({ points: 10, touches: 1, fini: false })
-    e = avanceCibles(e, 3, [{ mire: 0, taille: 90 }, { mire: 2, taille: 45 }], mires, 900, r) // la même mire, encore
-    expect(e).toEqual({ points: 25, touches: 3, fini: false })
-    e = avanceCibles(e, 4, [{ mire: 7, taille: 90 }], mires, 900, r) // une mire qui n'existe pas : rien
-    expect(e.points).toBe(25)
+    expect(e).toEqual({ points: 10, touches: 1, fini: false, serie: 1, derniereTouche: 2 })
+    // une seconde plus tard, deux touches : la deuxième de la série vaut ×2, la troisième ×3
+    e = avanceCibles(e, 3, [{ mire: 0, taille: 90 }, { mire: 2, taille: 45 }], mires, 900, r)
+    expect(e).toEqual({ points: 10 + 20 + 15, touches: 3, fini: false, serie: 3, derniereTouche: 3 })
+    // encore une, à moins de deux secondes : toujours ×3 (le plafond)
+    e = avanceCibles(e, 4.5, [{ mire: 1, taille: 90 }], mires, 900, r)
+    expect(e.points).toBe(45 + 15)
+    expect(e.serie).toBe(4)
+    e = avanceCibles(e, 5, [{ mire: 7, taille: 90 }], mires, 900, r) // une mire qui n'existe pas : rien
+    expect(e.points).toBe(60)
+    // plus de deux secondes après : la série repart à un
+    e = avanceCibles(e, 8, [{ mire: 0, taille: 90 }], mires, 900, r)
+    expect(e.points).toBe(70)
+    expect(e.serie).toBe(1)
     const fin = avanceCibles(e, r.duree, [{ mire: 1, taille: 90 }], mires, 900, r)
-    expect(fin).toEqual({ points: 30, touches: 4, fini: true })
+    expect(fin).toEqual({ points: 75, touches: 6, fini: true, serie: 1, derniereTouche: r.duree })
     expect(avanceCibles(fin, 40, [{ mire: 1, taille: 90 }], mires, 900, r)).toBe(fin)
+    expect(multiplicateurSerie(0, r)).toBe(1)
+    expect(multiplicateurSerie(9, r)).toBe(r.serieMax)
   })
 
   it('le verdict aux paliers', () => {
