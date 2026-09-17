@@ -31,8 +31,14 @@ somment. Vitesse circulaire au bord √(force·rayon) = 402 u/s, à 0,7 rayon
 282 u/s ; vitesse d'évasion au bord 569 u/s, loin sous `maxSpeed` (3 000).
 
 **Ce qui orbite, ce qui est capturé.** L'eau orbite, et reste un corps.
-La glace orbite (la moyenne d'`icePass` porte la traction ; l'écart entre
-particules devient une marée en rotation). La vapeur, elle, est capturée :
+La glace orbite : **un bloc reçoit la moyenne du champ sur son disque**
+(`applyPuits` somme les puits par bloc), pas une traction par particule —
+particule par particule, le cœur (`a ∝ r`) tirait plus sur le bord loin
+que sur le bord près, et la projection rigide d'`icePass` ne redresse que
+les vitesses : le bloc se tassait de 1 u/s (mesuré le 17/09, rms 73 → 55
+en 20 s). Dans le cœur, la moyenne est la valeur au centre : le bloc est
+un point-masse exact ; dans le halo en 1/r², elle en diffère un peu — ce
+qui compte quand on tire une orbite fermée (§7). La vapeur, elle, est capturée :
 `gasDrag` (1,3/s) la fait spiraler vers le cœur — un nuage n'orbite pas.
 Le dash de vapeur (820 u/s) reste une porte de sortie.
 
@@ -168,3 +174,41 @@ la recherche — jamais on ne déplace un anneau ni un palier à la main.
 - Le survol raconte le puits (la bulle savante) ; `checkLevel` avertit
   d'un puits hors cuve, d'un départ au fond d'un cœur sans impulsion, de
   deux cœurs qui se recouvrent.
+
+## 7. La ronde (`Voir la ronde (démo)`, `__ronde()`)
+
+Le concepteur (17/09, croquis) : « un niveau où le volume tourne non stop
+autour de ces trois centres de gravité, en glace ». Trois puits alignés
+sur x = 0 (écart 800, cœur 350, force 600), toute la salle en zone de
+glace, le bloc lancé de (−200, 0) droit vers le haut à 451 u/s : il
+enchaîne les trois puits en **un huit à trois lobes** (le sens s'inverse à
+chaque lobe) et se referme sur lui-même, **sans fin**. Un tour dure
+13,45 s. Rien ne se pilote : on regarde. Sans sas (`sansSas`, `ronde.ts`).
+
+**L'orbite est tirée, pas devinée** (`src/game/ronde.recherche.spec.ts`,
+la commande dans le fichier). Une orbite périodique dans un champ à trois
+centres : par symétrie, un lancer qui part de (−a, 0) droit vers le haut et
+recoupe y = 0 à angle droit après avoir contourné le puits du haut est
+fermé — la moitié du bas est le miroir de la moitié du haut. Deux
+inconnues (a, v), une condition : une famille à un paramètre, tirée par
+bissection. Ce qui a été mesuré :
+
+- **La stabilité se mesure**, elle ne se suppose pas : un écart de 1 u au
+  départ, combien après vingt tours ? La famille à un tour par lobe tient
+  (quelques unités) tant que le croisement reste dans le cœur ; elle se
+  déchire au-delà (des centaines d'unités en cinq tours). Les orbites à
+  plusieurs tours par lobe sont toutes instables.
+- **Le cœur fait la forme** : cœur 300 pour un écart de 650, le lobe du
+  haut est plat (164 au-dessus du puits) ; cœur 350 pour 800, il est rond
+  (224) ; cœur 450, les lobes s'étranglent. La force ne change que le
+  tempo (T ∝ 1/√force).
+- **Le corps n'est pas un point** : lancé sur l'orbite du point-masse, le
+  bloc s'en écartait de 40 u/s dès le premier croisement (la moyenne du
+  champ sur son disque, dans le halo) et de 300 u après un tour. La
+  recherche tire donc avec le champ moyenné sur un disque de 103 u ; la
+  famille tient alors jusqu'à a = 210 et se déchire à 220. Le tableau
+  prend a = 200.
+- **Le vrai solveur confirme** (`src/sim/ronde.spec.ts`, six tours ;
+  mesuré : vingt-cinq tours, 336 s) : le bloc repasse par (−200 ± 0,6, 0)
+  à chaque tour, vitesse droite à ±7 u/s, période 13,45 s, entier, sans se
+  tasser — avec la vitesse arrondie à l'entier, celle que l'éditeur écrit.

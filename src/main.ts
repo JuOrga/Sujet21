@@ -150,6 +150,7 @@ import {
   type Lancer,
   type NoteTrait,
 } from './game/minijeux'
+import { sansSas, tableauRonde } from './game/ronde'
 import {
   ditEffet,
   offresDe,
@@ -10525,7 +10526,7 @@ function rebuildRenderBoxes(): void {
   renderBoxes = [
     ...level.boxes.slice(0, Math.max(1, MAX_BOXES - 1 - factices.length)),
     ...factices,
-    ...(estMiniJeu(level) ? [] : [{ ...level.exit, material: MAT_EXIT }]),
+    ...(sansSas(level) ? [] : [{ ...level.exit, material: MAT_EXIT }]),
   ]
 }
 // ---- LE PACK PRÉSENCE : le Sujet est vivant ----
@@ -12715,6 +12716,12 @@ function lanceManoeuvre(quoi: string): void {
       }
       case 'orbites': {
         lanceOrbitesEssai()
+        pupitreEl.hidden = true
+        closeHome()
+        break
+      }
+      case 'ronde': {
+        lanceRondeEssai()
         pupitreEl.hidden = true
         closeHome()
         break
@@ -16047,6 +16054,18 @@ function lanceOrbitesEssai(): void {
 }
 ;(window as unknown as { __orbites: () => void }).__orbites = lanceOrbitesEssai
 
+// VOIR LA RONDE (le pupitre, et la sonde __ronde()) : le tableau de
+// démonstration des puits — en glace, lancé, sans fin
+function lanceRondeEssai(): void {
+  if (miseEnBonbonne) fermeMiseEnBonbonne()
+  auHub = false
+  hasPlayed = true
+  document.body.classList.add('playing')
+  testLevel = tableauRonde()
+  restart()
+}
+;(window as unknown as { __ronde: () => void }).__ronde = lanceRondeEssai
+
 function newExpedition(avecCarte = false): void {
   levelIndex = 0
   voieRang = 0 // une descente neuve repart du premier rang du plan
@@ -17859,7 +17878,7 @@ function corpsImage(now: number): boolean {
         }
         // un MINI-JEU n'a pas de sas : rien n'aspire, jamais — la lame
         // conclut ; sinon arroser un sas de loin pèserait
-        sim.exitRadiusFactor = estMiniJeu(level) ? 0 : lev('sasPortee')
+        sim.exitRadiusFactor = sansSas(level) ? 0 : lev('sasPortee')
         sim.applyExitSuction(exitMouth.x, exitMouth.y, params.dt)
         // les CHASSES qui soufflent : le courant s'applique au pas, comme le
         // sas — et la bouffée d'une chasse déclenchée s'épuise au temps de jeu
@@ -18379,7 +18398,7 @@ function corpsImage(now: number): boolean {
   // dans un MINI-JEU, rien ne s'aspire et le bouton ne sert pas : c'est le
   // jeu qui conclut (la lame du couperet ; au palet, le choix après chaque
   // lancer — relancer ou valider)
-  const aspireAssez = estMiniJeu(level) ? false : sim.swallowed >= Math.max(20, sim.baseVolume * 0.1)
+  const aspireAssez = sansSas(level) ? false : sim.swallowed >= Math.max(20, sim.baseVolume * 0.1)
   const texteBouton = 'CONTINUER — CONCLURE L’ESSAI'
   if (btnContinuer.textContent !== texteBouton) btnContinuer.textContent = texteBouton
   // Une traversée déclarée par un OUTIL de conception. La salle se conclut
@@ -18413,7 +18432,7 @@ function corpsImage(now: number): boolean {
   // salle comme une salle ordinaire
   const reached =
     !drainActive &&
-    !estMiniJeu(level) &&
+    !sansSas(level) &&
     pointInBox(sim.stats.centroidX, sim.stats.centroidY, level.exit)
   // au HUB, pas d'engloutissement à attendre : dès que le CORPS est dans la
   // bouche du sas, la run part — le sas de lancement est une porte, pas un
