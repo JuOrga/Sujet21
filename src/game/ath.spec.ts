@@ -117,4 +117,22 @@ describe('les pancartes du monde', () => {
   })
 })
 
+describe('le repos de l’ATH', () => {
+  it('a son réglage dans PARAMÈTRES', () => {
+    expect(HTML).toContain('id="params-ath"')
+  })
+
+  it('passe par l’automate testé', () => {
+    expect(MAIN).toContain('athAuRepos(')
+    expect(MAIN).toContain("'ath-repos'")
+  })
+
+  it('n’estompe jamais le module vital ni le médaillon courant', () => {
+    const regles = CSS_ATH.match(/body\.ath-repos[^{]*\{[^}]*\}/g) ?? []
+    expect(regles.length).toBeGreaterThan(0)
+    for (const r of regles) expect(r).not.toContain('.ath-vital')
+    expect(regles.join('\n')).toContain(':not(.st-cur)')
+  })
+})
+
 export { HTML, MAIN, CSS_ATH }

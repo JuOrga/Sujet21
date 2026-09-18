@@ -373,6 +373,7 @@ import {
 import { picto, type NomPicto } from './game/athPictos'
 import { entreesTiroir } from './game/athTiroir'
 import { pancarteLibre, zonesInterdites, type Rect } from './game/athZones'
+import { CLE_REGLAGE_ATH, athAuRepos, litReglageAth, pointeurPres, type ReglageAth } from './game/athRepos'
 import { PARALLAXE_DEFAUTS, facteurG } from './render/parallaxe'
 import { PerfCollector } from './game/perf'
 import {
@@ -3732,6 +3733,7 @@ let eauRiche = localStorage.getItem('sujet21-eau') !== 'sobre'
 // La FLÈCHE DE CAP à la manette : retirée par défaut (le regard du Sujet
 // suit déjà le stick) — réactivable dans PARAMÈTRES pour qui la préfère.
 let flecheVisible = localStorage.getItem('sujet21-fleche') === 'visible'
+let reglageAth: ReglageAth = litReglageAth(localStorage.getItem(CLE_REGLAGE_ATH))
 // LE FAISCEAU laser, trois crans : FOUDROYANT par défaut (aura pulsante
 // + mini-arcs électriques qui crépitent le long du rayon, sursaut
 // amplifié), SOMPTUEUX (flux + lueurs, sursaut sobre), CLASSIQUE
@@ -4166,6 +4168,29 @@ const paramsEl = document.getElementById('params') as HTMLDivElement
       }
     }
     renderFleche()
+  }
+
+  const choixAth = document.getElementById('params-ath') as HTMLDivElement | null
+  if (choixAth) {
+    const renderAth = (): void => {
+      choixAth.innerHTML = ''
+      for (const [cle, label] of [
+        ['discret', 'DISCRÈTE'],
+        ['complet', 'COMPLÈTE'],
+      ] as const) {
+        const b = document.createElement('button')
+        b.type = 'button'
+        b.textContent = label
+        b.className = reglageAth === cle ? 'actif' : ''
+        b.addEventListener('click', () => {
+          reglageAth = cle
+          localStorage.setItem(CLE_REGLAGE_ATH, cle)
+          renderAth()
+        })
+        choixAth.appendChild(b)
+      }
+    }
+    renderAth()
   }
 
   const choixFantomes = document.getElementById(
@@ -16915,6 +16940,22 @@ window.addEventListener(
   true,
 )
 
+// LE REPOS (game/athRepos.ts) : main.ts ne fait que dire l'heure du dernier
+// geste VERS l'interface. Le stick ne compte pas : il bouge en permanence.
+let dernierGesteAth = performance.now()
+function reveilleAth(): void {
+  dernierGesteAth = performance.now()
+}
+window.addEventListener(
+  'pointermove',
+  (ev) => {
+    if (pointeurPres(ev.clientX, ev.clientY, postesAth)) reveilleAth()
+  },
+  { passive: true },
+)
+for (const sel of ['#touchbar', '#tiroir', '#statebar', '.ath-etat'])
+  document.querySelector(sel)?.addEventListener('pointerdown', reveilleAth)
+
 // Le cadran des états publie sa propre hauteur (--cadran-h) : voir sa
 // déclaration plus bas, avec statebarEl.
 const btnPause = athBouton(touchbar, 'pause', 'pause (espace)', () => input.togglePause())
@@ -17057,6 +17098,7 @@ function majCadranEtats(zoneActive: ZoneForce): void {
   ].join('|')
   if (sig === cadranSignature) return
   cadranSignature = sig
+  reveilleAth() // l'état change (clavier, doigt ou manette) : le cadran se montre
   const NOMS_ETAT = {
     eau: 'LIQUIDE',
     glace: 'GLACE',
@@ -19444,6 +19486,21 @@ function corpsImage(now: number): boolean {
   btnVortex.classList.toggle('active', input.vortexArmed)
   btnVortex.style.display = params.vortexEnabled >= 0.5 ? '' : 'none'
   majCadranEtats(zoneActive)
+  document.body.classList.toggle(
+    'ath-repos',
+    athAuRepos({
+      maintenant: performance.now(),
+      dernierGeste: dernierGesteAth,
+      reglage: reglageAth,
+      // tiroir ouvert, pause, dispersion, jauge en alerte : l'interface
+      // doit rester lisible
+      force:
+        tiroirOuvert ||
+        input.paused ||
+        sim.dispersed ||
+        gaugeFill.classList.contains('danger'),
+    }),
+  )
   // le DOSSIER se rafraîchit quatre fois par seconde tant qu'il est ouvert
   if (dossierOuvert) {
     const tMaj = performance.now() / 1000

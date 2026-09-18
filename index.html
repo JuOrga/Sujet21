@@ -5574,6 +5574,24 @@
           display: none; /* pas de clavier sous le pouce */
         }
       }
+      /* ---- Le repos (réglage DISCRÈTE) : ce qui ne sert pas s'estompe.
+         Le module vital n'est pas cité ici, et ne doit jamais l'être : « le
+         coût est sur la jauge » — elle se lit en continu. ---- */
+      body.ath-repos #touchbar {
+        opacity: 0.3;
+      }
+      body.ath-repos #statebar button:not(.st-cur) {
+        opacity: 0.3;
+      }
+      body.ath-repos .ath-etat {
+        opacity: 0.62;
+      }
+      @media (prefers-reduced-motion: reduce) {
+        #touchbar,
+        #statebar button {
+          transition: none;
+        }
+      }
       /* ==== ATH : FIN ==== */
       /* Le compte à rebours de dispersion : impossible à rater */
       #hud-danger {
@@ -10504,6 +10522,14 @@
             lissée revient, mémorisé.
           </div>
           <div id="params-fleche" class="params-choix" role="group" aria-label="Flèche de cap manette"></div>
+          <div class="params-nom" style="margin-top: 16px">L'INTERFACE EN JEU</div>
+          <div class="params-desc">
+            Discrète (défaut) : les commandes et la capsule d'état s'estompent
+            après quelques secondes sans geste vers elles, et reviennent dès
+            qu'on s'en approche. Le litrage et la jauge, eux, ne s'estompent
+            jamais. Complète : tout reste affiché, mémorisé.
+          </div>
+          <div id="params-ath" class="params-choix" role="group" aria-label="Interface en jeu"></div>
           <div class="params-nom" style="margin-top: 16px">LES FANTÔMES</div>
           <div class="params-desc">
             Vos records rejoués en silhouette : à l'entrée d'une salle, la
