@@ -17013,7 +17013,6 @@ function majCadranEtats(zoneActive: ZoneForce): void {
       t !== null && (!gate || transfoTenue(t.id, acquis, verrousCycle))
     const montreVerrou = !estCur && !tenue && t !== null && verrou === s.etat
     s.el.hidden = !estCur && !tenue && !montreVerrou
-    s.el.classList.toggle('active', estCur)
     s.el.classList.toggle('st-cur', estCur)
     s.el.classList.toggle('st-verrou', montreVerrou)
     s.el.disabled = zone || montreVerrou
