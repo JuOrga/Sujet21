@@ -824,10 +824,13 @@ function createSim(level: LevelDef): FluidSim {
   // tableau, donc rendus à la salle suivante, et lus par le solveur, la
   // visée et le HUD au même endroit (params) : une seule vérité du geste.
   cartesDuTableau = level.cartes ?? []
-  const partTir = partTirEffective(params.glaceTir, lev('glaceTir'))
-  if (partTir !== params.glaceTir) {
+  // seulement si une carte contribue : sans carte, le banc n'est JAMAIS
+  // réécrit — la revue du 18/09 : le plafond de partTirEffective rognait en
+  // silence un banc réglé au-delà (le concepteur qui teste 0,6 lisait 0,5)
+  const bonusTir = lev('glaceTir')
+  if (bonusTir > 0) {
     if (!('glaceTir' in reglagesRendus)) reglagesRendus.glaceTir = params.glaceTir
-    params.glaceTir = partTir
+    params.glaceTir = partTirEffective(params.glaceTir, bonusTir)
   }
   const vitesseTir = lev('glaceTirVitesse')
   if (vitesseTir !== 1) {
