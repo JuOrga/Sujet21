@@ -16122,12 +16122,14 @@ const dashAimEl = el('dash-aim')
 const dashCostEl = el('dash-cost')
 
 // ---- LE FIL DE LA DESCENTE : elle se lit d'un regard --------------------
-// Un rail à CRANS sur le flanc droit — un cran par salle de la séquence (la
-// suite écrite comme le plan de la voie), les tiers
+// Un rail à CRANS dans la capsule de statut (haut-droit) — un cran par salle
+// de la séquence (la suite écrite comme le plan de la voie), les tiers
 // (début · milieu · fin) marqués d'une couture, le cran courant qui pulse
-// menthe, les franchis pleins, la profondeur record étoilée ✦. Et à chaque
-// entrée de salle, la CARTE D'IDENTITÉ complète (nom, code, moment,
-// mécanique, difficulté, rang) passe en fondu — sans rien bloquer.
+// menthe, les franchis pleins, la profondeur record étoilée ✦. Borné en
+// largeur (27 à 30 salles), il disparaît sur téléphone : SALLE n/N y porte
+// seul le compte. Et à chaque entrée de salle, la CARTE D'IDENTITÉ complète
+// (nom, code, moment, mécanique, difficulté, rang) passe en fondu — sans
+// rien bloquer.
 const voieHudEl = document.getElementById('voie-hud') as HTMLDivElement
 const voieCarteEl = document.getElementById('voie-carte') as HTMLDivElement
 let voieCarteTimer = 0
@@ -17134,7 +17136,7 @@ function majCadranEtats(zoneActive: ZoneForce): void {
 }
 
 // ---- LE DOSSIER DE DESCENTE : tout le relevé, d'un seul geste -----------
-// TAB (le bouton ▤ de la barre, R3 à la manette) fait glisser le panneau
+// TAB (l'entrée DOSSIER du tiroir ≡, R3 à la manette) fait glisser le panneau
 // depuis la droite : la salle et son identité, le corps et ses réserves,
 // le cycle et ce qu'il permet ICI, le butin, l'équipement embarqué. Il ne
 // fige RIEN — la descente continue derrière, c'est un dossier qu'on

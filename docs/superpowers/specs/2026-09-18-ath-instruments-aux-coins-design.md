@@ -48,12 +48,15 @@ Sujet.
 | poste | où | ce qu'il porte |
 | --- | --- | --- |
 | **le module vital** | haut-gauche | le litrage en grand (Plex Mono 600, 24 px), l'unité `L` en Michroma, la fiole (`#bonbonne`), une jauge courte de 168 × 4 px avec le seuil rouge. À droite de la jauge, la perte (`#hud-perte`) ; dessous, la rosée et le fantôme. Ces trois lignes **n'occupent de place que lorsqu'elles parlent**. |
-| **la capsule d'état** | haut-droit | les crans de progression + `SALLE n/N`, puis une rangée de lectures séparées par un filet : vies, condensat, coque, instruments (et `⏺ CAPTURER` en mode concepteur). Pas de cadre par lecture. |
+| **la capsule d'état** | haut-droit | les crans de progression (`#vh-rail`, bornés à `min(200px, 22vw)`, les crans se resserrent — une descente livrée compte 27 à 30 salles, pas les 7 de la maquette) + `SALLE n/N`, puis une rangée de lectures séparées par un filet : vies, condensat, coque, instruments (et `⏺ CAPTURER` en mode concepteur). Pas de cadre par lecture. |
 | **les commandes** | bas-gauche | trois boutons : `≡` (le tiroir), pause, le temps (`×1`). En essai depuis l'éditeur, `↩ ÉDITEUR` reste un quatrième bouton permanent. |
 | **le cadran des états** | bas-centre ; colonne bas-droite en compact | les trois médaillons, octogonaux (la forme des modules du plan de la station). Le courant est plein, 56 px, avec son nom ; les autres 42 px, en creux, avec leur touche. |
 
-Le centre-haut, libéré, reçoit la bannière d'alerte (`#hud-danger`, de
-`top: 62px` à `top: 14px`).
+La bannière d'alerte (`#hud-danger`), les trophées (`#trophee-toast`) et le
+panneau des instruments (`#instr-panel`) se posent sous le bas MESURÉ des
+deux coins (`--coins-bas`, publié par `majZonesAth`) plutôt que sur un
+`top` fixe : à 1024 px de large, ou en grande taille de texte, une bannière
+calée à `top: 14px` mordait sur les deux coins.
 
 ### Le style
 
@@ -115,10 +118,11 @@ compact, la feuille montante actuelle, plafonnée à `60dvh` au lieu de 78.
 
 Mêmes points de rupture qu'aujourd'hui (`max-width: 700px`, ou `pointer:
 coarse` et `max-height: 620px`). Le module vital tient sur une ligne
-(litrage 18 px, jauge 118 px), la capsule aussi (crans, salle, vies,
-condensat, coque — les instruments passent au dossier). Commandes en rangée
-bas-gauche, cadran en colonne bas-droite sous le pouce. Plus aucune colonne
-de boutons : **le débordement disparaît avec sa cause**. Les
+(litrage 18 px, jauge 118 px), la capsule aussi (`SALLE n/N`, vies,
+condensat, coque — le rail disparaît, 27 à 30 crans ne tenant pas à côté des
+lectures sur un téléphone ; les instruments passent au dossier). Commandes
+en rangée bas-gauche, cadran en colonne bas-droite sous le pouce. Plus
+aucune colonne de boutons : **le débordement disparaît avec sa cause**. Les
 `env(safe-area-inset-*)` sont repris sur les quatre postes.
 
 ## Comment c'est bâti
@@ -170,9 +174,11 @@ compact — `#rejeu-barre` y gagne la surcharge qui lui manquait.
 
 ### Les retouches de voisinage
 
-- `#fps-coin` passe de bas-gauche à bas-droite (le coin est pris).
+- `#fps-coin` passe de bas-gauche à bas-droite (le coin est pris) ; en
+  compact, il repasse à gauche pour ne plus tomber sur le médaillon courant.
 - Les bornes de `#obj-arrow` (`main.ts:19656+`) suivent les nouvelles marges.
-- `#instr-panel` et `#trophee-toast` restent sous la capsule (`top: 64px`).
+- `#instr-panel` et `#trophee-toast` se posent sous `--coins-bas`, le bas
+  mesuré des deux coins (plus de `top: 64px` fixe).
 - Suppression de `#tutor`, `#tableau-card`, `.hud-restes`, de leur CSS et du
   code qui les alimente.
 
