@@ -370,6 +370,8 @@ import {
   sourisInverse,
   toucheDe,
 } from './game/commandes'
+import { picto, type NomPicto } from './game/athPictos'
+import { entreesTiroir } from './game/athTiroir'
 import { PARALLAXE_DEFAUTS, facteurG } from './render/parallaxe'
 import { PerfCollector } from './game/perf'
 import {
@@ -16769,21 +16771,36 @@ input.onVortex = (clientX, clientY) => {
   bande.bruitage('vortex-sas', 0.55)
 }
 
-// Barre tactile : les commandes clavier/souris accessibles au doigt
+// LES COMMANDES DE L'ATH. Trois boutons restent à l'écran (le tiroir, la
+// pause, le temps — plus le retour à l'éditeur pendant un essai) ; les
+// autres se rangent dans le tiroir, bâti depuis game/athTiroir.ts.
 const touchbar = document.getElementById('touchbar') as HTMLDivElement
-function touchButton(
-  label: string,
+const tiroir = document.getElementById('tiroir') as HTMLDivElement
+function athBouton(
+  hote: HTMLElement,
+  nom: NomPicto,
   title: string,
   onTap: () => void,
   cls = '',
 ): HTMLButtonElement {
   const b = document.createElement('button')
-  b.textContent = label
+  b.type = 'button'
+  b.dataset.picto = nom
+  b.innerHTML = picto(nom)
   b.title = title
+  b.setAttribute('aria-label', title)
   if (cls) b.className = cls
   b.addEventListener('click', onTap)
-  touchbar.appendChild(b)
+  hote.appendChild(b)
   return b
+}
+/** Change le pictogramme d'un bouton SANS réécrire le DOM à chaque image :
+ *  seul le svg est remplacé, le nom et la touche restent. */
+function posePicto(b: HTMLButtonElement, nom: NomPicto): void {
+  if (b.dataset.picto === nom) return
+  b.dataset.picto = nom
+  b.querySelector('svg')?.remove()
+  b.insertAdjacentHTML('afterbegin', picto(nom))
 }
 
 // Panneaux de lecture : la légende des surfaces et les trois états (qui
@@ -16813,31 +16830,144 @@ function toggleBench(): void {
   void chargeBanc() // en route : un second appui rejoint le même chargement
 }
 
-const chipLegend = touchButton(
-  'LÉGENDE',
-  'légende des surfaces (L)',
-  toggleLegend,
-  'tb-chip',
+// Le tiroir — placé après toggleLegend, toggleStates, toggleBench : le geste
+// LÉGENDE / ÉTATS / BANC ci-dessous les appelle.
+let tiroirOuvert = false
+const btnTiroir = athBouton(touchbar, 'menu', 'les autres commandes', () =>
+  ouvreTiroir(!tiroirOuvert),
 )
-const chipStates = touchButton(
-  'ÉTATS',
-  'les trois états : qui bloque quoi (E)',
-  toggleStates,
-  'tb-chip',
+btnTiroir.setAttribute('aria-expanded', 'false')
+btnTiroir.setAttribute('aria-controls', 'tiroir')
+
+function basculeSon(): void {
+  audio.resume()
+  audio.setEnabled(!audio.enabled)
+  if (audio.enabled) {
+    bande.eveiller()
+  }
+  majInviteSon()
+  pane?.refresh()
+}
+const GESTES_TIROIR: Record<string, () => void> = {
+  legende: () => toggleLegend(),
+  etats: () => toggleStates(),
+  dossier: () => ouvreDossier(!dossierOuvert),
+  station: () => ouvreStation(true),
+  recadrer: () => camera.resetAutoZoom(),
+  vortex: () => {
+    input.vortexArmed = !input.vortexArmed
+  },
+  son: () => basculeSon(),
+  recommencer: () => resetAction(),
+  fiche: () => openHome(),
+  banc: () => toggleBench(),
+}
+const boutonsTiroir: Record<string, HTMLButtonElement> = {}
+// toutes les entrées sont bâties, vortex compris : c'est la boucle qui le
+// montre ou le masque selon le réglage (params.vortexEnabled peut changer)
+for (const e of entreesTiroir({ vortexActif: true })) {
+  const b = athBouton(tiroir, e.picto, e.nom, () => {
+    // le vortex s'ARME et le son BASCULE : le tiroir reste ouvert pour qu'on
+    // voie l'état changer ; tout le reste ouvre autre chose — il cède la place
+    if (e.id !== 'vortex' && e.id !== 'son') ouvreTiroir(false)
+    GESTES_TIROIR[e.id]()
+  })
+  b.insertAdjacentHTML('beforeend', `<span class="ti-nom">${e.nom}</span><kbd></kbd>`)
+  b.dataset.manoeuvre = e.manoeuvre ?? ''
+  boutonsTiroir[e.id] = b
+}
+const chipLegend = boutonsTiroir.legende
+const chipStates = boutonsTiroir.etats
+const chipBench = boutonsTiroir.banc
+const btnVortex = boutonsTiroir.vortex
+const btnSound = boutonsTiroir.son
+
+/** Les touches affichées sont celles EN VIGUEUR : relues à chaque ouverture,
+ *  le joueur a pu les redéfinir entre-temps. */
+function majTouchesTiroir(): void {
+  for (const b of Object.values(boutonsTiroir)) {
+    const kbd = b.querySelector('kbd') as HTMLElement
+    const m = b.dataset.manoeuvre
+    const t = m ? toucheDe(m) : null
+    kbd.textContent = t ? nomTouche(t) : ''
+    kbd.hidden = !t
+  }
+}
+function ouvreTiroir(v: boolean): void {
+  tiroirOuvert = v
+  tiroir.hidden = !v
+  btnTiroir.classList.toggle('active', v)
+  btnTiroir.setAttribute('aria-expanded', String(v))
+  if (v) majTouchesTiroir()
+}
+// un toucher ailleurs le referme — sans RETENIR le toucher : viser la cuve
+// avec le tiroir ouvert vise, et le referme au passage
+document.addEventListener(
+  'pointerdown',
+  (ev) => {
+    if (!tiroirOuvert) return
+    const t = ev.target as Node
+    if (tiroir.contains(t) || btnTiroir.contains(t)) return
+    ouvreTiroir(false)
+  },
+  true,
 )
-const chipBench = touchButton(
-  'BANC',
-  'banc de réglage : la physique en direct',
-  toggleBench,
-  'tb-chip',
+// Échap, tiroir ouvert, referme le tiroir — et ne mène PAS à la fiche
+window.addEventListener(
+  'keydown',
+  (ev) => {
+    if (!tiroirOuvert || ev.key !== 'Escape') return
+    ev.preventDefault()
+    ev.stopImmediatePropagation()
+    ouvreTiroir(false)
+  },
+  true,
 )
+
+// Le cadran des états publie sa propre hauteur (--cadran-h) : voir sa
+// déclaration plus bas, avec statebarEl.
+const btnPause = athBouton(touchbar, 'pause', 'pause (espace)', () => input.togglePause())
+const tbTime = document.createElement('div')
+tbTime.id = 'tb-time'
+touchbar.appendChild(tbTime)
+let replieTemps = 0
+/** ‹ et › ne paraissent que 3 s après un toucher sur ×N (ou au survol) :
+ *  la vitesse est une INFO permanente, ses réglages non. */
+function deplieTemps(): void {
+  tbTime.classList.add('deplie')
+  window.clearTimeout(replieTemps)
+  replieTemps = window.setTimeout(() => tbTime.classList.remove('deplie'), 3000)
+}
+const pasTemps = (label: string, title: string, sens: -1 | 1): void => {
+  const b = document.createElement('button')
+  b.type = 'button'
+  b.className = 'tb-pas'
+  b.textContent = label
+  b.title = title
+  b.addEventListener('click', () => {
+    input.stepWarp(sens)
+    deplieTemps()
+  })
+  tbTime.appendChild(b)
+}
+pasTemps('‹', 'ralentir le temps (,)', -1)
+const tbSpeed = document.createElement('button')
+tbSpeed.type = 'button'
+tbSpeed.id = 'tb-speed'
+tbSpeed.textContent = '×1'
+tbSpeed.title = 'vitesse du temps simulé — toucher pour la régler'
+tbSpeed.addEventListener('click', deplieTemps)
+tbTime.appendChild(tbSpeed)
+pasTemps('›', 'accélérer le temps (.)', 1)
 // Retour à l'éditeur : n'apparaît que pendant l'essai d'un tableau édité
-const chipEditor = touchButton(
-  '↩ ÉDITEUR',
+const chipEditor = athBouton(
+  touchbar,
+  'editeur',
   'revenir à l’éditeur (le tableau est retrouvé tel qu’il était)',
   () => void openEditor(),
-  'tb-chip tb-editor',
+  'tb-editor',
 )
+chipEditor.insertAdjacentHTML('beforeend', '<span class="ti-nom">ÉDITEUR</span>')
 chipEditor.style.display = 'none'
 // (La puce « ⌂ HUB » — le hub à tout moment, outil de conception — a été
 // retirée le 16/09 : elle menait au hub AVEC une run en cours, et le sas
@@ -16845,56 +16975,6 @@ chipEditor.style.display = 'none'
 // retrouvait en salle 4. On n'arrive au hub qu'en mourant, en bouclant
 // l'expédition, ou par le menu ; et dans ces trois cas la sauvegarde est
 // effacée.)
-
-// Le cadran des états publie sa propre hauteur (--cadran-h) : voir sa
-// déclaration plus bas, avec statebarEl.
-{
-  // au doigt, les chips ont leur rangée, les glyphes la leur
-  const brk = document.createElement('i')
-  brk.className = 'tb-break'
-  touchbar.appendChild(brk)
-}
-const btnPause = touchButton('⏸', 'pause (espace)', () => input.togglePause())
-// Le TEMPS en un seul bloc : ralentir · la vitesse courante · accélérer.
-// La vitesse est une INFO permanente (elle s'allume dès qu'on quitte ×1),
-// et le groupe reste au doigt — savoir à quelle vitesse on joue n'est pas
-// un réglage de banc.
-const tbTime = document.createElement('div')
-tbTime.id = 'tb-time'
-touchbar.appendChild(tbTime)
-const timeButton = (
-  label: string,
-  title: string,
-  onTap: () => void,
-): HTMLButtonElement => {
-  const b = document.createElement('button')
-  b.textContent = label
-  b.title = title
-  b.addEventListener('click', onTap)
-  tbTime.appendChild(b)
-  return b
-}
-timeButton('‹', 'ralentir le temps (,)', () => input.stepWarp(-1))
-const tbSpeed = document.createElement('span')
-tbSpeed.id = 'tb-speed'
-tbSpeed.textContent = '×1'
-tbSpeed.title = 'vitesse du temps simulé'
-tbTime.appendChild(tbSpeed)
-timeButton('›', 'accélérer le temps (.)', () => input.stepWarp(1))
-// le DOSSIER a son bouton dans la barre : au doigt comme au Deck, on n'a
-// pas toujours un clavier sous la main
-touchButton('▤', 'dossier de descente (Tab)', () =>
-  ouvreDossier(!dossierOuvert),
-)
-touchButton('🛰\uFE0E', 'le plan de la station (C)', () => ouvreStation(true))
-const btnVortex = touchButton(
-  '🌀',
-  'vortex : armer puis toucher l’écran (clic droit)',
-  () => {
-    input.vortexArmed = !input.vortexArmed
-  },
-  'tb-vortex',
-)
 
 // ---- LE CADRAN DU CYCLE (refonte du sélecteur d'état) -------------------
 // Trois LOGEMENTS fixes — ❄ à gauche, 💧 au centre, 💨 à droite : la
@@ -17517,25 +17597,6 @@ function majEveil(dtReal: number): void {
     }
   }
 }
-touchButton('⌖', 'recadrer sur le corps (zoom et caméra auto)', () =>
-  camera.resetAutoZoom(),
-)
-const btnSound = touchButton(
-  '🔊',
-  'son : couper / activer',
-  () => {
-    audio.resume()
-    audio.setEnabled(!audio.enabled)
-    if (audio.enabled) {
-      bande.eveiller()
-    }
-    majInviteSon()
-    pane?.refresh()
-  },
-  'tb-snd', // masqué au doigt : la bascule du son reste au banc (dossier Son)
-)
-touchButton('↺', 'recommencer (R)', resetAction)
-touchButton('≡', 'fiche d’essai (échap)', openHome)
 input.onTimeWarpChange = (warp) => {
   params.timeWarp = warp
   majVitesse()
@@ -19377,7 +19438,7 @@ function corpsImage(now: number): boolean {
   monitor.speed = speed
   monitor.quality = echelleRendue()
 
-  btnPause.textContent = input.paused ? '▶' : '⏸'
+  posePicto(btnPause, input.paused ? 'lecture' : 'pause')
   btnPause.classList.toggle('active', input.paused)
   chipLegend.classList.toggle('active', legend.classList.contains('visible'))
   chipStates.classList.toggle(
@@ -19406,7 +19467,7 @@ function corpsImage(now: number): boolean {
   stateGlace.disabled = locked
   stateVapeur.disabled = locked
   document.body.classList.toggle('state-locked', locked)
-  btnSound.textContent = audio.enabled ? '🔊' : '🔇'
+  posePicto(btnSound, audio.enabled ? 'son' : 'muet')
 
   // Instruments de bord
   const fraction = sim.baseVolume > 0 ? sim.playerCount / sim.baseVolume : 0

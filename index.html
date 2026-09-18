@@ -5412,6 +5412,167 @@
           display: none;
         }
       }
+      /* ---- Les commandes : le coin bas-gauche ----
+         Trois boutons. Le conteneur épouse ses boutons : tout le reste du
+         bas de l'écran laisse passer les gestes de visée. */
+      #touchbar {
+        position: fixed;
+        left: calc(14px + env(safe-area-inset-left));
+        bottom: calc(12px + env(safe-area-inset-bottom));
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        padding: 10px 12px;
+        background: radial-gradient(ellipse at 0 100%, rgba(3, 7, 16, 0.6), transparent 72%);
+        pointer-events: none;
+        z-index: 10;
+        opacity: 0;
+        transition: opacity 0.5s ease 0.2s;
+      }
+      #touchbar::before {
+        content: '';
+        position: absolute;
+        left: 0;
+        bottom: 0;
+        width: 12px;
+        height: 12px;
+        border: solid var(--line-strong);
+        border-width: 0 0 1px 1px;
+      }
+      body.playing #touchbar {
+        opacity: 1;
+      }
+      /* hors jeu, les barres invisibles ne doivent VOLER aucun toucher :
+         opacité 0 ne suffit pas, on les retire vraiment */
+      body:not(.playing) #touchbar,
+      body:not(.playing) #statebar,
+      body:not(.playing) #hud,
+      body:not(.playing) #tiroir {
+        visibility: hidden;
+      }
+      #touchbar button,
+      #tiroir button {
+        pointer-events: auto;
+        cursor: pointer;
+        touch-action: manipulation;
+        color: var(--ink);
+        font-family: var(--font-mono);
+        border: 1px solid var(--line-strong);
+        background: rgba(10, 20, 32, 0.6);
+        transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+      }
+      #touchbar button {
+        display: grid;
+        place-items: center;
+        min-width: 36px;
+        min-height: 36px;
+        padding: 0;
+        font-size: calc(16px * var(--ui));
+        line-height: 1;
+      }
+      #touchbar button:hover,
+      #tiroir button:hover {
+        border-color: var(--specimen);
+      }
+      #touchbar button.active,
+      #tiroir button.active {
+        border-color: var(--specimen);
+        color: var(--specimen);
+        background: rgba(99, 183, 230, 0.16);
+      }
+      /* Le TEMPS : ×N est une information permanente ; ‹ › ne paraissent
+         qu'au survol ou 3 s après un toucher */
+      #tb-time {
+        display: flex;
+        align-items: stretch;
+        gap: 4px;
+        pointer-events: none;
+      }
+      #touchbar #tb-speed {
+        padding: 0 10px;
+        color: var(--dim);
+        font-weight: 600;
+        font-size: calc(12px * var(--ui));
+      }
+      #touchbar #tb-speed.actif {
+        color: #f2c14e;
+        border-color: rgba(242, 193, 78, 0.6);
+        background: rgba(242, 193, 78, 0.12);
+      }
+      #touchbar .tb-pas {
+        display: none;
+        font-size: calc(20px * var(--ui));
+        padding-bottom: 3px; /* ‹ › optiquement centrés */
+      }
+      #tb-time:hover .tb-pas,
+      #tb-time.deplie .tb-pas {
+        display: grid;
+      }
+      /* Retour à l'éditeur : présent seulement pendant l'essai d'un tableau
+         édité — il se distingue, c'est le geste le plus fréquent d'un essai */
+      #touchbar button.tb-editor {
+        display: flex;
+        gap: 7px;
+        padding: 0 11px;
+        color: var(--valid);
+        border-color: rgba(63, 214, 155, 0.55);
+        background: rgba(63, 214, 155, 0.1);
+      }
+      .ti-nom {
+        font-family: var(--font-display);
+        font-size: calc(9px * var(--ui));
+        letter-spacing: 0.14em;
+      }
+      /* ---- Le tiroir : les commandes rares, au-dessus du coin ---- */
+      #tiroir {
+        position: fixed;
+        left: calc(14px + env(safe-area-inset-left));
+        bottom: calc(74px + env(safe-area-inset-bottom));
+        width: min(330px, calc(100vw - 28px));
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 1px;
+        background: var(--line);
+        border: 1px solid var(--line-strong);
+        z-index: 14;
+      }
+      #tiroir[hidden] {
+        display: none;
+      }
+      #tiroir button {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        min-height: 38px;
+        padding: 0 10px;
+        border: 0;
+        background: rgba(10, 20, 32, 0.95);
+        text-align: left;
+        font-size: calc(15px * var(--ui));
+      }
+      #tiroir .picto {
+        color: var(--specimen);
+      }
+      #tiroir kbd {
+        margin-left: auto;
+        font-family: var(--font-mono);
+        font-size: calc(9px * var(--ui));
+        color: var(--dim);
+      }
+      /* Au doigt : un cran plus grand */
+      @media (pointer: coarse) {
+        #touchbar button {
+          min-width: 44px;
+          min-height: 44px;
+          font-size: calc(19px * var(--ui));
+        }
+        #tiroir button {
+          min-height: 46px;
+        }
+        #tiroir kbd {
+          display: none; /* pas de clavier sous le pouce */
+        }
+      }
       /* ==== ATH : FIN ==== */
       /* Le compte à rebours de dispersion : impossible à rater */
       #hud-danger {
@@ -5856,142 +6017,6 @@
       .rec-rejouer:hover { border-color: var(--specimen); }
       .rec-rejouer[disabled] { opacity: 0.45; cursor: default; }
 
-      /* ---- Barre tactile ---- */
-      /* Le conteneur s'étend sur toute la largeur (un fixe ancré à 50 %
-         rétrécirait au shrink-to-fit) ; les boutons se centrent dedans,
-         et la zone vide laisse passer les gestes de visée. */
-      #touchbar {
-        position: fixed;
-        left: 6px;
-        right: 6px;
-        bottom: calc(10px + env(safe-area-inset-bottom));
-        display: flex;
-        flex-wrap: wrap;
-        justify-content: center;
-        gap: 7px;
-        /* assez large pour tenir sur une ligne quand le bouton de retour à
-           l'éditeur s'ajoute ; au doigt, la largeur d'écran commande */
-        max-width: 790px;
-        margin: 0 auto;
-        pointer-events: none;
-        z-index: 10;
-        opacity: 0;
-        transition: opacity 0.5s ease 0.2s;
-      }
-      #touchbar button {
-        pointer-events: auto;
-      }
-      /* Saut de rangée : au doigt, les chips ont leur ligne, les glyphes la leur */
-      .tb-break {
-        display: none;
-        flex-basis: 100%;
-        height: 0;
-      }
-      body.playing #touchbar {
-        opacity: 1;
-      }
-      /* hors jeu, les barres invisibles ne doivent VOLER aucun toucher :
-         opacité 0 ne suffit pas, on les retire vraiment */
-      body:not(.playing) #touchbar,
-      body:not(.playing) #statebar,
-      body:not(.playing) #hud {
-        visibility: hidden;
-      }
-      #touchbar button {
-        min-width: 46px;
-        min-height: 46px;
-        border: 1px solid var(--line-strong);
-        border-radius: 4px;
-        /* fond plus opaque : les glyphes se détachaient mal de la cuve */
-        background: rgba(13, 22, 32, 0.88);
-        color: var(--ink);
-        font-family: var(--font-mono);
-        font-size: calc(20px * var(--ui));
-        line-height: 1;
-        cursor: pointer;
-        touch-action: manipulation;
-        backdrop-filter: blur(4px);
-        transition: background 0.15s ease, border-color 0.15s ease;
-      }
-      /* Le bloc TEMPS : ralentir · vitesse courante · accélérer — la vitesse
-         est une information permanente, pas un réglage de banc */
-      #tb-time {
-        display: flex;
-        align-items: stretch;
-        gap: 5px;
-        pointer-events: none;
-      }
-      #tb-time button {
-        pointer-events: auto;
-        font-size: calc(24px * var(--ui));
-        padding-bottom: 3px; /* ‹ › optiquement centrés */
-      }
-      #tb-speed {
-        min-width: 46px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        border: 1px solid var(--line);
-        border-radius: 4px;
-        background: rgba(13, 22, 32, 0.7);
-        color: var(--dim);
-        font-family: var(--font-display);
-        font-size: calc(13px * var(--ui));
-        letter-spacing: 0.08em;
-      }
-      #tb-speed.actif {
-        color: #f2c14e;
-        border-color: rgba(242, 193, 78, 0.6);
-        background: rgba(242, 193, 78, 0.12);
-      }
-      #touchbar button:hover {
-        border-color: var(--line-strong);
-      }
-      #touchbar button.active {
-        background: rgba(99, 183, 230, 0.4);
-        border-color: var(--specimen);
-      }
-      /* Chips étiquetées (LÉGENDE, ÉTATS, BANC) : mises en évidence, sans
-         rivaliser avec le sélecteur d'état et ses halos */
-      #touchbar button.tb-chip {
-        font-family: var(--font-display);
-        font-size: calc(11px * var(--ui));
-        letter-spacing: 0.14em;
-        padding: 0 13px;
-        color: var(--specimen);
-        border-color: rgba(99, 183, 230, 0.45);
-        background: rgba(99, 183, 230, 0.1);
-      }
-      /* Au doigt (téléphone, Steam Deck, tablette) : tout un cran plus grand —
-         les glyphes de 16 px étaient illisibles sur un écran de 7 pouces */
-      @media (pointer: coarse) {
-        #touchbar button {
-          min-width: 52px;
-          min-height: 50px;
-          font-size: calc(24px * var(--ui));
-        }
-        #tb-time button {
-          font-size: calc(28px * var(--ui));
-        }
-        #tb-speed {
-          min-width: 52px;
-          font-size: calc(15px * var(--ui));
-        }
-        #touchbar button.tb-chip {
-          font-size: calc(12px * var(--ui));
-          min-height: 44px;
-        }
-      }
-      #touchbar button.tb-chip:hover {
-        background: rgba(99, 183, 230, 0.18);
-        border-color: var(--specimen);
-      }
-      #touchbar button.tb-chip.active {
-        background: rgba(99, 183, 230, 0.3);
-        border-color: var(--specimen);
-        color: var(--ink);
-      }
-
       /* ---- Étiquettes de monde : chaque surface porte son nom, dans la
              couleur de la légende — projetées par la caméra à chaque image ---- */
       #world-labels {
@@ -6332,9 +6357,9 @@
       /* Le style du banc de réglage vit dans src/bench/bench.css */
 
       @media (max-width: 700px), (pointer: coarse) and (max-height: 620px) {
-        /* Au doigt : la bande de vie se fait minuscule, et les commandes
-           passent en COLONNE à gauche — le pouce gauche les tient, le droit
-           vise, les états restent à droite. */
+        /* Au doigt : les commandes tiennent en rangée dans le coin bas-gauche
+           (la COLONNE de boutons débordait : ~459 px pour 390 px d'écran), le
+           cadran en colonne à droite sous le pouce. */
         /* Au doigt : chaque coin tient sur une ligne, et l'essentiel seul */
         .ath-coin {
           padding: 8px 10px;
@@ -6380,38 +6405,17 @@
           white-space: normal;
           text-align: center;
         }
-        /* la bascule du son reste accessible au banc (dossier Son) */
-        #touchbar .tb-snd {
-          display: none;
-        }
-        /* le vortex reste un outil de banc ; le TEMPS, lui, se règle au
-           doigt comme partout — le bloc ‹ ×N › garde sa rangée */
-        #touchbar .tb-vortex {
-          display: none;
-        }
         #touchbar {
-          left: calc(6px + env(safe-area-inset-left));
-          right: auto;
-          bottom: calc(8px + env(safe-area-inset-bottom));
-          max-width: none;
-          margin: 0;
-          flex-direction: column;
-          align-items: flex-start;
-          justify-content: flex-end;
-          gap: 5px;
+          left: calc(8px + env(safe-area-inset-left));
+          bottom: calc(6px + env(safe-area-inset-bottom));
+          padding: 8px 10px;
         }
-        .tb-break {
-          display: none;
-        }
-        #touchbar button.tb-chip {
-          font-size: calc(10.5px * var(--ui));
-          letter-spacing: 0.1em;
-          padding: 0 11px;
-          min-height: 40px;
-        }
-        #touchbar button {
-          min-width: 42px;
-          min-height: 42px;
+        #tiroir {
+          left: calc(8px + env(safe-area-inset-left));
+          bottom: calc(66px + env(safe-area-inset-bottom));
+          width: min(300px, calc(100vw - 16px));
+          max-height: calc(100dvh - 80px);
+          overflow-y: auto;
         }
         /* ATH compact : le bas */
         /* le cadran est en colonne à droite : ce qui se centre en bas n'a
@@ -6429,25 +6433,6 @@
         #tableau-card {
           top: 64px;
         }
-      }
-
-      /* Hors mobile, le panneau de bord occupe le coin bas gauche : la barre
-         de boutons se centre dans l'espace RESTANT, sinon elle passe dessous
-         sur les écrans étroits (tablette en paysage, fenêtre réduite).
-         Un téléphone en paysage dépasse 701px : on exclut le mode compact
-         (doigt + écran bas), où la colonne doit coller au bord gauche. */
-      @media (min-width: 701px) and (pointer: fine), (min-width: 701px) and (min-height: 621px) {
-        #touchbar {
-          left: 268px;
-        }
-      }
-
-      /* Retour à l'éditeur : présent seulement pendant l'essai d'un tableau
-         édité — il doit se distinguer des chips de lecture */
-      #touchbar button.tb-editor {
-        color: var(--valid);
-        border-color: rgba(63, 214, 155, 0.55);
-        background: rgba(63, 214, 155, 0.1);
       }
 
       /* Zone d'état : le sélecteur se grise, l'état n'est plus au choix */
@@ -10926,6 +10911,9 @@
     <button id="relance" type="button">RECOMMENCER LE TABLEAU</button>
     <button id="continuer" type="button">CONTINUER — CONCLURE L'ESSAI</button>
     <div id="touchbar"></div>
+    <!-- LE TIROIR : les commandes rares, bâties par main.ts depuis
+         game/athTiroir.ts. Il ne met pas la partie en pause. -->
+    <div id="tiroir" hidden role="group" aria-label="Autres commandes"></div>
 
     <!-- L'écran de chargement : voir la garde ci-dessous, qui le fait
          avancer, et la première image du jeu, qui le retire -->

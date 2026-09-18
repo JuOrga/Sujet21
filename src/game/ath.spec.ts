@@ -88,4 +88,24 @@ describe('le cadran des états', () => {
   })
 })
 
+describe('les commandes et le tiroir', () => {
+  it('a son tiroir dans la coque', () => {
+    expect(HTML).toContain('id="tiroir"')
+  })
+
+  it('bâtit le tiroir depuis la liste testée, pas depuis une liste recopiée', () => {
+    expect(MAIN).toContain('entreesTiroir(')
+    expect(MAIN).toContain('toucheDe(')
+  })
+
+  it('ne met plus la barre en colonne : c’est elle qui débordait', () => {
+    const regles = HTML.match(/#touchbar \{[^}]*\}/g) ?? []
+    for (const r of regles) expect(r).not.toContain('flex-direction: column')
+  })
+
+  it('n’a plus l’ancienne fabrique à emoji', () => {
+    expect(MAIN).not.toContain('touchButton(')
+  })
+})
+
 export { HTML, MAIN, CSS_ATH }
