@@ -10,7 +10,7 @@ describe('les pictogrammes de l’ATH', () => {
       'menu', 'pause', 'lecture', 'editeur',
       'legende', 'etats', 'dossier', 'station', 'recadrer', 'vortex',
       'son', 'muet', 'recommencer', 'fiche', 'banc',
-      'coque', 'instruments',
+      'coque', 'instruments', 'verrou',
     ])
       expect(noms).toContain(n)
   })

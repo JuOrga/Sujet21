@@ -16,15 +16,24 @@ const CSS_ATH = ((): string => {
   return a >= 0 && b > a ? HTML.slice(a, b) : ''
 })()
 
+/** Le compact vit HORS des bornes DÉBUT/FIN (un même @media mêle ATH et
+ *  reste) : borné à son tour par un marqueur dédié, pour protéger ses
+ *  tailles de texte comme CSS_ATH protège les siennes. */
+const COMPACT = ((): string => {
+  const a = HTML.indexOf('/* Au doigt : les commandes tiennent en rangée')
+  const b = HTML.indexOf('/* ATH compact : fin */')
+  return a >= 0 && b > a ? HTML.slice(a, b) : ''
+})()
+
 describe('l’ATH garde les noms que le jeu cherche', () => {
   it.each([
     'hud', 'hud-volume', 'bonbonne', 'gauge-fill', 'gauge-threshold',
     'hud-tableau', 'hud-vies', 'hud-vies-chip', 'hud-cond', 'hud-cond-chip',
-    'hud-instr', 'hud-instr-chip', 'hud-coque', 'hud-capture',
+    'hud-instr', 'hud-instr-chip', 'hud-coque', 'hud-coque-chip', 'hud-capture',
     'hud-perte', 'hud-rosee', 'hud-fantome',
     'voie-hud', 'vh-rang', 'vh-rail', 'vh-stade',
     'statebar', 'state-eau', 'state-glace', 'state-vapeur', 'state-zone',
-    'touchbar', 'hud-danger',
+    'touchbar', 'tiroir', 'hud-danger',
   ])('#%s existe', (id) => {
     expect(HTML).toContain(`id="${id}"`)
   })
@@ -83,8 +92,19 @@ describe('le cadran des états', () => {
 
   it('garde la barre de rejeu dans l’écran en compact', () => {
     // elle héritait de --tb-h (~459 px en colonne) et partait hors écran
-    const compact = HTML.slice(HTML.indexOf('/* ATH compact : le bas */'))
-    expect(compact.slice(0, 1200)).toContain('#rejeu-barre')
+    expect(/#rejeu-barre \{[^}]*bottom:[^}]*\}/.test(COMPACT)).toBe(true)
+  })
+})
+
+describe('le compact protège aussi ses tailles de texte', () => {
+  it('borne son bloc avec un marqueur dédié', () => {
+    expect(COMPACT.length).toBeGreaterThan(0)
+  })
+
+  it('écrit toutes ses tailles de texte à l’échelle --ui', () => {
+    const tailles = COMPACT.match(/font-size:[^;]+;/g) ?? []
+    expect(tailles.length).toBeGreaterThan(0)
+    for (const t of tailles) expect(t).toContain('var(--ui)')
   })
 })
 
@@ -99,8 +119,9 @@ describe('les commandes et le tiroir', () => {
   })
 
   it('ne met plus la barre en colonne : c’est elle qui débordait', () => {
-    const regles = HTML.match(/#touchbar \{[^}]*\}/g) ?? []
-    for (const r of regles) expect(r).not.toContain('flex-direction: column')
+    const regles = [...HTML.matchAll(/[^{}]*#touchbar[^{}]*\{([^}]*)\}/g)]
+    expect(regles.length).toBeGreaterThan(0)
+    for (const [, corps] of regles) expect(corps).not.toContain('flex-direction: column')
   })
 
   it('n’a plus l’ancienne fabrique à emoji', () => {
@@ -155,6 +176,38 @@ describe('le code mort est parti', () => {
   it('main.ts ne les alimente plus', () => {
     for (const nom of ['updateTutor', 'showTableauCard', 'hudVitesse', 'coqueBar'])
       expect(MAIN, nom).not.toContain(nom)
+  })
+})
+
+describe('le rail tient à 30 salles', () => {
+  it('est borné en largeur, sans crans figés', () => {
+    const rail = /#vh-rail \{[^}]*\}/.exec(CSS_ATH)?.[0] ?? ''
+    expect(rail).toContain('width: min(200px, 22vw)')
+    const cran = /\.vh-cran \{[^}]*\}/.exec(CSS_ATH)?.[0] ?? ''
+    expect(cran).not.toContain('flex: none')
+  })
+
+  it('disparaît en compact : SALLE n/N porte seule le compte', () => {
+    expect(HTML).toMatch(/#vh-rail \{\s*display: none;\s*\}/)
+  })
+})
+
+describe('ce qui se pose sous les coins suit leur bas mesuré', () => {
+  it('publie --coins-bas depuis majZonesAth', () => {
+    expect(MAIN).toContain('--coins-bas')
+  })
+
+  it('hud-danger (bureau et compact) s’appuie sur --coins-bas', () => {
+    const regles = HTML.match(/#hud-danger \{[^}]*\}/g) ?? []
+    expect(regles.length).toBe(2)
+    for (const r of regles) expect(r).toContain('var(--coins-bas')
+  })
+
+  it('le toast et le panneau des instruments aussi', () => {
+    const toast = /#trophee-toast \{[^}]*\}/.exec(HTML)?.[0] ?? ''
+    expect(toast).toContain('var(--coins-bas')
+    const panneau = (HTML.match(/#instr-panel \{[^}]*\}/g) ?? []).find((r) => r.includes('position: fixed')) ?? ''
+    expect(panneau).toContain('var(--coins-bas')
   })
 })
 

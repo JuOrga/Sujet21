@@ -3239,7 +3239,7 @@
          et une barre de vie dit le temps qu'il reste pour cliquer. */
       #trophee-toast {
         --tt: var(--specimen);
-        position: fixed; top: 64px; right: 14px; z-index: 60;
+        position: fixed; top: calc(var(--coins-bas, 96px) + 10px); right: 14px; z-index: 60;
         display: flex; gap: 11px; align-items: center; overflow: hidden;
         padding: 11px 15px 13px;
         border: 1px solid color-mix(in srgb, var(--tt) 55%, transparent);
@@ -4962,7 +4962,7 @@
         right: calc(14px + env(safe-area-inset-right));
         top: calc(12px + env(safe-area-inset-top));
         display: grid;
-        grid-template-columns: 1fr auto;
+        grid-template-columns: minmax(0, auto) auto;
         grid-template-areas: 'rail salle' 'lectures lectures' 'stade stade';
         align-items: center;
         justify-items: end;
@@ -5099,17 +5099,25 @@
       #vh-rang {
         display: none; /* le compte est déjà dit par SALLE n/N, juste à côté */
       }
+      /* Une descente livrée compte 27 à 30 salles : à crans fixes, le rail
+         faisait ~390 px, gonflait la capsule et la poussait SUR le module
+         vital. Il est donc BORNÉ, et ses crans se resserrent — comme ceux de
+         l'ancien rail vertical, qui rétrécissaient dans 56 vh. */
       #vh-rail {
         grid-area: rail;
         display: flex;
         align-items: center;
-        gap: 4px;
+        gap: 2px;
+        width: min(200px, 22vw);
+        min-width: 0;
       }
       .vh-cran {
         position: relative;
-        width: 7px;
+        flex: 1 1 7px;
+        min-width: 2px;
+        max-width: 7px;
         height: 7px;
-        flex: none;
+        box-sizing: border-box;
         border-radius: 50%;
         border: 1px solid var(--line-strong);
         transition: background 0.5s, border-color 0.5s, box-shadow 0.5s;
@@ -5131,6 +5139,7 @@
         width: 1px;
         height: 9px;
         flex: none;
+        margin: 0 1px;
         background: var(--line-strong);
       }
       .vh-record::after {
@@ -5143,12 +5152,18 @@
         color: #ffd9a8;
         line-height: 1.2;
       }
+      /* le nom du module (variable, procédural) pourrait à lui seul regonfler
+         la capsule que le rail borné vient d'assagir : borné à son tour */
       #vh-stade {
         grid-area: stade;
         font-family: var(--font-display);
         font-size: calc(8px * var(--ui));
         letter-spacing: 0.14em;
         color: var(--dim);
+        max-width: 300px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
       }
       @media (prefers-reduced-motion: reduce) {
         .vh-courant { animation: none; }
@@ -5490,15 +5505,18 @@
         letter-spacing: 0.14em;
       }
       /* ---- Le tiroir : les commandes rares, au-dessus du coin ---- */
+      /* pas de fond plein derrière la grille : quand le vortex est masqué,
+         9 entrées dans 2 colonnes laissent une demi-rangée vide qui, sinon,
+         montrait le fond du conteneur. Les filets viennent des boutons. */
       #tiroir {
         position: fixed;
         left: calc(14px + env(safe-area-inset-left));
         bottom: calc(74px + env(safe-area-inset-bottom));
-        width: min(330px, calc(100vw - 28px));
+        width: min(420px, calc(100vw - 28px));
         display: grid;
         grid-template-columns: 1fr 1fr;
-        gap: 1px;
-        background: var(--line);
+        gap: 0;
+        background: transparent;
         border: 1px solid var(--line-strong);
         z-index: 14;
       }
@@ -5512,6 +5530,8 @@
         min-height: 38px;
         padding: 0 10px;
         border: 0;
+        border-right: 1px solid var(--line);
+        border-bottom: 1px solid var(--line);
         background: rgba(10, 20, 32, 0.95);
         text-align: left;
         font-size: calc(15px * var(--ui));
@@ -5558,10 +5578,12 @@
         }
       }
       /* ==== ATH : FIN ==== */
-      /* Le compte à rebours de dispersion : impossible à rater */
+      /* Le compte à rebours de dispersion : impossible à rater — posée sous
+         le bas MESURÉ des coins (à 1024 px de large, ou en grande taille de
+         texte, une bannière calée sur un `top` fixe mordait sur les deux) */
       #hud-danger {
         position: fixed;
-        top: calc(14px + env(safe-area-inset-top));
+        top: calc(var(--coins-bas, 96px) + 12px);
         left: 50%;
         transform: translateX(-50%) translateY(-8px);
         background: rgba(46, 12, 14, 0.88);
@@ -6235,8 +6257,13 @@
         .ath-etat {
           right: calc(8px + env(safe-area-inset-right));
           top: calc(6px + env(safe-area-inset-top));
-          grid-template-columns: auto auto auto;
-          grid-template-areas: 'rail salle lectures';
+          grid-template-columns: auto auto;
+          grid-template-areas: 'salle lectures';
+        }
+        /* 27 à 30 crans ne tiennent pas à côté des lectures sur un téléphone :
+           SALLE n/N dit la même chose en six caractères */
+        #vh-rail {
+          display: none;
         }
         #hud-volume {
           font-size: calc(18px * var(--ui));
@@ -6258,9 +6285,9 @@
           font-size: calc(9.5px * var(--ui));
         }
         #hud-danger {
-          top: calc(8px + env(safe-area-inset-top));
+          top: calc(var(--coins-bas, 44px) + 8px);
           font-size: calc(10px * var(--ui));
-          max-width: 60vw;
+          max-width: 80vw;
           white-space: normal;
           text-align: center;
         }
@@ -6272,22 +6299,33 @@
         #tiroir {
           left: calc(8px + env(safe-area-inset-left));
           bottom: calc(66px + env(safe-area-inset-bottom));
-          width: min(300px, calc(100vw - 16px));
+          width: min(400px, calc(100vw - 16px));
           max-height: calc(100dvh - 80px);
           overflow-y: auto;
         }
+        /* le cadran est en colonne à droite : ce qui se centrait en bas n'a
+           plus rien sous lui. Et les trois boutons des commandes restent
+           visibles pendant un rejeu (#touchbar suit body.playing, jamais
+           retiré pour body.rejeu) : RELANCE, CONTINUER et la barre de rejeu
+           se calent donc AU-DESSUS d'eux, à des cotes fixes. */
         /* ATH compact : le bas */
-        /* le cadran est en colonne à droite : ce qui se centre en bas n'a
-           plus rien sous lui, et prend des cotes fixes */
         #relance {
-          bottom: calc(14px + env(safe-area-inset-bottom));
+          bottom: calc(72px + env(safe-area-inset-bottom));
         }
         #continuer {
-          bottom: calc(66px + env(safe-area-inset-bottom));
+          bottom: calc(124px + env(safe-area-inset-bottom));
         }
         #rejeu-barre {
-          bottom: calc(10px + env(safe-area-inset-bottom));
+          bottom: calc(72px + env(safe-area-inset-bottom));
         }
+        /* bas-droite : le médaillon du cadran y est en compact — l'aide
+           dev passe au-dessus, dans la même marge que les commandes */
+        #fps-coin {
+          right: auto;
+          left: calc(10px + env(safe-area-inset-left));
+          bottom: calc(76px + env(safe-area-inset-bottom));
+        }
+        /* ATH compact : fin */
       }
 
       /* Zone d'état : le sélecteur se grise, l'état n'est plus au choix */
@@ -7547,7 +7585,7 @@
     
       /* ---- Instruments embarqués : le panneau de détail (pastille 🧰) ---- */
       #instr-panel {
-        position: fixed; top: 64px; right: 14px; z-index: 46;
+        position: fixed; top: calc(var(--coins-bas, 96px) + 10px); right: 14px; z-index: 46;
         width: min(320px, 88vw);
         background: linear-gradient(180deg, #0d141f, #0a0f18);
         border: 1px solid #27405a; border-radius: 10px;

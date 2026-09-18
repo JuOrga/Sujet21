@@ -29,6 +29,7 @@ export const PICTOS = {
   banc: 'M5 7h14M5 12h14M5 17h14M9 5.5v3M15 10.5v3M8 15.5v3',
   coque: 'M12 4a2 2 0 0 1 2 2v7.5a3.5 3.5 0 1 1-4 0V6a2 2 0 0 1 2-2z',
   instruments: 'M12 20a8 8 0 1 1 0-16 8 8 0 0 1 0 16zM12 12l4-3',
+  verrou: 'M7 11V8a5 5 0 0 1 10 0v3M6 11h12v9H6z',
 } as const
 
 export type NomPicto = keyof typeof PICTOS

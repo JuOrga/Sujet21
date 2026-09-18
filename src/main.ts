@@ -1578,6 +1578,7 @@ let zonesAth: Rect[] = []
 /** les postes qui s'estompent au repos : capsule, commandes, cadran */
 let postesAth: Rect[] = []
 let zonesMesurees = 0
+let coinsBasPublie = 0
 function majZonesAth(t: number): void {
   if (t - zonesMesurees < 250) return
   zonesMesurees = t
@@ -1587,6 +1588,14 @@ function majZonesAth(t: number): void {
   }
   const vital = mesure('.ath-vital')
   const mobiles = [mesure('.ath-etat'), mesure('#touchbar'), mesure('#statebar')]
+  // le bas des deux coins du haut, publié pour ce qui se pose DESSOUS (la
+  // bannière d'alerte, les trophées, le panneau des instruments) : leur
+  // hauteur dépend de la taille des textes et de la zone sûre de l'appareil
+  const bas = Math.max(vital?.bottom ?? 0, mobiles[0]?.bottom ?? 0)
+  if (bas > 0 && bas !== coinsBasPublie) {
+    coinsBasPublie = bas
+    document.documentElement.style.setProperty('--coins-bas', `${Math.round(bas)}px`)
+  }
   zonesAth = zonesInterdites([vital, ...mobiles], MARGE_PANCARTE)
   postesAth = mobiles.filter((r): r is Rect => r !== null)
 }
@@ -17109,7 +17118,8 @@ function majCadranEtats(zoneActive: ZoneForce): void {
     s.el.classList.toggle('st-verrou', montreVerrou)
     s.el.disabled = zone || montreVerrou
     label.textContent = !estCur && t ? t.nom : NOMS_ETAT[s.etat]
-    kbd.textContent = montreVerrou ? '🔒' : manetteActive ? s.pad : s.kbd
+    if (montreVerrou) kbd.innerHTML = picto('verrou')
+    else kbd.textContent = manetteActive ? s.pad : s.kbd
     kbd.hidden = estCur
     s.el.title = estCur
       ? 're-toucher : revenir liquide'
@@ -17120,7 +17130,7 @@ function majCadranEtats(zoneActive: ZoneForce): void {
   statebarEl.classList.toggle('st-zone', zone)
   stateZoneEl.hidden = !zone
   if (zone)
-    stateZoneEl.textContent = `🔒 ${ZONE_CAUSES[zoneActive]} — RÉGIME IMPOSÉ`
+    stateZoneEl.innerHTML = `${picto('verrou')} ${ZONE_CAUSES[zoneActive]} — RÉGIME IMPOSÉ`
 }
 
 // ---- LE DOSSIER DE DESCENTE : tout le relevé, d'un seul geste -----------
