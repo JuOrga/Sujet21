@@ -238,7 +238,7 @@ export const FICHES_GENRES: Record<string, Fiche> = {
     lignes: [
       { cle: '·', txt: 'Une touche vaut les points de la mire × la taille de l’éclat (le premier tir vaut plein, un amas jusqu’au double).' },
       { cle: '·', txt: 'L’éclat qui touche disparaît ; la mire reste — on peut la toucher sans fin.' },
-      { cle: '·', txt: 'Le tir n’existe que si la physique du tableau l’active : le preset « ⚙ Tir de glace ».' },
+      { cle: '·', txt: 'Le tir n’existe que si le tableau le donne : le preset « ⚙ Tir de glace », ou la carte « Éclateur » imposée (Tableau → Cartes imposées).' },
     ],
   },
   'genre:cible-tor': {

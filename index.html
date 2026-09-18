@@ -7216,6 +7216,51 @@
         font-size: calc(12px * var(--ui));
         color: var(--dim);
       }
+      /* les cartes imposées : un pli fermé par défaut (le catalogue est long),
+         une case par carte, l'icône devant pour qu'on la reconnaisse comme en jeu */
+      .ed-cartes {
+        font-size: calc(12px * var(--ui));
+        color: var(--dim);
+      }
+      .ed-cartes summary {
+        display: flex;
+        justify-content: space-between;
+        gap: 8px;
+        cursor: pointer;
+        list-style: none;
+      }
+      .ed-cartes summary::-webkit-details-marker {
+        display: none;
+      }
+      .ed-cartes summary b {
+        color: var(--specimen);
+        font-weight: 600;
+      }
+      #ed-cartes {
+        display: flex;
+        flex-direction: column;
+        gap: 3px;
+        margin-top: 6px;
+        max-height: 220px;
+        overflow-y: auto;
+        padding-right: 4px;
+      }
+      #ed-cartes .k {
+        margin-top: 6px;
+      }
+      #ed-cartes label {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        cursor: pointer;
+      }
+      #ed-cartes label input {
+        width: auto;
+        margin: 0;
+      }
+      #ed-cartes label.inconnue {
+        color: var(--warn, #e8b04a);
+      }
       .ed-f input,
       .ed-f select,
       #editor textarea {
@@ -9618,6 +9663,10 @@
           <label class="ed-f"><span>Par (impulsions)</span><input type="number" id="ed-par" min="1" step="1" /></label>
           <label class="ed-f"><span>Dashs vapeur / écran</span><input type="number" id="ed-dashs" min="0" step="1" placeholder="banc" /></label>
           <label class="ed-f" title="LA PHYSIQUE DU TABLEAU : un preset du banc, COPIÉ dans le tableau — le fichier reste autonome. Les mini-jeux portent les leurs par-dessus. « Celle du banc » : rien n'est recouvert."><span>Physique (preset)</span><select id="ed-preset"><option value="">— celle du banc —</option></select></label>
+          <details class="ed-cartes" id="ed-cartes-bloc" title="LES CARTES IMPOSÉES : des cartes du catalogue des récompenses que la salle donne au joueur le temps du tableau, comme s'il les tenait. Le preset fixe les nombres de la physique ; les cartes tirent leurs leviers par-dessus (un facteur multiplie, un ajout s'ajoute), elles n'écrivent jamais dans le preset. Une carte déjà en poche ne compte qu'une fois.">
+            <summary><span>Cartes imposées</span><b id="ed-cartes-compte">aucune</b></summary>
+            <div id="ed-cartes"></div>
+          </details>
           <label class="ed-f"><span>États en descente</span>
             <select id="ed-etats">
               <option value="cycle">Suivant les mémoires (cycle)</option>

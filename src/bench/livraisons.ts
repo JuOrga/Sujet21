@@ -31,6 +31,19 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '17/09/2026 23:33',
+    title: 'LE TIR DE GLACE EN CARTE (« Éclateur »), et les cartes imposées par tableau',
+    notes: [
+      'LA DEMANDE : « le lancer de glace en tant que buff/actif/passif à acheter dans la run ou hub, une carte qu’on peut mettre dans la run ; ensuite pouvoir attribuer n’importe quelle carte de ce genre, ou qu’on créera, sur n’importe quel tableau, surcharger ». Et la question : « des cartes pourraient influencer le preset — conflit avec le preset défini par tableau ? et en cas de multicarte ? »',
+      'DEUX LEVIERS (leviers.ts) : glaceTir, un AJOUT neutre à 0 — la part du corps que vaut un éclat — et glaceTirVitesse, un facteur. UNE CARTE au catalogue livré : « Éclateur » (🧨, glaceTir 0,1) — au tirage des paliers, à l’essai depuis l’atelier, modèle pour en fabriquer d’autres. Elle donne le geste en glace dans n’importe quelle salle.',
+      'LES CARTES IMPOSÉES (LevelDef.cartes, éditeur : Tableau → « Cartes imposées », une case par carte du catalogue — livrées, contreparties, atelier et publiées) : la salle les donne au joueur le temps du tableau, comme s’il les tenait ; le HUD les montre « imposées par la salle » ; une carte déjà en poche ne compte qu’une fois. levelIO les relit et les écrit ; une carte inconnue du catalogue reste dans le fichier (l’atelier d’un autre poste) et l’éditeur dit qu’elle ne fera rien.',
+      'LA RÈGLE DE PRIORITÉ, en trois couches (cartesTableau.ts) : le banc → le preset du tableau → les réglages du mini-jeu écrivent les NOMBRES de la physique, clé par clé, le dernier gagne ; les cartes n’écrivent JAMAIS dans le preset, elles tirent des leviers lus par-dessus (un facteur multiplie, un ajout s’ajoute) — comme les patins de givre multiplient déjà la restitution que le banc fixe ; plusieurs cartes suivent la règle des leviers (produit, somme). Aucun conflit possible : le preset est la base, la carte le modificateur. Pour le tir, la part = preset + cartes, plafonnée à 50 % ; la salle des cibles garde son preset, y entrer avec l’Éclateur tire des éclats doubles — qui valent double aux mires et rétrécissent deux fois plus vite : un pari. checkLevel le dit quand un tableau cumule les deux.',
+      'À SAVOIR : hors des cibles, un éclat n’a pas d’usage encore (un bloc de glace libre, ni rappelé ni compté) — la carte est un geste tant qu’aucune salle ne lui donne une cible ; c’est la prochaine chose à dessiner.',
+      'LA REVUE avant la prod (18/09) : un défaut relu — la composition du tir plafonnait le banc même SANS carte (un banc réglé à 0,6 lisait 0,5 en silence) ; elle ne joue plus que si une carte contribue, le banc seul n’est jamais réécrit. Une limite connue, gardée : une carte imposée qui tire un levier de run (ballast → bonbonne, carnet → tirage) agit le temps de la salle puis se retire — une bonbonne remplie au-delà de 8 L sous un ballast imposé garde son contenu à la salle suivante. C’est le prix de « n’importe quelle carte » ; à restreindre si le concepteur le veut.',
+      'VÉRIFIÉ : cartesTableau.spec (six tests : dédoublonnage, addition preset + carte, plafond, vitesse, la carte au catalogue, les inconnues), levelIO (les cartes font l’aller-retour, la validation : inconnue, l’Éclateur suffit aux mires, preset + carte dit « 20 % »), type-check à 0, build propre. Injouable ici : l’écran de l’éditeur et le HUD sont à regarder en main.',
+    ],
+  },
+  {
     date: '17/09/2026 22:20',
     title: 'LES CIBLES, en main : plus de NaN, la jauge qui se remplit, des effets et un compte voyants, le tir à 2 600, la flèche pleine, le stick remis à l’endroit',
     notes: [

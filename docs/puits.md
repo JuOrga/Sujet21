@@ -272,6 +272,39 @@ concepteur, deux fois ; mesuré sur le solveur : un éclat ne traverse pas
 un sol de 40 u jusqu'à 2 600 u/s, neutre ou hydrophobe — `tirGlace.spec` ;
 c'est le plafond mesuré, on n'ira pas plus haut sans le remesurer).
 
+**Le tir en carte, et les cartes par tableau** (`leviers.ts`,
+`cartesTableau.ts`, `LevelDef.cartes`) : le concepteur, « le lancer de glace
+en tant que buff, une carte qu'on peut mettre dans la run… et attribuer
+n'importe quelle carte sur n'importe quel tableau, surcharger ». Deux
+leviers : `glaceTir` (un AJOUT, neutre 0 : la part de l'éclat) et
+`glaceTirVitesse` (un facteur). La carte « Éclateur » (🧨, `glaceTir` 0,1)
+est au catalogue livré : elle se tire aux paliers, se fabrique à l'atelier
+comme modèle, et donne le geste en glace dans n'importe quelle salle. Un
+tableau peut IMPOSER des cartes (panneau Tableau → « Cartes imposées », une
+case par carte du catalogue, contreparties et cartes d'atelier comprises) :
+elles jouent le temps de la salle comme si le joueur les tenait, le HUD les
+montre « imposées par la salle ». **La règle de priorité, en trois
+couches** — la question du concepteur, « est-ce que ça n'entre pas en
+conflit avec le preset défini par tableau ? et en cas de multicarte ? » :
+le banc → le preset du tableau → les réglages du mini-jeu écrivent les
+NOMBRES de la physique, clé par clé, le dernier gagne ; les cartes
+n'écrivent jamais dans le preset, elles tirent des leviers lus PAR-DESSUS
+(un facteur multiplie, un ajout s'ajoute) — le preset est la base, la carte
+le modificateur, comme les patins de givre multiplient déjà la restitution
+que le banc fixe ; plusieurs cartes suivent la règle des leviers (produit
+des facteurs, somme des ajouts), et une carte tenue ET imposée ne compte
+qu'une fois. Pour le tir : la part = preset + cartes, plafonnée à 50 % du
+corps (`GLACE_TIR_PART_MAX`) ; la salle des cibles garde son preset (0,1),
+un joueur qui y entre avec l'Éclateur tire des éclats de 0,2 — qui valent
+double aux mires (le prorata, plafonné ×2) et rétrécissent le corps deux
+fois plus vite : un vrai pari de carte. `checkLevel` le dit quand un
+tableau cumule les deux, dit une carte inconnue du catalogue (l'atelier
+d'un autre poste : gardée dans le fichier, inerte ici), et accepte
+l'Éclateur imposé comme tir pour des mires. À savoir : hors des cibles, un
+éclat n'a pas d'usage encore (il reste un bloc de glace libre, ni rappelé
+ni compté) — la carte est un geste, pas un avantage, tant qu'aucune salle
+ne lui donne une cible.
+
 **Ce qui se sent** (le concepteur : « des effets satisfaisants et
 gamifiés »). Une **jauge des paliers** au bord droit de la salle, graduée
 aux trois paliers avec leur verdict, qui se remplit en glissant avec les
