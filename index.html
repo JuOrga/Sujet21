@@ -5262,6 +5262,156 @@
         background: linear-gradient(90deg, #d98d4a, #7fc4de, #a9e2f5);
         transition: width 0.4s ease;
       }
+      /* ---- Le cadran des états : LA commande du jeu ----
+         Trois logements fixes, glace à gauche, liquide au centre, vapeur à
+         droite. Des médaillons OCTOGONAUX — la forme des modules sur le plan
+         de la station. Le courant est plein, à la couleur de son état ; les
+         autres sont en creux, et ne paraissent que si leur transformation
+         est tissée. Posé au bord bas : plus rien ne s'empile dessous. */
+      #statebar {
+        position: fixed;
+        left: 50%;
+        bottom: calc(14px + env(safe-area-inset-bottom));
+        transform: translateX(-50%);
+        display: flex;
+        align-items: flex-end;
+        gap: 10px;
+        z-index: 10;
+        opacity: 0;
+        transition: opacity 0.5s ease 0.2s;
+      }
+      #statebar button {
+        --teinte: var(--specimen);
+        position: relative;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 4px;
+        padding: 0;
+        background: none;
+        border: 0;
+        color: var(--dim);
+        font-family: var(--font-mono);
+        cursor: pointer;
+        touch-action: manipulation;
+        transition: opacity 0.5s ease;
+      }
+      #state-glace { --teinte: var(--glow); }
+      #state-vapeur { --teinte: #f2c98e; }
+      #statebar .st-ico {
+        display: grid;
+        place-items: center;
+        width: 42px;
+        height: 42px;
+        font-size: calc(17px * var(--ui));
+        color: var(--teinte);
+        background: rgba(10, 20, 32, 0.62);
+        clip-path: polygon(30% 0, 70% 0, 100% 30%, 100% 70%, 70% 100%, 30% 100%, 0 70%, 0 30%);
+        transition: background 0.15s ease, color 0.15s ease;
+      }
+      #statebar button:hover .st-ico {
+        background: rgba(20, 36, 54, 0.8);
+      }
+      #statebar button.st-cur {
+        cursor: default;
+      }
+      #statebar button.st-cur .st-ico {
+        width: 56px;
+        height: 56px;
+        font-size: calc(23px * var(--ui));
+        color: var(--void);
+        background: var(--teinte);
+      }
+      #statebar .st-label {
+        font-family: var(--font-display);
+        font-size: calc(8px * var(--ui));
+        letter-spacing: 0.18em;
+        text-shadow: 0 0 6px var(--void);
+      }
+      #statebar button.st-cur .st-label {
+        color: var(--teinte);
+      }
+      #statebar kbd {
+        position: absolute;
+        top: -7px;
+        right: -7px;
+        font-family: inherit;
+        font-size: calc(9px * var(--ui));
+        color: var(--dim);
+        background: var(--void);
+        border: 1px solid var(--line);
+        padding: 0 3px;
+      }
+      body.playing #statebar {
+        opacity: 1;
+      }
+      /* L'ordre du DOM reste eau/glace/vapeur (pour l'historique) : c'est
+         l'ordre VISUEL, seul, qui se règle ici. */
+      #state-glace { order: 0; }
+      #state-eau { order: 1; }
+      #state-vapeur { order: 2; }
+      #statebar button[hidden] { display: none; }
+      /* le VERROU : un logement refusé paraît quelques secondes, cadenassé —
+         le nom du lien à tisser dessus, l'envie se sème là */
+      #statebar button.st-verrou {
+        opacity: 0.65;
+      }
+      #statebar button.st-verrou .st-ico {
+        outline: 1px dashed var(--line-strong);
+        outline-offset: -3px;
+      }
+      #statebar button.st-verrou kbd {
+        border: none;
+        font-size: calc(11px * var(--ui));
+        top: 2px;
+      }
+      /* le RÉGIME IMPOSÉ (zone forcée) : tout le cadran se verrouille et le
+         badge nomme la cause — l'interface dit POURQUOI les boutons se taisent */
+      #statebar.st-zone button { opacity: 0.55; }
+      #statebar.st-zone button.st-cur { opacity: 1; }
+      #state-zone {
+        position: absolute;
+        top: -24px;
+        left: 50%;
+        transform: translateX(-50%);
+        white-space: nowrap;
+        font-family: var(--font-display);
+        font-size: calc(8.5px * var(--ui));
+        letter-spacing: 0.16em;
+        color: #f2c98e;
+        text-shadow: 0 0 8px rgba(242, 201, 142, 0.4);
+      }
+      #state-zone[hidden] { display: none; }
+      @media (pointer: coarse) {
+        #statebar kbd {
+          display: none;
+        }
+        /* au doigt, le badge de zone se pose au-dessus de la colonne */
+        #state-zone { top: -20px; }
+      }
+      @media (max-width: 700px), (pointer: coarse) and (max-height: 620px) {
+        /* au doigt : colonne à droite, sous le pouce */
+        #statebar {
+          left: auto;
+          right: calc(12px + env(safe-area-inset-right));
+          bottom: calc(12px + env(safe-area-inset-bottom));
+          transform: none;
+          flex-direction: column;
+          align-items: center;
+          gap: 7px;
+        }
+        #statebar .st-ico {
+          width: 46px;
+          height: 46px;
+        }
+        #statebar button.st-cur .st-ico {
+          width: 54px;
+          height: 54px;
+        }
+        #statebar .st-label {
+          display: none;
+        }
+      }
       /* ==== ATH : FIN ==== */
       /* Le compte à rebours de dispersion : impossible à rater */
       #hud-danger {
@@ -5323,16 +5473,16 @@
         to { border-color: #ffd9d0; }
       }
       /* Relance : elle apparaît quand l'échantillon n'a plus rien à éjecter.
-         Elle se range juste au-dessus du sélecteur d'états (lui-même calé sur
-         la hauteur réelle de la barre du bas) : la cuve reste dégagée, la
-         dérive reste visible en entier, et un rebond tardif peut encore mener
+         Elle se range juste au-dessus du cadran des états (calé sur SA
+         hauteur réelle, --cadran-h) : la cuve reste dégagée, la dérive
+         reste visible en entier, et un rebond tardif peut encore mener
          au sas. */
       /* Continuer : le corps principal est bu, il ne reste que des gouttes
          égarées — le joueur DÉCIDE de conclure. Voyant, mais il ne masque
          rien : on peut encore aller cueillir les dernières gouttes. */
       #continuer {
         position: fixed;
-        bottom: calc(var(--tb-h, 56px) + 148px);
+        bottom: calc(var(--cadran-h, 76px) + 86px);
         left: 50%;
         transform: translateX(-50%) translateY(6px);
         font-family: var(--font-display);
@@ -5359,7 +5509,7 @@
       }
       #relance {
         position: fixed;
-        bottom: calc(var(--tb-h, 56px) + 96px);
+        bottom: calc(var(--cadran-h, 76px) + 34px);
         left: 50%;
         transform: translateX(-50%) translateY(6px);
         font-family: var(--font-display);
@@ -5676,10 +5826,9 @@
         }
       }
 
-      /* ---- Sélecteur d'état : LA commande du jeu, mise en avant ---- */
       /* ---- Le REJEU : la barre de lecture, à la place de la barre d'état ---- */
       #rejeu-barre {
-        position: fixed; left: 50%; bottom: calc(var(--tb-h, 56px) + 20px); transform: translateX(-50%);
+        position: fixed; left: 50%; bottom: calc(14px + env(safe-area-inset-bottom)); transform: translateX(-50%);
         display: flex; align-items: center; gap: 8px; z-index: 11;
         padding: 8px 12px; background: rgba(9, 18, 30, 0.88); border: 1px solid var(--specimen); border-radius: 8px;
         font-family: var(--font-display); font-size: calc(10.5px * var(--ui)); letter-spacing: 0.12em; color: var(--ink);
@@ -5706,157 +5855,6 @@
       }
       .rec-rejouer:hover { border-color: var(--specimen); }
       .rec-rejouer[disabled] { opacity: 0.45; cursor: default; }
-      #statebar {
-        position: fixed;
-        left: 50%;
-        /* La barre du bas peut passer sur deux lignes selon le nombre de
-           boutons : le sélecteur se cale sur sa hauteur RÉELLE (--tb-h,
-           mesurée en direct) au lieu d'une valeur devinée — sinon les deux
-           se chevauchent dès qu'un bouton s'ajoute. */
-        bottom: calc(var(--tb-h, 56px) + 20px);
-        transform: translateX(-50%);
-        display: flex;
-        gap: 9px;
-        z-index: 10;
-        opacity: 0;
-        transition: opacity 0.5s ease 0.2s;
-      }
-      body.playing #statebar {
-        opacity: 1;
-      }
-      #statebar button {
-        position: relative;
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        gap: 4px;
-        min-width: 78px;
-        padding: 10px 12px 9px;
-        background: var(--panel);
-        border: 1px solid var(--line);
-        border-radius: 7px;
-        color: var(--dim);
-        font-family: var(--font-mono);
-        cursor: pointer;
-        touch-action: manipulation;
-        backdrop-filter: blur(4px);
-        transition: border-color 0.15s ease, background 0.15s ease, box-shadow 0.15s ease,
-          color 0.15s ease;
-      }
-      #statebar .st-ico {
-        font-size: calc(21px * var(--ui));
-        line-height: 1;
-      }
-      #statebar .st-label {
-        font-family: var(--font-display);
-        font-size: calc(8.5px * var(--ui));
-        letter-spacing: 0.2em;
-      }
-      #statebar kbd {
-        position: absolute;
-        top: 4px;
-        right: 6px;
-        font-family: inherit;
-        font-size: calc(8.5px * var(--ui));
-        color: var(--dim);
-        border: 1px solid var(--line);
-        border-radius: 2px;
-        padding: 0 3px;
-      }
-      #statebar button.active {
-        color: var(--ink);
-      }
-      #state-eau.active {
-        border-color: var(--specimen);
-        background: rgba(99, 183, 230, 0.2);
-        box-shadow: 0 0 16px rgba(99, 183, 230, 0.3);
-      }
-      #state-glace.active {
-        border-color: var(--glow);
-        background: rgba(167, 221, 245, 0.18);
-        box-shadow: 0 0 16px rgba(167, 221, 245, 0.35);
-      }
-      /* l'icône 💨 est teintée AMBRE (la couleur de la vapeur) : l'emoji
-         gris passe au doré par filtre — actif ou non, l'état s'identifie */
-      #state-vapeur .st-ico {
-        filter: sepia(1) saturate(2.6) hue-rotate(-14deg) brightness(1.15);
-      }
-      #state-vapeur.active {
-        border-color: #f2c98e;
-        background: rgba(242, 201, 142, 0.18);
-        box-shadow: 0 0 16px rgba(242, 201, 142, 0.35);
-      }
-      /* ---- Refonte « cadran du cycle » : trois logements FIXES, ❄ à
-         gauche, 💧 au centre, 💨 à droite (l'ordre du DOM reste eau/glace/
-         vapeur pour l'historique — c'est l'ordre visuel qui est réglé ici).
-         Le logement de l'état courant est le MÉDAILLON ; les autres ne
-         paraissent que si leur transformation est tissée. ---- */
-      #state-glace { order: 0; }
-      #state-eau { order: 1; }
-      #state-vapeur { order: 2; }
-      #statebar button[hidden] { display: none; }
-      #statebar button.st-cur {
-        min-width: 92px;
-        cursor: default;
-      }
-      #statebar button.st-cur .st-label { letter-spacing: 0.26em; }
-      /* le VERROU : un logement refusé paraît quelques secondes, cadenassé —
-         le nom du lien à tisser dessus, l'envie se sème là */
-      #statebar button.st-verrou {
-        opacity: 0.65;
-        border-style: dashed;
-      }
-      #statebar button.st-verrou kbd {
-        border: none;
-        font-size: calc(11px * var(--ui));
-        top: 2px;
-      }
-      /* le RÉGIME IMPOSÉ (zone forcée) : tout le cadran se verrouille et le
-         badge nomme la cause — l'interface dit POURQUOI les boutons se taisent */
-      #statebar.st-zone button { opacity: 0.55; }
-      #statebar.st-zone button.st-cur { opacity: 1; }
-      #state-zone {
-        position: absolute;
-        top: -24px;
-        left: 50%;
-        transform: translateX(-50%);
-        white-space: nowrap;
-        font-family: var(--font-display);
-        font-size: calc(8.5px * var(--ui));
-        letter-spacing: 0.16em;
-        color: #f2c98e;
-        text-shadow: 0 0 8px rgba(242, 201, 142, 0.4);
-      }
-      #state-zone[hidden] { display: none; }
-      @media (pointer: coarse) {
-        #statebar kbd {
-          display: none;
-        }
-        /* au doigt, le badge de zone se pose au-dessus de la colonne */
-        #state-zone { top: -20px; }
-      }
-      @media (max-width: 700px), (pointer: coarse) and (max-height: 620px) {
-        /* au doigt : colonne à droite, sous le pouce, hors du HUD — la barre
-           tactile peut occuper deux rangées, on remonte d'autant */
-        #statebar {
-          left: auto;
-          right: 10px;
-          bottom: calc(var(--tb-h, 100px) + 18px);
-          transform: none;
-          flex-direction: column;
-        }
-        /* icônes seules, boutons resserrés : l'état actif se lit au halo */
-        #statebar button {
-          min-width: 48px;
-          padding: 9px 8px;
-        }
-        #statebar .st-label {
-          display: none;
-        }
-        #statebar .st-ico {
-          font-size: calc(22px * var(--ui));
-        }
-      }
 
       /* ---- Barre tactile ---- */
       /* Le conteneur s'étend sur toute la largeur (un fixe ancré à 50 %
@@ -6415,16 +6413,17 @@
           min-width: 42px;
           min-height: 42px;
         }
-        /* la colonne de gauche ne pousse plus le sélecteur d'états : il
-           s'ancre en bas à droite, à hauteur de pouce */
-        #statebar {
-          bottom: calc(10px + env(safe-area-inset-bottom));
-        }
+        /* ATH compact : le bas */
+        /* le cadran est en colonne à droite : ce qui se centre en bas n'a
+           plus rien sous lui, et prend des cotes fixes */
         #relance {
-          bottom: 92px;
+          bottom: calc(14px + env(safe-area-inset-bottom));
         }
         #continuer {
-          bottom: 146px;
+          bottom: calc(66px + env(safe-area-inset-bottom));
+        }
+        #rejeu-barre {
+          bottom: calc(10px + env(safe-area-inset-bottom));
         }
         /* le carton du journal descend sous la bande */
         #tableau-card {
@@ -9487,13 +9486,13 @@
     </div>
     <div id="statebar" aria-label="État de l'échantillon">
       <button id="state-eau" type="button" title="redevenir liquide">
-        <span class="st-ico">💧</span><span class="st-label">LIQUIDE</span><kbd hidden></kbd>
+        <span class="st-ico"><svg class="picto" data-picto="eau" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 3.5c3.2 4.2 5.5 7.3 5.5 10.2a5.5 5.5 0 0 1-11 0C6.5 10.8 8.8 7.7 12 3.5z"/></svg></span><span class="st-label">LIQUIDE</span><kbd hidden></kbd>
       </button>
       <button id="state-glace" type="button" title="se changer en glace (F) : le bloc garde son élan">
-        <span class="st-ico">❄</span><span class="st-label">GLACE</span><kbd>F</kbd>
+        <span class="st-ico"><svg class="picto" data-picto="glace" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 3v18M4.2 7.5l15.6 9M19.8 7.5l-15.6 9M12 6.5l-2-2M12 6.5l2-2M12 17.5l-2 2M12 17.5l2 2"/></svg></span><span class="st-label">GLACE</span><kbd>F</kbd>
       </button>
       <button id="state-vapeur" type="button" title="se changer en vapeur (G) : visez — le temps ralentit — relâchez, le nuage fuse ; la distance du doigt fait la puissance">
-        <span class="st-ico">💨</span><span class="st-label">VAPEUR</span><kbd>G</kbd>
+        <span class="st-ico"><svg class="picto" data-picto="vapeur" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M8 20c-2-3 2-5 0-8s2-5 0-8M12 20c-2-3 2-5 0-8s2-5 0-8M16 20c-2-3 2-5 0-8s2-5 0-8"/></svg></span><span class="st-label">VAPEUR</span><kbd>G</kbd>
       </button>
       <div id="state-zone" hidden></div>
     </div>

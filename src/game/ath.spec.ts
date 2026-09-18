@@ -68,4 +68,24 @@ describe('le haut de l’écran : deux coins, plus de bandeau', () => {
   })
 })
 
+describe('le cadran des états', () => {
+  it('porte des pictogrammes, plus d’emoji', () => {
+    const bar = HTML.slice(HTML.indexOf('<div id="statebar"'), HTML.indexOf('id="state-zone"'))
+    expect(bar).not.toMatch(/[💧❄💨]/u)
+    for (const n of ['eau', 'glace', 'vapeur']) expect(bar).toContain(`data-picto="${n}"`)
+  })
+
+  it('ne s’empile plus sur la barre du bas : --tb-h a disparu', () => {
+    expect(HTML).not.toContain('--tb-h')
+    expect(MAIN).not.toContain('--tb-h')
+    expect(MAIN).toContain('--cadran-h')
+  })
+
+  it('garde la barre de rejeu dans l’écran en compact', () => {
+    // elle héritait de --tb-h (~459 px en colonne) et partait hors écran
+    const compact = HTML.slice(HTML.indexOf('/* ATH compact : le bas */'))
+    expect(compact.slice(0, 1200)).toContain('#rejeu-barre')
+  })
+})
+
 export { HTML, MAIN, CSS_ATH }

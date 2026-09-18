@@ -16846,19 +16846,8 @@ chipEditor.style.display = 'none'
 // l'expédition, ou par le menu ; et dans ces trois cas la sauvegarde est
 // effacée.)
 
-// La barre du bas passe sur deux lignes quand elle se remplit (le bouton de
-// retour à l'éditeur, par exemple). On publie sa hauteur réelle en variable
-// CSS : le sélecteur d'état se recale dessus au lieu de la chevaucher.
-function publishTouchbarHeight(): void {
-  const h = Math.round(touchbar.getBoundingClientRect().height)
-  if (h > 0) document.documentElement.style.setProperty('--tb-h', `${h}px`)
-}
-if (typeof ResizeObserver !== 'undefined') {
-  new ResizeObserver(publishTouchbarHeight).observe(touchbar)
-} else {
-  window.addEventListener('resize', publishTouchbarHeight)
-}
-publishTouchbarHeight()
+// Le cadran des états publie sa propre hauteur (--cadran-h) : voir sa
+// déclaration plus bas, avec statebarEl.
 {
   // au doigt, les chips ont leur rangée, les glyphes la leur
   const brk = document.createElement('i')
@@ -16922,6 +16911,22 @@ const stateGlace = document.getElementById('state-glace') as HTMLButtonElement
 const stateVapeur = document.getElementById('state-vapeur') as HTMLButtonElement
 const stateZoneEl = document.getElementById('state-zone') as HTMLDivElement
 const statebarEl = document.getElementById('statebar') as HTMLDivElement
+
+// Le cadran publie sa hauteur réelle : les boutons de relance se posent
+// AU-DESSUS de lui. (Avant, tout s'empilait sur la barre du bas via sa
+// propre variable de hauteur mesurée ; en colonne sur téléphone elle
+// mesurait ~459 px, et la barre de rejeu partait hors de l'écran.)
+function publieHauteurCadran(): void {
+  const h = Math.round(statebarEl.getBoundingClientRect().height)
+  if (h > 0) document.documentElement.style.setProperty('--cadran-h', `${h}px`)
+}
+if (typeof ResizeObserver !== 'undefined') {
+  new ResizeObserver(publieHauteurCadran).observe(statebarEl)
+} else {
+  window.addEventListener('resize', publieHauteurCadran)
+}
+publieHauteurCadran()
+
 stateEau.addEventListener('click', () => input.demande('eau'))
 stateGlace.addEventListener('click', () => input.demande('glace'))
 stateVapeur.addEventListener('click', () => input.demande('vapeur'))
