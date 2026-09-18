@@ -1705,6 +1705,7 @@ const hudBonbonne = el('hud-bonbonne')
 const hudCondChip = el('hud-cond-chip') as HTMLButtonElement
 const hudCond = el('hud-cond')
 const hudCoque = el('hud-coque')
+const hudCoqueChip = el('hud-coque-chip')
 const hudVolume = el('hud-volume')
 const hudSeuil = el('hud-seuil')
 const hudVitesse = el('hud-vitesse')
@@ -19424,6 +19425,7 @@ function corpsImage(now: number): boolean {
   const coque = Math.round(21 - 81 * chillNow())
   hudCoque.textContent = `${coque > 0 ? '+' : ''}${coque}°`
   hudCoque.classList.toggle('warn', chillNow() > 0.75)
+  hudCoqueChip.classList.toggle('gele', chillNow() > 0.75)
   coqueBar.style.width = `${(chillNow() * 100).toFixed(1)}%`
   // AU HUB la réserve est infinie : afficher un litrage qui ne descend
   // jamais ferait croire à une jauge en panne.
@@ -19474,7 +19476,10 @@ function corpsImage(now: number): boolean {
   // La vie compte la matière VIVANTE : le corps plus les gouttes marquées
   // encore dans son halo (la règle : n'est perdu que ce qui en SORT — et
   // tout ce qui reste dans le halo revient, le rappel s'en charge).
-  hudVolume.innerHTML = `${sim.liters().toFixed(2)} <small>L · ${sim.aliveCount()} part.</small>`
+  // le litrage seul : le compte de particules est une mesure d'atelier, il
+  // se lit au survol — l'écran garde ce qui se joue
+  hudVolume.innerHTML = `${sim.liters().toFixed(2)} <small>L</small>`
+  hudVolume.title = `${sim.aliveCount()} particules`
   gaugeFill.style.width = `${Math.min(100, fraction * 100).toFixed(1)}%`
   // Le seuil est un volume ABSOLU : sa position sur la jauge (graduée en % du
   // volume de départ) dépend donc du volume de base de ce tableau.

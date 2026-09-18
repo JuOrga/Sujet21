@@ -730,55 +730,6 @@
       }
       #planche-retour:hover { border-color: var(--specimen); color: #d5f3e8; }
       body.playing #planche-retour:not([hidden]) { display: block; }
-      /* ---- LE FIL DE LA DESCENTE : le rail du flanc droit, en jeu. Il
-         accompagne TOUTE descente — la séquence écrite comme la voie — et
-         répond d'un regard à « où j'en suis sur le total ». ---- */
-      #voie-hud {
-        position: fixed; right: 10px; top: 50%; transform: translateY(-50%);
-        z-index: 40; display: none; flex-direction: column; align-items: center;
-        gap: 6px; pointer-events: none; user-select: none;
-      }
-      body.playing #voie-hud:not([hidden]) { display: flex; }
-      #vh-rang {
-        font-family: var(--font-display); font-size: calc(11px * var(--ui)); letter-spacing: 0.1em;
-        color: #eaf6ff; text-shadow: 0 0 6px rgba(0, 0, 0, 0.8);
-      }
-      #vh-rail {
-        display: flex; flex-direction: column; align-items: center; gap: 3px;
-        max-height: 56vh; padding: 7px 5px;
-        background: rgba(8, 14, 22, 0.55);
-        border: 1px solid rgba(45, 74, 99, 0.8); border-radius: 9px;
-      }
-      .vh-cran {
-        width: 14px; flex: 1 1 auto; min-height: 4px; height: 12px; max-height: 12px;
-        border-radius: 3px; position: relative;
-        background: rgba(99, 183, 230, 0.13);
-        border: 1px solid rgba(99, 183, 230, 0.2);
-        transition: background 0.5s, border-color 0.5s, box-shadow 0.5s;
-      }
-      .vh-franchi {
-        background: var(--specimen); border-color: var(--specimen);
-        box-shadow: 0 0 6px rgba(99, 183, 230, 0.5);
-      }
-      .vh-courant {
-        background: rgba(109, 255, 184, 0.85); border-color: #6dffb8;
-        animation: vh-pouls 2.2s ease-in-out infinite;
-      }
-      @keyframes vh-pouls {
-        0%, 100% { box-shadow: 0 0 5px rgba(109, 255, 184, 0.45); }
-        50% { box-shadow: 0 0 13px rgba(109, 255, 184, 0.9); }
-      }
-      .vh-tiers { width: 20px; height: 1px; flex: 0 0 1px; background: rgba(99, 183, 230, 0.4); }
-      .vh-record::after {
-        content: '✦'; position: absolute; right: 100%; margin-right: 5px;
-        top: 50%; transform: translateY(-50%);
-        font-size: calc(9px * var(--ui)); color: #ffd9a8; line-height: 1;
-      }
-      #vh-stade {
-        font-family: var(--font-display); font-size: calc(8px * var(--ui)); letter-spacing: 0.14em;
-        color: var(--dim); text-align: center; max-width: 76px;
-        text-shadow: 0 0 6px rgba(0, 0, 0, 0.8);
-      }
       /* ---- LE DOSSIER DE DESCENTE : le récapitulatif complet, en panneau
          qui glisse par la droite. Pensé pour le paysage (PC, console,
          Steam Deck) : une colonne d'instrument, sections à filet coloré,
@@ -1086,7 +1037,6 @@
         100% { opacity: 0; transform: translateX(-50%) translateY(6px); }
       }
       @media (prefers-reduced-motion: reduce) {
-        .vh-courant { animation: none; }
         #voie-carte.joue { animation: vc-passe 4.2s steps(1, end) forwards; }
       }
       #vc-rang {
@@ -4948,21 +4898,16 @@
         }
       }
 
-      /* ---- HUD : la bande de vie, sur toutes les plateformes ----
-         Une ligne fine en haut : le volume, sa jauge quasi PLEINE LARGEUR
-         (on voit fondre ce qu'on dépense), et trois pastilles-icônes. */
+      /* ==== ATH : DÉBUT ==== */
+      /* ---- L'ATH : des instruments aux coins ----
+         L'interface était deux bandes : un bandeau de 51 px dont la jauge
+         n'occupait que 5, et une barre de 14 boutons. Elle tient maintenant
+         dans trois coins et un cadran, SANS PANNEAU : une équerre gravée,
+         un voile de nuit juste derrière le texte, et la cuve partout
+         ailleurs. #hud n'est plus qu'une couche : il ne peint rien. */
       #hud {
         position: fixed;
-        top: 0;
-        left: 0;
-        right: 0;
-        display: flex;
-        flex-direction: column;
-        gap: 1px;
-        padding: calc(6px + env(safe-area-inset-top)) 12px 5px;
-        background: rgba(9, 18, 30, 0.85);
-        border-bottom: 1px solid var(--line);
-        backdrop-filter: blur(4px);
+        inset: 0;
         pointer-events: none;
         z-index: 9;
         opacity: 0;
@@ -4971,44 +4916,248 @@
       body.playing #hud {
         opacity: 1;
       }
-      .hud-vie {
+      /* le trait des pictogrammes (game/athPictos.ts) : à la couleur et à la
+         taille du texte qui l'entoure */
+      .picto {
+        width: 1.15em;
+        height: 1.15em;
+        fill: none;
+        stroke: currentColor;
+        stroke-width: 1.6;
+        stroke-linecap: round;
+        stroke-linejoin: round;
+        vertical-align: -0.2em;
+        flex: none;
+      }
+      .ath-coin {
+        position: absolute;
+        padding: 10px 12px;
+        /* lisible sur le fluide sans le masquer */
+        text-shadow: 0 0 6px var(--void), 0 1px 2px var(--void);
+        transition: opacity 0.5s ease;
+      }
+      /* l'équerre gravée : deux filets, pas un cadre */
+      .ath-coin::before {
+        content: '';
+        position: absolute;
+        width: 12px;
+        height: 12px;
+        border: 0 solid var(--line-strong);
+      }
+      .ath-vital {
+        left: calc(14px + env(safe-area-inset-left));
+        top: calc(12px + env(safe-area-inset-top));
+        display: flex;
+        flex-direction: column;
+        gap: 7px;
+        background: radial-gradient(ellipse at 0 0, rgba(3, 7, 16, 0.66), transparent 72%);
+      }
+      .ath-vital::before {
+        left: 0;
+        top: 0;
+        border-width: 1px 0 0 1px;
+      }
+      .ath-etat {
+        right: calc(14px + env(safe-area-inset-right));
+        top: calc(12px + env(safe-area-inset-top));
+        display: grid;
+        grid-template-columns: 1fr auto;
+        grid-template-areas: 'rail salle' 'lectures lectures' 'stade stade';
+        align-items: center;
+        justify-items: end;
+        gap: 7px 8px;
+        background: radial-gradient(ellipse at 100% 0, rgba(3, 7, 16, 0.66), transparent 72%);
+      }
+      .ath-etat::before {
+        right: 0;
+        top: 0;
+        border-width: 1px 1px 0 0;
+      }
+      .ath-ligne {
         display: flex;
         align-items: center;
+        gap: 10px;
+      }
+      #hud-volume {
+        font-size: calc(24px * var(--ui));
+        font-weight: 600;
+        line-height: 1;
+        color: var(--specimen);
+        font-variant-numeric: tabular-nums;
+      }
+      #hud-volume small {
+        font-family: var(--font-display);
+        font-weight: 400;
+        font-size: calc(9px * var(--ui));
+        letter-spacing: 0.18em;
+        color: var(--dim);
+        margin-left: 6px;
+      }
+      /* Jauge de volume : courte. Étirée sur toute la largeur, elle ne disait
+         rien de plus ; le trait vertical marque le seuil de dernière impulsion */
+      .gauge {
+        position: relative;
+        width: 168px;
+        height: 4px;
+        flex: none;
+        background: rgba(150, 200, 235, 0.14);
+        overflow: hidden;
+      }
+      #gauge-threshold {
+        position: absolute;
+        top: 0;
+        bottom: 0;
+        width: 2px;
+        background: var(--alert);
+      }
+      /* les lignes qui ne parlent pas ne prennent pas de place */
+      #hud-perte {
+        font-size: calc(10.5px * var(--ui));
+        color: #f2a98f;
+        letter-spacing: 0.05em;
+        white-space: nowrap;
+      }
+      .hud-sous {
+        display: flex;
         gap: 14px;
       }
-      .hud-vie .gauge {
-        flex: 1 1 auto;
-        margin: 0;
-      }
-      .hud-chips {
-        display: flex;
-        gap: 6px;
-        flex: none;
-        pointer-events: auto;
-      }
-      /* display:flex écraserait l'attribut hidden : on le rétablit — sans
-         cette règle, masquer une pastille (vies au labo…) ne faisait rien */
-      .hud-chip[hidden] {
+      .hud-sous:not(:has(span:not(:empty))) {
         display: none;
+      }
+      #hud-rosee {
+        font-size: calc(10px * var(--ui));
+        color: #9fd8e8;
+        letter-spacing: 0.05em;
+      }
+      /* la capsule : des lectures séparées par un filet, sans cadre */
+      .hud-chips {
+        grid-area: lectures;
+        display: flex;
+        pointer-events: auto;
       }
       .hud-chip {
         position: relative;
         display: flex;
         align-items: center;
-        gap: 6px;
-        padding: 3px 9px;
+        gap: 5px;
+        padding: 2px 9px;
         background: transparent;
-        border: 1px solid var(--line);
-        border-radius: 4px;
+        border: 0;
+        border-left: 1px solid var(--line);
         color: var(--ink);
         font-family: var(--font-mono);
-        font-size: calc(11px * var(--ui));
+        font-size: calc(11.5px * var(--ui));
+        font-variant-numeric: tabular-nums;
+        text-shadow: inherit;
         cursor: pointer;
+        pointer-events: auto;
       }
-      .hud-chip i {
-        font-style: normal;
+      .hud-chips .hud-chip:first-child,
+      .hud-chip.ath-salle {
+        border-left: 0;
+      }
+      .hud-chips .hud-chip:last-child {
+        padding-right: 0;
+      }
+      .hud-chip .picto {
+        color: var(--dim);
+      }
+      .hud-chip.ath-salle {
+        grid-area: salle;
+        padding: 0;
         font-size: calc(12px * var(--ui));
-        opacity: 0.75;
+      }
+      /* L'AMBRE EST UN VOYANT (charte §3) : une lampe s'allume devant la
+         coque quand elle gèle, à la place du pictogramme */
+      .voyant {
+        display: none;
+        width: 6px;
+        height: 6px;
+        border-radius: 50%;
+        background: #f2c98e;
+        box-shadow: 0 0 6px #f2c98e;
+      }
+      .hud-chip.gele .voyant {
+        display: block;
+      }
+      .hud-chip.gele .picto {
+        display: none;
+      }
+      #hud-state.warn,
+      #hud-coque.warn {
+        color: #f2c98e;
+      }
+      /* ---- le fil de la descente, dans la capsule ---- */
+      #voie-hud {
+        display: none;
+      }
+      /* display: contents : le rail et le stade se posent directement dans la
+         grille de la capsule, sans que main.ts ait à connaître la mise en page */
+      body.playing #voie-hud:not([hidden]) {
+        display: contents;
+      }
+      #vh-rang {
+        display: none; /* le compte est déjà dit par SALLE n/N, juste à côté */
+      }
+      #vh-rail {
+        grid-area: rail;
+        display: flex;
+        align-items: center;
+        gap: 4px;
+      }
+      .vh-cran {
+        position: relative;
+        width: 7px;
+        height: 7px;
+        flex: none;
+        border-radius: 50%;
+        border: 1px solid var(--line-strong);
+        transition: background 0.5s, border-color 0.5s, box-shadow 0.5s;
+      }
+      .vh-franchi {
+        background: var(--specimen);
+        border-color: var(--specimen);
+      }
+      .vh-courant {
+        background: var(--valid);
+        border-color: var(--valid);
+        animation: vh-pouls 2.2s ease-in-out infinite;
+      }
+      @keyframes vh-pouls {
+        0%, 100% { box-shadow: 0 0 0 2px rgba(63, 214, 155, 0.25); }
+        50% { box-shadow: 0 0 0 5px rgba(63, 214, 155, 0.08); }
+      }
+      .vh-tiers {
+        width: 1px;
+        height: 9px;
+        flex: none;
+        background: var(--line-strong);
+      }
+      .vh-record::after {
+        content: '✦';
+        position: absolute;
+        left: 50%;
+        top: 100%;
+        transform: translateX(-50%);
+        font-size: calc(7px * var(--ui));
+        color: #ffd9a8;
+        line-height: 1.2;
+      }
+      #vh-stade {
+        grid-area: stade;
+        font-family: var(--font-display);
+        font-size: calc(8px * var(--ui));
+        letter-spacing: 0.14em;
+        color: var(--dim);
+      }
+      @media (prefers-reduced-motion: reduce) {
+        .vh-courant { animation: none; }
+        .ath-coin { transition: none; }
+      }
+      /* display:flex écraserait l'attribut hidden : on le rétablit — sans
+         cette règle, masquer une pastille (vies au labo…) ne faisait rien */
+      .hud-chip[hidden] {
+        display: none;
       }
       /* LA PLANCHE D'ICÔNES DU MÉTA dans l'interface : une pastille qui
          découpe la planche 4 × 2 en fond, à la taille du texte autour. Elle
@@ -5041,11 +5190,6 @@
         padding: 4px 9px;
         z-index: 14;
       }
-      .hud-sous {
-        display: flex;
-        gap: 16px;
-        min-height: 0;
-      }
       .hud-row {
         display: flex;
         justify-content: space-between;
@@ -5062,30 +5206,12 @@
       .hud-row .v {
         color: var(--ink);
       }
-      #hud-volume {
-        font-size: calc(17px * var(--ui));
-        color: var(--specimen);
-        flex: none;
-      }
-      #hud-volume small {
-        font-size: calc(11px * var(--ui));
-        color: var(--dim);
-        margin-left: 5px;
-      }
       /* Matière en retour : gouttes éjectées retombées dans le corps, que le
          délai de réabsorption rendra dans un instant — un prêt, pas une
          perte. Teinte eau, pour dire « ceci va revenir ». */
       #hud-volume .retour {
         color: #63b7e6;
         opacity: 0.9;
-      }
-      /* Jauge de volume : le trait vertical marque le seuil de dernière impulsion */
-      .gauge {
-        position: relative;
-        height: 5px;
-        margin: 6px 0 2px;
-        background: rgba(150, 200, 235, 0.12);
-        overflow: hidden;
       }
       #gauge-fill {
         position: absolute;
@@ -5094,20 +5220,9 @@
         background: linear-gradient(90deg, var(--specimen), var(--glow));
         transition: width 0.25s ease;
       }
-      #gauge-threshold {
-        position: absolute;
-        top: -2px;
-        bottom: -2px;
-        width: 2px;
-        background: var(--alert);
-      }
       body.dispersed #hud-volume,
       body.dispersed #gauge-fill {
         background: var(--alert);
-        color: var(--alert);
-      }
-      #hud-state.warn,
-      #hud-coque.warn {
         color: var(--alert);
       }
       /* Alerte volume : la jauge prévient avant le seuil (ambre), et sous le
@@ -5129,18 +5244,6 @@
       #hud-fantome b { font-weight: 600; color: #dcefff; }
       #hud-fantome .retard { color: #ffb3a8; }
       #hud-fantome .avance { color: #9be7c4; }
-      #hud-perte {
-        font-size: calc(10.5px * var(--ui));
-        color: #f2a98f;
-        letter-spacing: 0.05em;
-        min-height: 15px;
-        line-height: 15px;
-      }
-      #hud-rosee {
-        font-size: calc(10px * var(--ui));
-        color: #9fd8e8;
-        letter-spacing: 0.05em;
-      }
       /* La coque : une petite barre qui se remplit à mesure que le vaisseau
          refroidit — la pression temporelle d'un coup d'œil, pas un chiffre */
       #coque-bar {
@@ -5159,10 +5262,11 @@
         background: linear-gradient(90deg, #d98d4a, #7fc4de, #a9e2f5);
         transition: width 0.4s ease;
       }
+      /* ==== ATH : FIN ==== */
       /* Le compte à rebours de dispersion : impossible à rater */
       #hud-danger {
         position: fixed;
-        top: 62px;
+        top: calc(14px + env(safe-area-inset-top));
         left: 50%;
         transform: translateX(-50%) translateY(-8px);
         background: rgba(46, 12, 14, 0.88);
@@ -6233,15 +6337,50 @@
         /* Au doigt : la bande de vie se fait minuscule, et les commandes
            passent en COLONNE à gauche — le pouce gauche les tient, le droit
            vise, les états restent à droite. */
-        #hud {
-          padding: calc(3px + env(safe-area-inset-top)) 8px 3px;
+        /* Au doigt : chaque coin tient sur une ligne, et l'essentiel seul */
+        .ath-coin {
+          padding: 8px 10px;
+        }
+        .ath-vital {
+          left: calc(8px + env(safe-area-inset-left));
+          top: calc(6px + env(safe-area-inset-top));
+          flex-direction: row;
+          flex-wrap: wrap;
+          align-items: center;
+          gap: 3px 10px;
+          max-width: 46vw;
+        }
+        .ath-etat {
+          right: calc(8px + env(safe-area-inset-right));
+          top: calc(6px + env(safe-area-inset-top));
+          grid-template-columns: auto auto auto;
+          grid-template-areas: 'rail salle lectures';
         }
         #hud-volume {
-          font-size: calc(14px * var(--ui));
+          font-size: calc(18px * var(--ui));
+        }
+        .gauge {
+          width: 118px;
         }
         .hud-chip {
           padding: 2px 7px;
+          font-size: calc(10.5px * var(--ui));
+        }
+        /* les instruments et le stade se lisent au dossier */
+        #hud-instr-chip,
+        #vh-stade,
+        #hud-rosee {
+          display: none;
+        }
+        #hud-perte {
+          font-size: calc(9.5px * var(--ui));
+        }
+        #hud-danger {
+          top: calc(8px + env(safe-area-inset-top));
           font-size: calc(10px * var(--ui));
+          max-width: 60vw;
+          white-space: normal;
+          text-align: center;
         }
         /* la bascule du son reste accessible au banc (dossier Son) */
         #touchbar .tb-snd {
@@ -6290,21 +6429,6 @@
         /* le carton du journal descend sous la bande */
         #tableau-card {
           top: 64px;
-        }
-        #hud-danger {
-          top: 58px;
-          font-size: calc(11px * var(--ui));
-          max-width: 94vw;
-          white-space: normal;
-          text-align: center;
-        }
-        #hud-perte {
-          font-size: calc(9.5px * var(--ui));
-          min-height: 12px;
-          line-height: 12px;
-        }
-        #hud-rosee {
-          display: none; /* la bande mobile va à l'essentiel */
         }
       }
 
@@ -9265,64 +9389,81 @@
       </div>
     </aside>
 
-    <!-- La bande de vie : le volume et sa jauge quasi pleine largeur — on
-         VOIT diminuer ce qu'on dépense. À droite, trois pastilles-icônes
-         (tableau, bonbonnes, coque) : un toucher dit leur nom. -->
+    <!-- L'ATH, HAUT DE L'ÉCRAN : deux coins, plus de bandeau. À gauche le
+         MODULE VITAL (le litrage, la fiole, la jauge et son seuil — ce qu'on
+         dépense se lit en continu) ; à droite la CAPSULE D'ÉTAT (où l'on en
+         est, ce qu'on porte). #hud n'est qu'une couche : il ne peint rien et
+         ne prend aucun toucher. -->
     <div id="hud">
-      <div class="hud-vie">
-        <div id="hud-volume">— <small>L</small></div>
-        <!-- LA BONBONNE DE SECOURS : sous le litrage, une fiole qui se
-             remplit de ce qu'on a mis de côté. Elle se présente au début du
-             tableau et rappelle sa présence quand le corps touche à sa
-             dernière goutte — un toucher la verse. -->
-        <button type="button" id="bonbonne" class="bonbonne" data-nom="bonbonne de secours — toucher, touche V, ou croix ↑ à la manette : la réserve se verse dans le corps (en liquide)" hidden>
-          <svg viewBox="0 0 44 64" aria-hidden="true">
-            <defs>
-              <clipPath id="bb-dedans">
-                <rect x="8.6" y="16.5" width="26.8" height="41" rx="6" />
-                <rect x="19" y="8.5" width="6" height="9" />
-              </clipPath>
-              <linearGradient id="bb-eau" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0" stop-color="#8ad8ff" />
-                <stop offset="0.45" stop-color="#3ea6dd" />
-                <stop offset="1" stop-color="#1d6fa5" />
-              </linearGradient>
-            </defs>
-            <!-- le liquide, clippé par l'intérieur du verre -->
-            <g clip-path="url(#bb-dedans)">
-              <g id="bb-liquide">
-                <path class="bb-vague" d="M-14 9 q 5.5 -2.6 11 0 t 11 0 t 11 0 t 11 0 t 11 0 t 11 0 V 60 H -14 Z" />
-                <rect class="bb-corps" x="-14" y="9" width="72" height="52" />
-                <path class="bb-vague bb-vague2" d="M-14 10.5 q 7 2.4 14 0 t 14 0 t 14 0 t 14 0 t 14 0 V 60 H -14 Z" />
+      <div class="ath-coin ath-vital">
+        <div class="ath-ligne">
+          <div id="hud-volume">— <small>L</small></div>
+          <!-- LA BONBONNE DE SECOURS : sous le litrage, une fiole qui se
+               remplit de ce qu'on a mis de côté. Elle se présente au début du
+               tableau et rappelle sa présence quand le corps touche à sa
+               dernière goutte — un toucher la verse. -->
+          <button type="button" id="bonbonne" class="bonbonne" data-nom="bonbonne de secours — toucher, touche V, ou croix ↑ à la manette : la réserve se verse dans le corps (en liquide)" hidden>
+            <svg viewBox="0 0 44 64" aria-hidden="true">
+              <defs>
+                <clipPath id="bb-dedans">
+                  <rect x="8.6" y="16.5" width="26.8" height="41" rx="6" />
+                  <rect x="19" y="8.5" width="6" height="9" />
+                </clipPath>
+                <linearGradient id="bb-eau" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0" stop-color="#8ad8ff" />
+                  <stop offset="0.45" stop-color="#3ea6dd" />
+                  <stop offset="1" stop-color="#1d6fa5" />
+                </linearGradient>
+              </defs>
+              <!-- le liquide, clippé par l'intérieur du verre -->
+              <g clip-path="url(#bb-dedans)">
+                <g id="bb-liquide">
+                  <path class="bb-vague" d="M-14 9 q 5.5 -2.6 11 0 t 11 0 t 11 0 t 11 0 t 11 0 t 11 0 V 60 H -14 Z" />
+                  <rect class="bb-corps" x="-14" y="9" width="72" height="52" />
+                  <path class="bb-vague bb-vague2" d="M-14 10.5 q 7 2.4 14 0 t 14 0 t 14 0 t 14 0 t 14 0 V 60 H -14 Z" />
+                </g>
               </g>
-            </g>
-            <!-- le verre : col, épaules, corps, et son reflet -->
-            <path class="bb-verre" d="M17.6 15.4 V 9.2 h 8.8 v 6.2 q 9 3.4 9 12.4 v 22 q 0 7.4 -7.4 7.4 h -12 q -7.4 0 -7.4 -7.4 v -22 q 0 -9 9 -12.4 Z" />
-            <rect class="bb-bouchon" x="15.4" y="2.6" width="13.2" height="6.6" rx="2" />
-            <path class="bb-reflet" d="M13.4 26 q 2.6 -5.4 6.4 -7.2 v 30 q -6.4 -2 -6.4 -9 Z" />
-            <rect class="bb-eclat" x="-16" y="-8" width="9" height="86" />
-          </svg>
-          <span class="v" id="hud-bonbonne">0.00 L</span>
-          <span class="bb-mot" id="bb-mot" aria-live="polite"></span>
-        </button>
-        <div class="gauge">
-          <div id="gauge-fill"></div>
-          <div id="gauge-threshold"></div>
+              <!-- le verre : col, épaules, corps, et son reflet -->
+              <path class="bb-verre" d="M17.6 15.4 V 9.2 h 8.8 v 6.2 q 9 3.4 9 12.4 v 22 q 0 7.4 -7.4 7.4 h -12 q -7.4 0 -7.4 -7.4 v -22 q 0 -9 9 -12.4 Z" />
+              <rect class="bb-bouchon" x="15.4" y="2.6" width="13.2" height="6.6" rx="2" />
+              <path class="bb-reflet" d="M13.4 26 q 2.6 -5.4 6.4 -7.2 v 30 q -6.4 -2 -6.4 -9 Z" />
+              <rect class="bb-eclat" x="-16" y="-8" width="9" height="86" />
+            </svg>
+            <span class="v" id="hud-bonbonne">0.00 L</span>
+            <span class="bb-mot" id="bb-mot" aria-live="polite"></span>
+          </button>
         </div>
+        <div class="ath-ligne">
+          <div class="gauge">
+            <div id="gauge-fill"></div>
+            <div id="gauge-threshold"></div>
+          </div>
+          <span id="hud-perte"></span>
+        </div>
+        <div class="hud-sous"><span id="hud-rosee"></span><span id="hud-fantome"></span></div>
+      </div>
+      <div class="ath-coin ath-etat">
+        <!-- LE FIL DE LA DESCENTE : un cran par salle, les tiers marqués, le
+             record étoilé. Il tenait tout le flanc droit ; il tient ici en
+             une ligne, à côté du compte qu'il illustre. -->
+        <div id="voie-hud" hidden aria-label="Progression de la descente">
+          <div id="vh-rang"></div>
+          <div id="vh-rail"></div>
+          <div id="vh-stade"></div>
+        </div>
+        <button type="button" class="hud-chip ath-salle" data-nom="progression de l'expédition"><span class="v" id="hud-tableau">SALLE 1/1</span></button>
         <div class="hud-chips">
-          <button type="button" class="hud-chip" data-nom="progression de l'expédition"><i>▦</i><span class="v" id="hud-tableau">SALLE 1/1</span></button>
           <button type="button" class="hud-chip" data-nom="échantillons de secours — le dernier perdu, la run s'arrête" id="hud-vies-chip"><i class="ico-meta" style="--ic-x:3;--ic-y:1"></i><span class="v" id="hud-vies">×1</span></button>
           <button type="button" class="hud-chip" data-nom="condensat de la run — la matière ramassée, purgée en fin de run" id="hud-cond-chip"><i class="ico-meta" style="--ic-x:2;--ic-y:1"></i><span class="v" id="hud-cond">0 cL</span></button>
-          <button type="button" class="hud-chip" data-nom="instruments embarqués — toucher pour le détail" id="hud-instr-chip" hidden><i>🧰</i><span class="v" id="hud-instr">—</span></button>
-          <button type="button" class="hud-chip" data-nom="coque du vaisseau"><i>❄</i><span class="v" id="hud-coque">+21°</span></button>
+          <button type="button" class="hud-chip" data-nom="coque du vaisseau — elle refroidit : la pression du temps" id="hud-coque-chip"><i class="voyant"></i><svg class="picto" data-picto="coque" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 4a2 2 0 0 1 2 2v7.5a3.5 3.5 0 1 1-4 0V6a2 2 0 0 1 2-2z"/></svg><span class="v" id="hud-coque">+21°</span></button>
+          <button type="button" class="hud-chip" data-nom="instruments embarqués — toucher pour le détail" id="hud-instr-chip" hidden><svg class="picto" data-picto="instruments" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 20a8 8 0 1 1 0-16 8 8 0 0 1 0 16zM12 12l4-3"/></svg><span class="v" id="hud-instr">—</span></button>
           <!-- LA CAPTURE POUR LE CODEX (mode concepteur) : quatre secondes de
-               la scène, cadrées 4:3, envoyées à la fiche choisie — la vidéo
-               de l'effet se filme dans le jeu, elle ne se fabrique pas -->
+               la scène, cadrées 4:3, envoyées à la fiche choisie -->
           <button type="button" class="hud-chip hud-capture" data-dev id="hud-capture" data-nom="capture pour le codex : 4 s de la scène, à envoyer à une fiche">⏺ CAPTURER</button>
         </div>
       </div>
-      <div class="hud-sous"><span id="hud-perte"></span><span id="hud-rosee"></span><span id="hud-fantome"></span></div>
-      <!-- relevés secondaires : encore alimentés par le jeu, plus affichés -->
+      <!-- relevés secondaires : encore alimentés par le jeu, plus affichés
+           (retirés à la tâche 11) -->
       <div class="hud-restes" hidden>
         <i id="coque-bar"><b></b></i>
         <span id="hud-seuil"></span><span id="hud-vitesse"></span>
@@ -10654,14 +10795,6 @@
       <div id="card-code"></div>
       <img id="card-fig" alt="" hidden />
       <div id="card-log"></div>
-    </div>
-
-    <!-- LE FIL DE LA DESCENTE : elle se lit d'un regard — rail à crans,
-         un cran par salle du plan, les tiers marqués, le record étoilé -->
-    <div id="voie-hud" hidden aria-label="Progression de la descente">
-      <div id="vh-rang"></div>
-      <div id="vh-rail"></div>
-      <div id="vh-stade"></div>
     </div>
 
     <!-- La CARTE D'ENTRÉE de salle (voie) : l'identité complète, en fondu,
