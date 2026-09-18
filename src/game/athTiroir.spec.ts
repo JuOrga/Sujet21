@@ -4,15 +4,15 @@ import { MANOEUVRES } from './commandes'
 
 const RUN = { vortexActif: false }
 
-describe('le tiroir de l\'ATH', () => {
-  it('range les commandes rares dans l\'ordre de la spec', () => {
+describe('le tiroir de l’ATH', () => {
+  it('range les commandes rares dans l’ordre de la spec', () => {
     expect(entreesTiroir({ ...RUN, vortexActif: true }).map((e) => e.id)).toEqual([
       'legende', 'etats', 'dossier', 'station', 'recadrer',
       'vortex', 'son', 'recommencer', 'fiche', 'banc',
     ])
   })
 
-  it('ne montre le vortex que si le réglage l\'active', () => {
+  it('ne montre le vortex que si le réglage l’active', () => {
     expect(entreesTiroir(RUN).map((e) => e.id)).not.toContain('vortex')
   })
 

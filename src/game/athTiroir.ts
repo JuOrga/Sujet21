@@ -23,7 +23,7 @@ const ENTREES: EntreeTiroir[] = [
   { id: 'vortex', nom: 'VORTEX', picto: 'vortex', manoeuvre: null },
   { id: 'son', nom: 'SON', picto: 'son', manoeuvre: null },
   { id: 'recommencer', nom: 'RECOMMENCER', picto: 'recommencer', manoeuvre: 'recommencer' },
-  { id: 'fiche', nom: 'FICHE D\'ESSAI', picto: 'fiche', manoeuvre: 'fiche' },
+  { id: 'fiche', nom: 'FICHE D’ESSAI', picto: 'fiche', manoeuvre: 'fiche' },
   { id: 'banc', nom: 'BANC', picto: 'banc', manoeuvre: null },
 ]
 

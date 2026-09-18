@@ -17,7 +17,7 @@ describe('les zones interdites aux pancartes', () => {
     expect(zonesInterdites([{ left: 5, top: 5, right: 5, bottom: 9 }], 10)).toEqual([])
   })
 
-  it('rend le haut de l\'écran aux pancartes : seul le coin est pris', () => {
+  it('rend le haut de l’écran aux pancartes : seul le coin est pris', () => {
     // l'ancienne bande de 46 px effaçait cette pancarte, au centre-haut
     expect(pancarteLibre(640, 24, 60, 10, zones)).toBe(true)
     expect(pancarteLibre(120, 40, 60, 10, zones)).toBe(false)

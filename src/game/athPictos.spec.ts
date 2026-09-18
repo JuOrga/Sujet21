@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { PICTOS, picto, type NomPicto } from './athPictos'
 
-describe('les pictogrammes de l\'ATH', () => {
+describe('les pictogrammes de l’ATH', () => {
   const noms = Object.keys(PICTOS) as NomPicto[]
 
   it('couvre le cadran, les commandes, le tiroir et la capsule', () => {
@@ -15,7 +15,7 @@ describe('les pictogrammes de l\'ATH', () => {
       expect(noms).toContain(n)
   })
 
-  it('n\'écrit que des tracés SVG bien formés', () => {
+  it('n’écrit que des tracés SVG bien formés', () => {
     for (const n of noms) {
       expect(PICTOS[n], n).toMatch(/^M[0-9MmLlHhVvCcSsQqTtAaZz .,-]+$/)
     }
