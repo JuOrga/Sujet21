@@ -108,4 +108,13 @@ describe('les commandes et le tiroir', () => {
   })
 })
 
+describe('les pancartes du monde', () => {
+  it('ne connaissent plus de bandes : seuls les postes occupés sont interdits', () => {
+    expect(MAIN).not.toContain('BANDE_HAUTE')
+    expect(MAIN).not.toContain('bandeBasse')
+    expect(MAIN).toContain('pancarteLibre(')
+    expect(MAIN).toContain('zonesInterdites(')
+  })
+})
+
 export { HTML, MAIN, CSS_ATH }

@@ -372,6 +372,7 @@ import {
 } from './game/commandes'
 import { picto, type NomPicto } from './game/athPictos'
 import { entreesTiroir } from './game/athTiroir'
+import { pancarteLibre, zonesInterdites, type Rect } from './game/athZones'
 import { PARALLAXE_DEFAUTS, facteurG } from './render/parallaxe'
 import { PerfCollector } from './game/perf'
 import {
@@ -1565,38 +1566,28 @@ function buildWorldLabels(): void {
 // Marge de respiration entre deux pancartes, en pixels d'écran : elles ne
 // doivent pas seulement NE PAS se toucher, elles doivent se laisser lire.
 const MARGE_PANCARTE = 10
-// Bandes réservées à l'interface : le relevé en haut, le sélecteur d'état
-// et la barre tactile en bas. Une pancarte qui s'y glisserait passerait
-// DERRIÈRE les boutons — elle s'efface plutôt.
-const BANDE_HAUTE = 46
-let bandeBasse = 150 // recalculée sur la vraie hauteur des barres
-let bandeMesuree = 0
-
-// Hauteur d'écran interdite en bas : le sélecteur d'état et la barre
-// tactile. Relue quatre fois par seconde — les barres apparaissent avec la
-// partie, changent de hauteur en tournant l'écran, et une lecture de mise
-// en page par image ne se justifie pas pour ça.
-function majBandeBasse(t: number): void {
-  if (t - bandeMesuree < 250) return
-  bandeMesuree = t
-  let haut = window.innerHeight
-  for (const el of [
-    document.getElementById('statebar'),
-    document.getElementById('touchbar'),
-  ]) {
-    const r = el?.getBoundingClientRect()
-    if (!r || r.height <= 0) continue
-    // Seule une vraie barre POSÉE EN BAS définit la bande interdite : LARGE
-    // (pas une colonne) et dans la moitié basse. En paysage mobile, ces
-    // barres deviennent des COLONNES latérales dont le sommet est presque
-    // en haut de l'écran : les prendre pour des barres basses interdisait
-    // TOUT l'écran aux pancartes — plus une seule visible sur téléphone
-    // ou tablette en paysage.
-    if (r.width < r.height || r.width < window.innerWidth * 0.35) continue
-    if (r.top < window.innerHeight * 0.55) continue
-    if (r.top < haut) haut = r.top
+// OÙ UNE PANCARTE PEUT SE POSER. L'interface était deux bandes : on
+// interdisait 46 px en haut et ~150 px en bas, sur toute la largeur. Elle
+// tient maintenant dans des coins (game/athZones.ts) : une pancarte ne
+// s'efface que si elle TOUCHE un poste.
+// Relu quatre fois par seconde — les postes apparaissent avec la partie,
+// changent de place en tournant l'écran, et une lecture de mise en page par
+// image ne se justifie pas pour ça.
+let zonesAth: Rect[] = []
+/** les postes qui s'estompent au repos : capsule, commandes, cadran */
+let postesAth: Rect[] = []
+let zonesMesurees = 0
+function majZonesAth(t: number): void {
+  if (t - zonesMesurees < 250) return
+  zonesMesurees = t
+  const mesure = (sel: string): Rect | null => {
+    const r = document.querySelector(sel)?.getBoundingClientRect()
+    return r && r.width > 0 && r.height > 0 ? r : null
   }
-  bandeBasse = Math.max(0, window.innerHeight - haut) + 10
+  const vital = mesure('.ath-vital')
+  const mobiles = [mesure('.ath-etat'), mesure('#touchbar'), mesure('#statebar')]
+  zonesAth = zonesInterdites([vital, ...mobiles], MARGE_PANCARTE)
+  postesAth = mobiles.filter((r): r is Rect => r !== null)
 }
 
 // Les pancartes gardent une taille de LECTURE quel que soit le zoom (comme
@@ -1607,7 +1598,7 @@ function majBandeBasse(t: number): void {
 // fondu. Résultat : jamais deux textes l'un sur l'autre, à aucun zoom, et
 // le plan large se lit comme une carte — les lieux, sans le bavardage.
 function updateWorldLabels(vw: number, vh: number): void {
-  majBandeBasse(performance.now())
+  majZonesAth(performance.now())
   // Au plan large, les pancartes RÉTRÉCISSENT avec la carte (plancher 0,45)
   // au lieu de garder leur taille de lecture : deux plaques géantes
   // masquaient la carte entière et effaçaient toutes les autres — la
@@ -1641,9 +1632,9 @@ function updateWorldLabels(vw: number, vh: number): void {
       l.place = false
       continue
     }
-    // sous les barres d'interface : la pancarte serait masquée à moitié —
+    // sur un poste de l'interface : la pancarte serait masquée à moitié —
     // qu'elle s'efface franchement plutôt que de dépasser d'un bouton
-    if (sy - hh < BANDE_HAUTE || sy + hh > vh - bandeBasse) {
+    if (!pancarteLibre(sx, sy, hw, hh, zonesAth)) {
       l.span.style.display = ''
       l.span.style.transform = `translate(${sx.toFixed(1)}px, ${sy.toFixed(1)}px) translate(-50%, -50%) scale(${scale.toFixed(3)})`
       l.span.classList.add('efface')
@@ -19727,8 +19718,11 @@ function corpsImage(now: number): boolean {
   // bord du cadre, avec la distance restante — on sait toujours où aller.
   const exitSx = vw * 0.5 + (exitMouth.x - camera.x) * camera.zoom
   const exitSy = vh * 0.5 - (exitMouth.y - camera.y) * camera.zoom
+  // plus de bandes à éviter : le sas est « à l'écran » dès qu'il est
+  // visible, et la flèche se pose sous les coins du haut, au-dessus du
+  // cadran et des commandes
   const exitOnScreen =
-    exitSx > 30 && exitSx < vw - 30 && exitSy > 92 && exitSy < vh - 140
+    exitSx > 30 && exitSx < vw - 30 && exitSy > 30 && exitSy < vh - 30
   const showArrow =
     document.body.classList.contains('playing') &&
     !tableauDone &&
@@ -19738,7 +19732,7 @@ function corpsImage(now: number): boolean {
   if (showArrow) {
     const ang = Math.atan2(exitSy - vh * 0.5, exitSx - vw * 0.5)
     const ax = Math.min(vw - 48, Math.max(48, exitSx))
-    const ay = Math.min(vh - 152, Math.max(106, exitSy))
+    const ay = Math.min(vh - 96, Math.max(84, exitSy))
     objArrow.style.transform = `translate(${ax.toFixed(1)}px, ${ay.toFixed(1)}px) translate(-50%, -50%)`
     objArrowGlyph.style.transform = `rotate(${((ang * 180) / Math.PI).toFixed(1)}deg)`
     const dWorld = Math.hypot(
