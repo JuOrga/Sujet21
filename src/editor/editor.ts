@@ -63,6 +63,8 @@ import { periodeCoeur } from '../game/puits'
 import { tableauCibles, tableauCouperet, tableauOrbites, tableauPalet, tableauRafales } from '../game/minijeux'
 import { tableauRonde } from '../game/ronde'
 import { builtinPresets, loadStoredPresets, type Preset } from '../bench/presets'
+import { catalogueRecompenses } from '../game/recompenses'
+import { descriptionInstrument } from '../game/instruments'
 import { grainsPuits, rayonNoyau } from '../game/puitsDessin'
 import { FluidSim, KIND_PLAYER } from '../sim/solver'
 import {
@@ -4443,6 +4445,22 @@ export class LevelEditor {
       this.syncForm()
       this.commit(p ? `Physique : ${p.title} (${Object.keys(p.params).length} réglages copiés).` : 'Physique : celle du banc.')
     })
+    // LES CARTES IMPOSÉES : une case par carte du catalogue ; cocher ajoute
+    // l'identifiant au tableau, décocher le retire — une carte inconnue
+    // (venue d'un autre poste) garde sa case, pour qu'on puisse la retirer
+    this.el('ed-cartes').addEventListener('change', (ev) => {
+      const c = ev.target as HTMLInputElement
+      if (!(c instanceof HTMLInputElement) || !c.dataset.carte) return
+      const id = c.dataset.carte
+      const liste = (this.level.cartes ?? []).filter((x) => x !== id)
+      if (c.checked) liste.push(id)
+      this.level.cartes = liste.length > 0 ? liste : undefined
+      this.persist()
+      this.validate()
+      this.syncCartes()
+      const d = catalogueRecompenses().find((x) => x.id === id)
+      this.commit(c.checked ? `Carte imposée : ${d?.nom ?? id}.` : `Carte retirée : ${d?.nom ?? id}.`)
+    })
     // LE CYCLE en descente : ce tableau suit-il les mémoires tissées, ou
     // laisse-t-il les trois états au bouton (leçons, tableaux d'atelier) ?
     this.el('ed-etats').addEventListener('change', () => {
@@ -5324,6 +5342,34 @@ export class LevelEditor {
     sel.value = courant
   }
 
+  /** Les cartes imposées : le catalogue entier (livrées, contreparties,
+   *  atelier ou publiées), une case par carte, les cochées d'abord dans le
+   *  compte ; un identifiant que le catalogue ignore reste listé, signalé. */
+  private syncCartes(): void {
+    const host = this.el('ed-cartes')
+    const tenues = this.level.cartes ?? []
+    const cat = catalogueRecompenses()
+    const echappe = (t: string): string => t.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;')
+    const case_ = (id: string, icone: string, nom: string, desc: string, inconnue = false): string =>
+      `<label class="${inconnue ? 'inconnue' : ''}" title="${echappe(desc)}"><input type="checkbox" data-carte="${echappe(id)}" ${tenues.includes(id) ? 'checked' : ''} /> ${icone} ${echappe(nom)}</label>`
+    const groupes: [string, (typeof cat)[number][]][] = [
+      ['Livrées', cat.filter((d) => !d.contrepartie && !d.perso)],
+      ['Contreparties', cat.filter((d) => d.contrepartie)],
+      ['Atelier / publiées', cat.filter((d) => d.perso)],
+    ]
+    host.innerHTML =
+      groupes
+        .filter(([, l]) => l.length > 0)
+        .map(([titre, l]) => `<span class="k">${titre}</span>` + l.map((d) => case_(d.id, d.icone, d.nom, descriptionInstrument(d))).join(''))
+        .join('') +
+      tenues
+        .filter((id) => !cat.some((d) => d.id === id))
+        .map((id) => case_(id, '?', `${id} (inconnue du catalogue)`, 'Aucune carte de ce nom ici : elle ne fera rien sur ce poste.', true))
+        .join('')
+    const compte = this.el('ed-cartes-compte')
+    compte.textContent = tenues.length === 0 ? 'aucune' : tenues.map((id) => cat.find((d) => d.id === id)?.icone ?? '?').join(' ') + ` ${tenues.length}`
+  }
+
   /** Le panneau du mini-jeu : visible sur un tableau de cibles, et à jour. */
   private syncMiniJeu(): void {
     const mj = this.level.minijeu
@@ -5357,6 +5403,7 @@ export class LevelEditor {
     ;(this.el('ed-dashs') as HTMLInputElement).value =
       this.level.dashBudget === undefined ? '' : String(this.level.dashBudget)
     this.syncPreset()
+    this.syncCartes()
     this.syncMiniJeu()
     ;(this.el('ed-etats') as HTMLSelectElement).value =
       this.level.etats === 'libres' ? 'libres' : 'cycle'

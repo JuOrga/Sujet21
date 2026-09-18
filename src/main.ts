@@ -227,6 +227,7 @@ import {
   retireRecompense,
 } from './game/recompenses'
 import type { InstrumentDef } from './game/instruments'
+import { cartesActives, partTirEffective } from './game/cartesTableau'
 import {
   BONBONNE_CAP,
   INSTRUMENTS,
@@ -621,8 +622,16 @@ majCondensatUI()
 // Une carte fabriquée à l'atelier répond donc exactement comme une carte
 // livrée — c'est ce qui rend l'écran des récompenses jouable, et pas
 // seulement décoratif.
+// LES CARTES DU TABLEAU EN COURS (LevelDef.cartes) : posées par createSim,
+// lues comme si le joueur les tenait, le temps de la salle — une carte déjà
+// en poche ne compte qu'une fois (cartesTableau.ts dit la règle entière).
+let cartesDuTableau: string[] = []
+/** Ce qui joue ici : les cartes de la run, puis celles que la salle impose. */
+function cartesEnJeu(): string[] {
+  return cartesActives(run.instruments, cartesDuTableau)
+}
 function lev(id: LevierId): number {
-  return levier(run.instruments, id, catalogueRecompenses())
+  return levier(cartesEnJeu(), id, catalogueRecompenses())
 }
 
 // La fiche d'une carte, LIVRÉE OU FABRIQUÉE. Passer par ici plutôt que par
@@ -807,6 +816,26 @@ function createSim(level: LevelDef): FluidSim {
       if (!(k in reglagesRendus)) reglagesRendus[k] = params[k]
       params[k] = src[k] as never
     }
+  }
+  // LES CARTES IMPOSÉES par le tableau jouent dès maintenant : tout lev()
+  // ci-dessous les voit. Puis LE TIR DE GLACE se compose : le preset a fixé
+  // la base (params.glaceTir, souvent 0), les cartes s'ajoutent par-dessus
+  // (l'Éclateur), la vitesse se multiplie — recouverts comme un réglage du
+  // tableau, donc rendus à la salle suivante, et lus par le solveur, la
+  // visée et le HUD au même endroit (params) : une seule vérité du geste.
+  cartesDuTableau = level.cartes ?? []
+  // seulement si une carte contribue : sans carte, le banc n'est JAMAIS
+  // réécrit — la revue du 18/09 : le plafond de partTirEffective rognait en
+  // silence un banc réglé au-delà (le concepteur qui teste 0,6 lisait 0,5)
+  const bonusTir = lev('glaceTir')
+  if (bonusTir > 0) {
+    if (!('glaceTir' in reglagesRendus)) reglagesRendus.glaceTir = params.glaceTir
+    params.glaceTir = partTirEffective(params.glaceTir, bonusTir)
+  }
+  const vitesseTir = lev('glaceTirVitesse')
+  if (vitesseTir !== 1) {
+    if (!('glaceTirVitesse' in reglagesRendus)) reglagesRendus.glaceTirVitesse = params.glaceTirVitesse
+    params.glaceTirVitesse = params.glaceTirVitesse * vitesseTir
   }
   const sim = new FluidSim(params, level.bounds, CAPACITY)
   appliqueMoteur(sim)
@@ -11556,20 +11585,24 @@ function majInstrumentsUI(): void {
   const defs = run.instruments
     .map((id) => carteDef(id))
     .filter((d): d is NonNullable<typeof d> => d !== null)
+  // les cartes que LA SALLE impose (et que le joueur n'a pas déjà) : elles
+  // jouent, elles se voient — marquées, car elles partent avec la salle
+  const imposees = cartesDuTableau
+    .filter((id) => !run.instruments.includes(id))
+    .map((id) => carteDef(id))
+    .filter((d): d is NonNullable<typeof d> => d !== null)
   hudInstr.textContent =
-    defs.length > 0 ? defs.map((d) => d.icone).join('') : '—'
+    defs.length + imposees.length > 0 ? [...defs, ...imposees].map((d) => d.icone).join('') : '—'
   if (instrPanel) {
+    const ligne = (d: InstrumentDef, note = ''): string =>
+      `<div class="ip-row"><span class="ip-ico">${d.icone}</span><div><b>${d.nom}</b>${note}<small>${d.desc}</small></div></div>`
     instrPanel.innerHTML =
       `<h4>INSTRUMENTS EMBARQUÉS</h4>` +
-      (defs.length === 0
+      (defs.length === 0 && imposees.length === 0
         ? `<p class="ip-vide">Aucun pour l'instant — les paliers de maîtrise (XP) ouvrent les tirages.</p>`
-        : defs
-            .map(
-              (d) =>
-                `<div class="ip-row"><span class="ip-ico">${d.icone}</span><div><b>${d.nom}</b><small>${d.desc}</small></div></div>`,
-            )
-            .join('')) +
-      `<p class="ip-note">valables jusqu'à la fin de la run</p>`
+        : defs.map((d) => ligne(d)).join('') +
+          imposees.map((d) => ligne(d, ` <em>· imposée par la salle</em>`)).join('')) +
+      `<p class="ip-note">valables jusqu'à la fin de la run${imposees.length > 0 ? ' — les imposées, le temps de la salle' : ''}</p>`
   }
 }
 hudInstrChip?.addEventListener('click', () => {
@@ -19468,7 +19501,7 @@ function corpsImage(now: number): boolean {
     bonbonneEl.classList.remove('presente')
   }
   if (hudInstrChip) {
-    hudInstrChip.hidden = !!testLevel || auHub || run.instruments.length === 0
+    hudInstrChip.hidden = !!testLevel || auHub || cartesEnJeu().length === 0
     if (hudInstrChip.hidden && instrPanel) instrPanel.hidden = true
   }
   // La vie compte la matière VIVANTE : le corps plus les gouttes marquées

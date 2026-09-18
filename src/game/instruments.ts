@@ -167,6 +167,13 @@ export const INSTRUMENTS: InstrumentDef[] = [
     effets: [{ levier: 'glisseGlace', valeur: 0.4 }],
   },
   {
+    id: 'eclateur',
+    nom: 'Éclateur',
+    desc: 'En glace, le geste du dash tire un éclat : viser ralentit le temps, relâcher détache un dixième du corps vers le doigt.',
+    icone: '🧨',
+    effets: [{ levier: 'glaceTir', valeur: 0.1 }],
+  },
+  {
     id: 'croc-du-sas',
     nom: 'Croc du sas',
     desc: 'Le sas happe la glace : un palet ne file plus devant la bouche.',
