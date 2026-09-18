@@ -5084,7 +5084,6 @@
       .hud-chip.gele .picto {
         display: none;
       }
-      #hud-state.warn,
       #hud-coque.warn {
         color: #f2c98e;
       }
@@ -5191,22 +5190,6 @@
         padding: 4px 9px;
         z-index: 14;
       }
-      .hud-row {
-        display: flex;
-        justify-content: space-between;
-        align-items: baseline;
-        gap: 16px;
-        font-size: calc(11px * var(--ui));
-        line-height: 1.9;
-      }
-      .hud-row .k {
-        color: var(--dim);
-        letter-spacing: 0.14em;
-        font-size: calc(9.5px * var(--ui));
-      }
-      .hud-row .v {
-        color: var(--ink);
-      }
       /* Matière en retour : gouttes éjectées retombées dans le corps, que le
          délai de réabsorption rendra dans un instant — un prêt, pas une
          perte. Teinte eau, pour dire « ceci va revenir ». */
@@ -5245,24 +5228,6 @@
       #hud-fantome b { font-weight: 600; color: #dcefff; }
       #hud-fantome .retard { color: #ffb3a8; }
       #hud-fantome .avance { color: #9be7c4; }
-      /* La coque : une petite barre qui se remplit à mesure que le vaisseau
-         refroidit — la pression temporelle d'un coup d'œil, pas un chiffre */
-      #coque-bar {
-        flex: 1;
-        max-width: 64px;
-        height: 4px;
-        margin: 0 8px;
-        background: rgba(150, 200, 235, 0.14);
-        align-self: center;
-        overflow: hidden;
-      }
-      #coque-bar b {
-        display: block;
-        height: 100%;
-        width: 0;
-        background: linear-gradient(90deg, #d98d4a, #7fc4de, #a9e2f5);
-        transition: width 0.4s ease;
-      }
       /* ---- Le cadran des états : LA commande du jeu ----
          Trois logements fixes, glace à gauche, liquide au centre, vapeur à
          droite. Des médaillons OCTOGONAUX — la forme des modules sur le plan
@@ -5807,138 +5772,6 @@
         white-space: nowrap;
       }
 
-      /* ---- Carton de tableau : l'entrée du journal de bord, à l'ouverture ---- */
-      #tableau-card {
-        position: fixed;
-        top: 24px;
-        left: 50%;
-        transform: translateX(-50%) translateY(-10px);
-        max-width: min(600px, 92vw);
-        background: var(--panel);
-        border: 1px solid var(--line);
-        border-left: 2px solid var(--specimen);
-        padding: 13px 20px 14px;
-        backdrop-filter: blur(4px);
-        z-index: 12;
-        opacity: 0;
-        pointer-events: none;
-        transition: opacity 0.7s ease, transform 0.7s ease;
-      }
-      #tableau-card.visible {
-        opacity: 1;
-        transform: translateX(-50%) translateY(0);
-      }
-      /* la croix de fermeture : le carton reste tant qu'on ne l'a pas lue */
-      #card-fermer {
-        position: absolute;
-        top: 4px;
-        right: 4px;
-        width: 30px;
-        height: 30px;
-        border: none;
-        background: transparent;
-        color: var(--dim);
-        font-size: calc(14px * var(--ui));
-        line-height: 1;
-        cursor: pointer;
-        pointer-events: none;
-      }
-      #tableau-card.visible #card-fermer {
-        pointer-events: auto;
-      }
-      #card-fermer:hover {
-        color: var(--ink);
-      }
-      /* Vignette du carton : la planche du dossier d'essai, quand il y en a une */
-      #card-fig {
-        display: block;
-        width: 100%;
-        max-height: 190px;
-        object-fit: cover;
-        margin: 9px 0 2px;
-        border: 1px solid var(--line);
-        filter: saturate(0.9) brightness(0.92);
-      }
-      #card-fig[hidden] {
-        display: none;
-      }
-      #card-code {
-        font-family: var(--font-display);
-        font-size: calc(11.5px * var(--ui));
-        letter-spacing: 0.24em;
-        color: var(--specimen);
-      }
-      #card-log {
-        margin-top: 7px;
-        font-size: calc(11.5px * var(--ui));
-        line-height: 1.65;
-        color: var(--dim);
-      }
-      #card-log::before {
-        content: 'JOURNAL DE BORD — ';
-        letter-spacing: 0.14em;
-        color: var(--ink);
-        font-size: calc(9.5px * var(--ui));
-      }
-      @media (max-width: 700px), (pointer: coarse) and (max-height: 620px) {
-        #tableau-card {
-          top: 12px;
-        }
-      }
-
-      /* ---- Tutoriel diégétique : les consignes du protocole (tableau 1,
-             première partie seulement) — chaque consigne se valide par le
-             geste qu'elle enseigne, puis ne revient jamais ---- */
-      #tutor {
-        position: fixed;
-        top: 96px;
-        left: 50%;
-        transform: translateX(-50%) translateY(-6px);
-        max-width: min(560px, 92vw);
-        box-sizing: border-box;
-        background: var(--panel);
-        border: 1px solid var(--line);
-        border-left: 3px solid var(--valid);
-        padding: 10px 16px;
-        font-size: calc(13px * var(--ui));
-        line-height: 1.6;
-        color: var(--ink);
-        backdrop-filter: blur(4px);
-        z-index: 12;
-        opacity: 0;
-        pointer-events: none;
-        transition: opacity 0.45s ease, transform 0.45s ease;
-      }
-      #tutor.visible {
-        opacity: 1;
-        transform: translateX(-50%) translateY(0);
-      }
-      body:not(.playing) #tutor {
-        opacity: 0;
-      }
-      #tutor .consigne {
-        font-family: var(--font-mono);
-        font-size: calc(9.5px * var(--ui));
-        letter-spacing: 0.2em;
-        color: var(--valid);
-        display: block;
-        margin-bottom: 3px;
-      }
-      #tutor kbd {
-        font-family: var(--font-mono);
-        font-size: calc(11px * var(--ui));
-        color: var(--ink);
-        border: 1px solid var(--line-strong);
-        border-radius: 3px;
-        padding: 0 6px;
-      }
-      @media (max-width: 700px), (pointer: coarse) and (max-height: 620px) {
-        #tutor {
-          top: 122px;
-          font-size: calc(12px * var(--ui));
-        }
-      }
-
       /* ---- Overlays : tampons de protocole ---- */
       #overlay {
         position: fixed;
@@ -6454,10 +6287,6 @@
         }
         #rejeu-barre {
           bottom: calc(10px + env(safe-area-inset-bottom));
-        }
-        /* le carton du journal descend sous la bande */
-        #tableau-card {
-          top: 64px;
         }
       }
 
@@ -9472,13 +9301,6 @@
           <button type="button" class="hud-chip hud-capture" data-dev id="hud-capture" data-nom="capture pour le codex : 4 s de la scène, à envoyer à une fiche">⏺ CAPTURER</button>
         </div>
       </div>
-      <!-- relevés secondaires : encore alimentés par le jeu, plus affichés
-           (retirés à la tâche 11) -->
-      <div class="hud-restes" hidden>
-        <i id="coque-bar"><b></b></i>
-        <span id="hud-seuil"></span><span id="hud-vitesse"></span>
-        <span id="hud-state"></span><span id="hud-warp"></span>
-      </div>
     </div>
 
     <!-- LA BARRE DU REJEU (game/fantome.ts) : regarder une course sans la jouer -->
@@ -9828,8 +9650,6 @@
         </div>
       </aside>
     </div>
-
-    <div id="tutor" aria-live="polite"></div>
 
     <!-- Les records, en voile (mobile : la fiche va à l'essentiel) -->
     <div id="recs" hidden aria-label="Registres du labo">
@@ -10807,13 +10627,6 @@
     <!-- Une image de la boucle a levé une exception : la garde l'annonce ici, le jeu continue -->
     <div id="panne-boucle" role="alert" hidden></div>
     <div id="obj-arrow" aria-hidden="true"><i>➤</i><span id="obj-dist"></span></div>
-
-    <div id="tableau-card" aria-live="polite">
-      <button id="card-fermer" type="button" aria-label="Fermer le journal">✕</button>
-      <div id="card-code"></div>
-      <img id="card-fig" alt="" hidden />
-      <div id="card-log"></div>
-    </div>
 
     <!-- La CARTE D'ENTRÉE de salle (voie) : l'identité complète, en fondu,
          sans rien bloquer — elle s'efface seule -->

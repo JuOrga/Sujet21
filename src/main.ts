@@ -1701,16 +1701,11 @@ const hudCond = el('hud-cond')
 const hudCoque = el('hud-coque')
 const hudCoqueChip = el('hud-coque-chip')
 const hudVolume = el('hud-volume')
-const hudSeuil = el('hud-seuil')
-const hudVitesse = el('hud-vitesse')
-const hudState = el('hud-state')
-const hudWarp = el('hud-warp')
 const gaugeFill = el('gauge-fill')
 const gaugeThreshold = el('gauge-threshold')
 const hudPerte = el('hud-perte')
 const hudRosee = el('hud-rosee')
 const hudDanger = el('hud-danger')
-const coqueBar = el('coque-bar').firstElementChild as HTMLElement
 const objArrow = el('obj-arrow')
 const objArrowGlyph = objArrow.firstElementChild as HTMLElement
 const objDist = el('obj-dist')
@@ -1912,23 +1907,8 @@ function requireName(): boolean {
   recName.focus({ preventScroll: true })
   return true
 }
-const tableauCard = el('tableau-card')
-
-// Carton d'ouverture : l'entrée du journal de bord du tableau. Il RESTE
-// affiché tant qu'on ne l'a pas fermé à la croix — lire ne se chronomètre
-// pas (l'effacement automatique partait trop vite).
-// Le carton de journal (signé Dr N. Véga) ne s'affiche PLUS : retour
-// joueur — un popup à fermer à chaque tableau n'est pas ergonomique. Le
-// texte reste dans les tableaux (éditeur, champ journal) si on veut le
-// réutiliser autrement un jour.
-function showTableauCard(): void {
-  // volontairement vide — aucun carton ne s'affiche
-}
-document.getElementById('card-fermer')?.addEventListener('click', () => {
-  tableauCard.classList.remove('visible')
-})
-
-// Fiche d'essai : visible au chargement ; « échap » ou ≡ pour y revenir.
+// Fiche d'essai : visible au chargement ; « échap » pour y revenir
+// directement, ou l'entrée « fiche » du tiroir ≡.
 // L'essai continue de dériver derrière la fiche — elle observe, elle ne fige pas.
 const startBtn = document.getElementById('start') as HTMLButtonElement
 let hasPlayed = false
@@ -16319,7 +16299,6 @@ function restart(): void {
       idle.type = Math.random() < 0.5 ? 'toilette' : 'etire'
       idle.t0 = elapsed
     }
-    showTableauCard()
     annonceVoieCarte()
     // la cinématique d'ENTRÉE du tableau : à l'arrivée seulement — un R sur
     // place ne la rejoue pas (et MAINTENIR la saute de toute façon)
@@ -17687,131 +17666,6 @@ btnRelance.addEventListener('click', () => {
   }
   restart()
 })
-// ---- Tutoriel diégétique (tableau 1, première partie seulement) ----
-// Les consignes du protocole apparaissent au bon moment, se valident par le
-// geste qu'elles enseignent, et ne reviennent plus (localStorage). Les deux
-// dernières sont contextuelles : l'éponge à l'approche, le sas à l'arrivée.
-const TUTOR_KEY = 'projet21.tutoriel.v1'
-const tutorEl = el('tutor')
-let tutorActive = true
-try {
-  tutorActive = coffre.stockage.getItem(TUTOR_KEY) !== 'ok'
-} catch {
-  // stockage indisponible : le tutoriel s'affiche à chaque visite, sans gravité
-}
-let tutorStep = 0
-let tutorTimer = 0
-let tutorEjectHeld = 0
-let tutorShown = ''
-
-const TUTOR_TEXTS = [
-  'Maintenez le doigt (ou le pointeur) : la matière est éjectée <em>vers</em> lui — le corps part à l’opposé. Il n’y a pas de frein.',
-  'Chaque goutte éjectée est perdue. La jauge en haut est votre corps : sous le trait rouge, il ne reste qu’une impulsion. <strong>Se déplacer, c’est rétrécir.</strong>',
-  '<kbd>❄ / F</kbd> se changer en glace : l’élan se garde, re-presser dégèle. <kbd>💨 / G</kbd> vapeur : visez (le temps ralentit), relâchez — le nuage fuse, plus loin le doigt, plus fort le dash. Un tiers du volume à chaque fois. Essayez l’un des deux.',
-  'L’éponge boit ce qui s’attarde à son contact. Passez vite, payez le passage en volume — ou cherchez la vapeur.',
-  'Le sas aspire l’échantillon : laissez-vous boire. Le surplus part en bonbonne — la récompense, c’est ce qu’il vous reste.',
-]
-
-// Sonde de débogage/test : l'état du tutoriel depuis la console
-;(window as unknown as { __tutor: () => object }).__tutor = () => ({
-  active: tutorActive,
-  step: tutorStep,
-  held: tutorEjectHeld,
-  timer: tutorTimer,
-  aim: input.aimActive,
-})
-
-function tutorPersist(): void {
-  try {
-    coffre.stockage.setItem(TUTOR_KEY, 'ok')
-  } catch {
-    // sans gravité
-  }
-}
-
-function updateTutor(dtReal: number): void {
-  // Bandeaux CONSIGNE DU PROTOCOLE désactivés (même retour joueur que le
-  // carton) : l'onboarding gestuel du premier lancement suffit.
-  if (tutorShown !== '') {
-    tutorShown = ''
-    tutorEl.classList.remove('visible')
-  }
-  if (true) return
-  if (
-    !tutorActive ||
-    testLevel !== null ||
-    levelIndex !== 0 ||
-    sim.dispersed ||
-    run.ended ||
-    tutorStep >= TUTOR_TEXTS.length
-  ) {
-    if (tutorShown !== '') {
-      tutorShown = ''
-      tutorEl.classList.remove('visible')
-    }
-    return
-  }
-  const playing = document.body.classList.contains('playing') && !input.paused
-  const cardVisible = tableauCard.classList.contains('visible')
-  if (playing && input.aimActive) tutorEjectHeld += dtReal
-
-  // conditions de validation de l'étape courante
-  if (tutorStep === 0 && tutorEjectHeld > 1.2) {
-    tutorStep = 1
-    tutorTimer = 0
-  } else if (tutorStep === 2 && (input.freezeIntent || input.gasIntent)) {
-    tutorStep = 3
-    tutorTimer = 0
-    tutorPersist() // le cœur est acquis : plus de tutoriel aux prochaines visites
-  }
-
-  // texte à montrer (les étapes 3 et 4 sont contextuelles)
-  let text = ''
-  if (playing && !cardVisible) {
-    if (tutorStep <= 2) {
-      text = TUTOR_TEXTS[tutorStep]
-    } else if (tutorStep === 3) {
-      // à l'approche du mur d'éponge du tableau 1 (x = 560)
-      if (sim.stats.centroidX > 60 && sim.stats.centroidX < 560)
-        text = TUTOR_TEXTS[3]
-    } else if (tutorStep === 4) {
-      const d = Math.hypot(
-        sim.stats.centroidX - exitMouth.x,
-        sim.stats.centroidY - exitMouth.y,
-      )
-      if (d < Math.max(320, params.exitRadius * 1.6)) text = TUTOR_TEXTS[4]
-    }
-  }
-
-  // écoulement du temps sur les étapes à durée
-  if (text !== '') {
-    tutorTimer += dtReal
-    if (tutorStep === 1 && tutorTimer > 6) {
-      tutorStep = 2
-      tutorTimer = 0
-    } else if (tutorStep === 2 && tutorTimer > 22) {
-      tutorStep = 3 // on n'insiste pas : la consigne a été lue
-      tutorTimer = 0
-      tutorPersist()
-    } else if (tutorStep === 3 && tutorTimer > 7) {
-      tutorStep = 4
-      tutorTimer = 0
-    } else if (tutorStep === 4 && tutorTimer > 7) {
-      tutorStep = 5
-    }
-  }
-
-  if (text !== tutorShown) {
-    tutorShown = text
-    if (text !== '') {
-      tutorEl.innerHTML = `<span class="consigne">CONSIGNE DU PROTOCOLE</span>${text}`
-      tutorEl.classList.add('visible')
-    } else {
-      tutorEl.classList.remove('visible')
-    }
-  }
-}
-
 /** L'échappement HTML de la maison — texte ET attributs : le guillemet
  *  aussi, sinon un code de biome qui en porte un casse un `value="…"`. */
 function htmlSafe(s: string): string {
@@ -19335,7 +19189,6 @@ function corpsImage(now: number): boolean {
     )
     majEveil(dtReal) // l'éveil suit la caméra : ses repères (invite) sont à jour
   }
-  updateTutor(dtReal)
   updateTrophees(dtReal)
   majFpsCoin(dtReal)
   updateWorldLabels(vw, vh)
@@ -19539,7 +19392,6 @@ function corpsImage(now: number): boolean {
   hudCoque.textContent = `${coque > 0 ? '+' : ''}${coque}°`
   hudCoque.classList.toggle('warn', chillNow() > 0.75)
   hudCoqueChip.classList.toggle('gele', chillNow() > 0.75)
-  coqueBar.style.width = `${(chillNow() * 100).toFixed(1)}%`
   // AU HUB la réserve est infinie : afficher un litrage qui ne descend
   // jamais ferait croire à une jauge en panne.
   const bbInfinie = bonbonneIllimitee(auHub)
@@ -19600,8 +19452,6 @@ function corpsImage(now: number): boolean {
   const seuilPct =
     baseLiters > 0 ? (params.criticalVolumeLiters / baseLiters) * 100 : 0
   gaugeThreshold.style.left = `${Math.min(100, seuilPct).toFixed(1)}%`
-  hudSeuil.textContent = `${params.criticalVolumeLiters.toFixed(2)} L`
-  hudVitesse.textContent = `${speed.toFixed(0)} u/s`
 
   // Débit de perte lissé : combien coûte l'action en cours, et à quoi
   const nowLiters = sim.liters()
@@ -20017,23 +19867,7 @@ function corpsImage(now: number): boolean {
   }
   sim.iceImpact = 0
 
-  const stateText = sim.dispersed
-    ? 'DISPERSÉ'
-    : locked
-      ? `${zoneActive.toUpperCase()} — IMPOSÉE`
-      : allFrozen
-        ? 'GLACE'
-        : allGas
-          ? 'VAPEUR'
-          : 'liquide'
-  const gel = !allFrozen && frozenCount > 0 ? ' · gel partiel' : ''
-  const vape = !allGas && gasCount > 0 ? ' · vapeur partielle' : ''
-  const suffix = `${gel}${vape}${vortex.timer > 0 ? ' · vortex' : ''}${input.paused ? ' · pause' : ''}`
-  hudState.textContent = stateText + suffix
-  hudState.classList.toggle('warn', sim.dispersed)
   document.body.classList.toggle('dispersed', sim.dispersed)
-  hudWarp.textContent = `×${params.timeWarp}`
-  hudWarp.classList.toggle('warn', params.timeWarp !== 1)
   majVitesse()
 
   // Relevé vivant de la fiche d'essai

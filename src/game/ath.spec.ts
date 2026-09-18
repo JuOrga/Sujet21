@@ -144,4 +144,18 @@ describe('les panneaux de lecture', () => {
   })
 })
 
+describe('le code mort est parti', () => {
+  it.each(['id="tutor"', 'id="tableau-card"', 'hud-restes', 'id="coque-bar"'])(
+    '%s n’est plus dans la coque',
+    (trace) => {
+      expect(HTML).not.toContain(trace)
+    },
+  )
+
+  it('main.ts ne les alimente plus', () => {
+    for (const nom of ['updateTutor', 'showTableauCard', 'hudVitesse', 'coqueBar'])
+      expect(MAIN, nom).not.toContain(nom)
+  })
+})
+
 export { HTML, MAIN, CSS_ATH }
