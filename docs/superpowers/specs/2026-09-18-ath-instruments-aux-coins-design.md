@@ -83,8 +83,10 @@ BANC. Chaque entrée montre son pictogramme, son nom et sa touche **telle que
 le joueur l'a redéfinie** (`src/game/commandes.ts`).
 
 - Le tiroir **ne met pas la partie en pause** (le patron du dossier).
-- Il se ferme en choisissant une entrée, d'un toucher ailleurs, ou d'Échap /
-  `B`. Les entrées sont de vrais `<button>`, atteignables au clavier.
+- Il se ferme en choisissant une entrée, d'un toucher ailleurs, ou d'Échap
+  (qui, tiroir ouvert, ne mène pas à la fiche). Les entrées sont de vrais
+  `<button>`, atteignables au clavier. La manette n'ouvre pas le tiroir :
+  elle a déjà ses boutons.
 - Clavier et manette gardent tous leurs raccourcis : le tiroir est un
   confort de pointeur et de doigt, pas un passage obligé.
 - Le bouton du temps montre `×N` (ambre si ≠ ×1) ; un toucher le déplie en
@@ -98,7 +100,8 @@ PARAMÈTRES reçoit une ligne **ATH : DISCRET / COMPLET** (`#params-ath`, clé
 En DISCRET, après **4 s** sans geste vers elles, les commandes et les
 médaillons non courants passent à 30 % d'opacité, la capsule à 62 %. Ils
 reviennent d'un coup : pointeur à moins de 140 px d'un de ces postes, toucher
-sur l'ATH, bouton de manette, changement d'état, tiroir ouvert, alerte.
+sur l'ATH, changement d'état (clavier, doigt ou manette), tiroir ouvert,
+pause, alerte. Le stick ne réveille rien : il bouge en permanence.
 **Le module vital et le médaillon courant ne s'estompent jamais.** Sous
 `prefers-reduced-motion`, le passage est sans transition.
 
@@ -146,7 +149,7 @@ Les ids que le code et les tests cherchent **ne changent pas** : `#hud`,
 | module | rôle |
 | --- | --- |
 | `src/game/athPictos.ts` | le dictionnaire des tracés et `picto(nom)` → SVG. |
-| `src/game/athTiroir.ts` | la liste ordonnée des entrées (id, nom, picto, manœuvre de `commandes.ts`, condition d'affichage) et ce qui reste permanent selon le contexte (essai depuis l'éditeur, vortex). |
+| `src/game/athTiroir.ts` | la liste ordonnée des entrées (id, nom, picto, manœuvre de `commandes.ts`) et leur condition d'affichage (le vortex). |
 | `src/game/athRepos.ts` | l'automate du repos : `(maintenant, dernierGeste, réglage, forcé) → 'eveille' \| 'repos'`. `main.ts` ne fait que lui donner l'heure et poser `body.ath-repos`. |
 | `src/game/athZones.ts` | les zones interdites aux pancartes : à partir des rectangles mesurés des quatre postes, dit si une pancarte `(sx, sy, hw, hh)` est libre. Remplace les deux bandes. |
 
