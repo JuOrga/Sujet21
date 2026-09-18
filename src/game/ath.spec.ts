@@ -135,4 +135,13 @@ describe('le repos de l’ATH', () => {
   })
 })
 
+describe('les panneaux de lecture', () => {
+  it('ne tombent plus au centre de l’écran, sur le corps', () => {
+    const regle = /#legend,\s*#states \{[^}]*\}/.exec(HTML)?.[0] ?? ''
+    expect(regle).not.toBe('')
+    expect(regle).not.toContain('translate(-50%, -50%)')
+    expect(regle).toMatch(/right:\s*0/)
+  })
+})
+
 export { HTML, MAIN, CSS_ATH }
