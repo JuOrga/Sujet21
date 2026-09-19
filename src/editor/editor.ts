@@ -60,7 +60,7 @@ import {
 } from '../game/level'
 import { traceTrajectoire } from '../game/trajectoire'
 import { periodeCoeur } from '../game/puits'
-import { tableauCibles, tableauCouperet, tableauOrbites, tableauPalet, tableauRafales } from '../game/minijeux'
+import { tableauCibles, tableauCouperet, tableauMetronome, tableauOrbites, tableauPalet, tableauRafales } from '../game/minijeux'
 import { tableauRonde } from '../game/ronde'
 import { builtinPresets, loadStoredPresets, type Preset } from '../bench/presets'
 import { catalogueRecompenses } from '../game/recompenses'
@@ -4338,6 +4338,7 @@ export class LevelEditor {
       tableauRafales(),
       tableauOrbites(),
       tableauCibles(),
+      tableauMetronome(),
       tableauRonde(),
     ]
     selLivres.innerHTML = livres

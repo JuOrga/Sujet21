@@ -31,6 +31,18 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '19/09/2026 14:44',
+    title: 'LE MÉTRONOME : un sixième mini-jeu — pomper en cadence dans un seul puits de gravité',
+    notes: [
+      'LA DEMANDE (19/09) : « nous avons déjà fait quelques mini-jeux dont les cibles, que proposes-tu d’autre ? » — six propositions tirées de ce que le dépôt sait déjà faire (le miroir laser, le métronome, le triage des états, la brèche d’éponge, le tremplin des surchauffeurs, le funambule), le concepteur retient le métronome.',
+      'LE JEU : un seul puits (cœur 1 000 u, force 600 : période 8,1 s), le corps lancé de son centre à 116 u/s. Il oscille de part et d’autre et repasse au centre toutes les 4,05 s QUOI QU’ON FASSE — l’isochronie du cœur harmonique (puits.ts), une propriété que rien ne jouait. Pousser au passage du centre, dans le sens de la marche, gonfle l’amplitude pour le moins de gouttes (l’énergie d’une poussée vaut v · Δv : tout au centre, rien aux extrémités). Trois anneaux concentriques à atteindre (300 / 450 / 600 u), 45 s ; verdict : la part gardée (65 / 50 / 35 %), un palier de moins par anneau manqué.',
+      'CE QUE LA MESURE A IMPOSÉ (sim/metronome.spec.ts, trois joueurs sur le vrai corps) : des ÉPONGES sur les quatre parois — sans elles la cuve est un bol, chaque goutte éjectée retombait au centre à 900 u/s à travers le corps, qui perdait 41 % pour 28 % éjectés et n’avançait plus ; une ÉJECTION ACCORDÉE (2 400 u/s : à 1 400 le geste coûtait 25 % avant la moindre miette) et RALENTIE (24 gouttes/s : à 64 une poussée tenue gagnait la salle sans jamais revenir, le battement ne servait à rien) ; et LES MIETTES, comptées : ce qui n’est pas d’un seul tenant avec le corps à l’instant du recul ne le reçoit pas et reste en arrière — autant de perdu que d’éjecté. La part compte ce qui fait corps plus ce qui est en prêt dans le halo (les compter mortes à l’instant du dernier anneau mentait de 8 %).',
+      'LES NOMBRES : en cadence, le troisième anneau en 22 s, six passages, 69 % gardés ; sans arrêt, 6 s et 57 % ; rien, 100 % et aucun anneau, onze passages à 4,05 s ± 0,1. Le banc d’essai ne force plus le relabel : un relabel de plus à contretemps changeait la mesure de 8 %.',
+      'EN JEU : la fenêtre du centre (un disque allumé quand le corps y est, la consigne dit POUSSEZ), les anneaux (passé vert, prochain ambre qui bat), l’apogée en cercle fin, un cercle qui s’ouvre au centre avec un tic à chaque passage, le chrono et la part dans la consigne. Au catalogue des nœuds (tiré à la graine avec les cinq autres), au pupitre (« Jouer le métronome (essai) », __metronome()), dans l’éditeur (MJ-METRONOME parmi les modèles gravés ; une copie publiée sous ce code prime). levelIO comble les règles d’une copie ancienne avec celles du code.',
+      'VÉRIFIÉ : type-check à 0, 1 395 tests verts (quatorze neufs : la garde du point-masse — l’amplitude v/ω, le battement à la demi-période, poussé ou non —, la machine des anneaux et des passages, le verdict, la salle, l’aller-retour et le comblement de levelIO, le tirage à six, et la garde du vrai corps sur trois joueurs), build propre. Injouable ici : la sensation du tempo (4 s entre deux poussées), la lisibilité de la fenêtre et le prix ressenti des miettes sont à éprouver en main — les paliers ont de la marge pour une main moins régulière que le banc.',
+    ],
+  },
+  {
     date: '17/09/2026 23:33',
     title: 'LE TIR DE GLACE EN CARTE (« Éclateur »), et les cartes imposées par tableau',
     notes: [
