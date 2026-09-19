@@ -196,9 +196,10 @@ describe('le palet — les lancers et la maison', () => {
     expect(tireMiniJeu(() => 0)).toBe('couperet')
     expect(tireMiniJeu(() => 0.25)).toBe('palet')
     expect(tireMiniJeu(() => 0.45)).toBe('rafales')
-    expect(tireMiniJeu(() => 0.65)).toBe('orbites')
-    expect(tireMiniJeu(() => 0.99)).toBe('cibles')
-    expect(tireMiniJeu(() => 1)).toBe('cibles')
+    expect(tireMiniJeu(() => 0.55)).toBe('orbites')
+    expect(tireMiniJeu(() => 0.75)).toBe('cibles')
+    expect(tireMiniJeu(() => 0.99)).toBe('metronome')
+    expect(tireMiniJeu(() => 1)).toBe('metronome')
     const vus = new Set<string>()
     for (let i = 0; i < 40; i++) vus.add(tireMiniJeu(aleaDeGraine(`m${i}`)))
     expect([...vus].sort()).toEqual([...MINI_JEUX].sort())
@@ -402,5 +403,145 @@ describe('les cibles — des éclats de glace, des mires, trente secondes', () =
     expect(lv.boxes.every((b) => b.maxY < lv.puits![0].y - 350)).toBe(true) // rien ne barre la ronde
     expect(sansSas(lv)).toBe(true)
     expect(lv.labels.filter((l) => /^[123] · /.test(l.text))).toHaveLength(3)
+  })
+})
+
+import {
+  avanceMetronome,
+  CODE_METRONOME,
+  ETAT_METRONOME_NEUF,
+  noteMetronome,
+  pulsationMetronome,
+  REGLAGES_METRONOME,
+  REGLES_METRONOME,
+  tableauMetronome,
+  VERDICTS_METRONOME,
+} from './minijeux'
+import { accelerationPuits, periodeCoeur } from './puits'
+
+describe('le métronome — un puits, un battement, trois anneaux', () => {
+  const r = REGLES_METRONOME
+
+  /** Le point-masse dans le puits, poussé d'un Δv à chaque passage au
+   *  centre (`pousse`, u/s, dans le sens de la marche) ou jamais. */
+  function pointMasse(pousse: number, duree: number): { apogee: number; passages: number[]; e: ReturnType<typeof avanceMetronome> } {
+    const dt = 1 / 120
+    const a = (r.depart.impulsion.angle * Math.PI) / 180
+    let x = r.depart.x
+    let y = r.depart.y
+    let vx = Math.cos(a) * r.depart.impulsion.vitesse
+    let vy = Math.sin(a) * r.depart.impulsion.vitesse
+    let e = ETAT_METRONOME_NEUF
+    const passages: number[] = []
+    const acc = { ax: 0, ay: 0 }
+    for (let t = 0; t < duree && !e.fini; t += dt) {
+      acc.ax = 0
+      acc.ay = 0
+      accelerationPuits([r.puits], x, y, acc)
+      vx += acc.ax * dt
+      vy += acc.ay * dt
+      x += vx * dt
+      y += vy * dt
+      const avant = e
+      e = avanceMetronome(e, { t, x, y }, r)
+      if (e.passages > avant.passages) {
+        passages.push(t)
+        const v = Math.hypot(vx, vy)
+        vx += (vx / v) * pousse
+        vy += (vy / v) * pousse
+      }
+    }
+    return { apogee: e.apogee, passages, e }
+  }
+
+  it('LA GARDE DU POINT-MASSE : sans pousser, l’amplitude est celle du lancer (v/ω), aucun anneau, et le battement est celui du cœur — quelle que soit l’amplitude', () => {
+    const T = periodeCoeur(r.puits)
+    const omega = pulsationMetronome(r)
+    expect(omega).toBeCloseTo((2 * Math.PI) / T, 9)
+    const rien = pointMasse(0, r.dureeMax + 1)
+    expect(rien.e.anneauxPasses).toBe(0)
+    expect(rien.e.fin).toBe('temps')
+    expect(rien.apogee).toBeCloseTo(r.depart.impulsion.vitesse / omega, -1)
+    expect(rien.apogee).toBeLessThan(r.anneaux[0])
+    for (let i = 1; i < rien.passages.length; i++) expect(rien.passages[i] - rien.passages[i - 1]).toBeCloseTo(T / 2, 1)
+    // poussé de 60 u/s à chaque passage : le battement ne bouge pas, l’amplitude monte, les trois anneaux tombent
+    const pompe = pointMasse(60, r.dureeMax + 1)
+    expect(pompe.e.anneauxPasses).toBe(3)
+    expect(pompe.e.fin).toBe('anneaux')
+    for (let i = 1; i < pompe.passages.length; i++) expect(pompe.passages[i] - pompe.passages[i - 1]).toBeCloseTo(T / 2, 1)
+    // l’amplitude du dernier anneau reste dans le cœur : la marée y est compressive, le corps ne s’y déchire pas
+    expect(r.anneaux[2] + 120).toBeLessThan((r.puits.rayon ?? 0) * 0.8)
+  })
+
+  it('la machine : les anneaux se passent à la distance, dans l’ordre forcément ; un retournement dans la fenêtre est un passage, deux passages trop proches n’en font qu’un ; le dernier anneau conclut, le temps aussi', () => {
+    let e = avanceMetronome(ETAT_METRONOME_NEUF, { t: 0, x: 0, y: 0 }, r)
+    expect(e).toMatchObject({ anneauxPasses: 0, apogee: 0, passages: 0, dPrec: 0, approche: false, fini: false })
+    e = avanceMetronome(e, { t: 0.1, x: 100, y: 0 }, r) // s’éloigne
+    expect(e.approche).toBe(false)
+    e = avanceMetronome(e, { t: 0.2, x: 60, y: 0 }, r) // s’approche
+    expect(e.approche).toBe(true)
+    expect(e.passages).toBe(0)
+    e = avanceMetronome(e, { t: 0.3, x: 80, y: 0 }, r) // se retourne à 60 du centre, dans la fenêtre : un passage
+    expect(e.passages).toBe(1)
+    expect(e.dernierPassage).toBe(0.3)
+    e = avanceMetronome(e, { t: 0.4, x: 40, y: 0 }, r)
+    e = avanceMetronome(e, { t: 0.5, x: 50, y: 0 }, r) // un autre retournement, trop tôt : le même
+    expect(e.passages).toBe(1)
+    e = avanceMetronome(e, { t: 3, x: 400, y: 0 }, r)
+    e = avanceMetronome(e, { t: 3.1, x: 420, y: 0 }, r) // retournement loin du centre : pas un passage
+    expect(e.passages).toBe(1)
+    // 420 u d’un coup : les deux premiers anneaux (300, 450 non), l’apogée
+    expect(e.anneauxPasses).toBe(1)
+    expect(e.apogee).toBe(420)
+    e = avanceMetronome(e, { t: 4, x: 0, y: -460 }, r) // la distance compte, pas la direction
+    expect(e.anneauxPasses).toBe(2)
+    expect(e.fini).toBe(false)
+    const fini = avanceMetronome(e, { t: 5, x: 610, y: 0 }, r)
+    expect(fini).toMatchObject({ anneauxPasses: 3, apogee: 610, fini: true, fin: 'anneaux' })
+    expect(avanceMetronome(fini, { t: 6, x: 0, y: 0 }, r)).toBe(fini)
+    expect(avanceMetronome(e, { t: r.dureeMax, x: 0, y: 0 }, r)).toMatchObject({ anneauxPasses: 2, fini: true, fin: 'temps' })
+    // d’un seul bond au-delà du dernier : les trois d’un coup, jamais un de sauté
+    expect(avanceMetronome(ETAT_METRONOME_NEUF, { t: 1, x: 700, y: 0 }, r).anneauxPasses).toBe(3)
+  })
+
+  it('le verdict : la part gardée dit le palier, chaque anneau manqué en retire un, aucun anneau vaut rien', () => {
+    expect(noteMetronome(0.7, 3, r)).toMatchObject({ verdict: 'juste', memoire: 15 })
+    expect(noteMetronome(0.55, 3, r)).toMatchObject({ verdict: 'proche', memoire: 5 })
+    expect(noteMetronome(0.4, 3, r)).toMatchObject({ verdict: 'loin', memoire: 3 })
+    expect(noteMetronome(0.3, 3, r)).toMatchObject({ verdict: 'rate', memoire: 0 })
+    expect(noteMetronome(0.9, 2, r)).toMatchObject({ verdict: 'proche', memoire: 5 })
+    expect(noteMetronome(0.55, 2, r)).toMatchObject({ verdict: 'loin', memoire: 3 })
+    expect(noteMetronome(1, 0, r)).toMatchObject({ verdict: 'rate', memoire: 0 })
+    expect(VERDICTS_METRONOME.juste).toBe('EN CADENCE')
+  })
+
+  it('la salle : un seul puits au centre, le corps né dessus et lancé, des éponges sur les quatre parois, une éjection accordée, les anneaux croissants dans le cœur — et pas de sas', () => {
+    const lv = tableauMetronome()
+    expect(lv.code).toBe(CODE_METRONOME)
+    expect(lv.minijeu?.type).toBe('metronome')
+    expect(lv.minijeu?.reglages).toEqual(REGLAGES_METRONOME)
+    expect(estMiniJeu(lv)).toBe(true)
+    expect(estMiniJeu({ code: CODE_METRONOME })).toBe(true)
+    expect(lv.puits).toEqual([r.puits])
+    expect(lv.spawn).toMatchObject({ x: r.puits.x, y: r.puits.y, impulsion: r.depart.impulsion })
+    expect(lv.exit.minX).toBeGreaterThan(lv.bounds.maxX)
+    expect(lv.boxes).toEqual([])
+    expect(lv.sponges).toHaveLength(4)
+    // les bandes couvrent les quatre parois, sans se recouvrir
+    const [haut, bas, gauche, droite] = lv.sponges
+    expect(haut.minX).toBe(lv.bounds.minX)
+    expect(haut.minY + haut.rows * haut.cellSize).toBe(lv.bounds.maxY)
+    expect(bas.minY).toBe(lv.bounds.minY)
+    expect(gauche.minY).toBe(bas.minY + bas.rows * bas.cellSize)
+    expect(gauche.minY + gauche.rows * gauche.cellSize).toBe(haut.minY)
+    expect(droite.minX + droite.cols * droite.cellSize).toBe(lv.bounds.maxX)
+    // le corps au dernier anneau n’atteint pas les éponges
+    expect(r.anneaux[2] + 150).toBeLessThan(droite.minX)
+    expect(r.anneaux[2] + 150).toBeLessThan(haut.minY)
+    for (let i = 1; i < r.anneaux.length; i++) expect(r.anneaux[i]).toBeGreaterThan(r.anneaux[i - 1])
+    expect(r.paliers[0]).toBeGreaterThan(r.paliers[1])
+    expect(r.paliers[1]).toBeGreaterThan(r.paliers[2])
+    expect(lv.labels.filter((l) => /^[123] · /.test(l.text))).toHaveLength(3)
+    expect(lv.journal).toContain('4,1 s')
   })
 })

@@ -44,8 +44,11 @@ import {
 } from './level'
 import { IMPULSION_VITESSE_MAX, MIRE_POINTS_DEFAUT, MIRE_R_DEFAUT, PORTE_SENS_DEFAUT, PUITS_RAYON_DEFAUT, type ChasseDef, type MireDef, type PuitsDef } from './level'
 import { DEFAULT_PARAMS, type SimParams } from '../sim/params'
-import { MINI_JEUX, REGLES_CIBLES, REGLES_ORBITES, REGLES_PALET, REGLES_RAFALES, RYTHME_COUPERET, type MiniJeuDef, type MiniJeuId } from './minijeux'
+import { MINI_JEUX, REGLES_CIBLES, REGLES_METRONOME, REGLES_ORBITES, REGLES_PALET, REGLES_RAFALES, RYTHME_COUPERET, type MiniJeuDef, type MiniJeuId } from './minijeux'
 import { ARTICLES_ETAL_IDS } from './economat'
+import { cartesInconnues, litCartes, partTirEffective } from './cartesTableau'
+import { levier, type InstrumentDef } from './instruments'
+import { catalogueRecompenses } from './recompenses'
 import { ARTICLES_COMPTOIR_IDS, ROLES_ANCRE } from './hub'
 import { REPARATIONS } from './reparations'
 import { ECRANS_PUPITRE, type EcranPupitre } from './pupitres'
@@ -499,6 +502,10 @@ export function parseLevel(input: unknown): {
           | 'vapeur'
         )[])
       : undefined,
+    // les cartes imposées : des identifiants, relus tels quels — une carte
+    // inconnue ici (atelier d'un autre poste) est dite par checkLevel, pas
+    // perdue : le fichier la garde pour le poste qui la connaît
+    cartes: litCartes(o.cartes),
     raccourciVers: str(o.raccourciVers).slice(0, 16) || undefined,
     biome: str(o.biome).trim() || undefined,
     cineAvant: str(o.cineAvant).trim().slice(0, 24) || undefined,
@@ -739,7 +746,7 @@ export function parseLevel(input: unknown): {
       // les règles du code COMBLENT ce qu'une copie n'a pas (publiée avant
       // qu'un champ existe : la série des cibles) — sans quoi un champ absent
       // faisait NaN au compte (la revue du 17/09)
-      const defauts: Record<string, object | undefined> = { cibles: REGLES_CIBLES, orbites: REGLES_ORBITES, palet: REGLES_PALET, rafales: REGLES_RAFALES }
+      const defauts: Record<string, object | undefined> = { cibles: REGLES_CIBLES, orbites: REGLES_ORBITES, palet: REGLES_PALET, rafales: REGLES_RAFALES, metronome: REGLES_METRONOME }
       if (type === 'couperet') copie.rythme = { ...RYTHME_COUPERET, ...((copie.rythme as object) ?? {}) }
       else copie.regles = { ...defauts[type], ...(copie.regles as object) }
       level.minijeu = copie as unknown as MiniJeuDef
@@ -1106,6 +1113,7 @@ export function serializeLevel(level: LevelDef): string {
   if (level.ambiance) out.ambiance = level.ambiance
   if (level.etats === 'libres') out.etats = 'libres'
   if (level.exige?.length) out.exige = level.exige
+  if (level.cartes?.length) out.cartes = level.cartes
   if (level.raccourciVers) out.raccourciVers = level.raccourciVers
   if (level.biome) out.biome = level.biome
   if (level.cineAvant) out.cineAvant = level.cineAvant
@@ -1152,7 +1160,7 @@ function distanceAuTrace(
  * Garde-fous du level design, les mêmes que ceux des tableaux livrés : une
  * erreur rend le tableau injouable, un avertissement le rend douteux.
  */
-export function checkLevel(brut: LevelDef): Verdict[] {
+export function checkLevel(brut: LevelDef, catalogue: InstrumentDef[] = catalogueRecompenses()): Verdict[] {
   const v: Verdict[] = []
   // LE TABLEAU TEL QUE LE MOTEUR LE VERRA : les structures expansées en
   // parois. Le budget de blocs, le dégagement du départ et la chimie
@@ -1282,11 +1290,28 @@ export function checkLevel(brut: LevelDef): Verdict[] {
   for (const m of level.mires ?? []) {
     if (!inBounds(m.x, m.y)) v.push({ niveau: 'erreur', message: 'Une mire est hors de la cuve.' })
   }
-  // des mires sans le tir de glace : rien ne pourra jamais les toucher
-  if ((level.mires?.length ?? 0) > 0 && !(level.reglages?.glaceTir ?? 0) && !(level.minijeu?.reglages?.glaceTir ?? 0)) {
+  // LES CARTES IMPOSÉES : une carte que le catalogue ne connaît pas ne fera
+  // rien en jeu — l'éditeur le dit plutôt que de laisser croire au tableau
+  for (const id of cartesInconnues(level.cartes, catalogue)) {
+    v.push({ niveau: 'avertissement', message: `La carte imposée « ${id} » est inconnue du catalogue : elle ne fera rien.` })
+  }
+  // des mires sans le tir de glace : rien ne pourra jamais les toucher — le
+  // geste vient du preset (glaceTir) OU d'une carte imposée (l'Éclateur)
+  const tirPreset = (level.reglages?.glaceTir ?? 0) || (level.minijeu?.reglages?.glaceTir ?? 0)
+  const tirCartes = levier(level.cartes ?? [], 'glaceTir', catalogue)
+  if ((level.mires?.length ?? 0) > 0 && !tirPreset && !tirCartes) {
     v.push({
       niveau: 'avertissement',
-      message: 'Des mires sans le tir de glace (le réglage glaceTir, par le preset « Tir de glace ») : rien ne pourra les toucher.',
+      message: 'Des mires sans le tir de glace (le preset « Tir de glace », ou la carte « Éclateur » imposée) : rien ne pourra les toucher.',
+    })
+  }
+  // le preset ET une carte portent le tir : les parts s'additionnent — voulu
+  // ou non, le concepteur doit le savoir (un éclat deux fois plus gros vaut
+  // deux fois plus aux mires, et rétrécit le corps deux fois plus vite)
+  if (tirPreset && tirCartes) {
+    v.push({
+      niveau: 'avertissement',
+      message: `Le preset et une carte imposée portent tous deux le tir de glace : les parts s’additionnent (${Math.round(partTirEffective(tirPreset, tirCartes) * 100)} % du corps par éclat).`,
     })
   }
   // les règles des cibles : des paliers décroissants, une durée qui laisse jouer

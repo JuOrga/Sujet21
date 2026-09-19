@@ -28,6 +28,8 @@ export type LevierId =
   | 'visee'
   | 'froid'
   | 'rosee'
+  | 'glaceTir'
+  | 'glaceTirVitesse'
   // la collecte et la bourse
   | 'sasPortee'
   | 'priseSasGlace'
@@ -263,6 +265,40 @@ export const LEVIERS: LevierDef[] = [
     bon: 1,
     phrase: (v) =>
       `La rosée recondensée rend ${Math.round(v * 100)} points de rendement en plus.`,
+  },
+
+  // LE TIR DE GLACE, PAR LES CARTES (le concepteur, 17/09 : « le lancer de
+  // glace en tant que buff, une carte qu'on peut mettre dans la run… et
+  // attribuer n'importe quelle carte sur n'importe quel tableau »). Le
+  // réglage du banc (params.glaceTir) reste la BASE — un preset de tableau
+  // peut l'allumer — et les cartes S'AJOUTENT par-dessus, au chargement de
+  // la salle : la part de l'éclat est la somme (préset + cartes), plafonnée
+  // par cartesTableau.ts. Neutre à 0 : sans carte ni preset, rien ne part.
+  {
+    id: 'glaceTir',
+    nom: 'Tir de glace',
+    famille: 'etats',
+    mode: 'add',
+    min: 0.05,
+    max: 0.3,
+    pas: 0.05,
+    bon: 1,
+    phrase: (v) =>
+      `En glace, viser ralentit le temps et relâcher détache un éclat de ${Math.round(v * 100)} % du corps.`,
+  },
+  {
+    id: 'glaceTirVitesse',
+    nom: 'Vitesse de l’éclat',
+    famille: 'etats',
+    mode: 'mult',
+    min: 0.5,
+    max: 2,
+    pas: 0.05,
+    bon: 1,
+    phrase: (v) =>
+      v >= 1
+        ? `L’éclat de glace part ${plus(v)} % plus vite.`
+        : `L’éclat de glace part ${moins(v)} % moins vite.`,
   },
 
   // ——— la collecte et la bourse ——————————————————————————————

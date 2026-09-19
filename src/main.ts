@@ -123,14 +123,17 @@ import {
 import { CLE_MANQUES, inventairePool, litManques, noteManque, type Manque } from './game/manques'
 import {
   arriveRafales,
+  avanceMetronome,
   avanceOrbites,
   avancePalet,
   compteAuDela,
   estMiniJeu,
   CODE_CIBLES,
+  CODE_METRONOME,
   CODE_ORBITES,
   CODE_PALET,
   CODE_RAFALES,
+  ETAT_METRONOME_NEUF,
   ETAT_ORBITES_NEUF,
   ETAT_CIBLES_NEUF,
   avanceCibles,
@@ -141,21 +144,25 @@ import {
   type EtatCibles,
   ETAT_PALET_NEUF,
   meilleurLancer,
+  noteMetronome,
   noteOrbites,
   notePalet,
   noteRafales,
   noteTrait,
   phaseCouperet,
   tableauCouperet,
+  tableauMetronome,
   tableauOrbites,
   tableauPalet,
   tableauRafales,
   tireMiniJeu,
   tireTrait,
+  VERDICTS_METRONOME,
   VERDICTS_ORBITES,
   VERDICTS_PALET,
   VERDICTS_RAFALES,
   VERDICTS_TRAIT,
+  type EtatMetronome,
   type EtatOrbites,
   type EtatPalet,
   type Lancer,
@@ -227,6 +234,7 @@ import {
   retireRecompense,
 } from './game/recompenses'
 import type { InstrumentDef } from './game/instruments'
+import { cartesActives, partTirEffective } from './game/cartesTableau'
 import {
   BONBONNE_CAP,
   INSTRUMENTS,
@@ -625,8 +633,16 @@ majCondensatUI()
 // Une carte fabriquée à l'atelier répond donc exactement comme une carte
 // livrée — c'est ce qui rend l'écran des récompenses jouable, et pas
 // seulement décoratif.
+// LES CARTES DU TABLEAU EN COURS (LevelDef.cartes) : posées par createSim,
+// lues comme si le joueur les tenait, le temps de la salle — une carte déjà
+// en poche ne compte qu'une fois (cartesTableau.ts dit la règle entière).
+let cartesDuTableau: string[] = []
+/** Ce qui joue ici : les cartes de la run, puis celles que la salle impose. */
+function cartesEnJeu(): string[] {
+  return cartesActives(run.instruments, cartesDuTableau)
+}
 function lev(id: LevierId): number {
-  return levier(run.instruments, id, catalogueRecompenses())
+  return levier(cartesEnJeu(), id, catalogueRecompenses())
 }
 
 // La fiche d'une carte, LIVRÉE OU FABRIQUÉE. Passer par ici plutôt que par
@@ -811,6 +827,26 @@ function createSim(level: LevelDef): FluidSim {
       if (!(k in reglagesRendus)) reglagesRendus[k] = params[k]
       params[k] = src[k] as never
     }
+  }
+  // LES CARTES IMPOSÉES par le tableau jouent dès maintenant : tout lev()
+  // ci-dessous les voit. Puis LE TIR DE GLACE se compose : le preset a fixé
+  // la base (params.glaceTir, souvent 0), les cartes s'ajoutent par-dessus
+  // (l'Éclateur), la vitesse se multiplie — recouverts comme un réglage du
+  // tableau, donc rendus à la salle suivante, et lus par le solveur, la
+  // visée et le HUD au même endroit (params) : une seule vérité du geste.
+  cartesDuTableau = level.cartes ?? []
+  // seulement si une carte contribue : sans carte, le banc n'est JAMAIS
+  // réécrit — la revue du 18/09 : le plafond de partTirEffective rognait en
+  // silence un banc réglé au-delà (le concepteur qui teste 0,6 lisait 0,5)
+  const bonusTir = lev('glaceTir')
+  if (bonusTir > 0) {
+    if (!('glaceTir' in reglagesRendus)) reglagesRendus.glaceTir = params.glaceTir
+    params.glaceTir = partTirEffective(params.glaceTir, bonusTir)
+  }
+  const vitesseTir = lev('glaceTirVitesse')
+  if (vitesseTir !== 1) {
+    if (!('glaceTirVitesse' in reglagesRendus)) reglagesRendus.glaceTirVitesse = params.glaceTirVitesse
+    params.glaceTirVitesse = params.glaceTirVitesse * vitesseTir
   }
   const sim = new FluidSim(params, level.bounds, CAPACITY)
   appliqueMoteur(sim)
@@ -1055,6 +1091,9 @@ let paletLancersVus = 0
 // de l'entrée de caméra, que la physique traverse immobile
 let orbitesEtat: EtatOrbites = ETAT_ORBITES_NEUF
 let orbitesT0 = 0
+// LE MÉTRONOME en cours : les anneaux atteints, l'apogée et les passages au
+// centre (avanceMetronome, pur) — son horloge est celle du lancer (orbitesT0)
+let metronomeEtat: EtatMetronome = ETAT_METRONOME_NEUF
 // LES CIBLES en cours : les points et les touches (avanceCibles, pur), et
 // les dernières touches pour l'éclair du dessin (où, quand, combien)
 let ciblesEtat: EtatCibles = ETAT_CIBLES_NEUF
@@ -7167,7 +7206,7 @@ function renderDescente(): void {
     ),
     dscCran(
       'MINI-JEUX PAR MODULE',
-      'le couperet, le palet, les rafales ou les orbites, tirés à la graine : la précision paie en mémoire — 0 : aucun',
+      'le couperet, le palet, les rafales, les orbites, les cibles ou le métronome, tirés à la graine : la précision paie en mémoire — 0 : aucun',
       () => voiePlan.minijeuxParModule,
       (v) => {
         voiePlan.minijeuxParModule = v
@@ -8800,6 +8839,81 @@ function drawMecanismes(vw: number, vh: number, dpr: number): void {
         : orbitesEtat.anneauxPasses < r.anneaux.length
           ? `ANNEAU ${orbitesEtat.anneauxPasses + 1} / ${r.anneaux.length} — IL VOUS RESTE ${part} %`
           : `AU CROISSANT — IL VOUS RESTE ${part} %`
+    g.fillText(consigne, anc.sx, anc.sy)
+    g.restore()
+  }
+
+  // LE MÉTRONOME : la fenêtre du centre (un disque, allumé quand le corps y
+  // est — pousser y paie), les trois anneaux concentriques (passé : vert ;
+  // le prochain : ambre qui bat ; les autres : gris), l'apogée (un cercle
+  // fin, la plus grande distance atteinte), le battement (un cercle qui
+  // s'ouvre au centre à chaque passage), et la consigne du moment
+  if (level.minijeu?.type === 'metronome') {
+    const r = level.minijeu.regles
+    const c = S(r.puits.x, r.puits.y)
+    const tJeu = run.tableauTime - orbitesT0
+    const dCorps = Math.hypot(sim.stats.centroidX - r.puits.x, sim.stats.centroidY - r.puits.y)
+    const enJeu = !impulsionEnAttente && !minijeuResultat
+    const dedans = enJeu && dCorps <= r.fenetre
+    g.save()
+    g.beginPath()
+    g.arc(c.sx, c.sy, r.fenetre * z, 0, Math.PI * 2)
+    g.fillStyle = dedans ? `rgba(255,200,120,${(0.22 + 0.08 * Math.sin(elapsed * 12)).toFixed(3)})` : 'rgba(255,200,120,0.07)'
+    g.fill()
+    g.strokeStyle = dedans ? 'rgba(255,220,150,0.95)' : 'rgba(255,200,120,0.35)'
+    g.lineWidth = dedans ? 3 : 1.5
+    g.setLineDash([6, 8])
+    g.stroke()
+    g.setLineDash([])
+    r.anneaux.forEach((an, i) => {
+      const passe = i < metronomeEtat.anneauxPasses
+      const prochain = i === metronomeEtat.anneauxPasses && !minijeuResultat
+      const bat = prochain ? 0.7 + 0.3 * Math.sin(elapsed * 4) : 1
+      g.beginPath()
+      g.arc(c.sx, c.sy, an * z, 0, Math.PI * 2)
+      g.strokeStyle = passe ? 'rgba(140,255,190,0.9)' : prochain ? `rgba(255,200,120,${(0.95 * bat).toFixed(3)})` : 'rgba(200,210,230,0.4)'
+      g.lineWidth = prochain ? 3 : 2
+      g.stroke()
+      g.fillStyle = g.strokeStyle
+      g.font = `600 ${Math.max(11, Math.min(24, 70 * z))}px ui-monospace, monospace`
+      g.textAlign = 'center'
+      g.fillText(String(i + 1), c.sx, c.sy - an * z - 8)
+    })
+    if (metronomeEtat.apogee > 0) {
+      g.beginPath()
+      g.arc(c.sx, c.sy, metronomeEtat.apogee * z, 0, Math.PI * 2)
+      g.strokeStyle = 'rgba(255,255,255,0.35)'
+      g.setLineDash([3, 9])
+      g.lineWidth = 1
+      g.stroke()
+      g.setLineDash([])
+    }
+    const depuisBattement = tJeu - metronomeEtat.dernierPassage
+    if (enJeu && depuisBattement >= 0 && depuisBattement < 0.6) {
+      const k = depuisBattement / 0.6
+      g.beginPath()
+      g.arc(c.sx, c.sy, (r.fenetre + 260 * k) * z, 0, Math.PI * 2)
+      g.strokeStyle = `rgba(255,240,200,${(0.9 * (1 - k)).toFixed(3)})`
+      g.lineWidth = 5 * (1 - k) + 1
+      g.stroke()
+    }
+    const t = Math.max(12, Math.min(28, 90 * z))
+    const anc = S(r.puits.x, r.puits.y + 700)
+    g.textAlign = 'center'
+    g.font = `600 ${Math.round(t * 0.85)}px ui-monospace, monospace`
+    g.fillStyle = dedans ? 'rgba(255,220,150,0.98)' : 'rgba(255,255,255,0.92)'
+    // ce qui fait corps ET ce qui est en prêt dans le halo : une poussée
+    // laisse des miettes derrière soi que le rappel ramène — les compter
+    // mortes ferait ciller la jauge à chaque battement
+    const part = sim.baseVolume > 0 ? Math.round((100 * (sim.playerCount + sim.enPretCount)) / sim.baseVolume) : 0
+    const reste = Math.max(0, Math.ceil(r.dureeMax - tJeu))
+    const consigne = minijeuResultat
+      ? 'FINI'
+      : impulsionEnAttente
+        ? 'LE LANCER ATTEND LA FIN DU PLAN LARGE'
+        : dedans
+          ? `POUSSEZ — ANNEAU ${metronomeEtat.anneauxPasses + 1} / ${r.anneaux.length} — ${reste} s — IL VOUS RESTE ${part} %`
+          : `ANNEAU ${metronomeEtat.anneauxPasses + 1} / ${r.anneaux.length} — ${reste} s — IL VOUS RESTE ${part} %`
     g.fillText(consigne, anc.sx, anc.sy)
     g.restore()
   }
@@ -11564,20 +11678,24 @@ function majInstrumentsUI(): void {
   const defs = run.instruments
     .map((id) => carteDef(id))
     .filter((d): d is NonNullable<typeof d> => d !== null)
+  // les cartes que LA SALLE impose (et que le joueur n'a pas déjà) : elles
+  // jouent, elles se voient — marquées, car elles partent avec la salle
+  const imposees = cartesDuTableau
+    .filter((id) => !run.instruments.includes(id))
+    .map((id) => carteDef(id))
+    .filter((d): d is NonNullable<typeof d> => d !== null)
   hudInstr.textContent =
-    defs.length > 0 ? defs.map((d) => d.icone).join('') : '—'
+    defs.length + imposees.length > 0 ? [...defs, ...imposees].map((d) => d.icone).join('') : '—'
   if (instrPanel) {
+    const ligne = (d: InstrumentDef, note = ''): string =>
+      `<div class="ip-row"><span class="ip-ico">${d.icone}</span><div><b>${d.nom}</b>${note}<small>${d.desc}</small></div></div>`
     instrPanel.innerHTML =
       `<h4>INSTRUMENTS EMBARQUÉS</h4>` +
-      (defs.length === 0
+      (defs.length === 0 && imposees.length === 0
         ? `<p class="ip-vide">Aucun pour l'instant — les paliers de maîtrise (XP) ouvrent les tirages.</p>`
-        : defs
-            .map(
-              (d) =>
-                `<div class="ip-row"><span class="ip-ico">${d.icone}</span><div><b>${d.nom}</b><small>${d.desc}</small></div></div>`,
-            )
-            .join('')) +
-      `<p class="ip-note">valables jusqu'à la fin de la run</p>`
+        : defs.map((d) => ligne(d)).join('') +
+          imposees.map((d) => ligne(d, ` <em>· imposée par la salle</em>`)).join('')) +
+      `<p class="ip-note">valables jusqu'à la fin de la run${imposees.length > 0 ? ' — les imposées, le temps de la salle' : ''}</p>`
   }
 }
 hudInstrChip?.addEventListener('click', () => {
@@ -12979,6 +13097,12 @@ function lanceManoeuvre(quoi: string): void {
         closeHome()
         break
       }
+      case 'metronome': {
+        lanceMetronomeEssai()
+        pupitreEl.hidden = true
+        closeHome()
+        break
+      }
       case 'ronde': {
         lanceRondeEssai()
         pupitreEl.hidden = true
@@ -13357,6 +13481,33 @@ function majOrbites(): void {
   }
 }
 
+/** LE MÉTRONOME, à l'image : la distance du centre du corps au puits passe
+ *  les anneaux, tient l'apogée et lit les passages au centre (un tic) ; le
+ *  dernier anneau conclut, le temps aussi ; le verdict tient à la part du
+ *  volume gardée, un palier de moins par anneau manqué. */
+function majMetronome(): void {
+  const mj = level.minijeu
+  if (!mj || mj.type !== 'metronome' || minijeuResultat || impulsionEnAttente) return
+  const t = run.tableauTime - orbitesT0
+  const avant = metronomeEtat
+  metronomeEtat = avanceMetronome(metronomeEtat, { t, x: sim.stats.centroidX, y: sim.stats.centroidY }, mj.regles)
+  if (metronomeEtat.passages > avant.passages) audio.tic()
+  if (!metronomeEtat.fini) return
+  const part = sim.baseVolume > 0 ? (sim.playerCount + sim.enPretCount) / sim.baseVolume : 0
+  const note = noteMetronome(part, metronomeEtat.anneauxPasses, mj.regles)
+  const n = metronomeEtat.anneauxPasses
+  const b = metronomeEtat.passages
+  minijeuResultat = {
+    note,
+    mesure: part,
+    titre: `LE MÉTRONOME — ${VERDICTS_METRONOME[note.verdict]}`,
+    detail:
+      metronomeEtat.fin === 'anneaux'
+        ? `${n} anneau${n > 1 ? 'x' : ''} sur ${mj.regles.anneaux.length} en ${b} battement${b > 1 ? 's' : ''}, ${Math.round(part * 100)} % gardés, en ${t.toFixed(1).replace('.', ',')} s`
+        : `${n} anneau${n > 1 ? 'x' : ''} sur ${mj.regles.anneaux.length} en ${b} battement${b > 1 ? 's' : ''}, ${Math.round(part * 100)} % gardés, le temps écoulé (${mj.regles.dureeMax} s)`,
+  }
+}
+
 /** LES CIBLES, à l'image : les éclats libres qui touchent une mire sont
  *  comptés et retirés (touchesMires), les points vont à la taille, le chrono
  *  part du lancer et conclut. */
@@ -13620,6 +13771,7 @@ function resetLasers(): void {
   paletLancersVus = 0
   orbitesEtat = ETAT_ORBITES_NEUF
   orbitesT0 = 0
+  metronomeEtat = ETAT_METRONOME_NEUF
   ciblesEtat = ETAT_CIBLES_NEUF
   ciblesEclairs = []
   ciblesJauge = 0
@@ -15620,6 +15772,7 @@ function ouvreNoeud(nature: Exclude<NatureNoeud, 'salle'>): void {
       else if (quel === 'rafales') minijeuIntercalaire = salleMiniJeu(CODE_RAFALES, tableauRafales)
       else if (quel === 'orbites') minijeuIntercalaire = salleMiniJeu(CODE_ORBITES, tableauOrbites)
       else if (quel === 'cibles') minijeuIntercalaire = salleMiniJeu(CODE_CIBLES, tableauCibles)
+      else if (quel === 'metronome') minijeuIntercalaire = salleMiniJeu(CODE_METRONOME, tableauMetronome)
       else {
         const volumeL = volumeDepart(tableauCouperet(1)) * params.litersPerParticle
         minijeuIntercalaire = tableauCouperet(tireTrait(volumeL, alea))
@@ -15656,7 +15809,7 @@ function mbMontreResultatMiniJeu(r: NonNullable<typeof minijeuResultat>, suite: 
   btn.className = 'mb-carte mb-repos'
   btn.style.gridColumn = '2'
   btn.innerHTML =
-    `<i class="mb-repos-icone">${level.minijeu?.type === 'palet' ? '🥌' : level.minijeu?.type === 'rafales' ? '🌬️' : level.minijeu?.type === 'orbites' ? '🪐' : level.minijeu?.type === 'cibles' ? '🎯' : '🔪'}</i><b>${r.titre.split(' — ')[1] ?? ''}</b>` +
+    `<i class="mb-repos-icone">${level.minijeu?.type === 'palet' ? '🥌' : level.minijeu?.type === 'rafales' ? '🌬️' : level.minijeu?.type === 'orbites' ? '🪐' : level.minijeu?.type === 'cibles' ? '🎯' : level.minijeu?.type === 'metronome' ? '🎼' : '🔪'}</i><b>${r.titre.split(' — ')[1] ?? ''}</b>` +
     `<small>${res.memoire > 0 ? `+${res.memoire} mémoire` : 'rien — le trait est loin'} · continuer</small>`
   let elu = false
   btn.addEventListener('click', () => {
@@ -16399,6 +16552,16 @@ function lanceOrbitesEssai(): void {
   restart()
 }
 ;(window as unknown as { __orbites: () => void }).__orbites = lanceOrbitesEssai
+// JOUER LE MÉTRONOME EN ESSAI (le pupitre, et la sonde __metronome())
+function lanceMetronomeEssai(): void {
+  if (miseEnBonbonne) fermeMiseEnBonbonne()
+  auHub = false
+  hasPlayed = true
+  document.body.classList.add('playing')
+  testLevel = salleMiniJeu(CODE_METRONOME, tableauMetronome)
+  restart()
+}
+;(window as unknown as { __metronome: () => void }).__metronome = lanceMetronomeEssai
 
 // JOUER LES CIBLES EN ESSAI (le pupitre, et la sonde __cibles())
 function lanceCiblesEssai(): void {
@@ -18835,7 +18998,7 @@ function corpsImage(now: number): boolean {
       effaceRun()
       newExpedition(true)
     })
-  } else if (!tableauDone && !sim.dispersed && estMiniJeu(level) && level.minijeu && (majPalet(), majRafales(), majOrbites(), majCibles(), minijeuResultat)) {
+  } else if (!tableauDone && !sim.dispersed && estMiniJeu(level) && level.minijeu && (majPalet(), majRafales(), majOrbites(), majCibles(), majMetronome(), minijeuResultat)) {
     // LE MINI-JEU A CONCLU : la lame du couperet a pesé, le palet a fait
     // ses lancers (ou le joueur a conclu). Rien ne se consigne aux registres
     // (pas un tableau du protocole), la mémoire se gagne au barème, la
@@ -19447,7 +19610,7 @@ function corpsImage(now: number): boolean {
     bonbonneEl.classList.remove('presente')
   }
   if (hudInstrChip) {
-    hudInstrChip.hidden = !!testLevel || auHub || run.instruments.length === 0
+    hudInstrChip.hidden = !!testLevel || auHub || cartesEnJeu().length === 0
     if (hudInstrChip.hidden && instrPanel) instrPanel.hidden = true
   }
   // La vie compte la matière VIVANTE : le corps plus les gouttes marquées
