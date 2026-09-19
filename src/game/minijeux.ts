@@ -39,9 +39,10 @@
 // toucher au banc.
 import { MAT_HYDROPHILE, MAT_HYDROPHOBE, MAT_WALL, type ImpulsionDef, type LevelDef, type MireDef, type ObstacleBox, type PorteDef, type PuitsDef } from './level'
 import { FORME_ARC } from './formes'
+import { periodeCoeur } from './puits'
 import type { SimParams } from '../sim/params'
 
-export type MiniJeuId = 'couperet' | 'palet' | 'rafales' | 'orbites' | 'cibles'
+export type MiniJeuId = 'couperet' | 'palet' | 'rafales' | 'orbites' | 'cibles' | 'metronome'
 
 /** LE COUPERET : ce que porte son tableau. */
 export interface CouperetDef {
@@ -63,16 +64,17 @@ export interface PaletDef {
 }
 
 /** Ce que porte un tableau de mini-jeu (LevelDef.minijeu). */
-export type MiniJeuDef = CouperetDef | PaletDef | RafalesDef | OrbitesDef | CiblesDef
+export type MiniJeuDef = CouperetDef | PaletDef | RafalesDef | OrbitesDef | CiblesDef | MetronomeDef
 
 export const CODE_COUPERET = 'MJ-COUPERET'
 export const CODE_PALET = 'MJ-PALET'
 export const CODE_RAFALES = 'MJ-RAFALES'
 export const CODE_ORBITES = 'MJ-ORBITES'
 export const CODE_CIBLES = 'MJ-CIBLES'
+export const CODE_METRONOME = 'MJ-METRONOME'
 
 /** LE CATALOGUE : les mini-jeux qu'un nœud de la mini-carte peut servir. */
-export const MINI_JEUX: readonly MiniJeuId[] = ['couperet', 'palet', 'rafales', 'orbites', 'cibles']
+export const MINI_JEUX: readonly MiniJeuId[] = ['couperet', 'palet', 'rafales', 'orbites', 'cibles', 'metronome']
 
 /** LE TIRAGE du mini-jeu d'un nœud : au hasard du catalogue, à la graine. */
 export function tireMiniJeu(alea: () => number): MiniJeuId {
@@ -80,11 +82,19 @@ export function tireMiniJeu(alea: () => number): MiniJeuId {
   return MINI_JEUX[i]
 }
 
-export const NOMS_MINI_JEU: Record<MiniJeuId, string> = { couperet: 'LE COUPERET', palet: 'LE PALET', rafales: 'LES RAFALES', orbites: 'LES ORBITES', cibles: 'LES CIBLES' }
+export const NOMS_MINI_JEU: Record<MiniJeuId, string> = { couperet: 'LE COUPERET', palet: 'LE PALET', rafales: 'LES RAFALES', orbites: 'LES ORBITES', cibles: 'LES CIBLES', metronome: 'LE MÉTRONOME' }
 
 /** Ce tableau est-il un mini-jeu ? (il n'a pas de sas : il mesure) */
 export function estMiniJeu(level: { code: string; minijeu?: MiniJeuDef }): boolean {
-  return !!level.minijeu || level.code === CODE_COUPERET || level.code === CODE_PALET || level.code === CODE_RAFALES || level.code === CODE_ORBITES || level.code === CODE_CIBLES
+  return (
+    !!level.minijeu ||
+    level.code === CODE_COUPERET ||
+    level.code === CODE_PALET ||
+    level.code === CODE_RAFALES ||
+    level.code === CODE_ORBITES ||
+    level.code === CODE_CIBLES ||
+    level.code === CODE_METRONOME
+  )
 }
 
 /** LE TRAIT : une part du volume de départ, entre 35 et 70 %, arrondie au
@@ -841,5 +851,223 @@ export function tableauCibles(regles: ReglesCibles = REGLES_CIBLES, mires: MireD
     // le mécanisme de l'éditeur — le menu « Physique » montre « ⚙ Tir de glace »
     reglages: REGLAGES_CIBLES,
     minijeu: { type: 'cibles', regles },
+  }
+}
+
+// ---- LE MÉTRONOME ----------------------------------------------------------------
+//
+// LE MÉTRONOME (la proposition du 19/09, retenue par le concepteur). Un seul
+// puits, et une propriété du solveur que rien ne jouait encore : dans le
+// cœur harmonique, LA PÉRIODE NE DÉPEND PAS DE L'AMPLITUDE (puits.ts,
+// l'isochronie). Le corps est lancé du centre à petite vitesse : il
+// oscille de part et d'autre du puits, comme une balançoire — et repasse
+// au centre toutes les demi-périodes, quoi qu'on fasse. C'est le battement.
+// Le jeu : POMPER. Une éjection ajoute au corps une vitesse Δv ; l'énergie
+// qu'elle lui donne vaut v · Δv — tout au centre, où v est la plus grande,
+// rien aux extrémités, où le corps s'arrête. Pousser en cadence, au passage
+// du centre et dans le sens de la marche, gonfle l'amplitude pour le moins
+// de gouttes ; pousser n'importe quand gonfle aussi, mais dépense sans
+// compter. Trois anneaux concentriques à atteindre — l'amplitude qu'il
+// faut. Ce qui compte : la part du corps gardée (les gouttes sont le seul
+// prix), un palier de moins par anneau manqué. Les anneaux se passent
+// forcément dans l'ordre : l'amplitude est une distance, elle grandit ou
+// non. Le corps reste liquide et pilotable : c'est lui le sujet.
+//
+// LE COÛT DU GESTE, compté (le cahier du niveau : « une éjection de 10 % du
+// corps à 1 400 u/s donne ≈ 140 u/s ») : gagner Δv coûte Δv / ejectSpeed du
+// corps, au mieux. Du lancer (150 u d'amplitude) au troisième anneau (600 u)
+// il faut 450 · ω ≈ 350 u/s : 25 % du corps à 1 400 u/s, un prix qui laisse
+// le meilleur joueur sous 75 % avant même une goutte perdue — le barème ne
+// saurait tenir. Comme le palet, la salle accorde donc son éjection
+// (REGLAGES_METRONOME, 2 400 u/s : 15 % au mieux) — et la RALENTIT (24
+// gouttes par seconde, contre 32) : à 64, la salle se gagnait d'une seule
+// poussée tenue depuis le centre, sans jamais avoir à revenir — le battement
+// ne servait à rien. Lente, la poussée ne suffit pas en un passage : il faut
+// repasser, et c'est là que la cadence se paie ou se gagne (mesuré,
+// sim/metronome.spec.ts).
+
+export interface ReglesMetronome {
+  puits: PuitsDef
+  /** le corps naît au centre du puits, lancé — la première poussée est donnée */
+  depart: { x: number; y: number; impulsion: ImpulsionDef }
+  /** les anneaux : des DISTANCES au centre à atteindre, croissantes */
+  anneaux: number[]
+  /** la fenêtre du centre (u) : là où pousser paie — et où un passage se lit */
+  fenetre: number
+  /** deux passages au centre ne se lisent pas à moins de ce délai (s) : le
+   *  centre d'un corps liquide tremble, une lecture au pas de l'image le verrait deux fois */
+  passageDelai: number
+  dureeMax: number
+  /** la part du volume gardée : ≥ p0 en cadence, ≥ p1 à contretemps, ≥ p2 essoufflé */
+  paliers: [number, number, number]
+}
+
+export interface MetronomeDef {
+  type: 'metronome'
+  regles: ReglesMetronome
+  reglages?: Partial<SimParams>
+}
+
+export interface EtatMetronome {
+  anneauxPasses: number
+  /** la plus grande distance au centre atteinte : l'amplitude, lue sur le corps */
+  apogee: number
+  /** les passages au centre — le battement —, et l'instant du dernier (−∞ : aucun) */
+  passages: number
+  dernierPassage: number
+  /** la distance au centre à l'observation précédente (−1 : aucune), et si le
+   *  corps s'en approchait : un retournement près du centre est un passage */
+  dPrec: number
+  approche: boolean
+  fini: boolean
+  fin: 'anneaux' | 'temps' | null
+}
+
+export const ETAT_METRONOME_NEUF: EtatMetronome = {
+  anneauxPasses: 0,
+  apogee: 0,
+  passages: 0,
+  dernierPassage: -Infinity,
+  dPrec: -1,
+  approche: false,
+  fini: false,
+  fin: null,
+}
+
+export interface ObservationMetronome {
+  t: number
+  x: number
+  y: number
+}
+
+/** LE MÉTRONOME AVANCE d'une observation : la distance du centre du corps au
+ *  puits fait tout — elle passe les anneaux (dans l'ordre, forcément), tient
+ *  l'apogée, et son retournement dans la fenêtre du centre marque un
+ *  passage. Le dernier anneau conclut ; le temps aussi. Pur. */
+export function avanceMetronome(e: EtatMetronome, o: ObservationMetronome, r: ReglesMetronome): EtatMetronome {
+  if (e.fini) return e
+  const d = Math.hypot(o.x - r.puits.x, o.y - r.puits.y)
+  let anneauxPasses = e.anneauxPasses
+  while (anneauxPasses < r.anneaux.length && d >= r.anneaux[anneauxPasses]) anneauxPasses++
+  const apogee = Math.max(e.apogee, d)
+  // le passage : le corps s'approchait, il s'éloigne — au plus près du centre
+  let passages = e.passages
+  let dernierPassage = e.dernierPassage
+  const retourne = e.dPrec >= 0 && e.approche && d > e.dPrec
+  if (retourne && e.dPrec <= r.fenetre && o.t - e.dernierPassage >= r.passageDelai) {
+    passages++
+    dernierPassage = o.t
+  }
+  const approche = e.dPrec >= 0 ? d < e.dPrec : false
+  const fin: EtatMetronome['fin'] = anneauxPasses >= r.anneaux.length ? 'anneaux' : o.t >= r.dureeMax ? 'temps' : null
+  return { anneauxPasses, apogee, passages, dernierPassage, dPrec: d, approche, fini: fin !== null, fin }
+}
+
+/** LE VERDICT DU MÉTRONOME : la part gardée dit le palier, chaque anneau
+ *  manqué en retire un — aucun anneau, rien. */
+export function noteMetronome(partGardee: number, anneauxPasses: number, r: ReglesMetronome, bareme: BaremeTrait = BAREME_TRAIT): NoteTrait {
+  const ordre: NoteTrait['verdict'][] = ['juste', 'proche', 'loin', 'rate']
+  let rang = partGardee >= r.paliers[0] ? 0 : partGardee >= r.paliers[1] ? 1 : partGardee >= r.paliers[2] ? 2 : 3
+  rang = Math.min(3, rang + (r.anneaux.length - anneauxPasses))
+  const verdict = ordre[rang]
+  const facteur = verdict === 'juste' ? bareme.juste : verdict === 'proche' ? bareme.proche : verdict === 'loin' ? bareme.loin : 0
+  return { ecart: partGardee, verdict, memoire: Math.round(bareme.base * facteur) }
+}
+
+export const VERDICTS_METRONOME: Record<NoteTrait['verdict'], string> = {
+  juste: 'EN CADENCE',
+  proche: 'À CONTRETEMPS',
+  loin: 'ESSOUFFLÉ',
+  rate: 'À L’ARRÊT',
+}
+
+/** LA PULSATION du puits (rad/s) : 2π / la période du cœur — l'amplitude A
+ *  se lit dans la vitesse au centre, v = A · ω, et réciproquement. */
+export function pulsationMetronome(r: ReglesMetronome): number {
+  return (2 * Math.PI) / periodeCoeur(r.puits)
+}
+
+/** LES RÉGLAGES DU MÉTRONOME : une éjection plus franche et plus lente
+ *  (voir l'en-tête : à 1 400 u/s le meilleur joueur resterait sous 75 % ;
+ *  à 64 gouttes par seconde, une poussée tenue suffisait, sans cadence). */
+export const REGLAGES_METRONOME: Partial<SimParams> = {
+  ejectSpeed: 2400,
+  ejectRate: 24,
+}
+
+// LE PUITS DU MÉTRONOME : un cœur de 1 000 u qui couvre toute la salle — le
+// corps ne quitte jamais l'harmonique, là où la marée est compressive et
+// la période fixe (level.ts : « les orbites vivent dans le cœur »). Force
+// 600 : T = 2π·√(1000/600) = 8,1 s, un passage au centre toutes les 4,05 s —
+// le tempo d'un geste qu'on prépare (mesuré sur le vrai corps : 4,05 s à
+// 200 u d'amplitude, au centième). Au troisième anneau (600 u) le corps
+// passe le centre à 600 · ω ≈ 465 u/s, loin sous le plafond du solveur.
+// Le lancer : 116 u/s, l'amplitude de 150 u — la première poussée, sans
+// quoi le corps resterait posé au centre, où rien ne l'attire nulle part.
+// LA FENÊTRE (160 u, une fois et demie le rayon du corps) : dedans, la
+// vitesse vaut plus de 85 % de son maximum dès le premier anneau — pousser
+// y rend presque tout ; dehors, de moins en moins, rien aux extrémités.
+export const REGLES_METRONOME: ReglesMetronome = {
+  puits: { x: 0, y: 0, force: 600, rayon: 1000 },
+  depart: { x: 0, y: 0, impulsion: { angle: 0, vitesse: 116 } },
+  anneaux: [300, 450, 600],
+  fenetre: 160,
+  passageDelai: 1.5,
+  dureeMax: 45,
+  // MESURÉ le 19/09 (sim/metronome.spec.ts, le vrai corps, ce qui fait
+  // corps plus ce qui est en prêt dans le halo) : celui qui pousse dans la
+  // fenêtre du centre, dans le sens de la marche, atteint le troisième
+  // anneau en 22 s (six passages) et garde 69 % — 16 % éjectés, et autant de
+  // MIETTES : à chaque poussée, ce qui n'est pas d'un seul tenant avec le
+  // corps à l'instant du recul ne le reçoit pas, reste en arrière et
+  // oscille à part, hors du halo. Celui qui pousse sans arrêt y est en 6 s
+  // et garde 57 %. Les paliers se posent entre les deux, avec de la marge
+  // pour une main moins régulière que le banc.
+  paliers: [0.65, 0.5, 0.35],
+}
+
+/** La salle du métronome : une cuve autour d'un seul puits, le corps né au
+ *  centre et lancé, et DES ÉPONGES SUR LES QUATRE PAROIS. Mesuré le 19/09
+ *  sans elles : la cuve est un bol — chaque goutte éjectée montait jusqu'à
+ *  la paroi, s'y arrêtait, puis RETOMBAIT vers le centre à 900 u/s au
+ *  travers du corps, à chaque battement ; le corps en cadence perdait 41 %
+ *  pour 28 % éjectés, et l'amplitude stagnait trois passages de suite (les
+ *  gouttes rappelées lui rendaient leur élan à rebours). Les éponges boivent
+ *  ce qui atteint la paroi : une goutte partie est partie, et le prix du
+ *  geste est exactement ce qu'on éjecte. Le corps, lui, n'y arrive jamais
+ *  (600 u au dernier anneau, la paroi à 1 150). */
+export function tableauMetronome(regles: ReglesMetronome = REGLES_METRONOME): LevelDef {
+  const b = { minX: -1150, minY: -850, maxX: 1150, maxY: 850 }
+  const T = periodeCoeur(regles.puits)
+  const cellule = 25
+  const eponge = (minX: number, minY: number, cols: number, rows: number) => ({ minX, minY, cols, rows, cellSize: cellule, capacityPerCell: 6 })
+  const colsLarge = Math.round((b.maxX - b.minX) / cellule) // 92 : toute la largeur
+  const rowsHaut = Math.round((b.maxY - b.minY) / cellule) - 4 // 64 : entre les deux bandes
+  return {
+    name: 'Le métronome',
+    code: CODE_METRONOME,
+    journal:
+      `Un seul puits de gravité, et vous êtes lancé de son centre : vous oscillez de part et d'autre, et vous repassez au centre toutes les ${(T / 2).toFixed(1).replace('.', ',')} s — quoi que vous fassiez. ` +
+      `Poussez au passage du centre, dans le sens de la marche : chaque poussée en cadence vous porte plus loin, pour le moins de gouttes. Pousser ailleurs porte aussi, mais coûte. ` +
+      `Atteignez les trois anneaux. Intact au dernier, la mémoire triple ; chaque anneau manqué retire un palier.`,
+    par: 4,
+    bounds: b,
+    spawn: { x: regles.depart.x, y: regles.depart.y, n: 900, impulsion: regles.depart.impulsion },
+    exit: { minX: 1300, minY: -60, maxX: 1360, maxY: 60 },
+    boxes: [],
+    puits: [regles.puits],
+    sponges: [
+      eponge(b.minX, b.maxY - 2 * cellule, colsLarge, 2), // le haut
+      eponge(b.minX, b.minY, colsLarge, 2), // le bas
+      eponge(b.minX, b.minY + 2 * cellule, 2, rowsHaut), // la gauche
+      eponge(b.maxX - 2 * cellule, b.minY + 2 * cellule, 2, rowsHaut), // la droite
+    ],
+    labels: [
+      { x: -800, y: 760, text: 'LE MÉTRONOME', tone: 'mur' },
+      { x: 700, y: 760, text: '1 · LANCÉ DU CENTRE, VOUS OSCILLEZ — LE BATTEMENT NE CHANGE PAS', tone: 'mur' },
+      { x: -700, y: -760, text: '2 · POUSSEZ AU PASSAGE DU CENTRE, DANS LE SENS DE LA MARCHE', tone: 'mur' },
+      { x: 700, y: -760, text: '3 · ATTEIGNEZ LES TROIS ANNEAUX — CHAQUE GOUTTE COMPTE', tone: 'mur' },
+    ],
+    minijeu: { type: 'metronome', regles, reglages: REGLAGES_METRONOME },
   }
 }

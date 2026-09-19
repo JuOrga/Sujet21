@@ -44,7 +44,7 @@ import {
 } from './level'
 import { IMPULSION_VITESSE_MAX, MIRE_POINTS_DEFAUT, MIRE_R_DEFAUT, PORTE_SENS_DEFAUT, PUITS_RAYON_DEFAUT, type ChasseDef, type MireDef, type PuitsDef } from './level'
 import { DEFAULT_PARAMS, type SimParams } from '../sim/params'
-import { MINI_JEUX, REGLES_CIBLES, REGLES_ORBITES, REGLES_PALET, REGLES_RAFALES, RYTHME_COUPERET, type MiniJeuDef, type MiniJeuId } from './minijeux'
+import { MINI_JEUX, REGLES_CIBLES, REGLES_METRONOME, REGLES_ORBITES, REGLES_PALET, REGLES_RAFALES, RYTHME_COUPERET, type MiniJeuDef, type MiniJeuId } from './minijeux'
 import { ARTICLES_ETAL_IDS } from './economat'
 import { cartesInconnues, litCartes, partTirEffective } from './cartesTableau'
 import { levier, type InstrumentDef } from './instruments'
@@ -746,7 +746,7 @@ export function parseLevel(input: unknown): {
       // les règles du code COMBLENT ce qu'une copie n'a pas (publiée avant
       // qu'un champ existe : la série des cibles) — sans quoi un champ absent
       // faisait NaN au compte (la revue du 17/09)
-      const defauts: Record<string, object | undefined> = { cibles: REGLES_CIBLES, orbites: REGLES_ORBITES, palet: REGLES_PALET, rafales: REGLES_RAFALES }
+      const defauts: Record<string, object | undefined> = { cibles: REGLES_CIBLES, orbites: REGLES_ORBITES, palet: REGLES_PALET, rafales: REGLES_RAFALES, metronome: REGLES_METRONOME }
       if (type === 'couperet') copie.rythme = { ...RYTHME_COUPERET, ...((copie.rythme as object) ?? {}) }
       else copie.regles = { ...defauts[type], ...(copie.regles as object) }
       level.minijeu = copie as unknown as MiniJeuDef

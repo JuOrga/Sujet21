@@ -335,3 +335,67 @@ au nœud de la descente comme au pupitre — la même règle que le hub et
 l'Économat (`salleMiniJeu`, `main.ts`). Le couperet reste au code : son
 trait se tire à la graine. Effacer le mini-jeu d'une copie en fait une
 salle ordinaire, jouée telle quelle.
+
+## 9. Le mini-jeu « Le métronome » — l'isochronie jouée
+
+La proposition du 19/09, retenue par le concepteur : jouer la propriété
+du cœur harmonique que rien n'exploitait encore — **la période ne dépend
+pas de l'amplitude** (§1). Un seul puits (cœur 1 000 u, force 600 u/s² :
+T = 8,1 s), le corps lancé de son centre à 116 u/s (150 u d'amplitude) :
+il oscille de part et d'autre et repasse au centre toutes les 4,05 s,
+quoi qu'on fasse. Mesuré sur le vrai corps (900 particules, sans un
+geste) : onze passages en 45 s, tous à 4,05 s ± 0,1 — c'est le battement.
+
+**Le jeu : pomper.** Une éjection ajoute Δv au corps ; l'énergie qu'elle
+lui donne vaut v · Δv — tout au passage du centre, où v est la plus
+grande, rien aux extrémités, où le corps s'arrête. Pousser en cadence,
+dans la **fenêtre** du centre (160 u, une fois et demie le rayon du
+corps ; dedans, la vitesse vaut plus de 85 % de son maximum dès le
+premier anneau) et dans le sens de la marche, gonfle l'amplitude pour le
+moins de gouttes. Trois **anneaux** concentriques (300 / 450 / 600 u) :
+l'amplitude qu'il faut ; ils se passent forcément dans l'ordre. 45 s.
+Verdict : la part du volume gardée (≥ 65 / 50 / 35 %), un palier de moins
+par anneau manqué. La part compte ce qui fait corps **et** ce qui est en
+prêt dans le halo : une poussée laisse des miettes derrière soi que le
+rappel ramène, les compter mortes à l'instant du dernier anneau mentait
+de 8 %.
+
+**Ce que la mesure a imposé** (`sim/metronome.spec.ts`, trois joueurs sur
+le vrai corps : en cadence, sans arrêt, rien) :
+
+- **des éponges sur les quatre parois.** Sans elles, la cuve est un bol :
+  chaque goutte éjectée montait jusqu'à la paroi, s'y arrêtait, puis
+  retombait vers le centre à 900 u/s au travers du corps, à chaque
+  battement — le corps en cadence perdait 41 % pour 28 % éjectés, et
+  l'amplitude stagnait trois passages de suite (les gouttes rappelées lui
+  rendaient leur élan à rebours). Les éponges boivent ce qui atteint la
+  paroi : une goutte partie est partie. Le corps, lui, n'y arrive jamais
+  (600 u au dernier anneau, la paroi à 1 150).
+- **une éjection accordée** (`REGLAGES_METRONOME`) : 2 400 u/s au lieu de
+  1 400 — à 1 400, gagner les 350 u/s qu'il faut coûte 25 % du corps
+  avant la moindre miette, le barème ne tenait pas — et **24 gouttes par
+  seconde au lieu de 32** : à 64, la salle se gagnait d'une seule poussée
+  tenue depuis le centre, sans jamais revenir ; le battement ne servait à
+  rien. Lente, la poussée ne suffit pas en un passage : il faut repasser,
+  et c'est là que la cadence se paie ou se gagne.
+- **les miettes** : à chaque poussée, ce qui n'est pas d'un seul tenant
+  avec le corps à l'instant du recul ne le reçoit pas, reste en arrière
+  et oscille à part, hors du halo — autant de perdu que d'éjecté. C'est
+  le solveur, pas la salle ; les paliers le comptent.
+
+Les nombres : en cadence (la fenêtre, le sens de la marche), le troisième
+anneau en 22 s, six passages, 69 % gardés (16 % éjectés, 16 % de
+miettes) ; sans arrêt, 6 s et 57 % ; rien, 100 %, aucun anneau. Les
+paliers se posent entre les deux, avec de la marge pour une main moins
+régulière que le banc. La garde du vrai corps tient les trois ; si la
+physique ou les réglages changent, on remesure — jamais on ne déplace un
+palier à la main.
+
+**En jeu** : la fenêtre est un disque au centre, allumé quand le corps y
+est (la consigne dit « POUSSEZ ») ; les anneaux passés sont verts, le
+prochain bat en ambre ; un cercle fin dit l'apogée atteinte ; un cercle
+s'ouvre au centre à chaque passage, avec un tic. **P** écrit la prévision
+exacte, comme aux orbites. S'essaie sans run : « Jouer le métronome
+(essai) », `__metronome()` ; dans l'éditeur, `MJ-METRONOME — Le
+métronome` parmi les modèles gravés, et une copie publiée sous ce code
+prime sur la salle du code, comme les autres.

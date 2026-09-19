@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { MIRE_POINTS_DEFAUT, MIRE_R_DEFAUT } from './level'
-import { tableauCibles, tableauOrbites } from './minijeux'
+import { tableauCibles, tableauMetronome, tableauOrbites } from './minijeux'
 import {
   checkLevel,
   decodeCode21,
@@ -1490,6 +1490,16 @@ describe('un mini-jeu survit à l’enregistrement', () => {
     expect(relu.level!.puits).toEqual(lv.puits)
     const orbites = parseLevel(JSON.parse(serializeLevel(tableauOrbites())))
     expect(orbites.level!.minijeu?.type).toBe('orbites')
+    // le métronome : ses règles, ses réglages d'éjection et ses éponges font l'aller-retour
+    const metronome = parseLevel(JSON.parse(serializeLevel(tableauMetronome())))
+    expect(metronome.rejets).toEqual([])
+    expect(metronome.level!.minijeu).toEqual(tableauMetronome().minijeu)
+    expect(metronome.level!.sponges).toEqual(tableauMetronome().sponges)
+    expect(metronome.level!.puits).toEqual(tableauMetronome().puits)
+    // une copie publiée avant qu'un champ existe : le code comble
+    const metroAncien = JSON.parse(serializeLevel(tableauMetronome()))
+    delete metroAncien.minijeu.regles.fenetre
+    expect(parseLevel(metroAncien).level!.minijeu).toEqual(tableauMetronome().minijeu)
     const faux = parseLevel({ ...JSON.parse(serializeLevel(lv)), minijeu: { type: 'flipper', regles: {} } })
     expect(faux.level!.minijeu).toBeUndefined()
     expect(faux.rejets).toEqual(['le mini-jeu a été écarté (type inconnu)'])
