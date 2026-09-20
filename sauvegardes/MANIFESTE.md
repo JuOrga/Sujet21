@@ -1,6 +1,6 @@
 # Sauvegarde des documents partagés
 
-Prise le **2026-09-19T08:06:32.336Z** depuis `https://sujet21.vercel.app/api`.
+Prise le **2026-09-20T08:38:59.846Z** depuis `https://sujet21.vercel.app/api`.
 
 | Famille | Fichier | Entrées | Détail |
 | --- | --- | ---: | --- |
@@ -10,7 +10,7 @@ Prise le **2026-09-19T08:06:32.336Z** depuis `https://sujet21.vercel.app/api`.
 | fiches réécrites | `fiches.json` | 0 | 0 fiche(s) réécrite(s) |
 | cinématiques | `cinematiques.json` | 2 | SONDE-CI, ESSAI-3 |
 | catalogue d’images | `images.json` | 0 | 0 entrée(s) — URL seulement, pas les pixels |
-| registres | `records.json` | 100 | 51 tableau(x), 49 top(s), expédition : oui |
+| registres | `records.json` | 114 | 58 tableau(x), 56 top(s), expédition : oui |
 
 ## Ce que cette sauvegarde contient — et ce qu’elle ne contient pas
 

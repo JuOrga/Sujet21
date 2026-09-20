@@ -1,8 +1,8 @@
 {
   "tableaux": {
     "101": {
-      "liters": 2.36,
-      "time": 57.1,
+      "liters": 2.43,
+      "time": 66.9,
       "name": "BOIZ"
     },
     "212": {
@@ -216,9 +216,9 @@
       "name": "JU"
     },
     "21SE-202": {
-      "liters": 0.55,
-      "time": 52.6,
-      "name": "JU"
+      "liters": 0.69,
+      "time": 79.2,
+      "name": "BOIZ"
     },
     "G-312-MZ3L~4DBZW": {
       "liters": 2.26,
@@ -254,6 +254,41 @@
       "liters": 0.49,
       "time": 32.6,
       "name": "HGH"
+    },
+    "21LA-203": {
+      "liters": 0.69,
+      "time": 84.4,
+      "name": "BOIZ"
+    },
+    "G-202-E4JC~1H3RB": {
+      "liters": 3.6,
+      "time": 39.1,
+      "name": "BOIZ"
+    },
+    "G-201-B30P~1GY51": {
+      "liters": 2.55,
+      "time": 35,
+      "name": "BOIZ"
+    },
+    "G-302-XN0J~1IJQC": {
+      "liters": 3.24,
+      "time": 18.9,
+      "name": "BOIZ"
+    },
+    "G-304-GRYS~3TNO0": {
+      "liters": 2.63,
+      "time": 26,
+      "name": "BOIZ"
+    },
+    "G-304-U5VH~4OK5S": {
+      "liters": 3.09,
+      "time": 30.8,
+      "name": "BOIZ"
+    },
+    "G-303-Y4DD~4DBM8": {
+      "liters": 2.63,
+      "time": 37.3,
+      "name": "BOIZ"
     }
   },
   "expedition": {
@@ -266,11 +301,11 @@
     "101": {
       "volume": [
         {
-          "liters": 2.36,
-          "time": 57.1,
+          "liters": 2.43,
+          "time": 66.9,
           "name": "BOIZ",
-          "note": 121,
-          "quand": "2026-08-31T00:54:04.408Z"
+          "note": 115,
+          "quand": "2026-09-19T20:12:48.916Z"
         }
       ],
       "chrono": [
@@ -824,6 +859,13 @@
           "name": "JU",
           "note": 421,
           "quand": "2026-08-28T15:23:56.570Z"
+        },
+        {
+          "liters": 3.47,
+          "time": 41.2,
+          "name": "BOIZ",
+          "note": 206,
+          "quand": "2026-09-19T19:58:03.422Z"
         }
       ],
       "chrono": [
@@ -833,6 +875,13 @@
           "name": "JU",
           "note": 421,
           "quand": "2026-08-28T15:23:56.570Z"
+        },
+        {
+          "liters": 3.47,
+          "time": 41.2,
+          "name": "BOIZ",
+          "note": 206,
+          "quand": "2026-09-19T19:58:03.422Z"
         }
       ],
       "note": [
@@ -842,6 +891,13 @@
           "name": "JU",
           "note": 421,
           "quand": "2026-08-28T15:23:56.570Z"
+        },
+        {
+          "liters": 3.47,
+          "time": 41.2,
+          "name": "BOIZ",
+          "note": 206,
+          "quand": "2026-09-19T19:58:03.422Z"
         }
       ]
     },
@@ -853,6 +909,13 @@
           "name": "JU",
           "note": 388,
           "quand": "2026-08-28T15:24:18.162Z"
+        },
+        {
+          "liters": 2.78,
+          "time": 36.7,
+          "name": "BOIZ",
+          "note": 172,
+          "quand": "2026-09-19T20:01:36.266Z"
         }
       ],
       "chrono": [
@@ -862,6 +925,13 @@
           "name": "JU",
           "note": 388,
           "quand": "2026-08-28T15:24:18.162Z"
+        },
+        {
+          "liters": 2.78,
+          "time": 36.7,
+          "name": "BOIZ",
+          "note": 172,
+          "quand": "2026-09-19T20:01:36.266Z"
         }
       ],
       "note": [
@@ -871,6 +941,13 @@
           "name": "JU",
           "note": 388,
           "quand": "2026-08-28T15:24:18.162Z"
+        },
+        {
+          "liters": 2.78,
+          "time": 36.7,
+          "name": "BOIZ",
+          "note": 172,
+          "quand": "2026-09-19T20:01:36.266Z"
         }
       ]
     },
@@ -998,6 +1075,13 @@
           "name": "JU",
           "note": 319,
           "quand": "2026-08-28T15:24:41.945Z"
+        },
+        {
+          "liters": 2.06,
+          "time": 41.1,
+          "name": "BOIZ",
+          "note": 122,
+          "quand": "2026-09-19T19:59:09.943Z"
         }
       ],
       "chrono": [
@@ -1007,6 +1091,13 @@
           "name": "JU",
           "note": 94,
           "quand": "2026-08-29T22:14:38.300Z"
+        },
+        {
+          "liters": 2.06,
+          "time": 41.1,
+          "name": "BOIZ",
+          "note": 122,
+          "quand": "2026-09-19T19:59:09.943Z"
         }
       ],
       "note": [
@@ -1016,6 +1107,13 @@
           "name": "JU",
           "note": 319,
           "quand": "2026-08-28T15:24:41.945Z"
+        },
+        {
+          "liters": 2.06,
+          "time": 41.1,
+          "name": "BOIZ",
+          "note": 122,
+          "quand": "2026-09-19T19:59:09.943Z"
         }
       ]
     },
@@ -1092,6 +1190,13 @@
           "name": "HGH",
           "note": 200,
           "quand": "2026-09-16T18:57:45.132Z"
+        },
+        {
+          "liters": 2.73,
+          "time": 23.6,
+          "name": "BOIZ",
+          "note": 196,
+          "quand": "2026-09-19T20:31:54.754Z"
         }
       ],
       "chrono": [
@@ -1101,6 +1206,13 @@
           "name": "JU",
           "note": 208,
           "quand": "2026-08-30T15:10:36.097Z"
+        },
+        {
+          "liters": 2.73,
+          "time": 23.6,
+          "name": "BOIZ",
+          "note": 196,
+          "quand": "2026-09-19T20:31:54.754Z"
         },
         {
           "liters": 2.9,
@@ -1124,6 +1236,13 @@
           "name": "HGH",
           "note": 200,
           "quand": "2026-09-16T18:57:45.132Z"
+        },
+        {
+          "liters": 2.73,
+          "time": 23.6,
+          "name": "BOIZ",
+          "note": 196,
+          "quand": "2026-09-19T20:31:54.754Z"
         }
       ]
     },
@@ -1623,6 +1742,13 @@
     "21SE-202": {
       "volume": [
         {
+          "liters": 0.69,
+          "time": 79.2,
+          "name": "BOIZ",
+          "note": 30,
+          "quand": "2026-09-19T20:15:44.616Z"
+        },
+        {
           "liters": 0.55,
           "time": 52.6,
           "name": "JU",
@@ -1637,9 +1763,23 @@
           "name": "JU",
           "note": 29,
           "quand": "2026-09-12T09:49:26.749Z"
+        },
+        {
+          "liters": 0.69,
+          "time": 79.2,
+          "name": "BOIZ",
+          "note": 30,
+          "quand": "2026-09-19T20:15:44.616Z"
         }
       ],
       "note": [
+        {
+          "liters": 0.69,
+          "time": 79.2,
+          "name": "BOIZ",
+          "note": 30,
+          "quand": "2026-09-19T20:15:44.616Z"
+        },
         {
           "liters": 0.55,
           "time": 52.6,
@@ -1802,6 +1942,13 @@
           "name": "HGH",
           "note": 66,
           "quand": "2026-09-16T18:54:32.972Z"
+        },
+        {
+          "liters": 0.79,
+          "time": 69.4,
+          "name": "BOIZ",
+          "note": 37,
+          "quand": "2026-09-19T20:27:57.076Z"
         }
       ],
       "chrono": [
@@ -1811,6 +1958,13 @@
           "name": "HGH",
           "note": 66,
           "quand": "2026-09-16T18:54:32.972Z"
+        },
+        {
+          "liters": 0.79,
+          "time": 69.4,
+          "name": "BOIZ",
+          "note": 37,
+          "quand": "2026-09-19T20:27:57.076Z"
         }
       ],
       "note": [
@@ -1820,6 +1974,13 @@
           "name": "HGH",
           "note": 66,
           "quand": "2026-09-16T18:54:32.972Z"
+        },
+        {
+          "liters": 0.79,
+          "time": 69.4,
+          "name": "BOIZ",
+          "note": 37,
+          "quand": "2026-09-19T20:27:57.076Z"
         }
       ]
     },
@@ -1831,6 +1992,13 @@
           "name": "HGH",
           "note": 32,
           "quand": "2026-09-16T18:57:25.160Z"
+        },
+        {
+          "liters": 0.47,
+          "time": 48.2,
+          "name": "BOIZ",
+          "note": 26,
+          "quand": "2026-09-19T20:08:21.832Z"
         }
       ],
       "chrono": [
@@ -1840,6 +2008,13 @@
           "name": "HGH",
           "note": 32,
           "quand": "2026-09-16T18:57:25.160Z"
+        },
+        {
+          "liters": 0.47,
+          "time": 48.2,
+          "name": "BOIZ",
+          "note": 26,
+          "quand": "2026-09-19T20:08:21.832Z"
         }
       ],
       "note": [
@@ -1849,6 +2024,216 @@
           "name": "HGH",
           "note": 32,
           "quand": "2026-09-16T18:57:25.160Z"
+        },
+        {
+          "liters": 0.47,
+          "time": 48.2,
+          "name": "BOIZ",
+          "note": 26,
+          "quand": "2026-09-19T20:08:21.832Z"
+        }
+      ]
+    },
+    "21LA-203": {
+      "volume": [
+        {
+          "liters": 0.69,
+          "time": 84.4,
+          "name": "BOIZ",
+          "note": 29,
+          "quand": "2026-09-19T20:24:57.418Z"
+        }
+      ],
+      "chrono": [
+        {
+          "liters": 0.69,
+          "time": 84.4,
+          "name": "BOIZ",
+          "note": 29,
+          "quand": "2026-09-19T20:24:57.418Z"
+        }
+      ],
+      "note": [
+        {
+          "liters": 0.69,
+          "time": 84.4,
+          "name": "BOIZ",
+          "note": 29,
+          "quand": "2026-09-19T20:24:57.418Z"
+        }
+      ]
+    },
+    "G-202-E4JC~1H3RB": {
+      "volume": [
+        {
+          "liters": 3.6,
+          "time": 39.1,
+          "name": "BOIZ",
+          "note": 218,
+          "quand": "2026-09-19T20:30:55.957Z"
+        }
+      ],
+      "chrono": [
+        {
+          "liters": 3.6,
+          "time": 39.1,
+          "name": "BOIZ",
+          "note": 218,
+          "quand": "2026-09-19T20:30:55.957Z"
+        }
+      ],
+      "note": [
+        {
+          "liters": 3.6,
+          "time": 39.1,
+          "name": "BOIZ",
+          "note": 218,
+          "quand": "2026-09-19T20:30:55.957Z"
+        }
+      ]
+    },
+    "G-201-B30P~1GY51": {
+      "volume": [
+        {
+          "liters": 2.55,
+          "time": 35,
+          "name": "BOIZ",
+          "note": 161,
+          "quand": "2026-09-19T20:33:13.923Z"
+        }
+      ],
+      "chrono": [
+        {
+          "liters": 2.55,
+          "time": 35,
+          "name": "BOIZ",
+          "note": 161,
+          "quand": "2026-09-19T20:33:13.923Z"
+        }
+      ],
+      "note": [
+        {
+          "liters": 2.55,
+          "time": 35,
+          "name": "BOIZ",
+          "note": 161,
+          "quand": "2026-09-19T20:33:13.923Z"
+        }
+      ]
+    },
+    "G-302-XN0J~1IJQC": {
+      "volume": [
+        {
+          "liters": 3.24,
+          "time": 18.9,
+          "name": "BOIZ",
+          "note": 246,
+          "quand": "2026-09-19T20:34:29.848Z"
+        }
+      ],
+      "chrono": [
+        {
+          "liters": 3.24,
+          "time": 18.9,
+          "name": "BOIZ",
+          "note": 246,
+          "quand": "2026-09-19T20:34:29.848Z"
+        }
+      ],
+      "note": [
+        {
+          "liters": 3.24,
+          "time": 18.9,
+          "name": "BOIZ",
+          "note": 246,
+          "quand": "2026-09-19T20:34:29.848Z"
+        }
+      ]
+    },
+    "G-304-GRYS~3TNO0": {
+      "volume": [
+        {
+          "liters": 2.63,
+          "time": 26,
+          "name": "BOIZ",
+          "note": 183,
+          "quand": "2026-09-19T20:36:12.504Z"
+        }
+      ],
+      "chrono": [
+        {
+          "liters": 2.63,
+          "time": 26,
+          "name": "BOIZ",
+          "note": 183,
+          "quand": "2026-09-19T20:36:12.504Z"
+        }
+      ],
+      "note": [
+        {
+          "liters": 2.63,
+          "time": 26,
+          "name": "BOIZ",
+          "note": 183,
+          "quand": "2026-09-19T20:36:12.504Z"
+        }
+      ]
+    },
+    "G-304-U5VH~4OK5S": {
+      "volume": [
+        {
+          "liters": 3.09,
+          "time": 30.8,
+          "name": "BOIZ",
+          "note": 204,
+          "quand": "2026-09-19T20:37:35.865Z"
+        }
+      ],
+      "chrono": [
+        {
+          "liters": 3.09,
+          "time": 30.8,
+          "name": "BOIZ",
+          "note": 204,
+          "quand": "2026-09-19T20:37:35.865Z"
+        }
+      ],
+      "note": [
+        {
+          "liters": 3.09,
+          "time": 30.8,
+          "name": "BOIZ",
+          "note": 204,
+          "quand": "2026-09-19T20:37:35.865Z"
+        }
+      ]
+    },
+    "G-303-Y4DD~4DBM8": {
+      "volume": [
+        {
+          "liters": 2.63,
+          "time": 37.3,
+          "name": "BOIZ",
+          "note": 162,
+          "quand": "2026-09-19T20:38:45.802Z"
+        }
+      ],
+      "chrono": [
+        {
+          "liters": 2.63,
+          "time": 37.3,
+          "name": "BOIZ",
+          "note": 162,
+          "quand": "2026-09-19T20:38:45.802Z"
+        }
+      ],
+      "note": [
+        {
+          "liters": 2.63,
+          "time": 37.3,
+          "name": "BOIZ",
+          "note": 162,
+          "quand": "2026-09-19T20:38:45.802Z"
         }
       ]
     }
