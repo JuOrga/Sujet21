@@ -6,12 +6,16 @@
 // Ici, un tracé par nom, dans une boîte de 24 × 24 ; le trait (1,6) et la
 // couleur viennent du CSS (`.picto`), donc du texte qui l'entoure.
 
+// Les trois états sont trois OBJETS de même nature : un cube, une goutte,
+// un nuage — la matière elle-même, sous ses trois formes. Avant, seule
+// l'eau était un objet : la glace était un flocon (un symbole de froid) et
+// la vapeur trois volutes (un symbole de chaleur), et le cadran mélangeait
+// « ce que tu es » et « la température qu'il fait ».
 export const PICTOS = {
-  glace:
-    'M12 3v18M4.2 7.5l15.6 9M19.8 7.5l-15.6 9M12 6.5l-2-2M12 6.5l2-2M12 17.5l-2 2M12 17.5l2 2',
+  glace: 'M12 3l7.8 4.5v9L12 21l-7.8-4.5v-9zM4.2 7.5L12 12l7.8-4.5M12 12v9',
   eau: 'M12 3.5c3.2 4.2 5.5 7.3 5.5 10.2a5.5 5.5 0 0 1-11 0C6.5 10.8 8.8 7.7 12 3.5z',
   vapeur:
-    'M8 20c-2-3 2-5 0-8s2-5 0-8M12 20c-2-3 2-5 0-8s2-5 0-8M16 20c-2-3 2-5 0-8s2-5 0-8',
+    'M7.5 18.5a4 4 0 0 1-.6-7.95 5.5 5.5 0 0 1 10.7 1 3.5 3.5 0 0 1-.6 6.95z',
   menu: 'M4 7h16M4 12h16M4 17h16',
   pause: 'M9 5v14M15 5v14',
   lecture: 'M8 5l11 7-11 7z',
