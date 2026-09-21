@@ -371,6 +371,10 @@ import {
   sourisInverse,
   toucheDe,
 } from './game/commandes'
+import { picto, type NomPicto } from './game/athPictos'
+import { entreesTiroir } from './game/athTiroir'
+import { pancarteLibre, zonesInterdites, type Rect } from './game/athZones'
+import { CLE_REGLAGE_ATH, athAuRepos, litReglageAth, pointeurPres, type ReglageAth } from './game/athRepos'
 import { PARALLAXE_DEFAUTS, facteurG } from './render/parallaxe'
 import { PerfCollector } from './game/perf'
 import {
@@ -1592,38 +1596,37 @@ function buildWorldLabels(): void {
 // Marge de respiration entre deux pancartes, en pixels d'écran : elles ne
 // doivent pas seulement NE PAS se toucher, elles doivent se laisser lire.
 const MARGE_PANCARTE = 10
-// Bandes réservées à l'interface : le relevé en haut, le sélecteur d'état
-// et la barre tactile en bas. Une pancarte qui s'y glisserait passerait
-// DERRIÈRE les boutons — elle s'efface plutôt.
-const BANDE_HAUTE = 46
-let bandeBasse = 150 // recalculée sur la vraie hauteur des barres
-let bandeMesuree = 0
-
-// Hauteur d'écran interdite en bas : le sélecteur d'état et la barre
-// tactile. Relue quatre fois par seconde — les barres apparaissent avec la
-// partie, changent de hauteur en tournant l'écran, et une lecture de mise
-// en page par image ne se justifie pas pour ça.
-function majBandeBasse(t: number): void {
-  if (t - bandeMesuree < 250) return
-  bandeMesuree = t
-  let haut = window.innerHeight
-  for (const el of [
-    document.getElementById('statebar'),
-    document.getElementById('touchbar'),
-  ]) {
-    const r = el?.getBoundingClientRect()
-    if (!r || r.height <= 0) continue
-    // Seule une vraie barre POSÉE EN BAS définit la bande interdite : LARGE
-    // (pas une colonne) et dans la moitié basse. En paysage mobile, ces
-    // barres deviennent des COLONNES latérales dont le sommet est presque
-    // en haut de l'écran : les prendre pour des barres basses interdisait
-    // TOUT l'écran aux pancartes — plus une seule visible sur téléphone
-    // ou tablette en paysage.
-    if (r.width < r.height || r.width < window.innerWidth * 0.35) continue
-    if (r.top < window.innerHeight * 0.55) continue
-    if (r.top < haut) haut = r.top
+// OÙ UNE PANCARTE PEUT SE POSER. L'interface était deux bandes : on
+// interdisait 46 px en haut et ~150 px en bas, sur toute la largeur. Elle
+// tient maintenant dans des coins (game/athZones.ts) : une pancarte ne
+// s'efface que si elle TOUCHE un poste.
+// Relu quatre fois par seconde — les postes apparaissent avec la partie,
+// changent de place en tournant l'écran, et une lecture de mise en page par
+// image ne se justifie pas pour ça.
+let zonesAth: Rect[] = []
+/** les postes qui s'estompent au repos : capsule, commandes, cadran */
+let postesAth: Rect[] = []
+let zonesMesurees = 0
+let coinsBasPublie = 0
+function majZonesAth(t: number): void {
+  if (t - zonesMesurees < 250) return
+  zonesMesurees = t
+  const mesure = (sel: string): Rect | null => {
+    const r = document.querySelector(sel)?.getBoundingClientRect()
+    return r && r.width > 0 && r.height > 0 ? r : null
   }
-  bandeBasse = Math.max(0, window.innerHeight - haut) + 10
+  const vital = mesure('.ath-vital')
+  const mobiles = [mesure('.ath-etat'), mesure('#touchbar'), mesure('#statebar')]
+  // le bas des deux coins du haut, publié pour ce qui se pose DESSOUS (la
+  // bannière d'alerte, les trophées, le panneau des instruments) : leur
+  // hauteur dépend de la taille des textes et de la zone sûre de l'appareil
+  const bas = Math.max(vital?.bottom ?? 0, mobiles[0]?.bottom ?? 0)
+  if (bas > 0 && bas !== coinsBasPublie) {
+    coinsBasPublie = bas
+    document.documentElement.style.setProperty('--coins-bas', `${Math.round(bas)}px`)
+  }
+  zonesAth = zonesInterdites([vital, ...mobiles], MARGE_PANCARTE)
+  postesAth = mobiles.filter((r): r is Rect => r !== null)
 }
 
 // Les pancartes gardent une taille de LECTURE quel que soit le zoom (comme
@@ -1634,7 +1637,7 @@ function majBandeBasse(t: number): void {
 // fondu. Résultat : jamais deux textes l'un sur l'autre, à aucun zoom, et
 // le plan large se lit comme une carte — les lieux, sans le bavardage.
 function updateWorldLabels(vw: number, vh: number): void {
-  majBandeBasse(performance.now())
+  majZonesAth(performance.now())
   // Au plan large, les pancartes RÉTRÉCISSENT avec la carte (plancher 0,45)
   // au lieu de garder leur taille de lecture : deux plaques géantes
   // masquaient la carte entière et effaçaient toutes les autres — la
@@ -1668,9 +1671,9 @@ function updateWorldLabels(vw: number, vh: number): void {
       l.place = false
       continue
     }
-    // sous les barres d'interface : la pancarte serait masquée à moitié —
+    // sur un poste de l'interface : la pancarte serait masquée à moitié —
     // qu'elle s'efface franchement plutôt que de dépasser d'un bouton
-    if (sy - hh < BANDE_HAUTE || sy + hh > vh - bandeBasse) {
+    if (!pancarteLibre(sx, sy, hw, hh, zonesAth)) {
       l.span.style.display = ''
       l.span.style.transform = `translate(${sx.toFixed(1)}px, ${sy.toFixed(1)}px) translate(-50%, -50%) scale(${scale.toFixed(3)})`
       l.span.classList.add('efface')
@@ -1734,17 +1737,13 @@ const hudBonbonne = el('hud-bonbonne')
 const hudCondChip = el('hud-cond-chip') as HTMLButtonElement
 const hudCond = el('hud-cond')
 const hudCoque = el('hud-coque')
+const hudCoqueChip = el('hud-coque-chip')
 const hudVolume = el('hud-volume')
-const hudSeuil = el('hud-seuil')
-const hudVitesse = el('hud-vitesse')
-const hudState = el('hud-state')
-const hudWarp = el('hud-warp')
 const gaugeFill = el('gauge-fill')
 const gaugeThreshold = el('gauge-threshold')
 const hudPerte = el('hud-perte')
 const hudRosee = el('hud-rosee')
 const hudDanger = el('hud-danger')
-const coqueBar = el('coque-bar').firstElementChild as HTMLElement
 const objArrow = el('obj-arrow')
 const objArrowGlyph = objArrow.firstElementChild as HTMLElement
 const objDist = el('obj-dist')
@@ -1946,23 +1945,8 @@ function requireName(): boolean {
   recName.focus({ preventScroll: true })
   return true
 }
-const tableauCard = el('tableau-card')
-
-// Carton d'ouverture : l'entrée du journal de bord du tableau. Il RESTE
-// affiché tant qu'on ne l'a pas fermé à la croix — lire ne se chronomètre
-// pas (l'effacement automatique partait trop vite).
-// Le carton de journal (signé Dr N. Véga) ne s'affiche PLUS : retour
-// joueur — un popup à fermer à chaque tableau n'est pas ergonomique. Le
-// texte reste dans les tableaux (éditeur, champ journal) si on veut le
-// réutiliser autrement un jour.
-function showTableauCard(): void {
-  // volontairement vide — aucun carton ne s'affiche
-}
-document.getElementById('card-fermer')?.addEventListener('click', () => {
-  tableauCard.classList.remove('visible')
-})
-
-// Fiche d'essai : visible au chargement ; « échap » ou ≡ pour y revenir.
+// Fiche d'essai : visible au chargement ; « échap » pour y revenir
+// directement, ou l'entrée « fiche » du tiroir ≡.
 // L'essai continue de dériver derrière la fiche — elle observe, elle ne fige pas.
 const startBtn = document.getElementById('start') as HTMLButtonElement
 let hasPlayed = false
@@ -3767,6 +3751,7 @@ let eauRiche = localStorage.getItem('sujet21-eau') !== 'sobre'
 // La FLÈCHE DE CAP à la manette : retirée par défaut (le regard du Sujet
 // suit déjà le stick) — réactivable dans PARAMÈTRES pour qui la préfère.
 let flecheVisible = localStorage.getItem('sujet21-fleche') === 'visible'
+let reglageAth: ReglageAth = litReglageAth(localStorage.getItem(CLE_REGLAGE_ATH))
 // LE FAISCEAU laser, trois crans : FOUDROYANT par défaut (aura pulsante
 // + mini-arcs électriques qui crépitent le long du rayon, sursaut
 // amplifié), SOMPTUEUX (flux + lueurs, sursaut sobre), CLASSIQUE
@@ -4201,6 +4186,29 @@ const paramsEl = document.getElementById('params') as HTMLDivElement
       }
     }
     renderFleche()
+  }
+
+  const choixAth = document.getElementById('params-ath') as HTMLDivElement | null
+  if (choixAth) {
+    const renderAth = (): void => {
+      choixAth.innerHTML = ''
+      for (const [cle, label] of [
+        ['discret', 'DISCRÈTE'],
+        ['complet', 'COMPLÈTE'],
+      ] as const) {
+        const b = document.createElement('button')
+        b.type = 'button'
+        b.textContent = label
+        b.className = reglageAth === cle ? 'actif' : ''
+        b.addEventListener('click', () => {
+          reglageAth = cle
+          localStorage.setItem(CLE_REGLAGE_ATH, cle)
+          renderAth()
+        })
+        choixAth.appendChild(b)
+      }
+    }
+    renderAth()
   }
 
   const choixFantomes = document.getElementById(
@@ -16147,12 +16155,14 @@ const dashAimEl = el('dash-aim')
 const dashCostEl = el('dash-cost')
 
 // ---- LE FIL DE LA DESCENTE : elle se lit d'un regard --------------------
-// Un rail à CRANS sur le flanc droit — un cran par salle de la séquence (la
-// suite écrite comme le plan de la voie), les tiers
+// Un rail à CRANS dans la capsule de statut (haut-droit) — un cran par salle
+// de la séquence (la suite écrite comme le plan de la voie), les tiers
 // (début · milieu · fin) marqués d'une couture, le cran courant qui pulse
-// menthe, les franchis pleins, la profondeur record étoilée ✦. Et à chaque
-// entrée de salle, la CARTE D'IDENTITÉ complète (nom, code, moment,
-// mécanique, difficulté, rang) passe en fondu — sans rien bloquer.
+// menthe, les franchis pleins, la profondeur record étoilée ✦. Borné en
+// largeur (27 à 30 salles), il disparaît sur téléphone : SALLE n/N y porte
+// seul le compte. Et à chaque entrée de salle, la CARTE D'IDENTITÉ complète
+// (nom, code, moment, mécanique, difficulté, rang) passe en fondu — sans
+// rien bloquer.
 const voieHudEl = document.getElementById('voie-hud') as HTMLDivElement
 const voieCarteEl = document.getElementById('voie-carte') as HTMLDivElement
 let voieCarteTimer = 0
@@ -16333,7 +16343,6 @@ function restart(): void {
       idle.type = Math.random() < 0.5 ? 'toilette' : 'etire'
       idle.t0 = elapsed
     }
-    showTableauCard()
     annonceVoieCarte()
     // la cinématique d'ENTRÉE du tableau : à l'arrivée seulement — un R sur
     // place ne la rejoue pas (et MAINTENIR la saute de toute façon)
@@ -16801,21 +16810,36 @@ input.onVortex = (clientX, clientY) => {
   bande.bruitage('vortex-sas', 0.55)
 }
 
-// Barre tactile : les commandes clavier/souris accessibles au doigt
+// LES COMMANDES DE L'ATH. Trois boutons restent à l'écran (le tiroir, la
+// pause, le temps — plus le retour à l'éditeur pendant un essai) ; les
+// autres se rangent dans le tiroir, bâti depuis game/athTiroir.ts.
 const touchbar = document.getElementById('touchbar') as HTMLDivElement
-function touchButton(
-  label: string,
+const tiroir = document.getElementById('tiroir') as HTMLDivElement
+function athBouton(
+  hote: HTMLElement,
+  nom: NomPicto,
   title: string,
   onTap: () => void,
   cls = '',
 ): HTMLButtonElement {
   const b = document.createElement('button')
-  b.textContent = label
+  b.type = 'button'
+  b.dataset.picto = nom
+  b.innerHTML = picto(nom)
   b.title = title
+  b.setAttribute('aria-label', title)
   if (cls) b.className = cls
   b.addEventListener('click', onTap)
-  touchbar.appendChild(b)
+  hote.appendChild(b)
   return b
+}
+/** Change le pictogramme d'un bouton SANS réécrire le DOM à chaque image :
+ *  seul le svg est remplacé, le nom et la touche restent. */
+function posePicto(b: HTMLButtonElement, nom: NomPicto): void {
+  if (b.dataset.picto === nom) return
+  b.dataset.picto = nom
+  b.querySelector('svg')?.remove()
+  b.insertAdjacentHTML('afterbegin', picto(nom))
 }
 
 // Panneaux de lecture : la légende des surfaces et les trois états (qui
@@ -16845,31 +16869,160 @@ function toggleBench(): void {
   void chargeBanc() // en route : un second appui rejoint le même chargement
 }
 
-const chipLegend = touchButton(
-  'LÉGENDE',
-  'légende des surfaces (L)',
-  toggleLegend,
-  'tb-chip',
+// Le tiroir — placé après toggleLegend, toggleStates, toggleBench : le geste
+// LÉGENDE / ÉTATS / BANC ci-dessous les appelle.
+let tiroirOuvert = false
+const btnTiroir = athBouton(touchbar, 'menu', 'les autres commandes', () =>
+  ouvreTiroir(!tiroirOuvert),
 )
-const chipStates = touchButton(
-  'ÉTATS',
-  'les trois états : qui bloque quoi (E)',
-  toggleStates,
-  'tb-chip',
+btnTiroir.setAttribute('aria-expanded', 'false')
+btnTiroir.setAttribute('aria-controls', 'tiroir')
+
+function basculeSon(): void {
+  audio.resume()
+  audio.setEnabled(!audio.enabled)
+  if (audio.enabled) {
+    bande.eveiller()
+  }
+  majInviteSon()
+  pane?.refresh()
+}
+const GESTES_TIROIR: Record<string, () => void> = {
+  legende: () => toggleLegend(),
+  etats: () => toggleStates(),
+  dossier: () => ouvreDossier(!dossierOuvert),
+  station: () => ouvreStation(true),
+  recadrer: () => camera.resetAutoZoom(),
+  vortex: () => {
+    input.vortexArmed = !input.vortexArmed
+  },
+  son: () => basculeSon(),
+  recommencer: () => resetAction(),
+  fiche: () => openHome(),
+  banc: () => toggleBench(),
+}
+const boutonsTiroir: Record<string, HTMLButtonElement> = {}
+// toutes les entrées sont bâties, vortex compris : c'est la boucle qui le
+// montre ou le masque selon le réglage (params.vortexEnabled peut changer)
+for (const e of entreesTiroir({ vortexActif: true })) {
+  const b = athBouton(tiroir, e.picto, e.nom, () => {
+    // le vortex s'ARME et le son BASCULE : le tiroir reste ouvert pour qu'on
+    // voie l'état changer ; tout le reste ouvre autre chose — il cède la place
+    if (e.id !== 'vortex' && e.id !== 'son') ouvreTiroir(false)
+    GESTES_TIROIR[e.id]()
+  })
+  b.insertAdjacentHTML('beforeend', `<span class="ti-nom">${e.nom}</span><kbd></kbd>`)
+  b.dataset.manoeuvre = e.manoeuvre ?? ''
+  boutonsTiroir[e.id] = b
+}
+const chipLegend = boutonsTiroir.legende
+const chipStates = boutonsTiroir.etats
+const chipBench = boutonsTiroir.banc
+const btnVortex = boutonsTiroir.vortex
+const btnSound = boutonsTiroir.son
+
+/** Les touches affichées sont celles EN VIGUEUR : relues à chaque ouverture,
+ *  le joueur a pu les redéfinir entre-temps. */
+function majTouchesTiroir(): void {
+  for (const b of Object.values(boutonsTiroir)) {
+    const kbd = b.querySelector('kbd') as HTMLElement
+    const m = b.dataset.manoeuvre
+    const t = m ? toucheDe(m) : null
+    kbd.textContent = t ? nomTouche(t) : ''
+    kbd.hidden = !t
+  }
+}
+function ouvreTiroir(v: boolean): void {
+  tiroirOuvert = v
+  tiroir.hidden = !v
+  btnTiroir.classList.toggle('active', v)
+  btnTiroir.setAttribute('aria-expanded', String(v))
+  if (v) majTouchesTiroir()
+}
+// un toucher ailleurs le referme — sans RETENIR le toucher : viser la cuve
+// avec le tiroir ouvert vise, et le referme au passage
+document.addEventListener(
+  'pointerdown',
+  (ev) => {
+    if (!tiroirOuvert) return
+    const t = ev.target as Node
+    if (tiroir.contains(t) || btnTiroir.contains(t)) return
+    ouvreTiroir(false)
+  },
+  true,
 )
-const chipBench = touchButton(
-  'BANC',
-  'banc de réglage : la physique en direct',
-  toggleBench,
-  'tb-chip',
+// Échap, tiroir ouvert, referme le tiroir — et ne mène PAS à la fiche
+window.addEventListener(
+  'keydown',
+  (ev) => {
+    if (!tiroirOuvert || ev.key !== 'Escape') return
+    ev.preventDefault()
+    ev.stopImmediatePropagation()
+    ouvreTiroir(false)
+  },
+  true,
 )
+
+// LE REPOS (game/athRepos.ts) : main.ts ne fait que dire l'heure du dernier
+// geste VERS l'interface. Le stick ne compte pas : il bouge en permanence.
+let dernierGesteAth = performance.now()
+function reveilleAth(): void {
+  dernierGesteAth = performance.now()
+}
+window.addEventListener(
+  'pointermove',
+  (ev) => {
+    if (pointeurPres(ev.clientX, ev.clientY, postesAth)) reveilleAth()
+  },
+  { passive: true },
+)
+for (const sel of ['#touchbar', '#tiroir', '#statebar', '.ath-etat'])
+  document.querySelector(sel)?.addEventListener('pointerdown', reveilleAth)
+
+// Le cadran des états publie sa propre hauteur (--cadran-h) : voir sa
+// déclaration plus bas, avec statebarEl.
+const btnPause = athBouton(touchbar, 'pause', 'pause (espace)', () => input.togglePause())
+const tbTime = document.createElement('div')
+tbTime.id = 'tb-time'
+touchbar.appendChild(tbTime)
+let replieTemps = 0
+/** ‹ et › ne paraissent que 3 s après un toucher sur ×N (ou au survol) :
+ *  la vitesse est une INFO permanente, ses réglages non. */
+function deplieTemps(): void {
+  tbTime.classList.add('deplie')
+  window.clearTimeout(replieTemps)
+  replieTemps = window.setTimeout(() => tbTime.classList.remove('deplie'), 3000)
+}
+const pasTemps = (label: string, title: string, sens: -1 | 1): void => {
+  const b = document.createElement('button')
+  b.type = 'button'
+  b.className = 'tb-pas'
+  b.textContent = label
+  b.title = title
+  b.addEventListener('click', () => {
+    input.stepWarp(sens)
+    deplieTemps()
+  })
+  tbTime.appendChild(b)
+}
+pasTemps('‹', 'ralentir le temps (,)', -1)
+const tbSpeed = document.createElement('button')
+tbSpeed.type = 'button'
+tbSpeed.id = 'tb-speed'
+tbSpeed.textContent = '×1'
+tbSpeed.title = 'vitesse du temps simulé — toucher pour la régler'
+tbSpeed.addEventListener('click', deplieTemps)
+tbTime.appendChild(tbSpeed)
+pasTemps('›', 'accélérer le temps (.)', 1)
 // Retour à l'éditeur : n'apparaît que pendant l'essai d'un tableau édité
-const chipEditor = touchButton(
-  '↩ ÉDITEUR',
+const chipEditor = athBouton(
+  touchbar,
+  'editeur',
   'revenir à l’éditeur (le tableau est retrouvé tel qu’il était)',
   () => void openEditor(),
-  'tb-chip tb-editor',
+  'tb-editor',
 )
+chipEditor.insertAdjacentHTML('beforeend', '<span class="ti-nom">ÉDITEUR</span>')
 chipEditor.style.display = 'none'
 // (La puce « ⌂ HUB » — le hub à tout moment, outil de conception — a été
 // retirée le 16/09 : elle menait au hub AVEC une run en cours, et le sas
@@ -16877,67 +17030,6 @@ chipEditor.style.display = 'none'
 // retrouvait en salle 4. On n'arrive au hub qu'en mourant, en bouclant
 // l'expédition, ou par le menu ; et dans ces trois cas la sauvegarde est
 // effacée.)
-
-// La barre du bas passe sur deux lignes quand elle se remplit (le bouton de
-// retour à l'éditeur, par exemple). On publie sa hauteur réelle en variable
-// CSS : le sélecteur d'état se recale dessus au lieu de la chevaucher.
-function publishTouchbarHeight(): void {
-  const h = Math.round(touchbar.getBoundingClientRect().height)
-  if (h > 0) document.documentElement.style.setProperty('--tb-h', `${h}px`)
-}
-if (typeof ResizeObserver !== 'undefined') {
-  new ResizeObserver(publishTouchbarHeight).observe(touchbar)
-} else {
-  window.addEventListener('resize', publishTouchbarHeight)
-}
-publishTouchbarHeight()
-{
-  // au doigt, les chips ont leur rangée, les glyphes la leur
-  const brk = document.createElement('i')
-  brk.className = 'tb-break'
-  touchbar.appendChild(brk)
-}
-const btnPause = touchButton('⏸', 'pause (espace)', () => input.togglePause())
-// Le TEMPS en un seul bloc : ralentir · la vitesse courante · accélérer.
-// La vitesse est une INFO permanente (elle s'allume dès qu'on quitte ×1),
-// et le groupe reste au doigt — savoir à quelle vitesse on joue n'est pas
-// un réglage de banc.
-const tbTime = document.createElement('div')
-tbTime.id = 'tb-time'
-touchbar.appendChild(tbTime)
-const timeButton = (
-  label: string,
-  title: string,
-  onTap: () => void,
-): HTMLButtonElement => {
-  const b = document.createElement('button')
-  b.textContent = label
-  b.title = title
-  b.addEventListener('click', onTap)
-  tbTime.appendChild(b)
-  return b
-}
-timeButton('‹', 'ralentir le temps (,)', () => input.stepWarp(-1))
-const tbSpeed = document.createElement('span')
-tbSpeed.id = 'tb-speed'
-tbSpeed.textContent = '×1'
-tbSpeed.title = 'vitesse du temps simulé'
-tbTime.appendChild(tbSpeed)
-timeButton('›', 'accélérer le temps (.)', () => input.stepWarp(1))
-// le DOSSIER a son bouton dans la barre : au doigt comme au Deck, on n'a
-// pas toujours un clavier sous la main
-touchButton('▤', 'dossier de descente (Tab)', () =>
-  ouvreDossier(!dossierOuvert),
-)
-touchButton('🛰\uFE0E', 'le plan de la station (C)', () => ouvreStation(true))
-const btnVortex = touchButton(
-  '🌀',
-  'vortex : armer puis toucher l’écran (clic droit)',
-  () => {
-    input.vortexArmed = !input.vortexArmed
-  },
-  'tb-vortex',
-)
 
 // ---- LE CADRAN DU CYCLE (refonte du sélecteur d'état) -------------------
 // Trois LOGEMENTS fixes — ❄ à gauche, 💧 au centre, 💨 à droite : la
@@ -16954,6 +17046,22 @@ const stateGlace = document.getElementById('state-glace') as HTMLButtonElement
 const stateVapeur = document.getElementById('state-vapeur') as HTMLButtonElement
 const stateZoneEl = document.getElementById('state-zone') as HTMLDivElement
 const statebarEl = document.getElementById('statebar') as HTMLDivElement
+
+// Le cadran publie sa hauteur réelle : les boutons de relance se posent
+// AU-DESSUS de lui. (Avant, tout s'empilait sur la barre du bas via sa
+// propre variable de hauteur mesurée ; en colonne sur téléphone elle
+// mesurait ~459 px, et la barre de rejeu partait hors de l'écran.)
+function publieHauteurCadran(): void {
+  const h = Math.round(statebarEl.getBoundingClientRect().height)
+  if (h > 0) document.documentElement.style.setProperty('--cadran-h', `${h}px`)
+}
+if (typeof ResizeObserver !== 'undefined') {
+  new ResizeObserver(publieHauteurCadran).observe(statebarEl)
+} else {
+  window.addEventListener('resize', publieHauteurCadran)
+}
+publieHauteurCadran()
+
 stateEau.addEventListener('click', () => input.demande('eau'))
 stateGlace.addEventListener('click', () => input.demande('glace'))
 stateVapeur.addEventListener('click', () => input.demande('vapeur'))
@@ -17013,6 +17121,7 @@ function majCadranEtats(zoneActive: ZoneForce): void {
   ].join('|')
   if (sig === cadranSignature) return
   cadranSignature = sig
+  reveilleAth() // l'état change (clavier, doigt ou manette) : le cadran se montre
   const NOMS_ETAT = {
     eau: 'LIQUIDE',
     glace: 'GLACE',
@@ -17040,12 +17149,12 @@ function majCadranEtats(zoneActive: ZoneForce): void {
       t !== null && (!gate || transfoTenue(t.id, acquis, verrousCycle))
     const montreVerrou = !estCur && !tenue && t !== null && verrou === s.etat
     s.el.hidden = !estCur && !tenue && !montreVerrou
-    s.el.classList.toggle('active', estCur)
     s.el.classList.toggle('st-cur', estCur)
     s.el.classList.toggle('st-verrou', montreVerrou)
     s.el.disabled = zone || montreVerrou
     label.textContent = !estCur && t ? t.nom : NOMS_ETAT[s.etat]
-    kbd.textContent = montreVerrou ? '🔒' : manetteActive ? s.pad : s.kbd
+    if (montreVerrou) kbd.innerHTML = picto('verrou')
+    else kbd.textContent = manetteActive ? s.pad : s.kbd
     kbd.hidden = estCur
     s.el.title = estCur
       ? 're-toucher : revenir liquide'
@@ -17056,11 +17165,11 @@ function majCadranEtats(zoneActive: ZoneForce): void {
   statebarEl.classList.toggle('st-zone', zone)
   stateZoneEl.hidden = !zone
   if (zone)
-    stateZoneEl.textContent = `🔒 ${ZONE_CAUSES[zoneActive]} — RÉGIME IMPOSÉ`
+    stateZoneEl.innerHTML = `${picto('verrou')} ${ZONE_CAUSES[zoneActive]} — RÉGIME IMPOSÉ`
 }
 
 // ---- LE DOSSIER DE DESCENTE : tout le relevé, d'un seul geste -----------
-// TAB (le bouton ▤ de la barre, R3 à la manette) fait glisser le panneau
+// TAB (l'entrée DOSSIER du tiroir ≡, R3 à la manette) fait glisser le panneau
 // depuis la droite : la salle et son identité, le corps et ses réserves,
 // le cycle et ce qu'il permet ICI, le butin, l'équipement embarqué. Il ne
 // fige RIEN — la descente continue derrière, c'est un dossier qu'on
@@ -17545,25 +17654,6 @@ function majEveil(dtReal: number): void {
     }
   }
 }
-touchButton('⌖', 'recadrer sur le corps (zoom et caméra auto)', () =>
-  camera.resetAutoZoom(),
-)
-const btnSound = touchButton(
-  '🔊',
-  'son : couper / activer',
-  () => {
-    audio.resume()
-    audio.setEnabled(!audio.enabled)
-    if (audio.enabled) {
-      bande.eveiller()
-    }
-    majInviteSon()
-    pane?.refresh()
-  },
-  'tb-snd', // masqué au doigt : la bascule du son reste au banc (dossier Son)
-)
-touchButton('↺', 'recommencer (R)', resetAction)
-touchButton('≡', 'fiche d’essai (échap)', openHome)
 input.onTimeWarpChange = (warp) => {
   params.timeWarp = warp
   majVitesse()
@@ -17621,131 +17711,6 @@ btnRelance.addEventListener('click', () => {
   }
   restart()
 })
-// ---- Tutoriel diégétique (tableau 1, première partie seulement) ----
-// Les consignes du protocole apparaissent au bon moment, se valident par le
-// geste qu'elles enseignent, et ne reviennent plus (localStorage). Les deux
-// dernières sont contextuelles : l'éponge à l'approche, le sas à l'arrivée.
-const TUTOR_KEY = 'projet21.tutoriel.v1'
-const tutorEl = el('tutor')
-let tutorActive = true
-try {
-  tutorActive = coffre.stockage.getItem(TUTOR_KEY) !== 'ok'
-} catch {
-  // stockage indisponible : le tutoriel s'affiche à chaque visite, sans gravité
-}
-let tutorStep = 0
-let tutorTimer = 0
-let tutorEjectHeld = 0
-let tutorShown = ''
-
-const TUTOR_TEXTS = [
-  'Maintenez le doigt (ou le pointeur) : la matière est éjectée <em>vers</em> lui — le corps part à l’opposé. Il n’y a pas de frein.',
-  'Chaque goutte éjectée est perdue. La jauge en haut est votre corps : sous le trait rouge, il ne reste qu’une impulsion. <strong>Se déplacer, c’est rétrécir.</strong>',
-  '<kbd>❄ / F</kbd> se changer en glace : l’élan se garde, re-presser dégèle. <kbd>💨 / G</kbd> vapeur : visez (le temps ralentit), relâchez — le nuage fuse, plus loin le doigt, plus fort le dash. Un tiers du volume à chaque fois. Essayez l’un des deux.',
-  'L’éponge boit ce qui s’attarde à son contact. Passez vite, payez le passage en volume — ou cherchez la vapeur.',
-  'Le sas aspire l’échantillon : laissez-vous boire. Le surplus part en bonbonne — la récompense, c’est ce qu’il vous reste.',
-]
-
-// Sonde de débogage/test : l'état du tutoriel depuis la console
-;(window as unknown as { __tutor: () => object }).__tutor = () => ({
-  active: tutorActive,
-  step: tutorStep,
-  held: tutorEjectHeld,
-  timer: tutorTimer,
-  aim: input.aimActive,
-})
-
-function tutorPersist(): void {
-  try {
-    coffre.stockage.setItem(TUTOR_KEY, 'ok')
-  } catch {
-    // sans gravité
-  }
-}
-
-function updateTutor(dtReal: number): void {
-  // Bandeaux CONSIGNE DU PROTOCOLE désactivés (même retour joueur que le
-  // carton) : l'onboarding gestuel du premier lancement suffit.
-  if (tutorShown !== '') {
-    tutorShown = ''
-    tutorEl.classList.remove('visible')
-  }
-  if (true) return
-  if (
-    !tutorActive ||
-    testLevel !== null ||
-    levelIndex !== 0 ||
-    sim.dispersed ||
-    run.ended ||
-    tutorStep >= TUTOR_TEXTS.length
-  ) {
-    if (tutorShown !== '') {
-      tutorShown = ''
-      tutorEl.classList.remove('visible')
-    }
-    return
-  }
-  const playing = document.body.classList.contains('playing') && !input.paused
-  const cardVisible = tableauCard.classList.contains('visible')
-  if (playing && input.aimActive) tutorEjectHeld += dtReal
-
-  // conditions de validation de l'étape courante
-  if (tutorStep === 0 && tutorEjectHeld > 1.2) {
-    tutorStep = 1
-    tutorTimer = 0
-  } else if (tutorStep === 2 && (input.freezeIntent || input.gasIntent)) {
-    tutorStep = 3
-    tutorTimer = 0
-    tutorPersist() // le cœur est acquis : plus de tutoriel aux prochaines visites
-  }
-
-  // texte à montrer (les étapes 3 et 4 sont contextuelles)
-  let text = ''
-  if (playing && !cardVisible) {
-    if (tutorStep <= 2) {
-      text = TUTOR_TEXTS[tutorStep]
-    } else if (tutorStep === 3) {
-      // à l'approche du mur d'éponge du tableau 1 (x = 560)
-      if (sim.stats.centroidX > 60 && sim.stats.centroidX < 560)
-        text = TUTOR_TEXTS[3]
-    } else if (tutorStep === 4) {
-      const d = Math.hypot(
-        sim.stats.centroidX - exitMouth.x,
-        sim.stats.centroidY - exitMouth.y,
-      )
-      if (d < Math.max(320, params.exitRadius * 1.6)) text = TUTOR_TEXTS[4]
-    }
-  }
-
-  // écoulement du temps sur les étapes à durée
-  if (text !== '') {
-    tutorTimer += dtReal
-    if (tutorStep === 1 && tutorTimer > 6) {
-      tutorStep = 2
-      tutorTimer = 0
-    } else if (tutorStep === 2 && tutorTimer > 22) {
-      tutorStep = 3 // on n'insiste pas : la consigne a été lue
-      tutorTimer = 0
-      tutorPersist()
-    } else if (tutorStep === 3 && tutorTimer > 7) {
-      tutorStep = 4
-      tutorTimer = 0
-    } else if (tutorStep === 4 && tutorTimer > 7) {
-      tutorStep = 5
-    }
-  }
-
-  if (text !== tutorShown) {
-    tutorShown = text
-    if (text !== '') {
-      tutorEl.innerHTML = `<span class="consigne">CONSIGNE DU PROTOCOLE</span>${text}`
-      tutorEl.classList.add('visible')
-    } else {
-      tutorEl.classList.remove('visible')
-    }
-  }
-}
-
 /** L'échappement HTML de la maison — texte ET attributs : le guillemet
  *  aussi, sinon un code de biome qui en porte un casse un `value="…"`. */
 function htmlSafe(s: string): string {
@@ -19269,7 +19234,6 @@ function corpsImage(now: number): boolean {
     )
     majEveil(dtReal) // l'éveil suit la caméra : ses repères (invite) sont à jour
   }
-  updateTutor(dtReal)
   updateTrophees(dtReal)
   majFpsCoin(dtReal)
   updateWorldLabels(vw, vh)
@@ -19405,7 +19369,7 @@ function corpsImage(now: number): boolean {
   monitor.speed = speed
   monitor.quality = echelleRendue()
 
-  btnPause.textContent = input.paused ? '▶' : '⏸'
+  posePicto(btnPause, input.paused ? 'lecture' : 'pause')
   btnPause.classList.toggle('active', input.paused)
   chipLegend.classList.toggle('active', legend.classList.contains('visible'))
   chipStates.classList.toggle(
@@ -19420,6 +19384,21 @@ function corpsImage(now: number): boolean {
   btnVortex.classList.toggle('active', input.vortexArmed)
   btnVortex.style.display = params.vortexEnabled >= 0.5 ? '' : 'none'
   majCadranEtats(zoneActive)
+  document.body.classList.toggle(
+    'ath-repos',
+    athAuRepos({
+      maintenant: performance.now(),
+      dernierGeste: dernierGesteAth,
+      reglage: reglageAth,
+      // tiroir ouvert, pause, dispersion, jauge en alerte : l'interface
+      // doit rester lisible
+      force:
+        tiroirOuvert ||
+        input.paused ||
+        sim.dispersed ||
+        gaugeFill.classList.contains('danger'),
+    }),
+  )
   // le DOSSIER se rafraîchit quatre fois par seconde tant qu'il est ouvert
   if (dossierOuvert) {
     const tMaj = performance.now() / 1000
@@ -19434,7 +19413,7 @@ function corpsImage(now: number): boolean {
   stateGlace.disabled = locked
   stateVapeur.disabled = locked
   document.body.classList.toggle('state-locked', locked)
-  btnSound.textContent = audio.enabled ? '🔊' : '🔇'
+  posePicto(btnSound, audio.enabled ? 'son' : 'muet')
 
   // Instruments de bord
   const fraction = sim.baseVolume > 0 ? sim.playerCount / sim.baseVolume : 0
@@ -19457,7 +19436,7 @@ function corpsImage(now: number): boolean {
   const coque = Math.round(21 - 81 * chillNow())
   hudCoque.textContent = `${coque > 0 ? '+' : ''}${coque}°`
   hudCoque.classList.toggle('warn', chillNow() > 0.75)
-  coqueBar.style.width = `${(chillNow() * 100).toFixed(1)}%`
+  hudCoqueChip.classList.toggle('gele', chillNow() > 0.75)
   // AU HUB la réserve est infinie : afficher un litrage qui ne descend
   // jamais ferait croire à une jauge en panne.
   const bbInfinie = bonbonneIllimitee(auHub)
@@ -19507,7 +19486,10 @@ function corpsImage(now: number): boolean {
   // La vie compte la matière VIVANTE : le corps plus les gouttes marquées
   // encore dans son halo (la règle : n'est perdu que ce qui en SORT — et
   // tout ce qui reste dans le halo revient, le rappel s'en charge).
-  hudVolume.innerHTML = `${sim.liters().toFixed(2)} <small>L · ${sim.aliveCount()} part.</small>`
+  // le litrage seul : le compte de particules est une mesure d'atelier, il
+  // se lit au survol — l'écran garde ce qui se joue
+  hudVolume.innerHTML = `${sim.liters().toFixed(2)} <small>L</small>`
+  hudVolume.title = `${sim.aliveCount()} particules`
   gaugeFill.style.width = `${Math.min(100, fraction * 100).toFixed(1)}%`
   // Le seuil est un volume ABSOLU : sa position sur la jauge (graduée en % du
   // volume de départ) dépend donc du volume de base de ce tableau.
@@ -19515,8 +19497,6 @@ function corpsImage(now: number): boolean {
   const seuilPct =
     baseLiters > 0 ? (params.criticalVolumeLiters / baseLiters) * 100 : 0
   gaugeThreshold.style.left = `${Math.min(100, seuilPct).toFixed(1)}%`
-  hudSeuil.textContent = `${params.criticalVolumeLiters.toFixed(2)} L`
-  hudVitesse.textContent = `${speed.toFixed(0)} u/s`
 
   // Débit de perte lissé : combien coûte l'action en cours, et à quoi
   const nowLiters = sim.liters()
@@ -19690,8 +19670,11 @@ function corpsImage(now: number): boolean {
   // bord du cadre, avec la distance restante — on sait toujours où aller.
   const exitSx = vw * 0.5 + (exitMouth.x - camera.x) * camera.zoom
   const exitSy = vh * 0.5 - (exitMouth.y - camera.y) * camera.zoom
+  // plus de bandes à éviter : le sas est « à l'écran » dès qu'il est
+  // visible, et la flèche se pose sous les coins du haut, au-dessus du
+  // cadran et des commandes
   const exitOnScreen =
-    exitSx > 30 && exitSx < vw - 30 && exitSy > 92 && exitSy < vh - 140
+    exitSx > 30 && exitSx < vw - 30 && exitSy > 30 && exitSy < vh - 30
   const showArrow =
     document.body.classList.contains('playing') &&
     !tableauDone &&
@@ -19701,7 +19684,7 @@ function corpsImage(now: number): boolean {
   if (showArrow) {
     const ang = Math.atan2(exitSy - vh * 0.5, exitSx - vw * 0.5)
     const ax = Math.min(vw - 48, Math.max(48, exitSx))
-    const ay = Math.min(vh - 152, Math.max(106, exitSy))
+    const ay = Math.min(vh - 96, Math.max(84, exitSy))
     objArrow.style.transform = `translate(${ax.toFixed(1)}px, ${ay.toFixed(1)}px) translate(-50%, -50%)`
     objArrowGlyph.style.transform = `rotate(${((ang * 180) / Math.PI).toFixed(1)}deg)`
     const dWorld = Math.hypot(
@@ -19929,23 +19912,7 @@ function corpsImage(now: number): boolean {
   }
   sim.iceImpact = 0
 
-  const stateText = sim.dispersed
-    ? 'DISPERSÉ'
-    : locked
-      ? `${zoneActive.toUpperCase()} — IMPOSÉE`
-      : allFrozen
-        ? 'GLACE'
-        : allGas
-          ? 'VAPEUR'
-          : 'liquide'
-  const gel = !allFrozen && frozenCount > 0 ? ' · gel partiel' : ''
-  const vape = !allGas && gasCount > 0 ? ' · vapeur partielle' : ''
-  const suffix = `${gel}${vape}${vortex.timer > 0 ? ' · vortex' : ''}${input.paused ? ' · pause' : ''}`
-  hudState.textContent = stateText + suffix
-  hudState.classList.toggle('warn', sim.dispersed)
   document.body.classList.toggle('dispersed', sim.dispersed)
-  hudWarp.textContent = `×${params.timeWarp}`
-  hudWarp.classList.toggle('warn', params.timeWarp !== 1)
   majVitesse()
 
   // Relevé vivant de la fiche d'essai

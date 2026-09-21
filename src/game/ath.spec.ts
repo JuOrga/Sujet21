@@ -1,0 +1,231 @@
+// LE CONTRAT DE L'ATH. Rien ne relie index.html à main.ts qu'un nom écrit en
+// toutes lettres : un id renommé donne une interface muette, sans erreur et
+// sans test rouge. Et une taille écrite sans --ui échappe au seul réglage
+// d'accessibilité du jeu. Ce fichier verrouille les deux.
+import { readFileSync } from 'node:fs'
+import { describe, expect, it } from 'vitest'
+import { BULLES, PICTOS, type NomPicto } from './athPictos'
+
+const HTML = readFileSync(new URL('../../index.html', import.meta.url), 'utf-8')
+const MAIN = readFileSync(new URL('../main.ts', import.meta.url), 'utf-8')
+
+/** Le CSS de l'ATH, entre ses deux bornes écrites dans index.html. */
+const CSS_ATH = ((): string => {
+  const a = HTML.indexOf('/* ==== ATH : DÉBUT ==== */')
+  const b = HTML.indexOf('/* ==== ATH : FIN ==== */')
+  return a >= 0 && b > a ? HTML.slice(a, b) : ''
+})()
+
+/** Le compact vit HORS des bornes DÉBUT/FIN (un même @media mêle ATH et
+ *  reste) : borné à son tour par un marqueur dédié, pour protéger ses
+ *  tailles de texte comme CSS_ATH protège les siennes. */
+const COMPACT = ((): string => {
+  const a = HTML.indexOf('/* Au doigt : les commandes tiennent en rangée')
+  const b = HTML.indexOf('/* ATH compact : fin */')
+  return a >= 0 && b > a ? HTML.slice(a, b) : ''
+})()
+
+describe('l’ATH garde les noms que le jeu cherche', () => {
+  it.each([
+    'hud', 'hud-volume', 'bonbonne', 'gauge-fill', 'gauge-threshold',
+    'hud-tableau', 'hud-vies', 'hud-vies-chip', 'hud-cond', 'hud-cond-chip',
+    'hud-instr', 'hud-instr-chip', 'hud-coque', 'hud-coque-chip', 'hud-capture',
+    'hud-perte', 'hud-rosee', 'hud-fantome',
+    'voie-hud', 'vh-rang', 'vh-rail', 'vh-stade',
+    'statebar', 'state-eau', 'state-glace', 'state-vapeur', 'state-zone',
+    'touchbar', 'tiroir', 'hud-danger',
+  ])('#%s existe', (id) => {
+    expect(HTML).toContain(`id="${id}"`)
+  })
+})
+
+describe('le haut de l’écran : deux coins, plus de bandeau', () => {
+  it('borne son CSS', () => {
+    expect(CSS_ATH.length).toBeGreaterThan(0)
+  })
+
+  it('range les instruments dans .ath-vital et .ath-etat', () => {
+    const hud = HTML.slice(HTML.indexOf('<div id="hud">'), HTML.indexOf('id="rejeu-barre"'))
+    const vital = hud.slice(hud.indexOf('ath-vital'), hud.indexOf('ath-etat'))
+    const etat = hud.slice(hud.indexOf('ath-etat'))
+    for (const id of ['hud-volume', 'bonbonne', 'gauge-fill', 'hud-perte', 'hud-rosee', 'hud-fantome'])
+      expect(vital, id).toContain(`id="${id}"`)
+    for (const id of ['voie-hud', 'hud-tableau', 'hud-vies', 'hud-cond', 'hud-coque', 'hud-capture'])
+      expect(etat, id).toContain(`id="${id}"`)
+  })
+
+  it('ne peint plus de bandeau : #hud n’a ni fond ni flou', () => {
+    const regle = /#hud \{[^}]*\}/.exec(CSS_ATH)?.[0] ?? ''
+    expect(regle).toContain('pointer-events: none')
+    expect(regle).not.toMatch(/background|backdrop-filter|border-bottom/)
+  })
+
+  it('écrit toutes ses tailles de texte à l’échelle --ui', () => {
+    const tailles = CSS_ATH.match(/font-size:[^;]+;/g) ?? []
+    expect(tailles.length).toBeGreaterThan(5)
+    for (const t of tailles) expect(t).toContain('var(--ui)')
+  })
+
+  it('respecte prefers-reduced-motion', () => {
+    expect(CSS_ATH).toContain('prefers-reduced-motion: reduce')
+  })
+
+  it('écrit en dur les mêmes tracés que le dictionnaire', () => {
+    const durs = [...HTML.matchAll(/data-picto="([a-z]+)"[^>]*><path d="([^"]+)"/g)]
+    expect(durs.length).toBeGreaterThan(0)
+    for (const [, nom, d] of durs) expect(d, nom).toBe(PICTOS[nom as NomPicto])
+  })
+})
+
+describe('le cadran des états', () => {
+  it('porte des pictogrammes, plus d’emoji', () => {
+    const bar = HTML.slice(HTML.indexOf('<div id="statebar"'), HTML.indexOf('id="state-zone"'))
+    expect(bar).not.toMatch(/[💧❄💨]/u)
+    for (const n of ['eau', 'glace', 'vapeur']) expect(bar).toContain(`data-picto="${n}"`)
+  })
+
+  it('donne à chaque logement la silhouette de son état : un cube, une goutte, un nuage', () => {
+    // la bulle était un octogone découpé (clip-path), le même pour les trois
+    // états : seul le symbole disait lequel. Un découpage n'a pas de bord —
+    // le liseré des logements au repos exige un tracé.
+    const bar = HTML.slice(HTML.indexOf('<div id="statebar"'), HTML.indexOf('id="state-zone"'))
+    for (const n of ['eau', 'glace', 'vapeur'] as const) {
+      const m = bar.match(new RegExp(`data-bulle="${n}"[^>]*><path class="st-forme" d="([^"]+)"`))
+      expect(m?.[1], n).toBe(BULLES[n].forme)
+    }
+    // le cube seul a des arêtes : sans elles, ce n'est qu'un hexagone
+    expect(bar.match(/<path class="st-aretes" d="([^"]+)"/)?.[1]).toBe(BULLES.glace.aretes)
+    expect(bar.match(/st-aretes/g)?.length).toBe(1)
+    const regle = CSS_ATH.match(/#statebar \.st-ico \{[^}]*\}/)?.[0] ?? ''
+    expect(regle).not.toBe('')
+    expect(regle).not.toContain('clip-path')
+  })
+
+  it('ne s’empile plus sur la barre du bas : --tb-h a disparu', () => {
+    expect(HTML).not.toContain('--tb-h')
+    expect(MAIN).not.toContain('--tb-h')
+    expect(MAIN).toContain('--cadran-h')
+  })
+
+  it('garde la barre de rejeu dans l’écran en compact', () => {
+    // elle héritait de --tb-h (~459 px en colonne) et partait hors écran
+    expect(/#rejeu-barre \{[^}]*bottom:[^}]*\}/.test(COMPACT)).toBe(true)
+  })
+})
+
+describe('le compact protège aussi ses tailles de texte', () => {
+  it('borne son bloc avec un marqueur dédié', () => {
+    expect(COMPACT.length).toBeGreaterThan(0)
+  })
+
+  it('écrit toutes ses tailles de texte à l’échelle --ui', () => {
+    const tailles = COMPACT.match(/font-size:[^;]+;/g) ?? []
+    expect(tailles.length).toBeGreaterThan(0)
+    for (const t of tailles) expect(t).toContain('var(--ui)')
+  })
+})
+
+describe('les commandes et le tiroir', () => {
+  it('a son tiroir dans la coque', () => {
+    expect(HTML).toContain('id="tiroir"')
+  })
+
+  it('bâtit le tiroir depuis la liste testée, pas depuis une liste recopiée', () => {
+    expect(MAIN).toContain('entreesTiroir(')
+    expect(MAIN).toContain('toucheDe(')
+  })
+
+  it('ne met plus la barre en colonne : c’est elle qui débordait', () => {
+    const regles = [...HTML.matchAll(/[^{}]*#touchbar[^{}]*\{([^}]*)\}/g)]
+    expect(regles.length).toBeGreaterThan(0)
+    for (const [, corps] of regles) expect(corps).not.toContain('flex-direction: column')
+  })
+
+  it('n’a plus l’ancienne fabrique à emoji', () => {
+    expect(MAIN).not.toContain('touchButton(')
+  })
+})
+
+describe('les pancartes du monde', () => {
+  it('ne connaissent plus de bandes : seuls les postes occupés sont interdits', () => {
+    expect(MAIN).not.toContain('BANDE_HAUTE')
+    expect(MAIN).not.toContain('bandeBasse')
+    expect(MAIN).toContain('pancarteLibre(')
+    expect(MAIN).toContain('zonesInterdites(')
+  })
+})
+
+describe('le repos de l’ATH', () => {
+  it('a son réglage dans PARAMÈTRES', () => {
+    expect(HTML).toContain('id="params-ath"')
+  })
+
+  it('passe par l’automate testé', () => {
+    expect(MAIN).toContain('athAuRepos(')
+    expect(MAIN).toContain("'ath-repos'")
+  })
+
+  it('n’estompe jamais le module vital ni le médaillon courant', () => {
+    const regles = CSS_ATH.match(/body\.ath-repos[^{]*\{[^}]*\}/g) ?? []
+    expect(regles.length).toBeGreaterThan(0)
+    for (const r of regles) expect(r).not.toContain('.ath-vital')
+    expect(regles.join('\n')).toContain(':not(.st-cur)')
+  })
+})
+
+describe('les panneaux de lecture', () => {
+  it('ne tombent plus au centre de l’écran, sur le corps', () => {
+    const regle = /#legend,\s*#states \{[^}]*\}/.exec(HTML)?.[0] ?? ''
+    expect(regle).not.toBe('')
+    expect(regle).not.toContain('translate(-50%, -50%)')
+    expect(regle).toMatch(/right:\s*0/)
+  })
+})
+
+describe('le code mort est parti', () => {
+  it.each(['id="tutor"', 'id="tableau-card"', 'hud-restes', 'id="coque-bar"'])(
+    '%s n’est plus dans la coque',
+    (trace) => {
+      expect(HTML).not.toContain(trace)
+    },
+  )
+
+  it('main.ts ne les alimente plus', () => {
+    for (const nom of ['updateTutor', 'showTableauCard', 'hudVitesse', 'coqueBar'])
+      expect(MAIN, nom).not.toContain(nom)
+  })
+})
+
+describe('le rail tient à 30 salles', () => {
+  it('est borné en largeur, sans crans figés', () => {
+    const rail = /#vh-rail \{[^}]*\}/.exec(CSS_ATH)?.[0] ?? ''
+    expect(rail).toContain('width: min(200px, 22vw)')
+    const cran = /\.vh-cran \{[^}]*\}/.exec(CSS_ATH)?.[0] ?? ''
+    expect(cran).not.toContain('flex: none')
+  })
+
+  it('disparaît en compact : SALLE n/N porte seule le compte', () => {
+    expect(HTML).toMatch(/#vh-rail \{\s*display: none;\s*\}/)
+  })
+})
+
+describe('ce qui se pose sous les coins suit leur bas mesuré', () => {
+  it('publie --coins-bas depuis majZonesAth', () => {
+    expect(MAIN).toContain('--coins-bas')
+  })
+
+  it('hud-danger (bureau et compact) s’appuie sur --coins-bas', () => {
+    const regles = HTML.match(/#hud-danger \{[^}]*\}/g) ?? []
+    expect(regles.length).toBe(2)
+    for (const r of regles) expect(r).toContain('var(--coins-bas')
+  })
+
+  it('le toast et le panneau des instruments aussi', () => {
+    const toast = /#trophee-toast \{[^}]*\}/.exec(HTML)?.[0] ?? ''
+    expect(toast).toContain('var(--coins-bas')
+    const panneau = (HTML.match(/#instr-panel \{[^}]*\}/g) ?? []).find((r) => r.includes('position: fixed')) ?? ''
+    expect(panneau).toContain('var(--coins-bas')
+  })
+})
+
+export { HTML, MAIN, CSS_ATH }
