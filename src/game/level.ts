@@ -915,6 +915,13 @@ export interface LevelDef {
   // dans l'éditeur) : la voie ne propose pas sa « suite écrite » tant que
   // le lien manuel correspondant n'est pas tissé à l'écran des mémoires.
   exige?: ('glace' | 'vapeur')[]
+  // LES CARTES IMPOSÉES (le concepteur, 17/09 : « attribuer n'importe
+  // quelle carte sur n'importe quel tableau, surcharger ») : des
+  // identifiants du catalogue des récompenses, lus comme si le joueur les
+  // tenait, le temps de la salle — une carte déjà en poche ne compte qu'une
+  // fois. Le preset (`reglages`) fixe les NOMBRES de la physique ; les
+  // cartes tirent les leviers par-dessus, elles n'écrivent jamais dedans.
+  cartes?: string[]
   // LE BIOME du tableau : le code du module de la carte qui peut le
   // proposer (carteStation.json, champ `biome`). Sans biome, le tableau
   // est UNIVERSEL — tout module peut le piocher : c'est ce qui laisse la
