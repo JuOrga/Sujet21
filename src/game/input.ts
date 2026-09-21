@@ -5,8 +5,9 @@
 // Le bouton ⌖ recadre sur le corps (zoom et caméra automatiques).
 //
 // Tactile : un doigt = éjecter ; deux doigts = pincer pour zoomer ET glisser
-// pour déplacer la caméra. Pas de clavier : la barre tactile (main.ts) arme
-// le vortex et couvre pause / time warp / recommencer.
+// pour déplacer la caméra. Pas de clavier : le tiroir (main.ts) arme le
+// vortex et RECOMMENCER ; pause et le temps restent sur les trois boutons
+// de l'écran (≡, ⏸, ×N).
 
 import { actionDeTouche, sourisInverse } from './commandes'
 
