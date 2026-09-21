@@ -50,7 +50,7 @@ Sujet.
 | **le module vital** | haut-gauche | le litrage en grand (Plex Mono 600, 24 px), l'unité `L` en Michroma, la fiole (`#bonbonne`), une jauge courte de 168 × 4 px avec le seuil rouge. À droite de la jauge, la perte (`#hud-perte`) ; dessous, la rosée et le fantôme. Ces trois lignes **n'occupent de place que lorsqu'elles parlent**. |
 | **la capsule d'état** | haut-droit | les crans de progression (`#vh-rail`, bornés à `min(200px, 22vw)`, les crans se resserrent — une descente livrée compte 27 à 30 salles, pas les 7 de la maquette) + `SALLE n/N`, puis une rangée de lectures séparées par un filet : vies, condensat, coque, instruments (et `⏺ CAPTURER` en mode concepteur). Pas de cadre par lecture. |
 | **les commandes** | bas-gauche | trois boutons : `≡` (le tiroir), pause, le temps (`×1`). En essai depuis l'éditeur, `↩ ÉDITEUR` reste un quatrième bouton permanent. |
-| **le cadran des états** | bas-centre ; colonne bas-droite en compact | les trois médaillons, octogonaux (la forme des modules du plan de la station). Le courant est plein, 56 px, avec son nom ; les autres 42 px, en creux, avec leur touche. |
+| **le cadran des états** | bas-centre ; colonne bas-droite en compact | les trois bulles, chacune à la silhouette de son état — un cube, une goutte, un nuage (`BULLES`, dans `game/athPictos.ts`) — avec le symbole du régime dedans : flocon, vagues, volutes. (Jusqu'au 21/09 : trois octogones identiques, qu'on ne distinguait qu'au symbole.) Le courant est plein, 56 px, avec son nom ; les autres 42 px, en creux et cernés d'un liseré, avec leur touche. |
 
 La bannière d'alerte (`#hud-danger`), les trophées (`#trophee-toast`) et le
 panneau des instruments (`#instr-panel`) se posent sous le bas MESURÉ des

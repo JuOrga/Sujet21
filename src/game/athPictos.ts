@@ -6,16 +6,16 @@
 // Ici, un tracé par nom, dans une boîte de 24 × 24 ; le trait (1,6) et la
 // couleur viennent du CSS (`.picto`), donc du texte qui l'entoure.
 
-// Les trois états sont trois OBJETS de même nature : un cube, une goutte,
-// un nuage — la matière elle-même, sous ses trois formes. Avant, seule
-// l'eau était un objet : la glace était un flocon (un symbole de froid) et
-// la vapeur trois volutes (un symbole de chaleur), et le cadran mélangeait
-// « ce que tu es » et « la température qu'il fait ».
+// Dans le cadran, l'OBJET est porté par la bulle (BULLES, plus bas : un
+// cube, une goutte, un nuage) et le pictogramme posé dedans dit le RÉGIME :
+// un flocon, des vagues, des volutes — froid, liquide, chaud. L'eau était
+// une goutte : dans une bulle en goutte, elle ne disait plus rien.
 export const PICTOS = {
-  glace: 'M12 3l7.8 4.5v9L12 21l-7.8-4.5v-9zM4.2 7.5L12 12l7.8-4.5M12 12v9',
-  eau: 'M12 3.5c3.2 4.2 5.5 7.3 5.5 10.2a5.5 5.5 0 0 1-11 0C6.5 10.8 8.8 7.7 12 3.5z',
+  glace:
+    'M12 3v18M4.2 7.5l15.6 9M19.8 7.5l-15.6 9M12 6.5l-2-2M12 6.5l2-2M12 17.5l-2 2M12 17.5l2 2',
+  eau: 'M4 9.5c2.7-2.4 5.3-2.4 8 0s5.3 2.4 8 0M4 15.5c2.7-2.4 5.3-2.4 8 0s5.3 2.4 8 0',
   vapeur:
-    'M7.5 18.5a4 4 0 0 1-.6-7.95 5.5 5.5 0 0 1 10.7 1 3.5 3.5 0 0 1-.6 6.95z',
+    'M8 20c-2-3 2-5 0-8s2-5 0-8M12 20c-2-3 2-5 0-8s2-5 0-8M16 20c-2-3 2-5 0-8s2-5 0-8',
   menu: 'M4 7h16M4 12h16M4 17h16',
   pause: 'M9 5v14M15 5v14',
   lecture: 'M8 5l11 7-11 7z',
@@ -37,6 +37,24 @@ export const PICTOS = {
 } as const
 
 export type NomPicto = keyof typeof PICTOS
+
+// LES BULLES DU CADRAN : la silhouette de chaque logement d'état, dans une
+// boîte de 48 × 48. Les trois logements étaient le MÊME octogone découpé
+// (clip-path) : on ne savait lequel était lequel qu'en lisant le symbole.
+// Un tracé plutôt qu'un découpage, parce qu'un découpage n'a pas de bord —
+// or le logement au repos est en creux, cerné d'un liseré à sa couleur.
+// Le cube porte ses trois arêtes : sans elles, ce n'est qu'un hexagone.
+export const BULLES = {
+  glace: {
+    forme: 'M24 3l18.2 10.5v21L24 45 5.8 34.5v-21z',
+    aretes: 'M5.8 13.5L24 24l18.2-10.5M24 24v21',
+  },
+  eau: { forme: 'M24 3C31 13 39 21 39 30a15 15 0 0 1-30 0C9 21 17 13 24 3z' },
+  vapeur: {
+    forme:
+      'M12.75 41.25a10 10 0 0 1-1.5-19.875 13.75 13.75 0 0 1 26.75 2.5 8.75 8.75 0 0 1-1.5 17.375z',
+  },
+} as const
 
 /** Le svg complet d'un pictogramme — décoratif : le nom est porté par le
  *  bouton qui le contient (title, aria-label), jamais par l'image. */

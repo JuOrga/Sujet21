@@ -4,7 +4,7 @@
 // d'accessibilité du jeu. Ce fichier verrouille les deux.
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
-import { PICTOS, type NomPicto } from './athPictos'
+import { BULLES, PICTOS, type NomPicto } from './athPictos'
 
 const HTML = readFileSync(new URL('../../index.html', import.meta.url), 'utf-8')
 const MAIN = readFileSync(new URL('../main.ts', import.meta.url), 'utf-8')
@@ -82,6 +82,23 @@ describe('le cadran des états', () => {
     const bar = HTML.slice(HTML.indexOf('<div id="statebar"'), HTML.indexOf('id="state-zone"'))
     expect(bar).not.toMatch(/[💧❄💨]/u)
     for (const n of ['eau', 'glace', 'vapeur']) expect(bar).toContain(`data-picto="${n}"`)
+  })
+
+  it('donne à chaque logement la silhouette de son état : un cube, une goutte, un nuage', () => {
+    // la bulle était un octogone découpé (clip-path), le même pour les trois
+    // états : seul le symbole disait lequel. Un découpage n'a pas de bord —
+    // le liseré des logements au repos exige un tracé.
+    const bar = HTML.slice(HTML.indexOf('<div id="statebar"'), HTML.indexOf('id="state-zone"'))
+    for (const n of ['eau', 'glace', 'vapeur'] as const) {
+      const m = bar.match(new RegExp(`data-bulle="${n}"[^>]*><path class="st-forme" d="([^"]+)"`))
+      expect(m?.[1], n).toBe(BULLES[n].forme)
+    }
+    // le cube seul a des arêtes : sans elles, ce n'est qu'un hexagone
+    expect(bar.match(/<path class="st-aretes" d="([^"]+)"/)?.[1]).toBe(BULLES.glace.aretes)
+    expect(bar.match(/st-aretes/g)?.length).toBe(1)
+    const regle = CSS_ATH.match(/#statebar \.st-ico \{[^}]*\}/)?.[0] ?? ''
+    expect(regle).not.toBe('')
+    expect(regle).not.toContain('clip-path')
   })
 
   it('ne s’empile plus sur la barre du bas : --tb-h a disparu', () => {

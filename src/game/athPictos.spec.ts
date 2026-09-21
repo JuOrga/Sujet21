@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { PICTOS, picto, type NomPicto } from './athPictos'
+import { BULLES, PICTOS, picto, type NomPicto } from './athPictos'
 
 describe('les pictogrammes de l’ATH', () => {
   const noms = Object.keys(PICTOS) as NomPicto[]
@@ -19,6 +19,17 @@ describe('les pictogrammes de l’ATH', () => {
     for (const n of noms) {
       expect(PICTOS[n], n).toMatch(/^M[0-9MmLlHhVvCcSsQqTtAaZz .,-]+$/)
     }
+  })
+
+  it('trace une bulle par état, et des arêtes au cube seul', () => {
+    expect(Object.keys(BULLES).sort()).toEqual(['eau', 'glace', 'vapeur'])
+    for (const b of Object.values(BULLES)) {
+      // une silhouette est FERMÉE : elle se remplit à la couleur de l'état
+      expect(b.forme).toMatch(/^M[0-9MmLlHhVvCcSsQqTtAaZz .,-]+z$/)
+    }
+    expect(BULLES.glace.aretes).toMatch(/^M[0-9MmLlHhVv .,-]+$/)
+    expect('aretes' in BULLES.eau).toBe(false)
+    expect('aretes' in BULLES.vapeur).toBe(false)
   })
 
   it('rend un svg décoratif, sans couleur propre : le CSS le teinte', () => {

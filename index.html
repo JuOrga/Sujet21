@@ -5245,10 +5245,13 @@
       #hud-fantome .avance { color: #9be7c4; }
       /* ---- Le cadran des états : LA commande du jeu ----
          Trois logements fixes, glace à gauche, liquide au centre, vapeur à
-         droite. Des médaillons OCTOGONAUX — la forme des modules sur le plan
-         de la station. Le courant est plein, à la couleur de son état ; les
-         autres sont en creux, et ne paraissent que si leur transformation
-         est tissée. Posé au bord bas : plus rien ne s'empile dessous. */
+         droite. Chaque bulle a la SILHOUETTE de son état — un cube, une
+         goutte, un nuage (game/athPictos.ts, BULLES) : c'étaient trois
+         octogones identiques, qu'on ne distinguait qu'en lisant le symbole.
+         Le courant est plein, à la couleur de son état ; les autres sont en
+         creux, cernés d'un liseré, et ne paraissent que si leur
+         transformation est tissée. Posé au bord bas : plus rien ne s'empile
+         dessous. */
       #statebar {
         position: fixed;
         left: 50%;
@@ -5286,12 +5289,48 @@
         height: 42px;
         font-size: calc(17px * var(--ui));
         color: var(--teinte);
-        background: rgba(10, 20, 32, 0.62);
-        clip-path: polygon(30% 0, 70% 0, 100% 30%, 100% 70%, 70% 100%, 30% 100%, 0 70%, 0 30%);
-        transition: background 0.15s ease, color 0.15s ease;
+        transition: color 0.15s ease;
       }
-      #statebar button:hover .st-ico {
-        background: rgba(20, 36, 54, 0.8);
+      /* la bulle et son symbole partagent la même case : l'un sur l'autre */
+      #statebar .st-bulle,
+      #statebar .st-ico .picto {
+        grid-area: 1 / 1;
+      }
+      #statebar .st-bulle {
+        width: 100%;
+        height: 100%;
+        overflow: visible;
+      }
+      #statebar .st-forme,
+      #statebar .st-aretes {
+        stroke: var(--teinte);
+        stroke-width: 1.3px;
+        stroke-linejoin: round;
+        stroke-linecap: round;
+        /* le liseré garde son épaisseur quand la bulle passe de 42 à 56 px */
+        vector-effect: non-scaling-stroke;
+      }
+      #statebar .st-forme {
+        fill: rgba(10, 20, 32, 0.62);
+        transition: fill 0.15s ease;
+      }
+      #statebar .st-aretes {
+        fill: none;
+        /* en retrait : elles disent « cube » sans disputer la place au flocon */
+        opacity: 0.35;
+      }
+      /* le ventre d'une goutte et d'un nuage est plus BAS que le centre de
+         leur boîte : le symbole s'y pose, sinon il mord sur la pointe */
+      #statebar .st-ico .picto {
+        position: relative;
+        top: var(--ventre, 0%);
+        width: 1em;
+        height: 1em;
+      }
+      #state-eau { --ventre: 11%; }
+      #state-vapeur { --ventre: 7%; }
+      #statebar button:hover .st-forme {
+        fill: rgba(20, 36, 54, 0.8);
       }
       #statebar button.st-cur {
         cursor: default;
@@ -5301,7 +5340,13 @@
         height: 56px;
         font-size: calc(23px * var(--ui));
         color: var(--void);
-        background: var(--teinte);
+      }
+      #statebar button.st-cur .st-forme {
+        fill: var(--teinte);
+        stroke: none;
+      }
+      #statebar button.st-cur .st-aretes {
+        stroke: var(--void);
       }
       #statebar .st-label {
         font-family: var(--font-display);
@@ -5337,9 +5382,11 @@
       #statebar button.st-verrou {
         opacity: 0.65;
       }
-      #statebar button.st-verrou .st-ico {
-        outline: 1px dashed var(--line-strong);
-        outline-offset: -3px;
+      /* les pointillés suivent la silhouette (un outline aurait tracé un
+         carré autour d'un nuage) */
+      #statebar button.st-verrou .st-forme {
+        stroke: var(--line-strong);
+        stroke-dasharray: 3 3;
       }
       #statebar button.st-verrou kbd {
         border: none;
@@ -9357,13 +9404,13 @@
     </div>
     <div id="statebar" aria-label="État de l'échantillon">
       <button id="state-eau" type="button" title="redevenir liquide">
-        <span class="st-ico"><svg class="picto" data-picto="eau" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 3.5c3.2 4.2 5.5 7.3 5.5 10.2a5.5 5.5 0 0 1-11 0C6.5 10.8 8.8 7.7 12 3.5z"/></svg></span><span class="st-label">LIQUIDE</span><kbd hidden></kbd>
+        <span class="st-ico"><svg class="st-bulle" data-bulle="eau" viewBox="0 0 48 48" aria-hidden="true" focusable="false"><path class="st-forme" d="M24 3C31 13 39 21 39 30a15 15 0 0 1-30 0C9 21 17 13 24 3z"/></svg><svg class="picto" data-picto="eau" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M4 9.5c2.7-2.4 5.3-2.4 8 0s5.3 2.4 8 0M4 15.5c2.7-2.4 5.3-2.4 8 0s5.3 2.4 8 0"/></svg></span><span class="st-label">LIQUIDE</span><kbd hidden></kbd>
       </button>
       <button id="state-glace" type="button" title="se changer en glace (F) : le bloc garde son élan">
-        <span class="st-ico"><svg class="picto" data-picto="glace" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 3l7.8 4.5v9L12 21l-7.8-4.5v-9zM4.2 7.5L12 12l7.8-4.5M12 12v9"/></svg></span><span class="st-label">GLACE</span><kbd>F</kbd>
+        <span class="st-ico"><svg class="st-bulle" data-bulle="glace" viewBox="0 0 48 48" aria-hidden="true" focusable="false"><path class="st-forme" d="M24 3l18.2 10.5v21L24 45 5.8 34.5v-21z"/><path class="st-aretes" d="M5.8 13.5L24 24l18.2-10.5M24 24v21"/></svg><svg class="picto" data-picto="glace" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 3v18M4.2 7.5l15.6 9M19.8 7.5l-15.6 9M12 6.5l-2-2M12 6.5l2-2M12 17.5l-2 2M12 17.5l2 2"/></svg></span><span class="st-label">GLACE</span><kbd>F</kbd>
       </button>
       <button id="state-vapeur" type="button" title="se changer en vapeur (G) : visez — le temps ralentit — relâchez, le nuage fuse ; la distance du doigt fait la puissance">
-        <span class="st-ico"><svg class="picto" data-picto="vapeur" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M7.5 18.5a4 4 0 0 1-.6-7.95 5.5 5.5 0 0 1 10.7 1 3.5 3.5 0 0 1-.6 6.95z"/></svg></span><span class="st-label">VAPEUR</span><kbd>G</kbd>
+        <span class="st-ico"><svg class="st-bulle" data-bulle="vapeur" viewBox="0 0 48 48" aria-hidden="true" focusable="false"><path class="st-forme" d="M12.75 41.25a10 10 0 0 1-1.5-19.875 13.75 13.75 0 0 1 26.75 2.5 8.75 8.75 0 0 1-1.5 17.375z"/></svg><svg class="picto" data-picto="vapeur" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M8 20c-2-3 2-5 0-8s2-5 0-8M12 20c-2-3 2-5 0-8s2-5 0-8M16 20c-2-3 2-5 0-8s2-5 0-8"/></svg></span><span class="st-label">VAPEUR</span><kbd>G</kbd>
       </button>
       <div id="state-zone" hidden></div>
     </div>
