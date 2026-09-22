@@ -1594,12 +1594,12 @@
     },
     {
       "id": "le-rebond-2",
-      "auteur": "JU",
-      "majAt": "2026-08-30T20:41:17.421Z",
+      "auteur": "BOIZ",
+      "majAt": "2026-09-21T19:34:50.469Z",
       "codeAuteur": "JU",
       "codeAt": "2026-08-30T20:41:17.421Z",
       "level": {
-        "name": "Le rebond",
+        "name": "Le rebond vboiz",
         "code": "101",
         "journal": "Cellule 2, revêtement répulsif. Il a touché la paroi une fois, par curiosité — repoussé sans une goutte perdue. Au troisième passage il jouait au billard avec nos cloisons. Le rebond ne lui coûte rien : c’est nous qu’il use. — Dr N. Véga",
         "bounds": {
@@ -1609,134 +1609,156 @@
           "maxY": 750
         },
         "spawn": {
-          "x": -950,
-          "y": 0,
+          "x": -350,
+          "y": -550,
           "n": 900
         },
         "exit": {
-          "minX": 1040,
-          "minY": 260,
-          "maxX": 1180,
-          "maxY": 500
+          "minX": 890,
+          "minY": -295,
+          "maxX": 1030,
+          "maxY": -135
         },
         "boxes": [
           {
-            "minX": -700,
-            "minY": -420,
-            "maxX": -560,
-            "maxY": -280,
-            "material": 2
-          },
-          {
-            "minX": -180,
+            "minX": -150,
             "minY": -750,
-            "maxX": -100,
-            "maxY": 120,
+            "maxX": -50,
+            "maxY": 160,
             "material": 2
           },
           {
-            "minX": 220,
-            "minY": -120,
-            "maxX": 300,
-            "maxY": 750,
+            "minX": 250,
+            "minY": -240,
+            "maxX": 350,
+            "maxY": 500,
             "material": 2
           },
           {
-            "minX": 640,
-            "minY": 420,
-            "maxX": 860,
-            "maxY": 540,
+            "minX": 350,
+            "minY": 270,
+            "maxX": 1200,
+            "maxY": 330,
             "material": 2
           },
           {
-            "minX": 880,
-            "minY": -750,
-            "maxX": 960,
-            "maxY": 60,
+            "minX": 750,
+            "minY": -450,
+            "maxX": 810,
+            "maxY": 65,
             "material": 0
+          },
+          {
+            "minX": 1140,
+            "minY": -750,
+            "maxX": 1200,
+            "maxY": 270,
+            "material": 2
+          },
+          {
+            "minX": 1590,
+            "minY": -240,
+            "maxX": 1870,
+            "maxY": -80,
+            "material": 0
+          },
+          {
+            "minX": 750,
+            "minY": -750,
+            "maxX": 810,
+            "maxY": -450,
+            "material": 8
+          },
+          {
+            "minX": -380,
+            "minY": -1240,
+            "maxX": -80,
+            "maxY": -990,
+            "material": 0
+          },
+          {
+            "minX": -1200,
+            "minY": -250,
+            "maxX": -500,
+            "maxY": -150,
+            "material": 2
+          },
+          {
+            "minX": -750,
+            "minY": -750,
+            "maxX": -650,
+            "maxY": -500,
+            "material": 2
+          },
+          {
+            "minX": -850,
+            "minY": 160,
+            "maxX": -50,
+            "maxY": 260,
+            "material": 2
           }
         ],
         "sponges": [],
         "labels": [
           {
-            "x": -630,
-            "y": -200,
-            "text": "HYDROPHOBE — REPOUSSE",
-            "tone": "phobe",
-            "picto": {
-              "couleur": "#9e6bc7",
-              "eau": 2,
-              "glace": 1,
-              "vapeur": 1
-            }
-          },
-          {
-            "x": 60,
-            "y": 400,
-            "text": "LA CHICANE",
-            "tone": "phobe",
-            "rang": "secteur"
-          },
-          {
-            "x": 750,
-            "y": 600,
-            "text": "BANDE DE BILLARD",
-            "tone": "phobe"
-          },
-          {
-            "x": 1110,
-            "y": 560,
+            "x": 970,
+            "y": -220,
             "text": "SAS",
             "tone": "sas"
           }
         ],
         "par": 6,
         "ambiante": 0,
-        "decals": [
+        "caches": [
           {
-            "x": -1080,
-            "y": -500,
-            "w": 150,
-            "h": 150,
-            "kind": "tuyaux",
-            "fade": 0.4
+            "minX": -1200,
+            "minY": -750,
+            "maxX": -500,
+            "maxY": -250
+          },
+          {
+            "minX": 250,
+            "minY": 500,
+            "maxX": 1200,
+            "maxY": 750
+          },
+          {
+            "minX": 810,
+            "minY": -750,
+            "maxX": 1200,
+            "maxY": -370
           }
         ],
         "lumieres": [
           {
-            "x": -100,
-            "y": -680,
-            "h": 180,
-            "portee": 820,
-            "intensite": 1.15,
-            "forme": "bandeau",
-            "longueur": 1200
+            "x": -1010,
+            "y": 390
           },
           {
-            "x": -740,
-            "y": -350,
-            "h": 140,
-            "portee": 520,
-            "intensite": 0.95,
-            "couleur": "#9e6bc7",
-            "forme": "bandeau",
-            "longueur": 380,
-            "angle": 90
+            "x": 540,
+            "y": 120
+          }
+        ],
+        "condensats": [
+          {
+            "x": -1050,
+            "y": -530,
+            "cl": 6
           },
           {
-            "x": 750,
-            "y": 600,
-            "h": 240,
-            "portee": 460,
-            "intensite": 0.95,
-            "couleur": "#cfd8e6"
+            "x": 480,
+            "y": 640,
+            "cl": 6
           },
           {
-            "x": 1110,
-            "y": 380,
-            "h": 300,
-            "portee": 500,
-            "couleur": "#3fd69b"
+            "x": 1060,
+            "y": 640,
+            "cl": 6
+          },
+          {
+            "x": 950,
+            "y": -450,
+            "cl": 12
           }
         ]
       }
@@ -1897,8 +1919,8 @@
     },
     {
       "id": "le-premier-gel-2",
-      "auteur": "JU",
-      "majAt": "2026-08-30T20:45:24.471Z",
+      "auteur": "BOIZ",
+      "majAt": "2026-09-21T20:25:25.608Z",
       "codeAuteur": "JU",
       "codeAt": "2026-08-30T20:45:24.471Z",
       "level": {
@@ -1912,36 +1934,92 @@
           "maxY": 750
         },
         "spawn": {
-          "x": -950,
-          "y": 0,
+          "x": -923,
+          "y": 2,
           "n": 900
         },
         "exit": {
-          "minX": 1040,
-          "minY": -120,
-          "maxX": 1180,
-          "maxY": 120
+          "minX": 1057,
+          "minY": -72,
+          "maxX": 1200,
+          "maxY": 72
         },
         "boxes": [
           {
-            "minX": -620,
-            "minY": -360,
-            "maxX": -520,
-            "maxY": -260,
-            "material": 4
+            "minX": 820,
+            "minY": -392.5,
+            "maxX": 1303,
+            "maxY": 347.5,
+            "forme": 4,
+            "p0": 0.17,
+            "material": 0
           },
           {
-            "minX": -140,
+            "minX": 780,
+            "minY": -392.5,
+            "maxX": 860,
+            "maxY": -100,
+            "material": 9
+          },
+          {
+            "minX": 780,
+            "minY": 100,
+            "maxX": 860,
+            "maxY": 347.5,
+            "material": 9
+          },
+          {
+            "minX": -620,
             "minY": -750,
+            "maxX": 631,
+            "maxY": 750,
+            "material": 12
+          },
+          {
+            "minX": 110.17172154211266,
+            "minY": -1061,
+            "maxX": 609.8282784578873,
+            "maxY": -70.13151856665536,
+            "angle": -90,
+            "forme": 4,
+            "p0": 0.15,
+            "material": 0
+          },
+          {
+            "minX": -1245.5386458681355,
+            "minY": -795.1796017947331,
+            "maxX": 0.46658448635389504,
+            "maxY": 793.5578551470076,
+            "angle": 180,
+            "forme": 4,
+            "p0": 0.13,
+            "p1": 120,
+            "material": 0
+          },
+          {
+            "minX": 110.15529088066228,
+            "minY": 71,
+            "maxX": 609.8447091193377,
+            "maxY": 1062.3857313646654,
+            "angle": 90,
+            "forme": 4,
+            "p0": 0.15,
+            "material": 0
+          },
+          {
+            "minX": -134,
+            "minY": -370,
             "maxX": -60,
             "maxY": -220,
+            "forme": 2,
             "material": 4
           },
           {
-            "minX": -140,
+            "minX": -134,
             "minY": 220,
             "maxX": -60,
-            "maxY": 750,
+            "maxY": 370,
+            "forme": 2,
             "material": 4
           },
           {
@@ -1949,98 +2027,56 @@
             "minY": -55,
             "maxX": 540,
             "maxY": 55,
+            "forme": 2,
             "material": 4
           },
           {
-            "minX": 780,
-            "minY": -750,
-            "maxX": 860,
-            "maxY": -100,
-            "material": 0
-          },
-          {
-            "minX": 780,
-            "minY": 100,
-            "maxX": 860,
-            "maxY": 750,
-            "material": 0
+            "minX": -534,
+            "minY": -55,
+            "maxX": -434,
+            "maxY": 55,
+            "forme": 1,
+            "material": 4
           }
         ],
         "sponges": [],
         "labels": [
           {
-            "x": -570,
-            "y": -440,
-            "text": "PLAQUE FROIDE — FIGE",
-            "tone": "froid",
-            "picto": {
-              "couleur": "#8fc8ee",
-              "eau": 3,
-              "glace": 1,
-              "vapeur": 2
-            }
-          },
-          {
-            "x": -100,
-            "y": 60,
-            "text": "PORTE DE GIVRE",
-            "tone": "froid",
-            "rang": "secteur"
-          },
-          {
-            "x": 820,
-            "y": 200,
-            "text": "LA FENÊTRE",
-            "tone": "mur"
-          },
-          {
             "x": 1100,
-            "y": 180,
+            "y": -4,
             "text": "SAS",
             "tone": "sas"
           }
         ],
         "par": 6,
         "ambiante": 0,
-        "decals": [
+        "condensats": [
           {
-            "x": -1080,
-            "y": 560,
-            "w": 190,
-            "h": 285,
-            "kind": "vanne",
-            "fade": 0.42
+            "x": -100,
+            "y": -6,
+            "cl": 6
+          },
+          {
+            "x": -1100,
+            "y": 0,
+            "cl": 6
+          },
+          {
+            "x": 600,
+            "y": 0,
+            "cl": 12
+          },
+          {
+            "x": 900,
+            "y": -280,
+            "cl": 6
           }
         ],
         "lumieres": [
           {
-            "x": -190,
-            "y": 0,
-            "h": 150,
-            "portee": 880,
-            "intensite": 1.15,
-            "couleur": "#bfe0ff",
-            "forme": "bandeau",
-            "longueur": 820,
-            "angle": 90
-          },
-          {
-            "x": 740,
-            "y": 0,
-            "h": 150,
-            "portee": 620,
-            "intensite": 0.95,
-            "couleur": "#8fc8ee",
-            "forme": "bandeau",
-            "longueur": 560,
-            "angle": 90
-          },
-          {
-            "x": 1110,
-            "y": 0,
-            "h": 300,
-            "portee": 500,
-            "couleur": "#3fd69b"
+            "x": -100,
+            "y": 40,
+            "forme": "bandeau"
           }
         ]
       }
