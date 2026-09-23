@@ -36,6 +36,16 @@ export function sansPhysique(material: number): boolean {
   return material === MAT_EXIT || material === MAT_VIDE || material === MAT_BAIE
 }
 
+/** Les matériaux qui sont un FOND, comme les zones d'état : ils se peignent
+ *  SOUS tout le mobilier, quel que soit leur rang dans `boxes`. La baie
+ *  vitrée en est un : posée par-dessus une paroi, elle perçait la paroi
+ *  (elle se peignait dans l'ordre des surfaces, donc souvent la dernière —
+ *  dessus), alors qu'une verrière est une vue SOUS le décor, pas une pièce
+ *  posée dessus. */
+export function estUnFond(material: number): boolean {
+  return material === MAT_BAIE
+}
+
 export interface ObstacleBox {
   minX: number
   minY: number

@@ -32,6 +32,17 @@ export const MANOEUVRES: Manoeuvre[] = [
     fixe: true,
   },
   {
+    // A reste la main qui agit, même quand CONTINUER s'offre : au Deck, le
+    // bouton apparu captait A — le joueur ne pilotait plus ce qui restait du
+    // corps sans conclure la salle malgré lui. Conclure a donc son geste.
+    id: 'conclure',
+    nom: 'Conclure la salle (CONTINUER)',
+    aide: 'Quand le sas a assez bu, le bouton CONTINUER s’offre : ce geste le valide. Tant qu’on ne le fait pas, le corps restant se pilote comme avant.',
+    section: 'Le geste',
+    clavier: 'Enter',
+    manette: 13, // croix ↓
+  },
+  {
     id: 'glace',
     nom: 'Se changer en GLACE',
     aide: 'Le bloc garde son élan et glisse ; il ne se rassemble plus.',

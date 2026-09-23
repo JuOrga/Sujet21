@@ -23,6 +23,7 @@ import {
   MAT_BAIE,
   PLAFONDS_CONNUS,
   dansBoite,
+  estUnFond,
   MAT_HYDROPHILE,
   MAT_HYDROPHOBE,
   MAT_WALL,
@@ -94,7 +95,14 @@ import {
   FORME_COQUE,
   coquePieces,
 } from '../game/formes'
-import { deplaceDans, ditLeDeplacement, type SensOrdre } from '../game/ordre'
+import {
+  deplaceDans,
+  ditLeDeplacement,
+  indicesDuGroupe,
+  memeGroupeDePeinture,
+  rangsDePeinture,
+  type SensOrdre,
+} from '../game/ordre'
 import {
   CHANFREIN_MAX,
   EP_MAX,
@@ -1436,8 +1444,13 @@ export class LevelEditor {
         return { kind: 'decal', index: i }
       }
     }
+    // les FONDS (baie vitrée) se peignent sous tout : ils ne s'attrapent
+    // qu'en dernier, avec les zones — sinon la baie volait le clic à la
+    // paroi qu'on voit par-dessus
     for (let i = this.level.boxes.length - 1; i >= 0; i--) {
-      if (dansBoite(this.level.boxes[i], x, y)) return { kind: 'box', index: i }
+      const b = this.level.boxes[i]
+      if (!estUnFond(b.material) && dansBoite(b, x, y))
+        return { kind: 'box', index: i }
     }
     for (let i = this.level.sponges.length - 1; i >= 0; i--) {
       const sp = this.level.sponges[i]
@@ -1465,6 +1478,11 @@ export class LevelEditor {
       // juge sur sa vraie silhouette — l'AABB brute laissait la « hitbox »
       // à l'angle d'avant après une rotation (signalé)
       if (dansBoite(caches[i], x, y)) return { kind: 'cache', index: i }
+    }
+    for (let i = this.level.boxes.length - 1; i >= 0; i--) {
+      const b = this.level.boxes[i]
+      if (estUnFond(b.material) && dansBoite(b, x, y))
+        return { kind: 'box', index: i }
     }
     const zones = this.level.zones ?? []
     for (let i = zones.length - 1; i >= 0; i--) {
@@ -2534,7 +2552,11 @@ export class LevelEditor {
             this.cutWinner !== null &&
             this.cutWinner.kind === c.kind &&
             this.cutWinner.index === c.index
-          for (let i = this.level.boxes.length - 1; i >= 0; i--) {
+          // du DESSUS vers le dessous, dans l'ordre de peinture : une baie
+          // (un fond) ne vole plus le clic à la paroi qui la couvre
+          const rangs = rangsDePeinture(this.level.boxes)
+          for (let k = rangs.length - 1; k >= 0; k--) {
+            const i = rangs[k]
             if (!dansBoite(this.level.boxes[i], w.x, w.y)) continue
             const c: CutCible = { kind: 'box', index: i }
             if (memeQueGagnant(c)) leGagnant = c
@@ -4190,13 +4212,32 @@ export class LevelEditor {
     const s = this.sel
     if (!s || this.multi.length > 1) return
     if (s.kind !== 'box' && s.kind !== 'structure') return
+    // une boîte ne se déplace que parmi SON groupe de peinture : un fond
+    // parmi les fonds, le mobilier parmi le mobilier — le rang annoncé est
+    // celui qu'on VOIT
+    const groupe = (s.kind === 'box' ? memeGroupeDePeinture : undefined) as
+      | ((a: unknown, b: unknown) => boolean)
+      | undefined
     const liste: unknown[] | undefined =
       s.kind === 'box' ? this.level.boxes : this.level.structures
     if (!liste || liste.length < 2) return
     const avant = s.index
-    const apres = deplaceDans(liste, avant, sens)
+    const rangAvant = indicesDuGroupe(liste, avant, groupe).indexOf(avant)
+    const apres = deplaceDans(liste, avant, sens, groupe)
     if (apres !== avant) this.sel = { kind: s.kind, index: apres }
-    this.commit(ditLeDeplacement(sens, avant, apres, liste.length))
+    const membres = indicesDuGroupe(liste, apres, groupe)
+    // le rang se compte dans le groupe : le dire, sinon « couvre tout le
+    // reste » serait faux dès qu'il y a des fonds d'un côté et du mobilier
+    // de l'autre
+    let portee = ''
+    if (s.kind === 'box' && membres.length < liste.length)
+      portee = estUnFond(this.level.boxes[apres].material)
+        ? ' Parmi les fonds seulement : le mobilier reste dessus.'
+        : ' Parmi le mobilier : les fonds (baies vitrées) restent dessous.'
+    this.commit(
+      ditLeDeplacement(sens, rangAvant, membres.indexOf(apres), membres.length) +
+        portee,
+    )
   }
 
   private commit(hint: string): void {
@@ -7541,8 +7582,10 @@ export class LevelEditor {
 
     // surfaces (les obliques pivotent autour de leur centre) — une FORME se
     // trace par son contour partagé (formeOutline) : ce que l'éditeur montre
-    // est la silhouette que le shader et la physique évaluent en SDF
-    this.level.boxes.forEach((box, bi) => {
+    // est la silhouette que le shader et la physique évaluent en SDF.
+    // Dans l'ordre de PEINTURE du jeu : les fonds d'abord, sous le reste.
+    rangsDePeinture(this.level.boxes).forEach((bi) => {
+      const box = this.level.boxes[bi]
       const col = MAT_COLORS[box.material] ?? '#888'
       const gagnant =
         this.cutWinner?.kind === 'box' && this.cutWinner.index === bi

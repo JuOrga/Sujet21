@@ -9523,7 +9523,6 @@
           <button type="button" class="ed-tool" data-tool="box:8"><i style="background:#9fb9d8"></i>Rideau lamellaire</button>
           <button type="button" class="ed-tool" data-tool="box:9"><i style="background:#29d8ff"></i>Surchauffeur</button>
           <button type="button" class="ed-tool" data-tool="box:11"><i style="background:#1a2a44"></i>Vide (le dehors)</button>
-          <button type="button" class="ed-tool" data-tool="box:12"><i style="background:#5a7fb0"></i>Baie vitrée</button>
           <button type="button" class="ed-tool" data-tool="sponge"><i style="background:#d7ad55"></i>Éponge</button>
           <button type="button" class="ed-tool" data-tool="gomme" title="Effacer : glissez pour tracer une zone, tout ce qu'elle couvre disparaît. Une paroi à cheval est rognée ; une forme ou une oblique s'efface entière si son centre est dedans. Une COQUE (chambre, couloir) ne se rogne pas : elle part d'un bloc dès que la zone mord ses murs ET atteint son cœur — une zone tracée dans son vide ne gomme que le mobilier. La gomme reste en main : on gomme en série."><i style="background:#ffd24a"></i>Gomme</button>
           <button type="button" class="ed-tool" data-tool="cut" title="DEUX PAROIS QUI SE CHEVAUCHENT : cliquez celle qui prend le dessus, puis celle qui s'efface dessous — seule leur zone COMMUNE est rongée. Ne sert qu'à cela ; pour effacer librement, prenez la Gomme."><i style="background:#e86a6a"></i>Superposition</button>
@@ -9542,6 +9541,8 @@
           <button type="button" class="ed-tool" data-tool="struct:1" title="UN COULOIR : un tube ouvert aux deux bouts, qui relie deux modules. Faites-le MORDRE dans la coque d'à côté : la porte se perce toute seule. L'angle l'incline (branches obliques), et une PORTE DE MATIÈRE peut le barrer — rideau (seule la glace l'écarte), grille (seul le souffle passe), membrane (seule l'eau)."><i style="background:transparent;border:3px solid #5fd0ff;border-top:none;border-bottom:none"></i>Couloir</button>
         </div>
         <div class="ed-group">
+          <span class="k">Fonds — sous tout le reste</span>
+          <button type="button" class="ed-tool" data-tool="box:12" title="UNE BAIE VITRÉE : le dehors derrière une vitre encadrée. C'est un FOND, comme une zone d'état : elle se peint sous tout le mobilier, quel que soit son rang — une paroi posée par-dessus la couvre, elle ne la perce jamais. Sans physique : le corps passe dessus comme sur le sol."><i style="background:#5a7fb0"></i>Baie vitrée</button>
           <span class="k">Zones d’état</span>
           <button type="button" class="ed-tool" data-tool="zone:eau"><i style="background:#63b7e6"></i>Impose liquide</button>
           <button type="button" class="ed-tool" data-tool="zone:glace"><i style="background:#8fc8ee"></i>Impose glace</button>

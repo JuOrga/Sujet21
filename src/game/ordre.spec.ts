@@ -2,9 +2,22 @@
 // matière se voit. Les cas décrivent le geste du concepteur.
 
 import { describe, expect, it } from 'vitest'
-import { deplaceDans, ditLeDeplacement } from './ordre'
+import {
+  deplaceDans,
+  ditLeDeplacement,
+  indicesDuGroupe,
+  memeGroupeDePeinture,
+  rangsDePeinture,
+} from './ordre'
 import { STRUCT_CHAMBRE, STRUCT_COULOIR, niveauExpanse } from './structures'
-import { MAT_HYDROPHILE, MAT_WALL, type LevelDef } from './level'
+import {
+  MAT_BAIE,
+  MAT_HYDROPHILE,
+  MAT_VIDE,
+  MAT_WALL,
+  estUnFond,
+  type LevelDef,
+} from './level'
 
 describe('déplacer un élément dans l’ordre de peinture', () => {
   it('avancer d’un rang le fait passer devant son voisin', () => {
@@ -110,5 +123,81 @@ describe('l’ordre tel que le moteur le voit', () => {
     const avant = JSON.stringify(niveauExpanse(lv).boxes)
     deplaceDans(lv.structures!, 0, 'dessus')
     expect(JSON.stringify(niveauExpanse(lv).boxes)).not.toBe(avant)
+  })
+})
+
+describe('la baie vitrée est un FOND, comme une zone d’état', () => {
+  const boite = (material: number) => ({
+    minX: 0,
+    minY: 0,
+    maxX: 100,
+    maxY: 100,
+    material,
+  })
+
+  it('posée APRÈS une paroi, elle se peint quand même DESSOUS', () => {
+    // la plainte : tracée en dernier, la baie perçait la paroi
+    const boxes = [boite(MAT_WALL), boite(MAT_HYDROPHILE), boite(MAT_BAIE)]
+    expect(rangsDePeinture(boxes)).toEqual([2, 0, 1])
+  })
+
+  it('le reste garde l’ordre que règle l’éditeur, fonds compris', () => {
+    const boxes = [
+      boite(MAT_HYDROPHILE),
+      boite(MAT_BAIE),
+      boite(MAT_WALL),
+      boite(MAT_VIDE),
+      boite(MAT_BAIE),
+    ]
+    expect(rangsDePeinture(boxes)).toEqual([1, 4, 0, 2, 3])
+  })
+
+  it('ne peint que les n premières, et réutilise le tableau fourni', () => {
+    const out = [9, 9, 9, 9]
+    const boxes = [boite(MAT_WALL), boite(MAT_BAIE), boite(MAT_BAIE)]
+    expect(rangsDePeinture(boxes, 2, out)).toBe(out)
+    expect(out).toEqual([1, 0])
+  })
+
+  it('une surface n’est pas un fond — seule la baie l’est', () => {
+    expect(estUnFond(MAT_BAIE)).toBe(true)
+    expect(estUnFond(MAT_WALL)).toBe(false)
+    expect(estUnFond(MAT_VIDE)).toBe(false)
+  })
+})
+
+describe('les boutons d’ordre déplacent parmi le GROUPE de peinture', () => {
+  const b = (nom: string, material: number) => ({ nom, material })
+  const noms = (l: { nom: string }[]) => l.map((x) => x.nom)
+
+  it('« tout dessus » sur une baie la met au-dessus des FONDS seulement', () => {
+    // la plainte de la relecture : en fin de liste, elle annonçait couvrir
+    // tout — et rien ne bougeait à l'écran
+    const l = [b('baie', MAT_BAIE), b('paroi', MAT_WALL), b('baie2', MAT_BAIE), b('phile', MAT_HYDROPHILE)]
+    expect(deplaceDans(l, 0, 'dessus', memeGroupeDePeinture)).toBe(2)
+    expect(noms(l)).toEqual(['paroi', 'baie2', 'baie', 'phile'])
+    // et son rang, compté dans le groupe : dernière des deux baies
+    expect(indicesDuGroupe(l, 2, memeGroupeDePeinture)).toEqual([1, 2])
+  })
+
+  it('une baie seule de son groupe ne bouge pas : rien à dépasser', () => {
+    const l = [b('paroi', MAT_WALL), b('baie', MAT_BAIE), b('phile', MAT_HYDROPHILE)]
+    expect(deplaceDans(l, 1, 'dessus', memeGroupeDePeinture)).toBe(1)
+    expect(deplaceDans(l, 1, 'fond', memeGroupeDePeinture)).toBe(1)
+    expect(noms(l)).toEqual(['paroi', 'baie', 'phile'])
+  })
+
+  it('reculer une paroi saute la baie : elle passe derrière le mobilier voisin', () => {
+    const l = [b('paroi', MAT_WALL), b('baie', MAT_BAIE), b('phile', MAT_HYDROPHILE)]
+    expect(deplaceDans(l, 2, 'derriere', memeGroupeDePeinture)).toBe(0)
+    expect(noms(l)).toEqual(['phile', 'paroi', 'baie'])
+    expect(deplaceDans(l, 0, 'devant', memeGroupeDePeinture)).toBe(1)
+    expect(noms(l)).toEqual(['paroi', 'phile', 'baie'])
+  })
+
+  it('sans groupe, le geste d’avant : la liste entière', () => {
+    const l = ['a', 'b', 'c']
+    expect(deplaceDans(l, 0, 'dessus')).toBe(2)
+    expect(l).toEqual(['b', 'c', 'a'])
   })
 })
