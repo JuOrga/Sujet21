@@ -17203,18 +17203,28 @@ function majCadranEtats(zoneActive: ZoneForce): void {
       : transfoEntre(CYCLE_PAR_ETAT[cur], CYCLE_PAR_ETAT[s.etat])
     const tenue =
       t !== null && (!gate || transfoTenue(t.id, acquis, verrousCycle))
-    const montreVerrou = !estCur && !tenue && t !== null && verrou === s.etat
-    s.el.hidden = !estCur && !tenue && !montreVerrou
+    // LES TROIS LOGEMENTS RESTENT TOUJOURS À LEUR PLACE. Un lien non tissé
+    // ne cache plus son logement : il le GRISE, cadenas au coin. Avant, en
+    // passant de liquide à glace, la vapeur (la SUBLIMATION, non tissée)
+    // disparaissait comme jamais débloquée — le cadran changeait de forme
+    // avec l'état, et le joueur ne voyait plus ce qui restait à tisser.
+    const verrouille = !estCur && !tenue
+    // un refus tout juste essuyé AVIVE le logement cadenassé un instant
+    const refuse = verrouille && verrou === s.etat
+    s.el.hidden = false
     s.el.classList.toggle('st-cur', estCur)
-    s.el.classList.toggle('st-verrou', montreVerrou)
-    s.el.disabled = zone || montreVerrou
+    s.el.classList.toggle('st-verrou', verrouille)
+    s.el.classList.toggle('st-refus', refuse)
+    // PAS désactivé : le toucher (ou X/Y) sur un logement cadenassé passe
+    // par le refus, qui l'avive et le dit — un bouton mort ne dit rien
+    s.el.disabled = zone
     label.textContent = !estCur && t ? t.nom : NOMS_ETAT[s.etat]
-    if (montreVerrou) kbd.innerHTML = picto('verrou')
+    if (verrouille) kbd.innerHTML = picto('verrou')
     else kbd.textContent = manetteActive ? s.pad : s.kbd
     kbd.hidden = estCur
     s.el.title = estCur
       ? 're-toucher : revenir liquide'
-      : montreVerrou
+      : verrouille
         ? `${t?.nom} — mémoire non tissée. Passez par le liquide, ou tissez le lien à l’écran des MÉMOIRES.`
         : (t?.desc ?? '')
   }

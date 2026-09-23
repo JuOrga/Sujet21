@@ -5385,10 +5385,17 @@
       #state-eau { order: 1; }
       #state-vapeur { order: 2; }
       #statebar button[hidden] { display: none; }
-      /* le VERROU : un logement refusé paraît quelques secondes, cadenassé —
-         le nom du lien à tisser dessus, l'envie se sème là */
+      /* le VERROU : un lien non tissé ne CACHE plus son logement — il le
+         grise, cadenas au coin, le nom du lien à tisser dessous. Les trois
+         états restent en place quoi qu'on ait tissé : le cadran ne change
+         plus de forme, et ce qui reste à tisser se voit. */
       #statebar button.st-verrou {
-        opacity: 0.65;
+        --teinte: var(--dim);
+        opacity: 0.5;
+      }
+      /* un refus tout juste essuyé l'avive quelques secondes */
+      #statebar button.st-verrou.st-refus {
+        opacity: 0.9;
       }
       /* les pointillés suivent la silhouette (un outline aurait tracé un
          carré autour d'un nuage) */
@@ -5397,6 +5404,9 @@
         stroke-dasharray: 3 3;
       }
       #statebar button.st-verrou kbd {
+        /* le cadenas se montre partout, même au doigt où les touches se
+           taisent (@media pointer: coarse, plus bas) */
+        display: block;
         border: none;
         font-size: calc(11px * var(--ui));
         top: 2px;
