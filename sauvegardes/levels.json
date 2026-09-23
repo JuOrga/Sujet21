@@ -1920,11 +1920,11 @@
     {
       "id": "le-premier-gel-2",
       "auteur": "BOIZ",
-      "majAt": "2026-09-21T20:25:25.608Z",
+      "majAt": "2026-09-22T14:12:22.178Z",
       "codeAuteur": "JU",
       "codeAt": "2026-08-30T20:45:24.471Z",
       "level": {
-        "name": "Le premier gel",
+        "name": "Le premier gel vboiz",
         "code": "101",
         "journal": "Cellule 4, plaques cryogéniques. Le froid devait être une punition : tout ce qui s’attarde se fige, et tout ce qui se fige s’amarre. Il a foncé sur la plaque à pleine vitesse — arrêt net, pas une goutte perdue — a visé la fenêtre depuis son amarre, s’est dégelé, et l’a passée d’une seule impulsion. Le châtiment est devenu son frein de précision. — Dr N. Véga",
         "bounds": {
@@ -2729,8 +2729,8 @@
     },
     {
       "id": "les-regimes",
-      "auteur": "JU",
-      "majAt": "2026-08-30T21:05:11.391Z",
+      "auteur": "BOIZ",
+      "majAt": "2026-09-22T16:14:58.161Z",
       "codeAuteur": "JU",
       "codeAt": "2026-08-30T21:05:11.391Z",
       "level": {
@@ -2744,145 +2744,310 @@
           "maxY": 750
         },
         "spawn": {
-          "x": -950,
-          "y": 0,
+          "x": -891,
+          "y": 440,
           "n": 900
         },
         "exit": {
-          "minX": 1040,
-          "minY": -120,
-          "maxX": 1180,
-          "maxY": 120
+          "minX": -1056,
+          "minY": -110,
+          "maxX": -916,
+          "maxY": 50
         },
         "boxes": [
           {
-            "minX": 100,
-            "minY": -750,
-            "maxX": 140,
+            "minX": -1200,
+            "minY": 690,
+            "maxX": 890,
             "maxY": 750,
-            "material": 5
-          },
-          {
-            "minX": 740,
-            "minY": 140,
-            "maxX": 980,
-            "maxY": 200,
             "material": 0
           },
           {
-            "minX": 740,
-            "minY": -200,
-            "maxX": 980,
-            "maxY": -140,
+            "minX": -1200,
+            "minY": -750,
+            "maxX": -1140,
+            "maxY": 690,
+            "material": 0
+          },
+          {
+            "minX": -1758,
+            "minY": 156.5,
+            "maxX": -1258,
+            "maxY": 656.5,
+            "material": 0
+          },
+          {
+            "minX": -1655,
+            "minY": -437,
+            "maxX": -1595,
+            "maxY": 63,
+            "material": 0
+          },
+          {
+            "minX": -1140,
+            "minY": 126.5,
+            "maxX": -388,
+            "maxY": 186.5,
+            "material": 0
+          },
+          {
+            "minX": -328,
+            "minY": 126.5,
+            "maxX": 292,
+            "maxY": 186.5,
+            "material": 0
+          },
+          {
+            "minX": 1140,
+            "minY": -283,
+            "maxX": 1200,
+            "maxY": 750,
+            "material": 0
+          },
+          {
+            "minX": -388,
+            "minY": -163,
+            "maxX": -328,
+            "maxY": 440,
+            "material": 1
+          },
+          {
+            "minX": 1274,
+            "minY": -216,
+            "maxX": 1524,
+            "maxY": 34,
+            "material": 0
+          },
+          {
+            "minX": -78,
+            "minY": 440,
+            "maxX": -18,
+            "maxY": 690,
+            "material": 2
+          },
+          {
+            "minX": 232,
+            "minY": 186.5,
+            "maxX": 292,
+            "maxY": 440,
+            "material": 2
+          },
+          {
+            "minX": 542,
+            "minY": 440,
+            "maxX": 602,
+            "maxY": 630,
+            "material": 1
+          },
+          {
+            "minX": 232,
+            "minY": 87,
+            "maxX": 292,
+            "maxY": 126.5,
+            "material": 0
+          },
+          {
+            "minX": -340,
+            "minY": -750,
+            "maxX": 1200,
+            "maxY": -690,
+            "material": 0
+          },
+          {
+            "minX": 292,
+            "minY": 87,
+            "maxX": 890,
+            "maxY": 186.5,
+            "material": 6
+          },
+          {
+            "minX": 890,
+            "minY": 690,
+            "maxX": 1140,
+            "maxY": 750,
+            "material": 9
+          },
+          {
+            "minX": 1140,
+            "minY": -533,
+            "maxX": 1200,
+            "maxY": -283,
+            "material": 9
+          },
+          {
+            "minX": 292,
+            "minY": -223,
+            "maxX": 890,
+            "maxY": -163,
+            "material": 1
+          },
+          {
+            "minX": 232,
+            "minY": -163,
+            "maxX": 292,
+            "maxY": 87,
+            "material": 9
+          },
+          {
+            "minX": 232,
+            "minY": -223,
+            "maxX": 292,
+            "maxY": -163,
+            "material": 0
+          },
+          {
+            "minX": 232,
+            "minY": -283,
+            "maxX": 890,
+            "maxY": -223,
+            "material": 0
+          },
+          {
+            "minX": 232,
+            "minY": 440,
+            "maxX": 292,
+            "maxY": 690,
+            "material": 7
+          },
+          {
+            "minX": 833,
+            "minY": -690,
+            "maxX": 890,
+            "maxY": -283,
+            "material": 5
+          },
+          {
+            "minX": 232,
+            "minY": -690,
+            "maxX": 292,
+            "maxY": -283,
+            "material": 8
+          },
+          {
+            "minX": -1140,
+            "minY": -690,
+            "maxX": -940,
+            "maxY": -490,
+            "forme": 3,
+            "material": 2
+          },
+          {
+            "minX": -940,
+            "minY": -750,
+            "maxX": -340,
+            "maxY": -690,
+            "material": 2
+          },
+          {
+            "minX": -1140,
+            "minY": -750,
+            "maxX": -940,
+            "maxY": -690,
+            "material": 0
+          },
+          {
+            "minX": -328,
+            "minY": 66.5,
+            "maxX": 232,
+            "maxY": 126.5,
+            "material": 2
+          },
+          {
+            "minX": -444,
+            "minY": -163,
+            "maxX": -388,
+            "maxY": 126.5,
+            "material": 2
+          },
+          {
+            "minX": 602,
+            "minY": 630,
+            "maxX": 662,
+            "maxY": 690,
+            "forme": 3,
+            "p0": 3,
+            "material": 2
+          },
+          {
+            "minX": 542,
+            "minY": 630,
+            "maxX": 602,
+            "maxY": 690,
+            "material": 0
+          },
+          {
+            "minX": 1140,
+            "minY": -690,
+            "maxX": 1200,
+            "maxY": -533,
             "material": 0
           }
         ],
         "sponges": [],
         "labels": [
           {
-            "x": -540,
-            "y": 220,
-            "text": "HUBLOT FENDU — IMPOSE LA GLACE",
-            "tone": "froid"
-          },
-          {
-            "x": 120,
-            "y": -420,
-            "text": "CONDUITE ROMPUE — IMPOSE LA VAPEUR",
-            "tone": "chaud"
-          },
-          {
-            "x": 120,
-            "y": 320,
-            "text": "ÉVENT",
-            "tone": "grille"
-          },
-          {
-            "x": 580,
-            "y": 240,
-            "text": "L’ARMURE GRATUITE",
-            "tone": "froid"
-          },
-          {
-            "x": 1110,
-            "y": 180,
+            "x": -985,
+            "y": -21,
             "text": "SAS",
             "tone": "sas"
           }
         ],
         "zones": [
           {
-            "minX": -700,
-            "minY": 300,
-            "maxX": -380,
-            "maxY": 700,
+            "minX": -1126,
+            "minY": -283,
+            "maxX": 232,
+            "maxY": 126.5,
             "force": "glace"
           },
           {
-            "minX": -80,
-            "minY": -750,
-            "maxX": 320,
-            "maxY": 750,
-            "force": "vapeur"
-          },
-          {
-            "minX": 440,
-            "minY": -160,
-            "maxX": 720,
-            "maxY": 160,
+            "minX": -1150.5,
+            "minY": -690,
+            "maxX": 582,
+            "maxY": -283,
             "force": "glace"
           }
         ],
         "par": 7,
         "ambiante": 0,
-        "decals": [
+        "lasers": [
           {
-            "x": -1080,
-            "y": -540,
-            "w": 160,
-            "h": 160,
-            "kind": "tuyaux",
-            "fade": 0.4
+            "x": 30,
+            "y": 70,
+            "angle": 270
           }
         ],
-        "lumieres": [
+        "cibles": [
           {
-            "x": -700,
-            "y": 60,
-            "h": 170,
-            "portee": 720,
-            "intensite": 1.05,
-            "forme": "bandeau",
-            "longueur": 680,
-            "angle": 90
-          },
+            "x": 28,
+            "y": -713,
+            "r": 26,
+            "mode": "nor",
+            "canal": 1
+          }
+        ],
+        "portes": [
           {
-            "x": 200,
-            "y": 0,
-            "h": 190,
-            "portee": 720,
-            "intensite": 1.05,
-            "couleur": "#e8a05a",
-            "forme": "bandeau",
-            "longueur": 1000,
-            "angle": 90
-          },
+            "minX": 292,
+            "minY": -690,
+            "maxX": 352,
+            "maxY": -283,
+            "canal": 1
+          }
+        ],
+        "caches": [
           {
-            "x": 580,
-            "y": 220,
-            "h": 160,
-            "portee": 480,
-            "intensite": 0.9,
-            "couleur": "#8fc8ee",
-            "forme": "bandeau",
-            "longueur": 300
-          },
+            "minX": -328,
+            "minY": -163,
+            "maxX": 890,
+            "maxY": 126.5
+          }
+        ],
+        "condensats": [
           {
-            "x": 1110,
-            "y": 0,
-            "h": 300,
-            "portee": 480,
-            "couleur": "#3fd69b"
+            "x": -368,
+            "y": -461,
+            "cl": 6
           }
         ]
       }
