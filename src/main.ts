@@ -8030,9 +8030,13 @@ function boutonVisible(el: HTMLElement | null): el is HTMLElement {
   )
 }
 
-/** A dans les écrans de JEU (relance, fin de tableau) : valide le bouton. */
+/** A dans les écrans de JEU (relance, fin de tableau) : valide le bouton.
+ *  CONTINUER n'y est PAS : il s'offre en pleine partie, quand le corps a
+ *  encore de quoi nager — A le validait dès son apparition, et le joueur ne
+ *  pouvait plus piloter le reste du volume sans conclure. Il a son geste,
+ *  « conclure » (croix ↓ par défaut). */
 function clicMenuManette(): boolean {
-  for (const id of ['continuer', 'relance', 'overlay-btn']) {
+  for (const id of ['relance', 'overlay-btn']) {
     const el = document.getElementById(id)
     if (boutonVisible(el)) {
       el.click()
@@ -11930,6 +11934,7 @@ input.onCommande = (id: string): boolean => {
   else if (id === 'carte') ouvreStation(!!stationEl?.hidden)
   else if (id === 'recadrer') camera.resetAutoZoom()
   else if (id === 'prevision') lancePrevisionExacte()
+  else if (id === 'conclure') return conclureSalle()
   else return false
   return true
 }
@@ -17747,6 +17752,16 @@ btnContinuer.addEventListener('click', () => {
   continuerVoulu = true
   btnContinuer.classList.remove('visible')
 })
+function continuerOffert(): boolean {
+  return btnContinuer.classList.contains('visible')
+}
+/** Le geste « conclure » (clavier, manette) : le même effet que le clic sur
+ *  CONTINUER — et rien du tout tant que le bouton ne s'offre pas. */
+function conclureSalle(): boolean {
+  if (!continuerOffert()) return false
+  btnContinuer.click()
+  return true
+}
 // Le tableau seul reprend : la réserve déjà en bonbonne et le refroidissement
 // du vaisseau, eux, ne se rembobinent pas — sinon la pression n'existerait plus.
 // « J'en reste là » : en RUN, ce bouton ne rejoue pas la salle gratuitement
@@ -18013,8 +18028,15 @@ function corpsImage(now: number): boolean {
       // le stick DROIT ouvre le DOSSIER — la convention manette pour « la
       // fiche d'état » ; la descente continue derrière, comme au clavier
       if (manetteFait('dossier')) ouvreDossier(!dossierOuvert)
+      // CONCLURE : valide CONTINUER quand il s'offre. Sur la croix ↓, il
+      // prend alors le pas sur le zoom arrière (LT dézoome toujours) — la
+      // caméra ne doit pas reculer d'un cran au moment où l'on conclut
+      const conclureSurBas =
+        boutonDe('conclure') === BOUTON.BAS && continuerOffert()
+      if (manetteFait('conclure')) conclureSalle()
       if (manette.zoomAvant) camera.zoomBy(Math.pow(1.9, dtReal), params)
-      if (manette.zoomArriere) camera.zoomBy(Math.pow(1.9, -dtReal), params)
+      if (manette.zoomArriere && !conclureSurBas)
+        camera.zoomBy(Math.pow(1.9, -dtReal), params)
       // les grosses gâchettes zooment, la pression dose la vitesse
       if (manette.rtVal > 0.02)
         camera.zoomBy(Math.pow(2.2, manette.rtVal * dtReal), params)
@@ -18826,7 +18848,11 @@ function corpsImage(now: number): boolean {
   // jeu qui conclut (la lame du couperet ; au palet, le choix après chaque
   // lancer — relancer ou valider)
   const aspireAssez = sansSas(level) ? false : sim.swallowed >= Math.max(20, sim.baseVolume * 0.1)
-  const texteBouton = 'CONTINUER — CONCLURE L’ESSAI'
+  // à la manette, le bouton dit son geste : A n'y mène plus (il pilote)
+  const bConclure = manette.connectee ? boutonDe('conclure') : null
+  const texteBouton =
+    'CONTINUER — CONCLURE L’ESSAI' +
+    (bConclure !== null ? ` · ${nomBouton(bConclure)}` : '')
   if (btnContinuer.textContent !== texteBouton) btnContinuer.textContent = texteBouton
   // Une traversée déclarée par un OUTIL de conception. La salle se conclut
   // pour de bon — cérémonie, condensat, descente qui avance — mais RIEN DE
@@ -18841,10 +18867,19 @@ function corpsImage(now: number): boolean {
   // la branche du hub ne s'exécute pas (dispersion, salle déjà conclue).
   const sortieOutil = forceSortieHub
   forceSortieHub = null
+  // LA SORTIE MÉRITÉE NE SE REPERD PAS. Une fois CONTINUER offert, le sas
+  // a bu l'essentiel : ce qui reste du corps est sous le seuil critique, et
+  // seule l'emprise du sas le tenait. Un clic à côté du bouton éjectait, le
+  // corps quittait l'emprise… et se DISPERSAIT — la salle, gagnée, était
+  // perdue. Conclure était déjà offert : la dispersion conclut à sa place.
+  const sortieRattrapee = aspireAssez && sim.dispersed
   const drunk =
     sasOutil ||
     (sim.swallowed > 0 && sim.count <= seuilBu) ||
-    (aspireAssez && continuerVoulu)
+    (aspireAssez && continuerVoulu) ||
+    sortieRattrapee
+  // le corps « tient » pour les conclusions : vivant, ou rattrapé ci-dessus
+  const corpsTient = !sim.dispersed || sortieRattrapee
   btnContinuer.classList.toggle(
     'visible',
     aspireAssez &&
@@ -18962,7 +18997,7 @@ function corpsImage(now: number): boolean {
     }
   } else if (
     !tableauDone &&
-    !sim.dispersed &&
+    corpsTient &&
     (drunk || reached) &&
     testLevel
   ) {
@@ -18992,7 +19027,7 @@ function corpsImage(now: number): boolean {
     if (level.cineApres) void lireCineParCode(level.cineApres)
   } else if (
     !tableauDone &&
-    !sim.dispersed &&
+    corpsTient &&
     (drunk || reached) &&
     estEconomat(level)
   ) {
@@ -19002,7 +19037,7 @@ function corpsImage(now: number): boolean {
     audio.collect()
     bande.ponctuation('sting-collecte', 0.85)
     avanceSalle()
-  } else if (!tableauDone && !sim.dispersed && (drunk || reached)) {
+  } else if (!tableauDone && corpsTient && (drunk || reached)) {
     // Prime de glace : ce que le sas a avalé SOLIDE vaut plus cher que ce
     // qu'il a bu goutte à goutte.
     // CHAMBRE FROIDE : la prime de glace vaut moitié plus — la carte le
