@@ -2,7 +2,13 @@
 // matière se voit. Les cas décrivent le geste du concepteur.
 
 import { describe, expect, it } from 'vitest'
-import { deplaceDans, ditLeDeplacement, rangsDePeinture } from './ordre'
+import {
+  deplaceDans,
+  ditLeDeplacement,
+  indicesDuGroupe,
+  memeGroupeDePeinture,
+  rangsDePeinture,
+} from './ordre'
 import { STRUCT_CHAMBRE, STRUCT_COULOIR, niveauExpanse } from './structures'
 import {
   MAT_BAIE,
@@ -157,5 +163,41 @@ describe('la baie vitrée est un FOND, comme une zone d’état', () => {
     expect(estUnFond(MAT_BAIE)).toBe(true)
     expect(estUnFond(MAT_WALL)).toBe(false)
     expect(estUnFond(MAT_VIDE)).toBe(false)
+  })
+})
+
+describe('les boutons d’ordre déplacent parmi le GROUPE de peinture', () => {
+  const b = (nom: string, material: number) => ({ nom, material })
+  const noms = (l: { nom: string }[]) => l.map((x) => x.nom)
+
+  it('« tout dessus » sur une baie la met au-dessus des FONDS seulement', () => {
+    // la plainte de la relecture : en fin de liste, elle annonçait couvrir
+    // tout — et rien ne bougeait à l'écran
+    const l = [b('baie', MAT_BAIE), b('paroi', MAT_WALL), b('baie2', MAT_BAIE), b('phile', MAT_HYDROPHILE)]
+    expect(deplaceDans(l, 0, 'dessus', memeGroupeDePeinture)).toBe(2)
+    expect(noms(l)).toEqual(['paroi', 'baie2', 'baie', 'phile'])
+    // et son rang, compté dans le groupe : dernière des deux baies
+    expect(indicesDuGroupe(l, 2, memeGroupeDePeinture)).toEqual([1, 2])
+  })
+
+  it('une baie seule de son groupe ne bouge pas : rien à dépasser', () => {
+    const l = [b('paroi', MAT_WALL), b('baie', MAT_BAIE), b('phile', MAT_HYDROPHILE)]
+    expect(deplaceDans(l, 1, 'dessus', memeGroupeDePeinture)).toBe(1)
+    expect(deplaceDans(l, 1, 'fond', memeGroupeDePeinture)).toBe(1)
+    expect(noms(l)).toEqual(['paroi', 'baie', 'phile'])
+  })
+
+  it('reculer une paroi saute la baie : elle passe derrière le mobilier voisin', () => {
+    const l = [b('paroi', MAT_WALL), b('baie', MAT_BAIE), b('phile', MAT_HYDROPHILE)]
+    expect(deplaceDans(l, 2, 'derriere', memeGroupeDePeinture)).toBe(0)
+    expect(noms(l)).toEqual(['phile', 'paroi', 'baie'])
+    expect(deplaceDans(l, 0, 'devant', memeGroupeDePeinture)).toBe(1)
+    expect(noms(l)).toEqual(['paroi', 'phile', 'baie'])
+  })
+
+  it('sans groupe, le geste d’avant : la liste entière', () => {
+    const l = ['a', 'b', 'c']
+    expect(deplaceDans(l, 0, 'dessus')).toBe(2)
+    expect(l).toEqual(['b', 'c', 'a'])
   })
 })

@@ -98,6 +98,8 @@ import {
 import {
   deplaceDans,
   ditLeDeplacement,
+  indicesDuGroupe,
+  memeGroupeDePeinture,
   rangsDePeinture,
   type SensOrdre,
 } from '../game/ordre'
@@ -2550,7 +2552,11 @@ export class LevelEditor {
             this.cutWinner !== null &&
             this.cutWinner.kind === c.kind &&
             this.cutWinner.index === c.index
-          for (let i = this.level.boxes.length - 1; i >= 0; i--) {
+          // du DESSUS vers le dessous, dans l'ordre de peinture : une baie
+          // (un fond) ne vole plus le clic à la paroi qui la couvre
+          const rangs = rangsDePeinture(this.level.boxes)
+          for (let k = rangs.length - 1; k >= 0; k--) {
+            const i = rangs[k]
             if (!dansBoite(this.level.boxes[i], w.x, w.y)) continue
             const c: CutCible = { kind: 'box', index: i }
             if (memeQueGagnant(c)) leGagnant = c
@@ -4206,13 +4212,32 @@ export class LevelEditor {
     const s = this.sel
     if (!s || this.multi.length > 1) return
     if (s.kind !== 'box' && s.kind !== 'structure') return
+    // une boîte ne se déplace que parmi SON groupe de peinture : un fond
+    // parmi les fonds, le mobilier parmi le mobilier — le rang annoncé est
+    // celui qu'on VOIT
+    const groupe = (s.kind === 'box' ? memeGroupeDePeinture : undefined) as
+      | ((a: unknown, b: unknown) => boolean)
+      | undefined
     const liste: unknown[] | undefined =
       s.kind === 'box' ? this.level.boxes : this.level.structures
     if (!liste || liste.length < 2) return
     const avant = s.index
-    const apres = deplaceDans(liste, avant, sens)
+    const rangAvant = indicesDuGroupe(liste, avant, groupe).indexOf(avant)
+    const apres = deplaceDans(liste, avant, sens, groupe)
     if (apres !== avant) this.sel = { kind: s.kind, index: apres }
-    this.commit(ditLeDeplacement(sens, avant, apres, liste.length))
+    const membres = indicesDuGroupe(liste, apres, groupe)
+    // le rang se compte dans le groupe : le dire, sinon « couvre tout le
+    // reste » serait faux dès qu'il y a des fonds d'un côté et du mobilier
+    // de l'autre
+    let portee = ''
+    if (s.kind === 'box' && membres.length < liste.length)
+      portee = estUnFond(this.level.boxes[apres].material)
+        ? ' Parmi les fonds seulement : le mobilier reste dessus.'
+        : ' Parmi le mobilier : les fonds (baies vitrées) restent dessous.'
+    this.commit(
+      ditLeDeplacement(sens, rangAvant, membres.indexOf(apres), membres.length) +
+        portee,
+    )
   }
 
   private commit(hint: string): void {

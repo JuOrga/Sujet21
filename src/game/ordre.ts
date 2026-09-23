@@ -18,25 +18,60 @@ export type SensOrdre = 'derriere' | 'devant' | 'fond' | 'dessus'
 /** Déplace l'élément `de` dans la liste et rend son nouvel indice. Un
  *  déplacement impossible (déjà au bout, indice hors liste) ne touche à
  *  rien et rend l'indice d'origine — le bouton reste sans effet plutôt que
- *  de mentir. */
+ *  de mentir.
+ *
+ *  `memeGroupe` : le déplacement ne compte que les éléments du MÊME groupe
+ *  de peinture. Sans lui, « tout dessus » sur une baie vitrée la mettait en
+ *  fin de liste et annonçait qu'elle couvrait tout — alors qu'un fond reste
+ *  sous le mobilier quel que soit son rang (rangsDePeinture) : l'écran ne
+ *  bougeait pas et le message mentait. Par défaut, un seul groupe : la
+ *  liste entière, le comportement d'avant. */
 export function deplaceDans<T>(
   liste: T[],
   de: number,
   sens: SensOrdre,
+  memeGroupe: (a: T, b: T) => boolean = () => true,
 ): number {
   if (!Number.isInteger(de) || de < 0 || de >= liste.length) return de
-  const vers =
+  const groupe = indicesDuGroupe(liste, de, memeGroupe)
+  const pos = groupe.indexOf(de)
+  const cible =
     sens === 'derriere'
-      ? de - 1
+      ? pos - 1
       : sens === 'devant'
-        ? de + 1
+        ? pos + 1
         : sens === 'fond'
           ? 0
-          : liste.length - 1
-  if (vers === de || vers < 0 || vers >= liste.length) return de
+          : groupe.length - 1
+  if (cible === pos || cible < 0 || cible >= groupe.length) return de
+  // retirer puis réinsérer à l'indice du voisin visé : devant lui s'il
+  // était avant, derrière lui s'il était après — dans les deux cas
+  // l'élément prend exactement sa place dans le groupe
+  const vers = groupe[cible]
   const [item] = liste.splice(de, 1)
   liste.splice(vers, 0, item)
   return vers
+}
+
+/** Les indices des éléments du même groupe que `de`, dans l'ordre. */
+export function indicesDuGroupe<T>(
+  liste: readonly T[],
+  de: number,
+  memeGroupe: (a: T, b: T) => boolean = () => true,
+): number[] {
+  const out: number[] = []
+  for (let i = 0; i < liste.length; i++)
+    if (i === de || memeGroupe(liste[i], liste[de])) out.push(i)
+  return out
+}
+
+/** Deux boîtes sont du même groupe de peinture si elles sont toutes deux
+ *  des fonds, ou toutes deux du mobilier. */
+export function memeGroupeDePeinture(
+  a: { material: number },
+  b: { material: number },
+): boolean {
+  return estUnFond(a.material) === estUnFond(b.material)
 }
 
 /** Ce que le bouton doit dire une fois le geste fait — le mouvement se
