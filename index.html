@@ -9747,6 +9747,16 @@
               <label style="display:flex;gap:4px;align-items:center"><input type="checkbox" id="ed-exige-glace" /> glace</label>
               <label style="display:flex;gap:4px;align-items:center"><input type="checkbox" id="ed-exige-vapeur" /> vapeur</label>
             </span></label>
+          <label class="ed-f" title="Fait de ce tableau un MINI-JEU : pas de sas, il mesure (chrono, score, paliers). Le mini-jeu choisi arrive avec les règles de sa salle d’origine. Pour que la descente le tire, publiez-le sous le code du mini-jeu (MJ-PALET, MJ-CIBLES…) — la note dessous le rappelle."><span>Mini-jeu</span>
+            <select id="ed-mj-type">
+              <option value="">Aucun — tableau ordinaire</option>
+              <option value="palet">Le palet</option>
+              <option value="rafales">Les rafales</option>
+              <option value="orbites">Les orbites</option>
+              <option value="cibles">Les cibles</option>
+              <option value="couperet" hidden>Le couperet</option>
+            </select></label>
+          <p class="edg-note" id="ed-mj-note" hidden></p>
           <div id="ed-minijeu" hidden>
             <span class="k" title="Les règles du mini-jeu des cibles : la durée de la partie et les trois paliers de points (EN PLEIN, TOUCHÉ, EFFLEURÉ). La jauge et le chrono du jeu suivent.">Mini-jeu : les cibles</span>
             <label class="ed-f"><span>Durée (s)</span><input type="number" id="ed-mj-duree" min="5" step="1" /></label>

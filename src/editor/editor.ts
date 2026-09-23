@@ -60,7 +60,7 @@ import {
 } from '../game/level'
 import { traceTrajectoire } from '../game/trajectoire'
 import { periodeCoeur } from '../game/puits'
-import { tableauCibles, tableauCouperet, tableauOrbites, tableauPalet, tableauRafales } from '../game/minijeux'
+import { NOMS_MINI_JEU, tableauCibles, tableauCouperet, tableauOrbites, tableauPalet, tableauRafales } from '../game/minijeux'
 import { tableauRonde } from '../game/ronde'
 import { builtinPresets, loadStoredPresets, type Preset } from '../bench/presets'
 import { catalogueRecompenses } from '../game/recompenses'
@@ -206,6 +206,7 @@ import {
 } from '../game/netLevels'
 import { appelle } from '../game/reseau'
 import { issueChargement, questionChargement, tableauOuvert } from './chargement'
+import { MINI_JEUX_MENU, miniJeuNeuf, noteMiniJeu, valeurMenu, type MiniJeuMenu } from './miniJeuEditeur'
 import { Historique, type Pas } from './historique'
 
 const STORE_KEY = 'projet21.editeur.v1'
@@ -4494,6 +4495,17 @@ export class LevelEditor {
     }
     this.el('ed-exige-glace').addEventListener('change', litExige)
     this.el('ed-exige-vapeur').addEventListener('change', litExige)
+    // LE MINI-JEU du tableau (le concepteur, 23/09) : le menu pose celui de
+    // la salle du code, ou l'efface — le tableau redevient ordinaire. Le
+    // panneau des règles et la note (le code sous lequel publier) suivent.
+    this.el('ed-mj-type').addEventListener('change', () => {
+      const v = (this.el('ed-mj-type') as HTMLSelectElement).value
+      if (v === valeurMenu(this.level)) return
+      if ((MINI_JEUX_MENU as readonly string[]).includes(v)) this.level.minijeu = miniJeuNeuf(v as MiniJeuMenu)
+      else delete this.level.minijeu
+      this.syncMiniJeu()
+      this.commit(this.level.minijeu ? `Mini-jeu : ${NOMS_MINI_JEU[this.level.minijeu.type]}.` : 'Mini-jeu retiré : tableau ordinaire.')
+    })
     // LES RÈGLES DU MINI-JEU DES CIBLES (le concepteur, 17/09 : la durée et
     // les paliers sont à lui, pas au code) : la frappe applique, la sortie
     // du champ grave l'historique ; les paliers restent décroissants
@@ -4611,6 +4623,8 @@ export class LevelEditor {
         this.persist()
         this.validate()
         this.majLectureCode()
+        // la note du mini-jeu dit le code sous lequel publier : elle suit
+        if (id === 'ed-code') this.syncMiniJeu()
       })
       this.el(id).addEventListener('change', () => this.histoire())
     }
@@ -5389,9 +5403,14 @@ export class LevelEditor {
     compte.textContent = tenues.length === 0 ? 'aucune' : tenues.map((id) => cat.find((d) => d.id === id)?.icone ?? '?').join(' ') + ` ${tenues.length}`
   }
 
-  /** Le panneau du mini-jeu : visible sur un tableau de cibles, et à jour. */
+  /** Le menu du mini-jeu, sa note, et le panneau des règles : visible sur
+   *  un tableau de cibles, et à jour. */
   private syncMiniJeu(): void {
     const mj = this.level.minijeu
+    ;(this.el('ed-mj-type') as HTMLSelectElement).value = valeurMenu(this.level)
+    const note = this.el('ed-mj-note')
+    note.textContent = noteMiniJeu(this.level)
+    note.hidden = note.textContent === ''
     const host = this.el('ed-minijeu')
     const cibles = !!mj && mj.type === 'cibles'
     host.hidden = !cibles
