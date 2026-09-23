@@ -205,6 +205,7 @@ import {
   type StoredLevel,
 } from '../game/netLevels'
 import { appelle } from '../game/reseau'
+import { issueChargement, questionChargement } from './chargement'
 import { Historique, type Pas } from './historique'
 
 const STORE_KEY = 'projet21.editeur.v1'
@@ -5306,14 +5307,29 @@ export class LevelEditor {
       this.commit(`Chargement refusé : ${rejets[0] ?? 'document invalide'}`)
       return
     }
+    // un AUTRE tableau que l'entrée ouverte : ENREGISTRER l'écraserait
+    // (cf. chargement.ts) — on demande, et l'on charge détaché
+    const ouvert = this.openId ? this.library.find((l) => l.id === this.openId) : undefined
+    let detache = false
+    if (ouvert && issueChargement(ouvert.level, level) === 'demande') {
+      if (!confirm(questionChargement(ouvert.level.name, level.name))) {
+        this.commit('Chargement annulé.')
+        return
+      }
+      this.openId = ''
+      this.base = ''
+      detache = true
+      this.renderLibrary()
+    }
     this.level = level
     this.sel = null
     this.fitView()
     this.syncForm()
     this.commit(
-      rejets.length
+      (rejets.length
         ? `Chargé, ${rejets.length} pièce(s) écartée(s).`
-        : 'Tableau chargé.',
+        : 'Tableau chargé.') +
+        (detache ? ` Détaché de « ${ouvert!.level.name} » : ENREGISTRER créera un nouveau tableau.` : ''),
     )
   }
 
