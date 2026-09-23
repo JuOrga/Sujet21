@@ -533,6 +533,10 @@ export class FluidSim {
   // d'affilée, le temps qu'un corps qui condense ou dégèle se regroupe.
   // Publics : le HUD lit le danger pour afficher le compte à rebours.
   belowCritical = false
+  // Le corps était-il, au dernier relabel, dans l'emprise du sas ? Public :
+  // main.ts ne rattrape en victoire qu'une dispersion née de cette emprise
+  // (un corps sous le seuil que le sas tenait, puis qui en est sorti).
+  dansEmprise = false
   // GOUTTES EN PRÊT : tirées (délai de réabsorption en cours) mais encore
   // DANS le volume du corps — même composante connexe. La règle de la vie :
   // n'est perdu que ce qui SORT du volume. Tant que la goutte n'a pas
@@ -4015,6 +4019,7 @@ export class FluidSim {
         this.stats.centroidY - this.mouthY,
       ) <
         this.params.exitRadius * this.exitRadiusFactor * 1.3
+    this.dansEmprise = inDrainGrip
 
     if (playerLabel < 0) {
       this.playerCount = 0

@@ -8030,9 +8030,13 @@ function boutonVisible(el: HTMLElement | null): el is HTMLElement {
   )
 }
 
-/** A dans les écrans de JEU (relance, fin de tableau) : valide le bouton. */
+/** A dans les écrans de JEU (relance, fin de tableau) : valide le bouton.
+ *  CONTINUER n'y est PAS : il s'offre en pleine partie, quand le corps a
+ *  encore de quoi nager — A le validait dès son apparition, et le joueur ne
+ *  pouvait plus piloter le reste du volume sans conclure. Il a son geste,
+ *  « conclure » (croix ↓ par défaut). */
 function clicMenuManette(): boolean {
-  for (const id of ['continuer', 'relance', 'overlay-btn']) {
+  for (const id of ['relance', 'overlay-btn']) {
     const el = document.getElementById(id)
     if (boutonVisible(el)) {
       el.click()
@@ -8397,6 +8401,8 @@ const endgame = {
   sasVu: 0, // particules avalées déjà constatées (détection « le sas boit »)
   sasBoitJusqua: -1, // temps simulé jusqu'auquel la fin de course se tait
   enCollecte: false, // le sas boit en ce moment : alarmes et seuils se taisent
+  empriseJusqua: -1, // temps simulé du dernier instant du corps dans l'emprise du sas
+  rattrapee: false, // la dispersion de cet essai a conclu en victoire (CONTINUER offert)
 }
 // Dash de vapeur : viser fige le temps, relâcher lance le nuage (« air
 // dash »). On ne retient qu'une chose entre deux images : était-on en visée.
@@ -11930,6 +11936,7 @@ input.onCommande = (id: string): boolean => {
   else if (id === 'carte') ouvreStation(!!stationEl?.hidden)
   else if (id === 'recadrer') camera.resetAutoZoom()
   else if (id === 'prevision') lancePrevisionExacte()
+  else if (id === 'conclure') return conclureSalle()
   else return false
   return true
 }
@@ -16330,6 +16337,8 @@ function restart(): void {
   endgame.lastCall = false
   endgame.sasVu = 0
   endgame.sasBoitJusqua = -1
+  endgame.empriseJusqua = -1
+  endgame.rattrapee = false
   continuerVoulu = false
   btnContinuer.classList.remove('visible')
   endgame.spent = false
@@ -17747,6 +17756,16 @@ btnContinuer.addEventListener('click', () => {
   continuerVoulu = true
   btnContinuer.classList.remove('visible')
 })
+function continuerOffert(): boolean {
+  return btnContinuer.classList.contains('visible')
+}
+/** Le geste « conclure » (clavier, manette) : le même effet que le clic sur
+ *  CONTINUER — et rien du tout tant que le bouton ne s'offre pas. */
+function conclureSalle(): boolean {
+  if (!continuerOffert()) return false
+  btnContinuer.click()
+  return true
+}
 // Le tableau seul reprend : la réserve déjà en bonbonne et le refroidissement
 // du vaisseau, eux, ne se rembobinent pas — sinon la pression n'existerait plus.
 // « J'en reste là » : en RUN, ce bouton ne rejoue pas la salle gratuitement
@@ -18013,8 +18032,15 @@ function corpsImage(now: number): boolean {
       // le stick DROIT ouvre le DOSSIER — la convention manette pour « la
       // fiche d'état » ; la descente continue derrière, comme au clavier
       if (manetteFait('dossier')) ouvreDossier(!dossierOuvert)
+      // CONCLURE : valide CONTINUER quand il s'offre. Sur la croix ↓, il
+      // prend alors le pas sur le zoom arrière (LT dézoome toujours) — la
+      // caméra ne doit pas reculer d'un cran au moment où l'on conclut
+      const conclureSurBas =
+        boutonDe('conclure') === BOUTON.BAS && continuerOffert()
+      if (manetteFait('conclure')) conclureSalle()
       if (manette.zoomAvant) camera.zoomBy(Math.pow(1.9, dtReal), params)
-      if (manette.zoomArriere) camera.zoomBy(Math.pow(1.9, -dtReal), params)
+      if (manette.zoomArriere && !conclureSurBas)
+        camera.zoomBy(Math.pow(1.9, -dtReal), params)
       // les grosses gâchettes zooment, la pression dose la vitesse
       if (manette.rtVal > 0.02)
         camera.zoomBy(Math.pow(2.2, manette.rtVal * dtReal), params)
@@ -18311,6 +18337,7 @@ function corpsImage(now: number): boolean {
         // finir dans le sas — c'est au joueur de décider quand y renoncer.
         sim.step(params.dt)
         run.tableauTime += params.dt // temps simulé : le time warp ne fausse pas les records
+        if (sim.dansEmprise) endgame.empriseJusqua = run.tableauTime
         echantillonneFantome()
         run.runTime += params.dt // le vaisseau refroidit au fil de l'expédition
         // la mise en scène avance au TEMPS DE JEU : une pause la suspend,
@@ -18826,7 +18853,11 @@ function corpsImage(now: number): boolean {
   // jeu qui conclut (la lame du couperet ; au palet, le choix après chaque
   // lancer — relancer ou valider)
   const aspireAssez = sansSas(level) ? false : sim.swallowed >= Math.max(20, sim.baseVolume * 0.1)
-  const texteBouton = 'CONTINUER — CONCLURE L’ESSAI'
+  // à la manette, le bouton dit son geste : A n'y mène plus (il pilote)
+  const bConclure = manette.connectee ? boutonDe('conclure') : null
+  const texteBouton =
+    'CONTINUER — CONCLURE L’ESSAI' +
+    (bConclure !== null ? ` · ${nomBouton(bConclure)}` : '')
   if (btnContinuer.textContent !== texteBouton) btnContinuer.textContent = texteBouton
   // Une traversée déclarée par un OUTIL de conception. La salle se conclut
   // pour de bon — cérémonie, condensat, descente qui avance — mais RIEN DE
@@ -18841,10 +18872,28 @@ function corpsImage(now: number): boolean {
   // la branche du hub ne s'exécute pas (dispersion, salle déjà conclue).
   const sortieOutil = forceSortieHub
   forceSortieHub = null
+  // LA SORTIE MÉRITÉE NE SE REPERD PAS. Une fois CONTINUER offert, le sas
+  // a bu l'essentiel : ce qui reste du corps est sous le seuil critique, et
+  // seule l'emprise du sas le tenait. Un clic à côté du bouton éjectait, le
+  // corps quittait l'emprise… et se DISPERSAIT — la salle, gagnée, était
+  // perdue. Conclure était déjà offert : la dispersion conclut à sa place.
+  // MAIS seulement celle qui naît de l'emprise : le corps y était il y a
+  // moins que le délai de grâce (+ une marge). Dix pour cent bus puis le
+  // reste perdu loin du sas, sur un danger, reste une défaite (revue #453).
+  const sortieRattrapee =
+    endgame.rattrapee ||
+    (aspireAssez &&
+      sim.dispersed &&
+      endgame.empriseJusqua >= 0 &&
+      run.tableauTime - endgame.empriseJusqua <= params.dispersalGrace + 0.5)
+  if (sortieRattrapee) endgame.rattrapee = true
   const drunk =
     sasOutil ||
     (sim.swallowed > 0 && sim.count <= seuilBu) ||
-    (aspireAssez && continuerVoulu)
+    (aspireAssez && continuerVoulu) ||
+    sortieRattrapee
+  // le corps « tient » pour les conclusions : vivant, ou rattrapé ci-dessus
+  const corpsTient = !sim.dispersed || sortieRattrapee
   btnContinuer.classList.toggle(
     'visible',
     aspireAssez &&
@@ -18962,7 +19011,7 @@ function corpsImage(now: number): boolean {
     }
   } else if (
     !tableauDone &&
-    !sim.dispersed &&
+    corpsTient &&
     (drunk || reached) &&
     testLevel
   ) {
@@ -18992,7 +19041,7 @@ function corpsImage(now: number): boolean {
     if (level.cineApres) void lireCineParCode(level.cineApres)
   } else if (
     !tableauDone &&
-    !sim.dispersed &&
+    corpsTient &&
     (drunk || reached) &&
     estEconomat(level)
   ) {
@@ -19002,7 +19051,7 @@ function corpsImage(now: number): boolean {
     audio.collect()
     bande.ponctuation('sting-collecte', 0.85)
     avanceSalle()
-  } else if (!tableauDone && !sim.dispersed && (drunk || reached)) {
+  } else if (!tableauDone && corpsTient && (drunk || reached)) {
     // Prime de glace : ce que le sas a avalé SOLIDE vaut plus cher que ce
     // qu'il a bu goutte à goutte.
     // CHAMBRE FROIDE : la prime de glace vaut moitié plus — la carte le
@@ -19696,6 +19745,9 @@ function corpsImage(now: number): boolean {
     (endgame.spent || sim.dispersed) &&
       // le CONTINUER offert prime : une seule invite à l'écran
       !(aspireAssez && !sim.dispersed) &&
+      // une sortie rattrapée est une victoire : pas de relance, même
+      // l'image où elle tombe (tableauDone n'est vrai qu'à la suivante)
+      !sortieRattrapee &&
       document.body.classList.contains('playing') &&
       !tableauDone &&
       !run.ended,
@@ -19944,7 +19996,10 @@ function corpsImage(now: number): boolean {
     bande.bruitage('condensation', 0.7)
   }
   sfx.allGas = allGas
-  if (sim.dispersed && !sfx.dispersed) {
+  // une sortie RATTRAPÉE (CONTINUER offert, dispersion née de l'emprise du
+  // sas) est une victoire : ni son de dispersion, ni fin d'expédition
+  // consignée — sinon la run continuait avec un record de fin publié
+  if (sim.dispersed && !sfx.dispersed && !endgame.rattrapee) {
     audio.disperse()
     if (!testLevel && !auHub) {
       // fin de l'échantillon ET de l'expédition : les registres consignent
@@ -19996,7 +20051,8 @@ function corpsImage(now: number): boolean {
   // palet dérivait indéfiniment. Il conclut maintenant, après un sursis
   // pendant lequel le sas peut encore le boire.
   {
-    const horsRun = !!testLevel || auHub || run.ended || tableauDone
+    const horsRun =
+      !!testLevel || auHub || run.ended || tableauDone || endgame.rattrapee
     const perdu = !horsRun && (sim.dispersed || endgame.spent)
     // Le sas qui AVALE suspend le sursis (la salle peut encore se conclure)
     // — mais la simple PROXIMITÉ du sas ne suffit pas : un palet gelé qui
