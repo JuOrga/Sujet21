@@ -29,3 +29,16 @@ export function questionChargement(ouvert: string, charge: string): string {
     `Annuler : ne rien charger.`
   )
 }
+
+/** Le tableau OUVERT auquel comparer : l'entrée de la liste, ou — si la
+ *  bibliothèque n'est pas encore arrivée (démarrage, réseau coupé) — le
+ *  brouillon lui-même, qui EST ce tableau-là. Sans ce repli, le garde-fou
+ *  se taisait justement au démarrage, liste vide, lien bien là. */
+export function tableauOuvert<T extends { name?: string }>(
+  openId: string,
+  bibliotheque: { id: string; level: T }[],
+  brouillon: T,
+): T | null {
+  if (!openId) return null
+  return bibliotheque.find((l) => l.id === openId)?.level ?? brouillon
+}

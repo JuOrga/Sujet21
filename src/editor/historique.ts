@@ -52,21 +52,32 @@ export class Historique {
     this.courant = { ...this.courant, ...lien }
   }
 
-  /** Le pas à rétablir, contenu ET entrée ouverte — ou null. */
-  annule(): Pas | null {
+  /** Le pas à rétablir, contenu ET entrée ouverte — ou null. `present` :
+   *  le lien tel qu'il est à l'instant (un enregistrement a pu l'avancer). */
+  annule(present: Lien): Pas | null {
     const pas = this.past.pop()
     if (pas === undefined) return null
-    this.future.push(this.courant)
-    this.courant = pas
-    return { ...pas }
+    this.future.push({ ...this.courant, ...present })
+    return this.devient(pas, present)
   }
 
-  retablit(): Pas | null {
+  retablit(present: Lien): Pas | null {
     const pas = this.future.pop()
     if (pas === undefined) return null
-    this.past.push(this.courant)
-    this.courant = pas
-    return { ...pas }
+    this.past.push({ ...this.courant, ...present })
+    return this.devient(pas, present)
+  }
+
+  // Sur la MÊME entrée, la base ne recule pas avec le contenu : elle dit ce
+  // que la bibliothèque tenait à la dernière synchro, et ça, annuler ne le
+  // change pas. Reculer la base faisait passer le brouillon annulé pour
+  // « sans travail local » — le rattrapage suivant le remplaçait en silence
+  // par la version enregistrée. Changer d'entrée, en revanche, rend la base
+  // de l'entrée qu'on rouvre.
+  private devient(pas: Pas, present: Lien): Pas {
+    const r = pas.openId === present.openId ? { ...pas, base: present.base } : pas
+    this.courant = { ...r }
+    return { ...r }
   }
 
   get peutAnnuler(): boolean {

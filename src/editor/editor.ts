@@ -205,7 +205,7 @@ import {
   type StoredLevel,
 } from '../game/netLevels'
 import { appelle } from '../game/reseau'
-import { issueChargement, questionChargement } from './chargement'
+import { issueChargement, questionChargement, tableauOuvert } from './chargement'
 import { Historique, type Pas } from './historique'
 
 const STORE_KEY = 'projet21.editeur.v1'
@@ -679,7 +679,7 @@ export class LevelEditor {
   }
 
   private undo(): void {
-    const pas = this.historique.annule()
+    const pas = this.historique.annule({ openId: this.openId, base: this.base })
     if (!pas) {
       this.status('Rien à annuler.')
       return
@@ -688,7 +688,7 @@ export class LevelEditor {
   }
 
   private redo(): void {
-    const pas = this.historique.retablit()
+    const pas = this.historique.retablit({ openId: this.openId, base: this.base })
     if (!pas) {
       this.status('Rien à rétablir.')
       return
@@ -5309,10 +5309,10 @@ export class LevelEditor {
     }
     // un AUTRE tableau que l'entrée ouverte : ENREGISTRER l'écraserait
     // (cf. chargement.ts) — on demande, et l'on charge détaché
-    const ouvert = this.openId ? this.library.find((l) => l.id === this.openId) : undefined
+    const ouvert = tableauOuvert(this.openId, this.library, this.level)
     let detache = false
-    if (ouvert && issueChargement(ouvert.level, level) === 'demande') {
-      if (!confirm(questionChargement(ouvert.level.name, level.name))) {
+    if (ouvert && issueChargement(ouvert, level) === 'demande') {
+      if (!confirm(questionChargement(ouvert.name, level.name))) {
         this.commit('Chargement annulé.')
         return
       }
@@ -5329,7 +5329,7 @@ export class LevelEditor {
       (rejets.length
         ? `Chargé, ${rejets.length} pièce(s) écartée(s).`
         : 'Tableau chargé.') +
-        (detache ? ` Détaché de « ${ouvert!.level.name} » : ENREGISTRER créera un nouveau tableau.` : ''),
+        (detache ? ` Détaché de « ${ouvert!.name} » : ENREGISTRER créera un nouveau tableau.` : ''),
     )
   }
 

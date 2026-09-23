@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { issueChargement } from './chargement'
+import { issueChargement, tableauOuvert } from './chargement'
 
 describe('charger un JSON quand un tableau est ouvert', () => {
   it('un autre tableau : on demande (ENREGISTRER l’aurait écrasé)', () => {
@@ -16,5 +16,18 @@ describe('charger un JSON quand un tableau est ouvert', () => {
 
   it('un JSON sans nom face à un tableau nommé : on demande', () => {
     expect(issueChargement({ name: 'echangette' }, {})).toBe('demande')
+  })
+
+  it('bibliothèque pas encore arrivée : le brouillon fait foi, et l’on demande quand même', () => {
+    const brouillon = { name: 'echangette' }
+    const ouvert = tableauOuvert('echangette', [], brouillon)
+    expect(ouvert).toBe(brouillon)
+    expect(issueChargement(ouvert, { name: 'Les 3 voies' })).toBe('demande')
+  })
+
+  it('l’entrée de la liste prime sur le brouillon ; sans lien, rien d’ouvert', () => {
+    const lib = [{ id: 'x', level: { name: 'dans la liste' } }]
+    expect(tableauOuvert('x', lib, { name: 'brouillon' })).toEqual({ name: 'dans la liste' })
+    expect(tableauOuvert('', lib, { name: 'brouillon' })).toBeNull()
   })
 })
