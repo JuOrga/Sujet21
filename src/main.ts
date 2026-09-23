@@ -986,6 +986,19 @@ function economatLevel(): LevelDef {
 // tableau d'éditeur), sans toucher aux registres. La FILE enchaîne les
 // tableaux d'essai au sas — la trilogie laser se joue ainsi.
 let testLevel: LevelDef | null = null
+// LA RÉSERVE ET L'HORLOGE DE LA RUN, mises de côté le temps d'un essai :
+// l'essai part d'une bonbonne vide et d'un chrono à zéro, mais un essai
+// lancé en pleine descente les effaçait pour de bon — au retour, la salle
+// de la run repartait à sec. restart() les rend dès que plus aucun essai
+// n'est joué ; une run neuve, reprise ou close les oublie.
+let sauveEssai: { bonbonneLiters: number; runTime: number } | null = null
+/** L'essai démarre : bonbonne vide, chrono à zéro — la run mise de côté. */
+function ouvreEssai(): void {
+  if (!sauveEssai)
+    sauveEssai = { bonbonneLiters: run.bonbonneLiters, runTime: run.runTime }
+  run.bonbonneLiters = 0
+  run.runTime = 0
+}
 // La file d'essai est mixte : tableaux et cinématiques s'y enchaînent.
 let testQueue: (LevelDef | CinematiqueDef)[] = []
 let level: LevelDef = TABLEAUX[levelIndex]
@@ -4837,6 +4850,7 @@ function effaceRun(): void {
   majBoutonsRun()
 }
 function reprendreRun(save: RunSauvee): void {
+  sauveEssai = null // la run d'avant l'essai n'est plus celle qu'on joue
   auHub = false
   testLevel = null
   fromEditor = false
@@ -5078,8 +5092,7 @@ function startTest(etapes: (LevelDef | CinematiqueDef)[]): void {
   // ré-arme, juste après cet appel
   fromPlanche = false
   document.getElementById('planche-retour')?.setAttribute('hidden', '')
-  run.bonbonneLiters = 0
-  run.runTime = 0
+  ouvreEssai()
   hasPlayed = true
   // « playing » d'abord : restart() se charge alors lui-même du plan large et
   // du carton de journal — sinon les deux se jouaient en double, en décalé.
@@ -5250,8 +5263,7 @@ const chargeEditeur = chargeUneFois('l’éditeur de tableaux', async () => {
       play: (lvl) => {
         testLevel = lvl
         fromEditor = true
-        run.bonbonneLiters = 0
-        run.runTime = 0
+        ouvreEssai()
         hasPlayed = true
         ed.close()
         document.body.classList.add('playing')
@@ -13694,8 +13706,10 @@ function resetLasers(): void {
   cachesEntree = (level.caches ?? []).map(() => null)
   memosVoile.length = 0 // les bitmaps de l'ancien tableau ne servent plus
   // la CLEF DE CACHETTE se consomme ici : les voiles du tableau tombent
-  // d'emblée (le hub et l'Économat ne l'usent pas)
-  if (clefCachette && !estEconomat(level) && !auHub) {
+  // d'emblée (le hub et l'Économat ne l'usent pas). Un ESSAI non plus : la
+  // clef est achetée pour la run, et un essai d'éditeur lancé en pleine
+  // descente la brûlait — la salle suivante de la run gardait ses voiles.
+  if (clefCachette && !estEconomat(level) && !auHub && testLevel === null) {
     clefCachette = false
     cachesLevee = (level.caches ?? []).map(() => 0)
   }
@@ -16287,6 +16301,13 @@ function restart(): void {
   // un rejeu ne survit qu'à SA salle : toute autre salle chargée y met fin
   // (avant sauveRun, qui graverait sinon une réserve à zéro)
   if (rejeu && testLevel !== rejeu.niveau) finRejeu()
+  // plus d'essai joué : la run retrouve sa réserve et son horloge (avant
+  // sauveRun, qui graverait sinon une bonbonne vide)
+  if (sauveEssai && testLevel === null) {
+    run.bonbonneLiters = sauveEssai.bonbonneLiters
+    run.runTime = sauveEssai.runTime
+    sauveEssai = null
+  }
   run.exitTimer = 0
   run.tableauTime = 0
   // remis à zéro AVEC l'horloge qu'il mesure : sans cela, après un versement
@@ -16480,6 +16501,7 @@ function lanceRondeEssai(): void {
 ;(window as unknown as { __ronde: () => void }).__ronde = lanceRondeEssai
 
 function newExpedition(avecCarte = false): void {
+  sauveEssai = null // la run d'avant l'essai n'est plus celle qu'on joue
   levelIndex = 0
   voieRang = 0 // une descente neuve repart du premier rang du plan
   voieVues.clear()
@@ -16533,6 +16555,7 @@ function newExpedition(avecCarte = false): void {
 // Fin de run (dernier échantillon dispersé, ou expédition conclue) : le
 // laboratoire rappelle — on se réveille AU HUB, prêt à relancer par le sas.
 function retourAuLabo(): void {
+  sauveEssai = null // la run d'avant l'essai n'est plus celle qu'on joue
   // (le récit et les fins ne se livrent plus ici : une run perdue ou
   // abandonnée ne raconte rien — c'est l'expédition BOUCLÉE qui les sert)
   // LE DISTILLATEUR (réparé) : la prime du retour — le delta garanti
@@ -16652,6 +16675,7 @@ function afficheDispersion(): void {
  * les acquis (mémoire, liens, fioles, records) restent : ils survivent à
  * tout. Le bouton principal redira alors COMMENCER. */
 function quitteAuMenu(): void {
+  sauveEssai = null // la run d'avant l'essai n'est plus celle qu'on joue
   effaceRun()
   ecranDispersion = 'aucun'
   overlay.classList.remove('visible')
@@ -18373,7 +18397,6 @@ function corpsImage(now: number): boolean {
     const graves = absorbePastilles(formes, eclatsPrisEssai, sim)
     for (const i of graves) {
       const e = eclatsEssai[i]
-      eclatsPrisRun.add(e.cle)
       if (testLevel) {
         toastFile.push({
           nom: 'essai : rien ne se grave aux registres',
@@ -18382,6 +18405,9 @@ function corpsImage(now: number): boolean {
           sur: 'ÉCLAT DE MÉMOIRE',
         })
       } else {
+        // la clé ne se retient qu'en run : prise en essai, l'éclat restait
+        // « déjà pris » pour la run, et sa mémoire était perdue
+        eclatsPrisRun.add(e.cle)
         gagneMemoireRun(e.memoire)
         toastFile.push({
           nom: `+${e.memoire} mémoire — la matière se souvient`,
