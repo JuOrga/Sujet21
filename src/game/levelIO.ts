@@ -496,6 +496,9 @@ export function parseLevel(input: unknown): {
     ambiance: str(o.ambiance) || undefined,
     // seul 'libres' se grave : 'cycle' est le défaut, il reste implicite
     etats: o.etats === 'libres' ? 'libres' : undefined,
+    // seuls les deux tirages non classiques se gravent : le classique est
+    // le défaut, une valeur inconnue y retombe
+    tirage: o.tirage === 'minijeu' || o.tirage === 'partout' ? o.tirage : undefined,
     exige: Array.isArray(o.exige)
       ? (o.exige.filter((e: unknown) => e === 'glace' || e === 'vapeur') as (
           | 'glace'
@@ -1112,6 +1115,7 @@ export function serializeLevel(level: LevelDef): string {
   if (level.figure) out.figure = level.figure
   if (level.ambiance) out.ambiance = level.ambiance
   if (level.etats === 'libres') out.etats = 'libres'
+  if (level.tirage) out.tirage = level.tirage
   if (level.exige?.length) out.exige = level.exige
   if (level.cartes?.length) out.cartes = level.cartes
   if (level.raccourciVers) out.raccourciVers = level.raccourciVers
