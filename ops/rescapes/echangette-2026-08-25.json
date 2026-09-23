@@ -1,0 +1,407 @@
+{
+ "id": "echangette",
+ "auteur": "BOIZ",
+ "majAt": "2026-08-25T14:07:32.844Z",
+ "level": {
+  "name": "echangette",
+  "code": "21EU-102",
+  "journal": "Entrée de journal du protocole : ce que le laboratoire a observé dans cette cuve.",
+  "bounds": {
+   "minX": -1200,
+   "minY": -850,
+   "maxX": 1850,
+   "maxY": 800
+  },
+  "spawn": {
+   "x": -1078,
+   "y": 550,
+   "n": 900
+  },
+  "exit": {
+   "minX": 1663,
+   "minY": -210,
+   "maxX": 1803,
+   "maxY": -14
+  },
+  "boxes": [
+   {
+    "minX": -861,
+    "minY": 21,
+    "maxX": -798,
+    "maxY": 798,
+    "material": 0
+   },
+   {
+    "minX": -693,
+    "minY": 41,
+    "maxX": -690,
+    "maxY": 42,
+    "material": 0
+   },
+   {
+    "minX": -1092,
+    "minY": -42,
+    "maxX": -798,
+    "maxY": 21,
+    "skin": 2,
+    "material": 0
+   },
+   {
+    "minX": -1197,
+    "minY": -147,
+    "maxX": -1092,
+    "maxY": 273,
+    "material": 7
+   },
+   {
+    "minX": -1092,
+    "minY": -147,
+    "maxX": -799,
+    "maxY": -42,
+    "material": 7
+   },
+   {
+    "minX": -1197,
+    "minY": -210,
+    "maxX": -798,
+    "maxY": -147,
+    "skin": 2,
+    "material": 0
+   },
+   {
+    "minX": -420,
+    "minY": -357,
+    "maxX": -357,
+    "maxY": -294,
+    "angle": 90,
+    "forme": 3,
+    "material": 0
+   },
+   {
+    "minX": -420,
+    "minY": -420,
+    "maxX": -357,
+    "maxY": -357,
+    "angle": -180,
+    "forme": 3,
+    "material": 0
+   },
+   {
+    "minX": -357,
+    "minY": 63,
+    "maxX": -299,
+    "maxY": 189,
+    "material": 0
+   },
+   {
+    "minX": -420,
+    "minY": 63,
+    "maxX": -357,
+    "maxY": 126,
+    "angle": 180,
+    "forme": 3,
+    "material": 0
+   },
+   {
+    "minX": -420,
+    "minY": 126,
+    "maxX": -357,
+    "maxY": 189,
+    "angle": 90,
+    "forme": 3,
+    "material": 0
+   },
+   {
+    "minX": -298,
+    "minY": -420,
+    "maxX": 185,
+    "maxY": -357,
+    "material": 1
+   },
+   {
+    "minX": -299,
+    "minY": 63,
+    "maxX": 140,
+    "maxY": 189,
+    "material": 1
+   },
+   {
+    "minX": -799,
+    "minY": -849,
+    "maxX": -287.75,
+    "maxY": -786,
+    "material": 0
+   },
+   {
+    "minX": 128.25,
+    "minY": -848,
+    "maxX": 1071,
+    "maxY": -785,
+    "material": 0
+   },
+   {
+    "minX": -798,
+    "minY": 735,
+    "maxX": -247.5,
+    "maxY": 798,
+    "skin": 6,
+    "material": 0
+   },
+   {
+    "minX": 88.5,
+    "minY": 735,
+    "maxX": 168,
+    "maxY": 798,
+    "material": 0
+   },
+   {
+    "minX": 420,
+    "minY": 735,
+    "maxX": 819,
+    "maxY": 798,
+    "material": 0
+   },
+   {
+    "minX": -247.5,
+    "minY": 735,
+    "maxX": 88.5,
+    "maxY": 798,
+    "material": 4
+   },
+   {
+    "minX": 168,
+    "minY": 735,
+    "maxX": 420,
+    "maxY": 798,
+    "material": 9
+   },
+   {
+    "minX": -659,
+    "minY": 409.5,
+    "maxX": -470,
+    "maxY": 598.5,
+    "material": 6
+   },
+   {
+    "minX": -1092,
+    "minY": 21,
+    "maxX": -861,
+    "maxY": 273,
+    "material": 0
+   },
+   {
+    "minX": -357,
+    "minY": -420,
+    "maxX": -299,
+    "maxY": -294,
+    "material": 0
+   },
+   {
+    "minX": -286.75,
+    "minY": -848,
+    "maxX": 128.25,
+    "maxY": -785,
+    "material": 4
+   },
+   {
+    "minX": -1197,
+    "minY": -849,
+    "maxX": -799,
+    "maxY": -785,
+    "material": 0
+   },
+   {
+    "minX": -860,
+    "minY": -679,
+    "maxX": -798,
+    "maxY": -210,
+    "material": 0
+   },
+   {
+    "minX": -1200,
+    "minY": -533,
+    "maxX": -1199,
+    "maxY": -210,
+    "material": 0
+   },
+   {
+    "minX": -1092,
+    "minY": -680,
+    "maxX": -860,
+    "maxY": -525,
+    "material": 0
+   },
+   {
+    "minX": -860,
+    "minY": -680,
+    "maxX": -859,
+    "maxY": -679,
+    "material": 0
+   },
+   {
+    "minX": -1092,
+    "minY": -785,
+    "maxX": -797,
+    "maxY": -680,
+    "material": 7
+   },
+   {
+    "minX": -1197,
+    "minY": -785,
+    "maxX": -1092,
+    "maxY": -525,
+    "material": 7
+   },
+   {
+    "minX": 611.5,
+    "minY": 105,
+    "maxX": 819,
+    "maxY": 735,
+    "forme": 3,
+    "p0": 2,
+    "material": 0
+   },
+   {
+    "minX": 294,
+    "minY": -791.5,
+    "maxX": 819,
+    "maxY": -693,
+    "forme": 3,
+    "p0": 1,
+    "material": 2
+   },
+   {
+    "minX": 819,
+    "minY": -785,
+    "maxX": 1071,
+    "maxY": -407,
+    "material": 0
+   },
+   {
+    "minX": 140,
+    "minY": 63,
+    "maxX": 378,
+    "maxY": 462,
+    "forme": 3,
+    "p0": 3,
+    "material": 2
+   },
+   {
+    "minX": -299,
+    "minY": 189,
+    "maxX": 140,
+    "maxY": 462,
+    "forme": 3,
+    "p0": 1,
+    "material": 1
+   },
+   {
+    "minX": 819,
+    "minY": -407,
+    "maxX": 1073,
+    "maxY": -344,
+    "material": 9
+   },
+   {
+    "minX": 819,
+    "minY": 105,
+    "maxX": 1071,
+    "maxY": 798,
+    "material": 0
+   },
+   {
+    "minX": 1071,
+    "minY": 168,
+    "maxX": 1428,
+    "maxY": 798,
+    "material": 0
+   },
+   {
+    "minX": 1071,
+    "minY": -850,
+    "maxX": 1479,
+    "maxY": -441,
+    "material": 0
+   },
+   {
+    "minX": 1071,
+    "minY": 105,
+    "maxX": 1428,
+    "maxY": 168,
+    "material": 2
+   },
+   {
+    "minX": 1479,
+    "minY": -850,
+    "maxX": 1847,
+    "maxY": -344,
+    "material": 4
+   },
+   {
+    "minX": 1429,
+    "minY": 105,
+    "maxX": 1852,
+    "maxY": 801,
+    "material": 4
+   }
+  ],
+  "sponges": [
+   {
+    "minX": -298,
+    "minY": -357,
+    "cols": 20,
+    "rows": 3,
+    "cellSize": 24,
+    "capacityPerCell": 5
+   },
+   {
+    "minX": 1071,
+    "minY": -441,
+    "cols": 17,
+    "rows": 4,
+    "cellSize": 24,
+    "capacityPerCell": 5
+   }
+  ],
+  "labels": [
+   {
+    "x": 1730,
+    "y": -139,
+    "text": "SAS",
+    "tone": "sas"
+   }
+  ],
+  "zones": [
+   {
+    "minX": -315,
+    "minY": -294,
+    "maxX": 126,
+    "maxY": 63,
+    "force": "eau"
+   },
+   {
+    "minX": -294,
+    "minY": -777,
+    "maxX": 42,
+    "maxY": -420,
+    "force": "glace"
+   }
+  ],
+  "par": 3,
+  "caches": [
+   {
+    "minX": -1198,
+    "minY": -787,
+    "maxX": -857,
+    "maxY": -216
+   }
+  ],
+  "lumieres": [
+   {
+    "x": 624,
+    "y": -127,
+    "forme": "bandeau"
+   }
+  ]
+ }
+}

@@ -1,0 +1,24 @@
+# Rendre un tableau RESCAPÉ (ops/rescapes/) à la bibliothèque partagée.
+# L'environnement d'analyse ne joint pas l'API, le runner GitHub si — même
+# dispositif que seed-levels.
+#
+# Gâchette seule, aucun déclenchement automatique : ne tourne que si
+# quelqu'un pousse sur rend-rescape-go. Pas de paths-ignore — le rescapé vit
+# sous ops/, l'ignorer rendrait la gâchette muette (comme seed-levels).
+#     git push -f origin <votre-branche>:rend-rescape-go
+name: rend-rescape
+on:
+  push:
+    branches: [rend-rescape-go]
+
+concurrency:
+  group: rend-rescape
+  cancel-in-progress: true
+
+jobs:
+  rendre:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Rendre le rescapé
+        run: CONFIRME=oui node ops/rend-rescape.mjs
