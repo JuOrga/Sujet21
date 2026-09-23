@@ -14,6 +14,7 @@ import {
   zonePhases,
 } from '../game/level'
 import type { DecalDef, LumiereDef, ObstacleBox, ZoneDef } from '../game/level'
+import { rangsDePeinture } from '../game/ordre'
 import { decalageDe, planchesLivrees, vueCourante, vuesPlanche } from './planche'
 import {
   ARC_EPAISSEUR_DEFAUT,
@@ -2993,6 +2994,7 @@ export class Renderer {
   private readonly scratch: Float32Array
   private readonly boxScratch = new Float32Array(MAX_BOXES * 4)
   private readonly auxScratch = new Float32Array(MAX_BOXES * 4) // matériau, angle, charge, aura
+  private readonly rangsScratch: number[] = [] // l'ordre de peinture des boîtes (fonds d'abord)
   private readonly floatField: boolean
   private fieldScale: number
   private fbo: WebGLFramebuffer | null = null
@@ -3862,13 +3864,19 @@ export class Renderer {
     // Boîtes → scratchs, partagés par la composition ET la carte de lumière.
     // aux.x empaquette matériau + forme + paramètres (voir FORMES_GLSL) :
     // des entiers exacts en float32, aucun uniforme de plus.
+    // Les cases suivent l'ORDRE DE PEINTURE, pas celui de la liste : les
+    // fonds (la baie vitrée) d'abord, sous tout le reste — le shader peint
+    // case après case, la dernière dessus. `i` reste l'indice d'ORIGINE
+    // (celui du solveur, pour la charge du surchauffeur) ; `k` est la case.
     const boxCount = Math.min(boxes.length, MAX_BOXES)
-    for (let i = 0; i < boxCount; i++) {
+    const rangs = rangsDePeinture(boxes, boxCount, this.rangsScratch)
+    for (let k = 0; k < boxCount; k++) {
+      const i = rangs[k]
       const bx = boxes[i]
-      this.boxScratch[i * 4] = bx.minX
-      this.boxScratch[i * 4 + 1] = bx.minY
-      this.boxScratch[i * 4 + 2] = bx.maxX
-      this.boxScratch[i * 4 + 3] = bx.maxY
+      this.boxScratch[k * 4] = bx.minX
+      this.boxScratch[k * 4 + 1] = bx.minY
+      this.boxScratch[k * 4 + 2] = bx.maxX
+      this.boxScratch[k * 4 + 3] = bx.maxY
       const forme = bx.forme ?? FORME_RECT
       let q0 = 0
       let q1 = 0
@@ -3888,13 +3896,13 @@ export class Renderer {
         q0 = Math.max(0, Math.min(127, Math.round(bx.p0 ?? 0)))
         q1 = Math.max(0, Math.min(1023, Math.round(bx.p1 ?? 0)))
       }
-      this.auxScratch[i * 4] = bx.material + forme * 16 + q0 * 128 + q1 * 16384
-      this.auxScratch[i * 4 + 1] = ((bx.angle ?? 0) * Math.PI) / 180
+      this.auxScratch[k * 4] = bx.material + forme * 16 + q0 * 128 + q1 * 16384
+      this.auxScratch[k * 4 + 1] = ((bx.angle ?? 0) * Math.PI) / 180
       // aux.z : charge du surchauffeur (le solveur dit lesquels sont vides)
       // — ou HABILLAGE d'une paroi neutre (1-4), pur décor
-      this.auxScratch[i * 4 + 2] =
+      this.auxScratch[k * 4 + 2] =
         bx.material === 0 ? (bx.skin ?? 0) : sim.surchauffesVides.has(i) ? 0 : 1
-      this.auxScratch[i * 4 + 3] = bx.aura ?? 1
+      this.auxScratch[k * 4 + 3] = bx.aura ?? 1
     }
     // La carte de lumière recuit si le décor ou les lampes ont changé
     const lampes = this.lampesEffectives(sim.bounds, lumieres)

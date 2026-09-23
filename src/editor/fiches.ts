@@ -168,6 +168,7 @@ export const FICHES_MATERIAUX: Record<number, Fiche> = {
       { cle: 'VAPEUR', txt: 'flotte dessus, pareil.' },
       { cle: 'LASER', txt: 'traverse.' },
       { cle: '·', txt: 'Purement visuel : la monture et le reflet de la vitre en plus du vide. Prend toutes les formes — un disque fait un hublot.' },
+      { cle: '·', txt: 'Un FOND, comme une zone d’état : toujours sous le mobilier, quel que soit son rang — une paroi posée dessus la couvre.' },
     ],
   },
 }

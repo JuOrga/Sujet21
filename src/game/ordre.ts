@@ -11,6 +11,8 @@
 // indice : l'appelant garde ainsi sa sélection sur l'élément qu'il vient de
 // bouger, au lieu de la voir sauter sur le voisin.
 
+import { estUnFond } from './level'
+
 export type SensOrdre = 'derriere' | 'devant' | 'fond' | 'dessus'
 
 /** Déplace l'élément `de` dans la liste et rend son nouvel indice. Un
@@ -61,4 +63,22 @@ export function ditLeDeplacement(
     default:
       return `Avancé d'un rang (${rang}) — il passe devant son voisin.`
   }
+}
+
+/** L'ORDRE RÉEL DE PEINTURE des `n` premières boîtes : leurs indices, les
+ *  FONDS d'abord (estUnFond — la baie vitrée), puis tout le reste. Dans
+ *  chaque groupe, l'ordre de la liste tient : c'est toujours lui que
+ *  l'éditeur règle. Un fond passe ainsi sous le mobilier, comme une zone
+ *  d'état — le rendu et l'éditeur peignent dans cet ordre-là. `out` évite
+ *  une allocation par image au rendu. */
+export function rangsDePeinture(
+  boxes: readonly { material: number }[],
+  n = boxes.length,
+  out: number[] = [],
+): number[] {
+  out.length = 0
+  const m = Math.min(n, boxes.length)
+  for (let i = 0; i < m; i++) if (estUnFond(boxes[i].material)) out.push(i)
+  for (let i = 0; i < m; i++) if (!estUnFond(boxes[i].material)) out.push(i)
+  return out
 }
