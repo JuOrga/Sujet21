@@ -954,7 +954,7 @@ function finOuverte(): boolean {
 }
 function hubJoue(): LevelDef {
   const base = hubLevel()
-  const opts = { cuveClose: !eveilJoue(), finOuverte: finOuverte() }
+  const opts = { cuveClose: !eveilJoue() || alerteDifferee, finOuverte: finOuverte() }
   const cle = `${opts.cuveClose ? 'cuve|' : ''}${opts.finOuverte ? 'fin|' : ''}${records.reparationsFaites().sort().join('+')}`
   if (hubMemo && hubMemo.base === base && hubMemo.cle === cle) return hubMemo.lv
   const lv = appliqueReparations(base, records.reparationsFaites(), opts)
@@ -1008,6 +1008,12 @@ let auHub = !new URLSearchParams(location.search).has('tableau')
 function salleHub(): boolean {
   return auHub && testLevel === null
 }
+// L'ALERTE DIFFÉRÉE : l'éveil peut se conclure dans une salle d'essai (la
+// planche, le bis le lancent au premier contact). L'alerte — la brèche de
+// LA CUVE DU HUB — n'a rien à y faire : elle attend le hub, dont la cuve
+// reste close jusque-là. Sans cette attente, l'éveil gravé la rendait
+// introuvable : le joueur ne voyait jamais la brèche.
+let alerteDifferee = false
 // Le tableau COMMENCE-t-il en vapeur (départ posé dans une zone qui
 // l'impose) ? Alors la vapeur est l'ÉTAT INITIAL, pas une bascule : elle ne
 // se paie pas. Le drapeau se consomme au premier basculement de l'image.
@@ -11928,7 +11934,7 @@ input.onCommande = (id: string): boolean => {
 let forceSas = false
 function valideSalleCourante(): string {
   if (!hasPlayed) return 'menu'
-  if (auHub) return 'hub'
+  if (salleHub()) return 'hub'
   if (miseEnBonbonne || run.ended) return 'deja'
   if (sim.dispersed) return 'disperse'
   forceSas = true
@@ -11948,7 +11954,7 @@ function valideSalleCourante(): string {
 let forceSortieHub: 'principal' | 'givre' | 'vapeur' | null = null
 function passeLeHub(sortie: 'principal' | 'givre' | 'vapeur'): string {
   if (!hasPlayed) return 'menu'
-  if (!auHub) return 'dehors'
+  if (!salleHub()) return 'dehors'
   if (sim.dispersed) return 'disperse'
   forceSortieHub = sortie
   return 'ok'
@@ -16364,6 +16370,12 @@ function restart(): void {
     // la SÉQUENCE du tableau démarre à chaque essai : elle fait partie du
     // tableau, pas de l'arrivée — la rejouer après un R est le bon geste
     if (level.sequence) demarreSequence(level.sequence)
+    // l'ALERTE qu'un éveil conclu en essai a laissée en attente : au hub
+    // joué, et seulement là, la brèche cède enfin
+    if (alerteDifferee && salleHub()) {
+      alerteDifferee = false
+      if ((level.portes?.length ?? 0) > 0) demarreSequence('ALERTE')
+    }
   } else {
     camera.snapTo(sim.stats.centroidX, sim.stats.centroidY, camera.zoom)
   }
@@ -17295,7 +17307,7 @@ function majDossier(): void {
   }
   mission +=
     '<div class="do-mission">' +
-    `<div class="do-nom">${auHub ? 'LE LABORATOIRE' : level.name}</div>` +
+    `<div class="do-nom">${salleHub() ? 'LE LABORATOIRE' : level.name}</div>` +
     `<div class="do-code">${level.code}${estEconomat(level) ? ' · L’ÉCONOMAT' : ''}</div>`
   if (id)
     mission +=
@@ -17588,7 +17600,9 @@ function avanceEveil(): void {
     // L'ALERTE : au moment où le sujet SAIT se mouvoir, la station bascule
     // en rouge, la cuve tremble — et la brèche (porte d'index 0 : celle de
     // la cuve) cède. On naît enfermé, on sort par l'accident.
-    if (auHub && (level.portes?.length ?? 0) > 0) demarreSequence('ALERTE')
+    // Hors du hub (un essai), elle attend le hub : voir alerteDifferee.
+    if (!salleHub()) alerteDifferee = true
+    else if ((level.portes?.length ?? 0) > 0) demarreSequence('ALERTE')
   }
 }
 for (const carte of [eveil1El, eveil2El]) {
@@ -18448,7 +18462,7 @@ function corpsImage(now: number): boolean {
 
   // ---- LE MÉTA AU HUB : les zones héritées (comptoir par géométrie) —
   // seulement quand le module joué n'a pas de plots en données
-  const zonesHub = auHub && !sim.dispersed ? zonesDuHub(level) : null
+  const zonesHub = salleHub() && !sim.dispersed ? zonesDuHub(level) : null
   if (zonesHub && plotsNiveau.length === 0) {
     for (let i = 0; i < zonesHub.etal.length; i++) {
       const a = zonesHub.etal[i]
@@ -18530,7 +18544,7 @@ function corpsImage(now: number): boolean {
   // ---- LE MARCHAND : au contact de l'ÉTAL du comptoir (la boîte qui
   // englobe ses alcôves, élargie), le voile s'ouvre — une fois par entrée.
   // Les alcôves, elles, vendent toujours au contact : les deux se cumulent.
-  if (auHub && !sim.dispersed && !(level.pupitres ?? []).some((q) => q.ecran === 'marchand')) {
+  if (salleHub() && !sim.dispersed && !(level.pupitres ?? []).some((q) => q.ecran === 'marchand')) {
     const plots = level.plots?.length
       ? level.plots.filter((p) => p.monnaie === 'memoire')
       : (zonesHub?.etal ?? []).map((a) => a.plot)
@@ -18849,7 +18863,12 @@ function corpsImage(now: number): boolean {
   // écrite ; le SAS DU GIVRE (derrière le rideau — la glace) lance LA
   // VOIE ; le SAS DE VAPEUR (derrière la grille) lance la DESCENTE DU
   // JOUR. Le verrou est la MATIÈRE : sans le lien tissé, pas de passage.
-  const zonesSas = auHub ? zonesDuHub(level) : null
+  // salleHub() et non `auHub` : au premier essai après le chargement,
+  // `auHub` est encore vrai, et le sas de la salle essayée lançait une
+  // descente — zonesDuHub rend en outre les zones codées en dur du hub pour
+  // toute salle de plus de 2 600 u (sas de givre et de vapeur invisibles)
+  const auSasDuHub = salleHub()
+  const zonesSas = auSasDuHub ? zonesDuHub(level) : null
   // une sortie DÉCLARÉE par le pupitre vaut le corps posé dessus : tout
   // l'aval reste le vrai chemin (mode de descente, son, cinématique,
   // reprise de la sauvegarde) — seul le déclenchement est forcé
@@ -18862,7 +18881,7 @@ function corpsImage(now: number): boolean {
     (!!zonesSas &&
       pointInBox(sim.stats.centroidX, sim.stats.centroidY, zonesSas.sasVapeur))
   const rejointSasHub =
-    (auHub &&
+    (auSasDuHub &&
       (sortieOutil !== null ||
         pointInBox(sim.stats.centroidX, sim.stats.centroidY, level.exit))) ||
     surSasGivre ||
@@ -18871,7 +18890,7 @@ function corpsImage(now: number): boolean {
     !tableauDone &&
     !sim.dispersed &&
     (drunk || reached || rejointSasHub) &&
-    auHub
+    auSasDuHub
   ) {
     // LE SAS DE LANCEMENT : au hub, le sas ne collecte rien — il LANCE une
     // descente NEUVE. Il ne reprend plus de sauvegarde : on n'arrive au hub
