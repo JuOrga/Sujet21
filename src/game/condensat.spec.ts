@@ -1,15 +1,18 @@
 // Le condensat ramassable : le semis est déterministe et propre (jamais
 // dans une paroi, les cachettes servies d'abord), l'absorption se joue au
 // contact d'assez de particules du corps.
+import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import {
   absorbePastilles,
+  pastillesDeLaSalle,
   semeFiole,
   semePastilles,
   type CorpsLecture,
 } from './condensat'
 import { dansForme, type FormeBox } from './formes'
 import type { LevelDef } from './level'
+import { CODE_ECONOMAT } from './economat'
 
 function cuve(sur: Partial<LevelDef> = {}): LevelDef {
   return {
@@ -143,5 +146,32 @@ describe('le condensat ramassable', () => {
     libre.kind.fill(0)
     const prises3 = [false]
     expect(absorbePastilles(pastilles, prises3, libre)).toEqual([])
+  })
+})
+
+// LA PANNE DU 23/09 : les pastilles posées main se voyaient à l'éditeur et
+// plus du tout en jeu. Le semis se taisait « au hub » — mais le drapeau
+// `auHub` vaut vrai dès le chargement, et l'essai d'éditeur ne le baisse
+// pas : la salle essayée prime sur le hub sans l'effacer. Le garde lit
+// désormais la salle jouée.
+describe('les pastilles de la salle jouée', () => {
+  const posees = [
+    { x: 0, y: 0, cl: 6 },
+    { x: 500, y: 300, cl: 12 },
+  ]
+
+  it('une salle essayée garde ses pastilles posées main', () => {
+    expect(pastillesDeLaSalle(cuve({ condensats: posees }))).toEqual(posees)
+  })
+
+  it('ni au hub (ni ses chantiers) ni à l’Économat : on n’y farme rien', () => {
+    for (const code of ['HUB', 'hub2', CODE_ECONOMAT])
+      expect(pastillesDeLaSalle(cuve({ code, condensats: posees }))).toEqual([])
+  })
+
+  it('main.ts sème par la salle, pas par le drapeau du hub', () => {
+    const src = readFileSync(new URL('../main.ts', import.meta.url), 'utf-8')
+    const semis = src.match(/^\s*pastilles = (.+)$/m)
+    expect(semis?.[1]).toBe('pastillesDeLaSalle(level)')
   })
 })

@@ -8,8 +8,10 @@
 // est le code de la salle. Un tableau peut aussi poser ses pastilles à la
 // main (LevelDef.condensats) : elles remplacent alors le semis.
 
+import { estEconomat } from './economat'
 import { dansForme, type FormeBox } from './formes'
 import type { LevelDef, CondensatPose } from './level'
+import { estCodeHub } from './levelIO'
 
 export type CondensatDef = CondensatPose
 
@@ -109,6 +111,19 @@ export function semePastilles(level: LevelDef): CondensatDef[] {
     poses++
   }
   return out
+}
+
+/** Les pastilles de la salle JOUÉE : aucune au hub ni à l'Économat — on
+ * n'y farme rien —, le semis partout ailleurs.
+ *
+ * Le garde lit la SALLE, pas le drapeau « au hub » du jeu : ce drapeau vaut
+ * vrai dès le chargement et l'essai d'éditeur ne le baisse pas (la salle
+ * essayée prime sur le hub sans l'effacer, pour que « quitter » y ramène).
+ * Tant qu'il servait de garde, toute salle essayée depuis l'éditeur perdait
+ * ses pastilles — posées main comprises, pourtant visibles à l'éditeur. */
+export function pastillesDeLaSalle(level: LevelDef): CondensatDef[] {
+  if (estCodeHub(level.code) || estEconomat(level)) return []
+  return semePastilles(level)
 }
 
 /** Une FIOLE dort-elle dans ce tableau ? Déterministe (graine = code) :

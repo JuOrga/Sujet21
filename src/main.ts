@@ -459,8 +459,8 @@ import {
 import {
   RAYON_PASTILLE,
   absorbePastilles,
+  pastillesDeLaSalle,
   semeFiole,
-  semePastilles,
   type CondensatDef,
 } from './game/condensat'
 import { FIOLES, FIOLES_SLOTS, fioleDef } from './game/fioles'
@@ -13686,8 +13686,10 @@ function resetLasers(): void {
     cachesLevee = (level.caches ?? []).map(() => 0)
   }
   // les pastilles de condensat se re-sèment (mêmes places : semis
-  // déterministe) — ni au hub ni à l'Économat, on n'y farme rien
-  pastilles = auHub || estEconomat(level) ? [] : semePastilles(level)
+  // déterministe) — ni au hub ni à l'Économat, on n'y farme rien. Le garde
+  // lit la salle jouée, pas `auHub` : celui-ci reste vrai pendant un essai
+  // d'éditeur, et les pastilles des salles essayées disparaissaient.
+  pastilles = pastillesDeLaSalle(level)
   pastillesPrises = pastilles.map(() => false)
   run.pastillesCl = 0
   // la FIOLE — seulement s'il en manque encore à la collection : posée
