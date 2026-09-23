@@ -1000,6 +1000,14 @@ const exitMouth = { x: 0, y: 0 }
 // CHARGEMENT : derrière la fiche, l'échantillon dérive déjà dans la cuve
 // d'entraînement (sauf navigation directe ?tableau=N, outil de conception).
 let auHub = !new URLSearchParams(location.search).has('tableau')
+/** Le hub est-il la salle JOUÉE ? `auHub` seul ne le dit pas : il vaut vrai
+ *  dès le chargement, et l'essai d'éditeur ne le baisse pas (la salle
+ *  essayée passe devant le hub sans l'effacer, pour que « quitter » y
+ *  ramène). Tout ce qui décide qu'on est AU hub pour y jouer lit ce
+ *  prédicat, pas `auHub` : sinon la salle essayée hérite du hub. */
+function salleHub(): boolean {
+  return auHub && testLevel === null
+}
 // Le tableau COMMENCE-t-il en vapeur (départ posé dans une zone qui
 // l'impose) ? Alors la vapeur est l'ÉTAT INITIAL, pas une bascule : elle ne
 // se paie pas. Le drapeau se consomme au premier basculement de l'image.
@@ -13686,15 +13694,18 @@ function resetLasers(): void {
     cachesLevee = (level.caches ?? []).map(() => 0)
   }
   // les pastilles de condensat se re-sèment (mêmes places : semis
-  // déterministe) — ni au hub ni à l'Économat, on n'y farme rien
-  pastilles = auHub || estEconomat(level) ? [] : semePastilles(level)
+  // déterministe) — ni au hub ni à l'Économat, on n'y farme rien. Le hub
+  // se lit par salleHub() : `auHub` reste vrai pendant un essai d'éditeur,
+  // et les pastilles des salles essayées disparaissaient (celles posées
+  // main comprises, pourtant visibles à l'éditeur)
+  pastilles = salleHub() || estEconomat(level) ? [] : semePastilles(level)
   pastillesPrises = pastilles.map(() => false)
   run.pastillesCl = 0
   // la FIOLE — seulement s'il en manque encore à la collection : posée
   // main par le tableau (level.fiole), sinon le semis automatique décide
   const manqueFiole = FIOLES.some((f) => !records.possedeFiole(f.id))
   fiolePastille =
-    auHub || estEconomat(level) || !manqueFiole
+    salleHub() || estEconomat(level) || !manqueFiole
       ? null
       : level.fiole
         ? { ...level.fiole }
@@ -18332,7 +18343,9 @@ function corpsImage(now: number): boolean {
     const bues = absorbePastilles(pastilles, pastillesPrises, sim, rayon)
     for (const i of bues) {
       const cl = pastilles[i].cl
-      gagneCondensat(cl)
+      // en ESSAI, la pastille se boit mais la bourse de la run n'en voit
+      // rien : on ne farme pas depuis un banc (règle des éclats)
+      if (!testLevel) gagneCondensat(cl)
       run.pastillesCl += cl
       audio.collect(panDepuis(sim.stats.centroidX, pastilles[i].x))
     }
@@ -18375,7 +18388,16 @@ function corpsImage(now: number): boolean {
     ) {
       fiolePrise = true
       const manquantes = FIOLES.filter((f) => !records.possedeFiole(f.id))
-      if (manquantes.length > 0) {
+      if (testLevel) {
+        // en ESSAI, la fiole se prend mais rien ne rejoint la collection —
+        // comme les éclats : on ne farme pas les registres depuis un banc
+        toastFile.push({
+          nom: 'essai : rien ne rejoint la collection',
+          icone: '⚗️',
+          sur: 'FIOLE TROUVÉE',
+        })
+        audio.collect()
+      } else if (manquantes.length > 0) {
         let h = 0
         for (const ch of level.code) h = (h * 31 + ch.charCodeAt(0)) | 0
         const f = manquantes[Math.abs(h) % manquantes.length]
