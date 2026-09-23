@@ -1509,3 +1509,16 @@ describe('un mini-jeu survit à l’enregistrement', () => {
     expect(verdicts.some((v) => v.niveau === 'erreur' && /cinq secondes/.test(v.message))).toBe(true)
   })
 })
+
+describe('le tirage en descente d’un tableau', () => {
+  it('« cases mini-jeu » et « les deux » survivent à la publication ; une valeur inconnue retombe au classique', () => {
+    for (const tirage of ['minijeu', 'partout'] as const) {
+      const t = { ...TABLEAUX[0], tirage }
+      const { level } = parseLevel(JSON.parse(serializeLevel(t)))
+      expect(level?.tirage).toBe(tirage)
+    }
+    const { level } = parseLevel({ ...JSON.parse(serializeLevel(TABLEAUX[0])), tirage: 'nimporte' })
+    expect(level?.tirage).toBeUndefined()
+    expect(JSON.parse(serializeLevel(TABLEAUX[0])).tirage).toBeUndefined()
+  })
+})

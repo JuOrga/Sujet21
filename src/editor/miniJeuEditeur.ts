@@ -4,10 +4,10 @@
 // ou en greffant la clé `minijeu` à la main dans le JSON.
 //
 // Deux choses ne se voient pas depuis le menu, d'où la note qu'il affiche :
-//  - le nœud « mini-jeu » de la descente ne cherche pas « un tableau qui a
-//    un mini-jeu » : il tire un TYPE, puis prend la salle publiée sous le
-//    code de ce type (`salleMiniJeu`, main.ts). Hors de ce code, le tableau
-//    se joue en mini-jeu à l'essai, jamais en descente ;
+//  - poser un mini-jeu ne suffit pas à ce que la descente le tire : il faut
+//    le mettre au TIRAGE des cases mini-jeu (`tirage`, le menu voisin), ou
+//    le publier sous le code d'une salle du code pour la remplacer
+//    (`salleMiniJeu`, main.ts) ;
 //  - `estMiniJeu` juge aussi au seul code : un tableau publié sous
 //    `MJ-PALET` SANS mini-jeu n'a plus de sas et ne se conclut jamais.
 //
@@ -16,6 +16,7 @@
 // jouée.
 
 import {
+  auTirageMiniJeu,
   CODE_CIBLES,
   CODE_COUPERET,
   CODE_ORBITES,
@@ -65,7 +66,7 @@ export function valeurMenu(level: { minijeu?: MiniJeuDef }): string {
 
 /** La note sous le menu : ce qu'il reste à faire pour que la descente joue
  *  ce tableau, ou le piège d'un code de mini-jeu sans mini-jeu. */
-export function noteMiniJeu(level: { code: string; minijeu?: MiniJeuDef }): string {
+export function noteMiniJeu(level: { code: string; minijeu?: MiniJeuDef; tirage?: 'minijeu' | 'partout' }): string {
   const mj = level.minijeu
   if (!mj) {
     return CODES_MJ.includes(level.code)
@@ -80,8 +81,26 @@ export function noteMiniJeu(level: { code: string; minijeu?: MiniJeuDef }): stri
   return (
     (level.code === code
       ? `Publié sous ${code}, ce tableau remplace ${nom} de la descente. `
-      : `Ce tableau se joue en mini-jeu à l’essai. Pour que la descente le tire à la place de ${nom}, donnez-lui le code ${code} puis publiez. `) +
+      : auTirageMiniJeu(level)
+        ? 'Publié, ce tableau sort sur les cases mini-jeu de la descente. '
+        : `Ce tableau se joue en mini-jeu à l’essai. Pour que la descente le tire : « Tirage » sur « Cases mini-jeu », ou le code ${code} pour remplacer ${nom}. `) +
     positions +
     cibles
   )
+}
+
+/** La note sous le menu « Tirage » : où la descente fait sortir ce tableau,
+ *  et comment il s'y joue. */
+export function noteTirage(level: { code: string; minijeu?: MiniJeuDef; tirage?: 'minijeu' | 'partout' }): string {
+  if (!level.tirage) return ''
+  const commeUneSalle = level.minijeu
+    ? 'il s’y joue en mini-jeu (sa mesure, sa note).'
+    : 'il s’y joue comme une salle : son sas, son bilan, sa mémoire.'
+  const partout =
+    level.tirage === 'partout' && !level.minijeu
+      ? ' Il sort aussi aux portes classiques.'
+      : level.tirage === 'partout'
+        ? ' Pas aux portes classiques : un mini-jeu n’a pas de sas.'
+        : ' Il ne sort plus aux portes classiques.'
+  return `Publié, ce tableau entre au tirage des cases mini-jeu, à égalité avec le palet, les cibles… — ${commeUneSalle}${partout}`
 }

@@ -932,6 +932,14 @@ export interface LevelDef {
   // distance de la glace au centre. Import DE TYPE seul : minijeux.ts
   // importe level.ts, et un type ne fait pas de cycle à l'exécution.
   minijeu?: MiniJeuDef
+  // LE TIRAGE en descente (le concepteur, 23/09 : « je souhaite juste qu'il
+  // soit tiré parmi les mini-jeux ») : un tableau à SAS peut sortir sur les
+  // cases « mini-jeu » de la mini-carte, à côté du palet ou des cibles, et
+  // se jouer comme une salle — son sas, son bilan. Absent : salle classique
+  // (la pioche des portes) ; 'minijeu' : cases mini-jeu seulement ;
+  // 'partout' : les deux. Un tableau qui porte un mini-jeu (`minijeu`) ne
+  // sort jamais aux portes classiques : il n'a pas de sas.
+  tirage?: 'minijeu' | 'partout'
   // Lit musical imposé par le tableau. Sans valeur, la cuve suit le
   // refroidissement de la coque (tiède → glaciale) : c'est le cas général,
   // les tableaux n'ont pas à choisir une musique pour exister.

@@ -150,7 +150,9 @@ import {
   tableauOrbites,
   tableauPalet,
   tableauRafales,
-  tireMiniJeu,
+  auTirageClassique,
+  auTirageMiniJeu,
+  tireMiniJeuOuMaison,
   tireTrait,
   VERDICTS_ORBITES,
   VERDICTS_PALET,
@@ -926,8 +928,13 @@ function playedLevels(): LevelDef[] {
     // éditable comme les autres, mais jamais dans la séquence de l'expédition.
     // TOUTE la famille est écartée (HUB2, les chantiers…) : une copie du hub
     // publiée deviendrait la « salle 1 » et le sas semblerait y renvoyer.
-    const jouables = libraryLevels.filter((l) => !estCodeHub(l.code))
-    const codes = new Set(jouables.map((l) => l.code))
+    // LES MINI-JEUX et les tableaux réservés aux cases mini-jeu n'entrent
+    // pas non plus : un mini-jeu pioché comme salle n'a pas de sas, il ne
+    // se concluait jamais. Leur code reste compté : un livré qu'ils
+    // remplacent ne revient pas en douce dans la séquence.
+    const deBibliotheque = libraryLevels.filter((l) => !estCodeHub(l.code))
+    const jouables = deBibliotheque.filter(auTirageClassique)
+    const codes = new Set(deBibliotheque.map((l) => l.code))
     sequenceCache = {
       source: libraryLevels,
       seq:
@@ -15679,8 +15686,13 @@ function ouvreNoeud(nature: Exclude<NatureNoeud, 'salle'>): void {
       // couperet, sur le volume de départ que la salle donnera au corps —
       // l'essence rognée comprise
       const alea = aleaDeGraine(`${carteRun.tissage || graineRun()}@minijeu${carteRun.niveau}`)
-      const quel = tireMiniJeu(alea)
-      if (quel === 'palet') minijeuIntercalaire = salleMiniJeu(CODE_PALET, tableauPalet)
+      // LES MINI-JEUX MAISON entrent au chapeau : les tableaux publiés mis
+      // au tirage des cases mini-jeu, sauf ceux déjà joués de la run
+      const maison = libraryLevels.filter((l) => auTirageMiniJeu(l) && !estCodeHub(l.code) && !voieVues.has(l.code))
+      const tire = tireMiniJeuOuMaison(alea, maison)
+      const quel = 'type' in tire ? tire.type : null
+      if (!('type' in tire)) minijeuIntercalaire = tire.maison
+      else if (quel === 'palet') minijeuIntercalaire = salleMiniJeu(CODE_PALET, tableauPalet)
       else if (quel === 'rafales') minijeuIntercalaire = salleMiniJeu(CODE_RAFALES, tableauRafales)
       else if (quel === 'orbites') minijeuIntercalaire = salleMiniJeu(CODE_ORBITES, tableauOrbites)
       else if (quel === 'cibles') minijeuIntercalaire = salleMiniJeu(CODE_CIBLES, tableauCibles)
@@ -19108,6 +19120,11 @@ function corpsImage(now: number): boolean {
     // LA VOIE : chaque sas bu creuse la descente d'un rang — le palmarès
     // suit en direct (profondeur record, descentes entamées)
     voieRang += 1 // la descente avance : c'est la progression, pas un titre
+    // UN MINI-JEU À SAS (un tableau maison tiré à une case mini-jeu) se
+    // conclut ici, comme une salle : l'intercalaire est franchi — sans quoi
+    // applyLevel le rejouait à la porte suivante, il passe devant la voie
+    minijeuIntercalaire = null
+    minijeuForce = false
     carteRun = franchitSalle(carteRun) // et le module se vide d'une salle
     // LA CACHE : un module qui recèle un orbe le donne quand il est épuisé
     if (!sasOutil) prendOrbeDuModule()

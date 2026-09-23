@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { CODE_CIBLES, CODE_PALET, estMiniJeu, REGLES_PALET, tableauCouperet, tableauPalet } from '../game/minijeux'
 import { parseLevel, serializeLevel } from '../game/levelIO'
 import type { LevelDef } from '../game/level'
-import { CODE_DU_MINI_JEU, MINI_JEUX_MENU, miniJeuNeuf, noteMiniJeu, valeurMenu } from './miniJeuEditeur'
+import { CODE_DU_MINI_JEU, MINI_JEUX_MENU, miniJeuNeuf, noteMiniJeu, noteTirage, valeurMenu } from './miniJeuEditeur'
 
 // un tableau ordinaire quelconque : le décor ne compte pas, seul le code
 const ordinaire = (): LevelDef => {
@@ -58,9 +58,26 @@ describe('le menu « Mini-jeu » de l’éditeur', () => {
   it('la note dit le code sous lequel publier, tant qu’il n’est pas pris', () => {
     const t = ordinaire()
     t.minijeu = miniJeuNeuf('cibles')
-    expect(noteMiniJeu(t)).toContain(`donnez-lui le code ${CODE_CIBLES}`)
+    expect(noteMiniJeu(t)).toContain(`le code ${CODE_CIBLES}`)
+    expect(noteMiniJeu(t)).toContain('« Tirage » sur « Cases mini-jeu »')
+    t.tirage = 'minijeu'
+    expect(noteMiniJeu(t)).toContain('sort sur les cases mini-jeu')
+    delete t.tirage
     t.code = CODE_DU_MINI_JEU.cibles
     expect(noteMiniJeu(t)).toContain(`Publié sous ${CODE_CIBLES}`)
+  })
+
+  it('la note du tirage dit où sort le tableau, et comment il s’y joue', () => {
+    const t = ordinaire()
+    expect(noteTirage(t)).toBe('')
+    t.tirage = 'minijeu'
+    expect(noteTirage(t)).toContain('son sas')
+    expect(noteTirage(t)).toContain('ne sort plus aux portes classiques')
+    t.tirage = 'partout'
+    expect(noteTirage(t)).toContain('aussi aux portes classiques')
+    // un mini-jeu n'a pas de sas : « les deux » ne l'envoie pas aux portes
+    t.minijeu = miniJeuNeuf('palet')
+    expect(noteTirage(t)).toContain('Pas aux portes classiques')
   })
 
   it('un code de mini-jeu SANS mini-jeu est signalé (pas de sas, pas de fin)', () => {

@@ -206,7 +206,7 @@ import {
 } from '../game/netLevels'
 import { appelle } from '../game/reseau'
 import { issueChargement, questionChargement, tableauOuvert } from './chargement'
-import { MINI_JEUX_MENU, miniJeuNeuf, noteMiniJeu, valeurMenu, type MiniJeuMenu } from './miniJeuEditeur'
+import { MINI_JEUX_MENU, miniJeuNeuf, noteMiniJeu, noteTirage, valeurMenu, type MiniJeuMenu } from './miniJeuEditeur'
 import { Historique, type Pas } from './historique'
 
 const STORE_KEY = 'projet21.editeur.v1'
@@ -4506,6 +4506,21 @@ export class LevelEditor {
       this.syncMiniJeu()
       this.commit(this.level.minijeu ? `Mini-jeu : ${NOMS_MINI_JEU[this.level.minijeu.type]}.` : 'Mini-jeu retiré : tableau ordinaire.')
     })
+    // LE TIRAGE en descente (le concepteur, 23/09 : « je souhaite juste
+    // qu'il soit tiré parmi les mini-jeux ») : portes classiques, cases
+    // mini-jeu, ou les deux — le classique, défaut, ne se grave pas
+    this.el('ed-tirage').addEventListener('change', () => {
+      const v = (this.el('ed-tirage') as HTMLSelectElement).value
+      this.level.tirage = v === 'minijeu' || v === 'partout' ? v : undefined
+      this.syncMiniJeu()
+      this.commit(
+        v === 'minijeu'
+          ? 'Tirage : cases mini-jeu seulement.'
+          : v === 'partout'
+            ? 'Tirage : portes classiques et cases mini-jeu.'
+            : 'Tirage : portes classiques.',
+      )
+    })
     // LES RÈGLES DU MINI-JEU DES CIBLES (le concepteur, 17/09 : la durée et
     // les paliers sont à lui, pas au code) : la frappe applique, la sortie
     // du champ grave l'historique ; les paliers restent décroissants
@@ -5411,6 +5426,10 @@ export class LevelEditor {
     const note = this.el('ed-mj-note')
     note.textContent = noteMiniJeu(this.level)
     note.hidden = note.textContent === ''
+    ;(this.el('ed-tirage') as HTMLSelectElement).value = this.level.tirage ?? ''
+    const noteT = this.el('ed-tirage-note')
+    noteT.textContent = noteTirage(this.level)
+    noteT.hidden = noteT.textContent === ''
     const host = this.el('ed-minijeu')
     const cibles = !!mj && mj.type === 'cibles'
     host.hidden = !cibles
