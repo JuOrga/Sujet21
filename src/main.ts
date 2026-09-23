@@ -13680,8 +13680,10 @@ function resetLasers(): void {
   cachesEntree = (level.caches ?? []).map(() => null)
   memosVoile.length = 0 // les bitmaps de l'ancien tableau ne servent plus
   // la CLEF DE CACHETTE se consomme ici : les voiles du tableau tombent
-  // d'emblée (le hub et l'Économat ne l'usent pas)
-  if (clefCachette && !estEconomat(level) && !auHub) {
+  // d'emblée (le hub et l'Économat ne l'usent pas). Un ESSAI non plus : la
+  // clef est achetée pour la run, et un essai d'éditeur lancé en pleine
+  // descente la brûlait — la salle suivante de la run gardait ses voiles.
+  if (clefCachette && !estEconomat(level) && !auHub && testLevel === null) {
     clefCachette = false
     cachesLevee = (level.caches ?? []).map(() => 0)
   }
@@ -18332,7 +18334,9 @@ function corpsImage(now: number): boolean {
     const bues = absorbePastilles(pastilles, pastillesPrises, sim, rayon)
     for (const i of bues) {
       const cl = pastilles[i].cl
-      gagneCondensat(cl)
+      // en ESSAI, la pastille se boit mais la bourse de la run n'en voit
+      // rien : un essai d'éditeur lancé en pleine descente la remplissait
+      if (!testLevel) gagneCondensat(cl)
       run.pastillesCl += cl
       audio.collect(panDepuis(sim.stats.centroidX, pastilles[i].x))
     }
@@ -18375,7 +18379,17 @@ function corpsImage(now: number): boolean {
     ) {
       fiolePrise = true
       const manquantes = FIOLES.filter((f) => !records.possedeFiole(f.id))
-      if (manquantes.length > 0) {
+      if (testLevel) {
+        // en ESSAI, la fiole se prend mais rien ne rejoint la collection —
+        // comme les éclats : on ne farme pas les registres depuis un banc.
+        // Avant, une fiole bue dans un essai d'éditeur y restait pour de bon.
+        toastFile.push({
+          nom: 'essai : rien ne rejoint la collection',
+          icone: '⚗️',
+          sur: 'FIOLE TROUVÉE',
+        })
+        audio.collect()
+      } else if (manquantes.length > 0) {
         let h = 0
         for (const ch of level.code) h = (h * 31 + ch.charCodeAt(0)) | 0
         const f = manquantes[Math.abs(h) % manquantes.length]
