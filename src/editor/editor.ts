@@ -205,6 +205,8 @@ import {
   type StoredLevel,
 } from '../game/netLevels'
 import { appelle } from '../game/reseau'
+import { issueChargement, questionChargement, tableauOuvert } from './chargement'
+import { Historique, type Pas } from './historique'
 
 const STORE_KEY = 'projet21.editeur.v1'
 // À côté du brouillon : le LIEN avec la bibliothèque — quelle entrée est
@@ -652,7 +654,7 @@ export class LevelEditor {
     this.bindUi()
     this.bindCanvas()
     this.restore()
-    this.lastSnap = serializeLevel(this.level)
+    this.historique = new Historique(this.etat())
     this.majBoutonsHistoire()
     void this.refreshLibrary()
     // Sonde de test : l'éditeur depuis la console (comme __sim, __run, __fin)
@@ -663,46 +665,46 @@ export class LevelEditor {
   // L'historique retient des instantanés JSON du tableau : chaque commit qui
   // CHANGE le tableau en pousse un (les messages sans changement ne comptent
   // pas). Annuler remonte, rétablir redescend — toute action nouvelle coupe
-  // la branche du futur, comme partout ailleurs.
-  private past: string[] = []
-  private future: string[] = []
-  private lastSnap = ''
+  // la branche du futur, comme partout ailleurs. Chaque pas emporte aussi
+  // l'ENTRÉE OUVERTE (cf. historique.ts : l'échangette écrasée du 28/08).
+  private historique = new Historique({ snap: '', openId: '', base: '' })
+
+  private etat(): Pas {
+    return { snap: serializeLevel(this.level), openId: this.openId, base: this.base }
+  }
 
   private histoire(): void {
-    const snap = serializeLevel(this.level)
-    if (snap === this.lastSnap) return
-    this.past.push(this.lastSnap)
-    if (this.past.length > 100) this.past.shift()
-    this.future.length = 0
-    this.lastSnap = snap
+    this.historique.note(this.etat())
     this.majBoutonsHistoire()
   }
 
   private undo(): void {
-    const snap = this.past.pop()
-    if (snap === undefined) {
+    const pas = this.historique.annule({ openId: this.openId, base: this.base })
+    if (!pas) {
       this.status('Rien à annuler.')
       return
     }
-    this.future.push(this.lastSnap)
-    this.appliqueSnap(snap, 'Annulé.')
+    this.appliqueSnap(pas, 'Annulé.')
   }
 
   private redo(): void {
-    const snap = this.future.pop()
-    if (snap === undefined) {
+    const pas = this.historique.retablit({ openId: this.openId, base: this.base })
+    if (!pas) {
       this.status('Rien à rétablir.')
       return
     }
-    this.past.push(this.lastSnap)
-    this.appliqueSnap(snap, 'Rétabli.')
+    this.appliqueSnap(pas, 'Rétabli.')
   }
 
-  private appliqueSnap(snap: string, msg: string): void {
-    const { level } = parseLevel(JSON.parse(snap))
+  private appliqueSnap(pas: Pas, msg: string): void {
+    const { level } = parseLevel(JSON.parse(pas.snap))
     if (!level) return // un instantané vient de serializeLevel : toujours lisible
     this.level = level
-    this.lastSnap = snap
+    // le contenu revient AVEC son entrée : annuler une ouverture rouvre le
+    // tableau d'avant, et ENREGISTRER vise celui qu'on a sous les yeux
+    const changeDEntree = pas.openId !== this.openId
+    this.openId = pas.openId
+    this.base = pas.base
     this.sel = null
     this.multi = []
     this.cutWinner = null
@@ -710,6 +712,7 @@ export class LevelEditor {
     this.persist()
     this.syncForm()
     this.majBoutonsHistoire()
+    if (changeDEntree) this.renderLibrary()
     this.hint = msg
     this.draw()
   }
@@ -717,8 +720,8 @@ export class LevelEditor {
   private majBoutonsHistoire(): void {
     const u = this.host.querySelector('#ed-undo') as HTMLButtonElement | null
     const r = this.host.querySelector('#ed-redo') as HTMLButtonElement | null
-    if (u) u.disabled = this.past.length === 0
-    if (r) r.disabled = this.future.length === 0
+    if (u) u.disabled = !this.historique.peutAnnuler
+    if (r) r.disabled = !this.historique.peutRetablir
   }
 
   // ——— Ouverture / fermeture ———————————————————————————————
@@ -5171,6 +5174,7 @@ export class LevelEditor {
       // à jour : on (re)noue simplement le lien
       this.openId = entry.id
       this.base = enLib
+      this.historique.relie({ openId: this.openId, base: this.base })
       this.persist()
       return
     }
@@ -5303,14 +5307,29 @@ export class LevelEditor {
       this.commit(`Chargement refusé : ${rejets[0] ?? 'document invalide'}`)
       return
     }
+    // un AUTRE tableau que l'entrée ouverte : ENREGISTRER l'écraserait
+    // (cf. chargement.ts) — on demande, et l'on charge détaché
+    const ouvert = tableauOuvert(this.openId, this.library, this.level)
+    let detache = false
+    if (ouvert && issueChargement(ouvert, level) === 'demande') {
+      if (!confirm(questionChargement(ouvert.name, level.name))) {
+        this.commit('Chargement annulé.')
+        return
+      }
+      this.openId = ''
+      this.base = ''
+      detache = true
+      this.renderLibrary()
+    }
     this.level = level
     this.sel = null
     this.fitView()
     this.syncForm()
     this.commit(
-      rejets.length
+      (rejets.length
         ? `Chargé, ${rejets.length} pièce(s) écartée(s).`
-        : 'Tableau chargé.',
+        : 'Tableau chargé.') +
+        (detache ? ` Détaché de « ${ouvert!.name} » : ENREGISTRER créera un nouveau tableau.` : ''),
     )
   }
 

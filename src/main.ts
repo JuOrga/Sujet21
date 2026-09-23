@@ -954,7 +954,7 @@ function finOuverte(): boolean {
 }
 function hubJoue(): LevelDef {
   const base = hubLevel()
-  const opts = { cuveClose: !eveilJoue(), finOuverte: finOuverte() }
+  const opts = { cuveClose: !eveilJoue() || alerteDifferee, finOuverte: finOuverte() }
   const cle = `${opts.cuveClose ? 'cuve|' : ''}${opts.finOuverte ? 'fin|' : ''}${records.reparationsFaites().sort().join('+')}`
   if (hubMemo && hubMemo.base === base && hubMemo.cle === cle) return hubMemo.lv
   const lv = appliqueReparations(base, records.reparationsFaites(), opts)
@@ -986,6 +986,19 @@ function economatLevel(): LevelDef {
 // tableau d'éditeur), sans toucher aux registres. La FILE enchaîne les
 // tableaux d'essai au sas — la trilogie laser se joue ainsi.
 let testLevel: LevelDef | null = null
+// LA RÉSERVE ET L'HORLOGE DE LA RUN, mises de côté le temps d'un essai :
+// l'essai part d'une bonbonne vide et d'un chrono à zéro, mais un essai
+// lancé en pleine descente les effaçait pour de bon — au retour, la salle
+// de la run repartait à sec. restart() les rend dès que plus aucun essai
+// n'est joué ; une run neuve, reprise ou close les oublie.
+let sauveEssai: { bonbonneLiters: number; runTime: number } | null = null
+/** L'essai démarre : bonbonne vide, chrono à zéro — la run mise de côté. */
+function ouvreEssai(): void {
+  if (!sauveEssai)
+    sauveEssai = { bonbonneLiters: run.bonbonneLiters, runTime: run.runTime }
+  run.bonbonneLiters = 0
+  run.runTime = 0
+}
 // La file d'essai est mixte : tableaux et cinématiques s'y enchaînent.
 let testQueue: (LevelDef | CinematiqueDef)[] = []
 let level: LevelDef = TABLEAUX[levelIndex]
@@ -1000,6 +1013,20 @@ const exitMouth = { x: 0, y: 0 }
 // CHARGEMENT : derrière la fiche, l'échantillon dérive déjà dans la cuve
 // d'entraînement (sauf navigation directe ?tableau=N, outil de conception).
 let auHub = !new URLSearchParams(location.search).has('tableau')
+/** Le hub est-il la salle JOUÉE ? `auHub` seul ne le dit pas : il vaut vrai
+ *  dès le chargement, et l'essai d'éditeur ne le baisse pas (la salle
+ *  essayée passe devant le hub sans l'effacer, pour que « quitter » y
+ *  ramène). Tout ce qui décide qu'on est AU hub pour y jouer lit ce
+ *  prédicat, pas `auHub` : sinon la salle essayée hérite du hub. */
+function salleHub(): boolean {
+  return auHub && testLevel === null
+}
+// L'ALERTE DIFFÉRÉE : l'éveil peut se conclure dans une salle d'essai (la
+// planche, le bis le lancent au premier contact). L'alerte — la brèche de
+// LA CUVE DU HUB — n'a rien à y faire : elle attend le hub, dont la cuve
+// reste close jusque-là. Sans cette attente, l'éveil gravé la rendait
+// introuvable : le joueur ne voyait jamais la brèche.
+let alerteDifferee = false
 // Le tableau COMMENCE-t-il en vapeur (départ posé dans une zone qui
 // l'impose) ? Alors la vapeur est l'ÉTAT INITIAL, pas une bascule : elle ne
 // se paie pas. Le drapeau se consomme au premier basculement de l'image.
@@ -4823,6 +4850,7 @@ function effaceRun(): void {
   majBoutonsRun()
 }
 function reprendreRun(save: RunSauvee): void {
+  sauveEssai = null // la run d'avant l'essai n'est plus celle qu'on joue
   auHub = false
   testLevel = null
   fromEditor = false
@@ -5064,8 +5092,7 @@ function startTest(etapes: (LevelDef | CinematiqueDef)[]): void {
   // ré-arme, juste après cet appel
   fromPlanche = false
   document.getElementById('planche-retour')?.setAttribute('hidden', '')
-  run.bonbonneLiters = 0
-  run.runTime = 0
+  ouvreEssai()
   hasPlayed = true
   // « playing » d'abord : restart() se charge alors lui-même du plan large et
   // du carton de journal — sinon les deux se jouaient en double, en décalé.
@@ -5236,8 +5263,7 @@ const chargeEditeur = chargeUneFois('l’éditeur de tableaux', async () => {
       play: (lvl) => {
         testLevel = lvl
         fromEditor = true
-        run.bonbonneLiters = 0
-        run.runTime = 0
+        ouvreEssai()
         hasPlayed = true
         ed.close()
         document.body.classList.add('playing')
@@ -11920,7 +11946,7 @@ input.onCommande = (id: string): boolean => {
 let forceSas = false
 function valideSalleCourante(): string {
   if (!hasPlayed) return 'menu'
-  if (auHub) return 'hub'
+  if (salleHub()) return 'hub'
   if (miseEnBonbonne || run.ended) return 'deja'
   if (sim.dispersed) return 'disperse'
   forceSas = true
@@ -11940,7 +11966,7 @@ function valideSalleCourante(): string {
 let forceSortieHub: 'principal' | 'givre' | 'vapeur' | null = null
 function passeLeHub(sortie: 'principal' | 'givre' | 'vapeur'): string {
   if (!hasPlayed) return 'menu'
-  if (!auHub) return 'dehors'
+  if (!salleHub()) return 'dehors'
   if (sim.dispersed) return 'disperse'
   forceSortieHub = sortie
   return 'ok'
@@ -13680,21 +13706,26 @@ function resetLasers(): void {
   cachesEntree = (level.caches ?? []).map(() => null)
   memosVoile.length = 0 // les bitmaps de l'ancien tableau ne servent plus
   // la CLEF DE CACHETTE se consomme ici : les voiles du tableau tombent
-  // d'emblée (le hub et l'Économat ne l'usent pas)
-  if (clefCachette && !estEconomat(level) && !auHub) {
+  // d'emblée (le hub et l'Économat ne l'usent pas). Un ESSAI non plus : la
+  // clef est achetée pour la run, et un essai d'éditeur lancé en pleine
+  // descente la brûlait — la salle suivante de la run gardait ses voiles.
+  if (clefCachette && !estEconomat(level) && !auHub && testLevel === null) {
     clefCachette = false
     cachesLevee = (level.caches ?? []).map(() => 0)
   }
   // les pastilles de condensat se re-sèment (mêmes places : semis
-  // déterministe) — ni au hub ni à l'Économat, on n'y farme rien
-  pastilles = auHub || estEconomat(level) ? [] : semePastilles(level)
+  // déterministe) — ni au hub ni à l'Économat, on n'y farme rien. Le hub
+  // se lit par salleHub() : `auHub` reste vrai pendant un essai d'éditeur,
+  // et les pastilles des salles essayées disparaissaient (celles posées
+  // main comprises, pourtant visibles à l'éditeur)
+  pastilles = salleHub() || estEconomat(level) ? [] : semePastilles(level)
   pastillesPrises = pastilles.map(() => false)
   run.pastillesCl = 0
   // la FIOLE — seulement s'il en manque encore à la collection : posée
   // main par le tableau (level.fiole), sinon le semis automatique décide
   const manqueFiole = FIOLES.some((f) => !records.possedeFiole(f.id))
   fiolePastille =
-    auHub || estEconomat(level) || !manqueFiole
+    salleHub() || estEconomat(level) || !manqueFiole
       ? null
       : level.fiole
         ? { ...level.fiole }
@@ -16270,6 +16301,13 @@ function restart(): void {
   // un rejeu ne survit qu'à SA salle : toute autre salle chargée y met fin
   // (avant sauveRun, qui graverait sinon une réserve à zéro)
   if (rejeu && testLevel !== rejeu.niveau) finRejeu()
+  // plus d'essai joué : la run retrouve sa réserve et son horloge (avant
+  // sauveRun, qui graverait sinon une bonbonne vide)
+  if (sauveEssai && testLevel === null) {
+    run.bonbonneLiters = sauveEssai.bonbonneLiters
+    run.runTime = sauveEssai.runTime
+    sauveEssai = null
+  }
   run.exitTimer = 0
   run.tableauTime = 0
   // remis à zéro AVEC l'horloge qu'il mesure : sans cela, après un versement
@@ -16353,6 +16391,12 @@ function restart(): void {
     // la SÉQUENCE du tableau démarre à chaque essai : elle fait partie du
     // tableau, pas de l'arrivée — la rejouer après un R est le bon geste
     if (level.sequence) demarreSequence(level.sequence)
+    // l'ALERTE qu'un éveil conclu en essai a laissée en attente : au hub
+    // joué, et seulement là, la brèche cède enfin
+    if (alerteDifferee && salleHub()) {
+      alerteDifferee = false
+      if ((level.portes?.length ?? 0) > 0) demarreSequence('ALERTE')
+    }
   } else {
     camera.snapTo(sim.stats.centroidX, sim.stats.centroidY, camera.zoom)
   }
@@ -16457,6 +16501,7 @@ function lanceRondeEssai(): void {
 ;(window as unknown as { __ronde: () => void }).__ronde = lanceRondeEssai
 
 function newExpedition(avecCarte = false): void {
+  sauveEssai = null // la run d'avant l'essai n'est plus celle qu'on joue
   levelIndex = 0
   voieRang = 0 // une descente neuve repart du premier rang du plan
   voieVues.clear()
@@ -16510,6 +16555,7 @@ function newExpedition(avecCarte = false): void {
 // Fin de run (dernier échantillon dispersé, ou expédition conclue) : le
 // laboratoire rappelle — on se réveille AU HUB, prêt à relancer par le sas.
 function retourAuLabo(): void {
+  sauveEssai = null // la run d'avant l'essai n'est plus celle qu'on joue
   // (le récit et les fins ne se livrent plus ici : une run perdue ou
   // abandonnée ne raconte rien — c'est l'expédition BOUCLÉE qui les sert)
   // LE DISTILLATEUR (réparé) : la prime du retour — le delta garanti
@@ -16629,6 +16675,7 @@ function afficheDispersion(): void {
  * les acquis (mémoire, liens, fioles, records) restent : ils survivent à
  * tout. Le bouton principal redira alors COMMENCER. */
 function quitteAuMenu(): void {
+  sauveEssai = null // la run d'avant l'essai n'est plus celle qu'on joue
   effaceRun()
   ecranDispersion = 'aucun'
   overlay.classList.remove('visible')
@@ -17284,7 +17331,7 @@ function majDossier(): void {
   }
   mission +=
     '<div class="do-mission">' +
-    `<div class="do-nom">${auHub ? 'LE LABORATOIRE' : level.name}</div>` +
+    `<div class="do-nom">${salleHub() ? 'LE LABORATOIRE' : level.name}</div>` +
     `<div class="do-code">${level.code}${estEconomat(level) ? ' · L’ÉCONOMAT' : ''}</div>`
   if (id)
     mission +=
@@ -17577,7 +17624,9 @@ function avanceEveil(): void {
     // L'ALERTE : au moment où le sujet SAIT se mouvoir, la station bascule
     // en rouge, la cuve tremble — et la brèche (porte d'index 0 : celle de
     // la cuve) cède. On naît enfermé, on sort par l'accident.
-    if (auHub && (level.portes?.length ?? 0) > 0) demarreSequence('ALERTE')
+    // Hors du hub (un essai), elle attend le hub : voir alerteDifferee.
+    if (!salleHub()) alerteDifferee = true
+    else if ((level.portes?.length ?? 0) > 0) demarreSequence('ALERTE')
   }
 }
 for (const carte of [eveil1El, eveil2El]) {
@@ -18332,7 +18381,9 @@ function corpsImage(now: number): boolean {
     const bues = absorbePastilles(pastilles, pastillesPrises, sim, rayon)
     for (const i of bues) {
       const cl = pastilles[i].cl
-      gagneCondensat(cl)
+      // en ESSAI, la pastille se boit mais la bourse de la run n'en voit
+      // rien : on ne farme pas depuis un banc (règle des éclats)
+      if (!testLevel) gagneCondensat(cl)
       run.pastillesCl += cl
       audio.collect(panDepuis(sim.stats.centroidX, pastilles[i].x))
     }
@@ -18346,7 +18397,6 @@ function corpsImage(now: number): boolean {
     const graves = absorbePastilles(formes, eclatsPrisEssai, sim)
     for (const i of graves) {
       const e = eclatsEssai[i]
-      eclatsPrisRun.add(e.cle)
       if (testLevel) {
         toastFile.push({
           nom: 'essai : rien ne se grave aux registres',
@@ -18355,6 +18405,9 @@ function corpsImage(now: number): boolean {
           sur: 'ÉCLAT DE MÉMOIRE',
         })
       } else {
+        // la clé ne se retient qu'en run : prise en essai, l'éclat restait
+        // « déjà pris » pour la run, et sa mémoire était perdue
+        eclatsPrisRun.add(e.cle)
         gagneMemoireRun(e.memoire)
         toastFile.push({
           nom: `+${e.memoire} mémoire — la matière se souvient`,
@@ -18375,7 +18428,16 @@ function corpsImage(now: number): boolean {
     ) {
       fiolePrise = true
       const manquantes = FIOLES.filter((f) => !records.possedeFiole(f.id))
-      if (manquantes.length > 0) {
+      if (testLevel) {
+        // en ESSAI, la fiole se prend mais rien ne rejoint la collection —
+        // comme les éclats : on ne farme pas les registres depuis un banc
+        toastFile.push({
+          nom: 'essai : rien ne rejoint la collection',
+          icone: '⚗️',
+          sur: 'FIOLE TROUVÉE',
+        })
+        audio.collect()
+      } else if (manquantes.length > 0) {
         let h = 0
         for (const ch of level.code) h = (h * 31 + ch.charCodeAt(0)) | 0
         const f = manquantes[Math.abs(h) % manquantes.length]
@@ -18426,7 +18488,7 @@ function corpsImage(now: number): boolean {
 
   // ---- LE MÉTA AU HUB : les zones héritées (comptoir par géométrie) —
   // seulement quand le module joué n'a pas de plots en données
-  const zonesHub = auHub && !sim.dispersed ? zonesDuHub(level) : null
+  const zonesHub = salleHub() && !sim.dispersed ? zonesDuHub(level) : null
   if (zonesHub && plotsNiveau.length === 0) {
     for (let i = 0; i < zonesHub.etal.length; i++) {
       const a = zonesHub.etal[i]
@@ -18508,7 +18570,7 @@ function corpsImage(now: number): boolean {
   // ---- LE MARCHAND : au contact de l'ÉTAL du comptoir (la boîte qui
   // englobe ses alcôves, élargie), le voile s'ouvre — une fois par entrée.
   // Les alcôves, elles, vendent toujours au contact : les deux se cumulent.
-  if (auHub && !sim.dispersed && !(level.pupitres ?? []).some((q) => q.ecran === 'marchand')) {
+  if (salleHub() && !sim.dispersed && !(level.pupitres ?? []).some((q) => q.ecran === 'marchand')) {
     const plots = level.plots?.length
       ? level.plots.filter((p) => p.monnaie === 'memoire')
       : (zonesHub?.etal ?? []).map((a) => a.plot)
@@ -18827,7 +18889,12 @@ function corpsImage(now: number): boolean {
   // écrite ; le SAS DU GIVRE (derrière le rideau — la glace) lance LA
   // VOIE ; le SAS DE VAPEUR (derrière la grille) lance la DESCENTE DU
   // JOUR. Le verrou est la MATIÈRE : sans le lien tissé, pas de passage.
-  const zonesSas = auHub ? zonesDuHub(level) : null
+  // salleHub() et non `auHub` : au premier essai après le chargement,
+  // `auHub` est encore vrai, et le sas de la salle essayée lançait une
+  // descente — zonesDuHub rend en outre les zones codées en dur du hub pour
+  // toute salle de plus de 2 600 u (sas de givre et de vapeur invisibles)
+  const auSasDuHub = salleHub()
+  const zonesSas = auSasDuHub ? zonesDuHub(level) : null
   // une sortie DÉCLARÉE par le pupitre vaut le corps posé dessus : tout
   // l'aval reste le vrai chemin (mode de descente, son, cinématique,
   // reprise de la sauvegarde) — seul le déclenchement est forcé
@@ -18840,7 +18907,7 @@ function corpsImage(now: number): boolean {
     (!!zonesSas &&
       pointInBox(sim.stats.centroidX, sim.stats.centroidY, zonesSas.sasVapeur))
   const rejointSasHub =
-    (auHub &&
+    (auSasDuHub &&
       (sortieOutil !== null ||
         pointInBox(sim.stats.centroidX, sim.stats.centroidY, level.exit))) ||
     surSasGivre ||
@@ -18849,7 +18916,7 @@ function corpsImage(now: number): boolean {
     !tableauDone &&
     !sim.dispersed &&
     (drunk || reached || rejointSasHub) &&
-    auHub
+    auSasDuHub
   ) {
     // LE SAS DE LANCEMENT : au hub, le sas ne collecte rien — il LANCE une
     // descente NEUVE. Il ne reprend plus de sauvegarde : on n'arrive au hub

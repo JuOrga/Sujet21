@@ -1,0 +1,521 @@
+{
+ "id": "les-3-voies",
+ "auteur": "BOIZ",
+ "majAt": "2026-08-25T14:42:05.668Z",
+ "level": {
+  "name": "Les 3 voies",
+  "code": "21T-102",
+  "journal": "Entrée de journal du protocole : ce que le laboratoire a observé dans cette cuve.",
+  "bounds": {
+   "minX": -1200,
+   "minY": -900,
+   "maxX": 1650,
+   "maxY": 850
+  },
+  "spawn": {
+   "x": -1008,
+   "y": -256,
+   "n": 900
+  },
+  "exit": {
+   "minX": 1184,
+   "minY": -288,
+   "maxX": 1340,
+   "maxY": -120
+  },
+  "boxes": [
+   {
+    "minX": -768,
+    "minY": -288,
+    "maxX": -448,
+    "maxY": -176,
+    "material": 7
+   },
+   {
+    "minX": -768,
+    "minY": -336,
+    "maxX": -144,
+    "maxY": -288,
+    "material": 0
+   },
+   {
+    "minX": -768,
+    "minY": -896,
+    "maxX": 1648,
+    "maxY": -848,
+    "material": 0
+   },
+   {
+    "minX": -143,
+    "minY": -336,
+    "maxX": 303,
+    "maxY": -288,
+    "material": 8
+   },
+   {
+    "minX": 96,
+    "minY": -96,
+    "maxX": 554,
+    "maxY": -48,
+    "material": 8
+   },
+   {
+    "minX": 656,
+    "minY": 480,
+    "maxX": 1120,
+    "maxY": 528,
+    "material": 8
+   },
+   {
+    "minX": -480,
+    "minY": 448,
+    "maxX": 48,
+    "maxY": 528,
+    "material": 0
+   },
+   {
+    "minX": 624,
+    "minY": -352,
+    "maxX": 944,
+    "maxY": -288,
+    "material": 0
+   },
+   {
+    "minX": -1184,
+    "minY": -96,
+    "maxX": -768,
+    "maxY": -48,
+    "material": 5
+   },
+   {
+    "minX": -768,
+    "minY": -656,
+    "maxX": -448,
+    "maxY": -336,
+    "material": 8
+   },
+   {
+    "minX": -448,
+    "minY": -848,
+    "maxX": -256,
+    "maxY": -656,
+    "forme": 3,
+    "material": 2
+   },
+   {
+    "minX": -768,
+    "minY": -176,
+    "maxX": -448,
+    "maxY": -96,
+    "material": 0
+   },
+   {
+    "minX": -448,
+    "minY": -96,
+    "maxX": 48,
+    "maxY": 304,
+    "material": 1
+   },
+   {
+    "minX": -704,
+    "minY": -848,
+    "maxX": -448,
+    "maxY": -656,
+    "material": 0
+   },
+   {
+    "minX": 48,
+    "minY": -96,
+    "maxX": 96,
+    "maxY": -48,
+    "material": 0
+   },
+   {
+    "minX": 575,
+    "minY": -96,
+    "maxX": 895,
+    "maxY": -48,
+    "material": 2
+   },
+   {
+    "minX": 554,
+    "minY": -96,
+    "maxX": 575,
+    "maxY": -48,
+    "material": 0
+   },
+   {
+    "minX": 352,
+    "minY": -704,
+    "maxX": 624,
+    "maxY": -288,
+    "material": 1
+   },
+   {
+    "minX": 304,
+    "minY": -336,
+    "maxX": 352,
+    "maxY": -288,
+    "material": 0
+   },
+   {
+    "minX": -768,
+    "minY": -96,
+    "maxX": -752,
+    "maxY": 80,
+    "material": 0
+   },
+   {
+    "minX": -752,
+    "minY": -96,
+    "maxX": -448,
+    "maxY": -48,
+    "material": 9
+   },
+   {
+    "minX": 48,
+    "minY": 448,
+    "maxX": 352,
+    "maxY": 512,
+    "material": 9
+   },
+   {
+    "minX": 352,
+    "minY": 448,
+    "maxX": 656,
+    "maxY": 528,
+    "material": 0
+   },
+   {
+    "minX": 895,
+    "minY": -96,
+    "maxX": 1440,
+    "maxY": -48,
+    "material": 5
+   },
+   {
+    "minX": -784,
+    "minY": 448,
+    "maxX": -480,
+    "maxY": 512,
+    "material": 9
+   },
+   {
+    "minX": -1200,
+    "minY": 512,
+    "maxX": -784,
+    "maxY": 528,
+    "material": 2
+   },
+   {
+    "minX": -1200,
+    "minY": -896,
+    "maxX": -768,
+    "maxY": -848,
+    "material": 0
+   },
+   {
+    "minX": -1200,
+    "minY": 528,
+    "maxX": -1184,
+    "maxY": 850,
+    "material": 2
+   },
+   {
+    "minX": -784,
+    "minY": 512,
+    "maxX": -480,
+    "maxY": 528,
+    "material": 2
+   },
+   {
+    "minX": 48,
+    "minY": 512,
+    "maxX": 352,
+    "maxY": 528,
+    "material": 2
+   },
+   {
+    "minX": -832,
+    "minY": 448,
+    "maxX": -784,
+    "maxY": 512,
+    "material": 0
+   },
+   {
+    "minX": -1200,
+    "minY": 464,
+    "maxX": -832,
+    "maxY": 512,
+    "material": 0
+   },
+   {
+    "minX": 1440,
+    "minY": -96,
+    "maxX": 1488,
+    "maxY": 112,
+    "material": 0
+   },
+   {
+    "minX": 1440,
+    "minY": 368,
+    "maxX": 1488,
+    "maxY": 528,
+    "material": 0
+   },
+   {
+    "minX": 688,
+    "minY": -368,
+    "maxX": 944,
+    "maxY": -352,
+    "material": 2
+   },
+   {
+    "minX": 1134,
+    "minY": -720,
+    "maxX": 1248,
+    "maxY": -416,
+    "material": 1
+   },
+   {
+    "minX": 624,
+    "minY": -368,
+    "maxX": 688,
+    "maxY": -352,
+    "material": 0
+   },
+   {
+    "minX": 1120,
+    "minY": 464,
+    "maxX": 1440,
+    "maxY": 528,
+    "material": 9
+   },
+   {
+    "minX": 1440,
+    "minY": 112,
+    "maxX": 1488,
+    "maxY": 368,
+    "material": 9
+   },
+   {
+    "minX": 1440,
+    "minY": -848,
+    "maxX": 1648,
+    "maxY": -352,
+    "material": 0
+   },
+   {
+    "minX": 1120,
+    "minY": 448,
+    "maxX": 1440,
+    "maxY": 464,
+    "material": 1
+   },
+   {
+    "minX": 1424,
+    "minY": 112,
+    "maxX": 1440,
+    "maxY": 448,
+    "material": 1
+   },
+   {
+    "minX": 1424,
+    "minY": -48,
+    "maxX": 1440,
+    "maxY": 112,
+    "material": 0
+   },
+   {
+    "minX": -1200,
+    "minY": 448,
+    "maxX": -832,
+    "maxY": 464,
+    "material": 1
+   },
+   {
+    "minX": -1184,
+    "minY": 834,
+    "maxX": -800,
+    "maxY": 850,
+    "material": 2
+   },
+   {
+    "minX": -800,
+    "minY": 834,
+    "maxX": -432,
+    "maxY": 850,
+    "material": 0
+   },
+   {
+    "minX": 48,
+    "minY": 834,
+    "maxX": 352,
+    "maxY": 850,
+    "material": 0
+   },
+   {
+    "minX": 352,
+    "minY": 834,
+    "maxX": 656,
+    "maxY": 850,
+    "material": 2
+   },
+   {
+    "minX": 656,
+    "minY": 834,
+    "maxX": 1648,
+    "maxY": 850,
+    "material": 0
+   },
+   {
+    "minX": -432,
+    "minY": 834,
+    "maxX": 48,
+    "maxY": 850,
+    "material": 2
+   },
+   {
+    "minX": -1200,
+    "minY": 32,
+    "maxX": -1184,
+    "maxY": 448,
+    "material": 4
+   },
+   {
+    "minX": -1200,
+    "minY": -103,
+    "maxX": -1184,
+    "maxY": 32,
+    "material": 0
+   },
+   {
+    "minX": -1200,
+    "minY": -800,
+    "maxX": -1184,
+    "maxY": -176,
+    "material": 0
+   },
+   {
+    "minX": -1184,
+    "minY": 400,
+    "maxX": -1136,
+    "maxY": 448,
+    "angle": -90,
+    "forme": 3,
+    "material": 2
+   },
+   {
+    "minX": 1136,
+    "minY": -416,
+    "maxX": 1152,
+    "maxY": -288,
+    "material": 0
+   }
+  ],
+  "sponges": [
+   {
+    "minX": -768,
+    "minY": -848,
+    "cols": 3,
+    "rows": 8,
+    "cellSize": 24,
+    "capacityPerCell": 5
+   },
+   {
+    "minX": 944,
+    "minY": -720,
+    "cols": 8,
+    "rows": 18,
+    "cellSize": 24,
+    "capacityPerCell": 5
+   },
+   {
+    "minX": -1200,
+    "minY": -176,
+    "cols": 1,
+    "rows": 3,
+    "cellSize": 24,
+    "capacityPerCell": 5
+   },
+   {
+    "minX": -1200,
+    "minY": -848,
+    "cols": 2,
+    "rows": 2,
+    "cellSize": 24,
+    "capacityPerCell": 5
+   }
+  ],
+  "labels": [
+   {
+    "x": 1280,
+    "y": -208,
+    "text": "SAS",
+    "tone": "sas"
+   }
+  ],
+  "par": 3,
+  "lasers": [
+   {
+    "x": -1056,
+    "y": 528,
+    "angle": 90
+   },
+   {
+    "x": -256,
+    "y": -336,
+    "angle": 270
+   }
+  ],
+  "cibles": [
+   {
+    "x": -160,
+    "y": -832,
+    "r": 26
+   },
+   {
+    "x": -1104,
+    "y": 544,
+    "r": 26
+   }
+  ],
+  "portes": [
+   {
+    "minX": 656,
+    "minY": 448,
+    "maxX": 1120,
+    "maxY": 480,
+    "canal": 1
+   },
+   {
+    "minX": 1440,
+    "minY": -352,
+    "maxX": 1488,
+    "maxY": -96,
+    "canal": 2
+   },
+   {
+    "minX": 1120,
+    "minY": 528,
+    "maxX": 1152,
+    "maxY": 832,
+    "canal": 2
+   }
+  ],
+  "caches": [
+   {
+    "minX": -1187,
+    "minY": 512,
+    "maxX": 1647,
+    "maxY": 827
+   },
+   {
+    "minX": 1486,
+    "minY": -351,
+    "maxX": 1650,
+    "maxY": 528
+   }
+  ]
+ }
+}
