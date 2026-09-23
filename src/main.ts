@@ -8401,6 +8401,8 @@ const endgame = {
   sasVu: 0, // particules avalées déjà constatées (détection « le sas boit »)
   sasBoitJusqua: -1, // temps simulé jusqu'auquel la fin de course se tait
   enCollecte: false, // le sas boit en ce moment : alarmes et seuils se taisent
+  empriseJusqua: -1, // temps simulé du dernier instant du corps dans l'emprise du sas
+  rattrapee: false, // la dispersion de cet essai a conclu en victoire (CONTINUER offert)
 }
 // Dash de vapeur : viser fige le temps, relâcher lance le nuage (« air
 // dash »). On ne retient qu'une chose entre deux images : était-on en visée.
@@ -16335,6 +16337,8 @@ function restart(): void {
   endgame.lastCall = false
   endgame.sasVu = 0
   endgame.sasBoitJusqua = -1
+  endgame.empriseJusqua = -1
+  endgame.rattrapee = false
   continuerVoulu = false
   btnContinuer.classList.remove('visible')
   endgame.spent = false
@@ -18333,6 +18337,7 @@ function corpsImage(now: number): boolean {
         // finir dans le sas — c'est au joueur de décider quand y renoncer.
         sim.step(params.dt)
         run.tableauTime += params.dt // temps simulé : le time warp ne fausse pas les records
+        if (sim.dansEmprise) endgame.empriseJusqua = run.tableauTime
         echantillonneFantome()
         run.runTime += params.dt // le vaisseau refroidit au fil de l'expédition
         // la mise en scène avance au TEMPS DE JEU : une pause la suspend,
@@ -18872,7 +18877,16 @@ function corpsImage(now: number): boolean {
   // seule l'emprise du sas le tenait. Un clic à côté du bouton éjectait, le
   // corps quittait l'emprise… et se DISPERSAIT — la salle, gagnée, était
   // perdue. Conclure était déjà offert : la dispersion conclut à sa place.
-  const sortieRattrapee = aspireAssez && sim.dispersed
+  // MAIS seulement celle qui naît de l'emprise : le corps y était il y a
+  // moins que le délai de grâce (+ une marge). Dix pour cent bus puis le
+  // reste perdu loin du sas, sur un danger, reste une défaite (revue #453).
+  const sortieRattrapee =
+    endgame.rattrapee ||
+    (aspireAssez &&
+      sim.dispersed &&
+      endgame.empriseJusqua >= 0 &&
+      run.tableauTime - endgame.empriseJusqua <= params.dispersalGrace + 0.5)
+  if (sortieRattrapee) endgame.rattrapee = true
   const drunk =
     sasOutil ||
     (sim.swallowed > 0 && sim.count <= seuilBu) ||
@@ -19731,6 +19745,9 @@ function corpsImage(now: number): boolean {
     (endgame.spent || sim.dispersed) &&
       // le CONTINUER offert prime : une seule invite à l'écran
       !(aspireAssez && !sim.dispersed) &&
+      // une sortie rattrapée est une victoire : pas de relance, même
+      // l'image où elle tombe (tableauDone n'est vrai qu'à la suivante)
+      !sortieRattrapee &&
       document.body.classList.contains('playing') &&
       !tableauDone &&
       !run.ended,
@@ -19979,7 +19996,10 @@ function corpsImage(now: number): boolean {
     bande.bruitage('condensation', 0.7)
   }
   sfx.allGas = allGas
-  if (sim.dispersed && !sfx.dispersed) {
+  // une sortie RATTRAPÉE (CONTINUER offert, dispersion née de l'emprise du
+  // sas) est une victoire : ni son de dispersion, ni fin d'expédition
+  // consignée — sinon la run continuait avec un record de fin publié
+  if (sim.dispersed && !sfx.dispersed && !endgame.rattrapee) {
     audio.disperse()
     if (!testLevel && !auHub) {
       // fin de l'échantillon ET de l'expédition : les registres consignent
@@ -20031,7 +20051,8 @@ function corpsImage(now: number): boolean {
   // palet dérivait indéfiniment. Il conclut maintenant, après un sursis
   // pendant lequel le sas peut encore le boire.
   {
-    const horsRun = !!testLevel || auHub || run.ended || tableauDone
+    const horsRun =
+      !!testLevel || auHub || run.ended || tableauDone || endgame.rattrapee
     const perdu = !horsRun && (sim.dispersed || endgame.spent)
     // Le sas qui AVALE suspend le sursis (la salle peut encore se conclure)
     // — mais la simple PROXIMITÉ du sas ne suffit pas : un palet gelé qui
