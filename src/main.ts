@@ -1000,6 +1000,17 @@ const exitMouth = { x: 0, y: 0 }
 // CHARGEMENT : derrière la fiche, l'échantillon dérive déjà dans la cuve
 // d'entraînement (sauf navigation directe ?tableau=N, outil de conception).
 let auHub = !new URLSearchParams(location.search).has('tableau')
+/** Le hub est-il la salle JOUÉE ? `auHub` seul ne le dit pas : il vaut vrai
+ *  dès le chargement, et l'essai d'éditeur ne le baisse pas (la salle
+ *  essayée passe devant le hub sans l'effacer, pour que « quitter » y
+ *  ramène). Tout ce qui fait JOUER le hub — ses sas de lancement, son étal,
+ *  son marchand, l'alerte de l'éveil — lit ce prédicat : sinon, au premier
+ *  essai après le chargement, le sas de la salle essayée lançait une
+ *  descente, et les zones du hub (codées en dur, rendues pour toute salle
+ *  de plus de 2 600 u) s'éveillaient dans une salle qui n'en a pas. */
+function salleHub(): boolean {
+  return auHub && testLevel === null
+}
 // Le tableau COMMENCE-t-il en vapeur (départ posé dans une zone qui
 // l'impose) ? Alors la vapeur est l'ÉTAT INITIAL, pas une bascule : elle ne
 // se paie pas. Le drapeau se consomme au premier basculement de l'image.
@@ -11920,7 +11931,7 @@ input.onCommande = (id: string): boolean => {
 let forceSas = false
 function valideSalleCourante(): string {
   if (!hasPlayed) return 'menu'
-  if (auHub) return 'hub'
+  if (salleHub()) return 'hub'
   if (miseEnBonbonne || run.ended) return 'deja'
   if (sim.dispersed) return 'disperse'
   forceSas = true
@@ -11940,7 +11951,7 @@ function valideSalleCourante(): string {
 let forceSortieHub: 'principal' | 'givre' | 'vapeur' | null = null
 function passeLeHub(sortie: 'principal' | 'givre' | 'vapeur'): string {
   if (!hasPlayed) return 'menu'
-  if (!auHub) return 'dehors'
+  if (!salleHub()) return 'dehors'
   if (sim.dispersed) return 'disperse'
   forceSortieHub = sortie
   return 'ok'
@@ -17284,7 +17295,7 @@ function majDossier(): void {
   }
   mission +=
     '<div class="do-mission">' +
-    `<div class="do-nom">${auHub ? 'LE LABORATOIRE' : level.name}</div>` +
+    `<div class="do-nom">${salleHub() ? 'LE LABORATOIRE' : level.name}</div>` +
     `<div class="do-code">${level.code}${estEconomat(level) ? ' · L’ÉCONOMAT' : ''}</div>`
   if (id)
     mission +=
@@ -17577,7 +17588,7 @@ function avanceEveil(): void {
     // L'ALERTE : au moment où le sujet SAIT se mouvoir, la station bascule
     // en rouge, la cuve tremble — et la brèche (porte d'index 0 : celle de
     // la cuve) cède. On naît enfermé, on sort par l'accident.
-    if (auHub && (level.portes?.length ?? 0) > 0) demarreSequence('ALERTE')
+    if (salleHub() && (level.portes?.length ?? 0) > 0) demarreSequence('ALERTE')
   }
 }
 for (const carte of [eveil1El, eveil2El]) {
@@ -18426,7 +18437,7 @@ function corpsImage(now: number): boolean {
 
   // ---- LE MÉTA AU HUB : les zones héritées (comptoir par géométrie) —
   // seulement quand le module joué n'a pas de plots en données
-  const zonesHub = auHub && !sim.dispersed ? zonesDuHub(level) : null
+  const zonesHub = salleHub() && !sim.dispersed ? zonesDuHub(level) : null
   if (zonesHub && plotsNiveau.length === 0) {
     for (let i = 0; i < zonesHub.etal.length; i++) {
       const a = zonesHub.etal[i]
@@ -18508,7 +18519,7 @@ function corpsImage(now: number): boolean {
   // ---- LE MARCHAND : au contact de l'ÉTAL du comptoir (la boîte qui
   // englobe ses alcôves, élargie), le voile s'ouvre — une fois par entrée.
   // Les alcôves, elles, vendent toujours au contact : les deux se cumulent.
-  if (auHub && !sim.dispersed && !(level.pupitres ?? []).some((q) => q.ecran === 'marchand')) {
+  if (salleHub() && !sim.dispersed && !(level.pupitres ?? []).some((q) => q.ecran === 'marchand')) {
     const plots = level.plots?.length
       ? level.plots.filter((p) => p.monnaie === 'memoire')
       : (zonesHub?.etal ?? []).map((a) => a.plot)
@@ -18827,7 +18838,8 @@ function corpsImage(now: number): boolean {
   // écrite ; le SAS DU GIVRE (derrière le rideau — la glace) lance LA
   // VOIE ; le SAS DE VAPEUR (derrière la grille) lance la DESCENTE DU
   // JOUR. Le verrou est la MATIÈRE : sans le lien tissé, pas de passage.
-  const zonesSas = auHub ? zonesDuHub(level) : null
+  const auSasDuHub = salleHub()
+  const zonesSas = auSasDuHub ? zonesDuHub(level) : null
   // une sortie DÉCLARÉE par le pupitre vaut le corps posé dessus : tout
   // l'aval reste le vrai chemin (mode de descente, son, cinématique,
   // reprise de la sauvegarde) — seul le déclenchement est forcé
@@ -18840,7 +18852,7 @@ function corpsImage(now: number): boolean {
     (!!zonesSas &&
       pointInBox(sim.stats.centroidX, sim.stats.centroidY, zonesSas.sasVapeur))
   const rejointSasHub =
-    (auHub &&
+    (auSasDuHub &&
       (sortieOutil !== null ||
         pointInBox(sim.stats.centroidX, sim.stats.centroidY, level.exit))) ||
     surSasGivre ||
@@ -18849,7 +18861,7 @@ function corpsImage(now: number): boolean {
     !tableauDone &&
     !sim.dispersed &&
     (drunk || reached || rejointSasHub) &&
-    auHub
+    auSasDuHub
   ) {
     // LE SAS DE LANCEMENT : au hub, le sas ne collecte rien — il LANCE une
     // descente NEUVE. Il ne reprend plus de sauvegarde : on n'arrive au hub
