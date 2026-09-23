@@ -5259,11 +5259,16 @@
         transform: translateX(-50%);
         display: flex;
         align-items: flex-end;
-        gap: 10px;
+        gap: 8px;
         z-index: 10;
         opacity: 0;
         transition: opacity 0.5s ease 0.2s;
       }
+      /* Chaque logement a la LARGEUR FIXE du plus long libellé qu'il peut
+         porter (CONDENSATION, LIQUÉFACTION : 112 px mesurés). Avant, il
+         épousait son libellé : en glace, GLACE et FUSION, courts, serraient
+         les deux premiers logements et le cadran glissait de 20 px hors de
+         l'axe — les icônes changeaient de place avec l'état. */
       #statebar button {
         --teinte: var(--specimen);
         position: relative;
@@ -5271,6 +5276,7 @@
         flex-direction: column;
         align-items: center;
         gap: 4px;
+        width: calc(112px * var(--ui));
         padding: 0;
         background: none;
         border: 0;
@@ -5357,10 +5363,12 @@
       #statebar button.st-cur .st-label {
         color: var(--teinte);
       }
+      /* la touche s'accroche au coin de l'ICÔNE, pas du logement : celui-ci
+         est désormais bien plus large qu'elle */
       #statebar kbd {
         position: absolute;
         top: -7px;
-        right: -7px;
+        left: calc(50% + 12px);
         font-family: inherit;
         font-size: calc(9px * var(--ui));
         color: var(--dim);
@@ -5427,6 +5435,10 @@
           flex-direction: column;
           align-items: center;
           gap: 7px;
+        }
+        /* sans libellé, le logement redevient la taille de son icône */
+        #statebar button {
+          width: auto;
         }
         #statebar .st-ico {
           width: 46px;
