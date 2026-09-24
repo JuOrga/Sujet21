@@ -8029,9 +8029,16 @@
         animation: mb-tourne 5s linear infinite;
       }
       @keyframes mb-tourne { to { transform: rotate(360deg); } }
+      /* le NOM du rang (DÉLUGE… FILET) : un mot, plus une lettre. Michroma
+         est large (~1 em par lettre, espacement compris) : la taille se
+         règle sur le nombre de lettres (--mb-nom-n, posé par main.ts) pour
+         que le mot tienne dans la largeur utile du disque (--mb-nom-l) —
+         FILET s'affiche en grand, RUISSEAU sans déborder de l'anneau */
       .mb-rang-lettre {
         position: relative; font-family: var(--font-display); font-weight: 600;
-        font-size: calc(76px * var(--ui)); line-height: 1; color: var(--mb-rang);
+        font-size: min(calc(26px * var(--ui)), calc(var(--mb-nom-l, 128px) / var(--mb-nom-n, 6)));
+        line-height: 1; color: var(--mb-rang);
+        letter-spacing: 0.04em; white-space: nowrap;
         text-shadow:
           0 0 16px color-mix(in srgb, var(--mb-rang) 75%, transparent),
           0 0 46px color-mix(in srgb, var(--mb-rang) 40%, transparent);
@@ -8222,9 +8229,11 @@
         border: 1px solid rgba(150, 200, 235, 0.12); border-radius: 10px;
         background: rgba(10, 18, 30, 0.72);
       }
-      .mb-scene.mb-compact .mb-rang { width: 56px; height: 56px; }
-      .mb-scene.mb-compact .mb-rang::before { inset: 5px; }
-      .mb-scene.mb-compact .mb-rang-lettre { font-size: calc(26px * var(--ui)); animation: none; }
+      /* repliée, la médaille s'allonge en pastille : un mot ne tient pas
+         dans un disque de 56 px */
+      .mb-scene.mb-compact .mb-rang { width: 96px; height: 40px; }
+      .mb-scene.mb-compact .mb-rang::before { inset: 4px; }
+      .mb-scene.mb-compact .mb-rang-lettre { --mb-nom-l: 80px; animation: none; }
       .mb-scene.mb-compact .mb-rang-mot,
       .mb-scene.mb-compact .mb-etoiles,
       .mb-scene.mb-compact .mb-flacon,
@@ -8947,7 +8956,7 @@
         .mb-scene { padding: 10px 12px 14px; gap: 10px; }
         .mb-releve { grid-template-columns: 1fr; justify-items: center; gap: 8px; }
         .mb-rang { width: 136px; height: 136px; }
-        .mb-rang-lettre { font-size: calc(60px * var(--ui)); }
+        .mb-rang-lettre { --mb-nom-l: 100px; }
         .mb-corps { grid-template-columns: 1fr; width: 100%; }
         .mb-haut { grid-row: auto; justify-content: center; }
         .mb-litres b { font-size: calc(32px * var(--ui)); }
@@ -8969,7 +8978,7 @@
       @media (max-height: 820px) and (min-width: 761px) {
         .mb-scene { gap: 10px; padding-top: 8px; }
         .mb-rang { width: 140px; height: 140px; }
-        .mb-rang-lettre { font-size: calc(62px * var(--ui)); }
+        .mb-rang-lettre { --mb-nom-l: 104px; }
         .mb-flacon { width: 56px; height: 100px; flex-basis: 56px; }
         .mb-litres b { font-size: calc(32px * var(--ui)); }
         .mb-pli, .mb-pli .crt-draft { min-height: 160px; }
@@ -10728,7 +10737,7 @@
         <section class="mb-releve" id="mb-releve">
           <div class="mb-rang" id="mb-rang" hidden>
             <span class="mb-rang-anneau" aria-hidden="true"></span>
-            <b class="mb-rang-lettre" id="mb-rang-lettre">S</b>
+            <b class="mb-rang-lettre" id="mb-rang-lettre">DÉLUGE</b>
             <i class="mb-rang-mot" id="mb-rang-mot">IMPECCABLE</i>
             <span class="mb-etoiles" id="mb-etoiles" aria-hidden="true"></span>
           </div>

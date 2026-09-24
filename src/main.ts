@@ -16049,7 +16049,9 @@ function montreMiseEnBonbonne(b: BilanSalle): void {
     `MISE EN BONBONNE · ${level.code}` + (run.primeSalle ? ` · PRIME : ${NOMS_PRIME[run.primeSalle].toUpperCase()}` : '')
   mbEl('mb-rang').hidden = true
   mbEl('mb-corps').classList.remove('mb-on')
-  mbEl('mb-rang-lettre').textContent = verdict.rang
+  mbEl('mb-rang-lettre').textContent = verdict.nom
+  // la taille du mot suit sa longueur (index.html, .mb-rang-lettre)
+  mbEl('mb-rang-lettre').style.setProperty('--mb-nom-n', String(verdict.nom.length))
   mbEl('mb-rang-mot').textContent = verdict.mot
   mbEl('mb-etoiles').innerHTML = '<i>★</i>'.repeat(5)
   mbEl('mb-eau').style.height = '0%'
@@ -16071,7 +16073,7 @@ function montreMiseEnBonbonne(b: BilanSalle): void {
   }
   // Temps 1 — LE RANG TOMBE : la médaille claque sur la scène, l'écran
   // flashe, la manette tremble, le feu jaillit — puis les étoiles
-  // s'allument une à une. Un S ou un A sonne comme un record.
+  // s'allument une à une. Un déluge ou un torrent sonne comme un record.
   apres(TEMPS_BILAN.rang, () => {
     const rang = mbEl('mb-rang')
     rang.hidden = false

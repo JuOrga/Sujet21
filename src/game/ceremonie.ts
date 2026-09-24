@@ -6,15 +6,21 @@
 // module tient ce qui se DÉCIDE — le rang d'une salle, ses étoiles, l'ordre
 // et les instants des temps de la lecture, la courbe d'un compteur — et
 // rien de ce qui se dessine. C'est ce qui permet de vérifier qu'une salle
-// livrée à 92 % est bien un S, sans ouvrir un navigateur.
+// livrée à 92 % est bien un DÉLUGE, sans ouvrir un navigateur.
 
-/** Le RANG d'une salle, du plus haut au plus bas — la lettre que le joueur
- *  attend à la fin de chaque salle, comme dans un jeu d'arcade. */
+/** Le RANG d'une salle, du plus haut au plus bas. Les lettres d'arcade
+ *  restent la clé interne (seuils, tests) ; le joueur, lui, lit un DÉBIT —
+ *  voir `nom` : le jeu parle d'eau, sa note aussi. */
 export type Rang = 'S' | 'A' | 'B' | 'C' | 'D'
 
 export interface VerdictRang {
   rang: Rang
-  /** le mot qui accompagne la lettre : « IMPECCABLE », « HONORABLE »… */
+  /** CE QUE LE JOUEUR LIT sur la médaille, à la place de la lettre : un
+   *  mot du champ des fluides, du plus fort débit au plus mince — une
+   *  salle livrée presque entière est un déluge, une salle sauvée de
+   *  justesse n'est plus qu'un filet. */
+  nom: string
+  /** le mot qui accompagne le nom : « IMPECCABLE », « HONORABLE »… */
   mot: string
   /** la teinte de la médaille, en CSS */
   teinte: string
@@ -24,9 +30,9 @@ export interface VerdictRang {
 
 /** Les seuils du rang, sur la PART DU VOLUME DE DÉPART LIVRÉE (0..1+).
  *  Le chrono n'entre pas dans le rang : la salle se joue d'abord à ne rien
- *  perdre, et un joueur lent qui livre tout mérite son S. La prime de glace
+ *  perdre, et un joueur lent qui livre tout mérite son DÉLUGE. La prime de glace
  *  compte dans le surplus, donc dans la part : livrer plus que le départ
- *  reste un S, jamais plus. */
+ *  reste un DÉLUGE, jamais plus. */
 export const SEUILS_RANG: ReadonlyArray<readonly [Rang, number]> = [
   ['S', 0.9],
   ['A', 0.72],
@@ -36,11 +42,11 @@ export const SEUILS_RANG: ReadonlyArray<readonly [Rang, number]> = [
 ]
 
 const VERDICTS: Record<Rang, Omit<VerdictRang, 'rang'>> = {
-  S: { mot: 'IMPECCABLE', teinte: '#ffd977', etoiles: 5 },
-  A: { mot: 'BRILLANT', teinte: '#6dffb8', etoiles: 4 },
-  B: { mot: 'HONORABLE', teinte: '#63b7e6', etoiles: 3 },
-  C: { mot: 'PASSABLE', teinte: '#a9c3de', etoiles: 2 },
-  D: { mot: 'LIVRÉ DE JUSTESSE', teinte: '#e0685c', etoiles: 1 },
+  S: { nom: 'DÉLUGE', mot: 'IMPECCABLE', teinte: '#ffd977', etoiles: 5 },
+  A: { nom: 'TORRENT', mot: 'BRILLANT', teinte: '#6dffb8', etoiles: 4 },
+  B: { nom: 'RIVIÈRE', mot: 'HONORABLE', teinte: '#63b7e6', etoiles: 3 },
+  C: { nom: 'RUISSEAU', mot: 'PASSABLE', teinte: '#a9c3de', etoiles: 2 },
+  D: { nom: 'FILET', mot: 'LIVRÉ DE JUSTESSE', teinte: '#e0685c', etoiles: 1 },
 }
 
 /** Le rang d'une salle, d'après la part livrée. Une part hors de sens
