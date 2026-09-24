@@ -636,7 +636,7 @@ float nh3Texte(vec2 p) {
 float nh3Droit(float s, float pas, float L, float hw, float sPos, float sNeg) {
   if (s > sPos - 8.0 || -s > sNeg - 8.0) return 0.0;
   float k = floor(s / pas + 0.5);
-  float coude = step(0.5, abs(k)) * step(abs(k * pas) + hw + 12.0, L * 0.5);
+  float coude = step(0.5, abs(k)) * step(abs(k * pas) + hw + 20.0, k > 0.0 ? sPos : sNeg);
   return 1.0 - coude * step(abs(s - k * pas), hw + 8.0);
 }
 
@@ -684,7 +684,19 @@ vec3 conduiteNH3(vec2 loc, vec2 bsize, float px, vec3 givreTex) {
   float hw = rU + jeu;
   float t0 = 0.5 * lw;                             // voie du bord bas
   float t1 = T - 0.5 * lw;                         // voie du bord haut
-  float interieur = step(0.5, abs(kg)) * step(abs(kg * pas) + hw + 12.0, L * 0.5);
+  // le recul du collecteur (voir plus bas) et la limite du tube droit
+  float recul = rad * 1.2 + 6.0;
+  // la limite du tube droit vers CHAQUE bout, selon la pièce qui y est
+  // tirée (le collecteur recule, les autres non) : l'étiquette regarde le
+  // bout vers lequel elle va, pas le pire des deux
+  float colPos = multi * step(hash21(vec2(L, T) * 0.0137 + 3.1), 0.4999);
+  float colNeg = multi * step(hash21(vec2(L, T) * 0.0137 - 3.1), 0.4999);
+  float sDroitPos = L * 0.5 - rad - 4.0 - rU - colPos * recul;
+  float sDroitNeg = L * 0.5 - rad - 4.0 - rU - colNeg * recul;
+  // un raccord intérieur ne se pose que s'il reste du tube droit entre lui
+  // et la pièce du bout — sinon U et collecteur se tassaient en un rond
+  float interieur = step(0.5, abs(kg)) *
+                    step(abs(kg * pas) + hw + 20.0, kg > 0.0 ? sDroitPos : sDroitNeg);
   // (dès trois voies : entre deux seulement, le tube en travers n'aurait
   // que l'écart des tubes pour se montrer — un raccord de 6 u, illisible)
   float traverse = interieur * step(2.5, n) * step(hash21(vec2(kg, T) * 0.173 + L * 0.0071), 0.5);
@@ -700,17 +712,9 @@ vec3 conduiteNH3(vec2 loc, vec2 bsize, float px, vec3 givreTex) {
                                : (hBout < 0.6 ? 2.0 : 3.0);
   // l'axe de la pièce du bout ; le collecteur recule pour laisser à sa
   // SORTIE (le piquage en T vers la paroi) la place de se montrer
-  float recul = rad * 1.2 + 6.0;
   float sH = L * 0.5 - rad - 4.0 - (modeBout > 0.5 && modeBout < 1.5 ? recul : 0.0);
   float sBout = sH - rU;                           // où commence la pièce du bout
   float sE = sH - rb;                              // centre des coudes à 90°
-  // la limite du tube droit vers CHAQUE bout, selon la pièce qui y est
-  // tirée (le collecteur recule, les autres non) : l'étiquette regarde le
-  // bout vers lequel elle va, pas le pire des deux
-  float colPos = multi * step(hash21(vec2(L, T) * 0.0137 + 3.1), 0.4999);
-  float colNeg = multi * step(hash21(vec2(L, T) * 0.0137 - 3.1), 0.4999);
-  float sDroitPos = L * 0.5 - rad - 4.0 - rU - colPos * recul;
-  float sDroitNeg = L * 0.5 - rad - 4.0 - rU - colNeg * recul;
   float dansBout = step(sBout, sp) * step(modeBout, 2.5);
 
   // écart SIGNÉ au tracé et la direction où il croît : l'axe droit, le
@@ -720,18 +724,15 @@ vec3 conduiteNH3(vec2 loc, vec2 bsize, float px, vec3 givreTex) {
   // deux laissait un pli en biais à 45°, une jointure qu'aucun raccord n'a.
   float xo = 1e4;
   vec2 n2 = vec2(0.0, 1.0);
-  float alongArc = -1e9; // le long d'un coude : l'abscisse d'arc
   if (dansU > 0.5) {
     float sc = kg * pas + (df < 0.0 ? -hw : hw);
     vec2 rel = vec2(s - sc, t - tc);
     xo = length(rel) - rU;
     n2 = rel / max(length(rel), 1e-3);
-    alongArc = atan(rel.y, rel.x) * rU;
   } else if (dansBout > 0.5 && modeBout < 0.5) {
     vec2 rel = vec2(sp - sBout, t - tc);
     xo = length(rel) - rU;
     n2 = vec2(sg, 1.0) * rel / max(length(rel), 1e-3);
-    alongArc = atan(rel.y, rel.x) * rU;
   } else if (dansBout > 0.5 && modeBout < 1.5) {
     // COLLECTEUR : les voies du milieu filent jusqu'à son axe (T), celles
     // du bord tournent avant, par un coude serré
@@ -744,16 +745,14 @@ vec3 conduiteNH3(vec2 loc, vec2 bsize, float px, vec3 givreTex) {
     vec2 rb0 = vec2(sp - sE, t - (t0 + rb));
     if (rb0.x >= 0.0 && rb0.y <= 0.0 && abs(length(rb0) - rb) < abs(xo)) {
       xo = length(rb0) - rb; n2 = vec2(sg, 1.0) * rb0 / max(length(rb0), 1e-3);
-      alongArc = atan(rb0.y, rb0.x) * rb;
     }
     vec2 rb1 = vec2(sp - sE, t - (t1 - rb));
     if (rb1.x >= 0.0 && rb1.y >= 0.0 && abs(length(rb1) - rb) < abs(xo)) {
       xo = length(rb1) - rb; n2 = vec2(sg, 1.0) * rb1 / max(length(rb1), 1e-3);
-      alongArc = atan(rb1.y, rb1.x) * rb;
     }
     // la SORTIE : un piquage en T au milieu du collecteur, qui file dans la
     // paroi du bout — il s'emboîte dans le flanc du collecteur
-    if (sp - sH >= rad) { float ts = t - T * 0.5; if (abs(ts) < abs(xo)) { xo = ts; n2 = vec2(0.0, 1.0); alongArc = -1e9; } }
+    if (sp - sH >= rad) { float ts = t - T * 0.5; if (abs(ts) < abs(xo)) { xo = ts; n2 = vec2(0.0, 1.0); } }
   } else if (dansBout > 0.5) {
     // COUDE SEUL : le tube tourne vers la paroi — d'un côté à un bout, de
     // l'autre à l'autre bout (tt : l'ordonnée retournée)
@@ -763,7 +762,6 @@ vec3 conduiteNH3(vec2 loc, vec2 bsize, float px, vec3 givreTex) {
     vec2 rel = vec2(sp - sE, tt - (t0 + rb));
     if (rel.x >= 0.0 && rel.y <= 0.0) {
       xo = length(rel) - rb; n2 = vec2(sg, sy) * rel / max(length(rel), 1e-3);
-      alongArc = atan(rel.y, rel.x) * rb;
     }
     if (tt > t0 + rb && abs(sp - sH) < abs(xo)) { xo = sp - sH; n2 = vec2(sg, 0.0); }
   } else {
@@ -776,9 +774,6 @@ vec3 conduiteNH3(vec2 loc, vec2 bsize, float px, vec3 givreTex) {
     }
   }
   float x = xo / rad;
-  // le LONG du tube où l'on est (s sur une voie, t sur un tube en travers) :
-  // le givre suit chaque tube, au lieu de s'aplatir en travers du collecteur
-  float along = alongArc > -1e8 ? alongArc : (abs(n2.y) > 0.7 ? s : t);
   // LA PLACE LIBRE : l'étiquette, puis la vanne, ne se posent que si leur
   // bout lointain tombe encore sur du tube droit — sinon un coude les
   // tranchait net (« NH » sans son 3). On regarde du côté où elles vont.
@@ -815,6 +810,23 @@ vec3 conduiteNH3(vec2 loc, vec2 bsize, float px, vec3 givreTex) {
   float bout = L * 0.5 - sp;
   bride = max(bride, step(2.5, modeBout) * nh3Lisse(5.0, bout, px) * large);
 
+  // LA CONGÈRE : là où le tube tourne, la boîte reste carrée — les coins
+  // qu'il laisse montraient la semelle NOIRE, des trous dans le dessin. Le
+  // givre s'y est tassé : plus on s'éloigne du tube, plus il est épais et
+  // clair ; au pied du tube, une ombre de contact. Les fines lignes entre
+  // deux tubes parallèles (3 u) restent sombres : elles les détachent.
+  float vide = abs(xo) - rad;
+  float neige = smoothstep(2.5, 10.0, vide);
+  if (neige > 0.0) {
+    float n1 = dnoise(loc * 0.09);
+    float n2 = mix(0.5, dnoise(loc * 0.45), smoothstep(1.5, 0.6, px));
+    vec3 congere = vec3(0.56, 0.68, 0.80) * (0.78 + 0.30 * n1 + 0.14 * n2);
+    // une croûte plus claire au sommet de la congère (loin du tube)
+    congere += vec3(0.10, 0.12, 0.14) * smoothstep(8.0, 22.0, vide);
+    float ao = smoothstep(2.0, 12.0, vide);
+    col = mix(col, congere * (0.50 + 0.50 * ao), neige);
+  }
+
   float tube = nh3Lisse(1.0, abs(x), px / rad);
   if (tube > 0.0) {
     float nz = sqrt(max(1.0 - x * x, 0.0));
@@ -829,17 +841,19 @@ vec3 conduiteNH3(vec2 loc, vec2 bsize, float px, vec3 givreTex) {
 
     // LE GIVRE : par plaques, plus épais sur le dessus et aux brides — le
     // tube ne se lit pas comme du métal bleu, mais comme du métal qui GÈLE
-    float g1 = dnoise(vec2(along * 0.045, x * 1.6 + i * 7.3));
-    float g2 = dnoise(vec2(along * 0.16 + 3.1, x * 3.0 - i * 2.1));
+    // le givre se lit dans le repère de la BOÎTE, continu d'un tube à
+    // l'autre : suivre chaque tube faisait des coutures carrées au coude
+    float g1 = dnoise(loc * 0.045 + x * 0.9);
+    float g2 = dnoise(loc * 0.16 + 3.1 - x * 1.5);
     float givre = smoothstep(0.22, 0.62, 0.50 * g1 + 0.25 * g2 + 0.32 * nz);
     // le grain du givre, fondu au dézoom (sinon il scintille)
-    float grain = mix(0.5, dnoise(vec2(along, xo) * 0.7), smoothstep(1.5, 0.6, px));
+    float grain = mix(0.5, dnoise(loc * 0.7), smoothstep(1.5, 0.6, px));
     vec3 blanc = vec3(0.82, 0.91, 0.99) * (0.30 + 0.80 * diff) * (0.88 + 0.24 * grain);
     vec3 c = mix(acier, blanc, givre * 0.80);
     // les CRISTAUX : des éclats en étoile sur le givre, qui scintillent —
     // fondus au dézoom (un pixel blanc qui clignote au loin, c'est de la
     // neige d'écran, pas du gel)
-    vec2 cq = vec2(along, xo) / 5.0;
+    vec2 cq = loc / 5.0;
     vec2 cell = floor(cq);
     float h = hash21(cell + i * 13.0);
     vec2 o = fract(cq) - 0.5 - 0.3 * (vec2(hash21(cell + 2.7), hash21(cell + 5.3)) - 0.5);
