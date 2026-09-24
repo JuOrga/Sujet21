@@ -970,7 +970,7 @@ export const MATERIAL_NAMES: Record<number, string> = {
   [MAT_HYDROPHILE]: 'Hydrophile',
   [MAT_HYDROPHOBE]: 'Hydrophobe',
   [MAT_EXIT]: 'Sas',
-  [MAT_FROID]: 'Hublot (froid)',
+  [MAT_FROID]: 'Conduite NH3 (froid)',
   [MAT_GRILLE]: 'Évent',
   [MAT_CHAUD]: 'Chaudière',
   [MAT_MEMBRANE]: 'Membrane (liquide)',
