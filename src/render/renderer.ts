@@ -607,6 +607,29 @@ float nh3Lisse(float bord, float x, float px) {
   return 1.0 - smoothstep(bord - px, bord + px, x);
 }
 
+// L'INSCRIPTION « NH₃ » au trait (segments), en unités de hauteur de
+// lettre : nette à tout zoom, sans texture à charger. Rend la distance au
+// tracé le plus proche ; l'indice 3 est plus petit et descend sous la ligne.
+float nh3Seg(vec2 p, vec2 a, vec2 b) {
+  vec2 pa = p - a;
+  vec2 ba = b - a;
+  return length(pa - ba * clamp(dot(pa, ba) / dot(ba, ba), 0.0, 1.0));
+}
+
+float nh3Texte(vec2 p) {
+  float d = nh3Seg(p, vec2(0.0, 0.0), vec2(0.0, 1.0));         // N
+  d = min(d, nh3Seg(p, vec2(0.0, 1.0), vec2(0.6, 0.0)));
+  d = min(d, nh3Seg(p, vec2(0.6, 0.0), vec2(0.6, 1.0)));
+  d = min(d, nh3Seg(p, vec2(0.85, 0.0), vec2(0.85, 1.0)));     // H
+  d = min(d, nh3Seg(p, vec2(1.45, 0.0), vec2(1.45, 1.0)));
+  d = min(d, nh3Seg(p, vec2(0.85, 0.5), vec2(1.45, 0.5)));
+  float d3 = nh3Seg(p, vec2(1.62, 0.37), vec2(1.92, 0.37));    // ₃
+  d3 = min(d3, nh3Seg(p, vec2(1.70, 0.095), vec2(1.92, 0.095)));
+  d3 = min(d3, nh3Seg(p, vec2(1.62, -0.18), vec2(1.92, -0.18)));
+  d3 = min(d3, nh3Seg(p, vec2(1.92, -0.18), vec2(1.92, 0.37)));
+  return min(d, d3 + 0.015); // l'indice, un trait plus fin
+}
+
 vec3 conduiteNH3(vec2 loc, vec2 bsize, float px, vec3 givreTex) {
   bool horiz = bsize.x >= bsize.y;
   float L = horiz ? bsize.x : bsize.y;
@@ -670,19 +693,33 @@ vec3 conduiteNH3(vec2 loc, vec2 bsize, float px, vec3 givreTex) {
          smoothstep(0.9, 0.35, px);
 
     // LE REPÈRE NH3 : anneau violet (les bases, NF X08-100) puis
-    // l'étiquette jaune et ses chevrons, qui disent le sens du fluide. Le
-    // givre la mange à moitié : elle est posée là depuis longtemps.
+    // l'étiquette jaune — l'inscription « NH₃ » et ses chevrons, qui disent
+    // le sens du fluide. Le givre la mange à moitié : elle est posée là
+    // depuis longtemps, mais on la lit encore.
     float bande = nh3Lisse(4.5, abs(dm), px);
     float a = dm * sens;
-    float etiq = nh3Lisse(10.0, abs(a - 18.0), px) * step(0.0, a - 7.0);
-    float v = a - 12.0 - abs(x) * rad * 0.9;
+    // l'inscription n'a sa place que si le pas des repères la loge ; sinon
+    // l'étiquette se réduit aux chevrons (les plots courts)
+    float H = min(rad * 1.1, 14.0);
+    float lTexte = 1.95 * H;
+    float avecTexte = step(10.0 + lTexte + 20.0, pas * 0.5 - 6.0);
+    float a0 = 12.0 + avecTexte * (lTexte + 3.0);     // début des chevrons
+    float fin = a0 + 16.0;
+    float etiq = nh3Lisse((fin - 7.0) * 0.5, abs(a - (fin + 7.0) * 0.5), px);
+    float v = a - a0 - abs(x) * rad * 0.9;
     float chev = nh3Lisse(1.8, abs(mod(v + 4.0, 8.0) - 4.0), px) *
                  nh3Lisse(0.8, abs(x), px / rad) * step(0.0, v + 2.0) * step(v, 14.0);
+    // le texte se lit toujours DANS LE BON SENS à l'écran : de gauche à
+    // droite sur un tube couché, de bas en haut sur un tube debout — quel
+    // que soit le côté de l'anneau où tombe l'étiquette
+    float u = sens > 0.0 ? dm - 10.0 : dm + 10.0 + lTexte;
+    float vg = xr;
+    float txt = avecTexte * nh3Lisse(0.075, nh3Texte(vec2(u, vg) / H + vec2(0.0, 0.41)), px / H);
     vec3 violet = vec3(0.50, 0.26, 0.78) * (0.45 + 0.65 * diff);
-    vec3 jaune = mix(vec3(0.95, 0.74, 0.16), vec3(0.08, 0.07, 0.06), chev) * (0.45 + 0.65 * diff);
+    vec3 jaune = mix(vec3(0.95, 0.74, 0.16), vec3(0.08, 0.07, 0.06), max(chev, txt)) * (0.45 + 0.65 * diff);
     float mange = 1.0 - 0.55 * givre;
     c = mix(c, violet, bande * mange);
-    c = mix(c, jaune, etiq * (1.0 - bande) * mange);
+    c = mix(c, jaune, etiq * (1.0 - bande) * (1.0 - 0.40 * givre));
 
     // l'ombre de contact au bord du tube : il se détache de la semelle
     c *= 0.55 + 0.45 * smoothstep(0.0, 0.35, nz);
