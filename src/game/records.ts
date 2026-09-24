@@ -78,6 +78,10 @@ interface RecordsData {
   // LES CACHES VIDÉES : les modules de la carte dont l'orbe a été pris
   // (ids de modules) — une cache ne se pille qu'une fois.
   cachesVidees: string[]
+  // LES OFFRES ESSAYÉES des salles événement (clés de evenements.cleOffre) :
+  // une offre ne dit ce qu'elle coûte et rapporte qu'une fois qu'on l'a
+  // prise — la découverte survit à la run, comme la mémoire.
+  offresEssayees: string[]
 }
 
 // Les nœuds utilitaires de l'ANCIEN arbre de l'Éveil (remplacé par le
@@ -134,6 +138,7 @@ function blank(): RecordsData {
     orbes: [],
     ameliorations: [],
     cachesVidees: [],
+    offresEssayees: [],
   }
 }
 
@@ -193,6 +198,7 @@ export class Records {
           if (!Array.isArray(d.orbes)) d.orbes = [] // avant les orbes
           if (!Array.isArray(d.ameliorations)) d.ameliorations = []
           if (!Array.isArray(d.cachesVidees)) d.cachesVidees = []
+          if (!Array.isArray(d.offresEssayees)) d.offresEssayees = [] // avant les offres voilées
           // Migration : les registres d'avant la refonte (un seul record par
           // salle) sèment leurs deux records avec la même entrée.
           for (const code of Object.keys(d.tableaux)) {
@@ -405,6 +411,21 @@ export class Records {
     this.data.cachesVidees.push(module)
     if (!this.data.orbes.includes(orbe) && !this.data.eveil.includes(orbe))
       this.data.orbes.push(orbe)
+    this.save()
+    return true
+  }
+
+  // ---- LES OFFRES des salles événement ----------------------------------------
+
+  /** L'offre a-t-elle déjà été prise une fois ? Alors elle se lit en clair. */
+  offreEssayee(cle: string): boolean {
+    return this.data.offresEssayees.includes(cle)
+  }
+
+  /** Grave une offre prise. false si elle l'était déjà (idempotent). */
+  noteOffreEssayee(cle: string): boolean {
+    if (this.data.offresEssayees.includes(cle)) return false
+    this.data.offresEssayees.push(cle)
     this.save()
     return true
   }

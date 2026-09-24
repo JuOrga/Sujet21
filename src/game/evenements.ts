@@ -25,6 +25,13 @@
 //     ne voit pas venir est une punition ; un pari qu'on prend est un
 //     souvenir.
 //
+//  4. CE QU'UNE OFFRE DONNE S'APPREND EN LA PRENANT. Le libellé et la
+//     marque du pari (« N issues possibles » / « sans risque ») se lisent
+//     toujours ; le détail — ce qu'elle coûte et rapporte — reste voilé tant
+//     que le joueur ne l'a pas prise une fois (records.offresEssayees). Les
+//     offres qu'il a écartées gardent leur secret : il saura la prochaine
+//     fois qu'il les choisira, pas avant. On sait qu'on parie, pas sur quoi.
+//
 // Tout ici est PUR : le catalogue, le tirage et la résolution ne touchent
 // ni au DOM ni à l'état du jeu. main.ts applique les effets, et lui seul.
 
@@ -330,6 +337,22 @@ export function resoutChoix(choix: ChoixEvenement, alea: () => number): IssueEve
  *  run — une offre impossible reste LISIBLE (on voit ce qu'on rate). */
 export function offresDe(ev: EvenementDef, etat: EtatJoueur): { choix: ChoixEvenement; possible: boolean }[] {
   return ev.choix.map((choix) => ({ choix, possible: choix.possible ? choix.possible(etat) : true }))
+}
+
+/** LA CLÉ D'UNE OFFRE dans les registres : l'événement et le libellé.
+ *  Le libellé plutôt que le rang : une offre ajoutée ou déplacée dans le
+ *  catalogue ne doit pas hériter du savoir de sa voisine. */
+export function cleOffre(ev: EvenementDef, choix: ChoixEvenement): string {
+  return `${ev.id}:${choix.libelle}`
+}
+
+/** Le mot qui tient la place du détail tant que l'offre n'a pas été prise. */
+export const DETAIL_VOILE = 'effets inconnus — il faut la prendre pour savoir'
+
+/** CE QUE LA CARTE D'UNE OFFRE DIT : son détail si elle a déjà été prise,
+ *  le voile sinon (règle 4). */
+export function detailOffre(choix: ChoixEvenement, essayee: boolean): { texte: string; voilee: boolean } {
+  return essayee ? { texte: choix.detail, voilee: false } : { texte: DETAIL_VOILE, voilee: true }
 }
 
 /** L'effet dit en une ligne — ce que le bilan affiche après le choix. */
