@@ -17,6 +17,13 @@ export const FORME_ARC = 4 // arc d'anneau centré (p0 = épaisseur 0..1, p1 = d
 // d'OUVERTURES centrées sur les côtés qu'on désigne. Épaisse au point de se
 // refermer, elle devient un octogone PLEIN — c'est la même forme, remplie.
 export const FORME_COQUE = 5
+// LA CONDUITE D'AMMONIAC (plaque froide) : un rectangle aux coins
+// arrondis du rayon de ses coudes. Jamais choisie à l'éditeur ni
+// sérialisée : conduite.ts la pose sur toute plaque froide rectangulaire au
+// chargement, pour que la collision soit EXACTEMENT ce que le shader
+// dessine (conduiteNH3) — et non la boîte, dont les coins restaient durs
+// là où l'on ne voyait que le sol.
+export const FORME_CONDUITE = 6
 
 export const FORME_NAMES: Record<number, string> = {
   [FORME_RECT]: 'Rectangle',
@@ -182,6 +189,56 @@ function rectContactAxe(
 }
 
 // ---- Les nouvelles formes (repère local, boîte déjà dépivotée) -------------
+
+/** Le nombre de tubes d'une conduite d'épaisseur T : un par ~34 u, 1 à 4.
+ *  JUMEAU du shader (conduiteNH3) : les deux doivent dire la même chose. */
+export function voiesConduite(T: number): number {
+  return Math.min(4, Math.max(1, Math.floor(T / 34 + 0.5)))
+}
+
+/** Le rayon des coins d'une conduite w × h — celui de sa silhouette
+ *  dessinée. Une ou deux voies : les bouts sont ronds (calotte, U), le
+ *  rayon est la demi-épaisseur. Trois voies et plus : un collecteur, dont
+ *  les coudes à 90° ont pour rayon extérieur 2,05 × le rayon d'un tube
+ *  (0,45 × la voie). JUMEAU de rayonConduite dans le shader. */
+export function rayonConduite(w: number, h: number): number {
+  const T = Math.min(w, h)
+  const n = voiesConduite(T)
+  if (n <= 2) return T / 2
+  return 2.05 * 0.45 * (T / n)
+}
+
+function conduiteContactAxe(
+  x: number,
+  y: number,
+  b: { minX: number; minY: number; maxX: number; maxY: number },
+  out: FormeContact,
+): void {
+  const hx = (b.maxX - b.minX) / 2
+  const hy = (b.maxY - b.minY) / 2
+  const r = Math.min(rayonConduite(2 * hx, 2 * hy), hx, hy)
+  const px = x - (b.minX + b.maxX) / 2
+  const py = y - (b.minY + b.maxY) / 2
+  const sx = px < 0 ? -1 : 1
+  const sy = py < 0 ? -1 : 1
+  const qx = Math.abs(px) - hx + r
+  const qy = Math.abs(py) - hy + r
+  if (qx > 0 && qy > 0) {
+    // dans le quart de cercle d'un coin : le coin arrondi décide
+    const l = Math.hypot(qx, qy)
+    out.dist = l - r
+    out.nx = (sx * qx) / l
+    out.ny = (sy * qy) / l
+  } else if (qx > qy) {
+    out.dist = qx - r
+    out.nx = sx
+    out.ny = 0
+  } else {
+    out.dist = qy - r
+    out.nx = 0
+    out.ny = sy
+  }
+}
 
 // Ellipse inscrite : SDF approché classique (exact pour le cercle) — le
 // gradient reste exact, seule la distance est légèrement compressée sur les
@@ -770,6 +827,9 @@ function formeContactAxe(
       return
     case FORME_COQUE:
       coqueContactAxe(x, y, b, out)
+      return
+    case FORME_CONDUITE:
+      conduiteContactAxe(x, y, b, out)
       return
     default:
       rectContactAxe(x, y, b, out)

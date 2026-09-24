@@ -16,6 +16,9 @@ import {
   formeContact,
   formeOutline,
   FORME_COQUE,
+  FORME_CONDUITE,
+  rayonConduite,
+  voiesConduite,
   COQUE_EST,
   coquePack,
   coqueUnpack,
@@ -554,5 +557,50 @@ describe('formes — la coupe (un demi-plan qui tronque)', () => {
     const b: FormeBox = { ...rect, angle: 90, coupe }
     expect(dansForme(b, 0, 50)).toBe(false)
     expect(dansForme(b, 0, -50)).toBe(true)
+  })
+})
+
+// LA CONDUITE D'AMMONIAC — la panne vécue : le dessin (conduiteNH3) ne
+// peignait plus que les tubes, coins arrondis, mais la physique lisait la
+// BOÎTE : l'eau butait dans des coins où l'on ne voyait que le sol. La
+// forme de la conduite doit épouser la silhouette dessinée.
+describe('formes — conduite (plaque froide)', () => {
+  it('le rayon des coins suit le dessin : demi-épaisseur à 1-2 voies, coude de collecteur au-delà', () => {
+    expect(voiesConduite(16)).toBe(1)
+    expect(voiesConduite(60)).toBe(2)
+    expect(voiesConduite(120)).toBe(4)
+    expect(rayonConduite(670, 60)).toBe(30) // U : bout rond
+    expect(rayonConduite(16, 400)).toBe(8) // calotte
+    expect(rayonConduite(400, 120)).toBeCloseTo(2.05 * 0.45 * 30, 6) // collecteur
+  })
+
+  const b: FormeBox = { minX: 0, minY: 0, maxX: 400, maxY: 60, forme: FORME_CONDUITE }
+
+  it('un coin de la boîte que le tube ne couvre pas est DEHORS', () => {
+    // à 3 u du coin, dans la boîte — la conduite s'arrondit avant
+    const c = contact(b, 3, 3)
+    expect(c.dist).toBeGreaterThan(0)
+    // et la normale pousse vers le coin, en diagonale
+    expect(c.nx).toBeLessThan(0)
+    expect(c.ny).toBeLessThan(0)
+    expect(dansForme(b, 3, 3)).toBe(false)
+  })
+
+  it('sur les flancs droits, le contact reste celui du rectangle', () => {
+    const r = contact({ ...b, forme: undefined }, 200, 70)
+    const c = contact(b, 200, 70)
+    expect(c.dist).toBeCloseTo(r.dist, 9)
+    expect(c.ny).toBeCloseTo(1, 9)
+    const dedans = contact(b, 200, 55)
+    expect(dedans.dist).toBeCloseTo(-5, 9)
+    expect(dedans.ny).toBeCloseTo(1, 9)
+  })
+
+  it('le bout est un demi-cercle : même distance tout autour du centre du coude', () => {
+    for (const a of [-80, -40, 0, 40, 80]) {
+      const t = (a * Math.PI) / 180
+      const c = contact(b, 370 + 40 * Math.cos(t), 30 + 40 * Math.sin(t))
+      expect(c.dist).toBeCloseTo(10, 6)
+    }
   })
 })

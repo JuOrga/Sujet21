@@ -34,6 +34,7 @@ import {
   type ObstacleBox,
 } from './level'
 import { dansForme, type Coupe } from './formes'
+import { formePhysique } from './conduite'
 import { MILIEU_EAU, MILIEU_GLACE, MILIEU_VAPEUR, type Bounds } from '../sim/solver'
 
 export { MILIEU_EAU, MILIEU_GLACE, MILIEU_VAPEUR }
@@ -425,7 +426,9 @@ export function traceLaser(em: LaserDef, monde: TraceMonde): TraceResultat {
   let capSursis = 0 // distance à parcourir avant de pouvoir reprendre un rail
   // le filtre des boîtes (voir plus haut) : un segment droit démarre ici,
   // et redémarre à chaque changement de direction ou de position
-  const filtre = new FiltreBoites(monde.boxes, monde.portesFermees)
+  // la conduite d'ammoniac arrête le faisceau à sa silhouette arrondie,
+  // comme elle arrête l'eau (conduite.ts) — même ordre, mêmes indices
+  const filtre = new FiltreBoites(monde.boxes.map(formePhysique), monde.portesFermees)
   filtre.segment(x, y, dx, dy)
   let sSeg = 0 // distance parcourue depuis le départ du segment droit courant
   statsTrace.pas = 0
