@@ -29,6 +29,7 @@ import {
 import type { Camera } from './camera'
 import { VIE_STRIDE } from './vie'
 import { Programmes } from './programmes'
+import { sondeRetournement, type Retournement } from './retournement'
 
 // Budgets de rendu : au-delà, les éléments excédentaires ne sont plus
 // dessinés (la physique, elle, les voit tous) — l'éditeur avertit quand un
@@ -3702,6 +3703,50 @@ export class Renderer {
     img.src = v ? `/assets/plafond-${v}.webp` : '/assets/plafond.webp'
   }
 
+  // LE RETOURNEMENT DES TEXTURES, sondé une fois (render/retournement.ts) :
+  // Chromium ignore UNPACK_FLIP_Y pour un ImageBitmap — depuis le décodage
+  // hors du fil principal, tout ce qui n'était pas symétrique s'affichait
+  // à l'envers.
+  private retournement: Promise<Retournement> | null = null
+
+  private retournementPret(): Promise<Retournement> {
+    if (!this.retournement) {
+      this.retournement =
+        typeof createImageBitmap === 'function' && typeof ImageData === 'function'
+          ? sondeRetournement((mode) => this.essaiRetournement(mode))
+          : Promise.resolve('img')
+    }
+    return this.retournement
+  }
+
+  /** Téléverse un témoin 1×2 (rouge en haut, bleu en bas) par la voie
+   *  `mode` et lit la rangée v = 0 : bleue, l'image est arrivée retournée. */
+  private async essaiRetournement(mode: 'gl' | 'bitmap'): Promise<boolean> {
+    const temoin = new ImageData(new Uint8ClampedArray([255, 0, 0, 255, 0, 0, 255, 255]), 1, 2)
+    const bitmap = await createImageBitmap(
+      temoin,
+      mode === 'bitmap' ? { premultiplyAlpha: 'none', imageOrientation: 'flipY' } : { premultiplyAlpha: 'none' },
+    )
+    const gl = this.gl
+    const avant = gl.getParameter(gl.FRAMEBUFFER_BINDING) as WebGLFramebuffer | null
+    const tex = gl.createTexture()
+    const fb = gl.createFramebuffer()
+    gl.bindTexture(gl.TEXTURE_2D, tex)
+    gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, mode === 'gl')
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, gl.RGBA, gl.UNSIGNED_BYTE, bitmap)
+    gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false)
+    gl.bindFramebuffer(gl.FRAMEBUFFER, fb)
+    gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, tex, 0)
+    const px = new Uint8Array(4)
+    gl.readPixels(0, 0, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, px)
+    gl.bindFramebuffer(gl.FRAMEBUFFER, avant)
+    gl.bindTexture(gl.TEXTURE_2D, null)
+    gl.deleteFramebuffer(fb)
+    gl.deleteTexture(tex)
+    bitmap.close()
+    return px[2] > 128 && px[0] < 128
+  }
+
   private loadTexture(
     url: string,
     repeat: boolean,
@@ -3749,23 +3794,28 @@ export class Renderer {
       // c'est un gel de plusieurs centaines de millisecondes pendant que le
       // joueur lit la fiche, et la vingtaine d'autres textures s'y ajoute.
       // createImageBitmap fait le décodage dans un fil du navigateur ; il
-      // reste ici le retournement et la copie vers le GPU. Le retournement
-      // est laissé à WebGL (FLIP_Y) plutôt que demandé au bitmap
-      // (imageOrientation) : un navigateur qui ignore l'option en silence
-      // livrerait des textures à l'envers, alors que FLIP_Y est le même
-      // partout. Même alpha non prémultiplié qu'avant : le rendu est le
-      // même au pixel près. Un navigateur qui refuse repasse par l'<img>.
-      if (typeof createImageBitmap === 'function') {
-        createImageBitmap(img, { premultiplyAlpha: 'none' }).then(
+      // reste ici le retournement et la copie vers le GPU. QUI retourne
+      // dépend du navigateur (Chromium ignore FLIP_Y pour un bitmap) :
+      // sondé une fois, voir retournementPret. Même alpha non prémultiplié
+      // qu'avant. Un navigateur qui refuse repasse par l'<img>.
+      void this.retournementPret().then((mode) => {
+        if (mode === 'img') {
+          envoie(img, true)
+          return
+        }
+        createImageBitmap(
+          img,
+          mode === 'bitmap'
+            ? { premultiplyAlpha: 'none', imageOrientation: 'flipY' }
+            : { premultiplyAlpha: 'none' },
+        ).then(
           (bitmap) => {
-            envoie(bitmap, true)
+            envoie(bitmap, mode === 'gl')
             bitmap.close()
           },
           () => envoie(img, true),
         )
-      } else {
-        envoie(img, true)
-      }
+      })
     }
     img.src = url
   }
