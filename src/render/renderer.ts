@@ -599,46 +599,20 @@ float smoothField(vec2 p) {
 }
 
 // ——— LA CONDUITE D'AMMONIAC (plaque froide) ————————————————————————————
-// Des tubes givrés à −40 °C couchés dans le sens long de la boîte. Tout se
-// règle sur la BOÎTE, pas sur la grille du monde : le nombre de tubes suit
-// l'épaisseur, les repères et les brides tombent symétriques autour du
-// milieu, où trône le manomètre quand il y a la place.
+// UN SEUL tuyau givré à −40 °C, couché dans le sens long de la boîte, du
+// diamètre de son épaisseur, fermé par deux calottes : sa silhouette est
+// une pilule — exactement la forme physique (FORME_CAPSULE, conduite.ts).
+// Tout se règle sur la BOÎTE, pas sur la grille du monde : les anneaux et
+// les brides tombent symétriques autour du milieu.
 float nh3Lisse(float bord, float x, float px) {
   return 1.0 - smoothstep(bord - px, bord + px, x);
 }
 
-// L'INSCRIPTION « NH₃ » au trait (segments), en unités de hauteur de
-// lettre : nette à tout zoom, sans texture à charger. Rend la distance au
-// tracé le plus proche ; l'indice 3 est plus petit et descend sous la ligne.
-float nh3Seg(vec2 p, vec2 a, vec2 b) {
-  vec2 pa = p - a;
-  vec2 ba = b - a;
-  return length(pa - ba * clamp(dot(pa, ba) / dot(ba, ba), 0.0, 1.0));
-}
-
-float nh3Texte(vec2 p) {
-  float d = nh3Seg(p, vec2(0.0, 0.0), vec2(0.0, 1.0));         // N
-  d = min(d, nh3Seg(p, vec2(0.0, 1.0), vec2(0.6, 0.0)));
-  d = min(d, nh3Seg(p, vec2(0.6, 0.0), vec2(0.6, 1.0)));
-  d = min(d, nh3Seg(p, vec2(0.85, 0.0), vec2(0.85, 1.0)));     // H
-  d = min(d, nh3Seg(p, vec2(1.45, 0.0), vec2(1.45, 1.0)));
-  d = min(d, nh3Seg(p, vec2(0.85, 0.5), vec2(1.45, 0.5)));
-  float d3 = nh3Seg(p, vec2(1.62, 0.37), vec2(1.92, 0.37));    // ₃
-  d3 = min(d3, nh3Seg(p, vec2(1.70, 0.095), vec2(1.92, 0.095)));
-  d3 = min(d3, nh3Seg(p, vec2(1.62, -0.18), vec2(1.92, -0.18)));
-  d3 = min(d3, nh3Seg(p, vec2(1.92, -0.18), vec2(1.92, 0.37)));
-  return min(d, d3 + 0.015); // l'indice, un trait plus fin
-}
-
-// LA FORME de la conduite : un rectangle aux coins arrondis du rayon de
-// sa silhouette dessinée. JUMEAU de rayonConduite / FORME_CONDUITE
-// (game/formes.ts) : la physique arrête l'eau exactement là où l'on voit
-// les tubes. Une ou deux voies : bouts ronds (calotte, U) ; trois et plus :
-// les coudes à 90° du collecteur, rayon extérieur 2,05 × 0,45 × la voie.
+// LA FORME de la conduite : une pilule (rectangle aux coins arrondis de la
+// demi-épaisseur). JUMEAU de la CAPSULE (formes.ts, posée par conduite.ts) :
+// la physique arrête l'eau exactement là où l'on voit le tuyau.
 float rayonConduite(vec2 bsize) {
-  float T = min(bsize.x, bsize.y);
-  float n = clamp(floor(T / 34.0 + 0.5), 1.0, 4.0);
-  return n < 2.5 ? T * 0.5 : 2.05 * 0.45 * (T / n);
+  return 0.5 * min(bsize.x, bsize.y);
 }
 
 float conduiteSdf(vec2 p, vec4 box) {
@@ -649,31 +623,37 @@ float conduiteSdf(vec2 p, vec4 box) {
 }
 
 // Rend la conduite SEULE, en couleur prémultipliée (rgb) et couverture
-// (a) : là où il n'y a pas de tube, on voit le sol de la salle — la
-// silhouette est celle de la tuyauterie, plus celle d'une boîte. fondK :
-// l'ombre que la conduite porte sur ce sol (à multiplier au fond).
+// (a) : autour du tuyau, on voit le sol de la salle — la silhouette est
+// celle du tuyau, pas d'une boîte. fondK : l'ombre qu'il porte sur ce sol
+// (à multiplier au fond).
 vec4 conduiteNH3(vec2 loc, vec2 bsize, float px, vec3 givreTex, out float fondK) {
   bool horiz = bsize.x >= bsize.y;
   float L = horiz ? bsize.x : bsize.y;
   float T = horiz ? bsize.y : bsize.x;
   float s = (horiz ? loc.x : loc.y) - L * 0.5; // le long, centré
-  float t = horiz ? loc.y : loc.x;             // en travers
-
-  // LE SUPPORT : une semelle d'acier sombre sous les tubes, givrée
+  float t = (horiz ? loc.y : loc.x) - T * 0.5; // en travers, centré
   float lg = dot(givreTex, vec3(0.299, 0.587, 0.114));
   vec3 col = vec3(0.0);
   float a = 0.0;
   fondK = 1.0;
 
-  // LES TUBES : un par tranche de ~34 u d'épaisseur, 1 à 4 — assez gros
-  // (0,45 × la voie) pour que la silhouette colle à la forme physique : à
-  // 1,5 u près du bord de la boîte, jamais plus
-  float n = clamp(floor(T / 34.0 + 0.5), 1.0, 4.0);
-  float lw = T / n;
-  float i = clamp(floor(t / lw), 0.0, n - 1.0);
-  float rad = lw * 0.45;                          // rayon du tube
-  float xr = t - (i + 0.5) * lw;                  // écart à l'axe droit (u)
-  float sens = mod(i, 2.0) < 0.5 ? 1.0 : -1.0;    // aller / retour
+  // LE TUYAU : le rayon est la demi-épaisseur (un rien en retrait, pour
+  // que le liseré d'antialiasing reste dans la forme physique). Le droit
+  // va de −sD à +sD ; au-delà, une calotte : l'écart au tracé est la
+  // distance au segment, sa direction donne la normale — le même cylindre
+  // qui s'arrondit en demi-sphère au bout.
+  float rad = max(T * 0.5 - 0.75, 1.0);
+  float sD = max(L * 0.5 - T * 0.5, 0.0);
+  float sg = s < 0.0 ? -1.0 : 1.0;
+  vec2 q = vec2(sg * max(abs(s) - sD, 0.0), t);
+  float xo = length(q);
+  vec2 n2 = q / max(xo, 1e-3);
+  float x = xo / rad;
+  float droit = step(abs(s), sD);
+  // l'échelle des ornements : ils grandissent avec le tuyau (un tuyau de
+  // 120 u ne porte pas les bagues d'un tuyau de 16)
+  float k = clamp(rad / 14.0, 0.6, 2.4);
+  float kl = clamp(rad / 14.0, 0.6, 1.4);         // celle des anneaux et vannes
 
   // le PAS des repères : jamais plus de 260 u, deux par boîte au moins
   float pas = max(min(260.0, L * 0.5), 70.0);
@@ -681,91 +661,18 @@ vec4 conduiteNH3(vec2 loc, vec2 bsize, float px, vec3 givreTex, out float fondK)
   float dm = s - (km + 0.5) * pas;                 // au repère le plus proche
   float kg = floor(s / pas + 0.5);
   float df = s - kg * pas;                         // au raccord le plus proche
-
-  // LES BOUTS : une pièce FIXÉE par le nombre de voies — la silhouette doit
-  // être exactement la forme physique (conduiteSdf), un rectangle aux
-  // coins arrondis. Plus de tirage au sort ni de pièce qui laisse un vide
-  // DANS la forme (le recul et la sortie du collecteur, le coude seul vers
-  // la paroi, les U face à face au milieu) : là, l'eau aurait buté sur du
-  // sol visible.
-  //   · une voie : une CALOTTE ronde ;
-  //   · deux : la paire se referme en U ;
-  //   · trois et plus : un COLLECTEUR plaqué au bout — coudes à 90° aux
-  //     voies du bord, T aux voies du milieu.
-  float rU = lw * 0.5;                             // rayon du U (axe)
-  float rb = rad * 1.05;                           // rayon du coude à 90° (axe)
-  float t0 = 0.5 * lw;                             // voie du bord bas
-  float t1 = T - 0.5 * lw;                         // voie du bord haut
-  float sg = s < 0.0 ? -1.0 : 1.0;
-  float sp = abs(s);                               // vers le bout le plus proche
-  float sH = L * 0.5 - 0.5 * lw;                   // l'axe du collecteur
-  float sBout = n < 1.5 ? L * 0.5 - 0.5 * lw       // centre de la calotte
-              : n < 2.5 ? L * 0.5 - lw             // centre du U
-              : sH - rb;                           // centre des coudes à 90°
-  float dansBout = step(sBout, sp);
-
-  // écart SIGNÉ au tracé et la direction où il croît : l'axe droit, le
-  // rayon d'un coude, ou l'axe du collecteur — le même cylindre, éclairé
-  // juste dans tous les cas. Au T, le collecteur PASSE et la voie s'y
-  // emboîte : le plus proche des deux laissait un pli en biais à 45°.
-  float xo = xr;
-  vec2 n2 = vec2(0.0, 1.0);
-  if (dansBout > 0.5 && n < 1.5) {
-    vec2 rel = vec2(sp - sBout, t - T * 0.5);
-    xo = length(rel);                              // une demi-sphère
-    n2 = vec2(sg, 1.0) * rel / max(length(rel), 1e-3);
-  } else if (dansBout > 0.5 && n < 2.5) {
-    vec2 rel = vec2(sp - sBout, t - lw);
-    xo = length(rel) - rU;
-    n2 = vec2(sg, 1.0) * rel / max(length(rel), 1e-3);
-  } else if (dansBout > 0.5) {
-    float bord = 1.0 - step(0.5, i) * step(i, n - 1.5);
-    xo = 1e4;
-    if (sp <= (bord > 0.5 ? sBout : sH)) { xo = xr; n2 = vec2(0.0, 1.0); }
-    if (t >= t0 + rb && t <= t1 - rb && (abs(sp - sH) < abs(xo) || abs(sp - sH) <= rad)) {
-      xo = sp - sH; n2 = vec2(sg, 0.0);
-    }
-    vec2 rb0 = vec2(sp - sBout, t - (t0 + rb));
-    if (rb0.x >= 0.0 && rb0.y <= 0.0 && abs(length(rb0) - rb) < abs(xo)) {
-      xo = length(rb0) - rb; n2 = vec2(sg, 1.0) * rb0 / max(length(rb0), 1e-3);
-    }
-    vec2 rb1 = vec2(sp - sBout, t - (t1 - rb));
-    if (rb1.x >= 0.0 && rb1.y >= 0.0 && abs(length(rb1) - rb) < abs(xo)) {
-      xo = length(rb1) - rb; n2 = vec2(sg, 1.0) * rb1 / max(length(rb1), 1e-3);
-    }
-  }
-  float x = xo / rad;
-  // LA PLACE LIBRE : l'étiquette, puis la vanne, ne se posent que si leur
-  // bout lointain tombe encore sur du tube droit — sinon la pièce du bout
-  // les tranchait net (« NH » sans son 3). On regarde du côté où elles vont.
   float posRep = (km + 0.5) * pas;
-  float sLibre = sBout - 8.0;
-  float droit = 1.0 - dansBout;
+  float sensL = posRep > 0.0 ? -1.0 : 1.0;         // vers le milieu (les vannes)
+  float sLibre = sD - 6.0 * k;                     // le droit utilisable
 
-  // les raccords : une BRIDE boulonnée aux raccords intérieurs, un MANCHON
-  // sombre au départ de la pièce du bout — et, au collecteur, sur les
-  // voies du milieu, au ras du tube qui passe
-  float large = nh3Lisse(rad * 1.22, abs(xr), px);
-  float bride = nh3Lisse(4.0, abs(df), px) * large * step(0.5, abs(kg)) *
-                step(abs(kg * pas), sBout - 12.0);
-  float bordVoie = 1.0 - step(0.5, i) * step(i, n - 1.5);
-  float sMan = sBout - 4.0;
-  float sT = rad + 4.0;
-  float manBout = (n < 2.5 ? 1.0 : bordVoie) * nh3Lisse(3.0, abs(sp - sMan), px) * large;
-  float manT = step(2.5, n) * (1.0 - bordVoie) * nh3Lisse(2.5, abs(sp - (sH - sT)), px) * large;
-  float manchon = max(manBout, manT);
+  // L'OMBRE DE CONTACT : le tuyau pose sur le sol, une ombre douce l'y colle
+  fondK *= mix(0.45, 1.0, smoothstep(0.0, 6.0 + 4.0 * k, xo - rad));
 
-  // L'OMBRE DE CONTACT : le tube pose sur le sol, une ombre douce l'y
-  // colle. (Avant : une semelle sombre remplissait la boîte, puis une
-  // congère de givre — la boîte se voyait toujours, un bloc carré.)
-  float vide = abs(xo) - rad;
-  fondK *= mix(0.45, 1.0, smoothstep(0.0, 10.0, vide));
-
-  float tube = nh3Lisse(1.0, abs(x), px / rad);
+  float tube = nh3Lisse(1.0, x, px / rad);
   if (tube > 0.0) {
     float nz = sqrt(max(1.0 - x * x, 0.0));
-    // la normale 3D du cylindre, ramenée dans le repère de la boîte : la
-    // lampe (en haut à gauche) éclaire le coude comme le tube droit
+    // la normale 3D, ramenée dans le repère de la boîte : la lampe (en
+    // haut à gauche) éclaire la calotte comme le droit
     vec2 nl = horiz ? n2 : n2.yx;
     vec3 N = vec3(nl * x, nz);
     vec3 Lum = normalize(vec3(-0.40, 0.65, 0.65));
@@ -773,23 +680,23 @@ vec4 conduiteNH3(vec2 loc, vec2 bsize, float px, vec3 givreTex, out float fondK)
     float spec = pow(max(dot(N, normalize(Lum + vec3(0.0, 0.0, 1.0))), 0.0), 22.0);
     vec3 acier = vec3(0.36, 0.48, 0.60) * diff + vec3(0.55, 0.65, 0.75) * spec * 0.7;
 
-    // LE GIVRE : par plaques, plus épais sur le dessus et aux brides — le
-    // tube ne se lit pas comme du métal bleu, mais comme du métal qui GÈLE
-    // le givre se lit dans le repère de la BOÎTE, continu d'un tube à
-    // l'autre : suivre chaque tube faisait des coutures carrées au coude
-    float g1 = dnoise(loc * 0.045 + x * 0.9);
-    float g2 = dnoise(loc * 0.16 + 3.1 - x * 1.5);
+    // LE GIVRE : par plaques, plus épais sur le dessus — le tuyau ne se lit
+    // pas comme du métal bleu, mais comme du métal qui GÈLE. Lu dans le
+    // repère de la boîte, à l'échelle du tuyau : continu sur la calotte.
+    vec2 gq = loc / k;
+    float g1 = dnoise(gq * 0.045 + x * 0.9);
+    float g2 = dnoise(gq * 0.16 + 3.1 - x * 1.5);
     float givre = smoothstep(0.22, 0.62, 0.50 * g1 + 0.25 * g2 + 0.32 * nz);
     // le grain du givre, fondu au dézoom (sinon il scintille)
     float grain = mix(0.5, dnoise(loc * 0.7), smoothstep(1.5, 0.6, px));
-    vec3 blanc = vec3(0.82, 0.91, 0.99) * (0.30 + 0.80 * diff) * (0.88 + 0.24 * grain);
+    vec3 blanc = vec3(0.82, 0.91, 0.99) * (0.30 + 0.80 * diff) * (0.88 + 0.24 * grain) * (0.92 + 0.16 * lg);
     vec3 c = mix(acier, blanc, givre * 0.80);
     // les CRISTAUX : des éclats en étoile sur le givre, qui scintillent —
     // fondus au dézoom (un pixel blanc qui clignote au loin, c'est de la
     // neige d'écran, pas du gel)
     vec2 cq = loc / 5.0;
     vec2 cell = floor(cq);
-    float h = hash21(cell + i * 13.0);
+    float h = hash21(cell);
     vec2 o = fract(cq) - 0.5 - 0.3 * (vec2(hash21(cell + 2.7), hash21(cell + 5.3)) - 0.5);
     float etoile = max(nh3Lisse(0.05, abs(o.x), 0.03) * nh3Lisse(0.28, abs(o.y), 0.05),
                        nh3Lisse(0.05, abs(o.y), 0.03) * nh3Lisse(0.28, abs(o.x), 0.05));
@@ -798,81 +705,53 @@ vec4 conduiteNH3(vec2 loc, vec2 bsize, float px, vec3 givreTex, out float fondK)
     c += vec3(0.85, 0.94, 1.0) * etoile * step(0.90, h) * scint * givre * nz *
          smoothstep(0.9, 0.35, px);
 
-    // LE REPÈRE NH3 (sur les tubes droits) : anneau violet (les bases,
-    // NF X08-100) puis l'étiquette jaune — l'inscription « NH₃ » et ses
-    // chevrons, qui disent le sens du fluide. Le givre la mange à moitié :
-    // elle est posée là depuis longtemps, mais on la lit encore.
-    float bande = nh3Lisse(4.5, abs(dm), px) * droit;
-    float a = dm * sens;
-    // l'inscription n'a sa place que si le pas des repères la loge ; sinon
-    // l'étiquette se réduit aux chevrons (les plots courts)
-    float H = min(rad * 1.1, 14.0);
-    float lTexte = 1.95 * H;
-    float finTexte = 12.0 + lTexte + 3.0 + 16.0;
-    float avecTexte = step(finTexte, pas * 0.5) *
-                      step(abs(posRep + sens * finTexte), sLibre);
-    float a0 = 12.0 + avecTexte * (lTexte + 3.0);     // début des chevrons
-    float fin = a0 + 16.0;
-    float etiqOk = step(fin, pas * 0.5) * step(abs(posRep + sens * fin), sLibre);
-    float etiq = nh3Lisse((fin - 7.0) * 0.5, abs(a - (fin + 7.0) * 0.5), px) * droit * etiqOk;
-    float v = a - a0 - abs(x) * rad * 0.9;
-    float chev = nh3Lisse(1.8, abs(mod(v + 4.0, 8.0) - 4.0), px) *
-                 nh3Lisse(0.8, abs(x), px / rad) * step(0.0, v + 2.0) * step(v, 14.0);
-    // le texte se lit toujours dans le même sens à l'écran : de gauche à
-    // droite sur un tube couché, de bas en haut sur un tube debout — quel
-    // que soit le côté de l'anneau où tombe l'étiquette. Sur un tube
-    // debout, le haut des lettres regarde à GAUCHE (−xr) : une rotation ;
-    // +xr donnerait un reflet, « NH₃ » en miroir
-    float u = sens > 0.0 ? dm - 10.0 : dm + 10.0 + lTexte;
-    float vg = horiz ? xr : -xr;
-    float txt = avecTexte * nh3Lisse(0.075, nh3Texte(vec2(u, vg) / H + vec2(0.0, 0.41)), px / H);
+    // LE REPÈRE : un anneau violet (la couleur des bases, NF X08-100) — le
+    // tuyau blanchi et ses cristaux disent déjà le froid ; ni étiquette,
+    // ni texte, ni flèche
+    float bande = nh3Lisse(4.5 * kl, abs(dm), px) * droit;
     vec3 violet = vec3(0.50, 0.26, 0.78) * (0.45 + 0.65 * diff);
-    vec3 jaune = mix(vec3(0.95, 0.74, 0.16), vec3(0.08, 0.07, 0.06), max(chev, txt) * etiqOk) * (0.45 + 0.65 * diff);
-    float mange = 1.0 - 0.55 * givre;
-    c = mix(c, violet, bande * mange);
-    c = mix(c, jaune, etiq * (1.0 - bande) * (1.0 - 0.40 * givre));
+    c = mix(c, violet, bande * (1.0 - 0.55 * givre));
 
-    // l'ombre de contact au bord du tube : il se détache de la semelle
+    // LES BRIDES aux raccords intérieurs, et un MANCHON au départ de chaque
+    // calotte : des bagues sur le tuyau, jamais plus larges que lui — la
+    // silhouette reste la forme physique
+    float bride = nh3Lisse(4.0 * k, abs(df), px) * step(0.5, abs(kg)) *
+                  step(abs(kg * pas), sD - 10.0 * k);
+    float manchon = nh3Lisse(3.0 * k, abs(abs(s) - (sD - 4.0 * k)), px) * step(8.0 * k, sD);
+    float bague = max(bride, manchon);
+    if (bague > 0.0) {
+      float db = manchon > bride ? abs(s) - (sD - 4.0 * k) : df;
+      vec3 b = manchon > bride
+        ? vec3(0.13, 0.16, 0.20) * (0.45 + 0.85 * nz) + vec3(0.30, 0.36, 0.42) * nh3Lisse(0.9, abs(abs(db) - 2.2 * k), px)
+        : vec3(0.26, 0.33, 0.42) * (0.35 + 0.75 * nz);
+      float boulon = nh3Lisse(1.6 * k, length(vec2(db, abs(t) - rad * 0.82)), px) * step(manchon, bride);
+      b = mix(b, vec3(0.62, 0.70, 0.78), boulon);
+      // un voile de givre UNI sur la bague (en taches, elle faisait camouflage)
+      b = mix(b, vec3(0.80, 0.90, 0.98) * (0.55 + 0.45 * nz), 0.35);
+      c = mix(c, b, bague);
+    }
+
+    // l'ombre de contact au bord du tuyau : il se détache du sol
     c *= 0.55 + 0.45 * smoothstep(0.0, 0.35, nz);
     col = mix(col, c, tube);
     a += tube * (1.0 - a);
   }
 
-  float bague = max(bride, manchon);
-  if (bague > 0.0) {
-    // bride : acier boulonné ; manchon : bague sombre à liseré clair, comme
-    // un raccord à sertir. Givre épais : les ponts thermiques gèlent d'abord
-    float xb = xr / (rad * 1.22);
-    float nzb = sqrt(max(1.0 - xb * xb, 0.0));
-    float db = manchon > bride ? min(abs(sp - sMan), abs(sp - (sH - sT))) : df;
-    vec3 b = manchon > bride
-      ? vec3(0.13, 0.16, 0.20) * (0.45 + 0.85 * nzb) + vec3(0.30, 0.36, 0.42) * nh3Lisse(0.9, abs(abs(db) - 2.2), px)
-      : vec3(0.26, 0.33, 0.42) * (0.35 + 0.75 * nzb);
-    float boulon = nh3Lisse(1.6, length(vec2(db, abs(xr) - rad * 0.95)), px) * step(manchon, bride);
-    b = mix(b, vec3(0.62, 0.70, 0.78), boulon);
-    float gb = smoothstep(0.35, 0.65, dnoise(vec2(s * 0.3, xr * 0.3)));
-    b = mix(b, vec3(0.86, 0.94, 1.0) * (0.6 + 0.4 * nzb), gb * 0.55);
-    col = mix(col, b, bague);
-    a += bague * (1.0 - a);
-  }
-
-  // LES VANNES : un volant rouge ou jaune, vu de dessus, posé sur un corps
-  // de vanne — la touche de couleur qui dit « installation », pas « tube ».
-  // Une sur deux environ, du côté du repère OPPOSÉ à l'étiquette (l'aller
-  // et le retour d'une paire ont leurs étiquettes de part et d'autre).
-  float Rw = min(min(rad * 1.25, lw * 0.47), 17.0);
-  float hv = hash21(vec2(km, i) + 31.7);
-  float vanneOk = step(32.0 + Rw + 2.0, pas * 0.5) *
-                  step(abs(posRep - sens * (32.0 + Rw + 2.0)), sLibre);
+  // LES VANNES : un volant rouge ou jaune, vu de dessus, sur un repère sur
+  // deux environ, de l'autre côté de l'anneau que l'étiquette — la touche
+  // de couleur qui dit « installation ». Le volant reste DANS le tuyau.
+  float Rw = min(rad * 0.85, 16.0 * kl);
+  // la vanne se pose près de l'anneau, du côté du milieu (sensL)
+  float finEtiq = 12.0 * kl;
+  float dv = sensL * (finEtiq + 6.0 * kl + Rw);
+  float hv = hash21(vec2(km, L * 0.013) + 31.7);
+  float vanneOk = step(finEtiq + 6.0 * kl + 2.0 * Rw + 2.0, pas * 0.5) *
+                  step(abs(posRep + dv) + Rw, sLibre);
   if (droit > 0.5 && vanneOk > 0.5 && hv > 0.45) {
-    vec2 pv = vec2(dm + sens * 32.0, xr);
-    // le corps : un bloc plus large que le tube, et son ombre
-    float ov = 1.0 - 0.45 * nh3Lisse(Rw * 1.05, length(pv + vec2(-2.5, 3.0)), px);
+    vec2 pv = vec2(dm - dv, t);
+    float ov = 1.0 - 0.40 * nh3Lisse(Rw * 1.05, length(pv + vec2(-2.5, 3.0) * k), px);
     col *= ov;
     fondK *= ov;
-    float corps = nh3Lisse(rad * 0.55, abs(pv.x), px) * nh3Lisse(rad * 1.30, abs(pv.y), px);
-    col = mix(col, vec3(0.20, 0.25, 0.31) * (0.7 + 0.3 * sign(pv.y)), corps);
-    a += corps * (1.0 - a);
     // le volant : jante, quatre rayons, moyeu — droit dans le repère boîte
     vec2 pw = horiz ? pv : pv.yx;
     float r = length(pw) / Rw;
@@ -881,85 +760,47 @@ vec4 conduiteNH3(vec2 loc, vec2 bsize, float px, vec3 givreTex, out float fondK)
     float rayons = nh3Lisse(0.07, ray, px / Rw) * step(r, 0.82);
     float moyeu = nh3Lisse(0.22, r, px / Rw);
     float volant = max(max(jante, rayons), moyeu);
-    vec3 teinte = hash21(vec2(km, i) + 7.1) > 0.5 ? vec3(0.86, 0.16, 0.12) : vec3(0.96, 0.74, 0.14);
-    // un relief simple : clair en haut à gauche, sombre en bas à droite
+    vec3 teinte = hash21(vec2(km, L * 0.013) + 7.1) > 0.5 ? vec3(0.86, 0.16, 0.12) : vec3(0.96, 0.74, 0.14);
     float relief = 0.75 + 0.35 * dot(normalize(pw + 1e-3), normalize(vec2(-0.6, 0.8))) * step(0.3, r);
     vec3 vcol = teinte * relief;
     vcol = mix(vcol, vec3(0.92, 0.92, 0.88), moyeu * 0.55);
-    // même la vanne prend le givre, par points
-    vcol = mix(vcol, vec3(0.86, 0.94, 1.0), 0.35 * smoothstep(0.55, 0.8, dnoise(pw * 0.4 + km)));
+    vcol = mix(vcol, vec3(0.86, 0.94, 1.0), 0.35 * smoothstep(0.55, 0.8, dnoise(pw * 0.4 / k + km)));
     col = mix(col, vcol, volant);
     a += volant * (1.0 - a);
   }
 
-  // LE MANOMÈTRE : au milieu, s'il y a la place — cadran blanc, secteur
-  // bleu du froid, aiguille qui tremble au fond du bleu, un flocon au bas
-  // du cadran. Droit dans le repère de la boîte.
-  float R = min(min(T * 0.40, L * 0.40), 30.0);
-  if (T >= 44.0 && L >= 70.0) {
-    vec2 q = loc - bsize * 0.5;
-    float r = length(q) / R;
-    // l'ombre portée du boîtier
-    float og = 1.0 - 0.55 * nh3Lisse(1.18, length(q + vec2(-3.0, 4.0)) / R, px / R);
-    col *= og;
-    fondK *= og;
-    float boitier = nh3Lisse(1.0, r, px / R);
-    if (boitier > 0.0) {
-      float ang = atan(q.x, q.y);                    // 0 en haut, sens horaire
-      // la lunette chromée, givrée par endroits
-      float lun = smoothstep(0.84 - px / R, 0.84 + px / R, r);
-      float refl = 0.5 + 0.5 * cos(ang + 0.8);
-      vec3 lunette = mix(vec3(0.30, 0.36, 0.44), vec3(0.82, 0.88, 0.95), refl);
-      lunette = mix(lunette, vec3(0.90, 0.96, 1.0),
-                    0.6 * smoothstep(0.45, 0.75, dnoise(q * 0.35 + 9.0)));
-      vec3 cad = vec3(0.86, 0.90, 0.93);
-      // l'échelle : 270° de −135° à +135°
-      float f = (ang + 2.356) / 4.712;
-      float surEchelle = step(0.0, f) * step(f, 1.0);
-      vec3 sect = f < 0.55 ? vec3(0.16, 0.46, 0.95)
-                : f < 0.80 ? vec3(0.20, 0.70, 0.40)
-                : vec3(0.90, 0.22, 0.18);
-      float arc = smoothstep(0.56, 0.58, r) * (1.0 - smoothstep(0.70, 0.72, r)) * surEchelle;
-      cad = mix(cad, sect, arc);
-      float gr = fract(f * 10.0 + 0.5) - 0.5;
-      float trait = nh3Lisse(0.035, abs(gr), px / R * 0.6) *
-                    smoothstep(0.71, 0.73, r) * (1.0 - smoothstep(0.80, 0.82, r)) * surEchelle;
-      cad = mix(cad, vec3(0.10, 0.12, 0.15), trait);
-      // le FLOCON, au bas du cadran : trois traits à 60°
-      vec2 fq = (q - vec2(0.0, -0.40 * R)) / R;
-      float flo = 0.0;
-      for (int k = 0; k < 3; k++) {
-        float an = float(k) * 1.0472;
-        vec2 dir = vec2(cos(an), sin(an));
-        float along = dot(fq, dir);
-        float across = abs(dot(fq, vec2(-dir.y, dir.x)));
-        flo = max(flo, nh3Lisse(0.025, across, px / R) * nh3Lisse(0.14, abs(along), px / R));
-      }
-      cad = mix(cad, vec3(0.16, 0.46, 0.95), flo);
-      // l'AIGUILLE : au fond du bleu (−40 °C), qui frémit
-      float fa = 0.16 + 0.012 * sin(uTime * 9.0) * sin(uTime * 2.3) + 0.02 * sin(uTime * 0.4);
-      float aa = fa * 4.712 - 2.356;
-      vec2 ad = vec2(sin(aa), cos(aa));
-      float al = dot(q / R, ad);
-      float ac = abs(dot(q / R, vec2(-ad.y, ad.x)));
-      float aig = nh3Lisse(0.045 * (1.0 - al * 0.8), ac, px / R) * step(-0.12, al) * step(al, 0.70);
-      cad = mix(cad, vec3(0.78, 0.10, 0.08), aig);
-      cad = mix(cad, vec3(0.12, 0.13, 0.15), nh3Lisse(0.09, r, px / R));
-      // le verre : un reflet en croissant, un voile de buée sur le bas
-      float verre = smoothstep(0.2, 0.9, dot(normalize(q + 1e-4), normalize(vec2(-1.0, 1.0)))) *
-                    smoothstep(0.45, 0.78, r) * (1.0 - lun);
-      cad += vec3(0.35) * verre * 0.5;
-      cad = mix(cad, vec3(0.80, 0.88, 0.95), 0.35 * smoothstep(0.1, -0.7, q.y / R) *
-                smoothstep(0.4, 0.8, dnoise(q * 0.2 + uTime * 0.05)));
-      vec3 g = mix(cad, lunette, lun);
-      col = mix(col, g, boitier);
-      a += boitier * (1.0 - a);
-    }
-  }
-  // un voile de froid qui roule sur les tubes, lentement
+  // un voile de froid qui roule sur le tuyau, lentement
   float voile = dnoise(loc * 0.018 + vec2(uTime * 0.10, -uTime * 0.04));
   col += vec3(0.55, 0.70, 0.85) * smoothstep(0.55, 0.9, voile) * 0.10 * a;
   return vec4(col, a);
+}
+
+// LE SOL CRISTALLISÉ : dans l'aire d'effet (la portée de gel, celle du
+// solveur), le sol se couvre d'un givre LÉGER — des plaques de rime et
+// quelques aiguilles de glace qui scintillent, plus denses près du tuyau,
+// nulles au bord de la portée. Rend (voile de givre 0..1, éclats 0..1).
+vec2 givreSol(vec2 w, float d, float bande, float px) {
+  float portee = 1.0 - smoothstep(0.0, bande, d);
+  if (portee <= 0.0) return vec2(0.0);
+  float n1 = dnoise(w * 0.035);
+  float n2 = dnoise(w * 0.12 + 7.7);
+  // la rime : des plaques qui mordent de moins en moins loin du tuyau
+  float rime = smoothstep(0.50 - 0.25 * portee, 1.0, 0.6 * n1 + 0.4 * n2);
+  // les aiguilles : une étoile à six branches par cellule tirée
+  vec2 cq = w / 9.0;
+  vec2 cell = floor(cq);
+  float h = hash21(cell + 17.0);
+  vec2 o = fract(cq) - 0.5 - 0.35 * (vec2(hash21(cell + 1.3), hash21(cell + 8.9)) - 0.5);
+  float br = 0.0;
+  for (int kk = 0; kk < 3; kk++) {
+    float an = float(kk) * 1.0472 + h * 3.0;
+    vec2 dir = vec2(cos(an), sin(an));
+    br = max(br, nh3Lisse(0.035, abs(dot(o, vec2(-dir.y, dir.x))), 0.03) *
+                 nh3Lisse(0.30, abs(dot(o, dir)), 0.05));
+  }
+  float scint = 0.55 + 0.45 * sin(uTime * (1.2 + 2.0 * hash21(cell + 4.4)) + h * 40.0);
+  float aiguilles = br * step(1.0 - 0.12 * portee * portee, h) * scint * smoothstep(1.2, 0.5, px);
+  return vec2(rime * portee * portee, aiguilles);
 }
 
 // LA BRUME : hors de la boîte, des bouffées de vapeur froide qui
@@ -2121,10 +1962,10 @@ void main() {
       col = mix(col, barCol * eclMat, fill * (1.0 - hole * 0.85));
       col = mix(col, vec3(0.45, 0.60, 0.70) * eclMat, edge * 0.8);
     } else if (mat > 3.5) {
-      // Plaque froide (tableau 2) : une CONDUITE D'AMMONIAC à −40 °C —
-      // tubes givrés, repères NH3, manomètre au fond du bleu — et la brume
-      // qui s'en échappe : le danger se lit avant le contact, et on sait
-      // POURQUOI c'est froid. Le dessin se cale sur la boîte (conduiteNH3).
+      // Plaque froide (tableau 2) : une CONDUITE D'AMMONIAC à −40 °C — un
+      // tuyau givré du diamètre de la boîte, repères NH3, le sol qui
+      // cristallise autour et la brume qui s'en échappe : le danger se lit
+      // avant le contact, et on sait POURQUOI c'est froid (conduiteNH3).
       float fill = 1.0 - smoothstep(-edgeW, 0.0, dV);
       float edge = (1.0 - smoothstep(0.0, edgeW, abs(dV))) * libre;
       vec2 bmin = uBoxes[bi].xy;
@@ -2134,6 +1975,12 @@ void main() {
       // de la salle, avec l'ombre que la conduite y pose. Ni fond, ni
       // liseré, ni ombre carrée — la boîte ne se voit plus, la tuyauterie
       // si. (La collision, elle, reste la boîte.)
+      // LE SOL CRISTALLISÉ dans l'aire d'effet — léger : un voile de rime et
+      // quelques aiguilles de glace, là où le solveur fait geler l'eau
+      float dG = conduiteSdf(wb, uBoxes[bi]);
+      vec2 gsol = givreSol(wb, max(dG, 0.0), uColdBand, pxMonde);
+      col = mix(col, vec3(0.70, 0.82, 0.94) * eclMat, gsol.x * 0.12);
+      col += vec3(0.75, 0.88, 1.0) * gsol.y * 0.30;
       float ombreSol;
       vec4 cnh = conduiteNH3(clamp(wbV - bmin, vec2(0.0), bsize), bsize, pxMonde, givreTex, ombreSol);
       col *= mix(1.0, ombreSol, fill);
@@ -2143,8 +1990,7 @@ void main() {
       float hors = (1.0 - fill * cnh.a) * ((iCouv == bi || dCouv > 0.0) ? 1.0 : 0.0);
       // la brume se mesure depuis la FORME (conduiteSdf), comme l'aura de
       // gel du solveur : les coins arrondis ne givrent pas le vide
-      float dC = conduiteSdf(wb, uBoxes[bi]);
-      col += brumeNH3(wb, max(dC, 0.0), uColdBand) * hors * (dC > 0.0 ? 1.0 : 0.6);
+      col += brumeNH3(wb, max(dG, 0.0), uColdBand) * hors * (dG > 0.0 ? 1.0 : 0.6);
     } else {
       // Sas de sortie : une bouche d'aspiration — un trou dans lequel l'eau
       // s'engouffre. Gorge sombre, œil noir, anneau qui respire, et stries
@@ -2931,17 +2777,15 @@ float sceneSdf(vec2 p, float alt) {
       float sa = sin(ang);
       wb = bc + vec2(ca * rel.x + sa * rel.y, -sa * rel.x + ca * rel.y);
     }
-    // la CONDUITE D'AMMONIAC ombre à sa forme (FORME_CONDUITE) : un
-    // rectangle aux coins arrondis du rayon de ses coudes. L'ombre carrée
+    // la CONDUITE D'AMMONIAC ombre à sa forme — la pilule de son tuyau, la
+    // CAPSULE que la physique lui donne (conduite.ts). L'ombre carrée
     // trahissait le bloc que le dessin (conduiteNH3) s'applique à cacher.
-    // Ce programme n'a pas conduiteSdf : le rayon est recopié — JUMEAU de
-    // rayonConduite (formes.ts), vérifié par conduite.spec.ts.
+    // Ce programme n'a pas conduiteSdf : le calcul est recopié, vérifié par
+    // conduite.spec.ts.
     if (dec.x > 3.5 && dec.x < 4.5 && dec.y < 0.5) {
       vec2 bc = 0.5 * (uBoxes[i].xy + uBoxes[i].zw);
       vec2 hb = 0.5 * (uBoxes[i].zw - uBoxes[i].xy);
-      float Tc = 2.0 * min(hb.x, hb.y);
-      float nc = clamp(floor(Tc / 34.0 + 0.5), 1.0, 4.0);
-      float r = min(nc < 2.5 ? Tc * 0.5 : 2.05 * 0.45 * (Tc / nc), min(hb.x, hb.y));
+      float r = min(hb.x, hb.y); // la pilule : la demi-épaisseur
       vec2 q = abs(wb - bc) - hb + r;
       d = min(d, length(max(q, 0.0)) + min(max(q.x, q.y), 0.0) - r);
       continue;
