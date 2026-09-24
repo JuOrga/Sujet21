@@ -44,9 +44,9 @@ describe('le rang d’une salle', () => {
     expect(etoiles).toEqual([5, 4, 3, 2, 1])
   })
 
-  it('se lit en mots d’eau, pas en lettres : du déluge au filet', () => {
+  it('se lit en régimes d’écoulement, pas en lettres : du superfluide au figé', () => {
     const noms = SEUILS_RANG.map(([, seuil]) => rangDeSalle(seuil).nom)
-    expect(noms).toEqual(['DÉLUGE', 'TORRENT', 'RIVIÈRE', 'RUISSEAU', 'FILET'])
+    expect(noms).toEqual(['SUPERFLUIDE', 'LAMINAIRE', 'TURBULENT', 'VISQUEUX', 'FIGÉ'])
     // plus une seule lettre d'arcade sous les yeux du joueur
     for (const n of noms) expect(n.length).toBeGreaterThan(1)
   })

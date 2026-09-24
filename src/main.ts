@@ -16079,7 +16079,7 @@ function montreMiseEnBonbonne(b: BilanSalle): void {
   }
   // Temps 1 — LE RANG TOMBE : la médaille claque sur la scène, l'écran
   // flashe, la manette tremble, le feu jaillit — puis les étoiles
-  // s'allument une à une. Un déluge ou un torrent sonne comme un record.
+  // s'allument une à une. Un superfluide ou un laminaire sonne comme un record.
   apres(TEMPS_BILAN.rang, () => {
     const rang = mbEl('mb-rang')
     rang.hidden = false

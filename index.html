@@ -8029,14 +8029,14 @@
         animation: mb-tourne 5s linear infinite;
       }
       @keyframes mb-tourne { to { transform: rotate(360deg); } }
-      /* le NOM du rang (DÉLUGE… FILET) : un mot, plus une lettre. Michroma
+      /* le NOM du rang (SUPERFLUIDE… FIGÉ) : un mot, plus une lettre. Michroma
          est large (~1 em par lettre, espacement compris) : la taille se
          règle sur le nombre de lettres (--mb-nom-n, posé par main.ts) pour
          que le mot tienne dans la largeur utile du disque (--mb-nom-l) —
-         FILET s'affiche en grand, RUISSEAU sans déborder de l'anneau */
+         FIGÉ s'affiche en grand, SUPERFLUIDE sans déborder de l'anneau */
       .mb-rang-lettre {
         position: relative; font-family: var(--font-display); font-weight: 600;
-        font-size: min(calc(26px * var(--ui)), calc(var(--mb-nom-l, 128px) / var(--mb-nom-n, 6)));
+        font-size: min(calc(26px * var(--ui)), calc(var(--mb-nom-l, 136px) / var(--mb-nom-n, 6)));
         line-height: 1; color: var(--mb-rang);
         letter-spacing: 0.04em; white-space: nowrap;
         text-shadow:
@@ -8231,9 +8231,9 @@
       }
       /* repliée, la médaille s'allonge en pastille : un mot ne tient pas
          dans un disque de 56 px */
-      .mb-scene.mb-compact .mb-rang { width: 96px; height: 40px; }
+      .mb-scene.mb-compact .mb-rang { width: 120px; height: 40px; }
       .mb-scene.mb-compact .mb-rang::before { inset: 4px; }
-      .mb-scene.mb-compact .mb-rang-lettre { --mb-nom-l: 80px; animation: none; }
+      .mb-scene.mb-compact .mb-rang-lettre { --mb-nom-l: 100px; animation: none; }
       .mb-scene.mb-compact .mb-rang-mot,
       .mb-scene.mb-compact .mb-etoiles,
       .mb-scene.mb-compact .mb-flacon,
@@ -8958,7 +8958,7 @@
         .mb-scene { padding: 10px 12px 14px; gap: 10px; }
         .mb-releve { grid-template-columns: 1fr; justify-items: center; gap: 8px; }
         .mb-rang { width: 136px; height: 136px; }
-        .mb-rang-lettre { --mb-nom-l: 100px; }
+        .mb-rang-lettre { --mb-nom-l: 104px; }
         .mb-corps { grid-template-columns: 1fr; width: 100%; }
         .mb-haut { grid-row: auto; justify-content: center; }
         .mb-litres b { font-size: calc(32px * var(--ui)); }
@@ -8980,7 +8980,7 @@
       @media (max-height: 820px) and (min-width: 761px) {
         .mb-scene { gap: 10px; padding-top: 8px; }
         .mb-rang { width: 140px; height: 140px; }
-        .mb-rang-lettre { --mb-nom-l: 104px; }
+        .mb-rang-lettre { --mb-nom-l: 108px; }
         .mb-flacon { width: 56px; height: 100px; flex-basis: 56px; }
         .mb-litres b { font-size: calc(32px * var(--ui)); }
         .mb-pli, .mb-pli .crt-draft { min-height: 160px; }
@@ -10739,7 +10739,7 @@
         <section class="mb-releve" id="mb-releve">
           <div class="mb-rang" id="mb-rang" hidden>
             <span class="mb-rang-anneau" aria-hidden="true"></span>
-            <b class="mb-rang-lettre" id="mb-rang-lettre">DÉLUGE</b>
+            <b class="mb-rang-lettre" id="mb-rang-lettre">SUPERFLUIDE</b>
             <i class="mb-rang-mot" id="mb-rang-mot">IMPECCABLE</i>
             <span class="mb-etoiles" id="mb-etoiles" aria-hidden="true"></span>
           </div>
