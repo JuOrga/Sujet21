@@ -630,6 +630,15 @@ float nh3Texte(vec2 p) {
   return min(d, d3 + 0.015); // l'indice, un trait plus fin
 }
 
+// Le point s (le long, centré) est-il sur du tube DROIT ? Ni dans un
+// coude intérieur, ni dans la boucle d'un bout — marge comprise.
+float nh3Droit(float s, float pas, float L, float hw, float sBout, float apparie) {
+  if (abs(s) > (apparie > 0.5 ? sBout - 8.0 : L * 0.5 - 6.0)) return 0.0;
+  float k = floor(s / pas + 0.5);
+  float coude = apparie * step(0.5, abs(k)) * step(abs(k * pas) + hw + 12.0, L * 0.5);
+  return 1.0 - coude * step(abs(s - k * pas), hw + 8.0);
+}
+
 vec3 conduiteNH3(vec2 loc, vec2 bsize, float px, vec3 givreTex) {
   bool horiz = bsize.x >= bsize.y;
   float L = horiz ? bsize.x : bsize.y;
@@ -646,28 +655,71 @@ vec3 conduiteNH3(vec2 loc, vec2 bsize, float px, vec3 givreTex) {
   float lw = T / n;
   float i = clamp(floor(t / lw), 0.0, n - 1.0);
   float rad = lw * 0.40;                          // rayon du tube
-  float xr = t - (i + 0.5) * lw;                  // écart à l'axe (u)
-  float x = xr / rad;                             // -1..1 sur le tube
+  float xr = t - (i + 0.5) * lw;                  // écart à l'axe droit (u)
   float sens = mod(i, 2.0) < 0.5 ? 1.0 : -1.0;    // aller / retour
 
   // le PAS des repères : jamais plus de 260 u, deux par boîte au moins
   float pas = max(min(260.0, L * 0.5), 70.0);
-  float dm = s - (floor(s / pas) + 0.5) * pas;     // au repère le plus proche
-  float df = s - floor(s / pas + 0.5) * pas;       // à la bride la plus proche
+  float km = floor(s / pas);
+  float dm = s - (km + 0.5) * pas;                 // au repère le plus proche
+  float kg = floor(s / pas + 0.5);
+  float df = s - kg * pas;                         // au raccord le plus proche
 
-  // la bride déborde du tube : elle se calcule avant lui
-  float bride = nh3Lisse(4.0, abs(df), px) * nh3Lisse(rad * 1.22, abs(xr), px);
-  // les deux bouts de la conduite sont bridés aussi : elle sort du mur
+  // LE SERPENTIN : les tubes vont par PAIRES (aller, retour) et font
+  // demi-tour en U aux raccords — un évaporateur, pas une rampe de tubes
+  // parallèles. Au milieu (le manomètre) et près des bouts, ils filent
+  // droit ; un tube sans partenaire (nombre impair) aussi.
+  float apparie = step(i - mod(i, 2.0) + 1.0, n - 1.0);
+  float rU = lw * 0.5;                             // rayon du coude
+  float jeu = max(3.0, lw * 0.18);                 // l'écart entre deux U
+  float hw = rU + jeu;
+  float coude = apparie * step(0.5, abs(kg)) * step(abs(kg * pas) + hw + 12.0, L * 0.5);
+  float dansU = coude * step(abs(df), hw);
+  float tc = (i - mod(i, 2.0) + 1.0) * lw;         // l'axe de la paire
+  // écart SIGNÉ au tracé et la direction où il croît : l'axe droit, ou le
+  // rayon du coude — le même cylindre, éclairé juste dans les deux cas
+  // aux deux BOUTS, la paire se referme en U elle aussi : la boucle est
+  // bouclée, comme un serpentin posé contre la paroi
+  float sBout = L * 0.5 - rU - rad - 3.0;
+  float auBout = apparie * step(sBout, abs(s));
+  float xo = xr;
+  vec2 n2 = vec2(0.0, 1.0);
+  if (dansU > 0.5 || auBout > 0.5) {
+    // le centre du coude : du côté des tubes droits qu'il referme
+    float sc = auBout > 0.5 ? sign(s) * sBout
+                            : kg * pas + (df < 0.0 ? -hw : hw);
+    vec2 rel = vec2(s - sc, t - tc);
+    xo = length(rel) - rU;
+    n2 = rel / max(length(rel), 1e-3);
+  }
+  float x = xo / rad;
+  // LA PLACE LIBRE : l'étiquette, puis la vanne, ne se posent que si leur
+  // bout lointain tombe encore sur du tube droit — sinon un coude les
+  // tranchait net (« NH » sans son 3). On regarde du côté où elles vont.
+  float posRep = (km + 0.5) * pas;
+  float droit = (1.0 - dansU) * (1.0 - auBout);
+
+  // le raccord : une bride boulonnée sur les tubes droits, des MANCHONS
+  // sombres de part et d'autre de chaque coude
+  float large = nh3Lisse(rad * 1.22, abs(xr), px);
+  float bride = nh3Lisse(4.0, abs(df), px) * large * (1.0 - coude);
+  float manchon = coude * nh3Lisse(3.0, abs(abs(df) - hw - 4.0), px) * large;
+  manchon = max(manchon, apparie * nh3Lisse(3.0, abs(abs(s) - sBout + 4.0), px) * large);
+  // un tube sans partenaire, lui, sort du mur par une bride
   float bout = min(s + L * 0.5, L * 0.5 - s);
-  bride = max(bride, nh3Lisse(5.0, bout, px) * nh3Lisse(rad * 1.22, abs(xr), px));
+  bride = max(bride, (1.0 - apparie) * nh3Lisse(5.0, bout, px) * large);
 
   float tube = nh3Lisse(1.0, abs(x), px / rad);
   if (tube > 0.0) {
     float nz = sqrt(max(1.0 - x * x, 0.0));
-    // la lumière vient d'en haut à gauche du tube : un cylindre, pas un aplat
-    float diff = 0.30 + 0.70 * max(dot(vec2(x, nz), normalize(vec2(-0.45, 0.9))), 0.0);
-    float spec = pow(max(1.0 - abs(x + 0.40) * 3.0, 0.0), 3.0);
-    vec3 acier = vec3(0.36, 0.48, 0.60) * diff + vec3(0.55, 0.65, 0.75) * spec * 0.6;
+    // la normale 3D du cylindre, ramenée dans le repère de la boîte : la
+    // lampe (en haut à gauche) éclaire le coude comme le tube droit
+    vec2 nl = horiz ? n2 : n2.yx;
+    vec3 N = vec3(nl * x, nz);
+    vec3 Lum = normalize(vec3(-0.40, 0.65, 0.65));
+    float diff = 0.30 + 0.70 * max(dot(N, Lum), 0.0);
+    float spec = pow(max(dot(N, normalize(Lum + vec3(0.0, 0.0, 1.0))), 0.0), 22.0);
+    vec3 acier = vec3(0.36, 0.48, 0.60) * diff + vec3(0.55, 0.65, 0.75) * spec * 0.7;
 
     // LE GIVRE : par plaques, plus épais sur le dessus et aux brides — le
     // tube ne se lit pas comme du métal bleu, mais comme du métal qui GÈLE
@@ -677,7 +729,7 @@ vec3 conduiteNH3(vec2 loc, vec2 bsize, float px, vec3 givreTex) {
     // le grain du givre, fondu au dézoom (sinon il scintille)
     float grain = mix(0.5, dnoise(vec2(s, xr) * 0.7), smoothstep(1.5, 0.6, px));
     vec3 blanc = vec3(0.82, 0.91, 0.99) * (0.30 + 0.80 * diff) * (0.88 + 0.24 * grain);
-    vec3 c = mix(acier, blanc, givre * 0.85);
+    vec3 c = mix(acier, blanc, givre * 0.80);
     // les CRISTAUX : des éclats en étoile sur le givre, qui scintillent —
     // fondus au dézoom (un pixel blanc qui clignote au loin, c'est de la
     // neige d'écran, pas du gel)
@@ -692,31 +744,36 @@ vec3 conduiteNH3(vec2 loc, vec2 bsize, float px, vec3 givreTex) {
     c += vec3(0.85, 0.94, 1.0) * etoile * step(0.90, h) * scint * givre * nz *
          smoothstep(0.9, 0.35, px);
 
-    // LE REPÈRE NH3 : anneau violet (les bases, NF X08-100) puis
-    // l'étiquette jaune — l'inscription « NH₃ » et ses chevrons, qui disent
-    // le sens du fluide. Le givre la mange à moitié : elle est posée là
-    // depuis longtemps, mais on la lit encore.
-    float bande = nh3Lisse(4.5, abs(dm), px);
+    // LE REPÈRE NH3 (sur les tubes droits) : anneau violet (les bases,
+    // NF X08-100) puis l'étiquette jaune — l'inscription « NH₃ » et ses
+    // chevrons, qui disent le sens du fluide. Le givre la mange à moitié :
+    // elle est posée là depuis longtemps, mais on la lit encore.
+    float bande = nh3Lisse(4.5, abs(dm), px) * droit;
     float a = dm * sens;
     // l'inscription n'a sa place que si le pas des repères la loge ; sinon
     // l'étiquette se réduit aux chevrons (les plots courts)
     float H = min(rad * 1.1, 14.0);
     float lTexte = 1.95 * H;
-    float avecTexte = step(10.0 + lTexte + 20.0, pas * 0.5 - 6.0);
+    float finTexte = 12.0 + lTexte + 3.0 + 16.0;
+    float avecTexte = step(finTexte, pas * 0.5) *
+                      nh3Droit(posRep + sens * finTexte, pas, L, hw, sBout, apparie);
     float a0 = 12.0 + avecTexte * (lTexte + 3.0);     // début des chevrons
     float fin = a0 + 16.0;
-    float etiq = nh3Lisse((fin - 7.0) * 0.5, abs(a - (fin + 7.0) * 0.5), px);
+    float etiqOk = step(fin, pas * 0.5) * nh3Droit(posRep + sens * fin, pas, L, hw, sBout, apparie);
+    float etiq = nh3Lisse((fin - 7.0) * 0.5, abs(a - (fin + 7.0) * 0.5), px) * droit * etiqOk;
     float v = a - a0 - abs(x) * rad * 0.9;
     float chev = nh3Lisse(1.8, abs(mod(v + 4.0, 8.0) - 4.0), px) *
                  nh3Lisse(0.8, abs(x), px / rad) * step(0.0, v + 2.0) * step(v, 14.0);
-    // le texte se lit toujours DANS LE BON SENS à l'écran : de gauche à
+    // le texte se lit toujours dans le même sens à l'écran : de gauche à
     // droite sur un tube couché, de bas en haut sur un tube debout — quel
-    // que soit le côté de l'anneau où tombe l'étiquette
+    // que soit le côté de l'anneau où tombe l'étiquette. Sur un tube
+    // debout, le haut des lettres regarde à GAUCHE (−xr) : une rotation ;
+    // +xr donnerait un reflet, « NH₃ » en miroir
     float u = sens > 0.0 ? dm - 10.0 : dm + 10.0 + lTexte;
-    float vg = xr;
+    float vg = horiz ? xr : -xr;
     float txt = avecTexte * nh3Lisse(0.075, nh3Texte(vec2(u, vg) / H + vec2(0.0, 0.41)), px / H);
     vec3 violet = vec3(0.50, 0.26, 0.78) * (0.45 + 0.65 * diff);
-    vec3 jaune = mix(vec3(0.95, 0.74, 0.16), vec3(0.08, 0.07, 0.06), max(chev, txt)) * (0.45 + 0.65 * diff);
+    vec3 jaune = mix(vec3(0.95, 0.74, 0.16), vec3(0.08, 0.07, 0.06), max(chev, txt) * etiqOk) * (0.45 + 0.65 * diff);
     float mange = 1.0 - 0.55 * givre;
     c = mix(c, violet, bande * mange);
     c = mix(c, jaune, etiq * (1.0 - bande) * (1.0 - 0.40 * givre));
@@ -726,17 +783,53 @@ vec3 conduiteNH3(vec2 loc, vec2 bsize, float px, vec3 givreTex) {
     col = mix(col, c, tube);
   }
 
-  if (bride > 0.0) {
-    // bague boulonnée : acier plus sombre, boulons, et un givre épais —
-    // les ponts thermiques gèlent en premier
+  float bague = max(bride, manchon);
+  if (bague > 0.0) {
+    // bride : acier boulonné ; manchon : bague sombre à liseré clair, comme
+    // un raccord à sertir. Givre épais : les ponts thermiques gèlent d'abord
     float xb = xr / (rad * 1.22);
     float nzb = sqrt(max(1.0 - xb * xb, 0.0));
-    vec3 b = vec3(0.26, 0.33, 0.42) * (0.35 + 0.75 * nzb);
-    float boulon = nh3Lisse(1.6, length(vec2(df, abs(xr) - rad * 0.95)), px);
+    float db = manchon > bride ? min(abs(abs(df) - hw - 4.0), abs(abs(s) - sBout + 4.0)) : df;
+    vec3 b = manchon > bride
+      ? vec3(0.13, 0.16, 0.20) * (0.45 + 0.85 * nzb) + vec3(0.30, 0.36, 0.42) * nh3Lisse(0.9, abs(abs(db) - 2.2), px)
+      : vec3(0.26, 0.33, 0.42) * (0.35 + 0.75 * nzb);
+    float boulon = nh3Lisse(1.6, length(vec2(db, abs(xr) - rad * 0.95)), px) * step(manchon, bride);
     b = mix(b, vec3(0.62, 0.70, 0.78), boulon);
     float gb = smoothstep(0.35, 0.65, dnoise(vec2(s * 0.3, xr * 0.3)));
-    b = mix(b, vec3(0.86, 0.94, 1.0) * (0.6 + 0.4 * nzb), gb * 0.7);
-    col = mix(col, b, bride);
+    b = mix(b, vec3(0.86, 0.94, 1.0) * (0.6 + 0.4 * nzb), gb * 0.55);
+    col = mix(col, b, bague);
+  }
+
+  // LES VANNES : un volant rouge ou jaune, vu de dessus, posé sur un corps
+  // de vanne — la touche de couleur qui dit « installation », pas « tube ».
+  // Une sur deux environ, du côté du repère OPPOSÉ à l'étiquette (l'aller
+  // et le retour d'une paire ont leurs étiquettes de part et d'autre).
+  float Rw = min(min(rad * 1.25, lw * 0.47), 17.0);
+  float hv = hash21(vec2(km, i) + 31.7);
+  float vanneOk = step(32.0 + Rw + 2.0, pas * 0.5) *
+                  nh3Droit(posRep - sens * (32.0 + Rw + 2.0), pas, L, hw, sBout, apparie);
+  if (droit > 0.5 && vanneOk > 0.5 && hv > 0.45) {
+    vec2 pv = vec2(dm + sens * 32.0, xr);
+    // le corps : un bloc plus large que le tube, et son ombre
+    col *= 1.0 - 0.45 * nh3Lisse(Rw * 1.05, length(pv + vec2(-2.5, 3.0)), px);
+    float corps = nh3Lisse(rad * 0.55, abs(pv.x), px) * nh3Lisse(rad * 1.30, abs(pv.y), px);
+    col = mix(col, vec3(0.20, 0.25, 0.31) * (0.7 + 0.3 * sign(pv.y)), corps);
+    // le volant : jante, quatre rayons, moyeu — droit dans le repère boîte
+    vec2 pw = horiz ? pv : pv.yx;
+    float r = length(pw) / Rw;
+    float jante = nh3Lisse(0.13, abs(r - 0.80), px / Rw);
+    float ray = min(abs(pw.x + pw.y), abs(pw.x - pw.y)) * 0.7071 / Rw;
+    float rayons = nh3Lisse(0.07, ray, px / Rw) * step(r, 0.82);
+    float moyeu = nh3Lisse(0.22, r, px / Rw);
+    float volant = max(max(jante, rayons), moyeu);
+    vec3 teinte = hash21(vec2(km, i) + 7.1) > 0.5 ? vec3(0.86, 0.16, 0.12) : vec3(0.96, 0.74, 0.14);
+    // un relief simple : clair en haut à gauche, sombre en bas à droite
+    float relief = 0.75 + 0.35 * dot(normalize(pw + 1e-3), normalize(vec2(-0.6, 0.8))) * step(0.3, r);
+    vec3 vcol = teinte * relief;
+    vcol = mix(vcol, vec3(0.92, 0.92, 0.88), moyeu * 0.55);
+    // même la vanne prend le givre, par points
+    vcol = mix(vcol, vec3(0.86, 0.94, 1.0), 0.35 * smoothstep(0.55, 0.8, dnoise(pw * 0.4 + km)));
+    col = mix(col, vcol, volant);
   }
 
   // LE MANOMÈTRE : au milieu, s'il y a la place — cadran blanc, secteur
