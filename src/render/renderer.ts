@@ -640,7 +640,11 @@ float nh3Droit(float s, float pas, float L, float hw, float sPos, float sNeg) {
   return 1.0 - coude * step(abs(s - k * pas), hw + 8.0);
 }
 
-vec3 conduiteNH3(vec2 loc, vec2 bsize, float px, vec3 givreTex) {
+// Rend la conduite SEULE, en couleur prémultipliée (rgb) et couverture
+// (a) : là où il n'y a pas de tube, on voit le sol de la salle — la
+// silhouette est celle de la tuyauterie, plus celle d'une boîte. fondK :
+// l'ombre que la conduite porte sur ce sol (à multiplier au fond).
+vec4 conduiteNH3(vec2 loc, vec2 bsize, float px, vec3 givreTex, out float fondK) {
   bool horiz = bsize.x >= bsize.y;
   float L = horiz ? bsize.x : bsize.y;
   float T = horiz ? bsize.y : bsize.x;
@@ -649,7 +653,9 @@ vec3 conduiteNH3(vec2 loc, vec2 bsize, float px, vec3 givreTex) {
 
   // LE SUPPORT : une semelle d'acier sombre sous les tubes, givrée
   float lg = dot(givreTex, vec3(0.299, 0.587, 0.114));
-  vec3 col = vec3(0.050, 0.075, 0.105) * (0.75 + 0.9 * lg);
+  vec3 col = vec3(0.0);
+  float a = 0.0;
+  fondK = 1.0;
 
   // LES TUBES : un par tranche de ~34 u d'épaisseur, 1 à 4
   float n = clamp(floor(T / 34.0 + 0.5), 1.0, 4.0);
@@ -810,22 +816,11 @@ vec3 conduiteNH3(vec2 loc, vec2 bsize, float px, vec3 givreTex) {
   float bout = L * 0.5 - sp;
   bride = max(bride, step(2.5, modeBout) * nh3Lisse(5.0, bout, px) * large);
 
-  // LA CONGÈRE : là où le tube tourne, la boîte reste carrée — les coins
-  // qu'il laisse montraient la semelle NOIRE, des trous dans le dessin. Le
-  // givre s'y est tassé : plus on s'éloigne du tube, plus il est épais et
-  // clair ; au pied du tube, une ombre de contact. Les fines lignes entre
-  // deux tubes parallèles (3 u) restent sombres : elles les détachent.
+  // L'OMBRE DE CONTACT : le tube pose sur le sol, une ombre douce l'y
+  // colle. (Avant : une semelle sombre remplissait la boîte, puis une
+  // congère de givre — la boîte se voyait toujours, un bloc carré.)
   float vide = abs(xo) - rad;
-  float neige = smoothstep(2.5, 10.0, vide);
-  if (neige > 0.0) {
-    float n1 = dnoise(loc * 0.09);
-    float n2 = mix(0.5, dnoise(loc * 0.45), smoothstep(1.5, 0.6, px));
-    vec3 congere = vec3(0.56, 0.68, 0.80) * (0.78 + 0.30 * n1 + 0.14 * n2);
-    // une croûte plus claire au sommet de la congère (loin du tube)
-    congere += vec3(0.10, 0.12, 0.14) * smoothstep(8.0, 22.0, vide);
-    float ao = smoothstep(2.0, 12.0, vide);
-    col = mix(col, congere * (0.50 + 0.50 * ao), neige);
-  }
+  fondK *= mix(0.45, 1.0, smoothstep(0.0, 10.0, vide));
 
   float tube = nh3Lisse(1.0, abs(x), px / rad);
   if (tube > 0.0) {
@@ -901,6 +896,7 @@ vec3 conduiteNH3(vec2 loc, vec2 bsize, float px, vec3 givreTex) {
     // l'ombre de contact au bord du tube : il se détache de la semelle
     c *= 0.55 + 0.45 * smoothstep(0.0, 0.35, nz);
     col = mix(col, c, tube);
+    a += tube * (1.0 - a);
   }
 
   float bague = max(bride, manchon);
@@ -929,6 +925,7 @@ vec3 conduiteNH3(vec2 loc, vec2 bsize, float px, vec3 givreTex) {
     float gb = smoothstep(0.35, 0.65, dnoise(vec2(s * 0.3, xr * 0.3)));
     b = mix(b, vec3(0.86, 0.94, 1.0) * (0.6 + 0.4 * nzb), gb * 0.55);
     col = mix(col, b, bague);
+    a += bague * (1.0 - a);
   }
 
   // LES VANNES : un volant rouge ou jaune, vu de dessus, posé sur un corps
@@ -942,9 +939,12 @@ vec3 conduiteNH3(vec2 loc, vec2 bsize, float px, vec3 givreTex) {
   if (droit > 0.5 && vanneOk > 0.5 && hv > 0.45) {
     vec2 pv = vec2(dm + sens * 32.0, xr);
     // le corps : un bloc plus large que le tube, et son ombre
-    col *= 1.0 - 0.45 * nh3Lisse(Rw * 1.05, length(pv + vec2(-2.5, 3.0)), px);
+    float ov = 1.0 - 0.45 * nh3Lisse(Rw * 1.05, length(pv + vec2(-2.5, 3.0)), px);
+    col *= ov;
+    fondK *= ov;
     float corps = nh3Lisse(rad * 0.55, abs(pv.x), px) * nh3Lisse(rad * 1.30, abs(pv.y), px);
     col = mix(col, vec3(0.20, 0.25, 0.31) * (0.7 + 0.3 * sign(pv.y)), corps);
+    a += corps * (1.0 - a);
     // le volant : jante, quatre rayons, moyeu — droit dans le repère boîte
     vec2 pw = horiz ? pv : pv.yx;
     float r = length(pw) / Rw;
@@ -961,6 +961,7 @@ vec3 conduiteNH3(vec2 loc, vec2 bsize, float px, vec3 givreTex) {
     // même la vanne prend le givre, par points
     vcol = mix(vcol, vec3(0.86, 0.94, 1.0), 0.35 * smoothstep(0.55, 0.8, dnoise(pw * 0.4 + km)));
     col = mix(col, vcol, volant);
+    a += volant * (1.0 - a);
   }
 
   // LE MANOMÈTRE : au milieu, s'il y a la place — cadran blanc, secteur
@@ -971,7 +972,9 @@ vec3 conduiteNH3(vec2 loc, vec2 bsize, float px, vec3 givreTex) {
     vec2 q = loc - bsize * 0.5;
     float r = length(q) / R;
     // l'ombre portée du boîtier
-    col *= 1.0 - 0.55 * nh3Lisse(1.18, length(q + vec2(-3.0, 4.0)) / R, px / R);
+    float og = 1.0 - 0.55 * nh3Lisse(1.18, length(q + vec2(-3.0, 4.0)) / R, px / R);
+    col *= og;
+    fondK *= og;
     float boitier = nh3Lisse(1.0, r, px / R);
     if (boitier > 0.0) {
       float ang = atan(q.x, q.y);                    // 0 en haut, sens horaire
@@ -1022,12 +1025,13 @@ vec3 conduiteNH3(vec2 loc, vec2 bsize, float px, vec3 givreTex) {
                 smoothstep(0.4, 0.8, dnoise(q * 0.2 + uTime * 0.05)));
       vec3 g = mix(cad, lunette, lun);
       col = mix(col, g, boitier);
+      a += boitier * (1.0 - a);
     }
   }
   // un voile de froid qui roule sur les tubes, lentement
   float voile = dnoise(loc * 0.018 + vec2(uTime * 0.10, -uTime * 0.04));
-  col += vec3(0.55, 0.70, 0.85) * smoothstep(0.55, 0.9, voile) * 0.10;
-  return col;
+  col += vec3(0.55, 0.70, 0.85) * smoothstep(0.55, 0.9, voile) * 0.10 * a;
+  return vec4(col, a);
 }
 
 // LA BRUME : hors de la boîte, des bouffées de vapeur froide qui
@@ -1846,7 +1850,8 @@ void main() {
     // Ombre portée douce autour de chaque solide (sauf le sas) : les blocs
     // se détachent du fond au lieu de flotter — la cuve prend de la
     // profondeur, les rectangles cessent d'être des aplats.
-    if (solide) {
+    // (sauf la conduite d'ammoniac : son ombre suit ses tubes, pas la boîte)
+    if (solide && !(mat > 3.5 && mat < 4.5)) {
       float shade = 1.0 - smoothstep(0.0, 56.0, max(d, 0.0));
       col = mix(col, col * vec3(0.50, 0.56, 0.70), shade * shade * 0.5);
     }
@@ -1855,7 +1860,7 @@ void main() {
     // sommet, strates et chant clair — chaque matériau garde son identité
     // sur sa tranche : turquoise mouillé, violet cireux, vert de membrane,
     // ambre de borne… Le sommet (déplacé) se peint ensuite par-dessus.
-    if (flanc > 0.003) {
+    if (flanc > 0.003 && !(mat > 3.5 && mat < 4.5)) { // la conduite n'a pas de tranche de boîte
       vec2 gB = gradSdfBoite(bi, wb, d, dec, bca, bsa);
       float gn2 = max(length(gB), 1e-5);
       vec2 nrm = gB / gn2;
@@ -2197,10 +2202,18 @@ void main() {
       vec2 bmin = uBoxes[bi].xy;
       vec2 bsize = max(uBoxes[bi].zw - bmin, vec2(1.0));
       vec3 givreTex = uHasFroid > 0.5 ? texFroidC : vec3(0.35);
-      vec3 fillCol = conduiteNH3(clamp(wbV - bmin, vec2(0.0), bsize), bsize, pxMonde, givreTex);
-      col = mix(col, fillCol * eclMat, fill);
-      col = mix(col, vec3(0.70, 0.86, 0.97), edge * 0.45);
-      col += brumeNH3(wb, max(d, 0.0), uColdBand) * step(0.0, d);
+      // SEULS les tubes se peignent : entre eux et dans les coins, le sol
+      // de la salle, avec l'ombre que la conduite y pose. Ni fond, ni
+      // liseré, ni ombre carrée — la boîte ne se voit plus, la tuyauterie
+      // si. (La collision, elle, reste la boîte.)
+      float ombreSol;
+      vec4 cnh = conduiteNH3(clamp(wbV - bmin, vec2(0.0), bsize), bsize, pxMonde, givreTex, ombreSol);
+      col *= mix(1.0, ombreSol, fill);
+      col = col * (1.0 - fill * cnh.a) + cnh.rgb * eclMat * fill;
+      // la brume : dehors, et plus légère entre les tubes ; jamais sur un
+      // AUTRE solide (elle se peignait sur la conduite voisine, délavée)
+      float hors = (1.0 - fill * cnh.a) * ((iCouv == bi || dCouv > 0.0) ? 1.0 : 0.0);
+      col += brumeNH3(wb, max(d, 0.0), uColdBand) * hors * (d > 0.0 ? 1.0 : 0.6);
     } else {
       // Sas de sortie : une bouche d'aspiration — un trou dans lequel l'eau
       // s'engouffre. Gorge sombre, œil noir, anneau qui respire, et stries
@@ -2986,6 +2999,17 @@ float sceneSdf(vec2 p, float alt) {
       float ca = cos(ang);
       float sa = sin(ang);
       wb = bc + vec2(ca * rel.x + sa * rel.y, -sa * rel.x + ca * rel.y);
+    }
+    // la CONDUITE D'AMMONIAC ombre comme ses tubes, pas comme sa boîte : un
+    // rectangle aux coins arrondis du rayon des coudes. L'ombre carrée
+    // trahissait le bloc que le dessin (conduiteNH3) s'applique à cacher.
+    if (dec.x > 3.5 && dec.x < 4.5 && dec.y < 0.5) {
+      vec2 bc = 0.5 * (uBoxes[i].xy + uBoxes[i].zw);
+      vec2 hb = max(0.5 * (uBoxes[i].zw - uBoxes[i].xy) - 2.0, vec2(1.0));
+      float r = min(min(hb.x, hb.y), 30.0);
+      vec2 q = abs(wb - bc) - hb + r;
+      d = min(d, length(max(q, 0.0)) + min(max(q.x, q.y), 0.0) - r);
+      continue;
     }
     d = min(d, formeSdf(wb, uBoxes[i], dec.y, dec.z, dec.w));
   }
