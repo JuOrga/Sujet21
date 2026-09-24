@@ -17,6 +17,13 @@ export const FORME_ARC = 4 // arc d'anneau centré (p0 = épaisseur 0..1, p1 = d
 // d'OUVERTURES centrées sur les côtés qu'on désigne. Épaisse au point de se
 // refermer, elle devient un octogone PLEIN — c'est la même forme, remplie.
 export const FORME_COQUE = 5
+// LA CONDUITE D'AMMONIAC (plaque froide) : un tuyau givré, ses brides de
+// bout et ses joints — l'UNION des rectangles que dessine l'atlas (voir
+// CONDUITE plus bas). Jamais choisie à l'éditeur ni sérialisée : conduite.ts
+// la pose sur toute plaque froide rectangulaire au chargement, pour que la
+// collision soit EXACTEMENT ce que l'on voit — ni la boîte (des coins durs
+// sur du sol visible), ni une pilule (qui ne connaît pas les brides).
+export const FORME_CONDUITE = 6
 
 export const FORME_NAMES: Record<number, string> = {
   [FORME_RECT]: 'Rectangle',
@@ -179,6 +186,138 @@ function rectContactAxe(
   out.dist = -pen
   out.nx = nx
   out.ny = ny
+}
+
+// ---- La conduite d'ammoniac : ses pièces --------------------------------------
+
+/** Les proportions des images de la conduite (tools/images/conduite_atlas.py),
+ *  en fraction de l'ÉPAISSEUR T du bloc — la bride en fait toute la largeur.
+ *  Mesurées sur les images générées ; le shader les reçoit TELLES QUELLES
+ *  (renderer.ts les interpole dans son GLSL) : une seule vérité. Une
+ *  nouvelle image impose de les remesurer. */
+export const CONDUITE = {
+  /** demi-épaisseur du tuyau, givre compris (la collision) */
+  tuyau: 0.28,
+  /** demi-hauteur du tronçon dessiné (frange et stalactites comprises) */
+  bandeCorps: 0.309,
+  /** longueur d'un motif de tronçon, répété en miroir */
+  motif: 1.856,
+  /** longueur de la pièce de bout (image), et sa demi-hauteur */
+  bout: 0.888,
+  boutDemiH: 0.512,
+  /** la bride de bout, comptée depuis le bout du bloc */
+  brideDe: 0.167,
+  brideA: 0.744,
+  /** l'embout s'arrête juste avant le bout */
+  embout: 0.023,
+  /** le joint à brides : demi-longueur de l'image, haut et bas de l'image
+   *  autour de l'axe, demi-longueur de ses brides */
+  jointDemi: 0.698,
+  jointHaut: 0.557,
+  jointBas: 0.574,
+  brideJoint: 0.322,
+  /** l'écart entre deux joints sur une longue conduite (unités monde) */
+  pas: 280,
+} as const
+
+/** Les cadres des quatre pièces dans l'atlas conduite-atlas.webp :
+ *  [x, y, largeur, hauteur] en pixels depuis le coin HAUT-gauche. JUMEAUX
+ *  de tools/images/conduite_atlas.py (vérifié par conduite.spec.ts). */
+export const CONDUITE_ATLAS = {
+  taille: 1024,
+  corps: [0, 0, 1024, 341],
+  bout: [0, 350, 370, 426],
+  joint: [380, 350, 451, 365],
+  givre: [384, 720, 608, 304],
+} as const
+
+/** Une conduite est LONGUE si ses deux pièces de bout y tiennent ; sinon,
+ *  c'est un plot : un seul joint au milieu. */
+export function conduiteLongue(L: number, T: number): boolean {
+  return L >= (2 * CONDUITE.bout + 0.1) * T
+}
+
+/** Les joints d'une conduite, en abscisse le long du bloc (centrée) : un tous
+ *  les `pas` tant qu'ils restent à l'écart des pièces de bout ; au milieu,
+ *  seul, sur un plot. */
+export function jointsConduite(L: number, T: number): number[] {
+  if (!conduiteLongue(L, T)) return [0]
+  const libre = L / 2 - (CONDUITE.bout + 0.05 + CONDUITE.jointDemi) * T
+  const out: number[] = []
+  const n = Math.floor(libre / CONDUITE.pas)
+  for (let k = -n; k <= n; k++) out.push(k * CONDUITE.pas)
+  return out
+}
+
+/** Les rectangles pleins de la conduite, en repère local (s le long, t en
+ *  travers, centrés) : [s0, s1, demi-épaisseur]. Le tuyau, les brides de
+ *  bout, les brides des joints — leur union est la forme. */
+export function piecesConduite(L: number, T: number): [number, number, number][] {
+  const C = CONDUITE
+  const longue = conduiteLongue(L, T)
+  const bout = longue ? L / 2 - C.embout * T : L / 2
+  const out: [number, number, number][] = [[-bout, bout, C.tuyau * T]]
+  if (longue) {
+    out.push([L / 2 - C.brideA * T, L / 2 - C.brideDe * T, T / 2])
+    out.push([-L / 2 + C.brideDe * T, -L / 2 + C.brideA * T, T / 2])
+  }
+  for (const j of jointsConduite(L, T)) {
+    out.push([Math.max(-L / 2, j - C.brideJoint * T), Math.min(L / 2, j + C.brideJoint * T), T / 2])
+  }
+  return out
+}
+
+function conduiteContactAxe(
+  x: number,
+  y: number,
+  b: { minX: number; minY: number; maxX: number; maxY: number },
+  out: FormeContact,
+): void {
+  const w = b.maxX - b.minX
+  const h = b.maxY - b.minY
+  const horiz = w >= h
+  const L = horiz ? w : h
+  const T = horiz ? h : w
+  const px = x - (b.minX + b.maxX) / 2
+  const py = y - (b.minY + b.maxY) / 2
+  const s = horiz ? px : py
+  const t = horiz ? py : px
+  // l'union : le plus proche des rectangles l'emporte, sa normale avec
+  let best = Infinity
+  let ns = 0
+  let nt = 1
+  for (const [s0, s1, e] of piecesConduite(L, T)) {
+    const cs = (s0 + s1) / 2
+    const hs = (s1 - s0) / 2
+    const qs = Math.abs(s - cs) - hs
+    const qt = Math.abs(t - 0) - e
+    let d: number
+    let gs: number
+    let gt: number
+    if (qs > 0 || qt > 0) {
+      const as = Math.max(qs, 0)
+      const at = Math.max(qt, 0)
+      d = Math.hypot(as, at)
+      gs = d > 1e-9 ? (as / d) * Math.sign(s - cs || 1) : 0
+      gt = d > 1e-9 ? (at / d) * Math.sign(t || 1) : 1
+    } else if (qs > qt) {
+      d = qs
+      gs = Math.sign(s - cs || 1)
+      gt = 0
+    } else {
+      d = qt
+      gs = 0
+      gt = Math.sign(t || 1)
+    }
+    if (d < best) {
+      best = d
+      ns = gs
+      nt = gt
+    }
+  }
+  out.dist = best
+  out.nx = horiz ? ns : nt
+  out.ny = horiz ? nt : ns
 }
 
 // ---- Les nouvelles formes (repère local, boîte déjà dépivotée) -------------
@@ -770,6 +909,9 @@ function formeContactAxe(
       return
     case FORME_COQUE:
       coqueContactAxe(x, y, b, out)
+      return
+    case FORME_CONDUITE:
+      conduiteContactAxe(x, y, b, out)
       return
     default:
       rectContactAxe(x, y, b, out)

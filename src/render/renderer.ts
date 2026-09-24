@@ -23,6 +23,8 @@ import {
   FORME_COIN,
   FORME_RECT,
   FORME_COQUE,
+  CONDUITE,
+  CONDUITE_ATLAS,
 } from '../game/formes'
 import type { Camera } from './camera'
 import { VIE_STRIDE } from './vie'
@@ -141,6 +143,79 @@ void main() {
 // exacts en float32, zéro uniforme de plus (le budget mobile est déjà plein).
 // q0 : orientation du coin (0..3) ou épaisseur d'arc ×100 ; q1 : demi-
 // ouverture d'arc en degrés + 256·bouts (0 ronds, 1 droits, 2 pointe).
+// LA CONDUITE D'AMMONIAC : sa disposition (tuyau, brides de bout, joints),
+// sa FORME (l'union de ces pièces) et les cadres de son atlas — ÉCRITS
+// depuis CONDUITE et CONDUITE_ATLAS (game/formes.ts), la vérité unique que
+// lit aussi la physique. Injecté dans la composition (le dessin, la brume,
+// le sol) et dans le cuiseur de lumière (l'ombre des lampes).
+const CONDUITE_GLSL = (() => {
+  const C = CONDUITE
+  const A = CONDUITE_ATLAS
+  const f = (x: number) => (Number.isInteger(x) ? `${x}.0` : `${x}`)
+  const v4 = (r: readonly number[]) => `vec4(${r.map(f).join(', ')})`
+  return `
+const float CN_TUYAU = ${f(C.tuyau)};
+const float CN_BANDE = ${f(C.bandeCorps)};
+const float CN_MOTIF = ${f(C.motif)};
+const float CN_BOUT = ${f(C.bout)};
+const float CN_BOUT_H = ${f(C.boutDemiH)};
+const float CN_BRIDE_DE = ${f(C.brideDe)};
+const float CN_BRIDE_A = ${f(C.brideA)};
+const float CN_EMBOUT = ${f(C.embout)};
+const float CN_JOINT_DEMI = ${f(C.jointDemi)};
+const float CN_JOINT_HAUT = ${f(C.jointHaut)};
+const float CN_JOINT_BAS = ${f(C.jointBas)};
+const float CN_BRIDE_JOINT = ${f(C.brideJoint)};
+const float CN_PAS = ${f(C.pas)};
+const float CN_ATLAS = ${f(A.taille)};
+const vec4 CN_CORPS = ${v4(A.corps)};
+const vec4 CN_CADRE_BOUT = ${v4(A.bout)};
+const vec4 CN_CADRE_JOINT = ${v4(A.joint)};
+const vec4 CN_CADRE_GIVRE = ${v4(A.givre)};
+
+bool conduiteLongue(float L, float T) { return L >= (2.0 * CN_BOUT + 0.1) * T; }
+
+float cnRect(float s, float t, float cs, float hs, float ht) {
+  vec2 q = vec2(abs(s - cs) - hs, abs(t) - ht);
+  return length(max(q, 0.0)) + min(max(q.x, q.y), 0.0);
+}
+
+// le joint le plus proche de s (abscisse centrée), ou 1e9 s'il n'y en a pas
+float jointPres(float s, float L, float T) {
+  if (!conduiteLongue(L, T)) return 0.0;
+  float n = floor((L * 0.5 - (CN_BOUT + 0.05 + CN_JOINT_DEMI) * T) / CN_PAS);
+  if (n < 0.0) return 1e9;
+  return clamp(floor(s / CN_PAS + 0.5), -n, n) * CN_PAS;
+}
+
+// distance signée à la conduite (l'union du tuyau et de ses brides), en
+// repère local centré : s le long, t en travers
+float conduiteSdfLocal(float s, float t, float L, float T) {
+  bool lg = conduiteLongue(L, T);
+  float d = cnRect(s, t, 0.0, lg ? L * 0.5 - CN_EMBOUT * T : L * 0.5, CN_TUYAU * T);
+  if (lg) {
+    d = min(d, cnRect(abs(s), t, L * 0.5 - (CN_BRIDE_A + CN_BRIDE_DE) * 0.5 * T,
+                      (CN_BRIDE_A - CN_BRIDE_DE) * 0.5 * T, 0.5 * T));
+  }
+  float sj = jointPres(s, L, T);
+  if (sj < 1e8) {
+    float a0 = max(-L * 0.5, sj - CN_BRIDE_JOINT * T);
+    float a1 = min(L * 0.5, sj + CN_BRIDE_JOINT * T);
+    d = min(d, cnRect(s, t, 0.5 * (a0 + a1), 0.5 * (a1 - a0), 0.5 * T));
+  }
+  return d;
+}
+
+float conduiteSdf(vec2 p, vec4 box) {
+  vec2 sz = box.zw - box.xy;
+  vec2 q = p - 0.5 * (box.xy + box.zw);
+  bool horiz = sz.x >= sz.y;
+  return conduiteSdfLocal(horiz ? q.x : q.y, horiz ? q.y : q.x,
+                          horiz ? sz.x : sz.y, horiz ? sz.y : sz.x);
+}
+`
+})()
+
 const FORMES_GLSL = `
 float cote2(vec2 a, vec2 b, vec2 p) { // de quel côté de (a→b) tombe p
   return (b.x - a.x) * (p.y - a.y) - (b.y - a.y) * (p.x - a.x);
@@ -420,7 +495,7 @@ uniform vec2 uParCuve;   // la paroi de cuve, derrière l'eau
 uniform sampler2D uTexTank; // fond de cuve : panneaux, conduites, liserés
 uniform sampler2D uTexWall;
 uniform sampler2D uTexWallA; // seconde paroi : les murs alternent, sans répétition visible
-uniform sampler2D uTexFroid;
+uniform sampler2D uTexFroid; // l’atlas de la conduite d’ammoniac (tronçon, bride, joint, givre)
 uniform sampler2D uTexChaud;
 uniform sampler2D uTexGrille;
 uniform sampler2D uTexPhobe;
@@ -598,102 +673,93 @@ float smoothField(vec2 p) {
   return 0.5 + 0.25 * (a + b);
 }
 
+${CONDUITE_GLSL}
 // ——— LA CONDUITE D'AMMONIAC (plaque froide) ————————————————————————————
-// UN SEUL tuyau givré à −40 °C, couché dans le sens long de la boîte, du
-// diamètre de son épaisseur, fermé par deux calottes : sa silhouette est
-// une pilule — exactement la forme physique (FORME_CAPSULE, conduite.ts).
-// Tout se règle sur la BOÎTE, pas sur la grille du monde : les anneaux et
-// les brides tombent symétriques autour du milieu.
+// Un tuyau givré, ses brides de bout et ses joints, lus dans l'atlas
+// conduite-atlas.webp (tools/images/conduite_atlas.py) — quatre images
+// générées : le tronçon, la bride de bout, le joint, le givre du sol. Tout
+// se cale sur la BOÎTE : la bride en fait toute la largeur, le tuyau un peu
+// plus de la moitié ; la forme physique (FORME_CONDUITE) est l'union de ces
+// mêmes pièces, aux mêmes proportions (CONDUITE, game/formes.ts).
 float nh3Lisse(float bord, float x, float px) {
   return 1.0 - smoothstep(bord - px, bord + px, x);
 }
 
-// LA FORME de la conduite : une pilule (rectangle aux coins arrondis de la
-// demi-épaisseur). JUMEAU de la CAPSULE (formes.ts, posée par conduite.ts) :
-// la physique arrête l'eau exactement là où l'on voit le tuyau.
-float rayonConduite(vec2 bsize) {
-  return 0.5 * min(bsize.x, bsize.y);
+// Un cadre de l'atlas, lu en (x, y) : fractions du cadre depuis son coin
+// HAUT-gauche. ppw : pixels d'atlas par unité monde — le niveau de détail
+// est écrit à la main (textureGrad) : le miroir du tronçon et les bords de
+// cadre cassent les dérivées d'écran. Hors du cadre : rien.
+vec4 atlasCadre(vec4 cadre, vec2 f, float px, float ppw) {
+  if (f.x < 0.0 || f.x > 1.0 || f.y < 0.0 || f.y > 1.0) return vec4(0.0);
+  vec2 pa = cadre.xy + clamp(f * cadre.zw, vec2(0.5), cadre.zw - 0.5);
+  vec2 uv = vec2(pa.x, CN_ATLAS - pa.y) / CN_ATLAS; // téléversé avec FLIP_Y
+  float g = px * ppw / CN_ATLAS;
+  vec4 c = textureGrad(uTexFroid, uv, vec2(g, 0.0), vec2(0.0, g));
+  return vec4(c.rgb * c.a, c.a); // prémultiplié
 }
 
-float conduiteSdf(vec2 p, vec4 box) {
-  vec2 hb = 0.5 * (box.zw - box.xy);
-  float r = min(rayonConduite(2.0 * hb), min(hb.x, hb.y));
-  vec2 q = abs(p - 0.5 * (box.xy + box.zw)) - hb + r;
-  return length(max(q, 0.0)) + min(max(q.x, q.y), 0.0) - r;
+vec4 cnSur(vec4 dessous, vec4 dessus) {
+  return dessus + dessous * (1.0 - dessus.a);
+}
+
+// L'ombre que la conduite porte sur le sol, à multiplier au fond — calculée
+// PARTOUT autour d'elle depuis sa forme, pas seulement dans sa boîte : les
+// brides touchent le bord de la boîte, leur ombre coupée net au bord
+// redessinait le rectangle.
+float conduiteOmbre(vec2 p, vec4 box) {
+  vec2 sz = box.zw - box.xy;
+  float T = min(sz.x, sz.y);
+  return mix(0.45, 1.0, smoothstep(0.0, 3.0 + 0.12 * T, conduiteSdf(p, box)));
 }
 
 // Rend la conduite SEULE, en couleur prémultipliée (rgb) et couverture
-// (a) : autour du tuyau, on voit le sol de la salle — la silhouette est
-// celle du tuyau, pas d'une boîte. fondK : l'ombre qu'il porte sur ce sol
-// (à multiplier au fond).
-vec4 conduiteNH3(vec2 loc, vec2 bsize, float px, vec3 givreTex, out float fondK) {
+// (a) : autour d'elle, on voit le sol de la salle.
+vec4 conduiteNH3(vec2 loc, vec2 bsize, float px) {
   bool horiz = bsize.x >= bsize.y;
   float L = horiz ? bsize.x : bsize.y;
   float T = horiz ? bsize.y : bsize.x;
   float s = (horiz ? loc.x : loc.y) - L * 0.5; // le long, centré
   float t = (horiz ? loc.y : loc.x) - T * 0.5; // en travers, centré
-  float lg = dot(givreTex, vec3(0.299, 0.587, 0.114));
-  vec3 col = vec3(0.0);
-  float a = 0.0;
-  fondK = 1.0;
+  bool lg = conduiteLongue(L, T);
 
-  // LE TUYAU : le rayon est la demi-épaisseur (un rien en retrait, pour
-  // que le liseré d'antialiasing reste dans la forme physique). Le droit
-  // va de −sD à +sD ; au-delà, une calotte : l'écart au tracé est la
-  // distance au segment, sa direction donne la normale — le même cylindre
-  // qui s'arrondit en demi-sphère au bout.
-  float rad = max(T * 0.5 - 0.75, 1.0);
-  float sD = max(L * 0.5 - T * 0.5, 0.0);
-  float sg = s < 0.0 ? -1.0 : 1.0;
-  vec2 q = vec2(sg * max(abs(s) - sD, 0.0), t);
-  float xo = length(q);
-  vec2 n2 = q / max(xo, 1e-3);
-  float x = xo / rad;
-  float droit = step(abs(s), sD);
-  // l'échelle des ornements : ils grandissent avec le tuyau (un tuyau de
-  // 120 u ne porte pas les bagues d'un tuyau de 16)
-  float k = clamp(rad / 14.0, 0.6, 2.4);
-  float kl = clamp(rad / 14.0, 0.6, 1.4);         // celle des anneaux et vannes
+  vec4 acc = vec4(0.0);
+  // LE TRONÇON, répété EN MIROIR sur la longueur (l'image n'est pas
+  // raccordable bord à bord : mesuré, 31 contre 8 à l'intérieur)
+  float hb = CN_BANDE * T;
+  float fin = lg ? L * 0.5 - CN_EMBOUT * T : L * 0.5;
+  if (abs(t) < hb && abs(s) < fin) {
+    float m = s / (CN_MOTIF * T);
+    float tri = abs(fract(m * 0.5) * 2.0 - 1.0);
+    acc = atlasCadre(CN_CORPS, vec2(tri, (hb - t) / (2.0 * hb)), px, CN_CORPS.w / (2.0 * hb));
+  }
+  // LES BOUTS : la bride et son embout ; à gauche, l'image en miroir. Le
+  // côté tuyau de l'image se fond dans le tronçon.
+  if (lg) {
+    float sp = abs(s);
+    float s0 = L * 0.5 - CN_BOUT * T;
+    if (sp > s0) {
+      vec2 f = vec2((sp - s0) / (CN_BOUT * T), (CN_BOUT_H * T - t) / (2.0 * CN_BOUT_H * T));
+      vec4 c = atlasCadre(CN_CADRE_BOUT, f, px, CN_CADRE_BOUT.w / (2.0 * CN_BOUT_H * T));
+      acc = cnSur(acc, c * smoothstep(0.0, 0.16, f.x));
+    }
+  }
+  // LE JOINT à brides : sur un plot, seul au milieu ; ailleurs, tous les pas
+  float sj = jointPres(s, L, T);
+  if (sj < 1e8) {
+    float dx = s - sj;
+    vec2 f = vec2((dx + CN_JOINT_DEMI * T) / (2.0 * CN_JOINT_DEMI * T),
+                  (CN_JOINT_HAUT * T - t) / ((CN_JOINT_HAUT + CN_JOINT_BAS) * T));
+    vec4 c = atlasCadre(CN_CADRE_JOINT, f, px, CN_CADRE_JOINT.w / ((CN_JOINT_HAUT + CN_JOINT_BAS) * T));
+    // sur une longue conduite, les bouts du joint se fondent dans le tronçon
+    float fondu = lg ? smoothstep(0.0, 0.14, f.x) * smoothstep(0.0, 0.14, 1.0 - f.x) : 1.0;
+    acc = cnSur(acc, c * fondu);
+  }
 
-  // le PAS des repères : jamais plus de 260 u, deux par boîte au moins
-  float pas = max(min(260.0, L * 0.5), 70.0);
-  float km = floor(s / pas);
-  float dm = s - (km + 0.5) * pas;                 // au repère le plus proche
-  float kg = floor(s / pas + 0.5);
-  float df = s - kg * pas;                         // au raccord le plus proche
-  float posRep = (km + 0.5) * pas;
-  float sensL = posRep > 0.0 ? -1.0 : 1.0;         // vers le milieu (les vannes)
-  float sLibre = sD - 6.0 * k;                     // le droit utilisable
-
-  // L'OMBRE DE CONTACT : le tuyau pose sur le sol, une ombre douce l'y colle
-  fondK *= mix(0.45, 1.0, smoothstep(0.0, 6.0 + 4.0 * k, xo - rad));
-
-  float tube = nh3Lisse(1.0, x, px / rad);
-  if (tube > 0.0) {
-    float nz = sqrt(max(1.0 - x * x, 0.0));
-    // la normale 3D, ramenée dans le repère de la boîte : la lampe (en
-    // haut à gauche) éclaire la calotte comme le droit
-    vec2 nl = horiz ? n2 : n2.yx;
-    vec3 N = vec3(nl * x, nz);
-    vec3 Lum = normalize(vec3(-0.40, 0.65, 0.65));
-    float diff = 0.30 + 0.70 * max(dot(N, Lum), 0.0);
-    float spec = pow(max(dot(N, normalize(Lum + vec3(0.0, 0.0, 1.0))), 0.0), 22.0);
-    vec3 acier = vec3(0.36, 0.48, 0.60) * diff + vec3(0.55, 0.65, 0.75) * spec * 0.7;
-
-    // LE GIVRE : par plaques, plus épais sur le dessus — le tuyau ne se lit
-    // pas comme du métal bleu, mais comme du métal qui GÈLE. Lu dans le
-    // repère de la boîte, à l'échelle du tuyau : continu sur la calotte.
-    vec2 gq = loc / k;
-    float g1 = dnoise(gq * 0.045 + x * 0.9);
-    float g2 = dnoise(gq * 0.16 + 3.1 - x * 1.5);
-    float givre = smoothstep(0.22, 0.62, 0.50 * g1 + 0.25 * g2 + 0.32 * nz);
-    // le grain du givre, fondu au dézoom (sinon il scintille)
-    float grain = mix(0.5, dnoise(loc * 0.7), smoothstep(1.5, 0.6, px));
-    vec3 blanc = vec3(0.82, 0.91, 0.99) * (0.30 + 0.80 * diff) * (0.88 + 0.24 * grain) * (0.92 + 0.16 * lg);
-    vec3 c = mix(acier, blanc, givre * 0.80);
-    // les CRISTAUX : des éclats en étoile sur le givre, qui scintillent —
-    // fondus au dézoom (un pixel blanc qui clignote au loin, c'est de la
-    // neige d'écran, pas du gel)
+  // LES ÉCLATS : le givre de l'image scintille — des étoiles sur ses
+  // pixels clairs, fondues au dézoom (un pixel qui clignote au loin, c'est
+  // de la neige d'écran, pas du gel)
+  if (acc.a > 0.01) {
+    float lumC = dot(acc.rgb / acc.a, vec3(0.299, 0.587, 0.114));
     vec2 cq = loc / 5.0;
     vec2 cell = floor(cq);
     float h = hash21(cell);
@@ -702,91 +768,25 @@ vec4 conduiteNH3(vec2 loc, vec2 bsize, float px, vec3 givreTex, out float fondK)
                        nh3Lisse(0.05, abs(o.y), 0.03) * nh3Lisse(0.28, abs(o.x), 0.05));
     etoile = max(etoile, nh3Lisse(0.09, length(o), 0.04));
     float scint = 0.5 + 0.5 * sin(uTime * (1.5 + 3.0 * hash21(cell + 4.1)) + h * 60.0);
-    c += vec3(0.85, 0.94, 1.0) * etoile * step(0.90, h) * scint * givre * nz *
-         smoothstep(0.9, 0.35, px);
-
-    // LE REPÈRE : un anneau violet (la couleur des bases, NF X08-100) — le
-    // tuyau blanchi et ses cristaux disent déjà le froid ; ni étiquette,
-    // ni texte, ni flèche
-    float bande = nh3Lisse(4.5 * kl, abs(dm), px) * droit;
-    vec3 violet = vec3(0.50, 0.26, 0.78) * (0.45 + 0.65 * diff);
-    c = mix(c, violet, bande * (1.0 - 0.55 * givre));
-
-    // LES BRIDES aux raccords intérieurs, et un MANCHON au départ de chaque
-    // calotte : des bagues sur le tuyau, jamais plus larges que lui — la
-    // silhouette reste la forme physique
-    float bride = nh3Lisse(4.0 * k, abs(df), px) * step(0.5, abs(kg)) *
-                  step(abs(kg * pas), sD - 10.0 * k);
-    float manchon = nh3Lisse(3.0 * k, abs(abs(s) - (sD - 4.0 * k)), px) * step(8.0 * k, sD);
-    float bague = max(bride, manchon);
-    if (bague > 0.0) {
-      float db = manchon > bride ? abs(s) - (sD - 4.0 * k) : df;
-      vec3 b = manchon > bride
-        ? vec3(0.13, 0.16, 0.20) * (0.45 + 0.85 * nz) + vec3(0.30, 0.36, 0.42) * nh3Lisse(0.9, abs(abs(db) - 2.2 * k), px)
-        : vec3(0.26, 0.33, 0.42) * (0.35 + 0.75 * nz);
-      float boulon = nh3Lisse(1.6 * k, length(vec2(db, abs(t) - rad * 0.82)), px) * step(manchon, bride);
-      b = mix(b, vec3(0.62, 0.70, 0.78), boulon);
-      // un voile de givre UNI sur la bague (en taches, elle faisait camouflage)
-      b = mix(b, vec3(0.80, 0.90, 0.98) * (0.55 + 0.45 * nz), 0.35);
-      c = mix(c, b, bague);
-    }
-
-    // l'ombre de contact au bord du tuyau : il se détache du sol
-    c *= 0.55 + 0.45 * smoothstep(0.0, 0.35, nz);
-    col = mix(col, c, tube);
-    a += tube * (1.0 - a);
+    acc.rgb += vec3(0.85, 0.94, 1.0) * etoile * step(0.88, h) * scint *
+               smoothstep(0.55, 0.8, lumC) * acc.a * smoothstep(0.9, 0.35, px);
   }
-
-  // LES VANNES : un volant rouge ou jaune, vu de dessus, sur un repère sur
-  // deux environ, de l'autre côté de l'anneau que l'étiquette — la touche
-  // de couleur qui dit « installation ». Le volant reste DANS le tuyau.
-  float Rw = min(rad * 0.85, 16.0 * kl);
-  // la vanne se pose près de l'anneau, du côté du milieu (sensL)
-  float finEtiq = 12.0 * kl;
-  float dv = sensL * (finEtiq + 6.0 * kl + Rw);
-  float hv = hash21(vec2(km, L * 0.013) + 31.7);
-  float vanneOk = step(finEtiq + 6.0 * kl + 2.0 * Rw + 2.0, pas * 0.5) *
-                  step(abs(posRep + dv) + Rw, sLibre);
-  if (droit > 0.5 && vanneOk > 0.5 && hv > 0.45) {
-    vec2 pv = vec2(dm - dv, t);
-    float ov = 1.0 - 0.40 * nh3Lisse(Rw * 1.05, length(pv + vec2(-2.5, 3.0) * k), px);
-    col *= ov;
-    fondK *= ov;
-    // le volant : jante, quatre rayons, moyeu — droit dans le repère boîte
-    vec2 pw = horiz ? pv : pv.yx;
-    float r = length(pw) / Rw;
-    float jante = nh3Lisse(0.13, abs(r - 0.80), px / Rw);
-    float ray = min(abs(pw.x + pw.y), abs(pw.x - pw.y)) * 0.7071 / Rw;
-    float rayons = nh3Lisse(0.07, ray, px / Rw) * step(r, 0.82);
-    float moyeu = nh3Lisse(0.22, r, px / Rw);
-    float volant = max(max(jante, rayons), moyeu);
-    vec3 teinte = hash21(vec2(km, L * 0.013) + 7.1) > 0.5 ? vec3(0.86, 0.16, 0.12) : vec3(0.96, 0.74, 0.14);
-    float relief = 0.75 + 0.35 * dot(normalize(pw + 1e-3), normalize(vec2(-0.6, 0.8))) * step(0.3, r);
-    vec3 vcol = teinte * relief;
-    vcol = mix(vcol, vec3(0.92, 0.92, 0.88), moyeu * 0.55);
-    vcol = mix(vcol, vec3(0.86, 0.94, 1.0), 0.35 * smoothstep(0.55, 0.8, dnoise(pw * 0.4 / k + km)));
-    col = mix(col, vcol, volant);
-    a += volant * (1.0 - a);
-  }
-
-  // un voile de froid qui roule sur le tuyau, lentement
-  float voile = dnoise(loc * 0.018 + vec2(uTime * 0.10, -uTime * 0.04));
-  col += vec3(0.55, 0.70, 0.85) * smoothstep(0.55, 0.9, voile) * 0.10 * a;
-  return vec4(col, a);
+  return acc;
 }
 
 // LE SOL CRISTALLISÉ : dans l'aire d'effet (la portée de gel, celle du
-// solveur), le sol se couvre d'un givre LÉGER — des plaques de rime et
-// quelques aiguilles de glace qui scintillent, plus denses près du tuyau,
-// nulles au bord de la portée. Rend (voile de givre 0..1, éclats 0..1).
+// solveur), le givre de l'atlas se pose sur le sol — léger, plus dense près
+// de la conduite, nul au bord de la portée ; quelques aiguilles de glace y
+// scintillent. Seule sa CLARTÉ compte : l'image générée garde des franges
+// violettes, teintées ici en blanc bleuté. Rend (voile 0..1, éclats 0..1).
 vec2 givreSol(vec2 w, float d, float bande, float px) {
   float portee = 1.0 - smoothstep(0.0, bande, d);
   if (portee <= 0.0) return vec2(0.0);
-  float n1 = dnoise(w * 0.035);
-  float n2 = dnoise(w * 0.12 + 7.7);
-  // la rime : des plaques qui mordent de moins en moins loin du tuyau
-  float rime = smoothstep(0.50 - 0.25 * portee, 1.0, 0.6 * n1 + 0.4 * n2);
-  // les aiguilles : une étoile à six branches par cellule tirée
+  // le givre en miroir, un motif de 260 × 130 u
+  vec2 m = w / vec2(260.0, 130.0);
+  vec2 tri = abs(fract(m * 0.5) * 2.0 - 1.0);
+  vec4 g = atlasCadre(CN_CADRE_GIVRE, tri, px, CN_CADRE_GIVRE.z / 260.0);
+  float voile = dot(g.rgb, vec3(0.299, 0.587, 0.114)) * portee * portee;
   vec2 cq = w / 9.0;
   vec2 cell = floor(cq);
   float h = hash21(cell + 17.0);
@@ -799,8 +799,8 @@ vec2 givreSol(vec2 w, float d, float bande, float px) {
                  nh3Lisse(0.30, abs(dot(o, dir)), 0.05));
   }
   float scint = 0.55 + 0.45 * sin(uTime * (1.2 + 2.0 * hash21(cell + 4.4)) + h * 40.0);
-  float aiguilles = br * step(1.0 - 0.12 * portee * portee, h) * scint * smoothstep(1.2, 0.5, px);
-  return vec2(rime * portee * portee, aiguilles);
+  float aiguilles = br * step(1.0 - 0.10 * portee * portee, h) * scint * smoothstep(1.2, 0.5, px);
+  return vec2(voile, aiguilles);
 }
 
 // LA BRUME : hors de la boîte, des bouffées de vapeur froide qui
@@ -1484,7 +1484,6 @@ void main() {
   }
   vec3 texPhobeC = texture(uTexPhobe, world / 170.0).rgb;
   vec3 texPhileC = texture(uTexPhile, world / 210.0).rgb;
-  vec3 texFroidC = texture(uTexFroid, world / 460.0).rgb;
   vec3 texChaudC = texture(uTexChaud, world / 380.0).rgb;
   // la grille est calée pour que ses perforations fassent ~24 u, comme le
   // motif procédural qu'elle remplace
@@ -1962,34 +1961,30 @@ void main() {
       col = mix(col, barCol * eclMat, fill * (1.0 - hole * 0.85));
       col = mix(col, vec3(0.45, 0.60, 0.70) * eclMat, edge * 0.8);
     } else if (mat > 3.5) {
-      // Plaque froide (tableau 2) : une CONDUITE D'AMMONIAC à −40 °C — un
-      // tuyau givré du diamètre de la boîte, repères NH3, le sol qui
+      // Plaque froide (tableau 2) : une CONDUITE D'AMMONIAC à −40 °C — le
+      // tuyau givré de l'atlas, ses brides et ses joints, le sol qui
       // cristallise autour et la brume qui s'en échappe : le danger se lit
       // avant le contact, et on sait POURQUOI c'est froid (conduiteNH3).
+      // SEULE la conduite se peint : autour, le sol de la salle — ni fond,
+      // ni liseré, ni ombre carrée. La physique lit la même forme
+      // (FORME_CONDUITE) : ce qu'on voit est ce qui arrête.
       float fill = 1.0 - smoothstep(-edgeW, 0.0, dV);
-      float edge = (1.0 - smoothstep(0.0, edgeW, abs(dV))) * libre;
       vec2 bmin = uBoxes[bi].xy;
       vec2 bsize = max(uBoxes[bi].zw - bmin, vec2(1.0));
-      vec3 givreTex = uHasFroid > 0.5 ? texFroidC : vec3(0.35);
-      // SEULS les tubes se peignent : entre eux et dans les coins, le sol
-      // de la salle, avec l'ombre que la conduite y pose. Ni fond, ni
-      // liseré, ni ombre carrée — la boîte ne se voit plus, la tuyauterie
-      // si. (La collision, elle, reste la boîte.)
-      // LE SOL CRISTALLISÉ dans l'aire d'effet — léger : un voile de rime et
-      // quelques aiguilles de glace, là où le solveur fait geler l'eau
+      // ce qui se pose sur le SOL (givre, ombre, brume) ne se peint jamais
+      // sur un AUTRE solide (la brume délavait la conduite voisine)
+      float surSol = (iCouv == bi || dCouv > 0.0) ? 1.0 : 0.0;
       float dG = conduiteSdf(wb, uBoxes[bi]);
+      // LE SOL CRISTALLISÉ dans l'aire d'effet — là où le solveur gèle l'eau
       vec2 gsol = givreSol(wb, max(dG, 0.0), uColdBand, pxMonde);
-      col = mix(col, vec3(0.70, 0.82, 0.94) * eclMat, gsol.x * 0.12);
-      col += vec3(0.75, 0.88, 1.0) * gsol.y * 0.30;
-      float ombreSol;
-      vec4 cnh = conduiteNH3(clamp(wbV - bmin, vec2(0.0), bsize), bsize, pxMonde, givreTex, ombreSol);
-      col *= mix(1.0, ombreSol, fill);
+      col = mix(col, vec3(0.80, 0.90, 0.98) * eclMat, gsol.x * 0.25 * surSol);
+      col += vec3(0.75, 0.88, 1.0) * gsol.y * 0.30 * surSol;
+      // l'ombre au sol, PARTOUT autour de la conduite (coupée au bord de la
+      // boîte, elle redessinait le rectangle)
+      col *= mix(1.0, conduiteOmbre(wb, uBoxes[bi]), surSol);
+      vec4 cnh = conduiteNH3(clamp(wbV - bmin, vec2(0.0), bsize), bsize, pxMonde);
       col = col * (1.0 - fill * cnh.a) + cnh.rgb * eclMat * fill;
-      // la brume : dehors, et plus légère entre les tubes ; jamais sur un
-      // AUTRE solide (elle se peignait sur la conduite voisine, délavée)
-      float hors = (1.0 - fill * cnh.a) * ((iCouv == bi || dCouv > 0.0) ? 1.0 : 0.0);
-      // la brume se mesure depuis la FORME (conduiteSdf), comme l'aura de
-      // gel du solveur : les coins arrondis ne givrent pas le vide
+      float hors = (1.0 - fill * cnh.a) * surSol;
       col += brumeNH3(wb, max(dG, 0.0), uColdBand) * hors * (dG > 0.0 ? 1.0 : 0.6);
     } else {
       // Sas de sortie : une bouche d'aspiration — un trou dans lequel l'eau
@@ -2700,6 +2695,7 @@ uniform float uSpongeCell[MAX_SPONGES]; // taille de cellule
 layout(location = 0) out vec4 outColor;
 layout(location = 1) out vec4 outVis; // visibilité par lampe (canal = lampe)
 ${FORMES_GLSL}
+${CONDUITE_GLSL}
 
 float hashEp(vec2 p) {
   p = fract(p * vec2(127.1, 311.7));
@@ -2777,17 +2773,11 @@ float sceneSdf(vec2 p, float alt) {
       float sa = sin(ang);
       wb = bc + vec2(ca * rel.x + sa * rel.y, -sa * rel.x + ca * rel.y);
     }
-    // la CONDUITE D'AMMONIAC ombre à sa forme — la pilule de son tuyau, la
-    // CAPSULE que la physique lui donne (conduite.ts). L'ombre carrée
-    // trahissait le bloc que le dessin (conduiteNH3) s'applique à cacher.
-    // Ce programme n'a pas conduiteSdf : le calcul est recopié, vérifié par
-    // conduite.spec.ts.
+    // la CONDUITE D'AMMONIAC ombre à sa FORME — le tuyau et ses brides, la
+    // même union que la physique (conduite.ts). L'ombre carrée trahissait
+    // le bloc que le dessin (conduiteNH3) s'applique à cacher.
     if (dec.x > 3.5 && dec.x < 4.5 && dec.y < 0.5) {
-      vec2 bc = 0.5 * (uBoxes[i].xy + uBoxes[i].zw);
-      vec2 hb = 0.5 * (uBoxes[i].zw - uBoxes[i].xy);
-      float r = min(hb.x, hb.y); // la pilule : la demi-épaisseur
-      vec2 q = abs(wb - bc) - hb + r;
-      d = min(d, length(max(q, 0.0)) + min(max(q.x, q.y), 0.0) - r);
+      d = min(d, conduiteSdf(wb, uBoxes[i]));
       continue;
     }
     d = min(d, formeSdf(wb, uBoxes[i], dec.y, dec.z, dec.w));
@@ -3444,8 +3434,10 @@ export class Renderer {
       (t) => (this.texWallA = t),
     )
     this.loadTexture(
-      '/assets/froid.webp',
-      true,
+      // l'atlas de la conduite d'ammoniac (tools/images/conduite_atlas.py) :
+      // lu par cadres, sans répétition — les bords sont serrés à la main
+      '/assets/conduite-atlas.webp',
+      false,
       true,
       (t) => (this.texFroid = t),
     )
