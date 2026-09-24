@@ -122,6 +122,7 @@ elle **devient la référence** de sa famille : on la dépose dans
 | --- | --- |
 | sas de raccord, veilleuses ambre | `docs/reference/sas-raccord-reference.png` |
 | la station vue du dehors (les planches de l'approche, `assets-ia.md` §26) | `docs/reference/station-reference.png` — la planche `approche-3` livrée le 15/09 |
+| la conduite d'ammoniac (la plaque froide, `assets-ia.md` §27) | `docs/reference/conduite-reference.webp` — la « version 2 » de la planche d'exploration, choisie le 24/09 |
 | les autres | à désigner à la prochaine image réussie |
 
 ## 7. Les familles et leurs mesures

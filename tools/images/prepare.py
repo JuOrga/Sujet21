@@ -150,6 +150,12 @@ FAMILLES: list[Famille] = [
         note='une bande de vues côte à côte (tools/images/planche.py, docs/charte-visuelle.md §8)',
     ),
     Famille(
+        'atlas de la conduite', ('conduite-atlas',), taille=(1024, 1024), luma_max=0.60,
+        # mesuré : 450 Ko à 84, 398 Ko à 78 — il REMPLACE froid.webp (256 Ko)
+        qualite=78, poids_max_ko=420,
+        note='quatre pièces assemblées par tools/images/conduite_atlas.py — leurs cadres sont un contrat avec le shader',
+    ),
+    Famille(
         'décalque',
         ('decal-*', 'fiole-*', 'serre-*', 'meta-*', 'sas-raccord*', 'zone-*', 'lampe-*'),
         alpha=True, cote_max=1600, luma_max=0.60, poids_max_ko=350,
@@ -390,7 +396,10 @@ def rapporte(mesures: Iterable[Mesure]) -> int:
 
 def noms_relatifs(racine: str) -> list[str]:
     out: list[str] = []
-    for dossier, _, fichiers in os.walk(racine):
+    for dossier, sous, fichiers in os.walk(racine):
+        # les SOURCES d'un assemblage (l'atlas de la conduite) ne sont pas
+        # livrées telles quelles : leur outil en fait un master
+        sous[:] = [d for d in sous if d != 'sources']
         for fic in fichiers:
             base, ext = os.path.splitext(fic)
             if ext.lower() in EXTENSIONS:

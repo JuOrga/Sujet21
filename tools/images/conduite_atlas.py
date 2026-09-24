@@ -1,0 +1,93 @@
+#!/usr/bin/env python3
+"""
+L'ATLAS DE LA CONDUITE D'AMMONIAC — quatre images générées, une texture.
+
+POURQUOI UN ATLAS. Le shader de composition a ses seize unités de texture
+occupées (renderer.ts, bindTex). La conduite en veut quatre : le tronçon, la
+bride de bout, le joint à brides et le givre du sol. Elles remplacent donc,
+réunies, l'ancienne texture de la plaque froide (froid.webp, unité 9).
+
+Les sources (docs/assets-ia.md, « La conduite d'ammoniac ») :
+
+  masters/images/sources/conduite-troncon.png   le corps, sur fond sombre
+  masters/images/sources/conduite-bout.png      la bride de bout, détourée
+  masters/images/sources/conduite-raccords.png  la planche de raccords
+  masters/images/sources/conduite-givre.png     le givre du sol, détouré
+
+Sortie : masters/images/conduite-atlas.png (1024², RGBA), que
+tools/images/prepare.py livre ensuite en public/assets/conduite-atlas.webp.
+
+LES CADRES CI-DESSOUS SONT UN CONTRAT avec le shader et la physique : les
+proportions mesurées ici (la bride fait toute la largeur du bloc, le tuyau
+un peu plus de la moitié) sont celles de CONDUITE dans game/formes.ts. Une
+nouvelle image impose de remesurer — et de mettre les deux à jour.
+
+Usage : python3 tools/images/conduite_atlas.py
+"""
+
+from __future__ import annotations
+
+import os
+
+import numpy as np
+from PIL import Image
+
+ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+SRC = os.path.join(ROOT, 'masters', 'images', 'sources')
+DST = os.path.join(ROOT, 'masters', 'images', 'conduite-atlas.png')
+
+# 1024² : à l'écran, un tuyau fait au plus une centaine de pixels de large —
+# l'atlas de 2048² pesait 1,07 Mo en WebP (mesuré), sans rien de visible en
+# plus.
+TAILLE = 1024
+# (x, y, largeur, hauteur) dans l'atlas, en pixels depuis le HAUT-gauche.
+# Le shader lit les mêmes cadres (CONDUITE_ATLAS dans game/formes.ts).
+CADRE_CORPS = (0, 0, 1024, 341)
+CADRE_BOUT = (0, 350, 370, 426)
+CADRE_JOINT = (380, 350, 451, 365)
+CADRE_GIVRE = (384, 720, 608, 304)
+
+
+def lis(nom: str) -> Image.Image:
+    return Image.open(os.path.join(SRC, nom)).convert('RGBA')
+
+
+def corps() -> Image.Image:
+    """Le tronçon est livré sur fond sombre, sans alpha. Dans la bande du
+    tuyau (lignes 56 à 612 sur 724, mesurées), tout est opaque : le bas du
+    tuyau est aussi sombre que le fond, un seuil l'aurait troué. Hors de la
+    bande, seules la frange de givre et les stalactites restent, par leur
+    clarté."""
+    im = lis('conduite-troncon.png')
+    a = np.asarray(im, dtype=np.float32)
+    lum = a[..., :3].mean(axis=2)
+    h = a.shape[0]
+    rangs = np.arange(h)[:, None] / h
+    dans = (rangs >= 56 / 724) & (rangs <= 612 / 724)
+    alpha = np.clip((lum - 32.0) / 38.0, 0.0, 1.0)
+    alpha = np.where(dans, 1.0, alpha)
+    a[..., 3] = alpha * 255.0
+    return Image.fromarray(a.astype(np.uint8), 'RGBA')
+
+
+def colle(atlas: Image.Image, piece: Image.Image, cadre: tuple[int, int, int, int]) -> None:
+    x, y, w, h = cadre
+    atlas.alpha_composite(piece.resize((w, h), Image.LANCZOS), (x, y))
+
+
+def main() -> None:
+    atlas = Image.new('RGBA', (TAILLE, TAILLE), (0, 0, 0, 0))
+    colle(atlas, corps(), CADRE_CORPS)
+    # la bride de bout : de l'amorce du givre (x 880) au bout de l'embout
+    # (1619), de 10 px au-dessus à 10 px au-dessous de la bride (50..882)
+    colle(atlas, lis('conduite-bout.png').crop((880, 40, 1619, 892)), CADRE_BOUT)
+    # le joint : la première pièce de la planche, centrée sur ses brides
+    # (x 380), bride de 79 à 483
+    colle(atlas, lis('conduite-raccords.png').crop((98, 56, 662, 513)), CADRE_JOINT)
+    colle(atlas, lis('conduite-givre.png'), CADRE_GIVRE)
+    atlas.save(DST)
+    print('écrit', os.path.relpath(DST, ROOT))
+
+
+if __name__ == '__main__':
+    main()
