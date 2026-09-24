@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import { aleaDeGraine } from './voie'
 import {
+  cleOffre,
+  DETAIL_VOILE,
+  detailOffre,
   ditEffet,
   ESSENCE_PLANCHER,
   EVENEMENTS,
@@ -150,5 +153,22 @@ describe('ditEffet — chaque effet se lit en une ligne', () => {
       for (const c of ev.choix)
         for (const i of c.issues)
           for (const e of i.effets) expect(ditEffet(e).length).toBeGreaterThan(2)
+  })
+})
+
+describe('le voile des offres — on apprend une offre en la prenant', () => {
+  it('une offre jamais prise tait son détail ; prise une fois, elle le dit', () => {
+    const ev = evenementParId('decanteur')!
+    const c = ev.choix[0]
+    expect(detailOffre(c, false)).toEqual({ texte: DETAIL_VOILE, voilee: true })
+    expect(detailOffre(c, true)).toEqual({ texte: c.detail, voilee: false })
+    // le voile ne trahit rien de ce qu'il cache
+    for (const e of EVENEMENTS)
+      for (const ch of e.choix) expect(DETAIL_VOILE).not.toContain(ch.detail)
+  })
+
+  it('chaque offre du catalogue a sa propre clé — le savoir ne déborde pas sur la voisine', () => {
+    const cles = EVENEMENTS.flatMap((e) => e.choix.map((c) => cleOffre(e, c)))
+    expect(new Set(cles).size).toBe(cles.length)
   })
 })

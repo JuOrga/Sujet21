@@ -164,6 +164,8 @@ import {
 import { CODE_RONDE, sansSas, tableauRonde } from './game/ronde'
 import { dureeChuteCoeur, grainsPuits, porteeVisible, rayonNoyau } from './game/puitsDessin'
 import {
+  cleOffre,
+  detailOffre,
   ditEffet,
   offresDe,
   resoutChoix,
@@ -15956,8 +15958,10 @@ function mbPeintEvenement(ev: EvenementDef, alea: () => number): void {
     btn.className = 'mb-carte mb-ev-offre' + (possible ? '' : ' mb-pauvre')
     btn.disabled = !possible
     btn.style.setProperty('--i', String(i))
+    // le détail ne se lit que d'une offre déjà prise (evenements, règle 4)
+    const detail = detailOffre(choix, records.offreEssayee(cleOffre(ev, choix)))
     btn.innerHTML =
-      `<b>${esc(choix.libelle)}</b><small>${esc(choix.detail)}</small>` +
+      `<b>${esc(choix.libelle)}</b><small${detail.voilee ? ' class="mb-ev-voile"' : ''}>${esc(detail.texte)}</small>` +
       (choix.issues.length > 1
         ? `<em class="mb-ev-pari">⚄ ${choix.issues.length} issues possibles</em>`
         : `<em class="mb-ev-sur">▸ sans risque</em>`)
@@ -15975,6 +15979,8 @@ function mbPeintEvenement(ev: EvenementDef, alea: () => number): void {
 function mbTranche(ev: EvenementDef, choix: ChoixEvenement, alea: () => number): void {
   const esc = (t: string): string => t.replace(/&/g, '&amp;').replace(/</g, '&lt;')
   const issue = resoutChoix(choix, alea)
+  // l'offre prise se dévoile — elle, pas ses voisines écartées
+  records.noteOffreEssayee(cleOffre(ev, choix))
   const lignes = appliqueEffets(issue.effets)
   bande.ponctuation('sting-record', 0.6)
   mbQuestion(ev.titre)
@@ -15984,7 +15990,7 @@ function mbTranche(ev: EvenementDef, choix: ChoixEvenement, alea: () => number):
   bilan.className = 'mb-ev-recit mb-ev-issue'
   const dites = lignes.length > 0 ? lignes : [issue.effets.map(ditEffet).join(' · ') || 'rien']
   bilan.innerHTML =
-    `<em>${esc(choix.libelle)}</em><p>${esc(issue.texte)}</p>` +
+    `<em>${esc(choix.libelle)} — ${esc(choix.detail)}</em><p>${esc(issue.texte)}</p>` +
     `<ul class="mb-ev-gains">${dites.map((l) => `<li>${esc(l)}</li>`).join('')}</ul>`
   host.appendChild(bilan)
   const btn = document.createElement('button')
