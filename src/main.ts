@@ -17091,10 +17091,13 @@ chipEditor.style.display = 'none'
 // Trois LOGEMENTS fixes — ❄ à gauche, 💧 au centre, 💨 à droite : la
 // mémoire musculaire tient, au doigt comme à la manette (X / B / Y). Mais
 // ce qu'ils montrent a changé : le logement de l'état COURANT devient le
-// MÉDAILLON (l'identité, pas une commande), et les autres ne paraissent
-// que si la TRANSFORMATION qui y mène est tissée — ils portent alors son
-// NOM (FUSION, SOLIDIFICATION…), le vocabulaire de l'écran des mémoires.
-// Au tout début de partie : le médaillon seul, AUCUN bouton — c'est voulu.
+// MÉDAILLON (l'identité, pas une commande), et les autres portent le NOM
+// de la TRANSFORMATION qui y mène (FUSION, SOLIDIFICATION…), le
+// vocabulaire de l'écran des mémoires. Les trois restent TOUJOURS
+// affichés : une transformation non tissée GRISE son logement, cadenas au
+// coin (#455). Les cacher faisait disparaître la vapeur en passant en
+// glace, comme un état jamais débloqué — le joueur ne voyait plus ce qui
+// restait à tisser.
 // Le médaillon reste cliquable : re-toucher son état, c'est demander le
 // retour au liquide (le geste historique du dégel ne se perd pas).
 const stateEau = document.getElementById('state-eau') as HTMLButtonElement
