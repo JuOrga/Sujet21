@@ -630,12 +630,13 @@ float nh3Texte(vec2 p) {
   return min(d, d3 + 0.015); // l'indice, un trait plus fin
 }
 
-// Le point s (le long, centré) est-il sur du tube DROIT ? Ni dans un
-// coude intérieur, ni dans la boucle d'un bout — marge comprise.
-float nh3Droit(float s, float pas, float L, float hw, float sBout, float apparie) {
-  if (abs(s) > (apparie > 0.5 ? sBout - 8.0 : L * 0.5 - 6.0)) return 0.0;
+// Le point s (le long, centré) est-il sur du tube DROIT ? Ni près d'un
+// raccord intérieur (U ou traversée), ni dans la pièce d'un bout — marge
+// comprise. Prudent : on ne tire pas au sort la pièce, on l'évite.
+float nh3Droit(float s, float pas, float L, float hw, float sPos, float sNeg) {
+  if (s > sPos - 8.0 || -s > sNeg - 8.0) return 0.0;
   float k = floor(s / pas + 0.5);
-  float coude = apparie * step(0.5, abs(k)) * step(abs(k * pas) + hw + 12.0, L * 0.5);
+  float coude = step(0.5, abs(k)) * step(abs(k * pas) + hw + 12.0, L * 0.5);
   return 1.0 - coude * step(abs(s - k * pas), hw + 8.0);
 }
 
@@ -665,49 +666,154 @@ vec3 conduiteNH3(vec2 loc, vec2 bsize, float px, vec3 givreTex) {
   float kg = floor(s / pas + 0.5);
   float df = s - kg * pas;                         // au raccord le plus proche
 
-  // LE SERPENTIN : les tubes vont par PAIRES (aller, retour) et font
-  // demi-tour en U aux raccords — un évaporateur, pas une rampe de tubes
-  // parallèles. Au milieu (le manomètre) et près des bouts, ils filent
-  // droit ; un tube sans partenaire (nombre impair) aussi.
+  // LE RÉSEAU. Les tubes vont par PAIRES (aller, retour) ; aux raccords
+  // intérieurs et aux bouts, un tirage stable (la taille de la boîte, le
+  // rang du raccord) choisit la pièce :
+  //   · raccord intérieur : deux U face à face (serpentin d'évaporateur),
+  //     ou une TRAVERSÉE — un tube en travers qui relie toutes les voies :
+  //     des T aux bords, des croix au milieu ;
+  //   · bout : la paire se referme en U, ou toutes les voies se jettent
+  //     dans un COLLECTEUR — coudes à 90° serrés aux deux voies du bord,
+  //     T aux voies du milieu ; un tube seul part en COUDE vers la paroi.
+  // Au milieu (le manomètre), tout file droit.
   float apparie = step(i - mod(i, 2.0) + 1.0, n - 1.0);
-  float rU = lw * 0.5;                             // rayon du coude
+  float multi = step(1.5, n);
+  float rU = lw * 0.5;                             // rayon du U
+  float rb = rad * 1.05;                           // rayon du coude à 90°
   float jeu = max(3.0, lw * 0.18);                 // l'écart entre deux U
   float hw = rU + jeu;
-  float coude = apparie * step(0.5, abs(kg)) * step(abs(kg * pas) + hw + 12.0, L * 0.5);
+  float t0 = 0.5 * lw;                             // voie du bord bas
+  float t1 = T - 0.5 * lw;                         // voie du bord haut
+  float interieur = step(0.5, abs(kg)) * step(abs(kg * pas) + hw + 12.0, L * 0.5);
+  // (dès trois voies : entre deux seulement, le tube en travers n'aurait
+  // que l'écart des tubes pour se montrer — un raccord de 6 u, illisible)
+  float traverse = interieur * step(2.5, n) * step(hash21(vec2(kg, T) * 0.173 + L * 0.0071), 0.5);
+  float coude = interieur * apparie * (1.0 - traverse);
   float dansU = coude * step(abs(df), hw);
   float tc = (i - mod(i, 2.0) + 1.0) * lw;         // l'axe de la paire
-  // écart SIGNÉ au tracé et la direction où il croît : l'axe droit, ou le
-  // rayon du coude — le même cylindre, éclairé juste dans les deux cas
-  // aux deux BOUTS, la paire se referme en U elle aussi : la boucle est
-  // bouclée, comme un serpentin posé contre la paroi
-  float sBout = L * 0.5 - rU - rad - 3.0;
-  float auBout = apparie * step(sBout, abs(s));
-  float xo = xr;
+
+  float sg = s < 0.0 ? -1.0 : 1.0;
+  float sp = abs(s);                               // vers le bout le plus proche
+  float hBout = hash21(vec2(L, T) * 0.0137 + sg * 3.1);
+  // 0 : U (paire), 1 : collecteur, 2 : coude seul, 3 : bride (rien)
+  float modeBout = multi > 0.5 ? (hBout < 0.5 ? 1.0 : (apparie > 0.5 ? 0.0 : 3.0))
+                               : (hBout < 0.6 ? 2.0 : 3.0);
+  // l'axe de la pièce du bout ; le collecteur recule pour laisser à sa
+  // SORTIE (le piquage en T vers la paroi) la place de se montrer
+  float recul = rad * 1.2 + 6.0;
+  float sH = L * 0.5 - rad - 4.0 - (modeBout > 0.5 && modeBout < 1.5 ? recul : 0.0);
+  float sBout = sH - rU;                           // où commence la pièce du bout
+  float sE = sH - rb;                              // centre des coudes à 90°
+  // la limite du tube droit vers CHAQUE bout, selon la pièce qui y est
+  // tirée (le collecteur recule, les autres non) : l'étiquette regarde le
+  // bout vers lequel elle va, pas le pire des deux
+  float colPos = multi * step(hash21(vec2(L, T) * 0.0137 + 3.1), 0.4999);
+  float colNeg = multi * step(hash21(vec2(L, T) * 0.0137 - 3.1), 0.4999);
+  float sDroitPos = L * 0.5 - rad - 4.0 - rU - colPos * recul;
+  float sDroitNeg = L * 0.5 - rad - 4.0 - rU - colNeg * recul;
+  float dansBout = step(sBout, sp) * step(modeBout, 2.5);
+
+  // écart SIGNÉ au tracé et la direction où il croît : l'axe droit, le
+  // rayon d'un coude, ou l'axe d'un tube en travers — le même cylindre,
+  // éclairé juste dans tous les cas. Là où deux tracés se rejoignent (un
+  // T, une croix), l'un PASSE et l'autre s'y emboîte : le plus proche des
+  // deux laissait un pli en biais à 45°, une jointure qu'aucun raccord n'a.
+  float xo = 1e4;
   vec2 n2 = vec2(0.0, 1.0);
-  if (dansU > 0.5 || auBout > 0.5) {
-    // le centre du coude : du côté des tubes droits qu'il referme
-    float sc = auBout > 0.5 ? sign(s) * sBout
-                            : kg * pas + (df < 0.0 ? -hw : hw);
+  float alongArc = -1e9; // le long d'un coude : l'abscisse d'arc
+  if (dansU > 0.5) {
+    float sc = kg * pas + (df < 0.0 ? -hw : hw);
     vec2 rel = vec2(s - sc, t - tc);
     xo = length(rel) - rU;
     n2 = rel / max(length(rel), 1e-3);
+    alongArc = atan(rel.y, rel.x) * rU;
+  } else if (dansBout > 0.5 && modeBout < 0.5) {
+    vec2 rel = vec2(sp - sBout, t - tc);
+    xo = length(rel) - rU;
+    n2 = vec2(sg, 1.0) * rel / max(length(rel), 1e-3);
+    alongArc = atan(rel.y, rel.x) * rU;
+  } else if (dansBout > 0.5 && modeBout < 1.5) {
+    // COLLECTEUR : les voies du milieu filent jusqu'à son axe (T), celles
+    // du bord tournent avant, par un coude serré
+    float bord = 1.0 - step(0.5, i) * step(i, n - 1.5);
+    if (sp <= (bord > 0.5 ? sE : sH)) { xo = xr; n2 = vec2(0.0, 1.0); }
+    // le collecteur PASSE : les voies s'emboîtent dans son flanc
+    if (t >= t0 + rb && t <= t1 - rb && (abs(sp - sH) < abs(xo) || abs(sp - sH) <= rad)) {
+      xo = sp - sH; n2 = vec2(sg, 0.0);
+    }
+    vec2 rb0 = vec2(sp - sE, t - (t0 + rb));
+    if (rb0.x >= 0.0 && rb0.y <= 0.0 && abs(length(rb0) - rb) < abs(xo)) {
+      xo = length(rb0) - rb; n2 = vec2(sg, 1.0) * rb0 / max(length(rb0), 1e-3);
+      alongArc = atan(rb0.y, rb0.x) * rb;
+    }
+    vec2 rb1 = vec2(sp - sE, t - (t1 - rb));
+    if (rb1.x >= 0.0 && rb1.y >= 0.0 && abs(length(rb1) - rb) < abs(xo)) {
+      xo = length(rb1) - rb; n2 = vec2(sg, 1.0) * rb1 / max(length(rb1), 1e-3);
+      alongArc = atan(rb1.y, rb1.x) * rb;
+    }
+    // la SORTIE : un piquage en T au milieu du collecteur, qui file dans la
+    // paroi du bout — il s'emboîte dans le flanc du collecteur
+    if (sp - sH >= rad) { float ts = t - T * 0.5; if (abs(ts) < abs(xo)) { xo = ts; n2 = vec2(0.0, 1.0); alongArc = -1e9; } }
+  } else if (dansBout > 0.5) {
+    // COUDE SEUL : le tube tourne vers la paroi — d'un côté à un bout, de
+    // l'autre à l'autre bout (tt : l'ordonnée retournée)
+    float tt = sg > 0.0 ? t : T - t;
+    float sy = sg > 0.0 ? 1.0 : -1.0;
+    if (sp <= sE) { xo = xr; n2 = vec2(0.0, 1.0); }
+    vec2 rel = vec2(sp - sE, tt - (t0 + rb));
+    if (rel.x >= 0.0 && rel.y <= 0.0) {
+      xo = length(rel) - rb; n2 = vec2(sg, sy) * rel / max(length(rel), 1e-3);
+      alongArc = atan(rel.y, rel.x) * rb;
+    }
+    if (tt > t0 + rb && abs(sp - sH) < abs(xo)) { xo = sp - sH; n2 = vec2(sg, 0.0); }
+  } else {
+    xo = xr;
+    if (traverse > 0.5) {
+      // TRAVERSÉE : un tube en travers, de la voie du bas à celle du haut ;
+      // les voies PASSENT, lui s'emboîte dans leur flanc (T au bord, croix
+      // au milieu)
+      if (t >= t0 && t <= t1 && abs(xr) >= rad) { xo = df; n2 = vec2(1.0, 0.0); }
+    }
   }
   float x = xo / rad;
+  // le LONG du tube où l'on est (s sur une voie, t sur un tube en travers) :
+  // le givre suit chaque tube, au lieu de s'aplatir en travers du collecteur
+  float along = alongArc > -1e8 ? alongArc : (abs(n2.y) > 0.7 ? s : t);
   // LA PLACE LIBRE : l'étiquette, puis la vanne, ne se posent que si leur
   // bout lointain tombe encore sur du tube droit — sinon un coude les
   // tranchait net (« NH » sans son 3). On regarde du côté où elles vont.
   float posRep = (km + 0.5) * pas;
-  float droit = (1.0 - dansU) * (1.0 - auBout);
+  float droit = (1.0 - dansU) * (1.0 - dansBout) *
+                (1.0 - traverse * step(abs(df), rad * 1.6));
 
   // le raccord : une bride boulonnée sur les tubes droits, des MANCHONS
   // sombres de part et d'autre de chaque coude
   float large = nh3Lisse(rad * 1.22, abs(xr), px);
-  float bride = nh3Lisse(4.0, abs(df), px) * large * (1.0 - coude);
+  float bride = nh3Lisse(4.0, abs(df), px) * large * (1.0 - coude) * (1.0 - traverse) *
+                step(abs(kg * pas), sBout - 8.0);
   float manchon = coude * nh3Lisse(3.0, abs(abs(df) - hw - 4.0), px) * large;
-  manchon = max(manchon, apparie * nh3Lisse(3.0, abs(abs(s) - sBout + 4.0), px) * large);
-  // un tube sans partenaire, lui, sort du mur par une bride
-  float bout = min(s + L * 0.5, L * 0.5 - s);
-  bride = max(bride, (1.0 - apparie) * nh3Lisse(5.0, bout, px) * large);
+  // avant la pièce du bout : manchon au départ du U, ou du coude à 90°
+  float sMan = modeBout < 0.5 ? sBout - 4.0 : sE - 4.0;
+  float bordVoie = 1.0 - step(0.5, i) * step(i, n - 1.5);
+  float manBout = step(modeBout, 2.5) * (modeBout > 0.5 && modeBout < 1.5 ? bordVoie : 1.0);
+  manchon = max(manchon, manBout * nh3Lisse(3.0, abs(sp - sMan), px) * large);
+  // les T : un manchon sur la branche qui s'emboîte, au ras du tube qui
+  // passe — sur le tube en travers entre deux voies, sur les voies du
+  // milieu au pied du collecteur
+  float sT = rad + 4.0;
+  float tDe = traverse * (1.0 - dansBout);
+  float surT = step(t0, t) * step(t, t1) * nh3Lisse(rad * 1.22, abs(df), px);
+  float manT = tDe * surT * nh3Lisse(2.5, abs(abs(xr) - sT), px);
+  float colT = step(0.5, modeBout) * step(modeBout, 1.5) * (1.0 - bordVoie) * step(sBout - 12.0, sp);
+  manT = max(manT, colT * nh3Lisse(2.5, abs(sp - (sH - sT)), px) * large);
+  // et la sortie du collecteur, au ras de son flanc
+  float sortie = step(0.5, modeBout) * step(modeBout, 1.5) *
+                 nh3Lisse(rad * 1.22, abs(t - T * 0.5), px) * nh3Lisse(2.5, abs(sp - (sH + sT)), px);
+  manT = max(manT, sortie);
+  manchon = max(manchon, manT);
+  // sans pièce au bout, le tube sort du mur par une bride
+  float bout = L * 0.5 - sp;
+  bride = max(bride, step(2.5, modeBout) * nh3Lisse(5.0, bout, px) * large);
 
   float tube = nh3Lisse(1.0, abs(x), px / rad);
   if (tube > 0.0) {
@@ -723,17 +829,17 @@ vec3 conduiteNH3(vec2 loc, vec2 bsize, float px, vec3 givreTex) {
 
     // LE GIVRE : par plaques, plus épais sur le dessus et aux brides — le
     // tube ne se lit pas comme du métal bleu, mais comme du métal qui GÈLE
-    float g1 = dnoise(vec2(s * 0.045, x * 1.6 + i * 7.3));
-    float g2 = dnoise(vec2(s * 0.16 + 3.1, x * 3.0 - i * 2.1));
+    float g1 = dnoise(vec2(along * 0.045, x * 1.6 + i * 7.3));
+    float g2 = dnoise(vec2(along * 0.16 + 3.1, x * 3.0 - i * 2.1));
     float givre = smoothstep(0.22, 0.62, 0.50 * g1 + 0.25 * g2 + 0.32 * nz);
     // le grain du givre, fondu au dézoom (sinon il scintille)
-    float grain = mix(0.5, dnoise(vec2(s, xr) * 0.7), smoothstep(1.5, 0.6, px));
+    float grain = mix(0.5, dnoise(vec2(along, xo) * 0.7), smoothstep(1.5, 0.6, px));
     vec3 blanc = vec3(0.82, 0.91, 0.99) * (0.30 + 0.80 * diff) * (0.88 + 0.24 * grain);
     vec3 c = mix(acier, blanc, givre * 0.80);
     // les CRISTAUX : des éclats en étoile sur le givre, qui scintillent —
     // fondus au dézoom (un pixel blanc qui clignote au loin, c'est de la
     // neige d'écran, pas du gel)
-    vec2 cq = vec2(s, xr) / 5.0;
+    vec2 cq = vec2(along, xo) / 5.0;
     vec2 cell = floor(cq);
     float h = hash21(cell + i * 13.0);
     vec2 o = fract(cq) - 0.5 - 0.3 * (vec2(hash21(cell + 2.7), hash21(cell + 5.3)) - 0.5);
@@ -756,10 +862,10 @@ vec3 conduiteNH3(vec2 loc, vec2 bsize, float px, vec3 givreTex) {
     float lTexte = 1.95 * H;
     float finTexte = 12.0 + lTexte + 3.0 + 16.0;
     float avecTexte = step(finTexte, pas * 0.5) *
-                      nh3Droit(posRep + sens * finTexte, pas, L, hw, sBout, apparie);
+                      nh3Droit(posRep + sens * finTexte, pas, L, hw, sDroitPos, sDroitNeg);
     float a0 = 12.0 + avecTexte * (lTexte + 3.0);     // début des chevrons
     float fin = a0 + 16.0;
-    float etiqOk = step(fin, pas * 0.5) * nh3Droit(posRep + sens * fin, pas, L, hw, sBout, apparie);
+    float etiqOk = step(fin, pas * 0.5) * nh3Droit(posRep + sens * fin, pas, L, hw, sDroitPos, sDroitNeg);
     float etiq = nh3Lisse((fin - 7.0) * 0.5, abs(a - (fin + 7.0) * 0.5), px) * droit * etiqOk;
     float v = a - a0 - abs(x) * rad * 0.9;
     float chev = nh3Lisse(1.8, abs(mod(v + 4.0, 8.0) - 4.0), px) *
@@ -789,7 +895,18 @@ vec3 conduiteNH3(vec2 loc, vec2 bsize, float px, vec3 givreTex) {
     // un raccord à sertir. Givre épais : les ponts thermiques gèlent d'abord
     float xb = xr / (rad * 1.22);
     float nzb = sqrt(max(1.0 - xb * xb, 0.0));
-    float db = manchon > bride ? min(abs(abs(df) - hw - 4.0), abs(abs(s) - sBout + 4.0)) : df;
+    float db = manchon > bride ? min(min(abs(abs(df) - hw - 4.0), abs(sp - sMan)),
+                                     min(min(abs(abs(xr) - sT), abs(sp - (sH - sT))),
+                                         abs(sp - (sH + sT)))) : df;
+    // un manchon posé sur le tube en travers s'arrondit selon LUI
+    if (manT > 0.5 && tDe > 0.5) {
+      xb = df / (rad * 1.22);
+      nzb = sqrt(max(1.0 - xb * xb, 0.0));
+    }
+    if (sortie > 0.5) {
+      xb = (t - T * 0.5) / (rad * 1.22);
+      nzb = sqrt(max(1.0 - xb * xb, 0.0));
+    }
     vec3 b = manchon > bride
       ? vec3(0.13, 0.16, 0.20) * (0.45 + 0.85 * nzb) + vec3(0.30, 0.36, 0.42) * nh3Lisse(0.9, abs(abs(db) - 2.2), px)
       : vec3(0.26, 0.33, 0.42) * (0.35 + 0.75 * nzb);
@@ -807,7 +924,7 @@ vec3 conduiteNH3(vec2 loc, vec2 bsize, float px, vec3 givreTex) {
   float Rw = min(min(rad * 1.25, lw * 0.47), 17.0);
   float hv = hash21(vec2(km, i) + 31.7);
   float vanneOk = step(32.0 + Rw + 2.0, pas * 0.5) *
-                  nh3Droit(posRep - sens * (32.0 + Rw + 2.0), pas, L, hw, sBout, apparie);
+                  nh3Droit(posRep - sens * (32.0 + Rw + 2.0), pas, L, hw, sDroitPos, sDroitNeg);
   if (droit > 0.5 && vanneOk > 0.5 && hv > 0.45) {
     vec2 pv = vec2(dm + sens * 32.0, xr);
     // le corps : un bloc plus large que le tube, et son ombre
