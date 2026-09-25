@@ -3720,6 +3720,20 @@ appliqueSimHz()
 // deux rapports de performance, mêmes conditions, seul ce réglage change —
 // l'écart chiffre le coût réel des graphismes sur la machine du joueur.
 let decorRiche = localStorage.getItem('sujet21-decor') !== 'sobre'
+// LE DEHORS DU MODULE : les modules voisins, la station au loin et le
+// matériel posé sur la coque (compositionCoque.ts). MASQUÉ par défaut, le
+// temps de le mettre au point : seule la coque se dessine, avec les vides
+// qui la percent. ?exterieur=1 (ou 0) dans l'adresse l'impose et s'en
+// souvient — c'est le chemin des aperçus sur tablette.
+let exterieurActif = (() => {
+  const q = new URLSearchParams(location.search).get('exterieur')
+  try {
+    if (q === '1' || q === '0') localStorage.setItem('sujet21-exterieur', q === '1' ? 'on' : 'off')
+    return localStorage.getItem('sujet21-exterieur') === 'on'
+  } catch {
+    return q === '1'
+  }
+})()
 // LE VOILE DES CACHETTES : le brouillard (défaut, voileCache.ts) ou le
 // voile SOBRE d'avant — le rectangle plein, les nappes discrètes, le liseré.
 // Un choix de goût autant que de coût : le joueur qui préfère l'ancien le
@@ -3946,6 +3960,32 @@ const paramsEl = document.getElementById('params') as HTMLDivElement
     }
   }
   renderDecor()
+
+  const choixExterieur = document.getElementById('params-exterieur') as HTMLDivElement | null
+  const renderExterieur = (): void => {
+    if (!choixExterieur) return
+    choixExterieur.innerHTML = ''
+    for (const [on, label] of [
+      [true, 'AFFICHÉ'],
+      [false, 'MASQUÉ'],
+    ] as const) {
+      const b = document.createElement('button')
+      b.type = 'button'
+      b.textContent = label
+      b.className = exterieurActif === on ? 'actif' : ''
+      b.addEventListener('click', () => {
+        exterieurActif = on
+        try {
+          localStorage.setItem('sujet21-exterieur', on ? 'on' : 'off')
+        } catch {
+          // stockage refusé : le choix ne tiendra que la session
+        }
+        renderExterieur()
+      })
+      choixExterieur.appendChild(b)
+    }
+  }
+  renderExterieur()
 
   const choixVoile = document.getElementById('params-voile') as HTMLDivElement
   const renderVoile = (): void => {
@@ -19397,6 +19437,7 @@ function corpsImage(now: number): boolean {
   // s'affichait plus du tout. Posé à l'image, il ne peut ni arriver trop tôt
   // ni rester en retard d'un tableau.
   renderer.setSolModules(level.coque === 'structures')
+  renderer.setExterieur(exterieurActif)
   renderer.setCiel(
     CIEL_MODE[cielChoix],
     cielReglages.force,

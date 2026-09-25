@@ -1,11 +1,16 @@
 import { describe, it, expect } from 'vitest'
 import {
+  COUCHE_LOINTAIN,
+  COUCHE_MODULE,
+  COUCHE_VOISINS,
+  ECHELLE_LOINTAIN,
+  EMBASE_PROF,
   MAX_PIECES_COQUE,
   PIECE_AILE,
   PIECE_AMARRAGE,
   PIECE_EMBASE,
-  EMBASE_PROF,
   PIECE_FEU,
+  PIECE_MODULE,
   PIECE_PARABOLE,
   PIECE_RADIATEUR,
   PIECE_TREILLIS,
@@ -16,19 +21,20 @@ import {
 import { ATLAS_COQUE } from './coqueAtlas'
 import { COQUE_EPAISSEUR, COQUE_FRANGE } from './coque'
 
-// La cuve standard : 2400 × 1500, et le tableau de la capture du 25/09.
+// La cuve standard : 2400 × 1500.
 const cuve = { minX: -1200, minY: -750, maxX: 1200, maxY: 750 }
 const T = COQUE_EPAISSEUR
 
-const de = (ps: PieceCoque[], type: number) => ps.filter((p) => p.type === type)
-// le côté où une pièce est posée
+const de = (ps: PieceCoque[], type: number, couche = COUCHE_MODULE) =>
+  ps.filter((p) => p.type === type && p.couche === couche)
+// le côté où une pièce du module est posée : l'angle de son repère (son +y
+// regarde le dehors)
 function cote(p: PieceCoque): 'haut' | 'bas' | 'gauche' | 'droite' {
-  // l'angle du repère dit le côté : son +y regarde le dehors
   if (Math.abs(p.angle) < 0.01) return 'haut'
   if (Math.abs(p.angle - Math.PI) < 0.01) return 'bas'
   return p.angle > 0 ? 'gauche' : 'droite'
 }
-// la boîte englobante d'une pièce dans le monde
+// la boîte englobante d'une pièce
 function etendue(p: PieceCoque) {
   const c = Math.abs(Math.cos(p.angle))
   const s = Math.abs(Math.sin(p.angle))
@@ -37,79 +43,47 @@ function etendue(p: PieceCoque) {
   return { minX: p.cx - ex, maxX: p.cx + ex, minY: p.cy - ey, maxY: p.cy + ey }
 }
 
-describe('La composition du matériel de coque', () => {
+describe('Le module : son propre matériel, rien de plus', () => {
   const ps = composeCoque(cuve)
+  const module_ = ps.filter((p) => p.couche === COUCHE_MODULE)
 
-  it('le défaut signalé : plus de rangée de piquets — peu de pièces, et pas cinq fois la même', () => {
-    // l'aperçu du 25/09 : ~25 petites pièces tirées au sort, cinq paraboles
-    // sur un seul côté
-    expect(ps.filter((p) => p.type !== PIECE_EMBASE).length).toBeLessThanOrEqual(18)
-    expect(de(ps, PIECE_PARABOLE)).toHaveLength(1)
+  it('le défaut signalé : le module ne porte plus l’attirail d’un vaisseau entier', () => {
+    // retour du 25/09 : ailes, radiateurs et parabole sur la salle en
+    // faisaient un satellite complet — ils pendent désormais à la poutre
+    expect(de(ps, PIECE_AILE)).toHaveLength(0)
+    expect(de(ps, PIECE_RADIATEUR)).toHaveLength(0)
+    expect(de(ps, PIECE_PARABOLE)).toHaveLength(1) // l'antenne de liaison, petite
   })
 
-  it('un grand côté porte l’énergie : une aile au bout d’un bras en treillis', () => {
-    const ailes = de(ps, PIECE_AILE)
-    expect(ailes.length).toBeGreaterThanOrEqual(1)
-    for (const a of ailes) {
-      expect(['haut', 'bas']).toContain(cote(a))
-      // l'aile est couchée LE LONG de la paroi, et JAMAIS déformée : ses
-      // proportions sont celles de son image quand elle est livrée
-      expect(a.hx).toBeGreaterThan(a.hy)
-      const rapport = ATLAS_COQUE[PIECE_AILE]?.rapport
-      if (rapport) expect(a.hx / a.hy).toBeCloseTo(rapport, 3)
-      // et son bras la relie à la coque : même groupe, entre elle et la paroi
-      const bras = ps.find((p) => p.groupe === a.groupe && p.type === PIECE_TREILLIS)!
-      expect(bras).toBeTruthy()
-      expect(Math.abs(bras.cx - a.cx)).toBeLessThan(1)
-    }
+  it('un port d’amarrage à chaque bout : la salle est un maillon', () => {
+    expect(de(ps, PIECE_AMARRAGE).map(cote).sort()).toEqual(['droite', 'gauche'])
   })
 
-  it('l’autre grand côté porte le froid et la liaison — pas le même que l’énergie', () => {
-    const rad = de(ps, PIECE_RADIATEUR)
-    expect(rad.length).toBeGreaterThanOrEqual(1)
-    const coteEnergie = cote(de(ps, PIECE_AILE)[0])
-    for (const r of rad) expect(cote(r)).not.toBe(coteEnergie)
-    expect(cote(de(ps, PIECE_PARABOLE)[0])).not.toBe(coteEnergie)
+  it('les feux de navigation : rouge à bâbord, vert à tribord', () => {
+    expect(de(ps, PIECE_FEU).map(cote).sort()).toEqual(['droite', 'gauche'])
   })
 
-  it('un petit côté reçoit le port d’amarrage', () => {
-    const port = de(ps, PIECE_AMARRAGE)
-    expect(port).toHaveLength(1)
-    expect(['gauche', 'droite']).toContain(cote(port[0]))
-    // les propulseurs d'angle sont retirés : plus aucune pièce de type 5
-    expect(ps.some((p) => p.type === 5)).toBe(false)
-  })
-
-  it('les feux de navigation : rouge à bâbord, vert à tribord — un de chaque côté', () => {
-    const feux = de(ps, PIECE_FEU)
-    expect(feux.map(cote).sort()).toEqual(['droite', 'gauche'])
-  })
-
-  it('la liaison : chaque groupe tient sur une embase qui MORD dans la coque', () => {
-    const groupes = new Set(ps.map((p) => p.groupe))
+  it('la liaison : chaque groupe du module tient sur une embase qui MORD dans la coque', () => {
+    const groupes = new Set(module_.map((p) => p.groupe))
     for (const g of groupes) {
-      const emb = ps.filter((p) => p.groupe === g && p.type === PIECE_EMBASE)
+      const emb = module_.filter((p) => p.groupe === g && p.type === PIECE_EMBASE)
       expect(emb, `groupe ${g}`).toHaveLength(1)
-      // posée AVANT les pièces de son groupe : dessous à l'écran
-      expect(ps.findIndex((p) => p.groupe === g)).toBe(ps.indexOf(emb[0]))
-      // elle entre dans la coque d'EMBASE_PROF, jamais jusqu'à la cuve
+      // posée AVANT les pièces du module de son groupe : dessous à l'écran
+      expect(module_.findIndex((p) => p.groupe === g)).toBe(module_.indexOf(emb[0]))
       const e = etendue(emb[0])
-      const cote_ = cote(emb[0])
+      const c = cote(emb[0])
       const enfonce =
-        cote_ === 'haut' ? cuve.maxY + T - e.minY
-        : cote_ === 'bas' ? e.maxY - (cuve.minY - T)
-        : cote_ === 'gauche' ? e.maxX - (cuve.minX - T)
+        c === 'haut' ? cuve.maxY + T - e.minY
+        : c === 'bas' ? e.maxY - (cuve.minY - T)
+        : c === 'gauche' ? e.maxX - (cuve.minX - T)
         : cuve.maxX + T - e.minX
       expect(enfonce, `groupe ${g}`).toBeCloseTo(EMBASE_PROF, 3)
     }
-    // les bras ont leurs jambes de force, pas les petites pièces
-    const avecJambes = ps.filter((p) => p.type === PIECE_EMBASE && p.param > 0)
-    expect(avecJambes.length).toBe(de(ps, PIECE_TREILLIS).length - 1) // la parabole : un pylône sans jambes
   })
 
-  it('tout le reste tient dans la frange, dehors : rien ne mord la cuve ni la coque', () => {
+  it('tout le matériel du module tient dans la frange, dehors', () => {
     const H = T + COQUE_FRANGE
-    for (const p of ps.filter((q) => q.type !== PIECE_EMBASE)) {
+    for (const p of module_.filter((q) => q.type !== PIECE_EMBASE)) {
       const e = etendue(p)
       const dansCuve =
         e.maxX > cuve.minX - T + 1 && e.minX < cuve.maxX + T - 1 &&
@@ -121,55 +95,80 @@ describe('La composition du matériel de coque', () => {
       expect(e.maxY).toBeLessThanOrEqual(cuve.maxY + H + 1)
     }
   })
+})
 
-  it('stable : la même salle reçoit la même composition', () => {
-    expect(composeCoque({ ...cuve })).toEqual(ps)
+describe('La station autour : les voisins et le lointain', () => {
+  const ps = composeCoque(cuve)
+
+  it('derrière chaque port, le module voisin file hors de l’écran, dans le plan de la salle', () => {
+    const voisins = de(ps, PIECE_MODULE, COUCHE_VOISINS)
+    expect(voisins).toHaveLength(2)
+    for (const v of voisins) {
+      const port = ps.find((p) => p.groupe === v.groupe && p.type === PIECE_AMARRAGE)!
+      // même axe que son port, et bien plus long qu'un écran
+      expect(Math.abs(v.cy - port.cy)).toBeLessThan(1)
+      expect(2 * v.hy).toBeGreaterThan(4000)
+      // il commence sous le port (qui s'y fond), pas au-delà : pas de jour
+      const eV = etendue(v)
+      const eP = etendue(port)
+      const recouvre = cote(port) === 'gauche' ? eV.maxX - eP.minX : eP.maxX - eV.minX
+      expect(recouvre).toBeGreaterThan(0)
+    }
   })
 
-  it('un long côté porte une paire d’ailes, comme l’ISS ; un court, une seule', () => {
-    expect(de(ps, PIECE_AILE)).toHaveLength(2)
-    const courte = composeCoque({ minX: -900, minY: -600, maxX: 900, maxY: 600 })
-    expect(de(courte, PIECE_AILE)).toHaveLength(1)
+  it('la poutre maîtresse passe au large, derrière, et file des deux côtés', () => {
+    const poutre = de(ps, PIECE_TREILLIS, COUCHE_LOINTAIN)
+    expect(poutre).toHaveLength(1)
+    // elle PARAÎT (distance × échelle) au-delà de la coque, jamais dessus
+    const paraitA = Math.abs(poutre[0].cy) * ECHELLE_LOINTAIN
+    expect(paraitA - poutre[0].hx * ECHELLE_LOINTAIN).toBeGreaterThan(cuve.maxY + T)
+    expect(2 * poutre[0].hy * ECHELLE_LOINTAIN).toBeGreaterThan(10000)
   })
 
-  it('aucune pièce livrée en image n’est déformée : ses proportions sont celles de l’image', () => {
+  it('les grandes ailes et les radiateurs pendent à la poutre, bien plus grands que le module', () => {
+    const ailes = de(ps, PIECE_AILE, COUCHE_LOINTAIN)
+    expect(ailes).toHaveLength(2)
+    expect(de(ps, PIECE_RADIATEUR, COUCHE_LOINTAIN)).toHaveLength(2)
+    // une aile paraît plus large que la salle n'est haute
+    expect(2 * ailes[0].hx * ECHELLE_LOINTAIN).toBeGreaterThan(cuve.maxY - cuve.minY)
+  })
+
+  it('le lointain est posé AVANT tout le reste : dessous', () => {
+    const premier = ps.findIndex((p) => p.couche !== COUCHE_LOINTAIN)
+    expect(ps.slice(premier).some((p) => p.couche === COUCHE_LOINTAIN)).toBe(false)
+  })
+
+  it('aucune pièce peinte n’est déformée : ses proportions sont celles de l’image', () => {
     for (const p of ps) {
       const r = ATLAS_COQUE[p.type]?.rapport
-      if (!r || p.type === PIECE_TREILLIS) continue // le treillis se répète le long du bras
+      if (!r || p.type === PIECE_TREILLIS || p.type === PIECE_MODULE) continue
       const part = p.type === PIECE_AMARRAGE ? p.param : 1
       expect(p.hx / (p.hy / part), `pièce ${p.type}`).toBeCloseTo(r, 3)
     }
   })
 
-  it('le treillis se répète sans s’étirer : une tuile garde le rapport de son image', () => {
-    const r = ATLAS_COQUE[PIECE_TREILLIS]?.rapport
-    for (const t of de(ps, PIECE_TREILLIS)) if (r) expect((2 * t.hx) / t.param).toBeCloseTo(r, 3)
-  })
-
-  it('une salle en hauteur tourne sa composition : l’énergie sur un côté vertical', () => {
+  it('stable, et tournée avec la salle : une salle haute a sa poutre sur un côté vertical', () => {
+    expect(composeCoque({ ...cuve })).toEqual(ps)
     const haute = composeCoque({ minX: -600, minY: -1400, maxX: 600, maxY: 1400 })
-    const aile = de(haute, PIECE_AILE)[0]
-    expect(Math.abs(aile.cy)).toBeLessThan(1400)
-    expect(Math.abs(aile.cx)).toBeGreaterThan(600)
+    const poutre = de(haute, PIECE_TREILLIS, COUCHE_LOINTAIN)[0]
+    expect(Math.abs(poutre.cx)).toBeGreaterThan(600)
+    expect(Math.abs(poutre.cy)).toBeLessThan(1)
   })
 
-  it('arraché par le vide : un bras dont l’attache tombe dans un trou part avec son aile', () => {
-    const aile = de(ps, PIECE_AILE)[0]
-    const bras = ps.find((p) => p.groupe === aile.groupe && p.type === PIECE_TREILLIS)!
-    const trou = { minX: bras.cx - 40, maxX: bras.cx + 40, minY: -2000, maxY: 2000 }
-    // un vide vertical à travers la cuve : il coupe les deux grands côtés
+  it('arraché par le vide : un port percé emporte le module voisin qui s’y tenait', () => {
+    const port = de(ps, PIECE_AMARRAGE)[0]
+    const trou = { minX: port.cx - 400, maxX: port.cx + 400, minY: -200, maxY: 200 }
     const percee = composeCoque(cuve, [trou])
-    expect(percee.some((p) => p.groupe === aile.groupe)).toBe(false)
-    // le reste de la composition tient
-    expect(de(percee, PIECE_AMARRAGE)).toHaveLength(1)
+    expect(percee.some((p) => p.groupe === port.groupe)).toBe(false)
+    expect(de(percee, PIECE_MODULE, COUCHE_VOISINS)).toHaveLength(1)
   })
 
-  it('l’empaquetage suit le plafond du shader', () => {
+  it('l’empaquetage : la couche voyage avec le type, et le plafond du shader tient', () => {
+    expect(ps.length).toBeLessThanOrEqual(MAX_PIECES_COQUE)
     const geo = new Float32Array(MAX_PIECES_COQUE * 4)
     const aux = new Float32Array(MAX_PIECES_COQUE * 4)
     const n = empaquettePieces(ps, geo, aux)
     expect(n).toBe(ps.length)
-    expect([...geo.slice(0, 4)]).toEqual([ps[0].cx, ps[0].cy, ps[0].hx, ps[0].hy].map(Math.fround))
-    expect(aux[0]).toBe(ps[0].type)
+    for (let i = 0; i < n; i++) expect(aux[i * 4]).toBe(ps[i].type + 16 * ps[i].couche)
   })
 })

@@ -40,6 +40,13 @@ export const MAX_VIDES_COQUE = 16
 export const COQUE_FLOTTANTS = 6
 /** 4 bandes × 2 triangles × 3 sommets. */
 export const COQUE_SOMMETS = 24
+/** Le FOND DE STATION : un grand quadrilatère sous les bandes, où se posent
+ *  les modules voisins et le lointain (compositionCoque.ts). Côté 4 : le
+ *  shader le reconnaît, et s'arrête sur la cuve et sa coque. */
+export const STATION_SOMMETS = 6
+export const COTE_STATION = 4
+/** Assez large pour couvrir l'écran au plus fort recul. */
+export const STATION_MARGE = 20000
 
 // Les côtés, dans l'ordre où le shader les lit (vCote) : la normale
 // sortante s'en déduit — 0 haut (+y), 1 bas (−y), 2 gauche (−x), 3 droite (+x).
@@ -152,4 +159,32 @@ export function videsPercantLaCoque(
     k++
   }
   return k
+}
+
+/** Écrit le fond de station (STATION_SOMMETS sommets) à partir de `debut`
+ *  (en sommets) dans `out` : un rectangle autour de la cuve, au même format
+ *  que les bandes. Renvoie le nombre de sommets écrits. */
+export function remplitFondStation(b: Bounds, out: Float32Array, debut: number): number {
+  const m = STATION_MARGE
+  const x0 = b.minX - m
+  const x1 = b.maxX + m
+  const y0 = b.minY - m
+  const y1 = b.maxY + m
+  let o = debut * COQUE_FLOTTANTS
+  for (const [x, y] of [
+    [x0, y0],
+    [x1, y0],
+    [x1, y1],
+    [x0, y0],
+    [x1, y1],
+    [x0, y1],
+  ]) {
+    out[o++] = x
+    out[o++] = y
+    out[o++] = 0
+    out[o++] = 0
+    out[o++] = COTE_STATION
+    out[o++] = 0
+  }
+  return STATION_SOMMETS
 }

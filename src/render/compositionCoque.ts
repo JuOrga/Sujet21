@@ -10,19 +10,24 @@
 //
 // LA RÈGLE : tout est vu de dessus, et chaque salle reçoit une composition
 // écrite pour sa forme, stable d'un chargement à l'autre (tirée sur ses
-// bornes) :
-//   - un grand côté porte l'ÉNERGIE : un bras en treillis qui sort de la
-//     coque et, au bout, une aile solaire couchée le long de la paroi ;
-//     deux bras sur une très longue salle ;
-//   - l'autre grand côté porte le FROID et la LIAISON : des radiateurs qui
-//     s'écartent de la coque, et une parabole près d'un bout ;
-//   - un petit côté porte l'AMARRAGE : un port et l'amorce du module
-//     voisin — la salle est un maillon, pas une boîte perdue ;
-//   - les feux de navigation : rouge à bâbord (gauche), vert à tribord
-//     (droite). Les propulseurs d'angle ont été retirés (25/09) : aucune
-//     version, tracée ou peinte, ne tenait à côté des pièces peintes.
+// bornes), en TROIS COUCHES :
+//   0. LE MODULE — son propre matériel, rien de plus : un port d'amarrage à
+//      chaque bout, une antenne de liaison, ses feux de navigation (rouge à
+//      bâbord, vert à tribord). Il portait auparavant ailes, radiateurs et
+//      parabole : l'attirail d'un satellite entier, et la salle se lisait
+//      comme LE vaisseau (retour du 25/09). Sur l'ISS, un module n'en porte
+//      aucun : ils pendent à la poutre maîtresse.
+//   1. LES VOISINS — derrière chaque port, le module suivant, dans le plan
+//      de la salle, jusqu'au-delà de l'écran : la salle est un maillon.
+//   2. LE LOINTAIN — la poutre maîtresse de la station, qui passe au large,
+//      avec les grandes ailes solaires et les radiateurs qui y pendent. En
+//      PARALLAXE (échelle et défilement ECHELLE_LOINTAIN) : plus petite,
+//      plus lente, derrière — la station est bien plus grande que ce qu'on
+//      en voit.
+// Les propulseurs d'angle ont été retirés (25/09) : aucune version, tracée
+// ou peinte, ne tenait à côté des pièces peintes.
 // Une pièce dont l'attache tombe dans un VIDE est retirée avec tout son
-// groupe (un bras sans coque où tenir ne porte plus son aile).
+// groupe (un port arraché emporte le module voisin qui s'y tenait).
 //
 // Ce module ne dessine rien : il produit la liste que le shader parcourt
 // (drawHull, renderer.ts). C'est lui qui se teste.
@@ -47,6 +52,19 @@ export const PIECE_FEU = 6
  *  comme collées (aperçu du 25/09). Tracée par le shader, jamais peinte. */
 export const PIECE_EMBASE = 7
 export const EMBASE_PROF = 22
+/** Le MODULE VOISIN : le cylindre qui prolonge un port d'amarrage. Peint
+ *  avec l'image du port (sa partie au-dessus de la collerette, répétée en
+ *  miroir), sinon tracé. */
+export const PIECE_MODULE = 8
+
+/** Les couches (voir l'en-tête). */
+export const COUCHE_MODULE = 0
+export const COUCHE_VOISINS = 1
+export const COUCHE_LOINTAIN = 2
+/** Le lointain est vu à cette échelle, et défile à cette fraction du
+ *  mouvement de la caméra (les deux vont ensemble : c'est la profondeur).
+ *  Le shader en tire P = C + (W − C) / s. */
+export const ECHELLE_LOINTAIN = 0.55
 
 /** Le plafond du shader (uniformes) : une composition en pose une douzaine
  *  à une vingtaine ; au-delà, les dernières sont laissées. */
@@ -67,6 +85,9 @@ export interface PieceCoque {
   graine: number
   /** Le groupe : un bras et son aile tombent ensemble. */
   groupe: number
+  /** La couche : 0 le module, 1 ses voisins, 2 le lointain (coordonnées
+   *  du plan lointain — voir ECHELLE_LOINTAIN). */
+  couche: number
   /** Selon le type — treillis : la longueur d'une répétition de l'image le
    *  long du bras ; port d'amarrage : la part de l'image montrée depuis la
    *  collerette (le module voisin sort du cadre). 0 : sans objet. */
@@ -134,9 +155,8 @@ export function composeCoque(b: Bounds, vides: readonly FormeBox[] = []): PieceC
   const grands = horizontale ? [c.haut, c.bas] : [c.gauche, c.droite]
   const petits = horizontale ? [c.gauche, c.droite] : [c.haut, c.bas]
   if (alea() < 0.5) grands.reverse()
-  if (alea() < 0.5) petits.reverse()
-  const [energie, froid] = grands
-  const [amarrage, arriere] = petits
+  // le côté DORSAL est celui au large duquel passe la poutre maîtresse
+  const [dorsal, ventral] = grands
 
   const pieces: PieceCoque[] = []
   const attaches: { groupe: number; x: number; y: number }[] = []
@@ -152,6 +172,7 @@ export function composeCoque(b: Bounds, vides: readonly FormeBox[] = []): PieceC
     hy: number,
     g: number,
     param = 0,
+    couche = COUCHE_MODULE,
   ) => {
     pieces.push({
       type,
@@ -163,85 +184,119 @@ export function composeCoque(b: Bounds, vides: readonly FormeBox[] = []): PieceC
       graine: alea(),
       groupe: g,
       param,
+      couche,
     })
   }
   // l'attache d'un groupe : le point qui décide s'il tient (le vide), et son
   // EMBASE — posée AVANT les pièces du groupe, donc dessous. `pied` : la
   // largeur de ce qui sort de la coque ; `entretoises` : deux jambes de
-  // force en biais, pour ce qui porte loin (les bras).
+  // force en biais, pour ce qui porte loin.
   const attache = (cote: Cote, s: number, g: number, pied: number, entretoises = false) => {
     attaches.push({ groupe: g, x: cote.ox + cote.ax * s - cote.nx * 4, y: cote.oy + cote.ay * s - cote.ny * 4 })
     const haut = entretoises ? 48 : 10
     pose(cote, PIECE_EMBASE, s, (haut - EMBASE_PROF) / 2, pied / 2 + (entretoises ? 34 : 20), (haut + EMBASE_PROF) / 2, g, entretoises ? pied / 2 : -pied / 2)
   }
-
-  // la largeur du bras en treillis, et la longueur d'une répétition de son
-  // image le long du bras (elle se raccorde bout à bout)
   const largeurBras = 46
   const tuileBras = largeurBras / rapportDe(PIECE_TREILLIS, 0.19)
   const bras = (cote: Cote, s: number, long: number, g: number) =>
     pose(cote, PIECE_TREILLIS, s, long / 2, largeurBras / 2, long / 2, g, tuileBras)
 
-  // L'ÉNERGIE : des ailes couchées le long de la paroi, chacune au bout d'un
-  // bras court — deux sur un long côté, comme les paires de l'ISS. Leur
-  // hauteur (vers le dehors) est bornée par la frange ; la largeur suit
-  // le rapport de l'image.
+  // ——— LE LOINTAIN (dessous de tout, posé en premier) ———————————————
+  // La poutre maîtresse passe au large du côté dorsal, parallèle au grand
+  // axe, et file des deux côtés hors de l'écran ; ailes et radiateurs y
+  // pendent, tournés vers le dehors. Coordonnées du PLAN LOINTAIN : son
+  // centre est celui de la salle, et une distance D y paraît D × s.
   {
-    const L = energie.long
-    const places = L > 2000 ? [0.25, 0.75] : [0.5]
-    const rapport = rapportDe(PIECE_AILE, 7)
-    const longBras = 110 + 30 * alea()
-    let hAile = 430
-    // deux ailes ne se touchent pas, une seule ne déborde pas de la paroi
-    const largeurMax = (places.length > 1 ? 0.46 : 0.8) * L
-    if (hAile * rapport > largeurMax) hAile = largeurMax / rapport
-    for (const f of places) {
-      const g = ++groupe
-      const s = f * L
-      attache(energie, s, g, largeurBras, true)
-      bras(energie, s, longBras, g)
-      pose(energie, PIECE_AILE, s, longBras + hAile / 2, (hAile * rapport) / 2, hAile / 2, g)
+    const sL = ECHELLE_LOINTAIN
+    const cx = (b.minX + b.maxX) / 2
+    const cy = (b.minY + b.maxY) / 2
+    const demiCourt = Math.min(b.maxX - b.minX, b.maxY - b.minY) / 2
+    // la poutre paraît à ~420 u au-delà de la coque, derrière le matériel
+    // du module
+    const D = (demiCourt + COQUE_EPAISSEUR + 420) / sL
+    const nx = dorsal.nx
+    const ny = dorsal.ny
+    const ax = dorsal.ax
+    const ay = dorsal.ay
+    const g = ++groupe
+    const loin = (type: number, le: number, dehors: number, hx: number, hy: number, param = 0) =>
+      pieces.push({
+        type,
+        cx: cx + ax * le + nx * (D + dehors),
+        cy: cy + ay * le + ny * (D + dehors),
+        hx,
+        hy,
+        angle: dorsal.angle,
+        graine: alea(),
+        groupe: g,
+        param,
+        couche: COUCHE_LOINTAIN,
+      })
+    // la poutre : un treillis couché le long du grand axe, très long ; son
+    // repère est celui d'un bras tourné d'un quart de tour
+    const largeurPoutre = 150
+    const longPoutre = 40000
+    pieces.push({
+      type: PIECE_TREILLIS,
+      cx: cx + nx * D,
+      cy: cy + ny * D,
+      hx: largeurPoutre / 2,
+      hy: longPoutre / 2,
+      angle: dorsal.angle - Math.PI / 2,
+      graine: alea(),
+      groupe: g,
+      param: largeurPoutre / rapportDe(PIECE_TREILLIS, 0.19),
+      couche: COUCHE_LOINTAIN,
+    })
+    // les grandes ailes, deux paires, et les radiateurs entre elles
+    const hAile = 1400
+    const lAile = hAile * rapportDe(PIECE_AILE, 2.12)
+    for (const le of [-1, 1].map((k) => k * (lAile / 2 + 1300))) {
+      loin(PIECE_AILE, le, largeurPoutre / 2 + hAile / 2 - 20, lAile / 2, hAile / 2)
+    }
+    const hRad = 900
+    const lRad = hRad * rapportDe(PIECE_RADIATEUR, 0.4)
+    for (const le of [-600, 600]) {
+      loin(PIECE_RADIATEUR, le, largeurPoutre / 2 + hRad / 2 - 20, lRad / 2, hRad / 2)
     }
   }
-  // LE FROID ET LA LIAISON : deux radiateurs qui s'écartent, une parabole
-  {
-    const L = froid.long
-    const radiateurs = L > 1400 ? [0.33, 0.62] : [0.5]
-    const hRad = 380
-    const lRad = hRad * rapportDe(PIECE_RADIATEUR, 0.33)
-    for (const f of radiateurs) {
-      const g = ++groupe
-      const s = f * L
-      attache(froid, s, g, largeurBras, true)
-      bras(froid, s, 44, g)
-      pose(froid, PIECE_RADIATEUR, s, 44 + hRad / 2, lRad / 2, hRad / 2, g)
-    }
+
+  // ——— LE MODULE, et ses voisins derrière ses ports ———————————————
+  // un port d'amarrage à chaque bout ; derrière chacun, le module voisin
+  for (const cote of petits) {
+    if (cote.long < 700) continue
     const g = ++groupe
-    const s = (alea() < 0.5 ? 0.12 : 0.88) * L
-    // la parabole sur un pylône court : elle ne flotte plus devant la coque
-    attache(froid, s, g, 30)
-    bras(froid, s, 40, g)
-    const dParab = 150
-    const hParab = dParab / rapportDe(PIECE_PARABOLE, 1)
-    pose(froid, PIECE_PARABOLE, s, 30 + hParab / 2, dParab / 2, hParab / 2, g)
-  }
-  // L'AMARRAGE : le port, et l'amorce du module voisin qui s'y raccorde. On
-  // ne montre que le bas de l'image (la collerette et un tronçon) : le
-  // module continue au-delà, dans le noir.
-  if (amarrage.long >= 700) {
-    const g = ++groupe
-    const s = amarrage.long / 2
+    const s = cote.long / 2
     const largeur = 340
-    attache(amarrage, s, g, largeur * 0.9)
+    attache(cote, s, g, largeur * 0.9)
     const part = 0.62
     const h = (largeur / rapportDe(PIECE_AMARRAGE, 1.13)) * (ATLAS_COQUE[PIECE_AMARRAGE] ? part : 1)
-    pose(amarrage, PIECE_AMARRAGE, s, h / 2, largeur / 2, h / 2, g, ATLAS_COQUE[PIECE_AMARRAGE] ? part : 0)
+    // le voisin d'abord (couche 1, dessiné sous le module de toute façon) :
+    // il commence sous le haut du port, qui s'y fond, et file hors de
+    // l'écran. Sa tuile : la partie cylindre de l'image du port.
+    const longVoisin = 6000
+    const debut = h - 60
+    const largeurCyl = largeur * 0.95
+    // une tuile : la bande haute de l'image du port (26 % de sa hauteur)
+    const tuile = largeurCyl / (rapportDe(PIECE_AMARRAGE, 1.13) / 0.26)
+    pose(cote, PIECE_MODULE, s, debut + longVoisin / 2, largeurCyl / 2, longVoisin / 2, g,
+      tuile, COUCHE_VOISINS)
+    pose(cote, PIECE_AMARRAGE, s, h / 2, largeur / 2, h / 2, g, ATLAS_COQUE[PIECE_AMARRAGE] ? part : 0)
   }
-  // LES FEUX DE NAVIGATION : un par côté latéral (pas sur le port
-  // d'amarrage, qui tient le milieu du sien)
+  // l'antenne de liaison : une parabole sur un pylône court, près d'un bout
+  // du côté ventral (le dorsal regarde la poutre)
+  {
+    const g = ++groupe
+    const s = (alea() < 0.5 ? 0.14 : 0.86) * ventral.long
+    attache(ventral, s, g, 30)
+    bras(ventral, s, 40, g)
+    const dParab = 130
+    const hParab = dParab / rapportDe(PIECE_PARABOLE, 1)
+    pose(ventral, PIECE_PARABOLE, s, 30 + hParab / 2, dParab / 2, hParab / 2, g)
+  }
+  // les feux de navigation : un par côté latéral, à l'écart du port
   for (const cote of [c.gauche, c.droite]) {
-    const s = cote === arriere ? cote.long / 2 : cote.long * (alea() < 0.5 ? 0.25 : 0.75)
-    if (cote === amarrage && Math.abs(s - cote.long / 2) < 260) continue
+    const s = cote.long * (alea() < 0.5 ? 0.2 : 0.8)
     const g = ++groupe
     attache(cote, s, g, 18)
     pose(cote, PIECE_FEU, s, 14, 14, 14, g)
@@ -255,7 +310,7 @@ export function composeCoque(b: Bounds, vides: readonly FormeBox[] = []): PieceC
   return pieces.filter((p) => !perdus.has(p.groupe)).slice(0, MAX_PIECES_COQUE)
 }
 
-/** Empaquette pour le shader : (cx, cy, hx, hy) et (type, angle, graine, param)
+/** Empaquette pour le shader : (cx, cy, hx, hy) et (type + 16·couche, angle, graine, param)
  *  par pièce. Renvoie le nombre de pièces écrites. */
 export function empaquettePieces(
   pieces: readonly PieceCoque[],
@@ -266,7 +321,7 @@ export function empaquettePieces(
   for (let i = 0; i < n; i++) {
     const p = pieces[i]
     outGeo.set([p.cx, p.cy, p.hx, p.hy], i * 4)
-    outAux.set([p.type, p.angle, p.graine, p.param], i * 4)
+    outAux.set([p.type + 16 * p.couche, p.angle, p.graine, p.param], i * 4)
   }
   return n
 }

@@ -1511,3 +1511,21 @@ Cadrage : la platine sur toute la largeur ; la douille (où entre le bras) au mi
 ```
 Retro-futuristic 1970s orbital laboratory hardware, NASA/ISS-inspired, realistic worn industrial detail: riveted steel, weld seams, scuffed paint, bolts, small stencilled hazard markings. Muted cold palette: steel blue-grey #0a1420 to #2a3542, off-white quilted thermal blankets, a single cyan accent #63b7e6, amber only on tiny indicator lamps. STRICT TOP-DOWN ORTHOGRAPHIC VIEW, seen from directly above like a floor plan or a satellite photo, no perspective, no 3/4 angle, no side faces visible. Hard sunlight from the upper left: lit edges catch a thin bright rim, the lower right sides fall into deep shadow. Isolated single object on a fully TRANSPARENT background, filling the frame with a small empty margin, crisp clean silhouette, high detail, 2D game asset. Subject: one heavy bolted mounting base that fixes an external structure onto the hull of a space station, seen from directly above, in a 2:1 landscape image. A wide rectangular steel plate with chamfered corners and two rows of large hex bolts, a raised square flange socket in the middle where a lattice arm plugs in, two diagonal bracing struts rising from the plate corners towards the socket, a bundle of cables leaving the socket and disappearing into a small hatch on the plate, a thin yellow-black hazard stripe along the bottom edge. The bottom edge of the image is where the plate meets the hull. Avoid: side view, profile view, perspective, isometric, 3/4 view, ground, floor, cast shadow on a surface, background scenery, stars, planet, text, labels, logos, watermark, frame, border.
 ```
+
+## 29. LA BANDE DE COQUE — `hull.webp` (refonte, 25/09)
+
+La paroi de la cuve, vue de dessus : c'est elle qu'on voit le plus, et la
+bande livrée (un aplat métallique répété) restait la partie la plus pauvre
+de l'image. **Une seule image, qui se répète** le long des quatre côtés.
+
+**Sens à respecter** : le bord **BAS** de l'image est le côté SALLE (le
+trait lumineux cyan), le bord **HAUT** est le DEHORS (la peau du module).
+Le moteur lit la longueur d'une répétition dans le rapport de l'image :
+elle n'est jamais étirée.
+
+Livraison : `masters/images/hull.png`, puis `python3 tools/images/prepare.py hull`
+(raccord gauche-droite mesuré, luminance ≤ 0,25, ≤ 120 Ko).
+
+```
+Retro-futuristic 1970s orbital laboratory hardware, NASA/ISS-inspired, realistic worn industrial detail: riveted steel, weld seams, scuffed paint, bolts, small stencilled hazard markings. Muted cold palette: steel blue-grey #0a1420 to #2a3542, off-white quilted thermal blankets, a single cyan accent #63b7e6, amber only on tiny indicator lamps. STRICT TOP-DOWN ORTHOGRAPHIC VIEW, seen from directly above like a floor plan, no perspective, no side faces visible. Hard sunlight from the upper left. Subject: a long horizontal strip, 3:1 landscape, SEAMLESSLY TILEABLE LEFT-RIGHT (the left and right edges must match perfectly), showing the thick hull wall of a space station module seen from above, like the top of a wall on an architectural plan. From bottom to top: along the BOTTOM edge, the inner face of the wall with one thin continuous glowing cyan light strip (#63b7e6); then the body of the wall, heavy structural steel: bolted armour plates of varied lengths, a recessed channel carrying two or three pipes and cable bundles with clamps, reinforcing ribs crossing the wall every so often, a small maintenance hatch, faded stencilled markings; along the TOP edge, the outer skin of the module: a narrow band of off-white quilted thermal blanket held by a thin riveted metal rim. Overall dark and low-contrast (average brightness around 20 %), so that the lit room inside stays the brightest thing. Fills the whole image, no margin, no transparency. Avoid: perspective, 3/4 view, side view, vanishing point, seams at the left and right edges, bright colours, text, labels, logos, watermark, frame, border.
+```

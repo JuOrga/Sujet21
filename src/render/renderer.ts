@@ -34,10 +34,19 @@ import {
   COQUE_REP,
   COQUE_SOMMETS,
   MAX_VIDES_COQUE,
+  STATION_SOMMETS,
   remplitBandesCoque,
+  remplitFondStation,
   videsPercantLaCoque,
 } from './coque'
-import { MAX_PIECES_COQUE, composeCoque, empaquettePieces } from './compositionCoque'
+import {
+  ECHELLE_LOINTAIN,
+  MAX_PIECES_COQUE,
+  PIECE_AMARRAGE,
+  PIECE_MODULE,
+  composeCoque,
+  empaquettePieces,
+} from './compositionCoque'
 import { ATLAS_COQUE } from './coqueAtlas'
 
 // Budgets de rendu : au-delà, les éléments excédentaires ne sont plus
@@ -2869,9 +2878,13 @@ uniform sampler2D uTexHull;
 uniform int uPieceCount;
 uniform sampler2D uTexMateriel; // l'atlas des pièces (coqueAtlas.ts)
 uniform float uHasMateriel;
-uniform vec4 uAtlas[8];          // par type : u0, v0, u1, v1 (origine en haut) — u1 = 0 : pas d'image
+uniform vec4 uAtlas[16];         // par type : u0, v0, u1, v1 (origine en haut) — u1 = 0 : pas d'image
+uniform float uExterieur;        // 0 : le dehors du module est masqué (réglage), la coque reste
+uniform vec4 uCuve;              // la cuve : minX, minY, maxX, maxY
+uniform float uEchelleLoin;      // le plan lointain : échelle et défilement (compositionCoque.ts)
 uniform vec4 uPieces[MAX_PIECES];    // centre, demi-dimensions (le long, vers le dehors)
 uniform vec4 uPiecesAux[MAX_PIECES]; // type, angle du repère, graine, —
+uniform vec2 uCenter;
 uniform float uZoom;
 uniform float uTime;
 uniform float uEpais;
@@ -3041,6 +3054,16 @@ void dessinePiece(inout vec4 acc, vec2 q, vec2 h, float type, float g, float an,
     float cadre = max(min(mem, zig), abs(q.y) - h.y);
     piece(acc, cadre, acierC, px);
     piece(acc, max(abs(q.x) - 3.0, abs(q.y) - h.y), vec3(0.07, 0.065, 0.06), px); // le câble porté
+  } else if (type > 7.5) {
+    // LE MODULE VOISIN, tracé : un cylindre éclairé, couvertures claires,
+    // anneaux de renfort
+    float rc = h.x;
+    float nx = clamp(q.x / rc, -1.0, 1.0);
+    vec3 n = vec3(nx, 0.0, sqrt(max(0.0, 1.0 - nx * nx)));
+    float lum = 0.18 + 0.82 * max(0.0, dot(n, normalize(vec3(soleil, 0.9))));
+    float anneau = 1.0 - smoothstep(1.5, 3.5, abs(mod(q.y, 150.0) - 75.0) - 71.0);
+    vec3 c = mix(vec3(0.30, 0.31, 0.33), vec3(0.10, 0.12, 0.15), anneau) * lum;
+    pose(acc, c, 1.0 - smoothstep(-0.5 * px, 0.5 * px, abs(q.x) - rc));
   } else if (type > 6.5) {
     // L'EMBASE : la platine boulonnée qui tient la pièce. Elle MORD dans la
     // coque (y < 0) — c'est elle qui fait la liaison. Une ombre de contact
@@ -3123,6 +3146,13 @@ void peintPiece(inout vec4 acc, vec2 q, vec2 h, float type, float g, float param
   if (type > 3.5 && type < 4.5) { // treillis : des tuiles bout à bout
     vi = fract((q.y + h.y) / param);
     dv = (r.w - r.y) / param;
+  } else if (type > 7.5) { // module voisin : le cylindre du port, en miroir
+    // la partie HAUTE de l'image (74 % à 100 % depuis le bas : couvertures,
+    // anneau, mains courantes), répétée en aller-retour — pas de couture à
+    // raccorder. La bande du hublot n'y entre pas : répété, il faisait motif.
+    float t = (q.y + h.y) / param;
+    vi = 0.74 + 0.26 * abs(fract(t * 0.5) * 2.0 - 1.0);
+    dv = (r.w - r.y) * 0.26 / param;
   } else if (type > 2.5 && type < 3.5 && param > 0.0) { // amarrage
     vi = vv * param;
     dv *= param;
@@ -3191,29 +3221,55 @@ void fondDeCoque(inout vec4 acc, float s, float y, float cote, float px) {
 }
 
 // La boucle des pièces de la composition, dans l'ordre (une embase avant sa
-// pièce, un bras avant son aile). Dans la coque, seules les EMBASES se
-// posent : elles mordent dans la tôle, le reste est dehors.
-void poseLesPieces(inout vec4 acc, float px, bool embasesSeules) {
+// pièce, un bras avant son aile). « mode » : 0 la frange (le matériel du
+// module), 1 la coque (ses seules EMBASES, qui mordent dans la tôle), et
+// « couche » choisit, pour la station, les voisins (1) ou le lointain (2).
+void poseCouche(inout vec4 acc, vec2 w, float px, int mode, float couche) {
   for (int i = 0; i < MAX_PIECES; i++) {
     if (i >= uPieceCount) break;
     vec4 geo = uPieces[i];
     vec4 aux = uPiecesAux[i];
-    if (embasesSeules && aux.x < 6.5) continue;
-    vec2 rel = vWorld - geo.xy;
-    // la marge : les halos des feux, les bouffées, l'ombre des embases
+    float c = floor(aux.x / 16.0);
+    float type = aux.x - 16.0 * c;
+    if (abs(c - couche) > 0.5) continue;
+    if (mode == 1 && type < 6.5) continue;
+    vec2 rel = w - geo.xy;
+    // la marge : les halos des feux, l'ombre des embases
     if (length(rel) > length(geo.zw) + 40.0) continue;
     float ca = cos(aux.y);
     float sa = sin(aux.y);
     vec2 q = vec2(ca * rel.x + sa * rel.y, -sa * rel.x + ca * rel.y);
     vec2 soleil = normalize(vec2(ca * -0.6 + sa * 0.8, -sa * -0.6 + ca * 0.8));
-    vec4 rect = uAtlas[int(aux.x)];
-    if (uHasMateriel > 0.5 && rect.z > rect.x) peintPiece(acc, q, geo.zw, aux.x, aux.z, aux.w, rect, px);
-    else dessinePiece(acc, q, geo.zw, aux.x, aux.z, aux.y, aux.w, soleil, px);
+    vec4 rect = uAtlas[int(type)];
+    if (uHasMateriel > 0.5 && rect.z > rect.x) peintPiece(acc, q, geo.zw, type, aux.z, aux.w, rect, px);
+    else dessinePiece(acc, q, geo.zw, type, aux.z, aux.y, aux.w, soleil, px);
   }
+}
+void poseLesPieces(inout vec4 acc, float px, bool embasesSeules) {
+  if (uExterieur < 0.5) return;
+  poseCouche(acc, vWorld, px, embasesSeules ? 1 : 0, 0.0);
 }
 
 void main() {
   float px = 1.0 / max(uZoom, 1e-4); // un pixel d'écran, en unités monde
+  if (vCote.x > 3.5) {
+    // LA STATION AUTOUR : le lointain (la poutre maîtresse, ses ailes et
+    // ses radiateurs, en parallaxe), puis les modules voisins dans le plan
+    // de la salle. Tout ce qui est cuve ou coque le couvre : on s'y arrête.
+    if (uExterieur < 0.5) discard;
+    vec2 e = vec2(uEpais);
+    if (all(greaterThan(vWorld, uCuve.xy - e)) && all(lessThan(vWorld, uCuve.zw + e))) discard;
+    vec4 acc = vec4(0.0);
+    // le plan lointain : plus petit, plus lent — P = C + (W − C) / s
+    vec2 wl = uCenter + (vWorld - uCenter) / uEchelleLoin;
+    poseCouche(acc, wl, px / uEchelleLoin, 0, 2.0);
+    // la distance : plus sombre, bleuie par la brume de lumière diffuse
+    acc.rgb *= vec3(0.46, 0.52, 0.64);
+    poseCouche(acc, vWorld, px, 0, 1.0);
+    if (acc.a < 0.002 && max(acc.r, max(acc.g, acc.b)) < 0.002) discard;
+    outColor = acc;
+    return;
+  }
   float s = vUv.x;
   float a = vUv.y;
   float cote = vCote.x;
@@ -3352,7 +3408,7 @@ export class Renderer {
   private readonly decalVao: WebGLVertexArrayObject
   private readonly decalVbo: WebGLBuffer
   // 4 bandes × 6 sommets × (pos, le long / en travers, côté / longueur)
-  private readonly hullScratch = new Float32Array(COQUE_SOMMETS * COQUE_FLOTTANTS)
+  private readonly hullScratch = new Float32Array((COQUE_SOMMETS + STATION_SOMMETS) * COQUE_FLOTTANTS)
   // les vides qui percent la coque (coque.ts) : boîte, et (code, angle)
   private readonly videsCoque = new Float32Array(MAX_VIDES_COQUE * 4)
   private readonly videsCoqueAux = new Float32Array(MAX_VIDES_COQUE * 2)
@@ -3419,9 +3475,14 @@ export class Renderer {
   // l'atlas des pièces peintes (tools/images/materiel.py) : absent ou pas
   // encore chargé, le shader trace les pièces lui-même
   private texMateriel: WebGLTexture | null = null
+  // le dehors du module (voisins, lointain, matériel) : un réglage du
+  // joueur (main.ts) — masqué, il ne reste que la coque et ses vides
+  private exterieur = false
+  private hullRep = COQUE_REP
   private readonly atlasRects = new Float32Array(
-    Array.from({ length: 8 }, (_, i) => {
-      const r = ATLAS_COQUE[i]
+    Array.from({ length: 16 }, (_, i) => {
+      // le module voisin se peint avec l'image du port d'amarrage
+      const r = ATLAS_COQUE[i === PIECE_MODULE ? PIECE_AMARRAGE : i]
       return r ? [r.u0, r.v0, r.u1, r.v1] : [0, 0, 0, 0]
     }).flat(),
   )
@@ -3678,7 +3739,13 @@ export class Renderer {
       false,
       (t) => (this.texIris = t),
     )
-    this.loadTexture('/assets/hull.webp', true, true, (t) => (this.texHull = t))
+    // la longueur d'une répétition de la bande de coque suit le rapport de
+    // son IMAGE (épaisseur × largeur / hauteur) : une nouvelle bande n'est
+    // jamais étirée, quel que soit son format
+    this.loadTexture('/assets/hull.webp', true, true, (t, img) => {
+      this.texHull = t
+      if (img.naturalHeight > 0) this.hullRep = (COQUE_EPAISSEUR * img.naturalWidth) / img.naturalHeight
+    })
     if (ATLAS_COQUE.some((r) => r))
       this.loadTexture('/assets/coque-materiel.webp', false, true, (t) => (this.texMateriel = t))
     this.loadTexture(
@@ -3875,6 +3942,12 @@ export class Renderer {
     this.parSemis[1] = semis[1]
     this.parCuve[0] = cuve[0]
     this.parCuve[1] = cuve[1]
+  }
+
+  /** Le dehors du module : ses voisins, la station au loin, son matériel
+   *  de coque. Réglage du joueur (main.ts). */
+  setExterieur(actif: boolean): void {
+    this.exterieur = actif
   }
 
   setSolModules(actif: boolean): void {
@@ -4699,6 +4772,7 @@ export class Renderer {
     const b = sim.bounds
     const boxCount = Math.min(boxes.length, MAX_BOXES)
     const sommets = remplitBandesCoque(b, this.hullScratch)
+    remplitFondStation(b, this.hullScratch, sommets)
     // la composition ne change qu'avec la cuve et ses vides : recomposée
     // à ce moment-là seulement, pas à chaque image
     const vides = boxes.filter((bx) => bx.material === MAT_VIDE)
@@ -4725,7 +4799,7 @@ export class Renderer {
     gl.uniform1f(hu['uZoom'], camera.zoom)
     gl.uniform1f(hu['uTime'], timeSec)
     gl.uniform1f(hu['uEpais'], COQUE_EPAISSEUR)
-    gl.uniform1f(hu['uRep'], COQUE_REP)
+    gl.uniform1f(hu['uRep'], this.hullRep)
     gl.uniform1i(hu['uVideCount'], nVides)
     if (nVides > 0) {
       gl.uniform4fv(hu['uVides[0]'], this.videsCoque)
@@ -4735,6 +4809,9 @@ export class Renderer {
     gl.bindTexture(gl.TEXTURE_2D, this.texHull)
     gl.uniform1i(hu['uTexHull'], 0)
     gl.uniform1i(hu['uPieceCount'], this.piecesCount)
+    gl.uniform1f(hu['uExterieur'], this.exterieur ? 1 : 0)
+    gl.uniform4f(hu['uCuve'], b.minX, b.minY, b.maxX, b.maxY)
+    gl.uniform1f(hu['uEchelleLoin'], ECHELLE_LOINTAIN)
     gl.uniform4fv(hu['uAtlas[0]'], this.atlasRects)
     gl.uniform1f(hu['uHasMateriel'], this.texMateriel ? 1 : 0)
     gl.activeTexture(gl.TEXTURE1)
@@ -4749,6 +4826,8 @@ export class Renderer {
     gl.enable(gl.BLEND)
     gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA)
     gl.bindVertexArray(this.hullVao)
+    // la station d'abord (dessous), puis les bandes de coque et leur frange
+    if (this.exterieur) gl.drawArrays(gl.TRIANGLES, sommets, STATION_SOMMETS)
     gl.drawArrays(gl.TRIANGLES, 0, sommets)
     gl.bindVertexArray(null)
     gl.disable(gl.BLEND)
