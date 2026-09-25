@@ -5,16 +5,60 @@ DEHORS**) :
 
 | mode | ce que c'est | ce que ça coûte |
 |---|---|---|
-| **PLAQUE** (défaut) | une image de 4096 × 4096 — `public/assets/ciel.webp` | ~1 Mo au téléchargement, ~90 Mo de mémoire graphique |
+| **PLAQUE** (défaut) | un calque HTML : `public/assets/ciel.webp` (2400², une vraie photographie) et trois tuiles d'étoiles | ~1,4 Mo au téléchargement ; composé par le navigateur, sans calcul par pixel |
 | **TUILE** | l'ancien fond : deux petites textures répétées | ~0,1 Mo |
 | **PROCÉDURAL** | rien à charger, le vide est entièrement calculé | zéro |
 
 La plaque **ne se télécharge qu'à son premier affichage**. Qui la coupe ne la
 paie jamais.
 
+**LE CIEL EST UN CALQUE HTML, DERRIÈRE LA TOILE** (`src/render/cielCalque.ts`).
+Il était peint par le shader, donc à la définition de la toile — que le
+réglage de résolution rétrécit (moyenne ×0,75, faible ×0,5, et l'adaptatif,
+défaut des tablettes). La plus belle image y devenait floue. Derrière la
+toile, le navigateur le compose **toujours à la définition native de
+l'écran**, quel que soit le réglage, et le déplacer ne coûte qu'une
+transformation. Le shader rend la toile transparente dans le vide
+(`uCielCalque`, en alpha prémultiplié exact : les lumières posées sur le vide
+restent des ajouts).
+
+- **UNE image, UNE Voie lactée**, jamais répétée — en reculant, l'ancienne
+  plaque répétée montrait deux ou trois bandes parallèles ;
+- **jamais floue** : un pixel d'image ne couvre jamais plus de 1,15 pixel
+  physique de l'écran (`grossMax`, `cadrePlaque` dans
+  `src/render/parallaxe.ts`), quels que soient le zoom et l'écran — les tests
+  le garantissent. **Une image de 1254 px tient donc dans un tiers d'écran
+  d'iPad : pour une grande galaxie nette, il faut une grande image** (plus
+  bas) ;
+- sa **taille** voulue : 1,3 fois la grande dimension de l'écran au zoom de
+  jeu (la bande déborde), un peu moins au recul — la netteté a le dernier
+  mot ;
+- ses **bords sont fondus** dans l'image elle-même (`--fondu`, plus bas) ;
+- son centre **dérive** avec la caméra mais ne quitte jamais l'écran ;
+- les **étoiles** sont trois tuiles d'image (`tools/ciel/genere-etoiles.py`)
+  affichées à un texel par pixel physique, sur trois profondeurs : nettes
+  par construction, et elles ne changent pas de taille avec le zoom, comme
+  des étoiles ;
+- le **recul** s'arrête quand la salle entière occupe le quart de l'écran
+  (`plancher`, `src/render/camera.ts`).
+
+Les modes TUILE et PROCÉDURAL, eux, restent peints dans la toile.
+
 ---
 
 ## Déposer une vraie plaque de télescope
+
+**C'est LA voie vers une image vraiment nette.** La netteté est bornée par
+la taille de l'image : à 1254 px, la galaxie reste petite ; à 4096 px, elle
+peut couvrir un écran d'iPad entier sans flou. Une vraie photographie du
+centre galactique en haute définition, c'est ce que l'humanité a de plus
+beau en la matière, et c'est libre (crédits ci-dessous).
+
+**Pour me la transmettre** (l'environnement de travail ne joint ni l'ESO ni
+la NASA, et une image jointe à la conversation arrive réduite) : sur GitHub,
+*Releases → Draft a new release*, joindre le fichier original, publier (ou
+garder en brouillon) et donner le lien. Une pièce jointe de release n'entre
+PAS dans l'historique du dépôt.
 
 **Le jeu prend l'image qu'il trouve : il n'y a pas une ligne de code à
 changer.** Écrasez `public/assets/ciel.webp` et c'est fait.
@@ -95,7 +139,7 @@ python3 - <<'PY'
 from PIL import Image
 Image.MAX_IMAGE_PIXELS = None          # les plaques de Webb dépassent la garde
 im = Image.open('assets-src/smacs0723.tif').convert('RGB')
-c = min(im.size)                        # carré centré : le jeu répète la plaque
+c = min(im.size)                        # carré centré : le jeu attend un carré
 im = im.crop(((im.width - c) // 2, (im.height - c) // 2,
               (im.width + c) // 2, (im.height + c) // 2))
 im = im.resize((4096, 4096), Image.LANCZOS)
@@ -120,124 +164,135 @@ magick assets-src/original.tif -gravity center -crop 1:1 +repage \
        -resize 4096x4096 -quality 88 public/assets/ciel.webp
 ```
 
+**Mieux : `tools/ciel/prepare-plaque.py`** fait le carré, les retouches
+ponctuelles (`--retouche x,y,rayon`), la désaturation (`--saturation`), le
+fondu des bords (`--fondu`, 0,18 par défaut) et garde la taille de la
+source, plafonnée à 4096. **Ne jamais agrandir** : le
+jeu lit la largeur de l'image pour décider jusqu'où il peut l'afficher sans
+flou — une image de 1254 px portée à 2048 lui ferait croire à un détail qui
+n'existe pas, et la galaxie serait affichée 1,6 fois trop grande.
+
 **Pourquoi 4096 et pas 16 384.** Une texture coûte en mémoire graphique
 `côté² × 4` octets, plus un tiers pour ses niveaux de détail : 4096 → ~90 Mo,
 8192 → ~360 Mo, 16 384 → ~1,4 Go. Sur tablette, la troisième ligne ne se charge
 pas. Et le jeu montre environ **un texel par pixel d'écran** au cadrage du hub :
 au-delà de 4096, la finesse supplémentaire ne s'affiche jamais.
 
-**Pourquoi un carré.** La plaque se répète (`REPEAT`) : c'est ce qui permet au
-monde de s'élargir sans qu'on tombe sur un bord. Une image carrée se répète
-proprement dans les deux sens.
+**Pourquoi un carré.** Le cadrage compte en fraction d'image, la même dans
+les deux sens : une image non carrée serait étirée. Recadrez au carré.
 
-**Si la couture se voit.** Une photographie n'est pas raccordable : ses bords ne
-coïncident pas. Deux réponses, au choix — pousser l'**étendue** au banc pour que
-la répétition tombe hors du tableau (le hub fait 4500 unités ; à 12 000, on n'en
-traverse jamais un tiers), ou raccorder l'image dans un logiciel d'image avant
-de la convertir.
+**Plus de couture à craindre.** La plaque n'est plus répétée : ses bords n'ont
+pas à se raccorder, une photographie convient telle quelle. Ils ne se voient
+qu'au recul maximal, et encore — l'écran s'arrête à un pour cent du bord.
 
 ### 5. Régler
 
 BANC › **Ciel du dehors**, en jeu, à vue :
 
-- **force** — le dosage. Le défaut est 0,45, et ce n'est pas timide : à 1, le
-  vide écrase la station, les modules deviennent des découpes plates et la
-  hiérarchie lumineuse s'inverse. Montez par petits pas, en regardant la cuve.
-- **étendue (u)** — combien d'unités-monde la plaque couvre. Plus petite : le
-  ciel est plus net et défile plus vite. Plus grande : plus doux, presque
-  immobile. Un tableau fait 2400 unités, le hub 4500.
+- **force** — le dosage. Le défaut est 0,75 pour la Voie lactée livrée : à
+  0,55 son cœur et ses nébuleuses restaient ternes. Trop haut, le vide écrase
+  la station et la hiérarchie lumineuse s'inverse : baissez en regardant la
+  cuve.
+- **taille** — la largeur de la galaxie, en fraction de l'écran, au zoom de
+  jeu. Plafonnée par la netteté : sur un écran très fin, elle reste plus
+  petite que demandé.
 
 ---
 
 ## La plaque livrée avec le jeu
 
-`public/assets/ciel.webp` n'est **pas une photographie** : elle est fabriquée
-par `tools/ciel/genere-ciel.py`, qui imite un champ profond — fond noir bleuté,
-filaments de poussière chauds, semis d'étoiles colorées selon leur température,
-et **six aigrettes** sur les plus vives (la diffraction d'un miroir hexagonal,
-la signature de Webb). Elle est **périodique par construction** : ses bords se
-raccordent, donc elle se répète sans couture.
+`public/assets/ciel.webp` est une **vraie photographie** : le centre de la Voie
+lactée, découpé dans **« The Milky Way Panorama »** du projet GigaGalaxy Zoom de
+l'ESO — le ciel entier sur 360°, assemblé à partir de près de 1 200 clichés pris
+à La Silla, Paranal et La Palma.
+
+> **Crédit, obligatoire (CC BY 4.0) : ESO/S. Brunier.** Il est affiché dans
+> PARAMÈTRES › LE CIEL DU DEHORS.
+
+La source est le poster d'impression de l'ESO (`print_poster_0040.tif`, 11 811 ×
+5 905, 87 Mo), déposé en pièce jointe de la release GitHub `ciel-source` —
+hors de l'historique. Le carré de 2 400 px autour du cœur galactique :
+
+```bash
+curl -L -o assets-src/print_poster_0040.tif \
+  https://github.com/JuOrga/Sujet21/releases/download/ciel-source/print_poster_0040.tif
+python3 tools/ciel/prepare-plaque.py assets-src/print_poster_0040.tif --cadre 5935,2745,2400
+```
+
+Le cadre évite le titre, la légende et le logo du poster. Aucune désaturation :
+ce sont les couleurs du ciel. 1,28 Mo.
+
+**L'image générée, avant elle** (`assets-src/voie-lactee.png`, 1254 px, hors
+dépôt) : belle, mais trop petite pour être à la fois grande et nette, et trop
+colorée — `--retouche 620,495,3 --saturation 0.45`.
+
+**La plaque procédurale, en secours.** `tools/ciel/genere-ciel.py` fabrique une
+plaque sans image source. Elle imite le centre galactique vu de l'espace
+— une bande en biais, son **bulbe doré** près du centre de l'image, des lanes
+de poussière étirées dans le sens de la bande, des poches d'hydrogène roses,
+une région bleue et orangée au-dessus du cœur, et un étirement « asinh »
+d'astrophotographe. Elle a été jugée « pas terrible » face à l'image générée :
+ses poussières restent des nuages plus que des filaments.
 
 ```bash
 python3 tools/ciel/genere-ciel.py --taille 4096 --sortie public/assets/ciel.webp
-# --densite 1.4   plus d'étoiles      --nebuleuse 0.6  moins de nébulosité
+# --densite 1.4   plus d'étoiles      --nebuleuse 0.6  une bande plus pâle
 # --graine 7      un autre ciel       --taille 2048    moitié moins de mémoire
+# --etirement 10  un ciel plus clair (arc sinus hyperbolique ; défaut 6)
 ```
-
-Un outil plutôt qu'une image posée là, parce qu'une plaque se règle : sa
-luminance moyenne doit rester **basse** — le script l'affiche à chaque tirage —
-sans quoi le vide cesse d'être un fond.
 
 
 ---
 
 ## Faire générer une plaque, à défaut d'en photographier une
 
-Un générateur d'images sait faire un ciel crédible, à condition qu'on lutte
-contre ses trois réflexes : composer autour d'un sujet, éclaircir, et grossir
-les étoiles. En anglais — c'est la langue où ces outils travaillent le mieux.
+La plaque a désormais un **sujet** : la Voie lactée, son cœur près du centre.
+Le générateur doit donc composer — mais il a trois réflexes à combattre :
+poser un paysage au premier plan (presque toutes les photos de Voie lactée en
+ont un), grossir les étoiles, et tout saturer. En anglais, la langue où ces
+outils travaillent le mieux.
 
 ```
-A James Webb Space Telescope deep field photograph, square format.
+Deep-space astrophotograph of the Milky Way galactic core, seen from orbit
+with no atmosphere, square 1:1 format.
 
-At least three quarters of the frame is near-black empty void — deep
-indigo-black, almost no light. Scattered evenly across it, thousands of
-very small pinpoint stars, one to three pixels wide, of widely varying
-brightness and colour: cold white, pale blue-white, faint amber, dim
-orange. Only a few dozen stars are bright, and those show sharp thin
-six-pointed diffraction spikes.
+The luminous band of the Milky Way crosses the entire frame diagonally, from
+the lower left corner to the upper right corner, and fills about 40 % of the
+frame. The galactic bulge, a warm golden glow, sits near the centre of the
+image. The band is made of countless tiny stars and dense glittering star
+clouds, cut by intricate dark dust lanes that run along the band, with fine
+filamentary detail and rust-brown edges. A few small pink-magenta hydrogen
+nebulae along the band near the core. Above the band, one small region of
+blue reflection nebula beside a golden-orange star.
 
-Thin semi-transparent wisps and filaments of interstellar dust drift
-through part of the frame — desaturated teal and muted warm ochre, low
-contrast, never bright, never saturated. Dark absorbing dust lanes cut
-through them. A scattering of tiny distant galaxies, only a few pixels
-across, some edge-on slivers, some faint smudges.
-
-Flat, even, documentary astrophotography. No focal point, no
-composition, no centre of interest, no horizon, no up or down — the
-field looks statistically the same everywhere. Scientific, calibrated,
-raw sensor look, no artistic glow, no post-processing bloom.
+Outside the band: deep black space, with a sprinkle of pinpoint stars.
+All stars are pinpoint sharp, one or two pixels wide, in pale natural
+colours. Natural colour balance, deep true blacks, high dynamic range,
+crisp, extremely detailed.
 ```
 
 Prompt négatif :
 
 ```
-planet, moon, sun, spaceship, station, silhouette, horizon, ground,
-star cluster, centered galaxy, spiral galaxy, bright nebula, cosmic
-explosion, lens flare, bokeh, large glowing orbs, halos, vignette,
-dramatic lighting, aurora, milky way band, neon pink purple,
-oversaturated, painterly, illustration, digital art, concept art,
-depth of field, blur, text, watermark, signature, border
+horizon, landscape, mountains, trees, ground, silhouette, person, planet,
+moon, sun, spaceship, satellite, lens flare, bokeh, halos, big glowing
+stars, diffraction spikes, light pollution, airglow, gradient sky,
+spiral galaxy seen from outside, cartoon, painting, illustration, neon,
+oversaturated, blur, text, watermark, signature, border, frame, vignette
 ```
 
-Format **1:1**, résolution maximale. Chez Midjourney, `--ar 1:1 --style raw
---s 50` : la stylisation basse est ce qui empêche le modèle de COMPOSER une
-belle image au lieu de photographier un champ.
-
-**Variante plus colorée** — remplacer le paragraphe des poussières par :
-
-```
-A large soft nebula occupies the lower third of the frame — deep teal
-and dim rust, semi-transparent, with dark absorbing lanes. It fades
-completely into black before reaching any edge of the image.
-```
-
-Le « fades completely into black before reaching any edge » n'est pas
-décoratif : une nébuleuse coupée par le bord fabrique une couture nette à la
-répétition. Avec cette variante, descendre la **force** vers 0,3.
+Format **1:1**, la plus grande résolution possible. Chez Midjourney,
+`--ar 1:1 --style raw`.
 
 ## Le test d'acceptation — trente secondes, un aller-retour évité
 
-Vaut pour une photographie comme pour une image engendrée.
-
-1. **Plisser les yeux.** Si le regard va à un endroit précis, il y a un sujet :
-   derrière la station, il se lira comme une affiche accrochée au mur.
-2. **Réduire à 200 pixels.** L'image doit paraître PRESQUE NOIRE, texture à
-   peine perceptible. Si elle ressemble encore à un poster coloré, elle est
-   trop claire et le vide cessera d'être un fond.
-3. **Tourner à 180°.** Elle doit rester crédible à l'envers. S'il y a un haut
-   et un bas, la répétition se verra.
-
-Le défaut le plus probable est **des étoiles trop grosses** : le jeu montre
-environ un texel par pixel d'écran, donc une étoile de quarante pixels dans
-l'image fait une tache de quarante pixels en jeu.
+1. **Aucun premier plan.** Ni sol, ni arbre, ni horizon : c'est le premier
+   défaut des générateurs, et derrière une station en orbite il n'a pas de
+   sens.
+2. **Le cœur au centre.** La caméra regarde le centre au départ : c'est là
+   que doit se tenir le plus beau.
+3. **Les étoiles fines.** Le jeu montre à peu près un texel par pixel : une
+   étoile de quarante pixels dans l'image fait une tache de quarante pixels
+   en jeu. Les étoiles nettes, le shader les ajoute.
+4. **Du noir franc hors de la bande.** Un ciel gris ou dégradé noie la
+   station ; la **force** du banc dose le reste.

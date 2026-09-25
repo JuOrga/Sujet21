@@ -1,0 +1,37 @@
+import { describe, it, expect } from 'vitest'
+import { readFileSync } from 'node:fs'
+import { fileURLToPath } from 'node:url'
+
+// CE QUE LE SHADER DE LA CONDUITE DOIT GARDER — des défauts de la revue de
+// la livraison #461, qu'aucun test d'exécution n'atteint (le shader ne
+// tourne pas sous vitest) : on lit la SOURCE, comme budgets.spec.ts.
+const source = readFileSync(fileURLToPath(new URL('./renderer.ts', import.meta.url)), 'utf8')
+
+// la branche plaque froide de la composition, jusqu'à la branche suivante
+const debut = source.indexOf('// Plaque froide (tableau 2) : une CONDUITE')
+const branche = source.slice(debut, source.indexOf('} else {', source.indexOf('brumeNH3(wb', debut)))
+
+describe('la conduite dans la composition', () => {
+  it('sans atlas, elle ne lit pas l’atlas : sinon, des rectangles NOIRS', () => {
+    // l'unité liée à null se lit (0, 0, 0, 1) : conduiteNH3 doit être gardé
+    expect(debut).toBeGreaterThan(0)
+    const appel = branche.indexOf('conduiteNH3(')
+    const garde = branche.lastIndexOf('uHasFroid > 0.5', appel)
+    expect(appel).toBeGreaterThan(0)
+    expect(garde).toBeGreaterThan(0)
+  })
+
+  it('le givre de secours suit la SILHOUETTE du tuyau, pas la boîte', () => {
+    const secours = branche.slice(branche.indexOf('} else {', branche.indexOf('conduiteNH3(')))
+    expect(secours).toMatch(/conduiteSdf\(wbV/)
+  })
+
+  it('une plaque à forme gèle depuis SA forme, et garde ombre et tranche', () => {
+    expect(branche).toMatch(/bool tuyau = dec\.y < 0\.5;/)
+    expect(branche).toMatch(/float dG = tuyau \? conduiteSdf\([^)]*\) : dV;/)
+    // l'ombre portée et la tranche n'exemptent que la conduite SANS forme
+    const exemptions = source.match(/!\(mat > 3\.5 && mat < 4\.5[^)]*\)/g) ?? []
+    expect(exemptions.length).toBeGreaterThanOrEqual(2)
+    for (const e of exemptions) expect(e).toContain('dec.y < 0.5')
+  })
+})

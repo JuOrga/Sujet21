@@ -8,6 +8,8 @@
 import { describe, expect, it } from 'vitest'
 import {
   PARALLAXE_DEFAUTS,
+  PLAQUE_DEFAUTS,
+  cadrePlaque,
   coucheFond,
   empriseEcran,
   type Couche,
@@ -84,5 +86,58 @@ describe('parallaxe — la couche lointaine', () => {
     expect(d.semis.zoom).toBeLessThan(d.cuve.zoom)
     expect(d.cuve.zoom).toBeLessThanOrEqual(1)
     expect(d.ciel.suivi).toBeLessThan(d.cuve.suivi)
+  })
+})
+
+describe('la plaque de ciel, cadrée — une seule Voie lactée, jamais floue', () => {
+  const FORMATS = [[1280, 720, 1], [1280, 800, 2], [720, 1280, 3], [2560, 1080, 1], [390, 844, 3]]
+  const ZOOMS = [1e-6, 0.01, 0.05, 0.12, 0.3, 1, 3, 15]
+
+  it('un pixel d’image ne couvre jamais plus de grossMax pixels physiques', () => {
+    for (const [w, h, dpr] of FORMATS)
+      for (const tex of [1254, 2048, 4096])
+        for (const z of ZOOMS) {
+          const c = cadrePlaque(0, 0, z, w, h, dpr, tex)
+          const pxEcranParTexel = dpr / (c.parPx * tex)
+          expect(pxEcranParTexel).toBeLessThanOrEqual(PLAQUE_DEFAUTS.grossMax + 1e-9)
+        }
+  })
+
+  it('le centre de la galaxie ne quitte jamais l’écran, où qu’aille la caméra', () => {
+    for (const [w, h, dpr] of FORMATS)
+      for (const z of ZOOMS)
+        for (const x of [-1e7, -2250, 0, 900, 1e7])
+          for (const y of [-1e7, -750, 0, 1e7]) {
+            const c = cadrePlaque(x, y, z, w, h, dpr, 1254)
+            // où se dessine le centre de l'image, en px CSS depuis le centre
+            expect(Math.abs((0.5 - c.cx) / c.parPx)).toBeLessThan(w / 2)
+            expect(Math.abs((0.5 - c.cy) / c.parPx)).toBeLessThan(h / 2)
+          }
+  })
+
+  it('assez de texels : elle prend la taille réglée ; en reculant, elle rapetisse', () => {
+    const d = PLAQUE_DEFAUTS
+    // une image de 4096 sur un écran de 1280 × 720 n'est jamais agrandie
+    expect(1 / cadrePlaque(0, 0, d.ref, 1280, 720, 1, 4096).parPx).toBeCloseTo(1280 * d.taille, 6)
+    const loin = 1 / cadrePlaque(0, 0, 0.15, 1280, 720, 1, 4096).parPx
+    const pres = 1 / cadrePlaque(0, 0, 0.6, 1280, 720, 1, 4096).parPx
+    expect(loin).toBeLessThan(pres)
+  })
+
+  it('la galaxie est LOIN : au recul, elle rapetisse comme zoom^0,3, pas comme le monde', () => {
+    const d = PLAQUE_DEFAUTS
+    const ref = 1 / cadrePlaque(0, 0, d.ref, 1280, 720, 1, 4096).parPx
+    const moitie = 1 / cadrePlaque(0, 0, d.ref / 2, 1280, 720, 1, 4096).parPx
+    // zoom divisé par deux : la galaxie ne perd que 19 % (0,5^0,3), là où
+    // le monde perd la moitié — le premier jet la faisait suivre à 0,5^0,7
+    expect(moitie / ref).toBeCloseTo(Math.pow(0.5, d.zoom), 6)
+  })
+
+  it('la caméra qui se déplace fait glisser le ciel, dans le même sens', () => {
+    const a = cadrePlaque(0, 0, 0.3, 1280, 720, 1, 1254)
+    const b = cadrePlaque(500, -300, 0.3, 1280, 720, 1, 1254)
+    expect(a.cx).toBeCloseTo(0.5, 9)
+    expect(b.cx).toBeGreaterThan(a.cx)
+    expect(b.cy).toBeLessThan(a.cy)
   })
 })

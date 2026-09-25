@@ -84,3 +84,38 @@ describe('caméra — le plan d’ouverture', () => {
     expect(cam.introEnCours).toBe(false)
   })
 })
+
+describe('caméra — le recul a un fond', () => {
+  it('la molette ne recule pas au-delà de la salle entière, avec sa marge', () => {
+    const cam = ouvre()
+    for (let i = 0; i < 200; i++) cam.zoomBy(0.8, DEFAULT_PARAMS)
+    for (let i = 0; i < 200; i++) cam.update(1 / IPS, CORPS.x, CORPS.y, CORPS.r, VW, VH, DEFAULT_PARAMS)
+    // la salle (2400 × 1500) tient au quart de la dimension qui contraint
+    const salle = Math.min(VW / 2400, VH / 1500)
+    expect(cam.zoom).toBeCloseTo(salle * 0.25, 4)
+    expect(cam.zoom).toBeGreaterThan(DEFAULT_PARAMS.cameraMinZoom * 0.2)
+  })
+
+  it('le pincement ancré bute sur le même fond', () => {
+    const cam = ouvre()
+    for (let i = 0; i < 200; i++) cam.zoomAt(0.8, 100, 100, VW, VH, DEFAULT_PARAMS)
+    expect(cam.zoom).toBeCloseTo(Math.min(VW / 2400, VH / 1500) * 0.25, 6)
+  })
+
+  it('le zoom avant garde son plafond', () => {
+    const cam = ouvre()
+    for (let i = 0; i < 200; i++) cam.zoomBy(1.25, DEFAULT_PARAMS)
+    cam.update(1, CORPS.x, CORPS.y, CORPS.r, VW, VH, DEFAULT_PARAMS)
+    expect(cam.manualZoom).toBeCloseTo(DEFAULT_PARAMS.cameraMaxZoom * 5, 6)
+  })
+})
+
+describe('caméra — le fond du recul suit la salle ouverte', () => {
+  it('une salle ouverte sans plan d’ouverture (éditeur) prend SON plancher', () => {
+    const cam = ouvre() // 2400 × 1500 : le plan d'ouverture pose la salle
+    // une salle bien plus grande, ouverte sans startIntro
+    cam.salle({ minX: -4500, minY: -3000, maxX: 4500, maxY: 3000 })
+    for (let i = 0; i < 300; i++) cam.zoomBy(0.8, DEFAULT_PARAMS)
+    expect(cam.manualZoom).toBeCloseTo(Math.min(VW / 9000, VH / 6000) * 0.25, 6)
+  })
+})
