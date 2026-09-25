@@ -129,6 +129,7 @@ export interface FormeBox {
   p2?: number // ARC : bouts (0 arrondis, 1 droits, 2 en pointe)
   coupe?: Coupe // un demi-plan qui tronque la forme (monde, hors rotation)
   sens?: number // CONDUITE : le sens du tuyau (SENS_AUTO, _HORIZONTAL, _VERTICAL)
+  bouts?: number // CONDUITE : ses bouts plongés dans un mur (BOUT_MUR_*), calculés au chargement
 }
 
 export interface FormeContact {
@@ -263,17 +264,28 @@ export function jointsConduite(L: number, T: number): number[] {
   return out
 }
 
+/** Les bouts d'une conduite qui plongent DANS UN MUR (bit à bit) : le
+ *  côté des s négatifs (gauche ou bas), le côté des s positifs. */
+export const BOUT_MUR_NEG = 1
+export const BOUT_MUR_POS = 2
+
 /** Les rectangles pleins de la conduite, en repère local (s le long, t en
  *  travers, centrés) : [s0, s1, demi-épaisseur]. Le tuyau, les brides de
  *  bout, les brides des joints — leur union est la forme. */
-export function piecesConduite(L: number, T: number): [number, number, number][] {
+export function piecesConduite(L: number, T: number, bouts = 0): [number, number, number][] {
   const C = CONDUITE
   const longue = conduiteLongue(L, T)
-  const bout = longue ? L / 2 - C.embout * T : L / 2
-  const out: [number, number, number][] = [[-bout, bout, C.tuyau * T]]
+  // un bout DANS UN MUR (bouts : 1 côté négatif, 2 côté positif) n'a pas de
+  // bride : le tuyau file jusqu'au bord du bloc, et le mur le prend
+  const murNeg = (bouts & BOUT_MUR_NEG) !== 0
+  const murPos = (bouts & BOUT_MUR_POS) !== 0
+  const retrait = longue ? C.embout * T : 0
+  const out: [number, number, number][] = [
+    [-L / 2 + (murNeg ? 0 : retrait), L / 2 - (murPos ? 0 : retrait), C.tuyau * T],
+  ]
   if (longue) {
-    out.push([L / 2 - C.brideA * T, L / 2 - C.brideDe * T, T / 2])
-    out.push([-L / 2 + C.brideDe * T, -L / 2 + C.brideA * T, T / 2])
+    if (!murPos) out.push([L / 2 - C.brideA * T, L / 2 - C.brideDe * T, T / 2])
+    if (!murNeg) out.push([-L / 2 + C.brideDe * T, -L / 2 + C.brideA * T, T / 2])
   }
   for (const j of jointsConduite(L, T)) {
     out.push([Math.max(-L / 2, j - C.brideJoint * T), Math.min(L / 2, j + C.brideJoint * T), T / 2])
@@ -284,7 +296,7 @@ export function piecesConduite(L: number, T: number): [number, number, number][]
 function conduiteContactAxe(
   x: number,
   y: number,
-  b: { minX: number; minY: number; maxX: number; maxY: number; sens?: number },
+  b: { minX: number; minY: number; maxX: number; maxY: number; sens?: number; bouts?: number },
   out: FormeContact,
 ): void {
   const w = b.maxX - b.minX
@@ -300,7 +312,7 @@ function conduiteContactAxe(
   let best = Infinity
   let ns = 0
   let nt = 1
-  for (const [s0, s1, e] of piecesConduite(L, T)) {
+  for (const [s0, s1, e] of piecesConduite(L, T, b.bouts ?? 0)) {
     const cs = (s0 + s1) / 2
     const hs = (s1 - s0) / 2
     const qs = Math.abs(s - cs) - hs

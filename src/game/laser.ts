@@ -428,7 +428,10 @@ export function traceLaser(em: LaserDef, monde: TraceMonde): TraceResultat {
   // et redémarre à chaque changement de direction ou de position
   // la conduite d'ammoniac arrête le faisceau à sa silhouette arrondie,
   // comme elle arrête l'eau (conduite.ts) — même ordre, mêmes indices
-  const filtre = new FiltreBoites(monde.boxes.map(formePhysique), monde.portesFermees)
+  const filtre = new FiltreBoites(
+    monde.boxes.map((b) => formePhysique(b, monde.boxes, monde.bounds)),
+    monde.portesFermees,
+  )
   filtre.segment(x, y, dx, dy)
   let sSeg = 0 // distance parcourue depuis le départ du segment droit courant
   statsTrace.pas = 0

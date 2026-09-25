@@ -31,6 +31,7 @@ import type { Camera } from './camera'
 import { VIE_STRIDE } from './vie'
 import { Programmes } from './programmes'
 import { sondeRetournement, type Retournement } from './retournement'
+import { boutsEnMur } from '../game/conduite'
 
 // Budgets de rendu : au-delà, les éléments excédentaires ne sont plus
 // dessinés (la physique, elle, les voit tous) — l'éditeur avertit quand un
@@ -190,20 +191,31 @@ float jointPres(float s, float L, float T) {
   return clamp(floor(s / CN_PAS + 0.5), -n, n) * CN_PAS;
 }
 
+// le bout du côté de s (bouts : 1 côté négatif, 2 côté positif) plonge-t-il
+// dans un mur ? JUMEAU de BOUT_MUR_* (formes.ts)
+bool boutEnMur(float s, float bouts) {
+  return s < 0.0 ? mod(bouts, 2.0) > 0.5 : bouts > 1.5;
+}
+
 // distance signée à la conduite (l'union du tuyau et de ses brides), en
-// repère local centré : s le long, t en travers
-float conduiteSdfLocal(float s, float t, float L, float T) {
+// repère local centré : s le long, t en travers. Un bout dans un mur n'a
+// pas de bride : le tuyau file jusqu'au bord du bloc — JUMEAU de
+// piecesConduite (formes.ts)
+float conduiteSdfLocal(float s, float t, float L, float T, float bouts) {
   bool lg = conduiteLongue(L, T);
-  float d = cnRect(s, t, 0.0, lg ? L * 0.5 - CN_EMBOUT * T : L * 0.5, CN_TUYAU * T);
-  if (lg) {
+  float retrait = lg ? CN_EMBOUT * T : 0.0;
+  float a0 = -L * 0.5 + (boutEnMur(-1.0, bouts) ? 0.0 : retrait);
+  float a1 = L * 0.5 - (boutEnMur(1.0, bouts) ? 0.0 : retrait);
+  float d = cnRect(s, t, 0.5 * (a0 + a1), 0.5 * (a1 - a0), CN_TUYAU * T);
+  if (lg && !boutEnMur(s, bouts)) {
     d = min(d, cnRect(abs(s), t, L * 0.5 - (CN_BRIDE_A + CN_BRIDE_DE) * 0.5 * T,
                       (CN_BRIDE_A - CN_BRIDE_DE) * 0.5 * T, 0.5 * T));
   }
   float sj = jointPres(s, L, T);
   if (sj < 1e8) {
-    float a0 = max(-L * 0.5, sj - CN_BRIDE_JOINT * T);
-    float a1 = min(L * 0.5, sj + CN_BRIDE_JOINT * T);
-    d = min(d, cnRect(s, t, 0.5 * (a0 + a1), 0.5 * (a1 - a0), 0.5 * T));
+    float j0 = max(-L * 0.5, sj - CN_BRIDE_JOINT * T);
+    float j1 = min(L * 0.5, sj + CN_BRIDE_JOINT * T);
+    d = min(d, cnRect(s, t, 0.5 * (j0 + j1), 0.5 * (j1 - j0), 0.5 * T));
   }
   return d;
 }
@@ -216,12 +228,16 @@ bool conduiteHoriz(vec2 sz, float sens) {
   return sz.x >= sz.y;
 }
 
-float conduiteSdf(vec2 p, vec4 box, float sens) {
+// aux.z d'une plaque froide : sens + 4 · bouts (voir render())
+float conduiteSens(float code) { return mod(code, 4.0); }
+float conduiteBouts(float code) { return floor(code / 4.0 + 0.001); }
+
+float conduiteSdf(vec2 p, vec4 box, float code) {
   vec2 sz = box.zw - box.xy;
   vec2 q = p - 0.5 * (box.xy + box.zw);
-  bool horiz = conduiteHoriz(sz, sens);
+  bool horiz = conduiteHoriz(sz, conduiteSens(code));
   return conduiteSdfLocal(horiz ? q.x : q.y, horiz ? q.y : q.x,
-                          horiz ? sz.x : sz.y, horiz ? sz.y : sz.x);
+                          horiz ? sz.x : sz.y, horiz ? sz.y : sz.x, conduiteBouts(code));
 }
 `
 })()
@@ -716,16 +732,17 @@ vec4 cnSur(vec4 dessous, vec4 dessus) {
 // PARTOUT autour d'elle depuis sa forme, pas seulement dans sa boîte : les
 // brides touchent le bord de la boîte, leur ombre coupée net au bord
 // redessinait le rectangle.
-float conduiteOmbre(vec2 p, vec4 box, float sens) {
+float conduiteOmbre(vec2 p, vec4 box, float code) {
   vec2 sz = box.zw - box.xy;
-  float T = conduiteHoriz(sz, sens) ? sz.y : sz.x;
-  return mix(0.45, 1.0, smoothstep(0.0, 3.0 + 0.12 * T, conduiteSdf(p, box, sens)));
+  float T = conduiteHoriz(sz, conduiteSens(code)) ? sz.y : sz.x;
+  return mix(0.45, 1.0, smoothstep(0.0, 3.0 + 0.12 * T, conduiteSdf(p, box, code)));
 }
 
 // Rend la conduite SEULE, en couleur prémultipliée (rgb) et couverture
 // (a) : autour d'elle, on voit le sol de la salle.
-vec4 conduiteNH3(vec2 loc, vec2 bsize, float px, float sens) {
-  bool horiz = conduiteHoriz(bsize, sens);
+vec4 conduiteNH3(vec2 loc, vec2 bsize, float px, float code) {
+  bool horiz = conduiteHoriz(bsize, conduiteSens(code));
+  float bouts = conduiteBouts(code);
   float L = horiz ? bsize.x : bsize.y;
   float T = horiz ? bsize.y : bsize.x;
   float s = (horiz ? loc.x : loc.y) - L * 0.5; // le long, centré
@@ -736,7 +753,9 @@ vec4 conduiteNH3(vec2 loc, vec2 bsize, float px, float sens) {
   // LE TRONÇON, répété EN MIROIR sur la longueur (l'image n'est pas
   // raccordable bord à bord : mesuré, 31 contre 8 à l'intérieur)
   float hb = CN_BANDE * T;
-  float fin = lg ? L * 0.5 - CN_EMBOUT * T : L * 0.5;
+  // un bout dans un mur : le tronçon file jusqu'au bord du bloc
+  bool mur = boutEnMur(s, bouts);
+  float fin = (lg && !mur) ? L * 0.5 - CN_EMBOUT * T : L * 0.5;
   if (abs(t) < hb && abs(s) < fin) {
     float m = s / (CN_MOTIF * T);
     float tri = abs(fract(m * 0.5) * 2.0 - 1.0);
@@ -744,7 +763,7 @@ vec4 conduiteNH3(vec2 loc, vec2 bsize, float px, float sens) {
   }
   // LES BOUTS : la bride et son embout ; à gauche, l'image en miroir. Le
   // côté tuyau de l'image se fond dans le tronçon.
-  if (lg) {
+  if (lg && !mur) {
     float sp = abs(s);
     float s0 = L * 0.5 - CN_BOUT * T;
     if (sp > s0) {
@@ -763,6 +782,17 @@ vec4 conduiteNH3(vec2 loc, vec2 bsize, float px, float sens) {
     // sur une longue conduite, les bouts du joint se fondent dans le tronçon
     float fondu = lg ? smoothstep(0.0, 0.14, f.x) * smoothstep(0.0, 0.14, 1.0 - f.x) : 1.0;
     acc = cnSur(acc, c * fondu);
+  }
+
+  // LE TUYAU QUI PLONGE dans le mur : il s'assombrit en s'y enfonçant
+  // (l'ombre du mur sur lui), et une collerette de givre, épaisse, s'est
+  // formée au ras de la paroi — là où l'air humide rencontre le froid
+  if (mur && acc.a > 0.0) {
+    float aBord = L * 0.5 - abs(s);                 // la distance au mur
+    acc.rgb *= mix(0.30, 1.0, smoothstep(0.0, 0.45 * T, aBord));
+    float coll = (1.0 - smoothstep(0.0, 0.14 * T, aBord)) *
+                 smoothstep(0.30, 0.70, dnoise(vec2(s, t) * 0.25 / max(T / 60.0, 0.3)));
+    acc.rgb = mix(acc.rgb, vec3(0.80, 0.90, 0.98) * acc.a, coll * 0.75);
   }
 
   // LES ÉCLATS : le givre de l'image scintille — des étoiles sur ses
@@ -1984,7 +2014,7 @@ void main() {
       // ce qui se pose sur le SOL (givre, ombre, brume) ne se peint jamais
       // sur un AUTRE solide (la brume délavait la conduite voisine)
       float surSol = (iCouv == bi || dCouv > 0.0) ? 1.0 : 0.0;
-      float sensC = uBoxAux[bi].z; // le sens du tuyau (aux.z d'une plaque froide)
+      float sensC = uBoxAux[bi].z; // sens + 4 · bouts dans un mur (aux.z d'une plaque froide)
       float dG = conduiteSdf(wb, uBoxes[bi], sensC);
       // LE SOL CRISTALLISÉ dans l'aire d'effet — là où le solveur gèle l'eau
       vec2 gsol = givreSol(wb, max(dG, 0.0), uColdBand, pxMonde);
@@ -4205,7 +4235,7 @@ export class Renderer {
         bx.material === 0
           ? (bx.skin ?? 0)
           : bx.material === MAT_FROID
-            ? (bx.sens ?? 0)
+            ? (bx.sens ?? 0) + 4 * boutsEnMur(bx, boxes, sim.bounds)
             : sim.surchauffesVides.has(i)
               ? 0
               : 1

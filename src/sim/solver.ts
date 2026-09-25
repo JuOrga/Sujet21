@@ -553,7 +553,9 @@ export class FluidSim {
     // qu'aucun chemin (jeu, essai d'éditeur, banc) ne puisse l'oublier.
     // La conduite d'ammoniac (plaque froide) se lit à la forme de sa
     // silhouette dessinée, coins arrondis — plus à sa boîte (conduite.ts).
-    const physiques = boxes.filter((b) => !sansPhysique(b.material)).map(formePhysique)
+    const physiques = boxes
+      .filter((b) => !sansPhysique(b.material))
+      .map((b) => formePhysique(b, boxes, this.bounds))
     this.baseBoxes = physiques
     this.boxes = physiques
     this.spongeDefs = sponges // gardées pour la copie de prévision

@@ -1,8 +1,10 @@
 import { describe, expect, it } from 'vitest'
-import { formePhysique } from './conduite'
+import { boutsEnMur, formePhysique } from './conduite'
 import {
   CONDUITE,
   CONDUITE_ATLAS,
+  BOUT_MUR_NEG,
+  BOUT_MUR_POS,
   SENS_HORIZONTAL,
   SENS_VERTICAL,
   conduiteHoriz,
@@ -12,6 +14,7 @@ import {
   formeContact,
   jointsConduite,
   piecesConduite,
+  type FormeBox,
   type FormeContact,
 } from './formes'
 import { MAT_FROID, MAT_WALL, type ObstacleBox } from './level'
@@ -109,6 +112,55 @@ describe('conduite — forme physique', () => {
     s.setLevel([box(0, 0, 670, 60, MAT_FROID)], [])
     formeContact(170, 57, s.boxes[0], out)
     expect(out.dist).toBeGreaterThan(0)
+  })
+})
+
+// LES BOUTS DANS LE MUR : une conduite posée contre une paroi s'arrêtait
+// sur une bride, « posée là, sans arrivée ni départ ». Un bout contre un
+// solide ou le bord de la salle y plonge : pas de bride, le tuyau file
+// jusqu'au bord du bloc.
+describe('conduite — les bouts dans le mur', () => {
+  const salle = { minX: -1000, minY: -750, maxX: 1000, maxY: 750 }
+  const porte = box(-500, -750, -440, -150, MAT_FROID) // du bord bas à mi-salle
+
+  it('le bout contre le bord de la salle plonge, l’autre garde sa bride', () => {
+    expect(boutsEnMur(porte, [porte], salle)).toBe(BOUT_MUR_NEG)
+  })
+
+  it('un bout contre un mur plonge ; contre le vide (sans physique), non', () => {
+    const b = box(0, 0, 400, 60, MAT_FROID)
+    const mur = box(400, -100, 460, 200, MAT_WALL)
+    expect(boutsEnMur(b, [b, mur], null)).toBe(BOUT_MUR_POS)
+    const vide = box(400, -100, 460, 200, 11) // MAT_VIDE : un trou, pas un mur
+    expect(boutsEnMur(b, [b, vide], null)).toBe(0)
+  })
+
+  it('un mur qui ne prend que la moitié du tuyau ne l’avale pas', () => {
+    const b = box(0, 0, 400, 60, MAT_FROID)
+    const coin = box(400, 30, 460, 200, MAT_WALL) // ne couvre que le haut
+    expect(boutsEnMur(b, [b, coin], null)).toBe(0)
+  })
+
+  it('au mur, ni bride ni retrait : le tuyau touche le bord du bloc, le sol l’entoure', () => {
+    const phys = formePhysique(porte, [porte], salle)
+    expect((phys as FormeBox).bouts).toBe(BOUT_MUR_NEG)
+    // au ras du bord bas, sur l'axe : sans la salle, le bout garde son
+    // retrait (l'embout de la bride) ; avec elle, le tuyau touche le bord
+    expect(contact(porte, -470, -749).dist).toBeGreaterThan(0)
+    formeContact(-470, -749, phys, out)
+    expect(out.dist).toBeLessThan(0)
+    // au ras du bord bas, sur le flanc du BLOC : dehors — plus de bride là
+    formeContact(-443, -740, phys, out)
+    expect(out.dist).toBeGreaterThan(0)
+    // l'autre bout, libre, garde sa bride de toute la largeur
+    formeContact(-443, -150 - ((CONDUITE.brideDe + CONDUITE.brideA) / 2) * 60, phys, out)
+    expect(out.dist).toBeLessThan(0)
+  })
+
+  it('le solveur trouve les bouts avec la salle', () => {
+    const s = new FluidSim({ ...DEFAULT_PARAMS }, salle)
+    s.setLevel([porte], [])
+    expect((s.boxes[0] as FormeBox).bouts).toBe(BOUT_MUR_NEG)
   })
 })
 
