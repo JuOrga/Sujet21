@@ -3693,9 +3693,12 @@ let resChoix: ResChoix = ((): ResChoix => {
 const resDynamique = (): boolean => resChoix === 'dyn'
 // NETTETÉ DU DÉCOR : la résolution réduite ne touche que le volume (l'eau),
 // le décor reste natif (renderer.decorNet). Demandé : « les textures doivent
-// toujours être en haute résolution pour que ça rende bien ». Qui préfère
-// l'allègement complet le débranche au voile.
-let decorNet = localStorage.getItem('sujet21-decor-net') !== '0'
+// toujours être en haute résolution ». DÉBRANCHÉ par défaut, parce que c'est
+// le décor, pas l'eau, qui coûte : mesuré sous Chromium en rendu logiciel
+// (400×280, DPR 2, tableau 8, 60 s), élevée 0,31 im/s, faible 0,75, faible
+// avec décor net 0,36 — autant que le natif. Par défaut, l'adaptatif des
+// écrans tactiles n'aurait plus rien à alléger.
+let decorNet = localStorage.getItem('sujet21-decor-net') === '1'
 // rendu de la section MOTEUR PHYSIQUE — paresseux : `sim` n'existe pas
 // encore quand le voile se câble, il se dessine à l'ouverture
 let majMoteurUI: () => void = () => {}
