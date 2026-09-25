@@ -2834,11 +2834,17 @@ float sceneSdf(vec2 p, float alt) {
       float sa = sin(ang);
       wb = bc + vec2(ca * rel.x + sa * rel.y, -sa * rel.x + ca * rel.y);
     }
-    // la CONDUITE D'AMMONIAC ombre à sa FORME — le tuyau et ses brides, la
-    // même union que la physique (conduite.ts). L'ombre carrée trahissait
-    // le bloc que le dessin (conduiteNH3) s'applique à cacher.
+    // la CONDUITE D'AMMONIAC ombre comme son TUYAU. Ni la boîte (une ombre
+    // carrée trahissait le bloc), ni la forme de collision : ses brides y
+    // sont des rectangles de toute la largeur, et leur ombre projetée
+    // traçait des diagonales dures depuis leurs coins, là où l'image, elle,
+    // est ronde (vu en aperçu sur iPad, autour du plot froid).
     if (dec.x > 3.5 && dec.x < 4.5 && dec.y < 0.5) {
-      d = min(d, conduiteSdf(wb, uBoxes[i], uBoxAux[i].z));
+      vec2 szC = uBoxes[i].zw - uBoxes[i].xy;
+      bool hC = conduiteHoriz(szC, conduiteSens(uBoxAux[i].z));
+      vec2 qC = wb - 0.5 * (uBoxes[i].xy + uBoxes[i].zw);
+      d = min(d, cnRect(hC ? qC.x : qC.y, hC ? qC.y : qC.x, 0.0,
+                        0.5 * (hC ? szC.x : szC.y), CN_TUYAU * (hC ? szC.y : szC.x)));
       continue;
     }
     d = min(d, formeSdf(wb, uBoxes[i], dec.y, dec.z, dec.w));
