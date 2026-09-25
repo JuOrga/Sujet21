@@ -3440,6 +3440,45 @@ void main() {
   outColor = vec4(c, t.a * uFade * (1.0 - fluide));
 }`
 
+/** Ce qui reste du rectangle `a` hors de `b` : au plus quatre morceaux
+ *  disjoints (bandes haute et basse pleine largeur, puis gauche et droite
+ *  à la hauteur du chevauchement). [x0, y0, x1, y1]. */
+function soustraitRect(
+  a: [number, number, number, number],
+  b: [number, number, number, number],
+): [number, number, number, number][] {
+  const [ax0, ay0, ax1, ay1] = a
+  const [bx0, by0, bx1, by1] = b
+  if (bx0 >= ax1 || bx1 <= ax0 || by0 >= ay1 || by1 <= ay0) return [a]
+  const out: [number, number, number, number][] = []
+  const y0 = Math.max(ay0, by0)
+  const y1 = Math.min(ay1, by1)
+  if (ay0 < y0) out.push([ax0, ay0, ax1, y0])
+  if (y1 < ay1) out.push([ax0, y1, ax1, ay1])
+  if (ax0 < bx0) out.push([ax0, y0, bx0, y1])
+  if (bx1 < ax1) out.push([bx1, y0, ax1, y1])
+  return out
+}
+
+/** LES RECTANGLES DE LA PASSE NETTE, rendus DISJOINTS. Deux qui se
+ *  chevauchent (conduites voisines, rectangles élargis par le relief)
+ *  étaient dessinés chacun : la zone commune fondue DEUX fois en (ONE,
+ *  ONE_MINUS_SRC_ALPHA) — une couture sur les bords antialiasés, et la
+ *  composition payée deux fois. Chaque rectangle est donc découpé de ce que
+ *  les précédents couvrent déjà : la même surface exactement, chaque pixel
+ *  une fois. (Premier jet : leur ENVELOPPE — deux conduites en L de 1800 ×
+ *  60 et 60 × 1200 px en faisaient 1800 × 1200, douze fois la surface, au
+ *  réglage même où cette passe doit rester légère.) [x0, y0, x1, y1]. */
+export function rectsDisjoints(rects: [number, number, number, number][]): [number, number, number, number][] {
+  const faits: [number, number, number, number][] = []
+  for (const r of rects) {
+    let morceaux: [number, number, number, number][] = [r]
+    for (const f of faits) morceaux = morceaux.flatMap((m) => soustraitRect(m, f))
+    faits.push(...morceaux)
+  }
+  return faits
+}
+
 /** L'intervalle [a, b] (un axe d'une boîte, en unités monde) élargi à ce
  *  que le relief 2.5D en dessine. Le shader lit au pixel w le point
  *  w − (w − centre)·k : le sommet d'un point p se dessine donc en
@@ -3531,6 +3570,11 @@ export class Renderer {
    *  solveur ne connaît : sondés là, un bout contre une factice se dessinait
    *  sans bride quand la physique, elle, en gardait une, invisible. */
   boitesMurs: readonly ObstacleBox[] | null = null
+  /** La DERNIÈRE image a-t-elle tourné la passe nette (toile repassée en
+   *  natif) ? Le rapport de performance le dit : sans lui, un tableau à
+   *  conduite coûtait, au réglage « suit la résolution », bien plus que
+   *  l'échelle de rendu annoncée — et rien ne le montrait. */
+  passeNette = false
   // LES BOUTS DES CONDUITES, par état du décor : boutsEnMur sonde six
   // points contre toutes les boîtes, pour chaque conduite — et tournait à
   // CHAQUE image. La clé est celle de la carte de lumière (géométrie,
@@ -4585,6 +4629,7 @@ export class Renderer {
       this.canvas.width = natW
       this.canvas.height = natH
     }
+    this.passeNette = nette
     if (nette) this.ensureSceneTarget(devW, devH)
     this.cibleW = devW
     this.cibleH = devH
@@ -4985,6 +5030,7 @@ export class Renderer {
     const kRelief = relief * Math.min(1, Math.max(0, camera.zoom * 1.2))
     const px = (wx: number) => ((wx - camera.x) * camera.zoom + viewportW / 2) * dpr
     const py = (wy: number) => ((wy - camera.y) * camera.zoom + viewportH / 2) * dpr
+    const rects: [number, number, number, number][] = []
     for (const b of boxes) {
       if (b.material !== MAT_FROID || b.forme) continue
       // une boîte oblique : son cercle englobant
@@ -5011,6 +5057,9 @@ export class Renderer {
       const sx1 = Math.min(natW, Math.ceil(px(x1)) + 2)
       const sy1 = Math.min(natH, Math.ceil(py(y1)) + 2)
       if (sx1 <= sx0 || sy1 <= sy0) continue
+      rects.push([sx0, sy0, sx1, sy1])
+    }
+    for (const [sx0, sy0, sx1, sy1] of rectsDisjoints(rects)) {
       gl.scissor(sx0, sy0, sx1 - sx0, sy1 - sy0)
       gl.drawArrays(gl.TRIANGLES, 0, 3)
     }

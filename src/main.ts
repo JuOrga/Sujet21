@@ -4429,6 +4429,11 @@ function rapportPerf(): Record<string, unknown> {
       // le décor net recalcule le décor EN NATIF : l'échelle ne dit alors
       // plus que le coût de l'eau — sans ce drapeau, le rapport tromperait
       decorNet,
+      // les pixels RÉELS de la toile, et si la passe nette l'a repassée en
+      // natif : au réglage « suit la résolution », un tableau à conduite le
+      // fait aussi — « megapixels » (l'échelle au carré) le cachait
+      megapixelsToile: Math.round(((canvas.width * canvas.height) / 1e6) * 100) / 100,
+      passeNette: renderer.passeNette,
       timeWarp: params.timeWarp,
       downsampleChamp: params.renderDownsample,
     },
