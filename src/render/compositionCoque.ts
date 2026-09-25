@@ -144,6 +144,25 @@ function graineDe(b: Bounds): () => number {
   }
 }
 
+/** La clé de la composition : elle change dès que ce qui la décide change —
+ *  la cuve, et TOUT ce qui dit si un point tombe dans un vide (dansForme) :
+ *  boîte, angle, forme, ses paramètres p0 à p2, sa coupe. Une clé qui
+ *  oubliait p0..p2 et la coupe laissait, à l'éditeur, un port dessiné sur
+ *  un trou (ou manquant sur une coque intacte) après avoir tourné un coin
+ *  ou réglé un arc. */
+export function cleComposition(b: Bounds, vides: readonly FormeBox[]): string {
+  return (
+    `${b.minX},${b.minY},${b.maxX},${b.maxY}|` +
+    vides
+      .map(
+        (v) =>
+          `${v.minX},${v.minY},${v.maxX},${v.maxY},${v.angle ?? 0},${v.forme ?? 0},` +
+          `${v.p0 ?? ''},${v.p1 ?? ''},${v.p2 ?? ''},${v.coupe ? JSON.stringify(v.coupe) : ''}`,
+      )
+      .join(';')
+  )
+}
+
 /** Compose le matériel extérieur d'une cuve. `vides` : les boîtes de vide
  *  du tableau — une pièce dont l'attache y tombe part avec son groupe. */
 export function composeCoque(b: Bounds, vides: readonly FormeBox[] = []): PieceCoque[] {

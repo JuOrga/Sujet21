@@ -47,6 +47,7 @@ import {
   MAX_PIECES_COQUE,
   PIECE_AMARRAGE,
   PIECE_MODULE,
+  cleComposition,
   composeCoque,
   empaquettePieces,
 } from './compositionCoque'
@@ -3722,8 +3723,10 @@ void main() {
   // pièces de la composition, dans l'ordre (un bras avant son aile)
   float y = a - uEpais;
   vec4 acc = vec4(0.0);
-  // le fond de coque ne tient qu'où la coque tient : pas sur un trou
-  if (s > 20.0 && s < vCote.y - 20.0 && videSdf(origine + s * dA + uEpais * dO) > 0.0)
+  // le fond de coque ne tient qu'où la coque tient : pas sur un trou. Il
+  // fait partie du DEHORS DU MODULE : masqué avec lui (réglage), il ne
+  // reste que la coque et les vides qui la percent
+  if (uExterieur > 0.5 && s > 20.0 && s < vCote.y - 20.0 && videSdf(origine + s * dA + uEpais * dO) > 0.0)
     fondDeCoque(acc, s, y, cote, px);
   poseLesPieces(acc, px, false);
   // le fil de lumière sur la face externe : l'arête de la coque accroche
@@ -5479,8 +5482,7 @@ export class Renderer {
     // la composition ne change qu'avec la cuve et ses vides : recomposée
     // à ce moment-là seulement, pas à chaque image
     const vides = boxes.filter((bx) => bx.material === MAT_VIDE)
-    const cle = `${b.minX},${b.minY},${b.maxX},${b.maxY}|` +
-      vides.map((v) => `${v.minX},${v.minY},${v.maxX},${v.maxY},${v.angle ?? 0},${v.forme ?? 0}`).join(';')
+    const cle = cleComposition(b, vides)
     if (cle !== this.piecesCle) {
       this.piecesCle = cle
       this.piecesCount = empaquettePieces(composeCoque(b, vides), this.piecesGeo, this.piecesAux)

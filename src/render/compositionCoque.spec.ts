@@ -14,6 +14,7 @@ import {
   PIECE_PARABOLE,
   PIECE_RADIATEUR,
   PIECE_TREILLIS,
+  cleComposition,
   composeCoque,
   empaquettePieces,
   type PieceCoque,
@@ -170,5 +171,27 @@ describe('La station autour : les voisins et le lointain', () => {
     const n = empaquettePieces(ps, geo, aux)
     expect(n).toBe(ps.length)
     for (let i = 0; i < n; i++) expect(aux[i * 4]).toBe(ps[i].type + 16 * ps[i].couche)
+  })
+})
+
+describe('La clé de la composition : recomposer dès que ce qui la décide change', () => {
+  // un coin de vide posé à cheval sur la paroi
+  const vide = { minX: -1300, minY: -100, maxX: -1100, maxY: 100, forme: 3, p0: 0 }
+  const cle = (v: object) => cleComposition(cuve, [v as typeof vide])
+
+  it('les paramètres de forme comptent : tourner un coin, régler un arc', () => {
+    // la review du 25/09 : p0..p2 manquaient — tourner le coin laissait un
+    // port dessiné sur le trou, ou absent d'une coque intacte
+    expect(cle({ ...vide, p0: 1 })).not.toBe(cle(vide))
+    expect(cle({ ...vide, p1: 40 })).not.toBe(cle(vide))
+    expect(cle({ ...vide, p2: 2 })).not.toBe(cle(vide))
+  })
+
+  it('la coupe compte aussi', () => {
+    expect(cle({ ...vide, coupe: { x: 0, y: 0, nx: 1, ny: 0 } })).not.toBe(cle(vide))
+  })
+
+  it('et ce qui ne change rien à la composition ne la recalcule pas', () => {
+    expect(cle({ ...vide })).toBe(cle(vide))
   })
 })

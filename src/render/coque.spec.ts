@@ -152,6 +152,16 @@ describe('Le shader de coque tient sa promesse', () => {
     expect(fs).toMatch(/if \(garde <= 0\.0\) discard;/)
   })
 
+  it('le dehors masqué ne laisse QUE la coque : le fond de coque se tait avec lui', () => {
+    // la review du 25/09 : conduites et boîtiers restaient dessinés, réglage
+    // « LE DEHORS DU MODULE » sur MASQUÉ
+    const appel = fs.split('\n').find((l) => l.includes('fondDeCoque(acc, s, y, cote, px)'))
+    const avant = fs.slice(0, fs.indexOf('fondDeCoque(acc, s, y, cote, px)'))
+    const condition = avant.slice(avant.lastIndexOf('if ('))
+    expect(appel).toBeTruthy()
+    expect(condition).toMatch(/uExterieur > 0\.5/)
+  })
+
   it('et drawHull lui passe bien les vides retenus', () => {
     expect(source).toMatch(/videsPercantLaCoque\(/)
     expect(source).toMatch(/uniform4fv\(hu\['uVides\[0\]'\]/)
