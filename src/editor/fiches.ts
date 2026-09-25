@@ -89,11 +89,11 @@ export const FICHES_MATERIAUX: Record<number, Fiche> = {
     ],
   },
   [MAT_FROID]: {
-    titre: 'Hublot froid',
-    resume: 'Une aura de froid émane du hublot (pointillé = sa portée).',
+    titre: 'Conduite d’ammoniac',
+    resume: 'Une aura de gel émane de la conduite à −40 °C (pointillé = sa portée).',
     lignes: [
       { cle: 'EAU', txt: 'gèle si elle s’attarde dans l’aura.' },
-      { cle: 'GLACE', txt: 'se SOUDE au hublot : un vrai point d’ancrage.' },
+      { cle: 'GLACE', txt: 'se SOUDE à la conduite : un vrai point d’ancrage.' },
       { cle: 'VAPEUR', txt: 'recondensée en eau au passage.' },
       { cle: 'LASER', txt: 'absorbé par le bâti.' },
     ],

@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { DEFAULT_PARAMS, type SimParams } from './params'
 import { FluidSim, KIND_FREE, KIND_PLAYER, type Bounds } from './solver'
 import { MAT_FROID, MAT_WALL } from '../game/level'
+import { CONDUITE } from '../game/formes'
 
 const OPEN: Bounds = { minX: -3000, minY: -3000, maxX: 3000, maxY: 3000 }
 
@@ -175,7 +176,11 @@ describe('FluidSim — la glace : bloc balistique, soudure, dégel', () => {
 
   it('gelée AU CONTACT d’une plaque : soudée, le bloc s’arrête', () => {
     const sim = makeSim()
-    const i = sim.addParticle(4, -200, KIND_FREE) // collée à la face x = 0
+    // collée à la FACE DU TUYAU : la plaque froide est une conduite, plus
+    // mince que sa boîte (FORME_CONDUITE) — la face x = 0 de la boîte est
+    // désormais du sol, à 13 u du tuyau
+    const face = -30 + CONDUITE.tuyau * 60
+    const i = sim.addParticle(face + 4, -200, KIND_FREE)
     sim.velY[i] = 40
     run(sim, 3) // pleine aura : gel en ~1,2 s, puis soudure
     expect(sim.frozen[i]).toBe(1)

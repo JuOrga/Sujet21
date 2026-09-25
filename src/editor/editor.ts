@@ -157,6 +157,7 @@ import {
   FORME_COIN,
   FORME_DISQUE,
   FORME_NAMES,
+  SENS_NOMS,
   FORME_RECT,
   formeOutline,
 } from '../game/formes'
@@ -5736,6 +5737,17 @@ export class LevelEditor {
             `</select></label>`,
         )
       }
+      if (b.material === MAT_FROID && !(b.forme ?? 0)) {
+        // le sens du tuyau d'ammoniac : le diamètre est l'AUTRE côté — un
+        // plot presque carré se couche ou se dresse ; la collision suit
+        rows.push(
+          `<label class="ed-f"><span>Sens du tuyau</span><select id="p-sens">` +
+            SENS_NOMS.map(
+              (n, v) => `<option value="${v}"${v === (b.sens ?? 0) ? ' selected' : ''}>${n}</option>`,
+            ).join('') +
+            `</select></label>`,
+        )
+      }
       if (b.material === MAT_CHAUD) {
         // chaque chaudière règle sa portée d'aura : gros bloc à petite aura…
         rows.push(
@@ -6755,6 +6767,15 @@ export class LevelEditor {
         if (ouv !== ARC_OUVERTURE_DEFAUT) b.p1 = ouv
         const bout = Math.max(0, Math.min(2, Math.round(val('p-fbout'))))
         if (bout) b.p2 = bout
+      }
+      // sens du tuyau (plaque froide rectangulaire) : auto (0) efface la clé
+      const sensEl = document.getElementById('p-sens') as HTMLSelectElement | null
+      if (b.material === MAT_FROID && !(b.forme ?? 0) && sensEl) {
+        const sens = Math.max(0, Math.min(2, Math.round(Number(sensEl.value) || 0)))
+        if (sens) b.sens = sens
+        else delete b.sens
+      } else if (b.material !== MAT_FROID || (b.forme ?? 0)) {
+        delete b.sens
       }
       // portée d'aura propre (chaudière) : 1 (ou vide) efface la clé
       if (b.material === MAT_CHAUD) {

@@ -18,6 +18,7 @@ import { accelerationPuits, type Accel } from '../game/puits'
 import type { PuitsDef } from '../game/level'
 import { boxContact, Sponge, type ClosestPoint } from './obstacles'
 import type { FormeBox } from '../game/formes'
+import { formePhysique } from '../game/conduite'
 import {
   MAT_CHAUD,
   MAT_FROID,
@@ -550,7 +551,11 @@ export class FluidSim {
     // ce tri, le solveur les prendrait pour des parois — tout matériau qu'il
     // ne connaît pas bute. Le tri se fait ICI et non chez l'appelant, pour
     // qu'aucun chemin (jeu, essai d'éditeur, banc) ne puisse l'oublier.
-    const physiques = boxes.filter((b) => !sansPhysique(b.material))
+    // La conduite d'ammoniac (plaque froide) se lit à la forme de sa
+    // silhouette dessinée, coins arrondis — plus à sa boîte (conduite.ts).
+    const physiques = boxes
+      .filter((b) => !sansPhysique(b.material))
+      .map((b) => formePhysique(b, boxes, this.bounds))
     this.baseBoxes = physiques
     this.boxes = physiques
     this.spongeDefs = sponges // gardées pour la copie de prévision

@@ -1,24 +1,27 @@
-import { describe, it, expect } from 'vitest'
-import { readFileSync } from 'node:fs'
-import { fileURLToPath } from 'node:url'
+import { describe, expect, it } from 'vitest'
+import { sondeRetournement } from './retournement'
 
-// LES TEXTURES À L'ENDROIT. Le shader lit toutes ses images « V depuis le
-// BAS » (le tube de la coque, les rangées de l'atlas des parois, les
-// décalques) : il suppose un téléversement retourné. Or la spécification
-// WebGL ignore UNPACK_FLIP_Y_WEBGL quand la source est un ImageBitmap — du
-// 12/09 au 25/09/2026, le décodage hors du fil principal livrait donc tout
-// à l'envers, sans qu'aucune erreur ne le dise. Ce test lit la source : le
-// retournement doit être demandé AU BITMAP, et WebGL ne doit pas le refaire.
-const source = readFileSync(fileURLToPath(new URL('./renderer.ts', import.meta.url)), 'utf8')
-
-describe('Le téléversement des textures — à l’endroit sur tous les chemins', () => {
-  it('le bitmap sort déjà retourné (imageOrientation)', () => {
-    expect(source).toMatch(/createImageBitmap\(img, \{[^}]*imageOrientation: 'flipY'[^}]*\}\)/)
+// Le choix de la voie qui retourne les textures : la première qui rend
+// l'image témoin retournée — Chromium ignore UNPACK_FLIP_Y sur un bitmap,
+// d'autres navigateurs ignorent imageOrientation ; l'<img> en dernier.
+describe('retournement des textures', () => {
+  it('WebGL retourne le bitmap : on le laisse faire', async () => {
+    expect(await sondeRetournement(async (m) => m === 'gl')).toBe('gl')
   })
 
-  it('le bitmap n’est pas re-retourné par WebGL, l’<img> de secours l’est', () => {
-    expect(source).toMatch(/envoie\(bitmap, false\)/)
-    expect(source).not.toMatch(/envoie\(bitmap, true\)/)
-    expect(source).toMatch(/envoie\(img, true\)/)
+  it('Chromium : WebGL ignore le retournement, le bitmap s’en charge', async () => {
+    expect(await sondeRetournement(async (m) => m === 'bitmap')).toBe('bitmap')
+  })
+
+  it('personne ne retourne un bitmap : on repasse par l’<img>', async () => {
+    expect(await sondeRetournement(async () => false)).toBe('img')
+  })
+
+  it('une voie qui lève une erreur compte pour un non', async () => {
+    const essai = async (m: 'gl' | 'bitmap') => {
+      if (m === 'gl') throw new Error('bitmap refusé')
+      return true
+    }
+    expect(await sondeRetournement(essai)).toBe('bitmap')
   })
 })

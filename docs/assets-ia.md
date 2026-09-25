@@ -1436,6 +1436,76 @@ par le noir. La piste (silence, ou `cuve-tiede` avancée de six planches)
 se règle à la table de montage. Comme les autres planches, celles-ci ne se
 chargent qu'à la lecture de la cinématique.
 
+---
+
+## 27. LA CONDUITE D'AMMONIAC — l'atlas de la plaque froide ✅ LIVRÉ (24/09)
+**`conduite-atlas.webp` · 1024² · RGBA · assemblé par `tools/images/conduite_atlas.py`**
+
+La plaque froide est une conduite d'ammoniac à −40 °C : un tuyau d'acier
+sombre poli, givré sur ses deux bords, des brides boulonnées aux bouts et
+aux joints. Quatre images générées, réunies en **un seul atlas** (le shader
+de composition n'a plus d'unité de texture libre) : il remplace
+`froid.webp`. La référence de style est `docs/reference/conduite-reference.webp`
+(la « version 2 » de la planche d'exploration) — joignez-la à chaque
+génération (`--sref` sur Midjourney, image jointe sur ChatGPT / DALL·E).
+
+**Les sources** vont dans `masters/images/sources/` (non versionné) :
+`conduite-troncon.png`, `conduite-traversee.png`, `conduite-raccords.png`,
+`conduite-givre.png`. Puis :
+
+```bash
+python3 tools/images/conduite_atlas.py        # → masters/images/conduite-atlas.png
+python3 tools/images/prepare.py conduite-atlas
+```
+
+**Une nouvelle image impose de REMESURER.** Les recadrages du script et les
+proportions de `CONDUITE` (`src/game/formes.ts` : la bride fait toute la
+largeur du bloc, le tuyau un peu plus de la moitié, etc.) sont mesurés sur
+CES images ; la physique et le shader les lisent tels quels.
+
+Chaque prompt tient en un bloc (préambule de la charte compris). Sur
+Midjourney, remplacez « Avoid: » par `--no` et ajoutez les paramètres
+indiqués.
+
+### 27.1 Le tronçon (le corps, répété en miroir) · 2048×512
+
+```
+Retro-futuristic 1970s orbital laboratory, flat orthographic 2D game asset. Muted cold palette: near-black #030710, steel blue-grey #0a1420 to #2a3542, single cyan accent #63b7e6. Evenly lit from above, low brightness, no visible light source. Seamless horizontally tileable texture strip of a single frozen ammonia pipe seen from directly above, lying horizontally and filling the full height of the image edge to edge, left and right edges match perfectly. Dark polished gunmetal steel (#141c26 to #2a3542), glossy, with one long crisp cold specular highlight along the upper third and a faint cyan reflection on the lower third. Thick white hoarfrost (#d6e8f5) clings only along both long edges of the pipe: an irregular crystalline fringe with needle crystals, and small icicles hanging from the lower edge. The centre of the pipe stays bare, clean and shiny. Subtle weld seam, a few ice sparkles. In the exact style of the attached reference. No flanges, no bolts, no joints, no background above or below the pipe. Avoid: perspective, 3/4 view, isometric, side view, depth of field, blur, film grain, lens flare, vignette, bright lighting, warm colors, text, logo, watermark, border, frame, drop shadow, pipe fully covered in snow, white pipe, translucent ice sleeve, insulation cladding, aluminium foil.
+```
+*Midjourney : `--ar 4:1 --tile --style raw --sref <référence>`*
+
+### 27.2 La traversée de sol — le bout libre (détourée) · 2:1
+
+Le tuyau passe une bride, puis plonge par un coude dans une plaque boulonnée au
+plancher : il a une ARRIVÉE (un bout contre un mur, lui, plonge dans le mur, sans
+pièce — `conduite.ts`). **La plaque doit être centrée sur l'axe du tuyau** : une
+première génération, plaque décalée vers le bas, ne se posait pas sur un bloc
+dont le tuyau suit l'axe. Mesures de l'image livrée : plaque 677 px (= la largeur
+du bloc), bride ≈ 0,70 de cette largeur, tuyau 0,41 — la bride cache le passage
+au tronçon, plus gros, comme un réducteur.
+
+```
+Retro-futuristic 1970s orbital laboratory, flat orthographic 2D game asset. Muted cold palette: near-black #030710, steel blue-grey #0a1420 to #2a3542, single cyan accent #63b7e6. Evenly lit from above, low brightness, no visible light source. Single sprite on a transparent background, STRICT TOP-DOWN orthographic view looking straight down at the floor, in the exact style of the attached reference: a dark polished gunmetal steel pipe lying on the floor, coming from the left edge of the image, with a bolted flange joint on the pipe just before the plate, and on the right it bends 90 degrees DOWNWARD and disappears into the floor through a square riveted steel floor plate. The plate and its hole are CENTRED ON THE PIPE AXIS: the pipe goes straight ahead into the hole without curving sideways, the hole's centre is exactly on the pipe's centre line, and the plate extends equally above and below the pipe. Seen from directly above, the bend is a rounded pipe end whose top surface darkens as it curves down, sinking into a round black hole in the plate; a thin bolted collar ring lies FLAT on the plate around the hole, seen as a perfect circle, not an ellipse. The square plate is only about 1.8 times the pipe diameter, bolted at its four corners, lying flat. White hoarfrost (#d6e8f5) crusts the collar and the rim of the hole, a little frost on the plate edges, small icicles along the pipe's lower edge; the rest is bare glossy steel with a cold specular highlight. Pipe centred vertically in the image, the whole plate inside the image, clean edges, isolated on transparent background. Avoid: perspective, 3/4 view, isometric, side view, wall, elliptical ring, pipe entering horizontally, pipe curving sideways, off-centre plate, depth of field, blur, film grain, lens flare, vignette, bright lighting, warm colors, text, logo, watermark, border, frame, drop shadow, pipe fully covered in snow, white pipe.
+```
+*Midjourney : `--ar 2:1 --style raw --sref <référence>`, puis détourage. Source :
+`masters/images/sources/conduite-traversee.png`.*
+
+### 27.3 Les raccords (planche détourée : le joint sert aux joints et aux plots) · 2048×1024
+
+```
+Retro-futuristic 1970s orbital laboratory, flat orthographic 2D game asset. Muted cold palette: near-black #030710, steel blue-grey #0a1420 to #2a3542, single cyan accent #63b7e6. Evenly lit from above, low brightness, no visible light source. Sprite sheet on a transparent background, top-down orthographic view, same pipe diameter and exact style as the attached reference: dark polished gunmetal steel with a long cold specular highlight, white hoarfrost fringe (#d6e8f5) and small icicles along the edges. Pieces: (1) a bolted flange joint in the middle of a pipe, two flanges face to face with hex nuts, (2) a 90-degree elbow, (3) a T-junction, (4) a pipe clamp saddle with two bolts and a small base plate, (5) a gate valve with a round pale steel handwheel. Rime on bolts, rims and outer curves, the rest bare glossy steel. Pieces evenly spaced, not touching, clean edges, isolated on transparent background. Avoid: perspective, 3/4 view, isometric, side view, depth of field, blur, film grain, lens flare, vignette, bright lighting, warm colors, text, logo, watermark, border, frame, drop shadow, background, floor, pipe fully covered in snow, white pipe.
+```
+*Midjourney : `--ar 2:1 --style raw --sref <référence>`, puis détourage. Seule la pièce (1) est
+utilisée à ce jour ; le coude, le T, le collier et la vanne attendent dans la source.*
+
+### 27.4 Le givre du sol (l'aire d'effet) · 1024×1024
+
+```
+Retro-futuristic 1970s orbital laboratory, flat orthographic 2D game asset. Muted cold palette: near-black #030710, steel blue-grey #0a1420 to #2a3542, single cyan accent #63b7e6. Evenly lit from above, low brightness, no visible light source. Seamless tileable transparent overlay of light frost on a flat floor, seen from directly above, matching the floor frost of the attached reference: sparse powdery rime patches (#d6e8f5), thin cold mist stains, a few small needle crystals with faint cyan glints, mostly transparent and delicate, overlay only, no floor visible, no background. Avoid: perspective, depth of field, blur, film grain, lens flare, vignette, bright lighting, warm colors, text, logo, watermark, border, frame, solid background, snow drifts, thick ice.
+```
+*Midjourney : `--ar 1:1 --tile --style raw --sref <référence>`. L'image livrée garde des
+franges violettes : le shader n'en lit que la clarté, teintée en blanc bleuté.*
+
 ## 28. LE MATÉRIEL DE COQUE, VU DE DESSUS — une image par pièce
 
 Le décor posé AU-DEHORS de la cuve, **vu de dessus** comme la salle. Une image par pièce,
