@@ -5,7 +5,7 @@ DEHORS**) :
 
 | mode | ce que c'est | ce que ça coûte |
 |---|---|---|
-| **PLAQUE** (défaut) | une image de 4096 × 4096 — `public/assets/ciel.webp` | ~2 Mo au téléchargement, ~90 Mo de mémoire graphique |
+| **PLAQUE** (défaut) | une image carrée — `public/assets/ciel.webp`, 2048² | ~0,7 Mo au téléchargement, ~22 Mo de mémoire graphique |
 | **TUILE** | l'ancien fond : deux petites textures répétées | ~0,1 Mo |
 | **PROCÉDURAL** | rien à charger, le vide est entièrement calculé | zéro |
 
@@ -17,7 +17,7 @@ monde et répétée à l'infini : en reculant, on voyait deux ou trois bandes
 parallèles. Elle est désormais cadrée par rapport à l'**écran**
 (`cadrePlaque`, `src/render/parallaxe.ts`) :
 
-- l'écran en montre une **part** (0,6 de l'image sur sa grande dimension au
+- l'écran en montre une **part** (0,85 de l'image sur sa grande dimension au
   zoom de jeu), un peu plus en reculant, un peu moins en s'approchant ;
 - son centre **dérive** avec la caméra, pour que la profondeur se sente, mais
   sature avant le bord : les tests garantissent que, quels que soient la
@@ -143,6 +143,12 @@ magick assets-src/original.tif -gravity center -crop 1:1 +repage \
        -resize 4096x4096 -quality 88 public/assets/ciel.webp
 ```
 
+**Mieux : `tools/ciel/prepare-plaque.py`** fait le carré, les retouches
+ponctuelles (`--retouche x,y,rayon`) et choisit la taille d'après la source —
+la plus petite puissance de deux qui ne la réduit pas, plafonnée à 4096.
+Agrandir n'ajoute aucun détail : une image de 1254 px en 4096 coûterait quatre
+fois la mémoire de 2048 pour la même netteté.
+
 **Pourquoi 4096 et pas 16 384.** Une texture coûte en mémoire graphique
 `côté² × 4` octets, plus un tiers pour ses niveaux de détail : 4096 → ~90 Mo,
 8192 → ~360 Mo, 16 384 → ~1,4 Go. Sur tablette, la troisième ligne ne se charge
@@ -160,9 +166,10 @@ qu'au recul maximal, et encore — l'écran s'arrête à un pour cent du bord.
 
 BANC › **Ciel du dehors**, en jeu, à vue :
 
-- **force** — le dosage. Le défaut est 0,55, et ce n'est pas timide : à 1, le
-  vide écrase la station, les modules deviennent des découpes plates et la
-  hiérarchie lumineuse s'inverse. Montez par petits pas, en regardant la cuve.
+- **force** — le dosage. Le défaut est 0,75 pour la Voie lactée livrée : à
+  0,55 son cœur et ses nébuleuses restaient ternes. Trop haut, le vide écrase
+  la station et la hiérarchie lumineuse s'inverse : baissez en regardant la
+  cuve.
 - **part vue** — quelle part de l'image la grande dimension de l'écran montre
   au zoom de jeu. Plus petite : la Voie lactée paraît plus grande et plus
   proche. Quelle que soit la valeur, l'écran reste dans l'image.
@@ -171,14 +178,25 @@ BANC › **Ciel du dehors**, en jeu, à vue :
 
 ## La plaque livrée avec le jeu
 
-`public/assets/ciel.webp` n'est **pas une photographie** : elle est fabriquée
-par `tools/ciel/genere-ciel.py`, qui imite le centre galactique vu de l'espace
+`public/assets/ciel.webp` est une **image générée** sur le prompt ci-dessous :
+le centre galactique en biais, son bulbe doré près du centre, des lanes de
+poussière filamenteuses, des nébuleuses roses, une région bleue au-dessus du
+cœur. Source de 1254 px, préparée ainsi (l'original est hors dépôt) :
+
+```bash
+python3 tools/ciel/prepare-plaque.py assets-src/voie-lactee.png --retouche 620,495,3
+```
+
+La retouche efface un point noir que le générateur avait laissé en plein cœur
+— le premier endroit où l'œil va.
+
+**La plaque procédurale, en secours.** `tools/ciel/genere-ciel.py` fabrique une
+plaque sans image source. Elle imite le centre galactique vu de l'espace
 — une bande en biais, son **bulbe doré** près du centre de l'image, des lanes
 de poussière étirées dans le sens de la bande, des poches d'hydrogène roses,
 une région bleue et orangée au-dessus du cœur, et un étirement « asinh »
-d'astrophotographe. C'est une plaque d'attente : une vraie photographie ou une
-image générée (plus bas) fera mieux, et le procédural a ses limites — les
-poussières y restent des nuages plus que des filaments.
+d'astrophotographe. Elle a été jugée « pas terrible » face à l'image générée :
+ses poussières restent des nuages plus que des filaments.
 
 ```bash
 python3 tools/ciel/genere-ciel.py --taille 4096 --sortie public/assets/ciel.webp

@@ -137,11 +137,14 @@ export interface ReglagesPlaque {
   ref: number
 }
 
+// La part de 0,85 se règle sur la plaque livrée (une image de 1254 px) :
+// à 0,6, la bande emplissait tout l'écran — plus de noir autour, plus de
+// région bleue — et l'image, agrandie d'autant, tournait au grain pâteux.
 export const PLAQUE_DEFAUTS: ReglagesPlaque = {
-  part: 0.6,
+  part: 0.85,
   zoom: 0.3,
-  partMin: 0.32,
-  partMax: 0.94,
+  partMin: 0.45,
+  partMax: 0.96,
   derive: 4e-5,
   ref: 0.3,
 }

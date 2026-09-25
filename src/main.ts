@@ -3753,14 +3753,14 @@ if (!(cielChoix in CIEL_MODE)) cielChoix = 'plaque'
 // être. L'étendue de 6000 donnait des volutes énormes, plus proches d'un
 // ciel de nuages que d'un champ profond ; 12 000 les diluait en brume.
 // 8 000 rend la structure lisible sans qu'elle prenne toute la place.
-// La plaque de la Voie lactée est plus NOIRE que celle des nuages (tout
-// hors de la bande est vide) : à 0,55 le vide garde la luminance moyenne
-// d'avant, mesurée sur les deux plaques (0,058 contre 0,060) — la bande se
-// lit, la hiérarchie tient. Les étoiles nettes, elles, ne passent pas par
-// ce dosage : un point ne noie pas la cuve, un voile si.
+// La Voie lactée livrée (une image générée, centre galactique) est faite
+// pour être VUE : à 0,55 son cœur doré et ses nébuleuses restaient ternes,
+// 0,75 les rend sans brûler le cœur (comparé à l'écran, les deux côte à
+// côte). Si elle écrase les modules d'un tableau, c'est ce curseur du banc.
+// Les étoiles nettes ne passent pas par ce dosage.
 // LA PART : combien de la plaque la grande dimension de l'écran montre au
-// zoom de jeu. 0,6 : la Voie lactée déborde de l'écran sans qu'on la perde.
-const cielReglages = { force: 0.55, part: PLAQUE_DEFAUTS.part }
+// zoom de jeu (render/parallaxe.ts, PLAQUE_DEFAUTS).
+const cielReglages = { force: 0.75, part: PLAQUE_DEFAUTS.part }
 
 // LA PROFONDEUR DES COUCHES DE FOND : la règle, les valeurs et les tests
 // vivent dans render/parallaxe.ts — ici on n'en tient que la copie RÉGLABLE,

@@ -3025,8 +3025,9 @@ export class Renderer {
   // décor procédural assure l'intérim, l'image prend le relais sans à-coup.
   private texStars: WebGLTexture | null = null
   private texStarsFar: WebGLTexture | null = null
-  // LA PLAQUE DE CIEL, chargée SEULEMENT si on la demande : 4096², c'est
-  // ~90 Mo de mémoire graphique une fois les niveaux de détail construits.
+  // LA PLAQUE DE CIEL, chargée SEULEMENT si on la demande : 2048², c'est
+  // ~22 Mo de mémoire graphique une fois les niveaux de détail construits
+  // (une plaque de 4096² en coûterait ~90).
   // Un joueur qui reste au ciel procédural ne doit ni la télécharger ni la
   // loger — d'où le chargement paresseux, et la libération au retour.
   private texCiel: WebGLTexture | null = null
