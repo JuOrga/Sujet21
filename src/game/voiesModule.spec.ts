@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { aleaDeGraine } from './voie'
-import { dessinMiniCarteSVG, portesDuRang, tisseMiniCarte, TISSAGE_DEFAUT, typesDuModule, VOIES } from './voiesModule'
+import { dessinMiniCarteSVG, portesDuRang, tisseMiniCarte, TISSAGE_DEFAUT, typesDuModule, VOIES, type MiniCarte } from './voiesModule'
 
 // SANS HALTE par défaut : les tests des salles et des rencontres regardent la
 // grille nue ; les haltes ont leur propre bloc
@@ -220,12 +220,34 @@ describe('les réglages du tissage — ce que le concepteur tourne au banc', () 
     expect(avecRencontre).toBeGreaterThan(15)
   })
 
-  it('bifurcation à zéro : trois couloirs parallèles ; à un : tout mène aux voisines', () => {
+  it('bifurcation à zéro : trois couloirs parallèles ; à un : chaque voie bifurque, sauf la branche d’un X qui tombe', () => {
     const droit = tisseMiniCarte(4, aleaDeGraine('b'), [0], () => 1, { debut: 0, suite: 0 }, false, { ...NU, bifurcation: 0 })
     for (const r of droit.rangs.slice(0, -1)) for (const n of r) expect(n.suivants).toEqual([n.voie])
     const tout = tisseMiniCarte(4, aleaDeGraine('b'), [0], () => 1, { debut: 0, suite: 0 }, false, { ...NU, bifurcation: 1 })
-    expect(tout.rangs[0][1].suivants).toEqual([0, 1, 2])
-    expect(tout.rangs[0][0].suivants).toEqual([0, 1])
+    for (const r of tout.rangs.slice(0, -1)) {
+      // les bords bifurquent vers le milieu, sauf quand c'est la branche coupée d'un X
+      for (const [v, voisine] of [[0, 1], [2, 1]] as const)
+        if (!r[v].suivants.includes(voisine)) expect(r[voisine].suivants).toContain(v)
+      // le milieu garde au moins une voisine
+      expect(r[1].suivants.length).toBeGreaterThan(1)
+    }
+  })
+
+  it('les croisements se font plus rares : moitié moins de X, et aucune voie morte', () => {
+    // un X : la voie v mène à v+1 ET la voie v+1 mène à v, au même rang
+    const croisements = (mc: MiniCarte): number =>
+      mc.rangs.flat().filter((n) => n.suivants.includes(n.voie + 1) && mc.rangs[n.rang][n.voie + 1]?.suivants.includes(n.voie)).length
+    let x = 0
+    for (let g = 0; g < 400; g++) {
+      const mc = tisseMiniCarte(6, aleaDeGraine(`x${g}`), [0, 1, 2, 3], () => 2, { debut: 1, suite: 2 }, true, NU)
+      x += croisements(mc)
+      for (let r = 1; r < mc.rangs.length; r++)
+        for (const n of mc.rangs[r]) expect(mc.rangs[r - 1].some((p) => p.suivants.includes(n.voie))).toBe(true)
+    }
+    // à 45 % de bifurcation, un X valait 0,45² ≈ 0,2 par paire de voisines,
+    // dix paires par module de six salles : 2 par module avant ; ~1 désormais
+    expect(x / 400).toBeLessThan(1.3)
+    expect(x / 400).toBeGreaterThan(0.6) // des carrefours restent : « un peu moins », pas zéro
   })
 
   it('les réglages n’ajoutent aucun tirage : la même graine donne la même grille quel que soit le réglage des salles', () => {
@@ -282,3 +304,4 @@ describe('les HALTES dans la grille — l’économat, l’alcôve, la bonbonne,
     }
   })
 })
+

