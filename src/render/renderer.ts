@@ -2862,6 +2862,8 @@ in vec2 vUv;    // (le long de la paroi, en travers depuis le bord intérieur)
 in vec2 vWorld;
 in vec2 vCote;  // (côté 0 haut · 1 bas · 2 gauche · 3 droite, longueur de la paroi)
 uniform sampler2D uTexHull;
+uniform sampler2D uTexMateriel; // atlas 4 × 2 de pièces, pied en bas
+uniform float uHasMateriel;
 uniform float uZoom;
 uniform float uTime;
 uniform float uEpais;
@@ -3099,6 +3101,23 @@ void fondDeCoque(inout vec4 acc, float s, float y, float cote, float px) {
   }
 }
 
+// Une pièce de l'atlas peint (tools/images/materiel.py) : cases de 512 px,
+// SPRITE unités monde de côté, pied au bord bas, centrée. L'atlas est
+// téléversé retourné (FLIP_Y) : le V se lit depuis le BAS de l'image.
+const float SPRITE = 192.0;
+vec4 sprite(vec2 q, float type, vec2 grad) {
+  vec2 u = vec2(q.x / SPRITE + 0.5, q.y / SPRITE);
+  if (u.x < 0.0 || u.x > 1.0 || u.y < 0.0 || u.y > 1.0) return vec4(0.0);
+  float col = mod(type, 4.0);
+  float lig = floor(type / 4.0);
+  vec2 uv = vec2((col + u.x) * 0.25, 1.0 - (lig + 1.0) * 0.5 + u.y * 0.5);
+  vec4 t = textureGrad(uTexMateriel, uv, vec2(grad.x, 0.0), vec2(0.0, grad.y));
+  // éclairé par les étoiles seulement : un peu plus froid et plus sombre
+  // que la planche, pour rester sous la cuve dans la hiérarchie lumineuse
+  vec3 c = t.rgb * vec3(0.80, 0.86, 0.95);
+  return vec4(c * t.a, t.a);
+}
+
 void main() {
   float px = 1.0 / max(uZoom, 1e-4); // un pixel d'écran, en unités monde
   float s = vUv.x;
@@ -3146,9 +3165,23 @@ void main() {
     vec2 pied = origine + cx * dA + uEpais * dO;
     float tient = min(min(videSdf(pied), videSdf(pied - 110.0 * dA)), videSdf(pied + 110.0 * dA));
     if (tient > 0.0) {
-      if (type == 4.0 || type == 5.0 || r > 0.55) mainCourante(acc, p, px / 1.15);
-      vec4 m = materiel(p, type, r, cote, px / 1.15);
-      acc = m + acc * (1.0 - m.a); // la pièce devant la main courante
+      if (uHasMateriel > 0.5) {
+        // L'ATLAS PEINT : la case du type, pied sur la face de la coque.
+        // Le niveau de détail est écrit à la main (textureGrad) : on est ici
+        // dans une branche que les pixels voisins n'ont pas prise.
+        vec2 q = vec2(s - cx, y);
+        vec2 grad = vec2(px / (4.0 * SPRITE), px / (2.0 * SPRITE));
+        if (type == 4.0 || type == 5.0 || r > 0.55) {
+          vec4 mc = sprite(q + vec2(0.0, 2.0), 7.0, grad);
+          acc = mc + acc * (1.0 - mc.a);
+        }
+        vec4 m = sprite(q, type, grad);
+        acc = m + acc * (1.0 - m.a);
+      } else {
+        if (type == 4.0 || type == 5.0 || r > 0.55) mainCourante(acc, p, px / 1.15);
+        vec4 m = materiel(p, type, r, cote, px / 1.15);
+        acc = m + acc * (1.0 - m.a); // la pièce devant la main courante
+      }
     }
   }
   // le fil de lumière sur la face externe : l'arête de la coque accroche
@@ -3312,6 +3345,10 @@ export class Renderer {
   private texPhile: WebGLTexture | null = null
   private texIris: WebGLTexture | null = null
   private texHull: WebGLTexture | null = null
+  // l'atlas du matériel de coque (tools/images/materiel.py) — absent, ou
+  // écarté par le réglage, le shader trace les pièces lui-même
+  private texMateriel: WebGLTexture | null = null
+  private materielImage = true
   private texSpongeDry: WebGLTexture | null = null
   private texSpongeWet: WebGLTexture | null = null
   private spongeScratch = new Float32Array(0)
@@ -3566,6 +3603,7 @@ export class Renderer {
       (t) => (this.texIris = t),
     )
     this.loadTexture('/assets/hull.webp', true, true, (t) => (this.texHull = t))
+    this.loadTexture('/assets/coque-materiel.webp', false, true, (t) => (this.texMateriel = t))
     this.loadTexture(
       '/assets/sponge-dry.webp',
       true,
@@ -3760,6 +3798,12 @@ export class Renderer {
     this.parSemis[1] = semis[1]
     this.parCuve[0] = cuve[0]
     this.parCuve[1] = cuve[1]
+  }
+
+  /** Le matériel de coque en IMAGES (l'atlas, s'il est chargé) ou tracé
+   *  par le shader. Réglage du joueur (main.ts). */
+  setMaterielImage(actif: boolean): void {
+    this.materielImage = actif
   }
 
   setSolModules(actif: boolean): void {
@@ -4609,6 +4653,12 @@ export class Renderer {
     gl.activeTexture(gl.TEXTURE0)
     gl.bindTexture(gl.TEXTURE_2D, this.texHull)
     gl.uniform1i(hu['uTexHull'], 0)
+    const atlas = this.materielImage ? this.texMateriel : null
+    gl.activeTexture(gl.TEXTURE1)
+    gl.bindTexture(gl.TEXTURE_2D, atlas ?? this.texHull)
+    gl.uniform1i(hu['uTexMateriel'], 1)
+    gl.uniform1f(hu['uHasMateriel'], atlas ? 1 : 0)
+    gl.activeTexture(gl.TEXTURE0)
     // prémultiplié : la frange laisse voir le ciel, les feux s'y ajoutent
     gl.enable(gl.BLEND)
     gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA)

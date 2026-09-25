@@ -3720,6 +3720,11 @@ appliqueSimHz()
 // deux rapports de performance, mêmes conditions, seul ce réglage change —
 // l'écart chiffre le coût réel des graphismes sur la machine du joueur.
 let decorRiche = localStorage.getItem('sujet21-decor') !== 'sobre'
+// le matériel de coque : l'atlas peint (défaut, s'il est livré) ou le tracé
+// du moteur — deux rendus du même décor, à comparer (?materiel=dessin)
+let materielImage =
+  (new URLSearchParams(location.search).get('materiel') ??
+    localStorage.getItem('sujet21-materiel')) !== 'dessin'
 // LE VOILE DES CACHETTES : le brouillard (défaut, voileCache.ts) ou le
 // voile SOBRE d'avant — le rectangle plein, les nappes discrètes, le liseré.
 // Un choix de goût autant que de coût : le joueur qui préfère l'ancien le
@@ -3946,6 +3951,28 @@ const paramsEl = document.getElementById('params') as HTMLDivElement
     }
   }
   renderDecor()
+
+  const choixMateriel = document.getElementById('params-materiel') as HTMLDivElement | null
+  const renderMateriel = (): void => {
+    if (!choixMateriel) return
+    choixMateriel.innerHTML = ''
+    for (const [image, label] of [
+      [true, 'IMAGES'],
+      [false, 'DESSINÉES'],
+    ] as const) {
+      const b = document.createElement('button')
+      b.type = 'button'
+      b.textContent = label
+      b.className = materielImage === image ? 'actif' : ''
+      b.addEventListener('click', () => {
+        materielImage = image
+        localStorage.setItem('sujet21-materiel', image ? 'image' : 'dessin')
+        renderMateriel()
+      })
+      choixMateriel.appendChild(b)
+    }
+  }
+  renderMateriel()
 
   const choixVoile = document.getElementById('params-voile') as HTMLDivElement
   const renderVoile = (): void => {
@@ -19397,6 +19424,7 @@ function corpsImage(now: number): boolean {
   // s'affichait plus du tout. Posé à l'image, il ne peut ni arriver trop tôt
   // ni rester en retard d'un tableau.
   renderer.setSolModules(level.coque === 'structures')
+  renderer.setMaterielImage(materielImage)
   renderer.setCiel(
     CIEL_MODE[cielChoix],
     cielReglages.force,
