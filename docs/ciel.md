@@ -5,12 +5,20 @@ DEHORS**) :
 
 | mode | ce que c'est | ce que ça coûte |
 |---|---|---|
-| **PLAQUE** (défaut) | une image de 4096 × 4096 — `public/assets/ciel.webp` | ~1 Mo au téléchargement, ~90 Mo de mémoire graphique |
+| **PLAQUE** (défaut) | une image de 4096 × 4096 — `public/assets/ciel.webp` | ~2 Mo au téléchargement, ~90 Mo de mémoire graphique |
 | **TUILE** | l'ancien fond : deux petites textures répétées | ~0,1 Mo |
 | **PROCÉDURAL** | rien à charger, le vide est entièrement calculé | zéro |
 
 La plaque **ne se télécharge qu'à son premier affichage**. Qui la coupe ne la
 paie jamais.
+
+**Les étoiles nettes ne sont pas dans la plaque.** Le jeu montre environ deux
+texels par pixel : une étoile d'un texel y est moyennée, donc pâlie et floue.
+En modes PLAQUE et PROCÉDURAL, le shader dessine par-dessus six couches
+d'étoiles au pixel près (`etoiles` dans `src/render/renderer.ts`), nettes à
+tout zoom et sur tout écran, plus nombreuses là où la plaque est riche — la
+bande lactée. La plaque ne porte que le fond : la lueur, le grain, les
+poussières. Une plaque de télescope déposée à la place en profite aussi.
 
 ---
 
@@ -140,7 +148,7 @@ de la convertir.
 
 BANC › **Ciel du dehors**, en jeu, à vue :
 
-- **force** — le dosage. Le défaut est 0,45, et ce n'est pas timide : à 1, le
+- **force** — le dosage. Le défaut est 0,55, et ce n'est pas timide : à 1, le
   vide écrase la station, les modules deviennent des découpes plates et la
   hiérarchie lumineuse s'inverse. Montez par petits pas, en regardant la cuve.
 - **étendue (u)** — combien d'unités-monde la plaque couvre. Plus petite : le
@@ -152,15 +160,17 @@ BANC › **Ciel du dehors**, en jeu, à vue :
 ## La plaque livrée avec le jeu
 
 `public/assets/ciel.webp` n'est **pas une photographie** : elle est fabriquée
-par `tools/ciel/genere-ciel.py`, qui imite un champ profond — fond noir bleuté,
-filaments de poussière chauds, semis d'étoiles colorées selon leur température,
-et **six aigrettes** sur les plus vives (la diffraction d'un miroir hexagonal,
-la signature de Webb). Elle est **périodique par construction** : ses bords se
+par `tools/ciel/genere-ciel.py`, qui imite le ciel vu de l'espace — un noir
+franc, une **bande lactée** en biais (une nuée d'étoiles trop nombreuses pour
+être séparées, déchirée de lanes de poussière sombre, quelques poches roses et
+bleues), et un semis clairsemé partout ailleurs. Le premier tirage imitait un
+champ profond de Webb (nuages sarcelle et or, six aigrettes) : en jeu, il se
+lisait comme des taches de peinture molles. Elle est **périodique par construction** : ses bords se
 raccordent, donc elle se répète sans couture.
 
 ```bash
 python3 tools/ciel/genere-ciel.py --taille 4096 --sortie public/assets/ciel.webp
-# --densite 1.4   plus d'étoiles      --nebuleuse 0.6  moins de nébulosité
+# --densite 1.4   plus d'étoiles      --nebuleuse 0.6  une bande plus pâle
 # --graine 7      un autre ciel       --taille 2048    moitié moins de mémoire
 ```
 

@@ -589,6 +589,69 @@ float specks(vec2 world, float cell, float density, float zoom) {
   return smoothstep(r * 2.5, r * 0.5, d) * (0.4 + 0.6 * hash21(g + 8.9)) * vis;
 }
 
+/* LES ÉTOILES NETTES DU DEHORS. La plaque de ciel est vue à environ deux
+   texels par pixel : une étoile d'un texel y est MOYENNÉE, donc pâlie et
+   adoucie — c'est ce qui rendait le vide flou. Ici, chaque étoile est un
+   noyau gaussien mesuré EN PIXELS DE LA TOILE (px = largeur d'un pixel dans
+   l'espace de la couche) : un pixel et demi de large à tout zoom, sur tout
+   écran, net comme une vraie étoile — elle n'a pas de taille apparente.
+   Une cellule, au plus une étoile, gardée à deux pixels du bord : le noyau
+   n'en déborde pas, un pixel ne lit donc qu'UNE cellule par couche. Quand
+   les cellules passent sous quelques pixels (dézoom), la couche s'éteint en
+   fondu plutôt que de fourmiller : ce sont les couches plus larges, aux
+   étoiles plus vives, qui tiennent le ciel — comme à l'œil, où les faibles
+   disparaissent les premières. */
+vec3 etoilesCouche(vec2 p, float cell, float densite, float px, float eclat, float graine) {
+  float cellPx = cell / px;
+  float vis = smoothstep(5.0, 9.0, cellPx);
+  if (vis <= 0.0) return vec3(0.0);
+  vec2 g = floor(p / cell);
+  vec2 gs = g + graine;
+  if (hash21(gs) > densite) return vec3(0.0);
+  // la marge est PLAFONNÉE au quart de la cellule : plus large, elle
+  // coinçait les étoiles au centre des petites cellules, et le semis
+  // tournait au QUADRILLAGE — le premier essai en était tramé au dézoom
+  float bord = min(0.25, 2.0 / cellPx);
+  vec2 o = mix(vec2(bord), vec2(1.0 - bord), vec2(hash21(gs + 17.3), hash21(gs + 39.7)));
+  // l'éclat suit une loi de puissance : beaucoup de faibles, peu de vives —
+  // sans ce déséquilibre, un ciel a l'air d'un semis de confettis
+  float m = hash21(gs + 5.1);
+  float m4 = m * m * m * m;
+  float d = length(p - (g + o) * cell) / px; // en pixels
+  float sig = 0.55 + 0.40 * m4;              // les vives débordent un peu
+  float noyau = exp(-d * d / (2.0 * sig * sig)) + 0.05 * m4 * exp(-d * 0.9);
+  // la couleur suit la température, en teintes PÂLES : sans atmosphère les
+  // étoiles sont blanches à peine teintées, des couleurs franches font dessin
+  float t = hash21(gs + 8.9);
+  vec3 col = t < 0.5
+    ? mix(vec3(1.00, 0.80, 0.62), vec3(1.00, 0.96, 0.90), t * 2.0)
+    : mix(vec3(1.00, 0.96, 0.90), vec3(0.80, 0.87, 1.00), t * 2.0 - 1.0);
+  return col * (eclat * (0.12 + 0.88 * m4) * noyau * vis);
+}
+
+/* Le ciel d'étoiles, en six couches sur trois profondeurs : les faibles et
+   nombreuses collées au ciel lointain (elles défilent avec la Voie lactée
+   de la plaque), les rares vives sur le semis proche, une couche entre deux.
+   C'est l'écart de défilement entre elles qui fait la profondeur.
+   « riche » (0..1) dit où la plaque est dense — la bande lactée : les faibles
+   s'y entassent, comme dans le vrai ciel. */
+vec3 etoiles(vec2 world, float pxMonde, float riche) {
+  vec2 pL = coucheFond(world, uParCiel);
+  vec2 pP = coucheFond(world, uParSemis);
+  float xL = pxMonde * uParCiel.y;
+  float xP = pxMonde * uParSemis.y;
+  float foule = mix(0.6, 1.6, riche);
+  // des densités MOYENNES sur plus de couches plutôt qu'une couche pleine :
+  // une étoile dans presque chaque cellule redessine la grille
+  vec3 e = etoilesCouche(pL, 32.0, 0.38 * foule, xL, 0.45, 0.0);
+  e += etoilesCouche(pL, 45.0, 0.40 * foule, xL, 0.55, 5.0);
+  e += etoilesCouche(pL, 66.0, 0.42 * foule, xL, 0.70, 11.0);
+  e += etoilesCouche((pL + pP) * 0.5, 100.0, 0.45, (xL + xP) * 0.5, 0.90, 23.0);
+  e += etoilesCouche(pP, 190.0, 0.40, xP, 1.15, 37.0);
+  e += etoilesCouche(pP, 430.0, 0.35, xP, 1.50, 51.0);
+  return e;
+}
+
 // Champ doux sans réseau : somme de sinus modulés. Le bruit de valeur, à très
 // basse fréquence, laisse voir son réseau carré (interpolation bilinéaire sur
 // une grille entière) — d'où des PAVÉS de lumière à l'écran. Ceci n'en a pas.
@@ -1045,15 +1108,16 @@ void main() {
     // traverse jamais assez pour qu'un motif se reconnaisse, et le jour où
     // le monde s'élargira, elle se raccordera sans couture.
     vec3 fond = texture(uTexCiel, coucheFond(world, uParCiel) / uCielSpan).rgb;
-    // LE SEMIS PROCHE RESTE PROCÉDURAL, et ce n'est pas une économie : il
-    // est NET à tout grossissement là où la plaque s'adoucit, et c'est lui
-    // qui donne le MOUVEMENT — une plaque seule, si belle soit-elle, paraît
-    // collée à l'écran parce qu'elle défile à la même vitesse partout.
-    if (uDecor > 0.5) {
-      fond += vec3(0.50, 0.60, 0.75) * specks(world + uCenter * 0.5, 130.0, 0.10, uZoom) * 0.38;
-      fond += vec3(0.75, 0.82, 0.95) * specks(world + 500.0, 200.0, 0.08, uZoom) * 0.62;
-    }
     voidCol = fond * uCielForce;
+    // LES ÉTOILES NETTES RESTENT PROCÉDURALES, et ce n'est pas une
+    // économie : elles sont nettes à tout grossissement là où la plaque
+    // s'adoucit, et ce sont elles qui donnent le MOUVEMENT — une plaque
+    // seule paraît collée à l'écran parce qu'elle défile d'un bloc. Posées
+    // APRÈS le dosage : un point ne noie pas la cuve, un voile si.
+    if (uDecor > 0.5) {
+      float lum = dot(fond, vec3(0.30, 0.50, 0.20));
+      voidCol += etoiles(world, pxMonde, smoothstep(0.05, 0.20, lum));
+    }
   } else if (uCielMode > 0.5 && uHasStars > 0.5) {
     // Atténuée : le vide doit rester plus sombre que la cuve éclairée,
     // sinon la hiérarchie lumineuse s'inverse et la scène se noie.
@@ -1071,8 +1135,7 @@ void main() {
       neb = neb * 0.6 + 0.4 * vnoise(world * 0.004 - vec2(1.1, 7.7));
       voidCol += vec3(0.010, 0.018, 0.038) * neb;
       voidCol += vec3(0.022, 0.010, 0.034) * vnoise(world * 0.0009 + 21.0);
-      voidCol += vec3(0.50, 0.60, 0.75) * specks(world + uCenter * 0.5, 130.0, 0.10, uZoom) * 0.55;
-      voidCol += vec3(0.75, 0.82, 0.95) * specks(world + 500.0, 200.0, 0.08, uZoom) * 0.85;
+      voidCol += etoiles(world, pxMonde, neb * 0.5);
     }
   }
 
