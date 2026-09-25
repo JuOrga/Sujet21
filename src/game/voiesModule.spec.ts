@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { aleaDeGraine } from './voie'
-import { cheminDePorte, dessinMiniCarteSVG, fermeParPorte, REPERES_VOIE, portesDuRang, tisseMiniCarte, TISSAGE_DEFAUT, typesDuModule, VOIES, type MiniCarte } from './voiesModule'
+import { cheminDePorte, ditNoeud, dessinMiniCarteSVG, fermeParPorte, REPERES_VOIE, portesDuRang, tisseMiniCarte, TISSAGE_DEFAUT, typesDuModule, VOIES, type MiniCarte } from './voiesModule'
 
 // SANS HALTE par défaut : les tests des salles et des rencontres regardent la
 // grille nue ; les haltes ont leur propre bloc
@@ -356,11 +356,11 @@ describe('cheminDePorte — ce que le survol d’une porte allume', () => {
     // aussi (2-1 n'est joignable que par 1-1)
     const f = fermeParPorte(mc, 1, 0, [0, 1], 0)
     expect(f.noeuds.sort()).toEqual(['1-1', '2-1', '2-2'])
-    expect(f.liens.sort()).toEqual(['0-0-1', '1-1-1', '1-1-2'])
+    expect(f.liens.sort()).toEqual(['0-0-1', '1-1-1', '1-1-2', '2-1-sas', '2-2-sas'])
     // prendre 1 perd la voie 0 : ses nœuds, sa coursive d'entrée
     const g = fermeParPorte(mc, 1, 1, [0, 1], 0)
     expect(g.noeuds.sort()).toEqual(['1-0', '2-0'])
-    expect(g.liens.sort()).toEqual(['0-0-0', '1-0-0'])
+    expect(g.liens.sort()).toEqual(['0-0-0', '1-0-0', '2-0-sas'])
     // une seule porte : elle ne ferme rien
     expect(fermeParPorte(mc, 1, 1, [1], 0)).toEqual({ noeuds: [], liens: [] })
   })
@@ -371,5 +371,41 @@ describe('cheminDePorte — ce que le survol d’une porte allume', () => {
     expect(svg).toContain('class="mv-repere mv-repere-porte" data-voie="0"')
     expect(svg).toContain('class="mv-repere mv-repere-porte" data-voie="1"')
     expect(svg).toContain('class="mv-repere" data-voie="2"')
+  })
+
+  it('une forme par famille : octogone la salle, losange la rencontre, cercle la halte ; la prime a son anneau', () => {
+    const avec = (nature: 'evenement' | 'repos', prime: 'memoire' | null = null): MiniCarte => ({
+      voies: 3,
+      rangs: mc.rangs.map((r) => r.map((n) => (n.rang === 1 && n.voie === 0 ? { ...n, nature, prime } : n))),
+    })
+    const tuile = (svg: string): string => {
+      const g = svg.slice(svg.indexOf('data-rang="1" data-voie="0"'))
+      return g.slice(g.indexOf('class="mv-tuile"') - 12, g.indexOf('class="mv-tuile"'))
+    }
+    expect(tuile(dessinMiniCarteSVG(mc, { rang: 1, trace: [0], portes: [0, 1] }))).toContain('<polygon')
+    const ev = dessinMiniCarteSVG(avec('evenement'), { rang: 1, trace: [0], portes: [0, 1] })
+    expect(tuile(ev)).toContain('<polygon')
+    expect(ev).toMatch(/<polygon class="mv-tuile" points="0,-[\d.]+ [\d.]+,0 0,[\d.]+ -[\d.]+,0"\/>/) // quatre sommets : le losange
+    expect(tuile(dessinMiniCarteSVG(avec('repos'), { rang: 1, trace: [0], portes: [0, 1] }))).toContain('<circle')
+    const salle = mc.rangs.map((r) => r.map((n) => (n.rang === 1 && n.voie === 0 ? { ...n, prime: 'memoire' as const } : n)))
+    expect(dessinMiniCarteSVG({ voies: 3, rangs: salle }, { rang: 1, trace: [0], portes: [0, 1] })).toContain('mv-prime-anneau mv-prime-memoire')
+  })
+
+  it('le sas au bout : chaque case du dernier rang y mène, éteinte avec elle ; la bande « ici » sur le rang du choix', () => {
+    const svg = dessinMiniCarteSVG(mc, { rang: 1, trace: [0], portes: [0, 1] })
+    expect(svg).toContain('class="mv-sas"')
+    for (const v of [0, 1, 2]) expect(svg).toContain(`data-lien="2-${v}-sas"`)
+    // venu de 0, portes 0 et 1 : les trois cases du dernier rang restent joignables
+    expect(svg).not.toMatch(/mv-interdit" data-lien="2-\d-sas"/)
+    expect(svg).toContain('class="mv-ici"')
+    expect(svg).toMatch(/class="mv-titre mv-courant" x="140" y="\d+">SALLE 2</)
+    // module fini : pas de bande
+    expect(dessinMiniCarteSVG(mc, { rang: 3, trace: [0, 0, 0], portes: [] })).not.toContain('class="mv-ici"')
+  })
+
+  it('ditNoeud : la phrase de la fiche, prime comprise', () => {
+    expect(ditNoeud(mc.rangs[0][0])).toBe('salle · eau')
+    expect(ditNoeud({ ...mc.rangs[0][0], prime: 'tirage' })).toContain('PRIME : tirage garanti')
+    expect(ditNoeud({ ...mc.rangs[0][0], nature: 'evenement' })).toBe('une rencontre — on ne sait pas laquelle')
   })
 })

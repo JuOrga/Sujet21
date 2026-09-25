@@ -120,6 +120,7 @@ import {
   NOMS_PRIME,
   PRIMES,
   cheminDePorte,
+  ditNoeud,
   fermeParPorte,
   REPERES_VOIE,
 } from './game/voiesModule'
@@ -15487,6 +15488,9 @@ function propositionsVoie(seq: LevelDef[]): CarteVoie[] | null {
   return cartes.length >= 1 ? cartes : null
 }
 
+/** La ligne de fiche de la mini-carte du choix en cours (rien sans elle). */
+let ficheVoies: (t: string | null) => void = () => {}
+
 function mbMontreSallesVoie(cartes: CarteVoie[]): void {
   mbEtape = 'salles'
   // le CHANGEMENT DE STADE s'annonce : franchir un tiers du plan est un
@@ -15537,8 +15541,27 @@ function mbMontreSallesVoie(cartes: CarteVoie[]): void {
       trace: carteRun.trace,
       portes: cartes.map((c) => c.voie).filter((v): v is number => v !== undefined),
     })
+    // LA FICHE DE LA MINI-CARTE : ce qu'est la case ou la porte visée, en
+    // une ligne fixe — l'infobulle native ne paraissait ni à la manette ni
+    // au doigt, et la hauteur ne bouge pas (la carte ne « saute » pas)
+    const fiche = document.createElement('p')
+    fiche.className = 'mv-fiche'
+    voies.appendChild(fiche)
     host.appendChild(voies)
-  }
+    ficheVoies = (t: string | null): void => {
+      fiche.textContent = t ?? '▸ visez une porte : ce qu’elle fermerait s’éteint sur la carte'
+    }
+    ficheVoies(null)
+    // survoler une case de la grille la décrit aussi
+    const svg = voies.querySelector('.mv-svg')
+    svg?.addEventListener('pointerover', (e) => {
+      const g = (e.target as Element).closest('.mv-noeud')
+      const nd = g ? mini.rangs[Number(g.getAttribute('data-rang'))]?.[Number(g.getAttribute('data-voie'))] : undefined
+      const rep = nd ? REPERES_VOIE[nd.voie] : undefined
+      if (nd && rep) ficheVoies(`SALLE ${nd.rang + 1} · ${rep.signe} VOIE DU ${rep.nom} · ${ditNoeud(nd)}`)
+    })
+    svg?.addEventListener('pointerleave', () => ficheVoies(null))
+  } else ficheVoies = () => {}
   host.appendChild(mbConsignePortes(cartes.length))
   // LES MANQUES DU POOL se notent quand le choix se prend, une fois : ce
   // sont les trous que ce choix a réellement présentés au joueur
@@ -15601,7 +15624,11 @@ function mbMontreSallesVoie(cartes: CarteVoie[]): void {
         if (!svg) return
         for (const el of svg.querySelectorAll('.mv-perdu, .mv-entree, .mv-vise'))
           el.classList.remove('mv-perdu', 'mv-entree', 'mv-vise')
-        if (!oui) return
+        if (!oui) {
+          // une porte armée au doigt garde son aperçu
+          if (!porte.classList.contains('mb-armee')) ficheVoies(null)
+          return
+        }
         const vient = derniereVoie(carteRun)
         const perdu = fermeParPorte(mini, carteRun.niveau, voie, portes, vient)
         for (const k of perdu.noeuds) {
@@ -15613,6 +15640,14 @@ function mbMontreSallesVoie(cartes: CarteVoie[]): void {
         if (entree) svg.querySelector(`.mv-lien[data-lien="${entree}"]`)?.classList.add('mv-entree')
         svg.querySelector(`.mv-noeud[data-rang="${carteRun.niveau}"][data-voie="${voie}"]`)?.classList.add('mv-vise')
         svg.querySelector(`.mv-repere[data-voie="${voie}"]`)?.classList.add('mv-vise')
+        const nd = mini.rangs[carteRun.niveau]?.[voie]
+        const rep = REPERES_VOIE[voie]
+        const n = perdu.noeuds.length
+        if (nd && rep)
+          ficheVoies(
+            `${rep.signe} VOIE DU ${rep.nom} · ${ditNoeud(nd)} · ` +
+              (n > 0 ? `ferme ${n} case${n > 1 ? 's' : ''} (éteinte${n > 1 ? 's' : ''})` : 'ne ferme rien'),
+          )
       }
       for (const ev of ['pointerenter', 'focusin', 'pad-vise'] as const) porte.addEventListener(ev, () => allume(true))
       for (const ev of ['pointerleave', 'focusout', 'pad-quitte'] as const) porte.addEventListener(ev, () => allume(false))
@@ -15678,6 +15713,33 @@ function mbJauges(): HTMLElement {
  *  pendant que les autres se referment, puis `choisit` retient la salle et
  *  le sas mène à la suivante. Un second clic pendant l'ouverture ne compte
  *  pas : la porte est déjà prise. */
+/** AU DOIGT, UNE PORTE SE VISE PUIS S'OUVRE. Sans survol, le premier
+ *  toucher ouvrait tout de suite : la mini-carte n'avait jamais le temps
+ *  de dire ce que la porte fermait (revue du 25/09). Sur une mini-carte à
+ *  voies, le premier toucher ARME la porte — l'aperçu s'allume, « TOUCHEZ
+ *  ENCORE » — et le second l'ouvre. Souris, clavier et manette : inchangés.
+ *  Rend true quand le clic doit ouvrir. */
+function mbArmeAuToucher(btn: HTMLButtonElement, voie: number | undefined): () => boolean {
+  if (voie === undefined) return () => true
+  let doigt = false
+  btn.addEventListener('pointerdown', (e) => (doigt = e.pointerType === 'touch'))
+  return () => {
+    if (!doigt || btn.classList.contains('mb-armee')) return true
+    for (const autre of btn.parentElement?.querySelectorAll<HTMLElement>('.mb-armee') ?? []) {
+      autre.classList.remove('mb-armee')
+      const e = autre.querySelector('.mb-porte-entrer')
+      if (e) e.textContent = 'ENTRER ▸'
+      autre.dispatchEvent(new Event('pad-quitte'))
+    }
+    btn.classList.add('mb-armee')
+    const entrer = btn.querySelector('.mb-porte-entrer')
+    if (entrer) entrer.textContent = 'TOUCHEZ ENCORE ▸'
+    // le doigt levé a déjà envoyé pointerleave : l'aperçu se rallume
+    btn.dispatchEvent(new Event('pad-vise'))
+    return false
+  }
+}
+
 function mbPorte(
   lv: LevelDef,
   i: number,
@@ -15701,7 +15763,9 @@ function mbPorte(
       : '') +
     `<span class="mb-porte-entrer">ENTRER ▸</span>`
   dessineMiniCarte(btn.querySelector('canvas') as HTMLCanvasElement, lv)
+  const ouvre = mbArmeAuToucher(btn, o.voie)
   btn.addEventListener('click', () => {
+    if (!ouvre()) return
     const host = btn.parentElement
     if (!host || host.classList.contains('mb-elu')) return
     host.classList.add('mb-elu')
@@ -15762,9 +15826,6 @@ const NOMS_NOEUD: Record<Exclude<NatureNoeud, 'salle'>, { etiquette: string; tit
   },
 }
 
-/** LA PORTE D'UN NŒUD SANS SALLE : elle ne montre aucun plan — il n'y a pas
- *  de tableau derrière. L'icône de la mini-carte en grand, le titre, la
- *  phrase. Pour une rencontre, on ne sait pas laquelle attend. */
 /** LE NUMÉRO D'UNE PORTE : sur une mini-carte à voies, le REPÈRE de sa voie
  *  (▲ HAUT, ● MILIEU, ▼ BAS), le même signe que le bord de la mini-carte —
  *  « PORTE 2 » à côté de « VOIE 3 » obligeait à traduire. Sans voies, le
@@ -15776,6 +15837,9 @@ function mbNumeroPorte(i: number, voie: number | undefined): string {
     : `<span class="mb-porte-no">PORTE ${i + 1}</span>`
 }
 
+/** LA PORTE D'UN NŒUD SANS SALLE : elle ne montre aucun plan — il n'y a pas
+ *  de tableau derrière. L'icône de la mini-carte en grand, le titre, la
+ *  phrase. Pour une rencontre, on ne sait pas laquelle attend. */
 function mbPorteNoeud(
   i: number,
   etiquette: string,
@@ -15795,7 +15859,9 @@ function mbPorteNoeud(
     `<em class="mb-porte-tag mb-voie-ev">${esc(etiquette)}</em>` +
     `<b>${esc(d.titre)}</b><small>${esc(d.texte)}</small>` +
     `<span class="mb-porte-entrer">ENTRER ▸</span>`
+  const arme = mbArmeAuToucher(btn, voie)
   btn.addEventListener('click', () => {
+    if (!arme()) return
     const host = btn.parentElement
     if (!host || host.classList.contains('mb-elu')) return
     host.classList.add('mb-elu')

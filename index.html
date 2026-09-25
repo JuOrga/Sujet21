@@ -8868,12 +8868,15 @@
       /* la mini-carte à voies du module (game/voiesModule.ts) : rangs de
          gauche à droite, voies de haut en bas — des TUILES octogonales, la
          silhouette des modules de la station, une icône par nature */
-      .mb-voies { grid-column: 1 / -1; display: flex; justify-content: center; padding: 4px 0 6px; overflow-x: auto; }
+      .mb-voies { grid-column: 1 / -1; display: flex; flex-direction: column; align-items: center; padding: 4px 0 6px; overflow-x: auto; }
       .mv-svg { max-width: 100%; height: auto; font-family: var(--font-mono); }
       /* un lien joignable se lit à pleine intensité : c'est l'éteint qui recule */
       .mv-lien { stroke: #4a6680; stroke-width: 2.5; stroke-linecap: round; }
       .mv-lien.mv-joue { stroke: var(--mb-menthe); stroke-width: 3; filter: drop-shadow(0 0 5px rgba(109, 255, 184, 0.5)); }
-      .mv-lien.mv-ouvre { stroke: #9fb6c8; stroke-width: 2.5; stroke-dasharray: 5 5; animation: cs-flux 1.2s linear infinite; }
+      /* les coursives vers les portes : pleines et claires, IMMOBILES — une
+         seule chose bat sur la carte, les portes (trois animations se
+         disputaient l'œil, revue du 25/09) */
+      .mv-lien.mv-ouvre { stroke: #b8cddd; stroke-width: 3; }
       /* la teinte d'un nœud : sa nature (currentColor nourrit l'icône) */
       .mv-noeud { color: #7f9cb0; }
       .mv-noeud.mv-m0 { color: #63b7e6; }
@@ -8914,9 +8917,28 @@
       .mv-repere.mv-repere-porte { fill: #d5f3e8; }
       .mv-repere.mv-vise { fill: #ffffff; filter: drop-shadow(0 0 4px rgba(234, 246, 255, 0.9)); }
       @keyframes mv-bat { 0%, 100% { stroke-width: 6; stroke-opacity: 0.35; } 50% { stroke-width: 10; stroke-opacity: 0.12; } }
-      .mv-titre { fill: #55708c; font-size: 9px; letter-spacing: 0.22em; text-anchor: middle; font-family: var(--font-display); }
+      /* les titres se lisent sur un Deck : 11 px, contrastés (9 px en
+         #55708c sur quasi-noir avant) */
+      .mv-titre { fill: #8aa6bc; font-size: 11px; letter-spacing: 0.16em; text-anchor: middle; font-family: var(--font-display); }
       .mv-titre.mv-courant { fill: #d5f3e8; }
-      @media (prefers-reduced-motion: reduce) { .mv-lien.mv-ouvre, .mv-noeud.mv-porte .mv-halo { animation: none; } }
+      /* LA BANDE « VOUS ÊTES ICI » derrière le rang où l'on choisit */
+      .mv-ici { fill: rgba(109, 255, 184, 0.06); stroke: rgba(109, 255, 184, 0.22); stroke-width: 1; }
+      /* LA PRIME : un anneau autour de toute la case, à la teinte de ce qu'elle paie */
+      .mv-prime-anneau { fill: none; stroke-width: 2; stroke-dasharray: 3 3; }
+      .mv-prime-anneau.mv-prime-memoire { stroke: #6dffb8; }
+      .mv-prime-anneau.mv-prime-condensat { stroke: #63b7e6; }
+      .mv-prime-anneau.mv-prime-tirage { stroke: #ffd977; }
+      /* LE SAS : la sortie du module */
+      .mv-sas rect { fill: #0e1724; stroke: #8aa6bc; stroke-width: 1.5; }
+      .mv-sas path { fill: none; stroke: #d5f3e8; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+      /* LA FICHE sous la mini-carte : une ligne, hauteur fixe */
+      .mv-fiche {
+        margin: 2px 0 0; max-width: 100%; min-height: 1.5em; font-size: calc(11px * var(--ui)); letter-spacing: 0.06em;
+        color: #b8cddd; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-align: center;
+      }
+      /* au doigt : la porte armée attend un second toucher */
+      .mb-porte.mb-armee { outline: 2px solid #eaf6ff; outline-offset: 2px; }
+      @media (prefers-reduced-motion: reduce) { .mv-noeud.mv-porte .mv-halo { animation: none; } }
       /* les jauges en tête du choix : on décide en voyant ce qu'on possède */
       .mb-jauges {
         grid-column: 1 / -1; display: flex; justify-content: center; align-items: center;

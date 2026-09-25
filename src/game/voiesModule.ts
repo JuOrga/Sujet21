@@ -368,6 +368,8 @@ export function fermeParPorte(
   for (const k of noeuds) {
     const [r, v] = k.split('-').map(Number)
     for (const s of mc.rangs[r]?.[v]?.suivants ?? []) liens.add(`${r}-${v}-${s}`)
+    // au dernier rang, la coursive vers le sas s'éteint avec la case
+    if (r === mc.rangs.length - 1) liens.add(`${k}-sas`)
   }
   return { noeuds: [...noeuds], liens: [...liens] }
 }
@@ -406,6 +408,27 @@ export function cheminDePorte(
   return { noeuds: [...noeuds], liens, entree }
 }
 
+/** CE QU'EST UN NŒUD, en une phrase : la fiche sous la mini-carte et
+ *  l'infobulle le disent. La fiche est là parce que l'infobulle native ne
+ *  paraît ni à la manette ni au doigt (revue du 25/09). */
+const NOMS_HALTE: Record<string, string> = {
+  economat: 'l’économat — le Semblable troque contre du condensat',
+  repos: 'l’alcôve de repos — un souffle, de la réserve ou du condensat',
+  don: 'une bonbonne oubliée',
+  coffre: 'une cache — un orbe d’essence y dort',
+  minijeu: 'un mini-jeu — le couperet (laisser dépasser du trait ce que la lame doit trancher), le palet (glisser en glace jusqu’au centre), les rafales (traverser entre deux souffles) ou les orbites (lancé autour de trois puits de gravité)',
+}
+export function ditNoeud(nd: NoeudVoie): string {
+  return nd.nature === 'evenement'
+    ? 'une rencontre — on ne sait pas laquelle'
+    : nd.nature !== 'salle'
+      ? NOMS_HALTE[nd.nature] ?? nd.nature
+      : nd.ecrite
+        ? 'tableau du pool'
+        : `${nd.figure ? 'figure' : 'salle'} · ${['eau', 'glace', 'vapeur', 'toutes'][nd.mecanique] ?? 'eau'}` +
+          (nd.prime ? ` · PRIME : ${NOMS_PRIME[nd.prime]} (plus dure d’un cran)` : '')
+}
+
 /** LE DESSIN de la mini-carte, en SVG : les rangs de gauche à droite, les
  *  voies de haut en bas, le chemin déjà joué (`trace`, une voie par salle
  *  franchie), et les portes du rang courant allumées. Pur : une chaîne.
@@ -432,14 +455,28 @@ export function dessinMiniCarteSVG(
   const X0 = 48
   const Y0 = 32
   const S = 18 // la demi-taille d'une tuile
-  const w = X0 * 2 + PAS_X * (n - 1)
-  const h = Y0 * 2 + PAS_Y * (mc.voies - 1) + 18
+  // LE SAS au bout : la sortie vers le plan de la station, dessinée — le
+  // module ne s'arrêtait nulle part (revue du 25/09)
+  const SAS_DX = 64
+  const w = X0 * 2 + PAS_X * (n - 1) + SAS_DX
+  const h = Y0 * 2 + PAS_Y * (mc.voies - 1) + 22
   const x = (r: number): number => X0 + r * PAS_X
   const y = (v: number): number => Y0 + v * PAS_Y
   // l'octogone de la station, centré : les coins coupés à 22 % / 28 %
   const a = 0.56 * S
   const b = 0.44 * S
   const tuile = `${-a},${-S} ${a},${-S} ${S},${-b} ${S},${b} ${a},${S} ${-a},${S} ${-S},${b} ${-S},${-b}`
+  // UNE FORME PAR FAMILLE : la salle garde l'octogone de la station, la
+  // rencontre est un losange, la halte un cercle. Même forme partout, la
+  // nature ne tenait qu'à une icône de 22 px et deux bleus voisins — et le
+  // pool et la rencontre partageaient leur or (revue du 25/09)
+  const L = S * 1.18
+  const forme = (nd: NoeudVoie, cl: string, k = 1): string =>
+    nd.nature === 'evenement'
+      ? `<polygon class="${cl}" points="0,${-L * k} ${L * k},0 0,${L * k} ${-L * k},0"/>`
+      : nd.nature !== 'salle'
+        ? `<circle class="${cl}" r="${S * k}"/>`
+        : `<polygon class="${cl}" points="${k === 1 ? tuile : tuile.split(' ').map((pt) => pt.split(',').map((c) => Number(c) * k).join(',')).join(' ')}"/>`
   const icone = (nd: NoeudVoie): string =>
     nd.nature !== 'salle'
       ? nd.nature === 'evenement'
@@ -450,22 +487,6 @@ export function dessinMiniCarteSVG(
         : nd.figure
           ? 'figure'
           : (['eau', 'glace', 'vapeur', 'toutes'] as const)[nd.mecanique] ?? 'eau'
-  const NOMS_HALTE: Record<string, string> = {
-    economat: 'l’économat — le Semblable troque contre du condensat',
-    repos: 'l’alcôve de repos — un souffle, de la réserve ou du condensat',
-    don: 'une bonbonne oubliée',
-    coffre: 'une cache — un orbe d’essence y dort',
-    minijeu: 'un mini-jeu — le couperet (laisser dépasser du trait ce que la lame doit trancher), le palet (glisser en glace jusqu’au centre), les rafales (traverser entre deux souffles) ou les orbites (lancé autour de trois puits de gravité)',
-  }
-  const nom = (nd: NoeudVoie): string =>
-    nd.nature === 'evenement'
-      ? 'une rencontre — on ne sait pas laquelle'
-      : nd.nature !== 'salle'
-        ? NOMS_HALTE[nd.nature] ?? nd.nature
-        : nd.ecrite
-          ? 'tableau du pool'
-          : `${nd.figure ? 'figure' : 'salle'} · ${['eau', 'glace', 'vapeur', 'toutes'][nd.mecanique] ?? 'eau'}` +
-            (nd.prime ? ` · PRIME : ${NOMS_PRIME[nd.prime]} (plus dure d’un cran)` : '')
   const teinte = (nd: NoeudVoie): string =>
     nd.nature === 'evenement'
       ? 'mv-evenement'
@@ -504,9 +525,12 @@ export function dessinMiniCarteSVG(
         (!joueIci && (nd.rang < o.rang || !joignables.has(ici)) ? ' mv-interdit' : '')
       noeuds +=
         `<g class="${cl}" data-rang="${nd.rang}" data-voie="${nd.voie}" transform="translate(${x(nd.rang)} ${y(nd.voie)})">` +
-        `<title>salle ${nd.rang + 1}, voie ${nd.voie + 1} — ${nom(nd)}</title>` +
-        `<polygon class="mv-halo" points="${tuile}"/>` +
-        `<polygon class="mv-tuile" points="${tuile}"/>` +
+        `<title>salle ${nd.rang + 1}, voie ${nd.voie + 1} — ${ditNoeud(nd)}</title>` +
+        // LA PRIME SE VOIT DE LOIN : un anneau à la teinte de ce qu'elle paie
+        // autour de toute la case (le losange de 7 px au coin ne se lisait pas)
+        (nd.prime ? forme(nd, `mv-prime-anneau mv-prime-${nd.prime}`, 1.3) : '') +
+        forme(nd, 'mv-halo') +
+        forme(nd, 'mv-tuile') +
         `<use href="#mv-i-${icone(nd)}" x="-11" y="-11" width="22" height="22"/>` +
         (joueIci ? `<circle class="mv-coche" cx="${S - 3}" cy="${-S + 3}" r="4"/>` : '') +
         // LA PRIME : un losange au coin bas droit, teinté par ce qu'elle paie
@@ -515,6 +539,24 @@ export function dessinMiniCarteSVG(
           : '') +
         `</g>`
     }
+  // LA BANDE « VOUS ÊTES ICI » derrière le rang où l'on choisit
+  const bande =
+    o.rang >= 0 && o.rang < n
+      ? `<rect class="mv-ici" x="${x(o.rang) - PAS_X / 2 + 6}" y="4" width="${PAS_X - 12}" height="${h - 8}" rx="6"/>`
+      : ''
+  // LE SAS : chaque case du dernier rang y mène ; ce qui y arrive depuis
+  // une case hors d'atteinte s'éteint avec elle
+  const xs = x(n - 1) + SAS_DX
+  const ys = y((mc.voies - 1) / 2)
+  for (const nd of mc.rangs[n - 1]) {
+    const ici = `${nd.rang}-${nd.voie}`
+    const joue = o.trace[nd.rang] === nd.voie
+    const interdit = !joue && (nd.rang < o.rang || !joignables.has(ici))
+    liens += `<line class="mv-lien mv-lien-sas${joue ? ' mv-joue' : ''}${interdit ? ' mv-interdit' : ''}" data-lien="${ici}-sas" x1="${x(nd.rang) + S}" y1="${y(nd.voie)}" x2="${xs - 12}" y2="${ys}"/>`
+  }
+  noeuds +=
+    `<g class="mv-sas" transform="translate(${xs} ${ys})"><title>le sas — la sortie du module, le plan de la station se rouvre</title>` +
+    `<rect x="-12" y="-16" width="24" height="32" rx="3"/><path d="M-5 -6 L3 0 L-5 6"/></g>`
   let titres = ''
   // le repère de chaque voie à gauche de la grille, allumé là où une porte
   // s'ouvre — le même signe que sur la porte (REPERES_VOIE)
@@ -524,10 +566,12 @@ export function dessinMiniCarteSVG(
       titres += `<text class="mv-repere${o.portes.includes(v) ? ' mv-repere-porte' : ''}" data-voie="${v}" x="${X0 - S - 14}" y="${y(v)}">${rep.signe}</text>`
   }
   for (let r = 0; r < n; r++)
-    titres += `<text class="mv-titre${r === o.rang ? ' mv-courant' : ''}" x="${x(r)}" y="${h - 6}">SALLE ${r + 1}</text>`
+    titres += `<text class="mv-titre${r === o.rang ? ' mv-courant' : ''}" x="${x(r)}" y="${h - 8}">SALLE ${r + 1}</text>`
+  titres += `<text class="mv-titre" x="${xs}" y="${h - 8}">SAS</text>`
   return (
     `<svg class="mv-svg" viewBox="0 0 ${w} ${h}" width="${w}" height="${h}" role="img" aria-label="les voies du module">` +
     ICONES_MINI_CARTE +
+    bande +
     `<g class="mv-liens">${liens}</g><g class="mv-noeuds">${noeuds}</g>${titres}</svg>`
   )
 }
