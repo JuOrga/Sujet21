@@ -136,6 +136,30 @@ describe('levelIO — aller-retour JSON', () => {
     expect(again.level!.boxes).toEqual(bx)
   })
 
+  it('le SENS du tuyau d’une plaque froide survit ; ailleurs, il s’efface', () => {
+    const b = { minX: 0, minY: 0, maxX: 100, maxY: 120 }
+    const { level, rejets } = parseLevel({
+      name: 'sens',
+      code: '21-X',
+      bounds: { minX: -500, minY: -500, maxX: 500, maxY: 500 },
+      spawn: { x: -300, y: 0, n: 200 },
+      exit: { minX: 300, minY: -50, maxX: 400, maxY: 50 },
+      boxes: [
+        { ...b, material: 4, sens: 1 }, // couché
+        { ...b, material: 4, sens: 0 }, // auto : la clé s'efface
+        { ...b, material: 4, sens: 7 }, // inconnu : auto
+        { ...b, material: 0, sens: 2 }, // pas une plaque froide
+        { ...b, material: 4, forme: 1, sens: 2 }, // une forme : pas de tuyau
+      ],
+    })
+    expect(rejets).toEqual([])
+    const bx = level!.boxes
+    expect(bx[0].sens).toBe(1)
+    for (const k of [1, 2, 3, 4]) expect(bx[k].sens).toBeUndefined()
+    const again = parseLevel(JSON.parse(serializeLevel(level!)))
+    expect(again.level!.boxes).toEqual(bx)
+  })
+
   it('la VITRE est un habillage comme un autre : elle survit, et rien au-delà', () => {
     const { level, rejets } = parseLevel({
       name: 'Vitrage',

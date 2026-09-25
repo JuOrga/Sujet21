@@ -1677,7 +1677,7 @@ function essaieNiveau(
         labels.push({
           x: vertical ? cx + (bord === 'gauche' ? w + 60 : -w - 60) : cx,
           y: vertical ? cy : cy + (bord === 'haut' ? -h - 40 : h + 40),
-          text: chaud ? 'CHAUDIÈRE' : 'HUBLOT FENDU',
+          text: chaud ? 'CHAUDIÈRE' : 'AMMONIAC −40 °C',
           tone: chaud ? 'chaud' : 'froid',
           rang: 'detail',
         })
