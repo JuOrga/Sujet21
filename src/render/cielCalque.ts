@@ -43,6 +43,26 @@ export function decalageTuile(monde: number, zoom: number, vitesse: number, tuil
   return d === 0 ? 0 : -d
 }
 
+/** Un décalage ramené au PIXEL PHYSIQUE le plus proche. Une tuile d'un
+ *  texel par pixel, décalée d'une fraction de pixel, est rééchantillonnée
+ *  par le compositeur : chaque étoile s'étale sur quatre pixels et
+ *  scintille en défilant — exactement ce que les tuiles devaient éviter. */
+export function auPixel(v: number, dpr: number): number {
+  const d = Math.max(dpr, 1e-4)
+  return Math.round(v * d) / d
+}
+
+/** LE FROID DU VAISSEAU sur le ciel. Dans la toile, le shader teinte et
+ *  assombrit tout ce qu'il peint (uChill) ; le ciel n'y est plus, il reçoit
+ *  donc la même chose en filtre CSS — la part d'assombrissement (12 %) et
+ *  un glissement vers le bleu. Vide sous un froid négligeable : pas de
+ *  filtre, pas de coût. */
+export function filtreFroid(froid: number): string {
+  const f = Math.min(1, Math.max(0, froid))
+  if (f < 0.01) return 'none'
+  return `brightness(${(1 - 0.12 * f).toFixed(3)}) hue-rotate(${(8 * f).toFixed(1)}deg) saturate(${(1 - 0.25 * f).toFixed(3)})`
+}
+
 /** Où poser l'image de la galaxie à l'écran (px CSS, coin haut-gauche et
  *  largeur), d'après le cadre : le point (cx, cy) de l'image — y vers le
  *  HAUT, comme dans le shader — tombe au centre de l'écran. */
@@ -69,6 +89,8 @@ export interface EtatCiel {
   /** la densité NATIVE de l'écran — pas l'échelle de rendu de la toile */
   dpr: number
   force: number
+  /** le refroidissement du vaisseau, 0..1 (le uChill du shader) */
+  froid: number
   reglages: ReglagesPlaque
 }
 
@@ -85,8 +107,15 @@ export class CielCalque {
   // fond ne paie jamais la photographie (1,3 Mo) ni les tuiles
   private readonly urlGalaxie: string
   private charge = false
-  // le dernier style écrit, par élément : on n'écrit que ce qui change
-  private readonly ecrit = new Map<HTMLElement, string>()
+  // le dernier style écrit, par élément ET par propriété : on n'écrit que
+  // ce qui change. (Premier jet : une seule entrée par élément — la galaxie,
+  // qui écrit trois propriétés, s'écrasait elle-même et réécrivait tout à
+  // chaque image.)
+  private readonly ecrit = new Map<HTMLElement, Map<string, string>>()
+  // les motifs des tuiles, par toile de capture : créés une fois, seule
+  // leur matrice change d'une image à l'autre
+  private readonly motifs = new Map<CanvasRenderingContext2D, (CanvasPattern | null)[]>()
+  private readonly matrice = typeof DOMMatrix === 'undefined' ? null : new DOMMatrix()
   private dprTuiles = 0
 
   constructor(parent: HTMLElement, devant: HTMLElement, urlGalaxie: string) {
@@ -121,10 +150,13 @@ export class CielCalque {
   }
 
   private pose(el: HTMLElement, cle: string, valeur: string): void {
-    const k = this.ecrit.get(el)
-    const neuf = `${cle}:${valeur}`
-    if (k === neuf) return
-    this.ecrit.set(el, neuf)
+    let m = this.ecrit.get(el)
+    if (!m) {
+      m = new Map()
+      this.ecrit.set(el, m)
+    }
+    if (m.get(cle) === valeur) return
+    m.set(cle, valeur)
     ;(el.style as unknown as Record<string, string>)[cle] = valeur
   }
 
@@ -156,10 +188,11 @@ export class CielCalque {
     COUCHES_ETOILES.forEach((c, i) => {
       const t = c.tuile / dpr
       // l'écran descend quand le monde monte : le y change de signe
-      const ox = decalageTuile(e.camX, e.zoom, c.vitesse, t)
-      const oy = decalageTuile(-e.camY, e.zoom, c.vitesse, t)
-      this.pose(this.couches[i], 'transform', `translate3d(${ox.toFixed(2)}px,${oy.toFixed(2)}px,0)`)
+      const ox = auPixel(decalageTuile(e.camX, e.zoom, c.vitesse, t), dpr)
+      const oy = auPixel(decalageTuile(-e.camY, e.zoom, c.vitesse, t), dpr)
+      this.pose(this.couches[i], 'transform', `translate3d(${ox}px,${oy}px,0)`)
     })
+    this.pose(this.racine, 'filter', filtreFroid(e.froid))
     if (!this.galaxiePrete) return
     const n = this.galaxie.naturalWidth || 1
     const cadre = cadrePlaque(e.camX, e.camY, e.zoom, e.largeurCss, e.hauteurCss, dpr, n, e.reglages)
@@ -188,6 +221,7 @@ export class CielCalque {
     g.fillRect(0, 0, largeur, hauteur)
     const e = this.dernier
     if (e && e.actif) {
+      g.filter = filtreFroid(e.froid)
       const k = largeur / Math.max(l * e.largeurCss, 1e-6)
       g.setTransform(k, 0, 0, hauteur / Math.max(h * e.hauteurCss, 1e-6), -x * e.largeurCss * k, -y * e.hauteurCss * (hauteur / Math.max(h * e.hauteurCss, 1e-6)))
       if (this.galaxiePrete) {
@@ -199,15 +233,26 @@ export class CielCalque {
         g.globalAlpha = 1
       }
       g.globalCompositeOperation = 'screen'
+      let motifs = this.motifs.get(g)
+      if (!motifs) {
+        motifs = COUCHES_ETOILES.map(() => null)
+        this.motifs.set(g, motifs)
+      }
       COUCHES_ETOILES.forEach((c, i) => {
         const im = this.tuiles[i]
-        if (!im.complete || !im.naturalWidth) return
-        const motif = g.createPattern(im, 'repeat')
+        if (!im.complete || !im.naturalWidth || !this.matrice) return
+        const motif = motifs[i] ?? (motifs[i] = g.createPattern(im, 'repeat'))
         if (!motif) return
-        const t = c.tuile / Math.max(e.dpr, 1e-4)
-        const ox = decalageTuile(e.camX, e.zoom, c.vitesse, t)
-        const oy = decalageTuile(-e.camY, e.zoom, c.vitesse, t)
-        motif.setTransform(new DOMMatrix([1 / e.dpr, 0, 0, 1 / e.dpr, ox, oy]))
+        const dpr = Math.max(e.dpr, 1e-4)
+        const t = c.tuile / dpr
+        const m = this.matrice
+        m.a = 1 / dpr
+        m.b = 0
+        m.c = 0
+        m.d = 1 / dpr
+        m.e = auPixel(decalageTuile(e.camX, e.zoom, c.vitesse, t), dpr)
+        m.f = auPixel(decalageTuile(-e.camY, e.zoom, c.vitesse, t), dpr)
+        motif.setTransform(m)
         g.fillStyle = motif
         g.fillRect(0, 0, e.largeurCss, e.hauteurCss)
       })

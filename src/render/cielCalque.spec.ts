@@ -2,7 +2,7 @@
 // tuiles d'étoiles, et la pose de la galaxie à l'écran.
 
 import { describe, expect, it } from 'vitest'
-import { decalageTuile, rectGalaxie } from './cielCalque'
+import { auPixel, decalageTuile, filtreFroid, rectGalaxie } from './cielCalque'
 import { cadrePlaque } from './parallaxe'
 
 describe('ciel en calque — les tuiles d’étoiles', () => {
@@ -30,5 +30,21 @@ describe('ciel en calque — la galaxie', () => {
     // le point (cx, cy) de l'image, y vers le haut, dans le repère écran
     expect(r.x + c.cx * r.largeur).toBeCloseTo(640, 6)
     expect(r.y + (1 - c.cy) * r.largeur).toBeCloseTo(360, 6)
+  })
+})
+
+describe('ciel en calque — la netteté et le froid', () => {
+  it('les décalages tombent sur un pixel PHYSIQUE, à toute densité', () => {
+    for (const dpr of [1, 1.5, 2, 3])
+      for (const v of [-591.33, -12.345, -0.18, 0]) {
+        const p = auPixel(v, dpr) * dpr
+        expect(Math.abs(p - Math.round(p))).toBeLessThan(1e-9)
+        expect(Math.abs(auPixel(v, dpr) - v)).toBeLessThanOrEqual(0.5 / dpr + 1e-12)
+      }
+  })
+
+  it('le froid assombrit le ciel comme le shader assombrit la salle (−12 %)', () => {
+    expect(filtreFroid(0)).toBe('none')
+    expect(filtreFroid(1)).toContain('brightness(0.880)')
   })
 })

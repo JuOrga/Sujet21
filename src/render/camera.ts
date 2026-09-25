@@ -157,6 +157,15 @@ export class Camera {
     )
   }
 
+  /** LA SALLE COURANTE, posée À CHAQUE IMAGE. Le plancher du recul en
+   *  dépend : n'être posée qu'au plan d'ouverture (startIntro, qui ne joue
+   *  qu'en partie) laissait une salle ouverte autrement — à l'éditeur — sous
+   *  le plancher de la précédente, parfois trop serré pour la voir entière. */
+  salle(bounds: { minX: number; minY: number; maxX: number; maxY: number }): void {
+    this.nivL = bounds.maxX - bounds.minX
+    this.nivH = bounds.maxY - bounds.minY
+  }
+
   /** Le zoom le plus LARGE que la main peut demander : la salle entière,
    *  avec sa marge (RECUL_MAX) — jamais sous l'ancien plancher absolu. Sans
    *  salle connue (avant le premier tableau), l'ancien plancher seul. */

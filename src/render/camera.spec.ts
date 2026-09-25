@@ -109,3 +109,13 @@ describe('caméra — le recul a un fond', () => {
     expect(cam.manualZoom).toBeCloseTo(DEFAULT_PARAMS.cameraMaxZoom * 5, 6)
   })
 })
+
+describe('caméra — le fond du recul suit la salle ouverte', () => {
+  it('une salle ouverte sans plan d’ouverture (éditeur) prend SON plancher', () => {
+    const cam = ouvre() // 2400 × 1500 : le plan d'ouverture pose la salle
+    // une salle bien plus grande, ouverte sans startIntro
+    cam.salle({ minX: -4500, minY: -3000, maxX: 4500, maxY: 3000 })
+    for (let i = 0; i < 300; i++) cam.zoomBy(0.8, DEFAULT_PARAMS)
+    expect(cam.manualZoom).toBeCloseTo(Math.min(VW / 9000, VH / 6000) * 0.25, 6)
+  })
+})

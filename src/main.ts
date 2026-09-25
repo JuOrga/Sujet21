@@ -19403,7 +19403,10 @@ function corpsImage(now: number): boolean {
     waveScratch[i * 4 + 3] = 1
   }
 
-  // Caméra : suivi du corps, ou vue d'ensemble du tableau depuis le banc
+  // Caméra : suivi du corps, ou vue d'ensemble du tableau depuis le banc.
+  // La salle d'abord : le plancher du recul se règle sur elle, quelle que
+  // soit la façon dont elle a été ouverte (render/camera.ts, salle)
+  camera.salle(sim.bounds)
   if (monitor.overview) {
     const b = sim.bounds
     const fitZoom =
@@ -19466,6 +19469,7 @@ function corpsImage(now: number): boolean {
     hauteurCss: vh,
     dpr: Math.min(window.devicePixelRatio || 1, 3),
     force: cielReglages.force,
+    froid: chillNow(),
     reglages: { ...PLAQUE_DEFAUTS, taille: cielReglages.taille },
   })
   // LA PROFONDEUR DES COUCHES DE FOND : posée à l'image comme le ciel, pour

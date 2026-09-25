@@ -387,7 +387,9 @@ export function createBench(
     )
     describe(
       fCiel.addBinding(actions.ciel, 'taille', {
-        min: 0.3,
+        // pas sous 0,5 : cadrePlaque la borne là (tailleMin), le bas de la
+        // course n'aurait rien fait
+        min: 0.5,
         max: 1.4,
         step: 0.01,
         label: 'taille',

@@ -1484,7 +1484,11 @@ void main() {
       neb = neb * 0.6 + 0.4 * vnoise(world * 0.004 - vec2(1.1, 7.7));
       voidCol += vec3(0.010, 0.018, 0.038) * neb;
       voidCol += vec3(0.022, 0.010, 0.034) * vnoise(world * 0.0009 + 21.0);
-      voidCol += etoiles(world, pxMonde, neb * 0.5);
+      // pas sous une salle pleine : mix(voidCol, tank, inRoom) jetterait le
+      // résultat, et ce mode est le SECOURS des appareils qui peinent — huit
+      // couches d'étoiles y coûteraient sur tout l'écran pour rien. (Le trou
+      // de plancher, dans une salle, montre alors la nébulosité sans étoiles.)
+      if (inRoom < 0.999) voidCol += etoiles(world, pxMonde, neb * 0.5);
     }
   }
 
@@ -2904,6 +2908,12 @@ void main() {
   col *= 1.0 - 0.12 * uChill;
   colZero = mix(colZero, colZero * vec3(0.82, 0.92, 1.10), uChill * 0.6);
   colZero *= 1.0 - 0.12 * uChill;
+  // L'ALPHA DU DÉCOR sur le ciel en calque : la part NON ciel — relevée
+  // jusqu'à la couleur, car une lumière posée sur le vide (halo, liseré) y
+  // donnerait sinon une couleur prémultipliée PLUS forte que son alpha, cas
+  // que WebGL laisse indéfini (et qu'une copie en 2D, la capture vidéo,
+  // écrêterait). Le ciel derrière un halo s'en voile d'autant : invisible.
+  float alphaDecor = max(1.0 - cielVu, min(1.0, max(col.r, max(col.g, col.b))));
   // la passe NETTE des conduites : la couleur prémultipliée par la part de
   // conduite du pixel — le reste garde l'image de la passe principale
   if (uPasse > 1.5 && uPasse < 2.5)
@@ -2911,7 +2921,7 @@ void main() {
   else
     outColor = uPasse > 0.5 && uPasse < 1.5
       ? vec4(col * couvConduite, couvConduite)
-      : vec4(col, 1.0 - cielVu);
+      : vec4(col, alphaDecor);
 }`
 
 // Carte de lumière de la pièce : cuite en espace MONDE, à basse résolution,
