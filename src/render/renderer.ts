@@ -568,8 +568,7 @@ uniform vec2 uParCuve;   // la paroi de cuve, derrière l'eau
 uniform sampler2D uTexTank; // fond de cuve : panneaux, conduites, liserés
 uniform sampler2D uTexWall;
 uniform sampler2D uTexWallA; // seconde paroi : les murs alternent, sans répétition visible
-// la passe en cours (voir render) : 0 l'image entière ; 1 la passe NETTE
-// des conduites ; 2 la COUCHE D'EAU seule, basse résolution ; 3 le DÉCOR
+// la passe en cours (voir render) : 0 l'image entière ; 2 la COUCHE D'EAU seule, basse résolution ; 3 le DÉCOR
 // natif, sans l'eau — « le décor net »
 uniform float uPasse;
 uniform sampler2D uTexFroid; // l’atlas de la conduite d’ammoniac (tronçon, bride, joint, givre)
@@ -1716,9 +1715,6 @@ void main() {
   // comprise : on n'écrase que sur un STRICTEMENT plus petit.
   float dCouv = 1.0e9;
   int iCouv = -1;
-  // la part de ce pixel couverte par une CONDUITE : la passe nette ne
-  // recopie que celle-là (voir render, « la conduite nette »)
-  float couvConduite = 0.0;
   for (int bi = 0; bi < min(uBoxCount, MAX_BOXES); bi++) {
     float mc = decodeAux(uBoxAux[bi].x).x;
     if (mc > 2.5 && mc < 3.5) continue; // le sas est une bouche, il n'enterre rien
@@ -2242,7 +2238,6 @@ void main() {
       }
       col = col * (1.0 - fill * cnh.a) + cnh.rgb * eclMat * fill;
       cielVu *= 1.0 - clamp(fill * cnh.a, 0.0, 1.0);
-      couvConduite = max(couvConduite, fill * cnh.a);
       float hors = (1.0 - fill * cnh.a) * surSol;
       // (la brume ne baisse que SOUS l'image — pas dans la forme de collision,
       // dont les rectangles de brides se lisaient en pavés plus sombres)
@@ -2939,14 +2934,12 @@ void main() {
   // que WebGL laisse indéfini (et qu'une copie en 2D, la capture vidéo,
   // écrêterait). Le ciel derrière un halo s'en voile d'autant : invisible.
   float alphaDecor = max(1.0 - cielVu, min(1.0, max(col.r, max(col.g, col.b))));
-  // la passe NETTE des conduites : la couleur prémultipliée par la part de
-  // conduite du pixel — le reste garde l'image de la passe principale
+  // la COUCHE D'EAU (décor net) : la couleur prémultipliée de l'eau seule,
+  // transparente là où le décor, natif, se voit
   if (uPasse > 1.5 && uPasse < 2.5)
     outColor = vec4(max(col - partDecor * colZero, 0.0), 1.0 - partDecor);
   else
-    outColor = uPasse > 0.5 && uPasse < 1.5
-      ? vec4(col * couvConduite, couvConduite)
-      : vec4(col, alphaDecor);
+    outColor = vec4(col, alphaDecor);
 }`
 
 // Carte de lumière de la pièce : cuite en espace MONDE, à basse résolution,
@@ -3440,60 +3433,16 @@ void main() {
   outColor = vec4(c, t.a * uFade * (1.0 - fluide));
 }`
 
-/** Ce qui reste du rectangle `a` hors de `b` : au plus quatre morceaux
- *  disjoints (bandes haute et basse pleine largeur, puis gauche et droite
- *  à la hauteur du chevauchement). [x0, y0, x1, y1]. */
-function soustraitRect(
-  a: [number, number, number, number],
-  b: [number, number, number, number],
-): [number, number, number, number][] {
-  const [ax0, ay0, ax1, ay1] = a
-  const [bx0, by0, bx1, by1] = b
-  if (bx0 >= ax1 || bx1 <= ax0 || by0 >= ay1 || by1 <= ay0) return [a]
-  const out: [number, number, number, number][] = []
-  const y0 = Math.max(ay0, by0)
-  const y1 = Math.min(ay1, by1)
-  if (ay0 < y0) out.push([ax0, ay0, ax1, y0])
-  if (y1 < ay1) out.push([ax0, y1, ax1, ay1])
-  if (ax0 < bx0) out.push([ax0, y0, bx0, y1])
-  if (bx1 < ax1) out.push([bx1, y0, ax1, y1])
-  return out
-}
-
-/** LES RECTANGLES DE LA PASSE NETTE, rendus DISJOINTS. Deux qui se
- *  chevauchent (conduites voisines, rectangles élargis par le relief)
- *  étaient dessinés chacun : la zone commune fondue DEUX fois en (ONE,
- *  ONE_MINUS_SRC_ALPHA) — une couture sur les bords antialiasés, et la
- *  composition payée deux fois. Chaque rectangle est donc découpé de ce que
- *  les précédents couvrent déjà : la même surface exactement, chaque pixel
- *  une fois. (Premier jet : leur ENVELOPPE — deux conduites en L de 1800 ×
- *  60 et 60 × 1200 px en faisaient 1800 × 1200, douze fois la surface, au
- *  réglage même où cette passe doit rester légère.) [x0, y0, x1, y1]. */
-export function rectsDisjoints(rects: [number, number, number, number][]): [number, number, number, number][] {
-  const faits: [number, number, number, number][] = []
-  for (const r of rects) {
-    let morceaux: [number, number, number, number][] = [r]
-    for (const f of faits) morceaux = morceaux.flatMap((m) => soustraitRect(m, f))
-    faits.push(...morceaux)
-  }
-  return faits
-}
-
-/** L'intervalle [a, b] (un axe d'une boîte, en unités monde) élargi à ce
- *  que le relief 2.5D en dessine. Le shader lit au pixel w le point
- *  w − (w − centre)·k : le sommet d'un point p se dessine donc en
- *  centre + (p − centre)/(1 − k). La réunion de l'intervalle (le pied) et
- *  de son image (le sommet) couvre aussi les flancs, entre les deux. */
-export function cadreRelief(
-  a: number,
-  b: number,
-  centre: number,
-  k: number,
-): [number, number] {
-  const f = 1 / Math.max(0.05, 1 - k)
-  const da = centre + (a - centre) * f
-  const db = centre + (b - centre) * f
-  return [Math.min(a, da), Math.max(b, db)]
+/** FAUT-IL REPASSER LA TOILE EN NATIF ? Seulement si le joueur l'a DEMANDÉ
+ *  (« Netteté du décor » → « Toujours net ») et que la résolution est
+ *  réduite. La conduite d'ammoniac la déclenchait d'elle-même : dix-huit
+ *  tableaux sur vingt-quatre en portent une, et la toile repassait alors à
+ *  la définition NATIVE à chaque image — quatre fois les pixels au réglage
+ *  « faible », tout le gain du réglage perdu, et l'adaptatif des tablettes
+ *  (le défaut) descendait sans rien alléger. Au réglage « suit la
+ *  résolution », la conduite suit donc la résolution, comme tout le décor. */
+export function passeNetteRequise(dprNatif: number, dpr: number, decorNet: boolean): boolean {
+  return decorNet && dprNatif > dpr * 1.02
 }
 
 /** La part de la clé de cuisson de la lumière qui vient des boîtes : TOUT
@@ -3545,17 +3494,10 @@ export class Renderer {
   private readonly spongeProgram: WebGLProgram
   private readonly hullProgram: WebGLProgram
   private readonly recopieProgram: WebGLProgram
-  // LA CONDUITE NETTE. Aux résolutions réduites, TOUTE l'image se calcule
-  // en moins de pixels puis s'agrandit : la conduite d'ammoniac, dessinée
-  // dans la même passe, devenait floue quelle que soit la netteté de son
-  // atlas. On calcule alors la scène dans une image intermédiaire à la
-  // résolution réduite (sceneFbo), on la recopie sur la toile NATIVE, et on
-  // repasse la composition EN NATIF sur les seules boîtes des conduites —
-  // le même shader, donc les mêmes effets (eau, ombre du corps, brume,
-  // plafonniers), recopiés au prorata de la part de conduite du pixel.
-  // LE DÉCOR NET (réglage « Décor », PARAMÈTRES) va plus loin : c'est tout
-  // le décor qui reste natif, et seule l'EAU suit la résolution. L'eau se
-  // calcule seule en basse résolution dans sceneFbo (uPasse 2 : une couche
+  // LE DÉCOR NET (réglage « Décor », PARAMÈTRES). Aux résolutions réduites,
+  // TOUTE l'image se calcule en moins de pixels puis s'agrandit ; au décor
+  // net, tout le décor reste natif et seule l'EAU suit la résolution. L'eau
+  // se calcule seule en basse résolution dans sceneFbo (uPasse 2 : une couche
   // prémultipliée, transparente hors du corps), le décor en natif sans elle
   // (uPasse 3), puis la couche se pose dessus. Les 16 unités de texture de
   // la composition sont toutes prises : le décor ne peut pas LIRE la couche,
@@ -4615,14 +4557,9 @@ export class Renderer {
     const gl = this.gl
     const devW = Math.max(1, Math.round(viewportW * dpr))
     const devH = Math.max(1, Math.round(viewportH * dpr))
-    // la conduite nette : seulement si la résolution est réduite et qu'une
-    // conduite (plaque froide rectangulaire) est au tableau ; le décor net
-    // la contient (la conduite EST du décor)
-    const reduite = this.dprNatif > dpr * 1.02
-    const decorNet = reduite && this.decorNet
-    const nette =
-      reduite &&
-      (decorNet || boxes.some((b) => b.material === MAT_FROID && !b.forme))
+    // la passe nette : seulement au décor net DEMANDÉ (passeNetteRequise)
+    const decorNet = passeNetteRequise(this.dprNatif, dpr, this.decorNet)
+    const nette = decorNet
     const natW = nette ? Math.max(1, Math.round(viewportW * this.dprNatif)) : devW
     const natH = nette ? Math.max(1, Math.round(viewportH * this.dprNatif)) : devH
     if (this.canvas.width !== natW || this.canvas.height !== natH) {
@@ -4635,7 +4572,7 @@ export class Renderer {
     this.cibleH = devH
     // la densité des passes qui suivent la composition (vie, éponges) : la
     // native dès qu'une passe nette a lieu — elles se dessinent alors sur
-    // la toile native, APRÈS elle (voir drawConduiteNette)
+    // la toile native, APRÈS elle (voir drawDecorNet)
     const dprPasses = nette ? natW / viewportW : dpr
     const down = Math.max(1, downsample)
     const fboW = Math.max(1, Math.round(devW / down))
@@ -4963,8 +4900,6 @@ export class Renderer {
     gl.activeTexture(gl.TEXTURE0)
     gl.drawArrays(gl.TRIANGLES, 0, 3)
     if (decorNet) this.drawDecorNet(viewportW, natW, natH)
-    else if (nette)
-      this.drawConduiteNette(boxes, camera, viewportW, viewportH, natW, natH, relief)
 
     // Passe B vie — les motes dans le corps, la lueur des gouttes perdues
     this.drawVie(camera, viewportW, viewportH, dprPasses, params)
@@ -4980,94 +4915,6 @@ export class Renderer {
 
     // Passe C — cellules d'éponge
     this.drawSponges(sim, camera, viewportW, viewportH, dprPasses)
-  }
-
-  // LA CONDUITE NETTE (voir sceneFbo) : la scène basse résolution recopiée
-  // sur la toile native, puis la composition repassée EN NATIF sur les seules
-  // boîtes des conduites (ciseaux), mêlée au prorata de leur couverture.
-  // Elle suit IMMÉDIATEMENT la composition : repassée après la vie, les
-  // décalques, les lampes et les éponges, elle les effaçait là où ils
-  // chevauchaient une conduite — ils se dessinent donc ensuite, en natif.
-  // Tous les uniformes de la composition sont déjà posés par la passe
-  // principale : seuls changent la densité, la taille de la cible et le
-  // drapeau de la passe.
-  private drawConduiteNette(
-    boxes: ObstacleBox[],
-    camera: Camera,
-    viewportW: number,
-    viewportH: number,
-    natW: number,
-    natH: number,
-    relief: number,
-  ): void {
-    const gl = this.gl
-    gl.bindFramebuffer(gl.FRAMEBUFFER, null)
-    gl.viewport(0, 0, natW, natH)
-    gl.disable(gl.BLEND)
-    gl.useProgram(this.recopieProgram)
-    const ru = this.uniforms['recopie']
-    gl.activeTexture(gl.TEXTURE0)
-    gl.bindTexture(gl.TEXTURE_2D, this.sceneTex)
-    gl.uniform1i(ru['uScene'], 0)
-    gl.uniform2f(ru['uTaille'], natW, natH)
-    gl.drawArrays(gl.TRIANGLES, 0, 3)
-
-    gl.useProgram(this.composeProgram)
-    const cu = this.uniforms['compose']
-    const dpr = natW / viewportW
-    gl.uniform1f(cu['uDpr'], dpr)
-    gl.uniform2f(cu['uCanvasSize'], natW, natH)
-    gl.uniform1f(cu['uPasse'], 1)
-    // les unités 0 et 1 ont servi depuis (la scène, les décalques, les
-    // éponges) : la composition y lit le champ du fluide et le ciel proche
-    gl.activeTexture(gl.TEXTURE1)
-    gl.bindTexture(gl.TEXTURE_2D, this.texStars)
-    gl.activeTexture(gl.TEXTURE0)
-    gl.bindTexture(gl.TEXTURE_2D, this.fieldTex)
-    gl.enable(gl.BLEND)
-    gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA)
-    gl.enable(gl.SCISSOR_TEST)
-    const kRelief = relief * Math.min(1, Math.max(0, camera.zoom * 1.2))
-    const px = (wx: number) => ((wx - camera.x) * camera.zoom + viewportW / 2) * dpr
-    const py = (wy: number) => ((wy - camera.y) * camera.zoom + viewportH / 2) * dpr
-    const rects: [number, number, number, number][] = []
-    for (const b of boxes) {
-      if (b.material !== MAT_FROID || b.forme) continue
-      // une boîte oblique : son cercle englobant
-      let x0 = b.minX
-      let y0 = b.minY
-      let x1 = b.maxX
-      let y1 = b.maxY
-      if (b.angle) {
-        const r = Math.hypot(x1 - x0, y1 - y0) / 2
-        const cx = (x0 + x1) / 2
-        const cy = (y0 + y1) / 2
-        x0 = cx - r
-        x1 = cx + r
-        y0 = cy - r
-        y1 = cy + r
-      }
-      // le RELIEF 2.5D pousse le sommet des parois loin du centre de l'écran
-      // (relDisp du shader) : la boîte seule laissait floue, avec une
-      // couture, la part dessinée au-delà
-      ;[x0, x1] = cadreRelief(x0, x1, camera.x, kRelief)
-      ;[y0, y1] = cadreRelief(y0, y1, camera.y, kRelief)
-      const sx0 = Math.max(0, Math.floor(px(x0)) - 2)
-      const sy0 = Math.max(0, Math.floor(py(y0)) - 2)
-      const sx1 = Math.min(natW, Math.ceil(px(x1)) + 2)
-      const sy1 = Math.min(natH, Math.ceil(py(y1)) + 2)
-      if (sx1 <= sx0 || sy1 <= sy0) continue
-      rects.push([sx0, sy0, sx1, sy1])
-    }
-    for (const [sx0, sy0, sx1, sy1] of rectsDisjoints(rects)) {
-      gl.scissor(sx0, sy0, sx1 - sx0, sy1 - sy0)
-      gl.drawArrays(gl.TRIANGLES, 0, 3)
-    }
-    gl.disable(gl.SCISSOR_TEST)
-    gl.disable(gl.BLEND)
-    gl.uniform1f(cu['uPasse'], 0)
-    this.cibleW = natW
-    this.cibleH = natH
   }
 
   // LE DÉCOR NET (voir decorNet) : la couche d'eau vient d'être calculée

@@ -4430,8 +4430,7 @@ function rapportPerf(): Record<string, unknown> {
       // plus que le coût de l'eau — sans ce drapeau, le rapport tromperait
       decorNet,
       // les pixels RÉELS de la toile, et si la passe nette l'a repassée en
-      // natif : au réglage « suit la résolution », un tableau à conduite le
-      // fait aussi — « megapixels » (l'échelle au carré) le cachait
+      // natif — « megapixels » (l'échelle au carré) ne le dit pas
       megapixelsToile: Math.round(((canvas.width * canvas.height) / 1e6) * 100) / 100,
       passeNette: renderer.passeNette,
       timeWarp: params.timeWarp,
@@ -18025,8 +18024,8 @@ function corpsImage(now: number): boolean {
   // l'échelle fixe choisie s'applique ici : seul le canvas est mis à
   // l'échelle, l'interface HTML reste à la netteté native
   const dpr = echelleRendue()
-  // LA CONDUITE NETTE : aux résolutions réduites, la conduite d'ammoniac se
-  // repasse à la densité native de l'écran (renderer.ts, drawConduiteNette)
+  // LE DÉCOR NET, s'il est demandé : repassé à la densité native de l'écran
+  // (renderer.ts, passeNetteRequise)
   renderer.dprNatif = Math.min(window.devicePixelRatio || 1, PLAFOND_DPR)
   renderer.decorNet = decorNet
   renderer.boitesMurs = level.boxes
