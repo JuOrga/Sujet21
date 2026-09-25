@@ -19,6 +19,7 @@ import type { PuitsDef } from '../game/level'
 import { boxContact, Sponge, type ClosestPoint } from './obstacles'
 import type { FormeBox } from '../game/formes'
 import { formePhysique } from '../game/conduite'
+import { VIDE_COURANT, VIDE_PORTEE } from '../game/vide'
 import {
   MAT_CHAUD,
   MAT_FROID,
@@ -306,6 +307,11 @@ export class FluidSim {
   swallowed = 0
   // Part avalée à l'état de glace : ouvre droit à la prime de collecte
   swallowedIce = 0
+  // Matière avalée par le VIDE (game/vide.ts) : retirée elle aussi, mais
+  // PERDUE — le dehors ne rend rien, rien n'ira en bonbonne.
+  perdusVide = 0
+  // Report fractionnaire du débit de l'œil (applyAspirationVide)
+  private videCarry = 0
   // Fraction du corps ACTIF (particules joueur) baignant dans une aura de
   // chauffe — le déclencheur de la transformation à 95 % (main.ts). Mise à
   // jour à chaque pas par processCold.
@@ -1757,6 +1763,68 @@ export class FluidSim {
       }
       i++
     }
+  }
+
+  // LE VIDE QUI ASPIRE (game/vide.ts) : une fois le corps pris, la brèche
+  // est une vidange sans retour. Même champ de vitesses que le sas — une
+  // force pure ferait orbiter l'eau — mais tout y est plus dur : la portée
+  // est plus large, le courant plus vif, la giration serrée (l'eau tourne
+  // une fois et plonge), et la glace n'y oppose presque pas d'inertie.
+  // `force` (0 … 1) fait monter le courant : on voit le liquide se tendre
+  // vers l'œil avant d'y être englouti. Ce qu'il avale est PERDU (perdusVide),
+  // pas bu : le corps fond, et la dispersion conclut à la défaite.
+  //
+  // `debit` (particules/s) borne ce que l'œil avale. Sans lui, le corps
+  // pris était posé SUR l'œil : 900 particules disparaissaient en 0,86 s
+  // (mesuré au Chromium) — un clignement, pas une aspiration. Borné, le
+  // liquide tourne, s'étire en entonnoir et plonge : on le VOIT partir.
+  applyAspirationVide(cx: number, cy: number, dt: number, force: number, debit = Infinity): void {
+    if (force <= 0) return
+    const R = VIDE_PORTEE
+    const R2 = R * R
+    const vIn0 = VIDE_COURANT * force
+    const vTan0 = vIn0 * 0.6
+    const blend = 1 - Math.exp(-6 * force * dt)
+    for (let i = 0; i < this.count; i++) {
+      const dx = cx - this.posX[i]
+      const dy = cy - this.posY[i]
+      const d2 = dx * dx + dy * dy
+      // le CORPS est emporté où qu'il soit — un fragment éjecté à l'instant
+      // ne sauve rien ; le reste de la salle ne sent la brèche qu'à portée
+      if ((d2 >= R2 && this.kind[i] !== KIND_PLAYER) || d2 < 1e-6) continue
+      const d = Math.sqrt(d2)
+      const ux = dx / d
+      const uy = dy / d
+      const pres = 1 - Math.min(1, d / R)
+      const vIn = vIn0 * (1 + 2 * pres)
+      const t0 = Math.min(1, d / (R * 0.4))
+      const vTan = vTan0 * t0 * t0
+      const tx = ux * vIn - uy * vTan
+      const ty = uy * vIn + ux * vTan
+      const grip = this.frozen[i] === 1 ? 0.7 : 1
+      this.velX[i] += (tx - this.velX[i]) * blend * grip
+      this.velY[i] += (ty - this.velY[i]) * blend * grip
+    }
+    // l'œil avale : retirée, comptée perdue — au débit permis
+    const swallowR = this.params.kernelRadius * 2.8
+    const swallowR2 = swallowR * swallowR
+    this.videCarry = Math.min(this.count, this.videCarry + debit * force * dt)
+    let i = 0
+    while (i < this.count && this.videCarry >= 1) {
+      const dx = cx - this.posX[i]
+      const dy = cy - this.posY[i]
+      if (dx * dx + dy * dy < swallowR2) {
+        this.removeParticle(i)
+        this.perdusVide++
+        this.videCarry--
+        continue // l'indice i contient maintenant une autre particule
+      }
+      i++
+    }
+    // Le corps englouti EST la dispersion, constatée ici : quand le vide a
+    // tout avalé, relabel sort d'emblée (count nul) et ne la déclarait
+    // jamais — la salle restait ouverte sur un écran vide, sans game over.
+    if (this.playerCount < 2) this.dispersed = true
   }
 
   // LA CHASSE : un courant de poussée rectiligne dans un rectangle — ce qui

@@ -515,6 +515,17 @@ import type { Pane } from 'tweakpane'
 import { amorcePresets } from './bench/amorcePresets'
 import { creeGardeImage, type PanneImage } from './game/gardeBoucle'
 import { appelle } from './game/reseau'
+import {
+  audessusDuVide,
+  blocsVide,
+  forceVide,
+  majVide,
+  menaceVide,
+  nouvelEtatVide,
+  remiseVide,
+  VIDE_DELAI,
+  VIDE_ENGLOUTI,
+} from './game/vide'
 
 const CAPACITY = 4096
 
@@ -8467,6 +8478,36 @@ const monitor: BenchMonitor = {
 // Vortex de regroupement : déclenché au clic droit, actif vortexDuration s
 const vortex = { x: 0, y: 0, timer: 0 }
 
+// LE VIDE QUI ASPIRE (game/vide.ts) : la minuterie du corps attardé
+// au-dessus du dehors, et les blocs de vide du tableau — filtrés une fois
+// par tableau (la référence des boîtes change à chaque chargement).
+const vide = nouvelEtatVide()
+let videBlocs: ObstacleBox[] = []
+let videBoites: readonly ObstacleBox[] | null = null
+function majVideAuPas(dt: number): void {
+  if (videBoites !== level.boxes) {
+    videBoites = level.boxes
+    videBlocs = blocsVide(level.boxes)
+  }
+  if (videBlocs.length === 0 && !vide.prise) return
+  // l'impulsion de départ attend : le corps n'est pas encore lâché
+  if (impulsionEnAttente) return
+  if (!vide.prise) {
+    if (sim.dispersed || sim.playerCount === 0) return
+    const x = sim.stats.centroidX
+    const y = sim.stats.centroidY
+    if (majVide(vide, audessusDuVide(videBlocs, x, y), x, y, dt)) {
+      manette.rumble(1, 600) // la brèche prend : ça se sent dans les mains
+    }
+    return
+  }
+  majVide(vide, true, vide.oeilX, vide.oeilY, dt)
+  // le débit se règle sur le corps de DÉPART : un corps plein part en
+  // VIDE_ENGLOUTI secondes, un corps entamé plus vite — jamais d'un coup
+  const debit = Math.max(60, sim.baseVolume / VIDE_ENGLOUTI)
+  sim.applyAspirationVide(vide.oeilX, vide.oeilY, dt, forceVide(vide), debit)
+}
+
 // Le pointeur est-il posé SUR le corps ? (à un rayon de noyau et des
 // poussières près : la surface visible dépasse un peu les centres de
 // particules). Sert à retourner l'impulsion : sur soi, on se rassemble.
@@ -10997,7 +11038,7 @@ const vieTampon = new Float32Array((CAPACITY + 128) * VIE_STRIDE)
 /** L'humeur de l'image, pour les motes et le halo : ce que le corps
  *  ressent se lit déjà dans l'état du jeu (péril, visée, abandon). */
 function majVie(dtReal: number): void {
-  const peril = endgame.lastCall || endgame.spent
+  const peril = endgame.lastCall || endgame.spent || menaceVide(vide) > 0
   motes.update(
     dtReal,
     sim,
@@ -11459,7 +11500,7 @@ function majPresence(dtReal: number, aimX: number, aimY: number): void {
   const cx = sim.stats.centroidX
   const cy = sim.stats.centroidY
   const now = performance.now() / 1000
-  const peril = endgame.lastCall || endgame.spent
+  const peril = endgame.lastCall || endgame.spent || menaceVide(vide) > 0
   // les fronts de l'éjection : l'amorce et le relâcher (le dernier point
   // de visée est gardé pour le coup d'œil du relâcher)
   if (input.aimActive) {
@@ -16546,6 +16587,7 @@ function restart(): void {
   endgame.sasBoitJusqua = -1
   endgame.empriseJusqua = -1
   endgame.rattrapee = false
+  remiseVide(vide)
   continuerVoulu = false
   btnContinuer.classList.remove('visible')
   endgame.spent = false
@@ -16865,7 +16907,7 @@ function afficheDispersion(): void {
   if (run.vies > 1) {
     ecranDispersion = 'relance'
     showOverlay(
-      'ÉCHANTILLON DISPERSÉ',
+      vide.prise ? 'ÉCHANTILLON ASPIRÉ PAR LE VIDE' : 'ÉCHANTILLON DISPERSÉ',
       `Le laboratoire engage un échantillon de secours — il en restera ${run.vies - 1}. Reprise à la première goutte de la salle.`,
       'danger',
       `REPRENDRE — SALLE ${levelIndex + 1}`,
@@ -16880,7 +16922,9 @@ function afficheDispersion(): void {
   void joueMoment('run-perdue')
   showOverlay(
     'ÉCHANTILLON PERDU — FIN DE LA RUN',
-    `La dispersion a eu raison du dernier échantillon. Le laboratoire vous rappelle.`,
+    vide.prise
+      ? `Le vide a emporté le dernier échantillon. Le laboratoire vous rappelle.`
+      : `La dispersion a eu raison du dernier échantillon. Le laboratoire vous rappelle.`,
     'danger',
     'RETOUR AU LABO',
   )
@@ -18523,7 +18567,9 @@ function corpsImage(now: number): boolean {
           !input.gasIntent &&
           !tirAiming &&
           !sim.dispersed &&
-          !endgame.spent
+          !endgame.spent &&
+          // pris par le vide, le corps ne se pilote plus : il est emporté
+          !vide.prise
         ) {
           // En eau, maintenir éjecte ; en vapeur, la visée fige le temps —
           // le dash part au relâchement (voir plus haut), rien ne se pilote.
@@ -18545,6 +18591,9 @@ function corpsImage(now: number): boolean {
         // conclut ; sinon arroser un sas de loin pèserait
         sim.exitRadiusFactor = sansSas(level) ? 0 : lev('sasPortee')
         sim.applyExitSuction(exitMouth.x, exitMouth.y, params.dt)
+        // LE VIDE : la minuterie tourne au temps de jeu, et une fois le
+        // corps pris, le courant l'emporte vers l'œil de la brèche
+        majVideAuPas(params.dt)
         // les CHASSES qui soufflent : le courant s'applique au pas, comme le
         // sas — et la bouffée d'une chasse déclenchée s'épuise au temps de jeu
         {
@@ -19077,7 +19126,12 @@ function corpsImage(now: number): boolean {
   // dans un MINI-JEU, rien ne s'aspire et le bouton ne sert pas : c'est le
   // jeu qui conclut (la lame du couperet ; au palet, le choix après chaque
   // lancer — relancer ou valider)
-  const aspireAssez = sansSas(level) ? false : sim.swallowed >= Math.max(20, sim.baseVolume * 0.1)
+  // Pris par le VIDE, plus rien ne se conclut au sas : ni CONTINUER offert,
+  // ni dispersion « rattrapée » — le corps est perdu, pas collecté.
+  const aspireAssez =
+    sansSas(level) || vide.prise
+      ? false
+      : sim.swallowed >= Math.max(20, sim.baseVolume * 0.1)
   // à la manette, le bouton dit son geste : A n'y mène plus (il pilote)
   const bConclure = manette.connectee ? boutonDe('conclure') : null
   const texteBouton =
@@ -19112,9 +19166,12 @@ function corpsImage(now: number): boolean {
       endgame.empriseJusqua >= 0 &&
       run.tableauTime - endgame.empriseJusqua <= params.dispersalGrace + 0.5)
   if (sortieRattrapee) endgame.rattrapee = true
+  // Le VIDE qui vide la salle n'est pas le sas qui la boit : sans cette
+  // garde, un peu d'eau bue plus tôt suffisait — le vide avalait le reste,
+  // « count ≤ seuilBu » tombait vrai, et la brèche concluait en VICTOIRE.
   const drunk =
     sasOutil ||
-    (sim.swallowed > 0 && sim.count <= seuilBu) ||
+    (!vide.prise && sim.swallowed > 0 && sim.count <= seuilBu) ||
     (aspireAssez && continuerVoulu) ||
     sortieRattrapee
   // le corps « tient » pour les conclusions : vivant, ou rattrapé ci-dessus
@@ -19947,8 +20004,12 @@ function corpsImage(now: number): boolean {
   // déclarait « l'échantillon dérive » sur un corps... collecté.
   endgame.enCollecte = sasBoit || aspireAssez
   if (endgame.enCollecte) endgame.lastCall = false // le sas boit : l'alarme se tait
+  // pris par le VIDE, la fin de course se tait aussi : le corps fondait
+  // sous l'aspiration, passait la dernière impulsion et se GELAIT — un palet
+  // de glace qui résistait au courant au lieu d'y plonger
+  if (vide.prise) endgame.lastCall = false
   const alive = !sim.dispersed && !tableauDone && !run.ended
-  if (alive && !endgame.spent && !endgame.enCollecte) {
+  if (alive && !endgame.spent && !endgame.enCollecte && !vide.prise) {
     endgame.lastCall = sim.liters() <= params.criticalVolumeLiters
     // se rassembler ne dépense rien : ce maintien-là n'est pas une impulsion,
     // il ne consomme pas la dernière
@@ -20000,9 +20061,17 @@ function corpsImage(now: number): boolean {
     sim.liters() <= params.lastCallLiters
   // une fois le CONTINUER offert, plus aucune bannière funeste : le bouton
   // est l'interface de fin, l'alarme n'a plus rien à dire
+  // LE VIDE prime sur toute autre alarme : c'est la seule qui laisse un
+  // délai, et c'est maintenant qu'il faut le lire
+  const menaceDuVide = alive ? menaceVide(vide) : 0
   const inDanger =
-    alive && !aspireAssez && (endgame.spent || endgame.lastCall || nearLast)
-  if (inDanger) {
+    menaceDuVide > 0 ||
+    (alive && !aspireAssez && (endgame.spent || endgame.lastCall || nearLast))
+  if (menaceDuVide > 0) {
+    hudDanger.textContent = vide.prise
+      ? '⚠ LE VIDE ASPIRE L’ÉCHANTILLON'
+      : `⚠ AU-DESSUS DU VIDE — QUITTEZ LA BRÈCHE (${Math.ceil(VIDE_DELAI * (1 - menaceDuVide))} s)`
+  } else if (inDanger) {
     hudDanger.textContent = endgame.spent
       ? '❄ DERNIÈRE IMPULSION DONNÉE — L’ÉCHANTILLON DÉRIVE'
       : endgame.lastCall
