@@ -8,6 +8,8 @@
 import { describe, expect, it } from 'vitest'
 import {
   PARALLAXE_DEFAUTS,
+  PLAQUE_DEFAUTS,
+  cadrePlaque,
   coucheFond,
   empriseEcran,
   type Couche,
@@ -84,5 +86,47 @@ describe('parallaxe — la couche lointaine', () => {
     expect(d.semis.zoom).toBeLessThan(d.cuve.zoom)
     expect(d.cuve.zoom).toBeLessThanOrEqual(1)
     expect(d.ciel.suivi).toBeLessThan(d.cuve.suivi)
+  })
+})
+
+describe('la plaque de ciel, cadrée — une seule Voie lactée', () => {
+  // le rectangle que l'écran voit dans la plaque, en coordonnées de texture
+  const vu = (x: number, y: number, z: number, w: number, h: number) => {
+    const c = cadrePlaque(x, y, z, w, h)
+    return {
+      minX: c.cx - (w * c.parPx) / 2,
+      maxX: c.cx + (w * c.parPx) / 2,
+      minY: c.cy - (h * c.parPx) / 2,
+      maxY: c.cy + (h * c.parPx) / 2,
+    }
+  }
+
+  it('l’écran ne sort JAMAIS de l’image : aucune position, aucun zoom, aucun format', () => {
+    for (const [w, h] of [[1280, 720], [720, 1280], [2560, 1080], [390, 844], [1, 1]])
+      for (const z of [1e-6, 0.01, 0.05, 0.12, 0.3, 1, 3, 15])
+        for (const x of [-1e7, -40000, -2250, 0, 900, 2250, 40000, 1e7])
+          for (const y of [-1e7, -1500, 0, 750, 1e7]) {
+            const r = vu(x, y, z, w, h)
+            expect(r.minX).toBeGreaterThanOrEqual(0)
+            expect(r.maxX).toBeLessThanOrEqual(1)
+            expect(r.minY).toBeGreaterThanOrEqual(0)
+            expect(r.maxY).toBeLessThanOrEqual(1)
+          }
+  })
+
+  it('au zoom de jeu, l’écran montre la part réglée, et moins en s’approchant', () => {
+    const d = PLAQUE_DEFAUTS
+    expect(cadrePlaque(0, 0, d.ref, 1280, 720).parPx * 1280).toBeCloseTo(d.part, 6)
+    const loin = cadrePlaque(0, 0, 0.15, 1280, 720).parPx
+    const pres = cadrePlaque(0, 0, 0.6, 1280, 720).parPx
+    expect(loin).toBeGreaterThan(pres)
+  })
+
+  it('la caméra qui se déplace fait glisser le ciel, dans le même sens', () => {
+    const a = cadrePlaque(0, 0, 0.3, 1280, 720)
+    const b = cadrePlaque(500, -300, 0.3, 1280, 720)
+    expect(a.cx).toBeCloseTo(0.5, 9)
+    expect(b.cx).toBeGreaterThan(a.cx)
+    expect(b.cy).toBeLessThan(a.cy)
   })
 })

@@ -103,3 +103,79 @@ export function empriseEcran(
 ): number {
   return (largeurCss / Math.max(zoom, 1e-4)) * facteurG(zoom, couche, ref)
 }
+
+// ---------------------------------------------------------------------------
+// LA PLAQUE DE CIEL, CADRÉE — une seule Voie lactée, jamais répétée.
+//
+// La plaque était une couche comme les autres : collée au monde, répétée à
+// l'infini. En reculant ou en se déplaçant, on voyait donc sa COPIE — deux
+// Voies lactées parallèles, puis trois : un papier peint. Un ciel n'a
+// qu'une Voie lactée.
+//
+// Elle est donc cadrée par rapport à l'ÉCRAN, et non plus au monde : l'écran
+// en montre une PART (sur sa grande dimension), qui ne dépend que du zoom,
+// bornée des deux côtés ; son centre DÉRIVE avec la caméra pour que la
+// profondeur se sente, mais par une tangente hyperbolique qui sature avant le
+// bord. La garantie que les tests gravent : quels que soient la position, le
+// zoom et le format de l'écran, le rectangle vu tient DANS l'image.
+
+export interface ReglagesPlaque {
+  /** La part de la plaque que montre la grande dimension de l'écran, au
+   *  zoom d'étalonnage. Plus grande : la Voie lactée paraît plus petite. */
+  part: number
+  /** La réponse au zoom, même convention que les couches : 1 grandit comme
+   *  le monde, 0 ne change jamais de taille. Le ciel est loin : peu. */
+  zoom: number
+  /** Les bornes de la part montrée : la plus serrée (zoom avant) et la plus
+   *  large (recul) — celle-ci reste sous 1, c'est ce qui interdit le bord. */
+  partMin: number
+  partMax: number
+  /** La dérive du centre, en fraction de plaque par unité-monde de
+   *  déplacement de la caméra, près de l'origine (avant saturation). */
+  derive: number
+  /** Le zoom d'étalonnage, celui du jeu ordinaire. */
+  ref: number
+}
+
+export const PLAQUE_DEFAUTS: ReglagesPlaque = {
+  part: 0.6,
+  zoom: 0.3,
+  partMin: 0.32,
+  partMax: 0.94,
+  derive: 4e-5,
+  ref: 0.3,
+}
+
+/** Où l'écran regarde dans la plaque : le centre (en coordonnées de
+ *  texture, 0..1, y vers le haut) et la taille d'un pixel CSS en coordonnées
+ *  de texture. Le shader n'a plus qu'une multiplication-addition par pixel. */
+export interface CadrePlaque {
+  cx: number
+  cy: number
+  parPx: number
+}
+
+export function cadrePlaque(
+  camX: number,
+  camY: number,
+  zoom: number,
+  largeurCss: number,
+  hauteurCss: number,
+  r: ReglagesPlaque = PLAQUE_DEFAUTS,
+): CadrePlaque {
+  const z = Math.max(zoom, 1e-4) / Math.max(r.ref, 1e-4)
+  const partMax = Math.min(r.partMax, 0.96)
+  const part = Math.min(partMax, Math.max(r.partMin, r.part * Math.pow(z, -(1 - r.zoom))))
+  const grand = Math.max(largeurCss, hauteurCss, 1)
+  const parPx = part / grand
+  // la place qui reste de chaque côté du rectangle vu : la dérive ne peut
+  // pas la dépasser, la tangente hyperbolique y tend sans l'atteindre. Moins
+  // une MARGE d'un pour cent : saturée, la tangente touche le bord au
+  // chiffre près, et le filtrage lit aussi les texels voisins de l'écran
+  const MARGE = 0.01
+  const resteX = 0.5 - MARGE - (largeurCss * parPx) / 2
+  const resteY = 0.5 - MARGE - (hauteurCss * parPx) / 2
+  const glisse = (cam: number, reste: number): number =>
+    reste > 1e-6 ? reste * Math.tanh((cam * r.derive) / reste) : 0
+  return { cx: 0.5 + glisse(camX, resteX), cy: 0.5 + glisse(camY, resteY), parPx }
+}

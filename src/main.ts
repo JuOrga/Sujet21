@@ -377,7 +377,12 @@ import { picto, type NomPicto } from './game/athPictos'
 import { entreesTiroir } from './game/athTiroir'
 import { pancarteLibre, zonesInterdites, type Rect } from './game/athZones'
 import { CLE_REGLAGE_ATH, athAuRepos, litReglageAth, pointeurPres, type ReglageAth } from './game/athRepos'
-import { PARALLAXE_DEFAUTS, facteurG } from './render/parallaxe'
+import {
+  PARALLAXE_DEFAUTS,
+  PLAQUE_DEFAUTS,
+  cadrePlaque,
+  facteurG,
+} from './render/parallaxe'
 import { PerfCollector } from './game/perf'
 import {
   fetchLibrary,
@@ -3739,7 +3744,9 @@ if (!(cielChoix in CIEL_MODE)) cielChoix = 'plaque'
 // La FORCE dose la plaque — le vide doit rester plus sombre que la cuve
 // éclairée, sans quoi la hiérarchie lumineuse s'inverse. L'ÉTENDUE dit
 // combien d'unités-monde la plaque couvre : plus elle est petite, plus le
-// ciel est net et plus il défile vite.
+// ciel est net et plus il défile vite. (Depuis que la plaque est UNE image
+// cadrée par rapport à l'écran, l'étendue en unités-monde a cédé la place à
+// la PART de la plaque que l'écran montre — voir plus bas.)
 // Les défauts sont ceux du premier étalonnage à l'écran : à force 1, la
 // plaque écrasait la station — le vide devenait le sujet et les modules des
 // découpes plates. 0,45 la remet DERRIÈRE la cuve éclairée, là où elle doit
@@ -3751,7 +3758,9 @@ if (!(cielChoix in CIEL_MODE)) cielChoix = 'plaque'
 // d'avant, mesurée sur les deux plaques (0,058 contre 0,060) — la bande se
 // lit, la hiérarchie tient. Les étoiles nettes, elles, ne passent pas par
 // ce dosage : un point ne noie pas la cuve, un voile si.
-const cielReglages = { force: 0.55, etendue: 8000 }
+// LA PART : combien de la plaque la grande dimension de l'écran montre au
+// zoom de jeu. 0,6 : la Voie lactée déborde de l'écran sans qu'on la perde.
+const cielReglages = { force: 0.55, part: PLAQUE_DEFAUTS.part }
 
 // LA PROFONDEUR DES COUCHES DE FOND : la règle, les valeurs et les tests
 // vivent dans render/parallaxe.ts — ici on n'en tient que la copie RÉGLABLE,
@@ -19405,7 +19414,10 @@ function corpsImage(now: number): boolean {
   renderer.setCiel(
     CIEL_MODE[cielChoix],
     cielReglages.force,
-    cielReglages.etendue,
+    cadrePlaque(camera.x, camera.y, camera.zoom, vw, vh, {
+      ...PLAQUE_DEFAUTS,
+      part: cielReglages.part,
+    }),
   )
   // LA PROFONDEUR DES COUCHES DE FOND : posée à l'image comme le ciel, pour
   // que le banc l'entende tout de suite. Le facteur se cuisine ICI, une fois

@@ -26,6 +26,7 @@ import {
 } from '../game/formes'
 import type { Camera } from './camera'
 import { VIE_STRIDE } from './vie'
+import type { CadrePlaque } from './parallaxe'
 import { Programmes } from './programmes'
 
 // Budgets de rendu : au-delà, les éléments excédentaires ne sont plus
@@ -396,11 +397,11 @@ uniform float uZoneForce[MAX_ZONES]; // 1 eau, 2 glace, 3 vapeur, 0 libre
 uniform sampler2D uTexStars;
 // LE CIEL LOINTAIN partage une seule unité de texture — le fragment shader
 // n'en a que seize garanties, et les seize sont prises. Selon le mode, on y
-// lie soit la tuile d'intérim, soit LA PLAQUE : une image très grande,
-// périodique, qu'on survole en parallaxe lente.
+// lie soit la tuile d'intérim, soit LA PLAQUE : une image unique, cadrée
+// par rapport à l'écran (render/parallaxe.ts, cadrePlaque).
 uniform sampler2D uTexCiel;
 uniform float uCielMode;   // 0 procédural · 1 tuilé · 2 plaque
-uniform float uCielSpan;   // largeur en unités-monde que couvre la plaque
+uniform vec3 uPlaque;      // centre vu (x, y, texture 0..1) · taille d'un px CSS
 uniform float uCielForce;  // dosage : le vide doit rester plus sombre que la cuve
 // LA PROFONDEUR DES COUCHES DE FOND. Chaque couche porte DEUX nombres, tous
 // deux entre 0 et 1 et avec la même convention : 1 = elle se comporte comme
@@ -1102,12 +1103,12 @@ void main() {
   // procédural d'intérim.
   vec3 voidCol;
   if (uCielMode > 1.5 && uHasCiel > 0.5) {
-    // LA PLAQUE DE CIEL : une seule image, très grande, survolée en
-    // parallaxe lente. Elle est PÉRIODIQUE, donc échantillonnée en
-    // répétition franche : sur uCielSpan unités-monde, un tableau n'en
-    // traverse jamais assez pour qu'un motif se reconnaisse, et le jour où
-    // le monde s'élargira, elle se raccordera sans couture.
-    vec3 fond = texture(uTexCiel, coucheFond(world, uParCiel) / uCielSpan).rgb;
+    // LA PLAQUE DE CIEL : UNE image, UNE Voie lactée. Elle n'est plus
+    // collée au monde ni répétée — en reculant, on voyait sa copie, deux
+    // Voies lactées parallèles, un papier peint. Elle est cadrée par rapport
+    // à l'écran, son centre dérivant avec la caméra (render/parallaxe.ts,
+    // cadrePlaque, qui garantit que l'écran reste DANS l'image).
+    vec3 fond = texture(uTexCiel, uPlaque.xy + (css - uViewport * 0.5) * uPlaque.z).rgb;
     voidCol = fond * uCielForce;
     // LES ÉTOILES NETTES RESTENT PROCÉDURALES, et ce n'est pas une
     // économie : elles sont nettes à tout grossissement là où la plaque
@@ -3031,7 +3032,7 @@ export class Renderer {
   private texCiel: WebGLTexture | null = null
   private cielDemandee = false
   private cielMode = 2
-  private cielSpan = 6000
+  private readonly plaque = new Float32Array([0.5, 0.5, 0.0005])
   private cielForce = 1
   // LA PROFONDEUR DES COUCHES DE FOND : suivi et réponse au zoom, par
   // couche (cf. uParCiel/uParSemis/uParCuve dans le shader). Les défauts
@@ -3462,14 +3463,18 @@ export class Renderer {
    * lancée au chargement du module ne peut pas le toucher — il n'existe pas
    * encore (cf. src/main-amorce.spec.ts).
    */
-  setCiel(mode: number, force: number, span: number): void {
+  setCiel(mode: number, force: number, cadre: CadrePlaque): void {
     this.cielMode = mode
     this.cielForce = force
-    this.cielSpan = span
-    // le téléchargement n'est lancé qu'au premier passage en mode plaque
+    this.plaque[0] = cadre.cx
+    this.plaque[1] = cadre.cy
+    this.plaque[2] = cadre.parPx
+    // le téléchargement n'est lancé qu'au premier passage en mode plaque.
+    // SANS répétition : l'image est unique, son bord n'est jamais montré —
+    // et, filtrée, une répétition y mélangerait le bord opposé
     if (mode > 1.5 && !this.cielDemandee) {
       this.cielDemandee = true
-      this.loadTexture('/assets/ciel.webp', true, true, (t) => (this.texCiel = t))
+      this.loadTexture('/assets/ciel.webp', false, true, (t) => (this.texCiel = t))
     }
   }
 
@@ -4203,7 +4208,7 @@ export class Renderer {
     const cielPret = this.cielMode > 1.5 && this.texCiel !== null
     bindTex(7, cielPret ? this.texCiel : this.texStarsFar, 'uTexCiel', 'uHasCiel')
     gl.uniform1f(cu['uCielMode'], cielPret ? 2 : Math.min(this.cielMode, 1))
-    gl.uniform1f(cu['uCielSpan'], this.cielSpan)
+    gl.uniform3fv(cu['uPlaque'], this.plaque)
     gl.uniform1f(cu['uCielForce'], this.cielForce)
     gl.uniform2fv(cu['uParCiel'], this.parCiel)
     gl.uniform2fv(cu['uParSemis'], this.parSemis)
