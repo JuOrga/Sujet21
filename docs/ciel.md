@@ -5,7 +5,7 @@ DEHORS**) :
 
 | mode | ce que c'est | ce que ça coûte |
 |---|---|---|
-| **PLAQUE** (défaut) | un calque HTML : `public/assets/ciel.webp` (2400², une vraie photographie) et trois tuiles d'étoiles | ~1,4 Mo au téléchargement ; composé par le navigateur, sans calcul par pixel |
+| **PLAQUE** (défaut) | un calque HTML : `public/assets/ciel.webp` (2400², une vraie photographie) et une tuile d'étoiles | ~1,8 Mo au téléchargement ; composé par le navigateur, sans calcul par pixel — deux couches plein écran, en fusion normale |
 | **TUILE** | l'ancien fond : deux petites textures répétées | ~0,1 Mo |
 | **PROCÉDURAL** | rien à charger, le vide est entièrement calculé | zéro |
 
@@ -35,10 +35,16 @@ restent des ajouts).
   mot ;
 - ses **bords sont fondus** dans l'image elle-même (`--fondu`, plus bas) ;
 - son centre **dérive** avec la caméra mais ne quitte jamais l'écran ;
-- les **étoiles** sont trois tuiles d'image (`tools/ciel/genere-etoiles.py`)
-  affichées à un texel par pixel physique, sur trois profondeurs : nettes
-  par construction, et elles ne changent pas de taille avec le zoom, comme
-  des étoiles ;
+- les **étoiles** sont une tuile d'image (`tools/ciel/genere-etoiles.py`)
+  affichée à un texel par pixel physique : nettes par construction, et
+  elles ne changent pas de taille avec le zoom, comme des étoiles ;
+- **le calque se paie au compositeur**, à la définition native, à chaque
+  image. Le premier jet (trois tuiles en `mix-blend-mode: screen` dans un
+  groupe isolé, un `filter` CSS pour le froid) faisait tomber, sous Chromium
+  en rendu logiciel (1280 × 800, DPR 2), une page sans ciel de 60 im/s à 12 ;
+  deux couches en fusion normale, le froid peint dans la toile : 29. **Ne pas
+  y remettre de mode de fusion, de filtre ni de couche plein écran sans
+  mesurer** ;
 - le **recul** s'arrête quand la salle entière occupe le quart de l'écran
   (`plancher`, `src/render/camera.ts`).
 
