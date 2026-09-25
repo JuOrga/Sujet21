@@ -160,6 +160,10 @@
       }
       canvas#glcanvas {
         display: block;
+        /* positionnée : peinte PAR-DESSUS le calque de ciel qui la précède
+           dans #app (render/cielCalque.ts) — la toile est transparente dans
+           le vide */
+        position: relative;
         width: 100%;
         height: 100%;
         touch-action: none;
@@ -10471,13 +10475,16 @@
           <div id="params-voile" class="params-choix" role="group" aria-label="Le voile des cachettes"></div>
           <div class="params-nom" style="margin-top: 16px">LE CIEL DU DEHORS</div>
           <div class="params-desc">
-            Le fond du vide, derrière la station. PLAQUE (défaut) : un champ
-            profond de 4096 × 4096 — poussières, filaments, milliers d'étoiles
-            dont les plus vives portent les six aigrettes d'un miroir
-            hexagonal. Elle ne se télécharge qu'à son premier affichage
-            (0,6 Mo) et occupe de la mémoire graphique ; si l'appareil peine,
-            TUILE reprend l'ancien fond, et PROCÉDURAL ne charge rien du tout
-            — le vide est alors entièrement calculé.
+            Le fond du vide, derrière la station. PLAQUE (défaut) : le centre
+            de la Voie lactée, une vraie photographie, et des milliers
+            d'étoiles — toujours à la pleine définition de l'écran, quelle que
+            soit la résolution de rendu choisie plus haut, et sans calcul :
+            c'est le navigateur qui la compose. Elle ne se télécharge qu'à son
+            premier affichage (1,4 Mo). TUILE reprend l'ancien fond, et
+            PROCÉDURAL ne charge rien du tout — le vide est alors entièrement
+            calculé.
+            <br />Photographie : ESO/S. Brunier, « The Milky Way Panorama »
+            (GigaGalaxy Zoom), licence CC BY 4.0.
           </div>
           <div id="params-ciel" class="params-choix" role="group" aria-label="Le ciel du dehors"></div>
           <div class="params-nom" style="margin-top: 16px">RELIEF DES PAROIS</div>

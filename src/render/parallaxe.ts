@@ -103,3 +103,101 @@ export function empriseEcran(
 ): number {
   return (largeurCss / Math.max(zoom, 1e-4)) * facteurG(zoom, couche, ref)
 }
+
+// ---------------------------------------------------------------------------
+// LA PLAQUE DE CIEL, CADRÉE — une seule Voie lactée, jamais répétée, jamais
+// floue.
+//
+// La plaque était une couche comme les autres : collée au monde, répétée à
+// l'infini. En reculant, on voyait sa COPIE — deux Voies lactées parallèles,
+// un papier peint. Elle est donc cadrée par rapport à l'ÉCRAN.
+//
+// Premier cadrage : l'écran montrait une PART de l'image (0,85). Mais
+// l'image fait 1254 px, et un écran d'iPad en a 2 700 de large : la
+// galaxie y était agrandie deux fois et plus — « trop zoomée, pas nette du
+// tout ». Une image ne gagne aucun détail à être agrandie.
+//
+// La règle est donc désormais celle de la NETTETÉ : un pixel d'image ne
+// couvre jamais plus de GROSS_MAX pixels physiques de l'écran. La galaxie
+// tient dans une partie de l'écran, ses bords se fondent dans le noir (le
+// shader), et autour d'elle ce sont les étoiles profondes du shader — nettes
+// par construction, à l'infini. Son centre dérive avec la caméra, pour que
+// la profondeur se sente, mais sature avant de sortir de l'écran : on ne la
+// perd jamais de vue.
+
+export interface ReglagesPlaque {
+  /** La largeur de la galaxie, en fraction de la grande dimension de
+   *  l'écran, au zoom d'étalonnage — si la netteté le permet. */
+  taille: number
+  /** La réponse au zoom, même convention que les couches : 1 grandit comme
+   *  le monde, 0 ne change jamais de taille. Le ciel est loin : peu. */
+  zoom: number
+  /** Les bornes de cette largeur, en recul et en approche. */
+  tailleMin: number
+  tailleMax: number
+  /** L'agrandissement le plus fort permis : pixels physiques d'écran par
+   *  pixel d'image. Au-delà de ~1, l'image s'adoucit ; c'est LA borne. */
+  grossMax: number
+  /** La dérive de la galaxie, en pixels CSS par unité-monde de
+   *  déplacement de la caméra, près de l'origine (avant saturation). */
+  derive: number
+  /** Le zoom d'étalonnage, celui du jeu ordinaire. */
+  ref: number
+}
+
+// La taille de 1,3 se règle sur la VRAIE photographie livrée (2 400 px) :
+// la bande déborde de l'écran, le cœur ne se cache plus derrière la station
+// — et sur un iPad, la netteté (grossMax) la plafonne à peu près à la
+// largeur de l'écran. Avec l'image générée de 1254 px, 0,8 : elle ne
+// pouvait pas davantage sans flou.
+export const PLAQUE_DEFAUTS: ReglagesPlaque = {
+  taille: 1.3,
+  zoom: 0.3,
+  tailleMin: 0.5,
+  tailleMax: 2.0,
+  grossMax: 1.15,
+  derive: 0.02,
+  ref: 0.3,
+}
+
+/** Où l'écran regarde dans la plaque : le point de l'image au centre de
+ *  l'écran (coordonnées de texture, 0..1, y vers le haut) et la taille d'un
+ *  pixel CSS en coordonnées de texture. Hors de 0..1, c'est le noir : le
+ *  shader n'a plus qu'une multiplication-addition par pixel. */
+export interface CadrePlaque {
+  cx: number
+  cy: number
+  parPx: number
+}
+
+export function cadrePlaque(
+  camX: number,
+  camY: number,
+  zoom: number,
+  largeurCss: number,
+  hauteurCss: number,
+  dpr: number,
+  texels: number,
+  r: ReglagesPlaque = PLAQUE_DEFAUTS,
+): CadrePlaque {
+  const z = Math.max(zoom, 1e-4) / Math.max(r.ref, 1e-4)
+  const grand = Math.max(largeurCss, hauteurCss, 1)
+  // la réponse au zoom, par la MÊME convention que les couches : exposant
+  // r.zoom — 0,3, la galaxie est loin, elle change peu. (Premier jet :
+  // 1 − r.zoom, soit 0,7 : elle suivait le zoom comme un objet proche, et
+  // au recul se réduisait à une vignette.)
+  const voulue =
+    grand *
+    Math.min(r.tailleMax, Math.max(r.tailleMin, r.taille * Math.pow(z, r.zoom)))
+  // LA NETTETÉ D'ABORD : la largeur à l'écran (en px CSS) plafonnée à ce que
+  // l'image peut remplir sans être agrandie au-delà de grossMax
+  const nette = (Math.max(texels, 1) * r.grossMax) / Math.max(dpr, 1e-4)
+  const largeur = Math.min(voulue, nette)
+  const parPx = 1 / largeur
+  // la dérive, en px CSS : elle sature à un tiers de la petite dimension de
+  // l'écran — le centre de la galaxie ne quitte jamais l'écran
+  const reste = Math.min(largeurCss, hauteurCss) / 3
+  const glisse = (cam: number): number =>
+    reste > 1e-6 ? reste * Math.tanh((cam * r.derive) / reste) : 0
+  return { cx: 0.5 + glisse(camX) * parPx, cy: 0.5 + glisse(camY) * parPx, parPx }
+}

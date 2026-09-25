@@ -66,7 +66,7 @@ export interface BenchActions {
   // LE CIEL DU DEHORS : le choix du fond est dans PARAMÈTRES, mais son
   // DOSAGE se règle ici, à vue — c'est en regardant le vide qu'on trouve
   // la bonne force, pas dans un menu qui met la partie en pause.
-  ciel?: { force: number; etendue: number }
+  ciel?: { force: number; taille: number }
   // LA PROFONDEUR DES COUCHES DE FOND : deux nombres par couche, entre 0 et
   // 1 — le suivi (déplacement de la caméra) et le zoom (grossissement).
   parallaxe?: {
@@ -386,13 +386,15 @@ export function createBench(
       'Dose la plaque de ciel. Le vide DOIT rester plus sombre que la cuve éclairée : au-delà, la hiérarchie lumineuse s’inverse et la scène se noie. Sans effet sur les fonds tuilé et procédural.',
     )
     describe(
-      fCiel.addBinding(actions.ciel, 'etendue', {
-        min: 2000,
-        max: 20000,
-        step: 100,
-        label: 'étendue (u)',
+      fCiel.addBinding(actions.ciel, 'taille', {
+        // pas sous 0,5 : cadrePlaque la borne là (tailleMin), le bas de la
+        // course n'aurait rien fait
+        min: 0.5,
+        max: 1.4,
+        step: 0.01,
+        label: 'taille',
       }),
-      'Combien d’unités-monde la plaque couvre. Plus petite : le ciel est plus net et défile plus vite. Plus grande : plus doux, presque immobile. Un tableau fait 2400 unités, le hub 4500 — en dessous, le motif finit par se reconnaître.',
+      'La largeur de la galaxie, en fraction de l’écran, au zoom de jeu. Plafonnée par la netteté : l’image n’est jamais agrandie au-delà de ce qu’elle peut rendre net — sur un écran très fin, elle restera plus petite que demandé.',
     )
   }
 

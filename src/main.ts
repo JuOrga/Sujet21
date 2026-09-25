@@ -377,7 +377,12 @@ import { picto, type NomPicto } from './game/athPictos'
 import { entreesTiroir } from './game/athTiroir'
 import { pancarteLibre, zonesInterdites, type Rect } from './game/athZones'
 import { CLE_REGLAGE_ATH, athAuRepos, litReglageAth, pointeurPres, type ReglageAth } from './game/athRepos'
-import { PARALLAXE_DEFAUTS, facteurG } from './render/parallaxe'
+import { CielCalque } from './render/cielCalque'
+import {
+  PARALLAXE_DEFAUTS,
+  PLAQUE_DEFAUTS,
+  facteurG,
+} from './render/parallaxe'
 import { PerfCollector } from './game/perf'
 import {
   fetchLibrary,
@@ -3578,6 +3583,8 @@ const captureCodex = new CaptureCodex(
   document.getElementById('hud-capture') as HTMLButtonElement | null,
   {
     sources: () => ({ gl: canvas, fx: fxCanvas }),
+    // le ciel vit hors de la toile : il se repeint sous elle dans la vidéo
+    fond: (g, x, y, w, h, largeur, hauteur) => cielCalque.dessineDans(g, x, y, w, h, largeur, hauteur),
     fiches: () => fichesCodex().map((f) => ({ id: f.id, titre: codexLu(f).titre, groupe: f.groupe })),
     concepteur: () => document.body.classList.contains('concepteur'),
     cadenceTampon: () => cadenceTampon,
@@ -3747,14 +3754,23 @@ if (!(cielChoix in CIEL_MODE)) cielChoix = 'plaque'
 // La FORCE dose la plaque — le vide doit rester plus sombre que la cuve
 // éclairée, sans quoi la hiérarchie lumineuse s'inverse. L'ÉTENDUE dit
 // combien d'unités-monde la plaque couvre : plus elle est petite, plus le
-// ciel est net et plus il défile vite.
+// ciel est net et plus il défile vite. (Depuis que la plaque est UNE image
+// cadrée par rapport à l'écran, l'étendue en unités-monde a cédé la place à
+// la PART de la plaque que l'écran montre — voir plus bas.)
 // Les défauts sont ceux du premier étalonnage à l'écran : à force 1, la
 // plaque écrasait la station — le vide devenait le sujet et les modules des
 // découpes plates. 0,45 la remet DERRIÈRE la cuve éclairée, là où elle doit
 // être. L'étendue de 6000 donnait des volutes énormes, plus proches d'un
 // ciel de nuages que d'un champ profond ; 12 000 les diluait en brume.
 // 8 000 rend la structure lisible sans qu'elle prenne toute la place.
-const cielReglages = { force: 0.45, etendue: 8000 }
+// La Voie lactée livrée est une VRAIE photographie (ESO/S. Brunier) : plus
+// sombre qu'une image générée — à 0,75, en jeu, elle se devinait à peine
+// derrière la station. Pleine force. Si elle écrase les modules d'un
+// tableau, c'est ce curseur du banc.
+// Les étoiles nettes ne passent pas par ce dosage.
+// LA TAILLE : la largeur de la galaxie en fraction de l'écran, au zoom de
+// jeu — plafonnée par la netteté (render/parallaxe.ts, cadrePlaque).
+const cielReglages = { force: 1, taille: PLAQUE_DEFAUTS.taille }
 
 // LA PROFONDEUR DES COUCHES DE FOND : la règle, les valeurs et les tests
 // vivent dans render/parallaxe.ts — ici on n'en tient que la copie RÉGLABLE,
@@ -8028,6 +8044,8 @@ fetch('/noyaux.wasm')
   })
 
 const renderer = new Renderer(canvas, CAPACITY)
+// le ciel vit DERRIÈRE la toile, dans le même conteneur (render/cielCalque.ts)
+const cielCalque = new CielCalque(canvas.parentElement!, canvas, '/assets/ciel.webp')
 const rendererNe = performance.now() // pour dater l'attente de compilation
 const loop = new FixedLoop()
 const input = new Input()
@@ -19385,7 +19403,10 @@ function corpsImage(now: number): boolean {
     waveScratch[i * 4 + 3] = 1
   }
 
-  // Caméra : suivi du corps, ou vue d'ensemble du tableau depuis le banc
+  // Caméra : suivi du corps, ou vue d'ensemble du tableau depuis le banc.
+  // La salle d'abord : le plancher du recul se règle sur elle, quelle que
+  // soit la façon dont elle a été ouverte (render/camera.ts, salle)
+  camera.salle(sim.bounds)
   if (monitor.overview) {
     const b = sim.bounds
     const fitZoom =
@@ -19436,11 +19457,21 @@ function corpsImage(now: number): boolean {
   // s'affichait plus du tout. Posé à l'image, il ne peut ni arriver trop tôt
   // ni rester en retard d'un tableau.
   renderer.setSolModules(level.coque === 'structures')
-  renderer.setCiel(
-    CIEL_MODE[cielChoix],
-    cielReglages.force,
-    cielReglages.etendue,
-  )
+  renderer.setCiel(CIEL_MODE[cielChoix])
+  // LE CIEL EN CALQUE, à la densité NATIVE de l'écran — pas à l'échelle de
+  // rendu de la toile : c'est tout l'objet (render/cielCalque.ts)
+  cielCalque.maj({
+    actif: CIEL_MODE[cielChoix] > 1.5,
+    camX: camera.x,
+    camY: camera.y,
+    zoom: camera.zoom,
+    largeurCss: vw,
+    hauteurCss: vh,
+    dpr: Math.min(window.devicePixelRatio || 1, 3),
+    force: cielReglages.force,
+    froid: chillNow(),
+    reglages: { ...PLAQUE_DEFAUTS, taille: cielReglages.taille },
+  })
   // LA PROFONDEUR DES COUCHES DE FOND : posée à l'image comme le ciel, pour
   // que le banc l'entende tout de suite. Le facteur se cuisine ICI, une fois
   // par image (il ne dépend que du zoom et des réglages) : le shader n'a plus
