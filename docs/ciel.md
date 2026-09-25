@@ -5,45 +5,59 @@ DEHORS**) :
 
 | mode | ce que c'est | ce que ça coûte |
 |---|---|---|
-| **PLAQUE** (défaut) | une image carrée — `public/assets/ciel.webp`, 1254² | ~0,4 Mo au téléchargement, ~8 Mo de mémoire graphique |
+| **PLAQUE** (défaut) | un calque HTML : `public/assets/ciel.webp` (1254²) et trois tuiles d'étoiles | ~0,4 Mo au téléchargement ; composé par le navigateur, sans calcul par pixel |
 | **TUILE** | l'ancien fond : deux petites textures répétées | ~0,1 Mo |
 | **PROCÉDURAL** | rien à charger, le vide est entièrement calculé | zéro |
 
 La plaque **ne se télécharge qu'à son premier affichage**. Qui la coupe ne la
 paie jamais.
 
-**UNE image, UNE Voie lactée, jamais répétée.** La plaque était collée au
-monde et répétée à l'infini : en reculant, on voyait deux ou trois bandes
-parallèles. Elle est désormais cadrée par rapport à l'**écran**
-(`cadrePlaque`, `src/render/parallaxe.ts`) :
+**LE CIEL EST UN CALQUE HTML, DERRIÈRE LA TOILE** (`src/render/cielCalque.ts`).
+Il était peint par le shader, donc à la définition de la toile — que le
+réglage de résolution rétrécit (moyenne ×0,75, faible ×0,5, et l'adaptatif,
+défaut des tablettes). La plus belle image y devenait floue. Derrière la
+toile, le navigateur le compose **toujours à la définition native de
+l'écran**, quel que soit le réglage, et le déplacer ne coûte qu'une
+transformation. Le shader rend la toile transparente dans le vide
+(`uCielCalque`, en alpha prémultiplié exact : les lumières posées sur le vide
+restent des ajouts).
 
+- **UNE image, UNE Voie lactée**, jamais répétée — en reculant, l'ancienne
+  plaque répétée montrait deux ou trois bandes parallèles ;
 - **jamais floue** : un pixel d'image ne couvre jamais plus de 1,15 pixel
-  physique de l'écran (`grossMax`), quels que soient le zoom et l'écran — les
-  tests le garantissent. Une image de 1254 px tient donc dans une partie
-  d'un écran d'iPad, et c'est voulu : le premier réglage la montrait deux
-  fois agrandie, « trop zoomée, pas nette du tout » ;
-- sa **taille** voulue est 0,8 de la grande dimension de l'écran au zoom de
-  jeu, un peu moins en reculant — la netteté a le dernier mot ;
-- ses **bords se fondent** dans le noir, et autour ce sont les étoiles
-  profondes du shader, à l'infini ;
-- son centre **dérive** avec la caméra, pour que la profondeur se sente, mais
-  sature avant de sortir de l'écran : on ne la perd jamais de vue ;
-- au départ, la caméra regarde le **centre** de l'image : c'est là que doit
-  se tenir le plus beau ;
-- le recul s'arrête quand la salle entière occupe la moitié de l'écran
+  physique de l'écran (`grossMax`, `cadrePlaque` dans
+  `src/render/parallaxe.ts`), quels que soient le zoom et l'écran — les tests
+  le garantissent. **Une image de 1254 px tient donc dans un tiers d'écran
+  d'iPad : pour une grande galaxie nette, il faut une grande image** (plus
+  bas) ;
+- sa **taille** voulue : 0,8 de la grande dimension de l'écran au zoom de
+  jeu, un peu moins au recul — la netteté a le dernier mot ;
+- ses **bords sont fondus** dans l'image elle-même (`--fondu`, plus bas) ;
+- son centre **dérive** avec la caméra mais ne quitte jamais l'écran ;
+- les **étoiles** sont trois tuiles d'image (`tools/ciel/genere-etoiles.py`)
+  affichées à un texel par pixel physique, sur trois profondeurs : nettes
+  par construction, et elles ne changent pas de taille avec le zoom, comme
+  des étoiles ;
+- le **recul** s'arrête quand la salle entière occupe le quart de l'écran
   (`plancher`, `src/render/camera.ts`).
 
-**Les étoiles nettes ne sont pas dans la plaque.** Le jeu montre environ deux
-texels par pixel : une étoile d'un texel y est moyennée, donc pâlie et floue.
-En modes PLAQUE et PROCÉDURAL, le shader dessine par-dessus huit couches
-d'étoiles au pixel près (`etoiles` dans `src/render/renderer.ts`), nettes à
-tout zoom et sur tout écran, plus nombreuses là où la plaque est riche — la
-bande lactée. La plaque ne porte que le fond : la lueur, le grain, les
-poussières. Une plaque de télescope déposée à la place en profite aussi.
+Les modes TUILE et PROCÉDURAL, eux, restent peints dans la toile.
 
 ---
 
 ## Déposer une vraie plaque de télescope
+
+**C'est LA voie vers une image vraiment nette.** La netteté est bornée par
+la taille de l'image : à 1254 px, la galaxie reste petite ; à 4096 px, elle
+peut couvrir un écran d'iPad entier sans flou. Une vraie photographie du
+centre galactique en haute définition, c'est ce que l'humanité a de plus
+beau en la matière, et c'est libre (crédits ci-dessous).
+
+**Pour me la transmettre** (l'environnement de travail ne joint ni l'ESO ni
+la NASA, et une image jointe à la conversation arrive réduite) : sur GitHub,
+*Releases → Draft a new release*, joindre le fichier original, publier (ou
+garder en brouillon) et donner le lien. Une pièce jointe de release n'entre
+PAS dans l'historique du dépôt.
 
 **Le jeu prend l'image qu'il trouve : il n'y a pas une ligne de code à
 changer.** Écrasez `public/assets/ciel.webp` et c'est fait.
@@ -150,9 +164,10 @@ magick assets-src/original.tif -gravity center -crop 1:1 +repage \
 ```
 
 **Mieux : `tools/ciel/prepare-plaque.py`** fait le carré, les retouches
-ponctuelles (`--retouche x,y,rayon`), la désaturation (`--saturation`) et
-garde la taille de la source, plafonnée à 4096. **Ne jamais agrandir** : le
-jeu lit la largeur de la texture pour décider jusqu'où il peut l'afficher sans
+ponctuelles (`--retouche x,y,rayon`), la désaturation (`--saturation`), le
+fondu des bords (`--fondu`, 0,18 par défaut) et garde la taille de la
+source, plafonnée à 4096. **Ne jamais agrandir** : le
+jeu lit la largeur de l'image pour décider jusqu'où il peut l'afficher sans
 flou — une image de 1254 px portée à 2048 lui ferait croire à un détail qui
 n'existe pas, et la galaxie serait affichée 1,6 fois trop grande.
 

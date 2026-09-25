@@ -14,6 +14,11 @@ portée à 2048 lui ferait croire à un détail qui n'existe pas — la galaxie
 serait affichée 1,6 fois trop grande, donc floue. WebGL 2 accepte les
 tailles qui ne sont pas des puissances de deux.
 
+LE FONDU. Le jeu pose l'image telle quelle derrière la toile : ses bords
+doivent se fondre dans le noir, sans quoi elle se lit comme une affiche
+découpée dans le ciel. `--fondu 0.18` éteint 18 % de chaque côté, en
+courbe douce.
+
 LA SATURATION. Les générateurs saturent : « trop de couleurs ». Le
 réglage mélange chaque pixel à sa luminance (1 : intact, 0 : gris).
 
@@ -50,6 +55,7 @@ def main() -> None:
     p.add_argument("--retouche", action="append", default=[], help="x,y,rayon")
     p.add_argument("--taille", type=int, default=0, help="0 : celle de la source")
     p.add_argument("--saturation", type=float, default=1.0)
+    p.add_argument("--fondu", type=float, default=0.18)
     p.add_argument("--qualite", type=int, default=90)
     p.add_argument("--sortie", default="public/assets/ciel.webp")
     a = p.parse_args()
@@ -70,6 +76,13 @@ def main() -> None:
     taille = a.taille or min(4096, c)
     if taille != c:
         im = im.resize((taille, taille), Image.LANCZOS)
+    if a.fondu > 0:
+        u = (np.arange(taille, dtype=np.float32) + 0.5) / taille
+        t = np.clip(np.minimum(u, 1.0 - u) / a.fondu, 0.0, 1.0)
+        f = t * t * (3.0 - 2.0 * t)
+        masque = f[:, None] * f[None, :]
+        px = np.asarray(im, dtype=np.float32) * masque[..., None]
+        im = Image.fromarray(np.clip(px + 0.5, 0, 255).astype(np.uint8))
     im.save(a.sortie, "WEBP", quality=a.qualite, method=6)
     print(f"{a.sortie} — {taille}×{taille}, {os.path.getsize(a.sortie) / 1e6:.2f} Mo")
 
