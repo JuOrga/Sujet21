@@ -433,22 +433,32 @@ export function dessinMiniCarteSVG(
         : nd.ecrite
           ? 'mv-pool'
           : `mv-m${nd.mecanique}`
+  // CE QUE LE CHOIX INTERDIT : depuis les portes du rang courant, les
+  // nœuds encore joignables. Tout lien qui n'en part pas (et n'est pas le
+  // chemin joué) ne se prendra plus — il reste dessiné, mais éteint. Avant,
+  // les voies abandonnées gardaient leur trait plein : la carte montrait
+  // des croisements qui ne concernaient plus le joueur (le concepteur, 25/09).
+  const joignables = new Set<string>()
+  for (const p of o.portes) for (const k of cheminDePorte(mc, o.rang, p, null).noeuds) joignables.add(k)
   let liens = ''
   let noeuds = ''
   for (const rang of mc.rangs)
     for (const nd of rang) {
       const joueIci = o.trace[nd.rang] === nd.voie
+      const ici = `${nd.rang}-${nd.voie}`
       for (const s of nd.suivants) {
         const joue = joueIci && o.trace[nd.rang + 1] === s
         const ouvre = joueIci && nd.rang + 1 === o.rang && o.portes.includes(s)
-        liens += `<line class="mv-lien${joue ? ' mv-joue' : ''}${ouvre ? ' mv-ouvre' : ''}" data-lien="${nd.rang}-${nd.voie}-${s}" x1="${x(nd.rang) + S}" y1="${y(nd.voie)}" x2="${x(nd.rang + 1) - S}" y2="${y(s)}"/>`
+        const interdit = !joue && !ouvre && !joignables.has(ici)
+        liens += `<line class="mv-lien${joue ? ' mv-joue' : ''}${ouvre ? ' mv-ouvre' : ''}${interdit ? ' mv-interdit' : ''}" data-lien="${nd.rang}-${nd.voie}-${s}" x1="${x(nd.rang) + S}" y1="${y(nd.voie)}" x2="${x(nd.rang + 1) - S}" y2="${y(s)}"/>`
       }
       const porte = nd.rang === o.rang && o.portes.includes(nd.voie)
       const cl =
         'mv-noeud ' + teinte(nd) +
         (joueIci ? ' mv-joue' : '') + (porte ? ' mv-porte' : '') +
         (nd.rang < o.rang && !joueIci ? ' mv-ferme' : '') +
-        (nd.rang > o.rang ? ' mv-loin' : '')
+        (nd.rang > o.rang ? ' mv-loin' : '') +
+        (nd.rang >= o.rang && !joignables.has(ici) ? ' mv-interdit' : '')
       noeuds +=
         `<g class="${cl}" data-rang="${nd.rang}" data-voie="${nd.voie}" transform="translate(${x(nd.rang)} ${y(nd.voie)})">` +
         `<title>salle ${nd.rang + 1}, voie ${nd.voie + 1} — ${nom(nd)}</title>` +

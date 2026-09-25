@@ -330,6 +330,24 @@ describe('cheminDePorte — ce que le survol d’une porte allume', () => {
     expect(cheminDePorte(mc, 5, 0, null)).toEqual({ noeuds: [], liens: [], entree: null })
   })
 
+  it('le choix interdit : après la voie 0, les liens et nœuds qui ne sont plus joignables s’éteignent', () => {
+    // venu de la voie 0 au rang 0 : portes 0 et 1 au rang 1 ; la voie 2 n'est
+    // plus joignable qu'en passant par 1 → 2 — le nœud 1-2 est interdit
+    const svg = dessinMiniCarteSVG(mc, { rang: 1, trace: [0], portes: [0, 1] })
+    const classe = (k: string): string => /class="([^"]*)" data-lien="/.exec(svg.slice(svg.indexOf(`data-lien="${k}"`) - 60))?.[1] ?? ''
+    expect(classe('0-1-1')).toContain('mv-interdit') // une voie qu'on n'a pas prise
+    expect(classe('0-2-2')).toContain('mv-interdit')
+    expect(classe('1-2-2')).toContain('mv-interdit') // part d'un nœud qu'on n'atteindra plus
+    expect(classe('0-0-1')).not.toContain('mv-interdit') // la porte ouverte
+    expect(classe('1-1-2')).not.toContain('mv-interdit') // la suite joignable
+    expect(svg).toMatch(/mv-interdit" data-rang="1" data-voie="2"/)
+    expect(svg).not.toMatch(/mv-interdit" data-rang="2" data-voie="2"/) // joignable par 1 → 2
+  })
+
+  it('au premier rang, rien n’est interdit', () => {
+    expect(dessinMiniCarteSVG(mc, { rang: 0, trace: [], portes: [0, 1, 2] })).not.toContain('mv-interdit')
+  })
+
   it('les clés sont celles du dessin : chaque lien allumé existe dans le SVG', () => {
     const svg = dessinMiniCarteSVG(mc, { rang: 1, trace: [0], portes: [0, 1] })
     const ch = cheminDePorte(mc, 1, 1, 0)
