@@ -12,6 +12,7 @@ import {
   MAT_VIDE,
   MAT_BAIE,
   MAT_RIDEAU,
+  sansPhysique,
   MAT_SURCHAUFFEUR,
   MAT_HYDROPHILE,
   MAT_HYDROPHOBE,
@@ -1184,6 +1185,11 @@ export function checkLevel(brut: LevelDef, catalogue: InstrumentDef[] = catalogu
   // pour éloigner sa bande du départ criait encore à tort.
   const contact: FormeContact = { dist: 0, nx: 0, ny: 1 }
   for (const box of level.boxes) {
+    // Une ouverture sur le dehors (vide, baie vitrée) n'est pas une
+    // surface : le corps y passe comme sur le sol. Sans ce tri, un départ
+    // posé devant une baie était refusé alors que le solveur, lui, ne la
+    // voit même pas.
+    if (sansPhysique(box.material)) continue
     formeContact(level.spawn.x, level.spawn.y, box, contact)
     if (contact.dist < 120) {
       v.push({
