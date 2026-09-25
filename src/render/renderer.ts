@@ -11,6 +11,7 @@ import {
   LAMPE_HAUTEUR_MAX,
   LAMPE_HAUTEUR_MIN,
   lampeCouleurRVB,
+  MAT_FROID,
   zonePhases,
 } from '../game/level'
 import type { DecalDef, LumiereDef, ObstacleBox, ZoneDef } from '../game/level'
@@ -23,10 +24,14 @@ import {
   FORME_COIN,
   FORME_RECT,
   FORME_COQUE,
+  CONDUITE,
+  CONDUITE_ATLAS,
 } from '../game/formes'
 import type { Camera } from './camera'
 import { VIE_STRIDE } from './vie'
 import { Programmes } from './programmes'
+import { sondeRetournement, type Retournement } from './retournement'
+import { boutsEnMur } from '../game/conduite'
 
 // Budgets de rendu : au-delà, les éléments excédentaires ne sont plus
 // dessinés (la physique, elle, les voit tous) — l'éditeur avertit quand un
@@ -141,6 +146,148 @@ void main() {
 // exacts en float32, zéro uniforme de plus (le budget mobile est déjà plein).
 // q0 : orientation du coin (0..3) ou épaisseur d'arc ×100 ; q1 : demi-
 // ouverture d'arc en degrés + 256·bouts (0 ronds, 1 droits, 2 pointe).
+// LA CONDUITE D'AMMONIAC : sa disposition (tuyau, brides de bout, joints),
+// sa FORME (l'union de ces pièces) et les cadres de son atlas — ÉCRITS
+// depuis CONDUITE et CONDUITE_ATLAS (game/formes.ts), la vérité unique que
+// lit aussi la physique. Injecté dans la composition (le dessin, la brume,
+// le sol) et dans le cuiseur de lumière (l'ombre des lampes).
+const CONDUITE_GLSL = (() => {
+  const C = CONDUITE
+  const A = CONDUITE_ATLAS
+  const f = (x: number) => (Number.isInteger(x) ? `${x}.0` : `${x}`)
+  const v4 = (r: readonly number[]) => `vec4(${r.map(f).join(', ')})`
+  return `
+const float CN_TUYAU = ${f(C.tuyau)};
+const float CN_BANDE = ${f(C.bandeCorps)};
+const float CN_MOTIF = ${f(C.motif)};
+const float CN_BOUT = ${f(C.bout)};
+const float CN_BOUT_H = ${f(C.boutDemiH)};
+const float CN_BRIDE_DE = ${f(C.brideDe)};
+const float CN_BRIDE_A = ${f(C.brideA)};
+const float CN_EMBOUT = ${f(C.embout)};
+const float CN_FIN_CORPS = ${f(C.finCorps)};
+const float CN_BB_DE = ${f(C.brideBoutDe)};
+const float CN_BB_A = ${f(C.brideBoutA)};
+const float CN_BB_DEMI = ${f(C.brideBoutDemi)};
+const float CN_JOINT_DEMI = ${f(C.jointDemi)};
+const float CN_JOINT_HAUT = ${f(C.jointHaut)};
+const float CN_JOINT_BAS = ${f(C.jointBas)};
+const float CN_BRIDE_JOINT = ${f(C.brideJoint)};
+const float CN_PAS = ${f(C.pas)};
+const float CN_ATLAS = ${f(A.taille)};
+const vec4 CN_CORPS = ${v4(A.corps)};
+const vec4 CN_CADRE_BOUT = ${v4(A.bout)};
+const vec4 CN_CADRE_JOINT = ${v4(A.joint)};
+const vec4 CN_CADRE_GIVRE = ${v4(A.givre)};
+const vec4 CN_CADRE_VANNE = ${v4(A.vanne)};
+const float CN_TUYAU_TRAV = ${f(C.tuyauTraversee)};
+const float CN_SEUIL_VANNE = ${f(C.seuilVanne)};
+const float CN_VANNE_L = ${f(C.vanneImgL)};
+const float CN_VANNE_H = ${f(C.vanneImgH)};
+
+// le dessin selon la place — JUMEAUX de conduiteLongue, modeConduite et
+// echelleArceau (formes.ts) : 0 vanne, 1 arceau, 2 longue
+bool conduiteLongue(float L, float T) { return L >= 2.0 * CN_BOUT * T; }
+float modeConduite(float L, float T) {
+  if (conduiteLongue(L, T)) return 2.0;
+  return L < CN_SEUIL_VANNE * T ? 0.0 : 1.0;
+}
+float echelleArceau(float L, float T) { return min(1.0, L / (2.0 * CN_BOUT * T)); }
+
+float cnRect(float s, float t, float cs, float hs, float ht) {
+  vec2 q = vec2(abs(s - cs) - hs, abs(t) - ht);
+  return length(max(q, 0.0)) + min(max(q.x, q.y), 0.0);
+}
+
+// le joint le plus proche de s (abscisse centrée), ou 1e9 s'il n'y en a pas
+float jointPres(float s, float L, float T) {
+  if (!conduiteLongue(L, T)) return 1e9;
+  float n = floor((L * 0.5 - (CN_BOUT + 0.05 + CN_JOINT_DEMI) * T) / CN_PAS);
+  if (n < 0.0) return 1e9;
+  return clamp(floor(s / CN_PAS + 0.5), -n, n) * CN_PAS;
+}
+
+// le bout du côté de s (bouts : 1 côté négatif, 2 côté positif) plonge-t-il
+// dans un mur ? JUMEAU de BOUT_MUR_* (formes.ts)
+bool boutEnMur(float s, float bouts) {
+  return s < 0.0 ? mod(bouts, 2.0) > 0.5 : bouts > 1.5;
+}
+
+// distance signée à la conduite (l'union du tuyau et de ses brides), en
+// repère local centré : s le long, t en travers. Un bout dans un mur n'a
+// pas de bride : le tuyau file jusqu'au bord du bloc — JUMEAU de
+// piecesConduite (formes.ts)
+float conduiteSdfLocal(float s, float t, float L, float T, float bouts) {
+  float mode = modeConduite(L, T);
+  if (mode < 0.5) {
+    float c = min(L, T);
+    return cnRect(s, t, 0.0, 0.5 * c, 0.5 * c);
+  }
+  if (mode < 1.5) {
+    float k = echelleArceau(L, T);
+    float dA = cnRect(s, t, 0.0, 0.5 * L, CN_TUYAU_TRAV * k * T);
+    dA = min(dA, cnRect(abs(s), t, L * 0.5 - (CN_BRIDE_A + CN_BRIDE_DE) * 0.5 * k * T,
+                        (CN_BRIDE_A - CN_BRIDE_DE) * 0.5 * k * T, 0.5 * k * T));
+    dA = min(dA, cnRect(abs(s), t, L * 0.5 - (CN_BB_A + CN_BB_DE) * 0.5 * k * T,
+                        (CN_BB_A - CN_BB_DE) * 0.5 * k * T, CN_BB_DEMI * k * T));
+    return dA;
+  }
+  bool lg = true;
+  float retrait = lg ? CN_EMBOUT * T : 0.0;
+  float a0 = -L * 0.5 + (boutEnMur(-1.0, bouts) ? 0.0 : retrait);
+  float a1 = L * 0.5 - (boutEnMur(1.0, bouts) ? 0.0 : retrait);
+  float d = cnRect(s, t, 0.5 * (a0 + a1), 0.5 * (a1 - a0), CN_TUYAU * T);
+  if (lg && !boutEnMur(s, bouts)) {
+    d = min(d, cnRect(abs(s), t, L * 0.5 - (CN_BRIDE_A + CN_BRIDE_DE) * 0.5 * T,
+                      (CN_BRIDE_A - CN_BRIDE_DE) * 0.5 * T, 0.5 * T));
+    d = min(d, cnRect(abs(s), t, L * 0.5 - (CN_BB_A + CN_BB_DE) * 0.5 * T,
+                      (CN_BB_A - CN_BB_DE) * 0.5 * T, CN_BB_DEMI * T));
+  }
+  float sj = jointPres(s, L, T);
+  if (sj < 1e8) {
+    float j0 = max(-L * 0.5, sj - CN_BRIDE_JOINT * T);
+    float j1 = min(L * 0.5, sj + CN_BRIDE_JOINT * T);
+    d = min(d, cnRect(s, t, 0.5 * (j0 + j1), 0.5 * (j1 - j0), 0.5 * T));
+  }
+  return d;
+}
+
+// LA SILHOUETTE QUI OMBRE (ombre au sol, ombre des lampes) : le TUYAU,
+// pas la forme de collision — les brides y sont des rectangles pleins, et
+// leur ombre dure se lisait en pavés et en diagonales là où l'image est
+// ronde. La vanne ombre comme son volant (80 % de la plaque).
+float conduiteOmbreSdf(float s, float t, float L, float T) {
+  float mode = modeConduite(L, T);
+  if (mode < 0.5) {
+    float c = min(L, T);
+    return cnRect(s, t, 0.0, 0.40 * c, 0.40 * c);
+  }
+  if (mode < 1.5) return cnRect(s, t, 0.0, 0.5 * L, CN_TUYAU_TRAV * echelleArceau(L, T) * T);
+  return cnRect(s, t, 0.0, 0.5 * L, CN_TUYAU * T);
+}
+
+// le sens du tuyau : 0 auto (le grand côté), 1 horizontal, 2 vertical —
+// JUMEAU de conduiteHoriz (formes.ts)
+bool conduiteHoriz(vec2 sz, float sens) {
+  if (sens > 0.5 && sens < 1.5) return true;
+  if (sens > 1.5) return false;
+  return sz.x >= sz.y;
+}
+
+// aux.z d'une plaque froide : sens + 4 · bouts (voir render())
+float conduiteSens(float code) { return mod(code, 4.0); }
+float conduiteBouts(float code) { return floor(code / 4.0 + 0.001); }
+
+float conduiteSdf(vec2 p, vec4 box, float code) {
+  vec2 sz = box.zw - box.xy;
+  vec2 q = p - 0.5 * (box.xy + box.zw);
+  bool horiz = conduiteHoriz(sz, conduiteSens(code));
+  return conduiteSdfLocal(horiz ? q.x : q.y, horiz ? q.y : q.x,
+                          horiz ? sz.x : sz.y, horiz ? sz.y : sz.x, conduiteBouts(code));
+}
+`
+})()
+
 const FORMES_GLSL = `
 float cote2(vec2 a, vec2 b, vec2 p) { // de quel côté de (a→b) tombe p
   return (b.x - a.x) * (p.y - a.y) - (b.y - a.y) * (p.x - a.x);
@@ -421,7 +568,11 @@ uniform vec2 uParCuve;   // la paroi de cuve, derrière l'eau
 uniform sampler2D uTexTank; // fond de cuve : panneaux, conduites, liserés
 uniform sampler2D uTexWall;
 uniform sampler2D uTexWallA; // seconde paroi : les murs alternent, sans répétition visible
-uniform sampler2D uTexFroid;
+// la passe en cours (voir render) : 0 l'image entière ; 1 la passe NETTE
+// des conduites ; 2 la COUCHE D'EAU seule, basse résolution ; 3 le DÉCOR
+// natif, sans l'eau — « le décor net »
+uniform float uPasse;
+uniform sampler2D uTexFroid; // l’atlas de la conduite d’ammoniac (tronçon, bride, joint, givre)
 uniform sampler2D uTexChaud;
 uniform sampler2D uTexGrille;
 uniform sampler2D uTexPhobe;
@@ -667,6 +818,197 @@ float smoothField(vec2 p) {
   float a = sin(p.x + sin(p.y * 0.73) * 1.7);
   float b = sin(p.y * 0.87 + sin(p.x * 0.61) * 1.3);
   return 0.5 + 0.25 * (a + b);
+}
+
+${CONDUITE_GLSL}
+// ——— LA CONDUITE D'AMMONIAC (plaque froide) ————————————————————————————
+// Un tuyau givré, ses brides de bout et ses joints, lus dans l'atlas
+// conduite-atlas.webp (tools/images/conduite_atlas.py) — quatre images
+// générées : le tronçon, la bride de bout, le joint, le givre du sol. Tout
+// se cale sur la BOÎTE : la bride en fait toute la largeur, le tuyau un peu
+// plus de la moitié ; la forme physique (FORME_CONDUITE) est l'union de ces
+// mêmes pièces, aux mêmes proportions (CONDUITE, game/formes.ts).
+float nh3Lisse(float bord, float x, float px) {
+  return 1.0 - smoothstep(bord - px, bord + px, x);
+}
+
+// Un cadre de l'atlas, lu en (x, y) : fractions du cadre depuis son coin
+// HAUT-gauche. ppw : pixels d'atlas par unité monde — le niveau de détail
+// est écrit à la main (textureGrad) : le miroir du tronçon et les bords de
+// cadre cassent les dérivées d'écran. Hors du cadre : rien.
+vec4 atlasCadre(vec4 cadre, vec2 f, float px, float ppw) {
+  if (f.x < 0.0 || f.x > 1.0 || f.y < 0.0 || f.y > 1.0) return vec4(0.0);
+  vec2 pa = cadre.xy + clamp(f * cadre.zw, vec2(0.5), cadre.zw - 0.5);
+  vec2 uv = vec2(pa.x, CN_ATLAS - pa.y) / CN_ATLAS; // téléversé avec FLIP_Y
+  float g = px * ppw / CN_ATLAS;
+  vec4 c = textureGrad(uTexFroid, uv, vec2(g, 0.0), vec2(0.0, g));
+  return vec4(c.rgb * c.a, c.a); // prémultiplié
+}
+
+vec4 cnSur(vec4 dessous, vec4 dessus) {
+  return dessus + dessous * (1.0 - dessus.a);
+}
+
+// L'ombre que la conduite porte sur le sol, à multiplier au fond. Elle suit
+// le TUYAU, pas la forme de collision : les brides y sont des rectangles de
+// toute la largeur, et leur ombre dure se lisait en PAVÉS SOMBRES partout où
+// l'image est transparente — autour des brides rondes, entre les boulons,
+// aux coins de la plaque (vu en aperçu sur iPad). Douce, décalée vers le
+// bas à droite (la lampe du dessin est en haut à gauche), et calculée
+// partout autour, pas seulement dans la boîte.
+float conduiteOmbre(vec2 p, vec4 box, float code) {
+  vec2 sz = box.zw - box.xy;
+  bool horiz = conduiteHoriz(sz, conduiteSens(code));
+  float L = horiz ? sz.x : sz.y;
+  float T = horiz ? sz.y : sz.x;
+  vec2 q = p - 0.5 * (box.xy + box.zw) - vec2(0.06, -0.06) * T;
+  float s = horiz ? q.x : q.y;
+  float t = horiz ? q.y : q.x;
+  float d = conduiteOmbreSdf(s, t, L, T);
+  return mix(0.55, 1.0, smoothstep(-0.10 * T, 0.30 * T, d));
+}
+
+// Rend la conduite SEULE, en couleur prémultipliée (rgb) et couverture
+// (a) : autour d'elle, on voit le sol de la salle.
+vec4 conduiteNH3(vec2 loc, vec2 bsize, float px, float code) {
+  bool horiz = conduiteHoriz(bsize, conduiteSens(code));
+  float bouts = conduiteBouts(code);
+  float L = horiz ? bsize.x : bsize.y;
+  float T = horiz ? bsize.y : bsize.x;
+  float s = (horiz ? loc.x : loc.y) - L * 0.5; // le long, centré
+  float t = (horiz ? loc.y : loc.x) - T * 0.5; // en travers, centré
+  float mode = modeConduite(L, T);
+  bool lg = mode > 1.5;
+
+  vec4 acc = vec4(0.0);
+  if (mode < 0.5) {
+    // LA VANNE : la tête de vanne gelée, carrée, au centre du bloc — droite
+    // dans le repère du bloc (pas tournée avec le sens : c'est une vue du
+    // dessus, la lumière y reste en haut à gauche)
+    float c = min(L, T);
+    vec2 q = loc - 0.5 * bsize;
+    vec2 f = vec2(q.x / (CN_VANNE_L * c) + 0.5, 0.5 - q.y / (CN_VANNE_H * c));
+    acc = atlasCadre(CN_CADRE_VANNE, f, px, CN_CADRE_VANNE.z / (CN_VANNE_L * c));
+  } else if (mode < 1.5) {
+    // L'ARCEAU : le tuyau sort du sol et y replonge — deux traversées bride
+    // contre bride, réduites de k pour tenir ; à gauche, en miroir
+    float k = echelleArceau(L, T);
+    float lb = CN_BOUT * k * T;
+    vec2 f = vec2((abs(s) - (L * 0.5 - lb)) / lb, (CN_BOUT_H * k * T - t) / (2.0 * CN_BOUT_H * k * T));
+    acc = atlasCadre(CN_CADRE_BOUT, f, px, CN_CADRE_BOUT.w / (2.0 * CN_BOUT_H * k * T));
+  }
+  // LE TRONÇON, répété EN MIROIR sur la longueur (l'image n'est pas
+  // raccordable bord à bord : mesuré, 31 contre 8 à l'intérieur)
+  float hb = CN_BANDE * T;
+  // un bout dans un mur : le tronçon file jusqu'au bord du bloc (une
+  // conduite longue seulement : l'arceau et la vanne tiennent dans le bloc)
+  bool mur = lg && boutEnMur(s, bouts);
+  // un bout libre : le tronçon s'arrête sous la bride de la traversée
+  float fin = (lg && !mur) ? L * 0.5 - CN_FIN_CORPS * T : L * 0.5;
+  if (lg && abs(t) < hb && abs(s) < fin) {
+    float m = s / (CN_MOTIF * T);
+    float tri = abs(fract(m * 0.5) * 2.0 - 1.0);
+    acc = atlasCadre(CN_CORPS, vec2(tri, (hb - t) / (2.0 * hb)), px, CN_CORPS.w / (2.0 * hb));
+  }
+  // LES BOUTS LIBRES : la TRAVERSÉE DE SOL — bride, coude qui plonge dans
+  // une plaque boulonnée au plancher ; à gauche, l'image en miroir. Le
+  // tronçon s'arrête sous la bride (finCorps) : elle cache le changement
+  // de diamètre, comme un réducteur.
+  if (lg && !mur) {
+    float sp = abs(s);
+    float s0 = L * 0.5 - CN_BOUT * T;
+    if (sp > s0) {
+      vec2 f = vec2((sp - s0) / (CN_BOUT * T), (CN_BOUT_H * T - t) / (2.0 * CN_BOUT_H * T));
+      vec4 c = atlasCadre(CN_CADRE_BOUT, f, px, CN_CADRE_BOUT.w / (2.0 * CN_BOUT_H * T));
+      acc = cnSur(acc, c * smoothstep(0.0, 0.02, f.x));
+    }
+  }
+  // LE JOINT à brides, tous les pas, sur une conduite longue
+  float sj = jointPres(s, L, T);
+  if (sj < 1e8) {
+    float dx = s - sj;
+    vec2 f = vec2((dx + CN_JOINT_DEMI * T) / (2.0 * CN_JOINT_DEMI * T),
+                  (CN_JOINT_HAUT * T - t) / ((CN_JOINT_HAUT + CN_JOINT_BAS) * T));
+    vec4 c = atlasCadre(CN_CADRE_JOINT, f, px, CN_CADRE_JOINT.w / ((CN_JOINT_HAUT + CN_JOINT_BAS) * T));
+    // sur une longue conduite, les bouts du joint se fondent dans le tronçon
+    float fondu = lg ? smoothstep(0.0, 0.14, f.x) * smoothstep(0.0, 0.14, 1.0 - f.x) : 1.0;
+    acc = cnSur(acc, c * fondu);
+  }
+
+  // LE TUYAU QUI PLONGE dans le mur : il s'assombrit en s'y enfonçant
+  // (l'ombre du mur sur lui), et une collerette de givre, épaisse, s'est
+  // formée au ras de la paroi — là où l'air humide rencontre le froid
+  if (mur && acc.a > 0.0) {
+    float aBord = L * 0.5 - abs(s);                 // la distance au mur
+    acc.rgb *= mix(0.30, 1.0, smoothstep(0.0, 0.45 * T, aBord));
+    float coll = (1.0 - smoothstep(0.0, 0.14 * T, aBord)) *
+                 smoothstep(0.30, 0.70, dnoise(vec2(s, t) * 0.25 / max(T / 60.0, 0.3)));
+    acc.rgb = mix(acc.rgb, vec3(0.80, 0.90, 0.98) * acc.a, coll * 0.75);
+  }
+
+  // LES ÉCLATS : le givre de l'image scintille — des étoiles sur ses
+  // pixels clairs, fondues au dézoom (un pixel qui clignote au loin, c'est
+  // de la neige d'écran, pas du gel)
+  if (acc.a > 0.01) {
+    float lumC = dot(acc.rgb / acc.a, vec3(0.299, 0.587, 0.114));
+    vec2 cq = loc / 5.0;
+    vec2 cell = floor(cq);
+    float h = hash21(cell);
+    vec2 o = fract(cq) - 0.5 - 0.3 * (vec2(hash21(cell + 2.7), hash21(cell + 5.3)) - 0.5);
+    float etoile = max(nh3Lisse(0.05, abs(o.x), 0.03) * nh3Lisse(0.28, abs(o.y), 0.05),
+                       nh3Lisse(0.05, abs(o.y), 0.03) * nh3Lisse(0.28, abs(o.x), 0.05));
+    etoile = max(etoile, nh3Lisse(0.09, length(o), 0.04));
+    float scint = 0.5 + 0.5 * sin(uTime * (1.5 + 3.0 * hash21(cell + 4.1)) + h * 60.0);
+    acc.rgb += vec3(0.85, 0.94, 1.0) * etoile * step(0.88, h) * scint *
+               smoothstep(0.55, 0.8, lumC) * acc.a * smoothstep(0.9, 0.35, px);
+  }
+  return acc;
+}
+
+// LE SOL CRISTALLISÉ : dans l'aire d'effet (la portée de gel, celle du
+// solveur), le givre de l'atlas se pose sur le sol — léger, plus dense près
+// de la conduite, nul au bord de la portée ; quelques aiguilles de glace y
+// scintillent. Seule sa CLARTÉ compte : l'image générée garde des franges
+// violettes, teintées ici en blanc bleuté. Rend (voile 0..1, éclats 0..1).
+vec2 givreSol(vec2 w, float d, float bande, float px) {
+  float portee = 1.0 - smoothstep(0.0, bande, d);
+  if (portee <= 0.0) return vec2(0.0);
+  // le givre en miroir, un motif de 260 × 130 u
+  vec2 m = w / vec2(260.0, 130.0);
+  vec2 tri = abs(fract(m * 0.5) * 2.0 - 1.0);
+  vec4 g = atlasCadre(CN_CADRE_GIVRE, tri, px, CN_CADRE_GIVRE.z / 260.0);
+  float voile = dot(g.rgb, vec3(0.299, 0.587, 0.114)) * portee * portee;
+  vec2 cq = w / 9.0;
+  vec2 cell = floor(cq);
+  float h = hash21(cell + 17.0);
+  vec2 o = fract(cq) - 0.5 - 0.35 * (vec2(hash21(cell + 1.3), hash21(cell + 8.9)) - 0.5);
+  float br = 0.0;
+  for (int kk = 0; kk < 3; kk++) {
+    float an = float(kk) * 1.0472 + h * 3.0;
+    vec2 dir = vec2(cos(an), sin(an));
+    br = max(br, nh3Lisse(0.035, abs(dot(o, vec2(-dir.y, dir.x))), 0.03) *
+                 nh3Lisse(0.30, abs(dot(o, dir)), 0.05));
+  }
+  float scint = 0.55 + 0.45 * sin(uTime * (1.2 + 2.0 * hash21(cell + 4.4)) + h * 40.0);
+  float aiguilles = br * step(1.0 - 0.10 * portee * portee, h) * scint * smoothstep(1.2, 0.5, px);
+  return vec2(voile, aiguilles);
+}
+
+// LA BRUME : hors de la boîte, des bouffées de vapeur froide qui
+// S'ÉLOIGNENT de la conduite (en apesanteur, le froid ne tombe pas : il
+// fuse et se dissipe). Une onde qui part de la paroi, rompue par un bruit
+// qui dérive : pas de coordonnée « le long du bord », donc pas de couture
+// aux coins, et rien qui se cisaille quand le temps grandit.
+vec3 brumeNH3(vec2 wb, float d, float bande) {
+  float p1 = dnoise(wb * 0.028 + vec2(uTime * 0.10, -uTime * 0.07));
+  float p2 = dnoise(wb * 0.011 - vec2(uTime * 0.04, uTime * 0.03) + 5.7);
+  float onde = 0.5 + 0.5 * sin(d * 0.07 - uTime * 1.2 + p2 * 6.0);
+  float bouffees = smoothstep(0.55, 0.95, p1 * 0.7 + onde * 0.45);
+  float fuite = exp(-d / (bande * 0.6));
+  float aura = 1.0 - smoothstep(0.0, bande, d);
+  float souffle = 0.85 + 0.15 * sin(uTime * 0.7);
+  return vec3(0.14, 0.27, 0.40) * aura * aura * (0.55 + 0.45 * p2) * souffle +
+         vec3(0.60, 0.76, 0.92) * bouffees * fuite * 0.24;
 }
 
 // ---- La vie du vaisseau : veilleuses, dérive, respiration des machines ----
@@ -1024,6 +1366,15 @@ float ombreVolume(vec2 world, float dansEau) {
 void main() {
   vec2 uv = gl_FragCoord.xy / uCanvasSize;
   vec4 tex = texture(uField, uv);
+  // La couche d'eau ne se calcule que là où il y a de l'eau : loin du seuil,
+  // le pixel sort transparent AVANT la boucle d'obstacles — c'est ce qui
+  // rend la passe basse résolution presque gratuite hors du corps. Marge ×4 :
+  // l'onde, le souffle et les volutes gonflent le champ bien moins que cela.
+  if (uPasse > 1.5 && uPasse < 2.5 &&
+      tex.r / uFieldScale * 4.0 < uThreshold * (1.0 - uSoftness)) {
+    outColor = vec4(0.0);
+    return;
+  }
 
   float field = tex.r / uFieldScale;
   float speed = tex.g / max(tex.r, 1e-5);
@@ -1334,7 +1685,6 @@ void main() {
   }
   vec3 texPhobeC = texture(uTexPhobe, world / 170.0).rgb;
   vec3 texPhileC = texture(uTexPhile, world / 210.0).rgb;
-  vec3 texFroidC = texture(uTexFroid, world / 460.0).rgb;
   vec3 texChaudC = texture(uTexChaud, world / 380.0).rgb;
   // la grille est calée pour que ses perforations fassent ~24 u, comme le
   // motif procédural qu'elle remplace
@@ -1362,6 +1712,9 @@ void main() {
   // comprise : on n'écrase que sur un STRICTEMENT plus petit.
   float dCouv = 1.0e9;
   int iCouv = -1;
+  // la part de ce pixel couverte par une CONDUITE : la passe nette ne
+  // recopie que celle-là (voir render, « la conduite nette »)
+  float couvConduite = 0.0;
   for (int bi = 0; bi < min(uBoxCount, MAX_BOXES); bi++) {
     float mc = decodeAux(uBoxAux[bi].x).x;
     if (mc > 2.5 && mc < 3.5) continue; // le sas est une bouche, il n'enterre rien
@@ -1469,7 +1822,8 @@ void main() {
     // Ombre portée douce autour de chaque solide (sauf le sas) : les blocs
     // se détachent du fond au lieu de flotter — la cuve prend de la
     // profondeur, les rectangles cessent d'être des aplats.
-    if (solide) {
+    // (sauf la conduite d'ammoniac : son ombre suit ses tubes, pas la boîte)
+    if (solide && !(mat > 3.5 && mat < 4.5)) {
       float shade = 1.0 - smoothstep(0.0, 56.0, max(d, 0.0));
       col = mix(col, col * vec3(0.50, 0.56, 0.70), shade * shade * 0.5);
     }
@@ -1478,7 +1832,7 @@ void main() {
     // sommet, strates et chant clair — chaque matériau garde son identité
     // sur sa tranche : turquoise mouillé, violet cireux, vert de membrane,
     // ambre de borne… Le sommet (déplacé) se peint ensuite par-dessus.
-    if (flanc > 0.003) {
+    if (flanc > 0.003 && !(mat > 3.5 && mat < 4.5)) { // la conduite n'a pas de tranche de boîte
       vec2 gB = gradSdfBoite(bi, wb, d, dec, bca, bsa);
       float gn2 = max(length(gB), 1e-5);
       vec2 nrm = gB / gn2;
@@ -1833,25 +2187,37 @@ void main() {
       col = mix(col, vec3(0.45, 0.60, 0.70) * eclMat, edge * 0.8);
       cielVu *= 1.0 - clamp(edge * 0.8, 0.0, 1.0);
     } else if (mat > 3.5) {
-      // Plaque froide (tableau 2) : givre cristallin, arête pâle, et une
-      // aura de brume glacée — le danger se lit avant le contact.
+      // Plaque froide (tableau 2) : une CONDUITE D'AMMONIAC à −40 °C — le
+      // tuyau givré de l'atlas, ses brides et ses joints, le sol qui
+      // cristallise autour et la brume qui s'en échappe : le danger se lit
+      // avant le contact, et on sait POURQUOI c'est froid (conduiteNH3).
+      // SEULE la conduite se peint : autour, le sol de la salle — ni fond,
+      // ni liseré, ni ombre carrée. La physique lit la même forme
+      // (FORME_CONDUITE) : ce qu'on voit est ce qui arrête.
       float fill = 1.0 - smoothstep(-edgeW, 0.0, dV);
-      float edge = (1.0 - smoothstep(0.0, edgeW, abs(dV))) * libre;
-      float sparkle = smoothstep(0.72, 0.94, dnoise(world * 0.22));
-      // Givre texturé quand l'image est là ; le scintillement procédural
-      // reste par-dessus : le gel a l'air vivant, pas imprimé.
-      // Teinte franchement bleue : brute, l'image tire vers le gris béton et
-      // la plaque cesse de se lire comme du GEL au premier coup d'œil.
-      vec3 fillCol = uHasFroid > 0.5
-        ? texFroidC * vec3(0.52, 0.74, 1.02) * (0.60 + 0.28 * sparkle)
-        : vec3(0.15, 0.21, 0.29) + vec3(0.26, 0.34, 0.40) * sparkle * 0.55;
-      col = mix(col, fillCol * eclMat, fill);
-      cielVu *= 1.0 - clamp(fill, 0.0, 1.0);
-      col = mix(col, vec3(0.70, 0.86, 0.97), edge * 0.9);
-      cielVu *= 1.0 - clamp(edge * 0.9, 0.0, 1.0);
-      float aura = (1.0 - smoothstep(0.0, uColdBand, max(d, 0.0))) * step(0.0, d);
-      float mist = 0.55 + 0.45 * dnoise(world * 0.05 + vec2(uTime * 0.10, -uTime * 0.06));
-      col += vec3(0.14, 0.27, 0.40) * aura * aura * mist;
+      vec2 bmin = uBoxes[bi].xy;
+      vec2 bsize = max(uBoxes[bi].zw - bmin, vec2(1.0));
+      // ce qui se pose sur le SOL (givre, ombre, brume) ne se peint jamais
+      // sur un AUTRE solide (la brume délavait la conduite voisine)
+      float surSol = (iCouv == bi || dCouv > 0.0) ? 1.0 : 0.0;
+      float sensC = uBoxAux[bi].z; // sens + 4 · bouts dans un mur (aux.z d'une plaque froide)
+      float dG = conduiteSdf(wb, uBoxes[bi], sensC);
+      // LE SOL CRISTALLISÉ dans l'aire d'effet — là où le solveur gèle l'eau
+      vec2 gsol = givreSol(wb, max(dG, 0.0), uColdBand, pxMonde);
+      col = mix(col, vec3(0.80, 0.90, 0.98) * eclMat, gsol.x * 0.25 * surSol);
+      cielVu *= 1.0 - clamp(gsol.x * 0.25 * surSol, 0.0, 1.0);
+      col += vec3(0.75, 0.88, 1.0) * gsol.y * 0.30 * surSol;
+      // l'ombre au sol, PARTOUT autour de la conduite (coupée au bord de la
+      // boîte, elle redessinait le rectangle)
+      col *= mix(1.0, conduiteOmbre(wb, uBoxes[bi], sensC), surSol);
+      vec4 cnh = conduiteNH3(clamp(wbV - bmin, vec2(0.0), bsize), bsize, pxMonde, sensC);
+      col = col * (1.0 - fill * cnh.a) + cnh.rgb * eclMat * fill;
+      cielVu *= 1.0 - clamp(fill * cnh.a, 0.0, 1.0);
+      couvConduite = max(couvConduite, fill * cnh.a);
+      float hors = (1.0 - fill * cnh.a) * surSol;
+      // (la brume ne baisse que SOUS l'image — pas dans la forme de collision,
+      // dont les rectangles de brides se lisaient en pavés plus sombres)
+      col += brumeNH3(wb, max(dG, 0.0), uColdBand) * hors;
     } else {
       // Sas de sortie : une bouche d'aspiration — un trou dans lequel l'eau
       // s'engouffre. Gorge sombre, œil noir, anneau qui respire, et stries
@@ -2005,7 +2371,14 @@ void main() {
   // liquide couvre une fraction de l'écran, le reste des pixels sortait déjà
   // avec body = 0 — mais payait quand même relief, miroir et teintes. La
   // branche est cohérente par blocs de pixels : le GPU la saute vraiment.
-  if (body > 0.001) {
+  // LE DÉCOR NET (uPasse 3) la saute toujours : l'eau vient de la couche
+  // basse résolution, posée par-dessus (voir render).
+  vec3 colSansEau = col;
+  if (uPasse > 1.5 && uPasse < 2.5 && body <= 0.001) {
+    outColor = vec4(0.0);
+    return;
+  }
+  if (body > 0.001 && uPasse < 2.5) {
     float speedT = clamp(speed, 0.0, 1.0);
     vec3 slow = vec3(0.07, 0.30, 0.48);
     vec3 fast = vec3(0.55, 0.85, 0.95);
@@ -2416,6 +2789,18 @@ void main() {
     // L'eau qui recouvre l'œil du sas s'assombrit : elle sombre dans le trou
     col *= 1.0 - drainEye * body * 0.55;
   }
+  // LA COUCHE D'EAU. Le mélange de l'eau est affine : col = f·décor + Q.
+  // Les effets qui suivent (brume, plafonnier, refroidissement) le sont
+  // aussi : A(x) = m·x + c. L'image finale vaut donc f·A(décor) + A(Q) − f·A(0),
+  // et la couche porte A(Q) − f·A(0) avec l'alpha 1 − f : posée sur le décor
+  // natif (ONE, ONE_MINUS_SRC_ALPHA), elle redonne l'image exacte — seule
+  // l'eau reste à la résolution réduite. colZero suit A(0), ligne pour ligne.
+  float partDecor = 1.0; // f
+  vec3 colZero = vec3(0.0);
+  if (uPasse > 1.5 && uPasse < 2.5) {
+    partDecor = (1.0 - body) * (1.0 - drainEye * body * 0.55);
+    col -= colSansEau * partDecor;
+  }
 
   // ---- LA BRUME D'AMBIANCE : des nappes qui dérivent lentement dans la
   // pièce, réglées par tableau (éditeur, « Brume »). Deux octaves de bruit
@@ -2438,6 +2823,7 @@ void main() {
     float voile = b * uBrume * 0.30 * clamp(eclB, 0.0, 1.0) * inRoom;
     col = mix(col, vec3(0.60, 0.70, 0.78), voile);
     cielVu *= 1.0 - clamp(voile, 0.0, 1.0);
+    colZero = mix(colZero, vec3(0.60, 0.70, 0.78), voile);
   }
 
   // ---- LE PLAFONNIER : la source se VOIT. Un luminaire de station vu du
@@ -2508,6 +2894,7 @@ void main() {
 
       col = mix(col, metal, max(capot, pattes));
       cielVu *= 1.0 - clamp(max(capot, pattes), 0.0, 1.0);
+      colZero = mix(colZero, metal, max(capot, pattes));
     }
   }
 
@@ -2515,7 +2902,16 @@ void main() {
   // pression temporelle se voit, elle ne se chronomètre pas
   col = mix(col, col * vec3(0.82, 0.92, 1.10), uChill * 0.6);
   col *= 1.0 - 0.12 * uChill;
-  outColor = vec4(col, 1.0 - cielVu);
+  colZero = mix(colZero, colZero * vec3(0.82, 0.92, 1.10), uChill * 0.6);
+  colZero *= 1.0 - 0.12 * uChill;
+  // la passe NETTE des conduites : la couleur prémultipliée par la part de
+  // conduite du pixel — le reste garde l'image de la passe principale
+  if (uPasse > 1.5 && uPasse < 2.5)
+    outColor = vec4(max(col - partDecor * colZero, 0.0), 1.0 - partDecor);
+  else
+    outColor = uPasse > 0.5 && uPasse < 1.5
+      ? vec4(col * couvConduite, couvConduite)
+      : vec4(col, 1.0 - cielVu);
 }`
 
 // Carte de lumière de la pièce : cuite en espace MONDE, à basse résolution,
@@ -2568,6 +2964,7 @@ uniform float uSpongeCell[MAX_SPONGES]; // taille de cellule
 layout(location = 0) out vec4 outColor;
 layout(location = 1) out vec4 outVis; // visibilité par lampe (canal = lampe)
 ${FORMES_GLSL}
+${CONDUITE_GLSL}
 
 float hashEp(vec2 p) {
   p = fract(p * vec2(127.1, 311.7));
@@ -2644,6 +3041,19 @@ float sceneSdf(vec2 p, float alt) {
       float ca = cos(ang);
       float sa = sin(ang);
       wb = bc + vec2(ca * rel.x + sa * rel.y, -sa * rel.x + ca * rel.y);
+    }
+    // la CONDUITE D'AMMONIAC ombre comme son TUYAU. Ni la boîte (une ombre
+    // carrée trahissait le bloc), ni la forme de collision : ses brides y
+    // sont des rectangles de toute la largeur, et leur ombre projetée
+    // traçait des diagonales dures depuis leurs coins, là où l'image, elle,
+    // est ronde (vu en aperçu sur iPad, autour du plot froid).
+    if (dec.x > 3.5 && dec.x < 4.5 && dec.y < 0.5) {
+      vec2 szC = uBoxes[i].zw - uBoxes[i].xy;
+      bool hC = conduiteHoriz(szC, conduiteSens(uBoxAux[i].z));
+      vec2 qC = wb - 0.5 * (uBoxes[i].xy + uBoxes[i].zw);
+      d = min(d, conduiteOmbreSdf(hC ? qC.x : qC.y, hC ? qC.y : qC.x,
+                                  hC ? szC.x : szC.y, hC ? szC.y : szC.x));
+      continue;
     }
     d = min(d, formeSdf(wb, uBoxes[i], dec.y, dec.z, dec.w));
   }
@@ -2920,6 +3330,17 @@ void main() {
 
 // Coque texturée : quatre bandes autour de la cuve, tube lumineux côté
 // intérieur. Dessinée par-dessus la composition (le liquide reste dedans).
+// LA RECOPIE de la scène (image intermédiaire basse résolution) sur la
+// toile native — voir render, « la conduite nette »
+const RECOPIE_FS = `#version 300 es
+precision highp float;
+uniform sampler2D uScene;
+uniform vec2 uTaille;
+out vec4 outColor;
+void main() {
+  outColor = texture(uScene, gl_FragCoord.xy / uTaille);
+}`
+
 const HULL_VS = `#version 300 es
 layout(location = 0) in vec2 aPos;
 layout(location = 1) in vec2 aUv;
@@ -2984,6 +3405,39 @@ void main() {
   outColor = vec4(c, t.a * uFade * (1.0 - fluide));
 }`
 
+/** L'intervalle [a, b] (un axe d'une boîte, en unités monde) élargi à ce
+ *  que le relief 2.5D en dessine. Le shader lit au pixel w le point
+ *  w − (w − centre)·k : le sommet d'un point p se dessine donc en
+ *  centre + (p − centre)/(1 − k). La réunion de l'intervalle (le pied) et
+ *  de son image (le sommet) couvre aussi les flancs, entre les deux. */
+export function cadreRelief(
+  a: number,
+  b: number,
+  centre: number,
+  k: number,
+): [number, number] {
+  const f = 1 / Math.max(0.05, 1 - k)
+  const da = centre + (a - centre) * f
+  const db = centre + (b - centre) * f
+  return [Math.min(a, da), Math.max(b, db)]
+}
+
+/** La part de la clé de cuisson de la lumière qui vient des boîtes : TOUT
+ *  ce que le cuiseur lit d'elles (sceneSdf) — le SENS d'une conduite
+ *  compris : l'ombre suit le tuyau, et basculer seulement le sens à
+ *  l'éditeur laissait une ombre debout sous un tuyau couché. */
+export function cleBoitesLumiere(
+  boxes: readonly ObstacleBox[],
+  boxCount: number,
+): string {
+  let key = ''
+  for (let i = 0; i < boxCount; i++) {
+    const bx = boxes[i]
+    key += `;${bx.minX},${bx.minY},${bx.maxX},${bx.maxY},${bx.angle ?? 0},${bx.material},${bx.forme ?? 0},${bx.p0 ?? 0},${bx.p1 ?? 0},${bx.sens ?? 0}`
+  }
+  return key
+}
+
 /** Le fichier de chaque sorte de décalque (sans dossier ni extension) :
  *  c'est le nom que la planche de vues reprend (`<fichier>-anime.webp`). */
 const FICHIER_DECAL: Record<DecalDef['kind'], string> = {
@@ -3019,6 +3473,41 @@ export class Renderer {
   private readonly composeProgram: WebGLProgram
   private readonly spongeProgram: WebGLProgram
   private readonly hullProgram: WebGLProgram
+  private readonly recopieProgram: WebGLProgram
+  // LA CONDUITE NETTE. Aux résolutions réduites, TOUTE l'image se calcule
+  // en moins de pixels puis s'agrandit : la conduite d'ammoniac, dessinée
+  // dans la même passe, devenait floue quelle que soit la netteté de son
+  // atlas. On calcule alors la scène dans une image intermédiaire à la
+  // résolution réduite (sceneFbo), on la recopie sur la toile NATIVE, et on
+  // repasse la composition EN NATIF sur les seules boîtes des conduites —
+  // le même shader, donc les mêmes effets (eau, ombre du corps, brume,
+  // plafonniers), recopiés au prorata de la part de conduite du pixel.
+  // LE DÉCOR NET (réglage « Décor », PARAMÈTRES) va plus loin : c'est tout
+  // le décor qui reste natif, et seule l'EAU suit la résolution. L'eau se
+  // calcule seule en basse résolution dans sceneFbo (uPasse 2 : une couche
+  // prémultipliée, transparente hors du corps), le décor en natif sans elle
+  // (uPasse 3), puis la couche se pose dessus. Les 16 unités de texture de
+  // la composition sont toutes prises : le décor ne peut pas LIRE la couche,
+  // d'où le mélange par la fusion — exact, voir « LA COUCHE D'EAU ».
+  /** La densité native de l'écran (main.ts) ; 0 : pas de passe nette. */
+  dprNatif = 0
+  /** Le décor reste natif, seule l'eau suit la résolution (main.ts). */
+  decorNet = false
+  /** La salle telle que la PHYSIQUE la voit (main.ts : level.boxes), où se
+   *  sondent les bouts de conduite plongés dans un mur. La liste dessinée
+   *  porte en plus les parois factices des cachettes et le sas, qu'aucun
+   *  solveur ne connaît : sondés là, un bout contre une factice se dessinait
+   *  sans bride quand la physique, elle, en gardait une, invisible. */
+  boitesMurs: readonly ObstacleBox[] | null = null
+  private sceneFbo: WebGLFramebuffer | null = null
+  private sceneTex: WebGLTexture | null = null
+  private sceneW = 0
+  private sceneH = 0
+  /** La taille de la cible où se dessine la scène (toile ou image
+   *  intermédiaire) : les passes qui lisent le champ du fluide par
+   *  gl_FragCoord s'y rapportent. */
+  private cibleW = 1
+  private cibleH = 1
   private readonly decalProgram: WebGLProgram
   private readonly lightProgram: WebGLProgram
   private readonly vieProgram: WebGLProgram
@@ -3169,6 +3658,7 @@ export class Renderer {
       { nom: 'decal', vs: DECAL_VS, fs: DECAL_FS },
       { nom: 'light', vs: COMPOSE_VS, fs: LIGHT_FS },
       { nom: 'vie', vs: VIE_VS, fs: VIE_FS },
+      { nom: 'recopie', vs: COMPOSE_VS, fs: RECOPIE_FS },
     ])
     this.splatProgram = this.programmes.programme('splat')
     this.composeProgram = this.programmes.programme('compose')
@@ -3177,6 +3667,7 @@ export class Renderer {
     this.decalProgram = this.programmes.programme('decal')
     this.lightProgram = this.programmes.programme('light')
     this.vieProgram = this.programmes.programme('vie')
+    this.recopieProgram = this.programmes.programme('recopie')
 
     this.scratch = new Float32Array(capacity * 7)
     this.splatVao = gl.createVertexArray()!
@@ -3295,8 +3786,10 @@ export class Renderer {
       (t) => (this.texWallA = t),
     )
     this.loadTexture(
-      '/assets/froid.webp',
-      true,
+      // l'atlas de la conduite d'ammoniac (tools/images/conduite_atlas.py) :
+      // lu par cadres, sans répétition — les bords sont serrés à la main
+      '/assets/conduite-atlas.webp',
+      false,
       true,
       (t) => (this.texFroid = t),
     )
@@ -3475,7 +3968,7 @@ export class Renderer {
   pret(): boolean {
     if (this.programmesPrets) return true
     if (!this.programmes.pret()) return false
-    for (const nom of ['splat', 'compose', 'sponge', 'hull', 'decal', 'light', 'vie'])
+    for (const nom of ['splat', 'compose', 'sponge', 'hull', 'decal', 'light', 'vie', 'recopie'])
       this.uniforms[nom] = this.programmes.uniformes(nom)
     this.programmesPrets = true
     return true
@@ -3558,6 +4051,50 @@ export class Renderer {
     img.src = v ? `/assets/plafond-${v}.webp` : '/assets/plafond.webp'
   }
 
+  // LE RETOURNEMENT DES TEXTURES, sondé une fois (render/retournement.ts) :
+  // Chromium ignore UNPACK_FLIP_Y pour un ImageBitmap — depuis le décodage
+  // hors du fil principal, tout ce qui n'était pas symétrique s'affichait
+  // à l'envers.
+  private retournement: Promise<Retournement> | null = null
+
+  private retournementPret(): Promise<Retournement> {
+    if (!this.retournement) {
+      this.retournement =
+        typeof createImageBitmap === 'function' && typeof ImageData === 'function'
+          ? sondeRetournement((mode) => this.essaiRetournement(mode))
+          : Promise.resolve('img')
+    }
+    return this.retournement
+  }
+
+  /** Téléverse un témoin 1×2 (rouge en haut, bleu en bas) par la voie
+   *  `mode` et lit la rangée v = 0 : bleue, l'image est arrivée retournée. */
+  private async essaiRetournement(mode: 'gl' | 'bitmap'): Promise<boolean> {
+    const temoin = new ImageData(new Uint8ClampedArray([255, 0, 0, 255, 0, 0, 255, 255]), 1, 2)
+    const bitmap = await createImageBitmap(
+      temoin,
+      mode === 'bitmap' ? { premultiplyAlpha: 'none', imageOrientation: 'flipY' } : { premultiplyAlpha: 'none' },
+    )
+    const gl = this.gl
+    const avant = gl.getParameter(gl.FRAMEBUFFER_BINDING) as WebGLFramebuffer | null
+    const tex = gl.createTexture()
+    const fb = gl.createFramebuffer()
+    gl.bindTexture(gl.TEXTURE_2D, tex)
+    gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, mode === 'gl')
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, gl.RGBA, gl.UNSIGNED_BYTE, bitmap)
+    gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false)
+    gl.bindFramebuffer(gl.FRAMEBUFFER, fb)
+    gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, tex, 0)
+    const px = new Uint8Array(4)
+    gl.readPixels(0, 0, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, px)
+    gl.bindFramebuffer(gl.FRAMEBUFFER, avant)
+    gl.bindTexture(gl.TEXTURE_2D, null)
+    gl.deleteFramebuffer(fb)
+    gl.deleteTexture(tex)
+    bitmap.close()
+    return px[2] > 128 && px[0] < 128
+  }
+
   private loadTexture(
     url: string,
     repeat: boolean,
@@ -3605,23 +4142,28 @@ export class Renderer {
       // c'est un gel de plusieurs centaines de millisecondes pendant que le
       // joueur lit la fiche, et la vingtaine d'autres textures s'y ajoute.
       // createImageBitmap fait le décodage dans un fil du navigateur ; il
-      // reste ici le retournement et la copie vers le GPU. Le retournement
-      // est laissé à WebGL (FLIP_Y) plutôt que demandé au bitmap
-      // (imageOrientation) : un navigateur qui ignore l'option en silence
-      // livrerait des textures à l'envers, alors que FLIP_Y est le même
-      // partout. Même alpha non prémultiplié qu'avant : le rendu est le
-      // même au pixel près. Un navigateur qui refuse repasse par l'<img>.
-      if (typeof createImageBitmap === 'function') {
-        createImageBitmap(img, { premultiplyAlpha: 'none' }).then(
+      // reste ici le retournement et la copie vers le GPU. QUI retourne
+      // dépend du navigateur (Chromium ignore FLIP_Y pour un bitmap) :
+      // sondé une fois, voir retournementPret. Même alpha non prémultiplié
+      // qu'avant. Un navigateur qui refuse repasse par l'<img>.
+      void this.retournementPret().then((mode) => {
+        if (mode === 'img') {
+          envoie(img, true)
+          return
+        }
+        createImageBitmap(
+          img,
+          mode === 'bitmap'
+            ? { premultiplyAlpha: 'none', imageOrientation: 'flipY' }
+            : { premultiplyAlpha: 'none' },
+        ).then(
           (bitmap) => {
-            envoie(bitmap, true)
+            envoie(bitmap, mode === 'gl')
             bitmap.close()
           },
           () => envoie(img, true),
         )
-      } else {
-        envoie(img, true)
-      }
+      })
     }
     img.src = url
   }
@@ -3813,10 +4355,7 @@ export class Renderer {
       key +=
         `;L${l.x},${l.y},${l.h},${l.portee},${l.intensite},${l.rvb.join('/')}` +
         `,${l.bandeau ? 1 : 0},${l.demiLong},${l.angleRad}`
-    for (let i = 0; i < boxCount; i++) {
-      const bx = boxes[i]
-      key += `;${bx.minX},${bx.minY},${bx.maxX},${bx.maxY},${bx.angle ?? 0},${bx.material},${bx.forme ?? 0},${bx.p0 ?? 0},${bx.p1 ?? 0}`
-    }
+    key += cleBoitesLumiere(boxes, boxCount)
     if (key === this.lightKey) return
     this.lightKey = key
     this.lightMapMinX = minX
@@ -3948,10 +4487,27 @@ export class Renderer {
     const gl = this.gl
     const devW = Math.max(1, Math.round(viewportW * dpr))
     const devH = Math.max(1, Math.round(viewportH * dpr))
-    if (this.canvas.width !== devW || this.canvas.height !== devH) {
-      this.canvas.width = devW
-      this.canvas.height = devH
+    // la conduite nette : seulement si la résolution est réduite et qu'une
+    // conduite (plaque froide rectangulaire) est au tableau ; le décor net
+    // la contient (la conduite EST du décor)
+    const reduite = this.dprNatif > dpr * 1.02
+    const decorNet = reduite && this.decorNet
+    const nette =
+      reduite &&
+      (decorNet || boxes.some((b) => b.material === MAT_FROID && !b.forme))
+    const natW = nette ? Math.max(1, Math.round(viewportW * this.dprNatif)) : devW
+    const natH = nette ? Math.max(1, Math.round(viewportH * this.dprNatif)) : devH
+    if (this.canvas.width !== natW || this.canvas.height !== natH) {
+      this.canvas.width = natW
+      this.canvas.height = natH
     }
+    if (nette) this.ensureSceneTarget(devW, devH)
+    this.cibleW = devW
+    this.cibleH = devH
+    // la densité des passes qui suivent la composition (vie, éponges) : la
+    // native dès qu'une passe nette a lieu — elles se dessinent alors sur
+    // la toile native, APRÈS elle (voir drawConduiteNette)
+    const dprPasses = nette ? natW / viewportW : dpr
     const down = Math.max(1, downsample)
     const fboW = Math.max(1, Math.round(devW / down))
     const fboH = Math.max(1, Math.round(devH / down))
@@ -3995,9 +4551,17 @@ export class Renderer {
       this.auxScratch[k * 4] = bx.material + forme * 16 + q0 * 128 + q1 * 16384
       this.auxScratch[k * 4 + 1] = ((bx.angle ?? 0) * Math.PI) / 180
       // aux.z : charge du surchauffeur (le solveur dit lesquels sont vides)
-      // — ou HABILLAGE d'une paroi neutre (1-4), pur décor
+      // — ou HABILLAGE d'une paroi neutre (1-4), pur décor — ou SENS du
+      // tuyau d'une plaque froide (0 auto, 1 horizontal, 2 vertical)
       this.auxScratch[k * 4 + 2] =
-        bx.material === 0 ? (bx.skin ?? 0) : sim.surchauffesVides.has(i) ? 0 : 1
+        bx.material === 0
+          ? (bx.skin ?? 0)
+          : bx.material === MAT_FROID
+            ? (bx.sens ?? 0) +
+              4 * boutsEnMur(bx, this.boitesMurs ?? boxes, sim.bounds)
+            : sim.surchauffesVides.has(i)
+              ? 0
+              : 1
       this.auxScratch[k * 4 + 3] = bx.aura ?? 1
     }
     // La carte de lumière recuit si le décor ou les lampes ont changé
@@ -4068,11 +4632,13 @@ export class Renderer {
     gl.bindVertexArray(null)
     gl.disable(gl.BLEND)
 
-    // Passe B — composition
-    gl.bindFramebuffer(gl.FRAMEBUFFER, null)
+    // Passe B — composition (dans l'image intermédiaire si la conduite
+    // doit être nette : voir sceneFbo)
+    gl.bindFramebuffer(gl.FRAMEBUFFER, nette ? this.sceneFbo : null)
     gl.viewport(0, 0, devW, devH)
     gl.useProgram(this.composeProgram)
     const cu = this.uniforms['compose']
+    gl.uniform1f(cu['uPasse'], decorNet ? 2 : 0)
     gl.activeTexture(gl.TEXTURE0)
     gl.bindTexture(gl.TEXTURE_2D, this.fieldTex)
     gl.uniform1i(cu['uField'], 0)
@@ -4266,9 +4832,12 @@ export class Renderer {
     gl.uniform1f(cu['uHasHull'], this.texHull ? 1 : 0)
     gl.activeTexture(gl.TEXTURE0)
     gl.drawArrays(gl.TRIANGLES, 0, 3)
+    if (decorNet) this.drawDecorNet(viewportW, natW, natH)
+    else if (nette)
+      this.drawConduiteNette(boxes, camera, viewportW, viewportH, natW, natH, relief)
 
     // Passe B vie — les motes dans le corps, la lueur des gouttes perdues
-    this.drawVie(camera, viewportW, viewportH, dpr, params)
+    this.drawVie(camera, viewportW, viewportH, dprPasses, params)
 
     // Passe B bis — coque texturée autour de la cuve. Un tableau bâti en
     // MODULES n'a pas de cuve : ses parois sont celles de ses coques, et
@@ -4280,7 +4849,145 @@ export class Renderer {
     this.drawLampes(lampes, camera, viewportW, viewportH, params)
 
     // Passe C — cellules d'éponge
-    this.drawSponges(sim, camera, viewportW, viewportH, dpr)
+    this.drawSponges(sim, camera, viewportW, viewportH, dprPasses)
+  }
+
+  // LA CONDUITE NETTE (voir sceneFbo) : la scène basse résolution recopiée
+  // sur la toile native, puis la composition repassée EN NATIF sur les seules
+  // boîtes des conduites (ciseaux), mêlée au prorata de leur couverture.
+  // Elle suit IMMÉDIATEMENT la composition : repassée après la vie, les
+  // décalques, les lampes et les éponges, elle les effaçait là où ils
+  // chevauchaient une conduite — ils se dessinent donc ensuite, en natif.
+  // Tous les uniformes de la composition sont déjà posés par la passe
+  // principale : seuls changent la densité, la taille de la cible et le
+  // drapeau de la passe.
+  private drawConduiteNette(
+    boxes: ObstacleBox[],
+    camera: Camera,
+    viewportW: number,
+    viewportH: number,
+    natW: number,
+    natH: number,
+    relief: number,
+  ): void {
+    const gl = this.gl
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null)
+    gl.viewport(0, 0, natW, natH)
+    gl.disable(gl.BLEND)
+    gl.useProgram(this.recopieProgram)
+    const ru = this.uniforms['recopie']
+    gl.activeTexture(gl.TEXTURE0)
+    gl.bindTexture(gl.TEXTURE_2D, this.sceneTex)
+    gl.uniform1i(ru['uScene'], 0)
+    gl.uniform2f(ru['uTaille'], natW, natH)
+    gl.drawArrays(gl.TRIANGLES, 0, 3)
+
+    gl.useProgram(this.composeProgram)
+    const cu = this.uniforms['compose']
+    const dpr = natW / viewportW
+    gl.uniform1f(cu['uDpr'], dpr)
+    gl.uniform2f(cu['uCanvasSize'], natW, natH)
+    gl.uniform1f(cu['uPasse'], 1)
+    // les unités 0 et 1 ont servi depuis (la scène, les décalques, les
+    // éponges) : la composition y lit le champ du fluide et le ciel proche
+    gl.activeTexture(gl.TEXTURE1)
+    gl.bindTexture(gl.TEXTURE_2D, this.texStars)
+    gl.activeTexture(gl.TEXTURE0)
+    gl.bindTexture(gl.TEXTURE_2D, this.fieldTex)
+    gl.enable(gl.BLEND)
+    gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA)
+    gl.enable(gl.SCISSOR_TEST)
+    const kRelief = relief * Math.min(1, Math.max(0, camera.zoom * 1.2))
+    const px = (wx: number) => ((wx - camera.x) * camera.zoom + viewportW / 2) * dpr
+    const py = (wy: number) => ((wy - camera.y) * camera.zoom + viewportH / 2) * dpr
+    for (const b of boxes) {
+      if (b.material !== MAT_FROID || b.forme) continue
+      // une boîte oblique : son cercle englobant
+      let x0 = b.minX
+      let y0 = b.minY
+      let x1 = b.maxX
+      let y1 = b.maxY
+      if (b.angle) {
+        const r = Math.hypot(x1 - x0, y1 - y0) / 2
+        const cx = (x0 + x1) / 2
+        const cy = (y0 + y1) / 2
+        x0 = cx - r
+        x1 = cx + r
+        y0 = cy - r
+        y1 = cy + r
+      }
+      // le RELIEF 2.5D pousse le sommet des parois loin du centre de l'écran
+      // (relDisp du shader) : la boîte seule laissait floue, avec une
+      // couture, la part dessinée au-delà
+      ;[x0, x1] = cadreRelief(x0, x1, camera.x, kRelief)
+      ;[y0, y1] = cadreRelief(y0, y1, camera.y, kRelief)
+      const sx0 = Math.max(0, Math.floor(px(x0)) - 2)
+      const sy0 = Math.max(0, Math.floor(py(y0)) - 2)
+      const sx1 = Math.min(natW, Math.ceil(px(x1)) + 2)
+      const sy1 = Math.min(natH, Math.ceil(py(y1)) + 2)
+      if (sx1 <= sx0 || sy1 <= sy0) continue
+      gl.scissor(sx0, sy0, sx1 - sx0, sy1 - sy0)
+      gl.drawArrays(gl.TRIANGLES, 0, 3)
+    }
+    gl.disable(gl.SCISSOR_TEST)
+    gl.disable(gl.BLEND)
+    gl.uniform1f(cu['uPasse'], 0)
+    this.cibleW = natW
+    this.cibleH = natH
+  }
+
+  // LE DÉCOR NET (voir decorNet) : la couche d'eau vient d'être calculée
+  // dans sceneFbo. Le décor se calcule EN NATIF sur la toile, sans l'eau,
+  // puis la couche s'y pose. Les passes suivantes (vie, coque, décalques,
+  // éponges) se dessinent ensuite en natif, sur la toile.
+  private drawDecorNet(viewportW: number, natW: number, natH: number): void {
+    const gl = this.gl
+    const cu = this.uniforms['compose']
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null)
+    gl.viewport(0, 0, natW, natH)
+    gl.uniform1f(cu['uDpr'], natW / viewportW)
+    gl.uniform2f(cu['uCanvasSize'], natW, natH)
+    gl.uniform1f(cu['uPasse'], 3)
+    gl.drawArrays(gl.TRIANGLES, 0, 3)
+    gl.uniform1f(cu['uPasse'], 0)
+
+    gl.useProgram(this.recopieProgram)
+    const ru = this.uniforms['recopie']
+    gl.activeTexture(gl.TEXTURE0)
+    gl.bindTexture(gl.TEXTURE_2D, this.sceneTex)
+    gl.uniform1i(ru['uScene'], 0)
+    gl.uniform2f(ru['uTaille'], natW, natH)
+    gl.enable(gl.BLEND)
+    gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA)
+    gl.drawArrays(gl.TRIANGLES, 0, 3)
+    gl.disable(gl.BLEND)
+    // l'unité 0 portait le champ du fluide : les passes suivantes l'y lisent
+    gl.bindTexture(gl.TEXTURE_2D, this.fieldTex)
+    this.cibleW = natW
+    this.cibleH = natH
+  }
+
+  private ensureSceneTarget(w: number, h: number): void {
+    if (w === this.sceneW && h === this.sceneH && this.sceneFbo) return
+    const gl = this.gl
+    if (this.sceneTex) gl.deleteTexture(this.sceneTex)
+    if (this.sceneFbo) gl.deleteFramebuffer(this.sceneFbo)
+    this.sceneW = w
+    this.sceneH = h
+    this.sceneTex = gl.createTexture()!
+    gl.bindTexture(gl.TEXTURE_2D, this.sceneTex)
+    // demi-flottant quand la carte sait y dessiner : la couche d'eau porte
+    // des reflets au-delà de 1, qu'un RGBA8 écrêterait AVANT la brume et le
+    // refroidissement
+    gl.texStorage2D(gl.TEXTURE_2D, 1, this.floatField ? gl.RGBA16F : gl.RGBA8, w, h)
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR)
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR)
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE)
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE)
+    this.sceneFbo = gl.createFramebuffer()!
+    gl.bindFramebuffer(gl.FRAMEBUFFER, this.sceneFbo)
+    gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, this.sceneTex, 0)
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null)
   }
 
   /** Les points de vie de l'image (render/vie.ts, remplitVie) : à poser
@@ -4312,7 +5019,7 @@ export class Renderer {
     gl.uniform2f(vu['uViewport'], viewportW, viewportH)
     gl.uniform1f(vu['uZoom'], camera.zoom)
     gl.uniform1f(vu['uDpr'], dpr)
-    gl.uniform2f(vu['uCanvasSize'], this.canvas.width, this.canvas.height)
+    gl.uniform2f(vu['uCanvasSize'], this.cibleW, this.cibleH)
     gl.uniform1f(vu['uThreshold'], params.fieldThreshold)
     gl.uniform1f(vu['uFieldScale'], this.fieldScale)
     gl.activeTexture(gl.TEXTURE0)
@@ -4530,8 +5237,8 @@ export class Renderer {
         gl.uniform1i(du['uField'], 1)
         gl.uniform2f(
           du['uCanvasSize'],
-          gl.drawingBufferWidth,
-          gl.drawingBufferHeight,
+          this.cibleW,
+          this.cibleH,
         )
         gl.uniform1f(du['uThreshold'], params.fieldThreshold)
         gl.uniform1f(du['uSoftness'], params.fieldSoftness)
@@ -4614,8 +5321,8 @@ export class Renderer {
         gl.uniform1i(du['uField'], 1)
         gl.uniform2f(
           du['uCanvasSize'],
-          gl.drawingBufferWidth,
-          gl.drawingBufferHeight,
+          this.cibleW,
+          this.cibleH,
         )
         gl.uniform1f(du['uThreshold'], params.fieldThreshold)
         gl.uniform1f(du['uSoftness'], params.fieldSoftness)

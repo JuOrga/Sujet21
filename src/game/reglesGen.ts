@@ -394,7 +394,7 @@ export const CATALOGUE_REGLES: readonly RegleGen[] = [
     titre: 'Lire avant d’agir',
     texte:
       'Le sas porte son étiquette, chaque danger la sienne (CHAUDIÈRE, ' +
-      'HUBLOT FENDU) avec son aura visible, et l’entrée est un sanctuaire ' +
+      'AMMONIAC −40 °C) avec son aura visible, et l’entrée est un sanctuaire ' +
       '— le temps du premier regard. Il répond à « où vais-je ? », le ' +
       'deuxième à « qu’est-ce qui m’en empêche ? » — jamais ' +
       'l’inverse.',
