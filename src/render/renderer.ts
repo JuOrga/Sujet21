@@ -567,7 +567,10 @@ uniform vec2 uParCuve;   // la paroi de cuve, derrière l'eau
 uniform sampler2D uTexTank; // fond de cuve : panneaux, conduites, liserés
 uniform sampler2D uTexWall;
 uniform sampler2D uTexWallA; // seconde paroi : les murs alternent, sans répétition visible
-uniform float uPasseConduite; // 1 : la passe NETTE des conduites (voir render)
+// la passe en cours (voir render) : 0 l'image entière ; 1 la passe NETTE
+// des conduites ; 2 la COUCHE D'EAU seule, basse résolution ; 3 le DÉCOR
+// natif, sans l'eau — « le décor net »
+uniform float uPasse;
 uniform sampler2D uTexFroid; // l’atlas de la conduite d’ammoniac (tronçon, bride, joint, givre)
 uniform sampler2D uTexChaud;
 uniform sampler2D uTexGrille;
@@ -1292,6 +1295,15 @@ float ombreVolume(vec2 world, float dansEau) {
 void main() {
   vec2 uv = gl_FragCoord.xy / uCanvasSize;
   vec4 tex = texture(uField, uv);
+  // La couche d'eau ne se calcule que là où il y a de l'eau : loin du seuil,
+  // le pixel sort transparent AVANT la boucle d'obstacles — c'est ce qui
+  // rend la passe basse résolution presque gratuite hors du corps. Marge ×4 :
+  // l'onde, le souffle et les volutes gonflent le champ bien moins que cela.
+  if (uPasse > 1.5 && uPasse < 2.5 &&
+      tex.r / uFieldScale * 4.0 < uThreshold * (1.0 - uSoftness)) {
+    outColor = vec4(0.0);
+    return;
+  }
 
   float field = tex.r / uFieldScale;
   float speed = tex.g / max(tex.r, 1e-5);
@@ -2259,7 +2271,14 @@ void main() {
   // liquide couvre une fraction de l'écran, le reste des pixels sortait déjà
   // avec body = 0 — mais payait quand même relief, miroir et teintes. La
   // branche est cohérente par blocs de pixels : le GPU la saute vraiment.
-  if (body > 0.001) {
+  // LE DÉCOR NET (uPasse 3) la saute toujours : l'eau vient de la couche
+  // basse résolution, posée par-dessus (voir render).
+  vec3 colSansEau = col;
+  if (uPasse > 1.5 && uPasse < 2.5 && body <= 0.001) {
+    outColor = vec4(0.0);
+    return;
+  }
+  if (body > 0.001 && uPasse < 2.5) {
     float speedT = clamp(speed, 0.0, 1.0);
     vec3 slow = vec3(0.07, 0.30, 0.48);
     vec3 fast = vec3(0.55, 0.85, 0.95);
@@ -2669,6 +2688,18 @@ void main() {
     // L'eau qui recouvre l'œil du sas s'assombrit : elle sombre dans le trou
     col *= 1.0 - drainEye * body * 0.55;
   }
+  // LA COUCHE D'EAU. Le mélange de l'eau est affine : col = f·décor + Q.
+  // Les effets qui suivent (brume, plafonnier, refroidissement) le sont
+  // aussi : A(x) = m·x + c. L'image finale vaut donc f·A(décor) + A(Q) − f·A(0),
+  // et la couche porte A(Q) − f·A(0) avec l'alpha 1 − f : posée sur le décor
+  // natif (ONE, ONE_MINUS_SRC_ALPHA), elle redonne l'image exacte — seule
+  // l'eau reste à la résolution réduite. colZero suit A(0), ligne pour ligne.
+  float partDecor = 1.0; // f
+  vec3 colZero = vec3(0.0);
+  if (uPasse > 1.5 && uPasse < 2.5) {
+    partDecor = (1.0 - body) * (1.0 - drainEye * body * 0.55);
+    col -= colSansEau * partDecor;
+  }
 
   // ---- LA BRUME D'AMBIANCE : des nappes qui dérivent lentement dans la
   // pièce, réglées par tableau (éditeur, « Brume »). Deux octaves de bruit
@@ -2690,6 +2721,7 @@ void main() {
     }
     float voile = b * uBrume * 0.30 * clamp(eclB, 0.0, 1.0) * inRoom;
     col = mix(col, vec3(0.60, 0.70, 0.78), voile);
+    colZero = mix(colZero, vec3(0.60, 0.70, 0.78), voile);
   }
 
   // ---- LE PLAFONNIER : la source se VOIT. Un luminaire de station vu du
@@ -2759,6 +2791,7 @@ void main() {
         * smoothstep(R * 1.28 + px, R * 1.04, dl) * step(R * 0.8, dl);
 
       col = mix(col, metal, max(capot, pattes));
+      colZero = mix(colZero, metal, max(capot, pattes));
     }
   }
 
@@ -2766,9 +2799,16 @@ void main() {
   // pression temporelle se voit, elle ne se chronomètre pas
   col = mix(col, col * vec3(0.82, 0.92, 1.10), uChill * 0.6);
   col *= 1.0 - 0.12 * uChill;
+  colZero = mix(colZero, colZero * vec3(0.82, 0.92, 1.10), uChill * 0.6);
+  colZero *= 1.0 - 0.12 * uChill;
   // la passe NETTE des conduites : la couleur prémultipliée par la part de
   // conduite du pixel — le reste garde l'image de la passe principale
-  outColor = uPasseConduite > 0.5 ? vec4(col * couvConduite, couvConduite) : vec4(col, 1.0);
+  if (uPasse > 1.5 && uPasse < 2.5)
+    outColor = vec4(max(col - partDecor * colZero, 0.0), 1.0 - partDecor);
+  else
+    outColor = uPasse > 0.5 && uPasse < 1.5
+      ? vec4(col * couvConduite, couvConduite)
+      : vec4(col, 1.0);
 }`
 
 // Carte de lumière de la pièce : cuite en espace MONDE, à basse résolution,
@@ -3306,8 +3346,17 @@ export class Renderer {
   // repasse la composition EN NATIF sur les seules boîtes des conduites —
   // le même shader, donc les mêmes effets (eau, ombre du corps, brume,
   // plafonniers), recopiés au prorata de la part de conduite du pixel.
+  // LE DÉCOR NET (réglage « Décor », PARAMÈTRES) va plus loin : c'est tout
+  // le décor qui reste natif, et seule l'EAU suit la résolution. L'eau se
+  // calcule seule en basse résolution dans sceneFbo (uPasse 2 : une couche
+  // prémultipliée, transparente hors du corps), le décor en natif sans elle
+  // (uPasse 3), puis la couche se pose dessus. Les 16 unités de texture de
+  // la composition sont toutes prises : le décor ne peut pas LIRE la couche,
+  // d'où le mélange par la fusion — exact, voir « LA COUCHE D'EAU ».
   /** La densité native de l'écran (main.ts) ; 0 : pas de passe nette. */
   dprNatif = 0
+  /** Le décor reste natif, seule l'eau suit la résolution (main.ts). */
+  decorNet = false
   private sceneFbo: WebGLFramebuffer | null = null
   private sceneTex: WebGLTexture | null = null
   private sceneW = 0
@@ -4307,10 +4356,13 @@ export class Renderer {
     const devW = Math.max(1, Math.round(viewportW * dpr))
     const devH = Math.max(1, Math.round(viewportH * dpr))
     // la conduite nette : seulement si la résolution est réduite et qu'une
-    // conduite (plaque froide rectangulaire) est au tableau
+    // conduite (plaque froide rectangulaire) est au tableau ; le décor net
+    // la contient (la conduite EST du décor)
+    const reduite = this.dprNatif > dpr * 1.02
+    const decorNet = reduite && this.decorNet
     const nette =
-      this.dprNatif > dpr * 1.02 &&
-      boxes.some((b) => b.material === MAT_FROID && !b.forme)
+      reduite &&
+      (decorNet || boxes.some((b) => b.material === MAT_FROID && !b.forme))
     const natW = nette ? Math.max(1, Math.round(viewportW * this.dprNatif)) : devW
     const natH = nette ? Math.max(1, Math.round(viewportH * this.dprNatif)) : devH
     if (this.canvas.width !== natW || this.canvas.height !== natH) {
@@ -4320,6 +4372,9 @@ export class Renderer {
     if (nette) this.ensureSceneTarget(devW, devH)
     this.cibleW = devW
     this.cibleH = devH
+    // la densité des passes qui suivent la composition (vie, éponges) : la
+    // native quand elles se dessinent sur la toile native (décor net)
+    const dprPasses = decorNet ? natW / viewportW : dpr
     const down = Math.max(1, downsample)
     const fboW = Math.max(1, Math.round(devW / down))
     const fboH = Math.max(1, Math.round(devH / down))
@@ -4449,7 +4504,7 @@ export class Renderer {
     gl.viewport(0, 0, devW, devH)
     gl.useProgram(this.composeProgram)
     const cu = this.uniforms['compose']
-    gl.uniform1f(cu['uPasseConduite'], 0)
+    gl.uniform1f(cu['uPasse'], decorNet ? 2 : 0)
     gl.activeTexture(gl.TEXTURE0)
     gl.bindTexture(gl.TEXTURE_2D, this.fieldTex)
     gl.uniform1i(cu['uField'], 0)
@@ -4647,9 +4702,10 @@ export class Renderer {
     gl.uniform1f(cu['uHasHull'], this.texHull ? 1 : 0)
     gl.activeTexture(gl.TEXTURE0)
     gl.drawArrays(gl.TRIANGLES, 0, 3)
+    if (decorNet) this.drawDecorNet(viewportW, natW, natH)
 
     // Passe B vie — les motes dans le corps, la lueur des gouttes perdues
-    this.drawVie(camera, viewportW, viewportH, dpr, params)
+    this.drawVie(camera, viewportW, viewportH, dprPasses, params)
 
     // Passe B bis — coque texturée autour de la cuve. Un tableau bâti en
     // MODULES n'a pas de cuve : ses parois sont celles de ses coques, et
@@ -4661,9 +4717,9 @@ export class Renderer {
     this.drawLampes(lampes, camera, viewportW, viewportH, params)
 
     // Passe C — cellules d'éponge
-    this.drawSponges(sim, camera, viewportW, viewportH, dpr)
+    this.drawSponges(sim, camera, viewportW, viewportH, dprPasses)
 
-    if (nette) this.drawConduiteNette(boxes, camera, viewportW, viewportH, natW, natH)
+    if (nette && !decorNet) this.drawConduiteNette(boxes, camera, viewportW, viewportH, natW, natH)
   }
 
   // LA CONDUITE NETTE (voir sceneFbo) : la scène basse résolution recopiée
@@ -4697,7 +4753,7 @@ export class Renderer {
     const dpr = natW / viewportW
     gl.uniform1f(cu['uDpr'], dpr)
     gl.uniform2f(cu['uCanvasSize'], natW, natH)
-    gl.uniform1f(cu['uPasseConduite'], 1)
+    gl.uniform1f(cu['uPasse'], 1)
     // les unités 0 et 1 ont servi depuis (la scène, les décalques, les
     // éponges) : la composition y lit le champ du fluide et le ciel proche
     gl.activeTexture(gl.TEXTURE1)
@@ -4735,7 +4791,38 @@ export class Renderer {
     }
     gl.disable(gl.SCISSOR_TEST)
     gl.disable(gl.BLEND)
-    gl.uniform1f(cu['uPasseConduite'], 0)
+    gl.uniform1f(cu['uPasse'], 0)
+  }
+
+  // LE DÉCOR NET (voir decorNet) : la couche d'eau vient d'être calculée
+  // dans sceneFbo. Le décor se calcule EN NATIF sur la toile, sans l'eau,
+  // puis la couche s'y pose. Les passes suivantes (vie, coque, décalques,
+  // éponges) se dessinent ensuite en natif, sur la toile.
+  private drawDecorNet(viewportW: number, natW: number, natH: number): void {
+    const gl = this.gl
+    const cu = this.uniforms['compose']
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null)
+    gl.viewport(0, 0, natW, natH)
+    gl.uniform1f(cu['uDpr'], natW / viewportW)
+    gl.uniform2f(cu['uCanvasSize'], natW, natH)
+    gl.uniform1f(cu['uPasse'], 3)
+    gl.drawArrays(gl.TRIANGLES, 0, 3)
+    gl.uniform1f(cu['uPasse'], 0)
+
+    gl.useProgram(this.recopieProgram)
+    const ru = this.uniforms['recopie']
+    gl.activeTexture(gl.TEXTURE0)
+    gl.bindTexture(gl.TEXTURE_2D, this.sceneTex)
+    gl.uniform1i(ru['uScene'], 0)
+    gl.uniform2f(ru['uTaille'], natW, natH)
+    gl.enable(gl.BLEND)
+    gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA)
+    gl.drawArrays(gl.TRIANGLES, 0, 3)
+    gl.disable(gl.BLEND)
+    // l'unité 0 portait le champ du fluide : les passes suivantes l'y lisent
+    gl.bindTexture(gl.TEXTURE_2D, this.fieldTex)
+    this.cibleW = natW
+    this.cibleH = natH
   }
 
   private ensureSceneTarget(w: number, h: number): void {
@@ -4747,7 +4834,10 @@ export class Renderer {
     this.sceneH = h
     this.sceneTex = gl.createTexture()!
     gl.bindTexture(gl.TEXTURE_2D, this.sceneTex)
-    gl.texStorage2D(gl.TEXTURE_2D, 1, gl.RGBA8, w, h)
+    // demi-flottant quand la carte sait y dessiner : la couche d'eau porte
+    // des reflets au-delà de 1, qu'un RGBA8 écrêterait AVANT la brume et le
+    // refroidissement
+    gl.texStorage2D(gl.TEXTURE_2D, 1, this.floatField ? gl.RGBA16F : gl.RGBA8, w, h)
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR)
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR)
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE)

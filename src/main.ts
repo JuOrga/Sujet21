@@ -3691,6 +3691,11 @@ let resChoix: ResChoix = ((): ResChoix => {
   return 'elevee'
 })()
 const resDynamique = (): boolean => resChoix === 'dyn'
+// NETTETÉ DU DÉCOR : la résolution réduite ne touche que le volume (l'eau),
+// le décor reste natif (renderer.decorNet). Demandé : « les textures doivent
+// toujours être en haute résolution pour que ça rende bien ». Qui préfère
+// l'allègement complet le débranche au voile.
+let decorNet = localStorage.getItem('sujet21-decor-net') !== '0'
 // rendu de la section MOTEUR PHYSIQUE — paresseux : `sim` n'existe pas
 // encore quand le voile se câble, il se dessine à l'ouverture
 let majMoteurUI: () => void = () => {}
@@ -3922,6 +3927,29 @@ const paramsEl = document.getElementById('params') as HTMLDivElement
     }
   }
   renderRes()
+
+  const choixDecorNet = document.getElementById('params-decornet') as HTMLDivElement
+  const renderDecorNet = (): void => {
+    choixDecorNet.innerHTML = ''
+    for (const [net, label] of [
+      [true, 'TOUJOURS NET'],
+      [false, 'SUIT LA RÉSOLUTION'],
+    ] as const) {
+      const b = document.createElement('button')
+      b.type = 'button'
+      b.textContent = label
+      b.className = decorNet === net ? 'actif' : ''
+      b.addEventListener('click', () => {
+        decorNet = net
+        localStorage.setItem('sujet21-decor-net', net ? '1' : '0')
+        dynAmorce = false // la cadence change : l'adaptatif se réamorce
+        perf.reset()
+        renderDecorNet()
+      })
+      choixDecorNet.appendChild(b)
+    }
+  }
+  renderDecorNet()
 
   const choixDecor = document.getElementById('params-decor') as HTMLDivElement
   const renderDecor = (): void => {
@@ -4377,6 +4405,9 @@ function rapportPerf(): Record<string, unknown> {
           ((window.innerWidth * window.innerHeight * echelleRendue() ** 2) /
             1e6) * 100,
         ) / 100,
+      // le décor net recalcule le décor EN NATIF : l'échelle ne dit alors
+      // plus que le coût de l'eau — sans ce drapeau, le rapport tromperait
+      decorNet,
       timeWarp: params.timeWarp,
       downsampleChamp: params.renderDownsample,
     },
@@ -17962,6 +17993,7 @@ function corpsImage(now: number): boolean {
   // LA CONDUITE NETTE : aux résolutions réduites, la conduite d'ammoniac se
   // repasse à la densité native de l'écran (renderer.ts, drawConduiteNette)
   renderer.dprNatif = Math.min(window.devicePixelRatio || 1, PLAFOND_DPR)
+  renderer.decorNet = decorNet
   // mesures brutes de CETTE image, pour le collecteur de performance
   let physRaw = 0
   let stepsFaits = 0
