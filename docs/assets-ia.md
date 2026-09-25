@@ -1435,3 +1435,45 @@ zooms enchaînés font un seul travelling.
 par le noir. La piste (silence, ou `cuve-tiede` avancée de six planches)
 se règle à la table de montage. Comme les autres planches, celles-ci ne se
 chargent qu'à la lecture de la cinématique.
+
+## 27. LE MATÉRIEL DE COQUE — `coque-materiel.webp`
+
+**Une planche 4 × 2, fond MAGENTA uni `#FF00FF` · PNG · 2:1 (≥ 1776 × 896)**
+
+Le décor posé AU-DEHORS, sur la coque de la cuve : ce qu'on voit sur
+l'extérieur de l'ISS. Pas de transparence demandée — le magenta se détoure
+(`tools/images/materiel.py`), et aucune pièce n'en emploie. L'ordre des
+cases est celui du moteur, **à respecter** :
+
+| case | pièce |
+| --- | --- |
+| 1 | antenne fouet : mât fin, deux traverses, feu rouge au sommet |
+| 2 | parabole de liaison sur pylône |
+| 3 | aile solaire : deux panneaux de cellules bleu nuit, cadre doré, mât en treillis |
+| 4 | radiateur : panneau à ailettes gris clair sur deux jambes |
+| 5 | feu de navigation : petit boîtier et son dôme |
+| 6 | bloc de propulseurs : tuyères, chevrons jaune et noir |
+| 7 | poutre en treillis horizontale sur deux pieds, faisceau de câbles |
+| 8 | main courante d'EVA jaune sur ses plots |
+
+```
+[préambule §5 de la charte], game sprite sheet, 4 columns x 2 rows grid of 8
+separate objects, each centered in its own equal cell, on a flat solid pure
+magenta background (#FF00FF), no grid lines. Strict flat orthographic SIDE
+view of space station EXTERIOR hull hardware, seen from outside against space.
+Every object stands upright with its mounting base resting exactly on the
+bottom edge of its cell, nothing touching the cell's other edges. In order,
+left to right, top row then bottom row: 1 tall thin whip antenna mast with two
+crossbars and a red tip light; 2 parabolic communication dish on a pylon;
+3 solar array wing, two dark blue photovoltaic panels with thin gold frames on
+a lattice mast; 4 finned pale grey radiator panel on two struts; 5 small
+navigation light housing with a glass dome; 6 reaction control thruster block
+with four nozzles and yellow-black hazard chevrons; 7 horizontal lattice truss
+segment on two legs with a cable bundle; 8 yellow EVA handrail on standoffs.
+Crisp silhouettes, thin bright rim light on edges, no ground, no shadow.
+```
+Négatif : `perspective, 3/4 view, isometric, ground, cast shadow, background
+scenery, stars, gradient background, text, labels, watermark`
+
+Livraison : `python3 tools/images/materiel.py <planche>` — l'atlas sort dans
+`public/assets/`, à comparer au tracé dans Paramètres → LE MATÉRIEL DE COQUE.
