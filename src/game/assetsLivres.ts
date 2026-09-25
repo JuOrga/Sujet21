@@ -56,6 +56,7 @@ const NOMS: Record<string, string> = {
   'plafond.webp': 'Plafond du reflet (vu du dessous)',
   'iris.webp': 'Sas — iris mécanique',
   'hull.webp': 'Coque de la cuve',
+  'coque-materiel.webp': 'Coque — matériel extérieur (antennes, paraboles, ailes solaires…)',
   'tank-bg.webp': 'Fond de cuve',
   'stars.webp': 'Ciel étoilé (proche)',
   'stars-far.webp': 'Ciel étoilé (lointain, station)',
@@ -115,7 +116,7 @@ export function rubriqueDe(url: string): string {
     f.startsWith('plafond')
   )
     return 'Machinerie & décalques'
-  if (/^(hull|tank-bg|stars|ciel|home|card-)/.test(f)) return 'Coque & fonds'
+  if (/^(hull|coque-|tank-bg|stars|ciel|home|card-)/.test(f)) return 'Coque & fonds'
   if (/^(fiole|badge)/.test(f)) return 'Objets & emblèmes'
   return 'Autres'
 }

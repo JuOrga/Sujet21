@@ -25,9 +25,9 @@ import { MAT_VIDE } from '../game/level'
 
 /** Épaisseur de la coque, en unités monde. */
 export const COQUE_EPAISSEUR = 90
-/** La frange de décor extérieur, au-delà de la coque. Les plus hauts
- *  éléments (le mât d'antenne, feu compris) y tiennent avec de la marge. */
-export const COQUE_FRANGE = 190
+/** La frange de décor extérieur, au-delà de la coque : une case de l'atlas
+ *  (SPRITE, renderer.ts) y tient debout, mât d'antenne et feu compris. */
+export const COQUE_FRANGE = 250
 /** Longueur d'une répétition de la texture de coque (aspect 2,5:1). */
 export const COQUE_REP = 225
 /** Vides que la passe de coque sait découper — au-delà, les suivants ne

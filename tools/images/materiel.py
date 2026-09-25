@@ -2,14 +2,17 @@
 """LE MATÉRIEL DE COQUE EN IMAGES — de la planche du générateur à l'atlas.
 
 Le générateur livre une planche de 4 × 2 pièces (vue de profil, pied en
-bas) sur un fond MAGENTA uni — il ne sait pas rendre la transparence de
-façon fiable, un fond qu'aucune pièce n'emploie se détoure, lui. Mais il
-ne pose jamais les pièces au cordeau : l'une flotte au milieu de sa case,
-l'autre en déborde. Ce script :
+bas), détourée — ou sur un fond MAGENTA uni quand il ne sait pas rendre la
+transparence : un fond qu'aucune pièce n'emploie se détoure, lui. Mais il
+ne pose jamais les pièces au cordeau : l'une flotte, l'autre déborde sur
+la colonne voisine (les propulseurs de la planche du 25/09). Ce script :
 
-1. détoure le magenta (alpha progressif + dé-contamination des franges,
-   sinon chaque pièce garde un liseré rose sur le ciel noir) ;
-2. trouve chaque pièce dans sa case (la boîte de ses pixels opaques) ;
+1. garde l'alpha de la planche s'il en a un ; sinon détoure le magenta
+   (alpha progressif + dé-contamination des franges, sinon chaque pièce
+   garde un liseré rose sur le ciel noir) ;
+2. trouve les pièces par le VIDE qui les sépare, pas par une grille : deux
+   rangées (la bande sans pixel opaque entre elles), puis dans chaque
+   rangée les colonnes de vide — quatre pièces, de gauche à droite ;
 3. les repose dans un atlas 2048 × 1024 à cases de 512, PIED SUR LE BORD
    BAS et centrées — c'est ce que le shader suppose (drawHull, renderer.ts) ;
 4. à UNE échelle commune : un feu de navigation reste petit à côté d'un
@@ -59,27 +62,48 @@ def detoure(im: Image.Image) -> Image.Image:
     return out
 
 
-def boite(case: Image.Image):
-    """La boîte des pixels franchement opaques (le bruit JPEG ne compte pas)."""
-    alpha = case.getchannel('A').point(lambda v: 255 if v > 96 else 0)
-    return alpha.getbbox()
+def segments(occupe: list[bool], ecart: int) -> list[tuple[int, int]]:
+    """Les plages occupées d'une projection, les trous de moins de `ecart`
+    pixels comblés (une traverse fine ne coupe pas une pièce en deux)."""
+    plages: list[list[int]] = []
+    for i, o in enumerate(occupe):
+        if not o:
+            continue
+        if plages and i - plages[-1][1] <= ecart:
+            plages[-1][1] = i
+        else:
+            plages.append([i, i])
+    return [(a, b + 1) for a, b in plages]
+
+
+def pieces_de(planche: Image.Image) -> list[Image.Image]:
+    alpha = planche.getchannel('A').point(lambda v: 255 if v > 96 else 0)
+    w, h = planche.size
+    px = alpha.load()
+    lignes = [any(px[x, y] for x in range(0, w, 2)) for y in range(h)]
+    rangs = sorted(segments(lignes, 12), key=lambda r: r[1] - r[0], reverse=True)[:ROWS]
+    if len(rangs) < ROWS:
+        sys.exit(f'{len(rangs)} rangée(s) trouvée(s), {ROWS} attendues')
+    pieces = []
+    for y0, y1 in sorted(rangs):
+        cols = [any(px[x, y] for y in range(y0, y1, 2)) for x in range(w)]
+        plages = sorted(segments(cols, 12), key=lambda c: c[1] - c[0], reverse=True)[:COLS]
+        if len(plages) < COLS:
+            sys.exit(f'rangée {y0}..{y1} : {len(plages)} pièce(s), {COLS} attendues')
+        for x0, x1 in sorted(plages):
+            case = planche.crop((x0, y0, x1, y1))
+            pieces.append(case.crop(alpha.crop((x0, y0, x1, y1)).getbbox()))
+    return pieces
 
 
 def main() -> None:
     if len(sys.argv) < 2:
         print(__doc__)
         sys.exit(1)
-    planche = detoure(Image.open(sys.argv[1]))
-    w, h = planche.size
-    cw, ch = w / COLS, h / ROWS
-    pieces = []
-    for i in range(COLS * ROWS):
-        c, r = i % COLS, i // COLS
-        case = planche.crop((round(c * cw), round(r * ch), round((c + 1) * cw), round((r + 1) * ch)))
-        bb = boite(case)
-        if not bb:
-            sys.exit(f'case {i} vide : la planche n’a pas ses {COLS * ROWS} pièces')
-        pieces.append(case.crop(bb))
+    brut = Image.open(sys.argv[1])
+    a = brut.convert('RGBA').getchannel('A').getextrema()
+    planche = brut.convert('RGBA') if a[0] < 16 else detoure(brut)
+    pieces = pieces_de(planche)
     utile = CASE - 2 * MARGE
     echelle = min(min(utile / p.width, utile / p.height) for p in pieces)
     atlas = Image.new('RGBA', (COLS * CASE, ROWS * CASE), (0, 0, 0, 0))

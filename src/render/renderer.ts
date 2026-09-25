@@ -3104,7 +3104,52 @@ void fondDeCoque(inout vec4 acc, float s, float y, float cote, float px) {
 // Une pièce de l'atlas peint (tools/images/materiel.py) : cases de 512 px,
 // SPRITE unités monde de côté, pied au bord bas, centrée. L'atlas est
 // téléversé retourné (FLIP_Y) : le V se lit depuis le BAS de l'image.
-const float SPRITE = 192.0;
+const float SPRITE = 250.0;
+
+// LES PIÈCES VIVENT — de petites animations, chacune celle que la pièce
+// aurait vraiment : rien ne bouge sans raison sur une coque. Les positions
+// sont celles de l'atlas livré (planche du 25/09, échelle commune 0,927).
+void animeSprite(inout vec4 acc, vec2 q, vec4 m, float type, float r, float px) {
+  // les positions ci-dessous sont mesurées sur une case de 192 u
+  q *= 192.0 / SPRITE;
+  if (type == 0.0) {
+    // antenne : le feu d'obstacle, deux éclats rapprochés
+    float f = fract(uTime * 0.4 + r * 7.0);
+    float on = max(1.0 - smoothstep(0.0, 0.06, f), 1.0 - smoothstep(0.0, 0.05, abs(f - 0.14)));
+    feu(acc, q, vec2(0.0, 182.0), vec3(1.0, 0.22, 0.12), 0.15 + on, 6.0);
+  } else if (type == 2.0 || type == 3.0) {
+    // aile solaire / radiateur : le soleil glisse sur la surface — sur les
+    // cellules bleues pour l'aile, sur les ailettes pour le radiateur
+    float bleu = type == 2.0 ? smoothstep(0.02, 0.10, m.b - m.r) : m.a;
+    float nappe = smoothstep(0.82, 1.0, sin((q.x + q.y) * 0.02 - uTime * 0.25 + r * 6.0));
+    acc.rgb += vec3(0.10, 0.13, 0.18) * nappe * bleu * m.a * (type == 2.0 ? 1.0 : 0.4);
+  } else if (type == 4.0) {
+    // feu de navigation : un gyrophare — le faisceau tourne, le halo bat
+    float rot = 0.5 + 0.5 * cos(uTime * 3.2 + r * 6.28);
+    feu(acc, q, vec2(0.0, 57.0), vec3(1.0, 0.62, 0.20), 0.25 + 0.9 * rot * rot, 14.0);
+    float faisceau = exp(-abs(q.y - 57.0) * 0.12) * smoothstep(0.0, 1.0, rot) * (1.0 - m.a);
+    acc.rgb += vec3(0.30, 0.17, 0.05) * faisceau * exp(-abs(q.x) * 0.02);
+  } else if (type == 5.0) {
+    // propulseurs : de temps en temps, une bouffée de contrôle d'attitude
+    // — brève, froide, qui s'évase et s'éteint (on est dans le vide)
+    float cycle = fract(uTime * 0.13 + r * 3.0);
+    float bouffee = smoothstep(0.0, 0.02, cycle) * (1.0 - smoothstep(0.02, 0.09, cycle));
+    if (bouffee > 0.001) {
+      float cote_ = r > 0.5 ? 1.0 : -1.0; // une paire de tuyères à la fois
+      for (int k = 0; k < 2; k++) {
+        vec2 bouche = vec2(cote_ * 58.0, k == 0 ? 89.0 : 44.0);
+        vec2 d = (q - bouche) * vec2(cote_, 1.0);
+        float t = max(d.x, 0.0);
+        float jet = exp(-d.y * d.y / (2.0 * (4.0 + t * 0.35) * (4.0 + t * 0.35))) * exp(-t * 0.06) * step(0.0, d.x);
+        acc.rgb += vec3(0.55, 0.68, 0.85) * jet * bouffee * 0.8;
+      }
+    }
+  } else if (type == 6.0) {
+    // treillis : le voyant ambre du boîtier de câbles
+    float on = step(0.7, fract(uTime * 0.5 + r * 5.0));
+    feu(acc, q, vec2(-64.0, 44.0), vec3(1.0, 0.62, 0.18), 0.1 + 0.8 * on, 4.0);
+  }
+}
 vec4 sprite(vec2 q, float type, vec2 grad) {
   vec2 u = vec2(q.x / SPRITE + 0.5, q.y / SPRITE);
   if (u.x < 0.0 || u.x > 1.0 || u.y < 0.0 || u.y > 1.0) return vec4(0.0);
@@ -3171,12 +3216,25 @@ void main() {
         // dans une branche que les pixels voisins n'ont pas prise.
         vec2 q = vec2(s - cx, y);
         vec2 grad = vec2(px / (4.0 * SPRITE), px / (2.0 * SPRITE));
-        if (type == 4.0 || type == 5.0 || r > 0.55) {
-          vec4 mc = sprite(q + vec2(0.0, 2.0), 7.0, grad);
+        // la main courante se pose À CÔTÉ du feu de navigation, la seule
+        // pièce assez étroite pour lui laisser place dans la cellule —
+        // derrière une grande pièce, elle se lisait comme un cadre
+        if (type == 4.0) {
+          vec4 mc = sprite(q - vec2((r > 0.5 ? 1.0 : -1.0) * 95.0, 0.0), 7.0, grad);
           acc = mc + acc * (1.0 - mc.a);
         }
-        vec4 m = sprite(q, type, grad);
+        // LA PARABOLE SUIT SA CIBLE : tout ce qui est au-dessus de la
+        // rotule du pylône pivote de quelques degrés, lentement
+        vec2 qs = q;
+        if (type == 1.0 && q.y > 97.0 * SPRITE / 192.0) {
+          float an = 0.06 * sin(uTime * 0.09 + r * 6.28);
+          vec2 piv = vec2(0.0, 97.0 * SPRITE / 192.0);
+          vec2 d = q - piv;
+          qs = piv + vec2(cos(an) * d.x + sin(an) * d.y, -sin(an) * d.x + cos(an) * d.y);
+        }
+        vec4 m = sprite(qs, type, grad);
         acc = m + acc * (1.0 - m.a);
+        animeSprite(acc, q, m, type, r, px);
       } else {
         if (type == 4.0 || type == 5.0 || r > 0.55) mainCourante(acc, p, px / 1.15);
         vec4 m = materiel(p, type, r, cote, px / 1.15);
