@@ -8,6 +8,7 @@ import {
   SENS_HORIZONTAL,
   SENS_VERTICAL,
   conduiteHoriz,
+  dansForme,
   FORME_CONDUITE,
   FORME_DISQUE,
   conduiteLongue,
@@ -185,6 +186,35 @@ describe('conduite — les bouts dans le mur', () => {
     expect(boutsEnMur(b, [b, mur], null)).toBe(BOUT_MUR_POS)
     const vide = box(400, -100, 460, 200, 11) // MAT_VIDE : un trou, pas un mur
     expect(boutsEnMur(b, [b, vide], null)).toBe(0)
+  })
+
+  it('contre une AUTRE conduite, seul son tube compte, pas sa boîte (T, L)', () => {
+    const a = box(0, 125, 400, 185, MAT_FROID)
+    // B, verticale, dont la BOÎTE touche le bout de A mais dont le tube
+    // (0,56 de sa largeur, centré) passe plus loin
+    const b = box(400, -300, 520, 360, MAT_FROID)
+    // la géométrie que le test suppose : juste au-delà du bout de A, on est
+    // dans la boîte de B mais pas dans sa forme physique (entre deux joints)
+    for (const y of [140, 155, 170]) {
+      expect(dansForme(formePhysique(b), 403, y)).toBe(false)
+      expect(dansForme(b, 403, y)).toBe(true)
+    }
+    // A garde donc sa bride : son tube ne plonge pas dans du sol vide
+    expect(boutsEnMur(a, [a, b], null)).toBe(0)
+  })
+
+  it('une voisine dont le bout plonge dans le sol n’a pas de bride : on ne s’y arrête pas', () => {
+    const salle = { minX: -1000, minY: -750, maxX: 1000, maxY: 750 }
+    // B, verticale, plonge dans le sol par le bas : pas de bride de bout
+    const b = box(400, -750, 520, -150, MAT_FROID)
+    // A arrive contre la boîte de B, à la hauteur où B AURAIT sa bride de
+    // bout (les 117 premières unités) si ce bout était libre
+    const a = box(0, -730, 400, -690, MAT_FROID)
+    for (const y of [-720, -710, -700]) {
+      expect(dansForme(formePhysique(b), 403, y)).toBe(true) // la bride supposée
+      expect(dansForme(formePhysique(b, [a, b], salle), 403, y)).toBe(false) // la vraie forme
+    }
+    expect(boutsEnMur(a, [a, b], salle) & BOUT_MUR_POS).toBe(0)
   })
 
   it('un mur qui ne prend que la moitié du tuyau ne l’avale pas', () => {

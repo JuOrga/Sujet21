@@ -35,9 +35,23 @@ function dansLeMur(x: number, y: number, soi: Boite, boxes: readonly Boite[], bo
   if (bornes && (x < bornes.minX || x > bornes.maxX || y < bornes.minY || y > bornes.maxY)) return true
   for (const o of boxes) {
     if (o === soi || sansPhysique(o.material)) continue
-    if (dansForme(o, x, y)) return true
+    // une AUTRE conduite arrête par ce qu'elle a À COUP SÛR — son tube et
+    // ses joints —, pas par sa boîte : le bout d'une conduite en T contre
+    // la boîte d'une voisine plongeait sinon dans le sol vide entre la boîte
+    // et le tube (~0,22 T). Ses brides de BOUT n'y comptent pas : elles
+    // dépendent de ses propres bouts (un bout dans un mur n'en a pas), et
+    // les chercher ferait se sonder deux conduites l'une l'autre sans fin.
+    const f = o.material === MAT_FROID && !o.forme ? tronconSur(o) : o
+    if (dansForme(f, x, y)) return true
   }
   return false
+}
+
+/** Une conduite réduite à ce qu'elle a quels que soient ses bouts : les
+ *  deux bouts « dans un mur », donc sans bride ni traversée — le tube de
+ *  bout en bout, et ses joints. */
+function tronconSur(o: Boite): Boite {
+  return { ...o, forme: FORME_CONDUITE, bouts: BOUT_MUR_NEG | BOUT_MUR_POS } as Boite
 }
 
 /** Les bouts de la conduite `b` qui plongent dans un mur (BOUT_MUR_*). Un
