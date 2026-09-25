@@ -3836,16 +3836,20 @@ export class Renderer {
       // c'est un gel de plusieurs centaines de millisecondes pendant que le
       // joueur lit la fiche, et la vingtaine d'autres textures s'y ajoute.
       // createImageBitmap fait le décodage dans un fil du navigateur ; il
-      // reste ici le retournement et la copie vers le GPU. Le retournement
-      // est laissé à WebGL (FLIP_Y) plutôt que demandé au bitmap
-      // (imageOrientation) : un navigateur qui ignore l'option en silence
-      // livrerait des textures à l'envers, alors que FLIP_Y est le même
-      // partout. Même alpha non prémultiplié qu'avant : le rendu est le
-      // même au pixel près. Un navigateur qui refuse repasse par l'<img>.
+      // reste ici la copie vers le GPU.
+      // LE RETOURNEMENT SE DEMANDE AU BITMAP, PAS À WEBGL. La spécification
+      // WebGL IGNORE UNPACK_FLIP_Y_WEBGL (et le prémultiplié) quand la
+      // source est un ImageBitmap : du 12/09 au 25/09/2026, ce chemin
+      // livrait donc TOUTES les textures à l'envers — le tube lumineux de
+      // la coque tourné vers le dehors, les habillages de parois lus dans
+      // la mauvaise rangée de l'atlas, les décalques la tête en bas. Le
+      // bitmap sort donc déjà retourné (imageOrientation) et WebGL ne
+      // retourne plus rien ; l'<img> de secours, lui, garde FLIP_Y, qui
+      // s'applique bien à un élément image. Même alpha non prémultiplié.
       if (typeof createImageBitmap === 'function') {
-        createImageBitmap(img, { premultiplyAlpha: 'none' }).then(
+        createImageBitmap(img, { premultiplyAlpha: 'none', imageOrientation: 'flipY' }).then(
           (bitmap) => {
-            envoie(bitmap, true)
+            envoie(bitmap, false)
             bitmap.close()
           },
           () => envoie(img, true),
