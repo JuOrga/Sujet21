@@ -76,6 +76,29 @@ def colle(atlas: Image.Image, piece: Image.Image, cadre: tuple[int, int, int, in
     atlas.alpha_composite(piece.resize((w, h), Image.LANCZOS), (x, y))
 
 
+def saigne(atlas: Image.Image, passes: int = 24) -> Image.Image:
+    """LE SAIGNEMENT DES COULEURS : un pixel transparent garde la couleur de
+    ses voisins opaques. Le détourage laisse du NOIR sous l'alpha nul ; en
+    réduisant l'image (mipmaps, filtrage), la carte graphique le mélange au
+    bord de la pièce — un liseré sombre autour du givre. On étend donc les
+    couleurs dans le transparent, passe après passe ; l'alpha, lui, ne
+    bouge pas."""
+    a = np.asarray(atlas, dtype=np.float32).copy()
+    rgb = a[..., :3] * (a[..., 3:4] > 0)
+    poids = (a[..., 3] > 0).astype(np.float32)
+    for _ in range(passes):
+        somme = np.zeros_like(rgb)
+        n = np.zeros_like(poids)
+        for dy, dx in ((-1, 0), (1, 0), (0, -1), (0, 1)):
+            somme += np.roll(rgb * poids[..., None], (dy, dx), axis=(0, 1))
+            n += np.roll(poids, (dy, dx), axis=(0, 1))
+        vide = (poids == 0) & (n > 0)
+        rgb[vide] = somme[vide] / n[vide, None]
+        poids = np.where(vide, 1.0, poids)
+    a[..., :3] = rgb
+    return Image.fromarray(np.clip(a, 0, 255).astype(np.uint8), 'RGBA')
+
+
 def main() -> None:
     atlas = Image.new('RGBA', (TAILLE, TAILLE), (0, 0, 0, 0))
     colle(atlas, corps(), CADRE_CORPS)
@@ -88,7 +111,7 @@ def main() -> None:
     # (x 380), bride de 79 à 483
     colle(atlas, lis('conduite-raccords.png').crop((98, 56, 662, 513)), CADRE_JOINT)
     colle(atlas, lis('conduite-givre.png'), CADRE_GIVRE)
-    atlas.save(DST)
+    saigne(atlas).save(DST)
     print('écrit', os.path.relpath(DST, ROOT))
 
 

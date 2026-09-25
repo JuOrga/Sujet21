@@ -734,14 +734,23 @@ vec4 cnSur(vec4 dessous, vec4 dessus) {
   return dessus + dessous * (1.0 - dessus.a);
 }
 
-// L'ombre que la conduite porte sur le sol, à multiplier au fond — calculée
-// PARTOUT autour d'elle depuis sa forme, pas seulement dans sa boîte : les
-// brides touchent le bord de la boîte, leur ombre coupée net au bord
-// redessinait le rectangle.
+// L'ombre que la conduite porte sur le sol, à multiplier au fond. Elle suit
+// le TUYAU, pas la forme de collision : les brides y sont des rectangles de
+// toute la largeur, et leur ombre dure se lisait en PAVÉS SOMBRES partout où
+// l'image est transparente — autour des brides rondes, entre les boulons,
+// aux coins de la plaque (vu en aperçu sur iPad). Douce, décalée vers le
+// bas à droite (la lampe du dessin est en haut à gauche), et calculée
+// partout autour, pas seulement dans la boîte.
 float conduiteOmbre(vec2 p, vec4 box, float code) {
   vec2 sz = box.zw - box.xy;
-  float T = conduiteHoriz(sz, conduiteSens(code)) ? sz.y : sz.x;
-  return mix(0.45, 1.0, smoothstep(0.0, 3.0 + 0.12 * T, conduiteSdf(p, box, code)));
+  bool horiz = conduiteHoriz(sz, conduiteSens(code));
+  float L = horiz ? sz.x : sz.y;
+  float T = horiz ? sz.y : sz.x;
+  vec2 q = p - 0.5 * (box.xy + box.zw) - vec2(0.06, -0.06) * T;
+  float s = horiz ? q.x : q.y;
+  float t = horiz ? q.y : q.x;
+  float d = cnRect(s, t, 0.0, L * 0.5, CN_TUYAU * T);
+  return mix(0.55, 1.0, smoothstep(-0.10 * T, 0.30 * T, d));
 }
 
 // Rend la conduite SEULE, en couleur prémultipliée (rgb) et couverture
@@ -2035,7 +2044,9 @@ void main() {
       vec4 cnh = conduiteNH3(clamp(wbV - bmin, vec2(0.0), bsize), bsize, pxMonde, sensC);
       col = col * (1.0 - fill * cnh.a) + cnh.rgb * eclMat * fill;
       float hors = (1.0 - fill * cnh.a) * surSol;
-      col += brumeNH3(wb, max(dG, 0.0), uColdBand) * hors * (dG > 0.0 ? 1.0 : 0.6);
+      // (la brume ne baisse que SOUS l'image — pas dans la forme de collision,
+      // dont les rectangles de brides se lisaient en pavés plus sombres)
+      col += brumeNH3(wb, max(dG, 0.0), uColdBand) * hors;
     } else {
       // Sas de sortie : une bouche d'aspiration — un trou dans lequel l'eau
       // s'engouffre. Gorge sombre, œil noir, anneau qui respire, et stries
