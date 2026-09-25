@@ -1482,28 +1482,29 @@ void main() {
   // procédural d'intérim.
   vec3 voidCol;
   if (uCielMode > 1.5) {
-    // LA PLAQUE, PEINTE DANS LA TOILE. Elle a vécu un temps en calque HTML
-    // derrière une toile transparente, pour rester nette quel que soit le
-    // réglage de résolution — mais le compositeur la payait à chaque image,
-    // en natif : sur le Steam Deck, 20 im/s avec elle, près de 60 sans. Ici,
-    // UNE lecture de texture par pixel de ciel, à la définition de la toile.
-    // L'image est cadrée comme avant (une seule Voie lactée, jamais agrandie
-    // au-delà de ce qu'elle rend net) ; ses bords sont fondus au noir.
+    // LA PLAQUE, PEINTE DANS LA TOILE, comme les autres fonds. Elle a vécu
+    // un temps en calque HTML derrière une toile transparente, pour rester
+    // nette quel que soit le réglage de résolution : sur le Steam Deck, le
+    // joueur mesurait 20 im/s avec elle, près de 60 en la coupant. Ici, UNE
+    // lecture de texture par pixel de ciel, à la définition de la toile.
+    // L'image est cadrée comme avant (une seule Voie lactée, cadrePlaque) ;
+    // ses bords sont fondus au noir. Le jumeau de ce calcul : uvPlaque
+    // (render/parallaxe.ts), où il est testé.
     vec3 gal = vec3(0.0);
     if (uHasCiel > 0.5) {
-      vec2 css = gl_FragCoord.xy / uDpr;
-      vec2 uv = uPlaque.xy + (css - 0.5 * uCanvasSize / uDpr) * uPlaque.z;
+      vec2 uv = uPlaque.xy + (css - uViewport * 0.5) * uPlaque.z;
       vec2 dedans = step(vec2(0.0), uv) * step(uv, vec2(1.0));
       gal = texture(uTexCiel, uv).rgb * dedans.x * dedans.y;
     }
     voidCol = gal * uPlaque.w;
-    // les étoiles NETTES, procédurales (etoiles) : un pixel et demi à tout
-    // zoom — plus denses dans la bande lactée. Atténuées : la photographie
-    // porte déjà les siennes, et à pleine force le semis blanc uniforme
-    // prenait le pas sur elle. Pas sous une salle pleine, où
-    // mix(voidCol, tank, inRoom) les jetterait.
-    if (uDecor > 0.5 && inRoom < 0.999)
-      voidCol += 0.7 * etoiles(world, pxMonde, clamp(dot(gal, vec3(0.3, 0.5, 0.2)) * 3.0, 0.0, 1.0));
+    // LE SEMIS PROCHE, les deux couches d'étoiles de l'ancienne plaque : il
+    // donne le MOUVEMENT — une image seule paraît collée à l'écran. Pas les
+    // huit couches d'« etoiles » : elles se paient sur chaque pixel de
+    // vide, et c'est justement la cadence qu'on vient chercher ici.
+    if (uDecor > 0.5) {
+      voidCol += vec3(0.50, 0.60, 0.75) * specks(world + uCenter * 0.5, 130.0, 0.10, uZoom) * 0.38;
+      voidCol += vec3(0.75, 0.82, 0.95) * specks(world + 500.0, 200.0, 0.08, uZoom) * 0.62;
+    }
   } else if (uCielMode > 0.5 && uHasStars > 0.5) {
     // Atténuée : le vide doit rester plus sombre que la cuve éclairée,
     // sinon la hiérarchie lumineuse s'inverse et la scène se noie.
@@ -4132,9 +4133,9 @@ export class Renderer {
     // la fin. Le surcoût, « négligeable » sur un GPU de bureau, y devient le
     // poste dominant — du temps hors CPU, invisible dans les profils JS.
     // OPAQUE : le ciel est peint dans la toile. Transparente, elle laissait
-    // voir un calque de ciel HTML derrière elle — et le compositeur fondait
-    // alors la toile ET le calque, en natif, à chaque image : sur le Steam
-    // Deck, 20 im/s au lieu de près de 60. Opaque, il la recopie telle quelle.
+    // voir un calque de ciel HTML derrière elle, que le compositeur fondait
+    // avec elle, en natif, à chaque image — sur le Steam Deck, le joueur
+    // mesurait 20 im/s avec ce ciel, près de 60 en le coupant.
     const gl = canvas.getContext('webgl2', {
       antialias: false,
       alpha: false,
@@ -4510,12 +4511,24 @@ export class Renderer {
     this.cielMode = mode
     // LA PLAQUE ne se télécharge qu'à son premier affichage : qui garde un
     // autre fond ne paie ni la photographie (1,3 Mo) ni sa mémoire graphique
+    // (2400², avec ses niveaux de détail : ~30 Mo) — et qui la coupe la
+    // rend : c'est le geste qu'on fait quand l'appareil peine.
     if (mode > 1.5 && !this.plaqueDemandee) {
       this.plaqueDemandee = true
       this.loadTexture('/assets/ciel.webp', false, true, (t, img) => {
+        // coupée pendant le téléchargement : on ne la loge pas
+        if (!this.plaqueDemandee) {
+          this.gl.deleteTexture(t)
+          return
+        }
         this.texPlaque = t
         this.plaqueTexels = img.naturalWidth
       })
+    } else if (mode < 1.5 && this.plaqueDemandee) {
+      this.plaqueDemandee = false
+      if (this.texPlaque) this.gl.deleteTexture(this.texPlaque)
+      this.texPlaque = null
+      this.plaqueTexels = 0
     }
   }
 

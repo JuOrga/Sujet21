@@ -201,3 +201,18 @@ export function cadrePlaque(
     reste > 1e-6 ? reste * Math.tanh((cam * r.derive) / reste) : 0
   return { cx: 0.5 + glisse(camX) * parPx, cy: 0.5 + glisse(camY) * parPx, parPx }
 }
+
+/** LE POINT DE LA PLAQUE sous un pixel de l'écran — le jumeau exact du
+ *  shader (renderer.ts, uCielMode 2) : (x, y) en px CSS, y vers le HAUT
+ *  depuis le bas de l'écran (gl_FragCoord), et un résultat dans le repère
+ *  de la texture, v vers le haut de l'image (les textures sont retournées
+ *  au chargement). Hors de [0, 1] : hors de l'image, le shader y met noir. */
+export function uvPlaque(
+  c: CadrePlaque,
+  x: number,
+  y: number,
+  largeurCss: number,
+  hauteurCss: number,
+): [number, number] {
+  return [c.cx + (x - largeurCss / 2) * c.parPx, c.cy + (y - hauteurCss / 2) * c.parPx]
+}

@@ -19508,11 +19508,14 @@ function corpsImage(now: number): boolean {
     plaqueReglages.taille = cielReglages.taille
     const c = cadrePlaque(
       camera.x, camera.y, camera.zoom, vw, vh,
-      Math.min(window.devicePixelRatio || 1, 3),
+      // la densité la plus fine de la TOILE : le ciel y est peint
+      Math.min(window.devicePixelRatio || 1, PLAFOND_DPR),
       renderer.plaqueTexels,
       plaqueReglages,
     )
-    renderer.setPlaque(c.cx, c.cy, c.parPx, cielReglages.force)
+    // bornée à 1, comme l'opacité du calque qui la dosait : au-delà, la
+    // photographie sature et le vide passe devant la cuve éclairée
+    renderer.setPlaque(c.cx, c.cy, c.parPx, Math.min(1, Math.max(0, cielReglages.force)))
   }
   // LA PROFONDEUR DES COUCHES DE FOND : posée à l'image comme le ciel, pour
   // que le banc l'entende tout de suite. Le facteur se cuisine ICI, une fois
