@@ -10,6 +10,7 @@ import {
   LAMPE_HAUTEUR_DEFAUT,
   LAMPE_HAUTEUR_MAX,
   LAMPE_HAUTEUR_MIN,
+  MAT_VIDE,
   lampeCouleurRVB,
   zonePhases,
 } from '../game/level'
@@ -36,6 +37,7 @@ import {
   remplitBandesCoque,
   videsPercantLaCoque,
 } from './coque'
+import { MAX_PIECES_COQUE, composeCoque, empaquettePieces } from './compositionCoque'
 
 // Budgets de rendu : au-delà, les éléments excédentaires ne sont plus
 // dessinés (la physique, elle, les voit tous) — l'éditeur avertit quand un
@@ -2862,8 +2864,10 @@ in vec2 vUv;    // (le long de la paroi, en travers depuis le bord intérieur)
 in vec2 vWorld;
 in vec2 vCote;  // (côté 0 haut · 1 bas · 2 gauche · 3 droite, longueur de la paroi)
 uniform sampler2D uTexHull;
-uniform sampler2D uTexMateriel; // atlas 4 × 2 de pièces, pied en bas
-uniform float uHasMateriel;
+#define MAX_PIECES ${MAX_PIECES_COQUE}
+uniform int uPieceCount;
+uniform vec4 uPieces[MAX_PIECES];    // centre, demi-dimensions (le long, vers le dehors)
+uniform vec4 uPiecesAux[MAX_PIECES]; // type, angle du repère, graine, —
 uniform float uZoom;
 uniform float uTime;
 uniform float uEpais;
@@ -2935,137 +2939,138 @@ void feu(inout vec4 acc, vec2 p, vec2 c, vec3 coul, float on, float rayon) {
   acc.rgb += coul * on * (exp(-r * r / (2.0 * rayon * rayon)) * 0.55 + (1.0 - smoothstep(1.2, 2.6, r)) * 1.2);
 }
 
-// LE MATÉRIEL DE COQUE. x court le long de la paroi (centré sur la cellule),
-// y monte depuis la face externe de la coque. Une cellule, une pièce —
-// tirée au sort sur son numéro et son côté, donc STABLE d'une image à
-// l'autre et d'un chargement à l'autre. Tout y est sombre et froid : ce
-// n'est éclairé que par les étoiles, et ça doit rester sous la cuve dans la
-// hiérarchie lumineuse — seuls les feux ont le droit de briller.
-vec4 materiel(vec2 p, float type, float r, float cote, float px) {
-  vec4 acc = vec4(0.0);
+// LE MATÉRIEL DE COQUE, VU DE DESSUS — la composition de compositionCoque.ts.
+// Chaque pièce a son repère : x le long de la paroi, y vers le dehors, h ses
+// demi-dimensions. Tout est vu d'EN HAUT, comme la salle : une aile solaire
+// est une nappe couchée, une parabole un disque, un radiateur un panneau à
+// plat. Éclairé par le soleil (en haut à gauche du monde, uSoleil dans le
+// repère de la pièce) et par rien d'autre : sombre, sauf les feux.
+// Les animations sont celles que la pièce aurait vraiment.
+void dessinePiece(inout vec4 acc, vec2 q, vec2 h, float type, float g, float an, vec2 soleil, float px) {
   vec3 acier = vec3(0.085, 0.105, 0.135);
-  vec3 acierC = vec3(0.13, 0.16, 0.20);
-  float x = p.x;
-  float y = p.y;
-  if (type < 1.0) {
-    // ANTENNE FOUET : embase, mât haubané de deux traverses, feu d'obstacle
-    float h = 95.0 + 55.0 * r;
-    piece(acc, sdSeg(p, vec2(0.0, 8.0), vec2(0.0, h)) - 1.6, acierC, px);
-    piece(acc, sdSeg(p, vec2(-16.0, h * 0.55), vec2(16.0, h * 0.55)) - 1.2, acierC, px);
-    piece(acc, sdSeg(p, vec2(-9.0, h * 0.8), vec2(9.0, h * 0.8)) - 1.0, acierC, px);
-    piece(acc, min(sdSeg(p, vec2(-22.0, 2.0), vec2(0.0, h * 0.45)), sdSeg(p, vec2(22.0, 2.0), vec2(0.0, h * 0.45))) - 0.5, acier, px);
-    piece(acc, sdRect(p, vec2(0.0, 5.0), vec2(14.0, 5.0)) - 1.0, acier, px);
-    float clign = step(0.86, fract(uTime * 0.42 + r * 7.0));
-    feu(acc, p, vec2(0.0, h + 2.0), vec3(1.0, 0.18, 0.12), 0.25 + 0.75 * clign, 7.0);
-  } else if (type < 2.0) {
-    // PARABOLE DE LIAISON : pylône, et une antenne qui suit lentement sa cible
-    piece(acc, sdRect(p, vec2(0.0, 5.0), vec2(12.0, 5.0)) - 1.0, acier, px);
-    piece(acc, sdSeg(p, vec2(0.0, 8.0), vec2(0.0, 38.0)) - 3.0, acierC, px);
-    float an = 0.45 * sin(uTime * 0.045 + r * 6.28) + (r - 0.5) * 0.5;
-    vec2 q = p - vec2(0.0, 42.0);
-    q = vec2(cos(an) * q.x + sin(an) * q.y, -sin(an) * q.x + cos(an) * q.y);
-    // le réflecteur : une coque parabolique mince, creux tourné vers le ciel
-    float para = max(abs(q.y - q.x * q.x / 46.0) - 2.4, abs(q.x) - 34.0);
-    float creux = max(q.x * q.x / 46.0 - q.y, q.y - 25.1);
-    pose(acc, vec3(0.05, 0.065, 0.085), (1.0 - smoothstep(-0.5 * px, 0.5 * px, max(creux, abs(q.x) - 34.0))) * 0.85);
-    piece(acc, para, vec3(0.20, 0.23, 0.27), px);
-    piece(acc, sdSeg(q, vec2(0.0, 0.0), vec2(0.0, 14.0)) - 1.1, acierC, px);
-    piece(acc, sdRect(q, vec2(0.0, 15.0), vec2(3.0, 2.0)), acierC, px);
-    piece(acc, sdRect(q, vec2(0.0, -3.0), vec2(7.0, 4.0)) - 1.0, acier, px);
-  } else if (type < 3.0) {
-    // AILE SOLAIRE : mât en treillis, cardan, deux panneaux de cellules
-    piece(acc, sdRect(p, vec2(0.0, 6.0), vec2(10.0, 6.0)) - 1.0, acier, px);
-    float tri = abs(fract(y / 16.0) * 2.0 - 1.0) * 8.0 - 4.0;
-    float mat = min(min(abs(x - 4.0), abs(x + 4.0)) - 1.0, max(abs(x - tri) - 0.8, abs(x) - 4.0));
-    piece(acc, max(mat, max(12.0 - y, y - 150.0)), acierC, px);
-    piece(acc, sdRect(p, vec2(0.0, 36.0), vec2(8.0, 6.0)) - 1.0, acierC, px);
-    for (int k = 0; k < 2; k++) {
-      float sgn = k == 0 ? -1.0 : 1.0;
-      vec2 c = vec2(sgn * 66.0, 94.0);
-      vec2 hp = vec2(58.0, 54.0);
-      float d = sdRect(p, c, hp);
-      if (d < 3.0 * px) {
-        vec2 l = (p - c + hp) / (2.0 * hp);
-        vec2 g = fract(l * vec2(6.0, 8.0));
-        float grille = 1.0 - smoothstep(0.0, 0.07, min(min(g.x, 1.0 - g.x), min(g.y, 1.0 - g.y)));
-        // le reflet du soleil sur les cellules : une nappe lente
-        float nappe = smoothstep(0.75, 1.0, sin((x + y) * 0.018 + uTime * 0.07 + r * 5.0));
-        vec3 cell = vec3(0.035, 0.06, 0.15) + vec3(0.05, 0.08, 0.14) * nappe;
-        cell = mix(cell, vec3(0.20, 0.17, 0.09), grille * 0.8);
-        pose(acc, cell, 1.0 - smoothstep(-0.5 * px, 0.5 * px, d));
-        pose(acc, vec3(0.42, 0.34, 0.16), 1.0 - smoothstep(0.0, 1.4 * px, abs(d + 0.7 * px)));
+  vec3 acierC = vec3(0.15, 0.18, 0.22);
+  if (type < 0.5) {
+    // AILE SOLAIRE : deux couvertures de cellules de part et d'autre du mât
+    // central. Elle SUIT le soleil en pivotant sur son axe : vue de dessus,
+    // la couverture s'élargit et se rétrécit, très lentement.
+    float suivi = 0.78 + 0.22 * cos(uTime * 0.035 + g * 6.28);
+    vec2 hh = vec2(h.x, h.y * suivi);
+    float d = sdRect(q, vec2(0.0), hh);
+    float mat = abs(q.x) - 7.0;
+    if (d < 2.0 * px) {
+      vec2 l = (q + hh) / (2.0 * hh);
+      vec2 cel = fract(vec2(q.x / 34.0, l.y * 4.0));
+      float grille = 1.0 - smoothstep(0.0, 0.06, min(min(cel.x, 1.0 - cel.x), min(cel.y, 1.0 - cel.y)));
+      float nappe = smoothstep(0.80, 1.0, sin((q.x - q.y * 3.0) * 0.006 + uTime * 0.12 + g * 9.0));
+      vec3 cell = vec3(0.030, 0.050, 0.130) * (0.75 + 0.5 * suivi) + vec3(0.07, 0.10, 0.17) * nappe;
+      cell = mix(cell, vec3(0.20, 0.16, 0.08), grille * 0.75);
+      pose(acc, cell, 1.0 - smoothstep(-0.5 * px, 0.5 * px, max(d, -mat)));
+      pose(acc, vec3(0.45, 0.36, 0.16), (1.0 - smoothstep(0.0, 1.5 * px, abs(d + 0.8 * px))) * step(0.0, mat));
+    }
+    piece(acc, max(abs(q.x) - 6.0, abs(q.y) - h.y - 4.0), acierC, px);
+    // le cardan au pied de l'aile, et son voyant de veille
+    piece(acc, sdRect(q, vec2(0.0, -h.y - 2.0), vec2(14.0, 10.0)) - 1.0, acier, px);
+    feu(acc, q, vec2(9.0, -h.y - 2.0), vec3(1.0, 0.62, 0.18), 0.15 + 0.7 * step(0.8, fract(uTime * 0.5 + g * 3.0)), 3.0);
+  } else if (type < 1.5) {
+    // RADIATEUR : un panneau à plat, ailettes en travers ; le caloporteur y
+    // circule — une onde de chaleur très lente qui monte vers le bout
+    float d = sdRect(q, vec2(0.0), h);
+    float ail = smoothstep(0.30, 0.5, abs(fract(q.y / 11.0) - 0.5));
+    float onde = 0.5 + 0.5 * sin(q.y * 0.02 - uTime * 0.6 + g * 6.0);
+    vec3 blanc = vec3(0.17, 0.19, 0.22) * (0.8 + 0.25 * ail) + vec3(0.035, 0.03, 0.02) * onde;
+    piece(acc, d, blanc, px);
+    piece(acc, max(abs(q.x) - 3.0, abs(q.y) - h.y + 6.0), vec3(0.20, 0.15, 0.09), px);
+  } else if (type < 2.5) {
+    // PARABOLE : un disque vu d'en haut — le creux ombré du côté du soleil,
+    // les nervures, la source au foyer sur trois bras. Elle suit sa cible :
+    // la tête pivote, lentement.
+    float r = min(h.x, h.y);
+    float a = 0.5 * sin(uTime * 0.05 + g * 6.28);
+    vec2 qr = vec2(cos(a) * q.x + sin(a) * q.y, -sin(a) * q.x + cos(a) * q.y);
+    float d = length(q) - r;
+    float creux = clamp(dot(normalize(q + 1e-4), soleil), -1.0, 1.0) * length(q) / r;
+    vec3 coque = vec3(0.16, 0.18, 0.21) * (0.75 - 0.35 * creux);
+    // huit nervures, du bord au moyeu
+    float nerf = 1.0 - smoothstep(0.02, 0.07, abs(fract(atan(qr.y, qr.x) / 0.7854 + 0.5) - 0.5));
+    coque = mix(coque, vec3(0.22, 0.25, 0.29), nerf * 0.5);
+    piece(acc, d, coque, px);
+    for (int k = 0; k < 3; k++) {
+      float b = a + float(k) * 2.0944;
+      piece(acc, sdSeg(q, vec2(0.0), 0.8 * r * vec2(cos(b), sin(b))) - 1.2, acierC, px);
+    }
+    piece(acc, length(q) - 6.0, acierC, px);
+  } else if (type < 3.5) {
+    // PORT D'AMARRAGE : la collerette boulonnée sur la coque, puis l'amorce
+    // du module voisin — un cylindre annelé qui s'enfonce dans le noir.
+    // Ses feux d'approche battent deux par deux.
+    float bout = q.y + h.y; // 0 à la coque
+    float fondu = 1.0 - smoothstep(h.y * 1.1, h.y * 1.9, bout);
+    float rc = h.x * 0.62;
+    float cyl = abs(q.x) - rc;
+    // un CYLINDRE éclairé : la normale tourne autour de l'axe, le soleil
+    // (haut gauche, un peu au-dessus du plan) allume un flanc et noie
+    // l'autre — c'est ce modelé qui le fait lire comme un volume
+    float nx = clamp(q.x / rc, -1.0, 1.0);
+    vec3 n = vec3(nx, 0.0, sqrt(max(0.0, 1.0 - nx * nx)));
+    vec3 L = normalize(vec3(soleil, 0.9));
+    float lum = 0.18 + 0.82 * max(0.0, dot(n, L));
+    float brillant = pow(max(0.0, dot(reflect(-L, n), vec3(0.0, 0.0, 1.0))), 18.0);
+    // les couvertures isolantes : blanc cassé matelassé, comme sur l'ISS
+    vec2 mat = abs(fract(vec2(q.x / 16.0, bout / 16.0)) - 0.5);
+    float matelas = 0.92 + 0.08 * smoothstep(0.35, 0.5, max(mat.x, mat.y));
+    float anneau = 1.0 - smoothstep(1.5, 3.5, abs(mod(bout - 26.0, 72.0) - 36.0) - 32.0);
+    vec3 module_ = vec3(0.30, 0.31, 0.33) * lum * matelas;
+    module_ = mix(module_, vec3(0.10, 0.12, 0.15) * lum, anneau * step(26.0, bout));
+    module_ += vec3(0.20, 0.22, 0.25) * brillant;
+    pose(acc, module_, (1.0 - smoothstep(-0.5 * px, 0.5 * px, max(cyl, -bout + 26.0))) * fondu);
+    piece(acc, sdRect(q, vec2(0.0, -h.y + 13.0), vec2(h.x * 0.8, 13.0)) - 2.0, acierC, px);
+    for (int k = 0; k < 4; k++) {
+      float sx = (float(k) < 1.5 ? -1.0 : 1.0) * h.x * 0.72;
+      float on = step(0.5, fract(uTime * 0.7 + (mod(float(k), 2.0) > 0.5 ? 0.5 : 0.0)));
+      feu(acc, q, vec2(sx, -h.y + (mod(float(k), 2.0) > 0.5 ? 22.0 : 4.0)), vec3(0.3, 1.0, 0.55), 0.1 + 0.8 * on, 4.0);
+    }
+  } else if (type < 4.5) {
+    // POUTRE EN TREILLIS : deux membrures et la triangulation, vues d'en haut
+    float mem = abs(abs(q.x) - h.x + 2.5) - 2.0;
+    float t = fract(q.y / (2.0 * h.x));
+    float zig = abs(q.x - (h.x - 2.5) * (4.0 * abs(t - 0.5) - 1.0)) * 0.7 - 1.3;
+    float cadre = max(min(mem, zig), abs(q.y) - h.y);
+    piece(acc, cadre, acierC, px);
+    piece(acc, max(abs(q.x) - 3.0, abs(q.y) - h.y), vec3(0.07, 0.065, 0.06), px); // le câble porté
+  } else if (type < 5.5) {
+    // PROPULSEURS : le bloc, trois tuyères vers le dehors et les flancs ;
+    // de temps en temps, une bouffée brève (contrôle d'attitude)
+    piece(acc, sdRect(q, vec2(0.0), h * 0.55) - 3.0, acierC, px);
+    float chev = step(0.5, fract((q.x + q.y) / 6.0)) * step(abs(q.y), h.y * 0.25);
+    pose(acc, vec3(0.30, 0.25, 0.08), chev * (1.0 - smoothstep(-0.5 * px, 0.5 * px, sdRect(q, vec2(0.0), h * 0.5))) * 0.8);
+    float cycle = fract(uTime * 0.11 + g * 5.0);
+    float bouffee = smoothstep(0.0, 0.02, cycle) * (1.0 - smoothstep(0.02, 0.08, cycle));
+    int quelle = int(floor(g * 3.0));
+    for (int k = 0; k < 3; k++) {
+      vec2 dir = k == 0 ? vec2(0.0, 1.0) : k == 1 ? vec2(-1.0, 0.0) : vec2(1.0, 0.0);
+      vec2 o = dir * h.x * 0.55;
+      vec2 l = q - o;
+      float t = dot(l, dir);
+      float lat = abs(dot(l, vec2(-dir.y, dir.x)));
+      piece(acc, max(lat - (4.0 + max(t, 0.0) * 0.45), abs(t - 6.0) - 6.0), vec3(0.06, 0.065, 0.07), px);
+      if (k == quelle && bouffee > 0.001) {
+        float tt = max(t - 12.0, 0.0);
+        float jet = exp(-lat * lat / (2.0 * (5.0 + tt * 0.4) * (5.0 + tt * 0.4))) * exp(-tt * 0.05) * step(12.0, t);
+        acc.rgb += vec3(0.55, 0.68, 0.85) * jet * bouffee * 0.9;
       }
     }
-    piece(acc, sdSeg(p, vec2(-124.0, 94.0), vec2(124.0, 94.0)) - 1.0, acierC, px);
-  } else if (type < 4.0) {
-    // RADIATEUR : panneau à ailettes sur deux jambes, tuyau de caloporteur
-    piece(acc, sdSeg(p, vec2(-34.0, 0.0), vec2(-30.0, 26.0)) - 2.2, acierC, px);
-    piece(acc, sdSeg(p, vec2(34.0, 0.0), vec2(30.0, 26.0)) - 2.2, acierC, px);
-    piece(acc, sdSeg(p, vec2(6.0, 0.0), vec2(6.0, 28.0)) - 2.6, vec3(0.16, 0.12, 0.08), px);
-    vec2 c = vec2(0.0, 92.0);
-    float d = sdRect(p, c, vec2(54.0, 64.0));
-    float ail = smoothstep(0.35, 0.5, abs(fract((y - c.y) / 9.0) - 0.5));
-    vec3 blanc = vec3(0.19, 0.21, 0.24) * (0.8 + 0.25 * ail);
-    blanc += vec3(0.05, 0.06, 0.07) * smoothstep(0.6, 1.0, sin((x - y) * 0.02 + r * 4.0));
-    piece(acc, d, blanc, px);
-    piece(acc, sdSeg(p, vec2(-54.0, 28.0), vec2(54.0, 28.0)) - 2.0, acierC, px);
-  } else if (type < 5.0) {
-    // FEUX DE NAVIGATION : rouge à bâbord (gauche), vert à tribord (droite),
-    // blanc à éclats en haut et en bas — le code de toute chose qui vole
-    piece(acc, sdRect(p, vec2(0.0, 4.0), vec2(12.0, 4.0)) - 1.0, acier, px);
-    piece(acc, length(p - vec2(0.0, 9.0)) - 5.5, vec3(0.10, 0.12, 0.14), px);
-    vec3 coul = cote > 2.5 ? vec3(0.2, 1.0, 0.45) : cote > 1.5 ? vec3(1.0, 0.16, 0.12) : vec3(0.9, 0.95, 1.0);
-    float f = fract(uTime * 0.5 + r * 3.0);
-    float on = cote > 1.5 ? 0.75 + 0.25 * sin(uTime * 1.3 + r * 9.0)
-                          : max(step(f, 0.035), step(abs(f - 0.12), 0.018));
-    feu(acc, p, vec2(0.0, 10.0), coul, on, cote > 1.5 ? 11.0 : 14.0);
-  } else if (type < 6.0) {
-    // BLOC DE PROPULSEURS (contrôle d'attitude) : quatre tuyères en croix,
-    // capot rayé de chevrons d'avertissement
-    vec2 c = vec2(0.0, 22.0);
-    piece(acc, sdSeg(p, vec2(0.0, 0.0), vec2(0.0, 14.0)) - 4.0, acierC, px);
-    float capot = sdRect(p, c, vec2(12.0, 9.0)) - 2.0;
-    float chev = step(0.5, fract((x + y) / 7.0));
-    piece(acc, capot, mix(acier, vec3(0.30, 0.25, 0.08), chev * step(abs(y - c.y), 4.0) * 0.8), px);
-    for (int k = 0; k < 3; k++) {
-      // une tuyère : un tronc de cône qui s'évase vers la sortie
-      vec2 dir = k == 0 ? vec2(0.0, 1.0) : k == 1 ? vec2(-1.0, 0.0) : vec2(1.0, 0.0);
-      vec2 q = p - c - dir * 12.0;
-      float t = dot(q, dir);
-      float lat = abs(dot(q, vec2(-dir.y, dir.x)));
-      float tuy = max(lat - (2.5 + max(t, 0.0) * 0.35), abs(t - 5.0) - 5.0);
-      piece(acc, tuy, vec3(0.07, 0.075, 0.08), px);
-    }
   } else {
-    // POUTRE EN TREILLIS : deux membrures, la triangulation, deux pieds, et
-    // le faisceau de câbles qu'elle porte le long de la coque
-    float dx = abs(x) - 124.0;
-    float haut = max(abs(y - 50.0) - 2.0, dx);
-    float bas = max(abs(y - 24.0) - 2.0, dx);
-    float t = fract((x + 124.0) / 49.6);
-    float zig = abs(y - (24.0 + 26.0 * (1.0 - abs(2.0 * t - 1.0)))) * 0.7071 - 1.3;
-    zig = max(zig, max(abs(y - 37.0) - 13.0, dx));
-    piece(acc, min(min(haut, bas), zig), acierC, px);
-    piece(acc, min(sdSeg(p, vec2(-104.0, 0.0), vec2(-104.0, 24.0)), sdSeg(p, vec2(104.0, 0.0), vec2(104.0, 24.0))) - 3.0, acier, px);
-    float cable = max(abs(y - 8.0 - 1.5 * sin(x * 0.03 + r * 5.0)) - 2.6, abs(x) - 128.0);
-    piece(acc, cable, vec3(0.06, 0.055, 0.05), px);
-    float bride = max(abs(fract(x / 34.0) - 0.5) * 34.0 - 2.0, max(abs(y - 8.0) - 5.0, abs(x) - 120.0));
-    piece(acc, bride, acier, px);
-    float clign = step(0.9, fract(uTime * 0.3 + r * 11.0));
-    feu(acc, p, vec2(124.0 * sign(r - 0.5), 54.0), vec3(1.0, 0.62, 0.18), 0.2 + 0.8 * clign, 6.0);
+    // FEU DE NAVIGATION : rouge à bâbord (le côté gauche), vert à tribord
+    // (le droit), blanc à éclats ailleurs — le code de tout ce qui vole
+    piece(acc, length(q) - 7.0, acier, px);
+    bool babord = abs(an - 1.5708) < 0.1;
+    bool tribord = abs(an + 1.5708) < 0.1;
+    vec3 coul = babord ? vec3(1.0, 0.16, 0.12) : tribord ? vec3(0.2, 1.0, 0.45) : vec3(0.9, 0.95, 1.0);
+    float f = fract(uTime * 0.5 + g * 3.0);
+    float on = (babord || tribord) ? 0.75 + 0.25 * sin(uTime * 1.3 + g * 9.0)
+                                   : max(step(f, 0.035), step(abs(f - 0.12), 0.018));
+    feu(acc, q, vec2(0.0), coul, on, 12.0);
   }
-  return acc;
-}
-
-// LES MAINS COURANTES D'EVA : ces barres jaunes qui courent sur toute
-// station habitée, par où l'on se tient dehors. Posées sur les cellules
-// basses (feux, propulseurs, rien) — sous une antenne, elles se liraient
-// comme un fouillis.
-void mainCourante(inout vec4 acc, vec2 p, float px) {
-  float barre = max(abs(p.y - 15.0) - 1.8, abs(p.x) - 96.0);
-  float pieds = max(abs(fract((p.x + 96.0) / 48.0 + 0.5) - 0.5) * 48.0 - 1.4, max(p.y - 15.0, abs(p.x) - 97.0));
-  piece(acc, pieds, vec3(0.12, 0.11, 0.07), px);
-  piece(acc, barre, vec3(0.34, 0.27, 0.07), px);
 }
 
 // LE FOND DE COQUE, continu d'une cellule à l'autre : une CONDUITE qui
@@ -3101,68 +3106,6 @@ void fondDeCoque(inout vec4 acc, float s, float y, float cote, float px) {
   }
 }
 
-// Une pièce de l'atlas peint (tools/images/materiel.py) : cases de 512 px,
-// SPRITE unités monde de côté, pied au bord bas, centrée. L'atlas est
-// téléversé retourné (FLIP_Y) : le V se lit depuis le BAS de l'image.
-const float SPRITE = 250.0;
-
-// LES PIÈCES VIVENT — de petites animations, chacune celle que la pièce
-// aurait vraiment : rien ne bouge sans raison sur une coque. Les positions
-// sont celles de l'atlas livré (planche du 25/09, échelle commune 0,927).
-void animeSprite(inout vec4 acc, vec2 q, vec4 m, float type, float r, float px) {
-  // les positions ci-dessous sont mesurées sur une case de 192 u
-  q *= 192.0 / SPRITE;
-  if (type == 0.0) {
-    // antenne : le feu d'obstacle, deux éclats rapprochés
-    float f = fract(uTime * 0.4 + r * 7.0);
-    float on = max(1.0 - smoothstep(0.0, 0.06, f), 1.0 - smoothstep(0.0, 0.05, abs(f - 0.14)));
-    feu(acc, q, vec2(0.0, 182.0), vec3(1.0, 0.22, 0.12), 0.15 + on, 6.0);
-  } else if (type == 2.0 || type == 3.0) {
-    // aile solaire / radiateur : le soleil glisse sur la surface — sur les
-    // cellules bleues pour l'aile, sur les ailettes pour le radiateur
-    float bleu = type == 2.0 ? smoothstep(0.02, 0.10, m.b - m.r) : m.a;
-    float nappe = smoothstep(0.82, 1.0, sin((q.x + q.y) * 0.02 - uTime * 0.25 + r * 6.0));
-    acc.rgb += vec3(0.10, 0.13, 0.18) * nappe * bleu * m.a * (type == 2.0 ? 1.0 : 0.4);
-  } else if (type == 4.0) {
-    // feu de navigation : un gyrophare — le faisceau tourne, le halo bat
-    float rot = 0.5 + 0.5 * cos(uTime * 3.2 + r * 6.28);
-    feu(acc, q, vec2(0.0, 57.0), vec3(1.0, 0.62, 0.20), 0.25 + 0.9 * rot * rot, 14.0);
-    float faisceau = exp(-abs(q.y - 57.0) * 0.12) * smoothstep(0.0, 1.0, rot) * (1.0 - m.a);
-    acc.rgb += vec3(0.30, 0.17, 0.05) * faisceau * exp(-abs(q.x) * 0.02);
-  } else if (type == 5.0) {
-    // propulseurs : de temps en temps, une bouffée de contrôle d'attitude
-    // — brève, froide, qui s'évase et s'éteint (on est dans le vide)
-    float cycle = fract(uTime * 0.13 + r * 3.0);
-    float bouffee = smoothstep(0.0, 0.02, cycle) * (1.0 - smoothstep(0.02, 0.09, cycle));
-    if (bouffee > 0.001) {
-      float cote_ = r > 0.5 ? 1.0 : -1.0; // une paire de tuyères à la fois
-      for (int k = 0; k < 2; k++) {
-        vec2 bouche = vec2(cote_ * 58.0, k == 0 ? 89.0 : 44.0);
-        vec2 d = (q - bouche) * vec2(cote_, 1.0);
-        float t = max(d.x, 0.0);
-        float jet = exp(-d.y * d.y / (2.0 * (4.0 + t * 0.35) * (4.0 + t * 0.35))) * exp(-t * 0.06) * step(0.0, d.x);
-        acc.rgb += vec3(0.55, 0.68, 0.85) * jet * bouffee * 0.8;
-      }
-    }
-  } else if (type == 6.0) {
-    // treillis : le voyant ambre du boîtier de câbles
-    float on = step(0.7, fract(uTime * 0.5 + r * 5.0));
-    feu(acc, q, vec2(-64.0, 44.0), vec3(1.0, 0.62, 0.18), 0.1 + 0.8 * on, 4.0);
-  }
-}
-vec4 sprite(vec2 q, float type, vec2 grad) {
-  vec2 u = vec2(q.x / SPRITE + 0.5, q.y / SPRITE);
-  if (u.x < 0.0 || u.x > 1.0 || u.y < 0.0 || u.y > 1.0) return vec4(0.0);
-  float col = mod(type, 4.0);
-  float lig = floor(type / 4.0);
-  vec2 uv = vec2((col + u.x) * 0.25, 1.0 - (lig + 1.0) * 0.5 + u.y * 0.5);
-  vec4 t = textureGrad(uTexMateriel, uv, vec2(grad.x, 0.0), vec2(0.0, grad.y));
-  // éclairé par les étoiles seulement : un peu plus froid et plus sombre
-  // que la planche, pour rester sous la cuve dans la hiérarchie lumineuse
-  vec3 c = t.rgb * vec3(0.80, 0.86, 0.95);
-  return vec4(c * t.a, t.a);
-}
-
 void main() {
   float px = 1.0 / max(uZoom, 1e-4); // un pixel d'écran, en unités monde
   float s = vUv.x;
@@ -3188,59 +3131,25 @@ void main() {
     outColor = vec4(c * garde, garde);
     return;
   }
-  // LA FRANGE : le matériel de coque, cellule par cellule
+  // LA FRANGE : le petit matériel continu au ras de la paroi, puis les
+  // pièces de la composition, dans l'ordre (un bras avant son aile)
   float y = a - uEpais;
-  const float L = 300.0;
-  float id = floor(s / L);
-  float cx = (id + 0.5) * L;
-  vec2 p = vec2(s - cx, y) / 1.15; // le matériel, à l'échelle de la coque
-  float r = hash11(id * 1.618 + cote * 37.0 + 3.1);
-  float r2 = hash11(id * 2.414 + cote * 19.0 + 7.7);
-  // pas de pièce qui déborde dans l'angle, ni sur une paroi trop courte
-  bool loge = cx - 150.0 > 0.0 && cx + 150.0 < vCote.y;
-  // une cellule sur huit reste nue : la coque respire
-  float type = floor(r2 * 8.0);
   vec4 acc = vec4(0.0);
   // le fond de coque ne tient qu'où la coque tient : pas sur un trou
   if (s > 20.0 && s < vCote.y - 20.0 && videSdf(origine + s * dA + uEpais * dO) > 0.0)
     fondDeCoque(acc, s, y, cote, px);
-  if (loge && type < 7.0) {
-    // arrachée par le vide : une pièce dont le pied tombe dans un trou
-    // n'a plus rien où tenir — elle disparaît avec la paroi
-    vec2 pied = origine + cx * dA + uEpais * dO;
-    float tient = min(min(videSdf(pied), videSdf(pied - 110.0 * dA)), videSdf(pied + 110.0 * dA));
-    if (tient > 0.0) {
-      if (uHasMateriel > 0.5) {
-        // L'ATLAS PEINT : la case du type, pied sur la face de la coque.
-        // Le niveau de détail est écrit à la main (textureGrad) : on est ici
-        // dans une branche que les pixels voisins n'ont pas prise.
-        vec2 q = vec2(s - cx, y);
-        vec2 grad = vec2(px / (4.0 * SPRITE), px / (2.0 * SPRITE));
-        // la main courante se pose À CÔTÉ du feu de navigation, la seule
-        // pièce assez étroite pour lui laisser place dans la cellule —
-        // derrière une grande pièce, elle se lisait comme un cadre
-        if (type == 4.0) {
-          vec4 mc = sprite(q - vec2((r > 0.5 ? 1.0 : -1.0) * 95.0, 0.0), 7.0, grad);
-          acc = mc + acc * (1.0 - mc.a);
-        }
-        // LA PARABOLE SUIT SA CIBLE : tout ce qui est au-dessus de la
-        // rotule du pylône pivote de quelques degrés, lentement
-        vec2 qs = q;
-        if (type == 1.0 && q.y > 97.0 * SPRITE / 192.0) {
-          float an = 0.06 * sin(uTime * 0.09 + r * 6.28);
-          vec2 piv = vec2(0.0, 97.0 * SPRITE / 192.0);
-          vec2 d = q - piv;
-          qs = piv + vec2(cos(an) * d.x + sin(an) * d.y, -sin(an) * d.x + cos(an) * d.y);
-        }
-        vec4 m = sprite(qs, type, grad);
-        acc = m + acc * (1.0 - m.a);
-        animeSprite(acc, q, m, type, r, px);
-      } else {
-        if (type == 4.0 || type == 5.0 || r > 0.55) mainCourante(acc, p, px / 1.15);
-        vec4 m = materiel(p, type, r, cote, px / 1.15);
-        acc = m + acc * (1.0 - m.a); // la pièce devant la main courante
-      }
-    }
+  for (int i = 0; i < MAX_PIECES; i++) {
+    if (i >= uPieceCount) break;
+    vec4 geo = uPieces[i];
+    vec4 aux = uPiecesAux[i];
+    vec2 rel = vWorld - geo.xy;
+    // la marge : les halos des feux et les bouffées débordent de la boîte
+    if (length(rel) > length(geo.zw) + 40.0) continue;
+    float ca = cos(aux.y);
+    float sa = sin(aux.y);
+    vec2 q = vec2(ca * rel.x + sa * rel.y, -sa * rel.x + ca * rel.y);
+    vec2 soleil = normalize(vec2(ca * -0.6 + sa * 0.8, -sa * -0.6 + ca * 0.8));
+    dessinePiece(acc, q, geo.zw, aux.x, aux.z, aux.y, soleil, px);
   }
   // le fil de lumière sur la face externe : l'arête de la coque accroche
   // les étoiles, et la station se découpe sur le ciel
@@ -3403,10 +3312,12 @@ export class Renderer {
   private texPhile: WebGLTexture | null = null
   private texIris: WebGLTexture | null = null
   private texHull: WebGLTexture | null = null
-  // l'atlas du matériel de coque (tools/images/materiel.py) — absent, ou
-  // écarté par le réglage, le shader trace les pièces lui-même
-  private texMateriel: WebGLTexture | null = null
-  private materielImage = true
+  // la composition du matériel de coque (compositionCoque.ts), recalculée
+  // seulement quand la cuve ou ses vides changent
+  private readonly piecesGeo = new Float32Array(MAX_PIECES_COQUE * 4)
+  private readonly piecesAux = new Float32Array(MAX_PIECES_COQUE * 4)
+  private piecesCle = ''
+  private piecesCount = 0
   private texSpongeDry: WebGLTexture | null = null
   private texSpongeWet: WebGLTexture | null = null
   private spongeScratch = new Float32Array(0)
@@ -3661,7 +3572,6 @@ export class Renderer {
       (t) => (this.texIris = t),
     )
     this.loadTexture('/assets/hull.webp', true, true, (t) => (this.texHull = t))
-    this.loadTexture('/assets/coque-materiel.webp', false, true, (t) => (this.texMateriel = t))
     this.loadTexture(
       '/assets/sponge-dry.webp',
       true,
@@ -3856,12 +3766,6 @@ export class Renderer {
     this.parSemis[1] = semis[1]
     this.parCuve[0] = cuve[0]
     this.parCuve[1] = cuve[1]
-  }
-
-  /** Le matériel de coque en IMAGES (l'atlas, s'il est chargé) ou tracé
-   *  par le shader. Réglage du joueur (main.ts). */
-  setMaterielImage(actif: boolean): void {
-    this.materielImage = actif
   }
 
   setSolModules(actif: boolean): void {
@@ -4615,7 +4519,7 @@ export class Renderer {
     // MODULES n'a pas de cuve : ses parois sont celles de ses coques, et
     // le dehors doit rester le vide.
     if (!this.solModules)
-      this.drawHull(sim, camera, viewportW, viewportH, Math.min(boxes.length, MAX_BOXES), timeSec)
+      this.drawHull(sim, camera, viewportW, viewportH, boxes, timeSec)
 
     // Passe B ter — décalques de décor (tuyaux, vannes), effacés sous l'eau
     this.drawDecals(decals, camera, viewportW, viewportH, params, timeSec)
@@ -4678,13 +4582,23 @@ export class Renderer {
     camera: Camera,
     viewportW: number,
     viewportH: number,
-    boxCount: number,
+    boxes: readonly ObstacleBox[],
     timeSec: number,
   ): void {
     if (!this.texHull) return
     const gl = this.gl
     const b = sim.bounds
+    const boxCount = Math.min(boxes.length, MAX_BOXES)
     const sommets = remplitBandesCoque(b, this.hullScratch)
+    // la composition ne change qu'avec la cuve et ses vides : recomposée
+    // à ce moment-là seulement, pas à chaque image
+    const vides = boxes.filter((bx) => bx.material === MAT_VIDE)
+    const cle = `${b.minX},${b.minY},${b.maxX},${b.maxY}|` +
+      vides.map((v) => `${v.minX},${v.minY},${v.maxX},${v.maxY},${v.angle ?? 0},${v.forme ?? 0}`).join(';')
+    if (cle !== this.piecesCle) {
+      this.piecesCle = cle
+      this.piecesCount = empaquettePieces(composeCoque(b, vides), this.piecesGeo, this.piecesAux)
+    }
     const nVides = videsPercantLaCoque(
       this.boxScratch,
       this.auxScratch,
@@ -4711,12 +4625,11 @@ export class Renderer {
     gl.activeTexture(gl.TEXTURE0)
     gl.bindTexture(gl.TEXTURE_2D, this.texHull)
     gl.uniform1i(hu['uTexHull'], 0)
-    const atlas = this.materielImage ? this.texMateriel : null
-    gl.activeTexture(gl.TEXTURE1)
-    gl.bindTexture(gl.TEXTURE_2D, atlas ?? this.texHull)
-    gl.uniform1i(hu['uTexMateriel'], 1)
-    gl.uniform1f(hu['uHasMateriel'], atlas ? 1 : 0)
-    gl.activeTexture(gl.TEXTURE0)
+    gl.uniform1i(hu['uPieceCount'], this.piecesCount)
+    if (this.piecesCount > 0) {
+      gl.uniform4fv(hu['uPieces[0]'], this.piecesGeo)
+      gl.uniform4fv(hu['uPiecesAux[0]'], this.piecesAux)
+    }
     // prémultiplié : la frange laisse voir le ciel, les feux s'y ajoutent
     gl.enable(gl.BLEND)
     gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA)

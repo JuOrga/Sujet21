@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """LE MATÉRIEL DE COQUE EN IMAGES — de la planche du générateur à l'atlas.
 
-Le générateur livre une planche de 4 × 2 pièces (vue de profil, pied en
-bas), détourée — ou sur un fond MAGENTA uni quand il ne sait pas rendre la
+Le générateur livre une planche de 4 × 2 pièces VUES DE DESSUS (assets-ia
+§28), détourée — ou sur un fond MAGENTA uni quand il ne sait pas rendre la
 transparence : un fond qu'aucune pièce n'emploie se détoure, lui. Mais il
 ne pose jamais les pièces au cordeau : l'une flotte, l'autre déborde sur
 la colonne voisine (les propulseurs de la planche du 25/09). Ce script :
@@ -13,14 +13,16 @@ la colonne voisine (les propulseurs de la planche du 25/09). Ce script :
 2. trouve les pièces par le VIDE qui les sépare, pas par une grille : deux
    rangées (la bande sans pixel opaque entre elles), puis dans chaque
    rangée les colonnes de vide — quatre pièces, de gauche à droite ;
-3. les repose dans un atlas 2048 × 1024 à cases de 512, PIED SUR LE BORD
-   BAS et centrées — c'est ce que le shader suppose (drawHull, renderer.ts) ;
-4. à UNE échelle commune : un feu de navigation reste petit à côté d'un
-   mât d'antenne, comme dans la planche.
+3. les repose dans un atlas 2048 × 1024 à cases de 512, CENTRÉES, chacune
+   à sa propre échelle : c'est la composition (compositionCoque.ts) qui
+   décide de la taille d'une pièce dans le monde, pas la planche — une
+   aile solaire y fait 1700 u, un feu 28. Une échelle commune aurait
+   réduit le feu à quelques pixels de l'atlas.
 
-L'ordre des cases est celui des types du shader :
-  0 antenne · 1 parabole · 2 aile solaire · 3 radiateur
-  4 feux de navigation · 5 propulseurs · 6 poutre en treillis · 7 main courante
+L'ordre des cases est celui des types de la composition :
+  0 aile solaire · 1 radiateur · 2 parabole · 3 port d'amarrage
+  4 poutre en treillis · 5 propulseurs · 6 feu de navigation · 7 conduite
+(les constantes PIECE_* de compositionCoque.ts)
 
     python3 tools/images/materiel.py masters/images/coque-materiel.png
 """
@@ -105,18 +107,18 @@ def main() -> None:
     planche = brut.convert('RGBA') if a[0] < 16 else detoure(brut)
     pieces = pieces_de(planche)
     utile = CASE - 2 * MARGE
-    echelle = min(min(utile / p.width, utile / p.height) for p in pieces)
     atlas = Image.new('RGBA', (COLS * CASE, ROWS * CASE), (0, 0, 0, 0))
     for i, p in enumerate(pieces):
+        echelle = min(utile / p.width, utile / p.height)
         q = p.resize((max(1, round(p.width * echelle)), max(1, round(p.height * echelle))), Image.LANCZOS)
         c, r = i % COLS, i // COLS
         x = c * CASE + (CASE - q.width) // 2
-        y = (r + 1) * CASE - MARGE - q.height  # le pied sur le bord bas
+        y = r * CASE + (CASE - q.height) // 2
         atlas.alpha_composite(q, (x, y))
-        print(f'  pièce {i} : {p.width}×{p.height} → {q.width}×{q.height}')
+        print(f'  pièce {i} : {p.width}×{p.height} → {q.width}×{q.height} (rapport {p.width / p.height:.2f})')
     SORTIE.parent.mkdir(parents=True, exist_ok=True)
     atlas.save(SORTIE, 'WEBP', quality=88, method=6)
-    print(f'{SORTIE.relative_to(SORTIE.parents[2])} : {SORTIE.stat().st_size // 1024} Ko, échelle {echelle:.3f}')
+    print(f'{SORTIE.relative_to(SORTIE.parents[2])} : {SORTIE.stat().st_size // 1024} Ko')
 
 
 if __name__ == '__main__':

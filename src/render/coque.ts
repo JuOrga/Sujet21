@@ -14,9 +14,8 @@
 // 2. LE DEHORS ÉTAIT NU. Au-delà de la coque, rien que le ciel : une
 //    station n'est pas un caisson lisse. Chaque bande s'étend donc d'une
 //    FRANGE au-delà de la paroi, où le shader pose le matériel de coque
-//    d'une station orbitale (antennes, paraboles, panneaux solaires,
-//    radiateurs, feux de navigation, mains courantes d'EVA, blocs de
-//    propulseurs, poutres en treillis) — du décor pur, sans physique.
+//    d'une station orbitale, vu de dessus et COMPOSÉ pour la salle
+//    (compositionCoque.ts) — du décor pur, sans physique.
 //
 // Le shader ne se teste pas ; ce qui décide de ce qu'il reçoit, si.
 
@@ -25,9 +24,10 @@ import { MAT_VIDE } from '../game/level'
 
 /** Épaisseur de la coque, en unités monde. */
 export const COQUE_EPAISSEUR = 90
-/** La frange de décor extérieur, au-delà de la coque : une case de l'atlas
- *  (SPRITE, renderer.ts) y tient debout, mât d'antenne et feu compris. */
-export const COQUE_FRANGE = 250
+/** La frange de décor extérieur, au-delà de la coque : la plus grande pièce
+ *  de la composition y tient — le bras (jusqu'à 310) et l'aile au bout
+ *  (236), vue de dessus (compositionCoque.ts). */
+export const COQUE_FRANGE = 560
 /** Longueur d'une répétition de la texture de coque (aspect 2,5:1). */
 export const COQUE_REP = 225
 /** Vides que la passe de coque sait découper — au-delà, les suivants ne

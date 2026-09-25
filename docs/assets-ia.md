@@ -1436,44 +1436,60 @@ par le noir. La piste (silence, ou `cuve-tiede` avancée de six planches)
 se règle à la table de montage. Comme les autres planches, celles-ci ne se
 chargent qu'à la lecture de la cinématique.
 
-## 28. LE MATÉRIEL DE COQUE — `coque-materiel.webp`
+## 28. LE MATÉRIEL DE COQUE, VU DE DESSUS — `coque-materiel.webp`
 
-**Une planche 4 × 2, fond MAGENTA uni `#FF00FF` · PNG · 2:1 (≥ 1776 × 896)**
+**Une planche 4 × 2, détourée (ou fond MAGENTA uni `#FF00FF`) · PNG · 2:1**
 
-Le décor posé AU-DEHORS, sur la coque de la cuve : ce qu'on voit sur
-l'extérieur de l'ISS. Pas de transparence demandée — le magenta se détoure
-(`tools/images/materiel.py`), et aucune pièce n'en emploie. L'ordre des
-cases est celui du moteur, **à respecter** :
+Le décor posé AU-DEHORS de la cuve. **Vu de dessus**, comme la salle :
+une première planche en vue de PROFIL (25/09) se lisait comme des
+autocollants plantés sur le bord du plan. L'ordre des cases est celui du
+moteur (`compositionCoque.ts`), **à respecter** ; la composition, elle, est
+écrite par le moteur (un bras et son aile, des radiateurs, un port…) — la
+planche ne fournit que les pièces.
 
-| case | pièce |
-| --- | --- |
-| 1 | antenne fouet : mât fin, deux traverses, feu rouge au sommet |
-| 2 | parabole de liaison sur pylône |
-| 3 | aile solaire : deux panneaux de cellules bleu nuit, cadre doré, mât en treillis |
-| 4 | radiateur : panneau à ailettes gris clair sur deux jambes |
-| 5 | feu de navigation : petit boîtier et son dôme |
-| 6 | bloc de propulseurs : tuyères, chevrons jaune et noir |
-| 7 | poutre en treillis horizontale sur deux pieds, faisceau de câbles |
-| 8 | main courante d'EVA jaune sur ses plots |
+| case | pièce | forme attendue |
+| --- | --- | --- |
+| 1 | aile solaire | une nappe LONGUE couchée (≈ 6:1), deux couvertures de cellules de part et d'autre d'un mât central |
+| 2 | radiateur | un panneau long (≈ 1:3, dans la hauteur de la case), ailettes en travers |
+| 3 | parabole | un disque vu d'en haut, nervures, source au foyer sur trois bras |
+| 4 | port d'amarrage | une collerette et l'amorce d'un module cylindrique, couvertures isolantes matelassées |
+| 5 | poutre en treillis | un segment droit, raccordable bout à bout |
+| 6 | bloc de propulseurs | un bloc carré, trois tuyères vers le haut et les flancs |
+| 7 | feu de navigation | un petit boîtier rond et son dôme |
+| 8 | conduite | un segment de tuyauterie à brides, raccordable bout à bout |
 
 ```
-[préambule §5 de la charte], game sprite sheet, 4 columns x 2 rows grid of 8
-separate objects, each centered in its own equal cell, on a flat solid pure
-magenta background (#FF00FF), no grid lines. Strict flat orthographic SIDE
-view of space station EXTERIOR hull hardware, seen from outside against space.
-Every object stands upright with its mounting base resting exactly on the
-bottom edge of its cell, nothing touching the cell's other edges. In order,
-left to right, top row then bottom row: 1 tall thin whip antenna mast with two
-crossbars and a red tip light; 2 parabolic communication dish on a pylon;
-3 solar array wing, two dark blue photovoltaic panels with thin gold frames on
-a lattice mast; 4 finned pale grey radiator panel on two struts; 5 small
-navigation light housing with a glass dome; 6 reaction control thruster block
-with four nozzles and yellow-black hazard chevrons; 7 horizontal lattice truss
-segment on two legs with a cable bundle; 8 yellow EVA handrail on standoffs.
-Crisp silhouettes, thin bright rim light on edges, no ground, no shadow.
+Retro-futuristic 1970s orbital laboratory, flat orthographic 2D game asset,
+riveted steel panels with weld seams and worn paint. Muted cold palette:
+steel blue-grey #0a1420 to #2a3542, single cyan accent #63b7e6, amber only on
+small indicator lamps. No perspective, no text, no watermark.
+Game sprite sheet, 4 columns x 2 rows grid of 8 separate objects, each
+centered in its own equal cell, generous empty space between cells, on a
+transparent background. STRICT TOP-DOWN ORTHOGRAPHIC VIEW, seen from directly
+above like a floor plan, of space station EXTERIOR hull hardware. Soft light
+from the upper left, thin bright rim light on the lit edges, dark shadowed
+sides. In order, left to right, top row then bottom row:
+1 solar array wing seen from above, a long flat rectangle about 6 times wider
+than tall, two dark blue photovoltaic blankets with a fine cell grid and thin
+gold frames on each side of a narrow central mast;
+2 radiator panel seen from above, a tall flat rectangle about 3 times taller
+than wide, pale grey with fine horizontal fins and a coolant pipe along its
+centre;
+3 parabolic communication dish seen from directly above, a circular dish with
+radial ribs and a small feed horn held at the centre by three struts;
+4 docking port seen from above, a bolted square collar with a short
+cylindrical module stub covered in quilted white-grey thermal blankets;
+5 straight lattice truss segment seen from above, two rails with triangular
+bracing, horizontal, ends clean so it can be tiled end to end;
+6 reaction control thruster block seen from above, square housing with
+yellow-black hazard chevrons and three bell nozzles pointing up, left, right;
+7 small round navigation light housing with a glass dome, seen from above;
+8 straight segment of flanged coolant piping seen from above, horizontal,
+tileable end to end.
+Flat, no ground, no cast shadow on ground, no scenery.
 ```
-Négatif : `perspective, 3/4 view, isometric, ground, cast shadow, background
-scenery, stars, gradient background, text, labels, watermark`
+Négatif : `side view, profile view, perspective, 3/4 view, isometric, ground,
+cast shadow, background scenery, stars, text, labels, watermark`
 
 Livraison : `python3 tools/images/materiel.py <planche>` — l'atlas sort dans
-`public/assets/`, à comparer au tracé dans Paramètres → LE MATÉRIEL DE COQUE.
+`public/assets/`.

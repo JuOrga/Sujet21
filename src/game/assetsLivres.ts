@@ -56,7 +56,6 @@ const NOMS: Record<string, string> = {
   'plafond.webp': 'Plafond du reflet (vu du dessous)',
   'iris.webp': 'Sas — iris mécanique',
   'hull.webp': 'Coque de la cuve',
-  'coque-materiel.webp': 'Coque — matériel extérieur (antennes, paraboles, ailes solaires…)',
   'tank-bg.webp': 'Fond de cuve',
   'stars.webp': 'Ciel étoilé (proche)',
   'stars-far.webp': 'Ciel étoilé (lointain, station)',
