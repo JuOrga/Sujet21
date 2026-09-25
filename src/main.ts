@@ -17997,6 +17997,7 @@ function corpsImage(now: number): boolean {
   // repasse à la densité native de l'écran (renderer.ts, drawConduiteNette)
   renderer.dprNatif = Math.min(window.devicePixelRatio || 1, PLAFOND_DPR)
   renderer.decorNet = decorNet
+  renderer.boitesMurs = level.boxes
   // mesures brutes de CETTE image, pour le collecteur de performance
   let physRaw = 0
   let stepsFaits = 0

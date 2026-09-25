@@ -3302,6 +3302,39 @@ void main() {
   outColor = vec4(c, t.a * uFade * (1.0 - fluide));
 }`
 
+/** L'intervalle [a, b] (un axe d'une boîte, en unités monde) élargi à ce
+ *  que le relief 2.5D en dessine. Le shader lit au pixel w le point
+ *  w − (w − centre)·k : le sommet d'un point p se dessine donc en
+ *  centre + (p − centre)/(1 − k). La réunion de l'intervalle (le pied) et
+ *  de son image (le sommet) couvre aussi les flancs, entre les deux. */
+export function cadreRelief(
+  a: number,
+  b: number,
+  centre: number,
+  k: number,
+): [number, number] {
+  const f = 1 / Math.max(0.05, 1 - k)
+  const da = centre + (a - centre) * f
+  const db = centre + (b - centre) * f
+  return [Math.min(a, da), Math.max(b, db)]
+}
+
+/** La part de la clé de cuisson de la lumière qui vient des boîtes : TOUT
+ *  ce que le cuiseur lit d'elles (sceneSdf) — le SENS d'une conduite
+ *  compris : l'ombre suit le tuyau, et basculer seulement le sens à
+ *  l'éditeur laissait une ombre debout sous un tuyau couché. */
+export function cleBoitesLumiere(
+  boxes: readonly ObstacleBox[],
+  boxCount: number,
+): string {
+  let key = ''
+  for (let i = 0; i < boxCount; i++) {
+    const bx = boxes[i]
+    key += `;${bx.minX},${bx.minY},${bx.maxX},${bx.maxY},${bx.angle ?? 0},${bx.material},${bx.forme ?? 0},${bx.p0 ?? 0},${bx.p1 ?? 0},${bx.sens ?? 0}`
+  }
+  return key
+}
+
 /** Le fichier de chaque sorte de décalque (sans dossier ni extension) :
  *  c'est le nom que la planche de vues reprend (`<fichier>-anime.webp`). */
 const FICHIER_DECAL: Record<DecalDef['kind'], string> = {
@@ -3357,6 +3390,12 @@ export class Renderer {
   dprNatif = 0
   /** Le décor reste natif, seule l'eau suit la résolution (main.ts). */
   decorNet = false
+  /** La salle telle que la PHYSIQUE la voit (main.ts : level.boxes), où se
+   *  sondent les bouts de conduite plongés dans un mur. La liste dessinée
+   *  porte en plus les parois factices des cachettes et le sas, qu'aucun
+   *  solveur ne connaît : sondés là, un bout contre une factice se dessinait
+   *  sans bride quand la physique, elle, en gardait une, invisible. */
+  boitesMurs: readonly ObstacleBox[] | null = null
   private sceneFbo: WebGLFramebuffer | null = null
   private sceneTex: WebGLTexture | null = null
   private sceneW = 0
@@ -4220,10 +4259,7 @@ export class Renderer {
       key +=
         `;L${l.x},${l.y},${l.h},${l.portee},${l.intensite},${l.rvb.join('/')}` +
         `,${l.bandeau ? 1 : 0},${l.demiLong},${l.angleRad}`
-    for (let i = 0; i < boxCount; i++) {
-      const bx = boxes[i]
-      key += `;${bx.minX},${bx.minY},${bx.maxX},${bx.maxY},${bx.angle ?? 0},${bx.material},${bx.forme ?? 0},${bx.p0 ?? 0},${bx.p1 ?? 0}`
-    }
+    key += cleBoitesLumiere(boxes, boxCount)
     if (key === this.lightKey) return
     this.lightKey = key
     this.lightMapMinX = minX
@@ -4373,8 +4409,9 @@ export class Renderer {
     this.cibleW = devW
     this.cibleH = devH
     // la densité des passes qui suivent la composition (vie, éponges) : la
-    // native quand elles se dessinent sur la toile native (décor net)
-    const dprPasses = decorNet ? natW / viewportW : dpr
+    // native dès qu'une passe nette a lieu — elles se dessinent alors sur
+    // la toile native, APRÈS elle (voir drawConduiteNette)
+    const dprPasses = nette ? natW / viewportW : dpr
     const down = Math.max(1, downsample)
     const fboW = Math.max(1, Math.round(devW / down))
     const fboH = Math.max(1, Math.round(devH / down))
@@ -4424,7 +4461,8 @@ export class Renderer {
         bx.material === 0
           ? (bx.skin ?? 0)
           : bx.material === MAT_FROID
-            ? (bx.sens ?? 0) + 4 * boutsEnMur(bx, boxes, sim.bounds)
+            ? (bx.sens ?? 0) +
+              4 * boutsEnMur(bx, this.boitesMurs ?? boxes, sim.bounds)
             : sim.surchauffesVides.has(i)
               ? 0
               : 1
@@ -4703,6 +4741,8 @@ export class Renderer {
     gl.activeTexture(gl.TEXTURE0)
     gl.drawArrays(gl.TRIANGLES, 0, 3)
     if (decorNet) this.drawDecorNet(viewportW, natW, natH)
+    else if (nette)
+      this.drawConduiteNette(boxes, camera, viewportW, viewportH, natW, natH, relief)
 
     // Passe B vie — les motes dans le corps, la lueur des gouttes perdues
     this.drawVie(camera, viewportW, viewportH, dprPasses, params)
@@ -4718,13 +4758,14 @@ export class Renderer {
 
     // Passe C — cellules d'éponge
     this.drawSponges(sim, camera, viewportW, viewportH, dprPasses)
-
-    if (nette && !decorNet) this.drawConduiteNette(boxes, camera, viewportW, viewportH, natW, natH)
   }
 
   // LA CONDUITE NETTE (voir sceneFbo) : la scène basse résolution recopiée
   // sur la toile native, puis la composition repassée EN NATIF sur les seules
   // boîtes des conduites (ciseaux), mêlée au prorata de leur couverture.
+  // Elle suit IMMÉDIATEMENT la composition : repassée après la vie, les
+  // décalques, les lampes et les éponges, elle les effaçait là où ils
+  // chevauchaient une conduite — ils se dessinent donc ensuite, en natif.
   // Tous les uniformes de la composition sont déjà posés par la passe
   // principale : seuls changent la densité, la taille de la cible et le
   // drapeau de la passe.
@@ -4735,6 +4776,7 @@ export class Renderer {
     viewportH: number,
     natW: number,
     natH: number,
+    relief: number,
   ): void {
     const gl = this.gl
     gl.bindFramebuffer(gl.FRAMEBUFFER, null)
@@ -4763,6 +4805,7 @@ export class Renderer {
     gl.enable(gl.BLEND)
     gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA)
     gl.enable(gl.SCISSOR_TEST)
+    const kRelief = relief * Math.min(1, Math.max(0, camera.zoom * 1.2))
     const px = (wx: number) => ((wx - camera.x) * camera.zoom + viewportW / 2) * dpr
     const py = (wy: number) => ((wy - camera.y) * camera.zoom + viewportH / 2) * dpr
     for (const b of boxes) {
@@ -4781,6 +4824,11 @@ export class Renderer {
         y0 = cy - r
         y1 = cy + r
       }
+      // le RELIEF 2.5D pousse le sommet des parois loin du centre de l'écran
+      // (relDisp du shader) : la boîte seule laissait floue, avec une
+      // couture, la part dessinée au-delà
+      ;[x0, x1] = cadreRelief(x0, x1, camera.x, kRelief)
+      ;[y0, y1] = cadreRelief(y0, y1, camera.y, kRelief)
       const sx0 = Math.max(0, Math.floor(px(x0)) - 2)
       const sy0 = Math.max(0, Math.floor(py(y0)) - 2)
       const sx1 = Math.min(natW, Math.ceil(px(x1)) + 2)
@@ -4792,6 +4840,8 @@ export class Renderer {
     gl.disable(gl.SCISSOR_TEST)
     gl.disable(gl.BLEND)
     gl.uniform1f(cu['uPasse'], 0)
+    this.cibleW = natW
+    this.cibleH = natH
   }
 
   // LE DÉCOR NET (voir decorNet) : la couche d'eau vient d'être calculée
