@@ -1490,21 +1490,17 @@ Cadrage : le segment vertical, raccordable en haut et en bas.
 Retro-futuristic 1970s orbital laboratory hardware, NASA/ISS-inspired, realistic worn industrial detail: riveted steel, weld seams, scuffed paint, bolts, small stencilled hazard markings. Muted cold palette: steel blue-grey #0a1420 to #2a3542, off-white quilted thermal blankets, a single cyan accent #63b7e6, amber only on tiny indicator lamps. STRICT TOP-DOWN ORTHOGRAPHIC VIEW, seen from directly above like a floor plan or a satellite photo, no perspective, no 3/4 angle, no side faces visible. Hard sunlight from the upper left: lit edges catch a thin bright rim, the lower right sides fall into deep shadow. Isolated single object on a fully TRANSPARENT background, filling the frame with a small empty margin, crisp clean silhouette, high detail, 2D game asset. Subject: one straight segment of a space station lattice truss seen from directly above, running vertically through a 9:16 portrait image from the bottom edge to the top edge. Two parallel square steel rails on the left and right, triangular diagonal bracing between them, bolted gusset plates at each node, a bundle of cables and a thin coolant line running along the middle, a small yellow handrail on one side. Both ends are cut straight and identical so the segment tiles seamlessly end to end. Avoid: side view, profile view, perspective, isometric, 3/4 view, ground, floor, cast shadow on a surface, background scenery, stars, planet, text, labels, logos, watermark, frame, border.
 ```
 
-### 28.6 bloc de propulseurs — `coque/propulseurs.png` · 1:1 (carré)
+### 28.6 bloc de propulseurs — ✗ ABANDONNÉ (25/09)
 
-Cadrage : le bloc centré, une tuyère vers le HAUT, une à gauche, une à droite.
+Retiré de la composition : ni le tracé ni l'image générée (des tuyères
+vues de face, comme des haut-parleurs) ne tenaient à côté des pièces
+peintes.
 
-```
-Retro-futuristic 1970s orbital laboratory hardware, NASA/ISS-inspired, realistic worn industrial detail: riveted steel, weld seams, scuffed paint, bolts, small stencilled hazard markings. Muted cold palette: steel blue-grey #0a1420 to #2a3542, off-white quilted thermal blankets, a single cyan accent #63b7e6, amber only on tiny indicator lamps. STRICT TOP-DOWN ORTHOGRAPHIC VIEW, seen from directly above like a floor plan or a satellite photo, no perspective, no 3/4 angle, no side faces visible. Hard sunlight from the upper left: lit edges catch a thin bright rim, the lower right sides fall into deep shadow. Isolated single object on a fully TRANSPARENT background, filling the frame with a small empty margin, crisp clean silhouette, high detail, 2D game asset. Subject: one reaction control thruster quad of a space station seen from directly above, in a square 1:1 image. A compact square housing with yellow and black hazard chevrons on its top, access panels and bolts, and three bell-shaped rocket nozzles pointing outwards: one up, one left, one right; the inside of each nozzle dark and soot-stained. At the bottom edge, a short mounting bracket where it bolts to the hull. Avoid: side view, profile view, perspective, isometric, 3/4 view, ground, floor, cast shadow on a surface, background scenery, stars, planet, text, labels, logos, watermark, frame, border.
-```
+### 28.7 feu de navigation — ✗ PAS D'IMAGE (25/09)
 
-### 28.7 feu de navigation — `coque/feu.png` · 1:1 (carré)
-
-Cadrage : le feu centré.
-
-```
-Retro-futuristic 1970s orbital laboratory hardware, NASA/ISS-inspired, realistic worn industrial detail: riveted steel, weld seams, scuffed paint, bolts, small stencilled hazard markings. Muted cold palette: steel blue-grey #0a1420 to #2a3542, off-white quilted thermal blankets, a single cyan accent #63b7e6, amber only on tiny indicator lamps. STRICT TOP-DOWN ORTHOGRAPHIC VIEW, seen from directly above like a floor plan or a satellite photo, no perspective, no 3/4 angle, no side faces visible. Hard sunlight from the upper left: lit edges catch a thin bright rim, the lower right sides fall into deep shadow. Isolated single object on a fully TRANSPARENT background, filling the frame with a small empty margin, crisp clean silhouette, high detail, 2D game asset. Subject: one small navigation light of a space station seen from directly above, in a square 1:1 image. A round armoured housing with a protective wire cage over a glass dome, the lamp inside unlit (neutral clear glass, the game adds the coloured glow), four bolts on the base plate, a small cable leaving towards the bottom edge. Avoid: side view, profile view, perspective, isometric, 3/4 view, ground, floor, cast shadow on a surface, background scenery, stars, planet, text, labels, logos, watermark, frame, border.
-```
+Gardé TRACÉ par le moteur : à 28 u, quelques pixels au dézoom, aucun
+détail peint ne se verrait — c'est son halo coloré qui se lit. Une
+image générée (une lanterne grillagée de quai) a été écartée.
 
 ### 28.8 embase — `coque/embase.png` · 2:1 (paysage)
 

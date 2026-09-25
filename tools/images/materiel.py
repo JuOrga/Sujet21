@@ -45,8 +45,8 @@ PIECES = [
     ('parabole', 700),
     ('amarrage', 1000),
     ('treillis', 950),
-    ('propulseurs', 500),
-    ('feu', 250),
+    ('propulseurs', 0),  # retirés de la composition : la case reste vide
+    ('feu', 0),  # tracé par le moteur : à 28 u, une image ne se verrait pas
 ]
 
 
@@ -81,6 +81,9 @@ def main() -> None:
     lignes = []
     for i, (nom, h) in enumerate(PIECES):
         src = SOURCES / f'{nom}.png'
+        if not h:
+            lignes.append(f'  null, // {i} {nom} : sans image, par choix (voir PIECES)')
+            continue
         if not src.exists():
             lignes.append(f'  null, // {i} {nom} : pas d’image, tracée par le shader')
             continue

@@ -3041,28 +3041,6 @@ void dessinePiece(inout vec4 acc, vec2 q, vec2 h, float type, float g, float an,
     float cadre = max(min(mem, zig), abs(q.y) - h.y);
     piece(acc, cadre, acierC, px);
     piece(acc, max(abs(q.x) - 3.0, abs(q.y) - h.y), vec3(0.07, 0.065, 0.06), px); // le câble porté
-  } else if (type < 5.5) {
-    // PROPULSEURS : le bloc, trois tuyères vers le dehors et les flancs ;
-    // de temps en temps, une bouffée brève (contrôle d'attitude)
-    piece(acc, sdRect(q, vec2(0.0), h * 0.55) - 3.0, acierC, px);
-    float chev = step(0.5, fract((q.x + q.y) / 6.0)) * step(abs(q.y), h.y * 0.25);
-    pose(acc, vec3(0.30, 0.25, 0.08), chev * (1.0 - smoothstep(-0.5 * px, 0.5 * px, sdRect(q, vec2(0.0), h * 0.5))) * 0.8);
-    float cycle = fract(uTime * 0.11 + g * 5.0);
-    float bouffee = smoothstep(0.0, 0.02, cycle) * (1.0 - smoothstep(0.02, 0.08, cycle));
-    int quelle = int(floor(g * 3.0));
-    for (int k = 0; k < 3; k++) {
-      vec2 dir = k == 0 ? vec2(0.0, 1.0) : k == 1 ? vec2(-1.0, 0.0) : vec2(1.0, 0.0);
-      vec2 o = dir * h.x * 0.55;
-      vec2 l = q - o;
-      float t = dot(l, dir);
-      float lat = abs(dot(l, vec2(-dir.y, dir.x)));
-      piece(acc, max(lat - (4.0 + max(t, 0.0) * 0.45), abs(t - 6.0) - 6.0), vec3(0.06, 0.065, 0.07), px);
-      if (k == quelle && bouffee > 0.001) {
-        float tt = max(t - 12.0, 0.0);
-        float jet = exp(-lat * lat / (2.0 * (5.0 + tt * 0.4) * (5.0 + tt * 0.4))) * exp(-tt * 0.05) * step(12.0, t);
-        acc.rgb += vec3(0.55, 0.68, 0.85) * jet * bouffee * 0.9;
-      }
-    }
   } else if (type > 6.5) {
     // L'EMBASE : la platine boulonnée qui tient la pièce. Elle MORD dans la
     // coque (y < 0) — c'est elle qui fait la liaison. Une ombre de contact

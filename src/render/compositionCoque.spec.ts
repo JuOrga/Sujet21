@@ -7,7 +7,6 @@ import {
   EMBASE_PROF,
   PIECE_FEU,
   PIECE_PARABOLE,
-  PIECE_PROPULSEURS,
   PIECE_RADIATEUR,
   PIECE_TREILLIS,
   composeCoque,
@@ -73,11 +72,12 @@ describe('La composition du matériel de coque', () => {
     expect(cote(de(ps, PIECE_PARABOLE)[0])).not.toBe(coteEnergie)
   })
 
-  it('un petit côté reçoit le port d’amarrage, les coins leurs propulseurs', () => {
+  it('un petit côté reçoit le port d’amarrage', () => {
     const port = de(ps, PIECE_AMARRAGE)
     expect(port).toHaveLength(1)
     expect(['gauche', 'droite']).toContain(cote(port[0]))
-    expect(de(ps, PIECE_PROPULSEURS)).toHaveLength(4)
+    // les propulseurs d'angle sont retirés : plus aucune pièce de type 5
+    expect(ps.some((p) => p.type === 5)).toBe(false)
   })
 
   it('les feux de navigation : rouge à bâbord, vert à tribord — un de chaque côté', () => {

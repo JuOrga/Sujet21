@@ -18,8 +18,9 @@
 //     s'écartent de la coque, et une parabole près d'un bout ;
 //   - un petit côté porte l'AMARRAGE : un port et l'amorce du module
 //     voisin — la salle est un maillon, pas une boîte perdue ;
-//   - aux quatre coins, les PROPULSEURS de contrôle d'attitude, et les feux
-//     de navigation : rouge à bâbord (gauche), vert à tribord (droite).
+//   - les feux de navigation : rouge à bâbord (gauche), vert à tribord
+//     (droite). Les propulseurs d'angle ont été retirés (25/09) : aucune
+//     version, tracée ou peinte, ne tenait à côté des pièces peintes.
 // Une pièce dont l'attache tombe dans un VIDE est retirée avec tout son
 // groupe (un bras sans coque où tenir ne porte plus son aile).
 //
@@ -38,7 +39,7 @@ export const PIECE_RADIATEUR = 1
 export const PIECE_PARABOLE = 2
 export const PIECE_AMARRAGE = 3
 export const PIECE_TREILLIS = 4
-export const PIECE_PROPULSEURS = 5
+// 5 : les propulseurs, retirés — la case reste libre, l'atlas garde son ordre
 export const PIECE_FEU = 6
 /** L'EMBASE : la platine boulonnée qui tient une pièce sur la coque. Elle
  *  MORD dans la coque (EMBASE_PROF sous la face externe) : c'est elle qui
@@ -236,15 +237,8 @@ export function composeCoque(b: Bounds, vides: readonly FormeBox[] = []): PieceC
     const h = (largeur / rapportDe(PIECE_AMARRAGE, 1.13)) * (ATLAS_COQUE[PIECE_AMARRAGE] ? part : 1)
     pose(amarrage, PIECE_AMARRAGE, s, h / 2, largeur / 2, h / 2, g, ATLAS_COQUE[PIECE_AMARRAGE] ? part : 0)
   }
-  // LES COINS : propulseurs aux deux bouts des petits côtés, et les feux de
-  // navigation au côté arrière (pas sur l'amarrage : le port y est)
-  for (const cote of petits) {
-    for (const s of [70, cote.long - 70]) {
-      const g = ++groupe
-      attache(cote, s, g, 36)
-      pose(cote, PIECE_PROPULSEURS, s, 40, 36, 36, g)
-    }
-  }
+  // LES FEUX DE NAVIGATION : un par côté latéral (pas sur le port
+  // d'amarrage, qui tient le milieu du sien)
   for (const cote of [c.gauche, c.droite]) {
     const s = cote === arriere ? cote.long / 2 : cote.long * (alea() < 0.5 ? 0.25 : 0.75)
     if (cote === amarrage && Math.abs(s - cote.long / 2) < 260) continue
