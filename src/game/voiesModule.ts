@@ -331,6 +331,40 @@ export function portesDuRang(mc: MiniCarte, rang: number, voieDOuLOnVient: numbe
   return noeuds.filter((x) => avant.suivants.includes(x.voie))
 }
 
+/** LE CHEMIN D'UNE PORTE, pour le survol : la coursive qui y entre depuis
+ *  le nœud d'où l'on vient (`voieDOuLOnVient`, null au premier rang), puis
+ *  tout ce qu'elle rend joignable jusqu'au bout du module. Rend les clés
+ *  des nœuds (« rang-voie ») et des liens (« rang-voie-suivante », comme
+ *  `data-lien` du dessin). Allumer le seul nœud visé ne disait pas où la
+ *  porte menait : sur un tressage de voies, l'œil perdait la suite
+ *  (le concepteur, 25/09). */
+export function cheminDePorte(
+  mc: MiniCarte,
+  rang: number,
+  voie: number,
+  voieDOuLOnVient: number | null,
+): { noeuds: string[]; liens: string[]; entree: string | null } {
+  const noeuds = new Set<string>()
+  const liens: string[] = []
+  const avant = voieDOuLOnVient !== null ? mc.rangs[rang - 1]?.[voieDOuLOnVient] : undefined
+  const entree = avant?.suivants.includes(voie) ? `${rang - 1}-${voieDOuLOnVient}-${voie}` : null
+  if (!mc.rangs[rang]?.[voie]) return { noeuds: [], liens: [], entree: null }
+  // rang par rang : les voies joignables au rang r, puis leurs suivantes
+  let front = new Set<number>([voie])
+  for (let r = rang; r < mc.rangs.length && front.size > 0; r++) {
+    const suite = new Set<number>()
+    for (const v of front) {
+      noeuds.add(`${r}-${v}`)
+      for (const s of mc.rangs[r][v]?.suivants ?? []) {
+        liens.push(`${r}-${v}-${s}`)
+        suite.add(s)
+      }
+    }
+    front = suite
+  }
+  return { noeuds: [...noeuds], liens, entree }
+}
+
 /** LE DESSIN de la mini-carte, en SVG : les rangs de gauche à droite, les
  *  voies de haut en bas, le chemin déjà joué (`trace`, une voie par salle
  *  franchie), et les portes du rang courant allumées. Pur : une chaîne.
@@ -407,7 +441,7 @@ export function dessinMiniCarteSVG(
       for (const s of nd.suivants) {
         const joue = joueIci && o.trace[nd.rang + 1] === s
         const ouvre = joueIci && nd.rang + 1 === o.rang && o.portes.includes(s)
-        liens += `<line class="mv-lien${joue ? ' mv-joue' : ''}${ouvre ? ' mv-ouvre' : ''}" x1="${x(nd.rang) + S}" y1="${y(nd.voie)}" x2="${x(nd.rang + 1) - S}" y2="${y(s)}"/>`
+        liens += `<line class="mv-lien${joue ? ' mv-joue' : ''}${ouvre ? ' mv-ouvre' : ''}" data-lien="${nd.rang}-${nd.voie}-${s}" x1="${x(nd.rang) + S}" y1="${y(nd.voie)}" x2="${x(nd.rang + 1) - S}" y2="${y(s)}"/>`
       }
       const porte = nd.rang === o.rang && o.portes.includes(nd.voie)
       const cl =

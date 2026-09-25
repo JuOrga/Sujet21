@@ -6528,7 +6528,9 @@
       .cs-route.cs-principale:not(.cs-active):not(.cs-parcourue) { filter: drop-shadow(0 0 6px var(--c)); }
       .cs-route.cs-lien-sel { stroke: #eef8ff; filter: drop-shadow(0 0 8px #eef8ff); }
       /* le survol qui projette : la route la plus courte jusqu'à l'objectif */
-      .cs-route.cs-projet { stroke: #eef8ff; opacity: 1; filter: drop-shadow(0 0 7px #eef8ff); }
+      .cs-route.cs-projet { stroke: #eef8ff; stroke-width: 5; opacity: 1; stroke-dasharray: none; animation: none; filter: drop-shadow(0 0 7px #eef8ff); }
+      .cs-projection .cs-route { transition: opacity 0.16s ease; }
+      .cs-projection .cs-route:not(.cs-projet) { opacity: 0.18; filter: none; }
       .cs-mod.cs-projet { filter: drop-shadow(0 0 10px rgba(238, 248, 255, 0.75)); }
       /* ce que la porte survolée FERME : les modules qu'on ne pourra plus joindre */
       .cs-mod.cs-hors { opacity: 0.22 !important; filter: none; transition: opacity 0.18s ease; }
@@ -8899,6 +8901,16 @@
       .mv-noeud.mv-vise .mv-tuile { fill: currentColor; }
       .mv-noeud.mv-vise use { color: #071018; filter: none; }
       .mv-noeud.mv-evenement.mv-porte .mv-tuile { fill: rgba(255, 217, 119, 0.12); }
+      /* LE SURVOL D'UNE PORTE : son chemin s'allume en blanc plein, tout le
+         reste recule — le trait gris sur gris d'avant se perdait au milieu
+         des autres voies (le concepteur, 25/09) */
+      .mv-lien, .mv-noeud { transition: opacity 0.16s ease, stroke 0.16s ease; }
+      .mv-survol .mv-lien:not(.mv-chemin):not(.mv-entree):not(.mv-joue) { opacity: 0.15; }
+      .mv-survol .mv-noeud:not(.mv-chemin):not(.mv-joue) { opacity: 0.22; }
+      .mv-survol .mv-lien.mv-chemin { stroke: #eaf6ff; stroke-width: 3; stroke-dasharray: none; opacity: 0.8; animation: none; }
+      .mv-survol .mv-lien.mv-entree { stroke: #ffffff; stroke-width: 4.5; stroke-dasharray: none; animation: none; filter: drop-shadow(0 0 6px rgba(234, 246, 255, 0.9)); }
+      .mv-survol .mv-noeud.mv-chemin .mv-tuile { stroke-opacity: 1; }
+      .mv-survol .mv-noeud.mv-chemin use { opacity: 1; }
       @keyframes mv-bat { 0%, 100% { stroke-width: 6; stroke-opacity: 0.35; } 50% { stroke-width: 10; stroke-opacity: 0.12; } }
       .mv-titre { fill: #55708c; font-size: 9px; letter-spacing: 0.22em; text-anchor: middle; font-family: var(--font-display); }
       .mv-titre.mv-courant { fill: #d5f3e8; }

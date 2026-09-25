@@ -119,6 +119,7 @@ import {
   type PrimeNoeud,
   NOMS_PRIME,
   PRIMES,
+  cheminDePorte,
 } from './game/voiesModule'
 import { CLE_MANQUES, inventairePool, litManques, noteManque, type Manque } from './game/manques'
 import {
@@ -14895,9 +14896,11 @@ function mbMontreCarte(raison: 'depart' | 'suite'): void {
   // sur l'écran LA STATION (rebâtir relancerait le halo et volerait le focus).
   const projette = (id: string | null): void => {
     for (const el of scene.querySelectorAll('.cs-projet, .cs-hors')) el.classList.remove('cs-projet', 'cs-hors')
-    if (!id) return
-    const p = projectionDepuis(carte, id)
-    if (!p) return
+    const p = id ? projectionDepuis(carte, id) : null
+    // les autres coursives reculent le temps du survol : un trait blanc
+    // parmi vingt coursives colorées ne se suivait pas d'un coup d'œil
+    scene.classList.toggle('cs-projection', !!p)
+    if (!id || !p) return
     // CE QUI SE FERME : les modules que cette porte ne permet plus
     // d'atteindre s'éteignent — c'est ainsi que trois portes dont les
     // routes se rejoignent plus loin se distinguent quand même (revue du
@@ -15567,14 +15570,30 @@ function mbMontreSallesVoie(cartes: CarteVoie[]): void {
             } else salleChoisie = c.lv
           },
         )
-    // viser une porte allume son nœud sur la mini-carte
-    if (c.voie !== undefined) {
-      const noeud = (): Element | null =>
-        host.querySelector(`.mv-noeud[data-rang="${carteRun.niveau}"][data-voie="${c.voie}"]`)
-      for (const ev of ['pointerenter', 'focusin', 'pad-vise'] as const)
-        porte.addEventListener(ev, () => noeud()?.classList.add('mv-vise'))
-      for (const ev of ['pointerleave', 'focusout', 'pad-quitte'] as const)
-        porte.addEventListener(ev, () => noeud()?.classList.remove('mv-vise'))
+    // VISER UNE PORTE ALLUME SON CHEMIN sur la mini-carte : la coursive qui
+    // y entre, son nœud, et tout ce qu'elle rend joignable ensuite — le
+    // reste s'efface. Le nœud seul ne disait pas où la porte menait : sur
+    // les voies qui se croisent, l'œil perdait la suite (le concepteur, 25/09).
+    if (c.voie !== undefined && mini) {
+      const voie = c.voie
+      const allume = (oui: boolean): void => {
+        const svg = host.querySelector('.mv-svg')
+        if (!svg) return
+        for (const el of svg.querySelectorAll('.mv-chemin, .mv-entree, .mv-vise'))
+          el.classList.remove('mv-chemin', 'mv-entree', 'mv-vise')
+        svg.classList.toggle('mv-survol', oui)
+        if (!oui) return
+        const ch = cheminDePorte(mini, carteRun.niveau, voie, derniereVoie(carteRun))
+        for (const k of ch.noeuds) {
+          const [r, v] = k.split('-')
+          svg.querySelector(`.mv-noeud[data-rang="${r}"][data-voie="${v}"]`)?.classList.add('mv-chemin')
+        }
+        for (const k of ch.liens) svg.querySelector(`.mv-lien[data-lien="${k}"]`)?.classList.add('mv-chemin')
+        if (ch.entree) svg.querySelector(`.mv-lien[data-lien="${ch.entree}"]`)?.classList.add('mv-entree')
+        svg.querySelector(`.mv-noeud[data-rang="${carteRun.niveau}"][data-voie="${voie}"]`)?.classList.add('mv-vise')
+      }
+      for (const ev of ['pointerenter', 'focusin', 'pad-vise'] as const) porte.addEventListener(ev, () => allume(true))
+      for (const ev of ['pointerleave', 'focusout', 'pad-quitte'] as const) porte.addEventListener(ev, () => allume(false))
     }
     host.appendChild(porte)
   })

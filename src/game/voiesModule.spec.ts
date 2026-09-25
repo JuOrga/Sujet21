@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { aleaDeGraine } from './voie'
-import { dessinMiniCarteSVG, portesDuRang, tisseMiniCarte, TISSAGE_DEFAUT, typesDuModule, VOIES, type MiniCarte } from './voiesModule'
+import { cheminDePorte, dessinMiniCarteSVG, portesDuRang, tisseMiniCarte, TISSAGE_DEFAUT, typesDuModule, VOIES, type MiniCarte } from './voiesModule'
 
 // SANS HALTE par défaut : les tests des salles et des rencontres regardent la
 // grille nue ; les haltes ont leur propre bloc
@@ -305,3 +305,34 @@ describe('les HALTES dans la grille — l’économat, l’alcôve, la bonbonne,
   })
 })
 
+describe('cheminDePorte — ce que le survol d’une porte allume', () => {
+  // 0 → 0,1 ; 1 → 1 ; 2 → 2 ; puis 0 → 0 ; 1 → 1,2 ; 2 → 2 ; dernier rang
+  const nd = (rang: number, voie: number, suivants: number[]) =>
+    ({ rang, voie, mecanique: 0, figure: false, ecrite: false, nature: 'salle', prime: null, suivants }) as const
+  const mc: MiniCarte = {
+    voies: 3,
+    rangs: [
+      [nd(0, 0, [0, 1]), nd(0, 1, [1]), nd(0, 2, [2])],
+      [nd(1, 0, [0]), nd(1, 1, [1, 2]), nd(1, 2, [2])],
+      [nd(2, 0, []), nd(2, 1, []), nd(2, 2, [])],
+    ].map((r) => r.map((n) => ({ ...n, suivants: [...n.suivants] }))),
+  }
+
+  it('la coursive d’entrée, puis tout ce que la porte rend joignable — rien d’autre', () => {
+    const ch = cheminDePorte(mc, 1, 1, 0)
+    expect(ch.entree).toBe('0-0-1')
+    expect(ch.noeuds.sort()).toEqual(['1-1', '2-1', '2-2'])
+    expect(ch.liens.sort()).toEqual(['1-1-1', '1-1-2'])
+  })
+
+  it('au premier rang, pas d’entrée ; une porte hors grille, rien', () => {
+    expect(cheminDePorte(mc, 0, 2, null)).toEqual({ noeuds: ['0-2', '1-2', '2-2'], liens: ['0-2-2', '1-2-2'], entree: null })
+    expect(cheminDePorte(mc, 5, 0, null)).toEqual({ noeuds: [], liens: [], entree: null })
+  })
+
+  it('les clés sont celles du dessin : chaque lien allumé existe dans le SVG', () => {
+    const svg = dessinMiniCarteSVG(mc, { rang: 1, trace: [0], portes: [0, 1] })
+    const ch = cheminDePorte(mc, 1, 1, 0)
+    for (const k of [...ch.liens, ch.entree!]) expect(svg).toContain(`data-lien="${k}"`)
+  })
+})
