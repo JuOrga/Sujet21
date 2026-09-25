@@ -12,6 +12,7 @@ import {
   empaquettePieces,
   type PieceCoque,
 } from './compositionCoque'
+import { ATLAS_COQUE } from './coqueAtlas'
 import { COQUE_EPAISSEUR, COQUE_FRANGE } from './coque'
 
 // La cuve standard : 2400 × 1500, et le tableau de la capture du 25/09.
@@ -50,8 +51,11 @@ describe('La composition du matériel de coque', () => {
     expect(ailes.length).toBeGreaterThanOrEqual(1)
     for (const a of ailes) {
       expect(['haut', 'bas']).toContain(cote(a))
-      // l'aile est couchée LE LONG de la paroi : bien plus longue que large
-      expect(a.hx).toBeGreaterThan(3 * a.hy)
+      // l'aile est couchée LE LONG de la paroi, et JAMAIS déformée : ses
+      // proportions sont celles de son image quand elle est livrée
+      expect(a.hx).toBeGreaterThan(a.hy)
+      const rapport = ATLAS_COQUE[PIECE_AILE]?.rapport
+      if (rapport) expect(a.hx / a.hy).toBeCloseTo(rapport, 3)
       // et son bras la relie à la coque : même groupe, entre elle et la paroi
       const bras = ps.find((p) => p.groupe === a.groupe && p.type === PIECE_TREILLIS)!
       expect(bras).toBeTruthy()
@@ -98,9 +102,24 @@ describe('La composition du matériel de coque', () => {
     expect(composeCoque({ ...cuve })).toEqual(ps)
   })
 
-  it('une très longue salle porte deux ailes', () => {
-    const longue = composeCoque({ minX: -2400, minY: -750, maxX: 2400, maxY: 750 })
-    expect(de(longue, PIECE_AILE)).toHaveLength(2)
+  it('un long côté porte une paire d’ailes, comme l’ISS ; un court, une seule', () => {
+    expect(de(ps, PIECE_AILE)).toHaveLength(2)
+    const courte = composeCoque({ minX: -900, minY: -600, maxX: 900, maxY: 600 })
+    expect(de(courte, PIECE_AILE)).toHaveLength(1)
+  })
+
+  it('aucune pièce livrée en image n’est déformée : ses proportions sont celles de l’image', () => {
+    for (const p of ps) {
+      const r = ATLAS_COQUE[p.type]?.rapport
+      if (!r || p.type === PIECE_TREILLIS) continue // le treillis se répète le long du bras
+      const part = p.type === PIECE_AMARRAGE ? p.param : 1
+      expect(p.hx / (p.hy / part), `pièce ${p.type}`).toBeCloseTo(r, 3)
+    }
+  })
+
+  it('le treillis se répète sans s’étirer : une tuile garde le rapport de son image', () => {
+    const r = ATLAS_COQUE[PIECE_TREILLIS]?.rapport
+    for (const t of de(ps, PIECE_TREILLIS)) if (r) expect((2 * t.hx) / t.param).toBeCloseTo(r, 3)
   })
 
   it('une salle en hauteur tourne sa composition : l’énergie sur un côté vertical', () => {

@@ -38,6 +38,7 @@ import {
   videsPercantLaCoque,
 } from './coque'
 import { MAX_PIECES_COQUE, composeCoque, empaquettePieces } from './compositionCoque'
+import { ATLAS_COQUE } from './coqueAtlas'
 
 // Budgets de rendu : au-delà, les éléments excédentaires ne sont plus
 // dessinés (la physique, elle, les voit tous) — l'éditeur avertit quand un
@@ -2866,6 +2867,9 @@ in vec2 vCote;  // (côté 0 haut · 1 bas · 2 gauche · 3 droite, longueur de 
 uniform sampler2D uTexHull;
 #define MAX_PIECES ${MAX_PIECES_COQUE}
 uniform int uPieceCount;
+uniform sampler2D uTexMateriel; // l'atlas des pièces (coqueAtlas.ts)
+uniform float uHasMateriel;
+uniform vec4 uAtlas[8];          // par type : u0, v0, u1, v1 (origine en haut) — u1 = 0 : pas d'image
 uniform vec4 uPieces[MAX_PIECES];    // centre, demi-dimensions (le long, vers le dehors)
 uniform vec4 uPiecesAux[MAX_PIECES]; // type, angle du repère, graine, —
 uniform float uZoom;
@@ -3073,6 +3077,61 @@ void dessinePiece(inout vec4 acc, vec2 q, vec2 h, float type, float g, float an,
   }
 }
 
+// UNE PIÈCE PEINTE : son image dans l'atlas (tools/images/materiel.py), posée
+// dans la boîte de la pièce, la coque au bord bas. Le treillis se RÉPÈTE le
+// long du bras (param : la longueur d'une tuile) ; le port d'amarrage ne
+// montre que le bas de son image (param : la part montrée) et s'efface vers
+// le haut — le module voisin continue dans le noir. Niveau de détail écrit à
+// la main (textureGrad) : la boucle des pièces a un flot divergent.
+void peintPiece(inout vec4 acc, vec2 q, vec2 h, float type, float g, float param, vec4 r, float px) {
+  // la parabole suit sa cible : l'image entière pivote de quelques degrés
+  if (type > 1.5 && type < 2.5) {
+    float a = 0.10 * sin(uTime * 0.05 + g * 6.28);
+    q = vec2(cos(a) * q.x + sin(a) * q.y, -sin(a) * q.x + cos(a) * q.y);
+  }
+  float u = q.x / (2.0 * h.x) + 0.5;
+  float vv = q.y / (2.0 * h.y) + 0.5; // 0 à la coque, 1 au bout
+  if (u < 0.0 || u > 1.0 || vv < 0.0 || vv > 1.0) return;
+  float vi = vv;
+  float dv = (r.w - r.y) / (2.0 * h.y);
+  float fondu = 1.0;
+  if (type > 3.5 && type < 4.5) { // treillis : des tuiles bout à bout
+    vi = fract((q.y + h.y) / param);
+    dv = (r.w - r.y) / param;
+  } else if (type > 2.5 && type < 3.5 && param > 0.0) { // amarrage
+    vi = vv * param;
+    dv *= param;
+    fondu = 1.0 - smoothstep(0.72, 1.0, vv);
+  }
+  vec2 uv = vec2(mix(r.x, r.z, u), 1.0 - mix(r.w, r.y, vi)); // atlas retourné (FLIP_Y)
+  vec2 du = vec2((r.z - r.x) / (2.0 * h.x) * px, 0.0);
+  vec4 t = textureGrad(uTexMateriel, uv, du, vec2(0.0, dv * px));
+  // éclairé par le soleil seul : plus sombre et plus froid que la planche,
+  // pour rester sous la cuve dans la hiérarchie lumineuse
+  vec3 c = t.rgb * vec3(0.70, 0.75, 0.84);
+  float k = t.a * fondu;
+  acc = vec4(c * k, k) + acc * (1.0 - k);
+  if (type < 0.5) {
+    // l'aile : le soleil glisse sur les cellules bleues ; le voyant du cardan
+    float bleu = smoothstep(0.03, 0.12, t.b - t.r) * k;
+    float nappe = smoothstep(0.80, 1.0, sin((q.x - q.y * 3.0) * 0.006 + uTime * 0.12 + g * 9.0));
+    acc.rgb += vec3(0.09, 0.12, 0.18) * nappe * bleu;
+    feu(acc, q, vec2(0.0, -0.543 * h.y), vec3(1.0, 0.62, 0.18), 0.15 + 0.7 * step(0.8, fract(uTime * 0.5 + g * 3.0)), 4.0);
+  } else if (type < 1.5) {
+    // le radiateur : le caloporteur circule, une onde tiède qui monte
+    float onde = 0.5 + 0.5 * sin(q.y * 0.02 - uTime * 0.6 + g * 6.0);
+    acc.rgb += vec3(0.035, 0.028, 0.018) * onde * k;
+  } else if (type > 2.5 && type < 3.5 && param > 0.0) {
+    // le port : ses quatre feux d'approche battent deux par deux
+    for (int i = 0; i < 4; i++) {
+      float fx = (i == 0 || i == 2) ? -0.592 : 0.556;
+      float fy = i < 2 ? -0.004 : -0.754;
+      float on = step(0.5, fract(uTime * 0.7 + (i < 2 ? 0.0 : 0.5)));
+      feu(acc, q, vec2(fx * h.x, fy * h.y), vec3(0.3, 1.0, 0.55), 0.1 + 0.8 * on, 5.0);
+    }
+  }
+}
+
 // LE FOND DE COQUE, continu d'une cellule à l'autre : une CONDUITE qui
 // court au ras de la paroi (par tronçons, avec ses colliers), et du petit
 // matériel semé entre les pièces — boîtiers de jonction, points de préhension
@@ -3149,7 +3208,9 @@ void main() {
     float sa = sin(aux.y);
     vec2 q = vec2(ca * rel.x + sa * rel.y, -sa * rel.x + ca * rel.y);
     vec2 soleil = normalize(vec2(ca * -0.6 + sa * 0.8, -sa * -0.6 + ca * 0.8));
-    dessinePiece(acc, q, geo.zw, aux.x, aux.z, aux.y, soleil, px);
+    vec4 rect = uAtlas[int(aux.x)];
+    if (uHasMateriel > 0.5 && rect.z > rect.x) peintPiece(acc, q, geo.zw, aux.x, aux.z, aux.w, rect, px);
+    else dessinePiece(acc, q, geo.zw, aux.x, aux.z, aux.y, soleil, px);
   }
   // le fil de lumière sur la face externe : l'arête de la coque accroche
   // les étoiles, et la station se découpe sur le ciel
@@ -3318,6 +3379,15 @@ export class Renderer {
   private readonly piecesAux = new Float32Array(MAX_PIECES_COQUE * 4)
   private piecesCle = ''
   private piecesCount = 0
+  // l'atlas des pièces peintes (tools/images/materiel.py) : absent ou pas
+  // encore chargé, le shader trace les pièces lui-même
+  private texMateriel: WebGLTexture | null = null
+  private readonly atlasRects = new Float32Array(
+    Array.from({ length: 8 }, (_, i) => {
+      const r = ATLAS_COQUE[i]
+      return r ? [r.u0, r.v0, r.u1, r.v1] : [0, 0, 0, 0]
+    }).flat(),
+  )
   private texSpongeDry: WebGLTexture | null = null
   private texSpongeWet: WebGLTexture | null = null
   private spongeScratch = new Float32Array(0)
@@ -3572,6 +3642,8 @@ export class Renderer {
       (t) => (this.texIris = t),
     )
     this.loadTexture('/assets/hull.webp', true, true, (t) => (this.texHull = t))
+    if (ATLAS_COQUE.some((r) => r))
+      this.loadTexture('/assets/coque-materiel.webp', false, true, (t) => (this.texMateriel = t))
     this.loadTexture(
       '/assets/sponge-dry.webp',
       true,
@@ -4626,6 +4698,12 @@ export class Renderer {
     gl.bindTexture(gl.TEXTURE_2D, this.texHull)
     gl.uniform1i(hu['uTexHull'], 0)
     gl.uniform1i(hu['uPieceCount'], this.piecesCount)
+    gl.uniform4fv(hu['uAtlas[0]'], this.atlasRects)
+    gl.uniform1f(hu['uHasMateriel'], this.texMateriel ? 1 : 0)
+    gl.activeTexture(gl.TEXTURE1)
+    gl.bindTexture(gl.TEXTURE_2D, this.texMateriel ?? this.texHull)
+    gl.uniform1i(hu['uTexMateriel'], 1)
+    gl.activeTexture(gl.TEXTURE0)
     if (this.piecesCount > 0) {
       gl.uniform4fv(hu['uPieces[0]'], this.piecesGeo)
       gl.uniform4fv(hu['uPiecesAux[0]'], this.piecesAux)

@@ -29,6 +29,7 @@
 import type { Bounds } from '../sim/solver'
 import { dansForme, type FormeBox } from '../game/formes'
 import { COQUE_EPAISSEUR } from './coque'
+import { ATLAS_COQUE } from './coqueAtlas'
 
 // Les types, dans l'ordre des cases de l'atlas vu de dessus (assets-ia §28)
 // et des branches du shader.
@@ -59,6 +60,17 @@ export interface PieceCoque {
   graine: number
   /** Le groupe : un bras et son aile tombent ensemble. */
   groupe: number
+  /** Selon le type — treillis : la longueur d'une répétition de l'image le
+   *  long du bras ; port d'amarrage : la part de l'image montrée depuis la
+   *  collerette (le module voisin sort du cadre). 0 : sans objet. */
+  param: number
+}
+
+/** Le rapport largeur / hauteur d'une pièce : celui de son IMAGE quand elle
+ *  est livrée (coqueAtlas.ts, écrit par tools/images/materiel.py) — une
+ *  pièce n'est jamais déformée —, sinon celui du tracé du shader. */
+function rapportDe(type: number, parDefaut: number): number {
+  return ATLAS_COQUE[type]?.rapport ?? parDefaut
 }
 
 interface Cote {
@@ -132,6 +144,7 @@ export function composeCoque(b: Bounds, vides: readonly FormeBox[] = []): PieceC
     hx: number,
     hy: number,
     g: number,
+    param = 0,
   ) => {
     pieces.push({
       type,
@@ -142,47 +155,70 @@ export function composeCoque(b: Bounds, vides: readonly FormeBox[] = []): PieceC
       angle: cote.angle,
       graine: alea(),
       groupe: g,
+      param,
     })
   }
   const attache = (cote: Cote, s: number, g: number) =>
     attaches.push({ groupe: g, x: cote.ox + cote.ax * s - cote.nx * 4, y: cote.oy + cote.ay * s - cote.ny * 4 })
 
-  // L'ÉNERGIE : un ou deux bras, une aile couchée au bout de chacun
+  // la largeur du bras en treillis, et la longueur d'une répétition de son
+  // image le long du bras (elle se raccorde bout à bout)
+  const largeurBras = 46
+  const tuileBras = largeurBras / rapportDe(PIECE_TREILLIS, 0.19)
+  const bras = (cote: Cote, s: number, long: number, g: number) =>
+    pose(cote, PIECE_TREILLIS, s, long / 2, largeurBras / 2, long / 2, g, tuileBras)
+
+  // L'ÉNERGIE : des ailes couchées le long de la paroi, chacune au bout d'un
+  // bras court — deux sur un long côté, comme les paires de l'ISS. Leur
+  // hauteur (vers le dehors) est bornée par la frange ; la largeur suit
+  // le rapport de l'image.
   {
     const L = energie.long
-    const bras = L > 2600 ? [0.27, 0.73] : [0.5 + (alea() - 0.5) * 0.2]
-    const envergure = Math.min(bras.length > 1 ? 0.44 * L : 0.72 * L, 1700)
-    const longBras = 250 + 60 * alea()
-    for (const f of bras) {
+    const places = L > 2000 ? [0.25, 0.75] : [0.5]
+    const rapport = rapportDe(PIECE_AILE, 7)
+    const longBras = 110 + 30 * alea()
+    let hAile = 430
+    // deux ailes ne se touchent pas, une seule ne déborde pas de la paroi
+    const largeurMax = (places.length > 1 ? 0.46 : 0.8) * L
+    if (hAile * rapport > largeurMax) hAile = largeurMax / rapport
+    for (const f of places) {
       const g = ++groupe
       const s = f * L
       attache(energie, s, g)
-      pose(energie, PIECE_TREILLIS, s, longBras / 2, 26, longBras / 2, g)
-      pose(energie, PIECE_AILE, s, longBras + 118, envergure / 2, 118, g)
+      bras(energie, s, longBras, g)
+      pose(energie, PIECE_AILE, s, longBras + hAile / 2, (hAile * rapport) / 2, hAile / 2, g)
     }
   }
   // LE FROID ET LA LIAISON : deux radiateurs qui s'écartent, une parabole
   {
     const L = froid.long
     const radiateurs = L > 1400 ? [0.33, 0.62] : [0.5]
+    const hRad = 380
+    const lRad = hRad * rapportDe(PIECE_RADIATEUR, 0.33)
     for (const f of radiateurs) {
       const g = ++groupe
       const s = f * L
       attache(froid, s, g)
-      pose(froid, PIECE_TREILLIS, s, 30, 20, 30, g)
-      pose(froid, PIECE_RADIATEUR, s, 60 + 190, 62, 190, g)
+      bras(froid, s, 44, g)
+      pose(froid, PIECE_RADIATEUR, s, 44 + hRad / 2, lRad / 2, hRad / 2, g)
     }
     const g = ++groupe
     const s = (alea() < 0.5 ? 0.12 : 0.88) * L
     attache(froid, s, g)
-    pose(froid, PIECE_PARABOLE, s, 70, 62, 62, g)
+    const dParab = 150
+    pose(froid, PIECE_PARABOLE, s, 20 + dParab / 2 / rapportDe(PIECE_PARABOLE, 1), dParab / 2, dParab / 2 / rapportDe(PIECE_PARABOLE, 1), g)
   }
-  // L'AMARRAGE : le port, et l'amorce du module voisin qui s'y raccorde
+  // L'AMARRAGE : le port, et l'amorce du module voisin qui s'y raccorde. On
+  // ne montre que le bas de l'image (la collerette et un tronçon) : le
+  // module continue au-delà, dans le noir.
   if (amarrage.long >= 700) {
     const g = ++groupe
     const s = amarrage.long / 2
     attache(amarrage, s, g)
-    pose(amarrage, PIECE_AMARRAGE, s, 150, 170, 150, g)
+    const largeur = 340
+    const part = 0.62
+    const h = (largeur / rapportDe(PIECE_AMARRAGE, 1.13)) * (ATLAS_COQUE[PIECE_AMARRAGE] ? part : 1)
+    pose(amarrage, PIECE_AMARRAGE, s, h / 2, largeur / 2, h / 2, g, ATLAS_COQUE[PIECE_AMARRAGE] ? part : 0)
   }
   // LES COINS : propulseurs aux deux bouts des petits côtés, et les feux de
   // navigation au côté arrière (pas sur l'amarrage : le port y est)
@@ -209,7 +245,7 @@ export function composeCoque(b: Bounds, vides: readonly FormeBox[] = []): PieceC
   return pieces.filter((p) => !perdus.has(p.groupe)).slice(0, MAX_PIECES_COQUE)
 }
 
-/** Empaquette pour le shader : (cx, cy, hx, hy) et (type, angle, graine, 0)
+/** Empaquette pour le shader : (cx, cy, hx, hy) et (type, angle, graine, param)
  *  par pièce. Renvoie le nombre de pièces écrites. */
 export function empaquettePieces(
   pieces: readonly PieceCoque[],
@@ -220,7 +256,7 @@ export function empaquettePieces(
   for (let i = 0; i < n; i++) {
     const p = pieces[i]
     outGeo.set([p.cx, p.cy, p.hx, p.hy], i * 4)
-    outAux.set([p.type, p.angle, p.graine, 0], i * 4)
+    outAux.set([p.type, p.angle, p.graine, p.param], i * 4)
   }
   return n
 }
