@@ -34,7 +34,7 @@ import {
   type ObstacleBox,
 } from './level'
 import { dansForme, type Coupe } from './formes'
-import { formePhysique } from './conduite'
+import { formesPhysiques } from './conduite'
 import { MILIEU_EAU, MILIEU_GLACE, MILIEU_VAPEUR, type Bounds } from '../sim/solver'
 
 export { MILIEU_EAU, MILIEU_GLACE, MILIEU_VAPEUR }
@@ -428,8 +428,9 @@ export function traceLaser(em: LaserDef, monde: TraceMonde): TraceResultat {
   // et redémarre à chaque changement de direction ou de position
   // la conduite d'ammoniac arrête le faisceau à sa silhouette arrondie,
   // comme elle arrête l'eau (conduite.ts) — même ordre, mêmes indices
+  // (une fois par état du décor : conduite.ts, formesPhysiques)
   const filtre = new FiltreBoites(
-    monde.boxes.map((b) => formePhysique(b, monde.boxes, monde.bounds)),
+    formesPhysiques(monde.boxes, monde.bounds) as typeof monde.boxes,
     monde.portesFermees,
   )
   filtre.segment(x, y, dx, dy)

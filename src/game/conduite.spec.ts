@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { boutsEnMur, formePhysique } from './conduite'
+import { boutsEnMur, formePhysique, formesPhysiques } from './conduite'
 import {
   CONDUITE,
   CONDUITE_ATLAS,
@@ -271,5 +271,29 @@ describe('conduite — les jumeaux', () => {
     expect(cadre('GIVRE')).toEqual(CONDUITE_ATLAS.givre)
     expect(cadre('VANNE')).toEqual(CONDUITE_ATLAS.vanne)
     expect(Number(py.match(/^TAILLE = (\d+)/m)![1])).toBe(CONDUITE_ATLAS.taille)
+  })
+})
+
+// LES FORMES D'UNE SALLE, une fois par état du décor : le laser les
+// recalculait à chaque tir.
+describe('conduite — les formes physiques d’une salle, en cache', () => {
+  it('sans conduite, la liste elle-même : ni copie ni calcul', () => {
+    const boxes = [box(0, 0, 100, 100, MAT_WALL)]
+    expect(formesPhysiques(boxes, null)).toBe(boxes)
+  })
+
+  it('même décor : la même réponse ; un mur déplacé SUR PLACE : recalculée', () => {
+    const tuyau = box(0, 0, 400, 60, MAT_FROID)
+    const mur = box(400, -100, 460, 200, MAT_WALL)
+    const boxes = [tuyau, mur]
+    const a = formesPhysiques(boxes, null)
+    expect(formesPhysiques(boxes, null)).toBe(a)
+    expect((a[0] as FormeBox).bouts).toBe(BOUT_MUR_POS)
+    // l'éditeur écarte le mur en modifiant la boîte elle-même
+    mur.minX = 600
+    mur.maxX = 660
+    const b = formesPhysiques(boxes, null)
+    expect(b).not.toBe(a)
+    expect((b[0] as FormeBox).bouts ?? 0).toBe(0)
   })
 })

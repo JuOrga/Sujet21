@@ -22,6 +22,7 @@ import {
   CONDUITE,
   conduiteHoriz,
   dansForme,
+  piecesConduite,
   type FormeBox,
 } from './formes'
 import { MAT_FROID, sansPhysique } from './level'
@@ -96,5 +97,58 @@ export function boutsEnMur(b: Boite, boxes: readonly Boite[], bornes: Bornes | n
 export function formePhysique<B extends Boite>(b: B, boxes: readonly Boite[] = [], bornes: Bornes | null = null): B {
   if (b.material !== MAT_FROID || b.forme) return b
   const bouts = boutsEnMur(b, boxes, bornes)
-  return { ...b, forme: FORME_CONDUITE, ...(bouts ? { bouts } : {}) }
+  // LES PIÈCES, précalculées sur la copie : la boucle de contact du
+  // solveur (formes.ts, conduiteContactAxe) les lit d'un champ au lieu de
+  // les rebâtir, ou de les chercher, à chaque particule et chaque sous-pas
+  const w = b.maxX - b.minX
+  const h = b.maxY - b.minY
+  const horiz = conduiteHoriz(w, h, (b as Boite & { sens?: number }).sens)
+  const pieces = piecesConduite(horiz ? w : h, horiz ? h : w, bouts)
+  return { ...b, forme: FORME_CONDUITE, pieces, ...(bouts ? { bouts } : {}) }
+}
+
+/** LA CLÉ D'UNE BOÎTE : tout ce qui décide de la forme qu'on y lit —
+ *  géométrie, matière, forme et ses réglages (p0, p1, les bouts d'un arc
+ *  p2, la coupe), angle, sens du tuyau. UNE seule définition, pour la carte
+ *  de lumière (renderer.ts, cleBoitesLumiere) comme pour les bouts des
+ *  conduites : deux copies avaient déjà oublié p2 et la coupe, qui changent
+ *  la surface d'un arc sans rien changer d'autre. */
+export function cleBoite(b: Boite): string {
+  const f = b as Boite & {
+    angle?: number
+    p0?: number
+    p1?: number
+    p2?: number
+    sens?: number
+    coupe?: { x: number; y: number; nx: number; ny: number }
+  }
+  const c = f.coupe ? `${f.coupe.x}/${f.coupe.y}/${f.coupe.nx}/${f.coupe.ny}` : ''
+  return `;${b.minX},${b.minY},${b.maxX},${b.maxY},${f.angle ?? 0},${b.material},${b.forme ?? 0},${f.p0 ?? 0},${f.p1 ?? 0},${f.p2 ?? 0},${f.sens ?? 0},${c}`
+}
+
+/** La signature de tout ce dont les bouts d'une conduite dépendent : chaque
+ *  boîte (cleBoite) et les bornes. Un éditeur qui déplace une boîte SUR
+ *  PLACE la change : un cache qui s'y fie ne garde jamais des bouts
+ *  périmés. */
+export function signatureBoites(boxes: readonly Boite[], bornes: Bornes | null): string {
+  let k = bornes ? `${bornes.minX},${bornes.minY},${bornes.maxX},${bornes.maxY}` : '-'
+  for (const b of boxes) k += cleBoite(b)
+  return k
+}
+
+const formesParSalle = new WeakMap<readonly Boite[], { cle: string; formes: readonly Boite[] }>()
+
+/** LES FORMES PHYSIQUES D'UNE SALLE, une fois par état du décor. Le laser
+ *  les recalculait à CHAQUE tir (et le générateur en tire des centaines) :
+ *  pour chaque conduite, six sondages contre toutes les boîtes, plus une
+ *  copie de la liste. Sans conduite, la liste elle-même (rien à changer) ;
+ *  avec, la dernière réponse tant que la signature n'a pas bougé. */
+export function formesPhysiques<B extends Boite>(boxes: readonly B[], bornes: Bornes | null): readonly B[] {
+  if (!boxes.some((b) => b.material === MAT_FROID && !b.forme)) return boxes
+  const cle = signatureBoites(boxes, bornes)
+  const c = formesParSalle.get(boxes)
+  if (c && c.cle === cle) return c.formes as readonly B[]
+  const formes = boxes.map((b) => formePhysique(b, boxes, bornes))
+  formesParSalle.set(boxes, { cle, formes })
+  return formes
 }

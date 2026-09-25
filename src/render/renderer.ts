@@ -31,7 +31,7 @@ import type { Camera } from './camera'
 import { VIE_STRIDE } from './vie'
 import { Programmes } from './programmes'
 import { sondeRetournement, type Retournement } from './retournement'
-import { boutsEnMur } from '../game/conduite'
+import { boutsEnMur, cleBoite } from '../game/conduite'
 
 // Budgets de rendu : au-delà, les éléments excédentaires ne sont plus
 // dessinés (la physique, elle, les voit tous) — l'éditeur avertit quand un
@@ -3466,10 +3466,7 @@ export function cleBoitesLumiere(
   boxCount: number,
 ): string {
   let key = ''
-  for (let i = 0; i < boxCount; i++) {
-    const bx = boxes[i]
-    key += `;${bx.minX},${bx.minY},${bx.maxX},${bx.maxY},${bx.angle ?? 0},${bx.material},${bx.forme ?? 0},${bx.p0 ?? 0},${bx.p1 ?? 0},${bx.sens ?? 0}`
-  }
+  for (let i = 0; i < boxCount; i++) key += cleBoite(boxes[i])
   return key
 }
 
@@ -3534,6 +3531,17 @@ export class Renderer {
    *  solveur ne connaît : sondés là, un bout contre une factice se dessinait
    *  sans bride quand la physique, elle, en gardait une, invisible. */
   boitesMurs: readonly ObstacleBox[] | null = null
+  // LES BOUTS DES CONDUITES, par état du décor : boutsEnMur sonde six
+  // points contre toutes les boîtes, pour chaque conduite — et tournait à
+  // CHAQUE image. La clé est celle de la carte de lumière (géométrie,
+  // matière, forme, angle, sens, bouts d'arc, coupe) : un décor qui bouge,
+  // même sur place à l'éditeur, vide le cache.
+  private boutsCle = ''
+  private boutsCleFaite = false // la clé de CETTE image est-elle déjà bâtie ?
+  private boutsParBoite = new WeakMap<ObstacleBox, number>()
+  // la clé des boîtes de CETTE image (cleBoitesLumiere), bâtie une fois et
+  // partagée par les bouts des conduites et la carte de lumière
+  private cleImage: string | null = null
   private sceneFbo: WebGLFramebuffer | null = null
   private sceneTex: WebGLTexture | null = null
   private sceneW = 0
@@ -4332,6 +4340,47 @@ export class Renderer {
     }))
   }
 
+  /** La clé des boîtes de CETTE image, bâtie au plus une fois (cleImage,
+   *  remis à null avant la boucle des boîtes). */
+  private cleBoitesImage(boxes: ObstacleBox[], boxCount: number): string {
+    if (this.cleImage === null) this.cleImage = cleBoitesLumiere(boxes, boxCount)
+    return this.cleImage
+  }
+
+  /** Les bouts d'une conduite plongés dans un mur, en cache (boutsCle). */
+  private boutsDe(
+    bx: ObstacleBox,
+    boxes: ObstacleBox[],
+    boxCount: number,
+    bounds: { minX: number; minY: number; maxX: number; maxY: number },
+  ): number {
+    const murs = this.boitesMurs ?? boxes
+    // la clé une fois par IMAGE (boutsCleFaite, remis à faux avant la
+    // boucle des boîtes), pas une fois par conduite — et la liste des
+    // boîtes y entre par la clé que la carte de lumière bâtit de toute
+    // façon (cleBoitesImage) : rien de plus à fabriquer, sauf si les murs
+    // sont une autre liste
+    if (!this.boutsCleFaite) {
+      this.boutsCleFaite = true
+      const cle =
+        `${bounds.minX},${bounds.minY},${bounds.maxX},${bounds.maxY}|` +
+        this.cleBoitesImage(boxes, boxCount) +
+        (murs === boxes ? '' : '|' + cleBoitesLumiere(murs, murs.length))
+      if (cle !== this.boutsCle) {
+        this.boutsCle = cle
+        // une WeakMap neuve : l'ancienne, avec les boîtes d'un décor quitté,
+        // part au ramasse-miettes au lieu de grossir
+        this.boutsParBoite = new WeakMap()
+      }
+    }
+    let v = this.boutsParBoite.get(bx)
+    if (v === undefined) {
+      v = boutsEnMur(bx, murs, bounds)
+      this.boutsParBoite.set(bx, v)
+    }
+    return v
+  }
+
   // Cuit la carte de lumière si le décor OU les lampes ont changé — les
   // scratchs de boîtes doivent déjà être remplis. Quelques dizaines de
   // milliers de texels, une fois par tableau : le prix d'une image.
@@ -4390,7 +4439,7 @@ export class Renderer {
       key +=
         `;L${l.x},${l.y},${l.h},${l.portee},${l.intensite},${l.rvb.join('/')}` +
         `,${l.bandeau ? 1 : 0},${l.demiLong},${l.angleRad}`
-    key += cleBoitesLumiere(boxes, boxCount)
+    key += this.cleBoitesImage(boxes, boxCount)
     if (key === this.lightKey) return
     this.lightKey = key
     this.lightMapMinX = minX
@@ -4557,6 +4606,8 @@ export class Renderer {
     // (celui du solveur, pour la charge du surchauffeur) ; `k` est la case.
     const boxCount = Math.min(boxes.length, MAX_BOXES)
     const rangs = rangsDePeinture(boxes, boxCount, this.rangsScratch)
+    this.boutsCleFaite = false
+    this.cleImage = null
     for (let k = 0; k < boxCount; k++) {
       const i = rangs[k]
       const bx = boxes[i]
@@ -4592,8 +4643,7 @@ export class Renderer {
         bx.material === 0
           ? (bx.skin ?? 0)
           : bx.material === MAT_FROID
-            ? (bx.sens ?? 0) +
-              4 * boutsEnMur(bx, this.boitesMurs ?? boxes, sim.bounds)
+            ? (bx.sens ?? 0) + 4 * this.boutsDe(bx, boxes, boxCount, sim.bounds)
             : sim.surchauffesVides.has(i)
               ? 0
               : 1
