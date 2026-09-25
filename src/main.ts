@@ -380,7 +380,6 @@ import { CLE_REGLAGE_ATH, athAuRepos, litReglageAth, pointeurPres, type ReglageA
 import {
   PARALLAXE_DEFAUTS,
   PLAQUE_DEFAUTS,
-  cadrePlaque,
   facteurG,
 } from './render/parallaxe'
 import { PerfCollector } from './game/perf'
@@ -3758,9 +3757,9 @@ if (!(cielChoix in CIEL_MODE)) cielChoix = 'plaque'
 // 0,75 les rend sans brûler le cœur (comparé à l'écran, les deux côte à
 // côte). Si elle écrase les modules d'un tableau, c'est ce curseur du banc.
 // Les étoiles nettes ne passent pas par ce dosage.
-// LA PART : combien de la plaque la grande dimension de l'écran montre au
-// zoom de jeu (render/parallaxe.ts, PLAQUE_DEFAUTS).
-const cielReglages = { force: 0.75, part: PLAQUE_DEFAUTS.part }
+// LA TAILLE : la largeur de la galaxie en fraction de l'écran, au zoom de
+// jeu — plafonnée par la netteté (render/parallaxe.ts, cadrePlaque).
+const cielReglages = { force: 0.75, taille: PLAQUE_DEFAUTS.taille }
 
 // LA PROFONDEUR DES COUCHES DE FOND : la règle, les valeurs et les tests
 // vivent dans render/parallaxe.ts — ici on n'en tient que la copie RÉGLABLE,
@@ -19414,10 +19413,7 @@ function corpsImage(now: number): boolean {
   renderer.setCiel(
     CIEL_MODE[cielChoix],
     cielReglages.force,
-    cadrePlaque(camera.x, camera.y, camera.zoom, vw, vh, {
-      ...PLAQUE_DEFAUTS,
-      part: cielReglages.part,
-    }),
+    { ...PLAQUE_DEFAUTS, taille: cielReglages.taille },
   )
   // LA PROFONDEUR DES COUCHES DE FOND : posée à l'image comme le ciel, pour
   // que le banc l'entende tout de suite. Le facteur se cuisine ICI, une fois

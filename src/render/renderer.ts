@@ -26,7 +26,7 @@ import {
 } from '../game/formes'
 import type { Camera } from './camera'
 import { VIE_STRIDE } from './vie'
-import type { CadrePlaque } from './parallaxe'
+import { cadrePlaque, type ReglagesPlaque, PLAQUE_DEFAUTS } from './parallaxe'
 import { Programmes } from './programmes'
 
 // Budgets de rendu : au-delà, les éléments excédentaires ne sont plus
@@ -630,7 +630,7 @@ vec3 etoilesCouche(vec2 p, float cell, float densite, float px, float eclat, flo
   return col * (eclat * (0.12 + 0.88 * m4) * noyau * vis);
 }
 
-/* Le ciel d'étoiles, en six couches sur trois profondeurs : les faibles et
+/* Le ciel d'étoiles, en huit couches sur trois profondeurs : les faibles et
    nombreuses collées au ciel lointain (elles défilent avec la Voie lactée
    de la plaque), les rares vives sur le semis proche, une couche entre deux.
    C'est l'écart de défilement entre elles qui fait la profondeur.
@@ -644,7 +644,14 @@ vec3 etoiles(vec2 world, float pxMonde, float riche) {
   float foule = mix(0.6, 1.6, riche);
   // des densités MOYENNES sur plus de couches plutôt qu'une couche pleine :
   // une étoile dans presque chaque cellule redessine la grille
+  // LES ÉTOILES PROFONDES : deux couches de plus, faibles et nombreuses,
+  // sur les mêmes cellules que les suivantes mais tirées d'autres graines —
+  // doubler les couches plutôt que remplir les cellules, sans quoi le semis
+  // retourne au quadrillage. Depuis que la galaxie ne couvre plus l'écran,
+  // ce sont elles, le fond du ciel.
   vec3 e = etoilesCouche(pL, 32.0, 0.38 * foule, xL, 0.45, 0.0);
+  e += etoilesCouche(pL, 34.0, 0.40 * foule, xL, 0.32, 71.0);
+  e += etoilesCouche(pL, 41.0, 0.40 * foule, xL, 0.36, 93.0);
   e += etoilesCouche(pL, 45.0, 0.40 * foule, xL, 0.55, 5.0);
   e += etoilesCouche(pL, 66.0, 0.42 * foule, xL, 0.70, 11.0);
   e += etoilesCouche((pL + pP) * 0.5, 100.0, 0.45, (xL + xP) * 0.5, 0.90, 23.0);
@@ -1106,9 +1113,15 @@ void main() {
     // LA PLAQUE DE CIEL : UNE image, UNE Voie lactée. Elle n'est plus
     // collée au monde ni répétée — en reculant, on voyait sa copie, deux
     // Voies lactées parallèles, un papier peint. Elle est cadrée par rapport
-    // à l'écran, son centre dérivant avec la caméra (render/parallaxe.ts,
-    // cadrePlaque, qui garantit que l'écran reste DANS l'image).
-    vec3 fond = texture(uTexCiel, uPlaque.xy + (css - uViewport * 0.5) * uPlaque.z).rgb;
+    // à l'écran, jamais agrandie au-delà de ce que l'image peut rendre net
+    // (render/parallaxe.ts, cadrePlaque) : elle tient dans une partie de
+    // l'écran, et ses BORDS SE FONDENT dans le noir — un carré découpé net
+    // dans le ciel se lirait comme une affiche. Autour, les étoiles
+    // profondes. (Hors de l'image, la texture est bloquée au bord, et le
+    // fondu l'éteint.)
+    vec2 uvP = uPlaque.xy + (css - uViewport * 0.5) * uPlaque.z;
+    vec2 bord = smoothstep(vec2(0.0), vec2(0.18), uvP) * smoothstep(vec2(0.0), vec2(0.18), 1.0 - uvP);
+    vec3 fond = texture(uTexCiel, uvP).rgb * (bord.x * bord.y);
     voidCol = fond * uCielForce;
     // LES ÉTOILES NETTES RESTENT PROCÉDURALES, et ce n'est pas une
     // économie : elles sont nettes à tout grossissement là où la plaque
@@ -3025,15 +3038,17 @@ export class Renderer {
   // décor procédural assure l'intérim, l'image prend le relais sans à-coup.
   private texStars: WebGLTexture | null = null
   private texStarsFar: WebGLTexture | null = null
-  // LA PLAQUE DE CIEL, chargée SEULEMENT si on la demande : 2048², c'est
-  // ~22 Mo de mémoire graphique une fois les niveaux de détail construits
-  // (une plaque de 4096² en coûterait ~90).
+  // LA PLAQUE DE CIEL, chargée SEULEMENT si on la demande : 1254², c'est
+  // ~8 Mo de mémoire graphique une fois les niveaux de détail construits
+  // (côté² × 4 octets, plus un tiers ; une plaque de 4096² en coûterait ~90).
   // Un joueur qui reste au ciel procédural ne doit ni la télécharger ni la
   // loger — d'où le chargement paresseux, et la libération au retour.
   private texCiel: WebGLTexture | null = null
   private cielDemandee = false
   private cielMode = 2
   private readonly plaque = new Float32Array([0.5, 0.5, 0.0005])
+  private plaqueRegl: ReglagesPlaque = PLAQUE_DEFAUTS
+  private cielTexels = 2048 // la largeur de l'image, lue à son arrivée
   private cielForce = 1
   // LA PROFONDEUR DES COUCHES DE FOND : suivi et réponse au zoom, par
   // couche (cf. uParCiel/uParSemis/uParCuve dans le shader). Les défauts
@@ -3464,18 +3479,22 @@ export class Renderer {
    * lancée au chargement du module ne peut pas le toucher — il n'existe pas
    * encore (cf. src/main-amorce.spec.ts).
    */
-  setCiel(mode: number, force: number, cadre: CadrePlaque): void {
+  setCiel(mode: number, force: number, reglages: ReglagesPlaque): void {
     this.cielMode = mode
     this.cielForce = force
-    this.plaque[0] = cadre.cx
-    this.plaque[1] = cadre.cy
-    this.plaque[2] = cadre.parPx
+    // le cadrage se calcule au rendu : il lui faut la caméra, l'écran, sa
+    // densité de pixels ET la taille réelle de l'image — que seul le
+    // renderer connaît, une fois l'image arrivée
+    this.plaqueRegl = reglages
     // le téléchargement n'est lancé qu'au premier passage en mode plaque.
     // SANS répétition : l'image est unique, son bord n'est jamais montré —
     // et, filtrée, une répétition y mélangerait le bord opposé
     if (mode > 1.5 && !this.cielDemandee) {
       this.cielDemandee = true
-      this.loadTexture('/assets/ciel.webp', false, true, (t) => (this.texCiel = t))
+      this.loadTexture('/assets/ciel.webp', false, true, (t, img) => {
+        this.texCiel = t
+        this.cielTexels = img.naturalWidth || img.width || this.cielTexels
+      })
     }
   }
 
@@ -4209,6 +4228,13 @@ export class Renderer {
     const cielPret = this.cielMode > 1.5 && this.texCiel !== null
     bindTex(7, cielPret ? this.texCiel : this.texStarsFar, 'uTexCiel', 'uHasCiel')
     gl.uniform1f(cu['uCielMode'], cielPret ? 2 : Math.min(this.cielMode, 1))
+    const cadre = cadrePlaque(
+      camera.x, camera.y, camera.zoom, viewportW, viewportH, dpr,
+      this.cielTexels, this.plaqueRegl,
+    )
+    this.plaque[0] = cadre.cx
+    this.plaque[1] = cadre.cy
+    this.plaque[2] = cadre.parPx
     gl.uniform3fv(cu['uPlaque'], this.plaque)
     gl.uniform1f(cu['uCielForce'], this.cielForce)
     gl.uniform2fv(cu['uParCiel'], this.parCiel)

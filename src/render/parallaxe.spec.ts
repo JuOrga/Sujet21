@@ -89,42 +89,44 @@ describe('parallaxe — la couche lointaine', () => {
   })
 })
 
-describe('la plaque de ciel, cadrée — une seule Voie lactée', () => {
-  // le rectangle que l'écran voit dans la plaque, en coordonnées de texture
-  const vu = (x: number, y: number, z: number, w: number, h: number) => {
-    const c = cadrePlaque(x, y, z, w, h)
-    return {
-      minX: c.cx - (w * c.parPx) / 2,
-      maxX: c.cx + (w * c.parPx) / 2,
-      minY: c.cy - (h * c.parPx) / 2,
-      maxY: c.cy + (h * c.parPx) / 2,
-    }
-  }
+describe('la plaque de ciel, cadrée — une seule Voie lactée, jamais floue', () => {
+  const FORMATS = [[1280, 720, 1], [1280, 800, 2], [720, 1280, 3], [2560, 1080, 1], [390, 844, 3]]
+  const ZOOMS = [1e-6, 0.01, 0.05, 0.12, 0.3, 1, 3, 15]
 
-  it('l’écran ne sort JAMAIS de l’image : aucune position, aucun zoom, aucun format', () => {
-    for (const [w, h] of [[1280, 720], [720, 1280], [2560, 1080], [390, 844], [1, 1]])
-      for (const z of [1e-6, 0.01, 0.05, 0.12, 0.3, 1, 3, 15])
-        for (const x of [-1e7, -40000, -2250, 0, 900, 2250, 40000, 1e7])
-          for (const y of [-1e7, -1500, 0, 750, 1e7]) {
-            const r = vu(x, y, z, w, h)
-            expect(r.minX).toBeGreaterThanOrEqual(0)
-            expect(r.maxX).toBeLessThanOrEqual(1)
-            expect(r.minY).toBeGreaterThanOrEqual(0)
-            expect(r.maxY).toBeLessThanOrEqual(1)
+  it('un pixel d’image ne couvre jamais plus de grossMax pixels physiques', () => {
+    for (const [w, h, dpr] of FORMATS)
+      for (const tex of [1254, 2048, 4096])
+        for (const z of ZOOMS) {
+          const c = cadrePlaque(0, 0, z, w, h, dpr, tex)
+          const pxEcranParTexel = dpr / (c.parPx * tex)
+          expect(pxEcranParTexel).toBeLessThanOrEqual(PLAQUE_DEFAUTS.grossMax + 1e-9)
+        }
+  })
+
+  it('le centre de la galaxie ne quitte jamais l’écran, où qu’aille la caméra', () => {
+    for (const [w, h, dpr] of FORMATS)
+      for (const z of ZOOMS)
+        for (const x of [-1e7, -2250, 0, 900, 1e7])
+          for (const y of [-1e7, -750, 0, 1e7]) {
+            const c = cadrePlaque(x, y, z, w, h, dpr, 1254)
+            // où se dessine le centre de l'image, en px CSS depuis le centre
+            expect(Math.abs((0.5 - c.cx) / c.parPx)).toBeLessThan(w / 2)
+            expect(Math.abs((0.5 - c.cy) / c.parPx)).toBeLessThan(h / 2)
           }
   })
 
-  it('au zoom de jeu, l’écran montre la part réglée, et moins en s’approchant', () => {
+  it('assez de texels : elle prend la taille réglée ; en reculant, elle rapetisse', () => {
     const d = PLAQUE_DEFAUTS
-    expect(cadrePlaque(0, 0, d.ref, 1280, 720).parPx * 1280).toBeCloseTo(d.part, 6)
-    const loin = cadrePlaque(0, 0, 0.15, 1280, 720).parPx
-    const pres = cadrePlaque(0, 0, 0.6, 1280, 720).parPx
-    expect(loin).toBeGreaterThan(pres)
+    // une image de 4096 sur un écran de 1280 × 720 n'est jamais agrandie
+    expect(1 / cadrePlaque(0, 0, d.ref, 1280, 720, 1, 4096).parPx).toBeCloseTo(1280 * d.taille, 6)
+    const loin = 1 / cadrePlaque(0, 0, 0.15, 1280, 720, 1, 4096).parPx
+    const pres = 1 / cadrePlaque(0, 0, 0.6, 1280, 720, 1, 4096).parPx
+    expect(loin).toBeLessThan(pres)
   })
 
   it('la caméra qui se déplace fait glisser le ciel, dans le même sens', () => {
-    const a = cadrePlaque(0, 0, 0.3, 1280, 720)
-    const b = cadrePlaque(500, -300, 0.3, 1280, 720)
+    const a = cadrePlaque(0, 0, 0.3, 1280, 720, 1, 1254)
+    const b = cadrePlaque(500, -300, 0.3, 1280, 720, 1, 1254)
     expect(a.cx).toBeCloseTo(0.5, 9)
     expect(b.cx).toBeGreaterThan(a.cx)
     expect(b.cy).toBeLessThan(a.cy)

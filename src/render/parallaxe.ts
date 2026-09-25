@@ -105,53 +105,60 @@ export function empriseEcran(
 }
 
 // ---------------------------------------------------------------------------
-// LA PLAQUE DE CIEL, CADRÉE — une seule Voie lactée, jamais répétée.
+// LA PLAQUE DE CIEL, CADRÉE — une seule Voie lactée, jamais répétée, jamais
+// floue.
 //
 // La plaque était une couche comme les autres : collée au monde, répétée à
-// l'infini. En reculant ou en se déplaçant, on voyait donc sa COPIE — deux
-// Voies lactées parallèles, puis trois : un papier peint. Un ciel n'a
-// qu'une Voie lactée.
+// l'infini. En reculant, on voyait sa COPIE — deux Voies lactées parallèles,
+// un papier peint. Elle est donc cadrée par rapport à l'ÉCRAN.
 //
-// Elle est donc cadrée par rapport à l'ÉCRAN, et non plus au monde : l'écran
-// en montre une PART (sur sa grande dimension), qui ne dépend que du zoom,
-// bornée des deux côtés ; son centre DÉRIVE avec la caméra pour que la
-// profondeur se sente, mais par une tangente hyperbolique qui sature avant le
-// bord. La garantie que les tests gravent : quels que soient la position, le
-// zoom et le format de l'écran, le rectangle vu tient DANS l'image.
+// Premier cadrage : l'écran montrait une PART de l'image (0,85). Mais
+// l'image fait 1254 px, et un écran d'iPad en a 2 700 de large : la
+// galaxie y était agrandie deux fois et plus — « trop zoomée, pas nette du
+// tout ». Une image ne gagne aucun détail à être agrandie.
+//
+// La règle est donc désormais celle de la NETTETÉ : un pixel d'image ne
+// couvre jamais plus de GROSS_MAX pixels physiques de l'écran. La galaxie
+// tient dans une partie de l'écran, ses bords se fondent dans le noir (le
+// shader), et autour d'elle ce sont les étoiles profondes du shader — nettes
+// par construction, à l'infini. Son centre dérive avec la caméra, pour que
+// la profondeur se sente, mais sature avant de sortir de l'écran : on ne la
+// perd jamais de vue.
 
 export interface ReglagesPlaque {
-  /** La part de la plaque que montre la grande dimension de l'écran, au
-   *  zoom d'étalonnage. Plus grande : la Voie lactée paraît plus petite. */
-  part: number
+  /** La largeur de la galaxie, en fraction de la grande dimension de
+   *  l'écran, au zoom d'étalonnage — si la netteté le permet. */
+  taille: number
   /** La réponse au zoom, même convention que les couches : 1 grandit comme
    *  le monde, 0 ne change jamais de taille. Le ciel est loin : peu. */
   zoom: number
-  /** Les bornes de la part montrée : la plus serrée (zoom avant) et la plus
-   *  large (recul) — celle-ci reste sous 1, c'est ce qui interdit le bord. */
-  partMin: number
-  partMax: number
-  /** La dérive du centre, en fraction de plaque par unité-monde de
+  /** Les bornes de cette largeur, en recul et en approche. */
+  tailleMin: number
+  tailleMax: number
+  /** L'agrandissement le plus fort permis : pixels physiques d'écran par
+   *  pixel d'image. Au-delà de ~1, l'image s'adoucit ; c'est LA borne. */
+  grossMax: number
+  /** La dérive de la galaxie, en pixels CSS par unité-monde de
    *  déplacement de la caméra, près de l'origine (avant saturation). */
   derive: number
   /** Le zoom d'étalonnage, celui du jeu ordinaire. */
   ref: number
 }
 
-// La part de 0,85 se règle sur la plaque livrée (une image de 1254 px) :
-// à 0,6, la bande emplissait tout l'écran — plus de noir autour, plus de
-// région bleue — et l'image, agrandie d'autant, tournait au grain pâteux.
 export const PLAQUE_DEFAUTS: ReglagesPlaque = {
-  part: 0.85,
+  taille: 0.8,
   zoom: 0.3,
-  partMin: 0.45,
-  partMax: 0.96,
-  derive: 4e-5,
+  tailleMin: 0.3,
+  tailleMax: 1.4,
+  grossMax: 1.15,
+  derive: 0.02,
   ref: 0.3,
 }
 
-/** Où l'écran regarde dans la plaque : le centre (en coordonnées de
- *  texture, 0..1, y vers le haut) et la taille d'un pixel CSS en coordonnées
- *  de texture. Le shader n'a plus qu'une multiplication-addition par pixel. */
+/** Où l'écran regarde dans la plaque : le point de l'image au centre de
+ *  l'écran (coordonnées de texture, 0..1, y vers le haut) et la taille d'un
+ *  pixel CSS en coordonnées de texture. Hors de 0..1, c'est le noir : le
+ *  shader n'a plus qu'une multiplication-addition par pixel. */
 export interface CadrePlaque {
   cx: number
   cy: number
@@ -164,21 +171,24 @@ export function cadrePlaque(
   zoom: number,
   largeurCss: number,
   hauteurCss: number,
+  dpr: number,
+  texels: number,
   r: ReglagesPlaque = PLAQUE_DEFAUTS,
 ): CadrePlaque {
   const z = Math.max(zoom, 1e-4) / Math.max(r.ref, 1e-4)
-  const partMax = Math.min(r.partMax, 0.96)
-  const part = Math.min(partMax, Math.max(r.partMin, r.part * Math.pow(z, -(1 - r.zoom))))
   const grand = Math.max(largeurCss, hauteurCss, 1)
-  const parPx = part / grand
-  // la place qui reste de chaque côté du rectangle vu : la dérive ne peut
-  // pas la dépasser, la tangente hyperbolique y tend sans l'atteindre. Moins
-  // une MARGE d'un pour cent : saturée, la tangente touche le bord au
-  // chiffre près, et le filtrage lit aussi les texels voisins de l'écran
-  const MARGE = 0.01
-  const resteX = 0.5 - MARGE - (largeurCss * parPx) / 2
-  const resteY = 0.5 - MARGE - (hauteurCss * parPx) / 2
-  const glisse = (cam: number, reste: number): number =>
+  const voulue =
+    grand *
+    Math.min(r.tailleMax, Math.max(r.tailleMin, r.taille * Math.pow(z, 1 - r.zoom)))
+  // LA NETTETÉ D'ABORD : la largeur à l'écran (en px CSS) plafonnée à ce que
+  // l'image peut remplir sans être agrandie au-delà de grossMax
+  const nette = (Math.max(texels, 1) * r.grossMax) / Math.max(dpr, 1e-4)
+  const largeur = Math.min(voulue, nette)
+  const parPx = 1 / largeur
+  // la dérive, en px CSS : elle sature à un tiers de la petite dimension de
+  // l'écran — le centre de la galaxie ne quitte jamais l'écran
+  const reste = Math.min(largeurCss, hauteurCss) / 3
+  const glisse = (cam: number): number =>
     reste > 1e-6 ? reste * Math.tanh((cam * r.derive) / reste) : 0
-  return { cx: 0.5 + glisse(camX, resteX), cy: 0.5 + glisse(camY, resteY), parPx }
+  return { cx: 0.5 + glisse(camX) * parPx, cy: 0.5 + glisse(camY) * parPx, parPx }
 }

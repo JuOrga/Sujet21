@@ -66,7 +66,7 @@ export interface BenchActions {
   // LE CIEL DU DEHORS : le choix du fond est dans PARAMÈTRES, mais son
   // DOSAGE se règle ici, à vue — c'est en regardant le vide qu'on trouve
   // la bonne force, pas dans un menu qui met la partie en pause.
-  ciel?: { force: number; part: number }
+  ciel?: { force: number; taille: number }
   // LA PROFONDEUR DES COUCHES DE FOND : deux nombres par couche, entre 0 et
   // 1 — le suivi (déplacement de la caméra) et le zoom (grossissement).
   parallaxe?: {
@@ -386,13 +386,13 @@ export function createBench(
       'Dose la plaque de ciel. Le vide DOIT rester plus sombre que la cuve éclairée : au-delà, la hiérarchie lumineuse s’inverse et la scène se noie. Sans effet sur les fonds tuilé et procédural.',
     )
     describe(
-      fCiel.addBinding(actions.ciel, 'part', {
+      fCiel.addBinding(actions.ciel, 'taille', {
         min: 0.3,
-        max: 0.94,
+        max: 1.4,
         step: 0.01,
-        label: 'part vue',
+        label: 'taille',
       }),
-      'Quelle part de la plaque la grande dimension de l’écran montre, au zoom de jeu. Plus petite : la Voie lactée paraît plus grande et plus proche. La plaque n’est jamais répétée : quel que soit ce réglage, l’écran reste dans l’image.',
+      'La largeur de la galaxie, en fraction de l’écran, au zoom de jeu. Plafonnée par la netteté : l’image n’est jamais agrandie au-delà de ce qu’elle peut rendre net — sur un écran très fin, elle restera plus petite que demandé.',
     )
   }
 
