@@ -2950,7 +2950,7 @@ void feu(inout vec4 acc, vec2 p, vec2 c, vec3 coul, float on, float rayon) {
 // plat. Éclairé par le soleil (en haut à gauche du monde, uSoleil dans le
 // repère de la pièce) et par rien d'autre : sombre, sauf les feux.
 // Les animations sont celles que la pièce aurait vraiment.
-void dessinePiece(inout vec4 acc, vec2 q, vec2 h, float type, float g, float an, vec2 soleil, float px) {
+void dessinePiece(inout vec4 acc, vec2 q, vec2 h, float type, float g, float an, float param, vec2 soleil, float px) {
   vec3 acier = vec3(0.085, 0.105, 0.135);
   vec3 acierC = vec3(0.15, 0.18, 0.22);
   if (type < 0.5) {
@@ -3063,6 +3063,53 @@ void dessinePiece(inout vec4 acc, vec2 q, vec2 h, float type, float g, float an,
         acc.rgb += vec3(0.55, 0.68, 0.85) * jet * bouffee * 0.9;
       }
     }
+  } else if (type > 6.5) {
+    // L'EMBASE : la platine boulonnée qui tient la pièce. Elle MORD dans la
+    // coque (y < 0) — c'est elle qui fait la liaison. Une ombre de contact
+    // l'assied sur la tôle, un biseau éclairé du côté du soleil lui donne
+    // son épaisseur, des boulons la fixent, une bride serre le pied de la
+    // pièce, et deux jambes de force en biais tiennent ce qui porte loin.
+    float w = abs(param);
+    float y0 = -h.y; // le fond de la platine, dans la coque
+    vec2 cP = vec2(0.0, y0 + 15.0);
+    // plus large sous un bras : ses jambes de force partent des coins
+    vec2 hP = vec2(w + (param > 0.0 ? 30.0 : 16.0), 15.0);
+    float dP = sdRect(q, cP, hP - 4.0) - 4.0;
+    // l'ombre de contact, portée vers le bas à droite (le soleil est en haut
+    // à gauche) : la platine est POSÉE, pas peinte
+    float ombre = exp(-max(sdRect(q + soleil * 5.0, cP, hP - 4.0) - 4.0, 0.0) * 0.18);
+    acc = vec4(0.0, 0.0, 0.0, 0.55 * ombre * step(0.0, dP)) + acc * (1.0 - 0.55 * ombre * step(0.0, dP));
+    // le biseau : l'arête tournée vers le soleil s'allume, l'autre plonge
+    vec2 qq = q - cP;
+    vec2 n = (abs(qq.x) - hP.x > abs(qq.y) - hP.y) ? vec2(sign(qq.x), 0.0) : vec2(0.0, sign(qq.y));
+    float bord = 1.0 - smoothstep(0.0, 3.0, -dP);
+    // plus claire que la tôle de coque : c'est une pièce rapportée, elle
+    // doit se lire comme telle
+    vec3 plat = vec3(0.21, 0.24, 0.28) * (0.93 + 0.07 * sin(q.x * 0.9) * sin(q.y * 1.3));
+    plat *= 1.0 + bord * 1.3 * dot(n, soleil);
+    pose(acc, plat, 1.0 - smoothstep(-0.5 * px, 0.5 * px, dP));
+    // les boulons, deux rangées
+    for (int k = 0; k < 8; k++) {
+      float bx = (float(k / 2) - 1.5) / 1.5 * (w + 8.0);
+      vec2 b = vec2(bx, y0 + (mod(float(k), 2.0) < 0.5 ? 6.0 : 24.0));
+      float db = length(q - b) - 2.4;
+      pose(acc, vec3(0.05, 0.055, 0.06), 1.0 - smoothstep(-0.5 * px, 0.5 * px, db - 0.8));
+      pose(acc, vec3(0.30, 0.33, 0.37), 1.0 - smoothstep(-0.5 * px, 0.5 * px, length(q - b + soleil * 0.6) - 1.4));
+    }
+    // la bride qui serre le pied de la pièce, au ras de la face externe
+    piece(acc, sdRect(q, vec2(0.0, 3.0), vec2(w + 7.0, 5.0)) - 1.0, vec3(0.20, 0.23, 0.27), px);
+    pose(acc, vec3(0.05, 0.06, 0.07), (1.0 - smoothstep(0.0, 1.2 * px, abs(q.y - 3.0))) * step(abs(q.x), w + 7.0) * 0.6);
+    // le faisceau de câbles qui sort de la pièce et plonge dans la coque
+    float cable = sdSeg(q, vec2(w + 3.0, 10.0), vec2(w + 12.0, y0 + 4.0)) - 2.2;
+    piece(acc, cable, vec3(0.06, 0.055, 0.05), px);
+    if (param > 0.0) {
+      // deux jambes de force, des coins de la platine au bras
+      for (int k = 0; k < 2; k++) {
+        float sg = k == 0 ? -1.0 : 1.0;
+        piece(acc, sdSeg(q, vec2(sg * (w + 24.0), 6.0), vec2(sg * (w + 1.5), h.y - 4.0)) - 3.0, vec3(0.20, 0.23, 0.28), px);
+        piece(acc, length(q - vec2(sg * (w + 24.0), 6.0)) - 4.0, vec3(0.26, 0.29, 0.33), px);
+      }
+    }
   } else {
     // FEU DE NAVIGATION : rouge à bâbord (le côté gauche), vert à tribord
     // (le droit), blanc à éclats ailleurs — le code de tout ce qui vole
@@ -3165,6 +3212,28 @@ void fondDeCoque(inout vec4 acc, float s, float y, float cote, float px) {
   }
 }
 
+// La boucle des pièces de la composition, dans l'ordre (une embase avant sa
+// pièce, un bras avant son aile). Dans la coque, seules les EMBASES se
+// posent : elles mordent dans la tôle, le reste est dehors.
+void poseLesPieces(inout vec4 acc, float px, bool embasesSeules) {
+  for (int i = 0; i < MAX_PIECES; i++) {
+    if (i >= uPieceCount) break;
+    vec4 geo = uPieces[i];
+    vec4 aux = uPiecesAux[i];
+    if (embasesSeules && aux.x < 6.5) continue;
+    vec2 rel = vWorld - geo.xy;
+    // la marge : les halos des feux, les bouffées, l'ombre des embases
+    if (length(rel) > length(geo.zw) + 40.0) continue;
+    float ca = cos(aux.y);
+    float sa = sin(aux.y);
+    vec2 q = vec2(ca * rel.x + sa * rel.y, -sa * rel.x + ca * rel.y);
+    vec2 soleil = normalize(vec2(ca * -0.6 + sa * 0.8, -sa * -0.6 + ca * 0.8));
+    vec4 rect = uAtlas[int(aux.x)];
+    if (uHasMateriel > 0.5 && rect.z > rect.x) peintPiece(acc, q, geo.zw, aux.x, aux.z, aux.w, rect, px);
+    else dessinePiece(acc, q, geo.zw, aux.x, aux.z, aux.y, aux.w, soleil, px);
+  }
+}
+
 void main() {
   float px = 1.0 / max(uZoom, 1e-4); // un pixel d'écran, en unités monde
   float s = vUv.x;
@@ -3187,6 +3256,10 @@ void main() {
     vec3 c = tex;
     c = mix(c, vec3(0.030, 0.040, 0.055), (1.0 - smoothstep(0.0, 12.0, dv)) * 0.85);
     c = mix(c, vec3(0.30, 0.38, 0.48), (1.0 - smoothstep(px, 2.5 * px, dv)) * 0.65);
+    // les embases qui mordent dans la coque, par-dessus la tôle
+    vec4 emb = vec4(0.0);
+    poseLesPieces(emb, px, true);
+    c = emb.rgb + c * (1.0 - emb.a);
     outColor = vec4(c * garde, garde);
     return;
   }
@@ -3197,21 +3270,7 @@ void main() {
   // le fond de coque ne tient qu'où la coque tient : pas sur un trou
   if (s > 20.0 && s < vCote.y - 20.0 && videSdf(origine + s * dA + uEpais * dO) > 0.0)
     fondDeCoque(acc, s, y, cote, px);
-  for (int i = 0; i < MAX_PIECES; i++) {
-    if (i >= uPieceCount) break;
-    vec4 geo = uPieces[i];
-    vec4 aux = uPiecesAux[i];
-    vec2 rel = vWorld - geo.xy;
-    // la marge : les halos des feux et les bouffées débordent de la boîte
-    if (length(rel) > length(geo.zw) + 40.0) continue;
-    float ca = cos(aux.y);
-    float sa = sin(aux.y);
-    vec2 q = vec2(ca * rel.x + sa * rel.y, -sa * rel.x + ca * rel.y);
-    vec2 soleil = normalize(vec2(ca * -0.6 + sa * 0.8, -sa * -0.6 + ca * 0.8));
-    vec4 rect = uAtlas[int(aux.x)];
-    if (uHasMateriel > 0.5 && rect.z > rect.x) peintPiece(acc, q, geo.zw, aux.x, aux.z, aux.w, rect, px);
-    else dessinePiece(acc, q, geo.zw, aux.x, aux.z, aux.y, soleil, px);
-  }
+  poseLesPieces(acc, px, false);
   // le fil de lumière sur la face externe : l'arête de la coque accroche
   // les étoiles, et la station se découpe sur le ciel
   float arete = (1.0 - smoothstep(0.0, 1.5 * px, abs(y - 0.75 * px))) * smoothstep(0.0, px, videSdf(vWorld - dO * y));
