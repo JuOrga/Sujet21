@@ -1436,7 +1436,7 @@ par le noir. La piste (silence, ou `cuve-tiede` avancée de six planches)
 se règle à la table de montage. Comme les autres planches, celles-ci ne se
 chargent qu'à la lecture de la cinématique.
 
-## 27. LE MATÉRIEL DE COQUE — `coque-materiel.webp`
+## 28. LE MATÉRIEL DE COQUE — `coque-materiel.webp`
 
 **Une planche 4 × 2, fond MAGENTA uni `#FF00FF` · PNG · 2:1 (≥ 1776 × 896)**
 
