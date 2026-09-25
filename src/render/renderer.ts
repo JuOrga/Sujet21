@@ -165,6 +165,10 @@ const float CN_BOUT_H = ${f(C.boutDemiH)};
 const float CN_BRIDE_DE = ${f(C.brideDe)};
 const float CN_BRIDE_A = ${f(C.brideA)};
 const float CN_EMBOUT = ${f(C.embout)};
+const float CN_FIN_CORPS = ${f(C.finCorps)};
+const float CN_BB_DE = ${f(C.brideBoutDe)};
+const float CN_BB_A = ${f(C.brideBoutA)};
+const float CN_BB_DEMI = ${f(C.brideBoutDemi)};
 const float CN_JOINT_DEMI = ${f(C.jointDemi)};
 const float CN_JOINT_HAUT = ${f(C.jointHaut)};
 const float CN_JOINT_BAS = ${f(C.jointBas)};
@@ -210,6 +214,8 @@ float conduiteSdfLocal(float s, float t, float L, float T, float bouts) {
   if (lg && !boutEnMur(s, bouts)) {
     d = min(d, cnRect(abs(s), t, L * 0.5 - (CN_BRIDE_A + CN_BRIDE_DE) * 0.5 * T,
                       (CN_BRIDE_A - CN_BRIDE_DE) * 0.5 * T, 0.5 * T));
+    d = min(d, cnRect(abs(s), t, L * 0.5 - (CN_BB_A + CN_BB_DE) * 0.5 * T,
+                      (CN_BB_A - CN_BB_DE) * 0.5 * T, CN_BB_DEMI * T));
   }
   float sj = jointPres(s, L, T);
   if (sj < 1e8) {
@@ -755,21 +761,24 @@ vec4 conduiteNH3(vec2 loc, vec2 bsize, float px, float code) {
   float hb = CN_BANDE * T;
   // un bout dans un mur : le tronçon file jusqu'au bord du bloc
   bool mur = boutEnMur(s, bouts);
-  float fin = (lg && !mur) ? L * 0.5 - CN_EMBOUT * T : L * 0.5;
+  // un bout libre : le tronçon s'arrête sous la bride de la traversée
+  float fin = (lg && !mur) ? L * 0.5 - CN_FIN_CORPS * T : L * 0.5;
   if (abs(t) < hb && abs(s) < fin) {
     float m = s / (CN_MOTIF * T);
     float tri = abs(fract(m * 0.5) * 2.0 - 1.0);
     acc = atlasCadre(CN_CORPS, vec2(tri, (hb - t) / (2.0 * hb)), px, CN_CORPS.w / (2.0 * hb));
   }
-  // LES BOUTS : la bride et son embout ; à gauche, l'image en miroir. Le
-  // côté tuyau de l'image se fond dans le tronçon.
+  // LES BOUTS LIBRES : la TRAVERSÉE DE SOL — bride, coude qui plonge dans
+  // une plaque boulonnée au plancher ; à gauche, l'image en miroir. Le
+  // tronçon s'arrête sous la bride (finCorps) : elle cache le changement
+  // de diamètre, comme un réducteur.
   if (lg && !mur) {
     float sp = abs(s);
     float s0 = L * 0.5 - CN_BOUT * T;
     if (sp > s0) {
       vec2 f = vec2((sp - s0) / (CN_BOUT * T), (CN_BOUT_H * T - t) / (2.0 * CN_BOUT_H * T));
       vec4 c = atlasCadre(CN_CADRE_BOUT, f, px, CN_CADRE_BOUT.w / (2.0 * CN_BOUT_H * T));
-      acc = cnSur(acc, c * smoothstep(0.0, 0.16, f.x));
+      acc = cnSur(acc, c * smoothstep(0.0, 0.02, f.x));
     }
   }
   // LE JOINT à brides : sur un plot, seul au milieu ; ailleurs, tous les pas

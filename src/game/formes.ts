@@ -204,14 +204,22 @@ export const CONDUITE = {
   bandeCorps: 0.309,
   /** longueur d'un motif de tronçon, répété en miroir */
   motif: 1.856,
-  /** longueur de la pièce de bout (image), et sa demi-hauteur */
-  bout: 0.888,
-  boutDemiH: 0.512,
-  /** la bride de bout, comptée depuis le bout du bloc */
-  brideDe: 0.167,
-  brideA: 0.744,
-  /** l'embout s'arrête juste avant le bout */
-  embout: 0.023,
+  /** la pièce de bout — la TRAVERSÉE DE SOL : une bride, puis le coude
+   *  qui plonge dans une plaque boulonnée au plancher. Sa longueur (image)
+   *  et sa demi-hauteur ; le tronçon s'arrête sous la bride (finCorps),
+   *  qui cache le changement de diamètre, comme un réducteur */
+  bout: 1.366,
+  boutDemiH: 0.5096,
+  finCorps: 1.2,
+  /** la plaque de sol, comptée depuis le bout du bloc : toute sa largeur */
+  brideDe: 0,
+  brideA: 0.979,
+  /** la bride avant le coude, comptée depuis le bout, et sa demi-hauteur */
+  brideBoutDe: 1.027,
+  brideBoutA: 1.359,
+  brideBoutDemi: 0.34,
+  /** le tuyau file jusqu'au bout du bloc (sous la plaque) */
+  embout: 0,
   /** le joint à brides : demi-longueur de l'image, haut et bas de l'image
    *  autour de l'axe, demi-longueur de ses brides */
   jointDemi: 0.698,
@@ -228,7 +236,7 @@ export const CONDUITE = {
 export const CONDUITE_ATLAS = {
   taille: 1024,
   corps: [0, 0, 1024, 341],
-  bout: [0, 350, 370, 426],
+  bout: [0, 350, 370, 276],
   joint: [380, 350, 451, 365],
   givre: [384, 720, 608, 304],
 } as const
@@ -284,8 +292,14 @@ export function piecesConduite(L: number, T: number, bouts = 0): [number, number
     [-L / 2 + (murNeg ? 0 : retrait), L / 2 - (murPos ? 0 : retrait), C.tuyau * T],
   ]
   if (longue) {
-    if (!murPos) out.push([L / 2 - C.brideA * T, L / 2 - C.brideDe * T, T / 2])
-    if (!murNeg) out.push([-L / 2 + C.brideDe * T, -L / 2 + C.brideA * T, T / 2])
+    if (!murPos) {
+      out.push([L / 2 - C.brideA * T, L / 2 - C.brideDe * T, T / 2])
+      out.push([L / 2 - C.brideBoutA * T, L / 2 - C.brideBoutDe * T, C.brideBoutDemi * T])
+    }
+    if (!murNeg) {
+      out.push([-L / 2 + C.brideDe * T, -L / 2 + C.brideA * T, T / 2])
+      out.push([-L / 2 + C.brideBoutDe * T, -L / 2 + C.brideBoutA * T, C.brideBoutDemi * T])
+    }
   }
   for (const j of jointsConduite(L, T)) {
     out.push([Math.max(-L / 2, j - C.brideJoint * T), Math.min(L / 2, j + C.brideJoint * T), T / 2])

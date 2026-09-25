@@ -1450,7 +1450,7 @@ de composition n'a plus d'unité de texture libre) : il remplace
 génération (`--sref` sur Midjourney, image jointe sur ChatGPT / DALL·E).
 
 **Les sources** vont dans `masters/images/sources/` (non versionné) :
-`conduite-troncon.png`, `conduite-bout.png`, `conduite-raccords.png`,
+`conduite-troncon.png`, `conduite-traversee.png`, `conduite-raccords.png`,
 `conduite-givre.png`. Puis :
 
 ```bash
@@ -1474,12 +1474,21 @@ Retro-futuristic 1970s orbital laboratory, flat orthographic 2D game asset. Mute
 ```
 *Midjourney : `--ar 4:1 --tile --style raw --sref <référence>`*
 
-### 27.2 La bride de bout (détourée) · 1024×1024
+### 27.2 La traversée de sol — le bout libre (détourée) · 2:1
+
+Le tuyau passe une bride, puis plonge par un coude dans une plaque boulonnée au
+plancher : il a une ARRIVÉE (un bout contre un mur, lui, plonge dans le mur, sans
+pièce — `conduite.ts`). **La plaque doit être centrée sur l'axe du tuyau** : une
+première génération, plaque décalée vers le bas, ne se posait pas sur un bloc
+dont le tuyau suit l'axe. Mesures de l'image livrée : plaque 677 px (= la largeur
+du bloc), bride ≈ 0,70 de cette largeur, tuyau 0,41 — la bride cache le passage
+au tronçon, plus gros, comme un réducteur.
 
 ```
-Retro-futuristic 1970s orbital laboratory, flat orthographic 2D game asset. Muted cold palette: near-black #030710, steel blue-grey #0a1420 to #2a3542, single cyan accent #63b7e6. Evenly lit from above, low brightness, no visible light source. Single sprite on a transparent background, top-down orthographic view, in the exact style of the attached reference: the END of a dark polished gunmetal steel pipe with a heavy bolted flange, the pipe coming from the left edge of the image, the flange ring about 25 % taller than the pipe, eight large hexagonal nuts and bolts around it, a short capped pipe stub sticking out past the flange on the right. White hoarfrost (#d6e8f5) and small icicles gather on the flange rim, the bolt heads and the lower edge; the rest is bare glossy steel with a cold specular highlight. Pipe centred vertically, flange fully inside the image, clean edges, isolated on transparent background. Avoid: perspective, 3/4 view, isometric, side view, depth of field, blur, film grain, lens flare, vignette, bright lighting, warm colors, text, logo, watermark, border, frame, drop shadow, background, floor, pipe fully covered in snow, white pipe.
+Retro-futuristic 1970s orbital laboratory, flat orthographic 2D game asset. Muted cold palette: near-black #030710, steel blue-grey #0a1420 to #2a3542, single cyan accent #63b7e6. Evenly lit from above, low brightness, no visible light source. Single sprite on a transparent background, STRICT TOP-DOWN orthographic view looking straight down at the floor, in the exact style of the attached reference: a dark polished gunmetal steel pipe lying on the floor, coming from the left edge of the image, with a bolted flange joint on the pipe just before the plate, and on the right it bends 90 degrees DOWNWARD and disappears into the floor through a square riveted steel floor plate. The plate and its hole are CENTRED ON THE PIPE AXIS: the pipe goes straight ahead into the hole without curving sideways, the hole's centre is exactly on the pipe's centre line, and the plate extends equally above and below the pipe. Seen from directly above, the bend is a rounded pipe end whose top surface darkens as it curves down, sinking into a round black hole in the plate; a thin bolted collar ring lies FLAT on the plate around the hole, seen as a perfect circle, not an ellipse. The square plate is only about 1.8 times the pipe diameter, bolted at its four corners, lying flat. White hoarfrost (#d6e8f5) crusts the collar and the rim of the hole, a little frost on the plate edges, small icicles along the pipe's lower edge; the rest is bare glossy steel with a cold specular highlight. Pipe centred vertically in the image, the whole plate inside the image, clean edges, isolated on transparent background. Avoid: perspective, 3/4 view, isometric, side view, wall, elliptical ring, pipe entering horizontally, pipe curving sideways, off-centre plate, depth of field, blur, film grain, lens flare, vignette, bright lighting, warm colors, text, logo, watermark, border, frame, drop shadow, pipe fully covered in snow, white pipe.
 ```
-*Midjourney : `--ar 1:1 --style raw --sref <référence>`, puis détourage.*
+*Midjourney : `--ar 2:1 --style raw --sref <référence>`, puis détourage. Source :
+`masters/images/sources/conduite-traversee.png`.*
 
 ### 27.3 Les raccords (planche détourée : le joint sert aux joints et aux plots) · 2048×1024
 

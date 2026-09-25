@@ -78,7 +78,14 @@ describe('conduite — forme physique', () => {
     expect(contact(b, s, 30 + CONDUITE.tuyau * 60 + 4).dist).toBeCloseTo(4, 9)
   })
 
-  it('la bride de bout, elle, fait toute la largeur du bloc', () => {
+  it('la traversée de sol (plaque, puis bride) au bout libre', () => {
+    // la bride avant le coude : plus large que le tuyau, moins que le bloc
+    const sb = 670 - ((CONDUITE.brideBoutDe + CONDUITE.brideBoutA) / 2) * 60
+    expect(contact(b, sb, 30 + CONDUITE.brideBoutDemi * 60 - 1).dist).toBeLessThan(0)
+    expect(contact(b, sb, 30 + CONDUITE.brideBoutDemi * 60 + 3).dist).toBeCloseTo(3, 9)
+  })
+
+  it('la plaque de sol, elle, fait toute la largeur du bloc', () => {
     const s = 670 - ((CONDUITE.brideDe + CONDUITE.brideA) / 2) * 60
     expect(contact(b, s, 58).dist).toBeLessThan(0)
     expect(contact(b, s, 63).dist).toBeCloseTo(3, 9)
@@ -141,17 +148,18 @@ describe('conduite — les bouts dans le mur', () => {
     expect(boutsEnMur(b, [b, coin], null)).toBe(0)
   })
 
-  it('au mur, ni bride ni retrait : le tuyau touche le bord du bloc, le sol l’entoure', () => {
+  it('au mur, pas de traversée : le tuyau touche le bord du bloc, le sol l’entoure', () => {
     const phys = formePhysique(porte, [porte], salle)
     expect((phys as FormeBox).bouts).toBe(BOUT_MUR_NEG)
-    // au ras du bord bas, sur l'axe : sans la salle, le bout garde son
-    // retrait (l'embout de la bride) ; avec elle, le tuyau touche le bord
-    expect(contact(porte, -470, -749).dist).toBeGreaterThan(0)
-    formeContact(-470, -749, phys, out)
-    expect(out.dist).toBeLessThan(0)
-    // au ras du bord bas, sur le flanc du BLOC : dehors — plus de bride là
+    // au ras du bord bas, sur le flanc du BLOC : sans la salle, c'est la
+    // plaque de sol de la traversée (toute la largeur) ; avec elle, le
+    // tuyau plonge dans le bord, plus de plaque — du sol
+    expect(contact(porte, -443, -740).dist).toBeLessThan(0)
     formeContact(-443, -740, phys, out)
     expect(out.dist).toBeGreaterThan(0)
+    // et le tuyau, lui, touche le bord du bloc
+    formeContact(-470, -749, phys, out)
+    expect(out.dist).toBeLessThan(0)
     // l'autre bout, libre, garde sa bride de toute la largeur
     formeContact(-443, -150 - ((CONDUITE.brideDe + CONDUITE.brideA) / 2) * 60, phys, out)
     expect(out.dist).toBeLessThan(0)

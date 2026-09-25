@@ -10,7 +10,8 @@ réunies, l'ancienne texture de la plaque froide (froid.webp, unité 9).
 Les sources (docs/assets-ia.md, « La conduite d'ammoniac ») :
 
   masters/images/sources/conduite-troncon.png   le corps, sur fond sombre
-  masters/images/sources/conduite-bout.png      la bride de bout, détourée
+  masters/images/sources/conduite-traversee.png le bout : bride, coude qui
+                                                plonge dans une plaque de sol
   masters/images/sources/conduite-raccords.png  la planche de raccords
   masters/images/sources/conduite-givre.png     le givre du sol, détouré
 
@@ -43,7 +44,7 @@ TAILLE = 1024
 # (x, y, largeur, hauteur) dans l'atlas, en pixels depuis le HAUT-gauche.
 # Le shader lit les mêmes cadres (CONDUITE_ATLAS dans game/formes.ts).
 CADRE_CORPS = (0, 0, 1024, 341)
-CADRE_BOUT = (0, 350, 370, 426)
+CADRE_BOUT = (0, 350, 370, 276)
 CADRE_JOINT = (380, 350, 451, 365)
 CADRE_GIVRE = (384, 720, 608, 304)
 
@@ -78,9 +79,11 @@ def colle(atlas: Image.Image, piece: Image.Image, cadre: tuple[int, int, int, in
 def main() -> None:
     atlas = Image.new('RGBA', (TAILLE, TAILLE), (0, 0, 0, 0))
     colle(atlas, corps(), CADRE_CORPS)
-    # la bride de bout : de l'amorce du givre (x 880) au bout de l'embout
-    # (1619), de 10 px au-dessus à 10 px au-dessous de la bride (50..882)
-    colle(atlas, lis('conduite-bout.png').crop((880, 40, 1619, 892)), CADRE_BOUT)
+    # LA TRAVERSÉE DE SOL (le bout libre) : de l'amorce de la bride (x 845)
+    # au bord de la plaque (1770) ; en hauteur, la plaque (123..800,
+    # mesurée) et 10 px de marge, centrée sur l'axe du tuyau (455) et de
+    # la plaque (461) — y 113..803
+    colle(atlas, lis('conduite-traversee.png').crop((845, 113, 1770, 803)), CADRE_BOUT)
     # le joint : la première pièce de la planche, centrée sur ses brides
     # (x 380), bride de 79 à 483
     colle(atlas, lis('conduite-raccords.png').crop((98, 56, 662, 513)), CADRE_JOINT)
