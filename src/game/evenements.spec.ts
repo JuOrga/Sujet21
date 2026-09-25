@@ -4,6 +4,7 @@ import {
   cleOffre,
   DETAIL_VOILE,
   detailOffre,
+  DETAIL_HORS_PORTEE,
   ditEffet,
   ESSENCE_PLANCHER,
   EVENEMENTS,
@@ -162,6 +163,11 @@ describe('le voile des offres — on apprend une offre en la prenant', () => {
     const c = ev.choix[0]
     expect(detailOffre(c, false)).toEqual({ texte: DETAIL_VOILE, voilee: true })
     expect(detailOffre(c, true)).toEqual({ texte: c.detail, voilee: false })
+    // une offre qu'on NE PEUT PAS prendre reste voilée (rester pauvre ne
+    // doit rien apprendre), mais son voile dit pourquoi elle est grisée —
+    // pas « il faut la prendre pour savoir », qu'elle ne peut pas tenir
+    expect(detailOffre(c, false, false)).toEqual({ texte: DETAIL_HORS_PORTEE, voilee: true })
+    expect(detailOffre(c, true, false)).toEqual({ texte: c.detail, voilee: false })
     // le voile ne trahit rien de ce qu'il cache
     for (const e of EVENEMENTS)
       for (const ch of e.choix) expect(DETAIL_VOILE).not.toContain(ch.detail)

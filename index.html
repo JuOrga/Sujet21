@@ -8236,7 +8236,15 @@
       /* repliée, la médaille s'allonge en pastille : un mot ne tient pas
          dans un disque de 56 px */
       .mb-scene.mb-compact .mb-rang { width: 120px; height: 40px; }
-      .mb-scene.mb-compact .mb-rang::before { inset: 4px; }
+      .mb-scene.mb-compact .mb-rang::before { inset: 4px; border-radius: 999px; }
+      /* l'anneau suit la pastille, et cesse de TOURNER : dessiné pour un
+         disque, il devenait sur 120 × 40 une ellipse en rotation qui
+         balayait ~40 px au-dessus et au-dessous, sur le titre et les litres */
+      .mb-scene.mb-compact .mb-rang-anneau {
+        animation: none; border-radius: 999px; background: none;
+        -webkit-mask: none; mask: none;
+        border: 2px solid color-mix(in srgb, var(--mb-rang) 80%, transparent);
+      }
       .mb-scene.mb-compact .mb-rang-lettre { --mb-nom-l: 100px; animation: none; }
       .mb-scene.mb-compact .mb-rang-mot,
       .mb-scene.mb-compact .mb-etoiles,
@@ -8579,7 +8587,9 @@
       }
       .mb-ev-pari { color: var(--mb-or, #ffd977); }
       /* le détail d'une offre jamais prise : voilé, il se devine sans se lire */
-      .mb-ev-voile { font-style: italic; color: #6f8799; letter-spacing: 0.04em; }
+      /* .mb-carte devant : « .mb-carte small » (déclarée plus haut) était plus
+         spécifique, et le voile gardait la couleur d'un détail connu */
+      .mb-carte .mb-ev-voile { font-style: italic; color: #6f8799; letter-spacing: 0.04em; }
       /* l'alcôve de repos : trois offres, l'icône en tête */
       .mb-carte.mb-repos { min-height: 170px; justify-content: center; gap: 8px; }
       .mb-repos-icone { font-style: normal; font-size: calc(30px * var(--ui)); line-height: 1; }

@@ -130,6 +130,7 @@ export interface FormeBox {
   coupe?: Coupe // un demi-plan qui tronque la forme (monde, hors rotation)
   sens?: number // CONDUITE : le sens du tuyau (SENS_AUTO, _HORIZONTAL, _VERTICAL)
   bouts?: number // CONDUITE : ses bouts plongés dans un mur (BOUT_MUR_*), calculés au chargement
+  pieces?: [number, number, number][] // CONDUITE : ses pièces, précalculées par formePhysique
 }
 
 export interface FormeContact {
@@ -350,10 +351,34 @@ export function piecesConduite(L: number, T: number, bouts = 0): [number, number
   return out
 }
 
+// LES PIÈCES, UNE FOIS PAR BOÎTE. Elles ne dépendent que de (L, T, bouts),
+// mais conduiteContactAxe tourne dans la boucle la plus chaude du solveur
+// — par particule et par sous-pas — et les recalculait chaque fois, deux
+// tableaux alloués à la clé : des milliers d'objets éphémères par pas, que
+// le ramasse-miettes paie en à-coups sur mobile. La boîte (copie stable
+// que formePhysique donne au solveur) garde les siennes ; une boîte qui
+// change de taille les recalcule. La consultation n'alloue rien.
+const piecesParBoite = new WeakMap<object, { L: number; T: number; bouts: number; pieces: [number, number, number][] }>()
+function piecesDe(b: object, L: number, T: number, bouts: number): [number, number, number][] {
+  const c = piecesParBoite.get(b)
+  if (c && c.L === L && c.T === T && c.bouts === bouts) return c.pieces
+  const pieces = piecesConduite(L, T, bouts)
+  piecesParBoite.set(b, { L, T, bouts, pieces })
+  return pieces
+}
+
 function conduiteContactAxe(
   x: number,
   y: number,
-  b: { minX: number; minY: number; maxX: number; maxY: number; sens?: number; bouts?: number },
+  b: {
+    minX: number
+    minY: number
+    maxX: number
+    maxY: number
+    sens?: number
+    bouts?: number
+    pieces?: [number, number, number][]
+  },
   out: FormeContact,
 ): void {
   const w = b.maxX - b.minX
@@ -369,7 +394,9 @@ function conduiteContactAxe(
   let best = Infinity
   let ns = 0
   let nt = 1
-  for (const [s0, s1, e] of piecesConduite(L, T, b.bouts ?? 0)) {
+  // les pièces précalculées de la copie physique (formePhysique) — un champ,
+  // pas une recherche ; à défaut (une boîte bâtie ailleurs), le cache
+  for (const [s0, s1, e] of b.pieces ?? piecesDe(b, L, T, b.bouts ?? 0)) {
     const cs = (s0 + s1) / 2
     const hs = (s1 - s0) / 2
     const qs = Math.abs(s - cs) - hs

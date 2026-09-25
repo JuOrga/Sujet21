@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { boutsEnMur, formePhysique } from './conduite'
+import { boutsEnMur, formePhysique, formesPhysiques } from './conduite'
 import {
   CONDUITE,
   CONDUITE_ATLAS,
@@ -8,6 +8,7 @@ import {
   SENS_HORIZONTAL,
   SENS_VERTICAL,
   conduiteHoriz,
+  dansForme,
   FORME_CONDUITE,
   FORME_DISQUE,
   conduiteLongue,
@@ -187,6 +188,35 @@ describe('conduite — les bouts dans le mur', () => {
     expect(boutsEnMur(b, [b, vide], null)).toBe(0)
   })
 
+  it('contre une AUTRE conduite, seul son tube compte, pas sa boîte (T, L)', () => {
+    const a = box(0, 125, 400, 185, MAT_FROID)
+    // B, verticale, dont la BOÎTE touche le bout de A mais dont le tube
+    // (0,56 de sa largeur, centré) passe plus loin
+    const b = box(400, -300, 520, 360, MAT_FROID)
+    // la géométrie que le test suppose : juste au-delà du bout de A, on est
+    // dans la boîte de B mais pas dans sa forme physique (entre deux joints)
+    for (const y of [140, 155, 170]) {
+      expect(dansForme(formePhysique(b), 403, y)).toBe(false)
+      expect(dansForme(b, 403, y)).toBe(true)
+    }
+    // A garde donc sa bride : son tube ne plonge pas dans du sol vide
+    expect(boutsEnMur(a, [a, b], null)).toBe(0)
+  })
+
+  it('une voisine dont le bout plonge dans le sol n’a pas de bride : on ne s’y arrête pas', () => {
+    const salle = { minX: -1000, minY: -750, maxX: 1000, maxY: 750 }
+    // B, verticale, plonge dans le sol par le bas : pas de bride de bout
+    const b = box(400, -750, 520, -150, MAT_FROID)
+    // A arrive contre la boîte de B, à la hauteur où B AURAIT sa bride de
+    // bout (les 117 premières unités) si ce bout était libre
+    const a = box(0, -730, 400, -690, MAT_FROID)
+    for (const y of [-720, -710, -700]) {
+      expect(dansForme(formePhysique(b), 403, y)).toBe(true) // la bride supposée
+      expect(dansForme(formePhysique(b, [a, b], salle), 403, y)).toBe(false) // la vraie forme
+    }
+    expect(boutsEnMur(a, [a, b], salle) & BOUT_MUR_POS).toBe(0)
+  })
+
   it('un mur qui ne prend que la moitié du tuyau ne l’avale pas', () => {
     const b = box(0, 0, 400, 60, MAT_FROID)
     const coin = box(400, 30, 460, 200, MAT_WALL) // ne couvre que le haut
@@ -241,5 +271,29 @@ describe('conduite — les jumeaux', () => {
     expect(cadre('GIVRE')).toEqual(CONDUITE_ATLAS.givre)
     expect(cadre('VANNE')).toEqual(CONDUITE_ATLAS.vanne)
     expect(Number(py.match(/^TAILLE = (\d+)/m)![1])).toBe(CONDUITE_ATLAS.taille)
+  })
+})
+
+// LES FORMES D'UNE SALLE, une fois par état du décor : le laser les
+// recalculait à chaque tir.
+describe('conduite — les formes physiques d’une salle, en cache', () => {
+  it('sans conduite, la liste elle-même : ni copie ni calcul', () => {
+    const boxes = [box(0, 0, 100, 100, MAT_WALL)]
+    expect(formesPhysiques(boxes, null)).toBe(boxes)
+  })
+
+  it('même décor : la même réponse ; un mur déplacé SUR PLACE : recalculée', () => {
+    const tuyau = box(0, 0, 400, 60, MAT_FROID)
+    const mur = box(400, -100, 460, 200, MAT_WALL)
+    const boxes = [tuyau, mur]
+    const a = formesPhysiques(boxes, null)
+    expect(formesPhysiques(boxes, null)).toBe(a)
+    expect((a[0] as FormeBox).bouts).toBe(BOUT_MUR_POS)
+    // l'éditeur écarte le mur en modifiant la boîte elle-même
+    mur.minX = 600
+    mur.maxX = 660
+    const b = formesPhysiques(boxes, null)
+    expect(b).not.toBe(a)
+    expect((b[0] as FormeBox).bouts ?? 0).toBe(0)
   })
 })

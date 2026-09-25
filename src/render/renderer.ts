@@ -31,7 +31,7 @@ import type { Camera } from './camera'
 import { VIE_STRIDE } from './vie'
 import { Programmes } from './programmes'
 import { sondeRetournement, type Retournement } from './retournement'
-import { boutsEnMur } from '../game/conduite'
+import { boutsEnMur, cleBoite } from '../game/conduite'
 
 // Budgets de rendu : au-delà, les éléments excédentaires ne sont plus
 // dessinés (la physique, elle, les voit tous) — l'éditeur avertit quand un
@@ -1826,8 +1826,9 @@ void main() {
     // Ombre portée douce autour de chaque solide (sauf le sas) : les blocs
     // se détachent du fond au lieu de flotter — la cuve prend de la
     // profondeur, les rectangles cessent d'être des aplats.
-    // (sauf la conduite d'ammoniac : son ombre suit ses tubes, pas la boîte)
-    if (solide && !(mat > 3.5 && mat < 4.5)) {
+    // (sauf la conduite d'ammoniac : son ombre suit ses tubes, pas la boîte
+    // — une plaque froide À FORME, elle, est un solide comme un autre)
+    if (solide && !(mat > 3.5 && mat < 4.5 && dec.y < 0.5)) {
       float shade = 1.0 - smoothstep(0.0, 56.0, max(d, 0.0));
       col = mix(col, col * vec3(0.50, 0.56, 0.70), shade * shade * 0.5);
     }
@@ -1836,7 +1837,7 @@ void main() {
     // sommet, strates et chant clair — chaque matériau garde son identité
     // sur sa tranche : turquoise mouillé, violet cireux, vert de membrane,
     // ambre de borne… Le sommet (déplacé) se peint ensuite par-dessus.
-    if (flanc > 0.003 && !(mat > 3.5 && mat < 4.5)) { // la conduite n'a pas de tranche de boîte
+    if (flanc > 0.003 && !(mat > 3.5 && mat < 4.5 && dec.y < 0.5)) { // la conduite n'a pas de tranche de boîte
       vec2 gB = gradSdfBoite(bi, wb, d, dec, bca, bsa);
       float gn2 = max(length(gB), 1e-5);
       vec2 nrm = gB / gn2;
@@ -2205,7 +2206,14 @@ void main() {
       // sur un AUTRE solide (la brume délavait la conduite voisine)
       float surSol = (iCouv == bi || dCouv > 0.0) ? 1.0 : 0.0;
       float sensC = uBoxAux[bi].z; // sens + 4 · bouts dans un mur (aux.z d'une plaque froide)
-      float dG = conduiteSdf(wb, uBoxes[bi], sensC);
+      // UNE PLAQUE FROIDE QUI A UNE FORME (disque, capsule…) la garde dans la
+      // physique (formePhysique) : son gel se mesure depuis ELLE, pas depuis
+      // la silhouette du tuyau — sans quoi la brume dessinée débordait de la
+      // vraie bande de gel (d'un cinquième du côté aux diagonales d'un
+      // disque), ou commençait en deçà (capsule). Le cuiseur de lumière
+      // faisait déjà ce tri (dec.y < 0.5) ; la composition, non.
+      bool tuyau = dec.y < 0.5;
+      float dG = tuyau ? conduiteSdf(wb, uBoxes[bi], sensC) : dV;
       // LE SOL CRISTALLISÉ dans l'aire d'effet — là où le solveur gèle l'eau
       vec2 gsol = givreSol(wb, max(dG, 0.0), uColdBand, pxMonde);
       col = mix(col, vec3(0.80, 0.90, 0.98) * eclMat, gsol.x * 0.25 * surSol);
@@ -2213,8 +2221,25 @@ void main() {
       col += vec3(0.75, 0.88, 1.0) * gsol.y * 0.30 * surSol;
       // l'ombre au sol, PARTOUT autour de la conduite (coupée au bord de la
       // boîte, elle redessinait le rectangle)
-      col *= mix(1.0, conduiteOmbre(wb, uBoxes[bi], sensC), surSol);
-      vec4 cnh = conduiteNH3(clamp(wbV - bmin, vec2(0.0), bsize), bsize, pxMonde, sensC);
+      if (tuyau) col *= mix(1.0, conduiteOmbre(wb, uBoxes[bi], sensC), surSol);
+      // L'ATLAS PAS (ENCORE) LÀ : l'unité liée à null se lit (0, 0, 0, 1) —
+      // chaque conduite se peignait en rectangles NOIRS tant que l'image
+      // montait, et pour de bon si elle manquait. Le givre procédural
+      // d'avant l'atlas reprend alors, sur la silhouette de la conduite — et
+      // de même sur une plaque qui a une forme : le tuyau n'y a pas de sens.
+      vec4 cnh;
+      if (uHasFroid > 0.5 && tuyau) {
+        cnh = conduiteNH3(clamp(wbV - bmin, vec2(0.0), bsize), bsize, pxMonde, sensC);
+      } else {
+        // la COUVERTURE du secours : la silhouette du tuyau (sa forme de
+        // collision), pas la boîte — fill en suit le rectangle, et le givre
+        // de secours y aurait peint un bloc plein là où l'eau passe
+        float couvS = tuyau
+          ? 1.0 - smoothstep(-edgeW, 0.0, conduiteSdf(wbV, uBoxes[bi], sensC))
+          : 1.0;
+        float eclat = smoothstep(0.72, 0.94, dnoise(world * 0.22));
+        cnh = vec4(vec3(0.15, 0.21, 0.29) + vec3(0.26, 0.34, 0.40) * eclat * 0.55, 1.0) * couvS;
+      }
       col = col * (1.0 - fill * cnh.a) + cnh.rgb * eclMat * fill;
       cielVu *= 1.0 - clamp(fill * cnh.a, 0.0, 1.0);
       couvConduite = max(couvConduite, fill * cnh.a);
@@ -3415,6 +3440,45 @@ void main() {
   outColor = vec4(c, t.a * uFade * (1.0 - fluide));
 }`
 
+/** Ce qui reste du rectangle `a` hors de `b` : au plus quatre morceaux
+ *  disjoints (bandes haute et basse pleine largeur, puis gauche et droite
+ *  à la hauteur du chevauchement). [x0, y0, x1, y1]. */
+function soustraitRect(
+  a: [number, number, number, number],
+  b: [number, number, number, number],
+): [number, number, number, number][] {
+  const [ax0, ay0, ax1, ay1] = a
+  const [bx0, by0, bx1, by1] = b
+  if (bx0 >= ax1 || bx1 <= ax0 || by0 >= ay1 || by1 <= ay0) return [a]
+  const out: [number, number, number, number][] = []
+  const y0 = Math.max(ay0, by0)
+  const y1 = Math.min(ay1, by1)
+  if (ay0 < y0) out.push([ax0, ay0, ax1, y0])
+  if (y1 < ay1) out.push([ax0, y1, ax1, ay1])
+  if (ax0 < bx0) out.push([ax0, y0, bx0, y1])
+  if (bx1 < ax1) out.push([bx1, y0, ax1, y1])
+  return out
+}
+
+/** LES RECTANGLES DE LA PASSE NETTE, rendus DISJOINTS. Deux qui se
+ *  chevauchent (conduites voisines, rectangles élargis par le relief)
+ *  étaient dessinés chacun : la zone commune fondue DEUX fois en (ONE,
+ *  ONE_MINUS_SRC_ALPHA) — une couture sur les bords antialiasés, et la
+ *  composition payée deux fois. Chaque rectangle est donc découpé de ce que
+ *  les précédents couvrent déjà : la même surface exactement, chaque pixel
+ *  une fois. (Premier jet : leur ENVELOPPE — deux conduites en L de 1800 ×
+ *  60 et 60 × 1200 px en faisaient 1800 × 1200, douze fois la surface, au
+ *  réglage même où cette passe doit rester légère.) [x0, y0, x1, y1]. */
+export function rectsDisjoints(rects: [number, number, number, number][]): [number, number, number, number][] {
+  const faits: [number, number, number, number][] = []
+  for (const r of rects) {
+    let morceaux: [number, number, number, number][] = [r]
+    for (const f of faits) morceaux = morceaux.flatMap((m) => soustraitRect(m, f))
+    faits.push(...morceaux)
+  }
+  return faits
+}
+
 /** L'intervalle [a, b] (un axe d'une boîte, en unités monde) élargi à ce
  *  que le relief 2.5D en dessine. Le shader lit au pixel w le point
  *  w − (w − centre)·k : le sommet d'un point p se dessine donc en
@@ -3441,10 +3505,7 @@ export function cleBoitesLumiere(
   boxCount: number,
 ): string {
   let key = ''
-  for (let i = 0; i < boxCount; i++) {
-    const bx = boxes[i]
-    key += `;${bx.minX},${bx.minY},${bx.maxX},${bx.maxY},${bx.angle ?? 0},${bx.material},${bx.forme ?? 0},${bx.p0 ?? 0},${bx.p1 ?? 0},${bx.sens ?? 0}`
-  }
+  for (let i = 0; i < boxCount; i++) key += cleBoite(boxes[i])
   return key
 }
 
@@ -3509,6 +3570,22 @@ export class Renderer {
    *  solveur ne connaît : sondés là, un bout contre une factice se dessinait
    *  sans bride quand la physique, elle, en gardait une, invisible. */
   boitesMurs: readonly ObstacleBox[] | null = null
+  /** La DERNIÈRE image a-t-elle tourné la passe nette (toile repassée en
+   *  natif) ? Le rapport de performance le dit : sans lui, un tableau à
+   *  conduite coûtait, au réglage « suit la résolution », bien plus que
+   *  l'échelle de rendu annoncée — et rien ne le montrait. */
+  passeNette = false
+  // LES BOUTS DES CONDUITES, par état du décor : boutsEnMur sonde six
+  // points contre toutes les boîtes, pour chaque conduite — et tournait à
+  // CHAQUE image. La clé est celle de la carte de lumière (géométrie,
+  // matière, forme, angle, sens, bouts d'arc, coupe) : un décor qui bouge,
+  // même sur place à l'éditeur, vide le cache.
+  private boutsCle = ''
+  private boutsCleFaite = false // la clé de CETTE image est-elle déjà bâtie ?
+  private boutsParBoite = new WeakMap<ObstacleBox, number>()
+  // la clé des boîtes de CETTE image (cleBoitesLumiere), bâtie une fois et
+  // partagée par les bouts des conduites et la carte de lumière
+  private cleImage: string | null = null
   private sceneFbo: WebGLFramebuffer | null = null
   private sceneTex: WebGLTexture | null = null
   private sceneW = 0
@@ -4307,6 +4384,47 @@ export class Renderer {
     }))
   }
 
+  /** La clé des boîtes de CETTE image, bâtie au plus une fois (cleImage,
+   *  remis à null avant la boucle des boîtes). */
+  private cleBoitesImage(boxes: ObstacleBox[], boxCount: number): string {
+    if (this.cleImage === null) this.cleImage = cleBoitesLumiere(boxes, boxCount)
+    return this.cleImage
+  }
+
+  /** Les bouts d'une conduite plongés dans un mur, en cache (boutsCle). */
+  private boutsDe(
+    bx: ObstacleBox,
+    boxes: ObstacleBox[],
+    boxCount: number,
+    bounds: { minX: number; minY: number; maxX: number; maxY: number },
+  ): number {
+    const murs = this.boitesMurs ?? boxes
+    // la clé une fois par IMAGE (boutsCleFaite, remis à faux avant la
+    // boucle des boîtes), pas une fois par conduite — et la liste des
+    // boîtes y entre par la clé que la carte de lumière bâtit de toute
+    // façon (cleBoitesImage) : rien de plus à fabriquer, sauf si les murs
+    // sont une autre liste
+    if (!this.boutsCleFaite) {
+      this.boutsCleFaite = true
+      const cle =
+        `${bounds.minX},${bounds.minY},${bounds.maxX},${bounds.maxY}|` +
+        this.cleBoitesImage(boxes, boxCount) +
+        (murs === boxes ? '' : '|' + cleBoitesLumiere(murs, murs.length))
+      if (cle !== this.boutsCle) {
+        this.boutsCle = cle
+        // une WeakMap neuve : l'ancienne, avec les boîtes d'un décor quitté,
+        // part au ramasse-miettes au lieu de grossir
+        this.boutsParBoite = new WeakMap()
+      }
+    }
+    let v = this.boutsParBoite.get(bx)
+    if (v === undefined) {
+      v = boutsEnMur(bx, murs, bounds)
+      this.boutsParBoite.set(bx, v)
+    }
+    return v
+  }
+
   // Cuit la carte de lumière si le décor OU les lampes ont changé — les
   // scratchs de boîtes doivent déjà être remplis. Quelques dizaines de
   // milliers de texels, une fois par tableau : le prix d'une image.
@@ -4365,7 +4483,7 @@ export class Renderer {
       key +=
         `;L${l.x},${l.y},${l.h},${l.portee},${l.intensite},${l.rvb.join('/')}` +
         `,${l.bandeau ? 1 : 0},${l.demiLong},${l.angleRad}`
-    key += cleBoitesLumiere(boxes, boxCount)
+    key += this.cleBoitesImage(boxes, boxCount)
     if (key === this.lightKey) return
     this.lightKey = key
     this.lightMapMinX = minX
@@ -4511,6 +4629,7 @@ export class Renderer {
       this.canvas.width = natW
       this.canvas.height = natH
     }
+    this.passeNette = nette
     if (nette) this.ensureSceneTarget(devW, devH)
     this.cibleW = devW
     this.cibleH = devH
@@ -4532,6 +4651,8 @@ export class Renderer {
     // (celui du solveur, pour la charge du surchauffeur) ; `k` est la case.
     const boxCount = Math.min(boxes.length, MAX_BOXES)
     const rangs = rangsDePeinture(boxes, boxCount, this.rangsScratch)
+    this.boutsCleFaite = false
+    this.cleImage = null
     for (let k = 0; k < boxCount; k++) {
       const i = rangs[k]
       const bx = boxes[i]
@@ -4567,8 +4688,7 @@ export class Renderer {
         bx.material === 0
           ? (bx.skin ?? 0)
           : bx.material === MAT_FROID
-            ? (bx.sens ?? 0) +
-              4 * boutsEnMur(bx, this.boitesMurs ?? boxes, sim.bounds)
+            ? (bx.sens ?? 0) + 4 * this.boutsDe(bx, boxes, boxCount, sim.bounds)
             : sim.surchauffesVides.has(i)
               ? 0
               : 1
@@ -4910,6 +5030,7 @@ export class Renderer {
     const kRelief = relief * Math.min(1, Math.max(0, camera.zoom * 1.2))
     const px = (wx: number) => ((wx - camera.x) * camera.zoom + viewportW / 2) * dpr
     const py = (wy: number) => ((wy - camera.y) * camera.zoom + viewportH / 2) * dpr
+    const rects: [number, number, number, number][] = []
     for (const b of boxes) {
       if (b.material !== MAT_FROID || b.forme) continue
       // une boîte oblique : son cercle englobant
@@ -4936,6 +5057,9 @@ export class Renderer {
       const sx1 = Math.min(natW, Math.ceil(px(x1)) + 2)
       const sy1 = Math.min(natH, Math.ceil(py(y1)) + 2)
       if (sx1 <= sx0 || sy1 <= sy0) continue
+      rects.push([sx0, sy0, sx1, sy1])
+    }
+    for (const [sx0, sy0, sx1, sy1] of rectsDisjoints(rects)) {
       gl.scissor(sx0, sy0, sx1 - sx0, sy1 - sy0)
       gl.drawArrays(gl.TRIANGLES, 0, 3)
     }

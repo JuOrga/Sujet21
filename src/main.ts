@@ -4429,6 +4429,11 @@ function rapportPerf(): Record<string, unknown> {
       // le décor net recalcule le décor EN NATIF : l'échelle ne dit alors
       // plus que le coût de l'eau — sans ce drapeau, le rapport tromperait
       decorNet,
+      // les pixels RÉELS de la toile, et si la passe nette l'a repassée en
+      // natif : au réglage « suit la résolution », un tableau à conduite le
+      // fait aussi — « megapixels » (l'échelle au carré) le cachait
+      megapixelsToile: Math.round(((canvas.width * canvas.height) / 1e6) * 100) / 100,
+      passeNette: renderer.passeNette,
       timeWarp: params.timeWarp,
       downsampleChamp: params.renderDownsample,
     },
@@ -16010,8 +16015,9 @@ function mbPeintEvenement(ev: EvenementDef, alea: () => number): void {
     btn.className = 'mb-carte mb-ev-offre' + (possible ? '' : ' mb-pauvre')
     btn.disabled = !possible
     btn.style.setProperty('--i', String(i))
-    // le détail ne se lit que d'une offre déjà prise (evenements, règle 4)
-    const detail = detailOffre(choix, records.offreEssayee(cleOffre(ev, choix)))
+    // le détail ne se lit que d'une offre déjà prise ; une offre hors de
+    // portée le dit (evenements, règle 4)
+    const detail = detailOffre(choix, records.offreEssayee(cleOffre(ev, choix)), possible)
     btn.innerHTML =
       `<b>${esc(choix.libelle)}</b><small${detail.voilee ? ' class="mb-ev-voile"' : ''}>${esc(detail.texte)}</small>` +
       (choix.issues.length > 1
