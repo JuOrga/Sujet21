@@ -124,6 +124,7 @@ import {
   fermeParPorte,
   REPERES_VOIE,
 } from './game/voiesModule'
+import { armeAuToucher, ARMEE } from './game/porteArmee'
 import { CLE_MANQUES, inventairePool, litManques, noteManque, type Manque } from './game/manques'
 import {
   arriveRafales,
@@ -15387,7 +15388,7 @@ function propositionsVoie(seq: LevelDef[]): CarteVoie[] | null {
           lv: null,
           cahier: null,
           generee: false,
-          etiquette: `${NOMS_NOEUD[p.nature].etiquette}`,
+          etiquette: NOMS_NOEUD[p.nature].etiquette,
           voie: p.voie,
           nature: p.nature,
         })
@@ -15416,7 +15417,7 @@ function propositionsVoie(seq: LevelDef[]): CarteVoie[] | null {
           etiquette:
             (manque
               ? `TABLEAU DU POOL — PAS DE ${MECANIQUE_NOMS[p.mecanique].toUpperCase()} AU POOL`
-              : `TABLEAU DU POOL`) + suffixePrime,
+              : 'TABLEAU DU POOL') + suffixePrime,
           voie: p.voie,
           ...(p.prime ? { prime: p.prime } : {}),
           ...(manqueNote ? { manqueNote } : {}),
@@ -15433,7 +15434,7 @@ function propositionsVoie(seq: LevelDef[]): CarteVoie[] | null {
           etiquette:
             (manque
               ? `GÉNÉRÉE — LE POOL MANQUE (${MECANIQUE_NOMS[p.mecanique]})`
-              : `${etiquetteGeneree(g.figure, p.voie)}`) + suffixePrime,
+              : etiquetteGeneree(g.figure, p.voie)) + suffixePrime,
           voie: p.voie,
           ...(p.prime ? { prime: p.prime } : {}),
           ...(manqueNote ? { manqueNote } : {}),
@@ -15560,7 +15561,13 @@ function mbMontreSallesVoie(cartes: CarteVoie[]): void {
       const rep = nd ? REPERES_VOIE[nd.voie] : undefined
       if (nd && rep) ficheVoies(`SALLE ${nd.rang + 1} · ${rep.signe} VOIE DU ${rep.nom} · ${ditNoeud(nd)}`)
     })
-    svg?.addEventListener('pointerleave', () => ficheVoies(null))
+    svg?.addEventListener('pointerleave', () => {
+      // au doigt, quitter la grille ne vaut pas quitter la porte armée :
+      // sa fiche revient (revue de la PR, 25/09)
+      const armee = host.querySelector(`.${ARMEE}`)
+      if (armee) armee.dispatchEvent(new Event('pad-vise'))
+      else ficheVoies(null)
+    })
   } else ficheVoies = () => {}
   host.appendChild(mbConsignePortes(cartes.length))
   // LES MANQUES DU POOL se notent quand le choix se prend, une fois : ce
@@ -15626,7 +15633,7 @@ function mbMontreSallesVoie(cartes: CarteVoie[]): void {
           el.classList.remove('mv-perdu', 'mv-entree', 'mv-vise')
         if (!oui) {
           // une porte armée au doigt garde son aperçu
-          if (!porte.classList.contains('mb-armee')) ficheVoies(null)
+          if (!porte.classList.contains(ARMEE)) ficheVoies(null)
           return
         }
         const vient = derniereVoie(carteRun)
@@ -15713,33 +15720,6 @@ function mbJauges(): HTMLElement {
  *  pendant que les autres se referment, puis `choisit` retient la salle et
  *  le sas mène à la suivante. Un second clic pendant l'ouverture ne compte
  *  pas : la porte est déjà prise. */
-/** AU DOIGT, UNE PORTE SE VISE PUIS S'OUVRE. Sans survol, le premier
- *  toucher ouvrait tout de suite : la mini-carte n'avait jamais le temps
- *  de dire ce que la porte fermait (revue du 25/09). Sur une mini-carte à
- *  voies, le premier toucher ARME la porte — l'aperçu s'allume, « TOUCHEZ
- *  ENCORE » — et le second l'ouvre. Souris, clavier et manette : inchangés.
- *  Rend true quand le clic doit ouvrir. */
-function mbArmeAuToucher(btn: HTMLButtonElement, voie: number | undefined): () => boolean {
-  if (voie === undefined) return () => true
-  let doigt = false
-  btn.addEventListener('pointerdown', (e) => (doigt = e.pointerType === 'touch'))
-  return () => {
-    if (!doigt || btn.classList.contains('mb-armee')) return true
-    for (const autre of btn.parentElement?.querySelectorAll<HTMLElement>('.mb-armee') ?? []) {
-      autre.classList.remove('mb-armee')
-      const e = autre.querySelector('.mb-porte-entrer')
-      if (e) e.textContent = 'ENTRER ▸'
-      autre.dispatchEvent(new Event('pad-quitte'))
-    }
-    btn.classList.add('mb-armee')
-    const entrer = btn.querySelector('.mb-porte-entrer')
-    if (entrer) entrer.textContent = 'TOUCHEZ ENCORE ▸'
-    // le doigt levé a déjà envoyé pointerleave : l'aperçu se rallume
-    btn.dispatchEvent(new Event('pad-vise'))
-    return false
-  }
-}
-
 function mbPorte(
   lv: LevelDef,
   i: number,
@@ -15763,7 +15743,7 @@ function mbPorte(
       : '') +
     `<span class="mb-porte-entrer">ENTRER ▸</span>`
   dessineMiniCarte(btn.querySelector('canvas') as HTMLCanvasElement, lv)
-  const ouvre = mbArmeAuToucher(btn, o.voie)
+  const ouvre = armeAuToucher(btn, o.voie !== undefined)
   btn.addEventListener('click', () => {
     if (!ouvre()) return
     const host = btn.parentElement
@@ -15859,7 +15839,7 @@ function mbPorteNoeud(
     `<em class="mb-porte-tag mb-voie-ev">${esc(etiquette)}</em>` +
     `<b>${esc(d.titre)}</b><small>${esc(d.texte)}</small>` +
     `<span class="mb-porte-entrer">ENTRER ▸</span>`
-  const arme = mbArmeAuToucher(btn, voie)
+  const arme = armeAuToucher(btn, voie !== undefined)
   btn.addEventListener('click', () => {
     if (!arme()) return
     const host = btn.parentElement
