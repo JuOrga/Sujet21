@@ -377,10 +377,10 @@ import { picto, type NomPicto } from './game/athPictos'
 import { entreesTiroir } from './game/athTiroir'
 import { pancarteLibre, zonesInterdites, type Rect } from './game/athZones'
 import { CLE_REGLAGE_ATH, athAuRepos, litReglageAth, pointeurPres, type ReglageAth } from './game/athRepos'
-import { CielCalque } from './render/cielCalque'
 import {
   PARALLAXE_DEFAUTS,
   PLAQUE_DEFAUTS,
+  cadrePlaque,
   facteurG,
 } from './render/parallaxe'
 import { PerfCollector } from './game/perf'
@@ -3583,8 +3583,6 @@ const captureCodex = new CaptureCodex(
   document.getElementById('hud-capture') as HTMLButtonElement | null,
   {
     sources: () => ({ gl: canvas, fx: fxCanvas }),
-    // le ciel vit hors de la toile : il se repeint sous elle dans la vidéo
-    fond: (g, x, y, w, h, largeur, hauteur) => cielCalque.dessineDans(g, x, y, w, h, largeur, hauteur),
     fiches: () => fichesCodex().map((f) => ({ id: f.id, titre: codexLu(f).titre, groupe: f.groupe })),
     concepteur: () => document.body.classList.contains('concepteur'),
     cadenceTampon: () => cadenceTampon,
@@ -3785,6 +3783,8 @@ if (!(cielChoix in CIEL_MODE)) cielChoix = 'plaque'
 // LA TAILLE : la largeur de la galaxie en fraction de l'écran, au zoom de
 // jeu — plafonnée par la netteté (render/parallaxe.ts, cadrePlaque).
 const cielReglages = { force: 1, taille: PLAQUE_DEFAUTS.taille }
+// les réglages du cadre, tenus en un seul objet (pas d'allocation par image)
+const plaqueReglages = { ...PLAQUE_DEFAUTS }
 
 // LA PROFONDEUR DES COUCHES DE FOND : la règle, les valeurs et les tests
 // vivent dans render/parallaxe.ts — ici on n'en tient que la copie RÉGLABLE,
@@ -8088,8 +8088,6 @@ fetch('/noyaux.wasm')
   })
 
 const renderer = new Renderer(canvas, CAPACITY)
-// le ciel vit DERRIÈRE la toile, dans le même conteneur (render/cielCalque.ts)
-const cielCalque = new CielCalque(canvas.parentElement!, canvas, '/assets/ciel.webp')
 const rendererNe = performance.now() // pour dater l'attente de compilation
 const loop = new FixedLoop()
 const input = new Input()
@@ -19504,19 +19502,21 @@ function corpsImage(now: number): boolean {
   renderer.setSolModules(level.coque === 'structures')
   renderer.setExterieur(exterieurActif)
   renderer.setCiel(CIEL_MODE[cielChoix])
-  // LE CIEL EN CALQUE, à la densité NATIVE de l'écran — pas à l'échelle de
-  // rendu de la toile : c'est tout l'objet (render/cielCalque.ts)
-  cielCalque.maj({
-    actif: CIEL_MODE[cielChoix] > 1.5,
-    camX: camera.x,
-    camY: camera.y,
-    zoom: camera.zoom,
-    largeurCss: vw,
-    hauteurCss: vh,
-    dpr: Math.min(window.devicePixelRatio || 1, 3),
-    force: cielReglages.force,
-    reglages: { ...PLAQUE_DEFAUTS, taille: cielReglages.taille },
-  })
+  // LA PLAQUE, cadrée à l'image : une seule Voie lactée, jamais agrandie
+  // au-delà de ce que l'image rend net sur CET écran (densité native)
+  if (CIEL_MODE[cielChoix] > 1.5 && renderer.plaqueTexels > 0) {
+    plaqueReglages.taille = cielReglages.taille
+    const c = cadrePlaque(
+      camera.x, camera.y, camera.zoom, vw, vh,
+      // la densité la plus fine de la TOILE : le ciel y est peint
+      Math.min(window.devicePixelRatio || 1, PLAFOND_DPR),
+      renderer.plaqueTexels,
+      plaqueReglages,
+    )
+    // bornée à 1, comme l'opacité du calque qui la dosait : au-delà, la
+    // photographie sature et le vide passe devant la cuve éclairée
+    renderer.setPlaque(c.cx, c.cy, c.parPx, Math.min(1, Math.max(0, cielReglages.force)))
+  }
   // LA PROFONDEUR DES COUCHES DE FOND : posée à l'image comme le ciel, pour
   // que le banc l'entende tout de suite. Le facteur se cuisine ICI, une fois
   // par image (il ne dépend que du zoom et des réglages) : le shader n'a plus

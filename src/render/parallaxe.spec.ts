@@ -12,6 +12,7 @@ import {
   cadrePlaque,
   coucheFond,
   empriseEcran,
+  uvPlaque,
   type Couche,
 } from './parallaxe'
 
@@ -139,5 +140,22 @@ describe('la plaque de ciel, cadrée — une seule Voie lactée, jamais floue', 
     expect(a.cx).toBeCloseTo(0.5, 9)
     expect(b.cx).toBeGreaterThan(a.cx)
     expect(b.cy).toBeLessThan(a.cy)
+  })
+})
+
+describe('la plaque peinte dans la toile — uvPlaque, le jumeau du shader', () => {
+  it('le point visé de l’image tombe au centre de l’écran', () => {
+    const c = cadrePlaque(800, -300, 0.3, 1280, 720, 2, 2400)
+    const [u, v] = uvPlaque(c, 640, 360, 1280, 720)
+    expect(u).toBeCloseTo(c.cx, 12)
+    expect(v).toBeCloseTo(c.cy, 12)
+  })
+
+  it('le HAUT de l’écran montre le haut de l’image, la droite sa droite', () => {
+    const c = cadrePlaque(0, 0, 0.3, 1280, 720, 2, 2400)
+    const [u0, v0] = uvPlaque(c, 640, 360, 1280, 720)
+    const [u1, v1] = uvPlaque(c, 740, 460, 1280, 720) // 100 px à droite, 100 px plus haut
+    expect(u1 - u0).toBeCloseTo(100 * c.parPx, 12)
+    expect(v1 - v0).toBeCloseTo(100 * c.parPx, 12)
   })
 })

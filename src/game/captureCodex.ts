@@ -137,10 +137,6 @@ export interface HooksCapture {
   concepteur(): boolean
   /** la cadence de la mémoire de capture (PARAMÈTRES) — 0 : éteinte */
   cadenceTampon(): CadenceTampon
-  /** LE FOND, peint AVANT la toile WebGL : le ciel n'est plus dans la toile
-   *  (render/cielCalque.ts), qui est transparente dans le vide. La découpe
-   *  est donnée en FRACTIONS de l'écran, la cible en pixels. */
-  fond?(g: CanvasRenderingContext2D, fx: number, fy: number, fw: number, fh: number, largeur: number, hauteur: number): void
 }
 
 type Etape = 'repos' | 'enregistre' | 'pret'
@@ -287,11 +283,6 @@ export class CaptureCodex {
   }
 
   private composeDans(g: CanvasRenderingContext2D, c: CadreCapture, gl: HTMLCanvasElement, fx: HTMLCanvasElement): void {
-    if (this.hooks.fond) this.hooks.fond(g, c.x, c.y, c.w, c.h, c.largeur, c.hauteur)
-    else {
-      g.fillStyle = '#000'
-      g.fillRect(0, 0, c.largeur, c.hauteur)
-    }
     g.drawImage(gl, c.x * gl.width, c.y * gl.height, c.w * gl.width, c.h * gl.height, 0, 0, c.largeur, c.hauteur)
     g.drawImage(fx, c.x * fx.width, c.y * fx.height, c.w * fx.width, c.h * fx.height, 0, 0, c.largeur, c.hauteur)
   }
