@@ -64,6 +64,15 @@ export interface ReglagesTissage {
    *  à une carte sans coursive, la run ne finissait jamais (revue du 16/09). */
   dernierRangSalles: boolean
 }
+/** LA PART DE CROISEMENT (0..1) : un X entre deux voies voisines ne se
+ *  dessine que si ses deux bifurcations tombent sous `bifurcation × part`.
+ *  ZÉRO : aucun X. Une demi-mesure (0,7 : un X sur deux, 25/09) laissait
+ *  le défaut en place, en plus rare — et une carte où l'on suit sa voie du
+ *  doigt ne se lit que si les traits ne se coupent JAMAIS (Slay the Spire
+ *  n'en a aucun). Un X n'apportait presque rien au choix : les fourches et
+ *  les jonctions gardent les deux cases du rang suivant joignables. */
+export const PART_CROISEMENT = 0
+
 export const TISSAGE_DEFAUT: ReglagesTissage = {
   partEvenement: 0.2,
   rangMin: 1,
@@ -181,18 +190,41 @@ export function tisseMiniCarte(
     if (reglages.dernierRangSalles && r === n - 1) evs[0] = evs[1] = evs[2] = false
     const voiesSalle = [0, 1, 2].filter((v) => !evs[v])
     const voieEcrite = ecrites ? voiesSalle[Math.min(voiesSalle.length - 1, Math.floor(tEcrite * voiesSalle.length))] : -1
+    // la voie continue tout droit, et bifurque vers une voisine une fois
+    // sur deux environ — les tirages se font TOUJOURS, même au bord, dans
+    // l'ordre d'avant (gauche puis droite, voie par voie ; aucun au dernier
+    // rang), pour que la graine reste alignée quel que soit le tracé
+    const tG: number[] = []
+    const tD: number[] = []
+    if (r < n - 1)
+      for (let v = 0; v < VOIES; v++) {
+        tG.push(alea())
+        tD.push(alea())
+      }
+    const va = (v: number, cote: 'g' | 'd'): boolean =>
+      r < n - 1 && (cote === 'g' ? v > 0 && tG[v] < bif : v < VOIES - 1 && tD[v] < bif)
+    // PAS DE CROISEMENT. Deux voisines qui bifurquent l'une vers l'autre
+    // dessinent un X : à 45 % de bifurcation, il y en avait deux par module
+    // de six salles, et la mini-carte se lisait comme un tressage où l'on
+    // ne suivait plus sa voie (le concepteur, 25/09). Le X se défait : la
+    // branche au tirage le plus haut (la moins « voulue ») tombe, sauf si
+    // PART_CROISEMENT l'autorise. Aucun tirage de plus : la graine reste
+    // alignée.
+    const coupe = { g: new Set<number>(), d: new Set<number>() }
+    for (let v = 0; v < VOIES - 1; v++) {
+      if (!va(v, 'd') || !va(v + 1, 'g')) continue
+      const seuil = bif * PART_CROISEMENT
+      if (tD[v] < seuil && tG[v + 1] < seuil) continue
+      if (tD[v] >= tG[v + 1]) coupe.d.add(v)
+      else coupe.g.add(v + 1)
+    }
     const rang: NoeudVoie[] = []
     for (let v = 0; v < VOIES; v++) {
       const suivants: number[] = []
       if (r < n - 1) {
-        // la voie continue tout droit, et bifurque vers une voisine une
-        // fois sur deux environ — les tirages se font TOUJOURS, même au
-        // bord, pour que la graine reste alignée quel que soit le tracé
-        const gauche = alea() < bif
-        const droite = alea() < bif
-        if (gauche && v > 0) suivants.push(v - 1)
+        if (va(v, 'g') && !coupe.g.has(v)) suivants.push(v - 1)
         suivants.push(v)
-        if (droite && v < VOIES - 1) suivants.push(v + 1)
+        if (va(v, 'd') && !coupe.d.has(v)) suivants.push(v + 1)
       }
       rang.push({
         rang: r,
@@ -301,6 +333,102 @@ export function portesDuRang(mc: MiniCarte, rang: number, voieDOuLOnVient: numbe
   return noeuds.filter((x) => avant.suivants.includes(x.voie))
 }
 
+/** LE REPÈRE D'UNE VOIE, le même sur la porte et sur la mini-carte : la
+ *  porte disait « PORTE 2 » et « VOIE 3 » à la fois, la mini-carte ne
+ *  numérotait rien — le joueur faisait la correspondance de tête. Une
+ *  flèche vers le haut pour la voie du haut : le signe dit la place. */
+export const REPERES_VOIE: readonly { signe: string; nom: string }[] = [
+  { signe: '▲', nom: 'HAUT' },
+  { signe: '●', nom: 'MILIEU' },
+  { signe: '▼', nom: 'BAS' },
+]
+
+/** CE QU'UNE PORTE FERME, pour le survol : ce que les AUTRES portes du rang
+ *  rendent joignable et pas elle — nœuds et liens (clés du dessin), leurs
+ *  coursives d'entrée comprises. Allumer tout ce qu'une porte ouvre ne
+ *  disait rien au début d'un module : l'éventail couvrait presque la
+ *  grille. Ce qui décide, c'est ce qu'on perd (le concepteur, 25/09) —
+ *  comme le plan de la station éteint les modules qu'une porte ferme. */
+export function fermeParPorte(
+  mc: MiniCarte,
+  rang: number,
+  voie: number,
+  portes: readonly number[],
+  voieDOuLOnVient: number | null,
+): { noeuds: string[]; liens: string[] } {
+  const garde = new Set(cheminDePorte(mc, rang, voie, voieDOuLOnVient).noeuds)
+  const noeuds = new Set<string>()
+  const liens = new Set<string>()
+  for (const p of portes) {
+    if (p === voie) continue
+    const ch = cheminDePorte(mc, rang, p, voieDOuLOnVient)
+    if (ch.entree) liens.add(ch.entree)
+    for (const k of ch.noeuds) if (!garde.has(k)) noeuds.add(k)
+  }
+  for (const k of noeuds) {
+    const [r, v] = k.split('-').map(Number)
+    for (const s of mc.rangs[r]?.[v]?.suivants ?? []) liens.add(`${r}-${v}-${s}`)
+    // au dernier rang, la coursive vers le sas s'éteint avec la case
+    if (r === mc.rangs.length - 1) liens.add(`${k}-sas`)
+  }
+  return { noeuds: [...noeuds], liens: [...liens] }
+}
+
+/** LE CHEMIN D'UNE PORTE, pour le survol : la coursive qui y entre depuis
+ *  le nœud d'où l'on vient (`voieDOuLOnVient`, null au premier rang), puis
+ *  tout ce qu'elle rend joignable jusqu'au bout du module. Rend les clés
+ *  des nœuds (« rang-voie ») et des liens (« rang-voie-suivante », comme
+ *  `data-lien` du dessin). Allumer le seul nœud visé ne disait pas où la
+ *  porte menait : sur un tressage de voies, l'œil perdait la suite
+ *  (le concepteur, 25/09). */
+export function cheminDePorte(
+  mc: MiniCarte,
+  rang: number,
+  voie: number,
+  voieDOuLOnVient: number | null,
+): { noeuds: string[]; liens: string[]; entree: string | null } {
+  const noeuds = new Set<string>()
+  const liens: string[] = []
+  const avant = voieDOuLOnVient !== null ? mc.rangs[rang - 1]?.[voieDOuLOnVient] : undefined
+  const entree = avant?.suivants.includes(voie) ? `${rang - 1}-${voieDOuLOnVient}-${voie}` : null
+  if (!mc.rangs[rang]?.[voie]) return { noeuds: [], liens: [], entree: null }
+  // rang par rang : les voies joignables au rang r, puis leurs suivantes
+  let front = new Set<number>([voie])
+  for (let r = rang; r < mc.rangs.length && front.size > 0; r++) {
+    const suite = new Set<number>()
+    for (const v of front) {
+      noeuds.add(`${r}-${v}`)
+      for (const s of mc.rangs[r][v]?.suivants ?? []) {
+        liens.push(`${r}-${v}-${s}`)
+        suite.add(s)
+      }
+    }
+    front = suite
+  }
+  return { noeuds: [...noeuds], liens, entree }
+}
+
+/** CE QU'EST UN NŒUD, en une phrase : la fiche sous la mini-carte et
+ *  l'infobulle le disent. La fiche est là parce que l'infobulle native ne
+ *  paraît ni à la manette ni au doigt (revue du 25/09). */
+const NOMS_HALTE: Record<string, string> = {
+  economat: 'l’économat — le Semblable troque contre du condensat',
+  repos: 'l’alcôve de repos — un souffle, de la réserve ou du condensat',
+  don: 'une bonbonne oubliée',
+  coffre: 'une cache — un orbe d’essence y dort',
+  minijeu: 'un mini-jeu — le couperet (laisser dépasser du trait ce que la lame doit trancher), le palet (glisser en glace jusqu’au centre), les rafales (traverser entre deux souffles) ou les orbites (lancé autour de trois puits de gravité)',
+}
+export function ditNoeud(nd: NoeudVoie): string {
+  return nd.nature === 'evenement'
+    ? 'une rencontre — on ne sait pas laquelle'
+    : nd.nature !== 'salle'
+      ? NOMS_HALTE[nd.nature] ?? nd.nature
+      : nd.ecrite
+        ? 'tableau du pool'
+        : `${nd.figure ? 'figure' : 'salle'} · ${['eau', 'glace', 'vapeur', 'toutes'][nd.mecanique] ?? 'eau'}` +
+          (nd.prime ? ` · PRIME : ${NOMS_PRIME[nd.prime]} (plus dure d’un cran)` : '')
+}
+
 /** LE DESSIN de la mini-carte, en SVG : les rangs de gauche à droite, les
  *  voies de haut en bas, le chemin déjà joué (`trace`, une voie par salle
  *  franchie), et les portes du rang courant allumées. Pur : une chaîne.
@@ -327,14 +455,28 @@ export function dessinMiniCarteSVG(
   const X0 = 48
   const Y0 = 32
   const S = 18 // la demi-taille d'une tuile
-  const w = X0 * 2 + PAS_X * (n - 1)
-  const h = Y0 * 2 + PAS_Y * (mc.voies - 1) + 18
+  // LE SAS au bout : la sortie vers le plan de la station, dessinée — le
+  // module ne s'arrêtait nulle part (revue du 25/09)
+  const SAS_DX = 64
+  const w = X0 * 2 + PAS_X * (n - 1) + SAS_DX
+  const h = Y0 * 2 + PAS_Y * (mc.voies - 1) + 22
   const x = (r: number): number => X0 + r * PAS_X
   const y = (v: number): number => Y0 + v * PAS_Y
   // l'octogone de la station, centré : les coins coupés à 22 % / 28 %
   const a = 0.56 * S
   const b = 0.44 * S
   const tuile = `${-a},${-S} ${a},${-S} ${S},${-b} ${S},${b} ${a},${S} ${-a},${S} ${-S},${b} ${-S},${-b}`
+  // UNE FORME PAR FAMILLE : la salle garde l'octogone de la station, la
+  // rencontre est un losange, la halte un cercle. Même forme partout, la
+  // nature ne tenait qu'à une icône de 22 px et deux bleus voisins — et le
+  // pool et la rencontre partageaient leur or (revue du 25/09)
+  const L = S * 1.18
+  const forme = (nd: NoeudVoie, cl: string, k = 1): string =>
+    nd.nature === 'evenement'
+      ? `<polygon class="${cl}" points="0,${-L * k} ${L * k},0 0,${L * k} ${-L * k},0"/>`
+      : nd.nature !== 'salle'
+        ? `<circle class="${cl}" r="${S * k}"/>`
+        : `<polygon class="${cl}" points="${k === 1 ? tuile : tuile.split(' ').map((pt) => pt.split(',').map((c) => Number(c) * k).join(',')).join(' ')}"/>`
   const icone = (nd: NoeudVoie): string =>
     nd.nature !== 'salle'
       ? nd.nature === 'evenement'
@@ -345,22 +487,6 @@ export function dessinMiniCarteSVG(
         : nd.figure
           ? 'figure'
           : (['eau', 'glace', 'vapeur', 'toutes'] as const)[nd.mecanique] ?? 'eau'
-  const NOMS_HALTE: Record<string, string> = {
-    economat: 'l’économat — le Semblable troque contre du condensat',
-    repos: 'l’alcôve de repos — un souffle, de la réserve ou du condensat',
-    don: 'une bonbonne oubliée',
-    coffre: 'une cache — un orbe d’essence y dort',
-    minijeu: 'un mini-jeu — le couperet (laisser dépasser du trait ce que la lame doit trancher), le palet (glisser en glace jusqu’au centre), les rafales (traverser entre deux souffles) ou les orbites (lancé autour de trois puits de gravité)',
-  }
-  const nom = (nd: NoeudVoie): string =>
-    nd.nature === 'evenement'
-      ? 'une rencontre — on ne sait pas laquelle'
-      : nd.nature !== 'salle'
-        ? NOMS_HALTE[nd.nature] ?? nd.nature
-        : nd.ecrite
-          ? 'tableau du pool'
-          : `${nd.figure ? 'figure' : 'salle'} · ${['eau', 'glace', 'vapeur', 'toutes'][nd.mecanique] ?? 'eau'}` +
-            (nd.prime ? ` · PRIME : ${NOMS_PRIME[nd.prime]} (plus dure d’un cran)` : '')
   const teinte = (nd: NoeudVoie): string =>
     nd.nature === 'evenement'
       ? 'mv-evenement'
@@ -369,27 +495,42 @@ export function dessinMiniCarteSVG(
         : nd.ecrite
           ? 'mv-pool'
           : `mv-m${nd.mecanique}`
+  // CE QUE LE CHOIX INTERDIT : depuis les portes du rang courant, les
+  // nœuds encore joignables. Tout lien qui n'en part pas (et n'est pas le
+  // chemin joué) ne se prendra plus — il reste dessiné, mais éteint. Avant,
+  // les voies abandonnées gardaient leur trait plein : la carte montrait
+  // des croisements qui ne concernaient plus le joueur (le concepteur, 25/09).
+  const joignables = new Set<string>()
+  for (const p of o.portes) for (const k of cheminDePorte(mc, o.rang, p, null).noeuds) joignables.add(k)
   let liens = ''
   let noeuds = ''
   for (const rang of mc.rangs)
     for (const nd of rang) {
       const joueIci = o.trace[nd.rang] === nd.voie
+      const ici = `${nd.rang}-${nd.voie}`
       for (const s of nd.suivants) {
         const joue = joueIci && o.trace[nd.rang + 1] === s
         const ouvre = joueIci && nd.rang + 1 === o.rang && o.portes.includes(s)
-        liens += `<line class="mv-lien${joue ? ' mv-joue' : ''}${ouvre ? ' mv-ouvre' : ''}" x1="${x(nd.rang) + S}" y1="${y(nd.voie)}" x2="${x(nd.rang + 1) - S}" y2="${y(s)}"/>`
+        const interdit = !joue && !ouvre && !joignables.has(ici)
+        liens += `<line class="mv-lien${joue ? ' mv-joue' : ''}${ouvre ? ' mv-ouvre' : ''}${interdit ? ' mv-interdit' : ''}" data-lien="${nd.rang}-${nd.voie}-${s}" x1="${x(nd.rang) + S}" y1="${y(nd.voie)}" x2="${x(nd.rang + 1) - S}" y2="${y(s)}"/>`
       }
       const porte = nd.rang === o.rang && o.portes.includes(nd.voie)
       const cl =
         'mv-noeud ' + teinte(nd) +
         (joueIci ? ' mv-joue' : '') + (porte ? ' mv-porte' : '') +
-        (nd.rang < o.rang && !joueIci ? ' mv-ferme' : '') +
-        (nd.rang > o.rang ? ' mv-loin' : '')
+        // TROIS ÉTATS, PAS CINQ : joué, joignable, hors d'atteinte — le
+        // passé non joué et le futur perdu se lisent pareil, c'est la même
+        // chose pour le joueur (fermé, lointain, interdit, reculé au survol :
+        // cinq gris que l'œil ne distinguait pas, revue du 25/09)
+        (!joueIci && (nd.rang < o.rang || !joignables.has(ici)) ? ' mv-interdit' : '')
       noeuds +=
         `<g class="${cl}" data-rang="${nd.rang}" data-voie="${nd.voie}" transform="translate(${x(nd.rang)} ${y(nd.voie)})">` +
-        `<title>salle ${nd.rang + 1}, voie ${nd.voie + 1} — ${nom(nd)}</title>` +
-        `<polygon class="mv-halo" points="${tuile}"/>` +
-        `<polygon class="mv-tuile" points="${tuile}"/>` +
+        `<title>salle ${nd.rang + 1}, voie ${nd.voie + 1} — ${ditNoeud(nd)}</title>` +
+        // LA PRIME SE VOIT DE LOIN : un anneau à la teinte de ce qu'elle paie
+        // autour de toute la case (le losange de 7 px au coin ne se lisait pas)
+        (nd.prime ? forme(nd, `mv-prime-anneau mv-prime-${nd.prime}`, 1.3) : '') +
+        forme(nd, 'mv-halo') +
+        forme(nd, 'mv-tuile') +
         `<use href="#mv-i-${icone(nd)}" x="-11" y="-11" width="22" height="22"/>` +
         (joueIci ? `<circle class="mv-coche" cx="${S - 3}" cy="${-S + 3}" r="4"/>` : '') +
         // LA PRIME : un losange au coin bas droit, teinté par ce qu'elle paie
@@ -398,12 +539,39 @@ export function dessinMiniCarteSVG(
           : '') +
         `</g>`
     }
+  // LA BANDE « VOUS ÊTES ICI » derrière le rang où l'on choisit
+  const bande =
+    o.rang >= 0 && o.rang < n
+      ? `<rect class="mv-ici" x="${x(o.rang) - PAS_X / 2 + 6}" y="4" width="${PAS_X - 12}" height="${h - 8}" rx="6"/>`
+      : ''
+  // LE SAS : chaque case du dernier rang y mène ; ce qui y arrive depuis
+  // une case hors d'atteinte s'éteint avec elle
+  const xs = x(n - 1) + SAS_DX
+  const ys = y((mc.voies - 1) / 2)
+  for (const nd of mc.rangs[n - 1]) {
+    const ici = `${nd.rang}-${nd.voie}`
+    const joue = o.trace[nd.rang] === nd.voie
+    const interdit = !joue && (nd.rang < o.rang || !joignables.has(ici))
+    liens += `<line class="mv-lien mv-lien-sas${joue ? ' mv-joue' : ''}${interdit ? ' mv-interdit' : ''}" data-lien="${ici}-sas" x1="${x(nd.rang) + S}" y1="${y(nd.voie)}" x2="${xs - 12}" y2="${ys}"/>`
+  }
+  noeuds +=
+    `<g class="mv-sas" transform="translate(${xs} ${ys})"><title>le sas — la sortie du module, le plan de la station se rouvre</title>` +
+    `<rect x="-12" y="-16" width="24" height="32" rx="3"/><path d="M-5 -6 L3 0 L-5 6"/></g>`
   let titres = ''
+  // le repère de chaque voie à gauche de la grille, allumé là où une porte
+  // s'ouvre — le même signe que sur la porte (REPERES_VOIE)
+  for (let v = 0; v < mc.voies; v++) {
+    const rep = REPERES_VOIE[v]
+    if (rep)
+      titres += `<text class="mv-repere${o.portes.includes(v) ? ' mv-repere-porte' : ''}" data-voie="${v}" x="${X0 - S - 14}" y="${y(v)}">${rep.signe}</text>`
+  }
   for (let r = 0; r < n; r++)
-    titres += `<text class="mv-titre${r === o.rang ? ' mv-courant' : ''}" x="${x(r)}" y="${h - 6}">SALLE ${r + 1}</text>`
+    titres += `<text class="mv-titre${r === o.rang ? ' mv-courant' : ''}" x="${x(r)}" y="${h - 8}">SALLE ${r + 1}</text>`
+  titres += `<text class="mv-titre" x="${xs}" y="${h - 8}">SAS</text>`
   return (
     `<svg class="mv-svg" viewBox="0 0 ${w} ${h}" width="${w}" height="${h}" role="img" aria-label="les voies du module">` +
     ICONES_MINI_CARTE +
+    bande +
     `<g class="mv-liens">${liens}</g><g class="mv-noeuds">${noeuds}</g>${titres}</svg>`
   )
 }
