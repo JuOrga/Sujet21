@@ -7,6 +7,13 @@ import type { SimParams } from '../sim/params'
 const MANUAL_MIN_FACTOR = 0.2
 const MANUAL_MAX_FACTOR = 5
 
+// LE RECUL A UN FOND. Le plancher manuel (0,12 × 0,2 = 0,024) laissait
+// reculer presque sans fin : la salle devenait une tête d'épingle au milieu
+// du vide, et la Voie lactée du fond se répétait en papier peint. On recule
+// désormais jusqu'à voir la salle ENTIÈRE, qui occupe alors les trois quarts
+// de la dimension de l'écran qui la contraint — et pas plus loin.
+const RECUL_MAX = 0.75
+
 // L'horloge du plan d'ouverture ne compte jamais plus qu'une image « lente »
 // par image réelle. Le début d'un tableau est précisément le moment des
 // accrocs (le tableau se charge, la salle se dessine pour la première fois,
@@ -39,6 +46,11 @@ export class Camera {
   // zoom automatique s'en sert pour ne jamais cadrer trop serré — la vue
   // montre toujours une part du niveau, pas seulement le corps.
   private nivMin = 0
+  // la salle entière et l'écran, pour le plancher du recul (plancher())
+  private nivL = 0
+  private nivH = 0
+  private vueL = 0
+  private vueH = 0
 
   startIntro(
     bounds: { minX: number; minY: number; maxX: number; maxY: number },
@@ -48,6 +60,10 @@ export class Camera {
     dive = 1.7,
   ): void {
     this.nivMin = Math.min(bounds.maxX - bounds.minX, bounds.maxY - bounds.minY)
+    this.nivL = bounds.maxX - bounds.minX
+    this.nivH = bounds.maxY - bounds.minY
+    this.vueL = viewportW
+    this.vueH = viewportH
     this.introX = (bounds.minX + bounds.maxX) * 0.5
     this.introY = (bounds.minY + bounds.maxY) * 0.5
     this.introZoom =
@@ -98,11 +114,13 @@ export class Camera {
     p: SimParams,
   ): void {
     this.introTimer = 0
+    this.vueL = viewportW
+    this.vueH = viewportH
     const avant = this.screenToWorld(clientX, clientY, viewportW, viewportH)
     const base = this.manualZoom ?? this.zoom
     const z = Math.min(
       p.cameraMaxZoom * MANUAL_MAX_FACTOR,
-      Math.max(p.cameraMinZoom * MANUAL_MIN_FACTOR, base * factor),
+      Math.max(this.plancher(p), base * factor),
     )
     this.manualZoom = z
     this.zoom = z
@@ -132,8 +150,19 @@ export class Camera {
     const base = this.manualZoom ?? this.zoom
     this.manualZoom = Math.min(
       p.cameraMaxZoom * MANUAL_MAX_FACTOR,
-      Math.max(p.cameraMinZoom * MANUAL_MIN_FACTOR, base * factor),
+      Math.max(this.plancher(p), base * factor),
     )
+  }
+
+  /** Le zoom le plus LARGE que la main peut demander : la salle entière,
+   *  avec sa marge (RECUL_MAX) — jamais sous l'ancien plancher absolu. Sans
+   *  salle connue (avant le premier tableau), l'ancien plancher seul. */
+  plancher(p: SimParams): number {
+    const absolu = p.cameraMinZoom * MANUAL_MIN_FACTOR
+    if (this.nivL <= 0 || this.nivH <= 0 || this.vueL <= 0 || this.vueH <= 0)
+      return absolu
+    const salle = Math.min(this.vueL / this.nivL, this.vueH / this.nivH)
+    return Math.max(absolu, salle * RECUL_MAX)
   }
 
   resetAutoZoom(): void {
@@ -179,7 +208,14 @@ export class Camera {
       const vueMin = Math.min(1600, this.nivMin)
       targetZoom = Math.min(targetZoom, Math.min(viewportW, viewportH) / vueMin)
     }
-    if (this.manualZoom !== null) targetZoom = this.manualZoom
+    this.vueL = viewportW
+    this.vueH = viewportH
+    // l'écran a pu changer (rotation, fenêtre) : le recul demandé à la main
+    // reste sous le plancher de CET écran-ci
+    if (this.manualZoom !== null) {
+      this.manualZoom = Math.max(this.manualZoom, this.plancher(p))
+      targetZoom = this.manualZoom
+    }
 
     // Zoom d'ouverture : plan large tenu, puis plongée adoucie vers le corps
     if (this.introTimer > 0) {
