@@ -10,6 +10,7 @@ import {
   LAMPE_HAUTEUR_DEFAUT,
   LAMPE_HAUTEUR_MAX,
   LAMPE_HAUTEUR_MIN,
+  MAT_VIDE,
   lampeCouleurRVB,
   MAT_FROID,
   zonePhases,
@@ -30,6 +31,27 @@ import {
 import type { Camera } from './camera'
 import { VIE_STRIDE } from './vie'
 import { Programmes } from './programmes'
+import {
+  COQUE_EPAISSEUR,
+  COQUE_FLOTTANTS,
+  COQUE_REP,
+  COQUE_SOMMETS,
+  MAX_VIDES_COQUE,
+  STATION_SOMMETS,
+  remplitBandesCoque,
+  remplitFondStation,
+  videsPercantLaCoque,
+} from './coque'
+import {
+  ECHELLE_LOINTAIN,
+  MAX_PIECES_COQUE,
+  PIECE_AMARRAGE,
+  PIECE_MODULE,
+  cleComposition,
+  composeCoque,
+  empaquettePieces,
+} from './compositionCoque'
+import { ATLAS_COQUE } from './coqueAtlas'
 import { sondeRetournement, type Retournement } from './retournement'
 import { boutsEnMur, cleBoite } from '../game/conduite'
 
@@ -2039,10 +2061,18 @@ void main() {
         // est DESSOUS, pas peint dessus.
         col = mix(col, voidCol, fill);
         cielVu = mix(cielVu, uCielCalque, fill);
-        float tranche = (1.0 - smoothstep(0.0, edgeW * 3.0, -d)) * fill;
+        // AU-DEHORS, LE TROU N'A PLUS DE BORD. Sa tranche et son liseré sont
+        // ceux d'un plancher ou d'une paroi coupés : là où il n'y a ni cuve,
+        // ni coque, ni solide, le vide débouche sur le vide — un cadre y
+        // flottait dans les étoiles. La coque de la cuve (passe à part)
+        // trace elle-même sa découpe : ici, on s'arrête à sa face externe.
+        float coqueT = uSolModules > 0.5 ? 0.0 : (uHasHull > 0.5 ? ${COQUE_EPAISSEUR.toFixed(1)} : 34.0);
+        float matiere = max(1.0 - smoothstep(coqueT, coqueT + edgeW, roomD),
+                            1.0 - smoothstep(0.0, edgeW, dCouv));
+        float tranche = (1.0 - smoothstep(0.0, edgeW * 3.0, -d)) * fill * matiere;
         col = mix(col, vec3(0.016, 0.024, 0.036) * eclSolide, tranche * 0.85);
         cielVu *= 1.0 - clamp(tranche * 0.85, 0.0, 1.0);
-        float edge = (1.0 - smoothstep(0.0, edgeW, abs(d))) * libre;
+        float edge = (1.0 - smoothstep(0.0, edgeW, abs(d))) * libre * matiere;
         col = mix(col, vec3(0.30, 0.38, 0.48) * eclSolide, edge * 0.6);
         cielVu *= 1.0 - clamp(edge * 0.6, 0.0, 1.0);
       } else {
@@ -3362,8 +3392,6 @@ void main() {
   outColor = vec4(col * a, 0.0); // additif (ONE, ONE)
 }`
 
-// Coque texturée : quatre bandes autour de la cuve, tube lumineux côté
-// intérieur. Dessinée par-dessus la composition (le liquide reste dedans).
 // LA RECOPIE de la scène (image intermédiaire basse résolution) sur la
 // toile native — voir render, « la conduite nette »
 const RECOPIE_FS = `#version 300 es
@@ -3375,26 +3403,475 @@ void main() {
   outColor = texture(uScene, gl_FragCoord.xy / uTaille);
 }`
 
+// Coque texturée : quatre bandes autour de la cuve, tube lumineux côté
+// intérieur, et leur FRANGE extérieure — le matériel de coque d'une station.
+// Dessinée par-dessus la composition (le liquide reste dedans), en
+// transparence prémultipliée : la frange laisse voir le ciel entre ses
+// pièces. Géométrie et vides reçus : render/coque.ts.
 const HULL_VS = `#version 300 es
 layout(location = 0) in vec2 aPos;
 layout(location = 1) in vec2 aUv;
+layout(location = 2) in vec2 aCote;
 uniform vec2 uCenter;
 uniform vec2 uViewport;
 uniform float uZoom;
 out vec2 vUv;
+out vec2 vWorld;
+out vec2 vCote;
 void main() {
   vec2 clip = (aPos - uCenter) * uZoom / (uViewport * 0.5);
   gl_Position = vec4(clip, 0.0, 1.0);
   vUv = aUv;
+  vWorld = aPos;
+  vCote = aCote;
 }`
 
 const HULL_FS = `#version 300 es
 precision highp float;
-in vec2 vUv;
+#define MAX_VIDES ${MAX_VIDES_COQUE}
+in vec2 vUv;    // (le long de la paroi, en travers depuis le bord intérieur)
+in vec2 vWorld;
+in vec2 vCote;  // (côté 0 haut · 1 bas · 2 gauche · 3 droite, longueur de la paroi)
 uniform sampler2D uTexHull;
+#define MAX_PIECES ${MAX_PIECES_COQUE}
+uniform int uPieceCount;
+uniform sampler2D uTexMateriel; // l'atlas des pièces (coqueAtlas.ts)
+uniform float uHasMateriel;
+uniform vec4 uAtlas[16];         // par type : u0, v0, u1, v1 (origine en haut) — u1 = 0 : pas d'image
+uniform float uExterieur;        // 0 : le dehors du module est masqué (réglage), la coque reste
+uniform vec4 uCuve;              // la cuve : minX, minY, maxX, maxY
+uniform float uEchelleLoin;      // le plan lointain : échelle et défilement (compositionCoque.ts)
+uniform vec4 uPieces[MAX_PIECES];    // centre, demi-dimensions (le long, vers le dehors)
+uniform vec4 uPiecesAux[MAX_PIECES]; // type, angle du repère, graine, —
+uniform vec2 uCenter;
+uniform float uZoom;
+uniform float uTime;
+uniform float uEpais;
+uniform float uRep;
+uniform int uVideCount;
+uniform vec4 uVides[MAX_VIDES];   // minX, minY, maxX, maxY
+uniform vec2 uVidesAux[MAX_VIDES]; // code (matériau + forme), angle
 out vec4 outColor;
+
+float boxSdf(vec2 world, vec4 b) {
+  vec2 c = (b.xy + b.zw) * 0.5;
+  vec2 half_ = (b.zw - b.xy) * 0.5;
+  vec2 q = abs(world - c) - half_;
+  return length(max(q, 0.0)) + min(max(q.x, q.y), 0.0);
+}
+${FORMES_GLSL}
+
+// La distance au plus proche VIDE (négative dedans) : le trou que la coque
+// doit laisser. Même lecture que la composition — boîte dépivotée, forme
+// raffinée près du bord seulement (au loin, la boîte englobante suffit).
+float videSdf(vec2 w) {
+  float d = 1.0e9;
+  for (int i = 0; i < MAX_VIDES; i++) {
+    if (i >= uVideCount) break;
+    vec4 b = uVides[i];
+    vec2 wb = w;
+    float an = uVidesAux[i].y;
+    if (abs(an) > 0.0005) {
+      vec2 bc = 0.5 * (b.xy + b.zw);
+      vec2 rel = w - bc;
+      float ca = cos(an);
+      float sa = sin(an);
+      wb = bc + vec2(ca * rel.x + sa * rel.y, -sa * rel.x + ca * rel.y);
+    }
+    float db = boxSdf(wb, b);
+    vec4 dec = decodeAux(uVidesAux[i].x);
+    if (dec.y > 0.5 && db < 16.0) db = formeSdf(wb, b, dec.y, dec.z, dec.w);
+    d = min(d, db);
+  }
+  return d;
+}
+
+float hash11(float n) { return fract(sin(n * 12.9898) * 43758.5453); }
+float sdRect(vec2 p, vec2 c, vec2 h) {
+  vec2 q = abs(p - c) - h;
+  return length(max(q, 0.0)) + min(max(q.x, q.y), 0.0);
+}
+float sdSeg(vec2 p, vec2 a, vec2 b) {
+  vec2 pa = p - a;
+  vec2 ba = b - a;
+  return length(pa - ba * clamp(dot(pa, ba) / dot(ba, ba), 0.0, 1.0));
+}
+
+// Composition prémultipliée : une pièce opaque par-dessus ce qui est posé.
+void pose(inout vec4 acc, vec3 c, float k) {
+  acc.rgb = c * k + acc.rgb * (1.0 - k);
+  acc.a = k + acc.a * (1.0 - k);
+}
+// Une pièce de métal : aplat, puis un fil clair sur son pourtour — c'est ce
+// fil, la lumière des étoiles sur l'arête, qui la détache du ciel noir.
+void piece(inout vec4 acc, float d, vec3 c, float px) {
+  pose(acc, c, 1.0 - smoothstep(-0.5 * px, 0.5 * px, d));
+  pose(acc, c * 1.9 + vec3(0.02, 0.03, 0.04), (1.0 - smoothstep(0.0, 1.2 * px, abs(d + 0.6 * px))) * 0.7);
+}
+// Un feu : cœur net et halo additif (l'alpha n'en garde rien — la lumière
+// s'ajoute au ciel au lieu de le masquer).
+void feu(inout vec4 acc, vec2 p, vec2 c, vec3 coul, float on, float rayon) {
+  float r = length(p - c);
+  acc.rgb += coul * on * (exp(-r * r / (2.0 * rayon * rayon)) * 0.55 + (1.0 - smoothstep(1.2, 2.6, r)) * 1.2);
+}
+
+// LE MATÉRIEL DE COQUE, VU DE DESSUS — la composition de compositionCoque.ts.
+// Chaque pièce a son repère : x le long de la paroi, y vers le dehors, h ses
+// demi-dimensions. Tout est vu d'EN HAUT, comme la salle : une aile solaire
+// est une nappe couchée, une parabole un disque, un radiateur un panneau à
+// plat. Éclairé par le soleil (en haut à gauche du monde, uSoleil dans le
+// repère de la pièce) et par rien d'autre : sombre, sauf les feux.
+// Les animations sont celles que la pièce aurait vraiment.
+void dessinePiece(inout vec4 acc, vec2 q, vec2 h, float type, float g, float an, float param, vec2 soleil, float px) {
+  vec3 acier = vec3(0.085, 0.105, 0.135);
+  vec3 acierC = vec3(0.15, 0.18, 0.22);
+  if (type < 0.5) {
+    // AILE SOLAIRE : deux couvertures de cellules de part et d'autre du mât
+    // central. Elle SUIT le soleil en pivotant sur son axe : vue de dessus,
+    // la couverture s'élargit et se rétrécit, très lentement.
+    float suivi = 0.78 + 0.22 * cos(uTime * 0.035 + g * 6.28);
+    vec2 hh = vec2(h.x, h.y * suivi);
+    float d = sdRect(q, vec2(0.0), hh);
+    float mat = abs(q.x) - 7.0;
+    if (d < 2.0 * px) {
+      vec2 l = (q + hh) / (2.0 * hh);
+      vec2 cel = fract(vec2(q.x / 34.0, l.y * 4.0));
+      float grille = 1.0 - smoothstep(0.0, 0.06, min(min(cel.x, 1.0 - cel.x), min(cel.y, 1.0 - cel.y)));
+      float nappe = smoothstep(0.80, 1.0, sin((q.x - q.y * 3.0) * 0.006 + uTime * 0.12 + g * 9.0));
+      vec3 cell = vec3(0.030, 0.050, 0.130) * (0.75 + 0.5 * suivi) + vec3(0.07, 0.10, 0.17) * nappe;
+      cell = mix(cell, vec3(0.20, 0.16, 0.08), grille * 0.75);
+      pose(acc, cell, 1.0 - smoothstep(-0.5 * px, 0.5 * px, max(d, -mat)));
+      pose(acc, vec3(0.45, 0.36, 0.16), (1.0 - smoothstep(0.0, 1.5 * px, abs(d + 0.8 * px))) * step(0.0, mat));
+    }
+    piece(acc, max(abs(q.x) - 6.0, abs(q.y) - h.y - 4.0), acierC, px);
+    // le cardan au pied de l'aile, et son voyant de veille
+    piece(acc, sdRect(q, vec2(0.0, -h.y - 2.0), vec2(14.0, 10.0)) - 1.0, acier, px);
+    feu(acc, q, vec2(9.0, -h.y - 2.0), vec3(1.0, 0.62, 0.18), 0.15 + 0.7 * step(0.8, fract(uTime * 0.5 + g * 3.0)), 3.0);
+  } else if (type < 1.5) {
+    // RADIATEUR : un panneau à plat, ailettes en travers ; le caloporteur y
+    // circule — une onde de chaleur très lente qui monte vers le bout
+    float d = sdRect(q, vec2(0.0), h);
+    float ail = smoothstep(0.30, 0.5, abs(fract(q.y / 11.0) - 0.5));
+    float onde = 0.5 + 0.5 * sin(q.y * 0.02 - uTime * 0.6 + g * 6.0);
+    vec3 blanc = vec3(0.17, 0.19, 0.22) * (0.8 + 0.25 * ail) + vec3(0.035, 0.03, 0.02) * onde;
+    piece(acc, d, blanc, px);
+    piece(acc, max(abs(q.x) - 3.0, abs(q.y) - h.y + 6.0), vec3(0.20, 0.15, 0.09), px);
+  } else if (type < 2.5) {
+    // PARABOLE : un disque vu d'en haut — le creux ombré du côté du soleil,
+    // les nervures, la source au foyer sur trois bras. Elle suit sa cible :
+    // la tête pivote, lentement.
+    float r = min(h.x, h.y);
+    float a = 0.5 * sin(uTime * 0.05 + g * 6.28);
+    vec2 qr = vec2(cos(a) * q.x + sin(a) * q.y, -sin(a) * q.x + cos(a) * q.y);
+    float d = length(q) - r;
+    float creux = clamp(dot(normalize(q + 1e-4), soleil), -1.0, 1.0) * length(q) / r;
+    vec3 coque = vec3(0.16, 0.18, 0.21) * (0.75 - 0.35 * creux);
+    // huit nervures, du bord au moyeu
+    float nerf = 1.0 - smoothstep(0.02, 0.07, abs(fract(atan(qr.y, qr.x) / 0.7854 + 0.5) - 0.5));
+    coque = mix(coque, vec3(0.22, 0.25, 0.29), nerf * 0.5);
+    piece(acc, d, coque, px);
+    for (int k = 0; k < 3; k++) {
+      float b = a + float(k) * 2.0944;
+      piece(acc, sdSeg(q, vec2(0.0), 0.8 * r * vec2(cos(b), sin(b))) - 1.2, acierC, px);
+    }
+    piece(acc, length(q) - 6.0, acierC, px);
+  } else if (type < 3.5) {
+    // PORT D'AMARRAGE : la collerette boulonnée sur la coque, puis l'amorce
+    // du module voisin — un cylindre annelé qui s'enfonce dans le noir.
+    // Ses feux d'approche battent deux par deux.
+    float bout = q.y + h.y; // 0 à la coque
+    float fondu = 1.0 - smoothstep(h.y * 1.1, h.y * 1.9, bout);
+    float rc = h.x * 0.62;
+    float cyl = abs(q.x) - rc;
+    // un CYLINDRE éclairé : la normale tourne autour de l'axe, le soleil
+    // (haut gauche, un peu au-dessus du plan) allume un flanc et noie
+    // l'autre — c'est ce modelé qui le fait lire comme un volume
+    float nx = clamp(q.x / rc, -1.0, 1.0);
+    vec3 n = vec3(nx, 0.0, sqrt(max(0.0, 1.0 - nx * nx)));
+    vec3 L = normalize(vec3(soleil, 0.9));
+    float lum = 0.18 + 0.82 * max(0.0, dot(n, L));
+    float brillant = pow(max(0.0, dot(reflect(-L, n), vec3(0.0, 0.0, 1.0))), 18.0);
+    // les couvertures isolantes : blanc cassé matelassé, comme sur l'ISS
+    vec2 mat = abs(fract(vec2(q.x / 16.0, bout / 16.0)) - 0.5);
+    float matelas = 0.92 + 0.08 * smoothstep(0.35, 0.5, max(mat.x, mat.y));
+    float anneau = 1.0 - smoothstep(1.5, 3.5, abs(mod(bout - 26.0, 72.0) - 36.0) - 32.0);
+    vec3 module_ = vec3(0.30, 0.31, 0.33) * lum * matelas;
+    module_ = mix(module_, vec3(0.10, 0.12, 0.15) * lum, anneau * step(26.0, bout));
+    module_ += vec3(0.20, 0.22, 0.25) * brillant;
+    pose(acc, module_, (1.0 - smoothstep(-0.5 * px, 0.5 * px, max(cyl, -bout + 26.0))) * fondu);
+    piece(acc, sdRect(q, vec2(0.0, -h.y + 13.0), vec2(h.x * 0.8, 13.0)) - 2.0, acierC, px);
+    for (int k = 0; k < 4; k++) {
+      float sx = (float(k) < 1.5 ? -1.0 : 1.0) * h.x * 0.72;
+      float on = step(0.5, fract(uTime * 0.7 + (mod(float(k), 2.0) > 0.5 ? 0.5 : 0.0)));
+      feu(acc, q, vec2(sx, -h.y + (mod(float(k), 2.0) > 0.5 ? 22.0 : 4.0)), vec3(0.3, 1.0, 0.55), 0.1 + 0.8 * on, 4.0);
+    }
+  } else if (type < 4.5) {
+    // POUTRE EN TREILLIS : deux membrures et la triangulation, vues d'en haut
+    float mem = abs(abs(q.x) - h.x + 2.5) - 2.0;
+    float t = fract(q.y / (2.0 * h.x));
+    float zig = abs(q.x - (h.x - 2.5) * (4.0 * abs(t - 0.5) - 1.0)) * 0.7 - 1.3;
+    float cadre = max(min(mem, zig), abs(q.y) - h.y);
+    piece(acc, cadre, acierC, px);
+    piece(acc, max(abs(q.x) - 3.0, abs(q.y) - h.y), vec3(0.07, 0.065, 0.06), px); // le câble porté
+  } else if (type > 7.5) {
+    // LE MODULE VOISIN, tracé : un cylindre éclairé, couvertures claires,
+    // anneaux de renfort
+    float rc = h.x;
+    float nx = clamp(q.x / rc, -1.0, 1.0);
+    vec3 n = vec3(nx, 0.0, sqrt(max(0.0, 1.0 - nx * nx)));
+    float lum = 0.18 + 0.82 * max(0.0, dot(n, normalize(vec3(soleil, 0.9))));
+    float anneau = 1.0 - smoothstep(1.5, 3.5, abs(mod(q.y, 150.0) - 75.0) - 71.0);
+    vec3 c = mix(vec3(0.30, 0.31, 0.33), vec3(0.10, 0.12, 0.15), anneau) * lum;
+    pose(acc, c, 1.0 - smoothstep(-0.5 * px, 0.5 * px, abs(q.x) - rc));
+  } else if (type > 6.5) {
+    // L'EMBASE : la platine boulonnée qui tient la pièce. Elle MORD dans la
+    // coque (y < 0) — c'est elle qui fait la liaison. Une ombre de contact
+    // l'assied sur la tôle, un biseau éclairé du côté du soleil lui donne
+    // son épaisseur, des boulons la fixent, une bride serre le pied de la
+    // pièce, et deux jambes de force en biais tiennent ce qui porte loin.
+    float w = abs(param);
+    float y0 = -h.y; // le fond de la platine, dans la coque
+    vec2 cP = vec2(0.0, y0 + 15.0);
+    // plus large sous un bras : ses jambes de force partent des coins
+    vec2 hP = vec2(w + (param > 0.0 ? 30.0 : 16.0), 15.0);
+    float dP = sdRect(q, cP, hP - 4.0) - 4.0;
+    // l'ombre de contact, portée vers le bas à droite (le soleil est en haut
+    // à gauche) : la platine est POSÉE, pas peinte
+    float ombre = exp(-max(sdRect(q + soleil * 5.0, cP, hP - 4.0) - 4.0, 0.0) * 0.18);
+    acc = vec4(0.0, 0.0, 0.0, 0.55 * ombre * step(0.0, dP)) + acc * (1.0 - 0.55 * ombre * step(0.0, dP));
+    // le biseau : l'arête tournée vers le soleil s'allume, l'autre plonge
+    vec2 qq = q - cP;
+    vec2 n = (abs(qq.x) - hP.x > abs(qq.y) - hP.y) ? vec2(sign(qq.x), 0.0) : vec2(0.0, sign(qq.y));
+    float bord = 1.0 - smoothstep(0.0, 3.0, -dP);
+    // plus claire que la tôle de coque : c'est une pièce rapportée, elle
+    // doit se lire comme telle
+    vec3 plat = vec3(0.21, 0.24, 0.28) * (0.93 + 0.07 * sin(q.x * 0.9) * sin(q.y * 1.3));
+    plat *= 1.0 + bord * 1.3 * dot(n, soleil);
+    pose(acc, plat, 1.0 - smoothstep(-0.5 * px, 0.5 * px, dP));
+    // les boulons, deux rangées
+    for (int k = 0; k < 8; k++) {
+      float bx = (float(k / 2) - 1.5) / 1.5 * (w + 8.0);
+      vec2 b = vec2(bx, y0 + (mod(float(k), 2.0) < 0.5 ? 6.0 : 24.0));
+      float db = length(q - b) - 2.4;
+      pose(acc, vec3(0.05, 0.055, 0.06), 1.0 - smoothstep(-0.5 * px, 0.5 * px, db - 0.8));
+      pose(acc, vec3(0.30, 0.33, 0.37), 1.0 - smoothstep(-0.5 * px, 0.5 * px, length(q - b + soleil * 0.6) - 1.4));
+    }
+    // la bride qui serre le pied de la pièce, au ras de la face externe
+    piece(acc, sdRect(q, vec2(0.0, 3.0), vec2(w + 7.0, 5.0)) - 1.0, vec3(0.20, 0.23, 0.27), px);
+    pose(acc, vec3(0.05, 0.06, 0.07), (1.0 - smoothstep(0.0, 1.2 * px, abs(q.y - 3.0))) * step(abs(q.x), w + 7.0) * 0.6);
+    // le faisceau de câbles qui sort de la pièce et plonge dans la coque
+    float cable = sdSeg(q, vec2(w + 3.0, 10.0), vec2(w + 12.0, y0 + 4.0)) - 2.2;
+    piece(acc, cable, vec3(0.06, 0.055, 0.05), px);
+    if (param > 0.0) {
+      // deux jambes de force, des coins de la platine au bras
+      for (int k = 0; k < 2; k++) {
+        float sg = k == 0 ? -1.0 : 1.0;
+        piece(acc, sdSeg(q, vec2(sg * (w + 24.0), 6.0), vec2(sg * (w + 1.5), h.y - 4.0)) - 3.0, vec3(0.20, 0.23, 0.28), px);
+        piece(acc, length(q - vec2(sg * (w + 24.0), 6.0)) - 4.0, vec3(0.26, 0.29, 0.33), px);
+      }
+    }
+  } else {
+    // FEU DE NAVIGATION : rouge à bâbord (le côté gauche), vert à tribord
+    // (le droit), blanc à éclats ailleurs — le code de tout ce qui vole
+    piece(acc, length(q) - 7.0, acier, px);
+    bool babord = abs(an - 1.5708) < 0.1;
+    bool tribord = abs(an + 1.5708) < 0.1;
+    vec3 coul = babord ? vec3(1.0, 0.16, 0.12) : tribord ? vec3(0.2, 1.0, 0.45) : vec3(0.9, 0.95, 1.0);
+    float f = fract(uTime * 0.5 + g * 3.0);
+    float on = (babord || tribord) ? 0.75 + 0.25 * sin(uTime * 1.3 + g * 9.0)
+                                   : max(step(f, 0.035), step(abs(f - 0.12), 0.018));
+    feu(acc, q, vec2(0.0), coul, on, 12.0);
+  }
+}
+
+// UNE PIÈCE PEINTE : son image dans l'atlas (tools/images/materiel.py), posée
+// dans la boîte de la pièce, la coque au bord bas. Le treillis se RÉPÈTE le
+// long du bras (param : la longueur d'une tuile) ; le port d'amarrage ne
+// montre que le bas de son image (param : la part montrée) et s'efface vers
+// le haut — le module voisin continue dans le noir. Niveau de détail écrit à
+// la main (textureGrad) : la boucle des pièces a un flot divergent.
+void peintPiece(inout vec4 acc, vec2 q, vec2 h, float type, float g, float param, vec4 r, float px) {
+  // la parabole suit sa cible : l'image entière pivote de quelques degrés
+  if (type > 1.5 && type < 2.5) {
+    float a = 0.10 * sin(uTime * 0.05 + g * 6.28);
+    q = vec2(cos(a) * q.x + sin(a) * q.y, -sin(a) * q.x + cos(a) * q.y);
+  }
+  float u = q.x / (2.0 * h.x) + 0.5;
+  float vv = q.y / (2.0 * h.y) + 0.5; // 0 à la coque, 1 au bout
+  if (u < 0.0 || u > 1.0 || vv < 0.0 || vv > 1.0) return;
+  float vi = vv;
+  float dv = (r.w - r.y) / (2.0 * h.y);
+  float fondu = 1.0;
+  if (type > 3.5 && type < 4.5) { // treillis : des tuiles bout à bout
+    vi = fract((q.y + h.y) / param);
+    dv = (r.w - r.y) / param;
+  } else if (type > 7.5) { // module voisin : le cylindre du port, en miroir
+    // la partie HAUTE de l'image (74 % à 100 % depuis le bas : couvertures,
+    // anneau, mains courantes), répétée en aller-retour — pas de couture à
+    // raccorder. La bande du hublot n'y entre pas : répété, il faisait motif.
+    float t = (q.y + h.y) / param;
+    vi = 0.74 + 0.26 * abs(fract(t * 0.5) * 2.0 - 1.0);
+    dv = (r.w - r.y) * 0.26 / param;
+  } else if (type > 2.5 && type < 3.5 && param > 0.0) { // amarrage
+    vi = vv * param;
+    dv *= param;
+    fondu = 1.0 - smoothstep(0.72, 1.0, vv);
+  }
+  vec2 uv = vec2(mix(r.x, r.z, u), 1.0 - mix(r.w, r.y, vi)); // atlas retourné (FLIP_Y)
+  vec2 du = vec2((r.z - r.x) / (2.0 * h.x) * px, 0.0);
+  vec4 t = textureGrad(uTexMateriel, uv, du, vec2(0.0, dv * px));
+  // éclairé par le soleil seul : plus sombre et plus froid que la planche,
+  // pour rester sous la cuve dans la hiérarchie lumineuse
+  vec3 c = t.rgb * vec3(0.70, 0.75, 0.84);
+  float k = t.a * fondu;
+  acc = vec4(c * k, k) + acc * (1.0 - k);
+  if (type < 0.5) {
+    // l'aile : le soleil glisse sur les cellules bleues ; le voyant du cardan
+    float bleu = smoothstep(0.03, 0.12, t.b - t.r) * k;
+    float nappe = smoothstep(0.80, 1.0, sin((q.x - q.y * 3.0) * 0.006 + uTime * 0.12 + g * 9.0));
+    acc.rgb += vec3(0.09, 0.12, 0.18) * nappe * bleu;
+    feu(acc, q, vec2(0.0, -0.543 * h.y), vec3(1.0, 0.62, 0.18), 0.15 + 0.7 * step(0.8, fract(uTime * 0.5 + g * 3.0)), 4.0);
+  } else if (type < 1.5) {
+    // le radiateur : le caloporteur circule, une onde tiède qui monte
+    float onde = 0.5 + 0.5 * sin(q.y * 0.02 - uTime * 0.6 + g * 6.0);
+    acc.rgb += vec3(0.035, 0.028, 0.018) * onde * k;
+  } else if (type > 2.5 && type < 3.5 && param > 0.0) {
+    // le port : ses quatre feux d'approche battent deux par deux
+    for (int i = 0; i < 4; i++) {
+      float fx = (i == 0 || i == 2) ? -0.592 : 0.556;
+      float fy = i < 2 ? -0.004 : -0.754;
+      float on = step(0.5, fract(uTime * 0.7 + (i < 2 ? 0.0 : 0.5)));
+      feu(acc, q, vec2(fx * h.x, fy * h.y), vec3(0.3, 1.0, 0.55), 0.1 + 0.8 * on, 5.0);
+    }
+  }
+}
+
+// LE FOND DE COQUE, continu d'une cellule à l'autre : une CONDUITE qui
+// court au ras de la paroi (par tronçons, avec ses colliers), et du petit
+// matériel semé entre les pièces — boîtiers de jonction, points de préhension
+// pour le bras robotique. Sans lui, les pièces flottaient sur une arête nue.
+void fondDeCoque(inout vec4 acc, float s, float y, float cote, float px) {
+  float t = floor(s / 700.0);
+  float rt = hash11(t * 3.7 + cote * 11.0);
+  if (rt > 0.3) {
+    // un tronçon de 700 u, rogné à ses bouts : la conduite entre et sort
+    float u = s - (t + 0.5) * 700.0;
+    float yc = 5.5 + 2.0 * step(0.65, rt);
+    float tube = max(abs(y - yc) - 2.6, abs(u) - 300.0);
+    float collier = max(abs(fract(s / 60.0) - 0.5) * 60.0 - 2.2, max(abs(y - yc) - 4.2, abs(u) - 300.0));
+    piece(acc, tube, vec3(0.075, 0.09, 0.11), px);
+    piece(acc, collier, vec3(0.12, 0.14, 0.17), px);
+  }
+  float g = floor(s / 130.0);
+  float rg = hash11(g * 5.3 + cote * 23.0 + 1.9);
+  if (rg > 0.55) {
+    vec2 q = vec2(s - (g + 0.3 + 0.4 * hash11(g * 9.1 + cote)) * 130.0, y);
+    if (rg > 0.8) {
+      // point de préhension : un plot carré et son ergot central
+      piece(acc, sdRect(q, vec2(0.0, 5.0), vec2(9.0, 5.0)) - 0.8, vec3(0.14, 0.16, 0.19), px);
+      piece(acc, sdSeg(q, vec2(0.0, 9.0), vec2(0.0, 17.0)) - 1.6, vec3(0.20, 0.23, 0.27), px);
+      piece(acc, length(q - vec2(0.0, 18.0)) - 3.0, vec3(0.20, 0.23, 0.27), px);
+    } else {
+      // boîtier de jonction, et sa diode de veille
+      piece(acc, sdRect(q, vec2(0.0, 6.0), vec2(8.0, 6.0)) - 0.6, vec3(0.10, 0.12, 0.15), px);
+      acc.rgb += vec3(0.25, 0.75, 0.85) * (1.0 - smoothstep(0.8, 1.8, length(q - vec2(4.0, 8.0)))) * 0.8;
+    }
+  }
+}
+
+// La boucle des pièces de la composition, dans l'ordre (une embase avant sa
+// pièce, un bras avant son aile). « mode » : 0 la frange (le matériel du
+// module), 1 la coque (ses seules EMBASES, qui mordent dans la tôle), et
+// « couche » choisit, pour la station, les voisins (1) ou le lointain (2).
+void poseCouche(inout vec4 acc, vec2 w, float px, int mode, float couche) {
+  for (int i = 0; i < MAX_PIECES; i++) {
+    if (i >= uPieceCount) break;
+    vec4 geo = uPieces[i];
+    vec4 aux = uPiecesAux[i];
+    float c = floor(aux.x / 16.0);
+    float type = aux.x - 16.0 * c;
+    if (abs(c - couche) > 0.5) continue;
+    if (mode == 1 && type < 6.5) continue;
+    vec2 rel = w - geo.xy;
+    // la marge : les halos des feux, l'ombre des embases
+    if (length(rel) > length(geo.zw) + 40.0) continue;
+    float ca = cos(aux.y);
+    float sa = sin(aux.y);
+    vec2 q = vec2(ca * rel.x + sa * rel.y, -sa * rel.x + ca * rel.y);
+    vec2 soleil = normalize(vec2(ca * -0.6 + sa * 0.8, -sa * -0.6 + ca * 0.8));
+    vec4 rect = uAtlas[int(type)];
+    if (uHasMateriel > 0.5 && rect.z > rect.x) peintPiece(acc, q, geo.zw, type, aux.z, aux.w, rect, px);
+    else dessinePiece(acc, q, geo.zw, type, aux.z, aux.y, aux.w, soleil, px);
+  }
+}
+void poseLesPieces(inout vec4 acc, float px, bool embasesSeules) {
+  if (uExterieur < 0.5) return;
+  poseCouche(acc, vWorld, px, embasesSeules ? 1 : 0, 0.0);
+}
+
 void main() {
-  outColor = vec4(texture(uTexHull, vUv).rgb, 1.0);
+  float px = 1.0 / max(uZoom, 1e-4); // un pixel d'écran, en unités monde
+  if (vCote.x > 3.5) {
+    // LA STATION AUTOUR : le lointain (la poutre maîtresse, ses ailes et
+    // ses radiateurs, en parallaxe), puis les modules voisins dans le plan
+    // de la salle. Tout ce qui est cuve ou coque le couvre : on s'y arrête.
+    if (uExterieur < 0.5) discard;
+    vec2 e = vec2(uEpais);
+    if (all(greaterThan(vWorld, uCuve.xy - e)) && all(lessThan(vWorld, uCuve.zw + e))) discard;
+    vec4 acc = vec4(0.0);
+    // le plan lointain : plus petit, plus lent — P = C + (W − C) / s
+    vec2 wl = uCenter + (vWorld - uCenter) / uEchelleLoin;
+    poseCouche(acc, wl, px / uEchelleLoin, 0, 2.0);
+    // la distance : plus sombre, bleuie par la brume de lumière diffuse
+    acc.rgb *= vec3(0.46, 0.52, 0.64);
+    poseCouche(acc, vWorld, px, 0, 1.0);
+    if (acc.a < 0.002 && max(acc.r, max(acc.g, acc.b)) < 0.002) discard;
+    outColor = acc;
+    return;
+  }
+  float s = vUv.x;
+  float a = vUv.y;
+  float cote = vCote.x;
+  // la base de la bande : le point de paroi (s, a) se retrouve dans le monde
+  vec2 dA = cote < 1.5 ? vec2(1.0, 0.0) : vec2(0.0, 1.0);
+  vec2 dO = cote < 0.5 ? vec2(0.0, 1.0) : cote < 1.5 ? vec2(0.0, -1.0)
+          : cote < 2.5 ? vec2(-1.0, 0.0) : vec2(1.0, 0.0);
+  vec2 origine = vWorld - s * dA - a * dO;
+  // échantillonnée hors de toute branche : le mip se calcule partout
+  vec3 tex = texture(uTexHull, vec2(s / uRep, clamp(a / uEpais, 0.0, 1.0))).rgb;
+  if (a < uEpais) {
+    // LA COQUE, PERCÉE PAR LE VIDE. Dans le trou, rien : la composition
+    // dessous montre déjà le ciel. Au bord, la TRANCHE de la paroi coupée
+    // — sombre, un fil clair sur l'arête — dit qu'elle a une épaisseur.
+    float dv = videSdf(vWorld);
+    float garde = smoothstep(0.0, px, dv);
+    if (garde <= 0.0) discard;
+    vec3 c = tex;
+    c = mix(c, vec3(0.030, 0.040, 0.055), (1.0 - smoothstep(0.0, 12.0, dv)) * 0.85);
+    c = mix(c, vec3(0.30, 0.38, 0.48), (1.0 - smoothstep(px, 2.5 * px, dv)) * 0.65);
+    // les embases qui mordent dans la coque, par-dessus la tôle
+    vec4 emb = vec4(0.0);
+    poseLesPieces(emb, px, true);
+    c = emb.rgb + c * (1.0 - emb.a);
+    outColor = vec4(c * garde, garde);
+    return;
+  }
+  // LA FRANGE : le petit matériel continu au ras de la paroi, puis les
+  // pièces de la composition, dans l'ordre (un bras avant son aile)
+  float y = a - uEpais;
+  vec4 acc = vec4(0.0);
+  // le fond de coque ne tient qu'où la coque tient : pas sur un trou. Il
+  // fait partie du DEHORS DU MODULE : masqué avec lui (réglage), il ne
+  // reste que la coque et les vides qui la percent
+  if (uExterieur > 0.5 && s > 20.0 && s < vCote.y - 20.0 && videSdf(origine + s * dA + uEpais * dO) > 0.0)
+    fondDeCoque(acc, s, y, cote, px);
+  poseLesPieces(acc, px, false);
+  // le fil de lumière sur la face externe : l'arête de la coque accroche
+  // les étoiles, et la station se découpe sur le ciel
+  float arete = (1.0 - smoothstep(0.0, 1.5 * px, abs(y - 0.75 * px))) * smoothstep(0.0, px, videSdf(vWorld - dO * y));
+  acc.rgb += vec3(0.10, 0.16, 0.21) * arete * (1.0 - acc.a);
+  if (acc.a < 0.002 && max(acc.r, max(acc.g, acc.b)) < 0.002) discard;
+  outColor = acc;
 }`
 
 // Décalques de décor : machinerie posée sur les parois (tuyaux, vannes).
@@ -3560,7 +4037,11 @@ export class Renderer {
   private readonly hullVbo: WebGLBuffer
   private readonly decalVao: WebGLVertexArrayObject
   private readonly decalVbo: WebGLBuffer
-  private readonly hullScratch = new Float32Array(6 * 4 * 4) // 4 bandes × 6 sommets × (pos, uv)
+  // 4 bandes × 6 sommets × (pos, le long / en travers, côté / longueur)
+  private readonly hullScratch = new Float32Array((COQUE_SOMMETS + STATION_SOMMETS) * COQUE_FLOTTANTS)
+  // les vides qui percent la coque (coque.ts) : boîte, et (code, angle)
+  private readonly videsCoque = new Float32Array(MAX_VIDES_COQUE * 4)
+  private readonly videsCoqueAux = new Float32Array(MAX_VIDES_COQUE * 2)
   private readonly decalScratch = new Float32Array(6 * 4) // un quad : 6 sommets × (pos, uv)
   private readonly zoneScratch = new Float32Array(MAX_ZONES * 4)
   private readonly zoneForceScratch = new Float32Array(MAX_ZONES)
@@ -3607,6 +4088,26 @@ export class Renderer {
   private texPhile: WebGLTexture | null = null
   private texIris: WebGLTexture | null = null
   private texHull: WebGLTexture | null = null
+  // la composition du matériel de coque (compositionCoque.ts), recalculée
+  // seulement quand la cuve ou ses vides changent
+  private readonly piecesGeo = new Float32Array(MAX_PIECES_COQUE * 4)
+  private readonly piecesAux = new Float32Array(MAX_PIECES_COQUE * 4)
+  private piecesCle = ''
+  private piecesCount = 0
+  // l'atlas des pièces peintes (tools/images/materiel.py) : absent ou pas
+  // encore chargé, le shader trace les pièces lui-même
+  private texMateriel: WebGLTexture | null = null
+  // le dehors du module (voisins, lointain, matériel) : un réglage du
+  // joueur (main.ts) — masqué, il ne reste que la coque et ses vides
+  private exterieur = false
+  private hullRep = COQUE_REP
+  private readonly atlasRects = new Float32Array(
+    Array.from({ length: 16 }, (_, i) => {
+      // le module voisin se peint avec l'image du port d'amarrage
+      const r = ATLAS_COQUE[i === PIECE_MODULE ? PIECE_AMARRAGE : i]
+      return r ? [r.u0, r.v0, r.u1, r.v1] : [0, 0, 0, 0]
+    }).flat(),
+  )
   private texSpongeDry: WebGLTexture | null = null
   private texSpongeWet: WebGLTexture | null = null
   private spongeScratch = new Float32Array(0)
@@ -3760,12 +4261,15 @@ export class Renderer {
     gl.bindVertexArray(this.hullVao)
     gl.bindBuffer(gl.ARRAY_BUFFER, this.hullVbo)
     gl.bufferData(gl.ARRAY_BUFFER, this.hullScratch.byteLength, gl.DYNAMIC_DRAW)
-    const hullStride = 4 * 4
+    const coqueStride = COQUE_FLOTTANTS * 4
     gl.enableVertexAttribArray(0)
-    gl.vertexAttribPointer(0, 2, gl.FLOAT, false, hullStride, 0)
+    gl.vertexAttribPointer(0, 2, gl.FLOAT, false, coqueStride, 0)
     gl.enableVertexAttribArray(1)
-    gl.vertexAttribPointer(1, 2, gl.FLOAT, false, hullStride, 8)
+    gl.vertexAttribPointer(1, 2, gl.FLOAT, false, coqueStride, 8)
+    gl.enableVertexAttribArray(2)
+    gl.vertexAttribPointer(2, 2, gl.FLOAT, false, coqueStride, 16)
     gl.bindVertexArray(null)
+    const hullStride = 4 * 4 // les décalques : (pos, uv)
 
     this.decalVao = gl.createVertexArray()!
     this.decalVbo = gl.createBuffer()!
@@ -3865,7 +4369,15 @@ export class Renderer {
       false,
       (t) => (this.texIris = t),
     )
-    this.loadTexture('/assets/hull.webp', true, true, (t) => (this.texHull = t))
+    // la longueur d'une répétition de la bande de coque suit le rapport de
+    // son IMAGE (épaisseur × largeur / hauteur) : une nouvelle bande n'est
+    // jamais étirée, quel que soit son format
+    this.loadTexture('/assets/hull.webp', true, true, (t, img) => {
+      this.texHull = t
+      if (img.naturalHeight > 0) this.hullRep = (COQUE_EPAISSEUR * img.naturalWidth) / img.naturalHeight
+    })
+    if (ATLAS_COQUE.some((r) => r))
+      this.loadTexture('/assets/coque-materiel.webp', false, true, (t) => (this.texMateriel = t))
     this.loadTexture(
       '/assets/sponge-dry.webp',
       true,
@@ -4057,6 +4569,12 @@ export class Renderer {
     this.parSemis[1] = semis[1]
     this.parCuve[0] = cuve[0]
     this.parCuve[1] = cuve[1]
+  }
+
+  /** Le dehors du module : ses voisins, la station au loin, son matériel
+   *  de coque. Réglage du joueur (main.ts). */
+  setExterieur(actif: boolean): void {
+    this.exterieur = actif
   }
 
   setSolModules(actif: boolean): void {
@@ -4913,7 +5431,8 @@ export class Renderer {
     // Passe B bis — coque texturée autour de la cuve. Un tableau bâti en
     // MODULES n'a pas de cuve : ses parois sont celles de ses coques, et
     // le dehors doit rester le vide.
-    if (!this.solModules) this.drawHull(sim, camera, viewportW, viewportH)
+    if (!this.solModules)
+      this.drawHull(sim, camera, viewportW, viewportH, boxes, timeSec)
 
     // Passe B ter — décalques de décor (tuyaux, vannes), effacés sous l'eau
     this.drawDecals(decals, camera, viewportW, viewportH, params, timeSec)
@@ -5022,155 +5541,80 @@ export class Renderer {
   }
 
   // Quatre bandes de coque autour de la cuve, tube lumineux (bas de l'image,
-  // v = 0 avec le flip) tourné vers l'intérieur. Les horizontales débordent
-  // de l'épaisseur aux deux bouts et couvrent les angles.
+  // v = 0 avec le flip) tourné vers l'intérieur, et leur frange de matériel
+  // au-dehors. La géométrie et le choix des vides : coque.ts. Les vides
+  // viennent des scratchs de la composition, déjà remplis pour cette image.
   private drawHull(
     sim: FluidSim,
     camera: Camera,
     viewportW: number,
     viewportH: number,
+    boxes: readonly ObstacleBox[],
+    timeSec: number,
   ): void {
     if (!this.texHull) return
     const gl = this.gl
     const b = sim.bounds
-    const T = 90 // épaisseur de la coque (unités monde)
-    const REP = 225 // longueur d'une répétition de texture (aspect 2,5:1)
-    const data = this.hullScratch
-    let o = 0
-    // x0..x1 le long de la bande, « in » = bord intérieur (tube), « out » = bord extérieur
-    const quad = (
-      ax: number,
-      ay: number,
-      au: number,
-      av: number,
-      bx: number,
-      by: number,
-      bu: number,
-      bv: number,
-      cx: number,
-      cy: number,
-      cu2: number,
-      cv: number,
-      dx: number,
-      dy: number,
-      du: number,
-      dv: number,
-    ) => {
-      data[o++] = ax
-      data[o++] = ay
-      data[o++] = au
-      data[o++] = av
-      data[o++] = bx
-      data[o++] = by
-      data[o++] = bu
-      data[o++] = bv
-      data[o++] = cx
-      data[o++] = cy
-      data[o++] = cu2
-      data[o++] = cv
-      data[o++] = ax
-      data[o++] = ay
-      data[o++] = au
-      data[o++] = av
-      data[o++] = cx
-      data[o++] = cy
-      data[o++] = cu2
-      data[o++] = cv
-      data[o++] = dx
-      data[o++] = dy
-      data[o++] = du
-      data[o++] = dv
+    const boxCount = Math.min(boxes.length, MAX_BOXES)
+    const sommets = remplitBandesCoque(b, this.hullScratch)
+    remplitFondStation(b, this.hullScratch, sommets)
+    // la composition ne change qu'avec la cuve et ses vides : recomposée
+    // à ce moment-là seulement, pas à chaque image
+    const vides = boxes.filter((bx) => bx.material === MAT_VIDE)
+    const cle = cleComposition(b, vides)
+    if (cle !== this.piecesCle) {
+      this.piecesCle = cle
+      this.piecesCount = empaquettePieces(composeCoque(b, vides), this.piecesGeo, this.piecesAux)
     }
-    const uLen = (len: number) => len / REP
-    // haut : tube en y = maxY (v 0), extérieur en maxY + T (v 1)
-    quad(
-      b.minX - T,
-      b.maxY,
-      0,
-      0,
-      b.maxX + T,
-      b.maxY,
-      uLen(b.maxX - b.minX + 2 * T),
-      0,
-      b.maxX + T,
-      b.maxY + T,
-      uLen(b.maxX - b.minX + 2 * T),
-      1,
-      b.minX - T,
-      b.maxY + T,
-      0,
-      1,
-    )
-    // bas : tube en y = minY
-    quad(
-      b.minX - T,
-      b.minY,
-      0,
-      0,
-      b.maxX + T,
-      b.minY,
-      uLen(b.maxX - b.minX + 2 * T),
-      0,
-      b.maxX + T,
-      b.minY - T,
-      uLen(b.maxX - b.minX + 2 * T),
-      1,
-      b.minX - T,
-      b.minY - T,
-      0,
-      1,
-    )
-    // gauche : tube en x = minX
-    quad(
-      b.minX,
-      b.minY,
-      0,
-      0,
-      b.minX,
-      b.maxY,
-      uLen(b.maxY - b.minY),
-      0,
-      b.minX - T,
-      b.maxY,
-      uLen(b.maxY - b.minY),
-      1,
-      b.minX - T,
-      b.minY,
-      0,
-      1,
-    )
-    // droite : tube en x = maxX
-    quad(
-      b.maxX,
-      b.minY,
-      0,
-      0,
-      b.maxX,
-      b.maxY,
-      uLen(b.maxY - b.minY),
-      0,
-      b.maxX + T,
-      b.maxY,
-      uLen(b.maxY - b.minY),
-      1,
-      b.maxX + T,
-      b.minY,
-      0,
-      1,
+    const nVides = videsPercantLaCoque(
+      this.boxScratch,
+      this.auxScratch,
+      boxCount,
+      b,
+      this.videsCoque,
+      this.videsCoqueAux,
     )
     gl.bindBuffer(gl.ARRAY_BUFFER, this.hullVbo)
-    gl.bufferSubData(gl.ARRAY_BUFFER, 0, data)
+    gl.bufferSubData(gl.ARRAY_BUFFER, 0, this.hullScratch)
     gl.useProgram(this.hullProgram)
     const hu = this.uniforms['hull']
     gl.uniform2f(hu['uCenter'], camera.x, camera.y)
     gl.uniform2f(hu['uViewport'], viewportW, viewportH)
     gl.uniform1f(hu['uZoom'], camera.zoom)
+    gl.uniform1f(hu['uTime'], timeSec)
+    gl.uniform1f(hu['uEpais'], COQUE_EPAISSEUR)
+    gl.uniform1f(hu['uRep'], this.hullRep)
+    gl.uniform1i(hu['uVideCount'], nVides)
+    if (nVides > 0) {
+      gl.uniform4fv(hu['uVides[0]'], this.videsCoque)
+      gl.uniform2fv(hu['uVidesAux[0]'], this.videsCoqueAux)
+    }
     gl.activeTexture(gl.TEXTURE0)
     gl.bindTexture(gl.TEXTURE_2D, this.texHull)
     gl.uniform1i(hu['uTexHull'], 0)
+    gl.uniform1i(hu['uPieceCount'], this.piecesCount)
+    gl.uniform1f(hu['uExterieur'], this.exterieur ? 1 : 0)
+    gl.uniform4f(hu['uCuve'], b.minX, b.minY, b.maxX, b.maxY)
+    gl.uniform1f(hu['uEchelleLoin'], ECHELLE_LOINTAIN)
+    gl.uniform4fv(hu['uAtlas[0]'], this.atlasRects)
+    gl.uniform1f(hu['uHasMateriel'], this.texMateriel ? 1 : 0)
+    gl.activeTexture(gl.TEXTURE1)
+    gl.bindTexture(gl.TEXTURE_2D, this.texMateriel ?? this.texHull)
+    gl.uniform1i(hu['uTexMateriel'], 1)
+    gl.activeTexture(gl.TEXTURE0)
+    if (this.piecesCount > 0) {
+      gl.uniform4fv(hu['uPieces[0]'], this.piecesGeo)
+      gl.uniform4fv(hu['uPiecesAux[0]'], this.piecesAux)
+    }
+    // prémultiplié : la frange laisse voir le ciel, les feux s'y ajoutent
+    gl.enable(gl.BLEND)
+    gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA)
     gl.bindVertexArray(this.hullVao)
-    gl.drawArrays(gl.TRIANGLES, 0, 24)
+    // la station d'abord (dessous), puis les bandes de coque et leur frange
+    if (this.exterieur) gl.drawArrays(gl.TRIANGLES, sommets, STATION_SOMMETS)
+    gl.drawArrays(gl.TRIANGLES, 0, sommets)
     gl.bindVertexArray(null)
+    gl.disable(gl.BLEND)
   }
 
   // Décalques : un quad par pièce, dessinés en transparence. Le décor n'a pas

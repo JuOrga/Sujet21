@@ -116,7 +116,7 @@ export function rubriqueDe(url: string): string {
     f.startsWith('plafond')
   )
     return 'Machinerie & décalques'
-  if (/^(hull|tank-bg|stars|ciel|etoiles|home|card-)/.test(f)) return 'Coque & fonds'
+  if (/^(hull|coque-|tank-bg|stars|ciel|etoiles|home|card-)/.test(f)) return 'Coque & fonds'
   if (/^(fiole|badge)/.test(f)) return 'Objets & emblèmes'
   return 'Autres'
 }
