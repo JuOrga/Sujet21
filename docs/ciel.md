@@ -5,7 +5,7 @@ DEHORS**) :
 
 | mode | ce que c'est | ce que ça coûte |
 |---|---|---|
-| **PLAQUE** (défaut) | un calque HTML : `public/assets/ciel.webp` (1254²) et trois tuiles d'étoiles | ~0,4 Mo au téléchargement ; composé par le navigateur, sans calcul par pixel |
+| **PLAQUE** (défaut) | un calque HTML : `public/assets/ciel.webp` (2400², une vraie photographie) et trois tuiles d'étoiles | ~1,4 Mo au téléchargement ; composé par le navigateur, sans calcul par pixel |
 | **TUILE** | l'ancien fond : deux petites textures répétées | ~0,1 Mo |
 | **PROCÉDURAL** | rien à charger, le vide est entièrement calculé | zéro |
 
@@ -30,8 +30,9 @@ restent des ajouts).
   le garantissent. **Une image de 1254 px tient donc dans un tiers d'écran
   d'iPad : pour une grande galaxie nette, il faut une grande image** (plus
   bas) ;
-- sa **taille** voulue : 0,8 de la grande dimension de l'écran au zoom de
-  jeu, un peu moins au recul — la netteté a le dernier mot ;
+- sa **taille** voulue : 1,3 fois la grande dimension de l'écran au zoom de
+  jeu (la bande déborde), un peu moins au recul — la netteté a le dernier
+  mot ;
 - ses **bords sont fondus** dans l'image elle-même (`--fondu`, plus bas) ;
 - son centre **dérive** avec la caméra mais ne quitte jamais l'écran ;
 - les **étoiles** sont trois tuiles d'image (`tools/ciel/genere-etoiles.py`)
@@ -200,20 +201,30 @@ BANC › **Ciel du dehors**, en jeu, à vue :
 
 ## La plaque livrée avec le jeu
 
-`public/assets/ciel.webp` est une **image générée** sur le prompt ci-dessous :
-le centre galactique en biais, son bulbe doré près du centre, des lanes de
-poussière filamenteuses, des nébuleuses roses, une région bleue au-dessus du
-cœur. Source de 1254 px, préparée ainsi (l'original est hors dépôt) :
+`public/assets/ciel.webp` est une **vraie photographie** : le centre de la Voie
+lactée, découpé dans **« The Milky Way Panorama »** du projet GigaGalaxy Zoom de
+l'ESO — le ciel entier sur 360°, assemblé à partir de près de 1 200 clichés pris
+à La Silla, Paranal et La Palma.
+
+> **Crédit, obligatoire (CC BY 4.0) : ESO/S. Brunier.** Il est affiché dans
+> PARAMÈTRES › LE CIEL DU DEHORS.
+
+La source est le poster d'impression de l'ESO (`print_poster_0040.tif`, 11 811 ×
+5 905, 87 Mo), déposé en pièce jointe de la release GitHub `ciel-source` —
+hors de l'historique. Le carré de 2 400 px autour du cœur galactique :
 
 ```bash
-python3 tools/ciel/prepare-plaque.py assets-src/voie-lactee.png \
-    --retouche 620,495,3 --saturation 0.45
+curl -L -o assets-src/print_poster_0040.tif \
+  https://github.com/JuOrga/Sujet21/releases/download/ciel-source/print_poster_0040.tif
+python3 tools/ciel/prepare-plaque.py assets-src/print_poster_0040.tif --cadre 5935,2745,2400
 ```
 
-La saturation à 0,45 répond à « trop de couleurs » : le générateur sature.
+Le cadre évite le titre, la légende et le logo du poster. Aucune désaturation :
+ce sont les couleurs du ciel. 1,28 Mo.
 
-La retouche efface un point noir que le générateur avait laissé en plein cœur
-— le premier endroit où l'œil va.
+**L'image générée, avant elle** (`assets-src/voie-lactee.png`, 1254 px, hors
+dépôt) : belle, mais trop petite pour être à la fois grande et nette, et trop
+colorée — `--retouche 620,495,3 --saturation 0.45`.
 
 **La plaque procédurale, en secours.** `tools/ciel/genere-ciel.py` fabrique une
 plaque sans image source. Elle imite le centre galactique vu de l'espace

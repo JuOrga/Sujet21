@@ -81,6 +81,10 @@ export class CielCalque {
   // capture vidéo du codex) — le navigateur les a déjà en cache
   private readonly tuiles: HTMLImageElement[] = []
   private dernier: EtatCiel | null = null
+  // RIEN ne se télécharge avant le premier affichage : qui garde un autre
+  // fond ne paie jamais la photographie (1,3 Mo) ni les tuiles
+  private readonly urlGalaxie: string
+  private charge = false
   // le dernier style écrit, par élément : on n'écrit que ce qui change
   private readonly ecrit = new Map<HTMLElement, string>()
   private dprTuiles = 0
@@ -100,17 +104,15 @@ export class CielCalque {
     g.addEventListener('load', () => {
       this.galaxiePrete = true
     })
-    g.src = urlGalaxie
+    this.urlGalaxie = urlGalaxie
     r.appendChild(g)
     this.galaxie = g
-    for (const c of COUCHES_ETOILES) {
-      const im = new Image()
-      im.src = c.url
-      this.tuiles.push(im)
+    for (let i = 0; i < COUCHES_ETOILES.length; i++) {
+      this.tuiles.push(new Image())
       const d = document.createElement('div')
       // SCREEN : une étoile éclaire ce qu'elle recouvre, sans l'éteindre —
       // les lanes sombres de la galaxie en sont piquées, comme dans le vrai
-      d.style.cssText = `position:absolute;left:0;top:0;background-image:url(${c.url});background-repeat:repeat;mix-blend-mode:screen;will-change:transform`
+      d.style.cssText = 'position:absolute;left:0;top:0;background-repeat:repeat;mix-blend-mode:screen;will-change:transform'
       r.appendChild(d)
       this.couches.push(d)
     }
@@ -130,6 +132,14 @@ export class CielCalque {
     this.dernier = e
     this.racine.style.display = e.actif ? 'block' : 'none'
     if (!e.actif) return
+    if (!this.charge) {
+      this.charge = true
+      this.galaxie.src = this.urlGalaxie
+      COUCHES_ETOILES.forEach((c, i) => {
+        this.tuiles[i].src = c.url
+        this.couches[i].style.backgroundImage = `url(${c.url})`
+      })
+    }
     const dpr = Math.max(e.dpr, 1e-4)
     // LES TUILES, à un texel par pixel physique : leur taille CSS ne dépend
     // que de la densité de l'écran — on ne la réécrit que si elle change

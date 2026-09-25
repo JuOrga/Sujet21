@@ -145,11 +145,16 @@ export interface ReglagesPlaque {
   ref: number
 }
 
+// La taille de 1,3 se règle sur la VRAIE photographie livrée (2 400 px) :
+// la bande déborde de l'écran, le cœur ne se cache plus derrière la station
+// — et sur un iPad, la netteté (grossMax) la plafonne à peu près à la
+// largeur de l'écran. Avec l'image générée de 1254 px, 0,8 : elle ne
+// pouvait pas davantage sans flou.
 export const PLAQUE_DEFAUTS: ReglagesPlaque = {
-  taille: 0.8,
+  taille: 1.3,
   zoom: 0.3,
-  tailleMin: 0.3,
-  tailleMax: 1.4,
+  tailleMin: 0.5,
+  tailleMax: 2.0,
   grossMax: 1.15,
   derive: 0.02,
   ref: 0.3,

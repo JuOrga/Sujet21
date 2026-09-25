@@ -3,8 +3,13 @@
 PRÉPARER UNE PLAQUE DE CIEL à partir d'une image (photographie ou image
 générée) : carré centré, retouches ponctuelles, désaturation, WebP.
 
-    python3 tools/ciel/prepare-plaque.py assets-src/voie-lactee.png \\
-        --retouche 620,495,3 --saturation 0.55
+    python3 tools/ciel/prepare-plaque.py assets-src/print_poster_0040.tif \\
+        --cadre 5935,2745,2400
+
+LE CADRE. Une grande photographie (une panoramique du ciel entier) ne se
+prend pas entière : `--cadre x,y,côté` y découpe le carré voulu, centré sur
+(x, y) en pixels de la source — le cœur galactique. Sans lui, le plus grand
+carré centré.
 
 JAMAIS AGRANDIE. La taille de la plaque est celle de la SOURCE (plafonnée à
 4096 : au-delà, la tablette ne charge plus). Ce n'est pas qu'une économie :
@@ -56,23 +61,31 @@ def main() -> None:
     p.add_argument("--taille", type=int, default=0, help="0 : celle de la source")
     p.add_argument("--saturation", type=float, default=1.0)
     p.add_argument("--fondu", type=float, default=0.18)
+    p.add_argument("--cadre", default="", help="x,y,côté — sinon le plus grand carré centré")
     p.add_argument("--qualite", type=int, default=90)
     p.add_argument("--sortie", default="public/assets/ciel.webp")
     a = p.parse_args()
 
     Image.MAX_IMAGE_PIXELS = None  # les plaques de télescope dépassent la garde
     im = Image.open(a.source).convert("RGB")
+    # LE CADRE D'ABORD : une panoramique de 11 811 × 5 905 pèse ~840 Mo en
+    # flottants — on ne traite que le carré gardé
+    if a.cadre:
+        x, y, c = (int(v) for v in a.cadre.split(","))
+        x0, y0 = x - c // 2, y - c // 2
+    else:
+        c = min(im.size)  # le cadrage compte en fraction d'image : il faut un carré
+        x0, y0 = (im.width - c) // 2, (im.height - c) // 2
+    im = im.crop((x0, y0, x0 + c, y0 + c))
     px = np.asarray(im, dtype=np.float32).copy()
     for r in a.retouche:
+        # les retouches se donnent en pixels de la SOURCE
         x, y, rayon = (int(v) for v in r.split(","))
-        retouche(px, x, y, rayon)
-    lum = px @ np.array([0.2126, 0.7152, 0.0722], np.float32)
-    px = lum[..., None] + (px - lum[..., None]) * a.saturation
+        retouche(px, x - x0, y - y0, rayon)
+    if a.saturation != 1.0:
+        lum = px @ np.array([0.2126, 0.7152, 0.0722], np.float32)
+        px = lum[..., None] + (px - lum[..., None]) * a.saturation
     im = Image.fromarray(np.clip(px + 0.5, 0, 255).astype(np.uint8))
-    c = min(im.size)  # le cadrage compte en fraction d'image : il faut un carré
-    im = im.crop(
-        ((im.width - c) // 2, (im.height - c) // 2, (im.width + c) // 2, (im.height + c) // 2)
-    )
     taille = a.taille or min(4096, c)
     if taille != c:
         im = im.resize((taille, taille), Image.LANCZOS)
