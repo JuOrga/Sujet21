@@ -567,6 +567,7 @@ uniform vec2 uParCuve;   // la paroi de cuve, derrière l'eau
 uniform sampler2D uTexTank; // fond de cuve : panneaux, conduites, liserés
 uniform sampler2D uTexWall;
 uniform sampler2D uTexWallA; // seconde paroi : les murs alternent, sans répétition visible
+uniform float uPasseConduite; // 1 : la passe NETTE des conduites (voir render)
 uniform sampler2D uTexFroid; // l’atlas de la conduite d’ammoniac (tronçon, bride, joint, givre)
 uniform sampler2D uTexChaud;
 uniform sampler2D uTexGrille;
@@ -1627,6 +1628,9 @@ void main() {
   // comprise : on n'écrase que sur un STRICTEMENT plus petit.
   float dCouv = 1.0e9;
   int iCouv = -1;
+  // la part de ce pixel couverte par une CONDUITE : la passe nette ne
+  // recopie que celle-là (voir render, « la conduite nette »)
+  float couvConduite = 0.0;
   for (int bi = 0; bi < min(uBoxCount, MAX_BOXES); bi++) {
     float mc = decodeAux(uBoxAux[bi].x).x;
     if (mc > 2.5 && mc < 3.5) continue; // le sas est une bouche, il n'enterre rien
@@ -2101,6 +2105,7 @@ void main() {
       col *= mix(1.0, conduiteOmbre(wb, uBoxes[bi], sensC), surSol);
       vec4 cnh = conduiteNH3(clamp(wbV - bmin, vec2(0.0), bsize), bsize, pxMonde, sensC);
       col = col * (1.0 - fill * cnh.a) + cnh.rgb * eclMat * fill;
+      couvConduite = max(couvConduite, fill * cnh.a);
       float hors = (1.0 - fill * cnh.a) * surSol;
       // (la brume ne baisse que SOUS l'image — pas dans la forme de collision,
       // dont les rectangles de brides se lisaient en pavés plus sombres)
@@ -2761,7 +2766,9 @@ void main() {
   // pression temporelle se voit, elle ne se chronomètre pas
   col = mix(col, col * vec3(0.82, 0.92, 1.10), uChill * 0.6);
   col *= 1.0 - 0.12 * uChill;
-  outColor = vec4(col, 1.0);
+  // la passe NETTE des conduites : la couleur prémultipliée par la part de
+  // conduite du pixel — le reste garde l'image de la passe principale
+  outColor = uPasseConduite > 0.5 ? vec4(col * couvConduite, couvConduite) : vec4(col, 1.0);
 }`
 
 // Carte de lumière de la pièce : cuite en espace MONDE, à basse résolution,
@@ -3180,6 +3187,17 @@ void main() {
 
 // Coque texturée : quatre bandes autour de la cuve, tube lumineux côté
 // intérieur. Dessinée par-dessus la composition (le liquide reste dedans).
+// LA RECOPIE de la scène (image intermédiaire basse résolution) sur la
+// toile native — voir render, « la conduite nette »
+const RECOPIE_FS = `#version 300 es
+precision highp float;
+uniform sampler2D uScene;
+uniform vec2 uTaille;
+out vec4 outColor;
+void main() {
+  outColor = texture(uScene, gl_FragCoord.xy / uTaille);
+}`
+
 const HULL_VS = `#version 300 es
 layout(location = 0) in vec2 aPos;
 layout(location = 1) in vec2 aUv;
@@ -3279,6 +3297,26 @@ export class Renderer {
   private readonly composeProgram: WebGLProgram
   private readonly spongeProgram: WebGLProgram
   private readonly hullProgram: WebGLProgram
+  private readonly recopieProgram: WebGLProgram
+  // LA CONDUITE NETTE. Aux résolutions réduites, TOUTE l'image se calcule
+  // en moins de pixels puis s'agrandit : la conduite d'ammoniac, dessinée
+  // dans la même passe, devenait floue quelle que soit la netteté de son
+  // atlas. On calcule alors la scène dans une image intermédiaire à la
+  // résolution réduite (sceneFbo), on la recopie sur la toile NATIVE, et on
+  // repasse la composition EN NATIF sur les seules boîtes des conduites —
+  // le même shader, donc les mêmes effets (eau, ombre du corps, brume,
+  // plafonniers), recopiés au prorata de la part de conduite du pixel.
+  /** La densité native de l'écran (main.ts) ; 0 : pas de passe nette. */
+  dprNatif = 0
+  private sceneFbo: WebGLFramebuffer | null = null
+  private sceneTex: WebGLTexture | null = null
+  private sceneW = 0
+  private sceneH = 0
+  /** La taille de la cible où se dessine la scène (toile ou image
+   *  intermédiaire) : les passes qui lisent le champ du fluide par
+   *  gl_FragCoord s'y rapportent. */
+  private cibleW = 1
+  private cibleH = 1
   private readonly decalProgram: WebGLProgram
   private readonly lightProgram: WebGLProgram
   private readonly vieProgram: WebGLProgram
@@ -3433,6 +3471,7 @@ export class Renderer {
       { nom: 'decal', vs: DECAL_VS, fs: DECAL_FS },
       { nom: 'light', vs: COMPOSE_VS, fs: LIGHT_FS },
       { nom: 'vie', vs: VIE_VS, fs: VIE_FS },
+      { nom: 'recopie', vs: COMPOSE_VS, fs: RECOPIE_FS },
     ])
     this.splatProgram = this.programmes.programme('splat')
     this.composeProgram = this.programmes.programme('compose')
@@ -3441,6 +3480,7 @@ export class Renderer {
     this.decalProgram = this.programmes.programme('decal')
     this.lightProgram = this.programmes.programme('light')
     this.vieProgram = this.programmes.programme('vie')
+    this.recopieProgram = this.programmes.programme('recopie')
 
     this.scratch = new Float32Array(capacity * 7)
     this.splatVao = gl.createVertexArray()!
@@ -3741,7 +3781,7 @@ export class Renderer {
   pret(): boolean {
     if (this.programmesPrets) return true
     if (!this.programmes.pret()) return false
-    for (const nom of ['splat', 'compose', 'sponge', 'hull', 'decal', 'light', 'vie'])
+    for (const nom of ['splat', 'compose', 'sponge', 'hull', 'decal', 'light', 'vie', 'recopie'])
       this.uniforms[nom] = this.programmes.uniformes(nom)
     this.programmesPrets = true
     return true
@@ -4266,10 +4306,20 @@ export class Renderer {
     const gl = this.gl
     const devW = Math.max(1, Math.round(viewportW * dpr))
     const devH = Math.max(1, Math.round(viewportH * dpr))
-    if (this.canvas.width !== devW || this.canvas.height !== devH) {
-      this.canvas.width = devW
-      this.canvas.height = devH
+    // la conduite nette : seulement si la résolution est réduite et qu'une
+    // conduite (plaque froide rectangulaire) est au tableau
+    const nette =
+      this.dprNatif > dpr * 1.02 &&
+      boxes.some((b) => b.material === MAT_FROID && !b.forme)
+    const natW = nette ? Math.max(1, Math.round(viewportW * this.dprNatif)) : devW
+    const natH = nette ? Math.max(1, Math.round(viewportH * this.dprNatif)) : devH
+    if (this.canvas.width !== natW || this.canvas.height !== natH) {
+      this.canvas.width = natW
+      this.canvas.height = natH
     }
+    if (nette) this.ensureSceneTarget(devW, devH)
+    this.cibleW = devW
+    this.cibleH = devH
     const down = Math.max(1, downsample)
     const fboW = Math.max(1, Math.round(devW / down))
     const fboH = Math.max(1, Math.round(devH / down))
@@ -4393,11 +4443,13 @@ export class Renderer {
     gl.bindVertexArray(null)
     gl.disable(gl.BLEND)
 
-    // Passe B — composition
-    gl.bindFramebuffer(gl.FRAMEBUFFER, null)
+    // Passe B — composition (dans l'image intermédiaire si la conduite
+    // doit être nette : voir sceneFbo)
+    gl.bindFramebuffer(gl.FRAMEBUFFER, nette ? this.sceneFbo : null)
     gl.viewport(0, 0, devW, devH)
     gl.useProgram(this.composeProgram)
     const cu = this.uniforms['compose']
+    gl.uniform1f(cu['uPasseConduite'], 0)
     gl.activeTexture(gl.TEXTURE0)
     gl.bindTexture(gl.TEXTURE_2D, this.fieldTex)
     gl.uniform1i(cu['uField'], 0)
@@ -4610,6 +4662,100 @@ export class Renderer {
 
     // Passe C — cellules d'éponge
     this.drawSponges(sim, camera, viewportW, viewportH, dpr)
+
+    if (nette) this.drawConduiteNette(boxes, camera, viewportW, viewportH, natW, natH)
+  }
+
+  // LA CONDUITE NETTE (voir sceneFbo) : la scène basse résolution recopiée
+  // sur la toile native, puis la composition repassée EN NATIF sur les seules
+  // boîtes des conduites (ciseaux), mêlée au prorata de leur couverture.
+  // Tous les uniformes de la composition sont déjà posés par la passe
+  // principale : seuls changent la densité, la taille de la cible et le
+  // drapeau de la passe.
+  private drawConduiteNette(
+    boxes: ObstacleBox[],
+    camera: Camera,
+    viewportW: number,
+    viewportH: number,
+    natW: number,
+    natH: number,
+  ): void {
+    const gl = this.gl
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null)
+    gl.viewport(0, 0, natW, natH)
+    gl.disable(gl.BLEND)
+    gl.useProgram(this.recopieProgram)
+    const ru = this.uniforms['recopie']
+    gl.activeTexture(gl.TEXTURE0)
+    gl.bindTexture(gl.TEXTURE_2D, this.sceneTex)
+    gl.uniform1i(ru['uScene'], 0)
+    gl.uniform2f(ru['uTaille'], natW, natH)
+    gl.drawArrays(gl.TRIANGLES, 0, 3)
+
+    gl.useProgram(this.composeProgram)
+    const cu = this.uniforms['compose']
+    const dpr = natW / viewportW
+    gl.uniform1f(cu['uDpr'], dpr)
+    gl.uniform2f(cu['uCanvasSize'], natW, natH)
+    gl.uniform1f(cu['uPasseConduite'], 1)
+    // les unités 0 et 1 ont servi depuis (la scène, les décalques, les
+    // éponges) : la composition y lit le champ du fluide et le ciel proche
+    gl.activeTexture(gl.TEXTURE1)
+    gl.bindTexture(gl.TEXTURE_2D, this.texStars)
+    gl.activeTexture(gl.TEXTURE0)
+    gl.bindTexture(gl.TEXTURE_2D, this.fieldTex)
+    gl.enable(gl.BLEND)
+    gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA)
+    gl.enable(gl.SCISSOR_TEST)
+    const px = (wx: number) => ((wx - camera.x) * camera.zoom + viewportW / 2) * dpr
+    const py = (wy: number) => ((wy - camera.y) * camera.zoom + viewportH / 2) * dpr
+    for (const b of boxes) {
+      if (b.material !== MAT_FROID || b.forme) continue
+      // une boîte oblique : son cercle englobant
+      let x0 = b.minX
+      let y0 = b.minY
+      let x1 = b.maxX
+      let y1 = b.maxY
+      if (b.angle) {
+        const r = Math.hypot(x1 - x0, y1 - y0) / 2
+        const cx = (x0 + x1) / 2
+        const cy = (y0 + y1) / 2
+        x0 = cx - r
+        x1 = cx + r
+        y0 = cy - r
+        y1 = cy + r
+      }
+      const sx0 = Math.max(0, Math.floor(px(x0)) - 2)
+      const sy0 = Math.max(0, Math.floor(py(y0)) - 2)
+      const sx1 = Math.min(natW, Math.ceil(px(x1)) + 2)
+      const sy1 = Math.min(natH, Math.ceil(py(y1)) + 2)
+      if (sx1 <= sx0 || sy1 <= sy0) continue
+      gl.scissor(sx0, sy0, sx1 - sx0, sy1 - sy0)
+      gl.drawArrays(gl.TRIANGLES, 0, 3)
+    }
+    gl.disable(gl.SCISSOR_TEST)
+    gl.disable(gl.BLEND)
+    gl.uniform1f(cu['uPasseConduite'], 0)
+  }
+
+  private ensureSceneTarget(w: number, h: number): void {
+    if (w === this.sceneW && h === this.sceneH && this.sceneFbo) return
+    const gl = this.gl
+    if (this.sceneTex) gl.deleteTexture(this.sceneTex)
+    if (this.sceneFbo) gl.deleteFramebuffer(this.sceneFbo)
+    this.sceneW = w
+    this.sceneH = h
+    this.sceneTex = gl.createTexture()!
+    gl.bindTexture(gl.TEXTURE_2D, this.sceneTex)
+    gl.texStorage2D(gl.TEXTURE_2D, 1, gl.RGBA8, w, h)
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR)
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR)
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE)
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE)
+    this.sceneFbo = gl.createFramebuffer()!
+    gl.bindFramebuffer(gl.FRAMEBUFFER, this.sceneFbo)
+    gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, this.sceneTex, 0)
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null)
   }
 
   /** Les points de vie de l'image (render/vie.ts, remplitVie) : à poser
@@ -4641,7 +4787,7 @@ export class Renderer {
     gl.uniform2f(vu['uViewport'], viewportW, viewportH)
     gl.uniform1f(vu['uZoom'], camera.zoom)
     gl.uniform1f(vu['uDpr'], dpr)
-    gl.uniform2f(vu['uCanvasSize'], this.canvas.width, this.canvas.height)
+    gl.uniform2f(vu['uCanvasSize'], this.cibleW, this.cibleH)
     gl.uniform1f(vu['uThreshold'], params.fieldThreshold)
     gl.uniform1f(vu['uFieldScale'], this.fieldScale)
     gl.activeTexture(gl.TEXTURE0)
@@ -4859,8 +5005,8 @@ export class Renderer {
         gl.uniform1i(du['uField'], 1)
         gl.uniform2f(
           du['uCanvasSize'],
-          gl.drawingBufferWidth,
-          gl.drawingBufferHeight,
+          this.cibleW,
+          this.cibleH,
         )
         gl.uniform1f(du['uThreshold'], params.fieldThreshold)
         gl.uniform1f(du['uSoftness'], params.fieldSoftness)
@@ -4941,8 +5087,8 @@ export class Renderer {
         gl.uniform1i(du['uField'], 1)
         gl.uniform2f(
           du['uCanvasSize'],
-          gl.drawingBufferWidth,
-          gl.drawingBufferHeight,
+          this.cibleW,
+          this.cibleH,
         )
         gl.uniform1f(du['uThreshold'], params.fieldThreshold)
         gl.uniform1f(du['uSoftness'], params.fieldSoftness)

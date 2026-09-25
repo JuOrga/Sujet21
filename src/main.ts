@@ -17959,6 +17959,9 @@ function corpsImage(now: number): boolean {
   // l'échelle fixe choisie s'applique ici : seul le canvas est mis à
   // l'échelle, l'interface HTML reste à la netteté native
   const dpr = echelleRendue()
+  // LA CONDUITE NETTE : aux résolutions réduites, la conduite d'ammoniac se
+  // repasse à la densité native de l'écran (renderer.ts, drawConduiteNette)
+  renderer.dprNatif = Math.min(window.devicePixelRatio || 1, PLAFOND_DPR)
   // mesures brutes de CETTE image, pour le collecteur de performance
   let physRaw = 0
   let stepsFaits = 0
