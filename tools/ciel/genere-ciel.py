@@ -1,29 +1,32 @@
 #!/usr/bin/env python3
 """
-LA PLAQUE DE CIEL — fabrique le fond étoilé du jeu.
+LA PLAQUE DE CIEL — fabrique le fond du vide.
 
 POURQUOI UN OUTIL ET PAS UNE IMAGE POSÉE LÀ. Une plaque de ciel se règle :
-sa densité d'étoiles, la force de sa nébulosité, sa teinte, sa luminosité
-moyenne — laquelle doit rester BASSE, parce que le vide doit demeurer plus
-sombre que la cuve éclairée (sinon la hiérarchie lumineuse s'inverse et la
-scène se noie ; c'est écrit noir sur blanc dans le shader). Un outil rejoue
-la plaque avec un réglage de plus ; une image posée là ne se rejoue pas.
+sa densité d'étoiles, la force de sa Voie lactée, sa luminosité moyenne —
+laquelle doit rester BASSE, parce que le vide doit demeurer plus sombre que
+la cuve éclairée (sinon la hiérarchie lumineuse s'inverse et la scène se
+noie ; c'est écrit noir sur blanc dans le shader). Un outil rejoue la plaque
+avec un réglage de plus ; une image posée là ne se rejoue pas.
 
-CE QU'ELLE IMITE. Les grands champs profonds — la signature du télescope
-James Webb : un fond noir bleuté, des filaments de poussière chauds, un
-semis d'étoiles dont les plus vives portent SIX AIGRETTES (le miroir
-hexagonal de Webb les dessine ainsi), et de minuscules galaxies lointaines.
+CE QU'ELLE IMITE. Le ciel vu de l'espace, sans atmosphère : un noir franc,
+une BANDE LACTÉE qui le traverse en biais — une nuée d'étoiles trop
+nombreuses pour être séparées, déchirée par des lanes de poussière sombre —
+et, partout ailleurs, un semis clairsemé. Le premier tirage imitait un champ
+profond de Webb (nuages sarcelle et or, six aigrettes) : en jeu, il se lisait
+comme des TACHES DE PEINTURE molles, pas comme un ciel. Un vrai ciel tient
+presque tout entier dans ses étoiles ; le gaz n'y est qu'un voile.
 
-CE QU'ELLE N'EST PAS : une vraie photographie. Voir docs/ciel.md pour
-déposer une plaque authentique de Webb ou de Hubble à la place — le jeu
-prend celle qu'il trouve, sans une ligne de code à changer.
+CE QU'ELLE NE FAIT PLUS : porter seule les étoiles nettes. Le jeu montre
+environ deux texels par pixel au cadrage du hub ; une étoile d'un texel y est
+moyennée, donc pâlie et adoucie. Les étoiles NETTES sont dessinées par le
+shader, au pixel près, par-dessus (renderer.ts, `etoiles`). La plaque donne
+le fond : la Voie lactée, son grain, ses poussières.
 
-LES ÉTOILES SONT POSÉES EN DEUX FOIS, et c'est ce qui fait la ressemblance.
-Les dizaines de milliers d'étoiles faibles sont semées en points purs puis
-TOUTES floutées d'un coup par une convolution (une seule transformée de
-Fourier pour l'image entière) : c'est le même halo instrumental pour
-toutes, comme dans un vrai capteur. Les quelques centaines d'étoiles vives
-sont dessinées une à une, avec leur halo large et leurs aigrettes.
+ELLE EST PÉRIODIQUE PAR CONSTRUCTION : bruits tirés dans l'espace de Fourier,
+bande posée le long de la diagonale (u + v ne dépend que de sa valeur
+modulo 1), étoiles semées en coordonnées enroulées. Ses bords se raccordent,
+elle se répète sans couture.
 
     python3 tools/ciel/genere-ciel.py --taille 4096 --sortie public/assets/ciel.webp
 """
@@ -44,8 +47,7 @@ def bruit_periodique(n: int, beta: float, rng: np.random.Generator) -> np.ndarra
     Un champ de bruit fractal, PÉRIODIQUE par construction : du bruit blanc
     dont on pèse le spectre en 1/f^beta, puis retour dans l'espace image.
     Passer par Fourier n'est pas une coquetterie — c'est ce qui garantit que
-    les bords se raccordent, donc qu'on peut répéter la plaque si le monde
-    devient plus large que prévu, sans couture visible dans le noir.
+    les bords se raccordent, donc qu'on peut répéter la plaque sans couture.
     """
     blanc = rng.standard_normal((n, n)).astype(np.float32)
     spectre = np.fft.rfft2(blanc)
@@ -71,57 +73,59 @@ def deplace(champ: np.ndarray, dx: np.ndarray, dy: np.ndarray) -> np.ndarray:
     return champ[yi, xi]
 
 
+def floute(plan: np.ndarray, sigma: float) -> np.ndarray:
+    """Convolution gaussienne ENROULÉE, par Fourier : une transformée pour
+    l'image entière, et les bords se raccordent comme le reste."""
+    n = plan.shape[0]
+    ax = np.fft.fftfreq(n) * n
+    r2 = ax[:, None] ** 2 + ax[None, :] ** 2
+    psf = np.exp(-r2 / (2.0 * sigma**2)).astype(np.float32)
+    psf /= psf.sum()
+    pf = np.fft.rfft2(psf)
+    return np.fft.irfft2(np.fft.rfft2(plan) * pf, s=(n, n)).astype(np.float32)
+
+
 # --------------------------------------------------------------- étoiles ----
 
 
 def couleur_stellaire(t: np.ndarray) -> np.ndarray:
     """
-    La couleur d'une étoile suit sa température. On échelonne du bleu-blanc
-    des géantes chaudes à l'orange des naines froides, en passant par le
-    blanc : c'est cette DIVERSITÉ qui distingue un vrai champ d'un semis de
-    points blancs. t ∈ [0,1] : 0 = froid (orangé), 1 = chaud (bleuté).
+    La couleur d'une étoile suit sa température : de l'orangé des naines
+    froides au bleu-blanc des géantes chaudes, en passant par le blanc
+    jaunâtre du Soleil. Les teintes restent PÂLES — vues sans atmosphère,
+    les étoiles sont blanches à peine teintées ; des couleurs franches font
+    immédiatement « dessin ». t ∈ [0,1] : 0 = froid, 1 = chaud.
     """
-    froid = np.array([1.00, 0.72, 0.48], np.float32)
-    tiede = np.array([1.00, 0.94, 0.86], np.float32)
-    chaud = np.array([0.74, 0.83, 1.00], np.float32)
+    froid = np.array([1.00, 0.78, 0.58], np.float32)
+    tiede = np.array([1.00, 0.95, 0.88], np.float32)
+    chaud = np.array([0.78, 0.86, 1.00], np.float32)
     t = t[:, None]
     bas = froid + (tiede - froid) * np.clip(t * 2.0, 0, 1)
     haut = tiede + (chaud - tiede) * np.clip(t * 2.0 - 1.0, 0, 1)
     return np.where(t < 0.5, bas, haut).astype(np.float32)
 
 
-def magnitudes(n: int, rng: np.random.Generator) -> np.ndarray:
-    """
-    Le nombre d'étoiles croît vite quand on descend en éclat : beaucoup de
-    faibles, très peu de vives. Une loi de puissance rend ce déséquilibre —
-    sans lui, un ciel a l'air d'un semis de confettis tous pareils.
-    """
-    u = rng.random(n).astype(np.float32)
-    return (u ** 3.2).astype(np.float32)  # écrase vers le faible
-
-
-def aigrettes(
-    plan: np.ndarray, x: float, y: float, force: float, teinte: np.ndarray, portee: int
-) -> None:
-    """
-    LES SIX AIGRETTES DE WEBB. Le miroir du télescope est fait d'hexagones :
-    la lumière d'une étoile vive s'y diffracte en six branches à 60°, plus
-    deux horizontales plus faibles dues aux bras du support. C'est LA
-    signature visuelle de l'instrument — sans elle, l'image ne « dit » pas
-    Webb, quelle que soit la beauté du fond.
-    """
-    n = plan.shape[0]
-    branches = [(a, 1.0) for a in range(0, 360, 60)] + [(0, 0.35), (180, 0.35)]
-    for angle, poids in branches:
-        a = math.radians(angle)
-        ca, sa = math.cos(a), math.sin(a)
-        for r in range(1, portee):
-            f = force * poids * (1.0 - r / portee) ** 2.4
-            if f < 0.0015:
-                break
-            px = int(x + ca * r) % n
-            py = int(y + sa * r) % n
-            plan[py, px] += teinte * f
+def seme(
+    n: int,
+    nombre: int,
+    acceptation: np.ndarray,
+    rng: np.random.Generator,
+) -> tuple[np.ndarray, np.ndarray]:
+    """Tire `nombre` positions dont la densité suit `acceptation` (0..1) —
+    par rejet : on tire large, on garde selon la carte. C'est ce qui fait
+    que les étoiles s'ENTASSENT dans la bande lactée au lieu de s'y poser
+    au hasard comme partout ailleurs."""
+    xs_, ys_ = [], []
+    reste = nombre
+    while reste > 0:
+        lot = max(reste * 3, 1024)
+        x = rng.integers(0, n, lot)
+        y = rng.integers(0, n, lot)
+        garde = rng.random(lot) < acceptation[y, x]
+        xs_.append(x[garde][:reste])
+        ys_.append(y[garde][:reste])
+        reste -= len(xs_[-1])
+    return np.concatenate(xs_), np.concatenate(ys_)
 
 
 # ------------------------------------------------------------------ ciel ----
@@ -130,131 +134,137 @@ def aigrettes(
 def fabrique(taille: int, graine: int, densite: float, nebuleuse: float) -> np.ndarray:
     rng = np.random.default_rng(graine)
     n = taille
+    yy, xx = np.meshgrid(
+        np.arange(n, dtype=np.float32) / n,
+        np.arange(n, dtype=np.float32) / n,
+        indexing="ij",
+    )
 
-    # --- LA NÉBULOSITÉ : des FILAMENTS, pas des taches
-    # Un vrai champ profond n'a pas de nuages ronds : il a des veines, des
-    # crêtes, des fronts. Deux moyens l'obtiennent. Le bruit CRÊTÉ
-    # (1 - |2n-1|) transforme les creux en arêtes vives ; la DÉFORMATION du
-    # champ par deux autres bruits tord ces arêtes en volutes. Sans eux, on
-    # obtient un papier peint bleu — c'était le premier essai, et il ne
-    # ressemblait à rien.
+    # --- LA BANDE LACTÉE : le long de la diagonale, déformée
+    # u + v modulo 1 est périodique dans les deux sens : la bande se raccorde
+    # à elle-même d'un bord à l'autre. Sa ligne médiane ondule (un bruit très
+    # lent) pour ne pas se lire comme une règle posée sur le ciel.
+    ondule = (bruit_periodique(n, 3.2, rng) - 0.5) * 0.16
+    s = (xx + yy + ondule) % 1.0
+    d = np.abs(s - 0.5)  # 0 sur la ligne médiane, 0,5 au plus loin
+    coeur = np.exp(-((d / 0.075) ** 2))
+    bande = coeur * 0.70 + np.exp(-((d / 0.19) ** 2)) * 0.30
+
+    # les NUÉES : la bande n'est pas un tube lisse, c'est une suite de
+    # nuages d'étoiles plus ou moins riches
+    nuees = bruit_periodique(n, 2.3, rng)
+    nuees = np.clip((nuees - 0.25) / 0.6, 0, 1) ** 1.4
+    richesse = bande * (0.35 + 0.65 * nuees)
+
+    # --- LA POUSSIÈRE qui ABSORBE : des lanes, des filaments, des trous
+    # Le bruit CRÊTÉ (1 - |2n-1|) change les creux en arêtes ; la déformation
+    # par deux autres bruits tord ces arêtes en volutes. Elle ne mord que
+    # dans la bande : hors de la bande, il n'y a rien derrière à cacher.
     def crete(beta: float) -> np.ndarray:
         b = bruit_periodique(n, beta, rng)
         return 1.0 - np.abs(b * 2.0 - 1.0)
 
-    wx = (bruit_periodique(n, 2.7, rng) - 0.5) * (n * 0.10)
-    wy = (bruit_periodique(n, 2.7, rng) - 0.5) * (n * 0.10)
-    grand = deplace(crete(2.5), wx, wy)
-    moyen = deplace(crete(2.1), wx * 0.45, wy * 0.45)
-    fin = crete(1.75)
-    voile = grand * 0.52 + moyen * 0.32 + fin * 0.16
-    voile = (voile - voile.min()) / max(1e-6, float(voile.max() - voile.min()))
-    # LE SEUIL EST HAUT, ET C'EST VOULU : le vide occupe les trois quarts de
-    # la plaque. Une nébuleuse partout n'est pas un ciel, et surtout elle
-    # noierait la cuve éclairée — la hiérarchie lumineuse du jeu en dépend.
-    voile = np.clip((voile - 0.56) / 0.44, 0, 1) ** 2.1
+    wx = (bruit_periodique(n, 2.8, rng) - 0.5) * (n * 0.06)
+    wy = (bruit_periodique(n, 2.8, rng) - 0.5) * (n * 0.06)
+    lanes = deplace(crete(2.1) * 0.5 + crete(1.7) * 0.5, wx, wy)
+    lanes = np.clip((lanes - 0.50) / 0.42, 0, 1) ** 1.2
+    absorbe = np.clip(lanes * (0.35 + 0.9 * coeur), 0, 0.93)
+    transmis = 1.0 - absorbe
 
-    # --- LA POUSSIÈRE qui ABSORBE : les veines noires d'un vrai champ
-    poussiere = deplace(crete(2.4), wy * 0.7, -wx * 0.7)
-    absorbe = np.clip((poussiere - 0.52) / 0.48, 0, 1) ** 1.1
+    # --- LA LUEUR DIFFUSE : ce qu'on voit des milliards d'étoiles qu'on ne
+    # sépare pas. Chaude au cœur (vieilles étoiles), plus froide sur les
+    # flancs. Très basse : c'est un voile, pas un nuage.
+    tc = np.clip(coeur * 1.4, 0, 1)[..., None]
+    teinte = np.array([0.62, 0.70, 0.95], np.float32) * (1 - tc) + np.array(
+        [1.00, 0.86, 0.66], np.float32
+    ) * tc
+    lueur = floute(richesse, 3.0)[..., None] * teinte * 0.085 * nebuleuse
 
-    # --- LA COULEUR : noir bleuté, sarcelle, or — la palette des composites
-    # en infrarouge proche. Le fond part de PRESQUE RIEN : c'est le noir qui
-    # fait ressortir les étoiles, pas la couleur.
-    nuit = np.array([0.0007, 0.0011, 0.0026], np.float32)
-    sarcelle = np.array([0.026, 0.115, 0.150], np.float32)
-    orge = np.array([0.300, 0.150, 0.052], np.float32)
-    v = voile[..., None]
-    froid = nuit + (sarcelle - nuit) * np.clip(v * 2.3, 0, 1)
-    chaud = sarcelle + (orge - sarcelle) * np.clip(v * 2.3 - 1.0, 0, 1)
-    ciel = np.where(v < 0.435, froid, chaud).astype(np.float32)
-    ciel *= nebuleuse
-    ciel *= (1.0 - 0.80 * absorbe)[..., None]
-    ciel += nuit  # le fond du vide, et rien de plus
+    # quelques régions d'ÉMISSION (rose de l'hydrogène) et de RÉFLEXION
+    # (bleu), rares, collées à la bande — ce sont elles qui font « vrai »,
+    # à condition de rester à peine au-dessus du noir
+    def poches(seuil: float) -> np.ndarray:
+        b = bruit_periodique(n, 2.4, rng)
+        return np.clip((b - seuil) / (1.0 - seuil), 0, 1) ** 1.6
 
-    # --- LES ÉTOILES FAIBLES : semées en points purs, floutées EN UNE FOIS
-    nb = int(n * n * 4.5e-3 * densite)
-    xs = rng.integers(0, n, nb)
-    ys = rng.integers(0, n, nb)
-    ecl = magnitudes(nb, rng) * 0.85 + 0.015
+    rose = poches(0.70) * bande
+    bleu = poches(0.72) * bande
+    fils = deplace(crete(1.8), wx * 0.5, wy * 0.5) ** 3  # des filaments dedans
+    lueur += (rose * (0.4 + 0.6 * fils))[..., None] * np.array(
+        [0.100, 0.022, 0.034], np.float32
+    ) * nebuleuse
+    lueur += (bleu * (0.5 + 0.5 * fils))[..., None] * np.array(
+        [0.016, 0.030, 0.070], np.float32
+    ) * nebuleuse
+
+    # --- LE GRAIN DE LA BANDE : des centaines de milliers d'étoiles d'un
+    # texel, semées selon la richesse, puis floutées ensemble par un même
+    # halo instrumental — comme dans un vrai capteur
+    accept = np.clip(0.015 + 0.985 * richesse**0.8, 0, 1).astype(np.float32)
+    nb = int(n * n * 0.040 * densite)
+    xs, ys = seme(n, nb, accept, rng)
+    ecl = (rng.random(nb).astype(np.float32) ** 4.0) * 0.55 + 0.03
     col = couleur_stellaire(rng.random(nb).astype(np.float32))
-    semis = np.zeros((n, n, 3), np.float32)
-    np.add.at(semis, (ys, xs), col * ecl[:, None])
-
-    # le halo instrumental, identique pour toutes : une gaussienne étroite
-    # appliquée par convolution — une transformée pour l'image entière
-    ax = np.fft.fftfreq(n) * n
-    r2 = ax[:, None] ** 2 + ax[None, :] ** 2
-    psf = np.exp(-r2 / (2.0 * 0.62**2)).astype(np.float32)
-    # L'AILE LARGE RESTE MINCE. Chaque étoile faible en porte une ; à
-    # soixante-dix mille étoiles, la somme de ces ailes fait un VOILE
-    # laiteux qui mange le noir — le ciel paraît alors embué plutôt que
-    # profond. C'est le défaut qu'on voyait en jeu au deuxième essai.
-    psf += 0.010 * np.exp(-r2 / (2.0 * 1.9**2))
-    psf /= psf.sum()
-    pf = np.fft.rfft2(psf)
+    grain = np.zeros((n, n, 3), np.float32)
+    np.add.at(grain, (ys, xs), col * ecl[:, None])
     for c in range(3):
-        semis[..., c] = np.fft.irfft2(np.fft.rfft2(semis[..., c]) * pf, s=(n, n))
-    ciel += np.clip(semis, 0, None) * 1.75
+        grain[..., c] = floute(grain[..., c], 0.60)
 
-    # --- LES ÉTOILES VIVES : une à une, avec halo large et aigrettes
-    nbv = max(48, int(n * n * 4.0e-5 * densite))
-    for _ in range(nbv):
-        x = float(rng.integers(0, n))
-        y = float(rng.integers(0, n))
-        f = float(rng.random() ** 2.0) * 1.5 + 0.35
-        teinte = couleur_stellaire(rng.random(1).astype(np.float32))[0]
-        # LA TAILLE DES HALOS SE JUGE EN JEU, pas sur la plaque. À 0,006
-        # la plaque était superbe vue de près et se couvrait, une fois dans
-        # le vide du hub, de grosses taches molles — le jeu montre environ
-        # un texel par pixel, donc un halo de quarante texels fait une
-        # tache de quarante pixels à l'écran. Divisé par deux et demi.
-        portee = int(n * 0.0024 * (0.5 + f))
-        aigrettes(ciel, x, y, f * 0.16, teinte, max(6, portee))
-        # LE CŒUR ET SON HALO. Le halo large se dessine sur un carré, et
-        # c'est un piège : tronqué net, il laisse une BOÎTE visible autour
-        # de chaque étoile vive — le premier essai en était constellé. On
-        # étale donc le carré bien au-delà du halo, et on l'éteint par une
-        # fenêtre radiale qui atteint zéro AVANT le bord.
-        r = max(5, int(portee * 0.75))
-        yy, xx = np.mgrid[-r : r + 1, -r : r + 1]
-        d2 = (xx * xx + yy * yy).astype(np.float32)
-        sig = r * 0.13
-        noyau = np.exp(-d2 / (2.0 * sig**2)) + 0.16 * np.exp(
-            -d2 / (2.0 * (sig * 2.7) ** 2)
-        )
+    # --- LES ÉTOILES DU CHAMP, un peu plus vives, partout
+    # Le nombre croît vite quand l'éclat baisse (loi de puissance) : beaucoup
+    # de faibles, très peu de vives — sans ce déséquilibre, le ciel a l'air
+    # d'un semis de confettis tous pareils.
+    nbc = int(n * n * 0.0022 * densite)
+    xs, ys = seme(n, nbc, np.clip(0.18 + 0.82 * bande, 0, 1).astype(np.float32), rng)
+    ecl = (rng.random(nbc).astype(np.float32) ** 5.0) * 2.2 + 0.08
+    col = couleur_stellaire(rng.random(nbc).astype(np.float32))
+    champ = np.zeros((n, n, 3), np.float32)
+    np.add.at(champ, (ys, xs), col * ecl[:, None])
+    for c in range(3):
+        champ[..., c] = floute(champ[..., c], 0.70)
+
+    # la poussière éteint ce qui est DERRIÈRE elle : la lueur et le grain
+    # (les étoiles lointaines de la bande) ; les étoiles du champ sont pour
+    # la plupart devant, elle ne les voile qu'à moitié
+    ciel = (lueur + grain * 1.6) * transmis[..., None]
+    ciel += champ * (1.0 - 0.5 * absorbe)[..., None]
+
+    # --- QUELQUES ÉTOILES VIVES, avec un halo doux — et PAS d'aigrettes :
+    # l'œil nu n'en voit pas, et les six branches de Webb disaient
+    # « photographie » plutôt que « fenêtre »
+    for _ in range(max(24, int(n * n * 3.0e-6 * densite))):
+        x = int(rng.integers(0, n))
+        y = int(rng.integers(0, n))
+        f = float(rng.random() ** 2.5) * 1.6 + 0.5
+        t = couleur_stellaire(rng.random(1).astype(np.float32))[0]
+        r = 9
+        yy_, xx_ = np.mgrid[-r : r + 1, -r : r + 1]
+        d2 = (xx_ * xx_ + yy_ * yy_).astype(np.float32)
+        noyau = np.exp(-d2 / (2.0 * 0.85**2)) + 0.05 * np.exp(-d2 / (2.0 * 2.6**2))
+        # la fenêtre radiale éteint le halo AVANT le bord du carré : tronqué
+        # net, il laissait une BOÎTE visible autour de chaque étoile vive
         noyau *= np.clip(1.0 - np.sqrt(d2) / r, 0.0, 1.0) ** 2
-        yi = (np.arange(-r, r + 1) + int(y)) % n
-        xi = (np.arange(-r, r + 1) + int(x)) % n
-        ciel[np.ix_(yi, xi)] += (noyau * f)[..., None] * teinte
+        yi = (np.arange(-r, r + 1) + y) % n
+        xi = (np.arange(-r, r + 1) + x) % n
+        ciel[np.ix_(yi, xi)] += (noyau * f)[..., None] * t
 
-    # --- LES GALAXIES LOINTAINES : la signature d'un champ PROFOND
-    for _ in range(max(10, int(n * n * 2.2e-6))):
-        x, y = int(rng.integers(0, n)), int(rng.integers(0, n))
-        r = int(rng.integers(3, max(5, int(n * 0.0022))))
-        ang = rng.random() * math.pi
-        allonge = 0.28 + rng.random() * 0.55
-        yy, xx = np.mgrid[-r * 2 : r * 2 + 1, -r * 2 : r * 2 + 1]
-        u = xx * math.cos(ang) + yy * math.sin(ang)
-        w = (-xx * math.sin(ang) + yy * math.cos(ang)) / allonge
-        g = np.exp(-(u * u + w * w) / (2.0 * (r * 0.5) ** 2)).astype(np.float32)
-        t = couleur_stellaire(np.array([rng.random() * 0.45], np.float32))[0]
-        yi = (np.arange(-r * 2, r * 2 + 1) + y) % n
-        xi = (np.arange(-r * 2, r * 2 + 1) + x) % n
-        ciel[np.ix_(yi, xi)] += g[..., None] * t * (0.05 + rng.random() * 0.10)
-
+    # le fond du vide : presque rien, un soupçon de bleu
+    ciel += np.array([0.0006, 0.0008, 0.0016], np.float32)
     return ciel
 
 
-def encode(ciel: np.ndarray) -> Image.Image:
+def encode(ciel: np.ndarray, rng: np.random.Generator) -> Image.Image:
     """
     Le passage en octets. La compression douce (racine) rend au sombre la
     place qu'il mérite : sans elle, huit bits par canal écrasent tout le
     dégradé du vide en deux ou trois valeurs, et le fond se strie en bandes.
+    Un TRAMAGE d'un demi-niveau finit le travail : la lueur de la bande est
+    si faible que, même en racine, ses fondus tombent sur quelques valeurs.
     """
     x = np.clip(ciel, 0.0, 1.0)
-    x = x ** (1.0 / 2.2)
-    return Image.fromarray((x * 255.0 + 0.5).astype(np.uint8), "RGB")
+    x = x ** (1.0 / 2.2) * 255.0
+    x += rng.random(x.shape, dtype=np.float32) - 0.5
+    return Image.fromarray(np.clip(x + 0.5, 0, 255).astype(np.uint8), "RGB")
 
 
 def main() -> None:
@@ -263,12 +273,12 @@ def main() -> None:
     p.add_argument("--graine", type=int, default=21)
     p.add_argument("--densite", type=float, default=1.0)
     p.add_argument("--nebuleuse", type=float, default=1.0)
-    p.add_argument("--qualite", type=int, default=88)
+    p.add_argument("--qualite", type=int, default=80)
     p.add_argument("--sortie", default="public/assets/ciel.webp")
     a = p.parse_args()
 
     ciel = fabrique(a.taille, a.graine, a.densite, a.nebuleuse)
-    img = encode(ciel)
+    img = encode(ciel, np.random.default_rng(a.graine + 1))
     img.save(a.sortie, "WEBP", quality=a.qualite, method=6)
     import os
 
