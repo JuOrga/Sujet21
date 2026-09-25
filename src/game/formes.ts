@@ -128,6 +128,7 @@ export interface FormeBox {
   p1?: number // ARC : demi-ouverture en degrés
   p2?: number // ARC : bouts (0 arrondis, 1 droits, 2 en pointe)
   coupe?: Coupe // un demi-plan qui tronque la forme (monde, hors rotation)
+  sens?: number // CONDUITE : le sens du tuyau (SENS_AUTO, _HORIZONTAL, _VERTICAL)
 }
 
 export interface FormeContact {
@@ -231,6 +232,19 @@ export const CONDUITE_ATLAS = {
   givre: [384, 720, 608, 304],
 } as const
 
+/** LE SENS du tuyau (ObstacleBox.sens) : 0 auto — le long du grand côté —,
+ *  1 horizontal, 2 vertical. JUMEAU de conduiteHoriz dans le shader. */
+export const SENS_AUTO = 0
+export const SENS_HORIZONTAL = 1
+export const SENS_VERTICAL = 2
+export const SENS_NOMS = ['Auto (grand côté)', 'Horizontal', 'Vertical']
+
+export function conduiteHoriz(w: number, h: number, sens?: number): boolean {
+  if (sens === SENS_HORIZONTAL) return true
+  if (sens === SENS_VERTICAL) return false
+  return w >= h
+}
+
 /** Une conduite est LONGUE si ses deux pièces de bout y tiennent ; sinon,
  *  c'est un plot : un seul joint au milieu. */
 export function conduiteLongue(L: number, T: number): boolean {
@@ -270,12 +284,12 @@ export function piecesConduite(L: number, T: number): [number, number, number][]
 function conduiteContactAxe(
   x: number,
   y: number,
-  b: { minX: number; minY: number; maxX: number; maxY: number },
+  b: { minX: number; minY: number; maxX: number; maxY: number; sens?: number },
   out: FormeContact,
 ): void {
   const w = b.maxX - b.minX
   const h = b.maxY - b.minY
-  const horiz = w >= h
+  const horiz = conduiteHoriz(w, h, b.sens)
   const L = horiz ? w : h
   const T = horiz ? h : w
   const px = x - (b.minX + b.maxX) / 2

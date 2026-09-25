@@ -11,6 +11,7 @@ import {
   LAMPE_HAUTEUR_MAX,
   LAMPE_HAUTEUR_MIN,
   lampeCouleurRVB,
+  MAT_FROID,
   zonePhases,
 } from '../game/level'
 import type { DecalDef, LumiereDef, ObstacleBox, ZoneDef } from '../game/level'
@@ -207,10 +208,18 @@ float conduiteSdfLocal(float s, float t, float L, float T) {
   return d;
 }
 
-float conduiteSdf(vec2 p, vec4 box) {
+// le sens du tuyau : 0 auto (le grand côté), 1 horizontal, 2 vertical —
+// JUMEAU de conduiteHoriz (formes.ts)
+bool conduiteHoriz(vec2 sz, float sens) {
+  if (sens > 0.5 && sens < 1.5) return true;
+  if (sens > 1.5) return false;
+  return sz.x >= sz.y;
+}
+
+float conduiteSdf(vec2 p, vec4 box, float sens) {
   vec2 sz = box.zw - box.xy;
   vec2 q = p - 0.5 * (box.xy + box.zw);
-  bool horiz = sz.x >= sz.y;
+  bool horiz = conduiteHoriz(sz, sens);
   return conduiteSdfLocal(horiz ? q.x : q.y, horiz ? q.y : q.x,
                           horiz ? sz.x : sz.y, horiz ? sz.y : sz.x);
 }
@@ -707,16 +716,16 @@ vec4 cnSur(vec4 dessous, vec4 dessus) {
 // PARTOUT autour d'elle depuis sa forme, pas seulement dans sa boîte : les
 // brides touchent le bord de la boîte, leur ombre coupée net au bord
 // redessinait le rectangle.
-float conduiteOmbre(vec2 p, vec4 box) {
+float conduiteOmbre(vec2 p, vec4 box, float sens) {
   vec2 sz = box.zw - box.xy;
-  float T = min(sz.x, sz.y);
-  return mix(0.45, 1.0, smoothstep(0.0, 3.0 + 0.12 * T, conduiteSdf(p, box)));
+  float T = conduiteHoriz(sz, sens) ? sz.y : sz.x;
+  return mix(0.45, 1.0, smoothstep(0.0, 3.0 + 0.12 * T, conduiteSdf(p, box, sens)));
 }
 
 // Rend la conduite SEULE, en couleur prémultipliée (rgb) et couverture
 // (a) : autour d'elle, on voit le sol de la salle.
-vec4 conduiteNH3(vec2 loc, vec2 bsize, float px) {
-  bool horiz = bsize.x >= bsize.y;
+vec4 conduiteNH3(vec2 loc, vec2 bsize, float px, float sens) {
+  bool horiz = conduiteHoriz(bsize, sens);
   float L = horiz ? bsize.x : bsize.y;
   float T = horiz ? bsize.y : bsize.x;
   float s = (horiz ? loc.x : loc.y) - L * 0.5; // le long, centré
@@ -1975,15 +1984,16 @@ void main() {
       // ce qui se pose sur le SOL (givre, ombre, brume) ne se peint jamais
       // sur un AUTRE solide (la brume délavait la conduite voisine)
       float surSol = (iCouv == bi || dCouv > 0.0) ? 1.0 : 0.0;
-      float dG = conduiteSdf(wb, uBoxes[bi]);
+      float sensC = uBoxAux[bi].z; // le sens du tuyau (aux.z d'une plaque froide)
+      float dG = conduiteSdf(wb, uBoxes[bi], sensC);
       // LE SOL CRISTALLISÉ dans l'aire d'effet — là où le solveur gèle l'eau
       vec2 gsol = givreSol(wb, max(dG, 0.0), uColdBand, pxMonde);
       col = mix(col, vec3(0.80, 0.90, 0.98) * eclMat, gsol.x * 0.25 * surSol);
       col += vec3(0.75, 0.88, 1.0) * gsol.y * 0.30 * surSol;
       // l'ombre au sol, PARTOUT autour de la conduite (coupée au bord de la
       // boîte, elle redessinait le rectangle)
-      col *= mix(1.0, conduiteOmbre(wb, uBoxes[bi]), surSol);
-      vec4 cnh = conduiteNH3(clamp(wbV - bmin, vec2(0.0), bsize), bsize, pxMonde);
+      col *= mix(1.0, conduiteOmbre(wb, uBoxes[bi], sensC), surSol);
+      vec4 cnh = conduiteNH3(clamp(wbV - bmin, vec2(0.0), bsize), bsize, pxMonde, sensC);
       col = col * (1.0 - fill * cnh.a) + cnh.rgb * eclMat * fill;
       float hors = (1.0 - fill * cnh.a) * surSol;
       col += brumeNH3(wb, max(dG, 0.0), uColdBand) * hors * (dG > 0.0 ? 1.0 : 0.6);
@@ -2778,7 +2788,7 @@ float sceneSdf(vec2 p, float alt) {
     // même union que la physique (conduite.ts). L'ombre carrée trahissait
     // le bloc que le dessin (conduiteNH3) s'applique à cacher.
     if (dec.x > 3.5 && dec.x < 4.5 && dec.y < 0.5) {
-      d = min(d, conduiteSdf(wb, uBoxes[i]));
+      d = min(d, conduiteSdf(wb, uBoxes[i], uBoxAux[i].z));
       continue;
     }
     d = min(d, formeSdf(wb, uBoxes[i], dec.y, dec.z, dec.w));
@@ -4189,9 +4199,16 @@ export class Renderer {
       this.auxScratch[k * 4] = bx.material + forme * 16 + q0 * 128 + q1 * 16384
       this.auxScratch[k * 4 + 1] = ((bx.angle ?? 0) * Math.PI) / 180
       // aux.z : charge du surchauffeur (le solveur dit lesquels sont vides)
-      // — ou HABILLAGE d'une paroi neutre (1-4), pur décor
+      // — ou HABILLAGE d'une paroi neutre (1-4), pur décor — ou SENS du
+      // tuyau d'une plaque froide (0 auto, 1 horizontal, 2 vertical)
       this.auxScratch[k * 4 + 2] =
-        bx.material === 0 ? (bx.skin ?? 0) : sim.surchauffesVides.has(i) ? 0 : 1
+        bx.material === 0
+          ? (bx.skin ?? 0)
+          : bx.material === MAT_FROID
+            ? (bx.sens ?? 0)
+            : sim.surchauffesVides.has(i)
+              ? 0
+              : 1
       this.auxScratch[k * 4 + 3] = bx.aura ?? 1
     }
     // La carte de lumière recuit si le décor ou les lampes ont changé

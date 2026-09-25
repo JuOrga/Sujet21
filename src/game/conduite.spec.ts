@@ -3,6 +3,9 @@ import { formePhysique } from './conduite'
 import {
   CONDUITE,
   CONDUITE_ATLAS,
+  SENS_HORIZONTAL,
+  SENS_VERTICAL,
+  conduiteHoriz,
   FORME_CONDUITE,
   FORME_DISQUE,
   conduiteLongue,
@@ -76,6 +79,21 @@ describe('conduite — forme physique', () => {
     const s = 670 - ((CONDUITE.brideDe + CONDUITE.brideA) / 2) * 60
     expect(contact(b, s, 58).dist).toBeLessThan(0)
     expect(contact(b, s, 63).dist).toBeCloseTo(3, 9)
+  })
+
+  // LE SENS CHOISI à l'éditeur : un plot presque carré se couche ou se
+  // dresse, et sa collision le suit — le diamètre est l'AUTRE côté.
+  it('le sens imposé couche ou dresse le tuyau, collision comprise', () => {
+    const plot = box(0, 0, 100, 120, MAT_FROID) // auto : debout (120 > 100)
+    // hors du joint central (qui tient ±0,322·T autour du milieu)
+    const flanc = (b: ObstacleBox) => contact(b, 50 + CONDUITE.tuyau * 100 + 4, 105)
+    // debout, le tuyau a 100 de large : son flanc droit est à 50 + 0,28·100
+    expect(flanc(plot).dist).toBeCloseTo(4, 9)
+    expect(flanc({ ...plot, sens: SENS_VERTICAL }).dist).toBeCloseTo(4, 9)
+    // couché, il a 120 de diamètre et remplit la largeur : ce point est dedans
+    expect(flanc({ ...plot, sens: SENS_HORIZONTAL }).dist).toBeLessThan(0)
+    expect(conduiteHoriz(100, 120)).toBe(false)
+    expect(conduiteHoriz(100, 120, SENS_HORIZONTAL)).toBe(true)
   })
 
   it('un bloc debout se lit dans son sens long', () => {
