@@ -160,6 +160,10 @@
       }
       canvas#glcanvas {
         display: block;
+        /* positionnée : peinte PAR-DESSUS le calque de ciel qui la précède
+           dans #app (render/cielCalque.ts) — la toile est transparente dans
+           le vide */
+        position: relative;
         width: 100%;
         height: 100%;
         touch-action: none;
@@ -8029,9 +8033,16 @@
         animation: mb-tourne 5s linear infinite;
       }
       @keyframes mb-tourne { to { transform: rotate(360deg); } }
+      /* le NOM du rang (SUPERFLUIDE… FIGÉ) : un mot, plus une lettre. Michroma
+         est large (~1 em par lettre, espacement compris) : la taille se
+         règle sur le nombre de lettres (--mb-nom-n, posé par main.ts) pour
+         que le mot tienne dans la largeur utile du disque (--mb-nom-l) —
+         FIGÉ s'affiche en grand, SUPERFLUIDE sans déborder de l'anneau */
       .mb-rang-lettre {
         position: relative; font-family: var(--font-display); font-weight: 600;
-        font-size: calc(76px * var(--ui)); line-height: 1; color: var(--mb-rang);
+        font-size: min(calc(26px * var(--ui)), calc(var(--mb-nom-l, 136px) / var(--mb-nom-n, 6)));
+        line-height: 1; color: var(--mb-rang);
+        letter-spacing: 0.04em; white-space: nowrap;
         text-shadow:
           0 0 16px color-mix(in srgb, var(--mb-rang) 75%, transparent),
           0 0 46px color-mix(in srgb, var(--mb-rang) 40%, transparent);
@@ -8222,9 +8233,19 @@
         border: 1px solid rgba(150, 200, 235, 0.12); border-radius: 10px;
         background: rgba(10, 18, 30, 0.72);
       }
-      .mb-scene.mb-compact .mb-rang { width: 56px; height: 56px; }
-      .mb-scene.mb-compact .mb-rang::before { inset: 5px; }
-      .mb-scene.mb-compact .mb-rang-lettre { font-size: calc(26px * var(--ui)); animation: none; }
+      /* repliée, la médaille s'allonge en pastille : un mot ne tient pas
+         dans un disque de 56 px */
+      .mb-scene.mb-compact .mb-rang { width: 120px; height: 40px; }
+      .mb-scene.mb-compact .mb-rang::before { inset: 4px; border-radius: 999px; }
+      /* l'anneau suit la pastille, et cesse de TOURNER : dessiné pour un
+         disque, il devenait sur 120 × 40 une ellipse en rotation qui
+         balayait ~40 px au-dessus et au-dessous, sur le titre et les litres */
+      .mb-scene.mb-compact .mb-rang-anneau {
+        animation: none; border-radius: 999px; background: none;
+        -webkit-mask: none; mask: none;
+        border: 2px solid color-mix(in srgb, var(--mb-rang) 80%, transparent);
+      }
+      .mb-scene.mb-compact .mb-rang-lettre { --mb-nom-l: 100px; animation: none; }
       .mb-scene.mb-compact .mb-rang-mot,
       .mb-scene.mb-compact .mb-etoiles,
       .mb-scene.mb-compact .mb-flacon,
@@ -8565,6 +8586,10 @@
         font-style: normal; font-size: calc(10px * var(--ui)); letter-spacing: 0.14em; color: #7f9cb0;
       }
       .mb-ev-pari { color: var(--mb-or, #ffd977); }
+      /* le détail d'une offre jamais prise : voilé, il se devine sans se lire */
+      /* .mb-carte devant : « .mb-carte small » (déclarée plus haut) était plus
+         spécifique, et le voile gardait la couleur d'un détail connu */
+      .mb-carte .mb-ev-voile { font-style: italic; color: #6f8799; letter-spacing: 0.04em; }
       /* l'alcôve de repos : trois offres, l'icône en tête */
       .mb-carte.mb-repos { min-height: 170px; justify-content: center; gap: 8px; }
       .mb-repos-icone { font-style: normal; font-size: calc(30px * var(--ui)); line-height: 1; }
@@ -8947,7 +8972,7 @@
         .mb-scene { padding: 10px 12px 14px; gap: 10px; }
         .mb-releve { grid-template-columns: 1fr; justify-items: center; gap: 8px; }
         .mb-rang { width: 136px; height: 136px; }
-        .mb-rang-lettre { font-size: calc(60px * var(--ui)); }
+        .mb-rang-lettre { --mb-nom-l: 104px; }
         .mb-corps { grid-template-columns: 1fr; width: 100%; }
         .mb-haut { grid-row: auto; justify-content: center; }
         .mb-litres b { font-size: calc(32px * var(--ui)); }
@@ -8969,7 +8994,7 @@
       @media (max-height: 820px) and (min-width: 761px) {
         .mb-scene { gap: 10px; padding-top: 8px; }
         .mb-rang { width: 140px; height: 140px; }
-        .mb-rang-lettre { font-size: calc(62px * var(--ui)); }
+        .mb-rang-lettre { --mb-nom-l: 108px; }
         .mb-flacon { width: 56px; height: 100px; flex-basis: 56px; }
         .mb-litres b { font-size: calc(32px * var(--ui)); }
         .mb-pli, .mb-pli .crt-draft { min-height: 160px; }
@@ -10429,6 +10454,16 @@
             restent nets dans tous les cas ; la physique n'est jamais dégradée.
           </div>
           <div id="params-resdyn" class="params-choix" role="group" aria-label="Résolution de rendu"></div>
+          <div class="params-nom" style="margin-top: 16px">NETTETÉ DU DÉCOR</div>
+          <div class="params-desc">
+            Suit la résolution (défaut) : le décor s'allège avec elle, sauf les
+            conduites d'ammoniac, toujours nettes. Toujours net : la résolution
+            ne touche plus que le VOLUME — l'eau, le givre, la vapeur — et les
+            textures restent à la netteté de l'écran ; mais c'est le décor qui
+            coûte le plus, la cadence redevient alors proche de la résolution
+            élevée. Sans effet en résolution élevée.
+          </div>
+          <div id="params-decornet" class="params-choix" role="group" aria-label="Netteté du décor"></div>
           <div class="params-nom" style="margin-top: 16px">GRAPHISMES DU DÉCOR</div>
           <div class="params-desc">
             Riches (défaut) : le décor vit — veilleuses, caustiques, brumes
@@ -10450,13 +10485,16 @@
           <div id="params-voile" class="params-choix" role="group" aria-label="Le voile des cachettes"></div>
           <div class="params-nom" style="margin-top: 16px">LE CIEL DU DEHORS</div>
           <div class="params-desc">
-            Le fond du vide, derrière la station. PLAQUE (défaut) : un champ
-            profond de 4096 × 4096 — poussières, filaments, milliers d'étoiles
-            dont les plus vives portent les six aigrettes d'un miroir
-            hexagonal. Elle ne se télécharge qu'à son premier affichage
-            (0,6 Mo) et occupe de la mémoire graphique ; si l'appareil peine,
-            TUILE reprend l'ancien fond, et PROCÉDURAL ne charge rien du tout
-            — le vide est alors entièrement calculé.
+            Le fond du vide, derrière la station. PLAQUE (défaut) : le centre
+            de la Voie lactée, une vraie photographie, et des milliers
+            d'étoiles — toujours à la pleine définition de l'écran, quelle que
+            soit la résolution de rendu choisie plus haut, et sans calcul :
+            c'est le navigateur qui la compose. Elle ne se télécharge qu'à son
+            premier affichage (1,4 Mo). TUILE reprend l'ancien fond, et
+            PROCÉDURAL ne charge rien du tout — le vide est alors entièrement
+            calculé.
+            <br />Photographie : ESO/S. Brunier, « The Milky Way Panorama »
+            (GigaGalaxy Zoom), licence CC BY 4.0.
           </div>
           <div id="params-ciel" class="params-choix" role="group" aria-label="Le ciel du dehors"></div>
           <div class="params-nom" style="margin-top: 16px">RELIEF DES PAROIS</div>
@@ -10728,7 +10766,7 @@
         <section class="mb-releve" id="mb-releve">
           <div class="mb-rang" id="mb-rang" hidden>
             <span class="mb-rang-anneau" aria-hidden="true"></span>
-            <b class="mb-rang-lettre" id="mb-rang-lettre">S</b>
+            <b class="mb-rang-lettre" id="mb-rang-lettre">SUPERFLUIDE</b>
             <i class="mb-rang-mot" id="mb-rang-mot">IMPECCABLE</i>
             <span class="mb-etoiles" id="mb-etoiles" aria-hidden="true"></span>
           </div>

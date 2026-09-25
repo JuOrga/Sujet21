@@ -147,6 +147,17 @@ describe('Records — les registres du labo', () => {
     expect(r.decouvertesVues()).toEqual(['livraison', 'cahier-charges'])
   })
 
+  it('les OFFRES ESSAYÉES : gravure idempotente, et elles survivent au rechargement', () => {
+    const st = memoryStorage()
+    const r = new Records(st)
+    expect(r.offreEssayee('decanteur:SE DÉCANTER')).toBe(false)
+    expect(r.noteOffreEssayee('decanteur:SE DÉCANTER')).toBe(true)
+    expect(r.noteOffreEssayee('decanteur:SE DÉCANTER')).toBe(false)
+    // l'offre voisine, écartée, reste voilée
+    expect(r.offreEssayee('decanteur:Y LAISSER PLUS')).toBe(false)
+    expect(new Records(st).offreEssayee('decanteur:SE DÉCANTER')).toBe(true)
+  })
+
   it('verrous du cycle : pose et levée idempotentes (pour le scénario)', () => {
     const r = new Records(memoryStorage())
     r.poseVerrouCycle('solidification')
@@ -166,6 +177,8 @@ describe('Records — les registres du labo', () => {
     const r = new Records(st)
     expect(r.reparationsFaites()).toEqual([])
     expect(r.decouvertesVues()).toEqual([])
+    expect(r.offreEssayee('decanteur:SE DÉCANTER')).toBe(false)
+    expect(r.noteOffreEssayee('decanteur:SE DÉCANTER')).toBe(true)
     expect(r.repare('eclairage', 0)).toBe(true) // et les accès écrivent sans casser
   })
 

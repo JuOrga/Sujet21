@@ -17,6 +17,13 @@ export const FORME_ARC = 4 // arc d'anneau centré (p0 = épaisseur 0..1, p1 = d
 // d'OUVERTURES centrées sur les côtés qu'on désigne. Épaisse au point de se
 // refermer, elle devient un octogone PLEIN — c'est la même forme, remplie.
 export const FORME_COQUE = 5
+// LA CONDUITE D'AMMONIAC (plaque froide) : un tuyau givré, ses brides de
+// bout et ses joints — l'UNION des rectangles que dessine l'atlas (voir
+// CONDUITE plus bas). Jamais choisie à l'éditeur ni sérialisée : conduite.ts
+// la pose sur toute plaque froide rectangulaire au chargement, pour que la
+// collision soit EXACTEMENT ce que l'on voit — ni la boîte (des coins durs
+// sur du sol visible), ni une pilule (qui ne connaît pas les brides).
+export const FORME_CONDUITE = 6
 
 export const FORME_NAMES: Record<number, string> = {
   [FORME_RECT]: 'Rectangle',
@@ -121,6 +128,9 @@ export interface FormeBox {
   p1?: number // ARC : demi-ouverture en degrés
   p2?: number // ARC : bouts (0 arrondis, 1 droits, 2 en pointe)
   coupe?: Coupe // un demi-plan qui tronque la forme (monde, hors rotation)
+  sens?: number // CONDUITE : le sens du tuyau (SENS_AUTO, _HORIZONTAL, _VERTICAL)
+  bouts?: number // CONDUITE : ses bouts plongés dans un mur (BOUT_MUR_*), calculés au chargement
+  pieces?: [number, number, number][] // CONDUITE : ses pièces, précalculées par formePhysique
 }
 
 export interface FormeContact {
@@ -179,6 +189,245 @@ function rectContactAxe(
   out.dist = -pen
   out.nx = nx
   out.ny = ny
+}
+
+// ---- La conduite d'ammoniac : ses pièces --------------------------------------
+
+/** Les proportions des images de la conduite (tools/images/conduite_atlas.py),
+ *  en fraction de l'ÉPAISSEUR T du bloc — la bride en fait toute la largeur.
+ *  Mesurées sur les images générées ; le shader les reçoit TELLES QUELLES
+ *  (renderer.ts les interpole dans son GLSL) : une seule vérité. Une
+ *  nouvelle image impose de les remesurer. */
+export const CONDUITE = {
+  /** demi-épaisseur du tuyau, givre compris (la collision) */
+  tuyau: 0.28,
+  /** demi-hauteur du tronçon dessiné (frange et stalactites comprises) */
+  bandeCorps: 0.309,
+  /** longueur d'un motif de tronçon, répété en miroir */
+  motif: 1.856,
+  /** la pièce de bout — la TRAVERSÉE DE SOL : une bride, puis le coude
+   *  qui plonge dans une plaque boulonnée au plancher. Sa longueur (image)
+   *  et sa demi-hauteur ; le tronçon s'arrête sous la bride (finCorps),
+   *  qui cache le changement de diamètre, comme un réducteur */
+  bout: 1.366,
+  boutDemiH: 0.5096,
+  finCorps: 1.2,
+  /** la plaque de sol, comptée depuis le bout du bloc : toute sa largeur */
+  brideDe: 0,
+  brideA: 0.979,
+  /** la bride avant le coude, comptée depuis le bout, et sa demi-hauteur */
+  brideBoutDe: 1.027,
+  brideBoutA: 1.359,
+  brideBoutDemi: 0.34,
+  /** le tuyau file jusqu'au bout du bloc (sous la plaque) */
+  embout: 0,
+  /** demi-épaisseur du tuyau de la traversée, givre compris (l'arceau) */
+  tuyauTraversee: 0.205,
+  /** sous ce rapport L / T, la conduite devient une tête de VANNE */
+  seuilVanne: 1.6,
+  /** l'image de la vanne autour de sa plaque (côté c = la plaque) : largeur
+   *  et hauteur de l'image, en c — la plaque en est centrée */
+  vanneImgL: 1.0195,
+  vanneImgH: 0.9942,
+  /** le joint à brides : demi-longueur de l'image, haut et bas de l'image
+   *  autour de l'axe, demi-longueur de ses brides */
+  jointDemi: 0.698,
+  jointHaut: 0.557,
+  jointBas: 0.574,
+  brideJoint: 0.322,
+  /** l'écart entre deux joints sur une longue conduite (unités monde) */
+  pas: 280,
+} as const
+
+/** Les cadres des quatre pièces dans l'atlas conduite-atlas.webp :
+ *  [x, y, largeur, hauteur] en pixels depuis le coin HAUT-gauche. JUMEAUX
+ *  de tools/images/conduite_atlas.py (vérifié par conduite.spec.ts). */
+export const CONDUITE_ATLAS = {
+  taille: 1024,
+  corps: [0, 0, 1024, 341],
+  bout: [0, 350, 370, 276],
+  joint: [380, 350, 451, 365],
+  givre: [384, 720, 608, 304],
+  vanne: [0, 640, 370, 361],
+} as const
+
+/** LE SENS du tuyau (ObstacleBox.sens) : 0 auto — le long du grand côté —,
+ *  1 horizontal, 2 vertical. JUMEAU de conduiteHoriz dans le shader. */
+export const SENS_AUTO = 0
+export const SENS_HORIZONTAL = 1
+export const SENS_VERTICAL = 2
+export const SENS_NOMS = ['Auto (grand côté)', 'Horizontal', 'Vertical']
+
+export function conduiteHoriz(w: number, h: number, sens?: number): boolean {
+  if (sens === SENS_HORIZONTAL) return true
+  if (sens === SENS_VERTICAL) return false
+  return w >= h
+}
+
+/** Une conduite est LONGUE si ses deux pièces de bout y tiennent ; sinon,
+ *  c'est un plot : un seul joint au milieu. */
+export function conduiteLongue(L: number, T: number): boolean {
+  return L >= 2 * CONDUITE.bout * T
+}
+
+/** LE DESSIN SELON LA PLACE (L / T). Une conduite longue a sa place ; en
+ *  dessous, ses pièces se chevauchaient (vu en aperçu sur iPad : un joint
+ *  écrasé entre deux moignons, deux traversées l'une dans l'autre) :
+ *  · VANNE (moins de 1,6) : une tête de vanne gelée, carrée, au centre ;
+ *  · ARCEAU (jusqu'à 2 traversées bout à bout) : le tuyau sort du sol et y
+ *    replonge — les deux traversées se rejoignent bride contre bride,
+ *    réduites ensemble (echelleArceau) pour tenir ;
+ *  · LONGUE : tronçon, joints, traversées ou murs aux bouts. */
+export type ModeConduite = 'vanne' | 'arceau' | 'longue'
+export function modeConduite(L: number, T: number): ModeConduite {
+  if (conduiteLongue(L, T)) return 'longue'
+  return L < CONDUITE.seuilVanne * T ? 'vanne' : 'arceau'
+}
+/** La réduction des deux traversées d'un arceau : elles se touchent au
+ *  milieu. 1 au seuil de la conduite longue. */
+export function echelleArceau(L: number, T: number): number {
+  return Math.min(1, L / (2 * CONDUITE.bout * T))
+}
+
+/** Les joints d'une conduite, en abscisse le long du bloc (centrée) : un tous
+ *  les `pas` tant qu'ils restent à l'écart des pièces de bout ; au milieu,
+ *  seul, sur un plot. */
+export function jointsConduite(L: number, T: number): number[] {
+  if (!conduiteLongue(L, T)) return []
+  const libre = L / 2 - (CONDUITE.bout + 0.05 + CONDUITE.jointDemi) * T
+  const out: number[] = []
+  const n = Math.floor(libre / CONDUITE.pas)
+  for (let k = -n; k <= n; k++) out.push(k * CONDUITE.pas)
+  return out
+}
+
+/** Les bouts d'une conduite qui plongent DANS UN MUR (bit à bit) : le
+ *  côté des s négatifs (gauche ou bas), le côté des s positifs. */
+export const BOUT_MUR_NEG = 1
+export const BOUT_MUR_POS = 2
+
+/** Les rectangles pleins de la conduite, en repère local (s le long, t en
+ *  travers, centrés) : [s0, s1, demi-épaisseur]. Le tuyau, les brides de
+ *  bout, les brides des joints — leur union est la forme. */
+export function piecesConduite(L: number, T: number, bouts = 0): [number, number, number][] {
+  const C = CONDUITE
+  const mode = modeConduite(L, T)
+  if (mode === 'vanne') {
+    // la plaque carrée de la vanne, centrée, du côté de l'épaisseur
+    const c = Math.min(L, T)
+    return [[-c / 2, c / 2, c / 2]]
+  }
+  if (mode === 'arceau') {
+    // deux traversées bride contre bride, réduites de k ; les murs n'y
+    // changent rien — la pièce entière tient dans le bloc
+    const k = echelleArceau(L, T)
+    return [
+      [-L / 2, L / 2, C.tuyauTraversee * k * T],
+      [L / 2 - C.brideA * k * T, L / 2 - C.brideDe * k * T, (k * T) / 2],
+      [-L / 2 + C.brideDe * k * T, -L / 2 + C.brideA * k * T, (k * T) / 2],
+      [L / 2 - C.brideBoutA * k * T, L / 2 - C.brideBoutDe * k * T, C.brideBoutDemi * k * T],
+      [-L / 2 + C.brideBoutDe * k * T, -L / 2 + C.brideBoutA * k * T, C.brideBoutDemi * k * T],
+    ]
+  }
+  // LONGUE — un bout DANS UN MUR (bouts : 1 côté négatif, 2 côté positif)
+  // n'a pas de traversée : le tuyau file jusqu'au bord du bloc, et le mur
+  // le prend
+  const murNeg = (bouts & BOUT_MUR_NEG) !== 0
+  const murPos = (bouts & BOUT_MUR_POS) !== 0
+  const out: [number, number, number][] = [
+    [-L / 2 + (murNeg ? 0 : C.embout * T), L / 2 - (murPos ? 0 : C.embout * T), C.tuyau * T],
+  ]
+  if (!murPos) {
+    out.push([L / 2 - C.brideA * T, L / 2 - C.brideDe * T, T / 2])
+    out.push([L / 2 - C.brideBoutA * T, L / 2 - C.brideBoutDe * T, C.brideBoutDemi * T])
+  }
+  if (!murNeg) {
+    out.push([-L / 2 + C.brideDe * T, -L / 2 + C.brideA * T, T / 2])
+    out.push([-L / 2 + C.brideBoutDe * T, -L / 2 + C.brideBoutA * T, C.brideBoutDemi * T])
+  }
+  for (const j of jointsConduite(L, T)) {
+    out.push([Math.max(-L / 2, j - C.brideJoint * T), Math.min(L / 2, j + C.brideJoint * T), T / 2])
+  }
+  return out
+}
+
+// LES PIÈCES, UNE FOIS PAR BOÎTE. Elles ne dépendent que de (L, T, bouts),
+// mais conduiteContactAxe tourne dans la boucle la plus chaude du solveur
+// — par particule et par sous-pas — et les recalculait chaque fois, deux
+// tableaux alloués à la clé : des milliers d'objets éphémères par pas, que
+// le ramasse-miettes paie en à-coups sur mobile. La boîte (copie stable
+// que formePhysique donne au solveur) garde les siennes ; une boîte qui
+// change de taille les recalcule. La consultation n'alloue rien.
+const piecesParBoite = new WeakMap<object, { L: number; T: number; bouts: number; pieces: [number, number, number][] }>()
+function piecesDe(b: object, L: number, T: number, bouts: number): [number, number, number][] {
+  const c = piecesParBoite.get(b)
+  if (c && c.L === L && c.T === T && c.bouts === bouts) return c.pieces
+  const pieces = piecesConduite(L, T, bouts)
+  piecesParBoite.set(b, { L, T, bouts, pieces })
+  return pieces
+}
+
+function conduiteContactAxe(
+  x: number,
+  y: number,
+  b: {
+    minX: number
+    minY: number
+    maxX: number
+    maxY: number
+    sens?: number
+    bouts?: number
+    pieces?: [number, number, number][]
+  },
+  out: FormeContact,
+): void {
+  const w = b.maxX - b.minX
+  const h = b.maxY - b.minY
+  const horiz = conduiteHoriz(w, h, b.sens)
+  const L = horiz ? w : h
+  const T = horiz ? h : w
+  const px = x - (b.minX + b.maxX) / 2
+  const py = y - (b.minY + b.maxY) / 2
+  const s = horiz ? px : py
+  const t = horiz ? py : px
+  // l'union : le plus proche des rectangles l'emporte, sa normale avec
+  let best = Infinity
+  let ns = 0
+  let nt = 1
+  // les pièces précalculées de la copie physique (formePhysique) — un champ,
+  // pas une recherche ; à défaut (une boîte bâtie ailleurs), le cache
+  for (const [s0, s1, e] of b.pieces ?? piecesDe(b, L, T, b.bouts ?? 0)) {
+    const cs = (s0 + s1) / 2
+    const hs = (s1 - s0) / 2
+    const qs = Math.abs(s - cs) - hs
+    const qt = Math.abs(t - 0) - e
+    let d: number
+    let gs: number
+    let gt: number
+    if (qs > 0 || qt > 0) {
+      const as = Math.max(qs, 0)
+      const at = Math.max(qt, 0)
+      d = Math.hypot(as, at)
+      gs = d > 1e-9 ? (as / d) * Math.sign(s - cs || 1) : 0
+      gt = d > 1e-9 ? (at / d) * Math.sign(t || 1) : 1
+    } else if (qs > qt) {
+      d = qs
+      gs = Math.sign(s - cs || 1)
+      gt = 0
+    } else {
+      d = qt
+      gs = 0
+      gt = Math.sign(t || 1)
+    }
+    if (d < best) {
+      best = d
+      ns = gs
+      nt = gt
+    }
+  }
+  out.dist = best
+  out.nx = horiz ? ns : nt
+  out.ny = horiz ? nt : ns
 }
 
 // ---- Les nouvelles formes (repère local, boîte déjà dépivotée) -------------
@@ -770,6 +1019,9 @@ function formeContactAxe(
       return
     case FORME_COQUE:
       coqueContactAxe(x, y, b, out)
+      return
+    case FORME_CONDUITE:
+      conduiteContactAxe(x, y, b, out)
       return
     default:
       rectContactAxe(x, y, b, out)

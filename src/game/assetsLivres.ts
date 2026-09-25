@@ -39,7 +39,7 @@ const NOMS: Record<string, string> = {
   'paroi-atlas.webp': 'Atlas des habillages de paroi (4×2)',
   'phile.webp': 'Surface hydrophile',
   'phobe.webp': 'Surface hydrophobe',
-  'froid.webp': 'Plaque froide (givre)',
+  'conduite-atlas.webp': 'Conduite d’ammoniac (tronçon, bride, joint, givre du sol)',
   'chaud.webp': 'Chaudière (ailettes)',
   'grille.webp': 'Évent (panneau perforé)',
   'sponge-dry.webp': 'Éponge sèche',
@@ -59,7 +59,10 @@ const NOMS: Record<string, string> = {
   'tank-bg.webp': 'Fond de cuve',
   'stars.webp': 'Ciel étoilé (proche)',
   'stars-far.webp': 'Ciel étoilé (lointain, station)',
-  'ciel.webp': 'Plaque de ciel — champ profond 4096² (tools/ciel)',
+  'ciel.webp': 'Plaque de ciel — la Voie lactée, à la taille de sa source (tools/ciel/prepare-plaque.py)',
+  'etoiles-fond.webp': 'Calque de ciel — étoiles profondes (tools/ciel/genere-etoiles.py)',
+  'etoiles-milieu.webp': 'Calque de ciel — étoiles moyennes',
+  'etoiles-proche.webp': 'Calque de ciel — étoiles vives',
   'home.webp': 'Fiche — illustration d’accueil',
   'card-galerie.webp': 'Carton de journal — la galerie noyée',
   'fiole-pleine.webp': 'Fiole pleine (semblable)',
@@ -102,7 +105,7 @@ export function rubriqueDe(url: string): string {
   // le dossier fait foi, sinon elles tombaient dans « Autres »
   if (url.includes('/avaries/')) return 'Avaries — stations'
   if (url.includes('/codex/')) return 'Codex — aperçus'
-  if (/^(wall|paroi|phile|phobe|froid|chaud|grille|sponge)/.test(f))
+  if (/^(wall|paroi|phile|phobe|conduite|chaud|grille|sponge)/.test(f))
     return 'Surfaces & matériaux'
   if (f.startsWith('zone-')) return 'Zones d’état'
   if (f.startsWith('serre-')) return 'Serre & cultures'
@@ -115,7 +118,7 @@ export function rubriqueDe(url: string): string {
     f.startsWith('plafond')
   )
     return 'Machinerie & décalques'
-  if (/^(hull|tank-bg|stars|ciel|home|card-)/.test(f)) return 'Coque & fonds'
+  if (/^(hull|tank-bg|stars|ciel|etoiles|home|card-)/.test(f)) return 'Coque & fonds'
   if (/^(fiole|badge)/.test(f)) return 'Objets & emblèmes'
   return 'Autres'
 }

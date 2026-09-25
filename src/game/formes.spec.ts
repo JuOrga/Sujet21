@@ -556,3 +556,4 @@ describe('formes — la coupe (un demi-plan qui tronque)', () => {
     expect(dansForme(b, 0, -50)).toBe(true)
   })
 })
+

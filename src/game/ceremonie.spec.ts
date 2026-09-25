@@ -44,6 +44,13 @@ describe('le rang d’une salle', () => {
     expect(etoiles).toEqual([5, 4, 3, 2, 1])
   })
 
+  it('se lit en régimes d’écoulement, pas en lettres : du superfluide au figé', () => {
+    const noms = SEUILS_RANG.map(([, seuil]) => rangDeSalle(seuil).nom)
+    expect(noms).toEqual(['SUPERFLUIDE', 'LAMINAIRE', 'TURBULENT', 'VISQUEUX', 'FIGÉ'])
+    // plus une seule lettre d'arcade sous les yeux du joueur
+    for (const n of noms) expect(n.length).toBeGreaterThan(1)
+  })
+
   it('garde ses seuils rangés du plus haut au plus bas — c’est l’ordre de lecture', () => {
     for (let i = 1; i < SEUILS_RANG.length; i++)
       expect(SEUILS_RANG[i][1]).toBeLessThan(SEUILS_RANG[i - 1][1])

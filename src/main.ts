@@ -164,6 +164,8 @@ import {
 import { CODE_RONDE, sansSas, tableauRonde } from './game/ronde'
 import { dureeChuteCoeur, grainsPuits, porteeVisible, rayonNoyau } from './game/puitsDessin'
 import {
+  cleOffre,
+  detailOffre,
   ditEffet,
   offresDe,
   resoutChoix,
@@ -375,7 +377,12 @@ import { picto, type NomPicto } from './game/athPictos'
 import { entreesTiroir } from './game/athTiroir'
 import { pancarteLibre, zonesInterdites, type Rect } from './game/athZones'
 import { CLE_REGLAGE_ATH, athAuRepos, litReglageAth, pointeurPres, type ReglageAth } from './game/athRepos'
-import { PARALLAXE_DEFAUTS, facteurG } from './render/parallaxe'
+import { CielCalque } from './render/cielCalque'
+import {
+  PARALLAXE_DEFAUTS,
+  PLAQUE_DEFAUTS,
+  facteurG,
+} from './render/parallaxe'
 import { PerfCollector } from './game/perf'
 import {
   fetchLibrary,
@@ -3576,6 +3583,8 @@ const captureCodex = new CaptureCodex(
   document.getElementById('hud-capture') as HTMLButtonElement | null,
   {
     sources: () => ({ gl: canvas, fx: fxCanvas }),
+    // le ciel vit hors de la toile : il se repeint sous elle dans la vidéo
+    fond: (g, x, y, w, h, largeur, hauteur) => cielCalque.dessineDans(g, x, y, w, h, largeur, hauteur),
     fiches: () => fichesCodex().map((f) => ({ id: f.id, titre: codexLu(f).titre, groupe: f.groupe })),
     concepteur: () => document.body.classList.contains('concepteur'),
     cadenceTampon: () => cadenceTampon,
@@ -3691,6 +3700,14 @@ let resChoix: ResChoix = ((): ResChoix => {
   return 'elevee'
 })()
 const resDynamique = (): boolean => resChoix === 'dyn'
+// NETTETÉ DU DÉCOR : la résolution réduite ne touche que le volume (l'eau),
+// le décor reste natif (renderer.decorNet). Demandé : « les textures doivent
+// toujours être en haute résolution ». DÉBRANCHÉ par défaut, parce que c'est
+// le décor, pas l'eau, qui coûte : mesuré sous Chromium en rendu logiciel
+// (400×280, DPR 2, tableau 8, 60 s), élevée 0,31 im/s, faible 0,75, faible
+// avec décor net 0,36 — autant que le natif. Par défaut, l'adaptatif des
+// écrans tactiles n'aurait plus rien à alléger.
+let decorNet = localStorage.getItem('sujet21-decor-net') === '1'
 // rendu de la section MOTEUR PHYSIQUE — paresseux : `sim` n'existe pas
 // encore quand le voile se câble, il se dessine à l'ouverture
 let majMoteurUI: () => void = () => {}
@@ -3737,14 +3754,23 @@ if (!(cielChoix in CIEL_MODE)) cielChoix = 'plaque'
 // La FORCE dose la plaque — le vide doit rester plus sombre que la cuve
 // éclairée, sans quoi la hiérarchie lumineuse s'inverse. L'ÉTENDUE dit
 // combien d'unités-monde la plaque couvre : plus elle est petite, plus le
-// ciel est net et plus il défile vite.
+// ciel est net et plus il défile vite. (Depuis que la plaque est UNE image
+// cadrée par rapport à l'écran, l'étendue en unités-monde a cédé la place à
+// la PART de la plaque que l'écran montre — voir plus bas.)
 // Les défauts sont ceux du premier étalonnage à l'écran : à force 1, la
 // plaque écrasait la station — le vide devenait le sujet et les modules des
 // découpes plates. 0,45 la remet DERRIÈRE la cuve éclairée, là où elle doit
 // être. L'étendue de 6000 donnait des volutes énormes, plus proches d'un
 // ciel de nuages que d'un champ profond ; 12 000 les diluait en brume.
 // 8 000 rend la structure lisible sans qu'elle prenne toute la place.
-const cielReglages = { force: 0.45, etendue: 8000 }
+// La Voie lactée livrée est une VRAIE photographie (ESO/S. Brunier) : plus
+// sombre qu'une image générée — à 0,75, en jeu, elle se devinait à peine
+// derrière la station. Pleine force. Si elle écrase les modules d'un
+// tableau, c'est ce curseur du banc.
+// Les étoiles nettes ne passent pas par ce dosage.
+// LA TAILLE : la largeur de la galaxie en fraction de l'écran, au zoom de
+// jeu — plafonnée par la netteté (render/parallaxe.ts, cadrePlaque).
+const cielReglages = { force: 1, taille: PLAQUE_DEFAUTS.taille }
 
 // LA PROFONDEUR DES COUCHES DE FOND : la règle, les valeurs et les tests
 // vivent dans render/parallaxe.ts — ici on n'en tient que la copie RÉGLABLE,
@@ -3922,6 +3948,29 @@ const paramsEl = document.getElementById('params') as HTMLDivElement
     }
   }
   renderRes()
+
+  const choixDecorNet = document.getElementById('params-decornet') as HTMLDivElement
+  const renderDecorNet = (): void => {
+    choixDecorNet.innerHTML = ''
+    for (const [net, label] of [
+      [true, 'TOUJOURS NET'],
+      [false, 'SUIT LA RÉSOLUTION'],
+    ] as const) {
+      const b = document.createElement('button')
+      b.type = 'button'
+      b.textContent = label
+      b.className = decorNet === net ? 'actif' : ''
+      b.addEventListener('click', () => {
+        decorNet = net
+        localStorage.setItem('sujet21-decor-net', net ? '1' : '0')
+        dynAmorce = false // la cadence change : l'adaptatif se réamorce
+        perf.reset()
+        renderDecorNet()
+      })
+      choixDecorNet.appendChild(b)
+    }
+  }
+  renderDecorNet()
 
   const choixDecor = document.getElementById('params-decor') as HTMLDivElement
   const renderDecor = (): void => {
@@ -4377,6 +4426,14 @@ function rapportPerf(): Record<string, unknown> {
           ((window.innerWidth * window.innerHeight * echelleRendue() ** 2) /
             1e6) * 100,
         ) / 100,
+      // le décor net recalcule le décor EN NATIF : l'échelle ne dit alors
+      // plus que le coût de l'eau — sans ce drapeau, le rapport tromperait
+      decorNet,
+      // les pixels RÉELS de la toile, et si la passe nette l'a repassée en
+      // natif : au réglage « suit la résolution », un tableau à conduite le
+      // fait aussi — « megapixels » (l'échelle au carré) le cachait
+      megapixelsToile: Math.round(((canvas.width * canvas.height) / 1e6) * 100) / 100,
+      passeNette: renderer.passeNette,
       timeWarp: params.timeWarp,
       downsampleChamp: params.renderDownsample,
     },
@@ -7992,6 +8049,8 @@ fetch('/noyaux.wasm')
   })
 
 const renderer = new Renderer(canvas, CAPACITY)
+// le ciel vit DERRIÈRE la toile, dans le même conteneur (render/cielCalque.ts)
+const cielCalque = new CielCalque(canvas.parentElement!, canvas, '/assets/ciel.webp')
 const rendererNe = performance.now() // pour dater l'attente de compilation
 const loop = new FixedLoop()
 const input = new Input()
@@ -15956,8 +16015,11 @@ function mbPeintEvenement(ev: EvenementDef, alea: () => number): void {
     btn.className = 'mb-carte mb-ev-offre' + (possible ? '' : ' mb-pauvre')
     btn.disabled = !possible
     btn.style.setProperty('--i', String(i))
+    // le détail ne se lit que d'une offre déjà prise ; une offre hors de
+    // portée le dit (evenements, règle 4)
+    const detail = detailOffre(choix, records.offreEssayee(cleOffre(ev, choix)), possible)
     btn.innerHTML =
-      `<b>${esc(choix.libelle)}</b><small>${esc(choix.detail)}</small>` +
+      `<b>${esc(choix.libelle)}</b><small${detail.voilee ? ' class="mb-ev-voile"' : ''}>${esc(detail.texte)}</small>` +
       (choix.issues.length > 1
         ? `<em class="mb-ev-pari">⚄ ${choix.issues.length} issues possibles</em>`
         : `<em class="mb-ev-sur">▸ sans risque</em>`)
@@ -15975,6 +16037,8 @@ function mbPeintEvenement(ev: EvenementDef, alea: () => number): void {
 function mbTranche(ev: EvenementDef, choix: ChoixEvenement, alea: () => number): void {
   const esc = (t: string): string => t.replace(/&/g, '&amp;').replace(/</g, '&lt;')
   const issue = resoutChoix(choix, alea)
+  // l'offre prise se dévoile — elle, pas ses voisines écartées
+  records.noteOffreEssayee(cleOffre(ev, choix))
   const lignes = appliqueEffets(issue.effets)
   bande.ponctuation('sting-record', 0.6)
   mbQuestion(ev.titre)
@@ -15984,7 +16048,7 @@ function mbTranche(ev: EvenementDef, choix: ChoixEvenement, alea: () => number):
   bilan.className = 'mb-ev-recit mb-ev-issue'
   const dites = lignes.length > 0 ? lignes : [issue.effets.map(ditEffet).join(' · ') || 'rien']
   bilan.innerHTML =
-    `<em>${esc(choix.libelle)}</em><p>${esc(issue.texte)}</p>` +
+    `<em>${esc(choix.libelle)} — ${esc(choix.detail)}</em><p>${esc(issue.texte)}</p>` +
     `<ul class="mb-ev-gains">${dites.map((l) => `<li>${esc(l)}</li>`).join('')}</ul>`
   host.appendChild(bilan)
   const btn = document.createElement('button')
@@ -16049,7 +16113,9 @@ function montreMiseEnBonbonne(b: BilanSalle): void {
     `MISE EN BONBONNE · ${level.code}` + (run.primeSalle ? ` · PRIME : ${NOMS_PRIME[run.primeSalle].toUpperCase()}` : '')
   mbEl('mb-rang').hidden = true
   mbEl('mb-corps').classList.remove('mb-on')
-  mbEl('mb-rang-lettre').textContent = verdict.rang
+  mbEl('mb-rang-lettre').textContent = verdict.nom
+  // la taille du mot suit sa longueur (index.html, .mb-rang-lettre)
+  mbEl('mb-rang-lettre').style.setProperty('--mb-nom-n', String(verdict.nom.length))
   mbEl('mb-rang-mot').textContent = verdict.mot
   mbEl('mb-etoiles').innerHTML = '<i>★</i>'.repeat(5)
   mbEl('mb-eau').style.height = '0%'
@@ -16071,7 +16137,7 @@ function montreMiseEnBonbonne(b: BilanSalle): void {
   }
   // Temps 1 — LE RANG TOMBE : la médaille claque sur la scène, l'écran
   // flashe, la manette tremble, le feu jaillit — puis les étoiles
-  // s'allument une à une. Un S ou un A sonne comme un record.
+  // s'allument une à une. Un superfluide ou un laminaire sonne comme un record.
   apres(TEMPS_BILAN.rang, () => {
     const rang = mbEl('mb-rang')
     rang.hidden = false
@@ -17959,6 +18025,11 @@ function corpsImage(now: number): boolean {
   // l'échelle fixe choisie s'applique ici : seul le canvas est mis à
   // l'échelle, l'interface HTML reste à la netteté native
   const dpr = echelleRendue()
+  // LA CONDUITE NETTE : aux résolutions réduites, la conduite d'ammoniac se
+  // repasse à la densité native de l'écran (renderer.ts, drawConduiteNette)
+  renderer.dprNatif = Math.min(window.devicePixelRatio || 1, PLAFOND_DPR)
+  renderer.decorNet = decorNet
+  renderer.boitesMurs = level.boxes
   // mesures brutes de CETTE image, pour le collecteur de performance
   let physRaw = 0
   let stepsFaits = 0
@@ -19338,7 +19409,10 @@ function corpsImage(now: number): boolean {
     waveScratch[i * 4 + 3] = 1
   }
 
-  // Caméra : suivi du corps, ou vue d'ensemble du tableau depuis le banc
+  // Caméra : suivi du corps, ou vue d'ensemble du tableau depuis le banc.
+  // La salle d'abord : le plancher du recul se règle sur elle, quelle que
+  // soit la façon dont elle a été ouverte (render/camera.ts, salle)
+  camera.salle(sim.bounds)
   if (monitor.overview) {
     const b = sim.bounds
     const fitZoom =
@@ -19389,11 +19463,21 @@ function corpsImage(now: number): boolean {
   // s'affichait plus du tout. Posé à l'image, il ne peut ni arriver trop tôt
   // ni rester en retard d'un tableau.
   renderer.setSolModules(level.coque === 'structures')
-  renderer.setCiel(
-    CIEL_MODE[cielChoix],
-    cielReglages.force,
-    cielReglages.etendue,
-  )
+  renderer.setCiel(CIEL_MODE[cielChoix])
+  // LE CIEL EN CALQUE, à la densité NATIVE de l'écran — pas à l'échelle de
+  // rendu de la toile : c'est tout l'objet (render/cielCalque.ts)
+  cielCalque.maj({
+    actif: CIEL_MODE[cielChoix] > 1.5,
+    camX: camera.x,
+    camY: camera.y,
+    zoom: camera.zoom,
+    largeurCss: vw,
+    hauteurCss: vh,
+    dpr: Math.min(window.devicePixelRatio || 1, 3),
+    force: cielReglages.force,
+    froid: chillNow(),
+    reglages: { ...PLAQUE_DEFAUTS, taille: cielReglages.taille },
+  })
   // LA PROFONDEUR DES COUCHES DE FOND : posée à l'image comme le ciel, pour
   // que le banc l'entende tout de suite. Le facteur se cuisine ICI, une fois
   // par image (il ne dépend que du zoom et des réglages) : le shader n'a plus
