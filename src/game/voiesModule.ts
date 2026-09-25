@@ -66,10 +66,12 @@ export interface ReglagesTissage {
 }
 /** LA PART DE CROISEMENT (0..1) : un X entre deux voies voisines ne se
  *  dessine que si ses deux bifurcations tombent sous `bifurcation × part`.
- *  À 0,7, un X sur deux survit : mesuré sur 2 000 modules de six salles,
- *  2,04 X par module avant, 0,99 après — la carte garde ses carrefours,
- *  on y suit mieux sa voie. */
-export const PART_CROISEMENT = 0.7
+ *  ZÉRO : aucun X. Une demi-mesure (0,7 : un X sur deux, 25/09) laissait
+ *  le défaut en place, en plus rare — et une carte où l'on suit sa voie du
+ *  doigt ne se lit que si les traits ne se coupent JAMAIS (Slay the Spire
+ *  n'en a aucun). Un X n'apportait presque rien au choix : les fourches et
+ *  les jonctions gardent les deux cases du rang suivant joignables. */
+export const PART_CROISEMENT = 0
 
 export const TISSAGE_DEFAUT: ReglagesTissage = {
   partEvenement: 0.2,
@@ -201,13 +203,13 @@ export function tisseMiniCarte(
       }
     const va = (v: number, cote: 'g' | 'd'): boolean =>
       r < n - 1 && (cote === 'g' ? v > 0 && tG[v] < bif : v < VOIES - 1 && tD[v] < bif)
-    // LES CROISEMENTS SE FONT PLUS RARES. Deux voisines qui bifurquent l'une
-    // vers l'autre dessinent un X : à 45 % de bifurcation, il y en avait
-    // deux par module de six salles, et la mini-carte se lisait comme un
-    // tressage où l'on ne suivait plus sa voie (le concepteur, 25/09). Un X
-    // ne tient plus que si ses DEUX tirages tombent sous la part de
-    // croisement ; sinon la branche au tirage le plus haut (la moins
-    // « voulue ») tombe. Aucun tirage de plus : la graine reste alignée.
+    // PAS DE CROISEMENT. Deux voisines qui bifurquent l'une vers l'autre
+    // dessinent un X : à 45 % de bifurcation, il y en avait deux par module
+    // de six salles, et la mini-carte se lisait comme un tressage où l'on
+    // ne suivait plus sa voie (le concepteur, 25/09). Le X se défait : la
+    // branche au tirage le plus haut (la moins « voulue ») tombe, sauf si
+    // PART_CROISEMENT l'autorise. Aucun tirage de plus : la graine reste
+    // alignée.
     const coupe = { g: new Set<number>(), d: new Set<number>() }
     for (let v = 0; v < VOIES - 1; v++) {
       if (!va(v, 'd') || !va(v + 1, 'g')) continue
@@ -329,6 +331,45 @@ export function portesDuRang(mc: MiniCarte, rang: number, voieDOuLOnVient: numbe
   const avant = mc.rangs[rang - 1]?.[voieDOuLOnVient]
   if (!avant) return [...noeuds]
   return noeuds.filter((x) => avant.suivants.includes(x.voie))
+}
+
+/** LE REPÈRE D'UNE VOIE, le même sur la porte et sur la mini-carte : la
+ *  porte disait « PORTE 2 » et « VOIE 3 » à la fois, la mini-carte ne
+ *  numérotait rien — le joueur faisait la correspondance de tête. Une
+ *  flèche vers le haut pour la voie du haut : le signe dit la place. */
+export const REPERES_VOIE: readonly { signe: string; nom: string }[] = [
+  { signe: '▲', nom: 'HAUT' },
+  { signe: '●', nom: 'MILIEU' },
+  { signe: '▼', nom: 'BAS' },
+]
+
+/** CE QU'UNE PORTE FERME, pour le survol : ce que les AUTRES portes du rang
+ *  rendent joignable et pas elle — nœuds et liens (clés du dessin), leurs
+ *  coursives d'entrée comprises. Allumer tout ce qu'une porte ouvre ne
+ *  disait rien au début d'un module : l'éventail couvrait presque la
+ *  grille. Ce qui décide, c'est ce qu'on perd (le concepteur, 25/09) —
+ *  comme le plan de la station éteint les modules qu'une porte ferme. */
+export function fermeParPorte(
+  mc: MiniCarte,
+  rang: number,
+  voie: number,
+  portes: readonly number[],
+  voieDOuLOnVient: number | null,
+): { noeuds: string[]; liens: string[] } {
+  const garde = new Set(cheminDePorte(mc, rang, voie, voieDOuLOnVient).noeuds)
+  const noeuds = new Set<string>()
+  const liens = new Set<string>()
+  for (const p of portes) {
+    if (p === voie) continue
+    const ch = cheminDePorte(mc, rang, p, voieDOuLOnVient)
+    if (ch.entree) liens.add(ch.entree)
+    for (const k of ch.noeuds) if (!garde.has(k)) noeuds.add(k)
+  }
+  for (const k of noeuds) {
+    const [r, v] = k.split('-').map(Number)
+    for (const s of mc.rangs[r]?.[v]?.suivants ?? []) liens.add(`${r}-${v}-${s}`)
+  }
+  return { noeuds: [...noeuds], liens: [...liens] }
 }
 
 /** LE CHEMIN D'UNE PORTE, pour le survol : la coursive qui y entre depuis
@@ -456,9 +497,11 @@ export function dessinMiniCarteSVG(
       const cl =
         'mv-noeud ' + teinte(nd) +
         (joueIci ? ' mv-joue' : '') + (porte ? ' mv-porte' : '') +
-        (nd.rang < o.rang && !joueIci ? ' mv-ferme' : '') +
-        (nd.rang > o.rang ? ' mv-loin' : '') +
-        (nd.rang >= o.rang && !joignables.has(ici) ? ' mv-interdit' : '')
+        // TROIS ÉTATS, PAS CINQ : joué, joignable, hors d'atteinte — le
+        // passé non joué et le futur perdu se lisent pareil, c'est la même
+        // chose pour le joueur (fermé, lointain, interdit, reculé au survol :
+        // cinq gris que l'œil ne distinguait pas, revue du 25/09)
+        (!joueIci && (nd.rang < o.rang || !joignables.has(ici)) ? ' mv-interdit' : '')
       noeuds +=
         `<g class="${cl}" data-rang="${nd.rang}" data-voie="${nd.voie}" transform="translate(${x(nd.rang)} ${y(nd.voie)})">` +
         `<title>salle ${nd.rang + 1}, voie ${nd.voie + 1} — ${nom(nd)}</title>` +
@@ -473,6 +516,13 @@ export function dessinMiniCarteSVG(
         `</g>`
     }
   let titres = ''
+  // le repère de chaque voie à gauche de la grille, allumé là où une porte
+  // s'ouvre — le même signe que sur la porte (REPERES_VOIE)
+  for (let v = 0; v < mc.voies; v++) {
+    const rep = REPERES_VOIE[v]
+    if (rep)
+      titres += `<text class="mv-repere${o.portes.includes(v) ? ' mv-repere-porte' : ''}" data-voie="${v}" x="${X0 - S - 14}" y="${y(v)}">${rep.signe}</text>`
+  }
   for (let r = 0; r < n; r++)
     titres += `<text class="mv-titre${r === o.rang ? ' mv-courant' : ''}" x="${x(r)}" y="${h - 6}">SALLE ${r + 1}</text>`
   return (

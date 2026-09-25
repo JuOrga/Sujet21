@@ -120,6 +120,8 @@ import {
   NOMS_PRIME,
   PRIMES,
   cheminDePorte,
+  fermeParPorte,
+  REPERES_VOIE,
 } from './game/voiesModule'
 import { CLE_MANQUES, inventairePool, litManques, noteManque, type Manque } from './game/manques'
 import {
@@ -14896,19 +14898,27 @@ function mbMontreCarte(raison: 'depart' | 'suite'): void {
   // sur l'écran LA STATION (rebâtir relancerait le halo et volerait le focus).
   const projette = (id: string | null): void => {
     for (const el of scene.querySelectorAll('.cs-projet, .cs-hors')) el.classList.remove('cs-projet', 'cs-hors')
-    const p = id ? projectionDepuis(carte, id) : null
-    // les autres coursives reculent le temps du survol : un trait blanc
-    // parmi vingt coursives colorées ne se suivait pas d'un coup d'œil
-    scene.classList.toggle('cs-projection', !!p)
-    if (!id || !p) return
+    if (!id) return
+    const p = projectionDepuis(carte, id)
+    if (!p) return
     // CE QUI SE FERME : les modules que cette porte ne permet plus
     // d'atteindre s'éteignent — c'est ainsi que trois portes dont les
     // routes se rejoignent plus loin se distinguent quand même (revue du
     // 16/09 : la route projetée était la même pour les trois)
     const joignables = accessibles(carte, id)
+    const hors = new Set<string>()
     for (const m of carte.modules)
-      if (!joignables.has(m.id) && m.id !== carteRun.module && !carteRun.visites.includes(m.id))
+      if (!joignables.has(m.id) && m.id !== carteRun.module && !carteRun.visites.includes(m.id)) {
+        hors.add(m.id)
         scene.querySelector(`[data-mod="${CSS.escape(m.id)}"]`)?.classList.add('cs-hors')
+      }
+    // LES COURSIVES QUI S'Y RENDENT S'ÉTEIGNENT AVEC EUX : le même langage
+    // que la mini-carte des voies — au survol d'une porte, ce qu'elle ferme
+    // recule, le reste garde sa pleine intensité (revue du 25/09)
+    carte.liens.forEach((l, k) => {
+      if (hors.has(l.de) || hors.has(l.vers))
+        scene.querySelector(`.cs-route[data-lien="${k}"]`)?.classList.add('cs-hors')
+    })
     p.chemin.forEach((m, i) => {
       scene.querySelector(`[data-mod="${CSS.escape(m)}"]`)?.classList.add('cs-projet')
       if (i === 0) return
@@ -15376,7 +15386,7 @@ function propositionsVoie(seq: LevelDef[]): CarteVoie[] | null {
           lv: null,
           cahier: null,
           generee: false,
-          etiquette: `VOIE ${p.voie + 1} · ${NOMS_NOEUD[p.nature].etiquette}`,
+          etiquette: `${NOMS_NOEUD[p.nature].etiquette}`,
           voie: p.voie,
           nature: p.nature,
         })
@@ -15404,8 +15414,8 @@ function propositionsVoie(seq: LevelDef[]): CarteVoie[] | null {
           // un tableau d'une AUTRE mécanique que le nœud : la porte le dit
           etiquette:
             (manque
-              ? `VOIE ${p.voie + 1} · TABLEAU DU POOL — PAS DE ${MECANIQUE_NOMS[p.mecanique].toUpperCase()} AU POOL`
-              : `VOIE ${p.voie + 1} · TABLEAU DU POOL`) + suffixePrime,
+              ? `TABLEAU DU POOL — PAS DE ${MECANIQUE_NOMS[p.mecanique].toUpperCase()} AU POOL`
+              : `TABLEAU DU POOL`) + suffixePrime,
           voie: p.voie,
           ...(p.prime ? { prime: p.prime } : {}),
           ...(manqueNote ? { manqueNote } : {}),
@@ -15421,8 +15431,8 @@ function propositionsVoie(seq: LevelDef[]): CarteVoie[] | null {
           // générée FAUTE DE TABLEAU : le concepteur le lit sur la porte même
           etiquette:
             (manque
-              ? `VOIE ${p.voie + 1} · GÉNÉRÉE — LE POOL MANQUE (${MECANIQUE_NOMS[p.mecanique]})`
-              : `VOIE ${p.voie + 1} · ${etiquetteGeneree(g.figure, p.voie)}`) + suffixePrime,
+              ? `GÉNÉRÉE — LE POOL MANQUE (${MECANIQUE_NOMS[p.mecanique]})`
+              : `${etiquetteGeneree(g.figure, p.voie)}`) + suffixePrime,
           voie: p.voie,
           ...(p.prime ? { prime: p.prime } : {}),
           ...(manqueNote ? { manqueNote } : {}),
@@ -15540,11 +15550,17 @@ function mbMontreSallesVoie(cartes: CarteVoie[]): void {
   }
   cartes.forEach((c, i) => {
     const porte = c.nature
-      ? mbPorteNoeud(i, c.etiquette, c.nature, () => {
-          noteLesManques()
-          if (c.voie !== undefined) carteRun = choisitVoie(carteRun, c.voie)
-          ouvreNoeud(c.nature!)
-        })
+      ? mbPorteNoeud(
+          i,
+          c.etiquette,
+          c.nature,
+          () => {
+            noteLesManques()
+            if (c.voie !== undefined) carteRun = choisitVoie(carteRun, c.voie)
+            ouvreNoeud(c.nature!)
+          },
+          c.voie,
+        )
       : mbPorte(
           c.lv!,
           i,
@@ -15552,6 +15568,7 @@ function mbMontreSallesVoie(cartes: CarteVoie[]): void {
             etiquette: c.etiquette,
             classe: c.generee ? 'mb-voie-gen' : 'mb-voie-pool',
             cahier: c.cahier,
+            voie: c.voie,
           },
           () => {
             noteLesManques()
@@ -15570,27 +15587,32 @@ function mbMontreSallesVoie(cartes: CarteVoie[]): void {
             } else salleChoisie = c.lv
           },
         )
-    // VISER UNE PORTE ALLUME SON CHEMIN sur la mini-carte : la coursive qui
-    // y entre, son nœud, et tout ce qu'elle rend joignable ensuite — le
-    // reste s'efface. Le nœud seul ne disait pas où la porte menait : sur
-    // les voies qui se croisent, l'œil perdait la suite (le concepteur, 25/09).
+    // VISER UNE PORTE MONTRE CE QU'ELLE FERME sur la mini-carte : la
+    // coursive qui y entre s'allume, son repère aussi, et ce que les autres
+    // portes gardaient ouvert s'éteint comme s'éteindra ce que le choix
+    // interdit — le survol est l'aperçu de l'après. Allumer tout ce qu'une
+    // porte ouvre couvrait presque la grille en début de module : ce qui
+    // décide, c'est ce qu'on perd (revue du 25/09).
     if (c.voie !== undefined && mini) {
       const voie = c.voie
+      const portes = cartes.map((x) => x.voie).filter((v): v is number => v !== undefined)
       const allume = (oui: boolean): void => {
         const svg = host.querySelector('.mv-svg')
         if (!svg) return
-        for (const el of svg.querySelectorAll('.mv-chemin, .mv-entree, .mv-vise'))
-          el.classList.remove('mv-chemin', 'mv-entree', 'mv-vise')
-        svg.classList.toggle('mv-survol', oui)
+        for (const el of svg.querySelectorAll('.mv-perdu, .mv-entree, .mv-vise'))
+          el.classList.remove('mv-perdu', 'mv-entree', 'mv-vise')
         if (!oui) return
-        const ch = cheminDePorte(mini, carteRun.niveau, voie, derniereVoie(carteRun))
-        for (const k of ch.noeuds) {
+        const vient = derniereVoie(carteRun)
+        const perdu = fermeParPorte(mini, carteRun.niveau, voie, portes, vient)
+        for (const k of perdu.noeuds) {
           const [r, v] = k.split('-')
-          svg.querySelector(`.mv-noeud[data-rang="${r}"][data-voie="${v}"]`)?.classList.add('mv-chemin')
+          svg.querySelector(`.mv-noeud[data-rang="${r}"][data-voie="${v}"]`)?.classList.add('mv-perdu')
         }
-        for (const k of ch.liens) svg.querySelector(`.mv-lien[data-lien="${k}"]`)?.classList.add('mv-chemin')
-        if (ch.entree) svg.querySelector(`.mv-lien[data-lien="${ch.entree}"]`)?.classList.add('mv-entree')
+        for (const k of perdu.liens) svg.querySelector(`.mv-lien[data-lien="${k}"]`)?.classList.add('mv-perdu')
+        const entree = cheminDePorte(mini, carteRun.niveau, voie, vient).entree
+        if (entree) svg.querySelector(`.mv-lien[data-lien="${entree}"]`)?.classList.add('mv-entree')
         svg.querySelector(`.mv-noeud[data-rang="${carteRun.niveau}"][data-voie="${voie}"]`)?.classList.add('mv-vise')
+        svg.querySelector(`.mv-repere[data-voie="${voie}"]`)?.classList.add('mv-vise')
       }
       for (const ev of ['pointerenter', 'focusin', 'pad-vise'] as const) porte.addEventListener(ev, () => allume(true))
       for (const ev of ['pointerleave', 'focusout', 'pad-quitte'] as const) porte.addEventListener(ev, () => allume(false))
@@ -15659,7 +15681,7 @@ function mbJauges(): HTMLElement {
 function mbPorte(
   lv: LevelDef,
   i: number,
-  o: { etiquette?: string; classe?: string; cahier: CodeAtelier | null },
+  o: { etiquette?: string; classe?: string; cahier: CodeAtelier | null; voie?: number },
   choisit: () => void,
 ): HTMLButtonElement {
   const esc = (t: string): string =>
@@ -15669,7 +15691,7 @@ function mbPorte(
   btn.className = 'mb-porte'
   btn.style.setProperty('--i', String(i))
   btn.innerHTML =
-    `<span class="mb-porte-vue"><span class="mb-porte-no">PORTE ${i + 1}</span><canvas width="440" height="252"></canvas></span>` +
+    `<span class="mb-porte-vue">${mbNumeroPorte(i, o.voie)}<canvas width="440" height="252"></canvas></span>` +
     (o.etiquette ? `<em class="mb-porte-tag ${o.classe ?? ''}">${esc(o.etiquette)}</em>` : '') +
     `<b>${esc(lv.code)}</b><small>${esc(lv.name)}</small>` +
     (o.cahier
@@ -15743,7 +15765,24 @@ const NOMS_NOEUD: Record<Exclude<NatureNoeud, 'salle'>, { etiquette: string; tit
 /** LA PORTE D'UN NŒUD SANS SALLE : elle ne montre aucun plan — il n'y a pas
  *  de tableau derrière. L'icône de la mini-carte en grand, le titre, la
  *  phrase. Pour une rencontre, on ne sait pas laquelle attend. */
-function mbPorteNoeud(i: number, etiquette: string, nature: Exclude<NatureNoeud, 'salle'>, ouvre: () => void): HTMLButtonElement {
+/** LE NUMÉRO D'UNE PORTE : sur une mini-carte à voies, le REPÈRE de sa voie
+ *  (▲ HAUT, ● MILIEU, ▼ BAS), le même signe que le bord de la mini-carte —
+ *  « PORTE 2 » à côté de « VOIE 3 » obligeait à traduire. Sans voies, le
+ *  rang de la porte, comme avant. */
+function mbNumeroPorte(i: number, voie: number | undefined): string {
+  const rep = voie !== undefined ? REPERES_VOIE[voie] : undefined
+  return rep
+    ? `<span class="mb-porte-no mb-porte-repere"><i>${rep.signe}</i> VOIE DU ${rep.nom}</span>`
+    : `<span class="mb-porte-no">PORTE ${i + 1}</span>`
+}
+
+function mbPorteNoeud(
+  i: number,
+  etiquette: string,
+  nature: Exclude<NatureNoeud, 'salle'>,
+  ouvre: () => void,
+  voie?: number,
+): HTMLButtonElement {
   const esc = (t: string): string => t.replace(/&/g, '&amp;').replace(/</g, '&lt;')
   const d = NOMS_NOEUD[nature]
   const btn = document.createElement('button')
@@ -15751,7 +15790,7 @@ function mbPorteNoeud(i: number, etiquette: string, nature: Exclude<NatureNoeud,
   btn.className = `mb-porte mb-porte-ev mb-porte-${nature}`
   btn.style.setProperty('--i', String(i))
   btn.innerHTML =
-    `<span class="mb-porte-vue mb-ev-vue"><span class="mb-porte-no">PORTE ${i + 1}</span>` +
+    `<span class="mb-porte-vue mb-ev-vue">${mbNumeroPorte(i, voie)}` +
     `<svg class="mb-ev-icone" viewBox="0 0 24 24" aria-hidden="true">${ICONES_MINI_CARTE}<use href="#mv-i-${d.icone}" width="24" height="24"/></svg></span>` +
     `<em class="mb-porte-tag mb-voie-ev">${esc(etiquette)}</em>` +
     `<b>${esc(d.titre)}</b><small>${esc(d.texte)}</small>` +

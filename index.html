@@ -6529,11 +6529,10 @@
       .cs-route.cs-lien-sel { stroke: #eef8ff; filter: drop-shadow(0 0 8px #eef8ff); }
       /* le survol qui projette : la route la plus courte jusqu'à l'objectif */
       .cs-route.cs-projet { stroke: #eef8ff; stroke-width: 5; opacity: 1; stroke-dasharray: none; animation: none; filter: drop-shadow(0 0 7px #eef8ff); }
-      .cs-projection .cs-route { transition: opacity 0.16s ease; }
-      .cs-projection .cs-route:not(.cs-projet) { opacity: 0.18; filter: none; }
       .cs-mod.cs-projet { filter: drop-shadow(0 0 10px rgba(238, 248, 255, 0.75)); }
       /* ce que la porte survolée FERME : les modules qu'on ne pourra plus joindre */
       .cs-mod.cs-hors { opacity: 0.22 !important; filter: none; transition: opacity 0.18s ease; }
+      .cs-route.cs-hors { opacity: 0.18; filter: none; animation: none; transition: opacity 0.18s ease; }
       .cs-sens { fill: none; opacity: 0.85; }
       .cs-lien-prise { cursor: pointer; }
       .cs-brouillon { stroke: #eef8ff; stroke-width: 2; stroke-dasharray: 8 6; fill: none; pointer-events: none; }
@@ -8816,6 +8815,8 @@
         padding: 3px 7px; border-radius: 4px; color: var(--mb-encre);
         background: rgba(4, 10, 18, 0.75); border: 1px solid rgba(150, 200, 235, 0.25);
       }
+      /* le repère de voie : le signe se lit d'abord, comme au bord de la mini-carte */
+      .mb-porte-no.mb-porte-repere i { font-style: normal; font-size: 1.35em; margin-right: 3px; }
       .mb-porte-tag {
         font-style: normal; font-family: var(--font-display); font-size: calc(7px * var(--ui));
         letter-spacing: 0.18em; color: var(--dim);
@@ -8869,7 +8870,8 @@
          silhouette des modules de la station, une icône par nature */
       .mb-voies { grid-column: 1 / -1; display: flex; justify-content: center; padding: 4px 0 6px; overflow-x: auto; }
       .mv-svg { max-width: 100%; height: auto; font-family: var(--font-mono); }
-      .mv-lien { stroke: #2a3d52; stroke-width: 2.5; stroke-linecap: round; }
+      /* un lien joignable se lit à pleine intensité : c'est l'éteint qui recule */
+      .mv-lien { stroke: #4a6680; stroke-width: 2.5; stroke-linecap: round; }
       .mv-lien.mv-joue { stroke: var(--mb-menthe); stroke-width: 3; filter: drop-shadow(0 0 5px rgba(109, 255, 184, 0.5)); }
       .mv-lien.mv-ouvre { stroke: #9fb6c8; stroke-width: 2.5; stroke-dasharray: 5 5; animation: cs-flux 1.2s linear infinite; }
       /* la teinte d'un nœud : sa nature (currentColor nourrit l'icône) */
@@ -8884,12 +8886,12 @@
       .mv-halo { fill: none; stroke: transparent; stroke-width: 6; transition: stroke 0.16s ease; }
       .mv-tuile { fill: #0e1724; stroke: currentColor; stroke-width: 1.5; stroke-opacity: 0.55; transition: fill 0.16s ease, stroke-opacity 0.16s ease; }
       .mv-noeud use { opacity: 0.9; }
-      .mv-noeud.mv-loin .mv-tuile { stroke-opacity: 0.3; }
-      .mv-noeud.mv-loin use { opacity: 0.5; }
-      .mv-noeud.mv-ferme { opacity: 0.28; }
-      /* ce que le choix a interdit : les voies qu'on ne prendra plus */
-      .mv-lien.mv-interdit { opacity: 0.12; }
-      .mv-noeud.mv-interdit { opacity: 0.28; }
+      /* TROIS ÉTATS : joué (menthe), joignable (plein), hors d'atteinte — un
+         seul gris pour le passé non joué, le futur interdit par le choix, et
+         ce que la porte survolée fermera (cinq gris avant : l'œil ne les
+         distinguait pas, revue du 25/09) */
+      .mv-lien, .mv-noeud { transition: opacity 0.16s ease; }
+      .mv-lien.mv-interdit, .mv-noeud.mv-interdit, .mv-lien.mv-perdu, .mv-noeud.mv-perdu { opacity: 0.3; }
       .mv-noeud.mv-joue .mv-tuile { fill: rgba(109, 255, 184, 0.14); stroke: var(--mb-menthe); stroke-opacity: 1; }
       .mv-noeud.mv-joue use { opacity: 1; }
       .mv-coche { fill: var(--mb-menthe); stroke: #071018; stroke-width: 1.5; }
@@ -8904,16 +8906,13 @@
       .mv-noeud.mv-vise .mv-tuile { fill: currentColor; }
       .mv-noeud.mv-vise use { color: #071018; filter: none; }
       .mv-noeud.mv-evenement.mv-porte .mv-tuile { fill: rgba(255, 217, 119, 0.12); }
-      /* LE SURVOL D'UNE PORTE : son chemin s'allume en blanc plein, tout le
-         reste recule — le trait gris sur gris d'avant se perdait au milieu
-         des autres voies (le concepteur, 25/09) */
-      .mv-lien, .mv-noeud { transition: opacity 0.16s ease, stroke 0.16s ease; }
-      .mv-survol .mv-lien:not(.mv-chemin):not(.mv-entree):not(.mv-joue) { opacity: 0.15; }
-      .mv-survol .mv-noeud:not(.mv-chemin):not(.mv-joue) { opacity: 0.22; }
-      .mv-survol .mv-lien.mv-chemin { stroke: #eaf6ff; stroke-width: 3; stroke-dasharray: none; opacity: 0.8; animation: none; }
-      .mv-survol .mv-lien.mv-entree { stroke: #ffffff; stroke-width: 4.5; stroke-dasharray: none; animation: none; filter: drop-shadow(0 0 6px rgba(234, 246, 255, 0.9)); }
-      .mv-survol .mv-noeud.mv-chemin .mv-tuile { stroke-opacity: 1; }
-      .mv-survol .mv-noeud.mv-chemin use { opacity: 1; }
+      /* la coursive qui mène à la porte survolée : blanc plein, pour dire
+         laquelle des cases de la grille est cette porte */
+      .mv-lien.mv-entree { stroke: #ffffff; stroke-width: 4.5; stroke-dasharray: none; animation: none; filter: drop-shadow(0 0 6px rgba(234, 246, 255, 0.9)); }
+      /* LE REPÈRE DES VOIES (▲ ● ▼) : le même signe que sur la porte */
+      .mv-repere { fill: #55708c; font-size: 13px; text-anchor: middle; dominant-baseline: central; }
+      .mv-repere.mv-repere-porte { fill: #d5f3e8; }
+      .mv-repere.mv-vise { fill: #ffffff; filter: drop-shadow(0 0 4px rgba(234, 246, 255, 0.9)); }
       @keyframes mv-bat { 0%, 100% { stroke-width: 6; stroke-opacity: 0.35; } 50% { stroke-width: 10; stroke-opacity: 0.12; } }
       .mv-titre { fill: #55708c; font-size: 9px; letter-spacing: 0.22em; text-anchor: middle; font-family: var(--font-display); }
       .mv-titre.mv-courant { fill: #d5f3e8; }
