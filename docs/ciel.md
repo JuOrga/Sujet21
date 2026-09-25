@@ -5,22 +5,22 @@ DEHORS**) :
 
 | mode | ce que c'est | ce que ça coûte |
 |---|---|---|
-| **PLAQUE** (défaut) | un calque HTML : `public/assets/ciel.webp` (2400², une vraie photographie) et une tuile d'étoiles | ~1,8 Mo au téléchargement ; composé par le navigateur, sans calcul par pixel — deux couches plein écran, en fusion normale |
+| **PLAQUE** (défaut) | `public/assets/ciel.webp` (2400², une vraie photographie), peinte dans la toile, et des étoiles procédurales nettes | ~1,3 Mo au téléchargement ; une lecture de texture par pixel de ciel |
 | **TUILE** | l'ancien fond : deux petites textures répétées | ~0,1 Mo |
 | **PROCÉDURAL** | rien à charger, le vide est entièrement calculé | zéro |
 
 La plaque **ne se télécharge qu'à son premier affichage**. Qui la coupe ne la
 paie jamais.
 
-**LE CIEL EST UN CALQUE HTML, DERRIÈRE LA TOILE** (`src/render/cielCalque.ts`).
-Il était peint par le shader, donc à la définition de la toile — que le
-réglage de résolution rétrécit (moyenne ×0,75, faible ×0,5, et l'adaptatif,
-défaut des tablettes). La plus belle image y devenait floue. Derrière la
-toile, le navigateur le compose **toujours à la définition native de
-l'écran**, quel que soit le réglage, et le déplacer ne coûte qu'une
-transformation. Le shader rend la toile transparente dans le vide
-(`uCielCalque`, en alpha prémultiplié exact : les lumières posées sur le vide
-restent des ajouts).
+**LE CIEL EST PEINT DANS LA TOILE** (`uCielMode` 2, `uPlaque`, dans
+`src/render/renderer.ts`), comme tous les fonds. Il a vécu un temps en
+**calque HTML derrière une toile transparente**, pour rester à la définition
+native de l'écran quel que soit le réglage de résolution. Le compositeur le
+payait à chaque image, en natif : **sur le Steam Deck, 20 im/s avec lui, près
+de 60 sans**. Retiré. **Ne pas y revenir sans mesurer sur le Deck** : une
+toile transparente et des couches plein écran derrière elle ne sont pas
+gratuites, même sans aucun calcul par pixel. La contrepartie assumée : aux
+résolutions réduites, le ciel suit la résolution, comme le décor.
 
 - **UNE image, UNE Voie lactée**, jamais répétée — en reculant, l'ancienne
   plaque répétée montrait deux ou trois bandes parallèles ;
@@ -35,16 +35,9 @@ restent des ajouts).
   mot ;
 - ses **bords sont fondus** dans l'image elle-même (`--fondu`, plus bas) ;
 - son centre **dérive** avec la caméra mais ne quitte jamais l'écran ;
-- les **étoiles** sont une tuile d'image (`tools/ciel/genere-etoiles.py`)
-  affichée à un texel par pixel physique : nettes par construction, et
-  elles ne changent pas de taille avec le zoom, comme des étoiles ;
-- **le calque se paie au compositeur**, à la définition native, à chaque
-  image. Le premier jet (trois tuiles en `mix-blend-mode: screen` dans un
-  groupe isolé, un `filter` CSS pour le froid) faisait tomber, sous Chromium
-  en rendu logiciel (1280 × 800, DPR 2), une page sans ciel de 60 im/s à 12 ;
-  deux couches en fusion normale, le froid peint dans la toile : 29. **Ne pas
-  y remettre de mode de fusion, de filtre ni de couche plein écran sans
-  mesurer** ;
+- les **étoiles** sont procédurales (`etoiles`, dans le shader) : un noyau
+  d'un pixel et demi de toile à tout zoom, plus denses dans la bande
+  lactée ;
 - le **recul** s'arrête quand la salle entière occupe le quart de l'écran
   (`plancher`, `src/render/camera.ts`).
 
