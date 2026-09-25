@@ -1,17 +1,21 @@
 #!/usr/bin/env python3
 """
 PRÉPARER UNE PLAQUE DE CIEL à partir d'une image (photographie ou image
-générée) : carré centré, retouches ponctuelles, mise à la taille, WebP.
+générée) : carré centré, retouches ponctuelles, désaturation, WebP.
 
     python3 tools/ciel/prepare-plaque.py assets-src/voie-lactee.png \\
-        --retouche 620,495,3 --taille 2048
+        --retouche 620,495,3 --saturation 0.55
 
-POURQUOI PAS TOUJOURS 4096. Agrandir n'ajoute aucun détail : une image de
-1254 px portée à 4096 coûte quatre fois plus de mémoire graphique (≈ 90 Mo
-contre ≈ 22 Mo en 2048) pour exactement la même netteté. La taille se choisit
-d'après la SOURCE — la plus petite puissance de deux qui ne la réduit pas,
-plafonnée à 4096 (au-delà, la tablette ne charge plus). Les étoiles nettes ne
-viennent pas de la plaque : le shader les dessine au pixel près par-dessus.
+JAMAIS AGRANDIE. La taille de la plaque est celle de la SOURCE (plafonnée à
+4096 : au-delà, la tablette ne charge plus). Ce n'est pas qu'une économie :
+le jeu lit la largeur de la texture pour décider jusqu'où il peut l'agrandir
+à l'écran sans flou (render/parallaxe.ts, cadrePlaque). Une image de 1254 px
+portée à 2048 lui ferait croire à un détail qui n'existe pas — la galaxie
+serait affichée 1,6 fois trop grande, donc floue. WebGL 2 accepte les
+tailles qui ne sont pas des puissances de deux.
+
+LA SATURATION. Les générateurs saturent : « trop de couleurs ». Le
+réglage mélange chaque pixel à sa luminance (1 : intact, 0 : gris).
 
 LES RETOUCHES. Un générateur laisse parfois un défaut ponctuel — ici un
 point noir en plein cœur galactique, que l'œil trouve en premier. Chaque
@@ -44,7 +48,8 @@ def main() -> None:
     p = argparse.ArgumentParser(description="Prépare une plaque de ciel")
     p.add_argument("source")
     p.add_argument("--retouche", action="append", default=[], help="x,y,rayon")
-    p.add_argument("--taille", type=int, default=0, help="0 : d'après la source")
+    p.add_argument("--taille", type=int, default=0, help="0 : celle de la source")
+    p.add_argument("--saturation", type=float, default=1.0)
     p.add_argument("--qualite", type=int, default=90)
     p.add_argument("--sortie", default="public/assets/ciel.webp")
     a = p.parse_args()
@@ -55,13 +60,16 @@ def main() -> None:
     for r in a.retouche:
         x, y, rayon = (int(v) for v in r.split(","))
         retouche(px, x, y, rayon)
+    lum = px @ np.array([0.2126, 0.7152, 0.0722], np.float32)
+    px = lum[..., None] + (px - lum[..., None]) * a.saturation
     im = Image.fromarray(np.clip(px + 0.5, 0, 255).astype(np.uint8))
     c = min(im.size)  # le cadrage compte en fraction d'image : il faut un carré
     im = im.crop(
         ((im.width - c) // 2, (im.height - c) // 2, (im.width + c) // 2, (im.height + c) // 2)
     )
-    taille = a.taille or min(4096, 1 << (c - 1).bit_length())
-    im = im.resize((taille, taille), Image.LANCZOS)
+    taille = a.taille or min(4096, c)
+    if taille != c:
+        im = im.resize((taille, taille), Image.LANCZOS)
     im.save(a.sortie, "WEBP", quality=a.qualite, method=6)
     print(f"{a.sortie} — {taille}×{taille}, {os.path.getsize(a.sortie) / 1e6:.2f} Mo")
 

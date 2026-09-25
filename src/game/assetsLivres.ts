@@ -59,7 +59,7 @@ const NOMS: Record<string, string> = {
   'tank-bg.webp': 'Fond de cuve',
   'stars.webp': 'Ciel étoilé (proche)',
   'stars-far.webp': 'Ciel étoilé (lointain, station)',
-  'ciel.webp': 'Plaque de ciel — la Voie lactée, 2048² (tools/ciel/prepare-plaque.py)',
+  'ciel.webp': 'Plaque de ciel — la Voie lactée, à la taille de sa source (tools/ciel/prepare-plaque.py)',
   'home.webp': 'Fiche — illustration d’accueil',
   'card-galerie.webp': 'Carton de journal — la galerie noyée',
   'fiole-pleine.webp': 'Fiole pleine (semblable)',

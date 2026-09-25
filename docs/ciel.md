@@ -5,7 +5,7 @@ DEHORS**) :
 
 | mode | ce que c'est | ce que ça coûte |
 |---|---|---|
-| **PLAQUE** (défaut) | une image carrée — `public/assets/ciel.webp`, 2048² | ~0,7 Mo au téléchargement, ~22 Mo de mémoire graphique |
+| **PLAQUE** (défaut) | une image carrée — `public/assets/ciel.webp`, 1254² | ~0,4 Mo au téléchargement, ~8 Mo de mémoire graphique |
 | **TUILE** | l'ancien fond : deux petites textures répétées | ~0,1 Mo |
 | **PROCÉDURAL** | rien à charger, le vide est entièrement calculé | zéro |
 
@@ -17,19 +17,25 @@ monde et répétée à l'infini : en reculant, on voyait deux ou trois bandes
 parallèles. Elle est désormais cadrée par rapport à l'**écran**
 (`cadrePlaque`, `src/render/parallaxe.ts`) :
 
-- l'écran en montre une **part** (0,85 de l'image sur sa grande dimension au
-  zoom de jeu), un peu plus en reculant, un peu moins en s'approchant ;
+- **jamais floue** : un pixel d'image ne couvre jamais plus de 1,15 pixel
+  physique de l'écran (`grossMax`), quels que soient le zoom et l'écran — les
+  tests le garantissent. Une image de 1254 px tient donc dans une partie
+  d'un écran d'iPad, et c'est voulu : le premier réglage la montrait deux
+  fois agrandie, « trop zoomée, pas nette du tout » ;
+- sa **taille** voulue est 0,8 de la grande dimension de l'écran au zoom de
+  jeu, un peu moins en reculant — la netteté a le dernier mot ;
+- ses **bords se fondent** dans le noir, et autour ce sont les étoiles
+  profondes du shader, à l'infini ;
 - son centre **dérive** avec la caméra, pour que la profondeur se sente, mais
-  sature avant le bord : les tests garantissent que, quels que soient la
-  position, le zoom et le format de l'écran, **l'écran reste dans l'image** ;
+  sature avant de sortir de l'écran : on ne la perd jamais de vue ;
 - au départ, la caméra regarde le **centre** de l'image : c'est là que doit
   se tenir le plus beau ;
-- le recul s'arrête quand la salle entière occupe les trois quarts de l'écran
+- le recul s'arrête quand la salle entière occupe la moitié de l'écran
   (`plancher`, `src/render/camera.ts`).
 
 **Les étoiles nettes ne sont pas dans la plaque.** Le jeu montre environ deux
 texels par pixel : une étoile d'un texel y est moyennée, donc pâlie et floue.
-En modes PLAQUE et PROCÉDURAL, le shader dessine par-dessus six couches
+En modes PLAQUE et PROCÉDURAL, le shader dessine par-dessus huit couches
 d'étoiles au pixel près (`etoiles` dans `src/render/renderer.ts`), nettes à
 tout zoom et sur tout écran, plus nombreuses là où la plaque est riche — la
 bande lactée. La plaque ne porte que le fond : la lueur, le grain, les
@@ -144,10 +150,11 @@ magick assets-src/original.tif -gravity center -crop 1:1 +repage \
 ```
 
 **Mieux : `tools/ciel/prepare-plaque.py`** fait le carré, les retouches
-ponctuelles (`--retouche x,y,rayon`) et choisit la taille d'après la source —
-la plus petite puissance de deux qui ne la réduit pas, plafonnée à 4096.
-Agrandir n'ajoute aucun détail : une image de 1254 px en 4096 coûterait quatre
-fois la mémoire de 2048 pour la même netteté.
+ponctuelles (`--retouche x,y,rayon`), la désaturation (`--saturation`) et
+garde la taille de la source, plafonnée à 4096. **Ne jamais agrandir** : le
+jeu lit la largeur de la texture pour décider jusqu'où il peut l'afficher sans
+flou — une image de 1254 px portée à 2048 lui ferait croire à un détail qui
+n'existe pas, et la galaxie serait affichée 1,6 fois trop grande.
 
 **Pourquoi 4096 et pas 16 384.** Une texture coûte en mémoire graphique
 `côté² × 4` octets, plus un tiers pour ses niveaux de détail : 4096 → ~90 Mo,
@@ -170,9 +177,9 @@ BANC › **Ciel du dehors**, en jeu, à vue :
   0,55 son cœur et ses nébuleuses restaient ternes. Trop haut, le vide écrase
   la station et la hiérarchie lumineuse s'inverse : baissez en regardant la
   cuve.
-- **part vue** — quelle part de l'image la grande dimension de l'écran montre
-  au zoom de jeu. Plus petite : la Voie lactée paraît plus grande et plus
-  proche. Quelle que soit la valeur, l'écran reste dans l'image.
+- **taille** — la largeur de la galaxie, en fraction de l'écran, au zoom de
+  jeu. Plafonnée par la netteté : sur un écran très fin, elle reste plus
+  petite que demandé.
 
 ---
 
@@ -184,8 +191,11 @@ poussière filamenteuses, des nébuleuses roses, une région bleue au-dessus du
 cœur. Source de 1254 px, préparée ainsi (l'original est hors dépôt) :
 
 ```bash
-python3 tools/ciel/prepare-plaque.py assets-src/voie-lactee.png --retouche 620,495,3
+python3 tools/ciel/prepare-plaque.py assets-src/voie-lactee.png \
+    --retouche 620,495,3 --saturation 0.45
 ```
+
+La saturation à 0,45 répond à « trop de couleurs » : le générateur sature.
 
 La retouche efface un point noir que le générateur avait laissé en plein cœur
 — le premier endroit où l'œil va.
