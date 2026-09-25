@@ -10,11 +10,12 @@ const MANUAL_MAX_FACTOR = 5
 // LE RECUL A UN FOND. Le plancher manuel (0,12 × 0,2 = 0,024) laissait
 // reculer presque sans fin : la salle devenait une tête d'épingle au milieu
 // du vide, et la Voie lactée du fond se répétait en papier peint. On recule
-// désormais jusqu'à voir la salle ENTIÈRE, qui occupe alors la MOITIÉ de la
+// désormais jusqu'à voir la salle ENTIÈRE, qui occupe alors le QUART de la
 // dimension de l'écran qui la contraint — et pas plus loin. (Premier réglage
-// à trois quarts : « tu peux dézoomer plus ». Le ciel ne se répète plus, le
-// recul ne coûte donc plus rien au fond.)
-const RECUL_MAX = 0.5
+// à trois quarts, puis la moitié : « il faut pouvoir dézoomer plus », deux
+// fois. Le ciel ne se répète plus, le recul ne coûte donc plus rien au fond :
+// la salle tient désormais dans un quart.)
+const RECUL_MAX = 0.25
 
 // L'horloge du plan d'ouverture ne compte jamais plus qu'une image « lente »
 // par image réelle. Le début d'un tableau est précisément le moment des
