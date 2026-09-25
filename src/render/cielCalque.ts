@@ -12,10 +12,17 @@
 //
 //   - la GALAXIE : une image, cadrée par cadrePlaque (render/parallaxe.ts) —
 //     jamais agrandie au-delà de ce qu'elle peut rendre net ;
-//   - les ÉTOILES : trois tuiles d'image (tools/ciel/genere-etoiles.py)
-//     affichées à UN texel par pixel physique, sur trois profondeurs de
-//     parallaxe. Des étoiles lointaines ne changent pas de taille avec le
-//     zoom : les tuiles non plus.
+//   - les ÉTOILES : une tuile d'image (tools/ciel/genere-etoiles.py)
+//     affichée à UN texel par pixel physique. Des étoiles lointaines ne
+//     changent pas de taille avec le zoom : la tuile non plus.
+//
+// LE COÛT EST CELUI DU COMPOSITEUR, invisible dans les profils JS : chaque
+// couche plein écran se fond à la définition native, à chaque image. Le
+// premier jet en avait quatre (la galaxie, trois tuiles d'étoiles en
+// « screen » dans un groupe isolé) et un filtre CSS pour le froid — mesuré
+// sous Chromium en rendu logiciel (1280 × 800, DPR 2) : 60 im/s sans ciel,
+// 12 avec, 10 sous le froid. Il en reste deux, en fusion normale, sans
+// filtre (le froid se peint dans la toile, voir uChill) : 29.
 
 import { cadrePlaque, type CadrePlaque, type ReglagesPlaque } from './parallaxe'
 
@@ -28,9 +35,7 @@ export interface CoucheEtoiles {
 }
 
 export const COUCHES_ETOILES: readonly CoucheEtoiles[] = [
-  { url: '/assets/etoiles-fond.webp', tuile: 887, vitesse: 0.03 },
-  { url: '/assets/etoiles-milieu.webp', tuile: 1024, vitesse: 0.06 },
-  { url: '/assets/etoiles-proche.webp', tuile: 1181, vitesse: 0.11 },
+  { url: '/assets/etoiles.webp', tuile: 1531, vitesse: 0.06 },
 ]
 
 /** Le décalage d'une couche d'étoiles, en px CSS, ramené dans une période
@@ -50,17 +55,6 @@ export function decalageTuile(monde: number, zoom: number, vitesse: number, tuil
 export function auPixel(v: number, dpr: number): number {
   const d = Math.max(dpr, 1e-4)
   return Math.round(v * d) / d
-}
-
-/** LE FROID DU VAISSEAU sur le ciel. Dans la toile, le shader teinte et
- *  assombrit tout ce qu'il peint (uChill) ; le ciel n'y est plus, il reçoit
- *  donc la même chose en filtre CSS — la part d'assombrissement (12 %) et
- *  un glissement vers le bleu. Vide sous un froid négligeable : pas de
- *  filtre, pas de coût. */
-export function filtreFroid(froid: number): string {
-  const f = Math.min(1, Math.max(0, froid))
-  if (f < 0.01) return 'none'
-  return `brightness(${(1 - 0.12 * f).toFixed(3)}) hue-rotate(${(8 * f).toFixed(1)}deg) saturate(${(1 - 0.25 * f).toFixed(3)})`
 }
 
 /** Où poser l'image de la galaxie à l'écran (px CSS, coin haut-gauche et
@@ -89,8 +83,6 @@ export interface EtatCiel {
   /** la densité NATIVE de l'écran — pas l'échelle de rendu de la toile */
   dpr: number
   force: number
-  /** le refroidissement du vaisseau, 0..1 (le uChill du shader) */
-  froid: number
   reglages: ReglagesPlaque
 }
 
@@ -122,9 +114,8 @@ export class CielCalque {
     const r = document.createElement('div')
     r.id = 'ciel-calque'
     r.setAttribute('aria-hidden', 'true')
-    // isolation : les modes de fusion des étoiles restent DANS le calque
     r.style.cssText =
-      'position:absolute;inset:0;overflow:hidden;background:#000;isolation:isolate;pointer-events:none;display:none'
+      'position:absolute;inset:0;overflow:hidden;background:#000;pointer-events:none;display:none'
     const g = document.createElement('img')
     g.alt = ''
     g.decoding = 'async'
@@ -139,9 +130,10 @@ export class CielCalque {
     for (let i = 0; i < COUCHES_ETOILES.length; i++) {
       this.tuiles.push(new Image())
       const d = document.createElement('div')
-      // SCREEN : une étoile éclaire ce qu'elle recouvre, sans l'éteindre —
-      // les lanes sombres de la galaxie en sont piquées, comme dans le vrai
-      d.style.cssText = 'position:absolute;left:0;top:0;background-repeat:repeat;mix-blend-mode:screen;will-change:transform'
+      // FUSION NORMALE : la tuile porte son alpha (genere-etoiles.py) — une
+      // étoile éclaire ce qu'elle recouvre sans l'éteindre, comme le
+      // « screen » d'avant, sans la surface isolée qu'il coûtait
+      d.style.cssText = 'position:absolute;left:0;top:0;background-repeat:repeat;will-change:transform'
       r.appendChild(d)
       this.couches.push(d)
     }
@@ -192,7 +184,6 @@ export class CielCalque {
       const oy = auPixel(decalageTuile(-e.camY, e.zoom, c.vitesse, t), dpr)
       this.pose(this.couches[i], 'transform', `translate3d(${ox}px,${oy}px,0)`)
     })
-    this.pose(this.racine, 'filter', filtreFroid(e.froid))
     if (!this.galaxiePrete) return
     const n = this.galaxie.naturalWidth || 1
     const cadre = cadrePlaque(e.camX, e.camY, e.zoom, e.largeurCss, e.hauteurCss, dpr, n, e.reglages)
@@ -221,7 +212,6 @@ export class CielCalque {
     g.fillRect(0, 0, largeur, hauteur)
     const e = this.dernier
     if (e && e.actif) {
-      g.filter = filtreFroid(e.froid)
       const k = largeur / Math.max(l * e.largeurCss, 1e-6)
       g.setTransform(k, 0, 0, hauteur / Math.max(h * e.hauteurCss, 1e-6), -x * e.largeurCss * k, -y * e.hauteurCss * (hauteur / Math.max(h * e.hauteurCss, 1e-6)))
       if (this.galaxiePrete) {
@@ -232,7 +222,6 @@ export class CielCalque {
         g.drawImage(this.galaxie, r.x, r.y, r.largeur, r.largeur)
         g.globalAlpha = 1
       }
-      g.globalCompositeOperation = 'screen'
       let motifs = this.motifs.get(g)
       if (!motifs) {
         motifs = COUCHES_ETOILES.map(() => null)

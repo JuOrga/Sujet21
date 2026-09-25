@@ -3735,6 +3735,20 @@ appliqueSimHz()
 // deux rapports de performance, mêmes conditions, seul ce réglage change —
 // l'écart chiffre le coût réel des graphismes sur la machine du joueur.
 let decorRiche = localStorage.getItem('sujet21-decor') !== 'sobre'
+// LE DEHORS DU MODULE : les modules voisins, la station au loin et le
+// matériel posé sur la coque (compositionCoque.ts). MASQUÉ par défaut, le
+// temps de le mettre au point : seule la coque se dessine, avec les vides
+// qui la percent. ?exterieur=1 (ou 0) dans l'adresse l'impose et s'en
+// souvient — c'est le chemin des aperçus sur tablette.
+let exterieurActif = (() => {
+  const q = new URLSearchParams(location.search).get('exterieur')
+  try {
+    if (q === '1' || q === '0') localStorage.setItem('sujet21-exterieur', q === '1' ? 'on' : 'off')
+    return localStorage.getItem('sujet21-exterieur') === 'on'
+  } catch {
+    return q === '1'
+  }
+})()
 // LE VOILE DES CACHETTES : le brouillard (défaut, voileCache.ts) ou le
 // voile SOBRE d'avant — le rectangle plein, les nappes discrètes, le liseré.
 // Un choix de goût autant que de coût : le joueur qui préfère l'ancien le
@@ -3993,6 +4007,32 @@ const paramsEl = document.getElementById('params') as HTMLDivElement
     }
   }
   renderDecor()
+
+  const choixExterieur = document.getElementById('params-exterieur') as HTMLDivElement | null
+  const renderExterieur = (): void => {
+    if (!choixExterieur) return
+    choixExterieur.innerHTML = ''
+    for (const [on, label] of [
+      [true, 'AFFICHÉ'],
+      [false, 'MASQUÉ'],
+    ] as const) {
+      const b = document.createElement('button')
+      b.type = 'button'
+      b.textContent = label
+      b.className = exterieurActif === on ? 'actif' : ''
+      b.addEventListener('click', () => {
+        exterieurActif = on
+        try {
+          localStorage.setItem('sujet21-exterieur', on ? 'on' : 'off')
+        } catch {
+          // stockage refusé : le choix ne tiendra que la session
+        }
+        renderExterieur()
+      })
+      choixExterieur.appendChild(b)
+    }
+  }
+  renderExterieur()
 
   const choixVoile = document.getElementById('params-voile') as HTMLDivElement
   const renderVoile = (): void => {
@@ -4430,8 +4470,7 @@ function rapportPerf(): Record<string, unknown> {
       // plus que le coût de l'eau — sans ce drapeau, le rapport tromperait
       decorNet,
       // les pixels RÉELS de la toile, et si la passe nette l'a repassée en
-      // natif : au réglage « suit la résolution », un tableau à conduite le
-      // fait aussi — « megapixels » (l'échelle au carré) le cachait
+      // natif — « megapixels » (l'échelle au carré) ne le dit pas
       megapixelsToile: Math.round(((canvas.width * canvas.height) / 1e6) * 100) / 100,
       passeNette: renderer.passeNette,
       timeWarp: params.timeWarp,
@@ -18025,8 +18064,8 @@ function corpsImage(now: number): boolean {
   // l'échelle fixe choisie s'applique ici : seul le canvas est mis à
   // l'échelle, l'interface HTML reste à la netteté native
   const dpr = echelleRendue()
-  // LA CONDUITE NETTE : aux résolutions réduites, la conduite d'ammoniac se
-  // repasse à la densité native de l'écran (renderer.ts, drawConduiteNette)
+  // LE DÉCOR NET, s'il est demandé : repassé à la densité native de l'écran
+  // (renderer.ts, passeNetteRequise)
   renderer.dprNatif = Math.min(window.devicePixelRatio || 1, PLAFOND_DPR)
   renderer.decorNet = decorNet
   renderer.boitesMurs = level.boxes
@@ -19463,6 +19502,7 @@ function corpsImage(now: number): boolean {
   // s'affichait plus du tout. Posé à l'image, il ne peut ni arriver trop tôt
   // ni rester en retard d'un tableau.
   renderer.setSolModules(level.coque === 'structures')
+  renderer.setExterieur(exterieurActif)
   renderer.setCiel(CIEL_MODE[cielChoix])
   // LE CIEL EN CALQUE, à la densité NATIVE de l'écran — pas à l'échelle de
   // rendu de la toile : c'est tout l'objet (render/cielCalque.ts)
@@ -19475,7 +19515,6 @@ function corpsImage(now: number): boolean {
     hauteurCss: vh,
     dpr: Math.min(window.devicePixelRatio || 1, 3),
     force: cielReglages.force,
-    froid: chillNow(),
     reglages: { ...PLAQUE_DEFAUTS, taille: cielReglages.taille },
   })
   // LA PROFONDEUR DES COUCHES DE FOND : posée à l'image comme le ciel, pour

@@ -1505,3 +1505,97 @@ Retro-futuristic 1970s orbital laboratory, flat orthographic 2D game asset. Mute
 ```
 *Midjourney : `--ar 1:1 --tile --style raw --sref <référence>`. L'image livrée garde des
 franges violettes : le shader n'en lit que la clarté, teintée en blanc bleuté.*
+
+## 28. LE MATÉRIEL DE COQUE, VU DE DESSUS — une image par pièce
+
+Le décor posé AU-DEHORS de la cuve, **vu de dessus** comme la salle. Une image par pièce,
+chacune avec son prompt complet : une planche de huit (25/09) donnait des pièces trop
+petites et trop vite faites. La composition (qui va où, à quelle taille) est écrite par le
+moteur (`compositionCoque.ts`) : chaque image ne fournit qu'UNE pièce.
+
+**Convention commune** : fond transparent ; la COQUE est toujours au bord BAS de l'image —
+la pièce part de là vers le haut (le dehors). Soleil en haut à gauche pour toutes : c'est
+ce qui les fera tenir ensemble. Conseil : générez l'aile en premier, puis passez-la en
+référence de style au générateur pour les suivantes.
+
+Dépôt : `masters/images/coque/<nom>.png`, puis `python3 tools/images/materiel.py`.
+
+### 28.1 aile solaire — `coque/aile.png` · 16:9 (paysage)
+
+Cadrage : l'aile couchée sur toute la largeur ; son pied (le cardan) au milieu du bord BAS.
+
+```
+Retro-futuristic 1970s orbital laboratory hardware, NASA/ISS-inspired, realistic worn industrial detail: riveted steel, weld seams, scuffed paint, bolts, small stencilled hazard markings. Muted cold palette: steel blue-grey #0a1420 to #2a3542, off-white quilted thermal blankets, a single cyan accent #63b7e6, amber only on tiny indicator lamps. STRICT TOP-DOWN ORTHOGRAPHIC VIEW, seen from directly above like a floor plan or a satellite photo, no perspective, no 3/4 angle, no side faces visible. Hard sunlight from the upper left: lit edges catch a thin bright rim, the lower right sides fall into deep shadow. Isolated single object on a fully TRANSPARENT background, filling the frame with a small empty margin, crisp clean silhouette, high detail, 2D game asset. Subject: one solar array wing of a space station seen from directly above, lying flat, stretched across the whole width of a 16:9 landscape image. A long thin rectangle about five times wider than tall. It is made of two photovoltaic blankets, left and right, separated by a narrow central lattice mast running vertically through the middle. Each blanket: a dense grid of dark navy-blue solar cells with a faint violet sheen, fine silver interconnect lines, thin gold-anodized frame, tensioning cables at the outer ends, a few slightly misaligned cells. At the bottom centre, where it attaches, a compact rotating gimbal joint with a small amber status lamp. Avoid: side view, profile view, perspective, isometric, 3/4 view, ground, floor, cast shadow on a surface, background scenery, stars, planet, text, labels, logos, watermark, frame, border.
+```
+
+### 28.2 radiateur — `coque/radiateur.png` · 9:16 (portrait)
+
+Cadrage : le panneau debout ; son attache au milieu du bord BAS.
+
+```
+Retro-futuristic 1970s orbital laboratory hardware, NASA/ISS-inspired, realistic worn industrial detail: riveted steel, weld seams, scuffed paint, bolts, small stencilled hazard markings. Muted cold palette: steel blue-grey #0a1420 to #2a3542, off-white quilted thermal blankets, a single cyan accent #63b7e6, amber only on tiny indicator lamps. STRICT TOP-DOWN ORTHOGRAPHIC VIEW, seen from directly above like a floor plan or a satellite photo, no perspective, no 3/4 angle, no side faces visible. Hard sunlight from the upper left: lit edges catch a thin bright rim, the lower right sides fall into deep shadow. Isolated single object on a fully TRANSPARENT background, filling the frame with a small empty margin, crisp clean silhouette, high detail, 2D game asset. Subject: one thermal radiator panel of a space station seen from directly above, lying flat, standing tall in a 9:16 portrait image: a long rectangle about three times taller than wide. Pale off-white and light grey surface divided into many thin horizontal fins, a coolant pipe running up its centre with small flanged joints, darker structural frame on the edges, faint scorch and discoloration near the base, a hinge bracket and flexible hoses at the bottom centre where it attaches to the hull. Avoid: side view, profile view, perspective, isometric, 3/4 view, ground, floor, cast shadow on a surface, background scenery, stars, planet, text, labels, logos, watermark, frame, border.
+```
+
+### 28.3 parabole — `coque/parabole.png` · 1:1 (carré)
+
+Cadrage : le disque centré.
+
+```
+Retro-futuristic 1970s orbital laboratory hardware, NASA/ISS-inspired, realistic worn industrial detail: riveted steel, weld seams, scuffed paint, bolts, small stencilled hazard markings. Muted cold palette: steel blue-grey #0a1420 to #2a3542, off-white quilted thermal blankets, a single cyan accent #63b7e6, amber only on tiny indicator lamps. STRICT TOP-DOWN ORTHOGRAPHIC VIEW, seen from directly above like a floor plan or a satellite photo, no perspective, no 3/4 angle, no side faces visible. Hard sunlight from the upper left: lit edges catch a thin bright rim, the lower right sides fall into deep shadow. Isolated single object on a fully TRANSPARENT background, filling the frame with a small empty margin, crisp clean silhouette, high detail, 2D game asset. Subject: one parabolic communication dish of a space station seen from directly above, in a square 1:1 image. A perfect circle: the concave dish surface in matte light grey with subtle radial panel seams and eight structural ribs, the sunlight making the upper-left inner rim dark and the lower-right inner curve bright (it is a hollow bowl), a small cylindrical feed horn at the exact centre held by three thin struts, a cable running from the hub to the rim. Avoid: side view, profile view, perspective, isometric, 3/4 view, ground, floor, cast shadow on a surface, background scenery, stars, planet, text, labels, logos, watermark, frame, border.
+```
+
+### 28.4 port d'amarrage — `coque/amarrage.png` · 3:4 (portrait)
+
+Cadrage : la collerette sur le bord BAS, le module qui monte vers le haut et s'efface.
+
+```
+Retro-futuristic 1970s orbital laboratory hardware, NASA/ISS-inspired, realistic worn industrial detail: riveted steel, weld seams, scuffed paint, bolts, small stencilled hazard markings. Muted cold palette: steel blue-grey #0a1420 to #2a3542, off-white quilted thermal blankets, a single cyan accent #63b7e6, amber only on tiny indicator lamps. STRICT TOP-DOWN ORTHOGRAPHIC VIEW, seen from directly above like a floor plan or a satellite photo, no perspective, no 3/4 angle, no side faces visible. Hard sunlight from the upper left: lit edges catch a thin bright rim, the lower right sides fall into deep shadow. Isolated single object on a fully TRANSPARENT background, filling the frame with a small empty margin, crisp clean silhouette, high detail, 2D game asset. Subject: one docking port of a space station and the first section of the neighbouring module, seen from directly above, in a 3:4 portrait image. At the bottom, a heavy square bolted docking collar with guide petals and four small green approach lights. From it, a short cylindrical pressurised module rises towards the top of the image, covered in quilted off-white thermal blankets with stitched seams, handrails in faded yellow, circumferential reinforcing rings every so often, the cylinder clearly round (lit on its upper-left side, shadowed on the right). The module simply continues out of the top edge, cut cleanly by the frame. Avoid: side view, profile view, perspective, isometric, 3/4 view, ground, floor, cast shadow on a surface, background scenery, stars, planet, text, labels, logos, watermark, frame, border.
+```
+
+### 28.5 poutre en treillis — `coque/treillis.png` · 9:16 (portrait)
+
+Cadrage : le segment vertical, raccordable en haut et en bas.
+
+```
+Retro-futuristic 1970s orbital laboratory hardware, NASA/ISS-inspired, realistic worn industrial detail: riveted steel, weld seams, scuffed paint, bolts, small stencilled hazard markings. Muted cold palette: steel blue-grey #0a1420 to #2a3542, off-white quilted thermal blankets, a single cyan accent #63b7e6, amber only on tiny indicator lamps. STRICT TOP-DOWN ORTHOGRAPHIC VIEW, seen from directly above like a floor plan or a satellite photo, no perspective, no 3/4 angle, no side faces visible. Hard sunlight from the upper left: lit edges catch a thin bright rim, the lower right sides fall into deep shadow. Isolated single object on a fully TRANSPARENT background, filling the frame with a small empty margin, crisp clean silhouette, high detail, 2D game asset. Subject: one straight segment of a space station lattice truss seen from directly above, running vertically through a 9:16 portrait image from the bottom edge to the top edge. Two parallel square steel rails on the left and right, triangular diagonal bracing between them, bolted gusset plates at each node, a bundle of cables and a thin coolant line running along the middle, a small yellow handrail on one side. Both ends are cut straight and identical so the segment tiles seamlessly end to end. Avoid: side view, profile view, perspective, isometric, 3/4 view, ground, floor, cast shadow on a surface, background scenery, stars, planet, text, labels, logos, watermark, frame, border.
+```
+
+### 28.6 bloc de propulseurs — ✗ ABANDONNÉ (25/09)
+
+Retiré de la composition : ni le tracé ni l'image générée (des tuyères
+vues de face, comme des haut-parleurs) ne tenaient à côté des pièces
+peintes.
+
+### 28.7 feu de navigation — ✗ PAS D'IMAGE (25/09)
+
+Gardé TRACÉ par le moteur : à 28 u, quelques pixels au dézoom, aucun
+détail peint ne se verrait — c'est son halo coloré qui se lit. Une
+image générée (une lanterne grillagée de quai) a été écartée.
+
+### 28.8 embase — `coque/embase.png` · 2:1 (paysage)
+
+Cadrage : la platine sur toute la largeur ; la douille (où entre le bras) au milieu, vers le HAUT ; le bord bas touche la coque.
+
+*Aujourd'hui tracée par le moteur : l'image la remplacera si elle tient mieux à côté des pièces peintes.*
+
+```
+Retro-futuristic 1970s orbital laboratory hardware, NASA/ISS-inspired, realistic worn industrial detail: riveted steel, weld seams, scuffed paint, bolts, small stencilled hazard markings. Muted cold palette: steel blue-grey #0a1420 to #2a3542, off-white quilted thermal blankets, a single cyan accent #63b7e6, amber only on tiny indicator lamps. STRICT TOP-DOWN ORTHOGRAPHIC VIEW, seen from directly above like a floor plan or a satellite photo, no perspective, no 3/4 angle, no side faces visible. Hard sunlight from the upper left: lit edges catch a thin bright rim, the lower right sides fall into deep shadow. Isolated single object on a fully TRANSPARENT background, filling the frame with a small empty margin, crisp clean silhouette, high detail, 2D game asset. Subject: one heavy bolted mounting base that fixes an external structure onto the hull of a space station, seen from directly above, in a 2:1 landscape image. A wide rectangular steel plate with chamfered corners and two rows of large hex bolts, a raised square flange socket in the middle where a lattice arm plugs in, two diagonal bracing struts rising from the plate corners towards the socket, a bundle of cables leaving the socket and disappearing into a small hatch on the plate, a thin yellow-black hazard stripe along the bottom edge. The bottom edge of the image is where the plate meets the hull. Avoid: side view, profile view, perspective, isometric, 3/4 view, ground, floor, cast shadow on a surface, background scenery, stars, planet, text, labels, logos, watermark, frame, border.
+```
+
+## 29. LA BANDE DE COQUE — `hull.webp` (refonte, 25/09)
+
+La paroi de la cuve, vue de dessus : c'est elle qu'on voit le plus, et la
+bande livrée (un aplat métallique répété) restait la partie la plus pauvre
+de l'image. **Une seule image, qui se répète** le long des quatre côtés.
+
+**Sens à respecter** : le bord **BAS** de l'image est le côté SALLE (le
+trait lumineux cyan), le bord **HAUT** est le DEHORS (la peau du module).
+Le moteur lit la longueur d'une répétition dans le rapport de l'image :
+elle n'est jamais étirée.
+
+Livraison : `masters/images/hull.png`, puis `python3 tools/images/prepare.py hull`
+(raccord gauche-droite mesuré, luminance ≤ 0,25, ≤ 120 Ko).
+
+```
+Retro-futuristic 1970s orbital laboratory hardware, NASA/ISS-inspired, realistic worn industrial detail: riveted steel, weld seams, scuffed paint, bolts, small stencilled hazard markings. Muted cold palette: steel blue-grey #0a1420 to #2a3542, off-white quilted thermal blankets, a single cyan accent #63b7e6, amber only on tiny indicator lamps. STRICT TOP-DOWN ORTHOGRAPHIC VIEW, seen from directly above like a floor plan, no perspective, no side faces visible. Hard sunlight from the upper left. Subject: a long horizontal strip, 3:1 landscape, SEAMLESSLY TILEABLE LEFT-RIGHT (the left and right edges must match perfectly), showing the thick hull wall of a space station module seen from above, like the top of a wall on an architectural plan. From bottom to top: along the BOTTOM edge, the inner face of the wall with one thin continuous glowing cyan light strip (#63b7e6); then the body of the wall, heavy structural steel: bolted armour plates of varied lengths, a recessed channel carrying two or three pipes and cable bundles with clamps, reinforcing ribs crossing the wall every so often, a small maintenance hatch, faded stencilled markings; along the TOP edge, the outer skin of the module: a narrow band of off-white quilted thermal blanket held by a thin riveted metal rim. Overall dark and low-contrast (average brightness around 20 %), so that the lit room inside stays the brightest thing. Fills the whole image, no margin, no transparency. Avoid: perspective, 3/4 view, side view, vanishing point, seams at the left and right edges, bright colours, text, labels, logos, watermark, frame, border.
+```

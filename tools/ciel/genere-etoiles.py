@@ -9,12 +9,17 @@ que la toile. Les étoiles y sont des tuiles d'image affichées à UN texel
 par pixel physique : nettes par construction, et d'un coût à peu près nul
 (le déplacement est une transformation, faite par le compositeur).
 
-Trois tuiles, trois profondeurs, de tailles PREMIÈRES ENTRE ELLES : leurs
-répétitions ne coïncident qu'au bout de 887 × 1024 × 1181 pixels — l'œil
-n'y reconnaît aucun motif.
-  - fond   : la poussière d'étoiles, des milliers d'étoiles faibles ;
-  - milieu : un semis plus rare, un peu plus vif ;
-  - proche : quelques étoiles vives, légèrement plus larges.
+UNE SEULE TUILE, qui porte les trois populations (poussière, semis,
+étoiles vives). Il y en avait trois, sur trois profondeurs de parallaxe,
+fondues en « screen » : le compositeur payait alors trois couches plein
+écran, une surface isolée pour la fusion et une autre pour le filtre du
+froid — mesuré sous Chromium en rendu logiciel (1280 × 800, DPR 2), le
+calque tombait de 60 im/s (sans ciel) à 12. Une couche, en fusion normale :
+29. La tuile porte donc un ALPHA (la couleur la plus vive du pixel) : posée
+normalement sur la galaxie, elle donne s + g·(1 − a), à peu près le
+« screen » d'avant (s + g·(1 − s)) pour des étoiles presque blanches.
+
+La taille est PREMIÈRE (1531) : aucun sous-motif ne se répète en deçà.
 
 Périodiques : chaque étoile est posée modulo la taille, son noyau aussi.
 
@@ -67,8 +72,13 @@ def enregistre(img: np.ndarray, chemin: str) -> None:
     # confettis égaux. Sans courbe, les faibles disparaissaient : un ciel
     # vide. Entre les deux, les faibles restent à peine là — c'est la
     # profondeur.
-    x = np.clip(img, 0, 1) ** (1 / 1.6) * 255.0 + 0.5
-    Image.fromarray(x.astype(np.uint8), "RGB").save(chemin, "WEBP", lossless=True, method=6)
+    x = np.clip(img, 0, 1) ** (1 / 1.6)
+    # l'alpha : la composante la plus vive ; la couleur, rapportée à lui
+    # (WebP n'est pas prémultiplié)
+    a = x.max(axis=2, keepdims=True)
+    c = np.where(a > 0, x / np.maximum(a, 1e-6), 0.0)
+    rgba = np.concatenate([c, a], axis=2) * 255.0 + 0.5
+    Image.fromarray(rgba.astype(np.uint8), "RGBA").save(chemin, "WEBP", lossless=True, method=6)
     print(f"{chemin} — {img.shape[0]}², {os.path.getsize(chemin) / 1e3:.0f} Ko")
 
 
@@ -77,10 +87,15 @@ def main() -> None:
     # peine visibles, très peu de vives. Premier tirage (éclats 0,55 / 1 /
     # 2,2, puissances 3 à 3,5, noyaux de 0,5 à 0,65 px) : en jeu, des pâtés
     # blancs tous pareils — un semis de confettis, pas un ciel profond.
-    enregistre(tuile(887, 9000, 0.55, 4.0, 0.42, 1), "public/assets/etoiles-fond.webp")
-    enregistre(tuile(1024, 1500, 1.00, 4.5, 0.46, 2), "public/assets/etoiles-milieu.webp")
-    enregistre(tuile(1181, 170, 2.40, 3.5, 0.55, 3), "public/assets/etoiles-proche.webp")
-
+    # (les trois tirages d'origine — 887², 1024², 1181² — gardent leur
+    # densité par pixel sur la tuile commune de 1531²)
+    n = 1531
+    img = (
+        tuile(n, round(9000 * (n / 887) ** 2), 0.55, 4.0, 0.42, 1)
+        + tuile(n, round(1500 * (n / 1024) ** 2), 1.00, 4.5, 0.46, 2)
+        + tuile(n, round(170 * (n / 1181) ** 2), 2.40, 3.5, 0.55, 3)
+    )
+    enregistre(img, "public/assets/etoiles.webp")
 
 if __name__ == "__main__":
     main()

@@ -157,6 +157,7 @@ export const FICHES_MATERIAUX: Record<number, Fiche> = {
       { cle: 'VAPEUR', txt: 'flotte dessus, pareil.' },
       { cle: 'LASER', txt: 'traverse.' },
       { cle: '·', txt: 'Purement visuel : une fenêtre sur les étoiles, sans monture. Prend toutes les formes.' },
+      { cle: '·', txt: 'Perce aussi la COQUE de la cuve : à cheval sur le bord, il ouvre la paroi et son matériel extérieur sur le dehors. Le bord du tableau reste une limite — le corps y bute.' },
     ],
   },
   [MAT_BAIE]: {
