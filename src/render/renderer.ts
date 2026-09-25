@@ -1826,8 +1826,9 @@ void main() {
     // Ombre portée douce autour de chaque solide (sauf le sas) : les blocs
     // se détachent du fond au lieu de flotter — la cuve prend de la
     // profondeur, les rectangles cessent d'être des aplats.
-    // (sauf la conduite d'ammoniac : son ombre suit ses tubes, pas la boîte)
-    if (solide && !(mat > 3.5 && mat < 4.5)) {
+    // (sauf la conduite d'ammoniac : son ombre suit ses tubes, pas la boîte
+    // — une plaque froide À FORME, elle, est un solide comme un autre)
+    if (solide && !(mat > 3.5 && mat < 4.5 && dec.y < 0.5)) {
       float shade = 1.0 - smoothstep(0.0, 56.0, max(d, 0.0));
       col = mix(col, col * vec3(0.50, 0.56, 0.70), shade * shade * 0.5);
     }
@@ -1836,7 +1837,7 @@ void main() {
     // sommet, strates et chant clair — chaque matériau garde son identité
     // sur sa tranche : turquoise mouillé, violet cireux, vert de membrane,
     // ambre de borne… Le sommet (déplacé) se peint ensuite par-dessus.
-    if (flanc > 0.003 && !(mat > 3.5 && mat < 4.5)) { // la conduite n'a pas de tranche de boîte
+    if (flanc > 0.003 && !(mat > 3.5 && mat < 4.5 && dec.y < 0.5)) { // la conduite n'a pas de tranche de boîte
       vec2 gB = gradSdfBoite(bi, wb, d, dec, bca, bsa);
       float gn2 = max(length(gB), 1e-5);
       vec2 nrm = gB / gn2;
@@ -2205,7 +2206,14 @@ void main() {
       // sur un AUTRE solide (la brume délavait la conduite voisine)
       float surSol = (iCouv == bi || dCouv > 0.0) ? 1.0 : 0.0;
       float sensC = uBoxAux[bi].z; // sens + 4 · bouts dans un mur (aux.z d'une plaque froide)
-      float dG = conduiteSdf(wb, uBoxes[bi], sensC);
+      // UNE PLAQUE FROIDE QUI A UNE FORME (disque, capsule…) la garde dans la
+      // physique (formePhysique) : son gel se mesure depuis ELLE, pas depuis
+      // la silhouette du tuyau — sans quoi la brume dessinée débordait de la
+      // vraie bande de gel (d'un cinquième du côté aux diagonales d'un
+      // disque), ou commençait en deçà (capsule). Le cuiseur de lumière
+      // faisait déjà ce tri (dec.y < 0.5) ; la composition, non.
+      bool tuyau = dec.y < 0.5;
+      float dG = tuyau ? conduiteSdf(wb, uBoxes[bi], sensC) : dV;
       // LE SOL CRISTALLISÉ dans l'aire d'effet — là où le solveur gèle l'eau
       vec2 gsol = givreSol(wb, max(dG, 0.0), uColdBand, pxMonde);
       col = mix(col, vec3(0.80, 0.90, 0.98) * eclMat, gsol.x * 0.25 * surSol);
@@ -2213,8 +2221,25 @@ void main() {
       col += vec3(0.75, 0.88, 1.0) * gsol.y * 0.30 * surSol;
       // l'ombre au sol, PARTOUT autour de la conduite (coupée au bord de la
       // boîte, elle redessinait le rectangle)
-      col *= mix(1.0, conduiteOmbre(wb, uBoxes[bi], sensC), surSol);
-      vec4 cnh = conduiteNH3(clamp(wbV - bmin, vec2(0.0), bsize), bsize, pxMonde, sensC);
+      if (tuyau) col *= mix(1.0, conduiteOmbre(wb, uBoxes[bi], sensC), surSol);
+      // L'ATLAS PAS (ENCORE) LÀ : l'unité liée à null se lit (0, 0, 0, 1) —
+      // chaque conduite se peignait en rectangles NOIRS tant que l'image
+      // montait, et pour de bon si elle manquait. Le givre procédural
+      // d'avant l'atlas reprend alors, sur la silhouette de la conduite — et
+      // de même sur une plaque qui a une forme : le tuyau n'y a pas de sens.
+      vec4 cnh;
+      if (uHasFroid > 0.5 && tuyau) {
+        cnh = conduiteNH3(clamp(wbV - bmin, vec2(0.0), bsize), bsize, pxMonde, sensC);
+      } else {
+        // la COUVERTURE du secours : la silhouette du tuyau (sa forme de
+        // collision), pas la boîte — fill en suit le rectangle, et le givre
+        // de secours y aurait peint un bloc plein là où l'eau passe
+        float couvS = tuyau
+          ? 1.0 - smoothstep(-edgeW, 0.0, conduiteSdf(wbV, uBoxes[bi], sensC))
+          : 1.0;
+        float eclat = smoothstep(0.72, 0.94, dnoise(world * 0.22));
+        cnh = vec4(vec3(0.15, 0.21, 0.29) + vec3(0.26, 0.34, 0.40) * eclat * 0.55, 1.0) * couvS;
+      }
       col = col * (1.0 - fill * cnh.a) + cnh.rgb * eclMat * fill;
       cielVu *= 1.0 - clamp(fill * cnh.a, 0.0, 1.0);
       couvConduite = max(couvConduite, fill * cnh.a);
