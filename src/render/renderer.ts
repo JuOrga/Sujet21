@@ -2934,6 +2934,12 @@ void main() {
   // que WebGL laisse indéfini (et qu'une copie en 2D, la capture vidéo,
   // écrêterait). Le ciel derrière un halo s'en voile d'autant : invisible.
   float alphaDecor = max(1.0 - cielVu, min(1.0, max(col.r, max(col.g, col.b))));
+  // LE FROID SUR LE CIEL EN CALQUE : la toile le voile d'autant que la salle
+  // s'assombrit (−12 %). C'était un filtre CSS sur le calque : une surface
+  // de plus à fondre en natif, à chaque image (render/cielCalque.ts). Le
+  // glissement vers le bleu, lui, ne passe pas par un alpha : il se perd,
+  // sur un ciel presque noir.
+  alphaDecor = 1.0 - (1.0 - alphaDecor) * (1.0 - 0.12 * uChill);
   // la COUCHE D'EAU (décor net) : la couleur prémultipliée de l'eau seule,
   // transparente là où le décor, natif, se voit
   if (uPasse > 1.5 && uPasse < 2.5)

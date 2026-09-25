@@ -19474,7 +19474,6 @@ function corpsImage(now: number): boolean {
     hauteurCss: vh,
     dpr: Math.min(window.devicePixelRatio || 1, 3),
     force: cielReglages.force,
-    froid: chillNow(),
     reglages: { ...PLAQUE_DEFAUTS, taille: cielReglages.taille },
   })
   // LA PROFONDEUR DES COUCHES DE FOND : posée à l'image comme le ciel, pour
