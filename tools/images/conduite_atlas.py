@@ -14,6 +14,7 @@ Les sources (docs/assets-ia.md, « La conduite d'ammoniac ») :
                                                 plonge dans une plaque de sol
   masters/images/sources/conduite-raccords.png  la planche de raccords
   masters/images/sources/conduite-givre.png     le givre du sol, détouré
+  masters/images/sources/conduite-vanne.webp    la tête de vanne (petits blocs)
 
 Sortie : masters/images/conduite-atlas.png (1024², RGBA), que
 tools/images/prepare.py livre ensuite en public/assets/conduite-atlas.webp.
@@ -47,6 +48,7 @@ CADRE_CORPS = (0, 0, 1024, 341)
 CADRE_BOUT = (0, 350, 370, 276)
 CADRE_JOINT = (380, 350, 451, 365)
 CADRE_GIVRE = (384, 720, 608, 304)
+CADRE_VANNE = (0, 640, 370, 361)
 
 
 def lis(nom: str) -> Image.Image:
@@ -111,6 +113,9 @@ def main() -> None:
     # (x 380), bride de 79 à 483
     colle(atlas, lis('conduite-raccords.png').crop((98, 56, 662, 513)), CADRE_JOINT)
     colle(atlas, lis('conduite-givre.png'), CADRE_GIVRE)
+    # LA VANNE (les blocs presque carrés) : la plaque (x 48..1074,
+    # y 70..1058, mesurée) et 10 à 16 px de marge, centrée sur la plaque
+    colle(atlas, lis('conduite-vanne.webp').crop((38, 54, 1084, 1074)), CADRE_VANNE)
     saigne(atlas).save(DST)
     print('écrit', os.path.relpath(DST, ROOT))
 

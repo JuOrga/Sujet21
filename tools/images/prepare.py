@@ -151,8 +151,9 @@ FAMILLES: list[Famille] = [
     ),
     Famille(
         'atlas de la conduite', ('conduite-atlas',), taille=(1024, 1024), luma_max=0.60,
-        # mesuré : 450 Ko à 84, 398 Ko à 78 — il REMPLACE froid.webp (256 Ko)
-        qualite=78, poids_max_ko=420,
+        # mesuré : 450 Ko à 84, 398 Ko à 78 — il REMPLACE froid.webp (256 Ko) ;
+        # la tête de vanne (25/09) le porte à 441 Ko à 78
+        qualite=78, poids_max_ko=450,
         note='quatre pièces assemblées par tools/images/conduite_atlas.py — leurs cadres sont un contrat avec le shader',
     ),
     Famille(

@@ -179,8 +179,20 @@ const vec4 CN_CORPS = ${v4(A.corps)};
 const vec4 CN_CADRE_BOUT = ${v4(A.bout)};
 const vec4 CN_CADRE_JOINT = ${v4(A.joint)};
 const vec4 CN_CADRE_GIVRE = ${v4(A.givre)};
+const vec4 CN_CADRE_VANNE = ${v4(A.vanne)};
+const float CN_TUYAU_TRAV = ${f(C.tuyauTraversee)};
+const float CN_SEUIL_VANNE = ${f(C.seuilVanne)};
+const float CN_VANNE_L = ${f(C.vanneImgL)};
+const float CN_VANNE_H = ${f(C.vanneImgH)};
 
-bool conduiteLongue(float L, float T) { return L >= (2.0 * CN_BOUT + 0.1) * T; }
+// le dessin selon la place — JUMEAUX de conduiteLongue, modeConduite et
+// echelleArceau (formes.ts) : 0 vanne, 1 arceau, 2 longue
+bool conduiteLongue(float L, float T) { return L >= 2.0 * CN_BOUT * T; }
+float modeConduite(float L, float T) {
+  if (conduiteLongue(L, T)) return 2.0;
+  return L < CN_SEUIL_VANNE * T ? 0.0 : 1.0;
+}
+float echelleArceau(float L, float T) { return min(1.0, L / (2.0 * CN_BOUT * T)); }
 
 float cnRect(float s, float t, float cs, float hs, float ht) {
   vec2 q = vec2(abs(s - cs) - hs, abs(t) - ht);
@@ -189,7 +201,7 @@ float cnRect(float s, float t, float cs, float hs, float ht) {
 
 // le joint le plus proche de s (abscisse centrée), ou 1e9 s'il n'y en a pas
 float jointPres(float s, float L, float T) {
-  if (!conduiteLongue(L, T)) return 0.0;
+  if (!conduiteLongue(L, T)) return 1e9;
   float n = floor((L * 0.5 - (CN_BOUT + 0.05 + CN_JOINT_DEMI) * T) / CN_PAS);
   if (n < 0.0) return 1e9;
   return clamp(floor(s / CN_PAS + 0.5), -n, n) * CN_PAS;
@@ -206,7 +218,21 @@ bool boutEnMur(float s, float bouts) {
 // pas de bride : le tuyau file jusqu'au bord du bloc — JUMEAU de
 // piecesConduite (formes.ts)
 float conduiteSdfLocal(float s, float t, float L, float T, float bouts) {
-  bool lg = conduiteLongue(L, T);
+  float mode = modeConduite(L, T);
+  if (mode < 0.5) {
+    float c = min(L, T);
+    return cnRect(s, t, 0.0, 0.5 * c, 0.5 * c);
+  }
+  if (mode < 1.5) {
+    float k = echelleArceau(L, T);
+    float dA = cnRect(s, t, 0.0, 0.5 * L, CN_TUYAU_TRAV * k * T);
+    dA = min(dA, cnRect(abs(s), t, L * 0.5 - (CN_BRIDE_A + CN_BRIDE_DE) * 0.5 * k * T,
+                        (CN_BRIDE_A - CN_BRIDE_DE) * 0.5 * k * T, 0.5 * k * T));
+    dA = min(dA, cnRect(abs(s), t, L * 0.5 - (CN_BB_A + CN_BB_DE) * 0.5 * k * T,
+                        (CN_BB_A - CN_BB_DE) * 0.5 * k * T, CN_BB_DEMI * k * T));
+    return dA;
+  }
+  bool lg = true;
   float retrait = lg ? CN_EMBOUT * T : 0.0;
   float a0 = -L * 0.5 + (boutEnMur(-1.0, bouts) ? 0.0 : retrait);
   float a1 = L * 0.5 - (boutEnMur(1.0, bouts) ? 0.0 : retrait);
@@ -224,6 +250,20 @@ float conduiteSdfLocal(float s, float t, float L, float T, float bouts) {
     d = min(d, cnRect(s, t, 0.5 * (j0 + j1), 0.5 * (j1 - j0), 0.5 * T));
   }
   return d;
+}
+
+// LA SILHOUETTE QUI OMBRE (ombre au sol, ombre des lampes) : le TUYAU,
+// pas la forme de collision — les brides y sont des rectangles pleins, et
+// leur ombre dure se lisait en pavés et en diagonales là où l'image est
+// ronde. La vanne ombre comme son volant (80 % de la plaque).
+float conduiteOmbreSdf(float s, float t, float L, float T) {
+  float mode = modeConduite(L, T);
+  if (mode < 0.5) {
+    float c = min(L, T);
+    return cnRect(s, t, 0.0, 0.40 * c, 0.40 * c);
+  }
+  if (mode < 1.5) return cnRect(s, t, 0.0, 0.5 * L, CN_TUYAU_TRAV * echelleArceau(L, T) * T);
+  return cnRect(s, t, 0.0, 0.5 * L, CN_TUYAU * T);
 }
 
 // le sens du tuyau : 0 auto (le grand côté), 1 horizontal, 2 vertical —
@@ -749,7 +789,7 @@ float conduiteOmbre(vec2 p, vec4 box, float code) {
   vec2 q = p - 0.5 * (box.xy + box.zw) - vec2(0.06, -0.06) * T;
   float s = horiz ? q.x : q.y;
   float t = horiz ? q.y : q.x;
-  float d = cnRect(s, t, 0.0, L * 0.5, CN_TUYAU * T);
+  float d = conduiteOmbreSdf(s, t, L, T);
   return mix(0.55, 1.0, smoothstep(-0.10 * T, 0.30 * T, d));
 }
 
@@ -762,17 +802,35 @@ vec4 conduiteNH3(vec2 loc, vec2 bsize, float px, float code) {
   float T = horiz ? bsize.y : bsize.x;
   float s = (horiz ? loc.x : loc.y) - L * 0.5; // le long, centré
   float t = (horiz ? loc.y : loc.x) - T * 0.5; // en travers, centré
-  bool lg = conduiteLongue(L, T);
+  float mode = modeConduite(L, T);
+  bool lg = mode > 1.5;
 
   vec4 acc = vec4(0.0);
+  if (mode < 0.5) {
+    // LA VANNE : la tête de vanne gelée, carrée, au centre du bloc — droite
+    // dans le repère du bloc (pas tournée avec le sens : c'est une vue du
+    // dessus, la lumière y reste en haut à gauche)
+    float c = min(L, T);
+    vec2 q = loc - 0.5 * bsize;
+    vec2 f = vec2(q.x / (CN_VANNE_L * c) + 0.5, 0.5 - q.y / (CN_VANNE_H * c));
+    acc = atlasCadre(CN_CADRE_VANNE, f, px, CN_CADRE_VANNE.z / (CN_VANNE_L * c));
+  } else if (mode < 1.5) {
+    // L'ARCEAU : le tuyau sort du sol et y replonge — deux traversées bride
+    // contre bride, réduites de k pour tenir ; à gauche, en miroir
+    float k = echelleArceau(L, T);
+    float lb = CN_BOUT * k * T;
+    vec2 f = vec2((abs(s) - (L * 0.5 - lb)) / lb, (CN_BOUT_H * k * T - t) / (2.0 * CN_BOUT_H * k * T));
+    acc = atlasCadre(CN_CADRE_BOUT, f, px, CN_CADRE_BOUT.w / (2.0 * CN_BOUT_H * k * T));
+  }
   // LE TRONÇON, répété EN MIROIR sur la longueur (l'image n'est pas
   // raccordable bord à bord : mesuré, 31 contre 8 à l'intérieur)
   float hb = CN_BANDE * T;
-  // un bout dans un mur : le tronçon file jusqu'au bord du bloc
-  bool mur = boutEnMur(s, bouts);
+  // un bout dans un mur : le tronçon file jusqu'au bord du bloc (une
+  // conduite longue seulement : l'arceau et la vanne tiennent dans le bloc)
+  bool mur = lg && boutEnMur(s, bouts);
   // un bout libre : le tronçon s'arrête sous la bride de la traversée
   float fin = (lg && !mur) ? L * 0.5 - CN_FIN_CORPS * T : L * 0.5;
-  if (abs(t) < hb && abs(s) < fin) {
+  if (lg && abs(t) < hb && abs(s) < fin) {
     float m = s / (CN_MOTIF * T);
     float tri = abs(fract(m * 0.5) * 2.0 - 1.0);
     acc = atlasCadre(CN_CORPS, vec2(tri, (hb - t) / (2.0 * hb)), px, CN_CORPS.w / (2.0 * hb));
@@ -790,7 +848,7 @@ vec4 conduiteNH3(vec2 loc, vec2 bsize, float px, float code) {
       acc = cnSur(acc, c * smoothstep(0.0, 0.02, f.x));
     }
   }
-  // LE JOINT à brides : sur un plot, seul au milieu ; ailleurs, tous les pas
+  // LE JOINT à brides, tous les pas, sur une conduite longue
   float sj = jointPres(s, L, T);
   if (sj < 1e8) {
     float dx = s - sj;
@@ -2843,8 +2901,8 @@ float sceneSdf(vec2 p, float alt) {
       vec2 szC = uBoxes[i].zw - uBoxes[i].xy;
       bool hC = conduiteHoriz(szC, conduiteSens(uBoxAux[i].z));
       vec2 qC = wb - 0.5 * (uBoxes[i].xy + uBoxes[i].zw);
-      d = min(d, cnRect(hC ? qC.x : qC.y, hC ? qC.y : qC.x, 0.0,
-                        0.5 * (hC ? szC.x : szC.y), CN_TUYAU * (hC ? szC.y : szC.x)));
+      d = min(d, conduiteOmbreSdf(hC ? qC.x : qC.y, hC ? qC.y : qC.x,
+                                  hC ? szC.x : szC.y, hC ? szC.y : szC.x));
       continue;
     }
     d = min(d, formeSdf(wb, uBoxes[i], dec.y, dec.z, dec.w));

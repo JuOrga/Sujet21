@@ -220,6 +220,14 @@ export const CONDUITE = {
   brideBoutDemi: 0.34,
   /** le tuyau file jusqu'au bout du bloc (sous la plaque) */
   embout: 0,
+  /** demi-épaisseur du tuyau de la traversée, givre compris (l'arceau) */
+  tuyauTraversee: 0.205,
+  /** sous ce rapport L / T, la conduite devient une tête de VANNE */
+  seuilVanne: 1.6,
+  /** l'image de la vanne autour de sa plaque (côté c = la plaque) : largeur
+   *  et hauteur de l'image, en c — la plaque en est centrée */
+  vanneImgL: 1.0195,
+  vanneImgH: 0.9942,
   /** le joint à brides : demi-longueur de l'image, haut et bas de l'image
    *  autour de l'axe, demi-longueur de ses brides */
   jointDemi: 0.698,
@@ -239,6 +247,7 @@ export const CONDUITE_ATLAS = {
   bout: [0, 350, 370, 276],
   joint: [380, 350, 451, 365],
   givre: [384, 720, 608, 304],
+  vanne: [0, 640, 370, 361],
 } as const
 
 /** LE SENS du tuyau (ObstacleBox.sens) : 0 auto — le long du grand côté —,
@@ -257,14 +266,33 @@ export function conduiteHoriz(w: number, h: number, sens?: number): boolean {
 /** Une conduite est LONGUE si ses deux pièces de bout y tiennent ; sinon,
  *  c'est un plot : un seul joint au milieu. */
 export function conduiteLongue(L: number, T: number): boolean {
-  return L >= (2 * CONDUITE.bout + 0.1) * T
+  return L >= 2 * CONDUITE.bout * T
+}
+
+/** LE DESSIN SELON LA PLACE (L / T). Une conduite longue a sa place ; en
+ *  dessous, ses pièces se chevauchaient (vu en aperçu sur iPad : un joint
+ *  écrasé entre deux moignons, deux traversées l'une dans l'autre) :
+ *  · VANNE (moins de 1,6) : une tête de vanne gelée, carrée, au centre ;
+ *  · ARCEAU (jusqu'à 2 traversées bout à bout) : le tuyau sort du sol et y
+ *    replonge — les deux traversées se rejoignent bride contre bride,
+ *    réduites ensemble (echelleArceau) pour tenir ;
+ *  · LONGUE : tronçon, joints, traversées ou murs aux bouts. */
+export type ModeConduite = 'vanne' | 'arceau' | 'longue'
+export function modeConduite(L: number, T: number): ModeConduite {
+  if (conduiteLongue(L, T)) return 'longue'
+  return L < CONDUITE.seuilVanne * T ? 'vanne' : 'arceau'
+}
+/** La réduction des deux traversées d'un arceau : elles se touchent au
+ *  milieu. 1 au seuil de la conduite longue. */
+export function echelleArceau(L: number, T: number): number {
+  return Math.min(1, L / (2 * CONDUITE.bout * T))
 }
 
 /** Les joints d'une conduite, en abscisse le long du bloc (centrée) : un tous
  *  les `pas` tant qu'ils restent à l'écart des pièces de bout ; au milieu,
  *  seul, sur un plot. */
 export function jointsConduite(L: number, T: number): number[] {
-  if (!conduiteLongue(L, T)) return [0]
+  if (!conduiteLongue(L, T)) return []
   const libre = L / 2 - (CONDUITE.bout + 0.05 + CONDUITE.jointDemi) * T
   const out: number[] = []
   const n = Math.floor(libre / CONDUITE.pas)
@@ -282,24 +310,39 @@ export const BOUT_MUR_POS = 2
  *  bout, les brides des joints — leur union est la forme. */
 export function piecesConduite(L: number, T: number, bouts = 0): [number, number, number][] {
   const C = CONDUITE
-  const longue = conduiteLongue(L, T)
-  // un bout DANS UN MUR (bouts : 1 côté négatif, 2 côté positif) n'a pas de
-  // bride : le tuyau file jusqu'au bord du bloc, et le mur le prend
+  const mode = modeConduite(L, T)
+  if (mode === 'vanne') {
+    // la plaque carrée de la vanne, centrée, du côté de l'épaisseur
+    const c = Math.min(L, T)
+    return [[-c / 2, c / 2, c / 2]]
+  }
+  if (mode === 'arceau') {
+    // deux traversées bride contre bride, réduites de k ; les murs n'y
+    // changent rien — la pièce entière tient dans le bloc
+    const k = echelleArceau(L, T)
+    return [
+      [-L / 2, L / 2, C.tuyauTraversee * k * T],
+      [L / 2 - C.brideA * k * T, L / 2 - C.brideDe * k * T, (k * T) / 2],
+      [-L / 2 + C.brideDe * k * T, -L / 2 + C.brideA * k * T, (k * T) / 2],
+      [L / 2 - C.brideBoutA * k * T, L / 2 - C.brideBoutDe * k * T, C.brideBoutDemi * k * T],
+      [-L / 2 + C.brideBoutDe * k * T, -L / 2 + C.brideBoutA * k * T, C.brideBoutDemi * k * T],
+    ]
+  }
+  // LONGUE — un bout DANS UN MUR (bouts : 1 côté négatif, 2 côté positif)
+  // n'a pas de traversée : le tuyau file jusqu'au bord du bloc, et le mur
+  // le prend
   const murNeg = (bouts & BOUT_MUR_NEG) !== 0
   const murPos = (bouts & BOUT_MUR_POS) !== 0
-  const retrait = longue ? C.embout * T : 0
   const out: [number, number, number][] = [
-    [-L / 2 + (murNeg ? 0 : retrait), L / 2 - (murPos ? 0 : retrait), C.tuyau * T],
+    [-L / 2 + (murNeg ? 0 : C.embout * T), L / 2 - (murPos ? 0 : C.embout * T), C.tuyau * T],
   ]
-  if (longue) {
-    if (!murPos) {
-      out.push([L / 2 - C.brideA * T, L / 2 - C.brideDe * T, T / 2])
-      out.push([L / 2 - C.brideBoutA * T, L / 2 - C.brideBoutDe * T, C.brideBoutDemi * T])
-    }
-    if (!murNeg) {
-      out.push([-L / 2 + C.brideDe * T, -L / 2 + C.brideA * T, T / 2])
-      out.push([-L / 2 + C.brideBoutDe * T, -L / 2 + C.brideBoutA * T, C.brideBoutDemi * T])
-    }
+  if (!murPos) {
+    out.push([L / 2 - C.brideA * T, L / 2 - C.brideDe * T, T / 2])
+    out.push([L / 2 - C.brideBoutA * T, L / 2 - C.brideBoutDe * T, C.brideBoutDemi * T])
+  }
+  if (!murNeg) {
+    out.push([-L / 2 + C.brideDe * T, -L / 2 + C.brideA * T, T / 2])
+    out.push([-L / 2 + C.brideBoutDe * T, -L / 2 + C.brideBoutA * T, C.brideBoutDemi * T])
   }
   for (const j of jointsConduite(L, T)) {
     out.push([Math.max(-L / 2, j - C.brideJoint * T), Math.min(L / 2, j + C.brideJoint * T), T / 2])

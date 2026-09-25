@@ -11,6 +11,8 @@ import {
   FORME_CONDUITE,
   FORME_DISQUE,
   conduiteLongue,
+  echelleArceau,
+  modeConduite,
   formeContact,
   jointsConduite,
   piecesConduite,
@@ -55,7 +57,7 @@ describe('conduite — forme physique', () => {
   it('une longue conduite : brides aux bouts, joints au pas, à l’écart des bouts', () => {
     expect(conduiteLongue(670, 60)).toBe(true)
     expect(conduiteLongue(100, 100)).toBe(false)
-    expect(jointsConduite(100, 100)).toEqual([0]) // un plot : un joint au milieu
+    expect(jointsConduite(100, 100)).toEqual([]) // un petit bloc n'a pas de joint
     const j = jointsConduite(1200, 60)
     expect(j).toContain(0)
     expect(Math.max(...j) + CONDUITE.jointDemi * 60).toBeLessThanOrEqual(600 - CONDUITE.bout * 60)
@@ -91,17 +93,16 @@ describe('conduite — forme physique', () => {
     expect(contact(b, s, 63).dist).toBeCloseTo(3, 9)
   })
 
-  // LE SENS CHOISI à l'éditeur : un plot presque carré se couche ou se
-  // dresse, et sa collision le suit — le diamètre est l'AUTRE côté.
-  it('le sens imposé couche ou dresse le tuyau, collision comprise', () => {
-    const plot = box(0, 0, 100, 120, MAT_FROID) // auto : debout (120 > 100)
-    // hors du joint central (qui tient ±0,322·T autour du milieu)
-    const flanc = (b: ObstacleBox) => contact(b, 50 + CONDUITE.tuyau * 100 + 4, 105)
-    // debout, le tuyau a 100 de large : son flanc droit est à 50 + 0,28·100
-    expect(flanc(plot).dist).toBeCloseTo(4, 9)
-    expect(flanc({ ...plot, sens: SENS_VERTICAL }).dist).toBeCloseTo(4, 9)
-    // couché, il a 120 de diamètre et remplit la largeur : ce point est dedans
-    expect(flanc({ ...plot, sens: SENS_HORIZONTAL }).dist).toBeLessThan(0)
+  // LE SENS CHOISI à l'éditeur : il décide de ce qui tient dans le bloc —
+  // 60 × 120 debout est un arceau (le long des 120) ; couché, le tuyau
+  // n'aurait que 60 de long pour 120 d'épaisseur : une vanne de 60.
+  it('le sens imposé change le dessin, collision comprise', () => {
+    const b = box(0, 0, 60, 120, MAT_FROID)
+    // debout (auto) : la plaque de la traversée du haut couvre l'axe
+    expect(contact(b, 30, 100).dist).toBeLessThan(0)
+    // couché : la vanne de 60, centrée (y 30..90) — ce point est du sol
+    expect(contact({ ...b, sens: SENS_HORIZONTAL }, 30, 100).dist).toBeCloseTo(10, 9)
+    expect(contact({ ...b, sens: SENS_VERTICAL }, 30, 100).dist).toBeLessThan(0)
     expect(conduiteHoriz(100, 120)).toBe(false)
     expect(conduiteHoriz(100, 120, SENS_HORIZONTAL)).toBe(true)
   })
@@ -119,6 +120,50 @@ describe('conduite — forme physique', () => {
     s.setLevel([box(0, 0, 670, 60, MAT_FROID)], [])
     formeContact(170, 57, s.boxes[0], out)
     expect(out.dist).toBeGreaterThan(0)
+  })
+})
+
+// LES PETITS BLOCS : en dessous de deux traversées bout à bout, les pièces
+// de la conduite se chevauchaient (un joint écrasé entre deux moignons,
+// deux traversées l'une dans l'autre — vu en aperçu sur iPad). Le dessin
+// suit la place : vanne, arceau, conduite longue.
+describe('conduite — selon la place', () => {
+  it('les seuils : vanne sous 1,6, arceau jusqu’à deux traversées, longue au-delà', () => {
+    expect(modeConduite(100, 100)).toBe('vanne')
+    expect(modeConduite(95, 60)).toBe('vanne')
+    expect(modeConduite(100, 60)).toBe('arceau')
+    expect(modeConduite(2 * CONDUITE.bout * 60 - 1, 60)).toBe('arceau')
+    expect(modeConduite(2 * CONDUITE.bout * 60, 60)).toBe('longue')
+    expect(echelleArceau(2 * CONDUITE.bout * 60, 60)).toBe(1)
+    expect(echelleArceau(100, 60)).toBeCloseTo(100 / (2 * CONDUITE.bout * 60), 9)
+  })
+
+  it('la vanne : sa plaque carrée, centrée, du côté de l’épaisseur', () => {
+    const plot = box(0, 0, 100, 120, MAT_FROID) // debout : L 120, T 100
+    expect(contact(plot, 50, 60).dist).toBeLessThan(0)
+    expect(contact(plot, 50, 112).dist).toBeCloseTo(2, 9) // la plaque s'arrête à 110
+    expect(contact(plot, 104, 60).dist).toBeCloseTo(4, 9)
+  })
+
+  it('l’arceau tient dans son bloc, sans chevauchement : les deux traversées se touchent au milieu', () => {
+    for (const L of [100, 130, 160]) {
+      const T = 60
+      const k = echelleArceau(L, T)
+      for (const [s0, s1, e] of piecesConduite(L, T)) {
+        expect(s0).toBeGreaterThanOrEqual(-L / 2 - 1e-9)
+        expect(s1).toBeLessThanOrEqual(L / 2 + 1e-9)
+        expect(e).toBeLessThanOrEqual(T / 2 + 1e-9)
+      }
+      // chaque traversée mesure k × bout × T : à deux, toute la longueur
+      expect(2 * CONDUITE.bout * k * T).toBeCloseTo(L, 9)
+    }
+  })
+
+  it('un arceau contre un mur garde ses deux traversées : il tient dans le bloc', () => {
+    const b = box(0, 0, 130, 60, MAT_FROID)
+    const mur = box(130, -100, 200, 200, MAT_WALL)
+    const p = formePhysique(b, [b, mur], null)
+    expect(piecesConduite(130, 60, (p as FormeBox).bouts ?? 0)).toEqual(piecesConduite(130, 60))
   })
 })
 
@@ -194,6 +239,7 @@ describe('conduite — les jumeaux', () => {
     expect(cadre('BOUT')).toEqual(CONDUITE_ATLAS.bout)
     expect(cadre('JOINT')).toEqual(CONDUITE_ATLAS.joint)
     expect(cadre('GIVRE')).toEqual(CONDUITE_ATLAS.givre)
+    expect(cadre('VANNE')).toEqual(CONDUITE_ATLAS.vanne)
     expect(Number(py.match(/^TAILLE = (\d+)/m)![1])).toBe(CONDUITE_ATLAS.taille)
   })
 })
