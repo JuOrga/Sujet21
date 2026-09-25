@@ -23,8 +23,10 @@ export const MAT_MIROIR = 10 // miroir fixe : mur poli qui RÉFLÉCHIT le faisce
 // sas. Le plancher de la cuve s'efface et l'on voit le VIDE (le ciel du
 // dehors, ses étoiles) au travers : un trou franc, ou une baie vitrée avec
 // sa monture. Le corps passe dessus comme sur le sol, la lumière les ignore
-// (rien n'y fait d'ombre), le faisceau les traverse. Ce sont des zones à
-// regarder, pas des pièges — le vide n'aspire rien.
+// (rien n'y fait d'ombre), le faisceau les traverse. La baie est une zone
+// à regarder ; le VIDE, lui, aspire : le corps qui s'attarde au-dessus est
+// pris au bout de quelques secondes et emporté (game/vide.ts) — ce n'est
+// pas une physique de paroi, c'est une minuterie et un courant.
 export const MAT_VIDE = 11 // le plancher manque : le dehors, à nu
 export const MAT_BAIE = 12 // une verrière : le dehors derrière une vitre encadrée
 
