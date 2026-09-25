@@ -16015,8 +16015,9 @@ function mbPeintEvenement(ev: EvenementDef, alea: () => number): void {
     btn.className = 'mb-carte mb-ev-offre' + (possible ? '' : ' mb-pauvre')
     btn.disabled = !possible
     btn.style.setProperty('--i', String(i))
-    // le détail ne se lit que d'une offre déjà prise (evenements, règle 4)
-    const detail = detailOffre(choix, records.offreEssayee(cleOffre(ev, choix)))
+    // le détail ne se lit que d'une offre déjà prise ; une offre hors de
+    // portée le dit (evenements, règle 4)
+    const detail = detailOffre(choix, records.offreEssayee(cleOffre(ev, choix)), possible)
     btn.innerHTML =
       `<b>${esc(choix.libelle)}</b><small${detail.voilee ? ' class="mb-ev-voile"' : ''}>${esc(detail.texte)}</small>` +
       (choix.issues.length > 1

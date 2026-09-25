@@ -7,7 +7,7 @@
 // salle à jouer, un écran dans la cérémonie, deux ou trois offres, et la
 // descente reprend.
 //
-// TROIS RÈGLES DE CONCEPTION, tenues par le modèle de données :
+// QUATRE RÈGLES DE CONCEPTION, tenues par le modèle de données :
 //
 //  1. UN ÉVÉNEMENT RACONTE. La station est vide depuis onze ans, ses
 //     machines tournent encore, et les Semblables qui nous ont précédés y
@@ -31,6 +31,10 @@
 //     que le joueur ne l'a pas prise une fois (records.offresEssayees). Les
 //     offres qu'il a écartées gardent leur secret : il saura la prochaine
 //     fois qu'il les choisira, pas avant. On sait qu'on parie, pas sur quoi.
+//     Une offre qu'il NE PEUT PAS prendre (possible faux) reste voilée —
+//     la montrer ferait tout apprendre à qui reste pauvre exprès — mais son
+//     voile le DIT : « hors de portée », et non « il faut la prendre pour
+//     savoir », qu'une carte grisée ne peut pas tenir.
 //
 // Tout ici est PUR : le catalogue, le tirage et la résolution ne touchent
 // ni au DOM ni à l'état du jeu. main.ts applique les effets, et lui seul.
@@ -348,11 +352,19 @@ export function cleOffre(ev: EvenementDef, choix: ChoixEvenement): string {
 
 /** Le mot qui tient la place du détail tant que l'offre n'a pas été prise. */
 export const DETAIL_VOILE = 'effets inconnus — il faut la prendre pour savoir'
+/** Le même voile, sur une offre qu'on ne peut pas prendre cette fois. */
+export const DETAIL_HORS_PORTEE = 'effets inconnus — hors de portée cette fois'
 
 /** CE QUE LA CARTE D'UNE OFFRE DIT : son détail si elle a déjà été prise,
- *  le voile sinon (règle 4). */
-export function detailOffre(choix: ChoixEvenement, essayee: boolean): { texte: string; voilee: boolean } {
-  return essayee ? { texte: choix.detail, voilee: false } : { texte: DETAIL_VOILE, voilee: true }
+ *  le voile sinon — qui dit « hors de portée » sur une offre qu'on ne peut
+ *  pas prendre (règle 4). */
+export function detailOffre(
+  choix: ChoixEvenement,
+  essayee: boolean,
+  possible = true,
+): { texte: string; voilee: boolean } {
+  if (essayee) return { texte: choix.detail, voilee: false }
+  return { texte: possible ? DETAIL_VOILE : DETAIL_HORS_PORTEE, voilee: true }
 }
 
 /** L'effet dit en une ligne — ce que le bilan affiche après le choix. */
