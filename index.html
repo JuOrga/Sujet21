@@ -160,6 +160,10 @@
       }
       canvas#glcanvas {
         display: block;
+        /* positionnée : peinte PAR-DESSUS le calque de ciel qui la précède
+           dans #app (render/cielCalque.ts) — la toile est transparente dans
+           le vide */
+        position: relative;
         width: 100%;
         height: 100%;
         touch-action: none;

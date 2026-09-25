@@ -177,9 +177,13 @@ export function cadrePlaque(
 ): CadrePlaque {
   const z = Math.max(zoom, 1e-4) / Math.max(r.ref, 1e-4)
   const grand = Math.max(largeurCss, hauteurCss, 1)
+  // la réponse au zoom, par la MÊME convention que les couches : exposant
+  // r.zoom — 0,3, la galaxie est loin, elle change peu. (Premier jet :
+  // 1 − r.zoom, soit 0,7 : elle suivait le zoom comme un objet proche, et
+  // au recul se réduisait à une vignette.)
   const voulue =
     grand *
-    Math.min(r.tailleMax, Math.max(r.tailleMin, r.taille * Math.pow(z, 1 - r.zoom)))
+    Math.min(r.tailleMax, Math.max(r.tailleMin, r.taille * Math.pow(z, r.zoom)))
   // LA NETTETÉ D'ABORD : la largeur à l'écran (en px CSS) plafonnée à ce que
   // l'image peut remplir sans être agrandie au-delà de grossMax
   const nette = (Math.max(texels, 1) * r.grossMax) / Math.max(dpr, 1e-4)

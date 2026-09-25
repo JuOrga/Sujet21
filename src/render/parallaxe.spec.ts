@@ -124,6 +124,15 @@ describe('la plaque de ciel, cadrée — une seule Voie lactée, jamais floue', 
     expect(loin).toBeLessThan(pres)
   })
 
+  it('la galaxie est LOIN : au recul, elle rapetisse comme zoom^0,3, pas comme le monde', () => {
+    const d = PLAQUE_DEFAUTS
+    const ref = 1 / cadrePlaque(0, 0, d.ref, 1280, 720, 1, 4096).parPx
+    const moitie = 1 / cadrePlaque(0, 0, d.ref / 2, 1280, 720, 1, 4096).parPx
+    // zoom divisé par deux : la galaxie ne perd que 19 % (0,5^0,3), là où
+    // le monde perd la moitié — le premier jet la faisait suivre à 0,5^0,7
+    expect(moitie / ref).toBeCloseTo(Math.pow(0.5, d.zoom), 6)
+  })
+
   it('la caméra qui se déplace fait glisser le ciel, dans le même sens', () => {
     const a = cadrePlaque(0, 0, 0.3, 1280, 720, 1, 1254)
     const b = cadrePlaque(500, -300, 0.3, 1280, 720, 1, 1254)

@@ -26,7 +26,6 @@ import {
 } from '../game/formes'
 import type { Camera } from './camera'
 import { VIE_STRIDE } from './vie'
-import { cadrePlaque, type ReglagesPlaque, PLAQUE_DEFAUTS } from './parallaxe'
 import { Programmes } from './programmes'
 
 // Budgets de rendu : au-delà, les éléments excédentaires ne sont plus
@@ -397,12 +396,13 @@ uniform float uZoneForce[MAX_ZONES]; // 1 eau, 2 glace, 3 vapeur, 0 libre
 uniform sampler2D uTexStars;
 // LE CIEL LOINTAIN partage une seule unité de texture — le fragment shader
 // n'en a que seize garanties, et les seize sont prises. Selon le mode, on y
-// lie soit la tuile d'intérim, soit LA PLAQUE : une image unique, cadrée
-// par rapport à l'écran (render/parallaxe.ts, cadrePlaque).
+// y lie la tuile lointaine du fond tuilé.
 uniform sampler2D uTexCiel;
-uniform float uCielMode;   // 0 procédural · 1 tuilé · 2 plaque
-uniform vec3 uPlaque;      // centre vu (x, y, texture 0..1) · taille d'un px CSS
-uniform float uCielForce;  // dosage : le vide doit rester plus sombre que la cuve
+uniform float uCielMode;   // 0 procédural · 1 tuilé
+// 1 : le ciel est un CALQUE HTML derrière la toile (render/cielCalque.ts) —
+// le vide est transparent ici, et le navigateur y compose la Voie lactée
+// et les étoiles à la définition native de l'écran
+uniform float uCielCalque;
 // LA PROFONDEUR DES COUCHES DE FOND. Chaque couche porte DEUX nombres, tous
 // deux entre 0 et 1 et avec la même convention : 1 = elle se comporte comme
 // le plan de jeu, 0 = elle est infiniment loin.
@@ -1109,29 +1109,13 @@ void main() {
   // lointaine en parallaxe : elle suit à moitié la caméra), sinon décor
   // procédural d'intérim.
   vec3 voidCol;
-  if (uCielMode > 1.5 && uHasCiel > 0.5) {
-    // LA PLAQUE DE CIEL : UNE image, UNE Voie lactée. Elle n'est plus
-    // collée au monde ni répétée — en reculant, on voyait sa copie, deux
-    // Voies lactées parallèles, un papier peint. Elle est cadrée par rapport
-    // à l'écran, jamais agrandie au-delà de ce que l'image peut rendre net
-    // (render/parallaxe.ts, cadrePlaque) : elle tient dans une partie de
-    // l'écran, et ses BORDS SE FONDENT dans le noir — un carré découpé net
-    // dans le ciel se lirait comme une affiche. Autour, les étoiles
-    // profondes. (Hors de l'image, la texture est bloquée au bord, et le
-    // fondu l'éteint.)
-    vec2 uvP = uPlaque.xy + (css - uViewport * 0.5) * uPlaque.z;
-    vec2 bord = smoothstep(vec2(0.0), vec2(0.18), uvP) * smoothstep(vec2(0.0), vec2(0.18), 1.0 - uvP);
-    vec3 fond = texture(uTexCiel, uvP).rgb * (bord.x * bord.y);
-    voidCol = fond * uCielForce;
-    // LES ÉTOILES NETTES RESTENT PROCÉDURALES, et ce n'est pas une
-    // économie : elles sont nettes à tout grossissement là où la plaque
-    // s'adoucit, et ce sont elles qui donnent le MOUVEMENT — une plaque
-    // seule paraît collée à l'écran parce qu'elle défile d'un bloc. Posées
-    // APRÈS le dosage : un point ne noie pas la cuve, un voile si.
-    if (uDecor > 0.5) {
-      float lum = dot(fond, vec3(0.30, 0.50, 0.20));
-      voidCol += etoiles(world, pxMonde, smoothstep(0.05, 0.20, lum));
-    }
+  if (uCielCalque > 0.5) {
+    // LE CIEL EN CALQUE : rien à peindre ici. Il était peint dans cette
+    // toile — donc à SA définition, que le réglage de résolution divise
+    // (« moyenne » ×0,75, « faible » ×0,5, et l'adaptatif des tablettes) :
+    // la plus belle image y devenait floue. Derrière la toile, le
+    // navigateur la compose en natif, pour un coût à peu près nul.
+    voidCol = vec3(0.0);
   } else if (uCielMode > 0.5 && uHasStars > 0.5) {
     // Atténuée : le vide doit rester plus sombre que la cuve éclairée,
     // sinon la hiérarchie lumineuse s'inverse et la scène se noie.
@@ -1246,12 +1230,22 @@ void main() {
   if (uDecor > 0.5) tank += shipLife(world, uZoom, uTime);
 
   vec3 col = mix(voidCol, tank, inRoom);
+  // LA PART DE CIEL VISIBLE. Quand le ciel est un calque HTML derrière la
+  // toile (uCielCalque, render/cielCalque.ts), le vide vaut zéro ici et la
+  // toile y devient TRANSPARENTE : le navigateur compose le ciel à la
+  // définition native, quel que soit le réglage de résolution. cielVu suit
+  // ce qui en reste visible à travers chaque couche posée ensuite — chaque
+  // « col = mix(col, X, a) » le voile de a, en alpha prémultiplié exact (les
+  // ajouts de lumière restent des ajouts). Sans calque, il reste à zéro :
+  // alpha 1, le rendu d'avant au pixel près.
+  float cielVu = uCielCalque * (1.0 - inRoom);
 
   // La coque : bande procédurale d'intérim — la passe texturée (dessinée
   // par-dessus quand l'image est chargée) la remplace.
   float hull = smoothstep(-1.0, 2.0, roomD) * (1.0 - smoothstep(20.0, 34.0, roomD));
   vec3 hullCol = vec3(0.055, 0.085, 0.115) * (0.85 + 0.15 * sin(roomD * 0.9));
   col = mix(col, hullCol, hull * (1.0 - uHasHull));
+  cielVu *= 1.0 - clamp(hull * (1.0 - uHasHull), 0.0, 1.0);
   float wallLine = 1.0 - smoothstep(0.0, 3.0 / uZoom, abs(roomD));
   col += vec3(0.10, 0.22, 0.30) * wallLine * (1.0 - 0.8 * uHasHull);
 
@@ -1294,6 +1288,7 @@ void main() {
         // calque du tableau de zones : 0 buses (eau), 1 hublot, 2 conduite
         vec4 zt = texture(uTexZones, vec3(tuv, f - 1.0));
         col = mix(col, zt.rgb * vec3(0.68, 0.76, 0.86), zt.a * 0.92);
+        cielVu *= 1.0 - clamp(zt.a * 0.92, 0.0, 1.0);
         assetA = zt.a;
       }
     }
@@ -1528,6 +1523,7 @@ void main() {
         fc *= mix(0.52, 1.15, 0.5 + 0.5 * face) * eclMat;
       }
       col = mix(col, fc, flanc);
+      cielVu *= 1.0 - clamp(flanc, 0.0, 1.0);
     }
     if (mat < 2.5) {
       float fill = 1.0 - smoothstep(-edgeW, 0.0, dV);
@@ -1657,7 +1653,9 @@ void main() {
         edgeCol = vec3(0.62, 0.42, 0.78);
       }
       col = mix(col, fillCol * eclMat, fill * fillA);
+      cielVu *= 1.0 - clamp(fill * fillA, 0.0, 1.0);
       col = mix(col, edgeCol * eclMat, edge * 0.9);
+      cielVu *= 1.0 - clamp(edge * 0.9, 0.0, 1.0);
       if (mat > 0.5) {
         // L'aura dit la portée : une brume diffuse sur toute la bande
         // d'influence, sur le modèle de la chaleur du radiateur — turquoise
@@ -1685,10 +1683,13 @@ void main() {
         // prend la lumière de la salle : le sol a une épaisseur, le vide
         // est DESSOUS, pas peint dessus.
         col = mix(col, voidCol, fill);
+        cielVu = mix(cielVu, uCielCalque, fill);
         float tranche = (1.0 - smoothstep(0.0, edgeW * 3.0, -d)) * fill;
         col = mix(col, vec3(0.016, 0.024, 0.036) * eclSolide, tranche * 0.85);
+        cielVu *= 1.0 - clamp(tranche * 0.85, 0.0, 1.0);
         float edge = (1.0 - smoothstep(0.0, edgeW, abs(d))) * libre;
         col = mix(col, vec3(0.30, 0.38, 0.48) * eclSolide, edge * 0.6);
+        cielVu *= 1.0 - clamp(edge * 0.6, 0.0, 1.0);
       } else {
         // BAIE VITRÉE : le vide derrière une vitre, dans sa monture. La
         // monture est une bande large sur le pourtour INTÉRIEUR (elle suit
@@ -1705,7 +1706,9 @@ void main() {
         // un reflet fixe sur le bord intérieur de la vitre : le verre a une épaisseur
         float lisere = (1.0 - smoothstep(0.0, edgeW * 1.5, abs(d + montW))) * fill;
         col = mix(col, ciel, verre);
+        cielVu = mix(cielVu, uCielCalque, verre);
         col = mix(col, vec3(0.55, 0.70, 0.86) * eclSolide, lisere * 0.5);
+        cielVu *= 1.0 - clamp(lisere * 0.5, 0.0, 1.0);
         // la monture : métal brossé, une strie fine, des rivets sur une
         // grille monde (ils suivent la bande quelle que soit la forme)
         float grain = dnoise(world * 0.05);
@@ -1713,8 +1716,10 @@ void main() {
         float rivet = smoothstep(0.80, 0.96, sin(world.x * 0.14) * sin(world.y * 0.14));
         metal += vec3(0.16, 0.20, 0.24) * rivet;
         col = mix(col, metal * eclSolide, monture);
+        cielVu *= 1.0 - clamp(monture, 0.0, 1.0);
         float edge = (1.0 - smoothstep(0.0, edgeW, abs(d))) * libre;
         col = mix(col, vec3(0.42, 0.52, 0.64) * eclSolide, edge * 0.7);
+        cielVu *= 1.0 - clamp(edge * 0.7, 0.0, 1.0);
       }
     } else if (mat > 9.5) {
       // MIROIR FIXE : la paroi polie qui plie le faisceau (laser.ts fait la
@@ -1733,7 +1738,9 @@ void main() {
       base += vec3(0.05) * smoothstep(0.80, 1.0, stries);
       vec3 pol = base + vec3(0.34, 0.36, 0.38) * sweep;
       col = mix(col, pol * eclMat, fill);
+      cielVu *= 1.0 - clamp(fill, 0.0, 1.0);
       col = mix(col, vec3(0.92, 0.97, 1.05) * eclMat, edge * 0.95);
+      cielVu *= 1.0 - clamp(edge * 0.95, 0.0, 1.0);
     } else if (mat > 8.5) {
       // SURCHAUFFEUR : serpentin AMBRE sous verre (la couleur de la vapeur) — la borne de recharge du
       // dash. Chargé (aux.z = 1), le serpentin pulse ; déchargé, il s'éteint
@@ -1747,7 +1754,9 @@ void main() {
       vec3 metal = vec3(0.10, 0.13, 0.17) * (0.9 + 0.2 * dnoise(world * 0.14));
       vec3 lueur = mix(vec3(0.24, 0.20, 0.14), vec3(1.00, 0.76, 0.38) * pulse, charge);
       col = mix(col, metal * eclMat + lueur * tube * 0.85, fill);
+      cielVu *= 1.0 - clamp(fill, 0.0, 1.0);
       col = mix(col, mix(vec3(0.42, 0.40, 0.35) * eclMat, vec3(1.00, 0.85, 0.55), charge), edge * 0.9);
+      cielVu *= 1.0 - clamp(edge * 0.9, 0.0, 1.0);
       // le halo dit « approchez en vapeur » : il meurt avec la charge
       float aura = (1.0 - smoothstep(0.0, 60.0, max(d, 0.0))) * step(0.0, d);
       col += vec3(0.34, 0.24, 0.09) * aura * aura * charge;
@@ -1762,7 +1771,9 @@ void main() {
       float fente = smoothstep(0.86, 0.97, lam);
       vec3 lamCol = vec3(0.34, 0.46, 0.60) * (0.72 + 0.38 * lam);
       col = mix(col, lamCol * eclMat, fill * (1.0 - fente * 0.75));
+      cielVu *= 1.0 - clamp(fill * (1.0 - fente * 0.75), 0.0, 1.0);
       col = mix(col, vec3(0.70, 0.85, 0.98) * eclMat, edge * 0.85);
+      cielVu *= 1.0 - clamp(edge * 0.85, 0.0, 1.0);
     } else if (mat > 6.5) {
       // Membrane gorgée d'eau : trame tissée vert d'eau qui suinte — seule
       // l'EAU la traverse. Des gouttes descendent le long de la trame.
@@ -1773,7 +1784,9 @@ void main() {
         0.5 + 0.5 * sin(world.y * 0.10 - uTime * 1.6 + dnoise(world * 0.05) * 6.0));
       vec3 memCol = vec3(0.05, 0.20, 0.17) + vec3(0.04, 0.15, 0.12) * weave;
       col = mix(col, (memCol + vec3(0.03, 0.11, 0.09) * drip) * eclMat, fill);
+      cielVu *= 1.0 - clamp(fill, 0.0, 1.0);
       col = mix(col, vec3(0.25, 0.78, 0.62) * eclMat, edge * 0.9);
+      cielVu *= 1.0 - clamp(edge * 0.9, 0.0, 1.0);
     } else if (mat > 5.5) {
       // Radiateur (tableau 4) : rayures chaudes qui défilent, arête incandes-
       // cente, et une aura de chaleur qui tremble — le danger (et la
@@ -1789,7 +1802,9 @@ void main() {
         ? texChaudC * vec3(2.3, 1.45, 0.95) + vec3(0.30, 0.11, 0.02) * smoothstep(0.4, 0.9, stripe)
         : vec3(0.26, 0.11, 0.05) + vec3(0.42, 0.17, 0.04) * smoothstep(0.35, 0.85, stripe);
       col = mix(col, fillCol * eclMat, fill);
+      cielVu *= 1.0 - clamp(fill, 0.0, 1.0);
       col = mix(col, vec3(1.0, 0.56, 0.24), edge * 0.9);
+      cielVu *= 1.0 - clamp(edge * 0.9, 0.0, 1.0);
       // chaque chaudière porte sa propre portée d'aura (aux.w) : le halo
       // dessiné est exactement la portée mécanique
       float aura = (1.0 - smoothstep(0.0, uHeatBand * max(uBoxAux[bi].w, 0.001), max(d, 0.0))) * step(0.0, d);
@@ -1814,7 +1829,9 @@ void main() {
         barCol = vec3(0.17, 0.21, 0.26) * (0.9 + 0.2 * dnoise(world * 0.15));
       }
       col = mix(col, barCol * eclMat, fill * (1.0 - hole * 0.85));
+      cielVu *= 1.0 - clamp(fill * (1.0 - hole * 0.85), 0.0, 1.0);
       col = mix(col, vec3(0.45, 0.60, 0.70) * eclMat, edge * 0.8);
+      cielVu *= 1.0 - clamp(edge * 0.8, 0.0, 1.0);
     } else if (mat > 3.5) {
       // Plaque froide (tableau 2) : givre cristallin, arête pâle, et une
       // aura de brume glacée — le danger se lit avant le contact.
@@ -1829,7 +1846,9 @@ void main() {
         ? texFroidC * vec3(0.52, 0.74, 1.02) * (0.60 + 0.28 * sparkle)
         : vec3(0.15, 0.21, 0.29) + vec3(0.26, 0.34, 0.40) * sparkle * 0.55;
       col = mix(col, fillCol * eclMat, fill);
+      cielVu *= 1.0 - clamp(fill, 0.0, 1.0);
       col = mix(col, vec3(0.70, 0.86, 0.97), edge * 0.9);
+      cielVu *= 1.0 - clamp(edge * 0.9, 0.0, 1.0);
       float aura = (1.0 - smoothstep(0.0, uColdBand, max(d, 0.0))) * step(0.0, d);
       float mist = 0.55 + 0.45 * dnoise(world * 0.05 + vec2(uTime * 0.10, -uTime * 0.06));
       col += vec3(0.14, 0.27, 0.40) * aura * aura * mist;
@@ -1869,7 +1888,9 @@ void main() {
         float aMask = 1.0 - smoothstep(0.435, 0.465, length(rel) / (2.0 * frameR));
         // assise : léger sombre sous le cadre pour le détacher de la paroi
         col = mix(col, vec3(0.004, 0.010, 0.012), (1.0 - smoothstep(rad * 0.8, frameR * 1.1, dh)) * 0.45);
+        cielVu *= 1.0 - clamp((1.0 - smoothstep(rad * 0.8, frameR * 1.1, dh)) * 0.45, 0.0, 1.0);
         col = mix(col, irisCol, aMask);
+        cielVu *= 1.0 - clamp(aMask, 0.0, 1.0);
         // l'anneau vert respire par-dessus l'image
         float ring = exp(-pow((dh - rad * 0.74) * 5.0 / rad, 2.0));
         col += vec3(0.10, 0.55, 0.40) * ring * pulse * 0.5;
@@ -1877,8 +1898,10 @@ void main() {
         // gorge de l'entonnoir : l'espace s'assombrit en tombant vers le trou
         float throat = 1.0 - smoothstep(0.0, rad, dh);
         col = mix(col, vec3(0.004, 0.010, 0.012), throat * 0.85);
+        cielVu *= 1.0 - clamp(throat * 0.85, 0.0, 1.0);
         // œil du trou : noir profond
         col = mix(col, vec3(0.0, 0.002, 0.004), eye);
+        cielVu *= 1.0 - clamp(eye, 0.0, 1.0);
         // anneau lumineux qui respire au bord de la gorge
         float ring = exp(-pow((dh - rad * 0.55) * 6.0 / rad, 2.0));
         col += vec3(0.15, 0.75, 0.55) * ring * pulse * 0.8;
@@ -2389,6 +2412,7 @@ void main() {
     water += plas * plasmaS * vap * 0.30 * crepite;
 
     col = mix(col, water, body);
+    cielVu *= 1.0 - clamp(body, 0.0, 1.0);
     // L'eau qui recouvre l'œil du sas s'assombrit : elle sombre dans le trou
     col *= 1.0 - drainEye * body * 0.55;
   }
@@ -2413,6 +2437,7 @@ void main() {
     }
     float voile = b * uBrume * 0.30 * clamp(eclB, 0.0, 1.0) * inRoom;
     col = mix(col, vec3(0.60, 0.70, 0.78), voile);
+    cielVu *= 1.0 - clamp(voile, 0.0, 1.0);
   }
 
   // ---- LE PLAFONNIER : la source se VOIT. Un luminaire de station vu du
@@ -2482,6 +2507,7 @@ void main() {
         * smoothstep(R * 1.28 + px, R * 1.04, dl) * step(R * 0.8, dl);
 
       col = mix(col, metal, max(capot, pattes));
+      cielVu *= 1.0 - clamp(max(capot, pattes), 0.0, 1.0);
     }
   }
 
@@ -2489,7 +2515,7 @@ void main() {
   // pression temporelle se voit, elle ne se chronomètre pas
   col = mix(col, col * vec3(0.82, 0.92, 1.10), uChill * 0.6);
   col *= 1.0 - 0.12 * uChill;
-  outColor = vec4(col, 1.0);
+  outColor = vec4(col, 1.0 - cielVu);
 }`
 
 // Carte de lumière de la pièce : cuite en espace MONDE, à basse résolution,
@@ -3038,18 +3064,7 @@ export class Renderer {
   // décor procédural assure l'intérim, l'image prend le relais sans à-coup.
   private texStars: WebGLTexture | null = null
   private texStarsFar: WebGLTexture | null = null
-  // LA PLAQUE DE CIEL, chargée SEULEMENT si on la demande : 1254², c'est
-  // ~8 Mo de mémoire graphique une fois les niveaux de détail construits
-  // (côté² × 4 octets, plus un tiers ; une plaque de 4096² en coûterait ~90).
-  // Un joueur qui reste au ciel procédural ne doit ni la télécharger ni la
-  // loger — d'où le chargement paresseux, et la libération au retour.
-  private texCiel: WebGLTexture | null = null
-  private cielDemandee = false
   private cielMode = 2
-  private readonly plaque = new Float32Array([0.5, 0.5, 0.0005])
-  private plaqueRegl: ReglagesPlaque = PLAQUE_DEFAUTS
-  private cielTexels = 2048 // la largeur de l'image, lue à son arrivée
-  private cielForce = 1
   // LA PROFONDEUR DES COUCHES DE FOND : suivi et réponse au zoom, par
   // couche (cf. uParCiel/uParSemis/uParCuve dans le shader). Les défauts
   // reproduisent EXACTEMENT le rendu d'avant — suivi tel quel, zoom à 1 —
@@ -3123,9 +3138,13 @@ export class Renderer {
     // il doit RELIRE tout l'écran au début de chaque image et le RÉÉCRIRE à
     // la fin. Le surcoût, « négligeable » sur un GPU de bureau, y devient le
     // poste dominant — du temps hors CPU, invisible dans les profils JS.
+    // ALPHA : la toile laisse voir le calque de ciel derrière elle, là où
+    // le vide est à nu (render/cielCalque.ts). Prémultiplié, le défaut : le
+    // shader de composition écrit sa couleur déjà multipliée par sa
+    // couverture, et les lumières posées sur le vide restent des ajouts.
     const gl = canvas.getContext('webgl2', {
       antialias: false,
-      alpha: false,
+      alpha: true,
     })
     if (!gl) throw new Error('WebGL2 indisponible')
     this.gl = gl
@@ -3479,24 +3498,13 @@ export class Renderer {
    * lancée au chargement du module ne peut pas le toucher — il n'existe pas
    * encore (cf. src/main-amorce.spec.ts).
    */
-  setCiel(mode: number, force: number, reglages: ReglagesPlaque): void {
+  setCiel(mode: number): void {
+    // 2 : le calque HTML (render/cielCalque.ts) — la toile laisse le vide
+    // transparent, et c'est le calque qui dose la galaxie ; 0 et 1 : le
+    // ciel reste peint ici
     this.cielMode = mode
-    this.cielForce = force
-    // le cadrage se calcule au rendu : il lui faut la caméra, l'écran, sa
-    // densité de pixels ET la taille réelle de l'image — que seul le
-    // renderer connaît, une fois l'image arrivée
-    this.plaqueRegl = reglages
-    // le téléchargement n'est lancé qu'au premier passage en mode plaque.
-    // SANS répétition : l'image est unique, son bord n'est jamais montré —
-    // et, filtrée, une répétition y mélangerait le bord opposé
-    if (mode > 1.5 && !this.cielDemandee) {
-      this.cielDemandee = true
-      this.loadTexture('/assets/ciel.webp', false, true, (t, img) => {
-        this.texCiel = t
-        this.cielTexels = img.naturalWidth || img.width || this.cielTexels
-      })
-    }
   }
+
 
   /**
    * LA PROFONDEUR DES COUCHES DE FOND. Deux nombres par couche, entre 0 et
@@ -4223,20 +4231,9 @@ export class Renderer {
     bindTex(1, this.texStars, 'uTexStars', 'uHasStars')
     bindTex(2, this.texWall, 'uTexWall', 'uHasWall')
     bindTex(6, this.texTank, 'uTexTank', 'uHasTank')
-    // une seule unité pour le lointain : la plaque quand on la veut ET
-    // qu'elle est arrivée, la tuile d'intérim le reste du temps
-    const cielPret = this.cielMode > 1.5 && this.texCiel !== null
-    bindTex(7, cielPret ? this.texCiel : this.texStarsFar, 'uTexCiel', 'uHasCiel')
-    gl.uniform1f(cu['uCielMode'], cielPret ? 2 : Math.min(this.cielMode, 1))
-    const cadre = cadrePlaque(
-      camera.x, camera.y, camera.zoom, viewportW, viewportH, dpr,
-      this.cielTexels, this.plaqueRegl,
-    )
-    this.plaque[0] = cadre.cx
-    this.plaque[1] = cadre.cy
-    this.plaque[2] = cadre.parPx
-    gl.uniform3fv(cu['uPlaque'], this.plaque)
-    gl.uniform1f(cu['uCielForce'], this.cielForce)
+    bindTex(7, this.texStarsFar, 'uTexCiel', 'uHasCiel')
+    gl.uniform1f(cu['uCielMode'], Math.min(this.cielMode, 1))
+    gl.uniform1f(cu['uCielCalque'], this.cielMode > 1.5 ? 1 : 0)
     gl.uniform2fv(cu['uParCiel'], this.parCiel)
     gl.uniform2fv(cu['uParSemis'], this.parSemis)
     gl.uniform2fv(cu['uParCuve'], this.parCuve)
@@ -4540,7 +4537,9 @@ export class Renderer {
         gl.uniform1f(du['uSoftness'], params.fieldSoftness)
         gl.uniform1f(du['uFieldScale'], this.fieldScale)
         gl.enable(gl.BLEND)
-        gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA)
+        // l'ALPHA se compose à part : au-dessus du ciel transparent, un
+        // décor doit rendre son couvrement tel quel (sinon compté au carré)
+        gl.blendFuncSeparate(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA, gl.ONE, gl.ONE_MINUS_SRC_ALPHA)
         gl.bindVertexArray(this.decalVao)
       }
       const hw = d.w * 0.5
@@ -4622,7 +4621,9 @@ export class Renderer {
         gl.uniform1f(du['uSoftness'], params.fieldSoftness)
         gl.uniform1f(du['uFieldScale'], this.fieldScale)
         gl.enable(gl.BLEND)
-        gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA)
+        // l'ALPHA se compose à part : au-dessus du ciel transparent, un
+        // décor doit rendre son couvrement tel quel (sinon compté au carré)
+        gl.blendFuncSeparate(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA, gl.ONE, gl.ONE_MINUS_SRC_ALPHA)
         gl.bindVertexArray(this.decalVao)
       }
       // même rayon que le dessin procédural, marge des pattes comprise

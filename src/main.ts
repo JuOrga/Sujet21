@@ -377,6 +377,7 @@ import { picto, type NomPicto } from './game/athPictos'
 import { entreesTiroir } from './game/athTiroir'
 import { pancarteLibre, zonesInterdites, type Rect } from './game/athZones'
 import { CLE_REGLAGE_ATH, athAuRepos, litReglageAth, pointeurPres, type ReglageAth } from './game/athRepos'
+import { CielCalque } from './render/cielCalque'
 import {
   PARALLAXE_DEFAUTS,
   PLAQUE_DEFAUTS,
@@ -3582,6 +3583,8 @@ const captureCodex = new CaptureCodex(
   document.getElementById('hud-capture') as HTMLButtonElement | null,
   {
     sources: () => ({ gl: canvas, fx: fxCanvas }),
+    // le ciel vit hors de la toile : il se repeint sous elle dans la vidéo
+    fond: (g, x, y, w, h, largeur, hauteur) => cielCalque.dessineDans(g, x, y, w, h, largeur, hauteur),
     fiches: () => fichesCodex().map((f) => ({ id: f.id, titre: codexLu(f).titre, groupe: f.groupe })),
     concepteur: () => document.body.classList.contains('concepteur'),
     cadenceTampon: () => cadenceTampon,
@@ -8007,6 +8010,8 @@ fetch('/noyaux.wasm')
   })
 
 const renderer = new Renderer(canvas, CAPACITY)
+// le ciel vit DERRIÈRE la toile, dans le même conteneur (render/cielCalque.ts)
+const cielCalque = new CielCalque(canvas.parentElement!, canvas, '/assets/ciel.webp')
 const rendererNe = performance.now() // pour dater l'attente de compilation
 const loop = new FixedLoop()
 const input = new Input()
@@ -19410,11 +19415,20 @@ function corpsImage(now: number): boolean {
   // s'affichait plus du tout. Posé à l'image, il ne peut ni arriver trop tôt
   // ni rester en retard d'un tableau.
   renderer.setSolModules(level.coque === 'structures')
-  renderer.setCiel(
-    CIEL_MODE[cielChoix],
-    cielReglages.force,
-    { ...PLAQUE_DEFAUTS, taille: cielReglages.taille },
-  )
+  renderer.setCiel(CIEL_MODE[cielChoix])
+  // LE CIEL EN CALQUE, à la densité NATIVE de l'écran — pas à l'échelle de
+  // rendu de la toile : c'est tout l'objet (render/cielCalque.ts)
+  cielCalque.maj({
+    actif: CIEL_MODE[cielChoix] > 1.5,
+    camX: camera.x,
+    camY: camera.y,
+    zoom: camera.zoom,
+    largeurCss: vw,
+    hauteurCss: vh,
+    dpr: Math.min(window.devicePixelRatio || 1, 3),
+    force: cielReglages.force,
+    reglages: { ...PLAQUE_DEFAUTS, taille: cielReglages.taille },
+  })
   // LA PROFONDEUR DES COUCHES DE FOND : posée à l'image comme le ciel, pour
   // que le banc l'entende tout de suite. Le facteur se cuisine ICI, une fois
   // par image (il ne dépend que du zoom et des réglages) : le shader n'a plus
