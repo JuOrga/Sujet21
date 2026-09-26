@@ -1599,3 +1599,97 @@ Livraison : `masters/images/hull.png`, puis `python3 tools/images/prepare.py hul
 ```
 Retro-futuristic 1970s orbital laboratory hardware, NASA/ISS-inspired, realistic worn industrial detail: riveted steel, weld seams, scuffed paint, bolts, small stencilled hazard markings. Muted cold palette: steel blue-grey #0a1420 to #2a3542, off-white quilted thermal blankets, a single cyan accent #63b7e6, amber only on tiny indicator lamps. STRICT TOP-DOWN ORTHOGRAPHIC VIEW, seen from directly above like a floor plan, no perspective, no side faces visible. Hard sunlight from the upper left. Subject: a long horizontal strip, 3:1 landscape, SEAMLESSLY TILEABLE LEFT-RIGHT (the left and right edges must match perfectly), showing the thick hull wall of a space station module seen from above, like the top of a wall on an architectural plan. From bottom to top: along the BOTTOM edge, the inner face of the wall with one thin continuous glowing cyan light strip (#63b7e6); then the body of the wall, heavy structural steel: bolted armour plates of varied lengths, a recessed channel carrying two or three pipes and cable bundles with clamps, reinforcing ribs crossing the wall every so often, a small maintenance hatch, faded stencilled markings; along the TOP edge, the outer skin of the module: a narrow band of off-white quilted thermal blanket held by a thin riveted metal rim. Overall dark and low-contrast (average brightness around 20 %), so that the lit room inside stays the brightest thing. Fills the whole image, no margin, no transparency. Avoid: perspective, 3/4 view, side view, vanishing point, seams at the left and right edges, bright colours, text, labels, logos, watermark, frame, border.
 ```
+
+## 30. LA CHAUDIÈRE — l'atlas de la rampe de résistances ✅ LIVRÉ (26/09)
+**`chaudiere-atlas.webp` · 1024² · RGBA · assemblé par `tools/images/chaudiere_atlas.py`**
+
+Le même travail que la conduite d'ammoniac (§27), pour la chaudière : le
+rectangle à rayures devient une **rampe de résistances à ailettes** dont les
+barreaux rougeoient, fermée d'un capot, alimentée par un boîtier dont le câble
+plonge dans le sol. Le dessin suit la place (`CHAUDIERE`, `game/formes.ts`) :
+
+| rapport L / T | dessin |
+| --- | --- |
+| moins de 1,6 | la **compacte** ronde à hublot (le **brûleur** carré sous 80 u) |
+| jusqu'à 3,26 | la **rampe courte**, fermée de deux capots |
+| au-delà | la **rampe longue** : UNE arrivée de courant (boîtier, câble, plaque) au bout positif, un capot à l'autre — un bout contre un mur y plonge, le courant vient du mur |
+
+La collision suit le dessin, comme pour la conduite : l'union des pièces, et
+la compacte est un disque. Dans l'aire de chaleur, le sol roussit par
+**tampons** (les îlots de la source, posés tels quels). Les barreaux de
+l'image respirent : une onde lente parcourt la rampe.
+
+**La référence de style** est `docs/reference/chaudiere-reference.webp` (la
+traversée livrée) ; joignez aussi `conduite-reference.webp` pour l'acier.
+**L'ambre y est permis sur ce qui chauffe, et là seulement** : barreaux,
+hublot, voyant (charte §3 — la famille admet 25 % de pixels chauds ; l'atlas
+en mesure 24 %).
+
+**Les sources** vont dans `masters/images/sources/` (non versionné) :
+`chaudiere-troncon.png`, `chaudiere-traversee.png`, `chaudiere-raccords.png`,
+`chaudiere-compacte.png`, `chaudiere-sol.png`. Puis :
+
+```bash
+python3 tools/images/chaudiere_atlas.py        # → masters/images/chaudiere-atlas.png
+python3 tools/images/prepare.py chaudiere-atlas
+```
+
+**Une nouvelle image impose de REMESURER** les recadrages du script et les
+proportions de `CHAUDIERE` — la physique et le shader les lisent tels quels.
+
+### 30.1 Le tronçon (le carter, répété) · 3:1
+
+Livré : 2172×724, raccord gauche-droite invisible (écart 14 aux bords, 13
+entre colonnes voisines) — il se répète SANS miroir. Le script coupe la
+bande de fond ajoutée au-dessus et au-dessous des rails.
+
+```
+Retro-futuristic 1970s orbital laboratory, flat orthographic 2D game asset. Muted cold palette: near-black #030710, steel blue-grey #0a1420 to #2a3542, single cyan accent #63b7e6; amber heat glow (#f2c98e, #e8951f, #c96f14) allowed ONLY on the heating elements themselves. Evenly lit from above, low brightness, no visible light source. Seamless horizontally tileable texture strip of an industrial electric heater bank seen from directly above, lying horizontally and filling the full height of the image edge to edge, left and right edges match perfectly. A long dark gunmetal steel housing (#141c26 to #2a3542) with two thick rails along its long edges, and between them a dense row of parallel cooling fins running across the strip, evenly spaced like a radiator. Deep in the gaps between the fins, heating rods glow a smouldering amber-orange, brightest at the centre line and fading to dark toward both rails, as if seen through the fins. The fin tips stay dark steel with a thin cold specular highlight; the rails have small rivets and a faint heat-tint discoloration (straw and bluish oxidation) near the glow. Subtle soot. In the exact steel style of the attached reference. No flanges, no bolts at the ends, no joints, no background above or below the housing. Avoid: perspective, 3/4 view, isometric, side view, depth of field, blur, film grain, lens flare, vignette, bright lighting, open flames, fire, lava, orange steel, red everywhere, glowing housing, text, logo, watermark, border, frame, drop shadow.
+```
+*Midjourney : `--ar 4:1 --tile --style raw --sref <référence>`*
+
+### 30.2 La traversée — l'arrivée de courant (détourée) · 3:1
+
+**Tout sur l'axe** : la première génération posait la plaque SOUS le boîtier,
+le câble filant vers le bas de l'image — en vue de dessus, sur le côté au lieu
+de plonger. Mesures de l'image livrée : rampe centrée à y 401, boîtier 397,
+plaque 399 ; carter 613 px = 81 % du bloc.
+
+```
+Retro-futuristic 1970s orbital laboratory, flat orthographic 2D game asset. Muted cold palette: near-black #030710, steel blue-grey #0a1420 to #2a3542, single cyan accent #63b7e6; amber (#e8951f) allowed ONLY on one small indicator lamp and a faint glow between the last fins. Evenly lit from above, low brightness, no visible light source. Single sprite on a transparent background, STRICT TOP-DOWN orthographic view looking straight down at the floor, in the exact style of the attached reference. Everything lies on ONE HORIZONTAL LINE through the vertical centre of the image, left to right: (1) the end of a finned electric heater bank entering from the left edge, closed by a bolted steel end cap; (2) directly to its right, touching it, a squat square electrical junction box with four corner screws, one small round amber indicator lamp and a thin cyan trim line; (3) directly to the right of the box, a square riveted steel floor plate with a round black hole in its centre, where a short ribbed armoured cable coming out of the box's right side plunges straight DOWN INTO THE FLOOR — seen from above as a ribbed ring sinking into the dark hole, surrounded by a flat bolted collar that is a perfect circle. The cable does NOT run sideways, up or down the image: it goes from the box straight into the hole, all on the horizontal centre line. The box and the plate are both centred on that line and extend equally above and below it; the plate is about as tall as the heater housing. Whole piece inside the image, clean edges, isolated on transparent background. Avoid: perspective, 3/4 view, isometric, side view, cable running down the image, plate below the box, off-centre plate, elliptical ring, wall, glow halo, grey background, flames, fire, glowing box, text, letters, logo, watermark, border, frame, drop shadow.
+```
+*Midjourney : `--ar 3:1 --style raw --sref <référence>` ; joindre le tronçon livré, pour la hauteur du carter.*
+
+### 30.3 La compacte à hublot (détourée) · 1:1
+
+Livrée avec un boîtier et une bride qui dépassent du cercle : le script la
+détoure à son cercle d'ailettes (centre 625, 582 ; rayon 575) et passe en
+ambre le secteur rouge d'un manomètre (le rouge est réservé à l'alerte).
+
+```
+Retro-futuristic 1970s orbital laboratory, flat orthographic 2D game asset. Muted cold palette: near-black #030710, steel blue-grey #0a1420 to #2a3542, single cyan accent #63b7e6; amber heat glow (#f2c98e, #e8951f, #c96f14) allowed ONLY inside the porthole and in the fin gaps. Evenly lit from above, low brightness, no visible light source. Single sprite on a transparent background, STRICT TOP-DOWN orthographic view, in the exact steel style of the attached reference: a compact cylindrical boiler seen from directly above, a perfect circle of dark riveted gunmetal steel filling most of the image, ringed by short radial cooling fins all around its edge. In its centre a thick round porthole with a heavy bolted bezel, and behind the scratched heat-resistant glass a deep smouldering amber-orange glow, brighter at the centre, with faint dark shapes of heating coils inside. A thin cyan trim ring (#63b7e6) around the bezel, two small pressure-gauge dials and a pipe stub on the rim, heat-tint discoloration (straw to bluish) on the steel nearest the porthole, light soot. Everything except the porthole and fin gaps stays cold dark steel. Centred, whole piece inside the image with a clear transparent margin, clean edges, isolated on transparent background. Avoid: perspective, 3/4 view, isometric, side view, cylinder seen from the side, elliptical porthole, open flames, fire coming out, lava, orange steel, glowing body, depth of field, blur, film grain, lens flare, vignette, bright lighting, text, letters, logo, watermark, border, frame, drop shadow, background, floor.
+```
+*Midjourney : `--ar 1:1 --style raw --sref <référence>`, puis détourage.*
+
+### 30.4 Les raccords (planche détourée) · 3:1
+
+Le joint (les longues rampes, tous les 320 u), le brûleur (les compactes sous
+80 u) ; le collier attend dans la source.
+
+```
+Retro-futuristic 1970s orbital laboratory, flat orthographic 2D game asset. Muted cold palette: near-black #030710, steel blue-grey #0a1420 to #2a3542, single cyan accent #63b7e6; amber heat glow (#e8951f, #c96f14) allowed ONLY between fins and inside burners. Evenly lit from above, low brightness, no visible light source. Sprite sheet on a transparent background, STRICT TOP-DOWN orthographic view, same width as a finned heater bank and exact steel style of the attached reference: dark gunmetal steel, thin cold specular highlights, light soot and straw-to-blue heat tint near hot parts. Pieces: (1) a bolted joint between two heater bank sections, two thick flanges face to face with hex nuts across the full width, fins stopping on each side, a faint amber glow just leaking from the gaps; (2) a small square electric burner seen from above, a round perforated grille over a glowing amber coil, four corner bolts; (3) a mounting clamp saddle with two bolts and a small base plate. Pieces evenly spaced, not touching, clean edges, isolated on transparent background. Avoid: perspective, 3/4 view, isometric, side view, open flames, fire, lava, orange steel, glowing metal body, depth of field, blur, film grain, lens flare, vignette, bright lighting, text, letters, logo, watermark, border, frame, drop shadow, background, floor.
+```
+*Midjourney : `--ar 2:1 --style raw --sref <référence>`, puis détourage.*
+
+### 30.5 Le sol chauffé — des tampons (détourés) · 2:1
+
+Demandé tuilable, livré en îlots séparés : ils servent de **tampons**, posés
+en miroir tous les 520 × 260 u dans l'aire de chaleur, à faible force (à
+pleine force, ils se lisaient en taches de boue). Leurs franges rouges et
+jaunes sous l'alpha nul (16 331 pixels) sont effacées par le saignement du
+script.
+
+```
+Retro-futuristic 1970s orbital laboratory, flat orthographic 2D game asset. Muted cold palette: near-black #030710, steel blue-grey #0a1420 to #2a3542, single cyan accent #63b7e6. Evenly lit from above, low brightness, no visible light source. Seamless tileable transparent overlay of heat damage on a flat steel floor, seen from directly above: soft soot smudges, irregular heat-tint oxidation stains on metal in straw, bronze and bluish-purple rings like tempered steel, a few fine dry cracks and flaked paint specks, sparse and uneven, mostly transparent and subtle, overlay only, no floor visible, no background. Avoid: perspective, depth of field, blur, film grain, lens flare, vignette, bright lighting, glowing embers, flames, fire, lava, red glow, text, logo, watermark, border, frame, solid background, burnt holes.
+```
+*Midjourney : `--ar 1:1 --tile --style raw --sref <référence>`.*

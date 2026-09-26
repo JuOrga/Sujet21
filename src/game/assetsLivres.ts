@@ -40,7 +40,7 @@ const NOMS: Record<string, string> = {
   'phile.webp': 'Surface hydrophile',
   'phobe.webp': 'Surface hydrophobe',
   'conduite-atlas.webp': 'Conduite d’ammoniac (tronçon, bride, joint, givre du sol)',
-  'chaud.webp': 'Chaudière (ailettes)',
+  'chaudiere-atlas.webp': 'Chaudière (rampe, bout, joint, brûleur, compacte, sol chauffé)',
   'grille.webp': 'Évent (panneau perforé)',
   'sponge-dry.webp': 'Éponge sèche',
   'sponge-wet.webp': 'Éponge gorgée',
@@ -102,7 +102,7 @@ export function rubriqueDe(url: string): string {
   // le dossier fait foi, sinon elles tombaient dans « Autres »
   if (url.includes('/avaries/')) return 'Avaries — stations'
   if (url.includes('/codex/')) return 'Codex — aperçus'
-  if (/^(wall|paroi|phile|phobe|conduite|chaud|grille|sponge)/.test(f))
+  if (/^(wall|paroi|phile|phobe|conduite|chaudiere|grille|sponge)/.test(f))
     return 'Surfaces & matériaux'
   if (f.startsWith('zone-')) return 'Zones d’état'
   if (f.startsWith('serre-')) return 'Serre & cultures'

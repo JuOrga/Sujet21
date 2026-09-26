@@ -14,20 +14,34 @@
 // comme posée là : sans arrivée ni départ. Un bout qui touche un solide ou
 // le bord de la salle y PLONGE : pas de bride, le tuyau file jusqu'au bord
 // du bloc et le mur le prend. Le rendu lit les mêmes bouts (boutsEnMur).
+//
+// LA CHAUDIÈRE suit la même règle, avec ses pièces à elle (formes.ts,
+// CHAUDIERE) : le carter à ailettes, le capot, le boîtier et la plaque de
+// sol où plonge son câble. Toute chaudière RECTANGULAIRE s'y lit.
 
 import {
   BOUT_MUR_NEG,
   BOUT_MUR_POS,
+  CHAUDIERE,
+  FORME_CHAUDIERE,
   FORME_CONDUITE,
   CONDUITE,
   conduiteHoriz,
   dansForme,
+  piecesChaudiere,
   piecesConduite,
   type FormeBox,
 } from './formes'
-import { MAT_FROID, sansPhysique } from './level'
+import { MAT_CHAUD, MAT_FROID, sansPhysique } from './level'
 
 type Boite = FormeBox & { material: number }
+
+/** La conduite ou la chaudière qui se dessine à ses pièces : une plaque
+ *  froide ou une chaudière RECTANGULAIRE. Une forme donnée à l'éditeur
+ *  (disque, capsule…) l'emporte : la pièce est dessinée découpée à elle. */
+export function aPieces(b: { material: number; forme?: number }): boolean {
+  return (b.material === MAT_FROID || b.material === MAT_CHAUD) && !b.forme
+}
 type Bornes = { minX: number; minY: number; maxX: number; maxY: number }
 
 /** Ce qui arrête un tuyau qui file : un solide (hors lui-même et les sans-
@@ -42,7 +56,7 @@ function dansLeMur(x: number, y: number, soi: Boite, boxes: readonly Boite[], bo
     // et le tube (~0,22 T). Ses brides de BOUT n'y comptent pas : elles
     // dépendent de ses propres bouts (un bout dans un mur n'en a pas), et
     // les chercher ferait se sonder deux conduites l'une l'autre sans fin.
-    const f = o.material === MAT_FROID && !o.forme ? tronconSur(o) : o
+    const f = aPieces(o) ? tronconSur(o) : o
     if (dansForme(f, x, y)) return true
   }
   return false
@@ -52,7 +66,8 @@ function dansLeMur(x: number, y: number, soi: Boite, boxes: readonly Boite[], bo
  *  deux bouts « dans un mur », donc sans bride ni traversée — le tube de
  *  bout en bout, et ses joints. */
 function tronconSur(o: Boite): Boite {
-  return { ...o, forme: FORME_CONDUITE, bouts: BOUT_MUR_NEG | BOUT_MUR_POS } as Boite
+  const forme = o.material === MAT_CHAUD ? FORME_CHAUDIERE : FORME_CONDUITE
+  return { ...o, forme, bouts: BOUT_MUR_NEG | BOUT_MUR_POS } as Boite
 }
 
 /** Les bouts de la conduite `b` qui plongent dans un mur (BOUT_MUR_*). Un
@@ -61,7 +76,7 @@ function tronconSur(o: Boite): Boite {
  *  moitié contre un coin garde sa bride. Une boîte oblique n'est pas
  *  sondée : ses bouts gardent leur bride. */
 export function boutsEnMur(b: Boite, boxes: readonly Boite[], bornes: Bornes | null): number {
-  if (b.material !== MAT_FROID || b.forme || b.angle) return 0
+  if (!aPieces(b) || b.angle) return 0
   const w = b.maxX - b.minX
   const h = b.maxY - b.minY
   const horiz = conduiteHoriz(w, h, b.sens)
@@ -69,7 +84,7 @@ export function boutsEnMur(b: Boite, boxes: readonly Boite[], bornes: Bornes | n
   const cx = (b.minX + b.maxX) / 2
   const cy = (b.minY + b.maxY) / 2
   const e = 3 // juste au-delà du bout
-  const flanc = CONDUITE.tuyau * T * 0.9
+  const flanc = (b.material === MAT_CHAUD ? CHAUDIERE.corps : CONDUITE.tuyau) * T * 0.9
   let bouts = 0
   for (const [bit, signe] of [
     [BOUT_MUR_NEG, -1],
@@ -95,7 +110,7 @@ export function boutsEnMur(b: Boite, boxes: readonly Boite[], bornes: Bornes | n
  *  `boxes` et `bornes` : la salle, pour trouver les bouts plongés dans un
  *  mur ; sans elles, tous les bouts ont leur bride. */
 export function formePhysique<B extends Boite>(b: B, boxes: readonly Boite[] = [], bornes: Bornes | null = null): B {
-  if (b.material !== MAT_FROID || b.forme) return b
+  if (!aPieces(b)) return b
   const bouts = boutsEnMur(b, boxes, bornes)
   // LES PIÈCES, précalculées sur la copie : la boucle de contact du
   // solveur (formes.ts, conduiteContactAxe) les lit d'un champ au lieu de
@@ -103,8 +118,9 @@ export function formePhysique<B extends Boite>(b: B, boxes: readonly Boite[] = [
   const w = b.maxX - b.minX
   const h = b.maxY - b.minY
   const horiz = conduiteHoriz(w, h, (b as Boite & { sens?: number }).sens)
-  const pieces = piecesConduite(horiz ? w : h, horiz ? h : w, bouts)
-  return { ...b, forme: FORME_CONDUITE, pieces, ...(bouts ? { bouts } : {}) }
+  const chaud = b.material === MAT_CHAUD
+  const pieces = (chaud ? piecesChaudiere : piecesConduite)(horiz ? w : h, horiz ? h : w, bouts)
+  return { ...b, forme: chaud ? FORME_CHAUDIERE : FORME_CONDUITE, pieces, ...(bouts ? { bouts } : {}) }
 }
 
 /** LA CLÉ D'UNE BOÎTE : tout ce qui décide de la forme qu'on y lit —
@@ -144,7 +160,7 @@ const formesParSalle = new WeakMap<readonly Boite[], { cle: string; formes: read
  *  copie de la liste. Sans conduite, la liste elle-même (rien à changer) ;
  *  avec, la dernière réponse tant que la signature n'a pas bougé. */
 export function formesPhysiques<B extends Boite>(boxes: readonly B[], bornes: Bornes | null): readonly B[] {
-  if (!boxes.some((b) => b.material === MAT_FROID && !b.forme)) return boxes
+  if (!boxes.some(aPieces)) return boxes
   const cle = signatureBoites(boxes, bornes)
   const c = formesParSalle.get(boxes)
   if (c && c.cle === cle) return c.formes as readonly B[]

@@ -12,6 +12,7 @@ import {
   LAMPE_HAUTEUR_MIN,
   MAT_VIDE,
   lampeCouleurRVB,
+  MAT_CHAUD,
   MAT_FROID,
   zonePhases,
 } from '../game/level'
@@ -25,6 +26,8 @@ import {
   FORME_COIN,
   FORME_RECT,
   FORME_COQUE,
+  CHAUDIERE,
+  CHAUDIERE_ATLAS,
   CONDUITE,
   CONDUITE_ATLAS,
 } from '../game/formes'
@@ -296,7 +299,7 @@ bool conduiteHoriz(vec2 sz, float sens) {
   return sz.x >= sz.y;
 }
 
-// aux.z d'une plaque froide : sens + 4 · bouts (voir render())
+// aux.z d'une plaque froide ou d'une chaudière : sens + 4 · bouts (voir render())
 float conduiteSens(float code) { return mod(code, 4.0); }
 float conduiteBouts(float code) { return floor(code / 4.0 + 0.001); }
 
@@ -306,6 +309,133 @@ float conduiteSdf(vec2 p, vec4 box, float code) {
   bool horiz = conduiteHoriz(sz, conduiteSens(code));
   return conduiteSdfLocal(horiz ? q.x : q.y, horiz ? q.y : q.x,
                           horiz ? sz.x : sz.y, horiz ? sz.y : sz.x, conduiteBouts(code));
+}
+`
+})()
+
+// LA CHAUDIÈRE : la rampe de résistances, son capot, son boîtier dont le
+// câble plonge dans le sol, ses joints — et, courte, la rampe fermée de deux
+// capots ; ronde sous 1,6 (la compacte à hublot, ou le brûleur). ÉCRITE
+// depuis CHAUDIERE et CHAUDIERE_ATLAS (game/formes.ts), comme la conduite :
+// la physique lit les mêmes pièces (piecesChaudiere). Elle emprunte à la
+// conduite son repère (conduiteHoriz, boutEnMur, cnRect).
+const CHAUDIERE_GLSL = (() => {
+  const C = CHAUDIERE
+  const A = CHAUDIERE_ATLAS
+  const f = (x: number) => (Number.isInteger(x) ? `${x}.0` : `${x}`)
+  const v3 = (r: readonly number[]) => `vec3(${r.map(f).join(', ')})`
+  const v4 = (r: readonly number[]) => `vec4(${r.map(f).join(', ')})`
+  return `
+const float CH_CORPS = ${f(C.corps)};
+const float CH_MOTIF = ${f(C.motif)};
+const float CH_BOUT = ${f(C.bout)};
+const float CH_FIN_CORPS = ${f(C.finCorps)};
+const vec3 CH_CAPOT = ${v3(C.capot)};
+const vec3 CH_CHANFREIN = ${v3(C.chanfrein)};
+const vec3 CH_BOITIER = ${v3(C.boitier)};
+const vec3 CH_CABLE = ${v3(C.cable)};
+const vec3 CH_PLAQUE = ${v3(C.plaque)};
+const float CH_CAPOT_COURT = ${f(C.capotCourt)};
+const vec3 CH_CC_CAPOT = ${v3(C.capotCourtCapot)};
+const vec3 CH_CC_CHANFREIN = ${v3(C.capotCourtChanfrein)};
+const float CH_SEUIL_COMPACTE = ${f(C.seuilCompacte)};
+const float CH_COMPACTE_MIN = ${f(C.compacteMin)};
+const float CH_JOINT_DEMI = ${f(C.jointDemi)};
+const float CH_BRIDE_JOINT = ${f(C.brideJoint)};
+const float CH_PAS = ${f(C.pas)};
+const float CH_ATLAS = ${f(A.taille)};
+const vec4 CH_CADRE_CORPS = ${v4(A.corps)};
+const vec4 CH_CADRE_BOUT = ${v4(A.bout)};
+const vec4 CH_CADRE_JOINT = ${v4(A.joint)};
+const vec4 CH_CADRE_BRULEUR = ${v4(A.bruleur)};
+const vec4 CH_CADRE_COMPACTE = ${v4(A.compacte)};
+const vec4 CH_CADRE_SOL = ${v4(A.sol)};
+
+// 0 compacte, 1 courte, 2 longue — JUMEAU de modeChaudiere (formes.ts)
+float modeChaudiere(float L, float T) {
+  if (L >= (CH_BOUT + CH_CAPOT_COURT + 1.5) * T) return 2.0;
+  return L < CH_SEUIL_COMPACTE * T ? 0.0 : 1.0;
+}
+
+// ce qui termine le bout du côté de s, sur une longue rampe : 0 le mur,
+// 1 un capot, 2 l'arrivée de courant — JUMEAU de finsChaudiere (formes.ts)
+float finChaudiere(float s, float bouts) {
+  bool murNeg = mod(bouts, 2.0) > 0.5;
+  bool murPos = bouts > 1.5;
+  if (s < 0.0) return murNeg ? 0.0 : 1.0;
+  return murPos ? 0.0 : (murNeg ? 1.0 : 2.0);
+}
+
+// le joint le plus proche de s, ou 1e9 — JUMEAU de jointsChaudiere
+float jointPresCh(float s, float L, float T) {
+  if (modeChaudiere(L, T) < 1.5) return 1e9;
+  float n = floor((L * 0.5 - (CH_BOUT + 0.05 + CH_JOINT_DEMI) * T) / CH_PAS);
+  if (n < 0.0) return 1e9;
+  return clamp(floor(s / CH_PAS + 0.5), -n, n) * CH_PAS;
+}
+
+// une pièce de bout [de, à, demi], comptée depuis le bout du côté de s
+float chBout(float s, float t, float L, float T, vec3 p) {
+  return cnRect(abs(s), t, L * 0.5 - 0.5 * (p.x + p.y) * T, 0.5 * (p.y - p.x) * T, p.z * T);
+}
+
+// distance signée à la chaudière (l'union de ses pièces), en repère local
+// centré — JUMEAU de piecesChaudiere (formes.ts)
+float chaudiereSdfLocal(float s, float t, float L, float T, float bouts) {
+  float mode = modeChaudiere(L, T);
+  if (mode < 0.5) {
+    float c = min(L, T);
+    if (c >= CH_COMPACTE_MIN) return length(vec2(s, t)) - 0.5 * c; // le disque
+    return cnRect(s, t, 0.0, 0.5 * c, 0.5 * c);
+  }
+  if (mode < 1.5) {
+    float h = L * 0.5 - CH_CC_CAPOT.x * T;
+    float d = cnRect(s, t, 0.0, h, CH_CORPS * T);
+    d = min(d, chBout(s, t, L, T, CH_CC_CAPOT));
+    return min(d, chBout(s, t, L, T, CH_CC_CHANFREIN));
+  }
+  float fN = finChaudiere(-1.0, bouts);
+  float fP = finChaudiere(1.0, bouts);
+  float a0 = -L * 0.5 + (fN < 0.5 ? 0.0 : (fN < 1.5 ? CH_CC_CAPOT.x : CH_CAPOT.x) * T);
+  float a1 = L * 0.5 - (fP < 0.5 ? 0.0 : (fP < 1.5 ? CH_CC_CAPOT.x : CH_CAPOT.x) * T);
+  float d = cnRect(s, t, 0.5 * (a0 + a1), 0.5 * (a1 - a0), CH_CORPS * T);
+  float fS = finChaudiere(s, bouts);
+  if (fS > 1.5) {
+    d = min(d, chBout(s, t, L, T, CH_CAPOT));
+    d = min(d, chBout(s, t, L, T, CH_CHANFREIN));
+    d = min(d, chBout(s, t, L, T, CH_BOITIER));
+    d = min(d, chBout(s, t, L, T, CH_CABLE));
+    d = min(d, chBout(s, t, L, T, CH_PLAQUE));
+  } else if (fS > 0.5) {
+    d = min(d, chBout(s, t, L, T, CH_CC_CAPOT));
+    d = min(d, chBout(s, t, L, T, CH_CC_CHANFREIN));
+  }
+  float sj = jointPresCh(s, L, T);
+  if (sj < 1e8) {
+    float j0 = max(-L * 0.5, sj - CH_BRIDE_JOINT * T);
+    float j1 = min(L * 0.5, sj + CH_BRIDE_JOINT * T);
+    d = min(d, cnRect(s, t, 0.5 * (j0 + j1), 0.5 * (j1 - j0), 0.5 * T));
+  }
+  return d;
+}
+
+// LA SILHOUETTE QUI OMBRE : le carter sur toute la longueur (les boîtiers
+// et la plaque sont plus bas que lui, leur ombre s'y confond), la compacte
+// comme son corps
+float chaudiereOmbreSdf(float s, float t, float L, float T) {
+  if (modeChaudiere(L, T) < 0.5) {
+    float c = min(L, T);
+    return c >= CH_COMPACTE_MIN ? length(vec2(s, t)) - 0.45 * c : cnRect(s, t, 0.0, 0.45 * c, 0.45 * c);
+  }
+  return cnRect(s, t, 0.0, 0.5 * L, CH_CORPS * T);
+}
+
+float chaudiereSdf(vec2 p, vec4 box, float code) {
+  vec2 sz = box.zw - box.xy;
+  vec2 q = p - 0.5 * (box.xy + box.zw);
+  bool horiz = conduiteHoriz(sz, conduiteSens(code));
+  return chaudiereSdfLocal(horiz ? q.x : q.y, horiz ? q.y : q.x,
+                           horiz ? sz.x : sz.y, horiz ? sz.y : sz.x, conduiteBouts(code));
 }
 `
 })()
@@ -842,6 +972,7 @@ float smoothField(vec2 p) {
 }
 
 ${CONDUITE_GLSL}
+${CHAUDIERE_GLSL}
 // ——— LA CONDUITE D'AMMONIAC (plaque froide) ————————————————————————————
 // Un tuyau givré, ses brides de bout et ses joints, lus dans l'atlas
 // conduite-atlas.webp (tools/images/conduite_atlas.py) — quatre images
@@ -1030,6 +1161,115 @@ vec3 brumeNH3(vec2 wb, float d, float bande) {
   float souffle = 0.85 + 0.15 * sin(uTime * 0.7);
   return vec3(0.14, 0.27, 0.40) * aura * aura * (0.55 + 0.45 * p2) * souffle +
          vec3(0.60, 0.76, 0.92) * bouffees * fuite * 0.24;
+}
+
+// ——— LA CHAUDIÈRE (rampe de résistances) ——————————————————————————————
+// Lue dans chaudiere-atlas.webp (tools/images/chaudiere_atlas.py), comme la
+// conduite dans le sien : tout se cale sur la BOÎTE, les brides du joint en
+// font toute la largeur, le carter 81 % ; la physique lit les mêmes pièces.
+vec4 atlasChaud(vec4 cadre, vec2 f, float px, float ppw) {
+  if (f.x < 0.0 || f.x > 1.0 || f.y < 0.0 || f.y > 1.0) return vec4(0.0);
+  vec2 pa = cadre.xy + clamp(f * cadre.zw, vec2(0.5), cadre.zw - 0.5);
+  vec2 uv = vec2(pa.x, CH_ATLAS - pa.y) / CH_ATLAS; // téléversé avec FLIP_Y
+  float g = px * ppw / CH_ATLAS;
+  vec4 c = textureGrad(uTexChaud, uv, vec2(g, 0.0), vec2(0.0, g));
+  return vec4(c.rgb * c.a, c.a); // prémultiplié
+}
+
+// l'ombre au sol de la chaudière, comme celle de la conduite
+float chaudiereOmbre(vec2 p, vec4 box, float code) {
+  vec2 sz = box.zw - box.xy;
+  bool horiz = conduiteHoriz(sz, conduiteSens(code));
+  float L = horiz ? sz.x : sz.y;
+  float T = horiz ? sz.y : sz.x;
+  vec2 q = p - 0.5 * (box.xy + box.zw) - vec2(0.06, -0.06) * T;
+  float d = chaudiereOmbreSdf(horiz ? q.x : q.y, horiz ? q.y : q.x, L, T);
+  return mix(0.55, 1.0, smoothstep(-0.10 * T, 0.30 * T, d));
+}
+
+// Rend la chaudière SEULE, prémultipliée : autour, le sol de la salle.
+vec4 chaudiereRendu(vec2 loc, vec2 bsize, float px, float code) {
+  bool horiz = conduiteHoriz(bsize, conduiteSens(code));
+  float bouts = conduiteBouts(code);
+  float L = horiz ? bsize.x : bsize.y;
+  float T = horiz ? bsize.y : bsize.x;
+  float s = (horiz ? loc.x : loc.y) - L * 0.5;
+  float t = (horiz ? loc.y : loc.x) - T * 0.5;
+  float mode = modeChaudiere(L, T);
+  bool lg = mode > 1.5;
+
+  vec4 acc = vec4(0.0);
+  if (mode < 0.5) {
+    // LA COMPACTE, ronde, au centre du bloc — ou le BRÛLEUR sous 80 u.
+    // Droite dans le repère du bloc : une vue du dessus, sa lumière reste
+    // en haut à gauche quel que soit le sens
+    float c = min(L, T);
+    vec2 q = loc - 0.5 * bsize;
+    vec2 f = vec2(q.x / c + 0.5, 0.5 - q.y / c);
+    vec4 cadre = c >= CH_COMPACTE_MIN ? CH_CADRE_COMPACTE : CH_CADRE_BRULEUR;
+    acc = atlasChaud(cadre, f, px, cadre.z / c);
+  } else {
+    // LE CARTER À AILETTES : l'image se raccorde bord à bord — elle se
+    // répète telle quelle, sans miroir
+    float hb = CH_CORPS * T;
+    // ce qui termine CE bout : une courte a ses deux capots ; une longue, le
+    // mur, un capot ou l'arrivée de courant (finChaudiere)
+    float fS = lg ? finChaudiere(s, bouts) : 1.0;
+    bool mur = fS < 0.5;
+    // la rampe s'arrête sous le capot (celui de l'arrivée, ou celui qui la
+    // ferme) — au mur, elle file jusqu'au bord
+    float fin = mur ? L * 0.5 : (fS > 1.5 ? L * 0.5 - CH_FIN_CORPS * T : L * 0.5 - (CH_CAPOT_COURT - 0.02) * T);
+    if (abs(t) < hb && abs(s) < fin) {
+      acc = atlasChaud(CH_CADRE_CORPS, vec2(fract(s / (CH_MOTIF * T)), (hb - t) / (2.0 * hb)),
+                       px, CH_CADRE_CORPS.w / (2.0 * hb));
+    }
+    // LE BOUT : le capot, puis (l'arrivée) le boîtier et son câble qui
+    // plonge dans la plaque de sol ; à gauche, l'image en miroir. Un bout
+    // fermé n'en lit que la tête — le capot seul
+    float lb = fS > 1.5 ? CH_BOUT * T : CH_CAPOT_COURT * T;
+    float sp = abs(s);
+    float s0 = L * 0.5 - lb;
+    if (!mur && sp > s0) {
+      vec2 f = vec2((sp - s0) / (CH_BOUT * T), (0.5 * T - t) / T);
+      vec4 c = atlasChaud(CH_CADRE_BOUT, f, px, CH_CADRE_BOUT.w / T);
+      acc = cnSur(acc, c * smoothstep(0.0, 0.02, f.x));
+    }
+    // LE JOINT à brides, tous les pas, sur une longue rampe
+    float sj = jointPresCh(s, L, T);
+    if (sj < 1e8) {
+      vec2 f = vec2((s - sj + CH_JOINT_DEMI * T) / (2.0 * CH_JOINT_DEMI * T), (0.5 * T - t) / T);
+      vec4 c = atlasChaud(CH_CADRE_JOINT, f, px, CH_CADRE_JOINT.w / T);
+      acc = cnSur(acc, c * smoothstep(0.0, 0.14, f.x) * smoothstep(0.0, 0.14, 1.0 - f.x));
+    }
+    // LA RAMPE QUI PLONGE dans le mur : elle s'assombrit en s'y enfonçant
+    if (mur && acc.a > 0.0) acc.rgb *= mix(0.30, 1.0, smoothstep(0.0, 0.45 * T, L * 0.5 - sp));
+  }
+
+  // LA CHALEUR QUI COURT : les résistances de l'image (ses pixels ambre)
+  // respirent, une onde lente qui parcourt la rampe d'un bout à l'autre et
+  // un frémissement par ailette — le décor le plus chaud de la station ne
+  // peut pas être le seul à ne rien faire. Le métal, lui, ne bouge pas.
+  if (acc.a > 0.01) {
+    vec3 c = acc.rgb / acc.a;
+    float ambre = smoothstep(0.10, 0.35, c.r - c.b) * smoothstep(0.25, 0.55, c.r);
+    float onde = 0.5 + 0.5 * sin(uTime * 1.6 - s / max(T, 1.0) * 1.3);
+    float fremi = 0.5 + 0.5 * sin(uTime * 9.0 + floor(s / max(0.07 * T, 1.0)) * 2.3);
+    acc.rgb *= 1.0 + ambre * (0.28 * onde + 0.10 * fremi - 0.12);
+  }
+  return acc;
+}
+
+// LE SOL CHAUFFÉ : dans l'aire d'effet (la portée de chaleur, celle du
+// solveur), des TAMPONS d'acier revenu — suie, irisations paille, bronze et
+// bleu — posés en miroir tous les 520 × 260 u ; le vide entre les îlots de
+// l'image est voulu : le sol roussit par places, pas en papier peint. Plus
+// marqué près de la chaudière, nul au bord de la portée.
+vec4 solChauffe(vec2 w, float d, float bande, float px) {
+  float portee = 1.0 - smoothstep(0.0, bande, d);
+  if (portee <= 0.0) return vec4(0.0);
+  vec2 m = w / vec2(520.0, 260.0);
+  vec2 tri = abs(fract(m * 0.5) * 2.0 - 1.0);
+  return atlasChaud(CH_CADRE_SOL, tri, px, CH_CADRE_SOL.z / 520.0) * portee * portee;
 }
 
 // ---- La vie du vaisseau : veilleuses, dérive, respiration des machines ----
@@ -1716,7 +1956,6 @@ void main() {
   }
   vec3 texPhobeC = texture(uTexPhobe, world / 170.0).rgb;
   vec3 texPhileC = texture(uTexPhile, world / 210.0).rgb;
-  vec3 texChaudC = texture(uTexChaud, world / 380.0).rgb;
   // la grille est calée pour que ses perforations fassent ~24 u, comme le
   // motif procédural qu'elle remplace
   vec3 texGrilleC = texture(uTexGrille, world / 624.0).rgb;
@@ -1852,7 +2091,9 @@ void main() {
     // profondeur, les rectangles cessent d'être des aplats.
     // (sauf la conduite d'ammoniac : son ombre suit ses tubes, pas la boîte
     // — une plaque froide À FORME, elle, est un solide comme un autre)
-    if (solide && !(mat > 3.5 && mat < 4.5 && dec.y < 0.5)) {
+    // (ni la chaudière rectangulaire : même règle, mêmes pièces)
+    bool aPieces = ((mat > 3.5 && mat < 4.5) || (mat > 5.5 && mat < 6.5)) && dec.y < 0.5;
+    if (solide && !aPieces) {
       float shade = 1.0 - smoothstep(0.0, 56.0, max(d, 0.0));
       col = mix(col, col * vec3(0.50, 0.56, 0.70), shade * shade * 0.5);
     }
@@ -1861,7 +2102,7 @@ void main() {
     // sommet, strates et chant clair — chaque matériau garde son identité
     // sur sa tranche : turquoise mouillé, violet cireux, vert de membrane,
     // ambre de borne… Le sommet (déplacé) se peint ensuite par-dessus.
-    if (flanc > 0.003 && !(mat > 3.5 && mat < 4.5 && dec.y < 0.5)) { // la conduite n'a pas de tranche de boîte
+    if (flanc > 0.003 && !aPieces) { // la conduite et la chaudière n'ont pas de tranche de boîte
       vec2 gB = gradSdfBoite(bi, wb, d, dec, bca, bsa);
       float gn2 = max(length(gB), 1e-5);
       vec2 nrm = gB / gn2;
@@ -2161,26 +2402,45 @@ void main() {
       col = mix(col, (memCol + vec3(0.03, 0.11, 0.09) * drip) * eclMat, fill);
       col = mix(col, vec3(0.25, 0.78, 0.62) * eclMat, edge * 0.9);
     } else if (mat > 5.5) {
-      // Radiateur (tableau 4) : rayures chaudes qui défilent, arête incandes-
-      // cente, et une aura de chaleur qui tremble — le danger (et la
-      // ressource) se lit avant le contact, comme pour le froid.
+      // Chaudière : une RAMPE DE RÉSISTANCES à ailettes (chaudiereRendu),
+      // son capot, son boîtier dont le câble plonge dans le sol, et le sol
+      // qui roussit dans l'aire de chaleur — la portée même du solveur. Comme
+      // la conduite, SEULE la chaudière se peint : autour, le sol de la
+      // salle, et la physique lit la même forme (FORME_CHAUDIERE).
       float fill = 1.0 - smoothstep(-edgeW, 0.0, dV);
-      float edge = (1.0 - smoothstep(0.0, edgeW, abs(dV))) * libre;
-      float stripe = 0.5 + 0.5 * sin((world.x + world.y - uTime * 46.0) * 0.14);
-      // Panneau à ailettes texturé quand l'image est là : les rayures animées
-      // deviennent la CHALEUR qui court dessus, pas le panneau lui-même.
-      // L'image est très sombre : sans ce réchauffement, le panneau se lit
-      // comme du métal noir et perd son identité de SOURCE DE CHALEUR.
-      vec3 fillCol = uHasChaud > 0.5
-        ? texChaudC * vec3(2.3, 1.45, 0.95) + vec3(0.30, 0.11, 0.02) * smoothstep(0.4, 0.9, stripe)
-        : vec3(0.26, 0.11, 0.05) + vec3(0.42, 0.17, 0.04) * smoothstep(0.35, 0.85, stripe);
-      col = mix(col, fillCol * eclMat, fill);
-      col = mix(col, vec3(1.0, 0.56, 0.24), edge * 0.9);
-      // chaque chaudière porte sa propre portée d'aura (aux.w) : le halo
-      // dessiné est exactement la portée mécanique
-      float aura = (1.0 - smoothstep(0.0, uHeatBand * max(uBoxAux[bi].w, 0.001), max(d, 0.0))) * step(0.0, d);
+      vec2 bmin = uBoxes[bi].xy;
+      vec2 bsize = max(uBoxes[bi].zw - bmin, vec2(1.0));
+      float surSol = (iCouv == bi || dCouv > 0.0) ? 1.0 : 0.0;
+      float codeC = uBoxAux[bi].z; // sens + 4 · bouts dans un mur
+      // une chaudière À FORME (disque, capsule…) garde sa forme : sa chaleur
+      // se mesure depuis elle, et elle se peint découpée à elle
+      bool rampe = dec.y < 0.5;
+      float dG = rampe ? chaudiereSdf(wb, uBoxes[bi], codeC) : dV;
+      // chaque chaudière porte sa propre portée d'aura (aux.w) : le halo et
+      // le sol chauffé sont exactement la portée mécanique
+      float auraR = uHeatBand * max(uBoxAux[bi].w, 0.001);
+      if (uHasChaud > 0.5) {
+        // léger : à pleine force, les îlots se lisaient en taches de boue
+        // (vu en capture, 26/09) — l'acier revenu se devine, il ne salit pas
+        vec4 sol = solChauffe(wb, max(dG, 0.0), auraR, pxMonde) * surSol;
+        col = col * (1.0 - 0.35 * sol.a) + sol.rgb * eclMat * 0.35;
+      }
+      if (rampe) col *= mix(1.0, chaudiereOmbre(wb, uBoxes[bi], codeC), surSol);
+      vec4 ch;
+      if (uHasChaud > 0.5 && rampe) {
+        ch = chaudiereRendu(clamp(wbV - bmin, vec2(0.0), bsize), bsize, pxMonde, codeC);
+      } else {
+        // L'ATLAS PAS (ENCORE) LÀ, ou une chaudière à forme : les rayures
+        // chaudes d'avant, sur la silhouette (celle des pièces, pas la boîte)
+        float couvS = rampe ? 1.0 - smoothstep(-edgeW, 0.0, chaudiereSdf(wbV, uBoxes[bi], codeC)) : 1.0;
+        float stripe = 0.5 + 0.5 * sin((world.x + world.y - uTime * 46.0) * 0.14);
+        ch = vec4(vec3(0.26, 0.11, 0.05) + vec3(0.42, 0.17, 0.04) * smoothstep(0.35, 0.85, stripe), 1.0) * couvS;
+      }
+      col = col * (1.0 - fill * ch.a) + ch.rgb * eclMat * fill;
+      float hors = (1.0 - fill * ch.a) * surSol;
+      float aura = 1.0 - smoothstep(0.0, auraR, max(dG, 0.0));
       float shimmer = 0.55 + 0.45 * dnoise(world * 0.06 + vec2(-uTime * 0.16, uTime * 0.24));
-      col += vec3(0.36, 0.15, 0.04) * aura * aura * shimmer;
+      col += vec3(0.36, 0.15, 0.04) * aura * aura * shimmer * hors;
     } else if (mat > 4.5) {
       // Grille (tableau 3) : panneau perforé — le liquide s'y écrase, la
       // vapeur passe entre les mailles. Les trous laissent voir le fond.
@@ -2992,6 +3252,7 @@ layout(location = 0) out vec4 outColor;
 layout(location = 1) out vec4 outVis; // visibilité par lampe (canal = lampe)
 ${FORMES_GLSL}
 ${CONDUITE_GLSL}
+${CHAUDIERE_GLSL}
 
 float hashEp(vec2 p) {
   p = fract(p * vec2(127.1, 311.7));
@@ -3080,6 +3341,15 @@ float sceneSdf(vec2 p, float alt) {
       vec2 qC = wb - 0.5 * (uBoxes[i].xy + uBoxes[i].zw);
       d = min(d, conduiteOmbreSdf(hC ? qC.x : qC.y, hC ? qC.y : qC.x,
                                   hC ? szC.x : szC.y, hC ? szC.y : szC.x));
+      continue;
+    }
+    // la CHAUDIÈRE ombre comme son carter (ou sa compacte)
+    if (dec.x > 5.5 && dec.x < 6.5 && dec.y < 0.5) {
+      vec2 szC = uBoxes[i].zw - uBoxes[i].xy;
+      bool hC = conduiteHoriz(szC, conduiteSens(uBoxAux[i].z));
+      vec2 qC = wb - 0.5 * (uBoxes[i].xy + uBoxes[i].zw);
+      d = min(d, chaudiereOmbreSdf(hC ? qC.x : qC.y, hC ? qC.y : qC.x,
+                                   hC ? szC.x : szC.y, hC ? szC.y : szC.x));
       continue;
     }
     d = min(d, formeSdf(wb, uBoxes[i], dec.y, dec.z, dec.w));
@@ -4309,8 +4579,10 @@ export class Renderer {
       (t) => (this.texParoi = t),
     )
     this.loadTexture(
-      '/assets/chaud.webp',
-      true,
+      // l'atlas de la chaudière (tools/images/chaudiere_atlas.py) : lu par
+      // cadres, comme celui de la conduite
+      '/assets/chaudiere-atlas.webp',
+      false,
       true,
       (t) => (this.texChaud = t),
     )
@@ -5141,11 +5413,12 @@ export class Renderer {
       this.auxScratch[k * 4 + 1] = ((bx.angle ?? 0) * Math.PI) / 180
       // aux.z : charge du surchauffeur (le solveur dit lesquels sont vides)
       // — ou HABILLAGE d'une paroi neutre (1-4), pur décor — ou SENS du
-      // tuyau d'une plaque froide (0 auto, 1 horizontal, 2 vertical)
+      // tuyau d'une plaque froide ou de la rampe d'une chaudière (0 auto,
+      // 1 horizontal, 2 vertical), plus 4 · ses bouts plongés dans un mur
       this.auxScratch[k * 4 + 2] =
         bx.material === 0
           ? (bx.skin ?? 0)
-          : bx.material === MAT_FROID
+          : bx.material === MAT_FROID || bx.material === MAT_CHAUD
             ? (bx.sens ?? 0) + 4 * this.boutsDe(bx, boxes, boxCount, sim.bounds)
             : sim.surchauffesVides.has(i)
               ? 0

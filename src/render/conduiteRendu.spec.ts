@@ -29,9 +29,37 @@ describe('la conduite dans la composition', () => {
   it('une plaque à forme gèle depuis SA forme, et garde ombre et tranche', () => {
     expect(branche).toMatch(/bool tuyau = dec\.y < 0\.5;/)
     expect(branche).toMatch(/float dG = tuyau \? conduiteSdf\([^)]*\) : dV;/)
-    // l'ombre portée et la tranche n'exemptent que la conduite SANS forme
-    const exemptions = source.match(/!\(mat > 3\.5 && mat < 4\.5[^)]*\)/g) ?? []
-    expect(exemptions.length).toBeGreaterThanOrEqual(2)
-    for (const e of exemptions) expect(e).toContain('dec.y < 0.5')
+    // l'ombre portée et la tranche n'exemptent que la conduite (et la
+    // chaudière) SANS forme : aPieces, gardé par dec.y < 0.5, sert aux deux
+    expect(source).toMatch(
+      /bool aPieces = \(\(mat > 3\.5 && mat < 4\.5\) \|\| \(mat > 5\.5 && mat < 6\.5\)\) && dec\.y < 0\.5;/,
+    )
+    expect((source.match(/!aPieces\)/g) ?? []).length).toBeGreaterThanOrEqual(2)
+  })
+})
+
+// la branche chaudière de la composition, jusqu'à la branche suivante
+const debutCh = source.indexOf('// Chaudière : une RAMPE DE RÉSISTANCES')
+const brancheCh = source.slice(debutCh, source.indexOf('} else if (mat > 4.5)', debutCh))
+
+describe('la chaudière dans la composition', () => {
+  it('sans atlas, elle ne lit pas l’atlas : sinon, des rectangles NOIRS', () => {
+    expect(debutCh).toBeGreaterThan(0)
+    const appel = brancheCh.indexOf('chaudiereRendu(')
+    expect(appel).toBeGreaterThan(0)
+    expect(brancheCh.lastIndexOf('uHasChaud > 0.5', appel)).toBeGreaterThan(0)
+    // le sol chauffé lit l'atlas lui aussi : gardé de même
+    const sol = brancheCh.indexOf('solChauffe(')
+    expect(brancheCh.lastIndexOf('uHasChaud > 0.5', sol)).toBeGreaterThan(0)
+  })
+
+  it('les rayures de secours suivent la SILHOUETTE des pièces, pas la boîte', () => {
+    const secours = brancheCh.slice(brancheCh.indexOf('} else {', brancheCh.indexOf('chaudiereRendu(')))
+    expect(secours).toMatch(/chaudiereSdf\(wbV/)
+  })
+
+  it('une chaudière à forme chauffe depuis SA forme', () => {
+    expect(brancheCh).toMatch(/bool rampe = dec\.y < 0\.5;/)
+    expect(brancheCh).toMatch(/float dG = rampe \? chaudiereSdf\([^)]*\) : dV;/)
   })
 })

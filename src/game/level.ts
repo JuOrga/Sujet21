@@ -75,9 +75,10 @@ export interface ObstacleBox {
   p0?: number // COIN : orientation 0..3 · ARC : épaisseur relative 0..1
   p1?: number // ARC : demi-ouverture en degrés
   p2?: number // ARC : bouts (0 arrondis, 1 droits à 90°, 2 en pointe)
-  // PLAQUE FROIDE seulement : le sens du tuyau d'ammoniac (formes.ts,
-  // SENS_*) — absent/0 le long du grand côté, 1 horizontal, 2 vertical.
-  // Le tuyau prend pour diamètre l'autre côté : c'est aussi sa collision.
+  // PLAQUE FROIDE et CHAUDIÈRE : le sens du tuyau d'ammoniac ou de la rampe
+  // (formes.ts, SENS_*) — absent/0 le long du grand côté, 1 horizontal,
+  // 2 vertical. La pièce prend pour épaisseur l'autre côté : c'est aussi sa
+  // collision.
   sens?: number
 }
 

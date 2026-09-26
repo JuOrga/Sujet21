@@ -275,7 +275,8 @@ function readBox(o: Record<string, unknown>): ObstacleBox | null {
   const aura = num(o.aura, 1)
   // skin : habillage d'une paroi neutre (décor pur, physique inchangée)
   const skin = Math.round(num(o.skin, 0))
-  // sens : celui du tuyau d'une plaque froide (0 auto, 1 horizontal, 2 vertical)
+  // sens : celui du tuyau d'une plaque froide ou de la rampe d'une chaudière
+  // (0 auto, 1 horizontal, 2 vertical)
   const sens = Math.round(num(o.sens, 0))
   // forme : rectangle si absente (formes.ts) — clé effacée au défaut, comme
   // angle/aura/skin ; les paramètres ne survivent que pour la forme concernée
@@ -292,7 +293,7 @@ function readBox(o: Record<string, unknown>): ObstacleBox | null {
     ...(aura !== 1 && material === MAT_CHAUD
       ? { aura: Math.max(0.25, Math.min(4, aura)) }
       : {}),
-    ...(sens === 1 || sens === 2 ? (material === MAT_FROID && forme === FORME_RECT ? { sens } : {}) : {}),
+    ...(sens === 1 || sens === 2 ? ((material === MAT_FROID || material === MAT_CHAUD) && forme === FORME_RECT ? { sens } : {}) : {}),
     ...(skin > 0 && material === MAT_WALL && forme === FORME_RECT
       ? { skin: Math.min(9, skin) }
       : {}),
