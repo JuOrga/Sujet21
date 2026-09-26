@@ -1452,8 +1452,12 @@ function figEchangeur(cx: ContexteFamille): Squelette {
   // le toit de la chambre et la colonne droite
   bloc(ccx - 260, cy0 + 360, ccx + 260, H)
   bloc(ccx + 260, yB0, xB1, H, MAT_WALL, { skin: 2 })
-  // LA CHAUDIÈRE dans sa niche — vaporisé au passage de la descente
-  bloc(xA0 + 30, nY + 60, xA0 + 210, nY + 240, MAT_CHAUD)
+  // LA CHAUDIÈRE dans sa niche — vaporisé au passage de la descente. Carré,
+  // elle se dessine en chaudière COMPACTE, ronde (formes.ts), et sa chaleur
+  // se mesure depuis le disque : aux coins, elle portait moins loin dans le
+  // couloir. L'aura à 1,3 rend au couloir une traversée chauffée au moins
+  // aussi longue qu'avec le carré, à toute profondeur (chaudiere.spec.ts)
+  bloc(xA0 + 30, nY + 60, xA0 + 210, nY + 240, MAT_CHAUD, { aura: 1.3 })
 
   // L'ÉCLUSE du coin natal : on naît en haut du couloir ouest, on ne le
   // quitte qu'en EAU

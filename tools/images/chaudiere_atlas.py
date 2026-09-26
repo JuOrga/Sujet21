@@ -37,10 +37,9 @@ import numpy as np
 from PIL import Image
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from conduite_atlas import saigne  # noqa: E402 — le même saignement des couleurs
+from conduite_atlas import SRC, colle, lis, saigne  # noqa: E402 — les mêmes outils que la conduite
 
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-SRC = os.path.join(ROOT, 'masters', 'images', 'sources')
 DST = os.path.join(ROOT, 'masters', 'images', 'chaudiere-atlas.png')
 
 TAILLE = 1024
@@ -52,15 +51,6 @@ CADRE_JOINT = (450, 312, 200, 311)
 CADRE_BRULEUR = (660, 312, 185, 185)
 CADRE_COMPACTE = (0, 628, 396, 396)
 CADRE_SOL = (404, 628, 616, 308)
-
-
-def lis(nom: str) -> Image.Image:
-    return Image.open(os.path.join(SRC, nom)).convert('RGBA')
-
-
-def colle(atlas: Image.Image, piece: Image.Image, cadre: tuple[int, int, int, int]) -> None:
-    x, y, w, h = cadre
-    atlas.alpha_composite(piece.resize((w, h), Image.LANCZOS), (x, y))
 
 
 def compacte() -> Image.Image:

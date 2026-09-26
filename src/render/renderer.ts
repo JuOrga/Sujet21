@@ -402,8 +402,8 @@ float modeChaudiere(float L, float T) {
 // ce qui termine le bout du côté de s, sur une longue rampe : 0 le mur,
 // 1 un capot, 2 l'arrivée de courant — JUMEAU de finsChaudiere (formes.ts)
 float finChaudiere(float s, float bouts) {
-  bool murNeg = mod(bouts, 2.0) > 0.5;
-  bool murPos = bouts > 1.5;
+  bool murNeg = boutEnMur(-1.0, bouts);
+  bool murPos = boutEnMur(1.0, bouts);
   if (s < 0.0) return murNeg ? 0.0 : 1.0;
   return murPos ? 0.0 : (murNeg ? 1.0 : 2.0);
 }
@@ -1254,7 +1254,10 @@ vec4 atlasChaud(vec4 cadre, vec2 f, float px, float ppw) {
   if (f.x < 0.0 || f.x > 1.0 || f.y < 0.0 || f.y > 1.0) return vec4(0.0);
   vec2 pa = cadre.xy + clamp(f * cadre.zw, vec2(0.5), cadre.zw - 0.5);
   vec2 uv = vec2(pa.x, CH_ATLAS - pa.y) / CH_ATLAS; // téléversé avec FLIP_Y
-  float g = px * ppw / CH_ATLAS;
+  // le niveau de détail plafonné à 4 texels : les cadres de l'atlas ne sont
+  // qu'à 5 à 10 px les uns des autres, et au dézoom un niveau plus grossier
+  // mêlerait au bord d'une pièce la couleur de sa voisine
+  float g = min(px * ppw, 4.0) / CH_ATLAS;
   vec4 c = textureGrad(uTexChaud, uv, vec2(g, 0.0), vec2(0.0, g));
   return vec4(c.rgb * c.a, c.a); // prémultiplié
 }
@@ -2577,8 +2580,12 @@ void main() {
         col *= 1.0 - 0.45 * pied * surSol;
       }
       vec4 ch;
-      if (uHasChaud > 0.5 && rampe) {
+      // seulement DANS la boîte : la portée de la chaleur (jusqu'à 130 u
+      // autour) la ferait sinon calculer — et jeter — sur tout le halo
+      if (uHasChaud > 0.5 && rampe && fill > 0.0) {
         ch = chaudiereRendu(clamp(wbV - bmin, vec2(0.0), bsize), bsize, pxMonde, codeC);
+      } else if (uHasChaud > 0.5 && rampe) {
+        ch = vec4(0.0);
       } else {
         // L'ATLAS PAS (ENCORE) LÀ, ou une chaudière à forme : les rayures
         // chaudes d'avant, sur la silhouette (celle des pièces, pas la boîte)

@@ -198,3 +198,40 @@ describe('chaudière — les jumeaux', () => {
     expect(Number(py.match(/^TAILLE = (\d+)/m)![1])).toBe(CHAUDIERE_ATLAS.taille)
   })
 })
+
+// LA FIGURE DE L'ÉCHANGEUR (figures.ts) : une chaudière de 180 × 180 dans
+// sa niche, qu'on doit frôler en descendant le couloir pour s'y vaporiser.
+// Carrée, elle est devenue compacte — un disque — et sa chaleur portait
+// moins loin aux coins. Son aura à 1,3 doit rendre au couloir une traversée
+// chauffée au moins aussi longue qu'avec le carré, à toute profondeur.
+describe('chaudière — la niche de l’échangeur', () => {
+  const b = box(0, 0, 180, 180, MAT_CHAUD)
+  const bande = DEFAULT_PARAMS.heatBand
+  // la longueur de couloir (en y) où un point à la profondeur p (depuis le
+  // bord ouest de la chaudière, x < 0) est dans l'aura
+  const longueur = (dist: (x: number, y: number) => number, portee: number, p: number): number => {
+    let n = 0
+    for (let y = -400; y <= 580; y += 1) if (dist(-p, y) < portee) n++
+    return n
+  }
+  const carre = (x: number, y: number): number => {
+    const dx = Math.max(0 - x, 0, x - 180)
+    const dy = Math.max(0 - y, 0, y - 180)
+    return Math.hypot(dx, dy)
+  }
+  it('la chaudière de la niche est bien compacte, et porte l’aura 1,3', async () => {
+    expect(modeChaudiere(180, 180)).toBe('compacte')
+    const { readFileSync } = await import('node:fs')
+    const src = readFileSync(new URL('./figures.ts', import.meta.url), 'utf8')
+    expect(src).toMatch(/bloc\(xA0 \+ 30, nY \+ 60, xA0 \+ 210, nY \+ 240, MAT_CHAUD, \{ aura: 1\.3 \}\)/)
+  })
+  for (const p of [30, 60, 80, 100]) {
+    it(`à ${p} u du bord, la traversée chauffée n’est pas plus courte qu’avec le carré`, () => {
+      const avant = longueur(carre, bande, p)
+      const apres = longueur((x, y) => dist(b, x, y), bande * 1.3, p)
+      expect(avant).toBeGreaterThan(0)
+      expect(apres).toBeGreaterThanOrEqual(avant)
+    })
+  }
+})
+

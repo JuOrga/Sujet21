@@ -95,6 +95,7 @@ import {
   FORME_COQUE,
   coquePieces,
 } from '../game/formes'
+import { aPieces } from '../game/conduite'
 import {
   deplaceDans,
   ditLeDeplacement,
@@ -5737,7 +5738,7 @@ export class LevelEditor {
             `</select></label>`,
         )
       }
-      if ((b.material === MAT_FROID || b.material === MAT_CHAUD) && !(b.forme ?? 0)) {
+      if (aPieces(b)) {
         // le sens du tuyau d'ammoniac ou de la rampe de la chaudière :
         // l'épaisseur est l'AUTRE côté — un plot presque carré se couche ou
         // se dresse ; la collision suit
@@ -6772,7 +6773,7 @@ export class LevelEditor {
       // sens du tuyau ou de la rampe (plaque froide, chaudière — rectangulaires) :
       // auto (0) efface la clé
       const sensEl = document.getElementById('p-sens') as HTMLSelectElement | null
-      const aSens = (b.material === MAT_FROID || b.material === MAT_CHAUD) && !(b.forme ?? 0)
+      const aSens = aPieces(b)
       if (aSens && sensEl) {
         const sens = Math.max(0, Math.min(2, Math.round(Number(sensEl.value) || 0)))
         if (sens) b.sens = sens

@@ -28,6 +28,7 @@ import {
   CONDUITE,
   conduiteHoriz,
   dansForme,
+  modeChaudiere,
   piecesChaudiere,
   piecesConduite,
   type FormeBox,
@@ -81,6 +82,9 @@ export function boutsEnMur(b: Boite, boxes: readonly Boite[], bornes: Bornes | n
   const h = b.maxY - b.minY
   const horiz = conduiteHoriz(w, h, b.sens)
   const T = horiz ? h : w
+  // une chaudière compacte ou courte ignore ses bouts (piecesChaudiere, le
+  // shader) : les six sondages contre toute la salle seraient perdus
+  if (b.material === MAT_CHAUD && modeChaudiere(horiz ? w : h, T) !== 'longue') return 0
   const cx = (b.minX + b.maxX) / 2
   const cy = (b.minY + b.maxY) / 2
   const e = 3 // juste au-delà du bout

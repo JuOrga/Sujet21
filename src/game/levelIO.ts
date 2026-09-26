@@ -52,6 +52,7 @@ import { levier, type InstrumentDef } from './instruments'
 import { catalogueRecompenses } from './recompenses'
 import { ARTICLES_COMPTOIR_IDS, ROLES_ANCRE } from './hub'
 import { REPARATIONS } from './reparations'
+import { aPieces } from './conduite'
 import { ECRANS_PUPITRE, type EcranPupitre } from './pupitres'
 import { MAX_BOXES, MAX_LUMIERES, MAX_ZONES } from '../render/renderer'
 import {
@@ -293,7 +294,7 @@ function readBox(o: Record<string, unknown>): ObstacleBox | null {
     ...(aura !== 1 && material === MAT_CHAUD
       ? { aura: Math.max(0.25, Math.min(4, aura)) }
       : {}),
-    ...(sens === 1 || sens === 2 ? ((material === MAT_FROID || material === MAT_CHAUD) && forme === FORME_RECT ? { sens } : {}) : {}),
+    ...(sens === 1 || sens === 2 ? (aPieces({ material, forme }) ? { sens } : {}) : {}),
     ...(skin > 0 && material === MAT_WALL && forme === FORME_RECT
       ? { skin: Math.min(9, skin) }
       : {}),
