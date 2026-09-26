@@ -122,7 +122,7 @@ FAMILLES: list[Famille] = [
     ),
     Famille(
         'surface répétée',
-        ('wall', 'wall-*', 'phile', 'phobe', 'froid', 'chaud', 'grille', 'tank-bg'),
+        ('wall', 'wall-*', 'phile', 'phobe', 'froid', 'grille', 'tank-bg'),
         taille=(1024, 1024), raccord_x=True, raccord_y=True, luma_max=0.32, poids_max_ko=300,
     ),
     Famille(
@@ -155,6 +155,14 @@ FAMILLES: list[Famille] = [
         # la tête de vanne (25/09) le porte à 441 Ko à 78
         qualite=78, poids_max_ko=450,
         note='quatre pièces assemblées par tools/images/conduite_atlas.py — leurs cadres sont un contrat avec le shader',
+    ),
+    Famille(
+        'atlas de la chaudière', ('chaudiere-atlas',), taille=(1024, 1024), luma_max=0.60,
+        # la lueur des résistances est AMBRE (charte §3 : la chaufferie
+        # l'admet) — mesuré sur les sources du 26/09 : 7 à 19 % de pixels
+        # chauds selon la pièce ; la tolérance est celle de la chaufferie
+        chaud_max=0.25, qualite=78, poids_max_ko=450,
+        note='six pièces assemblées par tools/images/chaudiere_atlas.py — leurs cadres sont un contrat avec le shader',
     ),
     Famille(
         'décalque',

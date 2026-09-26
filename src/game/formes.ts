@@ -24,6 +24,11 @@ export const FORME_COQUE = 5
 // collision soit EXACTEMENT ce que l'on voit — ni la boîte (des coins durs
 // sur du sol visible), ni une pilule (qui ne connaît pas les brides).
 export const FORME_CONDUITE = 6
+// LA CHAUDIÈRE (rampe de résistances) : la même idée que la conduite — le
+// capot, le boîtier, le câble et la plaque de sol que dessine son atlas,
+// réunis (voir CHAUDIERE plus bas). Posée par conduite.ts sur toute
+// chaudière rectangulaire, jamais choisie ni sérialisée.
+export const FORME_CHAUDIERE = 7
 
 export const FORME_NAMES: Record<number, string> = {
   [FORME_RECT]: 'Rectangle',
@@ -130,8 +135,14 @@ export interface FormeBox {
   coupe?: Coupe // un demi-plan qui tronque la forme (monde, hors rotation)
   sens?: number // CONDUITE : le sens du tuyau (SENS_AUTO, _HORIZONTAL, _VERTICAL)
   bouts?: number // CONDUITE : ses bouts plongés dans un mur (BOUT_MUR_*), calculés au chargement
-  pieces?: [number, number, number][] // CONDUITE : ses pièces, précalculées par formePhysique
+  pieces?: Piece[] // CONDUITE, CHAUDIÈRE : ses pièces, précalculées par formePhysique
 }
+
+/** Une pièce pleine d'une conduite ou d'une chaudière, en repère local (s le
+ *  long, t en travers, centrés) : [s0, s1, demi-épaisseur, rayon des coins].
+ *  Le rayon (absent : 0) arrondit le rectangle — égal aux deux demi-côtés,
+ *  c'est un DISQUE : la chaudière compacte est ronde, et la collision aussi. */
+export type Piece = [number, number, number] | [number, number, number, number]
 
 export interface FormeContact {
   dist: number // signée : négative dedans
@@ -309,7 +320,7 @@ export const BOUT_MUR_POS = 2
 /** Les rectangles pleins de la conduite, en repère local (s le long, t en
  *  travers, centrés) : [s0, s1, demi-épaisseur]. Le tuyau, les brides de
  *  bout, les brides des joints — leur union est la forme. */
-export function piecesConduite(L: number, T: number, bouts = 0): [number, number, number][] {
+export function piecesConduite(L: number, T: number, bouts = 0): Piece[] {
   const C = CONDUITE
   const mode = modeConduite(L, T)
   if (mode === 'vanne') {
@@ -334,7 +345,7 @@ export function piecesConduite(L: number, T: number, bouts = 0): [number, number
   // le prend
   const murNeg = (bouts & BOUT_MUR_NEG) !== 0
   const murPos = (bouts & BOUT_MUR_POS) !== 0
-  const out: [number, number, number][] = [
+  const out: Piece[] = [
     [-L / 2 + (murNeg ? 0 : C.embout * T), L / 2 - (murPos ? 0 : C.embout * T), C.tuyau * T],
   ]
   if (!murPos) {
@@ -351,25 +362,155 @@ export function piecesConduite(L: number, T: number, bouts = 0): [number, number
   return out
 }
 
+// ---- La chaudière : ses pièces ---------------------------------------------
+
+/** Les proportions des images de la chaudière (tools/images/chaudiere_atlas.py),
+ *  en fraction de l'ÉPAISSEUR T du bloc — les brides du joint en font toute
+ *  la largeur, comme celles de la conduite. Mesurées sur les images
+ *  générées le 26/09 ; la physique et le shader les lisent TELLES QUELLES
+ *  (renderer.ts les écrit dans son GLSL). Une nouvelle image impose de les
+ *  remesurer, ici et dans le script. */
+export const CHAUDIERE = {
+  /** demi-épaisseur du carter à ailettes, rails compris (la collision) :
+   *  536 px de carter pour 660 de brides, sur la planche des raccords */
+  corps: 0.4061,
+  /** longueur d'un motif de tronçon — l'image se raccorde bord à bord
+   *  (mesuré : écart 14 entre les deux bords, 13 entre deux colonnes
+   *  voisines), elle se RÉPÈTE, sans miroir */
+  motif: 2.7432,
+  /** la pièce de bout — le capot, puis le boîtier de raccordement dont le
+   *  câble plonge dans une plaque de sol. Sa longueur (image) et sa
+   *  demi-hauteur ; le tronçon s'arrête sous le capot (finCorps) */
+  bout: 1.517,
+  boutDemiH: 0.5,
+  finCorps: 1.45,
+  /** les pièces du bout, comptées depuis le bout du bloc : [de, à, demi] */
+  capot: [1.3554, 1.4998, 0.4577],
+  chanfrein: [1.252, 1.3554, 0.36],
+  boitier: [0.7048, 1.252, 0.2769],
+  cable: [0.5631, 0.7048, 0.1007],
+  plaque: [0, 0.5631, 0.2802],
+  /** LA RAMPE COURTE (sans place pour deux boîtiers) : fermée par le seul
+   *  capot, lu dans la même image que le bout — ses 16 % de tête */
+  capotCourt: 0.2451,
+  capotCourtImg: 0.1616,
+  capotCourtCapot: [0.0835, 0.2279, 0.4577],
+  capotCourtChanfrein: [0, 0.0835, 0.36],
+  /** sous ce rapport L / T, la chaudière devient COMPACTE (ronde) */
+  seuilCompacte: 1.6,
+  /** sous ce diamètre (unités monde), la compacte cède au brûleur carré :
+   *  ses manomètres et son hublot n'y seraient plus qu'une tache */
+  compacteMin: 80,
+  /** le joint : demi-longueur de l'image, demi-longueur de ses brides */
+  jointDemi: 0.3212,
+  brideJoint: 0.2197,
+  /** l'écart entre deux joints sur une longue rampe (unités monde) */
+  pas: 320,
+} as const
+
+/** Les cadres des pièces dans l'atlas chaudiere-atlas.webp : [x, y,
+ *  largeur, hauteur] depuis le coin HAUT-gauche. JUMEAUX de
+ *  tools/images/chaudiere_atlas.py (vérifié par chaudiere.spec.ts). */
+export const CHAUDIERE_ATLAS = {
+  taille: 1024,
+  corps: [0, 0, 1024, 303],
+  bout: [0, 312, 440, 290],
+  joint: [450, 312, 200, 311],
+  bruleur: [660, 312, 185, 185],
+  compacte: [0, 628, 396, 396],
+  sol: [404, 628, 616, 308],
+} as const
+
+/** LE DESSIN SELON LA PLACE :
+ *  · COMPACTE (moins de 1,6) : la chaudière ronde à hublot, ou le brûleur
+ *    carré sous 80 u ;
+ *  · COURTE : la rampe fermée de deux capots ;
+ *  · LONGUE (l'arrivée, un capot et au moins 1,5 T de rampe) : la rampe
+ *    reçoit son COURANT — un boîtier dont le câble plonge dans le sol, à UN
+ *    bout ; l'autre est fermé d'un capot. Deux boîtiers mangeaient la rampe
+ *    d'un bloc de 400 × 120 (vu en capture, 26/09) : il n'y restait que
+ *    deux ailettes, et une rampe réelle n'a qu'une alimentation. Un bout
+ *    contre un mur y plonge : le courant vient du mur. */
+export type ModeChaudiere = 'compacte' | 'courte' | 'longue'
+export function modeChaudiere(L: number, T: number): ModeChaudiere {
+  if (L >= (CHAUDIERE.bout + CHAUDIERE.capotCourt + 1.5) * T) return 'longue'
+  return L < CHAUDIERE.seuilCompacte * T ? 'compacte' : 'courte'
+}
+
+/** Ce qui termine chaque bout d'une LONGUE rampe : 0 le mur (elle y
+ *  plonge), 1 un capot, 2 l'arrivée de courant (boîtier, câble, plaque).
+ *  L'arrivée va au bout positif, sauf si un bout est déjà dans un mur :
+ *  le courant vient alors de là. JUMEAU de finChaudiere dans le shader. */
+export function finsChaudiere(bouts: number): { neg: 0 | 1 | 2; pos: 0 | 1 | 2 } {
+  const murNeg = (bouts & BOUT_MUR_NEG) !== 0
+  const murPos = (bouts & BOUT_MUR_POS) !== 0
+  return { neg: murNeg ? 0 : 1, pos: murPos ? 0 : murNeg ? 1 : 2 }
+}
+
+/** Les joints d'une longue rampe, centrés, à l'écart des bouts. */
+export function jointsChaudiere(L: number, T: number): number[] {
+  if (modeChaudiere(L, T) !== 'longue') return []
+  const libre = L / 2 - (CHAUDIERE.bout + 0.05 + CHAUDIERE.jointDemi) * T
+  const out: number[] = []
+  const n = Math.floor(libre / CHAUDIERE.pas)
+  for (let k = -n; k <= n; k++) out.push(k * CHAUDIERE.pas)
+  return out
+}
+
+/** Les pièces pleines de la chaudière (voir Piece) : leur union est sa
+ *  forme, ce qui arrête l'eau et le faisceau. */
+export function piecesChaudiere(L: number, T: number, bouts = 0): Piece[] {
+  const C = CHAUDIERE
+  const mode = modeChaudiere(L, T)
+  if (mode === 'compacte') {
+    const c = Math.min(L, T)
+    // la compacte est un disque ; le brûleur, un carré
+    return c >= C.compacteMin ? [[-c / 2, c / 2, c / 2, c / 2]] : [[-c / 2, c / 2, c / 2]]
+  }
+  const deux = (de: number, a: number, e: number, out: Piece[], neg: boolean, pos: boolean): void => {
+    if (pos) out.push([L / 2 - a * T, L / 2 - de * T, e * T])
+    if (neg) out.push([-L / 2 + de * T, -L / 2 + a * T, e * T])
+  }
+  if (mode === 'courte') {
+    const out: Piece[] = [[-L / 2 + C.capotCourtCapot[0] * T, L / 2 - C.capotCourtCapot[0] * T, C.corps * T]]
+    for (const [de, a, e] of [C.capotCourtCapot, C.capotCourtChanfrein]) deux(de, a, e, out, true, true)
+    return out
+  }
+  const fin = finsChaudiere(bouts)
+  // le carter file jusqu'au bord au mur, jusque sous le capot sinon
+  const retrait = (f: number): number => (f === 0 ? 0 : f === 1 ? C.capotCourtCapot[0] : C.capot[0]) * T
+  const out: Piece[] = [[-L / 2 + retrait(fin.neg), L / 2 - retrait(fin.pos), C.corps * T]]
+  for (const [de, a, e] of [C.capot, C.chanfrein, C.boitier, C.cable, C.plaque]) {
+    deux(de, a, e, out, fin.neg === 2, fin.pos === 2)
+  }
+  for (const [de, a, e] of [C.capotCourtCapot, C.capotCourtChanfrein]) deux(de, a, e, out, fin.neg === 1, fin.pos === 1)
+  for (const j of jointsChaudiere(L, T)) {
+    out.push([Math.max(-L / 2, j - C.brideJoint * T), Math.min(L / 2, j + C.brideJoint * T), T / 2])
+  }
+  return out
+}
+
 // LES PIÈCES, UNE FOIS PAR BOÎTE. Elles ne dépendent que de (L, T, bouts),
-// mais conduiteContactAxe tourne dans la boucle la plus chaude du solveur
+// mais piecesContactAxe tourne dans la boucle la plus chaude du solveur
 // — par particule et par sous-pas — et les recalculait chaque fois, deux
 // tableaux alloués à la clé : des milliers d'objets éphémères par pas, que
 // le ramasse-miettes paie en à-coups sur mobile. La boîte (copie stable
 // que formePhysique donne au solveur) garde les siennes ; une boîte qui
 // change de taille les recalcule. La consultation n'alloue rien.
-const piecesParBoite = new WeakMap<object, { L: number; T: number; bouts: number; pieces: [number, number, number][] }>()
-function piecesDe(b: object, L: number, T: number, bouts: number): [number, number, number][] {
+type Fabrique = (L: number, T: number, bouts: number) => Piece[]
+const piecesParBoite = new WeakMap<object, { f: Fabrique; L: number; T: number; bouts: number; pieces: Piece[] }>()
+function piecesDe(b: object, f: Fabrique, L: number, T: number, bouts: number): Piece[] {
   const c = piecesParBoite.get(b)
-  if (c && c.L === L && c.T === T && c.bouts === bouts) return c.pieces
-  const pieces = piecesConduite(L, T, bouts)
-  piecesParBoite.set(b, { L, T, bouts, pieces })
+  if (c && c.f === f && c.L === L && c.T === T && c.bouts === bouts) return c.pieces
+  const pieces = f(L, T, bouts)
+  piecesParBoite.set(b, { f, L, T, bouts, pieces })
   return pieces
 }
 
-function conduiteContactAxe(
+function piecesContactAxe(
   x: number,
   y: number,
+  fab: Fabrique,
   b: {
     minX: number
     minY: number
@@ -377,7 +518,7 @@ function conduiteContactAxe(
     maxY: number
     sens?: number
     bouts?: number
-    pieces?: [number, number, number][]
+    pieces?: Piece[]
   },
   out: FormeContact,
 ): void {
@@ -396,11 +537,15 @@ function conduiteContactAxe(
   let nt = 1
   // les pièces précalculées de la copie physique (formePhysique) — un champ,
   // pas une recherche ; à défaut (une boîte bâtie ailleurs), le cache
-  for (const [s0, s1, e] of b.pieces ?? piecesDe(b, L, T, b.bouts ?? 0)) {
+  for (const pc of b.pieces ?? piecesDe(b, fab, L, T, b.bouts ?? 0)) {
+    const [s0, s1, e] = pc
+    // un coin arrondi : le rectangle réduit du rayon, puis la distance
+    // diminuée d'autant — le disque de la chaudière compacte en est un
+    const r = pc[3] ?? 0
     const cs = (s0 + s1) / 2
-    const hs = (s1 - s0) / 2
+    const hs = (s1 - s0) / 2 - r
     const qs = Math.abs(s - cs) - hs
-    const qt = Math.abs(t - 0) - e
+    const qt = Math.abs(t - 0) - (e - r)
     let d: number
     let gs: number
     let gt: number
@@ -419,6 +564,7 @@ function conduiteContactAxe(
       gs = 0
       gt = Math.sign(t || 1)
     }
+    d -= r
     if (d < best) {
       best = d
       ns = gs
@@ -1021,7 +1167,10 @@ function formeContactAxe(
       coqueContactAxe(x, y, b, out)
       return
     case FORME_CONDUITE:
-      conduiteContactAxe(x, y, b, out)
+      piecesContactAxe(x, y, piecesConduite, b, out)
+      return
+    case FORME_CHAUDIERE:
+      piecesContactAxe(x, y, piecesChaudiere, b, out)
       return
     default:
       rectContactAxe(x, y, b, out)
