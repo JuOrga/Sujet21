@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { aleaDeGraine } from './voie'
-import { dessinMiniCarteSVG, portesDuRang, tisseMiniCarte, TISSAGE_DEFAUT, typesDuModule, VOIES } from './voiesModule'
+import { cheminDePorte, ditNoeud, dessinMiniCarteSVG, fermeParPorte, REPERES_VOIE, portesDuRang, tisseMiniCarte, TISSAGE_DEFAUT, typesDuModule, VOIES, type MiniCarte } from './voiesModule'
 
 // SANS HALTE par défaut : les tests des salles et des rencontres regardent la
 // grille nue ; les haltes ont leur propre bloc
@@ -220,12 +220,30 @@ describe('les réglages du tissage — ce que le concepteur tourne au banc', () 
     expect(avecRencontre).toBeGreaterThan(15)
   })
 
-  it('bifurcation à zéro : trois couloirs parallèles ; à un : tout mène aux voisines', () => {
+  it('bifurcation à zéro : trois couloirs parallèles ; à un : chaque paire de voisines reliée dans UN sens', () => {
     const droit = tisseMiniCarte(4, aleaDeGraine('b'), [0], () => 1, { debut: 0, suite: 0 }, false, { ...NU, bifurcation: 0 })
     for (const r of droit.rangs.slice(0, -1)) for (const n of r) expect(n.suivants).toEqual([n.voie])
     const tout = tisseMiniCarte(4, aleaDeGraine('b'), [0], () => 1, { debut: 0, suite: 0 }, false, { ...NU, bifurcation: 1 })
-    expect(tout.rangs[0][1].suivants).toEqual([0, 1, 2])
-    expect(tout.rangs[0][0].suivants).toEqual([0, 1])
+    // toutes les bifurcations sont tirées ; le X de chaque paire se défait
+    // en gardant une seule des deux diagonales
+    for (const r of tout.rangs.slice(0, -1))
+      for (const v of [0, 1]) expect(Number(r[v].suivants.includes(v + 1)) + Number(r[v + 1].suivants.includes(v))).toBe(1)
+  })
+
+  it('aucun croisement : jamais deux voisines qui bifurquent l’une vers l’autre, et aucune voie morte', () => {
+    // un X : la voie v mène à v+1 ET la voie v+1 mène à v, au même rang
+    const croisements = (mc: MiniCarte): number =>
+      mc.rangs.flat().filter((n) => n.suivants.includes(n.voie + 1) && mc.rangs[n.rang][n.voie + 1]?.suivants.includes(n.voie)).length
+    let bifurcations = 0
+    for (let g = 0; g < 400; g++) {
+      const mc = tisseMiniCarte(6, aleaDeGraine(`x${g}`), [0, 1, 2, 3], () => 2, { debut: 1, suite: 2 }, true, NU)
+      expect(croisements(mc)).toBe(0)
+      bifurcations += mc.rangs.flat().filter((n) => n.suivants.length > 1).length
+      for (let r = 1; r < mc.rangs.length; r++)
+        for (const n of mc.rangs[r]) expect(mc.rangs[r - 1].some((p) => p.suivants.includes(n.voie))).toBe(true)
+    }
+    // les fourches restent : le choix ne se réduit pas à trois couloirs
+    expect(bifurcations / 400).toBeGreaterThan(3)
   })
 
   it('les réglages n’ajoutent aucun tirage : la même graine donne la même grille quel que soit le réglage des salles', () => {
@@ -280,5 +298,114 @@ describe('les HALTES dans la grille — l’économat, l’alcôve, la bonbonne,
       expect(svg).toContain(`mv-halte mv-${h}`)
       expect(svg).toContain(`href="#mv-i-${h}"`)
     }
+  })
+})
+
+describe('cheminDePorte — ce que le survol d’une porte allume', () => {
+  // 0 → 0,1 ; 1 → 1 ; 2 → 2 ; puis 0 → 0 ; 1 → 1,2 ; 2 → 2 ; dernier rang
+  const nd = (rang: number, voie: number, suivants: number[]) =>
+    ({ rang, voie, mecanique: 0, figure: false, ecrite: false, nature: 'salle', prime: null, suivants }) as const
+  const mc: MiniCarte = {
+    voies: 3,
+    rangs: [
+      [nd(0, 0, [0, 1]), nd(0, 1, [1]), nd(0, 2, [2])],
+      [nd(1, 0, [0]), nd(1, 1, [1, 2]), nd(1, 2, [2])],
+      [nd(2, 0, []), nd(2, 1, []), nd(2, 2, [])],
+    ].map((r) => r.map((n) => ({ ...n, suivants: [...n.suivants] }))),
+  }
+
+  it('la coursive d’entrée, puis tout ce que la porte rend joignable — rien d’autre', () => {
+    const ch = cheminDePorte(mc, 1, 1, 0)
+    expect(ch.entree).toBe('0-0-1')
+    expect(ch.noeuds.sort()).toEqual(['1-1', '2-1', '2-2'])
+    expect(ch.liens.sort()).toEqual(['1-1-1', '1-1-2'])
+  })
+
+  it('au premier rang, pas d’entrée ; une porte hors grille, rien', () => {
+    expect(cheminDePorte(mc, 0, 2, null)).toEqual({ noeuds: ['0-2', '1-2', '2-2'], liens: ['0-2-2', '1-2-2'], entree: null })
+    expect(cheminDePorte(mc, 5, 0, null)).toEqual({ noeuds: [], liens: [], entree: null })
+  })
+
+  it('le choix interdit : après la voie 0, les liens et nœuds qui ne sont plus joignables s’éteignent', () => {
+    // venu de la voie 0 au rang 0 : portes 0 et 1 au rang 1 ; la voie 2 n'est
+    // plus joignable qu'en passant par 1 → 2 — le nœud 1-2 est interdit
+    const svg = dessinMiniCarteSVG(mc, { rang: 1, trace: [0], portes: [0, 1] })
+    const classe = (k: string): string => /class="([^"]*)" data-lien="/.exec(svg.slice(svg.indexOf(`data-lien="${k}"`) - 60))?.[1] ?? ''
+    expect(classe('0-1-1')).toContain('mv-interdit') // une voie qu'on n'a pas prise
+    expect(classe('0-2-2')).toContain('mv-interdit')
+    expect(classe('1-2-2')).toContain('mv-interdit') // part d'un nœud qu'on n'atteindra plus
+    expect(classe('0-0-1')).not.toContain('mv-interdit') // la porte ouverte
+    expect(classe('1-1-2')).not.toContain('mv-interdit') // la suite joignable
+    expect(svg).toMatch(/mv-interdit" data-rang="1" data-voie="2"/)
+    expect(svg).not.toMatch(/mv-interdit" data-rang="2" data-voie="2"/) // joignable par 1 → 2
+  })
+
+  it('au premier rang, rien n’est interdit', () => {
+    expect(dessinMiniCarteSVG(mc, { rang: 0, trace: [], portes: [0, 1, 2] })).not.toContain('mv-interdit')
+  })
+
+  it('les clés sont celles du dessin : chaque lien allumé existe dans le SVG', () => {
+    const svg = dessinMiniCarteSVG(mc, { rang: 1, trace: [0], portes: [0, 1] })
+    const ch = cheminDePorte(mc, 1, 1, 0)
+    for (const k of [...ch.liens, ch.entree!]) expect(svg).toContain(`data-lien="${k}"`)
+  })
+
+  it('ce qu’une porte ferme : ce que les autres gardaient ouvert, et pas elle', () => {
+    // venu de la voie 0 : portes 0 et 1. Prendre 0 perd la porte 1, la voie
+    // 2 qu'elle seule atteint, et leurs coursives ; 1-1 → 2-1 est perdu
+    // aussi (2-1 n'est joignable que par 1-1)
+    const f = fermeParPorte(mc, 1, 0, [0, 1], 0)
+    expect(f.noeuds.sort()).toEqual(['1-1', '2-1', '2-2'])
+    expect(f.liens.sort()).toEqual(['0-0-1', '1-1-1', '1-1-2', '2-1-sas', '2-2-sas'])
+    // prendre 1 perd la voie 0 : ses nœuds, sa coursive d'entrée
+    const g = fermeParPorte(mc, 1, 1, [0, 1], 0)
+    expect(g.noeuds.sort()).toEqual(['1-0', '2-0'])
+    expect(g.liens.sort()).toEqual(['0-0-0', '1-0-0', '2-0-sas'])
+    // une seule porte : elle ne ferme rien
+    expect(fermeParPorte(mc, 1, 1, [1], 0)).toEqual({ noeuds: [], liens: [] })
+  })
+
+  it('les repères de voie : un signe par voie au bord de la grille, allumé là où une porte s’ouvre', () => {
+    const svg = dessinMiniCarteSVG(mc, { rang: 1, trace: [0], portes: [0, 1] })
+    for (const [v, rep] of REPERES_VOIE.entries()) expect(svg).toContain(`data-voie="${v}" x="16" y="${32 + v * 50}">${rep.signe}</text>`)
+    expect(svg).toContain('class="mv-repere mv-repere-porte" data-voie="0"')
+    expect(svg).toContain('class="mv-repere mv-repere-porte" data-voie="1"')
+    expect(svg).toContain('class="mv-repere" data-voie="2"')
+  })
+
+  it('une forme par famille : octogone la salle, losange la rencontre, cercle la halte ; la prime a son anneau', () => {
+    const avec = (nature: 'evenement' | 'repos', prime: 'memoire' | null = null): MiniCarte => ({
+      voies: 3,
+      rangs: mc.rangs.map((r) => r.map((n) => (n.rang === 1 && n.voie === 0 ? { ...n, nature, prime } : n))),
+    })
+    const tuile = (svg: string): string => {
+      const g = svg.slice(svg.indexOf('data-rang="1" data-voie="0"'))
+      return g.slice(g.indexOf('class="mv-tuile"') - 12, g.indexOf('class="mv-tuile"'))
+    }
+    expect(tuile(dessinMiniCarteSVG(mc, { rang: 1, trace: [0], portes: [0, 1] }))).toContain('<polygon')
+    const ev = dessinMiniCarteSVG(avec('evenement'), { rang: 1, trace: [0], portes: [0, 1] })
+    expect(tuile(ev)).toContain('<polygon')
+    expect(ev).toMatch(/<polygon class="mv-tuile" points="0,-[\d.]+ [\d.]+,0 0,[\d.]+ -[\d.]+,0"\/>/) // quatre sommets : le losange
+    expect(tuile(dessinMiniCarteSVG(avec('repos'), { rang: 1, trace: [0], portes: [0, 1] }))).toContain('<circle')
+    const salle = mc.rangs.map((r) => r.map((n) => (n.rang === 1 && n.voie === 0 ? { ...n, prime: 'memoire' as const } : n)))
+    expect(dessinMiniCarteSVG({ voies: 3, rangs: salle }, { rang: 1, trace: [0], portes: [0, 1] })).toContain('mv-prime-anneau mv-prime-memoire')
+  })
+
+  it('le sas au bout : chaque case du dernier rang y mène, éteinte avec elle ; la bande « ici » sur le rang du choix', () => {
+    const svg = dessinMiniCarteSVG(mc, { rang: 1, trace: [0], portes: [0, 1] })
+    expect(svg).toContain('class="mv-sas"')
+    for (const v of [0, 1, 2]) expect(svg).toContain(`data-lien="2-${v}-sas"`)
+    // venu de 0, portes 0 et 1 : les trois cases du dernier rang restent joignables
+    expect(svg).not.toMatch(/mv-interdit" data-lien="2-\d-sas"/)
+    expect(svg).toContain('class="mv-ici"')
+    expect(svg).toMatch(/class="mv-titre mv-courant" x="140" y="\d+">SALLE 2</)
+    // module fini : pas de bande
+    expect(dessinMiniCarteSVG(mc, { rang: 3, trace: [0, 0, 0], portes: [] })).not.toContain('class="mv-ici"')
+  })
+
+  it('ditNoeud : la phrase de la fiche, prime comprise', () => {
+    expect(ditNoeud(mc.rangs[0][0])).toBe('salle · eau')
+    expect(ditNoeud({ ...mc.rangs[0][0], prime: 'tirage' })).toContain('PRIME : tirage garanti')
+    expect(ditNoeud({ ...mc.rangs[0][0], nature: 'evenement' })).toBe('une rencontre — on ne sait pas laquelle')
   })
 })

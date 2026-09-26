@@ -287,6 +287,16 @@ describe('levelIO — garde-fous du level design', () => {
     ).toBe(true)
   })
 
+  it('une baie vitrée ou un vide sous le départ ne le bloque pas', () => {
+    // Signalé : une baie posée sur le point de départ le refusait (« naît
+    // dans une surface »), alors qu'elle n'a pas de physique.
+    for (const material of [MAT_BAIE, MAT_VIDE]) {
+      const l = base()
+      l.boxes.push({ minX: -1100, minY: -200, maxX: -800, maxY: 200, material })
+      expect(checkLevel(l).some((x) => /départ naît/.test(x.message))).toBe(false)
+    }
+  })
+
   it('le dégagement du départ suit la forme ET la rotation', () => {
     // Signalé : un arc posé sur le départ, puis pivoté pour éloigner sa
     // matière, criait encore — le garde-fou mesurait la boîte englobante,
