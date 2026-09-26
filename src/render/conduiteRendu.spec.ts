@@ -32,7 +32,7 @@ describe('la conduite dans la composition', () => {
     // l'ombre portée et la tranche n'exemptent que la conduite (et la
     // chaudière) SANS forme : aPieces, gardé par dec.y < 0.5, sert aux deux
     expect(source).toMatch(
-      /bool aPieces = \(\(mat > 3\.5 && mat < 4\.5\) \|\| \(mat > 5\.5 && mat < 6\.5\)\) && dec\.y < 0\.5;/,
+      /bool aPieces = \(\(mat > 3\.5 && mat < 4\.5\) \|\| \(mat > 5\.5 && mat < 6\.5\) \|\| \(mat > 8\.5 && mat < 9\.5\)\) && dec\.y < 0\.5;/,
     )
     expect((source.match(/!aPieces\)/g) ?? []).length).toBeGreaterThanOrEqual(2)
   })
@@ -82,3 +82,27 @@ describe('le relief de la conduite suit son dessin, pas sa boîte', () => {
     expect(branche).toMatch(/conduitePiedSdf\(wb,/)
   })
 })
+
+// la branche surchauffeur de la composition, jusqu'à la branche suivante
+const debutSu = source.indexOf('// SURCHAUFFEUR : un SERPENTIN chauffé à blanc')
+const brancheSu = source.slice(debutSu, source.indexOf('} else if (mat > 7.5)', debutSu))
+
+describe('le surchauffeur dans la composition', () => {
+  it('sans atlas, il ne lit pas l’atlas : sinon, des rectangles NOIRS', () => {
+    expect(debutSu).toBeGreaterThan(0)
+    const appel = brancheSu.indexOf('surchRendu(')
+    expect(appel).toBeGreaterThan(0)
+    expect(brancheSu.lastIndexOf('uHasChaud > 0.5', appel)).toBeGreaterThan(0)
+  })
+
+  it('le serpentin de secours suit la SILHOUETTE des pièces, pas la boîte', () => {
+    const secours = brancheSu.slice(brancheSu.indexOf('} else {', brancheSu.indexOf('surchRendu(')))
+    expect(secours).toMatch(/surchSdf\(wbV/)
+  })
+
+  it('la charge se lit dans aux.z, décodée — pas aux.z brut (il porte aussi le sens et les bouts)', () => {
+    expect(brancheSu).toMatch(/float charge = surchCharge\(zS\);/)
+    expect(brancheSu).not.toMatch(/float charge = uBoxAux\[bi\]\.z;/)
+  })
+})
+

@@ -1693,3 +1693,59 @@ script.
 Retro-futuristic 1970s orbital laboratory, flat orthographic 2D game asset. Muted cold palette: near-black #030710, steel blue-grey #0a1420 to #2a3542, single cyan accent #63b7e6. Evenly lit from above, low brightness, no visible light source. Seamless tileable transparent overlay of heat damage on a flat steel floor, seen from directly above: soft soot smudges, irregular heat-tint oxidation stains on metal in straw, bronze and bluish-purple rings like tempered steel, a few fine dry cracks and flaked paint specks, sparse and uneven, mostly transparent and subtle, overlay only, no floor visible, no background. Avoid: perspective, depth of field, blur, film grain, lens flare, vignette, bright lighting, glowing embers, flames, fire, lava, red glow, text, logo, watermark, border, frame, solid background, burnt holes.
 ```
 *Midjourney : `--ar 1:1 --tile --style raw --sref <référence>`.*
+
+## 31. LE SURCHAUFFEUR — le serpentin chauffé à blanc ✅ LIVRÉ (26/09)
+**Moitié basse de `chaudiere-atlas.webp` (1024 × 2048) · assemblé par `tools/images/chaudiere_atlas.py`**
+
+Dans une chaufferie, le surchauffeur est un **serpentin** où la vapeur passe
+au-delà de son point d'ébullition — la règle du jeu, exactement : frôlé en
+vapeur, il rend un dash. Le rectangle à serpentin tracé devient un serpentin
+de tubes chauffés à blanc entre deux rails, fermé par ses collecteurs. Il
+partage l'atlas de la chaudière (plus d'unité de texture libre).
+
+| rapport L / T | dessin |
+| --- | --- |
+| moins de 1,6 | la **spirale** ronde |
+| jusqu'à 2,87 | la **courte** : un collecteur à un bout, une plaque boulonnée ferme l'autre |
+| au-delà | la **longue** : un collecteur à chaque bout — l'arrivée et la sortie de la vapeur |
+
+Un bout contre un mur y plonge. La collision suit le dessin (le serpentin
+fait 81 % de l'épaisseur du bloc, le tambour du collecteur toute), et le
+frôlement de la vapeur avec. **Les deux états viennent du shader, pas de deux
+images** : on ne génère que l'état CHARGÉ ; le dash pris, le serpentin
+refroidit en deux secondes environ — le blanc s'éteint, puis l'ambre, il
+reste l'acier revenu — et le voyant s'éteint.
+
+**La lueur est plus claire et plus jaune que celle de la chaudière** : c'est
+ce qui distingue les deux en jeu. L'atlas des deux mesure 33 % de pixels
+chauds ; sa famille en tolère 35 %.
+
+Sources (non versionnées) : `masters/images/sources/surch-serpentin.webp`,
+`surch-collecteur.webp`, `surch-spirale.webp`, puis
+`python3 tools/images/chaudiere_atlas.py` et `prepare.py chaudiere-atlas`.
+Le serpentin livré ne se raccordait pas bord à bord ; neuf boucles
+(x 110..1819) se raccordent — le script les découpe.
+
+Référence de style : `docs/reference/surchauffeur-reference.webp`, avec
+celles de la conduite et de la chaudière.
+
+### 31.1 Le serpentin (le corps, répété) · 4:1
+
+```
+Retro-futuristic 1970s orbital laboratory, flat orthographic 2D game asset. Muted cold palette: near-black #030710, steel blue-grey #0a1420 to #2a3542, single cyan accent #63b7e6; white-hot yellow and amber glow (#fff1c8, #ffd27a, #e8951f) allowed ONLY inside the glowing tubes. Evenly lit from above, low brightness, no visible light source. Seamless horizontally tileable texture strip, STRICT TOP-DOWN orthographic view, filling the full height of the image edge to edge, left and right edges match perfectly, in the exact steel style of the attached references: a steam SUPERHEATER coil seen from directly above — one continuous serpentine of thick round steel tubes bending back and forth across the whole height of the strip in tight U-bends, like a hairpin heat exchanger, held by two thin dark gunmetal steel frame rails along the top and bottom edges with small clamps at each bend. The tubes glow from inside: a white-hot yellow core along each tube fading to deep amber at its edges, the metal skin of the tubes dark and heat-tinted (straw and blue oxidation) where they meet the clamps. Dark gaps between the tube runs show nothing but shadow. No background above or below the rails, no end pieces, no manifold. Avoid: perspective, 3/4 view, isometric, side view, depth of field, blur, film grain, lens flare, vignette, bright lighting, flames, fire, lava, orange everywhere, glowing frame, straight parallel fins, radiator grille, text, logo, watermark, border, frame, drop shadow.
+```
+
+### 31.2 Le collecteur (le bout, détouré) · 2:1
+
+Tout sur l'axe : mesuré sur l'image livrée, serpentin à y 439,5, collecteur
+à 439. Le secteur rouge du manomètre passe en ambre au montage.
+
+```
+Retro-futuristic 1970s orbital laboratory, flat orthographic 2D game asset. Muted cold palette: near-black #030710, steel blue-grey #0a1420 to #2a3542, single cyan accent #63b7e6; white-hot yellow and amber glow (#fff1c8, #ffd27a, #e8951f) allowed ONLY inside the glowing tubes and on one indicator lamp. Evenly lit from above, low brightness, no visible light source. Single sprite on a transparent background, STRICT TOP-DOWN orthographic view, in the exact style of the attached references. Everything lies on ONE HORIZONTAL LINE through the vertical centre of the image: from the left edge, the end of a glowing serpentine superheater coil (white-hot tubes in U-bends between two thin steel rails), whose tubes all plunge into a heavy cylindrical steel HEADER MANIFOLD seen from above — a thick bolted drum lying across the whole height of the coil, with a flanged end cap on the right, one round pressure gauge dial with a needle, one large round amber indicator lamp (lit), and a thin cyan trim ring (#63b7e6). The manifold is centred on the same horizontal line and is slightly taller than the coil. Whole piece inside the image, clean edges, isolated on transparent background. Avoid: perspective, 3/4 view, isometric, side view, manifold below the coil, off-centre parts, pipes leaving the image, wall, glow halo, grey background, flames, fire, glowing manifold body, text, letters, logo, watermark, border, frame, drop shadow.
+```
+
+### 31.3 La spirale (détourée) · 1:1
+
+```
+Retro-futuristic 1970s orbital laboratory, flat orthographic 2D game asset. Muted cold palette: near-black #030710, steel blue-grey #0a1420 to #2a3542, single cyan accent #63b7e6; white-hot yellow and amber glow (#fff1c8, #ffd27a, #e8951f) allowed ONLY inside the glowing tube. Evenly lit from above, low brightness, no visible light source. Single sprite on a transparent background, STRICT TOP-DOWN orthographic view, in the exact steel style of the attached references: a flat SPIRAL superheater coil seen from directly above — one thick round steel tube wound in a tight flat spiral of five or six turns, glowing from inside with a white-hot yellow core fading to amber at the tube edges, its metal skin heat-tinted (straw to blue), held by four radial dark steel clamp bars crossing the spiral like spokes, bolted to a round steel base ring. At the centre, a small bolted cap with one amber indicator lamp; at the rim, the tube's inlet ends in a short flange. Perfectly circular, centred, whole piece inside the image with a clear transparent margin, clean edges, isolated on transparent background. Avoid: perspective, 3/4 view, isometric, side view, elliptical spiral, flames, fire, lava, orange everywhere, glowing base, depth of field, blur, film grain, lens flare, vignette, bright lighting, text, letters, logo, watermark, border, frame, drop shadow, background, floor.
+```
