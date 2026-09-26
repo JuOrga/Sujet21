@@ -108,6 +108,37 @@ describe('surchauffeur — forme physique', () => {
   })
 })
 
+// LE FRÔLEMENT : la vapeur prend le dash à moins de deux espacements de
+// particule (13,2 u) du surchauffeur. Il se mesure au RECTANGLE du bloc,
+// comme avant le serpentin : mesuré depuis le serpentin (81 % de
+// l'épaisseur), il fallait passer 6 u plus près sur un bloc de 60.
+describe('surchauffeur — le frôlement garde sa portée', () => {
+  const frole = (s: FluidSim, x: number, y: number): number =>
+    (s as unknown as { surchauffeurFrole(x: number, y: number): number }).surchauffeurFrole(x, y)
+  const salle = { minX: -500, minY: -500, maxX: 900, maxY: 500 }
+
+  it('à 10 u du bord du bloc, le long du serpentin, la vapeur frôle', () => {
+    const s = new FluidSim({ ...DEFAULT_PARAMS }, salle)
+    s.setLevel([box(0, 0, 60, 200, MAT_SURCHAUFFEUR)], [])
+    // le serpentin s'arrête à 30 + 0,4028 · 60 ≈ 54 : ce point en est à 16 u
+    expect(frole(s, 70, 100)).toBe(0)
+  })
+
+  it('au-delà de la portée, non', () => {
+    const s = new FluidSim({ ...DEFAULT_PARAMS }, salle)
+    s.setLevel([box(0, 0, 60, 200, MAT_SURCHAUFFEUR)], [])
+    expect(frole(s, 76, 100)).toBe(-1)
+  })
+
+  it('la copie de prévision (setLevel sur les formes déjà posées) frôle pareil', () => {
+    const s = new FluidSim({ ...DEFAULT_PARAMS }, salle)
+    s.setLevel([box(0, 0, 60, 200, MAT_SURCHAUFFEUR)], [])
+    const c = new FluidSim({ ...DEFAULT_PARAMS }, salle)
+    c.setLevel(s.boxes, [])
+    expect(frole(c, 70, 100)).toBe(0)
+  })
+})
+
 describe('surchauffeur — les jumeaux', () => {
   it('le shader interpole SURCHAUFFEUR et SURCHAUFFEUR_ATLAS, et décode la charge', async () => {
     const { readFileSync } = await import('node:fs')
