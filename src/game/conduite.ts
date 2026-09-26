@@ -25,6 +25,10 @@ import {
   CHAUDIERE,
   FORME_CHAUDIERE,
   FORME_CONDUITE,
+  FORME_SURCHAUFFEUR,
+  SURCHAUFFEUR,
+  modeSurchauffeur,
+  piecesSurchauffeur,
   CONDUITE,
   conduiteHoriz,
   dansForme,
@@ -32,8 +36,9 @@ import {
   piecesChaudiere,
   piecesConduite,
   type FormeBox,
+  type Piece,
 } from './formes'
-import { MAT_CHAUD, MAT_FROID, sansPhysique } from './level'
+import { MAT_CHAUD, MAT_FROID, MAT_SURCHAUFFEUR, sansPhysique } from './level'
 
 type Boite = FormeBox & { material: number }
 
@@ -41,7 +46,14 @@ type Boite = FormeBox & { material: number }
  *  froide ou une chaudière RECTANGULAIRE. Une forme donnée à l'éditeur
  *  (disque, capsule…) l'emporte : la pièce est dessinée découpée à elle. */
 export function aPieces(b: { material: number; forme?: number }): boolean {
-  return (b.material === MAT_FROID || b.material === MAT_CHAUD) && !b.forme
+  return (b.material === MAT_FROID || b.material === MAT_CHAUD || b.material === MAT_SURCHAUFFEUR) && !b.forme
+}
+
+/** La forme à pièces d'une matière (aPieces), et la fabrique de ses pièces. */
+function famille(material: number): { forme: number; pieces: (L: number, T: number, bouts: number) => Piece[] } {
+  if (material === MAT_CHAUD) return { forme: FORME_CHAUDIERE, pieces: piecesChaudiere }
+  if (material === MAT_SURCHAUFFEUR) return { forme: FORME_SURCHAUFFEUR, pieces: piecesSurchauffeur }
+  return { forme: FORME_CONDUITE, pieces: piecesConduite }
 }
 type Bornes = { minX: number; minY: number; maxX: number; maxY: number }
 
@@ -67,8 +79,7 @@ function dansLeMur(x: number, y: number, soi: Boite, boxes: readonly Boite[], bo
  *  deux bouts « dans un mur », donc sans bride ni traversée — le tube de
  *  bout en bout, et ses joints. */
 function tronconSur(o: Boite): Boite {
-  const forme = o.material === MAT_CHAUD ? FORME_CHAUDIERE : FORME_CONDUITE
-  return { ...o, forme, bouts: BOUT_MUR_NEG | BOUT_MUR_POS } as Boite
+  return { ...o, forme: famille(o.material).forme, bouts: BOUT_MUR_NEG | BOUT_MUR_POS } as Boite
 }
 
 /** Les bouts de la conduite `b` qui plongent dans un mur (BOUT_MUR_*). Un
@@ -85,10 +96,15 @@ export function boutsEnMur(b: Boite, boxes: readonly Boite[], bornes: Bornes | n
   // une chaudière compacte ou courte ignore ses bouts (piecesChaudiere, le
   // shader) : les six sondages contre toute la salle seraient perdus
   if (b.material === MAT_CHAUD && modeChaudiere(horiz ? w : h, T) !== 'longue') return 0
+  // la spirale du surchauffeur n'a pas de bouts
+  if (b.material === MAT_SURCHAUFFEUR && modeSurchauffeur(horiz ? w : h, T) === 'spirale') return 0
   const cx = (b.minX + b.maxX) / 2
   const cy = (b.minY + b.maxY) / 2
   const e = 3 // juste au-delà du bout
-  const flanc = (b.material === MAT_CHAUD ? CHAUDIERE.corps : CONDUITE.tuyau) * T * 0.9
+  const flanc =
+    (b.material === MAT_CHAUD ? CHAUDIERE.corps : b.material === MAT_SURCHAUFFEUR ? SURCHAUFFEUR.corps : CONDUITE.tuyau) *
+    T *
+    0.9
   let bouts = 0
   for (const [bit, signe] of [
     [BOUT_MUR_NEG, -1],
@@ -122,9 +138,9 @@ export function formePhysique<B extends Boite>(b: B, boxes: readonly Boite[] = [
   const w = b.maxX - b.minX
   const h = b.maxY - b.minY
   const horiz = conduiteHoriz(w, h, (b as Boite & { sens?: number }).sens)
-  const chaud = b.material === MAT_CHAUD
-  const pieces = (chaud ? piecesChaudiere : piecesConduite)(horiz ? w : h, horiz ? h : w, bouts)
-  return { ...b, forme: chaud ? FORME_CHAUDIERE : FORME_CONDUITE, pieces, ...(bouts ? { bouts } : {}) }
+  const f = famille(b.material)
+  const pieces = f.pieces(horiz ? w : h, horiz ? h : w, bouts)
+  return { ...b, forme: f.forme, pieces, ...(bouts ? { bouts } : {}) }
 }
 
 /** LA CLÉ D'UNE BOÎTE : tout ce qui décide de la forme qu'on y lit —

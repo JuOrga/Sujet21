@@ -5743,7 +5743,7 @@ export class LevelEditor {
         // l'épaisseur est l'AUTRE côté — un plot presque carré se couche ou
         // se dresse ; la collision suit
         rows.push(
-          `<label class="ed-f"><span>${b.material === MAT_CHAUD ? 'Sens de la rampe' : 'Sens du tuyau'}</span><select id="p-sens">` +
+          `<label class="ed-f"><span>${b.material === MAT_CHAUD ? 'Sens de la rampe' : b.material === MAT_SURCHAUFFEUR ? 'Sens du serpentin' : 'Sens du tuyau'}</span><select id="p-sens">` +
             SENS_NOMS.map(
               (n, v) => `<option value="${v}"${v === (b.sens ?? 0) ? ' selected' : ''}>${n}</option>`,
             ).join('') +

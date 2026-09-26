@@ -17,7 +17,7 @@ import { labelComponents } from './components'
 import { accelerationPuits, type Accel } from '../game/puits'
 import type { PuitsDef } from '../game/level'
 import { boxContact, Sponge, type ClosestPoint } from './obstacles'
-import type { FormeBox } from '../game/formes'
+import { FORME_SURCHAUFFEUR, type FormeBox } from '../game/formes'
 import { formePhysique } from '../game/conduite'
 import { VIDE_COURANT, VIDE_PORTEE } from '../game/vide'
 import {
@@ -516,6 +516,9 @@ export class FluidSim {
   private chemBoxes: ObstacleBox[] = [] // parois neutres + hydrophile/phobe (bandes et amortis)
   private baseChemBoxes: ObstacleBox[] = [] // les mêmes, DÉCOR SEUL (sans les portes)
   private surchIdx: number[] = [] // indices des surchauffeurs dans boxes
+  // ce que le FRÔLEMENT de chaque surchauffeur mesure (parallèle à surchIdx) :
+  // son rectangle, pas son serpentin — voir surchauffeurFrole
+  private surchFrole: ObstacleBox[] = []
   private heatCarry = 0
   private gasIdleCarry = 0
   private baseBoxes: ObstacleBox[] = []
@@ -599,8 +602,18 @@ export class FluidSim {
     // Les indices du surchauffeur pointent dans `boxes` : les portes
     // s'ajoutant TOUJOURS en fin de liste, ceux du décor restent justes.
     this.surchIdx = []
+    this.surchFrole = []
     for (let bi = 0; bi < boxes.length; bi++) {
-      if (boxes[bi].material === MAT_SURCHAUFFEUR) this.surchIdx.push(bi)
+      const b = boxes[bi]
+      if (b.material !== MAT_SURCHAUFFEUR) continue
+      this.surchIdx.push(bi)
+      // un surchauffeur dessiné en serpentin (FORME_SURCHAUFFEUR) se frôle
+      // à son RECTANGLE : une fois par niveau, jamais par particule
+      this.surchFrole.push(
+        (b as FormeBox).forme === FORME_SURCHAUFFEUR
+          ? { minX: b.minX, minY: b.minY, maxX: b.maxX, maxY: b.maxY, material: b.material, ...(b.angle ? { angle: b.angle } : {}) }
+          : b,
+      )
     }
   }
 
@@ -1036,14 +1049,20 @@ export class FluidSim {
   // Le SURCHAUFFEUR le plus proche que ce point frôle ou touche (index de
   // boîte), ou -1. « Frôler » : à moins de deux espacements de particule de
   // la paroi — pas besoin de s'écraser dessus.
+  //
+  // LA DISTANCE SE MESURE AU RECTANGLE DU BLOC, pas au serpentin dessiné :
+  // le serpentin ne fait que 81 % de l'épaisseur du bloc, et mesuré depuis
+  // lui, le dash se prenait de 6 u plus près qu'avant (sur un bloc de 60)
+  // — un changement de dessin rendait l'aide plus dure à attraper. L'eau
+  // et la glace, elles, butent bien sur le serpentin (this.boxes).
   private surchauffeurFrole(x: number, y: number): number {
     const reach = this.params.particleSpacing * 2
     const cp = this.scratchCP
-    for (const bi of this.surchIdx) {
-      const b = this.boxes[bi]
+    for (let k = 0; k < this.surchIdx.length; k++) {
+      const b = this.surchFrole[k]
       if (horsBoite(b, x, y, reach)) continue
       boxContact(x, y, b, cp)
-      if (cp.dist <= reach) return bi
+      if (cp.dist <= reach) return this.surchIdx[k]
     }
     return -1
   }
