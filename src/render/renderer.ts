@@ -1540,23 +1540,27 @@ vec4 surchRendu(vec2 loc, vec2 bsize, float px, float z) {
   float gaz = 0.0;     // la part de vapeur de ce pixel (0..1)
   float courant = 0.0; // les filets qui défilent, s'il y en a
   if (mode < 0.5) {
-    // LE DÔME : la vapeur TOURNE — plus vite au centre qu'au bord, comme un
-    // vortex réel ; l'anneau d'acier et ses brides restent immobiles
+    // LE DÔME : la vapeur BOUILLONNE sur place, en volutes qui se tordent —
+    // elle ne tourne PAS : un rond où tourbillonne une spirale, c'est le sas
+    // de sortie (retour du concepteur, 27/09). L'anneau d'acier et ses
+    // brides restent immobiles.
     float c = min(L, T);
     vec2 q = loc - 0.5 * bsize;
     vec2 f0 = vec2(q.x / c + 0.5, 0.5 - q.y / c);
     acc = atlasChaud(SU_CADRE_DOME, f0, px, SU_CADRE_DOME.z / c);
     float rv = SU_RAYON_VERRE * c;
-    float r = length(q);
-    if (r < rv) {
-      float ang = tv * 0.9 * (1.0 - smoothstep(0.0, rv, r)) + tv * 0.15;
-      float ca = cos(ang);
-      float sa = sin(ang);
-      vec2 qr = vec2(ca * q.x - sa * q.y, sa * q.x + ca * q.y);
-      vec4 tourne = atlasChaud(SU_CADRE_DOME, vec2(qr.x / c + 0.5, 0.5 - qr.y / c), px, SU_CADRE_DOME.z / c);
-      float g = suGaz(acc) * suGaz(tourne) * (1.0 - smoothstep(0.85 * rv, rv, r));
-      acc = mix(acc, tourne, g);
+    if (length(q) < rv) {
+      vec2 w = q / c;
+      vec2 dw = vec2(dnoise(w * 3.2 + vec2(tv * 0.30, 1.7)) - 0.5,
+                     dnoise(w * 3.2 + vec2(4.1, -tv * 0.26)) - 0.5) * 0.10 * c;
+      vec2 qd = q + dw;
+      vec4 bout = atlasChaud(SU_CADRE_DOME, vec2(qd.x / c + 0.5, 0.5 - qd.y / c), px, SU_CADRE_DOME.z / c);
+      float g = suGaz(acc) * suGaz(bout) * (1.0 - smoothstep(0.85 * rv, rv, length(q)));
+      acc = mix(acc, bout, g);
       gaz = suGaz(acc);
+      // des bouffées claires montent et s'effacent, sans direction de rotation
+      float b = dnoise(w * 5.0 + vec2(0.0, -tv * 0.5)) * 0.6 + dnoise(w * 9.0 + vec2(tv * 0.2, 2.3)) * 0.4;
+      courant = smoothstep(0.60, 0.88, b) * (1.0 - smoothstep(0.7 * rv, rv, length(q)));
     }
   } else {
     float hb = SU_CORPS * T;

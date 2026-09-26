@@ -1717,7 +1717,8 @@ vapeur rappelle la chaudière, plus jaune et plus vive. Les prompts ci-dessous
 sont donc ceux de la version bleue — à garder tels quels.
 
 **LE MOUVEMENT EST DANS LE SHADER.** Seule la vapeur bouge (reconnue à sa
-couleur) : le **dôme tourne** en vortex, plus vite au centre ; dans le
+couleur) : le **dôme bouillonne** sur place (il ne tourne pas : un rond qui
+tourbillonne rappelait le sas) ; dans le
 **tube**, les volutes ondulent, des filets clairs **défilent** vers la tête,
 et une **bouffée** de pression le parcourt de temps en temps. Le dash pris,
 la vapeur ralentit, pâlit et se dissout en deux secondes : il reste un verre
@@ -1743,6 +1744,10 @@ Retro-futuristic 1970s orbital laboratory, flat orthographic 2D game asset. Mute
 
 ### 31.3 Le dôme (détouré) · 1:1
 
+**SANS SPIRALE.** Un rond où tourbillonne un vortex se lisait comme le sas de
+sortie (retour du concepteur, 27/09) : la vapeur y BOUILLONNE en volutes, et
+le shader la fait ondoyer sur place, jamais tourner.
+
 ```
-Retro-futuristic 1970s orbital laboratory, flat orthographic 2D game asset. Muted cold palette: near-black #030710, steel blue-grey #0a1420 to #2a3542, single cyan accent #63b7e6; soft white-cyan steam glow allowed ONLY inside the glass. Evenly lit from above, low brightness, no visible light source. Single sprite on a transparent background, STRICT TOP-DOWN orthographic view, in the exact steel style of the attached references: a round GLASS STEAM DOME seen from directly above — a thick clear glass hemisphere held in a heavy riveted steel base ring with six bolted clamps, filled with pressurised white-cyan steam swirling in a slow vortex, glowing gently from within, moderately dense so the spiral of the vortex is clearly visible. One crisp curved specular highlight on the upper left of the glass, a thin cyan rim light where glass meets steel, one small round CYAN indicator lamp on the base ring. Perfectly circular, centred, whole piece inside the image with a clear transparent margin, clean edges, isolated on transparent background. Avoid: perspective, 3/4 view, isometric, side view, elliptical dome, warm colors, orange, amber, fire, liquid water, solid white fill, depth of field, blur, film grain, lens flare, vignette, bright lighting, text, letters, logo, watermark, border, frame, drop shadow, background, floor.
+Retro-futuristic 1970s orbital laboratory, flat orthographic 2D game asset. Muted cold palette: near-black #030710, steel blue-grey #0a1420 to #2a3542, single cyan accent #63b7e6; soft white-cyan steam glow allowed ONLY inside the glass. Evenly lit from above, low brightness, no visible light source. Single sprite on a transparent background, STRICT TOP-DOWN orthographic view, in the exact steel style of the attached references: a round GLASS STEAM DOME seen from directly above — a thick clear glass hemisphere held in a heavy riveted steel base ring with six bolted clamps, filled with pressurised white-cyan steam that BILLOWS in soft irregular clouds and turbulent puffs, like boiling steam in a pressure vessel, dense in some places and thinner in others, with NO rotation, NO spiral, NO vortex and NO centre point — the pattern has no symmetry. One crisp curved specular highlight on the upper left of the glass, a thin cyan rim light where glass meets steel, one small round CYAN indicator lamp on the base ring, a few condensation beads on the inner glass. Perfectly circular, centred, whole piece inside the image with a clear transparent margin, clean edges, isolated on transparent background. Avoid: spiral, vortex, swirl around the centre, whirlpool, radial pattern, iris, portal, perspective, 3/4 view, isometric, side view, elliptical dome, warm colors, orange, amber, fire, liquid water, solid white fill, depth of field, blur, film grain, lens flare, vignette, bright lighting, text, letters, logo, watermark, border, frame, drop shadow, background, floor.
 ```
