@@ -58,6 +58,10 @@ describe('la chaudière dans la composition', () => {
     expect(secours).toMatch(/chaudiereSdf\(wbV/)
   })
 
+  it('la chaudière a son pied, au ras de ses pièces', () => {
+    expect(brancheCh).toMatch(/float pied = 1\.0 - smoothstep\([^;]*, dG\);/)
+  })
+
   it('une chaudière à forme chauffe depuis SA forme', () => {
     expect(brancheCh).toMatch(/bool rampe = dec\.y < 0\.5;/)
     expect(brancheCh).toMatch(/float dG = rampe \? chaudiereSdf\([^)]*\) : dV;/)
@@ -69,7 +73,8 @@ describe('le relief de la conduite suit son dessin, pas sa boîte', () => {
     const i = source.indexOf("// Relief d'éclairage : un biseau directionnel")
     expect(i).toBeGreaterThan(0)
     const garde = source.slice(i, source.indexOf('gradSdfBoite(', i))
-    expect(garde).toMatch(/!\(mat > 3\.5 && mat < 4\.5 && dec\.y < 0\.5\)/)
+    // aPieces : la conduite ET la chaudière sans forme (gardé par dec.y < 0.5)
+    expect(garde).toMatch(/!aPieces\)/)
   })
 
   it('les plaques ont leur arête et le tuyau son pied, dans la branche de la conduite', () => {

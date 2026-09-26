@@ -2568,6 +2568,14 @@ void main() {
         col = col * (1.0 - 0.35 * sol.a) + sol.rgb * eclMat * 0.35;
       }
       if (rampe) col *= mix(1.0, chaudiereOmbre(wb, uBoxes[bi], codeC), surSol);
+      // LE PIED, comme celui de la conduite : un liseré d'ombre serré au ras
+      // des pièces — sans lui, la rampe et sa plaque semblaient posées à plat
+      if (rampe) {
+        vec2 szP = uBoxes[bi].zw - uBoxes[bi].xy;
+        float tP = min(szP.x, szP.y);
+        float pied = 1.0 - smoothstep(-0.02 * tP, 0.10 * tP, dG);
+        col *= 1.0 - 0.45 * pied * surSol;
+      }
       vec4 ch;
       if (uHasChaud > 0.5 && rampe) {
         ch = chaudiereRendu(clamp(wbV - bmin, vec2(0.0), bsize), bsize, pxMonde, codeC);
@@ -2755,8 +2763,10 @@ void main() {
     // n'importe quelle forme. (Le sas, une bouche, ne se biseaute pas.)
     // La conduite d'ammoniac non plus : d y est la distance à sa BOÎTE, et
     // le biseau dessinait le rectangle du bloc sur le sol — dedans comme
-    // dehors. Son relief suit ses plaques et son tuyau (composition).
-    if (uLumiere > 0.5 && solide && !(mat > 3.5 && mat < 4.5 && dec.y < 0.5)) {
+    // dehors. Son relief suit ses plaques et son tuyau (composition). La
+    // chaudière rectangulaire est dans le même cas (aPieces) : son dessin ne
+    // remplit plus sa boîte non plus.
+    if (uLumiere > 0.5 && solide && !aPieces) {
       vec2 gd = gradSdfBoite(bi, wb, d, dec, bca, bsa);
       float gn = length(gd);
       if (gn > 1e-6) {
