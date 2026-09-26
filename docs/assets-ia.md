@@ -1694,58 +1694,55 @@ Retro-futuristic 1970s orbital laboratory, flat orthographic 2D game asset. Mute
 ```
 *Midjourney : `--ar 1:1 --tile --style raw --sref <référence>`.*
 
-## 31. LE SURCHAUFFEUR — le serpentin chauffé à blanc ✅ LIVRÉ (26/09)
+## 31. LE SURCHAUFFEUR — la borne à vapeur sous verre ✅ LIVRÉ (27/09)
 **Moitié basse de `chaudiere-atlas.webp` (1024 × 2048) · assemblé par `tools/images/chaudiere_atlas.py`**
 
-Dans une chaufferie, le surchauffeur est un **serpentin** où la vapeur passe
-au-delà de son point d'ébullition — la règle du jeu, exactement : frôlé en
-vapeur, il rend un dash. Le rectangle à serpentin tracé devient un serpentin
-de tubes chauffés à blanc entre deux rails, fermé par ses collecteurs. Il
-partage l'atlas de la chaudière (plus d'unité de texture libre).
+Le surchauffeur rend un dash à la vapeur qui le frôle : c'est une **borne de
+recharge**, un tube de verre cerclé d'acier où tourbillonne une vapeur
+dorée sous pression, fermé de têtes d'acier (vanne, manomètre, voyant). Un
+premier essai en serpentin chauffé à blanc (26/09) a été écarté : trop proche
+de la chaudière. Il partage l'atlas de la chaudière (plus d'unité de texture
+libre).
 
 | rapport L / T | dessin |
 | --- | --- |
-| moins de 1,6 | la **spirale** ronde |
-| jusqu'à 2,87 | la **courte** : un collecteur à un bout, une plaque boulonnée ferme l'autre |
-| au-delà | la **longue** : un collecteur à chaque bout — l'arrivée et la sortie de la vapeur |
+| moins de 1,6 | le **dôme** de verre rond |
+| jusqu'à 2,71 | la **courte** : une tête à un bout, une plaque boulonnée ferme l'autre |
+| au-delà | la **longue** : une tête à chaque bout |
 
-Un bout contre un mur y plonge. La collision suit le dessin (le serpentin
-fait 81 % de l'épaisseur du bloc, le tambour du collecteur toute), et le
-frôlement de la vapeur avec. **Les deux états viennent du shader, pas de deux
-images** : on ne génère que l'état CHARGÉ ; le dash pris, le serpentin
-refroidit en deux secondes environ — le blanc s'éteint, puis l'ambre, il
-reste l'acier revenu — et le voyant s'éteint.
+**LA COULEUR SE FAIT AU MONTAGE.** Les images ont été générées bleu-blanc (la
+vapeur froide y vient mieux) ; le script les **recolore** (`dore`) : tout ce
+qui est bleuté passe sur une rampe ambre profond → jaune → blanc chaud. La
+vapeur rappelle la chaudière, plus jaune et plus vive. Les prompts ci-dessous
+sont donc ceux de la version bleue — à garder tels quels.
 
-**La lueur est plus claire et plus jaune que celle de la chaudière** : c'est
-ce qui distingue les deux en jeu. L'atlas des deux mesure 33 % de pixels
-chauds ; sa famille en tolère 35 %.
+**LE MOUVEMENT EST DANS LE SHADER.** Seule la vapeur bouge (reconnue à sa
+couleur) : le **dôme tourne** en vortex, plus vite au centre ; dans le
+**tube**, les volutes ondulent, des filets clairs **défilent** vers la tête,
+et une **bouffée** de pression le parcourt de temps en temps. Le dash pris,
+la vapeur ralentit, pâlit et se dissout en deux secondes : il reste un verre
+terne. La collision suit le dessin ; le frôlement de la vapeur, lui, se
+mesure au rectangle du bloc (solver.ts).
 
-Sources (non versionnées) : `masters/images/sources/surch-serpentin.webp`,
-`surch-collecteur.webp`, `surch-spirale.webp`, puis
-`python3 tools/images/chaudiere_atlas.py` et `prepare.py chaudiere-atlas`.
-Le serpentin livré ne se raccordait pas bord à bord ; neuf boucles
-(x 110..1819) se raccordent — le script les découpe.
+Sources (non versionnées) : `masters/images/sources/surch-tube.png`,
+`surch-tete.png`, `surch-dome.png`. Mesures : tube raccordé bord à bord
+(écart 12,1 contre 11,2) ; tête sur l'axe à 1 px (443) ; dôme centré
+(626, 627), anneau 535 px, verre 410. Référence : `docs/reference/surchauffeur-reference.webp`.
 
-Référence de style : `docs/reference/surchauffeur-reference.webp`, avec
-celles de la conduite et de la chaudière.
-
-### 31.1 Le serpentin (le corps, répété) · 4:1
-
-```
-Retro-futuristic 1970s orbital laboratory, flat orthographic 2D game asset. Muted cold palette: near-black #030710, steel blue-grey #0a1420 to #2a3542, single cyan accent #63b7e6; white-hot yellow and amber glow (#fff1c8, #ffd27a, #e8951f) allowed ONLY inside the glowing tubes. Evenly lit from above, low brightness, no visible light source. Seamless horizontally tileable texture strip, STRICT TOP-DOWN orthographic view, filling the full height of the image edge to edge, left and right edges match perfectly, in the exact steel style of the attached references: a steam SUPERHEATER coil seen from directly above — one continuous serpentine of thick round steel tubes bending back and forth across the whole height of the strip in tight U-bends, like a hairpin heat exchanger, held by two thin dark gunmetal steel frame rails along the top and bottom edges with small clamps at each bend. The tubes glow from inside: a white-hot yellow core along each tube fading to deep amber at its edges, the metal skin of the tubes dark and heat-tinted (straw and blue oxidation) where they meet the clamps. Dark gaps between the tube runs show nothing but shadow. No background above or below the rails, no end pieces, no manifold. Avoid: perspective, 3/4 view, isometric, side view, depth of field, blur, film grain, lens flare, vignette, bright lighting, flames, fire, lava, orange everywhere, glowing frame, straight parallel fins, radiator grille, text, logo, watermark, border, frame, drop shadow.
-```
-
-### 31.2 Le collecteur (le bout, détouré) · 2:1
-
-Tout sur l'axe : mesuré sur l'image livrée, serpentin à y 439,5, collecteur
-à 439. Le secteur rouge du manomètre passe en ambre au montage.
+### 31.1 Le tube (le corps, répété) · 4:1
 
 ```
-Retro-futuristic 1970s orbital laboratory, flat orthographic 2D game asset. Muted cold palette: near-black #030710, steel blue-grey #0a1420 to #2a3542, single cyan accent #63b7e6; white-hot yellow and amber glow (#fff1c8, #ffd27a, #e8951f) allowed ONLY inside the glowing tubes and on one indicator lamp. Evenly lit from above, low brightness, no visible light source. Single sprite on a transparent background, STRICT TOP-DOWN orthographic view, in the exact style of the attached references. Everything lies on ONE HORIZONTAL LINE through the vertical centre of the image: from the left edge, the end of a glowing serpentine superheater coil (white-hot tubes in U-bends between two thin steel rails), whose tubes all plunge into a heavy cylindrical steel HEADER MANIFOLD seen from above — a thick bolted drum lying across the whole height of the coil, with a flanged end cap on the right, one round pressure gauge dial with a needle, one large round amber indicator lamp (lit), and a thin cyan trim ring (#63b7e6). The manifold is centred on the same horizontal line and is slightly taller than the coil. Whole piece inside the image, clean edges, isolated on transparent background. Avoid: perspective, 3/4 view, isometric, side view, manifold below the coil, off-centre parts, pipes leaving the image, wall, glow halo, grey background, flames, fire, glowing manifold body, text, letters, logo, watermark, border, frame, drop shadow.
+Retro-futuristic 1970s orbital laboratory, flat orthographic 2D game asset. Muted cold palette: near-black #030710, steel blue-grey #0a1420 to #2a3542, single cyan accent #63b7e6; soft white-cyan steam glow (#e8f6ff, #b8e4f7, #63b7e6) allowed ONLY inside the glass. Evenly lit from above, low brightness, no visible light source. Seamless horizontally tileable texture strip, STRICT TOP-DOWN orthographic view, filling the full height of the image edge to edge, left and right edges match perfectly, in the exact steel style of the attached references: a long thick horizontal GLASS PRESSURE TUBE seen from directly above, lying between two dark gunmetal steel rails along the top and bottom edges, held by riveted steel hoop bands crossing it at regular intervals. Inside the clear heavy glass, pressurised white-cyan steam swirls in soft turbulent wisps and eddies, glowing gently from within, moderately dense — the swirls are clearly visible but the glass is not solid white. Crisp long specular reflections run along the glass, thin cyan edge highlights where the glass meets the rails, a few tiny condensation beads on the inner wall. No background above or below the rails, no end caps. Avoid: perspective, 3/4 view, isometric, side view, depth of field, blur, film grain, lens flare, vignette, bright lighting, warm colors, orange, amber, fire, flames, liquid water, bubbles in liquid, solid white fill, text, logo, watermark, border, frame, drop shadow.
 ```
 
-### 31.3 La spirale (détourée) · 1:1
+### 31.2 La tête (le bout, détourée) · 2:1
 
 ```
-Retro-futuristic 1970s orbital laboratory, flat orthographic 2D game asset. Muted cold palette: near-black #030710, steel blue-grey #0a1420 to #2a3542, single cyan accent #63b7e6; white-hot yellow and amber glow (#fff1c8, #ffd27a, #e8951f) allowed ONLY inside the glowing tube. Evenly lit from above, low brightness, no visible light source. Single sprite on a transparent background, STRICT TOP-DOWN orthographic view, in the exact steel style of the attached references: a flat SPIRAL superheater coil seen from directly above — one thick round steel tube wound in a tight flat spiral of five or six turns, glowing from inside with a white-hot yellow core fading to amber at the tube edges, its metal skin heat-tinted (straw to blue), held by four radial dark steel clamp bars crossing the spiral like spokes, bolted to a round steel base ring. At the centre, a small bolted cap with one amber indicator lamp; at the rim, the tube's inlet ends in a short flange. Perfectly circular, centred, whole piece inside the image with a clear transparent margin, clean edges, isolated on transparent background. Avoid: perspective, 3/4 view, isometric, side view, elliptical spiral, flames, fire, lava, orange everywhere, glowing base, depth of field, blur, film grain, lens flare, vignette, bright lighting, text, letters, logo, watermark, border, frame, drop shadow, background, floor.
+Retro-futuristic 1970s orbital laboratory, flat orthographic 2D game asset. Muted cold palette: near-black #030710, steel blue-grey #0a1420 to #2a3542, single cyan accent #63b7e6; soft white-cyan steam glow allowed ONLY inside the glass and on one indicator lamp. Evenly lit from above, low brightness, no visible light source. Single sprite on a transparent background, STRICT TOP-DOWN orthographic view, in the exact style of the attached references. Everything lies on ONE HORIZONTAL LINE through the vertical centre of the image: from the left edge, the end of a thick glass pressure tube full of swirling white-cyan steam between two steel rails, closed on the right by a heavy bolted steel END HEAD seen from above — a round flange ring clamping the glass, then a squat cylindrical steel cap slightly taller than the tube, with a small hand valve wheel, one round pressure gauge dial with a needle, and one round CYAN indicator lamp (lit, #63b7e6). The head is centred on the same horizontal line. Whole piece inside the image, clean edges, isolated on transparent background. Avoid: perspective, 3/4 view, isometric, side view, head below the tube, off-centre parts, pipes leaving the image, wall, glow halo, grey background, warm colors, orange, amber, red, text, letters, logo, watermark, border, frame, drop shadow.
+```
+
+### 31.3 Le dôme (détouré) · 1:1
+
+```
+Retro-futuristic 1970s orbital laboratory, flat orthographic 2D game asset. Muted cold palette: near-black #030710, steel blue-grey #0a1420 to #2a3542, single cyan accent #63b7e6; soft white-cyan steam glow allowed ONLY inside the glass. Evenly lit from above, low brightness, no visible light source. Single sprite on a transparent background, STRICT TOP-DOWN orthographic view, in the exact steel style of the attached references: a round GLASS STEAM DOME seen from directly above — a thick clear glass hemisphere held in a heavy riveted steel base ring with six bolted clamps, filled with pressurised white-cyan steam swirling in a slow vortex, glowing gently from within, moderately dense so the spiral of the vortex is clearly visible. One crisp curved specular highlight on the upper left of the glass, a thin cyan rim light where glass meets steel, one small round CYAN indicator lamp on the base ring. Perfectly circular, centred, whole piece inside the image with a clear transparent margin, clean edges, isolated on transparent background. Avoid: perspective, 3/4 view, isometric, side view, elliptical dome, warm colors, orange, amber, fire, liquid water, solid white fill, depth of field, blur, film grain, lens flare, vignette, bright lighting, text, letters, logo, watermark, border, frame, drop shadow, background, floor.
 ```

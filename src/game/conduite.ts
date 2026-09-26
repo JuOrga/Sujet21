@@ -96,8 +96,8 @@ export function boutsEnMur(b: Boite, boxes: readonly Boite[], bornes: Bornes | n
   // une chaudière compacte ou courte ignore ses bouts (piecesChaudiere, le
   // shader) : les six sondages contre toute la salle seraient perdus
   if (b.material === MAT_CHAUD && modeChaudiere(horiz ? w : h, T) !== 'longue') return 0
-  // la spirale du surchauffeur n'a pas de bouts
-  if (b.material === MAT_SURCHAUFFEUR && modeSurchauffeur(horiz ? w : h, T) === 'spirale') return 0
+  // le dôme du surchauffeur n'a pas de bouts
+  if (b.material === MAT_SURCHAUFFEUR && modeSurchauffeur(horiz ? w : h, T) === 'dome') return 0
   const cx = (b.minX + b.maxX) / 2
   const cy = (b.minY + b.maxY) / 2
   const e = 3 // juste au-delà du bout

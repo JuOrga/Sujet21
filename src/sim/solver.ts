@@ -517,7 +517,7 @@ export class FluidSim {
   private baseChemBoxes: ObstacleBox[] = [] // les mêmes, DÉCOR SEUL (sans les portes)
   private surchIdx: number[] = [] // indices des surchauffeurs dans boxes
   // ce que le FRÔLEMENT de chaque surchauffeur mesure (parallèle à surchIdx) :
-  // son rectangle, pas son serpentin — voir surchauffeurFrole
+  // son rectangle, pas son tube — voir surchauffeurFrole
   private surchFrole: ObstacleBox[] = []
   private heatCarry = 0
   private gasIdleCarry = 0
@@ -607,7 +607,7 @@ export class FluidSim {
       const b = boxes[bi]
       if (b.material !== MAT_SURCHAUFFEUR) continue
       this.surchIdx.push(bi)
-      // un surchauffeur dessiné en serpentin (FORME_SURCHAUFFEUR) se frôle
+      // un surchauffeur dessiné en borne (FORME_SURCHAUFFEUR) se frôle
       // à son RECTANGLE : une fois par niveau, jamais par particule
       this.surchFrole.push(
         (b as FormeBox).forme === FORME_SURCHAUFFEUR
@@ -1050,11 +1050,11 @@ export class FluidSim {
   // boîte), ou -1. « Frôler » : à moins de deux espacements de particule de
   // la paroi — pas besoin de s'écraser dessus.
   //
-  // LA DISTANCE SE MESURE AU RECTANGLE DU BLOC, pas au serpentin dessiné :
-  // le serpentin ne fait que 81 % de l'épaisseur du bloc, et mesuré depuis
-  // lui, le dash se prenait de 6 u plus près qu'avant (sur un bloc de 60)
-  // — un changement de dessin rendait l'aide plus dure à attraper. L'eau
-  // et la glace, elles, butent bien sur le serpentin (this.boxes).
+  // LA DISTANCE SE MESURE AU RECTANGLE DU BLOC, pas au tube dessiné : le
+  // tube ne fait que 86 % de l'épaisseur du bloc, et mesuré depuis lui, le
+  // dash se prenait de 4 u plus près qu'avant (sur un bloc de 60) — un
+  // changement de dessin rendait l'aide plus dure à attraper. L'eau et la
+  // glace, elles, butent bien sur le tube (this.boxes).
   private surchauffeurFrole(x: number, y: number): number {
     const reach = this.params.particleSpacing * 2
     const cp = this.scratchCP

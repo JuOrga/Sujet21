@@ -9,22 +9,15 @@ chauffé — et elles remplacent, réunies, l'ancienne texture à ailettes
 (chaud.webp, unité 10).
 
 LE SURCHAUFFEUR y loge aussi, dans la MOITIÉ BASSE (l'atlas passe à
-1024 × 2048) : lui aussi voulait sa texture, et il n'y a plus d'unité. Trois
-images (docs/assets-ia.md §31) :
+1024 × 2048) : lui aussi voulait sa texture, et il n'y a plus d'unité. C'est
+une BORNE À VAPEUR SOUS VERRE — trois images (docs/assets-ia.md §31),
+générées bleu-blanc et RECOLORÉES ici en vapeur jaune-ambre incandescente
+(dore) : elle rappelle la chaudière, plus jaune et plus vive.
 
-  masters/images/sources/surch-serpentin.webp  le serpentin chauffé à blanc
-  masters/images/sources/surch-collecteur.webp le bout : le collecteur, son
-                                               manomètre et son voyant
-  masters/images/sources/surch-spirale.webp    la spirale (blocs presque carrés)
-
-Les sources (docs/assets-ia.md §30, « La chaudière ») :
-
-  masters/images/sources/chaudiere-troncon.png   la rampe de résistances, sur fond
-  masters/images/sources/chaudiere-traversee.png le bout : capot, boîtier, câble
-                                                 qui plonge dans une plaque de sol
-  masters/images/sources/chaudiere-raccords.png  le joint, le brûleur, le collier
-  masters/images/sources/chaudiere-compacte.png  la chaudière ronde à hublot
-  masters/images/sources/chaudiere-sol.png       le sol chauffé, en îlots détourés
+  masters/images/sources/surch-tube.png  le tube de verre, sa vapeur, ses cerclages
+  masters/images/sources/surch-tete.png  le bout : la tête d'acier, vanne,
+                                         manomètre et voyant
+  masters/images/sources/surch-dome.png  le dôme (blocs presque carrés)
 
 Sortie : masters/images/chaudiere-atlas.png (1024 × 2048, RGBA), que
 tools/images/prepare.py livre ensuite en public/assets/chaudiere-atlas.webp.
@@ -62,9 +55,9 @@ CADRE_BRULEUR = (660, 312, 185, 185)
 CADRE_COMPACTE = (0, 628, 396, 396)
 CADRE_SOL = (404, 628, 616, 308)
 # le surchauffeur, moitié basse (SURCHAUFFEUR_ATLAS dans game/formes.ts)
-CADRE_S_CORPS = (0, 1036, 1024, 359)
-CADRE_S_BOUT = (0, 1404, 485, 410)
-CADRE_S_SPIRALE = (495, 1404, 400, 400)
+CADRE_S_CORPS = (0, 1036, 1024, 338)
+CADRE_S_BOUT = (0, 1384, 453, 410)
+CADRE_S_DOME = (463, 1384, 400, 400)
 
 
 def ambre(a: np.ndarray, zone: tuple[int, int, int, int] | None = None) -> None:
@@ -100,16 +93,34 @@ def compacte() -> Image.Image:
     return Image.fromarray(np.clip(a, 0, 255).astype(np.uint8), 'RGBA')
 
 
-def collecteur() -> Image.Image:
-    """Le bout du surchauffeur : du serpentin juste avant ses coudes (x 800)
-    au bord du couvercle (1774) ; en hauteur, l'axe (439,5, mesuré sur le
-    serpentin comme sur le collecteur) ± 411,5 — le tambour du collecteur
-    touche 28..831, la demi-épaisseur du bloc. Le manomètre (x 1340..1530,
-    y 270..460) perd son secteur rouge."""
-    im = lis('surch-collecteur.webp')
-    a = np.asarray(im, dtype=np.float32).copy()
-    ambre(a, (1340, 270, 1530, 460))
-    return Image.fromarray(np.clip(a, 0, 255).astype(np.uint8), 'RGBA').crop((800, 28, 1774, 851))
+def dore(im: Image.Image) -> Image.Image:
+    """LA VAPEUR DORÉE. Les images sont générées bleu-blanc (la vapeur
+    froide y venait mieux) ; le surchauffeur doit rappeler la chaudière, plus
+    jaune et plus intense. Tout ce qui est BLEUTÉ (la vapeur, le verre, les
+    liserés, le voyant) passe sur une rampe selon sa clarté : ambre profond,
+    jaune, blanc chaud ; l'acier, neutre, ne bouge pas."""
+    a = np.asarray(im.convert('RGBA'), dtype=np.float32).copy()
+    r, g, b = a[..., 0], a[..., 1], a[..., 2]
+    lum = (0.299 * r + 0.587 * g + 0.114 * b) / 255.0
+    bleu = np.clip((b - r - 10.0) / 40.0, 0.0, 1.0)[..., None]
+    t = np.clip((lum - 0.15) / 0.75, 0.0, 1.0)[..., None]
+    c0 = np.array([150.0, 62.0, 8.0])
+    c1 = np.array([255.0, 176.0, 40.0])
+    c2 = np.array([255.0, 244.0, 205.0])
+    rampe = np.where(t < 0.55, c0 + (c1 - c0) * (t / 0.55), c1 + (c2 - c1) * ((t - 0.55) / 0.45))
+    a[..., :3] = a[..., :3] * (1.0 - bleu) + rampe * bleu
+    return Image.fromarray(np.clip(a, 0, 255).astype(np.uint8), 'RGBA')
+
+
+def tete() -> Image.Image:
+    """Le bout du surchauffeur : du tube juste avant la bride (x 1030) au
+    bord du couvercle (1774) ; en hauteur, l'axe (443, mesuré le long du tube
+    comme de la tête) ± 336,5 — la tête touche 107..780, la demi-épaisseur du
+    bloc. Le manomètre perd son secteur rouge."""
+    a = np.asarray(lis('surch-tete.png'), dtype=np.float32).copy()
+    ambre(a, (1380, 280, 1500, 420))
+    im = Image.fromarray(np.clip(a, 0, 255).astype(np.uint8), 'RGBA')
+    return dore(im).crop((1030, 107, 1774, 780))
 
 
 def main() -> None:
@@ -132,15 +143,13 @@ def main() -> None:
     # entre eux est voulu), leurs franges colorées sous l'alpha nul
     # effacées par le saignement
     colle(atlas, lis('chaudiere-sol.png'), CADRE_SOL)
-    # LE SURCHAUFFEUR. Le serpentin livré ne se raccordait pas bord à bord
-    # (écart 32 contre 15 entre colonnes voisines) : ses boucles, elles, sont
-    # régulières — neuf boucles, x 110..1819, se raccordent (écart 5,4
-    # contre 6,8). Il est rail à rail sur toute sa hauteur.
-    colle(atlas, lis('surch-serpentin.webp').crop((110, 0, 1819, 667)), CADRE_S_CORPS)
-    colle(atlas, collecteur(), CADRE_S_BOUT)
-    # la spirale, centrée sur son cercle (622, 615 ; rayon 559) — le raccord
-    # de tuyau en haut à droite tient dans le cadre
-    colle(atlas, lis('surch-spirale.webp').crop((22, 15, 1222, 1215)), CADRE_S_SPIRALE)
+    # LE SURCHAUFFEUR. Le tube se raccorde bord à bord (écart 12,1 contre
+    # 11,2 entre colonnes voisines) : pris tel quel, rails compris (0..716)
+    colle(atlas, dore(lis('surch-tube.png')).crop((0, 0, 2172, 717)), CADRE_S_CORPS)
+    colle(atlas, tete(), CADRE_S_BOUT)
+    # le dôme, centré sur son anneau (626, 627) — ses brides tiennent dans
+    # le cadre
+    colle(atlas, dore(lis('surch-dome.png')).crop((36, 37, 1216, 1217)), CADRE_S_DOME)
     saigne(atlas).save(DST)
     print('écrit', os.path.relpath(DST, ROOT))
 

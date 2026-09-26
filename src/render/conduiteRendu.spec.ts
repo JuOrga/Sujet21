@@ -84,7 +84,7 @@ describe('le relief de la conduite suit son dessin, pas sa boîte', () => {
 })
 
 // la branche surchauffeur de la composition, jusqu'à la branche suivante
-const debutSu = source.indexOf('// SURCHAUFFEUR : un SERPENTIN chauffé à blanc')
+const debutSu = source.indexOf('// SURCHAUFFEUR : une BORNE À VAPEUR sous verre')
 const brancheSu = source.slice(debutSu, source.indexOf('} else if (mat > 7.5)', debutSu))
 
 describe('le surchauffeur dans la composition', () => {

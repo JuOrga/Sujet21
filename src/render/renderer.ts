@@ -486,11 +486,11 @@ float chaudiereSdf(vec2 p, vec4 box, float code) {
 `
 })()
 
-// LE SURCHAUFFEUR : un serpentin chauffé à blanc entre deux rails, un
-// COLLECTEUR à chaque bout (une plaque ferme l'autre bout d'une courte),
-// une SPIRALE ronde sous 1,6. Écrit depuis SURCHAUFFEUR et
-// SURCHAUFFEUR_ATLAS (game/formes.ts), comme la chaudière dont il partage
-// l'atlas (sa moitié basse) et le repère.
+// LE SURCHAUFFEUR : une BORNE À VAPEUR SOUS VERRE — un tube de verre cerclé
+// d'acier où tourbillonne une vapeur dorée, une TÊTE à chaque bout (une
+// plaque ferme l'autre bout d'une courte), un DÔME rond sous 1,6. Écrit
+// depuis SURCHAUFFEUR et SURCHAUFFEUR_ATLAS (game/formes.ts), comme la
+// chaudière dont il partage l'atlas (sa moitié basse) et le repère.
 const SURCHAUFFEUR_GLSL = (() => {
   const C = SURCHAUFFEUR
   const A = SURCHAUFFEUR_ATLAS
@@ -500,28 +500,31 @@ const SURCHAUFFEUR_GLSL = (() => {
   return `
 const float SU_CORPS = ${f(C.corps)};
 const float SU_MOTIF = ${f(C.motif)};
+const float SU_VERRE = ${f(C.verre)};
 const float SU_BOUT = ${f(C.bout)};
 const float SU_FIN_CORPS = ${f(C.finCorps)};
 const vec3 SU_COUVERCLE = ${v3(C.couvercle)};
 const vec3 SU_TAMBOUR_A = ${v3(C.tambourA)};
 const vec3 SU_TAMBOUR_B = ${v3(C.tambourB)};
 const vec3 SU_TAMBOUR_C = ${v3(C.tambourC)};
+const vec3 SU_BRIDE = ${v3(C.bride)};
 const vec3 SU_PLAQUE = ${v3(C.plaque)};
 const vec2 SU_VOYANT = vec2(${f(C.voyantX)}, ${f(C.voyantY)});
-const float SU_SEUIL_SPIRALE = ${f(C.seuilSpirale)};
-const float SU_RAYON_SPIRALE = ${f(C.rayonSpirale)};
+const float SU_SEUIL_DOME = ${f(C.seuilDome)};
+const float SU_RAYON_DOME = ${f(C.rayonDome)};
+const float SU_RAYON_VERRE = ${f(C.rayonVerre)};
 const vec4 SU_CADRE_CORPS = ${v4(A.corps)};
 const vec4 SU_CADRE_BOUT = ${v4(A.bout)};
-const vec4 SU_CADRE_SPIRALE = ${v4(A.spirale)};
+const vec4 SU_CADRE_DOME = ${v4(A.dome)};
 
-// 0 spirale, 1 courte, 2 longue — JUMEAU de modeSurchauffeur (formes.ts)
+// 0 dôme, 1 courte, 2 longue — JUMEAU de modeSurchauffeur (formes.ts)
 float modeSurch(float L, float T) {
   if (L >= (2.0 * SU_BOUT + 0.5) * T) return 2.0;
-  return L < SU_SEUIL_SPIRALE * T ? 0.0 : 1.0;
+  return L < SU_SEUIL_DOME * T ? 0.0 : 1.0;
 }
 
-// ce qui termine le bout du côté de s : 0 le mur, 1 une plaque, 2 un
-// collecteur — JUMEAU de finsSurchauffeur (formes.ts)
+// ce qui termine le bout du côté de s : 0 le mur, 1 une plaque, 2 une tête
+// — JUMEAU de finsSurchauffeur (formes.ts)
 float finSurch(float s, float L, float T, float bouts) {
   bool murNeg = boutEnMur(-1.0, bouts);
   bool murPos = boutEnMur(1.0, bouts);
@@ -533,7 +536,7 @@ float finSurch(float s, float L, float T, float bouts) {
 // distance signée au surchauffeur (l'union de ses pièces) — JUMEAU de
 // piecesSurchauffeur (formes.ts)
 float surchSdfLocal(float s, float t, float L, float T, float bouts) {
-  if (modeSurch(L, T) < 0.5) return length(vec2(s, t)) - SU_RAYON_SPIRALE * min(L, T);
+  if (modeSurch(L, T) < 0.5) return length(vec2(s, t)) - SU_RAYON_DOME * min(L, T);
   float d = cnRect(s, t, 0.0, 0.5 * L, SU_CORPS * T);
   float fS = finSurch(s, L, T, bouts);
   if (fS > 1.5) {
@@ -541,15 +544,16 @@ float surchSdfLocal(float s, float t, float L, float T, float bouts) {
     d = min(d, chBout(s, t, L, T, SU_TAMBOUR_A));
     d = min(d, chBout(s, t, L, T, SU_TAMBOUR_B));
     d = min(d, chBout(s, t, L, T, SU_TAMBOUR_C));
+    d = min(d, chBout(s, t, L, T, SU_BRIDE));
   } else if (fS > 0.5) {
     d = min(d, chBout(s, t, L, T, SU_PLAQUE));
   }
   return d;
 }
 
-// la silhouette qui ombre : le serpentin sur toute sa longueur, ou la spirale
+// la silhouette qui ombre : le tube sur toute sa longueur, ou le dôme
 float surchOmbreSdf(float s, float t, float L, float T) {
-  if (modeSurch(L, T) < 0.5) return length(vec2(s, t)) - 0.9 * SU_RAYON_SPIRALE * min(L, T);
+  if (modeSurch(L, T) < 0.5) return length(vec2(s, t)) - 0.9 * SU_RAYON_DOME * min(L, T);
   return cnRect(s, t, 0.0, 0.5 * L, SU_CORPS * T);
 }
 
@@ -1505,11 +1509,19 @@ vec4 solChauffe(vec2 w, float d, float bande, float px) {
   return atlasChaud(CH_CADRE_SOL, tri, px, CH_CADRE_SOL.z / 520.0) * portee * portee;
 }
 
-// ——— LE SURCHAUFFEUR (serpentin chauffé à blanc) ——————————————————————
-// Lu dans la moitié basse de chaudiere-atlas.webp. la charge (0..1, lissée par
-// le moteur) décide de tout ce qui brille : chargé, le serpentin est blanc-
-// jaune et respire ; le dash pris, il s'éteint en quelques secondes — le
-// blanc part d'abord, l'ambre ensuite, et il reste l'acier revenu.
+// ——— LE SURCHAUFFEUR (borne à vapeur sous verre) ——————————————————————
+// Lu dans la moitié basse de chaudiere-atlas.webp. La charge (0..1, lissée par
+// le moteur) décide de ce qui vit : chargée, la vapeur dorée tourbillonne dans
+// le verre ; le dash pris, elle ralentit, pâlit et se dissout — il reste une
+// buée tiède. SEULE la vapeur bouge : on la reconnaît à sa couleur (l'or que
+// ni l'acier ni les cerclages n'ont), et une déformation qui tomberait sur un
+// cerclage garde l'image d'origine — l'acier ne coule jamais.
+float suGaz(vec4 c) {
+  if (c.a < 0.01) return 0.0;
+  vec3 k = c.rgb / c.a;
+  return smoothstep(0.12, 0.30, k.r - k.b) * smoothstep(0.35, 0.60, k.r);
+}
+
 vec4 surchRendu(vec2 loc, vec2 bsize, float px, float z) {
   float code = surchCode(z);
   float charge = surchCharge(z);
@@ -1520,65 +1532,94 @@ vec4 surchRendu(vec2 loc, vec2 bsize, float px, float z) {
   float s = (horiz ? loc.x : loc.y) - L * 0.5;
   float t = (horiz ? loc.y : loc.x) - T * 0.5;
   float mode = modeSurch(L, T);
+  // la vie de la vapeur ralentit avec la charge : un gaz qui se vide
+  // s'apaise — le temps de l'animation avance moins vite
+  float tv = uTime * (0.25 + 0.75 * charge);
 
   vec4 acc = vec4(0.0);
-  bool voyant = false;
+  float gaz = 0.0;     // la part de vapeur de ce pixel (0..1)
+  float courant = 0.0; // les filets qui défilent, s'il y en a
   if (mode < 0.5) {
-    // LA SPIRALE, droite dans le repère du bloc (vue du dessus)
+    // LE DÔME : la vapeur TOURNE — plus vite au centre qu'au bord, comme un
+    // vortex réel ; l'anneau d'acier et ses brides restent immobiles
     float c = min(L, T);
     vec2 q = loc - 0.5 * bsize;
-    acc = atlasChaud(SU_CADRE_SPIRALE, vec2(q.x / c + 0.5, 0.5 - q.y / c), px, SU_CADRE_SPIRALE.z / c);
-    // le voyant, au centre de la spirale
-    voyant = length(q) < 0.06 * c;
+    vec2 f0 = vec2(q.x / c + 0.5, 0.5 - q.y / c);
+    acc = atlasChaud(SU_CADRE_DOME, f0, px, SU_CADRE_DOME.z / c);
+    float rv = SU_RAYON_VERRE * c;
+    float r = length(q);
+    if (r < rv) {
+      float ang = tv * 0.9 * (1.0 - smoothstep(0.0, rv, r)) + tv * 0.15;
+      float ca = cos(ang);
+      float sa = sin(ang);
+      vec2 qr = vec2(ca * q.x - sa * q.y, sa * q.x + ca * q.y);
+      vec4 tourne = atlasChaud(SU_CADRE_DOME, vec2(qr.x / c + 0.5, 0.5 - qr.y / c), px, SU_CADRE_DOME.z / c);
+      float g = suGaz(acc) * suGaz(tourne) * (1.0 - smoothstep(0.85 * rv, rv, r));
+      acc = mix(acc, tourne, g);
+      gaz = suGaz(acc);
+    }
   } else {
     float hb = SU_CORPS * T;
     float fS = finSurch(s, L, T, bouts);
-    // le serpentin s'arrête sous les coudes du collecteur ; ailleurs (mur,
-    // plaque), il file jusqu'au bord
     float fin = fS > 1.5 ? L * 0.5 - SU_FIN_CORPS * T : L * 0.5;
     if (abs(t) < hb && abs(s) < fin) {
-      acc = atlasChaud(SU_CADRE_CORPS, vec2(fract(s / (SU_MOTIF * T)), (hb - t) / (2.0 * hb)),
-                       px, SU_CADRE_CORPS.w / (2.0 * hb));
+      float sm = SU_MOTIF * T;
+      acc = atlasChaud(SU_CADRE_CORPS, vec2(fract(s / sm), (hb - t) / (2.0 * hb)), px, SU_CADRE_CORPS.w / (2.0 * hb));
+      if (abs(t) < SU_VERRE * T) {
+        // L'ONDULATION : les volutes de l'image se tordent sur place
+        vec2 w = vec2(s, t) / T;
+        vec2 dw = vec2(dnoise(w * 1.7 + vec2(tv * 0.35, 0.0)) - 0.5,
+                       dnoise(w * 1.7 + vec2(3.1, -tv * 0.30)) - 0.5) * vec2(0.22, 0.10) * T;
+        vec4 tordu = atlasChaud(SU_CADRE_CORPS, vec2(fract((s + dw.x) / sm), (hb - (t + dw.y)) / (2.0 * hb)),
+                                px, SU_CADRE_CORPS.w / (2.0 * hb));
+        acc = mix(acc, tordu, suGaz(acc) * suGaz(tordu));
+        gaz = suGaz(acc);
+        // LE COURANT : des filets clairs défilent le long du tube, de la
+        // plaque ou de l'arrivée vers la tête — la vapeur circule
+        vec2 cq = vec2((s - tv * 0.9 * T) / T, t / T);
+        float fil = dnoise(cq * vec2(2.2, 6.0)) * 0.6 + dnoise(cq * vec2(4.5, 11.0) + 7.3) * 0.4;
+        courant = smoothstep(0.55, 0.85, fil);
+        // LA BOUFFÉE : de temps en temps, une vague plus claire parcourt
+        // le tube d'un bout à l'autre — une montée de pression
+        float ph = fract(uTime * 0.18 + hash21(floor(vec2(uTime * 0.18, L))) * 0.3);
+        float xb = mix(-0.5 * L - T, 0.5 * L + T, ph);
+        courant += 0.9 * exp(-pow((s - xb) / (0.45 * T), 2.0));
+      }
     }
     float sp = abs(s);
     if (fS > 1.5 && sp > L * 0.5 - SU_BOUT * T) {
-      // LE COLLECTEUR ; à gauche, en miroir
+      // LA TÊTE ; à gauche, en miroir
       vec2 f = vec2((sp - (L * 0.5 - SU_BOUT * T)) / (SU_BOUT * T), (0.5 * T - t) / T);
       vec4 c = atlasChaud(SU_CADRE_BOUT, f, px, SU_CADRE_BOUT.w / T);
+      // le voyant bat, chargé ; il s'éteint avec la charge (plus bas)
+      float dv = length((f - SU_VOYANT) * vec2(SU_BOUT, 1.0));
+      if (dv < 0.07) c.rgb *= 0.8 + 0.5 * charge * (0.5 + 0.5 * sin(uTime * 5.0));
       acc = cnSur(acc, c * smoothstep(0.0, 0.03, f.x));
-      voyant = length((f - SU_VOYANT) * vec2(SU_BOUT, 1.0)) < 0.07;
     } else if (fS > 0.5 && fS < 1.5 && sp > L * 0.5 - SU_PLAQUE.y * T) {
-      // LA PLAQUE qui ferme le serpentin : de l'acier sombre boulonné, un
-      // chant clair vers la lumière, deux boulons
-      float e = L * 0.5 - sp; // la distance au bout
+      // LA PLAQUE qui ferme le tube : de l'acier sombre, deux boulons
+      float e = L * 0.5 - sp;
       float dP = cnRect(e, t, 0.5 * SU_PLAQUE.y * T, 0.5 * SU_PLAQUE.y * T - 0.02 * T, SU_PLAQUE.z * T - 0.02 * T) - 0.02 * T;
       float couv = 1.0 - smoothstep(-px, px, dP);
       vec3 acier = vec3(0.11, 0.13, 0.16) * (0.85 + 0.3 * smoothstep(-0.04 * T, 0.0, dP));
       vec2 qb = vec2(e - 0.06 * T, abs(t) - 0.28 * T);
-      float boulon = 1.0 - smoothstep(0.022 * T - px, 0.022 * T + px, length(qb));
-      acier = mix(acier, vec3(0.32, 0.34, 0.37), boulon);
+      acier = mix(acier, vec3(0.32, 0.34, 0.37), 1.0 - smoothstep(0.022 * T - px, 0.022 * T + px, length(qb)));
       acc = cnSur(acc, vec4(acier, 1.0) * couv);
+      gaz = 0.0;
+      courant = 0.0;
     }
     if (fS < 0.5 && acc.a > 0.0) acc.rgb *= mix(0.30, 1.0, smoothstep(0.0, 0.45 * T, L * 0.5 - sp));
   }
 
-  // L'ÉTAT : ce qui brille, c'est ce que l'image a de chaud (ses pixels
-  // ambre et blancs-jaunes). Chargé, une onde parcourt le serpentin et le
-  // blanc pulse ; en refroidissant, le blanc s'éteint d'abord, l'ambre
-  // ensuite, jusqu'à l'acier revenu d'un serpentin froid.
+  // L'ÉTAT. Tout ce qui est doré (la vapeur, les liserés, le voyant) suit la
+  // charge : chargée, la vapeur respire et ses filets brillent ; en se
+  // vidant, elle pâlit vers une buée tiède — un verre presque vide.
   if (acc.a > 0.01) {
     vec3 c = acc.rgb / acc.a;
-    float chaud = smoothstep(0.10, 0.40, c.r - c.b) * smoothstep(0.30, 0.60, c.r);
-    float x = s / max(T, 1.0);
-    float onde = 0.5 + 0.5 * sin(uTime * 2.4 - x * 2.6);
-    float pouls = 0.5 + 0.5 * sin(uTime * 5.0);
-    vec3 froid = vec3(0.16, 0.13, 0.12) * (0.6 + 0.4 * dot(c, vec3(0.33)));
-    vec3 tiede = c * vec3(0.55, 0.22, 0.08);
-    vec3 etat = mix(froid, mix(tiede, c, smoothstep(0.5, 1.0, charge)), smoothstep(0.0, 0.5, charge));
-    vec3 vif = etat * (1.0 + charge * (0.30 * onde + 0.12 * pouls - 0.10));
-    acc.rgb = mix(acc.rgb, vif * acc.a, chaud);
-    // le voyant « prêt » : il bat, chargé ; éteint, sinon
-    if (voyant) acc.rgb = mix(acc.rgb, acc.rgb * (0.25 + 1.1 * charge * (0.6 + 0.4 * pouls)), chaud);
+    float dore = max(gaz, suGaz(acc));
+    float souffle = 0.5 + 0.5 * sin(uTime * 1.7 + s / max(T, 1.0));
+    vec3 plein = c * (1.0 + 0.18 * souffle) + vec3(1.0, 0.86, 0.55) * courant * 0.55 * gaz;
+    vec3 buee = vec3(0.16, 0.13, 0.10) + c * 0.12;
+    acc.rgb = mix(acc.rgb, mix(buee, plein, smoothstep(0.0, 1.0, charge)) * acc.a, dore);
   }
   return acc;
 }
@@ -2673,9 +2714,9 @@ void main() {
       col = mix(col, pol * eclMat, fill);
       col = mix(col, vec3(0.92, 0.97, 1.05) * eclMat, edge * 0.95);
     } else if (mat > 8.5) {
-      // SURCHAUFFEUR : un SERPENTIN chauffé à blanc (surchRendu), ses
-      // collecteurs, et le halo qui dit « approchez en vapeur ». Chargé, il
-      // brille ; le dash pris, il refroidit. Comme la conduite et la
+      // SURCHAUFFEUR : une BORNE À VAPEUR sous verre (surchRendu), ses
+      // têtes, et le halo qui dit « approchez en vapeur ». Chargée, la vapeur
+      // dorée tourbillonne ; le dash pris, elle se dissout. Comme la conduite et la
       // chaudière, SEUL l'appareil se peint, et la physique lit sa forme
       // (FORME_SURCHAUFFEUR) : ce que la vapeur frôle est ce qu'on voit.
       float fill = 1.0 - smoothstep(-edgeW, 0.0, dV);
@@ -2703,7 +2744,7 @@ void main() {
         ch = vec4(0.0);
       } else {
         // L'ATLAS PAS (ENCORE) LÀ, ou un surchauffeur à forme : le serpentin
-        // tracé d'avant, sur la silhouette des pièces
+        // tracé d'avant la borne, sur la silhouette des pièces
         float couvS = serp ? 1.0 - smoothstep(-edgeW, 0.0, surchSdf(wbV, uBoxes[bi], zS)) : 1.0;
         float coil = 0.5 + 0.5 * sin(world.x * 0.30 + sin(world.y * 0.24) * 2.2);
         float tube = smoothstep(0.55, 0.9, coil);
@@ -2715,7 +2756,7 @@ void main() {
       col = col * (1.0 - fill * ch.a) + ch.rgb * eclMat * fill;
       float hors = (1.0 - fill * ch.a) * surSol;
       // le halo dit « approchez en vapeur » : il meurt avec la charge — et,
-      // chargé, l'air tremble autour du serpentin
+      // chargé, l'air tremble autour de la borne
       float aura = 1.0 - smoothstep(0.0, 60.0, max(dG, 0.0));
       col += vec3(0.40, 0.30, 0.12) * aura * aura * charge * hors;
       if (serp && uDecor > 0.5) col += airChaud(wb, max(dG, 0.0), 60.0) * 0.8 * charge * hors;
@@ -3744,7 +3785,7 @@ float sceneSdf(vec2 p, float alt) {
                                   hC ? szC.x : szC.y, hC ? szC.y : szC.x));
       continue;
     }
-    // le SURCHAUFFEUR ombre comme son serpentin (ou sa spirale)
+    // le SURCHAUFFEUR ombre comme son tube (ou son dôme)
     if (dec.x > 8.5 && dec.x < 9.5 && dec.y < 0.5) {
       vec2 szC = uBoxes[i].zw - uBoxes[i].xy;
       bool hC = conduiteHoriz(szC, conduiteSens(surchCode(uBoxAux[i].z)));
@@ -4652,8 +4693,8 @@ export class Renderer {
   private boutsCleFaite = false // la clé de CETTE image est-elle déjà bâtie ?
   private boutsParBoite = new WeakMap<ObstacleBox, number>()
   /** LA CHARGE AFFICHÉE de chaque surchauffeur (0..1), qui suit la vraie en
-   *  douceur : le dash pris, le serpentin ne s'éteint pas d'un coup, il
-   *  REFROIDIT (~2 s) ; rechargé, il se rallume plus vite (~0,3 s). */
+   *  douceur : le dash pris, la vapeur ne disparaît pas d'un coup, elle
+   *  se DISSOUT (~2 s) ; rechargée, elle revient plus vite (~0,3 s). */
   private chargeVue = new WeakMap<ObstacleBox, number>()
   private chargeTemps = -1
   // la clé des boîtes de CETTE image (cleBoitesLumiere), bâtie une fois et

@@ -29,8 +29,8 @@ export const FORME_CONDUITE = 6
 // réunis (voir CHAUDIERE plus bas). Posée par conduite.ts sur toute
 // chaudière rectangulaire, jamais choisie ni sérialisée.
 export const FORME_CHAUDIERE = 7
-// LE SURCHAUFFEUR (serpentin chauffé à blanc) : ses collecteurs et son
-// serpentin, réunis (voir SURCHAUFFEUR plus bas). Posé par conduite.ts sur
+// LE SURCHAUFFEUR (borne à vapeur sous verre) : son tube et ses têtes,
+// réunis (voir SURCHAUFFEUR plus bas). Posé par conduite.ts sur
 // tout surchauffeur rectangulaire, jamais choisi ni sérialisé.
 export const FORME_SURCHAUFFEUR = 8
 
@@ -499,59 +499,64 @@ export function piecesChaudiere(L: number, T: number, bouts = 0): Piece[] {
 
 // ---- Le surchauffeur : ses pièces -------------------------------------------
 
-/** Les proportions des images du surchauffeur (tools/images/chaudiere_atlas.py,
- *  moitié basse), en fraction de l'ÉPAISSEUR T du bloc — le tambour du
- *  collecteur en fait toute la largeur. Mesurées sur les images du 26/09 ;
- *  la physique et le shader les lisent telles quelles. */
+/** Les proportions des images du surchauffeur — une BORNE À VAPEUR SOUS
+ *  VERRE (tools/images/chaudiere_atlas.py, moitié basse) —, en fraction de
+ *  l'ÉPAISSEUR T du bloc : la tête d'acier en fait toute la largeur.
+ *  Mesurées sur les images du 27/09 ; la physique et le shader les lisent
+ *  telles quelles. */
 export const SURCHAUFFEUR = {
-  /** demi-épaisseur du serpentin, rails compris (la collision) : 663 px de
-   *  rails pour 823 de tambour */
-  corps: 0.4028,
-  /** longueur d'un motif de serpentin (neuf boucles), répété sans miroir */
-  motif: 2.0643,
-  /** le COLLECTEUR (un bout) : sa longueur (image) ; le serpentin s'arrête
-   *  sous ses coudes (finCorps) */
-  bout: 1.1835,
-  finCorps: 1.15,
-  /** les pièces du collecteur, comptées depuis le bout du bloc : [de, à, demi] */
-  couvercle: [0, 0.1507, 0.33],
-  tambourA: [0.1507, 0.3937, 0.43],
-  tambourB: [0.3937, 0.6367, 0.4878],
-  tambourC: [0.6367, 0.7582, 0.4265],
-  /** la PLAQUE qui ferme le serpentin d'une rampe courte, à l'autre bout */
-  plaque: [0, 0.12, 0.43],
-  /** le voyant « prêt » dans l'image du collecteur (fractions du cadre) */
-  voyantX: 0.6489,
-  voyantY: 0.6355,
-  /** sous ce rapport L / T, le surchauffeur est une SPIRALE ronde */
-  seuilSpirale: 1.6,
-  /** la spirale : rayon du disque, en part du côté du cadre */
-  rayonSpirale: 0.4658,
+  /** demi-épaisseur du tube, rails compris (la collision) : 578 px de tube
+   *  pour 673 de tête */
+  corps: 0.4294,
+  /** longueur d'un motif de tube (trois travées de verre), répété sans miroir */
+  motif: 2.6016,
+  /** la bande de VERRE du tube, en demi-épaisseur (la vapeur y vit) : lignes
+   *  113..600 sur 717 */
+  verre: 0.2913,
+  /** la TÊTE (un bout) : sa longueur (image) ; le tube s'arrête sous sa bride */
+  bout: 1.1055,
+  finCorps: 1.08,
+  /** les pièces de la tête, comptées depuis le bout du bloc : [de, à, demi] */
+  couvercle: [0, 0.1397, 0.26],
+  tambourA: [0.1397, 0.63, 0.43],
+  tambourB: [0.63, 0.7786, 0.5],
+  tambourC: [0.7786, 0.8529, 0.43],
+  bride: [0.8529, 1.0609, 0.45],
+  /** la PLAQUE qui ferme le tube d'une borne courte, à l'autre bout */
+  plaque: [0, 0.12, 0.45],
+  /** le voyant dans l'image de la tête (fractions du cadre) */
+  voyantX: 0.7056,
+  voyantY: 0.3848,
+  /** sous ce rapport L / T, le surchauffeur est un DÔME rond */
+  seuilDome: 1.6,
+  /** le dôme : rayon de son anneau (la collision) et de son verre (le
+   *  tourbillon), en part du côté du cadre */
+  rayonDome: 0.4534,
+  rayonVerre: 0.343,
 } as const
 
 /** Les cadres du surchauffeur dans chaudiere-atlas.webp (moitié basse) —
  *  JUMEAUX de tools/images/chaudiere_atlas.py. */
 export const SURCHAUFFEUR_ATLAS = {
-  corps: [0, 1036, 1024, 359],
-  bout: [0, 1404, 485, 410],
-  spirale: [495, 1404, 400, 400],
+  corps: [0, 1036, 1024, 338],
+  bout: [0, 1384, 453, 410],
+  dome: [463, 1384, 400, 400],
 } as const
 
 /** LE DESSIN SELON LA PLACE :
- *  · SPIRALE (moins de 1,6) : la spirale ronde, au centre ;
- *  · COURTE : un collecteur à un bout, une plaque ferme l'autre ;
- *  · LONGUE (deux collecteurs et un demi-T de serpentin) : un collecteur à
- *    chaque bout — l'arrivée et la sortie de la vapeur. Un bout dans un mur
- *    y plonge. */
-export type ModeSurchauffeur = 'spirale' | 'courte' | 'longue'
+ *  · DÔME (moins de 1,6) : le dôme de verre rond, au centre ;
+ *  · COURTE : une tête à un bout, une plaque ferme l'autre ;
+ *  · LONGUE (deux têtes et un demi-T de tube) : une tête à chaque bout. Un
+ *    bout dans un mur y plonge. */
+export type ModeSurchauffeur = 'dome' | 'courte' | 'longue'
 export function modeSurchauffeur(L: number, T: number): ModeSurchauffeur {
   if (L >= (2 * SURCHAUFFEUR.bout + 0.5) * T) return 'longue'
-  return L < SURCHAUFFEUR.seuilSpirale * T ? 'spirale' : 'courte'
+  return L < SURCHAUFFEUR.seuilDome * T ? 'dome' : 'courte'
 }
 
-/** Ce qui termine chaque bout : 0 le mur, 1 une plaque, 2 un collecteur.
- *  Une courte a UN collecteur : au bout positif, sauf si ce bout est dans
- *  un mur — il passe alors à l'autre. JUMEAU de finSurch dans le shader. */
+/** Ce qui termine chaque bout : 0 le mur, 1 une plaque, 2 une tête. Une
+ *  courte a UNE tête : au bout positif, sauf si ce bout est dans un mur —
+ *  elle passe alors à l'autre. JUMEAU de finSurch dans le shader. */
 export function finsSurchauffeur(L: number, T: number, bouts: number): { neg: 0 | 1 | 2; pos: 0 | 1 | 2 } {
   const murNeg = (bouts & BOUT_MUR_NEG) !== 0
   const murPos = (bouts & BOUT_MUR_POS) !== 0
@@ -559,13 +564,12 @@ export function finsSurchauffeur(L: number, T: number, bouts: number): { neg: 0 
   return { pos: murPos ? 0 : 2, neg: murNeg ? 0 : murPos ? 2 : 1 }
 }
 
-/** Les pièces pleines du surchauffeur : leur union est ce que la vapeur
- *  frôle et ce qui arrête l'eau et la glace. */
+/** Les pièces pleines du surchauffeur : leur union est ce qui arrête l'eau
+ *  et la glace (la vapeur, elle, frôle son rectangle : solver.ts). */
 export function piecesSurchauffeur(L: number, T: number, bouts = 0): Piece[] {
   const C = SURCHAUFFEUR
-  if (modeSurchauffeur(L, T) === 'spirale') {
-    const c = Math.min(L, T)
-    const r = C.rayonSpirale * c
+  if (modeSurchauffeur(L, T) === 'dome') {
+    const r = C.rayonDome * Math.min(L, T)
     return [[-r, r, r, r]]
   }
   const fin = finsSurchauffeur(L, T, bouts)
@@ -574,7 +578,9 @@ export function piecesSurchauffeur(L: number, T: number, bouts = 0): Piece[] {
     if (pos) out.push([L / 2 - a * T, L / 2 - de * T, e * T])
     if (neg) out.push([-L / 2 + de * T, -L / 2 + a * T, e * T])
   }
-  for (const [de, a, e] of [C.couvercle, C.tambourA, C.tambourB, C.tambourC]) pose(de, a, e, fin.neg === 2, fin.pos === 2)
+  for (const [de, a, e] of [C.couvercle, C.tambourA, C.tambourB, C.tambourC, C.bride]) {
+    pose(de, a, e, fin.neg === 2, fin.pos === 2)
+  }
   pose(C.plaque[0], C.plaque[1], C.plaque[2], fin.neg === 1, fin.pos === 1)
   return out
 }
