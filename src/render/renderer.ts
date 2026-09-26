@@ -288,6 +288,26 @@ float conduiteOmbreSdf(float s, float t, float L, float T) {
   return cnRect(s, t, 0.0, 0.5 * L, CN_TUYAU * T);
 }
 
+// LES PLAQUES DE SOL : ce que l'image pose À PLAT sur le plancher — la
+// plaque boulonnée des traversées (arceau, bouts libres d'une longue) et
+// celle de la vanne. Ce sont elles qui se lisaient en « fond différent » :
+// un carré de métal collé au sol, sans arête ni pied. Coins arrondis : un
+// coin vif ombrait en pavé là où l'image a du givre transparent. Rend 1e9
+// s'il n'y a pas de plaque (bouts dans un mur).
+float conduitePlaquesLocal(float s, float t, float L, float T, float bouts) {
+  float mode = modeConduite(L, T);
+  if (mode < 0.5) {
+    float c = min(L, T);
+    float r = 0.07 * c;
+    return cnRect(s, t, 0.0, 0.5 * c - r, 0.5 * c - r) - r;
+  }
+  float k = mode < 1.5 ? echelleArceau(L, T) : 1.0;
+  if (mode > 1.5 && boutEnMur(s, bouts)) return 1e9;
+  float r = 0.07 * k * T;
+  return cnRect(abs(s), t, L * 0.5 - (CN_BRIDE_A + CN_BRIDE_DE) * 0.5 * k * T,
+                (CN_BRIDE_A - CN_BRIDE_DE) * 0.5 * k * T - r, 0.5 * k * T - r) - r;
+}
+
 // le sens du tuyau : 0 auto (le grand côté), 1 horizontal, 2 vertical —
 // JUMEAU de conduiteHoriz (formes.ts)
 bool conduiteHoriz(vec2 sz, float sens) {
@@ -306,6 +326,28 @@ float conduiteSdf(vec2 p, vec4 box, float code) {
   bool horiz = conduiteHoriz(sz, conduiteSens(code));
   return conduiteSdfLocal(horiz ? q.x : q.y, horiz ? q.y : q.x,
                           horiz ? sz.x : sz.y, horiz ? sz.y : sz.x, conduiteBouts(code));
+}
+
+// LE PIED de la conduite, en coordonnées de boîte : le tuyau (sa silhouette
+// qui ombre) et ses plaques de sol — ni les brides rectangulaires de la
+// collision, ni la boîte
+float conduitePiedSdf(vec2 p, vec4 box, float code) {
+  vec2 sz = box.zw - box.xy;
+  vec2 q = p - 0.5 * (box.xy + box.zw);
+  bool horiz = conduiteHoriz(sz, conduiteSens(code));
+  float s = horiz ? q.x : q.y;
+  float t = horiz ? q.y : q.x;
+  float L = horiz ? sz.x : sz.y;
+  float T = horiz ? sz.y : sz.x;
+  return min(conduiteOmbreSdf(s, t, L, T), conduitePlaquesLocal(s, t, L, T, conduiteBouts(code)));
+}
+
+float conduitePlaquesSdf(vec2 p, vec4 box, float code) {
+  vec2 sz = box.zw - box.xy;
+  vec2 q = p - 0.5 * (box.xy + box.zw);
+  bool horiz = conduiteHoriz(sz, conduiteSens(code));
+  return conduitePlaquesLocal(horiz ? q.x : q.y, horiz ? q.y : q.x,
+                              horiz ? sz.x : sz.y, horiz ? sz.y : sz.x, conduiteBouts(code));
 }
 `
 })()
@@ -2231,6 +2273,16 @@ void main() {
       // l'ombre au sol, PARTOUT autour de la conduite (coupée au bord de la
       // boîte, elle redessinait le rectangle)
       if (tuyau) col *= mix(1.0, conduiteOmbre(wb, uBoxes[bi], sensC), surSol);
+      // LE PIED : un liseré d'ombre serré au ras du tuyau et des plaques.
+      // L'ombre portée est large et douce ; sans ce contact, la conduite
+      // semblait flotter, et ses plaques se lisaient en carrés collés au sol
+      // (retour de jeu : « il manque du relief sur les contours »)
+      float tC = min(bsize.x, bsize.y);
+      if (tuyau) {
+        float dPied = conduitePiedSdf(wb, uBoxes[bi], sensC);
+        float pied = 1.0 - smoothstep(-0.02 * tC, 0.10 * tC, dPied);
+        col *= 1.0 - 0.45 * pied * surSol;
+      }
       // L'ATLAS PAS (ENCORE) LÀ : l'unité liée à null se lit (0, 0, 0, 1) —
       // chaque conduite se peignait en rectangles NOIRS tant que l'image
       // montait, et pour de bon si elle manquait. Le givre procédural
@@ -2250,6 +2302,30 @@ void main() {
         cnh = vec4(vec3(0.15, 0.21, 0.29) + vec3(0.26, 0.34, 0.40) * eclat * 0.55, 1.0) * couvS;
       }
       col = col * (1.0 - fill * cnh.a) + cnh.rgb * eclMat * fill;
+      // L'ARÊTE DES PLAQUES : l'image les peint à plat, sans épaisseur — un
+      // biseau tourné vers la lampe (le haut à gauche de l'image sans
+      // lampe) leur rend un chant, et une fine ligne sombre les découpe du
+      // sol. Le biseau générique des solides, lui, suivait la BOÎTE : il
+      // peignait un rectangle de 30 u autour du bloc, sur le sol, et
+      // l'intérieur du bloc ne se lisait plus comme le sol d'à côté.
+      if (tuyau && uHasFroid > 0.5) {
+        float dPl = conduitePlaquesSdf(wbV, uBoxes[bi], sensC);
+        float wBis = max(0.05 * tC, 1.5 * pxMonde);
+        if (dPl < wBis) {
+          const float eP = 0.5;
+          float gx = conduitePlaquesSdf(wbV + vec2(eP, 0.0), uBoxes[bi], sensC) - dPl;
+          float gy = conduitePlaquesSdf(wbV + vec2(0.0, eP), uBoxes[bi], sensC) - dPl;
+          vec2 gP = vec2(bca * gx - bsa * gy, bsa * gx + bca * gy); // repère de la boîte → monde
+          float gPn = length(gP);
+          vec2 lD = uLumiere > 0.5 ? lampeDir : vec2(-0.7071, 0.7071);
+          float face = gPn > 1e-6 ? dot(gP / gPn, lD) : 0.0;
+          float surImg = cnh.a * fill;
+          float bis = (1.0 - smoothstep(0.0, wBis, -dPl)) * step(dPl, 0.0) * surImg;
+          col += col * face * bis * 0.55 + vec3(0.55, 0.68, 0.80) * max(face, 0.0) * bis * 0.08 * eclMat;
+          float arete = 1.0 - smoothstep(0.0, 1.2 * pxMonde, abs(dPl));
+          col *= 1.0 - 0.40 * arete * max(surImg, surSol);
+        }
+      }
       float hors = (1.0 - fill * cnh.a) * surSol;
       // (la brume ne baisse que SOUS l'image — pas dans la forme de collision,
       // dont les rectangles de brides se lisaient en pavés plus sombres)
@@ -2309,7 +2385,10 @@ void main() {
     // solide — la face tournée vers la lampe s'éclaire, l'opposée plonge.
     // Le gradient du SDF vient des dérivées d'écran : gratuit, et il suit
     // n'importe quelle forme. (Le sas, une bouche, ne se biseaute pas.)
-    if (uLumiere > 0.5 && solide) {
+    // La conduite d'ammoniac non plus : d y est la distance à sa BOÎTE, et
+    // le biseau dessinait le rectangle du bloc sur le sol — dedans comme
+    // dehors. Son relief suit ses plaques et son tuyau (composition).
+    if (uLumiere > 0.5 && solide && !(mat > 3.5 && mat < 4.5 && dec.y < 0.5)) {
       vec2 gd = gradSdfBoite(bi, wb, d, dec, bca, bsa);
       float gn = length(gd);
       if (gn > 1e-6) {

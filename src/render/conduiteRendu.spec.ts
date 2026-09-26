@@ -35,3 +35,17 @@ describe('la conduite dans la composition', () => {
     for (const e of exemptions) expect(e).toContain('dec.y < 0.5')
   })
 })
+
+describe('le relief de la conduite suit son dessin, pas sa boîte', () => {
+  it('le biseau générique des solides exempte la conduite (il peignait le rectangle du bloc)', () => {
+    const i = source.indexOf("// Relief d'éclairage : un biseau directionnel")
+    expect(i).toBeGreaterThan(0)
+    const garde = source.slice(i, source.indexOf('gradSdfBoite(', i))
+    expect(garde).toMatch(/!\(mat > 3\.5 && mat < 4\.5 && dec\.y < 0\.5\)/)
+  })
+
+  it('les plaques ont leur arête et le tuyau son pied, dans la branche de la conduite', () => {
+    expect(branche).toMatch(/conduitePlaquesSdf\(wbV/)
+    expect(branche).toMatch(/conduitePiedSdf\(wb,/)
+  })
+})
