@@ -1111,8 +1111,14 @@ vec4 conduiteNH3(vec2 loc, vec2 bsize, float px, float code) {
                        nh3Lisse(0.05, abs(o.y), 0.03) * nh3Lisse(0.28, abs(o.x), 0.05));
     etoile = max(etoile, nh3Lisse(0.09, length(o), 0.04));
     float scint = 0.5 + 0.5 * sin(uTime * (1.5 + 3.0 * hash21(cell + 4.1)) + h * 60.0);
-    acc.rgb += vec3(0.85, 0.94, 1.0) * etoile * step(0.88, h) * scint *
+    // (accentués après l'aperçu du 26/09 : une étoile sur cinq, pas sur huit)
+    acc.rgb += vec3(0.85, 0.94, 1.0) * etoile * step(0.80, h) * scint * 1.4 *
                smoothstep(0.55, 0.8, lumC) * acc.a * smoothstep(0.9, 0.35, px);
+    // LE GIVRE RESPIRE : ses pixels clairs (la frange, les stalactites)
+    // s'éclairent et s'éteignent par vagues lentes le long du tuyau — le
+    // froid « travaille » ; l'acier sombre, lui, ne bouge pas
+    float givre = smoothstep(0.45, 0.75, lumC);
+    acc.rgb *= 1.0 + givre * 0.16 * sin(uTime * 0.9 - s / max(T, 1.0) * 0.8);
   }
   return acc;
 }
@@ -1142,7 +1148,7 @@ vec2 givreSol(vec2 w, float d, float bande, float px) {
                  nh3Lisse(0.30, abs(dot(o, dir)), 0.05));
   }
   float scint = 0.55 + 0.45 * sin(uTime * (1.2 + 2.0 * hash21(cell + 4.4)) + h * 40.0);
-  float aiguilles = br * step(1.0 - 0.10 * portee * portee, h) * scint * smoothstep(1.2, 0.5, px);
+  float aiguilles = br * step(1.0 - 0.20 * portee * portee, h) * scint * smoothstep(1.2, 0.5, px);
   return vec2(voile, aiguilles);
 }
 
@@ -1155,12 +1161,47 @@ vec3 brumeNH3(vec2 wb, float d, float bande) {
   float p1 = dnoise(wb * 0.028 + vec2(uTime * 0.10, -uTime * 0.07));
   float p2 = dnoise(wb * 0.011 - vec2(uTime * 0.04, uTime * 0.03) + 5.7);
   float onde = 0.5 + 0.5 * sin(d * 0.07 - uTime * 1.2 + p2 * 6.0);
-  float bouffees = smoothstep(0.55, 0.95, p1 * 0.7 + onde * 0.45);
+  float bouffees = smoothstep(0.50, 0.95, p1 * 0.7 + onde * 0.45);
   float fuite = exp(-d / (bande * 0.6));
   float aura = 1.0 - smoothstep(0.0, bande, d);
-  float souffle = 0.85 + 0.15 * sin(uTime * 0.7);
-  return vec3(0.14, 0.27, 0.40) * aura * aura * (0.55 + 0.45 * p2) * souffle +
-         vec3(0.60, 0.76, 0.92) * bouffees * fuite * 0.24;
+  float souffle = 0.80 + 0.20 * sin(uTime * 0.7);
+  // accentuée après l'aperçu du 26/09 : des bouffées plus franches, et un
+  // second voile, lent, qui roule autour du tuyau
+  float roule = smoothstep(0.35, 0.85, dnoise(wb * 0.018 + vec2(-uTime * 0.05, uTime * 0.06) + 2.3));
+  return vec3(0.14, 0.27, 0.40) * aura * aura * (0.55 + 0.45 * p2) * souffle * 1.25 +
+         vec3(0.60, 0.76, 0.92) * bouffees * fuite * 0.40 +
+         vec3(0.36, 0.50, 0.66) * roule * aura * 0.16;
+}
+
+// LES FUITES : aux joints et aux brides de bout, l'ammoniac s'échappe en
+// jets de vapeur froide, par bouffées — chaque joint a son rythme. Une
+// bouffée naît au ras du tuyau, gonfle en s'en éloignant et se dissout ;
+// des deux côtés, en alternance. Rend l'intensité (0..1) au point wb.
+float fuitesNH3(vec2 wb, vec4 box, float code) {
+  vec2 sz = box.zw - box.xy;
+  bool horiz = conduiteHoriz(sz, conduiteSens(code));
+  float L = horiz ? sz.x : sz.y;
+  float T = horiz ? sz.y : sz.x;
+  if (modeConduite(L, T) < 1.5) return 0.0;
+  vec2 q = wb - 0.5 * (box.xy + box.zw);
+  float s = horiz ? q.x : q.y;
+  float t = horiz ? q.y : q.x;
+  // la source la plus proche : un joint, ou la bride d'un bout libre
+  float src = jointPres(s, L, T);
+  float sb = sign(s) * (L * 0.5 - 0.5 * (CN_BB_DE + CN_BB_A) * T);
+  if (!boutEnMur(s, conduiteBouts(code)) && abs(s - sb) < abs(s - src)) src = sb;
+  if (src > 1e8) return 0.0;
+  float h = hash21(vec2(src * 0.013, box.x * 0.001 + box.y * 0.0007));
+  float cote = t < 0.0 ? -1.0 : 1.0;
+  // chaque côté a sa phase : les deux ne soufflent pas ensemble
+  float ph = fract(uTime * (0.22 + 0.10 * h) + h * 5.0 + (cote > 0.0 ? 0.0 : 0.5));
+  float naissance = CN_TUYAU * T;
+  float centre = naissance + ph * 1.1 * T;
+  float r = (0.10 + 0.35 * ph) * T;
+  vec2 d = vec2(s - src, abs(t) - centre);
+  float bruit = dnoise(wb * 0.06 + vec2(uTime * 0.3, -uTime * 0.2));
+  float nuage = 1.0 - smoothstep(0.0, r, length(d) * (0.8 + 0.5 * bruit));
+  return nuage * smoothstep(0.0, 0.15, ph) * (1.0 - ph) * step(naissance * 0.8, abs(t));
 }
 
 // ——— LA CHAUDIÈRE (rampe de résistances) ——————————————————————————————
@@ -1232,6 +1273,16 @@ vec4 chaudiereRendu(vec2 loc, vec2 bsize, float px, float code) {
     if (!mur && sp > s0) {
       vec2 f = vec2((sp - s0) / (CH_BOUT * T), (0.5 * T - t) / T);
       vec4 c = atlasChaud(CH_CADRE_BOUT, f, px, CH_CADRE_BOUT.w / T);
+      // LE VOYANT du boîtier (mesuré dans l'image : x 1285, y 305 de la
+      // traversée) clignote — la rampe est sous tension. Un halo ambre
+      // déborde un peu sur le couvercle quand il s'allume
+      if (fS > 1.5) {
+        float dv = length((f - vec2(0.4323, 0.3722)) * vec2(CH_BOUT, 1.0) * T);
+        float allume = smoothstep(0.35, 0.5, fract(uTime * 0.7)) * (1.0 - smoothstep(0.85, 1.0, fract(uTime * 0.7)));
+        vec3 lueur = vec3(1.0, 0.62, 0.18) * allume * c.a;
+        c.rgb = c.rgb * mix(0.55, 1.0, allume * step(dv, 0.05 * T)) +
+                lueur * (1.0 - smoothstep(0.0, 0.07 * T, dv)) * 0.9;
+      }
       acc = cnSur(acc, c * smoothstep(0.0, 0.02, f.x));
     }
     // LE JOINT à brides, tous les pas, sur une longue rampe
@@ -1249,14 +1300,63 @@ vec4 chaudiereRendu(vec2 loc, vec2 bsize, float px, float code) {
   // respirent, une onde lente qui parcourt la rampe d'un bout à l'autre et
   // un frémissement par ailette — le décor le plus chaud de la station ne
   // peut pas être le seul à ne rien faire. Le métal, lui, ne bouge pas.
+  // Accentuée après l'aperçu du 26/09 (« ça manque d'animation ») : deux
+  // ondes qui se croisent, et un barreau sur quelques-uns qui s'emballe un
+  // instant, plus clair, presque jaune.
   if (acc.a > 0.01) {
     vec3 c = acc.rgb / acc.a;
     float ambre = smoothstep(0.10, 0.35, c.r - c.b) * smoothstep(0.25, 0.55, c.r);
-    float onde = 0.5 + 0.5 * sin(uTime * 1.6 - s / max(T, 1.0) * 1.3);
-    float fremi = 0.5 + 0.5 * sin(uTime * 9.0 + floor(s / max(0.07 * T, 1.0)) * 2.3);
-    acc.rgb *= 1.0 + ambre * (0.28 * onde + 0.10 * fremi - 0.12);
+    float x = s / max(T, 1.0);
+    float onde = 0.5 + 0.5 * sin(uTime * 1.6 - x * 1.3);
+    float contre = 0.5 + 0.5 * sin(uTime * 0.9 + x * 2.1 + 1.7);
+    float barreau = floor(s / max(0.07 * T, 1.0));
+    float fremi = 0.5 + 0.5 * sin(uTime * 9.0 + barreau * 2.3);
+    float hb = hash21(vec2(barreau, floor(uTime * 0.8)));
+    float emballe = step(0.93, hb) * (0.5 + 0.5 * sin(uTime * 6.0 + hb * 20.0));
+    float k = 0.42 * onde + 0.22 * contre + 0.12 * fremi + 0.45 * emballe - 0.30;
+    acc.rgb *= 1.0 + ambre * k;
+    acc.rgb += vec3(0.30, 0.22, 0.05) * ambre * emballe * acc.a;
   }
   return acc;
+}
+
+// L'AIR CHAUD : autour de la chaudière, des bouffées d'air brûlant qui
+// S'ÉLOIGNENT d'elle (le pendant de brumeNH3), et des lignes de brume de
+// chaleur fines qui ondulent — l'air tremble. Additif, ambre sourd.
+vec3 airChaud(vec2 wb, float d, float bande) {
+  float p1 = dnoise(wb * 0.035 + vec2(uTime * 0.22, -uTime * 0.17));
+  float p2 = dnoise(wb * 0.012 - vec2(uTime * 0.07, uTime * 0.05) + 3.1);
+  float onde = 0.5 + 0.5 * sin(d * 0.09 - uTime * 2.4 + p2 * 6.0);
+  float bouffees = smoothstep(0.55, 0.95, p1 * 0.7 + onde * 0.45);
+  float fuite = exp(-d / (bande * 0.5));
+  float aura = 1.0 - smoothstep(0.0, bande, d);
+  // la brume de chaleur : des filets clairs serrés, qui courent vers le
+  // dehors et se tordent au gré du bruit
+  // (par plaques : réguliers partout, ils se lisaient en courbes de niveau)
+  float filets = pow(0.5 + 0.5 * sin(d * 0.45 - uTime * 5.0 + p1 * 9.0), 8.0) *
+                 smoothstep(0.45, 0.75, dnoise(wb * 0.02 + vec2(uTime * 0.12, 0.0) + 7.7));
+  return vec3(0.36, 0.15, 0.04) * aura * aura * (0.6 + 0.4 * p2) +
+         vec3(0.70, 0.32, 0.08) * bouffees * fuite * 0.30 +
+         vec3(0.55, 0.30, 0.10) * filets * aura * 0.10;
+}
+
+// LES BRAISES : dans l'aire de chaleur, des escarbilles s'allument, filent
+// un instant dans une direction à elles et s'éteignent — plus nombreuses
+// près de la rampe. Une par cellule de 16 u, sur une cellule sur six au
+// plus près.
+vec3 braises(vec2 w, float d, float bande, float px) {
+  float proche = 1.0 - smoothstep(0.0, bande * 0.8, d);
+  if (proche <= 0.0) return vec3(0.0);
+  vec2 cell = floor(w / 16.0);
+  float h = hash21(cell + 31.7);
+  if (h < 1.0 - 0.18 * proche) return vec3(0.0);
+  float vie = fract(uTime * (0.35 + 0.4 * hash21(cell + 4.2)) + h * 13.0);
+  float an = hash21(cell + 9.1) * 6.2832;
+  vec2 p = (cell + 0.5) * 16.0 + vec2(cos(an), sin(an)) * (vie * 14.0 - 7.0);
+  float r = max(1.8, 1.0 * px);
+  float point = 1.0 - smoothstep(r * 0.4, r, length(w - p));
+  float eclat = sin(vie * 3.1416) * (0.7 + 0.3 * sin(uTime * 17.0 + h * 40.0));
+  return mix(vec3(1.0, 0.45, 0.10), vec3(1.0, 0.85, 0.45), vie * 0.5) * point * eclat * proche;
 }
 
 // LE SOL CHAUFFÉ : dans l'aire d'effet (la portée de chaleur, celle du
@@ -2438,9 +2538,16 @@ void main() {
       }
       col = col * (1.0 - fill * ch.a) + ch.rgb * eclMat * fill;
       float hors = (1.0 - fill * ch.a) * surSol;
-      float aura = 1.0 - smoothstep(0.0, auraR, max(dG, 0.0));
-      float shimmer = 0.55 + 0.45 * dnoise(world * 0.06 + vec2(-uTime * 0.16, uTime * 0.24));
-      col += vec3(0.36, 0.15, 0.04) * aura * aura * shimmer * hors;
+      // l'air qui brûle autour, et — riche seulement — la lueur que les
+      // barreaux jettent au sol, au rythme de leur onde, et les braises
+      col += airChaud(wb, max(dG, 0.0), auraR) * hors;
+      if (rampe && uDecor > 0.5) {
+        vec2 szB = uBoxes[bi].zw - uBoxes[bi].xy;
+        float Tb = conduiteHoriz(szB, conduiteSens(codeC)) ? szB.y : szB.x;
+        float pouls = 0.75 + 0.25 * sin(uTime * 1.6 + 0.8);
+        col += vec3(0.95, 0.42, 0.10) * exp(-max(dG, 0.0) / (0.30 * Tb)) * 0.22 * pouls * hors;
+        col += braises(wb, max(dG, 0.0), auraR, pxMonde) * 0.9 * hors;
+      }
     } else if (mat > 4.5) {
       // Grille (tableau 3) : panneau perforé — le liquide s'y écrase, la
       // vapeur passe entre les mailles. Les trous laissent voir le fond.
@@ -2486,7 +2593,7 @@ void main() {
       float dG = tuyau ? conduiteSdf(wb, uBoxes[bi], sensC) : dV;
       // LE SOL CRISTALLISÉ dans l'aire d'effet — là où le solveur gèle l'eau
       vec2 gsol = givreSol(wb, max(dG, 0.0), uColdBand, pxMonde);
-      col = mix(col, vec3(0.80, 0.90, 0.98) * eclMat, gsol.x * 0.25 * surSol);
+      col = mix(col, vec3(0.80, 0.90, 0.98) * eclMat, gsol.x * 0.32 * surSol);
       col += vec3(0.75, 0.88, 1.0) * gsol.y * 0.30 * surSol;
       // l'ombre au sol, PARTOUT autour de la conduite (coupée au bord de la
       // boîte, elle redessinait le rectangle)
@@ -2514,6 +2621,7 @@ void main() {
       // (la brume ne baisse que SOUS l'image — pas dans la forme de collision,
       // dont les rectangles de brides se lisaient en pavés plus sombres)
       col += brumeNH3(wb, max(dG, 0.0), uColdBand) * hors;
+      if (tuyau && uDecor > 0.5) col += vec3(0.62, 0.78, 0.94) * fuitesNH3(wb, uBoxes[bi], sensC) * 0.55 * hors;
     } else {
       // Sas de sortie : une bouche d'aspiration — un trou dans lequel l'eau
       // s'engouffre. Gorge sombre, œil noir, anneau qui respire, et stries
