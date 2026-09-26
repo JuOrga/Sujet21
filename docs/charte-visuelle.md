@@ -45,7 +45,8 @@ moyenne, par famille, mesurés dans `prepare.py`.
 
 Froide, désaturée, avec **une seule couleur d'accent : le cyan**. L'ambre
 n'apparaît que sur les **veilleuses et voyants** (les petites lampes du
-sas de raccord, la chaufferie), le vert que dans la serre, le violet que
+sas de raccord, la chaufferie) et sur **ce qui chauffe** (les barreaux
+et le hublot de la chaudière, `assets-ia.md` §30), le vert que dans la serre, le violet que
 dans le méta. Le rouge est réservé à l'alerte des cinématiques.
 
 | rôle | teinte | où |
@@ -123,6 +124,7 @@ elle **devient la référence** de sa famille : on la dépose dans
 | sas de raccord, veilleuses ambre | `docs/reference/sas-raccord-reference.png` |
 | la station vue du dehors (les planches de l'approche, `assets-ia.md` §26) | `docs/reference/station-reference.png` — la planche `approche-3` livrée le 15/09 |
 | la conduite d'ammoniac (la plaque froide, `assets-ia.md` §27) | `docs/reference/conduite-reference.webp` — la « version 2 » de la planche d'exploration, choisie le 24/09 |
+| la chaudière (la rampe de résistances, `assets-ia.md` §30) | `docs/reference/chaudiere-reference.webp` — la traversée livrée le 26/09 ; l'acier est celui de la conduite |
 | les autres | à désigner à la prochaine image réussie |
 
 ## 7. Les familles et leurs mesures

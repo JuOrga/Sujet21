@@ -136,7 +136,7 @@ describe('levelIO — aller-retour JSON', () => {
     expect(again.level!.boxes).toEqual(bx)
   })
 
-  it('le SENS du tuyau d’une plaque froide survit ; ailleurs, il s’efface', () => {
+  it('le SENS du tuyau d’une plaque froide, ou de la rampe d’une chaudière, survit ; ailleurs, il s’efface', () => {
     const b = { minX: 0, minY: 0, maxX: 100, maxY: 120 }
     const { level, rejets } = parseLevel({
       name: 'sens',
@@ -150,12 +150,15 @@ describe('levelIO — aller-retour JSON', () => {
         { ...b, material: 4, sens: 7 }, // inconnu : auto
         { ...b, material: 0, sens: 2 }, // pas une plaque froide
         { ...b, material: 4, forme: 1, sens: 2 }, // une forme : pas de tuyau
+        { ...b, material: 6, sens: 2 }, // la rampe d'une chaudière : debout
+        { ...b, material: 6, forme: 1, sens: 1 }, // une chaudière à forme : pas de rampe
       ],
     })
     expect(rejets).toEqual([])
     const bx = level!.boxes
     expect(bx[0].sens).toBe(1)
-    for (const k of [1, 2, 3, 4]) expect(bx[k].sens).toBeUndefined()
+    for (const k of [1, 2, 3, 4, 6]) expect(bx[k].sens).toBeUndefined()
+    expect(bx[5].sens).toBe(2)
     const again = parseLevel(JSON.parse(serializeLevel(level!)))
     expect(again.level!.boxes).toEqual(bx)
   })

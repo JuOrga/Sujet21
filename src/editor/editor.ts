@@ -95,6 +95,7 @@ import {
   FORME_COQUE,
   coquePieces,
 } from '../game/formes'
+import { aPieces } from '../game/conduite'
 import {
   deplaceDans,
   ditLeDeplacement,
@@ -5737,11 +5738,12 @@ export class LevelEditor {
             `</select></label>`,
         )
       }
-      if (b.material === MAT_FROID && !(b.forme ?? 0)) {
-        // le sens du tuyau d'ammoniac : le diamètre est l'AUTRE côté — un
-        // plot presque carré se couche ou se dresse ; la collision suit
+      if (aPieces(b)) {
+        // le sens du tuyau d'ammoniac ou de la rampe de la chaudière :
+        // l'épaisseur est l'AUTRE côté — un plot presque carré se couche ou
+        // se dresse ; la collision suit
         rows.push(
-          `<label class="ed-f"><span>Sens du tuyau</span><select id="p-sens">` +
+          `<label class="ed-f"><span>${b.material === MAT_CHAUD ? 'Sens de la rampe' : 'Sens du tuyau'}</span><select id="p-sens">` +
             SENS_NOMS.map(
               (n, v) => `<option value="${v}"${v === (b.sens ?? 0) ? ' selected' : ''}>${n}</option>`,
             ).join('') +
@@ -6768,13 +6770,15 @@ export class LevelEditor {
         const bout = Math.max(0, Math.min(2, Math.round(val('p-fbout'))))
         if (bout) b.p2 = bout
       }
-      // sens du tuyau (plaque froide rectangulaire) : auto (0) efface la clé
+      // sens du tuyau ou de la rampe (plaque froide, chaudière — rectangulaires) :
+      // auto (0) efface la clé
       const sensEl = document.getElementById('p-sens') as HTMLSelectElement | null
-      if (b.material === MAT_FROID && !(b.forme ?? 0) && sensEl) {
+      const aSens = aPieces(b)
+      if (aSens && sensEl) {
         const sens = Math.max(0, Math.min(2, Math.round(Number(sensEl.value) || 0)))
         if (sens) b.sens = sens
         else delete b.sens
-      } else if (b.material !== MAT_FROID || (b.forme ?? 0)) {
+      } else if (!aSens) {
         delete b.sens
       }
       // portée d'aura propre (chaudière) : 1 (ou vide) efface la clé
