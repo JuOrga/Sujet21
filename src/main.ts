@@ -8774,12 +8774,17 @@ function dessineEclat(
 type Recharge = { t0: number; x: number; y: number; etincelles: { dx: number; dy: number; retard: number; courbe: number }[] }
 let recharges: Recharge[] = []
 let surchVidesVus = new Set<number>()
+let surchGeneration = -1
 
 /** Les surchauffeurs vidés DEPUIS la dernière image : chacun lance sa gerbe. */
-function guetteRecharges(maintenant: number, vw: number): void {
+function guetteRecharges(maintenant: number): void {
   const vides = sim.surchauffesVides
-  // un tableau (re)chargé vide l'ensemble : on repart de là, sans gerbe
-  if (vides.size < surchVidesVus.size) surchVidesVus = new Set()
+  // un tableau (re)chargé : ses indices ne sont plus ceux d'avant — on
+  // repart de zéro (la TAILLE de l'ensemble ne le dit pas toujours)
+  if (sim.generation !== surchGeneration) {
+    surchGeneration = sim.generation
+    surchVidesVus = new Set()
+  }
   for (const bi of vides) {
     if (surchVidesVus.has(bi)) continue
     surchVidesVus.add(bi)
@@ -8796,8 +8801,8 @@ function guetteRecharges(maintenant: number, vw: number): void {
     const x = (b.minX + b.maxX) / 2
     const y = (b.minY + b.maxY) / 2
     recharges.push({ t0: maintenant, x, y, etincelles })
-    const pan = Math.max(-1, Math.min(1, ((x - camera.x) * camera.zoom) / Math.max(1, vw * 0.5)))
-    audio.recharge(pan)
+    // placé comme les autres sons, par rapport au corps (ouie.ts)
+    audio.recharge(panDepuis(sim.stats.centroidX, x))
   }
 }
 
@@ -19728,7 +19733,7 @@ function corpsImage(now: number): boolean {
   previsionGasAvant = input.gasIntent
   avancePrevisionExacte()
   drawMecanismes(vw, vh, dpr)
-  guetteRecharges(performance.now() / 1000, vw)
+  guetteRecharges(performance.now() / 1000)
   drawRecharges(vw, vh, dpr, performance.now() / 1000)
   drawFantomes(vw, vh, dpr)
   drawFleche(dtReal, dpr)

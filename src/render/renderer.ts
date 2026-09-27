@@ -2386,7 +2386,10 @@ void main() {
       if (mat > 0.5 && mat < 2.5) reachMax = max(reachMax, uHydroBand);
       else if (mat > 5.5 && mat < 6.5) reachMax = max(reachMax, uHeatBand * uBoxAux[bi].w);
       else if (mat > 3.5 && mat < 4.5) reachMax = max(reachMax, uColdBand);
-      else if (mat > 8.5) reachMax = max(reachMax, uBoxAux[bi].w > 0.001 ? 240.0 : 60.0); // l'onde de choc de la recharge
+      // le surchauffeur : l'onde de choc de la recharge part jusqu'à ~290 u
+      // (222 de rayon, 32 de bande) — pas le miroir, qui garde ses 60
+      else if (mat > 8.5 && mat < 9.5) reachMax = max(reachMax, uBoxAux[bi].w > 0.001 ? 300.0 : 60.0);
+      else if (mat > 8.5) reachMax = max(reachMax, 60.0);
       if (d > reachMax + edgeW + (uRelief > 0.0 ? length(relDisp) : 0.0)) continue;
     }
     // FORME de la pièce : la distance se raffine après le rejet grossier —
@@ -2742,22 +2745,25 @@ void main() {
         col *= 1.0 - 0.45 * (1.0 - smoothstep(-0.02 * tP, 0.10 * tP, dG)) * surSol;
       }
       vec4 ch;
+      vec3 emis = vec3(0.0); // ce qui brille par soi-même, hors éclairage
       if (uHasChaud > 0.5 && serp && fill > 0.0) {
         ch = surchRendu(clamp(wbV - bmin, vec2(0.0), bsize), bsize, pxMonde, zS);
       } else if (uHasChaud > 0.5 && serp) {
         ch = vec4(0.0);
       } else {
         // L'ATLAS PAS (ENCORE) LÀ, ou un surchauffeur à forme : le serpentin
-        // tracé d'avant la borne, sur la silhouette des pièces
+        // tracé d'avant la borne, sur la silhouette des pièces — sa lueur
+        // brille par elle-même (emis), la pièce sombre ne l'éteint pas
         float couvS = serp ? 1.0 - smoothstep(-edgeW, 0.0, surchSdf(wbV, uBoxes[bi], zS)) : 1.0;
         float coil = 0.5 + 0.5 * sin(world.x * 0.30 + sin(world.y * 0.24) * 2.2);
         float tube = smoothstep(0.55, 0.9, coil);
         float pulse = 0.7 + 0.3 * sin(uTime * 3.1 + world.y * 0.05);
         vec3 metal = vec3(0.10, 0.13, 0.17) * (0.9 + 0.2 * dnoise(world * 0.14));
         vec3 lueur = mix(vec3(0.24, 0.20, 0.14), vec3(1.00, 0.76, 0.38) * pulse, charge);
-        ch = vec4(metal + lueur * tube * 0.85, 1.0) * couvS;
+        ch = vec4(metal, 1.0) * couvS;
+        emis = lueur * tube * 0.85 * couvS;
       }
-      col = col * (1.0 - fill * ch.a) + ch.rgb * eclMat * fill;
+      col = col * (1.0 - fill * ch.a) + ch.rgb * eclMat * fill + emis * fill;
       float hors = (1.0 - fill * ch.a) * surSol;
       // le halo dit « approchez en vapeur » : il meurt avec la charge — et,
       // chargé, l'air tremble autour de la borne
@@ -5930,14 +5936,15 @@ export class Renderer {
           : bx.material === MAT_FROID || bx.material === MAT_CHAUD
             ? (bx.sens ?? 0) + 4 * this.boutsDe(bx, boxes, boxCount, sim.bounds)
             : bx.material === MAT_SURCHAUFFEUR
-              ? this.chargeLissee(bx, sim.surchauffesVides.has(i) ? 0 : 1, timeSec) +
-                2 * ((bx.sens ?? 0) + 4 * this.boutsDe(bx, boxes, boxCount, sim.bounds))
+              ? // le surchauffeur n'a jamais de bout dans un mur (conduite.ts) :
+                // aux.z = charge + 2 · sens
+                this.chargeLissee(bx, sim.surchauffeurVide(bx) ? 0 : 1, timeSec) + 2 * (bx.sens ?? 0)
               : 1
       // aux.w : la portée d'aura (chaudière) — ou, d'un SURCHAUFFEUR, son
       // ÉCLAT de recharge (1 à l'instant du dash rendu, 0 après ~0,9 s)
       this.auxScratch[k * 4 + 3] =
         bx.material === MAT_SURCHAUFFEUR
-          ? this.eclatRecharge(bx, sim.surchauffesVides.has(i), timeSec)
+          ? this.eclatRecharge(bx, sim.surchauffeurVide(bx), timeSec)
           : (bx.aura ?? 1)
     }
     // le pas de temps du refroidissement des surchauffeurs : une fois par image

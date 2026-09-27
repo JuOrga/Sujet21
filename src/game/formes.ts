@@ -546,8 +546,9 @@ export const SURCHAUFFEUR_ATLAS = {
 /** LE DESSIN SELON LA PLACE :
  *  · DÔME (moins de 1,6) : le dôme de verre rond, au centre ;
  *  · COURTE : une tête à un bout, une plaque ferme l'autre ;
- *  · LONGUE (deux têtes et un demi-T de tube) : une tête à chaque bout. Un
- *    bout dans un mur y plonge. */
+ *  · LONGUE (deux têtes et un demi-T de tube) : une tête à chaque bout.
+ *  Contre un mur, la tête reste : une borne sous pression ne plonge pas
+ *  (conduite.ts, boutsEnMur rend 0 pour elle). */
 export type ModeSurchauffeur = 'dome' | 'courte' | 'longue'
 export function modeSurchauffeur(L: number, T: number): ModeSurchauffeur {
   if (L >= (2 * SURCHAUFFEUR.bout + 0.5) * T) return 'longue'

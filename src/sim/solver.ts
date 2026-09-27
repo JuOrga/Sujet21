@@ -349,6 +349,10 @@ export class FluidSim {
   // Surchauffeurs déjà déchargés (indices de boîtes) — remis à neuf au
   // chargement du tableau. Le rendu lit ce même état pour le manomètre.
   readonly surchauffesVides = new Set<number>()
+  /** Compteur de chargements (setLevel) : qui garde des indices de
+   *  surchauffesVides d'une image à l'autre sait ainsi qu'ils ont changé de
+   *  salle — un Set vidé puis rempli d'autant ne se remarque pas à sa taille. */
+  generation = 0
   private mouthX = 0
   private mouthY = 0
   private drainOn = false
@@ -572,6 +576,20 @@ export class FluidSim {
     this.refreshBoxCaches()
     this.surchauffesVides.clear()
     this.codexContacts.fill(0)
+    this.generation++
+  }
+
+  /** Ce surchauffeur (reconnu à sa BOÎTE, pas à un indice) a-t-il rendu son
+   *  dash ? Les indices de surchauffesVides comptent les boîtes du solveur,
+   *  sans le sas, le vide ni la baie : le rendu, qui numérote TOUTES les
+   *  boîtes du tableau, tombait à côté dès qu'une d'elles précédait le
+   *  surchauffeur (vu en revue, 27/09). */
+  surchauffeurVide(b: { minX: number; minY: number; maxX: number; maxY: number }): boolean {
+    for (const bi of this.surchauffesVides) {
+      const o = this.baseBoxes[bi]
+      if (o && o.minX === b.minX && o.minY === b.minY && o.maxX === b.maxX && o.maxY === b.maxY) return true
+    }
+    return false
   }
 
   // Listes de boîtes par famille, recalculées quand le niveau change (jamais

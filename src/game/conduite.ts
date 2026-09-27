@@ -26,7 +26,6 @@ import {
   FORME_CHAUDIERE,
   FORME_CONDUITE,
   FORME_SURCHAUFFEUR,
-  SURCHAUFFEUR,
   piecesSurchauffeur,
   CONDUITE,
   conduiteHoriz,
@@ -104,10 +103,7 @@ export function boutsEnMur(b: Boite, boxes: readonly Boite[], bornes: Bornes | n
   const cx = (b.minX + b.maxX) / 2
   const cy = (b.minY + b.maxY) / 2
   const e = 3 // juste au-delà du bout
-  const flanc =
-    (b.material === MAT_CHAUD ? CHAUDIERE.corps : b.material === MAT_SURCHAUFFEUR ? SURCHAUFFEUR.corps : CONDUITE.tuyau) *
-    T *
-    0.9
+  const flanc = (b.material === MAT_CHAUD ? CHAUDIERE.corps : CONDUITE.tuyau) * T * 0.9
   let bouts = 0
   for (const [bit, signe] of [
     [BOUT_MUR_NEG, -1],

@@ -116,17 +116,30 @@ describe('la recharge d’un surchauffeur se voit', () => {
   })
 
   it('le moteur remplit aux.w de l’éclat pour un surchauffeur, de l’aura pour le reste', () => {
-    expect(source).toMatch(/bx\.material === MAT_SURCHAUFFEUR\s*\?\s*this\.eclatRecharge\(bx, sim\.surchauffesVides\.has\(i\), timeSec\)\s*:\s*\(bx\.aura \?\? 1\)/)
+    expect(source).toMatch(/bx\.material === MAT_SURCHAUFFEUR\s*\?\s*this\.eclatRecharge\(bx, sim\.surchauffeurVide\(bx\), timeSec\)\s*:\s*\(bx\.aura \?\? 1\)/)
   })
 
   it('l’onde de choc n’est pas coupée par le rejet grossier : la portée s’élargit pendant l’éclat', () => {
-    expect(source).toMatch(/else if \(mat > 8\.5\) reachMax = max\(reachMax, uBoxAux\[bi\]\.w > 0\.001 \? 240\.0 : 60\.0\);/)
+    // 300 : l'onde va jusqu'à 222 u, sa bande jusqu'à 32 — coupée à 240, elle
+    // laissait une couture (vu en revue, 27/09)
+    expect(source).toMatch(/else if \(mat > 8\.5 && mat < 9\.5\) reachMax = max\(reachMax, uBoxAux\[bi\]\.w > 0\.001 \? 300\.0 : 60\.0\);/)
+  })
+
+  it('le MIROIR garde sa portée de 60 : son aux.w (l’aura, 1) n’est pas un éclat', () => {
+    expect(source).toMatch(/else if \(mat > 8\.5\) reachMax = max\(reachMax, 60\.0\);/)
+  })
+
+  it('la charge et l’éclat lisent le surchauffeur à sa BOÎTE, pas à un indice', () => {
+    expect(source).not.toMatch(/surchauffesVides\.has\(i\)/)
   })
 
   it('le jeu lance la gerbe et le son à chaque recharge', () => {
     const main = readFileSync(fileURLToPath(new URL('../main.ts', import.meta.url)), 'utf8')
-    expect(main).toMatch(/guetteRecharges\(performance\.now\(\) \/ 1000, vw\)/)
-    expect(main).toMatch(/audio\.recharge\(pan\)/)
+    expect(main).toMatch(/guetteRecharges\(performance\.now\(\) \/ 1000\)/)
+    // un rechargement de salle se voit au compteur du solveur, pas à la taille
+    expect(main).toMatch(/sim\.generation !== surchGeneration/)
+    // placé comme les autres sons, par rapport au corps (ouie.ts)
+    expect(main).toMatch(/audio\.recharge\(panDepuis\(sim\.stats\.centroidX, x\)\)/)
     // ni anneau ni « +1 DASH » autour du corps : retirés à la demande (27/09)
     expect(main).not.toContain("'+1 DASH'")
     const audio = readFileSync(fileURLToPath(new URL('../game/audio.ts', import.meta.url)), 'utf8')

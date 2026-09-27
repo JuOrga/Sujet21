@@ -145,6 +145,32 @@ describe('surchauffeur — le frôlement garde sa portée', () => {
   })
 })
 
+// LE RENDU RECONNAÎT LE SURCHAUFFEUR VIDÉ À SA BOÎTE. Les indices de
+// surchauffesVides comptent les boîtes du solveur, qui écarte le sas, le vide
+// et la baie ; le rendu numérote toutes celles du tableau. Une baie posée
+// avant le surchauffeur décalait tout : on vidait l'un, un autre s'éteignait.
+describe('surchauffeur — reconnu à sa boîte', () => {
+  const salle = { minX: -500, minY: -500, maxX: 900, maxY: 500 }
+  it('une baie avant le surchauffeur ne décale rien', () => {
+    const s = new FluidSim({ ...DEFAULT_PARAMS }, salle)
+    const baie = box(-400, -400, -300, -300, 12) // MAT_BAIE : sans physique
+    const a = box(0, 0, 60, 200, MAT_SURCHAUFFEUR)
+    const b = box(200, 0, 260, 200, MAT_SURCHAUFFEUR)
+    s.setLevel([baie, a, b], [])
+    s.surchauffesVides.add(0) // l'indice du solveur de `a` (la baie écartée)
+    expect(s.surchauffeurVide(a)).toBe(true)
+    expect(s.surchauffeurVide(b)).toBe(false)
+  })
+
+  it('chaque chargement de salle avance le compteur', () => {
+    const s = new FluidSim({ ...DEFAULT_PARAMS }, salle)
+    const g0 = s.generation
+    s.setLevel([box(0, 0, 60, 200, MAT_SURCHAUFFEUR)], [])
+    s.setLevel([box(0, 0, 60, 200, MAT_SURCHAUFFEUR)], [])
+    expect(s.generation).toBe(g0 + 2)
+  })
+})
+
 describe('surchauffeur — les jumeaux', () => {
   it('le shader interpole SURCHAUFFEUR et SURCHAUFFEUR_ATLAS, et décode la charge', async () => {
     const { readFileSync } = await import('node:fs')
@@ -152,8 +178,9 @@ describe('surchauffeur — les jumeaux', () => {
     expect(src).toMatch(/const float SU_CORPS = \$\{f\(C\.corps\)\};/)
     expect(src).toMatch(/const vec4 SU_CADRE_BOUT = \$\{v4\(A\.bout\)\};/)
     expect((src.match(/\$\{SURCHAUFFEUR_GLSL\}/g) ?? []).length).toBe(2)
-    // aux.z = charge + 2 · (sens + 4 · bouts), côté moteur comme côté shader
-    expect(src).toMatch(/this\.chargeLissee\(bx, [^\n]*timeSec\) \+\s*2 \* \(\(bx\.sens \?\? 0\) \+ 4 \* this\.boutsDe/)
+    // aux.z = charge + 2 · sens (le surchauffeur n'a jamais de bout dans un
+    // mur) ; le shader décode charge + 2 · (sens + 4 · bouts), bouts nuls
+    expect(src).toMatch(/this\.chargeLissee\(bx, sim\.surchauffeurVide\(bx\) \? 0 : 1, timeSec\) \+ 2 \* \(bx\.sens \?\? 0\)/)
     expect(src).toMatch(/float surchCharge\(float z\) \{ return clamp\(z - 2\.0 \* surchCode\(z\), 0\.0, 1\.0\); \}/)
   })
 
