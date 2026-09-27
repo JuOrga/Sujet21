@@ -8767,9 +8767,10 @@ function dessineEclat(
 
 // LA RECHARGE PAR UN SURCHAUFFEUR. Le solveur rend le dash sans bruit : le
 // compteur change, rien d'autre. Chaque recharge lance ici une GERBE —
-// des étincelles dorées quittent la borne et filent vers le corps, puis un
-// éclat autour de lui et un « +1 DASH » qui monte ; le son part avec. La
-// borne, elle, flashe et lance son onde de choc (renderer, aux.w).
+// des étincelles dorées quittent la borne et filent vers le corps ; le son
+// (souffle et carillon) part avec. La borne, elle, flashe et lance son onde
+// de choc (renderer, aux.w). Ni anneau ni « +1 DASH » autour du corps :
+// essayés, retirés à la demande du concepteur (27/09).
 type Recharge = { t0: number; x: number; y: number; etincelles: { dx: number; dy: number; retard: number; courbe: number }[] }
 let recharges: Recharge[] = []
 let surchVidesVus = new Set<number>()
@@ -8802,7 +8803,7 @@ function guetteRecharges(maintenant: number, vw: number): void {
 
 function drawRecharges(vw: number, vh: number, dpr: number, maintenant: number): void {
   if (recharges.length === 0) return
-  recharges = recharges.filter((r) => maintenant - r.t0 < 1.6)
+  recharges = recharges.filter((r) => maintenant - r.t0 < 0.8)
   if (!document.body.classList.contains('playing')) return
   const g = fxCtx
   const dprC = Math.min(dpr, 2)
@@ -8841,26 +8842,6 @@ function drawRecharges(vw: number, vh: number, dpr: number, maintenant: number):
       g.beginPath()
       g.arc(px, py, 2.6, 0, Math.PI * 2)
       g.fill()
-    }
-    // L'ÉCLAT autour du corps quand la gerbe arrive, et le « +1 DASH »
-    const arrivee = age - 0.5
-    if (arrivee > 0 && arrivee < 0.7) {
-      const k = arrivee / 0.7
-      const rayon = (sim.stats.rmsRadius * z + 14) * (1 + 0.9 * k)
-      g.strokeStyle = `rgba(255,200,90,${0.8 * (1 - k)})`
-      g.lineWidth = 3 * (1 - k) + 1
-      g.beginPath()
-      g.arc(cx, cy, rayon, 0, Math.PI * 2)
-      g.stroke()
-    }
-    if (arrivee > 0 && arrivee < 1.1) {
-      const k = arrivee / 1.1
-      g.globalCompositeOperation = 'source-over'
-      g.font = '600 15px Michroma, sans-serif'
-      g.textAlign = 'center'
-      g.fillStyle = `rgba(255,214,120,${Math.min(1, 3 * (1 - k))})`
-      g.fillText('+1 DASH', cx, cy - sim.stats.rmsRadius * z - 18 - 26 * k)
-      g.globalCompositeOperation = 'lighter'
     }
   }
   g.restore()

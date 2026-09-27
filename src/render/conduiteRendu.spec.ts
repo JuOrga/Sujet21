@@ -127,6 +127,8 @@ describe('la recharge d’un surchauffeur se voit', () => {
     const main = readFileSync(fileURLToPath(new URL('../main.ts', import.meta.url)), 'utf8')
     expect(main).toMatch(/guetteRecharges\(performance\.now\(\) \/ 1000, vw\)/)
     expect(main).toMatch(/audio\.recharge\(pan\)/)
+    // ni anneau ni « +1 DASH » autour du corps : retirés à la demande (27/09)
+    expect(main).not.toContain("'+1 DASH'")
     const audio = readFileSync(fileURLToPath(new URL('../game/audio.ts', import.meta.url)), 'utf8')
     expect(audio).toMatch(/recharge\(pan = 0\): void \{/)
   })
