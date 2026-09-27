@@ -44,3 +44,19 @@ export function panDepuis(corpsX: number, sourceX: number, portee = 700): number
   const p = (sourceX - corpsX) / Math.max(1, portee)
   return Math.max(-1, Math.min(1, p)) * 0.85
 }
+
+/** Le souffle de la nappe de vapeur (0..1, avant le gain de audio.ts).
+ *  Elle tournait à 0,35 dès qu'on était vapeur, immobile compris : un bourdon
+ *  de 30 s en boucle, sans fin — c'est ce qui la rendait pénible bien plus
+ *  que son timbre. Désormais le nuage respire avec le geste : un fond à peine
+ *  présent au repos, le souffle plein quand le corps file (la moitié de la
+ *  vitesse d'un dash suffit), et la visée garde la nappe pleine — on charge.
+ *  Le retour au calme suit la traînée du gaz : pas d'interrupteur. */
+export const NAPPE_REPOS = 0.08
+export const NAPPE_ELAN = 0.6
+export function souffleNappe(vitesse: number, visee: boolean, vitesseDash: number): number {
+  if (visee) return 1
+  const x = Math.min(1, Math.max(0, vitesse / Math.max(1, vitesseDash * 0.5)))
+  const doux = x * x * (3 - 2 * x)
+  return NAPPE_REPOS + (NAPPE_ELAN - NAPPE_REPOS) * doux
+}

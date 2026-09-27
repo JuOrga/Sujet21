@@ -316,7 +316,7 @@ import {
 import { Camera } from './render/camera'
 import { MAX_BOXES, Renderer } from './render/renderer'
 import { Motes, VIE_STRIDE, remplitVie, toucheLeCorps } from './render/vie'
-import { panDepuis } from './game/ouie'
+import { panDepuis, souffleNappe } from './game/ouie'
 import { dangerDevant, directionDeMarche, saccade, type Saccade } from './game/regard'
 import { AGONIE_DUREE, agonie, clignement, intervalleClignement } from './game/paupiere'
 import { FixedLoop } from './game/loop'
@@ -20225,11 +20225,16 @@ function corpsImage(now: number): boolean {
   }
   // Le souffle continu d'éjection est retiré (la voix elle-même n'existe
   // plus) : l'eau se signale par la goutte qui « ploc » à chaque impulsion.
+  // La nappe de vapeur respire avec le geste (ouie.ts, souffleNappe) : elle
+  // tournait à 0,35 fixe dès qu'on était vapeur, immobile compris — un
+  // bourdon sans fin, ce qui la rendait pénible.
   audio.setGasLevel(
     audible && gasCount > 0
-      ? input.aimActive && input.gasIntent
-        ? 1
-        : 0.35
+      ? souffleNappe(
+          Math.hypot(sim.stats.velX, sim.stats.velY),
+          input.aimActive && input.gasIntent,
+          params.gasDashSpeed,
+        )
       : 0,
   )
 

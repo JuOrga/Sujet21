@@ -252,7 +252,18 @@ export class AudioFx {
       src.loop = true
       src.loopStart = Math.min(0.12, buf.duration / 4)
       src.loopEnd = Math.max(buf.duration - 0.12, buf.duration * 0.75)
-      src.connect(sortie)
+      // Le creux du carton : 86 % de l'énergie du fichier tient entre 160 et
+      // 640 Hz — la bande qui sonne « nasillard », du bruit dans un tube
+      // plutôt qu'un nuage. -4 dB autour de 300 Hz la dégonfle (mesuré sur
+      // le MP3 livré : -2,5 dB de niveau global). Il ne rend pas l'air qui
+      // manque au-dessus de 800 Hz : ça, seul un nouveau fichier le donnera.
+      const creux = ctx.createBiquadFilter()
+      creux.type = 'peaking'
+      creux.frequency.value = 300
+      creux.Q.value = 0.9
+      creux.gain.value = -4
+      src.connect(creux)
+      creux.connect(sortie)
       src.start()
     } catch {
       this.nappeDeSecours(ctx, sortie)

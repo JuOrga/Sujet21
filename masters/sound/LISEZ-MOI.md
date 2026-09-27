@@ -32,7 +32,10 @@ choisies sur des attaques mesurées à 17–25 dB au-dessus du creux qui précè
 `vapeur-nappe.wav` est à part : c'est la seule boucle pilotée **à la frame**
 par le jeu (`setGasLevel`, dans `src/game/audio.ts`), pas par la bande-son.
 Elle a remplacé une voix de bruit blanc filtré qui sifflait quoi qu'on lui
-fasse. Son niveau dans le jeu tient à une seule ligne — `v * 0.6` — et la
+fasse. Son niveau dans le jeu tient à une seule ligne — `v * 0.6` — où `v`
+suit la vitesse du corps (`souffleNappe`, dans `src/game/ouie.ts`) : presque
+muette au repos, pleine en mouvement et à la visée. Un creux de -4 dB vers
+300 Hz, posé à la lecture, dégonfle son côté « carton ». La
 lecture reboucle à 0,12 s des bords, pour que la couture tombe en pleine
 matière plutôt que sur les fondus.
 
