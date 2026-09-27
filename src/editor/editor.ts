@@ -95,7 +95,8 @@ import {
   FORME_COQUE,
   coquePieces,
 } from '../game/formes'
-import { aPieces } from '../game/conduite'
+import { aPieces, cleBoite, formePhysique } from '../game/conduite'
+import { contourAura, type Point } from './aura'
 import {
   deplaceDans,
   ditLeDeplacement,
@@ -807,6 +808,24 @@ export class LevelEditor {
     } catch {
       // brouillon illisible : on repart d'un tableau vierge
     }
+  }
+
+  // LES CONTOURS D'AURA, gardés d'un tracé à l'autre : l'éditeur redessine
+  // à chaque mouvement de souris, et un contour coûte quelques milliers de
+  // lectures de la forme. La clé porte tout ce qui le décide — la boîte, ses
+  // bouts plongés (qui dépendent des voisines) et la portée.
+  private contoursAura = new Map<string, Point[][]>()
+  private contourAuraCache(forme: Parameters<typeof cleBoite>[0], portee: number): Point[][] {
+    const cle = `${cleBoite(forme)}|${forme.bouts ?? 0}|${portee}`
+    let c = this.contoursAura.get(cle)
+    if (!c) {
+      // les pièces qu'on déplace laissent des clés mortes : on repart à vide
+      // plutôt que de laisser la table grossir sans fin
+      if (this.contoursAura.size > 256) this.contoursAura.clear()
+      c = contourAura(forme, portee)
+      this.contoursAura.set(cle, c)
+    }
+    return c
   }
 
   // ——— Repères ————————————————————————————————————————
@@ -7465,6 +7484,11 @@ export class LevelEditor {
     // Zones d'effet des surfaces : la portée RÉELLE des auras, aux réglages
     // par défaut du banc. Le contour iso-distance d'un rectangle est un
     // rectangle arrondi de rayon = portée — c'est exactement ce qu'on trace.
+    // Une FORME (chaudière, conduite, surchauffeur, disque…) rayonne depuis
+    // ce qu'elle dessine, pas depuis sa boîte : le solveur mesure sa forme
+    // physique — l'éditeur trace donc l'iso-distance de cette forme
+    // (editor/aura.ts). Avant, la rampe d'une chaudière montrait une aura
+    // débordant sur tout le long côté, et bien plus aux coins d'une ronde.
     // La plaque froide montre AUSSI sa portée à froid complet (pointillé
     // long) : le refroidissement du vaisseau étend son emprise en cours de
     // partie. Le radiateur, lui, rétrécit à froid (pointillé court).
@@ -7491,12 +7515,34 @@ export class LevelEditor {
       // surface — une pièce oblique porte donc une aura oblique. Avant,
       // l'aura restait dessinée sur la boîte NON tournée : pivoter une
       // chaudière laissait sa zone d'effet à l'angle d'avant (signalé).
+      const forme = formePhysique(box, this.level.boxes, this.level.bounds)
       const aura = (
         portee: number,
         alphaFill: string,
         alphaLine: string,
         dash: number[],
       ): void => {
+        if (forme.forme) {
+          g.beginPath()
+          for (const boucle of this.contourAuraCache(forme, portee)) {
+            boucle.forEach((pt, i) => {
+              const sp = this.toScreen(pt.x, pt.y)
+              if (i === 0) g.moveTo(sp.sx, sp.sy)
+              else g.lineTo(sp.sx, sp.sy)
+            })
+            g.closePath()
+          }
+          if (alphaFill) {
+            g.fillStyle = colA + alphaFill
+            g.fill('evenodd')
+          }
+          g.strokeStyle = colA + alphaLine
+          g.setLineDash(dash)
+          g.lineWidth = 1
+          g.stroke()
+          g.setLineDash([])
+          return
+        }
         const w = (box.maxX - box.minX + 2 * portee) * this.zoom
         const h = (box.maxY - box.minY + 2 * portee) * this.zoom
         const r = Math.min(portee * this.zoom, w / 2, h / 2)
