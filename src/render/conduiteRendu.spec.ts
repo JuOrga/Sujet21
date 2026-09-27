@@ -106,3 +106,29 @@ describe('le surchauffeur dans la composition', () => {
   })
 })
 
+// LA RECHARGE (retour du concepteur, 27/09 : « plus marqué quand la recharge
+// de dash a lieu ») : la borne flashe et lance une onde de choc, lues dans
+// aux.w — que le moteur remplit de l'éclat de recharge pour un surchauffeur
+describe('la recharge d’un surchauffeur se voit', () => {
+  it('la branche lit l’éclat dans aux.w et en tire le flash et l’onde', () => {
+    expect(brancheSu).toMatch(/float eclat = uBoxAux\[bi\]\.w;/)
+    expect(brancheSu).toMatch(/float onde = exp\(/)
+  })
+
+  it('le moteur remplit aux.w de l’éclat pour un surchauffeur, de l’aura pour le reste', () => {
+    expect(source).toMatch(/bx\.material === MAT_SURCHAUFFEUR\s*\?\s*this\.eclatRecharge\(bx, sim\.surchauffesVides\.has\(i\), timeSec\)\s*:\s*\(bx\.aura \?\? 1\)/)
+  })
+
+  it('l’onde de choc n’est pas coupée par le rejet grossier : la portée s’élargit pendant l’éclat', () => {
+    expect(source).toMatch(/else if \(mat > 8\.5\) reachMax = max\(reachMax, uBoxAux\[bi\]\.w > 0\.001 \? 240\.0 : 60\.0\);/)
+  })
+
+  it('le jeu lance la gerbe et le son à chaque recharge', () => {
+    const main = readFileSync(fileURLToPath(new URL('../main.ts', import.meta.url)), 'utf8')
+    expect(main).toMatch(/guetteRecharges\(performance\.now\(\) \/ 1000, vw\)/)
+    expect(main).toMatch(/audio\.recharge\(pan\)/)
+    const audio = readFileSync(fileURLToPath(new URL('../game/audio.ts', import.meta.url)), 'utf8')
+    expect(audio).toMatch(/recharge\(pan = 0\): void \{/)
+  })
+})
+

@@ -2386,7 +2386,7 @@ void main() {
       if (mat > 0.5 && mat < 2.5) reachMax = max(reachMax, uHydroBand);
       else if (mat > 5.5 && mat < 6.5) reachMax = max(reachMax, uHeatBand * uBoxAux[bi].w);
       else if (mat > 3.5 && mat < 4.5) reachMax = max(reachMax, uColdBand);
-      else if (mat > 8.5) reachMax = max(reachMax, 60.0);
+      else if (mat > 8.5) reachMax = max(reachMax, uBoxAux[bi].w > 0.001 ? 240.0 : 60.0); // l'onde de choc de la recharge
       if (d > reachMax + edgeW + (uRelief > 0.0 ? length(relDisp) : 0.0)) continue;
     }
     // FORME de la pièce : la distance se raffine après le rejet grossier —
@@ -2764,6 +2764,21 @@ void main() {
       float aura = 1.0 - smoothstep(0.0, 60.0, max(dG, 0.0));
       col += vec3(0.40, 0.30, 0.12) * aura * aura * charge * hors;
       if (serp && uDecor > 0.5) col += airChaud(wb, max(dG, 0.0), 60.0) * 0.8 * charge * hors;
+      // LA RECHARGE (aux.w, l'éclat : 1 → 0 en ~0,9 s) : la borne FLASHE,
+      // blanc-or, et une ONDE DE CHOC dorée part de sa silhouette — la
+      // vapeur qu'elle vient de rendre au corps, visible d'un bout à
+      // l'autre de la salle
+      float eclat = uBoxAux[bi].w;
+      if (eclat > 0.001) {
+        col += vec3(1.0, 0.86, 0.55) * eclat * eclat * 1.1 * fill * ch.a;
+        float k = 1.0 - eclat;
+        float rOnde = 12.0 + 210.0 * (1.0 - (1.0 - k) * (1.0 - k));
+        float large = 6.0 + 26.0 * k;
+        float onde = exp(-pow((max(dG, 0.0) - rOnde) / large, 2.0)) * step(0.0, dG);
+        col += vec3(1.0, 0.72, 0.26) * onde * eclat * 0.85;
+        // et un halo bref, serré, qui s'éteint le premier
+        col += vec3(1.0, 0.80, 0.40) * exp(-max(dG, 0.0) / 30.0) * eclat * eclat * eclat * 0.7 * hors;
+      }
     } else if (mat > 7.5) {
       // Rideau lamellaire : lamelles souples bleu-glace qui ondulent — seule
       // la GLACE les écarte. Des fentes fines entre lamelles laissent deviner
@@ -4701,6 +4716,9 @@ export class Renderer {
    *  se DISSOUT (~2 s) ; rechargée, elle revient plus vite (~0,3 s). */
   private chargeVue = new WeakMap<ObstacleBox, number>()
   private chargeTemps = -1
+  /** L'instant où chaque surchauffeur a rendu son dash : il flashe et lance
+   *  son onde de choc (aux.w, ~0,9 s). */
+  private rechargeT0 = new WeakMap<ObstacleBox, number>()
   // la clé des boîtes de CETTE image (cleBoitesLumiere), bâtie une fois et
   // partagée par les bouts des conduites et la carte de lumière
   private cleImage: string | null = null
@@ -5586,6 +5604,22 @@ export class Renderer {
     return this.cleImage
   }
 
+  /** L'éclat de recharge d'un surchauffeur (1 → 0 en ~0,9 s) : le moment
+   *  où il passe de chargé à vide, vu d'ici. */
+  private eclatRecharge(bx: ObstacleBox, vide: boolean, t: number): number {
+    const t0 = this.rechargeT0.get(bx)
+    if (!vide) {
+      if (t0 !== undefined) this.rechargeT0.delete(bx)
+      return 0
+    }
+    // vide au premier regard (tableau rechargé, déjà vidé) : pas d'éclat
+    if (t0 === undefined) {
+      this.rechargeT0.set(bx, this.chargeVue.get(bx) !== undefined && (this.chargeVue.get(bx) ?? 0) > 0.5 ? t : -1e9)
+      return this.eclatRecharge(bx, vide, t)
+    }
+    return Math.max(0, 1 - (t - t0) / 0.9)
+  }
+
   /** La charge affichée d'un surchauffeur, qui rejoint la vraie (`cible`) :
    *  vite en montant, lentement en descendant — le refroidissement. */
   private chargeLissee(bx: ObstacleBox, cible: number, t: number): number {
@@ -5899,7 +5933,12 @@ export class Renderer {
               ? this.chargeLissee(bx, sim.surchauffesVides.has(i) ? 0 : 1, timeSec) +
                 2 * ((bx.sens ?? 0) + 4 * this.boutsDe(bx, boxes, boxCount, sim.bounds))
               : 1
-      this.auxScratch[k * 4 + 3] = bx.aura ?? 1
+      // aux.w : la portée d'aura (chaudière) — ou, d'un SURCHAUFFEUR, son
+      // ÉCLAT de recharge (1 à l'instant du dash rendu, 0 après ~0,9 s)
+      this.auxScratch[k * 4 + 3] =
+        bx.material === MAT_SURCHAUFFEUR
+          ? this.eclatRecharge(bx, sim.surchauffesVides.has(i), timeSec)
+          : (bx.aura ?? 1)
     }
     // le pas de temps du refroidissement des surchauffeurs : une fois par image
     this.chargeTemps = timeSec
