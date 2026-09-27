@@ -1,11 +1,11 @@
 import { describe, expect, it } from 'vitest'
 import { readFileSync } from 'node:fs'
-import { RIDEAU_BALANCE, SuiviRideaux, depaquetTravee, paquetTravee, traveeGlace } from './rideauSuivi'
+import { SuiviRideaux, depaquetTravee, paquetTravee, traveeGlace } from './rideauSuivi'
 import { MAT_RIDEAU, type ObstacleBox } from '../game/level'
 
-// LE BALANCEMENT À LA FERMETURE : le shader ne se souvient de rien d'une
-// image à l'autre. Le rendu retient où la glace a traversé le rideau et
-// depuis quand elle en est sortie — c'est ce qu'on vérifie ici.
+// LE RESSORT DES LANIÈRES : le shader ne se souvient de rien d'une image à
+// l'autre. Le rendu tient, par rideau, où la glace le traverse et un
+// ressort amorti — ouverture, puis balancement à la fermeture, sans à-coup.
 const rideau = (minX: number, minY: number, maxX: number, maxY: number, angle = 0): ObstacleBox => ({
   minX,
   minY,
@@ -61,8 +61,22 @@ describe('rideau — la travée de glace', () => {
   })
 })
 
-describe('rideau — la mémoire du balancement', () => {
-  it('empaquetée dans un flottant, relue par le jumeau du shader', () => {
+/** Un rideau suivi à 60 images/s ; `glace(k)` : la travée à l'image k. */
+function joue(glace: (k: number) => [number, number] | null, images: number) {
+  const s = new SuiviRideaux()
+  const b = rideau(0, 0, 400, 60)
+  const xs: number[] = []
+  const zs: number[] = []
+  for (let k = 0; k < images; k++) {
+    const [z, w] = s.aux(b, glace(k), k / 60)
+    xs.push(w)
+    zs.push(z)
+  }
+  return { xs, zs }
+}
+
+describe('rideau — le ressort des lanières', () => {
+  it('empaquetée dans un flottant, la travée est relue par le jumeau du shader', () => {
     const [a, b] = depaquetTravee(paquetTravee(0.25, 0.8))!
     expect(a).toBeCloseTo(0.25, 2)
     expect(b).toBeCloseTo(0.8, 2)
@@ -71,45 +85,64 @@ describe('rideau — la mémoire du balancement', () => {
     expect(Math.fround(paquetTravee(1, 1))).toBe(paquetTravee(1, 1))
   })
 
-  it('pendant le passage : pas d’âge ; la glace sortie : l’âge court, puis tout s’efface', () => {
-    const s = new SuiviRideaux()
-    const b = rideau(0, 0, 400, 60)
-    expect(s.aux(b, null, 0)).toEqual([0, -1])
-    expect(s.aux(b, [0.2, 0.3], 1)[1]).toBe(-1)
-    // le bloc glisse en traversant : la travée s'élargit
-    const [z] = s.aux(b, [0.25, 0.4], 1.1)
-    expect(depaquetTravee(z)![0]).toBeCloseTo(0.2, 2)
-    expect(depaquetTravee(z)![1]).toBeCloseTo(0.4, 2)
-    // sortie à 1,2 s
-    expect(s.aux(b, null, 1.2)[1]).toBe(0)
-    expect(s.aux(b, null, 2.2)[1]).toBeCloseTo(1, 6)
-    expect(s.aux(b, null, 1.2 + RIDEAU_BALANCE.duree + 0.01)).toEqual([0, -1])
+  it('sans glace, rien : ni travée ni ouverture', () => {
+    const { xs, zs } = joue(() => null, 30)
+    expect(xs.every((x) => x === 0)).toBe(true)
+    expect(zs.every((z) => z === 0)).toBe(true)
   })
 
-  it('une nouvelle glace pendant le balancement repart d’une travée neuve', () => {
-    const s = new SuiviRideaux()
-    const b = rideau(0, 0, 400, 60)
-    s.aux(b, [0.1, 0.2], 0)
-    s.aux(b, null, 0.5)
-    const [z, w] = s.aux(b, [0.7, 0.8], 1)
-    expect(w).toBe(-1)
-    expect(depaquetTravee(z)![0]).toBeCloseTo(0.7, 2)
+  it('la glace qui traverse l’ouvre d’un geste, sans rebond marqué', () => {
+    const { xs } = joue(() => [0.4, 0.6], 60)
+    expect(xs[59]).toBeGreaterThan(0.95)
+    expect(Math.max(...xs)).toBeLessThan(1.15)
   })
 
-  it('chaque rideau a sa mémoire', () => {
+  it('la glace sortie, les lanières repassent l’aplomb, se balancent, puis tout s’efface', () => {
+    const { xs, zs } = joue((k) => (k < 60 ? [0.4, 0.6] : null), 60 + 5 * 60)
+    const apres = xs.slice(60)
+    // le premier aller dépasse l'aplomb d'un bon tiers de l'ouverture
+    expect(Math.min(...apres.slice(0, 45))).toBeLessThan(-0.3)
+    // et revient : au moins un second passage du côté ouvert
+    expect(Math.max(...apres.slice(20, 90))).toBeGreaterThan(0.05)
+    // éteint en quelques secondes : la mémoire est rendue
+    expect(zs[zs.length - 1]).toBe(0)
+    expect(xs[xs.length - 1]).toBe(0)
+  })
+
+  it('SANS À-COUP : une glace vue une image sur deux ne fait pas sauter les lanières', () => {
+    // le reproche (27/09) : le mouvement suivait le bruit de la détection
+    const { xs } = joue((k) => (k % 2 === 0 ? [0.4, 0.6] : null), 120)
+    let saut = 0
+    for (let k = 1; k < xs.length; k++) saut = Math.max(saut, Math.abs(xs[k] - xs[k - 1]))
+    // le plus grand pas d'une image à la suivante, sur toute l'ouverture
+    expect(saut).toBeLessThan(0.08)
+  })
+
+  it('un passage en cours élargit sa travée ; un nouveau repart de la sienne', () => {
+    const { zs } = joue((k) => (k < 30 ? [0.2, 0.3] : k < 60 ? [0.25, 0.4] : null), 60)
+    const [a, b] = depaquetTravee(zs[59])!
+    expect(a).toBeCloseTo(0.2, 2)
+    expect(b).toBeCloseTo(0.4, 2)
+    const neuf = joue((k) => (k < 30 ? [0.1, 0.2] : k < 600 ? null : [0.7, 0.8]), 601)
+    expect(depaquetTravee(neuf.zs[600])![0]).toBeCloseTo(0.7, 2)
+  })
+
+  it('chaque rideau a son ressort', () => {
     const s = new SuiviRideaux()
     const a = rideau(0, 0, 400, 60)
     const b = rideau(0, 100, 400, 160)
     s.aux(a, [0.1, 0.2], 0)
-    expect(s.aux(b, null, 0.5)).toEqual([0, -1])
+    expect(s.aux(b, null, 0.5)).toEqual([0, 0])
   })
 
-  it('le shader relit la mémoire du rideau, et interpole ses constantes', () => {
+  it('le shader lit le ressort, et ne tire plus l’ouverture du champ du fluide', () => {
     const src = readFileSync(new URL('./renderer.ts', import.meta.url), 'utf8')
-    expect(src).toMatch(/const float RD_AMPLITUDE = \$\{f\(B\.amplitude\)\};/)
-    expect(src).toMatch(/const float RD_AMORTI = \$\{f\(B\.amorti\)\};/)
+    expect(src).toMatch(/const float RD_OUVERTURE = \$\{f\(B\.ouverture\)\};/)
     expect(src).toMatch(/vec2 rdTravee\(float z\)/)
     expect(src).toMatch(/rideauRendu\([^;]*uBoxAux\[bi\]\.z, uBoxAux\[bi\]\.w\)/)
     expect(src).toMatch(/this\.suiviRideaux\.aux\(bx, traveeGlace\(/)
+    const f = src.slice(src.indexOf('vec4 rideauRendu('), src.indexOf('vec4 atlasChaud('))
+    expect(f).toMatch(/RD_OUVERTURE \* p \* wR/)
+    expect(f).not.toMatch(/float glace =/)
   })
 })

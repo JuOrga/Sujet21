@@ -1,25 +1,32 @@
-// LA MÉMOIRE DU RIDEAU LAMELLAIRE.
+// LA MÉMOIRE DU RIDEAU LAMELLAIRE — et le RESSORT de ses lanières.
 //
-// Le shader écarte chaque lanière d'après la glace qu'il voit sur SA colonne
-// (rideauRendu) — mais il ne se souvient de rien d'une image à l'autre :
-// la glace partie, la lanière retombait droite, sans le balancement d'une
-// vraie porte à lanières. Ce qu'il faut retenir tient en peu de chose : OÙ
-// la glace a traversé le rideau (la travée, en fractions de sa longueur) et
-// DEPUIS QUAND elle en est sortie. Le rendu le calcule ici, sur les grains
-// gelés du solveur, et le passe au shader dans aux.z / aux.w du rideau —
-// deux champs qu'aucune autre lecture n'utilise pour cette matière.
+// Le shader ne se souvient de rien d'une image à l'autre. Au départ, il
+// écartait chaque lanière d'après la glace qu'il lisait À L'INSTANT dans le
+// champ du fluide, et un balancement prenait le relais à la sortie : le
+// mouvement suivait le bruit du champ (la glace vue saute d'une image à
+// l'autre), le côté de poussée pouvait basculer tout seul, et le relais se
+// voyait — « pas assez smooth » (retour du concepteur, 27/09).
+//
+// Le mouvement vit donc ICI, d'une image à l'autre : un ressort amorti par
+// rideau, dont la cible vaut 1 tant que la glace traverse et 0 sinon. Il
+// s'ouvre sans à-coup, puis la glace sortie, repasse l'aplomb et oscille en
+// s'amortissant — un seul mouvement continu, ouverture et balancement
+// compris. Le rendu le passe au shader dans aux.z (la TRAVÉE, où la glace a
+// traversé) et aux.w (l'ouverture du ressort) — deux champs qu'aucune autre
+// lecture n'utilise pour cette matière.
 
 import type { ObstacleBox } from '../game/level'
 
-/** Le balancement à la fermeture : une oscillation amortie, lue par le
- *  shader (RIDEAU_GLSL). `duree` borne le suivi : à 3 s, l'enveloppe
- *  exp(-3 / 0,6) ne vaut plus que 0,7 %. */
-export const RIDEAU_BALANCE = {
-  amplitude: 0.55, // en pas de lanière
-  frequence: 1.6, // Hz
-  amorti: 0.6, // s — constante de temps de l'enveloppe
-  montee: 0.15, // s — le relais du geste en cours, sans saut
-  duree: 3, // s
+/** Le ressort des lanières. `ouverture` (en pas de lanière) est lue par le
+ *  shader (RIDEAU_GLSL) ; le reste règle le ressort : une fréquence propre
+ *  de 1,6 Hz, amorti presque critique à l'OUVERTURE (elle se fait d'un
+ *  geste, sans rebond marqué), faiblement à la FERMETURE (la lanière repasse
+ *  l'aplomb et se balance ~0,7 s). */
+export const RIDEAU_RESSORT = {
+  ouverture: 0.8,
+  frequence: 1.6,
+  amortiOuvre: 0.6,
+  amortiFerme: 0.15,
 } as const
 
 /** Une travée (s0, s1 en fractions de L, 0..1) serrée dans UN flottant :
@@ -39,8 +46,8 @@ export function depaquetTravee(z: number): [number, number] | null {
 
 /** Où la GLACE traverse le rideau en ce moment : l'étendue, en fractions
  *  de sa longueur, des grains gelés dans sa bande — un peu avant et après
- *  lui (`marge` × son épaisseur, comme les sondages du shader). null :
- *  aucun. Rotation de la boîte comprise, comme formeContact. */
+ *  lui (`marge` × son épaisseur : elle s'ouvre à l'arrivée). null : aucun.
+ *  Rotation de la boîte comprise, comme formeContact. */
 export function traveeGlace(
   b: ObstacleBox,
   posX: ArrayLike<number>,
@@ -59,6 +66,8 @@ export function traveeGlace(
   const rad = ((b.angle ?? 0) * Math.PI) / 180
   const ca = Math.cos(rad)
   const sa = Math.sin(rad)
+  const t0 = horiz ? b.minY : b.minX
+  const t1 = horiz ? b.maxY : b.maxX
   let s0 = Infinity
   let s1 = -Infinity
   for (let i = 0; i < count; i++) {
@@ -69,8 +78,6 @@ export function traveeGlace(
     const ly = cy - rx * sa + ry * ca
     const s = horiz ? lx - b.minX : ly - b.minY
     const t = horiz ? ly : lx
-    const t0 = horiz ? b.minY : b.minX
-    const t1 = horiz ? b.maxY : b.maxX
     if (s < 0 || s > L || t < t0 - m || t > t1 + m) continue
     if (s < s0) s0 = s
     if (s > s1) s1 = s
@@ -81,7 +88,9 @@ export function traveeGlace(
 interface Etat {
   s0: number
   s1: number
-  sortie: number // l'instant où la glace est sortie ; -1 tant qu'elle traverse
+  x: number // l'ouverture du ressort (négative : au-delà de l'aplomb)
+  v: number
+  t: number // l'instant du dernier pas
 }
 
 /** Le suivi des rideaux d'un tableau, une boîte à la fois (clé : l'objet
@@ -90,29 +99,43 @@ export class SuiviRideaux {
   private etats = new WeakMap<ObstacleBox, Etat>()
 
   /** (aux.z, aux.w) du rideau à l'instant t : la travée empaquetée (0 :
-   *  rien à balancer) et l'âge du balancement en secondes (-1 : la glace
-   *  traverse encore, ou rien). */
+   *  aucune) et l'ouverture du ressort. */
   aux(b: ObstacleBox, travee: [number, number] | null, t: number): [number, number] {
     let e = this.etats.get(b)
+    if (!e) {
+      if (!travee) return [0, 0]
+      e = { s0: travee[0], s1: travee[1], x: 0, v: 0, t }
+      this.etats.set(b, e)
+    }
     if (travee) {
-      // un même passage ÉLARGIT sa travée : un bloc qui glisse le long du
-      // rideau en le traversant laisse toutes ses lanières se balancer
-      if (e && e.sortie < 0) {
+      // un NOUVEAU passage (le ressort presque au repos) repart de sa
+      // travée ; un passage en cours l'ÉLARGIT — un bloc qui glisse le long
+      // du rideau en le traversant laisse toutes ses lanières ouvertes
+      if (Math.abs(e.x) < 0.05 && Math.abs(e.v) < 0.5) {
+        e.s0 = travee[0]
+        e.s1 = travee[1]
+      } else {
         e.s0 = Math.min(e.s0, travee[0])
         e.s1 = Math.max(e.s1, travee[1])
-      } else {
-        e = { s0: travee[0], s1: travee[1], sortie: -1 }
-        this.etats.set(b, e)
       }
-      return [paquetTravee(e.s0, e.s1), -1]
     }
-    if (!e) return [0, -1]
-    if (e.sortie < 0) e.sortie = t
-    const age = t - e.sortie
-    if (age > RIDEAU_BALANCE.duree || age < 0) {
+    // le ressort, en sous-pas (Euler semi-implicite, stable à ces pas) ;
+    // un saut d'horloge (onglet en veille, tableau rechargé) est borné
+    const dt = Math.max(0, Math.min(0.05, t - e.t))
+    e.t = t
+    const cible = travee ? 1 : 0
+    const w = 2 * Math.PI * RIDEAU_RESSORT.frequence
+    const z = travee ? RIDEAU_RESSORT.amortiOuvre : RIDEAU_RESSORT.amortiFerme
+    const n = 4
+    const h = dt / n
+    for (let k = 0; k < n; k++) {
+      e.v += (w * w * (cible - e.x) - 2 * z * w * e.v) * h
+      e.x += e.v * h
+    }
+    if (!travee && Math.abs(e.x) < 0.003 && Math.abs(e.v) < 0.02) {
       this.etats.delete(b)
-      return [0, -1]
+      return [0, 0]
     }
-    return [paquetTravee(e.s0, e.s1), age]
+    return [paquetTravee(e.s0, e.s1), e.x]
   }
 }

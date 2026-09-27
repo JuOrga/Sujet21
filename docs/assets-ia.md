@@ -1775,22 +1775,23 @@ règle arrête : la collision reste le bloc entier. Le montant fait toute
 l'épaisseur du bloc ; le tronçon occupe la bande de ses rails (6,6 % à
 98,6 %).
 
-**LE MOUVEMENT EST DANS LE SHADER** (`rideauRendu`). Chaque lanière lit le
-champ du fluide sur SA colonne (quatre points : les deux tiers de sa
-largeur, et un peu avant et après le rideau) : la **glace** l'écarte — elle
-pend de sa pince, son bas part le plus loin, du côté où il y a le moins de
-glace — et elle se referme quand la glace s'éloigne ; l'**eau** et la
-**vapeur**, qu'elle arrête, la font seulement frémir ; un souffle d'air la
-balance à peine au repos. Le rail, les pinces et le seuil ne bougent pas.
-L'écartement ouvre sur le noir du dessous du bloc.
+**LE MOUVEMENT EST UN RESSORT** (`render/rideauSuivi.ts`, lu par
+`rideauRendu`). Le rendu repère, sur les grains gelés du solveur, la TRAVÉE
+que la glace traverse (un peu avant et après le rideau compris, 0,15 T), et
+tient par rideau un ressort amorti dont la cible vaut 1 pendant le passage,
+0 après (1,6 Hz ; amorti 0,6 à l'ouverture, 0,15 à la fermeture). Il passe
+au shader la travée (aux.z) et l'ouverture (aux.w). Les lanières de la
+travée s'écartent de son milieu — elles pendent de leur pince, leur bas
+part le plus loin, celles du milieu le plus —, puis la glace sortie
+repassent l'aplomb et se balancent ~0,7 s : un seul mouvement continu.
+L'eau et la vapeur arrêtées contre ses faces le font frémir lentement ; un
+souffle d'air le balance à peine au repos. Le rail, les pinces et le seuil
+ne bougent pas. L'écartement ouvre sur le noir du dessous du bloc.
 
-**LE BALANCEMENT À LA FERMETURE** (`render/rideauSuivi.ts`). Le shader ne se
-souvient de rien d'une image à l'autre : le rendu retient, sur les grains
-gelés du solveur, la TRAVÉE que la glace a traversée et l'instant où elle en
-est sortie, et les passe au shader (aux.z, aux.w du rideau). Les lanières de
-la travée repassent alors par leur aplomb et oscillent en s'amortissant
-(1,6 Hz, enveloppe de 0,6 s, 3 s au plus), chacune un peu en retard sur sa
-voisine, du côté où elles avaient été poussées.
+Première version (27/09) : l'ouverture était lue à l'instant dans le
+champ du fluide, et un balancement prenait le relais à la sortie — le
+mouvement suivait le bruit du champ, le côté de poussée pouvait basculer,
+et le relais se voyait : « pas assez smooth » (retour du concepteur).
 
 **LA DISPOSITION** (`dispositionRideau`, jumeau `rideauDispo`) : un montant
 à chaque bout (0,226 T, 30 % de L au plus), et entre eux un nombre ENTIER de

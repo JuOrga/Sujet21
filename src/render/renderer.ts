@@ -20,7 +20,7 @@ import {
 } from '../game/level'
 import type { DecalDef, LumiereDef, ObstacleBox, ZoneDef } from '../game/level'
 import { rangsDePeinture } from '../game/ordre'
-import { RIDEAU_BALANCE, SuiviRideaux, traveeGlace } from './rideauSuivi'
+import { RIDEAU_RESSORT, SuiviRideaux, traveeGlace } from './rideauSuivi'
 import { decalageDe, planchesLivrees, vueCourante, vuesPlanche } from './planche'
 import {
   ARC_EPAISSEUR_DEFAUT,
@@ -584,7 +584,7 @@ float surchSdf(vec2 p, vec4 box, float z) {
 const RIDEAU_GLSL = (() => {
   const R = RIDEAU
   const A = FILTRES_ATLAS
-  const B = RIDEAU_BALANCE
+  const B = RIDEAU_RESSORT
   const f = (x: number) => (Number.isInteger(x) ? `${x}.0` : `${x}`)
   const v4 = (r: readonly number[]) => `vec4(${r.map(f).join(', ')})`
   return `
@@ -601,10 +601,7 @@ const vec4 FI_GRILLE = ${v4(A.grille)};
 const float FI_MARGE_GRILLE = ${f(A.margeGrille)};
 const vec4 FI_CORPS = ${v4(A.corps)};
 const vec4 FI_MONTANT = ${v4(A.montant)};
-const float RD_AMPLITUDE = ${f(B.amplitude)};
-const float RD_FREQUENCE = ${f(B.frequence)};
-const float RD_AMORTI = ${f(B.amorti)};
-const float RD_MONTEE = ${f(B.montee)};
+const float RD_OUVERTURE = ${f(B.ouverture)};
 
 // JUMEAU de depaquetTravee (rideauSuivi.ts) : où la glace a traversé, en
 // fractions de L — (-1, -1) : nulle part
@@ -1452,14 +1449,15 @@ vec2 rdMonde(float s, float t, vec2 bmin, vec2 bsize, bool horiz, float ca, floa
 }
 
 // LE RIDEAU LAMELLAIRE, en couleur prémultipliée : un montant à chaque bout,
-// entre eux un nombre entier de lanières (rideauDispo). Chaque lanière lit
-// le fluide sur SA colonne : la GLACE qui la traverse l'écarte — elle pend
-// de sa pince, son bas part le plus loin, du côté opposé à la glace — et
-// elle se referme quand la glace s'éloigne ; l'eau et la vapeur, qu'elle
-// arrête, la font seulement FRÉMIR. Un souffle d'air la balance à peine au
-// repos. Le rail, les pinces et le seuil ne bougent jamais.
-// zR / wR : la MÉMOIRE du rideau (rideauSuivi.ts) — la travée que la glace
-// a traversée et l'âge du balancement (-1 : elle traverse encore, ou rien).
+// entre eux un nombre entier de lanières (rideauDispo). Les lanières de la
+// TRAVÉE que la glace traverse s'écartent de son milieu — elles pendent de
+// leur pince, leur bas part le plus loin — puis, la glace sortie, repassent
+// l'aplomb et se balancent. Ce mouvement n'est PAS lu ici dans le champ du
+// fluide (il y suivait le bruit du champ, à-coups compris) : c'est un
+// ressort tenu d'une image à l'autre par le rendu (rideauSuivi.ts), passé
+// en zR (la travée) et wR (son ouverture). L'eau et la vapeur, que le
+// rideau arrête, le font seulement FRÉMIR, lentement ; un souffle d'air le
+// balance à peine au repos. Le rail, les pinces et le seuil ne bougent pas.
 vec4 rideauRendu(vec2 loc, vec2 bsize, vec2 bmin, float px, float ca, float sa, float zR, float wR) {
   bool horiz = bsize.x >= bsize.y;
   float L = horiz ? bsize.x : bsize.y;
@@ -1491,34 +1489,24 @@ vec4 rideauRendu(vec2 loc, vec2 bsize, vec2 bmin, float px, float ca, float sa, 
     float off = 0.0;
     if (pendue) {
       float sc = m + (j + 0.5) * p;
-      vec2 fG = rdFluide(rdMonde(sc - 0.3 * p, 0.5, bmin, bsize, horiz, ca, sa));
-      vec2 fD = rdFluide(rdMonde(sc + 0.3 * p, 0.5, bmin, bsize, horiz, ca, sa));
-      // un peu AVANT le rideau, des deux côtés : elle s'ouvre à l'arrivée
+      float bas = pow(pend, 1.4);
+      // LE RESSORT : les lanières de la travée, écartées de son milieu — un
+      // côté FIXE par lanière, qui ne bascule jamais en cours de geste. Au
+      // bord de la travée, la lanière voisine suit à moitié (une lanière de
+      // fondu) ; au milieu, elles s'ouvrent le plus, comme une porte.
+      if (trav.x >= 0.0) {
+        float c = 0.5 * (trav.x + trav.y);
+        float dans = 1.0 - smoothstep(0.0, p, max(trav.x - sc, sc - trav.y));
+        float cote = sc < c ? -1.0 : 1.0;
+        float poids = 1.0 - 0.35 * clamp(abs(sc - c) / (0.5 * (trav.y - trav.x) + p), 0.0, 1.0);
+        off += cote * RD_OUVERTURE * p * wR * dans * poids * bas;
+      }
+      // l'eau ou la vapeur arrêtées contre ses faces : un frémissement LENT
       vec2 fA = rdFluide(rdMonde(sc, -0.15, bmin, bsize, horiz, ca, sa));
       vec2 fB = rdFluide(rdMonde(sc, 1.15, bmin, bsize, horiz, ca, sa));
-      float glace = max(max(fG.x, fD.x), max(fA.x, fB.x));
-      float autre = max(max(fG.y, fD.y), max(fA.y, fB.y));
-      // écartée du côté où il y a le moins de glace ; à égalité, vers le
-      // bout le plus proche — le rideau s'ouvre en son milieu
-      float ecart = fG.x - fD.x;
-      float sens = abs(ecart) > 0.05 ? sign(ecart) : (sc < 0.5 * L ? -1.0 : 1.0);
-      float bas = pow(pend, 1.4);
-      off = sens * glace * 0.8 * p * bas * (1.0 + 0.08 * sin(uTime * 9.0 + j * 1.7));
-      off += autre * (1.0 - glace) * 0.05 * p * sin(uTime * 21.0 + j * 2.3) * pend;
+      float autre = max(fA.y, fB.y);
+      off += autre * 0.035 * p * sin(uTime * 6.0 + j * 1.3) * pend;
       off += 0.012 * p * sin(uTime * 1.3 + j * 0.9) * pend;
-      // LE BALANCEMENT À LA FERMETURE : la glace sortie, les lanières de sa
-      // travée repassent par leur aplomb et oscillent en s'amortissant — du
-      // côté où elles avaient été poussées (loin du milieu de la travée),
-      // chacune un peu en retard sur sa voisine. Il prend le relais de
-      // l'écartement en montant (RD_MONTEE) : la lanière encore ouverte ne
-      // saute pas. Il s'efface là où la glace revient.
-      if (wR >= 0.0 && trav.x >= 0.0) {
-        float dans = 1.0 - smoothstep(0.0, p, max(trav.x - sc, sc - trav.y));
-        float cote = sc < 0.5 * (trav.x + trav.y) ? -1.0 : 1.0;
-        float env = exp(-wR / RD_AMORTI) * smoothstep(0.0, RD_MONTEE, wR);
-        float bal = cos(6.2832 * RD_FREQUENCE * wR + j * 0.35);
-        off += cote * RD_AMPLITUDE * p * env * bal * dans * bas * (1.0 - glace);
-      }
     }
     float u = (sx - j * p - off) / p;
     if (u < 0.0 || u >= 1.0) continue;
@@ -6135,7 +6123,7 @@ export class Renderer {
         q1 = Math.max(0, Math.min(1023, Math.round(bx.p1 ?? 0)))
       }
       // un RIDEAU porte sa mémoire (aux.z, aux.w) : la travée de glace et
-      // l'âge de son balancement
+      // l'ouverture du ressort de ses lanières
       const rideau =
         bx.material === MAT_RIDEAU
           ? this.suiviRideaux.aux(bx, traveeGlace(bx, sim.posX, sim.posY, sim.frozen, sim.count), timeSec)
@@ -6146,7 +6134,7 @@ export class Renderer {
       // — ou HABILLAGE d'une paroi neutre (1-4), pur décor — ou SENS du
       // tuyau d'une plaque froide ou de la rampe d'une chaudière (0 auto,
       // 1 horizontal, 2 vertical), plus 4 · ses bouts plongés dans un mur
-      // — ou, d'un RIDEAU, la travée empaquetée que la glace a traversée
+      // — ou, d'un RIDEAU, la travée empaquetée que la glace traverse
       this.auxScratch[k * 4 + 2] =
         bx.material === 0
           ? (bx.skin ?? 0)
@@ -6161,7 +6149,7 @@ export class Renderer {
                 : 1
       // aux.w : la portée d'aura (chaudière) — ou, d'un SURCHAUFFEUR, son
       // ÉCLAT de recharge (1 à l'instant du dash rendu, 0 après ~0,9 s) —
-      // ou, d'un RIDEAU, l'âge de son balancement (-1 : rien à balancer)
+      // ou, d'un RIDEAU, l'ouverture du ressort de ses lanières
       this.auxScratch[k * 4 + 3] =
         bx.material === MAT_SURCHAUFFEUR
           ? this.eclatRecharge(bx, sim.surchauffeurVide(bx), timeSec)
