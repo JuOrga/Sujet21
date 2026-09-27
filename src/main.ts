@@ -8765,6 +8765,93 @@ function dessineEclat(
   g.restore()
 }
 
+// LA RECHARGE PAR UN SURCHAUFFEUR. Le solveur rend le dash sans bruit : le
+// compteur change, rien d'autre. Chaque recharge lance ici une GERBE —
+// des étincelles dorées quittent la borne et filent vers le corps ; le son
+// (souffle et carillon) part avec. La borne, elle, flashe et lance son onde
+// de choc (renderer, aux.w). Ni anneau ni « +1 DASH » autour du corps :
+// essayés, retirés à la demande du concepteur (27/09).
+type Recharge = { t0: number; x: number; y: number; etincelles: { dx: number; dy: number; retard: number; courbe: number }[] }
+let recharges: Recharge[] = []
+let surchVidesVus = new Set<number>()
+let surchGeneration = -1
+
+/** Les surchauffeurs vidés DEPUIS la dernière image : chacun lance sa gerbe. */
+function guetteRecharges(maintenant: number): void {
+  const vides = sim.surchauffesVides
+  // un tableau (re)chargé : ses indices ne sont plus ceux d'avant — on
+  // repart de zéro (la TAILLE de l'ensemble ne le dit pas toujours)
+  if (sim.generation !== surchGeneration) {
+    surchGeneration = sim.generation
+    surchVidesVus = new Set()
+  }
+  for (const bi of vides) {
+    if (surchVidesVus.has(bi)) continue
+    surchVidesVus.add(bi)
+    const b = sim.boxes[bi]
+    if (!b) continue
+    const w = b.maxX - b.minX
+    const h = b.maxY - b.minY
+    const etincelles = Array.from({ length: 16 }, () => ({
+      dx: (Math.random() - 0.5) * w * 0.8,
+      dy: (Math.random() - 0.5) * h * 0.8,
+      retard: Math.random() * 0.18,
+      courbe: (Math.random() - 0.5) * 1.6,
+    }))
+    const x = (b.minX + b.maxX) / 2
+    const y = (b.minY + b.maxY) / 2
+    recharges.push({ t0: maintenant, x, y, etincelles })
+    // placé comme les autres sons, par rapport au corps (ouie.ts)
+    audio.recharge(panDepuis(sim.stats.centroidX, x))
+  }
+}
+
+function drawRecharges(vw: number, vh: number, dpr: number, maintenant: number): void {
+  if (recharges.length === 0) return
+  recharges = recharges.filter((r) => maintenant - r.t0 < 0.8)
+  if (!document.body.classList.contains('playing')) return
+  const g = fxCtx
+  const dprC = Math.min(dpr, 2)
+  g.setTransform(dprC, 0, 0, dprC, 0, 0)
+  const z = camera.zoom
+  const S = (x: number, y: number): [number, number] => [vw * 0.5 + (x - camera.x) * z, vh * 0.5 - (y - camera.y) * z]
+  // le corps, là où arrive la vapeur (il bouge : on vise où il EST)
+  const [cx, cy] = S(sim.stats.centroidX, sim.stats.centroidY)
+  g.save()
+  g.globalCompositeOperation = 'lighter'
+  for (const r of recharges) {
+    const age = maintenant - r.t0
+    // LES ÉTINCELLES : de la borne au corps en ~0,55 s, sur une courbe,
+    // chacune avec sa traîne
+    for (const e of r.etincelles) {
+      const u = (age - e.retard) / 0.55
+      if (u <= 0 || u >= 1) continue
+      const [sx, sy] = S(r.x + e.dx, r.y + e.dy)
+      const pos = (k: number): [number, number] => {
+        const ease = 1 - Math.pow(1 - k, 2.2)
+        const mx = (sx + cx) / 2 - (cy - sy) * e.courbe * 0.35
+        const my = (sy + cy) / 2 + (cx - sx) * e.courbe * 0.35
+        const a = 1 - ease
+        return [a * a * sx + 2 * a * ease * mx + ease * ease * cx, a * a * sy + 2 * a * ease * my + ease * ease * cy]
+      }
+      const [px, py] = pos(u)
+      const [qx, qy] = pos(Math.max(0, u - 0.12))
+      const vie = Math.sin(u * Math.PI)
+      g.strokeStyle = `rgba(255,190,70,${0.55 * vie})`
+      g.lineWidth = 2.2
+      g.beginPath()
+      g.moveTo(qx, qy)
+      g.lineTo(px, py)
+      g.stroke()
+      g.fillStyle = `rgba(255,246,210,${0.95 * vie})`
+      g.beginPath()
+      g.arc(px, py, 2.6, 0, Math.PI * 2)
+      g.fill()
+    }
+  }
+  g.restore()
+}
+
 // La superposition des mécanismes : faisceaux, émetteurs, cibles, portes —
 // dessinée en 2D par-dessus la cuve, avec la même caméra que le rendu WebGL.
 function drawMecanismes(vw: number, vh: number, dpr: number): void {
@@ -19646,6 +19733,8 @@ function corpsImage(now: number): boolean {
   previsionGasAvant = input.gasIntent
   avancePrevisionExacte()
   drawMecanismes(vw, vh, dpr)
+  guetteRecharges(performance.now() / 1000)
+  drawRecharges(vw, vh, dpr, performance.now() / 1000)
   drawFantomes(vw, vh, dpr)
   drawFleche(dtReal, dpr)
   majIdle(dtReal)
