@@ -15,10 +15,12 @@ import {
   MAT_CHAUD,
   MAT_FROID,
   MAT_SURCHAUFFEUR,
+  MAT_RIDEAU,
   zonePhases,
 } from '../game/level'
 import type { DecalDef, LumiereDef, ObstacleBox, ZoneDef } from '../game/level'
 import { rangsDePeinture } from '../game/ordre'
+import { RIDEAU_BALANCE, SuiviRideaux, traveeGlace } from './rideauSuivi'
 import { decalageDe, planchesLivrees, vueCourante, vuesPlanche } from './planche'
 import {
   ARC_EPAISSEUR_DEFAUT,
@@ -582,6 +584,7 @@ float surchSdf(vec2 p, vec4 box, float z) {
 const RIDEAU_GLSL = (() => {
   const R = RIDEAU
   const A = FILTRES_ATLAS
+  const B = RIDEAU_BALANCE
   const f = (x: number) => (Number.isInteger(x) ? `${x}.0` : `${x}`)
   const v4 = (r: readonly number[]) => `vec4(${r.map(f).join(', ')})`
   return `
@@ -598,6 +601,19 @@ const vec4 FI_GRILLE = ${v4(A.grille)};
 const float FI_MARGE_GRILLE = ${f(A.margeGrille)};
 const vec4 FI_CORPS = ${v4(A.corps)};
 const vec4 FI_MONTANT = ${v4(A.montant)};
+const float RD_AMPLITUDE = ${f(B.amplitude)};
+const float RD_FREQUENCE = ${f(B.frequence)};
+const float RD_AMORTI = ${f(B.amorti)};
+const float RD_MONTEE = ${f(B.montee)};
+
+// JUMEAU de depaquetTravee (rideauSuivi.ts) : où la glace a traversé, en
+// fractions de L — (-1, -1) : nulle part
+vec2 rdTravee(float z) {
+  if (z < 0.5) return vec2(-1.0);
+  float zz = floor(z + 0.5) - 1.0;
+  float q0 = floor(zz / 1024.0);
+  return vec2(q0, zz - q0 * 1024.0) / 1023.0;
+}
 
 // JUMEAU de dispositionRideau (formes.ts) : (largeur d'un montant, nombre
 // de lanières, pas)
@@ -1442,7 +1458,9 @@ vec2 rdMonde(float s, float t, vec2 bmin, vec2 bsize, bool horiz, float ca, floa
 // elle se referme quand la glace s'éloigne ; l'eau et la vapeur, qu'elle
 // arrête, la font seulement FRÉMIR. Un souffle d'air la balance à peine au
 // repos. Le rail, les pinces et le seuil ne bougent jamais.
-vec4 rideauRendu(vec2 loc, vec2 bsize, vec2 bmin, float px, float ca, float sa) {
+// zR / wR : la MÉMOIRE du rideau (rideauSuivi.ts) — la travée que la glace
+// a traversée et l'âge du balancement (-1 : elle traverse encore, ou rien).
+vec4 rideauRendu(vec2 loc, vec2 bsize, vec2 bmin, float px, float ca, float sa, float zR, float wR) {
   bool horiz = bsize.x >= bsize.y;
   float L = horiz ? bsize.x : bsize.y;
   float T = horiz ? bsize.y : bsize.x;
@@ -1465,6 +1483,7 @@ vec4 rideauRendu(vec2 loc, vec2 bsize, vec2 bmin, float px, float ca, float sa) 
   float k = floor(sx / p);
   bool pendue = ty > RD_PINCE && ty < RD_FIN_LANIERE + 0.01;
   float pend = clamp((ty - RD_PINCE) / (RD_FIN_LANIERE - RD_PINCE), 0.0, 1.0);
+  vec2 trav = rdTravee(zR) * L;
   vec4 acc = vec4(0.0);
   for (int dj = -1; dj <= 1; dj++) {
     float j = k + float(dj);
@@ -1487,6 +1506,19 @@ vec4 rideauRendu(vec2 loc, vec2 bsize, vec2 bmin, float px, float ca, float sa) 
       off = sens * glace * 0.8 * p * bas * (1.0 + 0.08 * sin(uTime * 9.0 + j * 1.7));
       off += autre * (1.0 - glace) * 0.05 * p * sin(uTime * 21.0 + j * 2.3) * pend;
       off += 0.012 * p * sin(uTime * 1.3 + j * 0.9) * pend;
+      // LE BALANCEMENT À LA FERMETURE : la glace sortie, les lanières de sa
+      // travée repassent par leur aplomb et oscillent en s'amortissant — du
+      // côté où elles avaient été poussées (loin du milieu de la travée),
+      // chacune un peu en retard sur sa voisine. Il prend le relais de
+      // l'écartement en montant (RD_MONTEE) : la lanière encore ouverte ne
+      // saute pas. Il s'efface là où la glace revient.
+      if (wR >= 0.0 && trav.x >= 0.0) {
+        float dans = 1.0 - smoothstep(0.0, p, max(trav.x - sc, sc - trav.y));
+        float cote = sc < 0.5 * (trav.x + trav.y) ? -1.0 : 1.0;
+        float env = exp(-wR / RD_AMORTI) * smoothstep(0.0, RD_MONTEE, wR);
+        float bal = cos(6.2832 * RD_FREQUENCE * wR + j * 0.35);
+        off += cote * RD_AMPLITUDE * p * env * bal * dans * bas * (1.0 - glace);
+      }
     }
     float u = (sx - j * p - off) / p;
     if (u < 0.0 || u >= 1.0) continue;
@@ -2954,7 +2986,8 @@ void main() {
         if (fill > 0.0) {
           vec2 bmin = uBoxes[bi].xy;
           vec2 bsize = max(uBoxes[bi].zw - bmin, vec2(1.0));
-          vec4 rc = rideauRendu(clamp(wbV - bmin, vec2(0.0), bsize), bsize, bmin, pxMonde, bca, bsa);
+          vec4 rc = rideauRendu(clamp(wbV - bmin, vec2(0.0), bsize), bsize, bmin, pxMonde, bca, bsa,
+                                uBoxAux[bi].z, uBoxAux[bi].w);
           col = col * (1.0 - rc.a * fill) + rc.rgb * eclMat * fill;
         }
       } else {
@@ -4896,6 +4929,9 @@ export class Renderer {
   /** L'instant où chaque surchauffeur a rendu son dash : il flashe et lance
    *  son onde de choc (aux.w, ~0,9 s). */
   private rechargeT0 = new WeakMap<ObstacleBox, number>()
+  // la mémoire des rideaux lamellaires : où la glace a traversé, et quand
+  // elle en est sortie (rideauSuivi.ts)
+  private suiviRideaux = new SuiviRideaux()
   // la clé des boîtes de CETTE image (cleBoitesLumiere), bâtie une fois et
   // partagée par les bouts des conduites et la carte de lumière
   private cleImage: string | null = null
@@ -6098,12 +6134,19 @@ export class Renderer {
         q0 = Math.max(0, Math.min(127, Math.round(bx.p0 ?? 0)))
         q1 = Math.max(0, Math.min(1023, Math.round(bx.p1 ?? 0)))
       }
+      // un RIDEAU porte sa mémoire (aux.z, aux.w) : la travée de glace et
+      // l'âge de son balancement
+      const rideau =
+        bx.material === MAT_RIDEAU
+          ? this.suiviRideaux.aux(bx, traveeGlace(bx, sim.posX, sim.posY, sim.frozen, sim.count), timeSec)
+          : null
       this.auxScratch[k * 4] = bx.material + forme * 16 + q0 * 128 + q1 * 16384
       this.auxScratch[k * 4 + 1] = ((bx.angle ?? 0) * Math.PI) / 180
       // aux.z : charge du surchauffeur (le solveur dit lesquels sont vides)
       // — ou HABILLAGE d'une paroi neutre (1-4), pur décor — ou SENS du
       // tuyau d'une plaque froide ou de la rampe d'une chaudière (0 auto,
       // 1 horizontal, 2 vertical), plus 4 · ses bouts plongés dans un mur
+      // — ou, d'un RIDEAU, la travée empaquetée que la glace a traversée
       this.auxScratch[k * 4 + 2] =
         bx.material === 0
           ? (bx.skin ?? 0)
@@ -6113,13 +6156,18 @@ export class Renderer {
               ? // le surchauffeur n'a jamais de bout dans un mur (conduite.ts) :
                 // aux.z = charge + 2 · sens
                 this.chargeLissee(bx, sim.surchauffeurVide(bx) ? 0 : 1, timeSec) + 2 * (bx.sens ?? 0)
-              : 1
+              : rideau
+                ? rideau[0]
+                : 1
       // aux.w : la portée d'aura (chaudière) — ou, d'un SURCHAUFFEUR, son
-      // ÉCLAT de recharge (1 à l'instant du dash rendu, 0 après ~0,9 s)
+      // ÉCLAT de recharge (1 à l'instant du dash rendu, 0 après ~0,9 s) —
+      // ou, d'un RIDEAU, l'âge de son balancement (-1 : rien à balancer)
       this.auxScratch[k * 4 + 3] =
         bx.material === MAT_SURCHAUFFEUR
           ? this.eclatRecharge(bx, sim.surchauffeurVide(bx), timeSec)
-          : (bx.aura ?? 1)
+          : rideau
+            ? rideau[1]
+            : (bx.aura ?? 1)
     }
     // le pas de temps du refroidissement des surchauffeurs : une fois par image
     this.chargeTemps = timeSec

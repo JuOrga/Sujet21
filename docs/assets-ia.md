@@ -1784,10 +1784,21 @@ glace — et elle se referme quand la glace s'éloigne ; l'**eau** et la
 balance à peine au repos. Le rail, les pinces et le seuil ne bougent pas.
 L'écartement ouvre sur le noir du dessous du bloc.
 
+**LE BALANCEMENT À LA FERMETURE** (`render/rideauSuivi.ts`). Le shader ne se
+souvient de rien d'une image à l'autre : le rendu retient, sur les grains
+gelés du solveur, la TRAVÉE que la glace a traversée et l'instant où elle en
+est sortie, et les passe au shader (aux.z, aux.w du rideau). Les lanières de
+la travée repassent alors par leur aplomb et oscillent en s'amortissant
+(1,6 Hz, enveloppe de 0,6 s, 3 s au plus), chacune un peu en retard sur sa
+voisine, du côté où elles avaient été poussées.
+
 **LA DISPOSITION** (`dispositionRideau`, jumeau `rideauDispo`) : un montant
 à chaque bout (0,226 T, 30 % de L au plus), et entre eux un nombre ENTIER de
-lanières au pas mesuré (0,23 T), à peine étiré. Couché, le rail est en haut ;
-debout, à gauche.
+lanières au pas mesuré ÉLARGI de 1,8 (0,41 T), à peine étiré pour tomber
+juste. Aux proportions de l'image (0,23 T), un rideau mince montrait des
+dizaines de lanières de 9 u — « pas assez larges par rapport à l'asset »
+(retour du concepteur, 27/09). Couché, le rail est en haut ; debout, à
+gauche.
 
 **Mesures** (sources non versionnées : `masters/images/sources/rideau-
 troncon.png` 1774 × 887, `rideau-montant.png` 1024 × 1536, `grille.webp`) :

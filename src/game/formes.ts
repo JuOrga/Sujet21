@@ -577,10 +577,18 @@ export const FILTRES_ATLAS = {
   montant: [0, 1484, 108, 478],
 } as const
 
+/** L'ÉLARGISSEMENT des lanières. Aux proportions de l'image, une lanière
+ *  fait 0,3 fois sa hauteur pendante : sur un rideau mince, le jeu en
+ *  montrait des dizaines de 9 u — « pas assez larges par rapport à
+ *  l'asset » (retour du concepteur, 27/09). Elles sont donc étirées en
+ *  largeur : moins nombreuses, chacune plus lisible. */
+export const RIDEAU_ELARGI = 1.8
+
 /** Le pas d'une lanière, en fractions de T : le tronçon (880 × 440 px)
- *  couvre la bande haut..bas, et chacune de ses 8 lanières y fait 110 px. */
+ *  couvre la bande haut..bas, chacune de ses 8 lanières y fait 110 px — et
+ *  s'élargit de RIDEAU_ELARGI. */
 export const RIDEAU_PAS =
-  (FILTRES_ATLAS.corps[2] / RIDEAU.lanieres / FILTRES_ATLAS.corps[3]) * (RIDEAU.bas - RIDEAU.haut)
+  (FILTRES_ATLAS.corps[2] / RIDEAU.lanieres / FILTRES_ATLAS.corps[3]) * (RIDEAU.bas - RIDEAU.haut) * RIDEAU_ELARGI
 
 /** LA DISPOSITION d'un rideau de longueur L et d'épaisseur T : un montant
  *  à chaque bout, et entre eux un nombre ENTIER de lanières, au pas mesuré
