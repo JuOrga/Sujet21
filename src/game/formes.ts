@@ -531,8 +531,8 @@ export const SURCHAUFFEUR = {
   seuilDome: 1.6,
   /** le dôme : rayon de son anneau (la collision) et de son verre (le
    *  tourbillon), en part du côté du cadre */
-  rayonDome: 0.4534,
-  rayonVerre: 0.343,
+  rayonDome: 0.4545,
+  rayonVerre: 0.3394,
 } as const
 
 /** Les cadres du surchauffeur dans chaudiere-atlas.webp (moitié basse) —

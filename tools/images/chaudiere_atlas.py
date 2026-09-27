@@ -147,9 +147,10 @@ def main() -> None:
     # 11,2 entre colonnes voisines) : pris tel quel, rails compris (0..716)
     colle(atlas, dore(lis('surch-tube.png')).crop((0, 0, 2172, 717)), CADRE_S_CORPS)
     colle(atlas, tete(), CADRE_S_BOUT)
-    # le dôme, centré sur son anneau (626, 627) — ses brides tiennent dans
-    # le cadre
-    colle(atlas, dore(lis('surch-dome.png')).crop((36, 37, 1216, 1217)), CADRE_S_DOME)
+    # le dôme, centré sur son anneau (626, 616 ; rayon 549, verre 410 —
+    # ajusté sur son bord) : ses brides tiennent dans le cadre. Sa vapeur
+    # BOUILLONNE, sans spirale (une spirale dans un rond, c'était le sas)
+    colle(atlas, dore(lis('surch-dome.png')).crop((22, 12, 1230, 1220)), CADRE_S_DOME)
     saigne(atlas).save(DST)
     print('écrit', os.path.relpath(DST, ROOT))
 

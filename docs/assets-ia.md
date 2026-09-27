@@ -1727,8 +1727,8 @@ mesure au rectangle du bloc (solver.ts).
 
 Sources (non versionnées) : `masters/images/sources/surch-tube.png`,
 `surch-tete.png`, `surch-dome.png`. Mesures : tube raccordé bord à bord
-(écart 12,1 contre 11,2) ; tête sur l'axe à 1 px (443) ; dôme centré
-(626, 627), anneau 535 px, verre 410. Référence : `docs/reference/surchauffeur-reference.webp`.
+(écart 12,1 contre 11,2) ; tête sur l'axe à 1 px (443) ; dôme (sans
+spirale, livré le 27/09) centré (626, 616), anneau 549 px, verre 410. Référence : `docs/reference/surchauffeur-reference.webp`.
 
 ### 31.1 Le tube (le corps, répété) · 4:1
 
