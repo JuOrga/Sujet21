@@ -31,6 +31,9 @@ import {
   CHAUDIERE_ATLAS,
   SURCHAUFFEUR,
   SURCHAUFFEUR_ATLAS,
+  RIDEAU,
+  RIDEAU_PAS,
+  FILTRES_ATLAS,
   CONDUITE,
   CONDUITE_ATLAS,
 } from '../game/formes'
@@ -572,6 +575,41 @@ float surchSdf(vec2 p, vec4 box, float z) {
 `
 })()
 
+// LE RIDEAU LAMELLAIRE et l'ATLAS DES FILTRES : proportions et cadres ÉCRITS
+// depuis RIDEAU et FILTRES_ATLAS (game/formes.ts), mesurés sur les images
+// par tools/images/filtres_atlas.py. Injecté dans la composition seule : le
+// rideau est un bloc plein, le cuiseur de lumière le lit déjà comme tel.
+const RIDEAU_GLSL = (() => {
+  const R = RIDEAU
+  const A = FILTRES_ATLAS
+  const f = (x: number) => (Number.isInteger(x) ? `${x}.0` : `${x}`)
+  const v4 = (r: readonly number[]) => `vec4(${r.map(f).join(', ')})`
+  return `
+const float RD_MONTANT = ${f(R.montant)};
+const float RD_HAUT = ${f(R.haut)};
+const float RD_BAS = ${f(R.bas)};
+const float RD_LANIERES = ${f(R.lanieres)};
+const float RD_PINCE = ${f(R.pince)};
+const float RD_FIN_LANIERE = ${f(R.finLaniere)};
+const float RD_PAS = ${f(RIDEAU_PAS)};
+const float FI_ATLAS = ${f(A.taille)};
+const float FI_ATLAS_H = ${f(A.hauteur)};
+const vec4 FI_GRILLE = ${v4(A.grille)};
+const float FI_MARGE_GRILLE = ${f(A.margeGrille)};
+const vec4 FI_CORPS = ${v4(A.corps)};
+const vec4 FI_MONTANT = ${v4(A.montant)};
+
+// JUMEAU de dispositionRideau (formes.ts) : (largeur d'un montant, nombre
+// de lanières, pas)
+vec3 rideauDispo(float L, float T) {
+  float m = min(RD_MONTANT * T, 0.3 * L);
+  float reste = L - 2.0 * m;
+  float n = max(1.0, floor(reste / (RD_PAS * T) + 0.5));
+  return vec3(m, n, reste / n);
+}
+`
+})()
+
 const FORMES_GLSL = `
 float cote2(vec2 a, vec2 b, vec2 p) { // de quel côté de (a→b) tombe p
   return (b.x - a.x) * (p.y - a.y) - (b.y - a.y) * (p.x - a.x);
@@ -857,7 +895,7 @@ uniform sampler2D uTexWallA; // seconde paroi : les murs alternent, sans répét
 uniform float uPasse;
 uniform sampler2D uTexFroid; // l’atlas de la conduite d’ammoniac (tronçon, bride, joint, givre)
 uniform sampler2D uTexChaud;
-uniform sampler2D uTexGrille;
+uniform sampler2D uTexGrille; // l’atlas des filtres : la grille de l’évent, le rideau lamellaire
 uniform sampler2D uTexPhobe;
 uniform sampler2D uTexPhile;
 uniform sampler2D uTexIris;
@@ -1106,6 +1144,7 @@ float smoothField(vec2 p) {
 ${CONDUITE_GLSL}
 ${CHAUDIERE_GLSL}
 ${SURCHAUFFEUR_GLSL}
+${RIDEAU_GLSL}
 // ——— LA CONDUITE D'AMMONIAC (plaque froide) ————————————————————————————
 // Un tuyau givré, ses brides de bout et ses joints, lus dans l'atlas
 // conduite-atlas.webp (tools/images/conduite_atlas.py) — quatre images
@@ -1338,6 +1377,126 @@ float fuitesNH3(vec2 wb, vec4 box, float code) {
 }
 
 // ——— LA CHAUDIÈRE (rampe de résistances) ——————————————————————————————
+// ——— L'ATLAS DES FILTRES (filtres-atlas.webp) ————————————————————————
+// Un cadre lu en (x, y) : fractions du cadre depuis son coin HAUT-gauche,
+// comme atlasChaud — même plafond de niveau de détail (4 texels), les
+// cadres n'étant qu'à 10 px les uns des autres.
+vec4 atlasFiltre(vec4 cadre, vec2 f, float px, float ppw) {
+  if (f.x < 0.0 || f.x > 1.0 || f.y < 0.0 || f.y > 1.0) return vec4(0.0);
+  vec2 pa = cadre.xy + clamp(f * cadre.zw, vec2(0.5), cadre.zw - 0.5);
+  vec2 uv = vec2(pa.x / FI_ATLAS, (FI_ATLAS_H - pa.y) / FI_ATLAS_H); // téléversé avec FLIP_Y
+  float g = min(px * ppw, 4.0);
+  vec4 c = textureGrad(uTexGrille, uv, vec2(g / FI_ATLAS, 0.0), vec2(0.0, g / FI_ATLAS_H));
+  return vec4(c.rgb * c.a, c.a); // prémultiplié
+}
+
+// LA GRILLE DE L'ÉVENT, répétée À LA MAIN : elle avait sa texture, répétée
+// par la carte graphique (world / 624) ; logée dans l'atlas, elle se répète
+// par fract. Les dérivées se prennent sur q, continu — celles de fract(q)
+// sautent à chaque tuile et y allumeraient une couture —, et le niveau de
+// détail est plafonné à la MARGE de 32 px qui borde la tuile de sa propre
+// répétition : une lecture qui déborde retombe sur le bon motif.
+vec3 grilleEvent(vec2 world) {
+  vec2 q = world / 624.0;
+  vec2 fq = fract(q);
+  float tuile = FI_GRILLE.z - 2.0 * FI_MARGE_GRILLE;
+  // (1 - y) : le bas de la tuile en bas, comme la texture d'avant
+  vec2 pa = FI_GRILLE.xy + FI_MARGE_GRILLE + vec2(fq.x, 1.0 - fq.y) * tuile;
+  vec2 uv = vec2(pa.x / FI_ATLAS, (FI_ATLAS_H - pa.y) / FI_ATLAS_H);
+  vec2 dx = dFdx(q) * tuile;
+  vec2 dy = dFdy(q) * tuile;
+  float l = max(length(dx), length(dy));
+  float k = l > 16.0 ? 16.0 / l : 1.0;
+  dx *= k;
+  dy *= k;
+  return textureGrad(uTexGrille, uv,
+    vec2(dx.x / FI_ATLAS, dx.y / FI_ATLAS_H), vec2(dy.x / FI_ATLAS, dy.y / FI_ATLAS_H)).rgb;
+}
+
+// Ce que le fluide fait en un point MONDE : (glace, eau ou vapeur)
+// présentes, 0..1 — lu dans le champ de l'image (uField), la même source que
+// le dessin du fluide. textureLod : on est dans une branche non uniforme.
+vec2 rdFluide(vec2 pw) {
+  vec2 fuv = ((pw - uCenter) * uZoom + uViewport * 0.5) / uViewport;
+  if (fuv.x < 0.0 || fuv.x > 1.0 || fuv.y < 0.0 || fuv.y > 1.0) return vec2(0.0);
+  vec4 t = textureLod(uField, fuv, 0.0);
+  float pres = smoothstep(0.35 * uThreshold, uThreshold, t.r / uFieldScale);
+  float icy = clamp(t.a / max(t.r, 1e-5), 0.0, 1.0);
+  return vec2(pres * icy, pres * (1.0 - icy));
+}
+
+// Un point du rideau (s le long, t en travers : 0 au rail, 1 au seuil) en
+// MONDE, rotation de la boîte comprise (l'inverse du dépivotage de la boucle)
+vec2 rdMonde(float s, float t, vec2 bmin, vec2 bsize, bool horiz, float ca, float sa) {
+  float T = horiz ? bsize.y : bsize.x;
+  vec2 loc = horiz ? vec2(s, T * (1.0 - t)) : vec2(t * T, s);
+  vec2 bc = bmin + 0.5 * bsize;
+  vec2 r = bmin + loc - bc;
+  return bc + vec2(ca * r.x - sa * r.y, sa * r.x + ca * r.y);
+}
+
+// LE RIDEAU LAMELLAIRE, en couleur prémultipliée : un montant à chaque bout,
+// entre eux un nombre entier de lanières (rideauDispo). Chaque lanière lit
+// le fluide sur SA colonne : la GLACE qui la traverse l'écarte — elle pend
+// de sa pince, son bas part le plus loin, du côté opposé à la glace — et
+// elle se referme quand la glace s'éloigne ; l'eau et la vapeur, qu'elle
+// arrête, la font seulement FRÉMIR. Un souffle d'air la balance à peine au
+// repos. Le rail, les pinces et le seuil ne bougent jamais.
+vec4 rideauRendu(vec2 loc, vec2 bsize, vec2 bmin, float px, float ca, float sa) {
+  bool horiz = bsize.x >= bsize.y;
+  float L = horiz ? bsize.x : bsize.y;
+  float T = horiz ? bsize.y : bsize.x;
+  float s = horiz ? loc.x : loc.y;
+  // le rail en haut d'un rideau couché, à gauche d'un rideau debout
+  float t = horiz ? 1.0 - loc.y / T : loc.x / T;
+  vec3 dsp = rideauDispo(L, T);
+  float m = dsp.x;
+  float n = dsp.y;
+  float p = dsp.z;
+  // LES MONTANTS : l'image au bout droit, en miroir au bout gauche
+  if (s < m || s > L - m) {
+    float fx = s < m ? 1.0 - s / m : (s - (L - m)) / m;
+    return atlasFiltre(FI_MONTANT, vec2(fx, t), px, FI_MONTANT.w / T);
+  }
+  float ty = (t - RD_HAUT) / (RD_BAS - RD_HAUT);
+  if (ty < 0.0 || ty > 1.0) return vec4(0.0);
+  float ppw = FI_CORPS.w / ((RD_BAS - RD_HAUT) * T);
+  float sx = s - m;
+  float k = floor(sx / p);
+  bool pendue = ty > RD_PINCE && ty < RD_FIN_LANIERE + 0.01;
+  float pend = clamp((ty - RD_PINCE) / (RD_FIN_LANIERE - RD_PINCE), 0.0, 1.0);
+  vec4 acc = vec4(0.0);
+  for (int dj = -1; dj <= 1; dj++) {
+    float j = k + float(dj);
+    if (j < 0.0 || j > n - 1.0) continue;
+    float off = 0.0;
+    if (pendue) {
+      float sc = m + (j + 0.5) * p;
+      vec2 fG = rdFluide(rdMonde(sc - 0.3 * p, 0.5, bmin, bsize, horiz, ca, sa));
+      vec2 fD = rdFluide(rdMonde(sc + 0.3 * p, 0.5, bmin, bsize, horiz, ca, sa));
+      // un peu AVANT le rideau, des deux côtés : elle s'ouvre à l'arrivée
+      vec2 fA = rdFluide(rdMonde(sc, -0.15, bmin, bsize, horiz, ca, sa));
+      vec2 fB = rdFluide(rdMonde(sc, 1.15, bmin, bsize, horiz, ca, sa));
+      float glace = max(max(fG.x, fD.x), max(fA.x, fB.x));
+      float autre = max(max(fG.y, fD.y), max(fA.y, fB.y));
+      // écartée du côté où il y a le moins de glace ; à égalité, vers le
+      // bout le plus proche — le rideau s'ouvre en son milieu
+      float ecart = fG.x - fD.x;
+      float sens = abs(ecart) > 0.05 ? sign(ecart) : (sc < 0.5 * L ? -1.0 : 1.0);
+      float bas = pow(pend, 1.4);
+      off = sens * glace * 0.8 * p * bas * (1.0 + 0.08 * sin(uTime * 9.0 + j * 1.7));
+      off += autre * (1.0 - glace) * 0.05 * p * sin(uTime * 21.0 + j * 2.3) * pend;
+      off += 0.012 * p * sin(uTime * 1.3 + j * 0.9) * pend;
+    }
+    float u = (sx - j * p - off) / p;
+    if (u < 0.0 || u >= 1.0) continue;
+    float cel = mod(j, RD_LANIERES);
+    vec4 c = atlasFiltre(FI_CORPS, vec2((cel + u) / RD_LANIERES, ty), px, ppw);
+    acc = c + acc * (1.0 - c.a); // la lanière suivante passe par-dessus, comme sur l'image
+  }
+  return acc;
+}
+
 // Lue dans chaudiere-atlas.webp (tools/images/chaudiere_atlas.py), comme la
 // conduite dans le sien : tout se cale sur la BOÎTE, les brides du joint en
 // font toute la largeur, le carter 81 % ; la physique lit les mêmes pièces.
@@ -2314,7 +2473,7 @@ void main() {
   vec3 texPhileC = texture(uTexPhile, world / 210.0).rgb;
   // la grille est calée pour que ses perforations fassent ~24 u, comme le
   // motif procédural qu'elle remplace
-  vec3 texGrilleC = texture(uTexGrille, world / 624.0).rgb;
+  vec3 texGrilleC = grilleEvent(world);
 
   // Obstacles : remplissage texturé + liseré, couleur par matériau (§6)
   float edgeW = 2.5 / uZoom;
@@ -2786,17 +2945,29 @@ void main() {
         col += vec3(1.0, 0.80, 0.40) * exp(-max(dG, 0.0) / 30.0) * eclat * eclat * eclat * 0.7 * hors;
       }
     } else if (mat > 7.5) {
-      // Rideau lamellaire : lamelles souples bleu-glace qui ondulent — seule
-      // la GLACE les écarte. Des fentes fines entre lamelles laissent deviner
-      // le fond : c'est un rideau, pas un mur.
+      // RIDEAU LAMELLAIRE : une porte de chambre froide à lanières de PVC
+      // givré entre deux montants — seule la GLACE les écarte (rideauRendu).
       float fill = 1.0 - smoothstep(-edgeW, 0.0, dV);
-      float edge = (1.0 - smoothstep(0.0, edgeW, abs(dV))) * libre;
-      float sway = sin(world.y * 0.30 + uTime * 1.1 + world.x * 0.02) * 1.8;
-      float lam = 0.5 + 0.5 * sin((world.y + sway) * 0.55);
-      float fente = smoothstep(0.86, 0.97, lam);
-      vec3 lamCol = vec3(0.34, 0.46, 0.60) * (0.72 + 0.38 * lam);
-      col = mix(col, lamCol * eclMat, fill * (1.0 - fente * 0.75));
-      col = mix(col, vec3(0.70, 0.85, 0.98) * eclMat, edge * 0.85);
+      if (uHasGrille > 0.5 && dec.y < 0.5) {
+        // LA PORTE À LANIÈRES (rideauRendu) : lue dans l'atlas des filtres.
+        // La physique reste le bloc entier — seul le dessin change.
+        if (fill > 0.0) {
+          vec2 bmin = uBoxes[bi].xy;
+          vec2 bsize = max(uBoxes[bi].zw - bmin, vec2(1.0));
+          vec4 rc = rideauRendu(clamp(wbV - bmin, vec2(0.0), bsize), bsize, bmin, pxMonde, bca, bsa);
+          col = col * (1.0 - rc.a * fill) + rc.rgb * eclMat * fill;
+        }
+      } else {
+        // l'atlas pas (encore) là, ou un rideau À FORME : les lamelles
+        // tracées d'avant
+        float edge = (1.0 - smoothstep(0.0, edgeW, abs(dV))) * libre;
+        float sway = sin(world.y * 0.30 + uTime * 1.1 + world.x * 0.02) * 1.8;
+        float lam = 0.5 + 0.5 * sin((world.y + sway) * 0.55);
+        float fente = smoothstep(0.86, 0.97, lam);
+        vec3 lamCol = vec3(0.34, 0.46, 0.60) * (0.72 + 0.38 * lam);
+        col = mix(col, lamCol * eclMat, fill * (1.0 - fente * 0.75));
+        col = mix(col, vec3(0.70, 0.85, 0.98) * eclMat, edge * 0.85);
+      }
     } else if (mat > 6.5) {
       // Membrane gorgée d'eau : trame tissée vert d'eau qui suinte — seule
       // l'EAU la traverse. Des gouttes descendent le long de la trame.
@@ -5071,8 +5242,11 @@ export class Renderer {
       (t) => (this.texChaud = t),
     )
     this.loadTexture(
-      '/assets/grille.webp',
-      true,
+      // l'atlas des filtres (tools/images/filtres_atlas.py) : la grille de
+      // l'évent, qui s'y répète à la main, et le rideau lamellaire — lu par
+      // cadres, sans répétition de la carte graphique
+      '/assets/filtres-atlas.webp',
+      false,
       true,
       (t) => (this.texGrille = t),
     )

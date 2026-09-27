@@ -727,6 +727,11 @@ générateur ne tient pas la couture de la grille, envoyez quand même : un
 panneau perforé se recadre à un nombre entier de trous, je le fais.
 
 ### 18a. L'évent — `grille.webp` ✗ À REFAIRE
+
+> Depuis le 27/09, la grille livrée loge dans la moitié haute de
+> `filtres-atlas.webp` (§32), bordée de sa propre répétition : l'unité de
+> texture sert aussi au rideau. Sa couture (raccord 4,6 / 4,7) y est restée
+> telle quelle — la refonte de l'évent la remplacera.
 **1024×1024 · tileable · pas de transparence · luminance ≤ 0,32**
 
 ```
@@ -1750,4 +1755,59 @@ le shader la fait ondoyer sur place, jamais tourner.
 
 ```
 Retro-futuristic 1970s orbital laboratory, flat orthographic 2D game asset. Muted cold palette: near-black #030710, steel blue-grey #0a1420 to #2a3542, single cyan accent #63b7e6; soft white-cyan steam glow allowed ONLY inside the glass. Evenly lit from above, low brightness, no visible light source. Single sprite on a transparent background, STRICT TOP-DOWN orthographic view, in the exact steel style of the attached references: a round GLASS STEAM DOME seen from directly above — a thick clear glass hemisphere held in a heavy riveted steel base ring with six bolted clamps, filled with pressurised white-cyan steam that BILLOWS in soft irregular clouds and turbulent puffs, like boiling steam in a pressure vessel, dense in some places and thinner in others, with NO rotation, NO spiral, NO vortex and NO centre point — the pattern has no symmetry. One crisp curved specular highlight on the upper left of the glass, a thin cyan rim light where glass meets steel, one small round CYAN indicator lamp on the base ring, a few condensation beads on the inner glass. Perfectly circular, centred, whole piece inside the image with a clear transparent margin, clean edges, isolated on transparent background. Avoid: spiral, vortex, swirl around the centre, whirlpool, radial pattern, iris, portal, perspective, 3/4 view, isometric, side view, elliptical dome, warm colors, orange, amber, fire, liquid water, solid white fill, depth of field, blur, film grain, lens flare, vignette, bright lighting, text, letters, logo, watermark, border, frame, drop shadow, background, floor.
+```
+
+## 32. LE RIDEAU LAMELLAIRE — la porte à lanières de chambre froide 🔎 EN APERÇU (27/09)
+**Moitié basse de `filtres-atlas.webp` (1024 × 2048) · assemblé par `tools/images/filtres_atlas.py`**
+
+Le rideau ne laisse passer que la GLACE : c'est une **porte de chambre
+froide à lanières** — des bandes de PVC épais, translucides et givrées,
+pendues à un rail boulonné, fermées à chaque bout par un **montant** (poteau,
+équerre, voyant cyan). L'ancien rendu était des lamelles tracées.
+
+**L'ATLAS DES FILTRES.** Plus d'unité de texture libre : celle de la grille
+de l'évent (`grille.webp`) devient celle de la famille des filtres — l'évent
+en haut (répété à la main, marge de 32 px), le rideau en bas ; la membrane et
+l'évent refondus y logeront à leur tour.
+
+**LA PHYSIQUE NE CHANGE PAS.** Un filtre troué laisserait passer ce que sa
+règle arrête : la collision reste le bloc entier. Le montant fait toute
+l'épaisseur du bloc ; le tronçon occupe la bande de ses rails (6,6 % à
+98,6 %).
+
+**LE MOUVEMENT EST DANS LE SHADER** (`rideauRendu`). Chaque lanière lit le
+champ du fluide sur SA colonne (quatre points : les deux tiers de sa
+largeur, et un peu avant et après le rideau) : la **glace** l'écarte — elle
+pend de sa pince, son bas part le plus loin, du côté où il y a le moins de
+glace — et elle se referme quand la glace s'éloigne ; l'**eau** et la
+**vapeur**, qu'elle arrête, la font seulement frémir ; un souffle d'air la
+balance à peine au repos. Le rail, les pinces et le seuil ne bougent pas.
+L'écartement ouvre sur le noir du dessous du bloc.
+
+**LA DISPOSITION** (`dispositionRideau`, jumeau `rideauDispo`) : un montant
+à chaque bout (0,226 T, 30 % de L au plus), et entre eux un nombre ENTIER de
+lanières au pas mesuré (0,23 T), à peine étiré. Couché, le rail est en haut ;
+debout, à gauche.
+
+**Mesures** (sources non versionnées : `masters/images/sources/rideau-
+troncon.png` 1774 × 887, `rideau-montant.png` 1024 × 1536, `grille.webp`) :
+les 8 lanières culminent en reflet aux colonnes 219, 439, 658, 879, 1099,
+1321, 1542, 1761 — espacées de 212 à 222 px par le générateur, elles sont
+recoupées 5 px avant et remises toutes à 110 px ; la lanière sort de sa
+pince à la ligne 111 et s'arrête à 832 ; le montant est recadré au poteau
+(x 380..712, y 19..1487), rail et seuil aux lignes 116 et 1466, ce qui
+raccorde ses rails à ceux du tronçon à l'échelle. Atlas livré : 312 Ko,
+luminance 0,20, 0 % de pixels chauds. Référence (écartement forcé pour la
+capture) : `docs/reference/rideau-reference.webp`.
+
+### 32.1 Le tronçon (le corps, répété) · 4:1 demandé, 2:1 livré
+
+```
+Retro-futuristic 1970s orbital laboratory, flat orthographic 2D game asset. Muted cold palette: near-black #030710, steel blue-grey #0a1420 to #2a3542, pale frosted ice-blue #cfe6f2 to #8fb8cc for the plastic strips, single cyan accent #63b7e6 used sparingly. Evenly lit, low brightness, no visible light source. Seamless horizontally tileable texture strip, STRICT FLAT FRONT orthographic view, filling the full height of the image edge to edge, left and right edges match perfectly, in the exact steel style of the attached references: an industrial COLD-ROOM STRIP CURTAIN. Along the TOP edge, a heavy dark gunmetal steel mounting rail with a row of hex bolts; along the BOTTOM edge, a thin dark steel threshold bar. Hanging from the rail down to the threshold, EXACTLY 8 identical vertical strips of thick translucent frosted PVC, all the same width, evenly spaced, each overlapping the next by about one third, hanging straight and still, the image width holding exactly 8 strips with no strip cut at the left or right edge. Each strip is a thick flexible plastic band with slightly rounded bottom corners, milky and semi-transparent — the dark background shows faintly through the thinner overlapping parts — with a thin crisp specular line along one edge, fine vertical wear scratches, and a light rime of FROST crystals along its lower third, heaviest at the bottom edge. Each strip is held at the top by a small steel clamp plate with two rivets. Behind the strips, only near-black darkness. Avoid: perspective, 3/4 view, isometric, top-down view, strips swaying or parted, uneven strip widths, cut strip at the edges, fabric, cloth, curtain folds, drapery, glass tube, pipes, water, dripping liquid, ice blocks, snow pile, bright lighting, warm colors, orange, amber, red, depth of field, blur, film grain, lens flare, vignette, text, logo, watermark, border, frame, drop shadow.
+```
+
+### 32.2 Le montant (le bout, détouré) · 1:1 demandé, 2:3 livré
+
+```
+Retro-futuristic 1970s orbital laboratory, flat orthographic 2D game asset. Muted cold palette: near-black #030710, steel blue-grey #0a1420 to #2a3542, pale frosted ice-blue #cfe6f2 to #8fb8cc, single cyan accent #63b7e6. Evenly lit, low brightness, no visible light source. Single sprite on a transparent background, STRICT FLAT FRONT orthographic view, in the exact steel style of the attached references: the END POST of an industrial cold-room strip curtain. A heavy vertical steel JAMB running the full height of the image, a square-section gunmetal post with a bolted mounting flange, a riveted corner bracket at the top where a horizontal steel rail arrives from the LEFT edge and ends against the post, and a small bolted foot plate at the bottom where a thin threshold bar arrives from the left. On the left side, the first frosted translucent PVC strip hangs from the rail, partly cut by the left edge of the image. On the post, one small round CYAN indicator lamp (lit, #63b7e6) and a tiny engraved-looking steel plate with no readable text. A light rime of frost on the lower part of the post. Everything upright and centred on the vertical axis of the post, whole post inside the image, clean edges, isolated on transparent background. Avoid: perspective, 3/4 view, isometric, top-down view, door leaf, handle, hinges, wall, floor, background, glow halo, warm colors, orange, amber, red, text, letters, numbers, logo, watermark, border, frame, drop shadow.
 ```
