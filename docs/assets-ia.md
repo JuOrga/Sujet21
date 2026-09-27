@@ -1693,3 +1693,61 @@ script.
 Retro-futuristic 1970s orbital laboratory, flat orthographic 2D game asset. Muted cold palette: near-black #030710, steel blue-grey #0a1420 to #2a3542, single cyan accent #63b7e6. Evenly lit from above, low brightness, no visible light source. Seamless tileable transparent overlay of heat damage on a flat steel floor, seen from directly above: soft soot smudges, irregular heat-tint oxidation stains on metal in straw, bronze and bluish-purple rings like tempered steel, a few fine dry cracks and flaked paint specks, sparse and uneven, mostly transparent and subtle, overlay only, no floor visible, no background. Avoid: perspective, depth of field, blur, film grain, lens flare, vignette, bright lighting, glowing embers, flames, fire, lava, red glow, text, logo, watermark, border, frame, solid background, burnt holes.
 ```
 *Midjourney : `--ar 1:1 --tile --style raw --sref <référence>`.*
+
+## 31. LE SURCHAUFFEUR — la borne à vapeur sous verre ✅ LIVRÉ (27/09)
+**Moitié basse de `chaudiere-atlas.webp` (1024 × 2048) · assemblé par `tools/images/chaudiere_atlas.py`**
+
+Le surchauffeur rend un dash à la vapeur qui le frôle : c'est une **borne de
+recharge**, un tube de verre cerclé d'acier où tourbillonne une vapeur
+dorée sous pression, fermé de têtes d'acier (vanne, manomètre, voyant). Un
+premier essai en serpentin chauffé à blanc (26/09) a été écarté : trop proche
+de la chaudière. Il partage l'atlas de la chaudière (plus d'unité de texture
+libre).
+
+| rapport L / T | dessin |
+| --- | --- |
+| moins de 1,6 | le **dôme** de verre rond |
+| jusqu'à 2,71 | la **courte** : une tête à un bout, une plaque boulonnée ferme l'autre |
+| au-delà | la **longue** : une tête à chaque bout |
+
+**LA COULEUR SE FAIT AU MONTAGE.** Les images ont été générées bleu-blanc (la
+vapeur froide y vient mieux) ; le script les **recolore** (`dore`) : tout ce
+qui est bleuté passe sur une rampe ambre profond → jaune → blanc chaud. La
+vapeur rappelle la chaudière, plus jaune et plus vive. Les prompts ci-dessous
+sont donc ceux de la version bleue — à garder tels quels.
+
+**LE MOUVEMENT EST DANS LE SHADER.** Seule la vapeur bouge (reconnue à sa
+couleur) : le **dôme bouillonne** sur place (il ne tourne pas : un rond qui
+tourbillonne rappelait le sas) ; dans le
+**tube**, les volutes ondulent, des filets clairs **défilent** vers la tête,
+et une **bouffée** de pression le parcourt de temps en temps. Le dash pris,
+la vapeur ralentit, pâlit et se dissout en deux secondes : il reste un verre
+terne. La collision suit le dessin ; le frôlement de la vapeur, lui, se
+mesure au rectangle du bloc (solver.ts).
+
+Sources (non versionnées) : `masters/images/sources/surch-tube.png`,
+`surch-tete.png`, `surch-dome.png`. Mesures : tube raccordé bord à bord
+(écart 12,1 contre 11,2) ; tête sur l'axe à 1 px (443) ; dôme (sans
+spirale, livré le 27/09) centré (626, 616), anneau 549 px, verre 410. Référence : `docs/reference/surchauffeur-reference.webp`.
+
+### 31.1 Le tube (le corps, répété) · 4:1
+
+```
+Retro-futuristic 1970s orbital laboratory, flat orthographic 2D game asset. Muted cold palette: near-black #030710, steel blue-grey #0a1420 to #2a3542, single cyan accent #63b7e6; soft white-cyan steam glow (#e8f6ff, #b8e4f7, #63b7e6) allowed ONLY inside the glass. Evenly lit from above, low brightness, no visible light source. Seamless horizontally tileable texture strip, STRICT TOP-DOWN orthographic view, filling the full height of the image edge to edge, left and right edges match perfectly, in the exact steel style of the attached references: a long thick horizontal GLASS PRESSURE TUBE seen from directly above, lying between two dark gunmetal steel rails along the top and bottom edges, held by riveted steel hoop bands crossing it at regular intervals. Inside the clear heavy glass, pressurised white-cyan steam swirls in soft turbulent wisps and eddies, glowing gently from within, moderately dense — the swirls are clearly visible but the glass is not solid white. Crisp long specular reflections run along the glass, thin cyan edge highlights where the glass meets the rails, a few tiny condensation beads on the inner wall. No background above or below the rails, no end caps. Avoid: perspective, 3/4 view, isometric, side view, depth of field, blur, film grain, lens flare, vignette, bright lighting, warm colors, orange, amber, fire, flames, liquid water, bubbles in liquid, solid white fill, text, logo, watermark, border, frame, drop shadow.
+```
+
+### 31.2 La tête (le bout, détourée) · 2:1
+
+```
+Retro-futuristic 1970s orbital laboratory, flat orthographic 2D game asset. Muted cold palette: near-black #030710, steel blue-grey #0a1420 to #2a3542, single cyan accent #63b7e6; soft white-cyan steam glow allowed ONLY inside the glass and on one indicator lamp. Evenly lit from above, low brightness, no visible light source. Single sprite on a transparent background, STRICT TOP-DOWN orthographic view, in the exact style of the attached references. Everything lies on ONE HORIZONTAL LINE through the vertical centre of the image: from the left edge, the end of a thick glass pressure tube full of swirling white-cyan steam between two steel rails, closed on the right by a heavy bolted steel END HEAD seen from above — a round flange ring clamping the glass, then a squat cylindrical steel cap slightly taller than the tube, with a small hand valve wheel, one round pressure gauge dial with a needle, and one round CYAN indicator lamp (lit, #63b7e6). The head is centred on the same horizontal line. Whole piece inside the image, clean edges, isolated on transparent background. Avoid: perspective, 3/4 view, isometric, side view, head below the tube, off-centre parts, pipes leaving the image, wall, glow halo, grey background, warm colors, orange, amber, red, text, letters, logo, watermark, border, frame, drop shadow.
+```
+
+### 31.3 Le dôme (détouré) · 1:1
+
+**SANS SPIRALE.** Un rond où tourbillonne un vortex se lisait comme le sas de
+sortie (retour du concepteur, 27/09) : la vapeur y BOUILLONNE en volutes, et
+le shader la fait ondoyer sur place, jamais tourner.
+
+```
+Retro-futuristic 1970s orbital laboratory, flat orthographic 2D game asset. Muted cold palette: near-black #030710, steel blue-grey #0a1420 to #2a3542, single cyan accent #63b7e6; soft white-cyan steam glow allowed ONLY inside the glass. Evenly lit from above, low brightness, no visible light source. Single sprite on a transparent background, STRICT TOP-DOWN orthographic view, in the exact steel style of the attached references: a round GLASS STEAM DOME seen from directly above — a thick clear glass hemisphere held in a heavy riveted steel base ring with six bolted clamps, filled with pressurised white-cyan steam that BILLOWS in soft irregular clouds and turbulent puffs, like boiling steam in a pressure vessel, dense in some places and thinner in others, with NO rotation, NO spiral, NO vortex and NO centre point — the pattern has no symmetry. One crisp curved specular highlight on the upper left of the glass, a thin cyan rim light where glass meets steel, one small round CYAN indicator lamp on the base ring, a few condensation beads on the inner glass. Perfectly circular, centred, whole piece inside the image with a clear transparent margin, clean edges, isolated on transparent background. Avoid: spiral, vortex, swirl around the centre, whirlpool, radial pattern, iris, portal, perspective, 3/4 view, isometric, side view, elliptical dome, warm colors, orange, amber, fire, liquid water, solid white fill, depth of field, blur, film grain, lens flare, vignette, bright lighting, text, letters, logo, watermark, border, frame, drop shadow, background, floor.
+```

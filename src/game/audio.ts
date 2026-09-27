@@ -560,6 +560,16 @@ export class AudioFx {
     this.blip(1320, 1320, 0.4, 0.045, 'sine', 0.36, pan)
   }
 
+  // LA RECHARGE D'UN SURCHAUFFEUR : la vapeur de la borne s'échappe dans un
+  // souffle qui monte, puis un carillon clair — le dash rendu s'entend avant
+  // qu'on regarde le compteur. Là où est la borne (pan).
+  recharge(pan = 0): void {
+    this.noiseBurst(900, 1.4, 0.45, 0.07, 'bandpass', 0, pan)
+    this.blip(260, 780, 0.34, 0.06, 'triangle', 0, pan)
+    this.blip(1046, 1046, 0.26, 0.05, 'sine', 0.22, pan)
+    this.blip(1568, 1568, 0.42, 0.045, 'sine', 0.3, pan)
+  }
+
   // LES CIBLES (le mini-jeu, 17/09) : une touche sonne d'autant plus haut
   // qu'elle vaut (force 0…1), le tic des dernières secondes, le coup final
   toucheMire(force: number, pan = 0): void {

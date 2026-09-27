@@ -157,12 +157,13 @@ FAMILLES: list[Famille] = [
         note='quatre pièces assemblées par tools/images/conduite_atlas.py — leurs cadres sont un contrat avec le shader',
     ),
     Famille(
-        'atlas de la chaudière', ('chaudiere-atlas',), taille=(1024, 1024), luma_max=0.60,
-        # la lueur des résistances est AMBRE (charte §3 : la chaufferie
+        'atlas des chaleurs', ('chaudiere-atlas',), taille=(1024, 2048), luma_max=0.60,
+        # la lueur des résistances est AMBRE (charte §3 : ce qui chauffe
         # l'admet) — mesuré sur les sources du 26/09 : 7 à 19 % de pixels
-        # chauds selon la pièce ; la tolérance est celle de la chaufferie
-        chaud_max=0.25, qualite=78, poids_max_ko=450,
-        note='six pièces assemblées par tools/images/chaudiere_atlas.py — leurs cadres sont un contrat avec le shader',
+        # chauds pour la chaudière (24 % dans l'atlas seul), 18 à 40 % pour
+        # le surchauffeur, chauffé à blanc ; l'atlas des deux mesure 33 %
+        chaud_max=0.35, qualite=78, poids_max_ko=450,
+        note='la chaudière (moitié haute) et le surchauffeur (moitié basse), assemblés par tools/images/chaudiere_atlas.py — leurs cadres sont un contrat avec le shader',
     ),
     Famille(
         'décalque',

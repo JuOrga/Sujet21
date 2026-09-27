@@ -15,3 +15,6 @@ masters/images/*
 
 # Résidus NTFS de WSL
 *:Zone.Identifier
+
+# le cache de Python (tools/images importe conduite_atlas)
+__pycache__/

@@ -32,7 +32,7 @@ describe('la conduite dans la composition', () => {
     // l'ombre portée et la tranche n'exemptent que la conduite (et la
     // chaudière) SANS forme : aPieces, gardé par dec.y < 0.5, sert aux deux
     expect(source).toMatch(
-      /bool aPieces = \(\(mat > 3\.5 && mat < 4\.5\) \|\| \(mat > 5\.5 && mat < 6\.5\)\) && dec\.y < 0\.5;/,
+      /bool aPieces = \(\(mat > 3\.5 && mat < 4\.5\) \|\| \(mat > 5\.5 && mat < 6\.5\) \|\| \(mat > 8\.5 && mat < 9\.5\)\) && dec\.y < 0\.5;/,
     )
     expect((source.match(/!aPieces\)/g) ?? []).length).toBeGreaterThanOrEqual(2)
   })
@@ -82,3 +82,68 @@ describe('le relief de la conduite suit son dessin, pas sa boîte', () => {
     expect(branche).toMatch(/conduitePiedSdf\(wb,/)
   })
 })
+
+// la branche surchauffeur de la composition, jusqu'à la branche suivante
+const debutSu = source.indexOf('// SURCHAUFFEUR : une BORNE À VAPEUR sous verre')
+const brancheSu = source.slice(debutSu, source.indexOf('} else if (mat > 7.5)', debutSu))
+
+describe('le surchauffeur dans la composition', () => {
+  it('sans atlas, il ne lit pas l’atlas : sinon, des rectangles NOIRS', () => {
+    expect(debutSu).toBeGreaterThan(0)
+    const appel = brancheSu.indexOf('surchRendu(')
+    expect(appel).toBeGreaterThan(0)
+    expect(brancheSu.lastIndexOf('uHasChaud > 0.5', appel)).toBeGreaterThan(0)
+  })
+
+  it('le serpentin de secours suit la SILHOUETTE des pièces, pas la boîte', () => {
+    const secours = brancheSu.slice(brancheSu.indexOf('} else {', brancheSu.indexOf('surchRendu(')))
+    expect(secours).toMatch(/surchSdf\(wbV/)
+  })
+
+  it('la charge se lit dans aux.z, décodée — pas aux.z brut (il porte aussi le sens et les bouts)', () => {
+    expect(brancheSu).toMatch(/float charge = surchCharge\(zS\);/)
+    expect(brancheSu).not.toMatch(/float charge = uBoxAux\[bi\]\.z;/)
+  })
+})
+
+// LA RECHARGE (retour du concepteur, 27/09 : « plus marqué quand la recharge
+// de dash a lieu ») : la borne flashe et lance une onde de choc, lues dans
+// aux.w — que le moteur remplit de l'éclat de recharge pour un surchauffeur
+describe('la recharge d’un surchauffeur se voit', () => {
+  it('la branche lit l’éclat dans aux.w et en tire le flash et l’onde', () => {
+    expect(brancheSu).toMatch(/float eclat = uBoxAux\[bi\]\.w;/)
+    expect(brancheSu).toMatch(/float onde = exp\(/)
+  })
+
+  it('le moteur remplit aux.w de l’éclat pour un surchauffeur, de l’aura pour le reste', () => {
+    expect(source).toMatch(/bx\.material === MAT_SURCHAUFFEUR\s*\?\s*this\.eclatRecharge\(bx, sim\.surchauffeurVide\(bx\), timeSec\)\s*:\s*\(bx\.aura \?\? 1\)/)
+  })
+
+  it('l’onde de choc n’est pas coupée par le rejet grossier : la portée s’élargit pendant l’éclat', () => {
+    // 300 : l'onde va jusqu'à 222 u, sa bande jusqu'à 32 — coupée à 240, elle
+    // laissait une couture (vu en revue, 27/09)
+    expect(source).toMatch(/else if \(mat > 8\.5 && mat < 9\.5\) reachMax = max\(reachMax, uBoxAux\[bi\]\.w > 0\.001 \? 300\.0 : 60\.0\);/)
+  })
+
+  it('le MIROIR garde sa portée de 60 : son aux.w (l’aura, 1) n’est pas un éclat', () => {
+    expect(source).toMatch(/else if \(mat > 8\.5\) reachMax = max\(reachMax, 60\.0\);/)
+  })
+
+  it('la charge et l’éclat lisent le surchauffeur à sa BOÎTE, pas à un indice', () => {
+    expect(source).not.toMatch(/surchauffesVides\.has\(i\)/)
+  })
+
+  it('le jeu lance la gerbe et le son à chaque recharge', () => {
+    const main = readFileSync(fileURLToPath(new URL('../main.ts', import.meta.url)), 'utf8')
+    expect(main).toMatch(/guetteRecharges\(performance\.now\(\) \/ 1000\)/)
+    // un rechargement de salle se voit au compteur du solveur, pas à la taille
+    expect(main).toMatch(/sim\.generation !== surchGeneration/)
+    // placé comme les autres sons, par rapport au corps (ouie.ts)
+    expect(main).toMatch(/audio\.recharge\(panDepuis\(sim\.stats\.centroidX, x\)\)/)
+    // ni anneau ni « +1 DASH » autour du corps : retirés à la demande (27/09)
+    expect(main).not.toContain("'+1 DASH'")
+    const audio = readFileSync(fileURLToPath(new URL('../game/audio.ts', import.meta.url)), 'utf8')
+    expect(audio).toMatch(/recharge\(pan = 0\): void \{/)
+  })
+})
+
