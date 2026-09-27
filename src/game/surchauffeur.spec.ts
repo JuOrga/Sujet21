@@ -93,10 +93,16 @@ describe('surchauffeur — forme physique', () => {
     expect(dist(b, 50 + 42, 45 + 42)).toBeGreaterThan(0)
   })
 
-  it('un bout contre un mur y plonge', () => {
+  it('un bout contre un mur NE plonge PAS : la borne garde ses têtes, encastrée dans la ligne de mur', () => {
+    // la ligne de mur des figures : un mur, le surchauffeur, un autre mur
     const b = box(0, 0, 60, 200, MAT_SURCHAUFFEUR)
-    const mur = box(-100, 200, 200, 260, MAT_WALL)
-    expect(boutsEnMur(b, [b, mur], null)).toBe(BOUT_MUR_POS)
+    const murHaut = box(-100, 200, 200, 260, MAT_WALL)
+    const murBas = box(-100, -60, 200, 0, MAT_WALL)
+    expect(boutsEnMur(b, [b, murHaut, murBas], null)).toBe(0)
+    // le tambour de la tête, de toute la largeur, est bien là au ras du mur
+    const T = 60
+    const s = 200 - ((SURCHAUFFEUR.tambourB[0] + SURCHAUFFEUR.tambourB[1]) / 2) * T
+    expect(dist(b, 58, s, [b, murHaut, murBas])).toBeLessThan(0)
   })
 
   it('le solveur lit le surchauffeur à sa forme : l’eau bute sur le tube, pas sur la boîte', () => {

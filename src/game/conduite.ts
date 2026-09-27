@@ -27,7 +27,6 @@ import {
   FORME_CONDUITE,
   FORME_SURCHAUFFEUR,
   SURCHAUFFEUR,
-  modeSurchauffeur,
   piecesSurchauffeur,
   CONDUITE,
   conduiteHoriz,
@@ -96,8 +95,12 @@ export function boutsEnMur(b: Boite, boxes: readonly Boite[], bornes: Bornes | n
   // une chaudière compacte ou courte ignore ses bouts (piecesChaudiere, le
   // shader) : les six sondages contre toute la salle seraient perdus
   if (b.material === MAT_CHAUD && modeChaudiere(horiz ? w : h, T) !== 'longue') return 0
-  // le dôme du surchauffeur n'a pas de bouts
-  if (b.material === MAT_SURCHAUFFEUR && modeSurchauffeur(horiz ? w : h, T) === 'dome') return 0
+  // LE SURCHAUFFEUR NE PLONGE JAMAIS. Un tuyau qui entre dans une paroi
+  // continue derrière elle ; une borne de verre sous pression, elle, est
+  // FERMÉE par ses têtes — sans elles, dans les lignes de mur des figures
+  // (surchauffeur entre deux segments), on voyait un tube coupé net
+  // (retour du concepteur, 27/09). Ses têtes s'appuient contre la paroi.
+  if (b.material === MAT_SURCHAUFFEUR) return 0
   const cx = (b.minX + b.maxX) / 2
   const cy = (b.minY + b.maxY) / 2
   const e = 3 // juste au-delà du bout
