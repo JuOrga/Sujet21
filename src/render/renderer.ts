@@ -15,10 +15,12 @@ import {
   MAT_CHAUD,
   MAT_FROID,
   MAT_SURCHAUFFEUR,
+  MAT_RIDEAU,
   zonePhases,
 } from '../game/level'
 import type { DecalDef, LumiereDef, ObstacleBox, ZoneDef } from '../game/level'
 import { rangsDePeinture } from '../game/ordre'
+import { RIDEAU_RESSORT, SuiviRideaux, traveeGlace } from './rideauSuivi'
 import { decalageDe, planchesLivrees, vueCourante, vuesPlanche } from './planche'
 import {
   ARC_EPAISSEUR_DEFAUT,
@@ -31,6 +33,9 @@ import {
   CHAUDIERE_ATLAS,
   SURCHAUFFEUR,
   SURCHAUFFEUR_ATLAS,
+  RIDEAU,
+  RIDEAU_PAS,
+  FILTRES_ATLAS,
   CONDUITE,
   CONDUITE_ATLAS,
 } from '../game/formes'
@@ -572,6 +577,52 @@ float surchSdf(vec2 p, vec4 box, float z) {
 `
 })()
 
+// LE RIDEAU LAMELLAIRE et l'ATLAS DES FILTRES : proportions et cadres ÉCRITS
+// depuis RIDEAU et FILTRES_ATLAS (game/formes.ts), mesurés sur les images
+// par tools/images/filtres_atlas.py. Injecté dans la composition seule : le
+// rideau est un bloc plein, le cuiseur de lumière le lit déjà comme tel.
+const RIDEAU_GLSL = (() => {
+  const R = RIDEAU
+  const A = FILTRES_ATLAS
+  const B = RIDEAU_RESSORT
+  const f = (x: number) => (Number.isInteger(x) ? `${x}.0` : `${x}`)
+  const v4 = (r: readonly number[]) => `vec4(${r.map(f).join(', ')})`
+  return `
+const float RD_MONTANT = ${f(R.montant)};
+const float RD_HAUT = ${f(R.haut)};
+const float RD_BAS = ${f(R.bas)};
+const float RD_LANIERES = ${f(R.lanieres)};
+const float RD_PINCE = ${f(R.pince)};
+const float RD_FIN_LANIERE = ${f(R.finLaniere)};
+const float RD_PAS = ${f(RIDEAU_PAS)};
+const float FI_ATLAS = ${f(A.taille)};
+const float FI_ATLAS_H = ${f(A.hauteur)};
+const vec4 FI_GRILLE = ${v4(A.grille)};
+const float FI_MARGE_GRILLE = ${f(A.margeGrille)};
+const vec4 FI_CORPS = ${v4(A.corps)};
+const vec4 FI_MONTANT = ${v4(A.montant)};
+const float RD_OUVERTURE = ${f(B.ouverture)};
+
+// JUMEAU de depaquetTravee (rideauSuivi.ts) : où la glace traverse — son
+// milieu et sa demi-largeur, en fractions de L ; (-1, -1) : nulle part
+vec2 rdTravee(float z) {
+  if (z < 0.5) return vec2(-1.0);
+  float zz = floor(z + 0.5) - 1.0;
+  float q0 = floor(zz / 1024.0);
+  return vec2(q0, zz - q0 * 1024.0) / 1023.0;
+}
+
+// JUMEAU de dispositionRideau (formes.ts) : (largeur d'un montant, nombre
+// de lanières, pas)
+vec3 rideauDispo(float L, float T) {
+  float m = RD_MONTANT * T;
+  float reste = L - 2.0 * m;
+  float n = max(1.0, floor(reste / (RD_PAS * T) + 0.5));
+  return vec3(m, n, reste / n);
+}
+`
+})()
+
 const FORMES_GLSL = `
 float cote2(vec2 a, vec2 b, vec2 p) { // de quel côté de (a→b) tombe p
   return (b.x - a.x) * (p.y - a.y) - (b.y - a.y) * (p.x - a.x);
@@ -857,7 +908,7 @@ uniform sampler2D uTexWallA; // seconde paroi : les murs alternent, sans répét
 uniform float uPasse;
 uniform sampler2D uTexFroid; // l’atlas de la conduite d’ammoniac (tronçon, bride, joint, givre)
 uniform sampler2D uTexChaud;
-uniform sampler2D uTexGrille;
+uniform sampler2D uTexGrille; // l’atlas des filtres : la grille de l’évent, le rideau lamellaire
 uniform sampler2D uTexPhobe;
 uniform sampler2D uTexPhile;
 uniform sampler2D uTexIris;
@@ -1106,6 +1157,7 @@ float smoothField(vec2 p) {
 ${CONDUITE_GLSL}
 ${CHAUDIERE_GLSL}
 ${SURCHAUFFEUR_GLSL}
+${RIDEAU_GLSL}
 // ——— LA CONDUITE D'AMMONIAC (plaque froide) ————————————————————————————
 // Un tuyau givré, ses brides de bout et ses joints, lus dans l'atlas
 // conduite-atlas.webp (tools/images/conduite_atlas.py) — quatre images
@@ -1337,21 +1389,156 @@ float fuitesNH3(vec2 wb, vec4 box, float code) {
   return nuage * smoothstep(0.0, 0.15, ph) * (1.0 - ph) * step(naissance * 0.8, abs(t));
 }
 
+// ——— LA LECTURE D'UN ATLAS PAR CADRES ——————————————————————————————————
+// Un cadre lu en (x, y) : fractions du cadre depuis son coin HAUT-gauche ;
+// « taille » : celle de l'atlas en pixels, téléversé avec FLIP_Y. ppw : pixels
+// d'atlas par unité monde — le niveau de détail est écrit à la main
+// (textureGrad) et plafonné à 4 texels : les cadres ne sont qu'à 5 à 10 px
+// les uns des autres, et au dézoom un niveau plus grossier mêlerait au bord
+// d'une pièce la couleur de sa voisine. Hors du cadre : rien. UNE lecture
+// pour l'atlas des chaleurs et celui des filtres (vu en revue, 29/09 : deux
+// copies ligne à ligne ne se corrigent pas ensemble).
+vec4 atlasLit(sampler2D tex, vec2 taille, vec4 cadre, vec2 f, float px, float ppw) {
+  if (f.x < 0.0 || f.x > 1.0 || f.y < 0.0 || f.y > 1.0) return vec4(0.0);
+  vec2 pa = cadre.xy + clamp(f * cadre.zw, vec2(0.5), cadre.zw - 0.5);
+  vec2 uv = vec2(pa.x / taille.x, (taille.y - pa.y) / taille.y);
+  float g = min(px * ppw, 4.0);
+  vec4 c = textureGrad(tex, uv, vec2(g / taille.x, 0.0), vec2(0.0, g / taille.y));
+  return vec4(c.rgb * c.a, c.a); // prémultiplié
+}
+
+// L'ATLAS DES FILTRES (filtres-atlas.webp)
+vec4 atlasFiltre(vec4 cadre, vec2 f, float px, float ppw) {
+  return atlasLit(uTexGrille, vec2(FI_ATLAS, FI_ATLAS_H), cadre, f, px, ppw);
+}
+
+// LA GRILLE DE L'ÉVENT, répétée À LA MAIN : elle avait sa texture, répétée
+// par la carte graphique (world / 624) ; logée dans l'atlas, elle se répète
+// par fract. Le gradient est EXPLICITE (pxMonde) — les dérivées d'écran de
+// fract(q) sautent à chaque tuile et y allumeraient une couture, et sans
+// dérivées la lecture se fait dans la branche de l'évent seulement, pas sur
+// chaque pixel de l'écran. Le niveau de détail est plafonné à la MARGE de
+// 32 px qui borde la tuile de sa propre répétition : jusqu'au zoom le plus
+// lointain de l'éditeur (0,05 : ~31 texels par pixel), le motif est filtré.
+vec3 grilleEvent(vec2 world, float px) {
+  vec2 fq = fract(world / 624.0);
+  float tuile = FI_GRILLE.z - 2.0 * FI_MARGE_GRILLE;
+  // (1 - y) : le bas de la tuile en bas, comme la texture d'avant
+  vec2 pa = FI_GRILLE.xy + FI_MARGE_GRILLE + vec2(fq.x, 1.0 - fq.y) * tuile;
+  vec2 uv = vec2(pa.x / FI_ATLAS, (FI_ATLAS_H - pa.y) / FI_ATLAS_H);
+  float g = min(px / 624.0 * tuile, FI_MARGE_GRILLE);
+  return textureGrad(uTexGrille, uv, vec2(g / FI_ATLAS, 0.0), vec2(0.0, g / FI_ATLAS_H)).rgb;
+}
+
+// Ce que le fluide fait en un point MONDE : (glace, eau ou vapeur)
+// présentes, 0..1 — lu dans le champ de l'image (uField), la même source que
+// le dessin du fluide. textureLod : on est dans une branche non uniforme.
+vec2 rdFluide(vec2 pw) {
+  vec2 fuv = ((pw - uCenter) * uZoom + uViewport * 0.5) / uViewport;
+  if (fuv.x < 0.0 || fuv.x > 1.0 || fuv.y < 0.0 || fuv.y > 1.0) return vec2(0.0);
+  vec4 t = textureLod(uField, fuv, 0.0);
+  float pres = smoothstep(0.35 * uThreshold, uThreshold, t.r / uFieldScale);
+  float icy = clamp(t.a / max(t.r, 1e-5), 0.0, 1.0);
+  return vec2(pres * icy, pres * (1.0 - icy));
+}
+
+// Un point du rideau (s le long, t en travers : 0 au rail, 1 au seuil) en
+// MONDE, rotation de la boîte comprise (l'inverse du dépivotage de la boucle)
+vec2 rdMonde(float s, float t, vec2 bmin, vec2 bsize, bool horiz, float ca, float sa) {
+  float T = horiz ? bsize.y : bsize.x;
+  vec2 loc = horiz ? vec2(s, T * (1.0 - t)) : vec2(t * T, s);
+  vec2 bc = bmin + 0.5 * bsize;
+  vec2 r = bmin + loc - bc;
+  return bc + vec2(ca * r.x - sa * r.y, sa * r.x + ca * r.y);
+}
+
+// LE RIDEAU LAMELLAIRE, en couleur prémultipliée : un montant à chaque bout,
+// entre eux un nombre entier de lanières (rideauDispo). Les lanières de la
+// TRAVÉE que la glace traverse s'écartent de son milieu — elles pendent de
+// leur pince, leur bas part le plus loin — puis, la glace sortie, repassent
+// l'aplomb et se balancent. Ce mouvement n'est PAS lu ici dans le champ du
+// fluide (il y suivait le bruit du champ, à-coups compris) : c'est un
+// ressort tenu d'une image à l'autre par le rendu (rideauSuivi.ts), passé
+// en zR (la travée) et wR (son ouverture). L'eau et la vapeur, que le
+// rideau arrête, le font seulement FRÉMIR, lentement ; un souffle d'air le
+// balance à peine au repos. Le rail, les pinces et le seuil ne bougent pas.
+vec4 rideauRendu(vec2 loc, vec2 bsize, vec2 bmin, float px, float ca, float sa, float zR, float wR) {
+  bool horiz = bsize.x >= bsize.y;
+  float L = horiz ? bsize.x : bsize.y;
+  float T = horiz ? bsize.y : bsize.x;
+  float s = horiz ? loc.x : loc.y;
+  // le rail en haut d'un rideau couché, à gauche d'un rideau debout
+  float t = horiz ? 1.0 - loc.y / T : loc.x / T;
+  vec3 dsp = rideauDispo(L, T);
+  float m = dsp.x;
+  float n = dsp.y;
+  float p = dsp.z;
+  // LES MONTANTS : l'image au bout droit, en miroir au bout gauche
+  if (s < m || s > L - m) {
+    float fx = s < m ? 1.0 - s / m : (s - (L - m)) / m;
+    return atlasFiltre(FI_MONTANT, vec2(fx, t), px, FI_MONTANT.w / T);
+  }
+  float ty = (t - RD_HAUT) / (RD_BAS - RD_HAUT);
+  if (ty < 0.0 || ty > 1.0) return vec4(0.0);
+  float ppw = FI_CORPS.w / ((RD_BAS - RD_HAUT) * T);
+  float sx = s - m;
+  float k = floor(sx / p);
+  bool pendue = ty > RD_PINCE && ty < RD_FIN_LANIERE + 0.01;
+  float pend = clamp((ty - RD_PINCE) / (RD_FIN_LANIERE - RD_PINCE), 0.0, 1.0);
+  vec2 trav = rdTravee(zR) * L; // (milieu, demi-largeur)
+  // l'eau ou la vapeur arrêtées contre ses faces, lues UNE fois par pixel
+  // à la lanière du pixel, pas à chacune des trois candidates : la même
+  // réponse pour six lectures de moins (vu en revue, 29/09)
+  float autre = 0.0;
+  if (pendue) {
+    float sk = m + (k + 0.5) * p;
+    vec2 fA = rdFluide(rdMonde(sk, -0.15, bmin, bsize, horiz, ca, sa));
+    vec2 fB = rdFluide(rdMonde(sk, 1.15, bmin, bsize, horiz, ca, sa));
+    autre = max(fA.y, fB.y);
+  }
+  vec4 acc = vec4(0.0);
+  for (int dj = -1; dj <= 1; dj++) {
+    float j = k + float(dj);
+    if (j < 0.0 || j > n - 1.0) continue;
+    float off = 0.0;
+    if (pendue) {
+      float sc = m + (j + 0.5) * p;
+      float bas = pow(pend, 1.4);
+      // LE RESSORT : les lanières de la travée, écartées de son milieu — un
+      // côté FIXE par lanière, qui ne bascule jamais en cours de geste. Au
+      // bord de la travée, la lanière voisine suit à moitié (une lanière de
+      // fondu) ; au milieu, elles s'ouvrent le plus, comme une porte.
+      if (trav.x >= 0.0) {
+        float c = trav.x;
+        float dans = 1.0 - smoothstep(0.0, p, abs(sc - c) - trav.y);
+        float cote = sc < c ? -1.0 : 1.0;
+        float poids = 1.0 - 0.35 * clamp(abs(sc - c) / (trav.y + p), 0.0, 1.0);
+        off += cote * RD_OUVERTURE * p * wR * dans * poids * bas;
+      }
+      // l'eau ou la vapeur : un frémissement LENT
+      off += autre * 0.035 * p * sin(uTime * 6.0 + j * 1.3) * pend;
+      off += 0.012 * p * sin(uTime * 1.3 + j * 0.9) * pend;
+    }
+    float u = (sx - j * p - off) / p;
+    if (u < 0.0 || u >= 1.0) continue;
+    float cel = mod(j, RD_LANIERES);
+    // la lecture reste DANS la cellule de la lanière : au bord, le filtrage
+    // et le niveau de détail (jusqu'à 4 texels) liraient la voisine — une
+    // lanière écartée traînait le reflet clair de sa voisine (vu en revue)
+    float bordU = 2.5 / (FI_CORPS.z / RD_LANIERES);
+    vec4 c = atlasFiltre(FI_CORPS, vec2((cel + clamp(u, bordU, 1.0 - bordU)) / RD_LANIERES, ty), px, ppw);
+    acc = c + acc * (1.0 - c.a); // la lanière suivante passe par-dessus, comme sur l'image
+  }
+  return acc;
+}
+
 // ——— LA CHAUDIÈRE (rampe de résistances) ——————————————————————————————
 // Lue dans chaudiere-atlas.webp (tools/images/chaudiere_atlas.py), comme la
 // conduite dans le sien : tout se cale sur la BOÎTE, les brides du joint en
 // font toute la largeur, le carter 81 % ; la physique lit les mêmes pièces.
 vec4 atlasChaud(vec4 cadre, vec2 f, float px, float ppw) {
-  if (f.x < 0.0 || f.x > 1.0 || f.y < 0.0 || f.y > 1.0) return vec4(0.0);
-  vec2 pa = cadre.xy + clamp(f * cadre.zw, vec2(0.5), cadre.zw - 0.5);
   // (l'atlas fait 1024 × 2048 : la moitié basse loge le surchauffeur)
-  vec2 uv = vec2(pa.x / CH_ATLAS, (CH_ATLAS_H - pa.y) / CH_ATLAS_H); // téléversé avec FLIP_Y
-  // le niveau de détail plafonné à 4 texels : les cadres de l'atlas ne sont
-  // qu'à 5 à 10 px les uns des autres, et au dézoom un niveau plus grossier
-  // mêlerait au bord d'une pièce la couleur de sa voisine
-  float g = min(px * ppw, 4.0);
-  vec4 c = textureGrad(uTexChaud, uv, vec2(g / CH_ATLAS, 0.0), vec2(0.0, g / CH_ATLAS_H));
-  return vec4(c.rgb * c.a, c.a); // prémultiplié
+  return atlasLit(uTexChaud, vec2(CH_ATLAS, CH_ATLAS_H), cadre, f, px, ppw);
 }
 
 // l'ombre au sol de la chaudière, comme celle de la conduite
@@ -2314,7 +2501,6 @@ void main() {
   vec3 texPhileC = texture(uTexPhile, world / 210.0).rgb;
   // la grille est calée pour que ses perforations fassent ~24 u, comme le
   // motif procédural qu'elle remplace
-  vec3 texGrilleC = texture(uTexGrille, world / 624.0).rgb;
 
   // Obstacles : remplissage texturé + liseré, couleur par matériau (§6)
   float edgeW = 2.5 / uZoom;
@@ -2786,17 +2972,30 @@ void main() {
         col += vec3(1.0, 0.80, 0.40) * exp(-max(dG, 0.0) / 30.0) * eclat * eclat * eclat * 0.7 * hors;
       }
     } else if (mat > 7.5) {
-      // Rideau lamellaire : lamelles souples bleu-glace qui ondulent — seule
-      // la GLACE les écarte. Des fentes fines entre lamelles laissent deviner
-      // le fond : c'est un rideau, pas un mur.
+      // RIDEAU LAMELLAIRE : une porte de chambre froide à lanières de PVC
+      // givré entre deux montants — seule la GLACE les écarte (rideauRendu).
       float fill = 1.0 - smoothstep(-edgeW, 0.0, dV);
-      float edge = (1.0 - smoothstep(0.0, edgeW, abs(dV))) * libre;
-      float sway = sin(world.y * 0.30 + uTime * 1.1 + world.x * 0.02) * 1.8;
-      float lam = 0.5 + 0.5 * sin((world.y + sway) * 0.55);
-      float fente = smoothstep(0.86, 0.97, lam);
-      vec3 lamCol = vec3(0.34, 0.46, 0.60) * (0.72 + 0.38 * lam);
-      col = mix(col, lamCol * eclMat, fill * (1.0 - fente * 0.75));
-      col = mix(col, vec3(0.70, 0.85, 0.98) * eclMat, edge * 0.85);
+      if (uHasGrille > 0.5 && dec.y < 0.5) {
+        // LA PORTE À LANIÈRES (rideauRendu) : lue dans l'atlas des filtres.
+        // La physique reste le bloc entier — seul le dessin change.
+        if (fill > 0.0) {
+          vec2 bmin = uBoxes[bi].xy;
+          vec2 bsize = max(uBoxes[bi].zw - bmin, vec2(1.0));
+          vec4 rc = rideauRendu(clamp(wbV - bmin, vec2(0.0), bsize), bsize, bmin, pxMonde, bca, bsa,
+                                uBoxAux[bi].z, uBoxAux[bi].w);
+          col = col * (1.0 - rc.a * fill) + rc.rgb * eclMat * fill;
+        }
+      } else {
+        // l'atlas pas (encore) là, ou un rideau À FORME : les lamelles
+        // tracées d'avant
+        float edge = (1.0 - smoothstep(0.0, edgeW, abs(dV))) * libre;
+        float sway = sin(world.y * 0.30 + uTime * 1.1 + world.x * 0.02) * 1.8;
+        float lam = 0.5 + 0.5 * sin((world.y + sway) * 0.55);
+        float fente = smoothstep(0.86, 0.97, lam);
+        vec3 lamCol = vec3(0.34, 0.46, 0.60) * (0.72 + 0.38 * lam);
+        col = mix(col, lamCol * eclMat, fill * (1.0 - fente * 0.75));
+        col = mix(col, vec3(0.70, 0.85, 0.98) * eclMat, edge * 0.85);
+      }
     } else if (mat > 6.5) {
       // Membrane gorgée d'eau : trame tissée vert d'eau qui suinte — seule
       // l'EAU la traverse. Des gouttes descendent le long de la trame.
@@ -2877,6 +3076,7 @@ void main() {
       float hole;
       vec3 barCol;
       if (uHasGrille > 0.5) {
+        vec3 texGrilleC = grilleEvent(world, pxMonde);
         float lum = dot(texGrilleC, vec3(0.299, 0.587, 0.114));
         hole = 1.0 - smoothstep(0.020, 0.075, lum);
         barCol = texGrilleC * 1.5;
@@ -4725,6 +4925,9 @@ export class Renderer {
   /** L'instant où chaque surchauffeur a rendu son dash : il flashe et lance
    *  son onde de choc (aux.w, ~0,9 s). */
   private rechargeT0 = new WeakMap<ObstacleBox, number>()
+  // la mémoire des rideaux lamellaires : où la glace a traversé, et quand
+  // elle en est sortie (rideauSuivi.ts)
+  private suiviRideaux = new SuiviRideaux()
   // la clé des boîtes de CETTE image (cleBoitesLumiere), bâtie une fois et
   // partagée par les bouts des conduites et la carte de lumière
   private cleImage: string | null = null
@@ -5071,8 +5274,11 @@ export class Renderer {
       (t) => (this.texChaud = t),
     )
     this.loadTexture(
-      '/assets/grille.webp',
-      true,
+      // l'atlas des filtres (tools/images/filtres_atlas.py) : la grille de
+      // l'évent, qui s'y répète à la main, et le rideau lamellaire — lu par
+      // cadres, sans répétition de la carte graphique
+      '/assets/filtres-atlas.webp',
+      false,
       true,
       (t) => (this.texGrille = t),
     )
@@ -5924,12 +6130,22 @@ export class Renderer {
         q0 = Math.max(0, Math.min(127, Math.round(bx.p0 ?? 0)))
         q1 = Math.max(0, Math.min(1023, Math.round(bx.p1 ?? 0)))
       }
+      // un RIDEAU porte sa mémoire (aux.z, aux.w) : la travée de glace et
+      // l'ouverture du ressort de ses lanières
+      // (pas pour un rideau À FORME, ni sans atlas : il garde ses lamelles
+      // tracées, qui ne lisent pas cette mémoire — le balayage des grains
+      // serait perdu)
+      const rideau =
+        bx.material === MAT_RIDEAU && !(bx.forme ?? 0) && this.texGrille
+          ? this.suiviRideaux.aux(bx, traveeGlace(bx, sim.posX, sim.posY, sim.frozen, sim.count), timeSec)
+          : null
       this.auxScratch[k * 4] = bx.material + forme * 16 + q0 * 128 + q1 * 16384
       this.auxScratch[k * 4 + 1] = ((bx.angle ?? 0) * Math.PI) / 180
       // aux.z : charge du surchauffeur (le solveur dit lesquels sont vides)
       // — ou HABILLAGE d'une paroi neutre (1-4), pur décor — ou SENS du
       // tuyau d'une plaque froide ou de la rampe d'une chaudière (0 auto,
       // 1 horizontal, 2 vertical), plus 4 · ses bouts plongés dans un mur
+      // — ou, d'un RIDEAU, la travée empaquetée que la glace traverse
       this.auxScratch[k * 4 + 2] =
         bx.material === 0
           ? (bx.skin ?? 0)
@@ -5939,13 +6155,18 @@ export class Renderer {
               ? // le surchauffeur n'a jamais de bout dans un mur (conduite.ts) :
                 // aux.z = charge + 2 · sens
                 this.chargeLissee(bx, sim.surchauffeurVide(bx) ? 0 : 1, timeSec) + 2 * (bx.sens ?? 0)
-              : 1
+              : rideau
+                ? rideau[0]
+                : 1
       // aux.w : la portée d'aura (chaudière) — ou, d'un SURCHAUFFEUR, son
-      // ÉCLAT de recharge (1 à l'instant du dash rendu, 0 après ~0,9 s)
+      // ÉCLAT de recharge (1 à l'instant du dash rendu, 0 après ~0,9 s) —
+      // ou, d'un RIDEAU, l'ouverture du ressort de ses lanières
       this.auxScratch[k * 4 + 3] =
         bx.material === MAT_SURCHAUFFEUR
           ? this.eclatRecharge(bx, sim.surchauffeurVide(bx), timeSec)
-          : (bx.aura ?? 1)
+          : rideau
+            ? rideau[1]
+            : (bx.aura ?? 1)
     }
     // le pas de temps du refroidissement des surchauffeurs : une fois par image
     this.chargeTemps = timeSec

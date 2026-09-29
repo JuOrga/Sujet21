@@ -543,6 +543,65 @@ export const SURCHAUFFEUR_ATLAS = {
   dome: [463, 1384, 400, 400],
 } as const
 
+/** LE RIDEAU LAMELLAIRE : une porte de chambre froide à lanières de PVC
+ *  givré, tendue entre deux MONTANTS (docs/assets-ia.md §32). Sa physique
+ *  reste le BLOC ENTIER — un filtre troué laisserait passer ce que sa règle
+ *  arrête ; seul le dessin change. Les proportions sont MESURÉES sur les
+ *  images (tools/images/filtres_atlas.py), en fractions de l'épaisseur T :
+ *  · montant : sa largeur — sa hauteur est tout T ;
+ *  · haut / bas : où tombent le rail et le bas du seuil sur le montant
+ *    (lignes 116 et 1466 d'un poteau de 19 à 1487) : le tronçon occupe
+ *    cette bande, et ses rails s'y raccordent à ceux du montant ;
+ *  · pince / finLaniere : où la lanière sort de sa pince et où elle
+ *    s'arrête, en fractions de la hauteur du TRONÇON (lignes 111 et 832
+ *    sur 1..876) — seule cette partie s'écarte, le rail et le seuil ne
+ *    bougent pas. */
+export const RIDEAU = {
+  montant: 332 / 1468,
+  haut: (116 - 19) / 1468,
+  bas: (1466 - 19) / 1468,
+  lanieres: 8,
+  pince: 110 / 875,
+  finLaniere: 831 / 875,
+} as const
+
+/** L'ATLAS DES FILTRES (filtres-atlas.webp, 1024 × 2048) : la grille de
+ *  l'évent en haut — une tuile de 960 bordée de 32 px de sa propre
+ *  répétition —, le rideau en bas. Les cadres de filtres_atlas.py. */
+export const FILTRES_ATLAS = {
+  taille: 1024,
+  hauteur: 2048,
+  grille: [0, 0, 1024, 1024],
+  margeGrille: 32,
+  corps: [0, 1034, 880, 440],
+  montant: [0, 1484, 108, 478],
+} as const
+
+/** L'ÉLARGISSEMENT des lanières. Aux proportions de l'image, une lanière
+ *  fait 0,3 fois sa hauteur pendante : sur un rideau mince, le jeu en
+ *  montrait des dizaines de 9 u — « pas assez larges par rapport à
+ *  l'asset » (retour du concepteur, 27/09). Elles sont donc étirées en
+ *  largeur : moins nombreuses, chacune plus lisible. */
+export const RIDEAU_ELARGI = 1.8
+
+/** Le pas d'une lanière, en fractions de T : le tronçon (880 × 440 px)
+ *  couvre la bande haut..bas, chacune de ses 8 lanières y fait 110 px — et
+ *  s'élargit de RIDEAU_ELARGI. */
+export const RIDEAU_PAS =
+  (FILTRES_ATLAS.corps[2] / RIDEAU.lanieres / FILTRES_ATLAS.corps[3]) * (RIDEAU.bas - RIDEAU.haut) * RIDEAU_ELARGI
+
+/** LA DISPOSITION d'un rideau de longueur L et d'épaisseur T (L ≥ T : la
+ *  longueur est le grand côté) : un montant à chaque bout, et entre eux un
+ *  nombre ENTIER de lanières, au pas mesuré à peine étiré — une lanière
+ *  coupée par un montant se lirait comme un raccord raté. Au moins une :
+ *  un rideau carré en garde une. JUMEAU de rideauDispo dans le shader. */
+export function dispositionRideau(L: number, T: number): { montant: number; n: number; pas: number } {
+  const montant = RIDEAU.montant * T
+  const reste = L - 2 * montant
+  const n = Math.max(1, Math.floor(reste / (RIDEAU_PAS * T) + 0.5))
+  return { montant, n, pas: reste / n }
+}
+
 /** LE DESSIN SELON LA PLACE :
  *  · DÔME (moins de 1,6) : le dôme de verre rond, au centre ;
  *  · COURTE : une tête à un bout, une plaque ferme l'autre ;
