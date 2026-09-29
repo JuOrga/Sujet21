@@ -95,8 +95,8 @@ import {
   FORME_COQUE,
   coquePieces,
 } from '../game/formes'
-import { aPieces, cleBoite, formePhysique } from '../game/conduite'
-import { contourAura, type Point } from './aura'
+import { aPieces, cleBoite, formesPhysiques } from '../game/conduite'
+import { contourAura, porteesAura, type ContourPieces } from './aura'
 import {
   deplaceDans,
   ditLeDeplacement,
@@ -811,20 +811,22 @@ export class LevelEditor {
   }
 
   // LES CONTOURS D'AURA, gardés d'un tracé à l'autre : l'éditeur redessine
-  // à chaque mouvement de souris, et un contour coûte quelques milliers de
-  // lectures de la forme. La clé porte tout ce qui le décide — la boîte, ses
-  // bouts plongés (qui dépendent des voisines) et la portée.
-  private contoursAura = new Map<string, Point[][]>()
-  private contourAuraCache(forme: Parameters<typeof cleBoite>[0], portee: number): Point[][] {
-    const cle = `${cleBoite(forme)}|${forme.bouts ?? 0}|${portee}`
-    let c = this.contoursAura.get(cle)
-    if (!c) {
-      // les pièces qu'on déplace laissent des clés mortes : on repart à vide
-      // plutôt que de laisser la table grossir sans fin
-      if (this.contoursAura.size > 256) this.contoursAura.clear()
-      c = contourAura(forme, portee)
-      this.contoursAura.set(cle, c)
-    }
+  // à chaque mouvement de souris. La clé porte tout ce qui les décide — la
+  // boîte, ses bouts plongés (qui dépendent des voisines), la portée et le
+  // pas. La table est RENOUVELÉE à chaque tracé (seules les clés servies y
+  // passent) : les pièces qu'on déplace n'y laissent pas de clés mortes, et
+  // un grand tableau ne la vide pas en plein tracé.
+  private contoursAura = new Map<string, ContourPieces | null>()
+  private contourAuraCache(
+    precedents: Map<string, ContourPieces | null>,
+    forme: Parameters<typeof cleBoite>[0],
+    portee: number,
+    pas: number,
+  ): ContourPieces | null {
+    const cle = `${cleBoite(forme)}|${forme.bouts ?? 0}|${portee}|${pas}`
+    let c = this.contoursAura.get(cle) ?? precedents.get(cle)
+    if (c === undefined) c = contourAura(forme, portee, pas)
+    this.contoursAura.set(cle, c)
     return c
   }
 
@@ -7482,98 +7484,84 @@ export class LevelEditor {
     })
 
     // Zones d'effet des surfaces : la portée RÉELLE des auras, aux réglages
-    // par défaut du banc. Le contour iso-distance d'un rectangle est un
-    // rectangle arrondi de rayon = portée — c'est exactement ce qu'on trace.
-    // Une FORME (chaudière, conduite, surchauffeur, disque…) rayonne depuis
-    // ce qu'elle dessine, pas depuis sa boîte : le solveur mesure sa forme
-    // physique — l'éditeur trace donc l'iso-distance de cette forme
-    // (editor/aura.ts). Avant, la rampe d'une chaudière montrait une aura
-    // débordant sur tout le long côté, et bien plus aux coins d'une ronde.
-    // La plaque froide montre AUSSI sa portée à froid complet (pointillé
-    // long) : le refroidissement du vaisseau étend son emprise en cours de
-    // partie. Le radiateur, lui, rétrécit à froid (pointillé court).
+    // par défaut du banc (porteesAura : portée + rayon d'un grain, et la
+    // portée à froid complet — la plaque froide s'étend, la chaudière
+    // rétrécit). Le contour iso-distance d'un rectangle est un rectangle
+    // arrondi de rayon = portée. Une forme à PIÈCES (chaudière, conduite)
+    // rayonne depuis ce qu'elle dessine, pas depuis sa boîte : l'éditeur
+    // trace l'iso-distance exacte de ses pièces (editor/aura.ts).
     const P = this.hooks.params?.() ?? DEFAULT_PARAMS
-    for (const box of this.level.boxes) {
-      let band = 0
-      let colA = ''
-      if (box.material === MAT_FROID) {
-        band = P.coldBand
-        colA = '#8fc8ee'
-      } else if (box.material === MAT_CHAUD) {
-        // chaque chaudière porte sa propre portée d'aura (champ Aura)
-        band = P.heatBand * (box.aura ?? 1)
-        colA = '#ff8a3c'
-      } else if (box.material === MAT_HYDROPHILE) {
-        band = P.hydroBand
-        colA = '#2ec6c9'
-      } else if (box.material === MAT_HYDROPHOBE) {
-        band = P.hydroBand
-        colA = '#a878e8'
-      }
-      if (band <= 0) continue
-      // L'aura PIVOTE avec sa pièce : la portée est une iso-distance de la
-      // surface — une pièce oblique porte donc une aura oblique. Avant,
-      // l'aura restait dessinée sur la boîte NON tournée : pivoter une
-      // chaudière laissait sa zone d'effet à l'angle d'avant (signalé).
-      const forme = formePhysique(box, this.level.boxes, this.level.bounds)
-      const aura = (
-        portee: number,
-        alphaFill: string,
-        alphaLine: string,
-        dash: number[],
-      ): void => {
-        if (forme.forme) {
+    // les formes physiques, UNE fois par tracé (mises en cache par
+    // signature du décor) : les bouts plongés d'une conduite sondent toutes
+    // les boîtes — pas à refaire pour chaque aura, à chaque mouvement
+    const formes = formesPhysiques(this.level.boxes, this.level.bounds)
+    const precedents = this.contoursAura
+    this.contoursAura = new Map()
+    // un point tous les ~2 pixels, au pas arrondi à une puissance de 2 : un
+    // zoom continu ne recalcule pas les contours à chaque cran
+    const pas = Math.min(16, Math.max(0.5, 2 ** Math.round(Math.log2(2 / this.zoom))))
+    this.level.boxes.forEach((box, bi) => {
+      const forme = formes[bi]
+      for (const a of porteesAura(box, P)) {
+        // L'aura PIVOTE avec sa pièce : la portée est une iso-distance de la
+        // surface — une pièce oblique porte donc une aura oblique.
+        const c = aPieces(box) ? this.contourAuraCache(precedents, forme, a.portee, pas) : null
+        if (c) {
+          if (a.fond) {
+            g.beginPath()
+            for (const surf of c.surfaces) {
+              surf.forEach((pt, i) => {
+                const sp = this.toScreen(pt.x, pt.y)
+                if (i === 0) g.moveTo(sp.sx, sp.sy)
+                else g.lineTo(sp.sx, sp.sy)
+              })
+              g.closePath()
+            }
+            // l'union des pièces gonflées : « nonzero » la remplit une fois
+            g.fillStyle = a.couleur + a.fond
+            g.fill('nonzero')
+          }
           g.beginPath()
-          for (const boucle of this.contourAuraCache(forme, portee)) {
-            boucle.forEach((pt, i) => {
+          for (const m of c.morceaux) {
+            m.points.forEach((pt, i) => {
               const sp = this.toScreen(pt.x, pt.y)
               if (i === 0) g.moveTo(sp.sx, sp.sy)
               else g.lineTo(sp.sx, sp.sy)
             })
-            g.closePath()
+            // seul le bord ENTIER d'une pièce se referme : un arc ouvert
+            // refermé tirerait une corde à travers la forme
+            if (m.ferme) g.closePath()
           }
-          if (alphaFill) {
-            g.fillStyle = colA + alphaFill
-            g.fill('evenodd')
-          }
-          g.strokeStyle = colA + alphaLine
-          g.setLineDash(dash)
+          g.strokeStyle = a.couleur + a.trait
+          g.setLineDash(a.tirets)
           g.lineWidth = 1
           g.stroke()
           g.setLineDash([])
-          return
+          continue
         }
-        const w = (box.maxX - box.minX + 2 * portee) * this.zoom
-        const h = (box.maxY - box.minY + 2 * portee) * this.zoom
-        const r = Math.min(portee * this.zoom, w / 2, h / 2)
-        const c = this.toScreen(
-          (box.minX + box.maxX) / 2,
-          (box.minY + box.maxY) / 2,
-        )
+        const w = (box.maxX - box.minX + 2 * a.portee) * this.zoom
+        const h = (box.maxY - box.minY + 2 * a.portee) * this.zoom
+        const r = Math.min(a.portee * this.zoom, w / 2, h / 2)
+        const ctr = this.toScreen((box.minX + box.maxX) / 2, (box.minY + box.maxY) / 2)
         g.save()
-        g.translate(c.sx, c.sy)
+        g.translate(ctr.sx, ctr.sy)
         // même convention que le tracé des pièces : l'écran a l'axe y
         // inversé, l'angle trigonométrique s'y dessine en négatif
         if (box.angle) g.rotate((-box.angle * Math.PI) / 180)
         g.beginPath()
         g.roundRect(-w / 2, -h / 2, w, h, Math.max(0, r))
-        if (alphaFill) {
-          g.fillStyle = colA + alphaFill
+        if (a.fond) {
+          g.fillStyle = a.couleur + a.fond
           g.fill()
         }
-        g.strokeStyle = colA + alphaLine
-        g.setLineDash(dash)
+        g.strokeStyle = a.couleur + a.trait
+        g.setLineDash(a.tirets)
         g.lineWidth = 1
         g.stroke()
         g.setLineDash([])
         g.restore()
       }
-      aura(band, '10', '55', [5, 4])
-      if (box.material === MAT_FROID)
-        aura(band * (1 + P.chillColdGrowth), '', '2e', [2, 7])
-      if (box.material === MAT_CHAUD)
-        aura(band * (1 - P.chillHeatFade), '', '2e', [2, 7])
-    }
+    })
 
     // LES STRUCTURES DE COQUE, sous le mobilier : on dessine les PAROIS
     // RÉELLEMENT FABRIQUÉES (portes percées comprises), pas un schéma —
