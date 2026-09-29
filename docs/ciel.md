@@ -5,7 +5,7 @@ DEHORS**) :
 
 | mode | ce que c'est | ce que ça coûte |
 |---|---|---|
-| **TERRE** (défaut) | `public/assets/terre.webp` (4096 × 2048 : le jour en RVB, les villes dans l'alpha), la planète vue de l'ISS à l'heure du joueur | ~1 Mo au téléchargement, ~45 Mo de mémoire graphique (rendus quand on la coupe) ; par pixel de ciel, un rayon contre une sphère et une lecture de texture |
+| **TERRE** (défaut) | `public/assets/terre.webp` (4096 × 2048 : le jour en RVB, les villes dans l'alpha), la planète à l'heure du joueur, vue de l'ISS ou d'un point de Lagrange | ~1 Mo au téléchargement, ~45 Mo de mémoire graphique (rendus quand on la coupe) ; par pixel de ciel, un rayon contre une sphère et une lecture de texture |
 | **PLAQUE** | `public/assets/ciel.webp` (2400², une vraie photographie), peinte dans la toile, et deux couches d'étoiles procédurales | ~1,3 Mo au téléchargement, ~30 Mo de mémoire graphique (rendus quand on la coupe) ; une lecture de texture par pixel de ciel |
 | **TUILE** | l'ancien fond : deux petites textures répétées | ~0,1 Mo |
 | **PROCÉDURAL** | rien à charger, le vide est entièrement calculé | zéro |
@@ -63,8 +63,19 @@ vraie station passe. Pour la caler sur la vraie, il suffirait de reporter
 dans `TERRE_DEFAUTS` le nœud et l'argument de latitude d'un TLE récent (le
 réseau de l'environnement de travail ne joint pas CelesTrak).
 
-- le regard est **penché de 52°** depuis le nadir, vers l'avant : le sol
-  défile vers le bas de l'écran, l'horizon courbe barre le haut ;
+- **trois points de vue** (PARAMÈTRES › LA TERRE, VUE DE…, `vue`) :
+  - **ISS** — le regard **penché de 52°** depuis le nadir, vers l'avant : le
+    sol défile vers le bas de l'écran, l'horizon courbe barre le haut ;
+  - **L1 Terre–Lune** (défaut) — à ~323 000 km, entre la Terre et la Lune
+    (position de la Lune : l'algorithme bref de l'Astronomical Almanac,
+    ~0,3°). La Terre entière, nord en haut, avec ses **phases** : pleine à
+    la nouvelle Lune, nocturne à la pleine Lune ;
+  - **L1 Soleil–Terre** — à 1,5 million de km, la vue du satellite DSCOVR
+    (caméra EPIC) : la Terre toujours pleine, qui tourne en 24 h.
+  Depuis un point de Lagrange, la Terre ferait 2° ou un demi-degré à l'œil
+  nu : elle est cadrée comme au téléobjectif (`disque`, `centreX`,
+  `centreY`). Le disque tient alors toute la texture à sa définition : là,
+  le sol est **net** ;
 - **tout ce qui ne dépend pas du pixel est cuit à l'image** (`cadreTerre`,
   une mat4) : le shader n'a qu'un rayon, un `atan`, un `asin` et une lecture ;
 - **les nuages sont cuits dans l'image**, pas calculés à l'image ;
@@ -75,7 +86,7 @@ réseau de l'environnement de travail ne joint pas CelesTrak).
 - sonde : `__terre` dans la console — `__terre.decalageMin = 46` passe du
   jour à la nuit, `__terre.force` dose la luminosité.
 
-**NETTETÉ.** À 420 km, un texel de 4096 px (~10 km à l'équateur) couvre plus
+**NETTETÉ (vue ISS).** À 420 km, un texel de 4096 px (~10 km à l'équateur) couvre plus
 d'un degré sous la station : le sol proche est doux, et aucune carte
 globale n'y changerait grand-chose (même la Blue Marble à 21 600 px resterait
 à ~5 pixels d'écran par texel). L'horizon, lui, est net.

@@ -1,4 +1,5 @@
-// LA TERRE VUE DE L'ISS — le mode TERRE du ciel du dehors.
+// LA TERRE VUE DE L'ISS — le mode TERRE du ciel du dehors. (Ou vue de
+// plus loin, entière, depuis un point de Lagrange : voir VueTerre.)
 //
 // Derrière la station, au lieu de la Voie lactée : la Terre telle qu'on la
 // voit depuis la Station spatiale internationale, à 420 km d'altitude, le
@@ -34,7 +35,29 @@ const MU_KM3_S2 = 398600.4418
 const J2 = 1.08263e-3
 const DEG = Math.PI / 180
 
+/** D'OÙ l'on regarde. L'ISS rase la Terre ; les deux points de Lagrange la
+ *  voient ENTIÈRE, comme un disque :
+ *   - 'l1-lune' : le point L1 du couple Terre–Lune, entre les deux, à ~84 %
+ *     du chemin vers la Lune (~323 000 km). La Terre y a des PHASES — celles
+ *     de la Lune vue d'ici, à l'envers : pleine Terre à la nouvelle Lune,
+ *     Terre noire semée de villes à la pleine Lune ;
+ *   - 'l1-soleil' : le point L1 du couple Soleil–Terre, à 1,5 million de km
+ *     vers le Soleil — là où veille le satellite DSCOVR, dont la caméra EPIC
+ *     photographie chaque jour la Terre PLEINE, toujours de face au jour. */
+export type VueTerre = 'iss' | 'l1-lune' | 'l1-soleil'
+
 export interface ReglagesTerre {
+  /** le point de vue (voir VueTerre) */
+  vue: VueTerre
+  /** DEPUIS UN POINT DE LAGRANGE — le rayon du disque, en fraction de la
+   *  PETITE dimension de l'écran. À l'œil nu, la Terre y ferait 2° (L1
+   *  Terre–Lune) ou un demi-degré (L1 Soleil–Terre) : on la cadre comme
+   *  un téléobjectif, comme le fait EPIC. */
+  disque: number
+  /** où se tient son centre, en fraction de l'écran (x vers la droite,
+   *  y vers le HAUT) */
+  centreX: number
+  centreY: number
   /** l'altitude de l'orbite (km) */
   altitudeKm: number
   /** l'inclinaison de l'orbite sur l'équateur (degrés) */
@@ -62,6 +85,10 @@ export interface ReglagesTerre {
 }
 
 export const TERRE_DEFAUTS: ReglagesTerre = {
+  vue: 'l1-lune',
+  disque: 0.36,
+  centreX: 0.62,
+  centreY: 0.55,
   altitudeKm: 420,
   inclinaisonDeg: 51.64,
   noeudDeg: 120,
@@ -121,6 +148,65 @@ export function soleil(ms: number): Vec3 {
     Math.sin(eps) * Math.sin(lambda),
   ]
   return versTerre(eci, tempsSideral(ms))
+}
+
+/** LA LUNE : direction (unitaire, repère lié à la Terre) et distance (km).
+ *  L'algorithme bref de l'Astronomical Almanac — ~0,3° en direction, ce qui
+ *  suffit : il ne sert qu'à placer le point L1 et donc la PHASE de la Terre,
+ *  qui se lit sur tout un mois. */
+export function lune(ms: number): { dir: Vec3; km: number } {
+  const T = joursJ2000(ms) / 36525
+  const s = (a: number, b: number): number => Math.sin((a + b * T) * DEG)
+  const c = (a: number, b: number): number => Math.cos((a + b * T) * DEG)
+  const lambda =
+    (218.32 +
+      481267.881 * T +
+      6.29 * s(135.0, 477198.87) -
+      1.27 * s(259.3, -413335.36) +
+      0.66 * s(235.7, 890534.22) +
+      0.21 * s(269.9, 954397.74) -
+      0.19 * s(357.5, 35999.05) -
+      0.11 * s(186.5, 966404.03)) *
+    DEG
+  const beta =
+    (5.13 * s(93.3, 483202.02) +
+      0.28 * s(228.2, 960400.89) -
+      0.28 * s(318.3, 6003.15) -
+      0.17 * s(217.6, -407332.21)) *
+    DEG
+  const parallaxe =
+    (0.9508 +
+      0.0518 * c(135.0, 477198.87) +
+      0.0095 * c(259.3, -413335.36) +
+      0.0078 * c(235.7, 890534.22) +
+      0.0028 * c(269.9, 954397.74)) *
+    DEG
+  const eps = (23.439 - 0.013 * T) * DEG
+  const cb = Math.cos(beta)
+  const eci: Vec3 = [
+    cb * Math.cos(lambda),
+    Math.cos(eps) * cb * Math.sin(lambda) - Math.sin(eps) * Math.sin(beta),
+    Math.sin(eps) * cb * Math.sin(lambda) + Math.cos(eps) * Math.sin(beta),
+  ]
+  return { dir: versTerre(eci, tempsSideral(ms)), km: RAYON_TERRE_KM / Math.sin(parallaxe) }
+}
+
+/** L1 Terre–Lune, en fraction de la distance à la Lune (~61 000 km avant
+ *  elle) ; L1 Soleil–Terre, à 1,5 million de km. */
+const L1_LUNE = 0.8404
+const L1_SOLEIL_KM = 1.5e6
+
+/** La position de l'observateur à un point de Lagrange, en rayons
+ *  terrestres, dans le repère lié à la Terre. */
+export function pointLagrange(ms: number, vue: 'l1-lune' | 'l1-soleil'): Vec3 {
+  if (vue === 'l1-soleil') {
+    const k = L1_SOLEIL_KM / RAYON_TERRE_KM
+    const sd = soleil(ms)
+    return [sd[0] * k, sd[1] * k, sd[2] * k]
+  }
+  const l = lune(ms)
+  const k = (l.km * L1_LUNE) / RAYON_TERRE_KM
+  return [l.dir[0] * k, l.dir[1] * k, l.dir[2] * k]
 }
 
 /** La période de l'orbite (s) : Kepler, pour une orbite circulaire. */
@@ -185,8 +271,26 @@ export function cadreTerre(
   r: ReglagesTerre = TERRE_DEFAUTS,
 ): Float32Array {
   const t = ms + r.decalageMin * 60000
-  const { pos, vol } = station(t, r)
   const sol = soleil(t)
+  const reste = Math.min(largeurCss, hauteurCss) / 8
+  const glisse = (cam: number): number =>
+    reste > 1e-6 ? reste * Math.tanh((cam * r.derive) / reste) : 0
+  if (r.vue !== 'iss') {
+    // DEPUIS UN POINT DE LAGRANGE : le regard droit sur le centre de la
+    // Terre, le NORD en haut de l'écran (comme les images d'EPIC), et une
+    // focale de téléobjectif qui donne au disque le rayon voulu
+    const pos = pointLagrange(t, r.vue)
+    const F = unite([-pos[0], -pos[1], -pos[2]])
+    const nord: Vec3 = [0, 0, 1]
+    const U = unite([nord[0] - F[0] * F[2], nord[1] - F[1] * F[2], nord[2] - F[2] * F[2]])
+    const R = croix(F, U)
+    const rayonPx = Math.max(1, r.disque * Math.min(largeurCss, hauteurCss))
+    const f = rayonPx / Math.tan(Math.asin(1 / norme(pos)))
+    const ox = largeurCss * r.centreX + glisse(camX)
+    const oy = hauteurCss * r.centreY + glisse(camY)
+    return remplit(out, F, R, U, f, ox, oy, pos, sol, r.force)
+  }
+  const { pos, vol } = station(t, r)
   const haut = unite(pos) // le zénith local
   // le vol, ramené dans le plan de l'horizon local
   const avant = unite([
@@ -211,11 +315,23 @@ export function cadreTerre(
   const f = Math.max(1, r.focale * Math.max(largeurCss, hauteurCss))
   // la dérive avec la caméra, saturée comme celle de la plaque : la Terre
   // bouge un peu quand on se déplace, ne s'en va jamais
-  const reste = Math.min(largeurCss, hauteurCss) / 8
-  const glisse = (cam: number): number =>
-    reste > 1e-6 ? reste * Math.tanh((cam * r.derive) / reste) : 0
   const ox = largeurCss / 2 + glisse(camX)
   const oy = hauteurCss / 2 + glisse(camY)
+  return remplit(out, F, R, U, f, ox, oy, pos, sol, r.force)
+}
+
+function remplit(
+  out: Float32Array,
+  F: Vec3,
+  R: Vec3,
+  U: Vec3,
+  f: number,
+  ox: number,
+  oy: number,
+  pos: Vec3,
+  sol: Vec3,
+  force: number,
+): Float32Array {
   for (let k = 0; k < 3; k++) {
     out[k] = F[k] - (R[k] * ox + U[k] * oy) / f
     out[4 + k] = R[k] / f
@@ -225,7 +341,7 @@ export function cadreTerre(
   out[3] = sol[0]
   out[7] = sol[1]
   out[11] = sol[2]
-  out[15] = r.force
+  out[15] = force
   return out
 }
 
@@ -236,7 +352,10 @@ export function rayonPixel(c: Float32Array, x: number, y: number): Vec3 | null {
   const d = unite([c[0] + c[4] * x + c[8] * y, c[1] + c[5] * x + c[9] * y, c[2] + c[6] * x + c[10] * y])
   const P: Vec3 = [c[12], c[13], c[14]]
   const b = scal(P, d)
-  const disc = b * b - (scal(P, P) - 1)
+  // le point du rayon le plus proche du centre, pris en VECTEUR — la même
+  // forme que le shader (voir `terre`, renderer.ts)
+  const m: Vec3 = [P[0] - d[0] * b, P[1] - d[1] * b, P[2] - d[2] * b]
+  const disc = 1 - scal(m, m)
   if (disc < 0 || b > 0) return null
   const t = -b - Math.sqrt(disc)
   return [P[0] + d[0] * t, P[1] + d[1] * t, P[2] + d[2] * t]

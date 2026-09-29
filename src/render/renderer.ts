@@ -1100,7 +1100,7 @@ vec3 etoiles(vec2 world, float pxMonde, float riche) {
 }
 
 /* LA TERRE VUE DE L'ISS. Par pixel : un rayon lancé contre la sphère
-   (rayon 1, la station à 1,066) et UNE lecture de texture — le jour en RVB,
+   (rayon 1 ; l'ISS à 1,066, un point de Lagrange à 50 ou 235) et UNE lecture de texture — le jour en RVB,
    les villes dans l'alpha (tools/ciel/prepare-terre.py). Tout ce qui ne
    dépend pas du pixel — l'orbite, le Soleil, le repère — est cuit par
    cadreTerre (render/terre.ts), où son jumeau rayonPixel est testé.
@@ -1113,8 +1113,14 @@ vec3 terre(vec2 css) {
   vec3 P = uTerre[3].xyz;
   vec3 sol = vec3(uTerre[0].w, uTerre[1].w, uTerre[2].w);
   float b = dot(P, d);
-  float c = dot(P, P) - 1.0;
-  float disc = b * b - c;
+  // m, le point du rayon le plus proche du centre, pris en VECTEUR : écrit
+  // b² − (|P|² − 1), le discriminant soustrait deux nombres de ~55 000
+  // depuis L1 Soleil–Terre — en flottant 32 bits, une erreur de l'ordre du
+  // pixel sur le bord du disque (estimée, pas vue), qui tremblerait au fil
+  // des images. En vecteur, rien ne se soustrait de si grand
+  vec3 m = P - d * b;
+  float mm = dot(m, m);
+  float disc = 1.0 - mm;
   // hors de la Terre, le point le plus proche du rayon : la texture y reste
   // continue, et les dérivées aussi (elles se prennent avant tout « if »)
   float tt = -b - sqrt(max(disc, 0.0));
@@ -1148,10 +1154,9 @@ vec3 terre(vec2 css) {
     // L'AIR AU BORD : une lueur mince au-dessus du limbe, bleue côté jour.
     // h, l'altitude du point le plus proche, en rayons terrestres : l'air
     // se lit sur ~100 km (0,016), et c'est ce liseré qui fait la Terre.
-    float h = sqrt(max(c - b * b + 1.0, 1.0)) - 1.0;
+    float h = sqrt(max(mm, 1.0)) - 1.0;
     float air = exp(-h / 0.0075) * step(b, 0.0);
-    vec3 m = normalize(P - d * b);
-    float jourAir = clamp(dot(m, sol) * 2.0 + 0.35, 0.0, 1.0);
+    float jourAir = clamp(dot(normalize(m), sol) * 2.0 + 0.35, 0.0, 1.0);
     col = mix(vec3(0.02, 0.03, 0.08), vec3(0.35, 0.60, 1.0), jourAir) * air * 1.3;
   }
   return col * uTerre[3].w;

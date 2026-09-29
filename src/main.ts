@@ -388,7 +388,7 @@ import {
   cadrePlaque,
   facteurG,
 } from './render/parallaxe'
-import { TERRE_DEFAUTS, cadreTerre } from './render/terre'
+import { TERRE_DEFAUTS, cadreTerre, type VueTerre } from './render/terre'
 import { PerfCollector } from './game/perf'
 import {
   fetchLibrary,
@@ -3784,6 +3784,11 @@ if (!(cielChoix in CIEL_MODE)) cielChoix = 'terre'
 // dans un seul tableau — pas d'allocation par image. Sonde : __terre depuis
 // la console (decalageMin : 46 pour passer du jour à la nuit).
 const terreReglages = { ...TERRE_DEFAUTS }
+// LE POINT DE VUE sur la Terre : l'ISS (le sol qui défile, l'horizon) ou un
+// point de Lagrange (la Terre entière, un disque) — retenu comme le ciel
+const VUES_TERRE: readonly VueTerre[] = ['iss', 'l1-lune', 'l1-soleil']
+const vueLue = localStorage.getItem('sujet21-terre-vue') as VueTerre | null
+if (vueLue && VUES_TERRE.includes(vueLue)) terreReglages.vue = vueLue
 const terreCadre = new Float32Array(16)
 ;(window as unknown as { __terre: typeof terreReglages }).__terre = terreReglages
 // Réglés au banc, à vue : c'est en regardant le vide qu'on trouve le dosage.
@@ -4105,6 +4110,34 @@ const paramsEl = document.getElementById('params') as HTMLDivElement
     }
   }
   renderCiel()
+
+  const choixVueTerre = document.getElementById('params-terre-vue') as HTMLDivElement | null
+  const renderVueTerre = (): void => {
+    if (!choixVueTerre) return
+    choixVueTerre.innerHTML = ''
+    for (const [vue, label] of [
+      ['iss', 'ISS'],
+      ['l1-lune', 'L1 TERRE–LUNE'],
+      ['l1-soleil', 'L1 SOLEIL–TERRE'],
+    ] as const) {
+      const b = document.createElement('button')
+      b.type = 'button'
+      b.textContent = label
+      b.className = terreReglages.vue === vue ? 'actif' : ''
+      b.addEventListener('click', () => {
+        terreReglages.vue = vue
+        localStorage.setItem('sujet21-terre-vue', vue)
+        // choisir un point de vue, c'est vouloir voir la Terre
+        cielChoix = 'terre'
+        localStorage.setItem('sujet21-ciel', 'terre')
+        perf.reset()
+        renderCiel()
+        renderVueTerre()
+      })
+      choixVueTerre.appendChild(b)
+    }
+  }
+  renderVueTerre()
 
   const choixRelief = document.getElementById('params-relief') as HTMLDivElement
   const renderRelief = (): void => {

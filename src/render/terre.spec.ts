@@ -9,11 +9,16 @@ import {
   TERRE_DEFAUTS,
   cadreTerre,
   latLon,
+  lune,
   periodeS,
+  pointLagrange,
   rayonPixel,
   soleil,
   station,
+  type ReglagesTerre,
 } from './terre'
+
+const ISS: ReglagesTerre = { ...TERRE_DEFAUTS, vue: 'iss' }
 
 describe('terre — le Soleil de l’instant', () => {
   it('au solstice de juin, midi sur l’Europe de l’Ouest : sous le tropique du Cancer', () => {
@@ -74,12 +79,12 @@ describe('terre — l’orbite de la station', () => {
   })
 })
 
-describe('terre — le cadre : le sol devant, l’horizon en haut', () => {
+describe('terre — le cadre depuis l’ISS : le sol devant, l’horizon en haut', () => {
   const W = 1280
   const H = 800
   const c = new Float32Array(16)
   const t = Date.UTC(2026, 8, 29, 16, 30)
-  cadreTerre(t, 0, 0, W, H, c)
+  cadreTerre(t, 0, 0, W, H, c, ISS)
 
   it('le centre de l’écran regarde le sol, devant la station', () => {
     const p = rayonPixel(c, W / 2, H / 2)
@@ -102,14 +107,14 @@ describe('terre — le cadre : le sol devant, l’horizon en haut', () => {
 
   it('sur un téléphone en portrait aussi, l’horizon reste dans l’écran', () => {
     const p = new Float32Array(16)
-    cadreTerre(t, 0, 0, 390, 844, p)
+    cadreTerre(t, 0, 0, 390, 844, p, ISS)
     expect(rayonPixel(p, 195, 0)).not.toBeNull()
     expect(rayonPixel(p, 195, 844)).toBeNull()
   })
 
   it('la dérive avec la caméra sature : la vue ne part jamais', () => {
     const loin = new Float32Array(16)
-    cadreTerre(t, 1e9, 1e9, W, H, loin)
+    cadreTerre(t, 1e9, 1e9, W, H, loin, ISS)
     // même loin, le bas de l'écran est encore la Terre et le haut le noir
     expect(rayonPixel(loin, W / 2, 0)).not.toBeNull()
     expect(rayonPixel(loin, W / 2, H)).toBeNull()
@@ -122,10 +127,83 @@ describe('terre — le cadre : le sol devant, l’horizon en haut', () => {
 
   it('le décalage d’horloge déplace la station, pas le cadrage', () => {
     const d = new Float32Array(16)
-    cadreTerre(t, 0, 0, W, H, d, { ...TERRE_DEFAUTS, decalageMin: 46 })
+    cadreTerre(t, 0, 0, W, H, d, { ...ISS, decalageMin: 46 })
     // une demi-orbite plus tard, la station est presque aux antipodes
     const a = latLon([c[12], c[13], c[14]])
     const b = latLon([d[12], d[13], d[14]])
     expect(Math.abs(a.lat + b.lat)).toBeLessThan(3)
+  })
+})
+
+describe('terre — la Lune, qui place L1 Terre–Lune', () => {
+  // janvier 2024 : nouvelle Lune le 11 à 11 h 57 UTC, pleine Lune le 25 à
+  // 17 h 54 UTC (éphémérides publiées)
+  const ecart = (ms: number): number => {
+    const a = lune(ms).dir
+    const b = soleil(ms)
+    return (Math.acos(a[0] * b[0] + a[1] * b[1] + a[2] * b[2]) * 180) / Math.PI
+  }
+
+  it('à la nouvelle Lune, elle est du côté du Soleil ; à la pleine, à l’opposé', () => {
+    expect(ecart(Date.UTC(2024, 0, 11, 12))).toBeLessThan(8)
+    expect(ecart(Date.UTC(2024, 0, 25, 18))).toBeGreaterThan(172)
+  })
+
+  it('reste entre le périgée et l’apogée', () => {
+    for (let j = 0; j < 60; j++) {
+      const km = lune(Date.UTC(2026, 8, 1) + j * 86400000).km
+      expect(km).toBeGreaterThan(355000)
+      expect(km).toBeLessThan(407500)
+    }
+  })
+})
+
+describe('terre — vue d’un point de Lagrange : un disque entier, nord en haut', () => {
+  const W = 1280
+  const H = 800
+  const r: ReglagesTerre = { ...TERRE_DEFAUTS, vue: 'l1-lune' }
+
+  it('L1 Terre–Lune est à ~323 000 km ; L1 Soleil–Terre à 1,5 million', () => {
+    const t = Date.UTC(2026, 8, 29, 12)
+    expect(Math.hypot(...pointLagrange(t, 'l1-lune')) * RAYON_TERRE_KM).toBeGreaterThan(298000)
+    expect(Math.hypot(...pointLagrange(t, 'l1-lune')) * RAYON_TERRE_KM).toBeLessThan(343000)
+    expect(Math.hypot(...pointLagrange(t, 'l1-soleil')) * RAYON_TERRE_KM).toBeCloseTo(1.5e6, -3)
+  })
+
+  for (const vue of ['l1-lune', 'l1-soleil'] as const) {
+    it(`${vue} : le disque a le rayon voulu, à l’endroit voulu`, () => {
+      const c = cadreTerre(Date.UTC(2026, 8, 29, 12), 0, 0, W, H, new Float32Array(16), { ...r, vue })
+      const cx = W * r.centreX
+      const cy = H * r.centreY
+      const rayon = r.disque * H
+      expect(rayonPixel(c, cx, cy)).not.toBeNull()
+      // le bord, au pixel près
+      expect(rayonPixel(c, cx + rayon - 2, cy)).not.toBeNull()
+      expect(rayonPixel(c, cx + rayon + 2, cy)).toBeNull()
+      expect(rayonPixel(c, cx, cy + rayon + 2)).toBeNull()
+      // le nord en haut
+      expect(latLon(rayonPixel(c, cx, cy + rayon * 0.8)!).lat).toBeGreaterThan(
+        latLon(rayonPixel(c, cx, cy - rayon * 0.8)!).lat,
+      )
+    })
+  }
+
+  it('L1 Terre–Lune : pleine Terre à la nouvelle Lune, Terre de nuit à la pleine Lune', () => {
+    const eclaire = (ms: number): number => {
+      const c = cadreTerre(ms, 0, 0, W, H, new Float32Array(16), r)
+      const p = rayonPixel(c, W * r.centreX, H * r.centreY)!
+      const n = Math.hypot(...p)
+      return (p[0] * c[3] + p[1] * c[7] + p[2] * c[11]) / n
+    }
+    expect(eclaire(Date.UTC(2024, 0, 11, 12))).toBeGreaterThan(0.95)
+    expect(eclaire(Date.UTC(2024, 0, 25, 18))).toBeLessThan(-0.95)
+  })
+
+  it('L1 Soleil–Terre : la Terre toujours pleine, de face au jour (la vue d’EPIC)', () => {
+    for (const ms of [Date.UTC(2026, 2, 1), Date.UTC(2026, 6, 14, 5), Date.UTC(2026, 11, 3, 20)]) {
+      const c = cadreTerre(ms, 0, 0, W, H, new Float32Array(16), { ...r, vue: 'l1-soleil' })
+      const p = rayonPixel(c, W * r.centreX, H * r.centreY)!
+      expect((p[0] * c[3] + p[1] * c[7] + p[2] * c[11]) / Math.hypot(...p)).toBeGreaterThan(0.99)
+    }
   })
 })
