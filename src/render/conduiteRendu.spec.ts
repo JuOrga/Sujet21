@@ -116,7 +116,8 @@ describe('la recharge d’un surchauffeur se voit', () => {
   })
 
   it('le moteur remplit aux.w de l’éclat pour un surchauffeur, de l’aura pour le reste', () => {
-    expect(source).toMatch(/bx\.material === MAT_SURCHAUFFEUR\s*\?\s*this\.eclatRecharge\(bx, sim\.surchauffeurVide\(bx\), timeSec\)\s*:\s*\(bx\.aura \?\? 1\)/)
+    // (un rideau y met l'âge de son balancement : rideauSuivi.ts)
+    expect(source).toMatch(/bx\.material === MAT_SURCHAUFFEUR\s*\?\s*this\.eclatRecharge\(bx, sim\.surchauffeurVide\(bx\), timeSec\)\s*:\s*rideau\s*\?\s*rideau\[1\]\s*:\s*\(bx\.aura \?\? 1\)/)
   })
 
   it('l’onde de choc n’est pas coupée par le rejet grossier : la portée s’élargit pendant l’éclat', () => {
