@@ -1107,8 +1107,11 @@ vec3 etoiles(vec2 world, float pxMonde, float riche) {
    LA COUTURE : à ±180°, la longitude saute de 1 à 0 d'un pixel à l'autre ;
    laissé au GPU, ce saut choisirait le plus petit niveau de détail et
    tracerait un trait flou du pôle au pôle. On lui donne donc les dérivées
-   de la longitude prise des DEUX côtés de la couture, et la plus petite. */
-vec3 terre(vec2 css) {
+   de la longitude prise des DEUX côtés de la couture, et la plus petite.
+   L'ALPHA dit si le rayon a touché la Terre : c'est lui, et non la
+   luminosité, qui cache les étoiles — la face de nuit est presque noire,
+   et les étoiles y transparaissaient à travers la planète. */
+vec4 terre(vec2 css) {
   vec3 d = normalize(uTerre[0].xyz + uTerre[1].xyz * css.x + uTerre[2].xyz * css.y);
   vec3 P = uTerre[3].xyz;
   vec3 sol = vec3(uTerre[0].w, uTerre[1].w, uTerre[2].w);
@@ -1134,7 +1137,9 @@ vec3 terre(vec2 css) {
   // frôle la Terre au plus près
   float mu = dot(n, sol);
   vec3 col;
+  float touche = 0.0;
   if (disc > 0.0 && b < 0.0) {
+    touche = 1.0;
     vec4 tx = textureGrad(uTexCiel, uv, dx, dy);
     // le jour, avec un peu de lumière diffusée côté nuit du terminateur ;
     // et jamais tout à fait zéro : la nuit, la lune et la lueur de l'air
@@ -1159,7 +1164,7 @@ vec3 terre(vec2 css) {
     float jourAir = clamp(dot(normalize(m), sol) * 2.0 + 0.35, 0.0, 1.0);
     col = mix(vec3(0.02, 0.03, 0.08), vec3(0.35, 0.60, 1.0), jourAir) * air * 1.3;
   }
-  return col * uTerre[3].w;
+  return vec4(col * uTerre[3].w, touche);
 }
 
 // Champ doux sans réseau : somme de sinus modulés. Le bruit de valeur, à très
@@ -2146,14 +2151,30 @@ void main() {
   // procédural d'intérim.
   vec3 voidCol;
   if (uCielMode > 2.5) {
-    // LA TERRE VUE DE L'ISS (render/terre.ts) — l'horloge du joueur, la
-    // station qui file, le jour et la nuit de l'instant. Les étoiles
-    // proches n'y sont que dans le NOIR au-dessus de l'horizon : sur le
-    // sol, elles se liraient comme des poussières sur la vitre.
-    voidCol = uHasCiel > 0.5 ? terre(css) : vec3(0.004, 0.007, 0.014);
+    // LA TERRE (render/terre.ts) — l'horloge du joueur, le jour et la nuit
+    // de l'instant, vue de l'ISS ou d'un point de Lagrange.
+    vec4 planete = uHasCiel > 0.5 ? terre(css) : vec4(0.004, 0.007, 0.014, 0.0);
+    voidCol = planete.rgb;
+    // LES ÉTOILES, DERRIÈRE ELLE. Infiniment plus loin que la Terre, elles
+    // bougent MOINS qu'elle quand la caméra se déplace ou zoome : pas du
+    // tout. Elles sont donc posées sur l'ÉCRAN, en pixels, jamais sur le
+    // plan de jeu — les premières l'étaient, défilaient à la vitesse de la
+    // station devant une Terre presque immobile, et la profondeur se lisait
+    // à l'envers (« ça fait bizarre quand on déplace »). Ce sont les étoiles
+    // nettes du mode procédural (un noyau d'un pixel et demi, une loi de
+    // puissance sur l'éclat), en quatre couches au lieu de huit, et
+    // seulement HORS DU DISQUE — la Terre les cache, jour comme nuit — et
+    // estompées dans le liseré d'air ; sur le disque, elles ne se paient pas.
     if (uDecor > 0.5) {
-      float noir = 1.0 - smoothstep(0.004, 0.04, dot(voidCol, vec3(0.33)));
-      voidCol += vec3(0.75, 0.82, 0.95) * specks(world + 500.0, 200.0, 0.08, uZoom) * 0.5 * noir;
+      float noir = (1.0 - planete.a) * (1.0 - smoothstep(0.004, 0.04, dot(voidCol, vec3(0.33))));
+      if (noir > 0.0) {
+        float px = 1.0 / uDpr; // un pixel de la toile, en px CSS
+        vec3 e = etoilesCouche(css, 11.0, 0.30, px, 0.30, 3.0);
+        e += etoilesCouche(css, 19.0, 0.34, px, 0.42, 19.0);
+        e += etoilesCouche(css, 37.0, 0.40, px, 0.65, 7.0);
+        e += etoilesCouche(css, 89.0, 0.45, px, 1.10, 29.0);
+        voidCol += e * noir;
+      }
     }
   } else if (uCielMode > 1.5) {
     // LA PLAQUE, PEINTE DANS LA TOILE, comme les autres fonds. Elle a vécu

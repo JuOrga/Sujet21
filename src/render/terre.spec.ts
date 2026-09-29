@@ -3,6 +3,8 @@
 // la période, et le cadre : le sol devant, l'horizon en haut, le noir
 // au-dessus.
 
+import { readFileSync } from 'node:fs'
+import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
 import {
   RAYON_TERRE_KM,
@@ -205,5 +207,40 @@ describe('terre — vue d’un point de Lagrange : un disque entier, nord en hau
       const p = rayonPixel(c, W * r.centreX, H * r.centreY)!
       expect((p[0] * c[3] + p[1] * c[7] + p[2] * c[11]) / Math.hypot(...p)).toBeGreaterThan(0.99)
     }
+  })
+})
+
+// LE CIEL DERRIÈRE LA TERRE. Les étoiles sont infiniment plus loin que la
+// Terre : quand la caméra se déplace ou zoome, elles doivent bouger MOINS
+// qu'elle — donc pas du tout. Les premières étoiles de ce mode étaient
+// indexées par `world` : collées au plan de jeu, elles défilaient à la
+// vitesse de la station et grossissaient au zoom, pendant que la Terre ne
+// bougeait presque pas — la profondeur à l'envers (« ça fait bizarre quand
+// on déplace »). Le test lit la branche Terre du shader de composition.
+describe('terre — les étoiles sont derrière la Terre, pas collées au jeu', () => {
+  const source = readFileSync(fileURLToPath(new URL('./renderer.ts', import.meta.url)), 'utf8')
+  const debut = source.indexOf('if (uCielMode > 2.5) {')
+  const fin = source.indexOf('} else if (uCielMode > 1.5) {', debut)
+  const branche = source.slice(debut, fin)
+
+  it('la branche Terre existe', () => {
+    expect(debut).toBeGreaterThan(0)
+    expect(fin).toBeGreaterThan(debut)
+  })
+
+  it('aucune couche d’étoiles n’y dépend de la position ni du zoom de la caméra', () => {
+    expect(branche).not.toMatch(/\bworld\b/)
+    expect(branche).not.toMatch(/\buZoom\b/)
+    expect(branche).not.toMatch(/\bspecks\s*\(/)
+  })
+
+  it('ses étoiles sont les étoiles nettes, mesurées en pixels de l’écran', () => {
+    expect(branche).toMatch(/etoilesCouche\s*\(/)
+  })
+
+  it('la Terre cache les étoiles par sa FORME (l’alpha de terre()), pas par sa luminosité', () => {
+    // la face de nuit est presque noire : un masque de luminosité seul y
+    // laissait passer les étoiles, à travers la planète
+    expect(branche).toMatch(/noir\s*=\s*\(1\.0\s*-\s*planete\.a\)/)
   })
 })

@@ -83,6 +83,12 @@ réseau de l'environnement de travail ne joint pas CelesTrak).
   flou d'un pôle à l'autre) ;
 - les villes sont dans l'alpha **inversé** (`255 − 127 · lumière`), pour
   qu'un décodage en alpha prémultiplié n'éteigne jamais l'océan ;
+- **les étoiles sont posées sur l'ÉCRAN**, pas sur le plan de jeu : plus
+  loin que la Terre, elles bougent moins qu'elle — pas du tout — quand la
+  caméra se déplace ou zoome ; la Terre, elle, glisse un peu (`derive`).
+  Collées au jeu, elles défilaient devant une Terre immobile : la profondeur
+  à l'envers. Ce sont les étoiles nettes (`etoilesCouche`), quatre couches,
+  cachées par le disque — jour comme nuit ;
 - sonde : `__terre` dans la console — `__terre.decalageMin = 46` passe du
   jour à la nuit, `__terre.force` dose la luminosité.
 
