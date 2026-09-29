@@ -388,6 +388,7 @@ import {
   cadrePlaque,
   facteurG,
 } from './render/parallaxe'
+import { TERRE_DEFAUTS, cadreTerre } from './render/terre'
 import { PerfCollector } from './game/perf'
 import {
   fetchLibrary,
@@ -3768,16 +3769,23 @@ let exterieurActif = (() => {
 // Un choix de goût autant que de coût : le joueur qui préfère l'ancien le
 // retrouve tel quel.
 let voileSobre = localStorage.getItem('sujet21-voile') === 'sobre'
-// LE CIEL DU DEHORS. Trois fonds pour le vide, du plus riche au plus léger :
-// la PLAQUE (une image de 4096², un champ profond), la TUILE d'intérim
-// (l'ancien fond, deux petites textures répétées), le PROCÉDURAL (rien à
-// charger, tout calculé). La plaque ne se télécharge qu'à son premier
-// affichage — un joueur qui la coupe ne la paie jamais.
-type CielChoix = 'plaque' | 'tuile' | 'procedural'
-const CIEL_MODE: Record<CielChoix, number> = { procedural: 0, tuile: 1, plaque: 2 }
+// LE CIEL DU DEHORS. Quatre fonds pour le vide : la TERRE vue de l'ISS
+// (défaut — la planète sous la station, à l'heure du joueur, render/terre.ts),
+// la PLAQUE (une Voie lactée photographiée), la TUILE d'intérim (l'ancien
+// fond, deux petites textures répétées), le PROCÉDURAL (rien à charger, tout
+// calculé). La Terre et la plaque ne se téléchargent qu'à leur premier
+// affichage — un joueur qui les coupe ne les paie jamais.
+type CielChoix = 'terre' | 'plaque' | 'tuile' | 'procedural'
+const CIEL_MODE: Record<CielChoix, number> = { procedural: 0, tuile: 1, plaque: 2, terre: 3 }
 let cielChoix = (localStorage.getItem('sujet21-ciel') ??
-  'plaque') as CielChoix
-if (!(cielChoix in CIEL_MODE)) cielChoix = 'plaque'
+  'terre') as CielChoix
+if (!(cielChoix in CIEL_MODE)) cielChoix = 'terre'
+// LA TERRE : ses réglages (render/terre.ts) et son cadre, cuit à l'image
+// dans un seul tableau — pas d'allocation par image. Sonde : __terre depuis
+// la console (decalageMin : 46 pour passer du jour à la nuit).
+const terreReglages = { ...TERRE_DEFAUTS }
+const terreCadre = new Float32Array(16)
+;(window as unknown as { __terre: typeof terreReglages }).__terre = terreReglages
 // Réglés au banc, à vue : c'est en regardant le vide qu'on trouve le dosage.
 // La FORCE dose la plaque — le vide doit rester plus sombre que la cuve
 // éclairée, sans quoi la hiérarchie lumineuse s'inverse. L'ÉTENDUE dit
@@ -4078,6 +4086,7 @@ const paramsEl = document.getElementById('params') as HTMLDivElement
     if (!choixCiel) return
     choixCiel.innerHTML = ''
     for (const [mode, label] of [
+      ['terre', 'TERRE'],
       ['plaque', 'PLAQUE'],
       ['tuile', 'TUILE'],
       ['procedural', 'PROCÉDURAL'],
@@ -19754,7 +19763,7 @@ function corpsImage(now: number): boolean {
   renderer.setCiel(CIEL_MODE[cielChoix])
   // LA PLAQUE, cadrée à l'image : une seule Voie lactée, jamais agrandie
   // au-delà de ce que l'image rend net sur CET écran (densité native)
-  if (CIEL_MODE[cielChoix] > 1.5 && renderer.plaqueTexels > 0) {
+  if (cielChoix === 'plaque' && renderer.plaqueTexels > 0) {
     plaqueReglages.taille = cielReglages.taille
     const c = cadrePlaque(
       camera.x, camera.y, camera.zoom, vw, vh,
@@ -19766,6 +19775,14 @@ function corpsImage(now: number): boolean {
     // bornée à 1, comme l'opacité du calque qui la dosait : au-delà, la
     // photographie sature et le vide passe devant la cuve éclairée
     renderer.setPlaque(c.cx, c.cy, c.parPx, Math.min(1, Math.max(0, cielReglages.force)))
+  }
+  // LA TERRE, à l'horloge du joueur : la station a avancé depuis l'image
+  // précédente, le Soleil aussi — c'est Date.now() et non le temps du jeu,
+  // qui s'arrête en pause : dehors, l'orbite ne s'arrête pas.
+  if (cielChoix === 'terre') {
+    renderer.setTerre(
+      cadreTerre(Date.now(), camera.x, camera.y, vw, vh, terreCadre, terreReglages),
+    )
   }
   // LA PROFONDEUR DES COUCHES DE FOND : posée à l'image comme le ciel, pour
   // que le banc l'entende tout de suite. Le facteur se cuisine ICI, une fois

@@ -1,11 +1,12 @@
 # La plaque de ciel — remplacer le fond du vide
 
-Le fond du vide, derrière la station, a trois formes (PARAMÈTRES › **LE CIEL DU
+Le fond du vide, derrière la station, a quatre formes (PARAMÈTRES › **LE CIEL DU
 DEHORS**) :
 
 | mode | ce que c'est | ce que ça coûte |
 |---|---|---|
-| **PLAQUE** (défaut) | `public/assets/ciel.webp` (2400², une vraie photographie), peinte dans la toile, et deux couches d'étoiles procédurales | ~1,3 Mo au téléchargement, ~30 Mo de mémoire graphique (rendus quand on la coupe) ; une lecture de texture par pixel de ciel |
+| **TERRE** (défaut) | `public/assets/terre.webp` (4096 × 2048 : le jour en RVB, les villes dans l'alpha), la planète vue de l'ISS à l'heure du joueur | ~1 Mo au téléchargement, ~45 Mo de mémoire graphique (rendus quand on la coupe) ; par pixel de ciel, un rayon contre une sphère et une lecture de texture |
+| **PLAQUE** | `public/assets/ciel.webp` (2400², une vraie photographie), peinte dans la toile, et deux couches d'étoiles procédurales | ~1,3 Mo au téléchargement, ~30 Mo de mémoire graphique (rendus quand on la coupe) ; une lecture de texture par pixel de ciel |
 | **TUILE** | l'ancien fond : deux petites textures répétées | ~0,1 Mo |
 | **PROCÉDURAL** | rien à charger, le vide est entièrement calculé | zéro |
 
@@ -44,6 +45,44 @@ résolutions réduites, le ciel suit la résolution, comme le décor.
   (`plancher`, `src/render/camera.ts`).
 
 Les trois modes sont peints dans la toile ; aucun ne passe par le compositeur.
+
+---
+
+## La Terre vue de l'ISS
+
+`src/render/terre.ts` (la règle, testée) et `terre()` dans
+`src/render/renderer.ts` (le shader, `uCielMode` 3, `uTerre`).
+
+**Simulée, réglée sur l'horloge** — pas une transmission. Ce qui est VRAI :
+le Soleil de l'instant (la ligne du jour et de la nuit, les saisons), la
+rotation de la Terre, l'orbite de l'ISS (420 km, 51,64°, un tour en
+~92,8 min, le plan qui recule de ~5° par jour). Ce qui est ARBITRAIRE : la
+**phase** de l'orbite (`noeudDeg`, `latitudeArgDeg` à `epoqueMs`) — sans
+éléments orbitaux frais, on ne prétend pas dire au-dessus de quel pays la
+vraie station passe. Pour la caler sur la vraie, il suffirait de reporter
+dans `TERRE_DEFAUTS` le nœud et l'argument de latitude d'un TLE récent (le
+réseau de l'environnement de travail ne joint pas CelesTrak).
+
+- le regard est **penché de 52°** depuis le nadir, vers l'avant : le sol
+  défile vers le bas de l'écran, l'horizon courbe barre le haut ;
+- **tout ce qui ne dépend pas du pixel est cuit à l'image** (`cadreTerre`,
+  une mat4) : le shader n'a qu'un rayon, un `atan`, un `asin` et une lecture ;
+- **les nuages sont cuits dans l'image**, pas calculés à l'image ;
+- **la couture de ±180°** est traitée par `textureGrad` (sinon : un trait
+  flou d'un pôle à l'autre) ;
+- les villes sont dans l'alpha **inversé** (`255 − 127 · lumière`), pour
+  qu'un décodage en alpha prémultiplié n'éteigne jamais l'océan ;
+- sonde : `__terre` dans la console — `__terre.decalageMin = 46` passe du
+  jour à la nuit, `__terre.force` dose la luminosité.
+
+**NETTETÉ.** À 420 km, un texel de 4096 px (~10 km à l'équateur) couvre plus
+d'un degré sous la station : le sol proche est doux, et aucune carte
+globale n'y changerait grand-chose (même la Blue Marble à 21 600 px resterait
+à ~5 pixels d'écran par texel). L'horizon, lui, est net.
+
+Refaire la texture : `tools/ciel/prepare-terre.py` (les sources et la
+commande sont dans son en-tête). Images NASA Earth Observatory, Blue Marble
+et Black Marble, domaine public.
 
 ---
 

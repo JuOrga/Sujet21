@@ -829,11 +829,16 @@ uniform sampler2D uTexStars;
 // n'en a que seize garanties, et les seize sont prises. Selon le mode, on y
 // lie la tuile lointaine du fond tuilé, ou la photographie de la plaque.
 uniform sampler2D uTexCiel;
-uniform float uCielMode;   // 0 procédural · 1 tuilé · 2 plaque
+uniform float uCielMode;   // 0 procédural · 1 tuilé · 2 plaque · 3 la Terre
 // LA PLAQUE : le point de l'image au centre de l'écran (x, y ; y vers le
 // haut), la part de l'image par px CSS, et la force — cadrePlaque
 // (render/parallaxe.ts), calculé à l'image par main.ts
 uniform vec4 uPlaque;
+// LA TERRE VUE DE L'ISS : le rayon du coin bas-gauche, les pas d'un px CSS
+// vers la droite et vers le haut, la station — le Soleil et la force dans
+// les quatrièmes composantes. Cuit à l'image par cadreTerre
+// (render/terre.ts) : une seule mat4, quatre vecteurs d'uniformes.
+uniform mat4 uTerre;
 // LA PROFONDEUR DES COUCHES DE FOND. Chaque couche porte DEUX nombres, tous
 // deux entre 0 et 1 et avec la même convention : 1 = elle se comporte comme
 // le plan de jeu, 0 = elle est infiniment loin.
@@ -1092,6 +1097,64 @@ vec3 etoiles(vec2 world, float pxMonde, float riche) {
   e += etoilesCouche(pP, 190.0, 0.40, xP, 1.15, 37.0);
   e += etoilesCouche(pP, 430.0, 0.35, xP, 1.50, 51.0);
   return e;
+}
+
+/* LA TERRE VUE DE L'ISS. Par pixel : un rayon lancé contre la sphère
+   (rayon 1, la station à 1,066) et UNE lecture de texture — le jour en RVB,
+   les villes dans l'alpha (tools/ciel/prepare-terre.py). Tout ce qui ne
+   dépend pas du pixel — l'orbite, le Soleil, le repère — est cuit par
+   cadreTerre (render/terre.ts), où son jumeau rayonPixel est testé.
+   LA COUTURE : à ±180°, la longitude saute de 1 à 0 d'un pixel à l'autre ;
+   laissé au GPU, ce saut choisirait le plus petit niveau de détail et
+   tracerait un trait flou du pôle au pôle. On lui donne donc les dérivées
+   de la longitude prise des DEUX côtés de la couture, et la plus petite. */
+vec3 terre(vec2 css) {
+  vec3 d = normalize(uTerre[0].xyz + uTerre[1].xyz * css.x + uTerre[2].xyz * css.y);
+  vec3 P = uTerre[3].xyz;
+  vec3 sol = vec3(uTerre[0].w, uTerre[1].w, uTerre[2].w);
+  float b = dot(P, d);
+  float c = dot(P, P) - 1.0;
+  float disc = b * b - c;
+  // hors de la Terre, le point le plus proche du rayon : la texture y reste
+  // continue, et les dérivées aussi (elles se prennent avant tout « if »)
+  float tt = -b - sqrt(max(disc, 0.0));
+  vec3 n = normalize(P + d * tt);
+  vec2 uv = vec2(atan(n.y, n.x) * 0.15915494 + 0.5, asin(clamp(n.z, -1.0, 1.0)) * 0.31830989 + 0.5);
+  vec2 dx = dFdx(uv), dy = dFdy(uv);
+  float ux = dFdx(fract(uv.x + 0.5)), uy = dFdy(fract(uv.x + 0.5));
+  if (abs(ux) < abs(dx.x)) dx.x = ux;
+  if (abs(uy) < abs(dy.x)) dy.x = uy;
+  // l'éclairage, au point touché, et l'atmosphère, au point où le rayon
+  // frôle la Terre au plus près
+  float mu = dot(n, sol);
+  vec3 col;
+  if (disc > 0.0 && b < 0.0) {
+    vec4 tx = textureGrad(uTexCiel, uv, dx, dy);
+    // le jour, avec un peu de lumière diffusée côté nuit du terminateur ;
+    // et jamais tout à fait zéro : la nuit, la lune et la lueur de l'air
+    // laissent deviner les côtes — sans elles, un océan de nuit est un trou
+    float jour = clamp(mu * 1.15 + 0.06, 0.025, 1.0);
+    col = tx.rgb * jour;
+    // le TERMINATEUR rougeoie : le soleil couchant traverse l'air en biais
+    col *= mix(vec3(1.0), vec3(1.25, 0.82, 0.60), smoothstep(0.35, 0.0, mu) * step(-0.05, mu));
+    // les VILLES, relues de l'alpha inversé : 2 · (1 − a)
+    float villes = clamp(2.0 * (1.0 - tx.a), 0.0, 1.0);
+    col += vec3(1.0, 0.72, 0.38) * villes * villes * 1.6 * (1.0 - smoothstep(-0.10, 0.04, mu));
+    // la brume vers l'horizon : plus le regard est rasant, plus l'air compte
+    float rasant = 1.0 - clamp(-dot(d, n), 0.0, 1.0);
+    float brume = rasant * rasant * rasant;
+    col = mix(col, vec3(0.32, 0.52, 0.95) * clamp(mu * 1.4 + 0.15, 0.0, 1.0), brume * 0.75);
+  } else {
+    // L'AIR AU BORD : une lueur mince au-dessus du limbe, bleue côté jour.
+    // h, l'altitude du point le plus proche, en rayons terrestres : l'air
+    // se lit sur ~100 km (0,016), et c'est ce liseré qui fait la Terre.
+    float h = sqrt(max(c - b * b + 1.0, 1.0)) - 1.0;
+    float air = exp(-h / 0.0075) * step(b, 0.0);
+    vec3 m = normalize(P - d * b);
+    float jourAir = clamp(dot(m, sol) * 2.0 + 0.35, 0.0, 1.0);
+    col = mix(vec3(0.02, 0.03, 0.08), vec3(0.35, 0.60, 1.0), jourAir) * air * 1.3;
+  }
+  return col * uTerre[3].w;
 }
 
 // Champ doux sans réseau : somme de sinus modulés. Le bruit de valeur, à très
@@ -2077,7 +2140,17 @@ void main() {
   // lointaine en parallaxe : elle suit à moitié la caméra), sinon décor
   // procédural d'intérim.
   vec3 voidCol;
-  if (uCielMode > 1.5) {
+  if (uCielMode > 2.5) {
+    // LA TERRE VUE DE L'ISS (render/terre.ts) — l'horloge du joueur, la
+    // station qui file, le jour et la nuit de l'instant. Les étoiles
+    // proches n'y sont que dans le NOIR au-dessus de l'horizon : sur le
+    // sol, elles se liraient comme des poussières sur la vitre.
+    voidCol = uHasCiel > 0.5 ? terre(css) : vec3(0.004, 0.007, 0.014);
+    if (uDecor > 0.5) {
+      float noir = 1.0 - smoothstep(0.004, 0.04, dot(voidCol, vec3(0.33)));
+      voidCol += vec3(0.75, 0.82, 0.95) * specks(world + 500.0, 200.0, 0.08, uZoom) * 0.5 * noir;
+    }
+  } else if (uCielMode > 1.5) {
     // LA PLAQUE, PEINTE DANS LA TOILE, comme les autres fonds. Elle a vécu
     // un temps en calque HTML derrière une toile transparente, pour rester
     // nette quel que soit le réglage de résolution : sur le Steam Deck, le
@@ -4788,7 +4861,9 @@ export class Renderer {
   private texStarsFar: WebGLTexture | null = null
   private cielMode = 2
   private texPlaque: WebGLTexture | null = null
-  private plaqueDemandee = false
+  /** l'image du ciel demandée (plaque ou Terre), null pour les autres modes */
+  private cielDemande: string | null = null
+  private readonly terreCadre = new Float32Array(16)
   /** La largeur de la photographie en pixels, 0 tant qu'elle n'est pas là :
    *  cadrePlaque en a besoin pour ne jamais l'agrandir au-delà du net. */
   plaqueTexels = 0
@@ -5258,34 +5333,40 @@ export class Renderer {
   }
 
   /**
-   * LE CIEL DU DEHORS. 0 procédural · 1 tuilé (l'intérim) · 2 la plaque.
-   * Appelé À L'IMAGE, comme tout ce qui pilote le renderer : une fonction
-   * lancée au chargement du module ne peut pas le toucher — il n'existe pas
-   * encore (cf. src/main-amorce.spec.ts).
+   * LE CIEL DU DEHORS. 0 procédural · 1 tuilé (l'intérim) · 2 la plaque ·
+   * 3 la Terre vue de l'ISS. Appelé À L'IMAGE, comme tout ce qui pilote le
+   * renderer : une fonction lancée au chargement du module ne peut pas le
+   * toucher — il n'existe pas encore (cf. src/main-amorce.spec.ts).
    */
   setCiel(mode: number): void {
     this.cielMode = mode
-    // LA PLAQUE ne se télécharge qu'à son premier affichage : qui garde un
-    // autre fond ne paie ni la photographie (1,3 Mo) ni sa mémoire graphique
-    // (2400², avec ses niveaux de détail : ~30 Mo) — et qui la coupe la
-    // rend : c'est le geste qu'on fait quand l'appareil peine.
-    if (mode > 1.5 && !this.plaqueDemandee) {
-      this.plaqueDemandee = true
-      this.loadTexture('/assets/ciel.webp', false, true, (t, img) => {
-        // coupée pendant le téléchargement : on ne la loge pas
-        if (!this.plaqueDemandee) {
-          this.gl.deleteTexture(t)
-          return
-        }
-        this.texPlaque = t
-        this.plaqueTexels = img.naturalWidth
-      })
-    } else if (mode < 1.5 && this.plaqueDemandee) {
-      this.plaqueDemandee = false
-      if (this.texPlaque) this.gl.deleteTexture(this.texPlaque)
-      this.texPlaque = null
-      this.plaqueTexels = 0
-    }
+    // LA PLAQUE ou LA TERRE ne se téléchargent qu'à leur premier affichage :
+    // qui garde un autre fond ne paie ni l'image (1,3 Mo la plaque, 1 Mo la
+    // Terre) ni sa mémoire graphique (~30 Mo, ~45 Mo avec les niveaux de
+    // détail) — et qui en change rend la précédente : elles se partagent
+    // l'unité de texture du ciel, jamais deux à la fois.
+    const url = mode > 2.5 ? '/assets/terre.webp' : mode > 1.5 ? '/assets/ciel.webp' : null
+    if (url === this.cielDemande) return
+    if (this.texPlaque) this.gl.deleteTexture(this.texPlaque)
+    this.texPlaque = null
+    this.plaqueTexels = 0
+    this.cielDemande = url
+    if (!url) return
+    // la Terre fait le tour : elle se raccorde à ±180°, la plaque non
+    this.loadTexture(url, url.endsWith('terre.webp'), true, (t, img) => {
+      // changée pendant le téléchargement : on ne la loge pas
+      if (this.cielDemande !== url) {
+        this.gl.deleteTexture(t)
+        return
+      }
+      this.texPlaque = t
+      this.plaqueTexels = img.naturalWidth
+    })
+  }
+
+  /** Le cadre de la Terre pour cette image (cadreTerre, render/terre.ts). */
+  setTerre(cadre: Float32Array): void {
+    this.terreCadre.set(cadre)
   }
 
   /** Le cadre de la plaque pour cette image (cadrePlaque, main.ts) : le point
@@ -6185,6 +6266,7 @@ export class Renderer {
     bindTex(7, this.cielMode > 1.5 ? this.texPlaque : this.texStarsFar, 'uTexCiel', 'uHasCiel')
     gl.uniform1f(cu['uCielMode'], this.cielMode)
     gl.uniform4f(cu['uPlaque'], this.plaque[0], this.plaque[1], this.plaque[2], this.plaque[3])
+    gl.uniformMatrix4fv(cu['uTerre'], false, this.terreCadre)
     gl.uniform2fv(cu['uParCiel'], this.parCiel)
     gl.uniform2fv(cu['uParSemis'], this.parSemis)
     gl.uniform2fv(cu['uParCuve'], this.parCuve)
