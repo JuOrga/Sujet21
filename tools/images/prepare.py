@@ -122,7 +122,7 @@ FAMILLES: list[Famille] = [
     ),
     Famille(
         'surface répétée',
-        ('wall', 'wall-*', 'phile', 'phobe', 'froid', 'grille', 'tank-bg'),
+        ('wall', 'wall-*', 'phile', 'phobe', 'froid', 'tank-bg'),
         taille=(1024, 1024), raccord_x=True, raccord_y=True, luma_max=0.32, poids_max_ko=300,
     ),
     Famille(
@@ -155,6 +155,13 @@ FAMILLES: list[Famille] = [
         # la tête de vanne (25/09) le porte à 441 Ko à 78
         qualite=78, poids_max_ko=450,
         note='quatre pièces assemblées par tools/images/conduite_atlas.py — leurs cadres sont un contrat avec le shader',
+    ),
+    Famille(
+        # la grille de l'évent (l'ancienne grille.webp, qu'il remplace) et le
+        # rideau lamellaire — la famille des filtres, sur l'unité de la grille
+        'atlas des filtres', ('filtres-atlas',), taille=(1024, 2048), luma_max=0.60,
+        qualite=80, poids_max_ko=450,
+        note='la grille et le rideau assemblés par tools/images/filtres_atlas.py — leurs cadres sont un contrat avec le shader',
     ),
     Famille(
         'atlas des chaleurs', ('chaudiere-atlas',), taille=(1024, 2048), luma_max=0.60,
