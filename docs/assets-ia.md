@@ -1788,13 +1788,20 @@ L'eau et la vapeur arrêtées contre ses faces le font frémir lentement ; un
 souffle d'air le balance à peine au repos. Le rail, les pinces et le seuil
 ne bougent pas. L'écartement ouvre sur le noir du dessous du bloc.
 
+La travée se dit par son MILIEU, figé au début du passage, et sa
+demi-largeur, qui rejoint la glace en douceur : un élargissement ne fait
+changer aucune lanière de côté. Une glace qui traverse AILLEURS (à plus
+d'une lanière) repart de sa propre travée. Limite connue : deux morceaux de
+glace qui traversent ensemble loin l'un de l'autre font une seule travée —
+il faudrait un état par lanière, et aucun canal vers le shader n'est libre.
+
 Première version (27/09) : l'ouverture était lue à l'instant dans le
 champ du fluide, et un balancement prenait le relais à la sortie — le
 mouvement suivait le bruit du champ, le côté de poussée pouvait basculer,
 et le relais se voyait : « pas assez smooth » (retour du concepteur).
 
 **LA DISPOSITION** (`dispositionRideau`, jumeau `rideauDispo`) : un montant
-à chaque bout (0,226 T, 30 % de L au plus), et entre eux un nombre ENTIER de
+à chaque bout (0,226 T), et entre eux un nombre ENTIER de
 lanières au pas mesuré ÉLARGI de 1,8 (0,41 T), à peine étiré pour tomber
 juste. Aux proportions de l'image (0,23 T), un rideau mince montrait des
 dizaines de lanières de 9 u — « pas assez larges par rapport à l'asset »

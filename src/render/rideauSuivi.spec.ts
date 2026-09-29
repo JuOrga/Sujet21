@@ -76,7 +76,7 @@ function joue(glace: (k: number) => [number, number] | null, images: number) {
 }
 
 describe('rideau — le ressort des lanières', () => {
-  it('empaquetée dans un flottant, la travée est relue par le jumeau du shader', () => {
+  it('empaquetée dans un flottant (milieu, demi-largeur), relue par le jumeau du shader', () => {
     const [a, b] = depaquetTravee(paquetTravee(0.25, 0.8))!
     expect(a).toBeCloseTo(0.25, 2)
     expect(b).toBeCloseTo(0.8, 2)
@@ -118,13 +118,34 @@ describe('rideau — le ressort des lanières', () => {
     expect(saut).toBeLessThan(0.08)
   })
 
-  it('un passage en cours élargit sa travée ; un nouveau repart de la sienne', () => {
-    const { zs } = joue((k) => (k < 30 ? [0.2, 0.3] : k < 60 ? [0.25, 0.4] : null), 60)
-    const [a, b] = depaquetTravee(zs[59])!
-    expect(a).toBeCloseTo(0.2, 2)
-    expect(b).toBeCloseTo(0.4, 2)
+  it('un passage en cours élargit sa travée autour du MÊME milieu, en douceur', () => {
+    // le bloc glisse le long du rideau en le traversant : 0,2..0,3 puis 0,25..0,4
+    const { zs } = joue((k) => (k < 30 ? [0.2, 0.3] : k < 90 ? [0.25, 0.4] : null), 90)
+    const milieux = zs.slice(5, 90).map((z) => depaquetTravee(z)![0])
+    // le milieu ne bouge pas : aucune lanière ne change de côté (revue, 29/09)
+    expect(Math.max(...milieux) - Math.min(...milieux)).toBeLessThan(0.002)
+    const demi = zs.map((z) => depaquetTravee(z)![1])
+    expect(demi[89]).toBeCloseTo(0.15, 2)
+    // la demi-largeur rejoint la glace sans sauter
+    let saut = 0
+    for (let k = 31; k < 90; k++) saut = Math.max(saut, demi[k] - demi[k - 1])
+    expect(saut).toBeLessThan(0.02)
+  })
+
+  it('une glace qui traverse AILLEURS pendant le balancement repart de sa travée, fermée', () => {
+    // 0,1..0,2 une seconde, sortie, puis 0,8..0,9 pendant le balancement
+    const { xs, zs } = joue((k) => (k < 60 ? [0.1, 0.2] : k < 80 ? null : [0.8, 0.9]), 81)
+    expect(Math.abs(xs[79])).toBeGreaterThan(0.1) // le balancement était en cours
+    const [c, hw] = depaquetTravee(zs[80])!
+    expect(c).toBeCloseTo(0.85, 2)
+    expect(hw).toBeCloseTo(0.05, 2)
+    // ses lanières ne naissent pas ouvertes : le ressort repart de zéro
+    expect(Math.abs(xs[80])).toBeLessThan(0.05)
+  })
+
+  it('un nouveau passage, le ressort au repos, repart de sa travée', () => {
     const neuf = joue((k) => (k < 30 ? [0.1, 0.2] : k < 600 ? null : [0.7, 0.8]), 601)
-    expect(depaquetTravee(neuf.zs[600])![0]).toBeCloseTo(0.7, 2)
+    expect(depaquetTravee(neuf.zs[600])![0]).toBeCloseTo(0.75, 2)
   })
 
   it('chaque rideau a son ressort', () => {

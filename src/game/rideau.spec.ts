@@ -24,10 +24,10 @@ describe('rideau lamellaire — la disposition', () => {
     if (d.n > 1) expect(Math.abs(d.pas / (RIDEAU_PAS * T) - 1)).toBeLessThan(0.5 / d.n + 1e-9)
   })
 
-  it('un rideau très court garde une lanière : ses montants s’amincissent', () => {
-    const d = dispositionRideau(40, 60)
+  it('un rideau carré — le plus court possible, L est le grand côté — garde une lanière', () => {
+    const d = dispositionRideau(60, 60)
     expect(d.n).toBe(1)
-    expect(d.montant).toBeCloseTo(0.3 * 40, 6)
+    expect(2 * d.montant + d.pas).toBeCloseTo(60, 6)
     expect(d.pas).toBeGreaterThan(0)
   })
 
@@ -86,7 +86,11 @@ describe('rideau lamellaire — dans la composition', () => {
   })
 
   it('la grille de l’évent vient de l’atlas, répétée à la main', () => {
-    expect(renderer).toMatch(/vec3 texGrilleC = grilleEvent\(world\);/)
+    // dans la branche de l'évent seulement, au gradient explicite : pas une
+    // lecture par pixel de l'écran (revue, 29/09)
+    expect(renderer).toMatch(/if \(uHasGrille > 0\.5\) \{\s*vec3 texGrilleC = grilleEvent\(world, pxMonde\);/)
+    const g = renderer.slice(renderer.indexOf('vec3 grilleEvent('), renderer.indexOf('vec2 rdFluide('))
+    expect(g).not.toMatch(/dFd[xy]/)
     expect(renderer).not.toMatch(/texture\(uTexGrille, world/)
     expect(renderer).toMatch(/'\/assets\/filtres-atlas\.webp'/)
     expect(renderer).not.toMatch(/grille\.webp/)

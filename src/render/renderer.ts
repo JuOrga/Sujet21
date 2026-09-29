@@ -603,8 +603,8 @@ const vec4 FI_CORPS = ${v4(A.corps)};
 const vec4 FI_MONTANT = ${v4(A.montant)};
 const float RD_OUVERTURE = ${f(B.ouverture)};
 
-// JUMEAU de depaquetTravee (rideauSuivi.ts) : où la glace a traversé, en
-// fractions de L — (-1, -1) : nulle part
+// JUMEAU de depaquetTravee (rideauSuivi.ts) : où la glace traverse — son
+// milieu et sa demi-largeur, en fractions de L ; (-1, -1) : nulle part
 vec2 rdTravee(float z) {
   if (z < 0.5) return vec2(-1.0);
   float zz = floor(z + 0.5) - 1.0;
@@ -615,7 +615,7 @@ vec2 rdTravee(float z) {
 // JUMEAU de dispositionRideau (formes.ts) : (largeur d'un montant, nombre
 // de lanières, pas)
 vec3 rideauDispo(float L, float T) {
-  float m = min(RD_MONTANT * T, 0.3 * L);
+  float m = RD_MONTANT * T;
   float reste = L - 2.0 * m;
   float n = max(1.0, floor(reste / (RD_PAS * T) + 0.5));
   return vec3(m, n, reste / n);
@@ -1389,41 +1389,45 @@ float fuitesNH3(vec2 wb, vec4 box, float code) {
   return nuage * smoothstep(0.0, 0.15, ph) * (1.0 - ph) * step(naissance * 0.8, abs(t));
 }
 
-// ——— LA CHAUDIÈRE (rampe de résistances) ——————————————————————————————
-// ——— L'ATLAS DES FILTRES (filtres-atlas.webp) ————————————————————————
-// Un cadre lu en (x, y) : fractions du cadre depuis son coin HAUT-gauche,
-// comme atlasChaud — même plafond de niveau de détail (4 texels), les
-// cadres n'étant qu'à 10 px les uns des autres.
-vec4 atlasFiltre(vec4 cadre, vec2 f, float px, float ppw) {
+// ——— LA LECTURE D'UN ATLAS PAR CADRES ——————————————————————————————————
+// Un cadre lu en (x, y) : fractions du cadre depuis son coin HAUT-gauche ;
+// « taille » : celle de l'atlas en pixels, téléversé avec FLIP_Y. ppw : pixels
+// d'atlas par unité monde — le niveau de détail est écrit à la main
+// (textureGrad) et plafonné à 4 texels : les cadres ne sont qu'à 5 à 10 px
+// les uns des autres, et au dézoom un niveau plus grossier mêlerait au bord
+// d'une pièce la couleur de sa voisine. Hors du cadre : rien. UNE lecture
+// pour l'atlas des chaleurs et celui des filtres (vu en revue, 29/09 : deux
+// copies ligne à ligne ne se corrigent pas ensemble).
+vec4 atlasLit(sampler2D tex, vec2 taille, vec4 cadre, vec2 f, float px, float ppw) {
   if (f.x < 0.0 || f.x > 1.0 || f.y < 0.0 || f.y > 1.0) return vec4(0.0);
   vec2 pa = cadre.xy + clamp(f * cadre.zw, vec2(0.5), cadre.zw - 0.5);
-  vec2 uv = vec2(pa.x / FI_ATLAS, (FI_ATLAS_H - pa.y) / FI_ATLAS_H); // téléversé avec FLIP_Y
+  vec2 uv = vec2(pa.x / taille.x, (taille.y - pa.y) / taille.y);
   float g = min(px * ppw, 4.0);
-  vec4 c = textureGrad(uTexGrille, uv, vec2(g / FI_ATLAS, 0.0), vec2(0.0, g / FI_ATLAS_H));
+  vec4 c = textureGrad(tex, uv, vec2(g / taille.x, 0.0), vec2(0.0, g / taille.y));
   return vec4(c.rgb * c.a, c.a); // prémultiplié
+}
+
+// L'ATLAS DES FILTRES (filtres-atlas.webp)
+vec4 atlasFiltre(vec4 cadre, vec2 f, float px, float ppw) {
+  return atlasLit(uTexGrille, vec2(FI_ATLAS, FI_ATLAS_H), cadre, f, px, ppw);
 }
 
 // LA GRILLE DE L'ÉVENT, répétée À LA MAIN : elle avait sa texture, répétée
 // par la carte graphique (world / 624) ; logée dans l'atlas, elle se répète
-// par fract. Les dérivées se prennent sur q, continu — celles de fract(q)
-// sautent à chaque tuile et y allumeraient une couture —, et le niveau de
-// détail est plafonné à la MARGE de 32 px qui borde la tuile de sa propre
-// répétition : une lecture qui déborde retombe sur le bon motif.
-vec3 grilleEvent(vec2 world) {
-  vec2 q = world / 624.0;
-  vec2 fq = fract(q);
+// par fract. Le gradient est EXPLICITE (pxMonde) — les dérivées d'écran de
+// fract(q) sautent à chaque tuile et y allumeraient une couture, et sans
+// dérivées la lecture se fait dans la branche de l'évent seulement, pas sur
+// chaque pixel de l'écran. Le niveau de détail est plafonné à la MARGE de
+// 32 px qui borde la tuile de sa propre répétition : jusqu'au zoom le plus
+// lointain de l'éditeur (0,05 : ~31 texels par pixel), le motif est filtré.
+vec3 grilleEvent(vec2 world, float px) {
+  vec2 fq = fract(world / 624.0);
   float tuile = FI_GRILLE.z - 2.0 * FI_MARGE_GRILLE;
   // (1 - y) : le bas de la tuile en bas, comme la texture d'avant
   vec2 pa = FI_GRILLE.xy + FI_MARGE_GRILLE + vec2(fq.x, 1.0 - fq.y) * tuile;
   vec2 uv = vec2(pa.x / FI_ATLAS, (FI_ATLAS_H - pa.y) / FI_ATLAS_H);
-  vec2 dx = dFdx(q) * tuile;
-  vec2 dy = dFdy(q) * tuile;
-  float l = max(length(dx), length(dy));
-  float k = l > 16.0 ? 16.0 / l : 1.0;
-  dx *= k;
-  dy *= k;
-  return textureGrad(uTexGrille, uv,
-    vec2(dx.x / FI_ATLAS, dx.y / FI_ATLAS_H), vec2(dy.x / FI_ATLAS, dy.y / FI_ATLAS_H)).rgb;
+  float g = min(px / 624.0 * tuile, FI_MARGE_GRILLE);
+  return textureGrad(uTexGrille, uv, vec2(g / FI_ATLAS, 0.0), vec2(0.0, g / FI_ATLAS_H)).rgb;
 }
 
 // Ce que le fluide fait en un point MONDE : (glace, eau ou vapeur)
@@ -1481,7 +1485,17 @@ vec4 rideauRendu(vec2 loc, vec2 bsize, vec2 bmin, float px, float ca, float sa, 
   float k = floor(sx / p);
   bool pendue = ty > RD_PINCE && ty < RD_FIN_LANIERE + 0.01;
   float pend = clamp((ty - RD_PINCE) / (RD_FIN_LANIERE - RD_PINCE), 0.0, 1.0);
-  vec2 trav = rdTravee(zR) * L;
+  vec2 trav = rdTravee(zR) * L; // (milieu, demi-largeur)
+  // l'eau ou la vapeur arrêtées contre ses faces, lues UNE fois par pixel
+  // à la lanière du pixel, pas à chacune des trois candidates : la même
+  // réponse pour six lectures de moins (vu en revue, 29/09)
+  float autre = 0.0;
+  if (pendue) {
+    float sk = m + (k + 0.5) * p;
+    vec2 fA = rdFluide(rdMonde(sk, -0.15, bmin, bsize, horiz, ca, sa));
+    vec2 fB = rdFluide(rdMonde(sk, 1.15, bmin, bsize, horiz, ca, sa));
+    autre = max(fA.y, fB.y);
+  }
   vec4 acc = vec4(0.0);
   for (int dj = -1; dj <= 1; dj++) {
     float j = k + float(dj);
@@ -1495,42 +1509,36 @@ vec4 rideauRendu(vec2 loc, vec2 bsize, vec2 bmin, float px, float ca, float sa, 
       // bord de la travée, la lanière voisine suit à moitié (une lanière de
       // fondu) ; au milieu, elles s'ouvrent le plus, comme une porte.
       if (trav.x >= 0.0) {
-        float c = 0.5 * (trav.x + trav.y);
-        float dans = 1.0 - smoothstep(0.0, p, max(trav.x - sc, sc - trav.y));
+        float c = trav.x;
+        float dans = 1.0 - smoothstep(0.0, p, abs(sc - c) - trav.y);
         float cote = sc < c ? -1.0 : 1.0;
-        float poids = 1.0 - 0.35 * clamp(abs(sc - c) / (0.5 * (trav.y - trav.x) + p), 0.0, 1.0);
+        float poids = 1.0 - 0.35 * clamp(abs(sc - c) / (trav.y + p), 0.0, 1.0);
         off += cote * RD_OUVERTURE * p * wR * dans * poids * bas;
       }
-      // l'eau ou la vapeur arrêtées contre ses faces : un frémissement LENT
-      vec2 fA = rdFluide(rdMonde(sc, -0.15, bmin, bsize, horiz, ca, sa));
-      vec2 fB = rdFluide(rdMonde(sc, 1.15, bmin, bsize, horiz, ca, sa));
-      float autre = max(fA.y, fB.y);
+      // l'eau ou la vapeur : un frémissement LENT
       off += autre * 0.035 * p * sin(uTime * 6.0 + j * 1.3) * pend;
       off += 0.012 * p * sin(uTime * 1.3 + j * 0.9) * pend;
     }
     float u = (sx - j * p - off) / p;
     if (u < 0.0 || u >= 1.0) continue;
     float cel = mod(j, RD_LANIERES);
-    vec4 c = atlasFiltre(FI_CORPS, vec2((cel + u) / RD_LANIERES, ty), px, ppw);
+    // la lecture reste DANS la cellule de la lanière : au bord, le filtrage
+    // et le niveau de détail (jusqu'à 4 texels) liraient la voisine — une
+    // lanière écartée traînait le reflet clair de sa voisine (vu en revue)
+    float bordU = 2.5 / (FI_CORPS.z / RD_LANIERES);
+    vec4 c = atlasFiltre(FI_CORPS, vec2((cel + clamp(u, bordU, 1.0 - bordU)) / RD_LANIERES, ty), px, ppw);
     acc = c + acc * (1.0 - c.a); // la lanière suivante passe par-dessus, comme sur l'image
   }
   return acc;
 }
 
+// ——— LA CHAUDIÈRE (rampe de résistances) ——————————————————————————————
 // Lue dans chaudiere-atlas.webp (tools/images/chaudiere_atlas.py), comme la
 // conduite dans le sien : tout se cale sur la BOÎTE, les brides du joint en
 // font toute la largeur, le carter 81 % ; la physique lit les mêmes pièces.
 vec4 atlasChaud(vec4 cadre, vec2 f, float px, float ppw) {
-  if (f.x < 0.0 || f.x > 1.0 || f.y < 0.0 || f.y > 1.0) return vec4(0.0);
-  vec2 pa = cadre.xy + clamp(f * cadre.zw, vec2(0.5), cadre.zw - 0.5);
   // (l'atlas fait 1024 × 2048 : la moitié basse loge le surchauffeur)
-  vec2 uv = vec2(pa.x / CH_ATLAS, (CH_ATLAS_H - pa.y) / CH_ATLAS_H); // téléversé avec FLIP_Y
-  // le niveau de détail plafonné à 4 texels : les cadres de l'atlas ne sont
-  // qu'à 5 à 10 px les uns des autres, et au dézoom un niveau plus grossier
-  // mêlerait au bord d'une pièce la couleur de sa voisine
-  float g = min(px * ppw, 4.0);
-  vec4 c = textureGrad(uTexChaud, uv, vec2(g / CH_ATLAS, 0.0), vec2(0.0, g / CH_ATLAS_H));
-  return vec4(c.rgb * c.a, c.a); // prémultiplié
+  return atlasLit(uTexChaud, vec2(CH_ATLAS, CH_ATLAS_H), cadre, f, px, ppw);
 }
 
 // l'ombre au sol de la chaudière, comme celle de la conduite
@@ -2493,7 +2501,6 @@ void main() {
   vec3 texPhileC = texture(uTexPhile, world / 210.0).rgb;
   // la grille est calée pour que ses perforations fassent ~24 u, comme le
   // motif procédural qu'elle remplace
-  vec3 texGrilleC = grilleEvent(world);
 
   // Obstacles : remplissage texturé + liseré, couleur par matériau (§6)
   float edgeW = 2.5 / uZoom;
@@ -3069,6 +3076,7 @@ void main() {
       float hole;
       vec3 barCol;
       if (uHasGrille > 0.5) {
+        vec3 texGrilleC = grilleEvent(world, pxMonde);
         float lum = dot(texGrilleC, vec3(0.299, 0.587, 0.114));
         hole = 1.0 - smoothstep(0.020, 0.075, lum);
         barCol = texGrilleC * 1.5;
@@ -6124,8 +6132,11 @@ export class Renderer {
       }
       // un RIDEAU porte sa mémoire (aux.z, aux.w) : la travée de glace et
       // l'ouverture du ressort de ses lanières
+      // (pas pour un rideau À FORME, ni sans atlas : il garde ses lamelles
+      // tracées, qui ne lisent pas cette mémoire — le balayage des grains
+      // serait perdu)
       const rideau =
-        bx.material === MAT_RIDEAU
+        bx.material === MAT_RIDEAU && !(bx.forme ?? 0) && this.texGrille
           ? this.suiviRideaux.aux(bx, traveeGlace(bx, sim.posX, sim.posY, sim.frozen, sim.count), timeSec)
           : null
       this.auxScratch[k * 4] = bx.material + forme * 16 + q0 * 128 + q1 * 16384

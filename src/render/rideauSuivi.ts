@@ -14,7 +14,19 @@
 // compris. Le rendu le passe au shader dans aux.z (la TRAVÉE, où la glace a
 // traversé) et aux.w (l'ouverture du ressort) — deux champs qu'aucune autre
 // lecture n'utilise pour cette matière.
+//
+// LA TRAVÉE SE DIT PAR SON MILIEU ET SA DEMI-LARGEUR, et son milieu est
+// FIGÉ au premier instant du passage : chaque lanière s'écarte du milieu,
+// et si l'élargissement déplaçait ce milieu, les lanières entre l'ancien et
+// le nouveau changeaient de côté d'une image à l'autre (vu en revue, 29/09).
+// La demi-largeur, elle, rejoint la glace en douceur : une lanière qui
+// entre dans la travée s'ouvre, elle ne saute pas.
+//
+// Limite connue : deux morceaux de glace qui traversent ensemble loin l'un
+// de l'autre font UNE travée, qui les couvre tous deux — il faudrait un
+// état par lanière, et aucun canal vers le shader n'est libre pour ça.
 
+import { dispositionRideau } from '../game/formes'
 import type { ObstacleBox } from '../game/level'
 
 /** Le ressort des lanières. `ouverture` (en pas de lanière) est lue par le
@@ -27,14 +39,15 @@ export const RIDEAU_RESSORT = {
   frequence: 1.6,
   amortiOuvre: 0.6,
   amortiFerme: 0.15,
+  elargit: 0.12, // s — la constante de temps de la demi-largeur qui s'étend
 } as const
 
-/** Une travée (s0, s1 en fractions de L, 0..1) serrée dans UN flottant :
- *  1 + 1024 · q0 + q1, q au 1/1023e. 0 : aucune. Moins de 2^24 : exact en
- *  float32. JUMEAU de rdTravee dans le shader. */
-export function paquetTravee(s0: number, s1: number): number {
+/** Une travée (milieu c, demi-largeur hw, en fractions de L, 0..1) serrée
+ *  dans UN flottant : 1 + 1024 · q(c) + q(hw), q au 1/1023e. 0 : aucune.
+ *  Moins de 2^24 : exact en float32. JUMEAU de rdTravee dans le shader. */
+export function paquetTravee(c: number, hw: number): number {
   const q = (s: number) => Math.round(Math.max(0, Math.min(1, s)) * 1023)
-  return 1 + 1024 * q(s0) + q(s1)
+  return 1 + 1024 * q(c) + q(hw)
 }
 
 export function depaquetTravee(z: number): [number, number] | null {
@@ -68,10 +81,14 @@ export function traveeGlace(
   const sa = Math.sin(rad)
   const t0 = horiz ? b.minY : b.minX
   const t1 = horiz ? b.maxY : b.maxX
+  // le rejet grossier : le cercle qui contient la boîte tournée et sa
+  // marge — l'essentiel des grains d'une salle est loin de ses rideaux
+  const r = Math.hypot(w / 2 + m, h / 2 + m)
   let s0 = Infinity
   let s1 = -Infinity
   for (let i = 0; i < count; i++) {
     if (gele[i] !== 1) continue
+    if (Math.abs(posX[i] - cx) > r || Math.abs(posY[i] - cy) > r) continue
     const rx = posX[i] - cx
     const ry = posY[i] - cy
     const lx = cx + rx * ca + ry * sa
@@ -86,8 +103,9 @@ export function traveeGlace(
 }
 
 interface Etat {
-  s0: number
-  s1: number
+  c: number // le milieu de la travée, figé au début du passage
+  hw: number // sa demi-largeur, qui rejoint hwCible en douceur
+  hwCible: number
   x: number // l'ouverture du ressort (négative : au-delà de l'aplomb)
   v: number
   t: number // l'instant du dernier pas
@@ -102,27 +120,44 @@ export class SuiviRideaux {
    *  aucune) et l'ouverture du ressort. */
   aux(b: ObstacleBox, travee: [number, number] | null, t: number): [number, number] {
     let e = this.etats.get(b)
+    const neuf = (a: number, z: number): Etat => ({ c: (a + z) / 2, hw: (z - a) / 2, hwCible: (z - a) / 2, x: 0, v: 0, t })
     if (!e) {
       if (!travee) return [0, 0]
-      e = { s0: travee[0], s1: travee[1], x: 0, v: 0, t }
+      e = neuf(travee[0], travee[1])
       this.etats.set(b, e)
-    }
-    if (travee) {
-      // un NOUVEAU passage (le ressort presque au repos) repart de sa
-      // travée ; un passage en cours l'ÉLARGIT — un bloc qui glisse le long
-      // du rideau en le traversant laisse toutes ses lanières ouvertes
-      if (Math.abs(e.x) < 0.05 && Math.abs(e.v) < 0.5) {
-        e.s0 = travee[0]
-        e.s1 = travee[1]
+    } else if (travee) {
+      // un NOUVEAU passage repart de sa travée : le ressort presque au
+      // repos, ou une glace qui traverse AILLEURS (à plus d'une lanière de
+      // la travée) — elle ouvrirait sinon tout ce qui sépare les deux
+      const w = b.maxX - b.minX
+      const hh = b.maxY - b.minY
+      const L = Math.max(w, hh)
+      const pas = dispositionRideau(L, Math.min(w, hh)).pas / L
+      const ailleurs = travee[0] > e.c + e.hwCible + pas || travee[1] < e.c - e.hwCible - pas
+      if ((Math.abs(e.x) < 0.05 && Math.abs(e.v) < 0.5) || ailleurs) {
+        // le ressort garde son élan au repos (les premières images d'un
+        // passage) ; il repart de zéro pour une glace ailleurs — sans quoi
+        // ses lanières naîtraient déjà ouvertes
+        const n = neuf(travee[0], travee[1])
+        n.t = e.t
+        if (!ailleurs) {
+          n.x = e.x
+          n.v = e.v
+        }
+        e = n
+        this.etats.set(b, e)
       } else {
-        e.s0 = Math.min(e.s0, travee[0])
-        e.s1 = Math.max(e.s1, travee[1])
+        // un passage en cours ÉLARGIT sa travée autour du MÊME milieu : un
+        // bloc qui glisse le long du rideau en le traversant laisse toutes
+        // ses lanières ouvertes, chacune du côté où elle est partie
+        e.hwCible = Math.max(e.hwCible, e.c - travee[0], travee[1] - e.c)
       }
     }
     // le ressort, en sous-pas (Euler semi-implicite, stable à ces pas) ;
     // un saut d'horloge (onglet en veille, tableau rechargé) est borné
     const dt = Math.max(0, Math.min(0.05, t - e.t))
     e.t = t
+    e.hw += (e.hwCible - e.hw) * (1 - Math.exp(-dt / RIDEAU_RESSORT.elargit))
     const cible = travee ? 1 : 0
     const w = 2 * Math.PI * RIDEAU_RESSORT.frequence
     const z = travee ? RIDEAU_RESSORT.amortiOuvre : RIDEAU_RESSORT.amortiFerme
@@ -136,6 +171,6 @@ export class SuiviRideaux {
       this.etats.delete(b)
       return [0, 0]
     }
-    return [paquetTravee(e.s0, e.s1), e.x]
+    return [paquetTravee(e.c, e.hw), e.x]
   }
 }

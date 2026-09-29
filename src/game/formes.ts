@@ -590,14 +590,13 @@ export const RIDEAU_ELARGI = 1.8
 export const RIDEAU_PAS =
   (FILTRES_ATLAS.corps[2] / RIDEAU.lanieres / FILTRES_ATLAS.corps[3]) * (RIDEAU.bas - RIDEAU.haut) * RIDEAU_ELARGI
 
-/** LA DISPOSITION d'un rideau de longueur L et d'épaisseur T : un montant
- *  à chaque bout, et entre eux un nombre ENTIER de lanières, au pas mesuré
- *  à peine étiré — une lanière coupée par un montant se lirait comme un
- *  raccord raté. Un rideau très court garde au moins une lanière : ses
- *  montants s'amincissent (30 % de L au plus chacun). JUMEAU de
- *  rideauDispo dans le shader. */
+/** LA DISPOSITION d'un rideau de longueur L et d'épaisseur T (L ≥ T : la
+ *  longueur est le grand côté) : un montant à chaque bout, et entre eux un
+ *  nombre ENTIER de lanières, au pas mesuré à peine étiré — une lanière
+ *  coupée par un montant se lirait comme un raccord raté. Au moins une :
+ *  un rideau carré en garde une. JUMEAU de rideauDispo dans le shader. */
 export function dispositionRideau(L: number, T: number): { montant: number; n: number; pas: number } {
-  const montant = Math.min(RIDEAU.montant * T, 0.3 * L)
+  const montant = RIDEAU.montant * T
   const reste = L - 2 * montant
   const n = Math.max(1, Math.floor(reste / (RIDEAU_PAS * T) + 0.5))
   return { montant, n, pas: reste / n }
