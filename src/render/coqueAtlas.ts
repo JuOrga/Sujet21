@@ -21,4 +21,7 @@ export const ATLAS_COQUE: readonly (RectAtlas | null)[] = [
   { u0: 0.57715, v0: 0.39551, u1: 0.66406, v1: 0.85938, rapport: 0.1873 }, // 4 treillis
   null, // 5 propulseurs : sans image, par choix (voir PIECES)
   null, // 6 feu : sans image, par choix (voir PIECES)
+  null, // 7 embase : sans image, par choix (voir PIECES)
+  null, // 8 voisin : pas d’image, tracée par le shader
+  null, // 9 voisin-bout : pas d’image, tracée par le shader
 ]

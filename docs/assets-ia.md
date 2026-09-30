@@ -1830,3 +1830,187 @@ Retro-futuristic 1970s orbital laboratory, flat orthographic 2D game asset. Mute
 ```
 Retro-futuristic 1970s orbital laboratory, flat orthographic 2D game asset. Muted cold palette: near-black #030710, steel blue-grey #0a1420 to #2a3542, pale frosted ice-blue #cfe6f2 to #8fb8cc, single cyan accent #63b7e6. Evenly lit, low brightness, no visible light source. Single sprite on a transparent background, STRICT FLAT FRONT orthographic view, in the exact steel style of the attached references: the END POST of an industrial cold-room strip curtain. A heavy vertical steel JAMB running the full height of the image, a square-section gunmetal post with a bolted mounting flange, a riveted corner bracket at the top where a horizontal steel rail arrives from the LEFT edge and ends against the post, and a small bolted foot plate at the bottom where a thin threshold bar arrives from the left. On the left side, the first frosted translucent PVC strip hangs from the rail, partly cut by the left edge of the image. On the post, one small round CYAN indicator lamp (lit, #63b7e6) and a tiny engraved-looking steel plate with no readable text. A light rime of frost on the lower part of the post. Everything upright and centred on the vertical axis of the post, whole post inside the image, clean edges, isolated on transparent background. Avoid: perspective, 3/4 view, isometric, top-down view, door leaf, handle, hinges, wall, floor, background, glow halo, warm colors, orange, amber, red, text, letters, numbers, logo, watermark, border, frame, drop shadow.
 ```
+
+## 33. LE DEHORS DU MODULE, REFAIT — voisins, sas, poutre et ailes ⏸ EN ATTENTE (30/09)
+
+**En attente** : le concepteur garde les images actuelles (« les assets que nous
+avons me conviennent », 30/09) ; ce qui gêne est la COMPOSITION — la cuve posée
+seule dans le vide, flanquée de sas, se lit comme un module entre deux autres,
+pas comme un bassin d'essai dans un grand vaisseau. Des maquettes de mise en
+scène sont à l'étude (la cuve dans son laboratoire, le plan du pont, la salle
+des cuves…). Les prompts ci-dessous restent valables si la refonte des images
+revient.
+
+**Pourquoi refaire le §28.** Retour du concepteur, 30/09 : au dézoom, « les accès
+aux modules sur les côtés sont des couleurs immenses » et « la structure en haut
+n'est pas top ». Trois causes, dans les images elles-mêmes :
+
+1. **Trop claires.** Couvertures blanc cassé, cadres dorés : le §28 visait des
+   objets lisibles seuls, pas des objets DERRIÈRE une salle qu'on joue. Au
+   dézoom, le blanc gagne l'écran.
+2. **Une lumière peinte.** « Hard sunlight from the upper left » : chaque image
+   porte son soleil. Or le jeu éclaire désormais le dehors lui-même — le VRAI
+   Soleil, celui de la Terre en fond, qui tourne avec l'heure, et la lueur bleue
+   de la Terre (`lumiereStation`, `render/terre.ts`). Une ombre peinte à droite
+   quand le Soleil est à gauche, c'est deux lumières : le « tableau posé devant
+   une affiche ». La charte le disait déjà (§5 : *evenly lit, no visible light
+   source*) ; le §28 s'en était écarté.
+3. **Pas de voisin.** Le module voisin n'avait pas d'image : le moteur répétait
+   le haut de celle du port, en bande sans fin.
+
+**La règle de cette famille** : des pièces **sombres, éclairées également**,
+qui se lisent en SILHOUETTE. Le relief vient du dessin (panneaux, nervures,
+rivets), la lumière du moteur (la face selon le Soleil, un liseré doré du côté
+du Soleil, bleu du côté de la Terre). Luminance moyenne visée **≤ 0,22** (la
+bande de coque est à ~0,20) ; **aucun blanc franc**.
+
+**Convention commune** (celle du §28) : vue de DESSUS stricte, fond
+TRANSPARENT, la coque au bord **BAS** de l'image, la pièce part de là vers le
+haut. Les pièces qui se RÉPÈTENT (tronçon, treillis) se raccordent **bord
+haut / bord bas**, à l'identique.
+
+**L'ordre, et la référence de famille** (charte §6) : générer **33.1 le
+tronçon en premier**, avec `docs/reference/conduite-reference.webp` en
+référence de style (l'acier de la maison). Quand il est bon, il devient la
+référence de toute la famille : `--sref` + même `--seed` chez Midjourney,
+IP-Adapter (0,7) chez Flux/SD, image jointe chez GPT (« in the exact style of
+the attached reference »).
+
+**Dépôt** : `masters/images/coque/<nom>.png` — par exemple sur GitHub, sur la
+branche `claude/dehors-module` : *Add file → Upload files* dans ce dossier.
+Puis `python3 tools/images/materiel.py` reconstruit l'atlas et
+`src/render/coqueAtlas.ts` ; le moteur prend chaque image dès qu'elle est
+là (les absentes gardent l'ancienne, ou le tracé).
+
+**Le préambule de la famille** — celui de la charte §5, et la part commune :
+
+```
+Retro-futuristic 1970s orbital laboratory, flat orthographic 2D game asset,
+riveted steel panels with weld seams and worn paint, thick pipes with flanges,
+cable trays. Muted cold palette: near-black night #030710, steel blue-grey
+#0a1420 to #2a3542, single cyan accent #63b7e6, amber only on small indicator
+lamps. Evenly lit from above, low brightness, no visible light source, no
+perspective, no depth of field, no text, no watermark. STRICT TOP-DOWN
+ORTHOGRAPHIC VIEW, seen from directly above like a floor plan, no side faces
+visible. DARK AND LOW-CONTRAST OVERALL (average brightness about 20 %), thermal
+blankets in weathered dim grey, never bright white; no cast shadows, no
+highlights, no rim light — the game adds the lighting. Isolated single object
+on a fully TRANSPARENT background, crisp clean silhouette, high detail.
+```
+
+Négatif de la famille :
+
+```
+perspective, isometric, 3/4 view, side view, depth of field, blur, lens flare,
+bright lighting, directional sunlight, hard shadows, cast shadow, specular
+highlights, white, bright white panels, gold foil, warm colors, background,
+stars, planet, text, labels, logos, watermark, border, frame
+```
+
+### 33.1 le tronçon du module voisin — `coque/voisin.png` · 1:2 (portrait) — EN PREMIER
+
+Cadrage : le cylindre debout, **de bord à bord en largeur**, coupé net en haut
+et en bas ; il se répète bout à bout.
+
+```
+[PRÉAMBULE §33]
+Subject: one straight section of a pressurised cylindrical space station
+module seen from directly above, running vertically through a 1:2 portrait
+image from the bottom edge to the top edge, filling the full width. The
+cylinder reads as round only through its drawing: panel seams that converge
+slightly toward the two long edges, darker edges, a flat central strip. Dim
+grey quilted thermal blanket panels with stitched seams, two circumferential
+reinforcing rings crossing it, a pair of dark handrails along one side, a
+small closed hatch, a few stencilled markings, one tiny amber lamp. The top
+and bottom edges are cut straight and identical so the section tiles
+seamlessly end to end.
+```
+
+### 33.2 le bout du voisin — `coque/voisin-bout.png` · 1:1
+
+Cadrage : le bord **BAS** de l'image est la jonction avec le tronçon (même
+largeur que lui, pleine largeur) ; le bout se ferme vers le haut.
+
+```
+[PRÉAMBULE §33]
+Subject: the closed far end of the same cylindrical station module, seen from
+directly above, in a square 1:1 image. Along the bottom edge, the cylinder at
+full image width, matching the module section exactly; above it, a
+reinforced end ring, then a shallow rounded end cap (a dome seen from above:
+concentric panel rings narrowing toward a small central hatch with a
+docking target). Two small amber lamps on the ring. The top of the image is
+empty transparent space beyond the cap.
+```
+
+### 33.3 le port d'amarrage — `coque/amarrage.png` · 2:1 (paysage) — remplace §28.4
+
+Cadrage : la collerette SEULE ; son bord bas contre la coque, son bord haut
+à la largeur du tronçon (le voisin y commence).
+
+```
+[PRÉAMBULE §33]
+Subject: one square docking collar joining two station modules, seen from
+directly above, in a 2:1 landscape image, alone (no module attached). A
+heavy dark steel ring frame with bolted flanges, four guide petals, a
+flexible pressurised bellows segment in dim grey fabric, four small green
+approach lights at the corners. The bottom edge of the image is where it
+meets the hull; the top edge, slightly narrower, is where the next module
+begins.
+```
+
+### 33.4 le treillis — `coque/treillis.png` · 1:4 (portrait) — remplace §28.5
+
+Cadrage : le segment debout, raccordable en haut et en bas.
+
+```
+[PRÉAMBULE §33]
+Subject: one straight segment of a space station lattice truss seen from
+directly above, running vertically through a 1:4 portrait image from the
+bottom edge to the top edge. Two parallel dark square steel rails, triangular
+diagonal bracing, bolted gusset plates at each node, a bundle of dark cables
+and a thin coolant line along the middle. Mostly dark open lattice: the
+background shows through between the members. Both ends cut straight and
+identical so it tiles seamlessly end to end.
+```
+
+### 33.5 l'aile solaire — `coque/aile.png` · 5:2 (paysage) — remplace §28.1
+
+Cadrage : l'aile couchée sur toute la largeur ; son pied au milieu du bord BAS.
+
+```
+[PRÉAMBULE §33]
+Subject: one solar array wing of a space station seen from directly above,
+lying flat, stretched across a 5:2 landscape image. Two long photovoltaic
+blankets left and right of a narrow central lattice mast. The cells are VERY
+DARK navy, almost black, with a faint deep-violet tint and fine dim grey
+interconnect lines; a thin dark steel frame (no gold), tensioning cables at
+the outer ends. At the bottom centre, a compact gimbal joint with one tiny
+amber lamp.
+```
+
+### 33.6 le radiateur — `coque/radiateur.png` · 2:5 (portrait) — remplace §28.2
+
+```
+[PRÉAMBULE §33]
+Subject: one thermal radiator panel of a space station seen from directly
+above, standing tall in a 2:5 portrait image. Dim grey surface divided into
+many thin horizontal fins, a dark coolant pipe up its centre with small
+flanged joints, a darker structural frame, a hinge bracket and flexible hoses
+at the bottom centre where it attaches.
+```
+
+### 33.7 la parabole — `coque/parabole.png` · 1:1 — remplace §28.3
+
+```
+[PRÉAMBULE §33]
+Subject: one parabolic communication dish seen from directly above, a
+perfect circle in a square 1:1 image: a matte dim grey dish with radial panel
+seams and eight dark ribs, a small feed horn at the exact centre held by
+three thin struts. The bowl reads as hollow through its seams only, not
+through lighting.
+```
+
+**Mesure à la livraison** (`materiel.py`, à étendre quand les images arrivent) :
+luminance moyenne ≤ 0,22 par pièce, raccord haut/bas du tronçon et du treillis
+(écart moyen de la première et de la dernière ligne), aucune zone > 0,85 de
+luminance sur plus de 2 % de la pièce (le « blanc franc »).
