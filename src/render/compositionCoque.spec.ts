@@ -11,6 +11,10 @@ import {
   PIECE_EMBASE,
   PIECE_FEU,
   PIECE_MODULE,
+  PIECE_VOISIN_BOUT,
+  LONG_VOISIN,
+  ZOOM_DEHORS_PARTI,
+  ZOOM_DEHORS_PLEIN,
   PIECE_PARABOLE,
   PIECE_RADIATEUR,
   PIECE_TREILLIS,
@@ -101,14 +105,16 @@ describe('Le module : son propre matériel, rien de plus', () => {
 describe('La station autour : les voisins et le lointain', () => {
   const ps = composeCoque(cuve)
 
-  it('derrière chaque port, le module voisin file hors de l’écran, dans le plan de la salle', () => {
+  it('derrière chaque port, le module voisin, dans le plan de la salle — FINI, pas une bande sans fin', () => {
     const voisins = de(ps, PIECE_MODULE, COUCHE_VOISINS)
     expect(voisins).toHaveLength(2)
     for (const v of voisins) {
       const port = ps.find((p) => p.groupe === v.groupe && p.type === PIECE_AMARRAGE)!
-      // même axe que son port, et bien plus long qu'un écran
+      // même axe que son port ; LONG_VOISIN largeurs de port, pas 6000 u :
+      // il traversait l'écran au dézoom, une bande claire (retour du 30/09)
       expect(Math.abs(v.cy - port.cy)).toBeLessThan(1)
-      expect(2 * v.hy).toBeGreaterThan(4000)
+      expect(2 * v.hy).toBeCloseTo(LONG_VOISIN * 2 * port.hx, 6)
+      expect(2 * v.hy).toBeLessThan(1500)
       // il commence sous le port (qui s'y fond), pas au-delà : pas de jour
       const eV = etendue(v)
       const eP = etendue(port)
@@ -193,5 +199,20 @@ describe('La clé de la composition : recomposer dès que ce qui la décide chan
 
   it('et ce qui ne change rien à la composition ne la recalcule pas', () => {
     expect(cle({ ...vide })).toBe(cle(vide))
+  })
+})
+
+describe('Le dehors, en attendant ses nouvelles images (assets-ia §33)', () => {
+  const ps = composeCoque(cuve)
+
+  it('sans image du tronçon, le voisin garde l’ancien montage (tuile positive) ; sans bout, pas de bout', () => {
+    for (const v of de(ps, PIECE_MODULE, COUCHE_VOISINS)) expect(v.param).toBeGreaterThan(0)
+    expect(ps.filter((p) => p.type === PIECE_VOISIN_BOUT)).toHaveLength(0)
+  })
+
+  it('l’effacement au recul part avant d’atteindre le zoom de jeu', () => {
+    // zoom de jeu ordinaire ~0,13–0,15 (render/parallaxe.ts) : pleinement là
+    expect(ZOOM_DEHORS_PLEIN).toBeLessThan(0.13)
+    expect(ZOOM_DEHORS_PARTI).toBeLessThan(ZOOM_DEHORS_PLEIN)
   })
 })

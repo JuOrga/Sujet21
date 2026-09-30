@@ -47,6 +47,9 @@ PIECES = [
     ('treillis', 950),
     ('propulseurs', 0),  # retirés de la composition : la case reste vide
     ('feu', 0),  # tracé par le moteur : à 28 u, une image ne se verrait pas
+    ('embase', 0),  # tracée par le moteur (assets-ia §28.8)
+    ('voisin', 900),  # le tronçon du module voisin, raccordé bout à bout (§33)
+    ('voisin-bout', 700),  # ce qui le ferme (§33)
 ]
 
 
