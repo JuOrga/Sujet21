@@ -11,6 +11,7 @@ import {
   TERRE_DEFAUTS,
   cadreTerre,
   latLon,
+  lumiereStation,
   lune,
   periodeS,
   pointLagrange,
@@ -242,5 +243,125 @@ describe('terre — les étoiles sont derrière la Terre, pas collées au jeu', 
     // la face de nuit est presque noire : un masque de luminosité seul y
     // laissait passer les étoiles, à travers la planète
     expect(branche).toMatch(/noir\s*=\s*\(1\.0\s*-\s*planete\.a\)/)
+  })
+})
+
+describe('terre — la lumière de la scène sur la station', () => {
+  const W = 1280
+  const H = 800
+  const lumiere = (ms: number, r: ReglagesTerre) => {
+    const c = cadreTerre(ms, 0, 0, W, H, new Float32Array(16), r)
+    return lumiereStation(c, W, H, new Float32Array(8), r)
+  }
+  const L1 = { ...TERRE_DEFAUTS, vue: 'l1-lune' as const }
+
+  it('L1 Terre–Lune, nouvelle Lune : Soleil de face, Terre pleine et lumineuse', () => {
+    const l = lumiere(Date.UTC(2024, 0, 11, 12), L1)
+    expect(l[2]).toBeGreaterThan(0.9)
+    expect(l[6]).toBeGreaterThan(0.65)
+    expect(l[3]).toBe(1)
+  })
+
+  it('L1 Terre–Lune, pleine Lune : la station à contre-jour, la Terre éteinte', () => {
+    const l = lumiere(Date.UTC(2024, 0, 25, 18), L1)
+    expect(l[2]).toBeLessThan(-0.9)
+    expect(l[6]).toBeLessThan(0.02)
+  })
+
+  it('la part du Soleil dans le plan de l’écran complète celle de face', () => {
+    for (const ms of [Date.UTC(2026, 2, 1), Date.UTC(2026, 8, 30, 12), Date.UTC(2026, 10, 7, 3)]) {
+      const l = lumiere(ms, L1)
+      expect(Math.hypot(l[0], l[1], l[2])).toBeCloseTo(1, 5)
+    }
+  })
+
+  it('la Terre est du côté de son disque à l’écran (L1 : à droite, un peu en haut)', () => {
+    const l = lumiere(Date.UTC(2026, 8, 30, 12), L1)
+    const attendu = [L1.centreX - 0.5, L1.centreY - 0.5].map((v, i) => v * (i ? H : W))
+    const n = Math.hypot(attendu[0], attendu[1])
+    expect(l[4]).toBeCloseTo(attendu[0] / n, 4)
+    expect(l[5]).toBeCloseTo(attendu[1] / n, 4)
+  })
+
+  it('depuis l’ISS, la Terre est EN DESSOUS, et sa lueur est pleine de jour', () => {
+    const iss = { ...TERRE_DEFAUTS, vue: 'iss' as const }
+    let jour = 0
+    for (let m = 0; m < 93; m += 3) {
+      const l = lumiere(Date.UTC(2026, 8, 30, 12) + m * 60000, iss)
+      expect(l[5]).toBeLessThan(-0.99)
+      jour = Math.max(jour, l[6])
+    }
+    expect(jour).toBeGreaterThan(0.95)
+  })
+})
+
+describe('terre — la lumière de scène ne change rien hors du ciel TERRE', () => {
+  const source = readFileSync(fileURLToPath(new URL('./renderer.ts', import.meta.url)), 'utf8')
+  const glsl = source.slice(source.indexOf('const LUMIERE_SCENE_GLSL'), source.indexOf('const COMPOSE_FS'))
+
+  it('inactive, la face garde son facteur 1 et l’arête ne reçoit rien', () => {
+    expect(glsl).toMatch(/uLumSoleil\.w > 0\.5 \? [^:]+: 1\.0;/)
+    expect(glsl).toMatch(/if \(uLumSoleil\.w < 0\.5\) return vec3\(0\.0\);/)
+  })
+
+  it('la composition et la passe de coque la reçoivent toutes deux', () => {
+    for (const nom of ['COMPOSE_FS', 'HULL_FS']) {
+      const debut = source.indexOf(`const ${nom} = \``)
+      const fin = source.indexOf('\n`', debut)
+      expect(source.slice(debut, fin)).toContain('${LUMIERE_SCENE_GLSL}')
+    }
+  })
+
+  it('les pièces dessinées prennent le soleil de la Terre, le soleil fixe n’est que le repli', () => {
+    expect(source).toMatch(/uLumSoleil\.w > 0\.5[^;]*\? normalize\(uLumSoleil\.xy\) : vec2\(-0\.6, 0\.8\)/)
+    expect(source).not.toMatch(/ca \* -0\.6 \+ sa \* 0\.8/)
+  })
+})
+
+describe('terre — au-dessus de chez vous : la Terre à l’heure du joueur', () => {
+  const W = 1280
+  const H = 800
+  const paris: ReglagesTerre = { ...TERRE_DEFAUTS, vue: 'chez-vous', lieuLat: 48.86, lieuLon: 2.35 }
+  const auCentre = (ms: number, r: ReglagesTerre) => {
+    const c = cadreTerre(ms, 0, 0, W, H, new Float32Array(16), r)
+    const p = rayonPixel(c, W * r.centreX, H * r.centreY)!
+    const n = Math.hypot(...p)
+    return { ...latLon(p), soleil: (p[0] * c[3] + p[1] * c[7] + p[2] * c[11]) / n, c }
+  }
+
+  it('la région du joueur est au centre du disque, à toute heure', () => {
+    for (const h of [0, 6, 12, 18]) {
+      const { lat, lon } = auCentre(Date.UTC(2026, 8, 30, h), paris)
+      expect(lat).toBeCloseTo(48.86, 1)
+      expect(lon).toBeCloseTo(2.35, 1)
+    }
+  })
+
+  it('midi à Paris : le Soleil est haut au centre ; minuit : c’est la nuit', () => {
+    // midi solaire à Paris, le 30/09 : ~11 h 40 UTC
+    expect(auCentre(Date.UTC(2026, 8, 30, 11, 40), paris).soleil).toBeGreaterThan(0.6)
+    expect(auCentre(Date.UTC(2026, 8, 30, 23, 40), paris).soleil).toBeLessThan(-0.6)
+  })
+
+  it('la même minute, Tokyo est de l’autre côté du jour', () => {
+    const tokyo = { ...paris, lieuLat: 35.68, lieuLon: 139.69 }
+    const t = Date.UTC(2026, 8, 30, 11, 40)
+    expect(auCentre(t, tokyo).soleil).toBeLessThan(0)
+  })
+
+  it('la station suit l’heure locale : de face à midi, à contre-jour à minuit', () => {
+    const face = (ms: number) =>
+      lumiereStation(auCentre(ms, paris).c, W, H, new Float32Array(8), paris)[2]
+    expect(face(Date.UTC(2026, 8, 30, 11, 40))).toBeGreaterThan(0.6)
+    expect(face(Date.UTC(2026, 8, 30, 23, 40))).toBeLessThan(-0.6)
+  })
+
+  it('le disque garde son rayon depuis l’altitude géostationnaire', () => {
+    const { c } = auCentre(Date.UTC(2026, 8, 30, 12), paris)
+    const cx = W * paris.centreX
+    const cy = H * paris.centreY
+    const rayon = paris.disque * H
+    expect(rayonPixel(c, cx + rayon - 2, cy)).not.toBeNull()
+    expect(rayonPixel(c, cx + rayon + 2, cy)).toBeNull()
   })
 })
