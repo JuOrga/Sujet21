@@ -63,10 +63,15 @@ vraie station passe. Pour la caler sur la vraie, il suffirait de reporter
 dans `TERRE_DEFAUTS` le nœud et l'argument de latitude d'un TLE récent (le
 réseau de l'environnement de travail ne joint pas CelesTrak).
 
-- **trois points de vue** (PARAMÈTRES › LA TERRE, VUE DE…, `vue`) :
+- **quatre points de vue** (PARAMÈTRES › LA TERRE, VUE DE…, `vue`) :
+  - **AU-DESSUS DE CHEZ VOUS** (défaut) — un satellite fixe à l'altitude
+    géostationnaire au-dessus de la région du joueur, devinée par son fuseau
+    horaire (`render/lieu.ts`, sans géolocalisation) : la Terre à l'heure
+    LOCALE du joueur, nuit chez lui, nuit à l'écran — et la station sous
+    la même lumière ;
   - **ISS** — le regard **penché de 52°** depuis le nadir, vers l'avant : le
     sol défile vers le bas de l'écran, l'horizon courbe barre le haut ;
-  - **L1 Terre–Lune** (défaut) — à ~323 000 km, entre la Terre et la Lune
+  - **L1 Terre–Lune** — à ~323 000 km, entre la Terre et la Lune
     (position de la Lune : l'algorithme bref de l'Astronomical Almanac,
     ~0,3°). La Terre entière, nord en haut, avec ses **phases** : pleine à
     la nouvelle Lune, nocturne à la pleine Lune ;
@@ -89,6 +94,13 @@ réseau de l'environnement de travail ne joint pas CelesTrak).
   Collées au jeu, elles défilaient devant une Terre immobile : la profondeur
   à l'envers. Ce sont les étoiles nettes (`etoilesCouche`), quatre couches,
   cachées par le disque — jour comme nuit ;
+- **la station sous la même lumière** (`lumiereStation`, `LUMIERE_SCENE_GLSL`) :
+  le Soleil qui éclaire la Terre éclaire aussi la coque — sa face plus
+  claire au Soleil de face, sombre à contre-jour, l'arête dorée du côté
+  d'où il vient — et la Terre la bleuit du sien, selon sa phase. Coques des
+  tableaux à cuve (passe de coque) et des tableaux en modules
+  (composition). Hors du ciel TERRE : inactive, le rendu d'avant au pixel
+  près. Les pièces PEINTES du dehors gardent la lumière de leur image ;
 - sonde : `__terre` dans la console — `__terre.decalageMin = 46` passe du
   jour à la nuit, `__terre.force` dose la luminosité.
 
