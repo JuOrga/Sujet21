@@ -58,6 +58,8 @@ import {
   MAX_PIECES_COQUE,
   PIECE_AMARRAGE,
   PIECE_MODULE,
+  ZOOM_DEHORS_PARTI,
+  ZOOM_DEHORS_PLEIN,
   cleComposition,
   composeCoque,
   empaquettePieces,
@@ -4736,7 +4738,7 @@ void dessinePiece(inout vec4 acc, vec2 q, vec2 h, float type, float g, float an,
 // montre que le bas de son image (param : la part montrée) et s'efface vers
 // le haut — le module voisin continue dans le noir. Niveau de détail écrit à
 // la main (textureGrad) : la boucle des pièces a un flot divergent.
-void peintPiece(inout vec4 acc, vec2 q, vec2 h, float type, float g, float param, vec4 r, float px) {
+void peintPiece(inout vec4 acc, vec2 q, vec2 h, float type, float g, float param, vec4 r, float px, vec2 rot) {
   // la parabole suit sa cible : l'image entière pivote de quelques degrés
   if (type > 1.5 && type < 2.5) {
     float a = 0.10 * sin(uTime * 0.05 + g * 6.28);
@@ -4751,13 +4753,21 @@ void peintPiece(inout vec4 acc, vec2 q, vec2 h, float type, float g, float param
   if (type > 3.5 && type < 4.5) { // treillis : des tuiles bout à bout
     vi = fract((q.y + h.y) / param);
     dv = (r.w - r.y) / param;
-  } else if (type > 7.5) { // module voisin : le cylindre du port, en miroir
-    // la partie HAUTE de l'image (74 % à 100 % depuis le bas : couvertures,
-    // anneau, mains courantes), répétée en aller-retour — pas de couture à
-    // raccorder. La bande du hublot n'y entre pas : répété, il faisait motif.
-    float t = (q.y + h.y) / param;
-    vi = 0.74 + 0.26 * abs(fract(t * 0.5) * 2.0 - 1.0);
-    dv = (r.w - r.y) * 0.26 / param;
+  } else if (type > 7.5 && type < 8.5) { // module voisin
+    if (param < 0.0) {
+      // SON image (§33) : un tronçon raccordé bout à bout
+      vi = fract((q.y + h.y) / -param);
+      dv = (r.w - r.y) / -param;
+    } else {
+      // repli, l'image du port : sa partie HAUTE (74 % à 100 % depuis le
+      // bas), répétée en aller-retour — pas de couture à raccorder
+      float t = (q.y + h.y) / param;
+      vi = 0.74 + 0.26 * abs(fract(t * 0.5) * 2.0 - 1.0);
+      dv = (r.w - r.y) * 0.26 / param;
+    }
+    // il s'efface sur son dernier quart : sans bout livré, c'est ce qui le
+    // finit ; avec, le bout le couvre
+    fondu = 1.0 - smoothstep(0.75, 1.0, vv);
   } else if (type > 2.5 && type < 3.5 && param > 0.0) { // amarrage
     vi = vv * param;
     dv *= param;
@@ -4769,6 +4779,15 @@ void peintPiece(inout vec4 acc, vec2 q, vec2 h, float type, float g, float param
   // éclairé par le soleil seul : plus sombre et plus froid que la planche,
   // pour rester sous la cuve dans la hiérarchie lumineuse
   vec3 c = t.rgb * vec3(0.70, 0.75, 0.84);
+  // LA LUMIÈRE DE LA SCÈNE (ciel TERRE) : la face au Soleil de face ou à
+  // contre-jour, et le long des bords de la pièce, l'or du Soleil et le bleu
+  // de la Terre — les bords de son cadre, repassés dans le monde (rot : le
+  // cosinus et le sinus de son angle). Inactive, facteur 1 et rien d'ajouté.
+  c *= lumiereFace();
+  vec2 e2 = h - abs(q);
+  vec2 nL = e2.x < e2.y ? vec2(sign(q.x), 0.0) : vec2(0.0, sign(q.y));
+  vec2 nW = vec2(rot.x * nL.x - rot.y * nL.y, rot.y * nL.x + rot.x * nL.y);
+  c += lumiereArete(nW) * exp(-max(min(e2.x, e2.y), 0.0) / (2.5 * px + 1.0));
   float k = t.a * fondu;
   acc = vec4(c * k, k) + acc * (1.0 - k);
   if (type < 0.5) {
@@ -4850,7 +4869,7 @@ void poseCouche(inout vec4 acc, vec2 w, float px, int mode, float couche) {
       ? normalize(uLumSoleil.xy) : vec2(-0.6, 0.8);
     vec2 soleil = normalize(vec2(ca * sd.x + sa * sd.y, -sa * sd.x + ca * sd.y));
     vec4 rect = uAtlas[int(type)];
-    if (uHasMateriel > 0.5 && rect.z > rect.x) peintPiece(acc, q, geo.zw, type, aux.z, aux.w, rect, px);
+    if (uHasMateriel > 0.5 && rect.z > rect.x) peintPiece(acc, q, geo.zw, type, aux.z, aux.w, rect, px, vec2(ca, sa));
     else dessinePiece(acc, q, geo.zw, type, aux.z, aux.y, aux.w, soleil, px);
   }
 }
@@ -4875,6 +4894,9 @@ void main() {
     // la distance : plus sombre, bleuie par la brume de lumière diffuse
     acc.rgb *= vec3(0.46, 0.52, 0.64);
     poseCouche(acc, vWorld, px, 0, 1.0);
+    // AU RECUL, LE DEHORS S'EFFACE (ZOOM_DEHORS_*, compositionCoque.ts) : on
+    // recule pour voir la salle entière, pas ce qui l'entoure
+    acc *= smoothstep(${ZOOM_DEHORS_PARTI.toFixed(4)}, ${ZOOM_DEHORS_PLEIN.toFixed(4)}, uZoom);
     if (acc.a < 0.002 && max(acc.r, max(acc.g, acc.b)) < 0.002) discard;
     outColor = acc;
     return;
@@ -5178,8 +5200,9 @@ export class Renderer {
   private hullRep = COQUE_REP
   private readonly atlasRects = new Float32Array(
     Array.from({ length: 16 }, (_, i) => {
-      // le module voisin se peint avec l'image du port d'amarrage
-      const r = ATLAS_COQUE[i === PIECE_MODULE ? PIECE_AMARRAGE : i]
+      // le module voisin se peint avec son image (§33), sinon avec celle du
+      // port d'amarrage
+      const r = ATLAS_COQUE[i] ?? (i === PIECE_MODULE ? ATLAS_COQUE[PIECE_AMARRAGE] : null)
       return r ? [r.u0, r.v0, r.u1, r.v1] : [0, 0, 0, 0]
     }).flat(),
   )

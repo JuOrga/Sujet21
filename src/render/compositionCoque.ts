@@ -18,7 +18,8 @@
 //      comme LE vaisseau (retour du 25/09). Sur l'ISS, un module n'en porte
 //      aucun : ils pendent à la poutre maîtresse.
 //   1. LES VOISINS — derrière chaque port, le module suivant, dans le plan
-//      de la salle, jusqu'au-delà de l'écran : la salle est un maillon.
+//      de la salle : la salle est un maillon. Il s'arrête à LONG_VOISIN
+//      largeurs (il filait à 6000 u : une bande claire au dézoom).
 //   2. LE LOINTAIN — la poutre maîtresse de la station, qui passe au large,
 //      avec les grandes ailes solaires et les radiateurs qui y pendent. En
 //      PARALLAXE (échelle et défilement ECHELLE_LOINTAIN) : plus petite,
@@ -56,6 +57,21 @@ export const EMBASE_PROF = 22
  *  avec l'image du port (sa partie au-dessus de la collerette, répétée en
  *  miroir), sinon tracé. */
 export const PIECE_MODULE = 8
+/** LE BOUT DU VOISIN : ce qui ferme le module voisin (un nœud, une coiffe),
+ *  pour qu'il s'arrête au lieu de filer à l'infini. Posé seulement quand son
+ *  image est livrée (assets-ia §33) ; sans elle, le voisin s'efface. */
+export const PIECE_VOISIN_BOUT = 9
+/** La longueur du module voisin, en largeurs de port : il en paraissait
+ *  6000 u, une bande claire qui traversait tout l'écran au dézoom — « des
+ *  couleurs immenses » (retour du 30/09). Fini, il se lit comme un module
+ *  de plus, et la salle reste le sujet. */
+export const LONG_VOISIN = 2.6
+/** LE DEHORS S'EFFACE AU RECUL : pleinement là au zoom de jeu, parti quand
+ *  la caméra recule d'un facteur trois environ — en reculant, c'est la salle
+ *  entière qu'on veut voir, pas ce qui l'entoure. (Zoom de jeu ordinaire :
+ *  ~0,13–0,15 sur 1280 × 800, voir render/parallaxe.ts.) */
+export const ZOOM_DEHORS_PARTI = 0.045
+export const ZOOM_DEHORS_PLEIN = 0.09
 
 /** Les couches (voir l'en-tête). */
 export const COUCHE_MODULE = 0
@@ -288,18 +304,33 @@ export function composeCoque(b: Bounds, vides: readonly FormeBox[] = []): PieceC
     const s = cote.long / 2
     const largeur = 340
     attache(cote, s, g, largeur * 0.9)
-    const part = 0.62
+    // LE VOISIN A SA PROPRE IMAGE (assets-ia §33 : un tronçon qui se
+    // raccorde bout à bout) : le port n'est plus que sa collerette, montrée
+    // entière. Sans elle, l'ancien montage : le haut de l'image du port,
+    // répété en miroir, et le port coupé aux 62 % de son image.
+    const voisinPeint = ATLAS_COQUE[PIECE_MODULE] != null
+    const part = voisinPeint ? 1 : 0.62
     const h = (largeur / rapportDe(PIECE_AMARRAGE, 1.13)) * (ATLAS_COQUE[PIECE_AMARRAGE] ? part : 1)
     // le voisin d'abord (couche 1, dessiné sous le module de toute façon) :
-    // il commence sous le haut du port, qui s'y fond, et file hors de
-    // l'écran. Sa tuile : la partie cylindre de l'image du port.
-    const longVoisin = 6000
-    const debut = h - 60
+    // il commence sous le haut du port, qui s'y fond, et s'arrête à
+    // LONG_VOISIN largeurs — fermé par son bout s'il est livré, sinon il
+    // s'efface sur son dernier quart (le shader).
     const largeurCyl = largeur * 0.95
-    // une tuile : la bande haute de l'image du port (26 % de sa hauteur)
-    const tuile = largeurCyl / (rapportDe(PIECE_AMARRAGE, 1.13) / 0.26)
+    const longVoisin = LONG_VOISIN * largeur
+    const debut = h - 60
+    // une tuile : l'image du tronçon (négative : c'est ainsi que le shader
+    // la reconnaît), ou la bande haute de l'image du port (26 % de sa hauteur)
+    const tuile = voisinPeint
+      ? -largeurCyl / rapportDe(PIECE_MODULE, 0.5)
+      : largeurCyl / (rapportDe(PIECE_AMARRAGE, 1.13) / 0.26)
     pose(cote, PIECE_MODULE, s, debut + longVoisin / 2, largeurCyl / 2, longVoisin / 2, g,
       tuile, COUCHE_VOISINS)
+    if (ATLAS_COQUE[PIECE_VOISIN_BOUT]) {
+      const hb = largeurCyl / rapportDe(PIECE_VOISIN_BOUT, 1)
+      // il chevauche la fin du tronçon : la couture est sous lui
+      pose(cote, PIECE_VOISIN_BOUT, s, debut + longVoisin - 0.3 * hb + hb / 2, largeurCyl / 2, hb / 2, g,
+        0, COUCHE_VOISINS)
+    }
     pose(cote, PIECE_AMARRAGE, s, h / 2, largeur / 2, h / 2, g, ATLAS_COQUE[PIECE_AMARRAGE] ? part : 0)
   }
   // l'antenne de liaison : une parabole sur un pylône court, près d'un bout
