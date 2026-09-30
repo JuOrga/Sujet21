@@ -25,6 +25,8 @@ export interface CodexDef {
   groupe: CodexGroupe
   icone: string
   titre: string
+  // `[[id]]` ou `[[id|libellé]]` y lie une autre fiche, comme un wiki
+  // (codexLiens.ts) — le joueur ne voit jamais les crochets
   texte: string
   // combinaison matériau × état (détection par contact du solveur) —
   // absente pour les fiches « phénomènes », détectées par événement
@@ -47,7 +49,7 @@ export const CODEX_EXPERIENCES: CodexDef[] = [
     icone: '🧱',
     titre: 'Le liquide épouse la paroi',
     texte:
-      'L’eau s’écrase et s’étale contre le métal : rien ne se perd, mais l’élan si. Pour rebondir, il faudra un autre état.',
+      'L’eau s’écrase et s’étale contre le métal : rien ne se perd, mais l’élan si. Pour rebondir, il faudra [[glace-mur|un autre état]].',
     mat: MAT_WALL,
     etat: 0,
   },
@@ -77,7 +79,7 @@ export const CODEX_EXPERIENCES: CodexDef[] = [
     icone: '❄',
     titre: 'L’aura froide gèle',
     texte:
-      'L’eau qui s’attarde dans l’aura d’une plaque froide gèle sur place. Une transformation gratuite — mais la glace née là reste soudée à la plaque.',
+      'L’eau qui s’attarde dans l’aura d’une plaque froide gèle sur place. Une transformation gratuite — mais la glace née là [[glace-froid|reste soudée à la plaque]].',
     mat: MAT_FROID,
     etat: 0,
   },
@@ -87,7 +89,7 @@ export const CODEX_EXPERIENCES: CodexDef[] = [
     icone: '🚧',
     titre: 'L’évent arrête le liquide',
     texte:
-      'La grille d’évent bloque l’eau comme un mur. Un seul état la traverse : la vapeur.',
+      'La grille d’évent bloque l’eau comme un mur. Un seul état la traverse : [[vapeur-grille|la vapeur]].',
     mat: MAT_GRILLE,
     etat: 0,
   },
@@ -107,7 +109,7 @@ export const CODEX_EXPERIENCES: CodexDef[] = [
     icone: '🧽',
     titre: 'L’eau suinte à travers la membrane',
     texte:
-      'La membrane gorgée d’eau laisse passer le liquide — et seulement lui. Glace et vapeur butent : pour franchir, redevenez eau.',
+      'La membrane gorgée d’eau laisse passer le liquide — et seulement lui. [[glace-membrane|Glace]] et [[vapeur-membrane|vapeur]] butent : pour franchir, redevenez eau.',
     mat: MAT_MEMBRANE,
     etat: 0,
   },
@@ -117,7 +119,7 @@ export const CODEX_EXPERIENCES: CodexDef[] = [
     icone: '🪟',
     titre: 'Le rideau refuse le liquide',
     texte:
-      'Les lamelles souples ne s’écartent pas devant l’eau : elle bute. Seule la glace, d’un bloc, force le passage.',
+      'Les lamelles souples ne s’écartent pas devant l’eau : elle bute. Seule [[glace-rideau|la glace]], d’un bloc, force le passage.',
     mat: MAT_RIDEAU,
     etat: 0,
   },
@@ -127,7 +129,7 @@ export const CODEX_EXPERIENCES: CodexDef[] = [
     icone: '🔋',
     titre: 'La borne ignore le liquide',
     texte:
-      'Pour l’eau, le surchauffeur n’est qu’un mur. Sa lueur ambre s’adresse à un autre état : approchez-le en vapeur.',
+      'Pour l’eau, le surchauffeur n’est qu’un mur. Sa lueur ambre s’adresse à un autre état : approchez-le [[vapeur-surchauffeur|en vapeur]].',
     mat: MAT_SURCHAUFFEUR,
     etat: 0,
   },
@@ -168,7 +170,7 @@ export const CODEX_EXPERIENCES: CodexDef[] = [
     icone: '⚓',
     titre: 'La glace se soude au froid',
     texte:
-      'Un palet qui touche une plaque froide s’y ancre : soudé, immobile, imprenable. Pour repartir, il faut dégeler — et viser juste.',
+      'Un palet qui touche une plaque froide s’y ancre : soudé, immobile, imprenable. Pour repartir, il faut [[glace-chaud|dégeler]] — et viser juste.',
     mat: MAT_FROID,
     etat: 1,
   },
@@ -178,7 +180,7 @@ export const CODEX_EXPERIENCES: CodexDef[] = [
     icone: '🚧',
     titre: 'L’évent arrête le palet',
     texte:
-      'La grille bloque la glace comme elle bloque l’eau. Le nuage seul se faufile entre ses barreaux.',
+      'La grille bloque la glace comme elle bloque l’eau. [[vapeur-grille|Le nuage seul]] se faufile entre ses barreaux.',
     mat: MAT_GRILLE,
     etat: 1,
   },
@@ -198,7 +200,7 @@ export const CODEX_EXPERIENCES: CodexDef[] = [
     icone: '🧊',
     titre: 'La membrane refuse le solide',
     texte:
-      'Le palet bute sur la membrane gorgée d’eau : elle ne laisse suinter que le liquide. Dégeler devant elle, c’est la clé.',
+      'Le palet bute sur la membrane gorgée d’eau : elle ne laisse suinter que [[eau-membrane|le liquide]]. Dégeler devant elle, c’est la clé.',
     mat: MAT_MEMBRANE,
     etat: 1,
   },
@@ -218,7 +220,7 @@ export const CODEX_EXPERIENCES: CodexDef[] = [
     icone: '🔋',
     titre: 'La borne ignore le solide',
     texte:
-      'Pour le palet, le surchauffeur est un mur de plus — un rebond, rien d’autre. Sa recharge est réservée au nuage.',
+      'Pour le palet, le surchauffeur est un mur de plus — un rebond, rien d’autre. Sa recharge est réservée [[vapeur-surchauffeur|au nuage]].',
     mat: MAT_SURCHAUFFEUR,
     etat: 1,
   },
@@ -229,7 +231,7 @@ export const CODEX_EXPERIENCES: CodexDef[] = [
     icone: '🌫',
     titre: 'Le nuage longe les parois',
     texte:
-      'La vapeur du corps glisse le long du métal sans coller ni rebondir. Attention au souffle du dash : lui se condense à la première paroi.',
+      'La vapeur du corps glisse le long du métal sans coller ni rebondir. Attention au souffle du dash : lui [[rosee|se condense à la première paroi]].',
     mat: MAT_WALL,
     etat: 2,
   },
@@ -269,7 +271,7 @@ export const CODEX_EXPERIENCES: CodexDef[] = [
     icone: '🕳',
     titre: 'La vapeur traverse l’évent',
     texte:
-      'Le nuage se faufile entre les barreaux de la grille comme si elle n’existait pas. C’est LE passe-partout de la vapeur — l’eau et la glace restent dehors.',
+      'Le nuage se faufile entre les barreaux de la grille comme si elle n’existait pas. C’est LE passe-partout de la vapeur — [[eau-grille|l’eau]] et [[glace-grille|la glace]] restent dehors.',
     mat: MAT_GRILLE,
     etat: 2,
   },
@@ -289,7 +291,7 @@ export const CODEX_EXPERIENCES: CodexDef[] = [
     icone: '⛔',
     titre: 'La membrane arrête le nuage',
     texte:
-      'La membrane gorgée d’eau bloque la vapeur — et le souffle n’y perle pas : il rebondit et ira se condenser ailleurs. Elle est faite pour ça.',
+      'La membrane gorgée d’eau bloque la vapeur — et le souffle n’y perle pas : il rebondit et [[rosee|ira se condenser ailleurs]]. Elle est faite pour ça.',
     mat: MAT_MEMBRANE,
     etat: 2,
   },
@@ -299,7 +301,7 @@ export const CODEX_EXPERIENCES: CodexDef[] = [
     icone: '🪟',
     titre: 'Le rideau retient le nuage',
     texte:
-      'Les lamelles ne s’écartent que devant la glace : la vapeur bute. Un nuage ne force rien — il contourne.',
+      'Les lamelles ne s’écartent que devant [[glace-rideau|la glace]] : la vapeur bute. Un nuage ne force rien — il contourne.',
     mat: MAT_RIDEAU,
     etat: 2,
   },
@@ -328,7 +330,7 @@ export const CODEX_EXPERIENCES: CodexDef[] = [
     icone: '🔦',
     titre: 'Le corps gelé réfléchit le laser',
     texte:
-      'Un faisceau qui frappe le palet repart comme sur un miroir. Le corps devient un outil optique : orientez-le, et le laser ira où les miroirs ne vont pas.',
+      'Un faisceau qui frappe [[glace-mur|le palet]] repart comme sur un miroir. Le corps devient un outil optique : orientez-le, et le laser ira où les miroirs ne vont pas.',
   },
   {
     id: 'eponge',
@@ -352,7 +354,7 @@ export const CODEX_EXPERIENCES: CodexDef[] = [
     icone: '💨',
     titre: 'La zone impose la vapeur',
     texte:
-      'Dans une zone vapeur, le corps monte en nuage d’office — et la sortie de zone le rend. Profitez du passage : les évents s’ouvrent.',
+      'Dans une zone vapeur, le corps monte en nuage d’office — et la sortie de zone le rend. Profitez du passage : [[vapeur-grille|les évents s’ouvrent]].',
   },
   {
     id: 'sas',

@@ -10,10 +10,12 @@ import {
   indice,
   litCibles,
   ordinal,
+  placeDe,
   progression,
   rangJournal,
   rayonsDe,
   romain,
+  toutesLesFiches,
   visibles,
   voisine,
 } from './codexVue'
@@ -102,5 +104,17 @@ describe('le journal en jalons', () => {
     expect(ordinal(3)).toBe('3e')
     expect(conditionJournal('fins', 1)).toBe('Se révèle à la 1re expédition bouclée.')
     expect(conditionJournal('recit', 5)).toBe('Se livre au 5e fragment servi.')
+  })
+})
+
+describe('la place d’une fiche', () => {
+  it('trouve le mode et le rayon, des fiches comme du journal', () => {
+    expect(placeDe('glace-rideau')).toMatchObject({ mode: 'fiches', rayon: { id: 'glace' } })
+    expect(placeDe('recit-livraison')).toMatchObject({ mode: 'journal', rayon: { id: 'recit' } })
+    expect(placeDe('nulle-part')).toBeNull()
+  })
+
+  it('toutes les fiches de l’écran sont tout le codex', () => {
+    expect(toutesLesFiches().map((d) => d.id).sort()).toEqual(fichesCodex().map((d) => d.id).sort())
   })
 })

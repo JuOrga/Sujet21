@@ -70,6 +70,20 @@ export function fichesDuRayon(r: RayonCodex): CodexDef[] {
   return r.groupe ? fichesCodex().filter((d) => d.groupe === r.groupe) : []
 }
 
+/** Où vit une fiche : son mode et son rayon — null si aucun rayon ne la
+ *  montre (id inconnu, ou fiche retirée du journal). Sert à y SAUTER : un
+ *  lien du codex, l'objectif suivi, un toast. */
+export function placeDe(id: string): { mode: ModeCodex; rayon: RayonCodex } | null {
+  for (const mode of ['fiches', 'journal'] as const)
+    for (const rayon of rayonsDe(mode)) if (fichesDuRayon(rayon).some((d) => d.id === id)) return { mode, rayon }
+  return null
+}
+
+/** Toutes les fiches que l'écran montre, les deux modes confondus. */
+export function toutesLesFiches(): CodexDef[] {
+  return [...RAYONS_FICHES, ...RAYONS_JOURNAL].flatMap(fichesDuRayon)
+}
+
 export function visibles(r: RayonCodex, filtre: FiltreCodex, connu: (id: string) => boolean): CodexDef[] {
   return fichesDuRayon(r).filter((d) =>
     filtre === 'tous' ? true : filtre === 'ok' ? connu(d.id) : !connu(d.id),

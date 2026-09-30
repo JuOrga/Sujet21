@@ -18,6 +18,7 @@
 //     retirer une entrée déjà vue par un joueur ne lui retire rien.
 
 import type { CodexDef } from './codex'
+import { liensBrises } from './codexLiens'
 import { appelle } from './reseau'
 
 export interface EntreeJournal {
@@ -241,10 +242,14 @@ export function memeJournal(a: JournalDef, b: JournalDef): boolean {
 }
 
 /** Ce qui cloche, en clair — vide : rien. Un verdict qui commence par
- *  « ATTENTION » n'empêche pas de publier. */
-export function verifieJournal(j: JournalDef): string[] {
+ *  « ATTENTION » n'empêche pas de publier. `autreFiche` dit si un id hors
+ *  du journal (une fiche d'expérience) existe : les `[[liens]]` du texte
+ *  vers autre chose se liraient en texte nu — on le dit avant de publier. */
+export function verifieJournal(j: JournalDef, autreFiche: (id: string) => boolean = () => false): string[] {
   const v: string[] = []
   const ids = new Set<string>()
+  const duJournal = new Set([...j.recit, ...j.fins].map((e) => e.id))
+  const existe = (id: string): boolean => duJournal.has(id) || autreFiche(id)
   const groupes: [GroupeJournal, EntreeJournal[], string][] = [
     ['recit', j.recit, 'fragment'],
     ['fins', j.fins, 'fin'],
@@ -259,6 +264,8 @@ export function verifieJournal(j: JournalDef): string[] {
       ids.add(e.id)
       if (!e.titre.trim()) v.push(`${ou} : titre vide`)
       if (!e.texte.trim()) v.push(`${ou} : texte vide`)
+      for (const id of liensBrises(e.texte, existe))
+        v.push(`ATTENTION : ${ou} : le lien [[${id}]] ne mène à aucune fiche — il se lira en texte nu`)
     })
   }
   if (j.revelationApres > j.recit.length)
