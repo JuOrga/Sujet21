@@ -388,7 +388,7 @@ import {
   cadrePlaque,
   facteurG,
 } from './render/parallaxe'
-import { TERRE_DEFAUTS, cadreTerre, type VueTerre } from './render/terre'
+import { TERRE_DEFAUTS, cadreTerre, lumiereStation, type VueTerre } from './render/terre'
 import { PerfCollector } from './game/perf'
 import {
   fetchLibrary,
@@ -3790,6 +3790,7 @@ const VUES_TERRE: readonly VueTerre[] = ['iss', 'l1-lune', 'l1-soleil']
 const vueLue = localStorage.getItem('sujet21-terre-vue') as VueTerre | null
 if (vueLue && VUES_TERRE.includes(vueLue)) terreReglages.vue = vueLue
 const terreCadre = new Float32Array(16)
+const terreLumiere = new Float32Array(8)
 ;(window as unknown as { __terre: typeof terreReglages }).__terre = terreReglages
 // Réglés au banc, à vue : c'est en regardant le vide qu'on trouve le dosage.
 // La FORCE dose la plaque — le vide doit rester plus sombre que la cuve
@@ -19816,6 +19817,10 @@ function corpsImage(now: number): boolean {
     renderer.setTerre(
       cadreTerre(Date.now(), camera.x, camera.y, vw, vh, terreCadre, terreReglages),
     )
+    // la station sous la MÊME lumière que la Terre (render/terre.ts)
+    renderer.setLumiereScene(lumiereStation(terreCadre, vw, vh, terreLumiere, terreReglages))
+  } else {
+    renderer.setLumiereScene(null)
   }
   // LA PROFONDEUR DES COUCHES DE FOND : posée à l'image comme le ciel, pour
   // que le banc l'entende tout de suite. Le facteur se cuisine ICI, une fois

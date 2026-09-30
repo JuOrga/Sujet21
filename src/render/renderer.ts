@@ -818,6 +818,32 @@ float formeSdf(vec2 w, vec4 b, float forme, float q0, float q1) {
   return dU / max(length(g), 1e-9);
 }`
 
+// LA LUMIÈRE DE LA SCÈNE SUR LA STATION (render/terre.ts, lumiereStation) —
+// le Soleil qui éclaire la Terre, et la lueur de la Terre elle-même. Commune
+// à la composition (les coques des tableaux en modules) et à la passe de
+// coque (les tableaux à cuve). Inactive (w = 0) hors du ciel TERRE : le
+// rendu y est celui d'avant, au pixel près — facteur 1, aucun ajout.
+const LUMIERE_SCENE_GLSL = `
+uniform vec4 uLumSoleil; // xy : le Soleil dans l'écran (longueur = part rasante) · z : sur la face, −1..1 · w : actif
+uniform vec4 uLumTerre;  // xy : la direction de la Terre à l'écran · z : sa lueur, 0..1
+// la FACE des modules : un peu plus claire au Soleil de face, sombre à
+// contre-jour — jamais assez pour cacher le jeu
+float lumiereFace() {
+  return uLumSoleil.w > 0.5 ? mix(0.70, 1.06, 0.5 + 0.5 * uLumSoleil.z) : 1.0;
+}
+// une ARÊTE de normale sortante n (plan de l'écran) : le Soleil la dore du
+// côté d'où il vient, la Terre la bleuit du sien ; à contre-jour d'une Terre
+// pleine, tout le pourtour s'allume faiblement — c'est ce liseré qui détache
+// la station du disque au lieu de l'y coller
+vec3 lumiereArete(vec2 n) {
+  if (uLumSoleil.w < 0.5) return vec3(0.0);
+  vec3 c = vec3(1.0, 0.92, 0.80) * max(0.0, dot(n, uLumSoleil.xy)) * 0.60;
+  float t = max(0.0, dot(n, uLumTerre.xy));
+  c += vec3(0.32, 0.52, 1.0) * uLumTerre.z * (0.25 + 0.75 * t) * 0.70;
+  return c;
+}
+`
+
 const COMPOSE_FS = `#version 300 es
 precision highp float;
 #define MAX_BOXES 160
@@ -890,6 +916,7 @@ uniform vec4 uPlaque;
 // les quatrièmes composantes. Cuit à l'image par cadreTerre
 // (render/terre.ts) : une seule mat4, quatre vecteurs d'uniformes.
 uniform mat4 uTerre;
+${LUMIERE_SCENE_GLSL}
 // LA PROFONDEUR DES COUCHES DE FOND. Chaque couche porte DEUX nombres, tous
 // deux entre 0 et 1 et avec la même convention : 1 = elle se comporte comme
 // le plan de jeu, 0 = elle est infiniment loin.
@@ -2513,6 +2540,16 @@ void main() {
   col = mix(col, hullCol, hull * (1.0 - uHasHull));
   float wallLine = 1.0 - smoothstep(0.0, 3.0 / uZoom, abs(roomD));
   col += vec3(0.10, 0.22, 0.30) * wallLine * (1.0 - 0.8 * uHasHull);
+  // LA LUMIÈRE DE LA SCÈNE sur le pourtour des modules (tableaux bâtis en
+  // modules : leurs coques sont peintes ici ; ceux à cuve passent par la
+  // passe de coque). La normale sortante vient du gradient de roomD —
+  // dérivées prises ici, hors de toute boucle et de toute branche.
+  vec2 gRoom = vec2(dFdx(roomD), dFdy(roomD));
+  if (uSolModules > 0.5 && uLumSoleil.w > 0.5) {
+    vec2 nRoom = gRoom / max(length(gRoom), 1e-6);
+    float bord = (1.0 - smoothstep(0.0, 4.0 / uZoom, abs(roomD - 1.5 / uZoom)));
+    col += lumiereArete(nRoom) * bord;
+  }
 
   // Zones d'état, sous les surfaces : un voile teinté qui emplit la région,
   // un liseré net à la frontière, et des chevrons lents qui balaient vers
@@ -4460,6 +4497,7 @@ uniform int uVideCount;
 uniform vec4 uVides[MAX_VIDES];   // minX, minY, maxX, maxY
 uniform vec2 uVidesAux[MAX_VIDES]; // code (matériau + forme), angle
 out vec4 outColor;
+${LUMIERE_SCENE_GLSL}
 
 float boxSdf(vec2 world, vec4 b) {
   vec2 c = (b.xy + b.zw) * 0.5;
@@ -4806,7 +4844,11 @@ void poseCouche(inout vec4 acc, vec2 w, float px, int mode, float couche) {
     float ca = cos(aux.y);
     float sa = sin(aux.y);
     vec2 q = vec2(ca * rel.x + sa * rel.y, -sa * rel.x + ca * rel.y);
-    vec2 soleil = normalize(vec2(ca * -0.6 + sa * 0.8, -sa * -0.6 + ca * 0.8));
+    // le soleil des pièces dessinées : celui de la Terre quand elle est là
+    // (les pièces PEINTES gardent la lumière de leur image)
+    vec2 sd = uLumSoleil.w > 0.5 && dot(uLumSoleil.xy, uLumSoleil.xy) > 1e-6
+      ? normalize(uLumSoleil.xy) : vec2(-0.6, 0.8);
+    vec2 soleil = normalize(vec2(ca * sd.x + sa * sd.y, -sa * sd.x + ca * sd.y));
     vec4 rect = uAtlas[int(type)];
     if (uHasMateriel > 0.5 && rect.z > rect.x) peintPiece(acc, q, geo.zw, type, aux.z, aux.w, rect, px);
     else dessinePiece(acc, q, geo.zw, type, aux.z, aux.y, aux.w, soleil, px);
@@ -4854,7 +4896,11 @@ void main() {
     float dv = videSdf(vWorld);
     float garde = smoothstep(0.0, px, dv);
     if (garde <= 0.0) discard;
-    vec3 c = tex;
+    // la tôle sous la lumière de la scène : sa face (le Soleil de face ou
+    // à contre-jour), et le long de l'arête externe, l'or du Soleil et le
+    // bleu de la Terre du côté où ils sont
+    vec3 c = tex * lumiereFace();
+    c += lumiereArete(dO) * exp(-(uEpais - a) / (3.0 * px + 2.0));
     c = mix(c, vec3(0.030, 0.040, 0.055), (1.0 - smoothstep(0.0, 12.0, dv)) * 0.85);
     c = mix(c, vec3(0.30, 0.38, 0.48), (1.0 - smoothstep(px, 2.5 * px, dv)) * 0.65);
     // les embases qui mordent dans la coque, par-dessus la tôle
@@ -4877,7 +4923,7 @@ void main() {
   // le fil de lumière sur la face externe : l'arête de la coque accroche
   // les étoiles, et la station se découpe sur le ciel
   float arete = (1.0 - smoothstep(0.0, 1.5 * px, abs(y - 0.75 * px))) * smoothstep(0.0, px, videSdf(vWorld - dO * y));
-  acc.rgb += vec3(0.10, 0.16, 0.21) * arete * (1.0 - acc.a);
+  acc.rgb += (vec3(0.10, 0.16, 0.21) + lumiereArete(dO)) * arete * (1.0 - acc.a);
   if (acc.a < 0.002 && max(acc.r, max(acc.g, acc.b)) < 0.002) discard;
   outColor = acc;
 }`
@@ -5093,6 +5139,8 @@ export class Renderer {
   /** l'image du ciel demandée (plaque ou Terre), null pour les autres modes */
   private cielDemande: string | null = null
   private readonly terreCadre = new Float32Array(16)
+  /** la lumière de la scène sur la station (lumiereStation) ; w = 0 : inactive */
+  private readonly lumScene = new Float32Array(8)
   /** La largeur de la photographie en pixels, 0 tant qu'elle n'est pas là :
    *  cadrePlaque en a besoin pour ne jamais l'agrandir au-delà du net. */
   plaqueTexels = 0
@@ -5594,6 +5642,13 @@ export class Renderer {
       this.texPlaque = t
       this.plaqueTexels = img.naturalWidth
     })
+  }
+
+  /** La lumière de la scène sur la station (lumiereStation, render/terre.ts) ;
+   *  null l'éteint — le rendu d'avant. */
+  setLumiereScene(l: Float32Array | null): void {
+    if (l) this.lumScene.set(l)
+    else this.lumScene.fill(0)
   }
 
   /** Le cadre de la Terre pour cette image (cadreTerre, render/terre.ts). */
@@ -6514,6 +6569,8 @@ export class Renderer {
     gl.uniform1f(cu['uCielMode'], this.cielMode)
     gl.uniform4f(cu['uPlaque'], this.plaque[0], this.plaque[1], this.plaque[2], this.plaque[3])
     gl.uniformMatrix4fv(cu['uTerre'], false, this.terreCadre)
+    gl.uniform4fv(cu['uLumSoleil'], this.lumScene.subarray(0, 4))
+    gl.uniform4fv(cu['uLumTerre'], this.lumScene.subarray(4, 8))
     gl.uniform2fv(cu['uParCiel'], this.parCiel)
     gl.uniform2fv(cu['uParSemis'], this.parSemis)
     gl.uniform2fv(cu['uParCuve'], this.parCuve)
@@ -6717,6 +6774,8 @@ export class Renderer {
     gl.uniform1i(hu['uTexHull'], 0)
     gl.uniform1i(hu['uPieceCount'], this.piecesCount)
     gl.uniform1f(hu['uExterieur'], this.exterieur ? 1 : 0)
+    gl.uniform4fv(hu['uLumSoleil'], this.lumScene.subarray(0, 4))
+    gl.uniform4fv(hu['uLumTerre'], this.lumScene.subarray(4, 8))
     gl.uniform4f(hu['uCuve'], b.minX, b.minY, b.maxX, b.maxY)
     gl.uniform1f(hu['uEchelleLoin'], ECHELLE_LOINTAIN)
     gl.uniform4fv(hu['uAtlas[0]'], this.atlasRects)

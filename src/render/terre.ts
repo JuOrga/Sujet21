@@ -360,3 +360,69 @@ export function rayonPixel(c: Float32Array, x: number, y: number): Vec3 | null {
   const t = -b - Math.sqrt(disc)
   return [P[0] + d[0] * t, P[1] + d[1] * t, P[2] + d[2] * t]
 }
+
+/**
+ * LA LUMIÈRE DE LA SCÈNE SUR LA STATION — le même Soleil que la Terre, et la
+ * lueur de la Terre elle-même. Sans elle, la salle était éclairée par un
+ * soleil fixe « en haut à gauche » devant une Terre éclairée d'ailleurs, et
+ * se lisait comme un tableau posé devant une affiche.
+ *
+ * Tout se déduit du cadre de l'image (cadreTerre) : le repère de la caméra,
+ * la station et le Soleil y sont déjà. Rempli dans `out` (8 nombres) :
+ *
+ *   0, 1 : le Soleil dans le plan de l'écran (x droite, y haut) — sa LONGUEUR
+ *          est la part du Soleil qui vient de côté (1 : rasant, 0 : dans
+ *          l'axe du regard), c'est elle qui fait briller les arêtes
+ *   2    : le Soleil sur la FACE des modules, −1..1 : 1, il est derrière le
+ *          regard et les éclaire de face ; −1, il est derrière la Terre et
+ *          les laisse à contre-jour
+ *   3    : 1 — la lumière de scène est active (0 : l'éclairage d'avant)
+ *   4, 5 : la direction de la Terre à l'écran, depuis le centre (unitaire)
+ *   6    : la lueur de la Terre, 0..1 — la part éclairée qu'on en voit
+ *          (ses phases), pondérée par sa taille dans le ciel
+ *   7    : 0 (réservé)
+ */
+export function lumiereStation(
+  cadre: Float32Array,
+  largeurCss: number,
+  hauteurCss: number,
+  out: Float32Array,
+  r: ReglagesTerre = TERRE_DEFAUTS,
+): Float32Array {
+  const col = (k: number): Vec3 => [cadre[4 * k], cadre[4 * k + 1], cadre[4 * k + 2]]
+  const R = unite(col(1))
+  const U = unite(col(2))
+  const F = croix(U, R)
+  const f = 1 / Math.max(norme(col(1)), 1e-12)
+  const c0 = col(0)
+  const ox = -scal(c0, R) * f
+  const oy = -scal(c0, U) * f
+  const P = col(3)
+  const sol: Vec3 = [cadre[3], cadre[7], cadre[11]]
+  out[0] = scal(sol, R)
+  out[1] = scal(sol, U)
+  out[2] = -scal(sol, F)
+  out[3] = 1
+  // le centre de la Terre, projeté sur l'écran
+  const v: Vec3 = [-P[0], -P[1], -P[2]]
+  const prof = scal(v, F)
+  let dx: number
+  let dy: number
+  if (prof > 1e-9) {
+    dx = ox + (f * scal(v, R)) / prof - largeurCss / 2
+    dy = oy + (f * scal(v, U)) / prof - hauteurCss / 2
+  } else {
+    dx = scal(v, R)
+    dy = scal(v, U)
+  }
+  const n = Math.hypot(dx, dy)
+  out[4] = n > 1e-9 ? dx / n : 0
+  out[5] = n > 1e-9 ? dy / n : -1
+  // la phase : la part éclairée du disque vu d'ici. Sous l'ISS, la Terre
+  // couvre la moitié du ciel ; depuis L1, elle n'est qu'un disque (cadré
+  // en grand, mais sa lumière est celle d'un astre lointain) : 0,7
+  const phase = 0.5 * (1 + scal(sol, unite(P)))
+  out[6] = phase * (r.vue === 'iss' ? 1 : 0.7)
+  out[7] = 0
+  return out
+}
