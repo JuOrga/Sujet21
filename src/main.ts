@@ -389,6 +389,7 @@ import {
   facteurG,
 } from './render/parallaxe'
 import { TERRE_DEFAUTS, cadreTerre, lumiereStation, type VueTerre } from './render/terre'
+import { decalageStandardMin, lieuDuJoueur } from './render/lieu'
 import { PerfCollector } from './game/perf'
 import {
   fetchLibrary,
@@ -3784,11 +3785,29 @@ if (!(cielChoix in CIEL_MODE)) cielChoix = 'terre'
 // dans un seul tableau — pas d'allocation par image. Sonde : __terre depuis
 // la console (decalageMin : 46 pour passer du jour à la nuit).
 const terreReglages = { ...TERRE_DEFAUTS }
-// LE POINT DE VUE sur la Terre : l'ISS (le sol qui défile, l'horizon) ou un
-// point de Lagrange (la Terre entière, un disque) — retenu comme le ciel
-const VUES_TERRE: readonly VueTerre[] = ['iss', 'l1-lune', 'l1-soleil']
-const vueLue = localStorage.getItem('sujet21-terre-vue') as VueTerre | null
+// LE POINT DE VUE sur la Terre : au-dessus de chez le joueur (défaut — sa
+// région, à son heure), l'ISS (le sol qui défile, l'horizon) ou un point de
+// Lagrange (la Terre entière, un disque) — retenu comme le ciel. La clé a
+// changé avec l'arrivée de « chez vous » : l'éclairage doit suivre l'heure
+// du joueur (retour du 30/09), et un choix de L1 fait la veille, quand
+// cette vue n'existait pas, ne doit pas l'en priver.
+const VUES_TERRE: readonly VueTerre[] = ['chez-vous', 'iss', 'l1-lune', 'l1-soleil']
+const CLE_VUE_TERRE = 'sujet21-terre-vue2'
+const vueLue = localStorage.getItem(CLE_VUE_TERRE) as VueTerre | null
 if (vueLue && VUES_TERRE.includes(vueLue)) terreReglages.vue = vueLue
+// OÙ JOUE LE JOUEUR : son fuseau horaire, jamais la géolocalisation
+// (render/lieu.ts)
+{
+  let fuseau: string | undefined
+  try {
+    fuseau = Intl.DateTimeFormat().resolvedOptions().timeZone
+  } catch {
+    fuseau = undefined
+  }
+  const lieu = lieuDuJoueur(fuseau, decalageStandardMin(new Date().getFullYear()))
+  terreReglages.lieuLat = lieu.lat
+  terreReglages.lieuLon = lieu.lon
+}
 const terreCadre = new Float32Array(16)
 const terreLumiere = new Float32Array(8)
 ;(window as unknown as { __terre: typeof terreReglages }).__terre = terreReglages
@@ -4117,6 +4136,7 @@ const paramsEl = document.getElementById('params') as HTMLDivElement
     if (!choixVueTerre) return
     choixVueTerre.innerHTML = ''
     for (const [vue, label] of [
+      ['chez-vous', 'AU-DESSUS DE CHEZ VOUS'],
       ['iss', 'ISS'],
       ['l1-lune', 'L1 TERRE–LUNE'],
       ['l1-soleil', 'L1 SOLEIL–TERRE'],
@@ -4127,7 +4147,7 @@ const paramsEl = document.getElementById('params') as HTMLDivElement
       b.className = terreReglages.vue === vue ? 'actif' : ''
       b.addEventListener('click', () => {
         terreReglages.vue = vue
-        localStorage.setItem('sujet21-terre-vue', vue)
+        localStorage.setItem(CLE_VUE_TERRE, vue)
         // choisir un point de vue, c'est vouloir voir la Terre
         cielChoix = 'terre'
         localStorage.setItem('sujet21-ciel', 'terre')

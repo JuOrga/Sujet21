@@ -317,3 +317,51 @@ describe('terre — la lumière de scène ne change rien hors du ciel TERRE', ()
     expect(source).not.toMatch(/ca \* -0\.6 \+ sa \* 0\.8/)
   })
 })
+
+describe('terre — au-dessus de chez vous : la Terre à l’heure du joueur', () => {
+  const W = 1280
+  const H = 800
+  const paris: ReglagesTerre = { ...TERRE_DEFAUTS, vue: 'chez-vous', lieuLat: 48.86, lieuLon: 2.35 }
+  const auCentre = (ms: number, r: ReglagesTerre) => {
+    const c = cadreTerre(ms, 0, 0, W, H, new Float32Array(16), r)
+    const p = rayonPixel(c, W * r.centreX, H * r.centreY)!
+    const n = Math.hypot(...p)
+    return { ...latLon(p), soleil: (p[0] * c[3] + p[1] * c[7] + p[2] * c[11]) / n, c }
+  }
+
+  it('la région du joueur est au centre du disque, à toute heure', () => {
+    for (const h of [0, 6, 12, 18]) {
+      const { lat, lon } = auCentre(Date.UTC(2026, 8, 30, h), paris)
+      expect(lat).toBeCloseTo(48.86, 1)
+      expect(lon).toBeCloseTo(2.35, 1)
+    }
+  })
+
+  it('midi à Paris : le Soleil est haut au centre ; minuit : c’est la nuit', () => {
+    // midi solaire à Paris, le 30/09 : ~11 h 40 UTC
+    expect(auCentre(Date.UTC(2026, 8, 30, 11, 40), paris).soleil).toBeGreaterThan(0.6)
+    expect(auCentre(Date.UTC(2026, 8, 30, 23, 40), paris).soleil).toBeLessThan(-0.6)
+  })
+
+  it('la même minute, Tokyo est de l’autre côté du jour', () => {
+    const tokyo = { ...paris, lieuLat: 35.68, lieuLon: 139.69 }
+    const t = Date.UTC(2026, 8, 30, 11, 40)
+    expect(auCentre(t, tokyo).soleil).toBeLessThan(0)
+  })
+
+  it('la station suit l’heure locale : de face à midi, à contre-jour à minuit', () => {
+    const face = (ms: number) =>
+      lumiereStation(auCentre(ms, paris).c, W, H, new Float32Array(8), paris)[2]
+    expect(face(Date.UTC(2026, 8, 30, 11, 40))).toBeGreaterThan(0.6)
+    expect(face(Date.UTC(2026, 8, 30, 23, 40))).toBeLessThan(-0.6)
+  })
+
+  it('le disque garde son rayon depuis l’altitude géostationnaire', () => {
+    const { c } = auCentre(Date.UTC(2026, 8, 30, 12), paris)
+    const cx = W * paris.centreX
+    const cy = H * paris.centreY
+    const rayon = paris.disque * H
+    expect(rayonPixel(c, cx + rayon - 2, cy)).not.toBeNull()
+    expect(rayonPixel(c, cx + rayon + 2, cy)).toBeNull()
+  })
+})

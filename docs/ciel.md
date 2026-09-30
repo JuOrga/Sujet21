@@ -63,10 +63,15 @@ vraie station passe. Pour la caler sur la vraie, il suffirait de reporter
 dans `TERRE_DEFAUTS` le nœud et l'argument de latitude d'un TLE récent (le
 réseau de l'environnement de travail ne joint pas CelesTrak).
 
-- **trois points de vue** (PARAMÈTRES › LA TERRE, VUE DE…, `vue`) :
+- **quatre points de vue** (PARAMÈTRES › LA TERRE, VUE DE…, `vue`) :
+  - **AU-DESSUS DE CHEZ VOUS** (défaut) — un satellite fixe à l'altitude
+    géostationnaire au-dessus de la région du joueur, devinée par son fuseau
+    horaire (`render/lieu.ts`, sans géolocalisation) : la Terre à l'heure
+    LOCALE du joueur, nuit chez lui, nuit à l'écran — et la station sous
+    la même lumière ;
   - **ISS** — le regard **penché de 52°** depuis le nadir, vers l'avant : le
     sol défile vers le bas de l'écran, l'horizon courbe barre le haut ;
-  - **L1 Terre–Lune** (défaut) — à ~323 000 km, entre la Terre et la Lune
+  - **L1 Terre–Lune** — à ~323 000 km, entre la Terre et la Lune
     (position de la Lune : l'algorithme bref de l'Astronomical Almanac,
     ~0,3°). La Terre entière, nord en haut, avec ses **phases** : pleine à
     la nouvelle Lune, nocturne à la pleine Lune ;

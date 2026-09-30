@@ -35,8 +35,16 @@ const MU_KM3_S2 = 398600.4418
 const J2 = 1.08263e-3
 const DEG = Math.PI / 180
 
-/** D'OÙ l'on regarde. L'ISS rase la Terre ; les deux points de Lagrange la
- *  voient ENTIÈRE, comme un disque :
+/** D'OÙ l'on regarde. L'ISS rase la Terre ; les autres la voient ENTIÈRE,
+ *  comme un disque :
+ *   - 'chez-vous' : un satellite FIXE au-dessus de la région du joueur, à
+ *     l'altitude géostationnaire (35 786 km). Il tourne avec la Terre : la
+ *     région reste au centre du disque, et la ligne du jour et de la nuit la
+ *     traverse à l'HEURE LOCALE du joueur — nuit chez lui, nuit à l'écran.
+ *     Les points de Lagrange, eux, montrent la face tournée vers eux, quelle
+ *     que soit l'heure du joueur (« il faut que l'éclairage respecte l'heure
+ *     de la zone où l'on joue », 30/09). La région vient du fuseau horaire
+ *     du navigateur (render/lieu.ts) ;
  *   - 'l1-lune' : le point L1 du couple Terre–Lune, entre les deux, à ~84 %
  *     du chemin vers la Lune (~323 000 km). La Terre y a des PHASES — celles
  *     de la Lune vue d'ici, à l'envers : pleine Terre à la nouvelle Lune,
@@ -44,11 +52,14 @@ const DEG = Math.PI / 180
  *   - 'l1-soleil' : le point L1 du couple Soleil–Terre, à 1,5 million de km
  *     vers le Soleil — là où veille le satellite DSCOVR, dont la caméra EPIC
  *     photographie chaque jour la Terre PLEINE, toujours de face au jour. */
-export type VueTerre = 'iss' | 'l1-lune' | 'l1-soleil'
+export type VueTerre = 'chez-vous' | 'iss' | 'l1-lune' | 'l1-soleil'
 
 export interface ReglagesTerre {
   /** le point de vue (voir VueTerre) */
   vue: VueTerre
+  /** 'chez-vous' : la région du joueur, en degrés (render/lieu.ts) */
+  lieuLat: number
+  lieuLon: number
   /** DEPUIS UN POINT DE LAGRANGE — le rayon du disque, en fraction de la
    *  PETITE dimension de l'écran. À l'œil nu, la Terre y ferait 2° (L1
    *  Terre–Lune) ou un demi-degré (L1 Soleil–Terre) : on la cadre comme
@@ -85,7 +96,10 @@ export interface ReglagesTerre {
 }
 
 export const TERRE_DEFAUTS: ReglagesTerre = {
-  vue: 'l1-lune',
+  vue: 'chez-vous',
+  // Paris, en attendant le fuseau du joueur (main.ts, lieuDuJoueur)
+  lieuLat: 48.86,
+  lieuLon: 2.35,
   disque: 0.36,
   centreX: 0.62,
   centreY: 0.55,
@@ -209,6 +223,23 @@ export function pointLagrange(ms: number, vue: 'l1-lune' | 'l1-soleil'): Vec3 {
   return [l.dir[0] * k, l.dir[1] * k, l.dir[2] * k]
 }
 
+/** L'altitude géostationnaire, depuis le centre de la Terre (km) : là où un
+ *  satellite fait le tour en un jour sidéral, et reste au-dessus du même
+ *  point. */
+const GEO_KM = 42164
+
+/** La position de l'observateur d'un point de vue à disque, en rayons
+ *  terrestres, dans le repère lié à la Terre. */
+export function positionVue(ms: number, r: ReglagesTerre): Vec3 {
+  if (r.vue === 'chez-vous') {
+    const k = GEO_KM / RAYON_TERRE_KM
+    const la = r.lieuLat * DEG
+    const lo = r.lieuLon * DEG
+    return [k * Math.cos(la) * Math.cos(lo), k * Math.cos(la) * Math.sin(lo), k * Math.sin(la)]
+  }
+  return pointLagrange(ms, r.vue === 'l1-soleil' ? 'l1-soleil' : 'l1-lune')
+}
+
 /** La période de l'orbite (s) : Kepler, pour une orbite circulaire. */
 export function periodeS(r: ReglagesTerre = TERRE_DEFAUTS): number {
   const a = RAYON_TERRE_KM + r.altitudeKm
@@ -276,10 +307,11 @@ export function cadreTerre(
   const glisse = (cam: number): number =>
     reste > 1e-6 ? reste * Math.tanh((cam * r.derive) / reste) : 0
   if (r.vue !== 'iss') {
-    // DEPUIS UN POINT DE LAGRANGE : le regard droit sur le centre de la
-    // Terre, le NORD en haut de l'écran (comme les images d'EPIC), et une
-    // focale de téléobjectif qui donne au disque le rayon voulu
-    const pos = pointLagrange(t, r.vue)
+    // DE LOIN (au-dessus de chez le joueur, ou d'un point de Lagrange) : le
+    // regard droit sur le centre de la Terre, le NORD en haut de l'écran
+    // (comme les images d'EPIC), et une focale de téléobjectif qui donne au
+    // disque le rayon voulu
+    const pos = positionVue(t, r)
     const F = unite([-pos[0], -pos[1], -pos[2]])
     const nord: Vec3 = [0, 0, 1]
     const U = unite([nord[0] - F[0] * F[2], nord[1] - F[1] * F[2], nord[2] - F[2] * F[2]])
@@ -419,8 +451,8 @@ export function lumiereStation(
   out[4] = n > 1e-9 ? dx / n : 0
   out[5] = n > 1e-9 ? dy / n : -1
   // la phase : la part éclairée du disque vu d'ici. Sous l'ISS, la Terre
-  // couvre la moitié du ciel ; depuis L1, elle n'est qu'un disque (cadré
-  // en grand, mais sa lumière est celle d'un astre lointain) : 0,7
+  // couvre la moitié du ciel ; de loin, elle n'est qu'un disque (cadré en
+  // grand, mais sa lumière est celle d'un astre lointain) : 0,7
   const phase = 0.5 * (1 + scal(sol, unite(P)))
   out[6] = phase * (r.vue === 'iss' ? 1 : 0.7)
   out[7] = 0
