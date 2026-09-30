@@ -11,6 +11,11 @@
 // indice — une entrée du journal, ce qui l'ouvre — et se MARQUE comme
 // objectif : l'objectif suivi s'affiche en tête, et survit au rechargement.
 //
+// LES LIENS (codexLiens.ts) : une fiche en cite d'autres, comme un wiki —
+// `[[id|libellé]]` dans le texte devient un lien, et sous le texte, le
+// MÊME ÉLÉMENT aux autres états et les fiches qui CITENT celle-ci. Suivre
+// un lien empile la fiche quittée : « ← RETOUR » y ramène.
+//
 // Tout ce qui se calcule vit dans codexVue.ts (testé) ; ici, le DOM. La
 // classe ne connaît ni les registres ni le Codex : elle reçoit ce qu'elle
 // lit par des crochets, comme l'éditeur reçoit les biomes.
@@ -22,6 +27,7 @@
 // langue de ce qui a la main (padEcran.ts). Le clavier suit le même schéma.
 
 import type { CodexDef } from './codex'
+import { decoupeLiens, liensEntrants, memeElement } from './codexLiens'
 import {
   RARETES,
   blobEnBase64,
@@ -39,10 +45,12 @@ import {
   formateQuand,
   indice,
   litCibles,
+  placeDe,
   progression,
   rangJournal,
   rayonsDe,
   romain,
+  toutesLesFiches,
   videoDe,
   visibles,
   type FiltreCodex,
@@ -111,6 +119,9 @@ export class EcranCodex {
   private envoiEnCours = false
   private fichePeinte: string | null = null
   private pilote = new PiloteEcran()
+  // les fiches quittées en suivant un lien, la plus récente au bout — la
+  // pile du « ← RETOUR », comme l'historique d'un navigateur
+  private retours: string[] = []
   private legendeManette: boolean | null = null
 
   constructor(
@@ -147,17 +158,35 @@ export class EcranCodex {
   /** Ouvre le codex — sur une fiche, s'il en est donné une : son rayon est
    *  choisi, elle est lue, et elle s'illumine le temps d'un regard. */
   open(fiche?: string): void {
-    if (fiche) {
-      const r = [...rayonsDe('fiches'), ...rayonsDe('journal')].find((x) =>
-        fichesDuRayon(x).some((d) => d.id === fiche),
-      )
-      if (r) {
-        this.mode = rayonsDe('journal').includes(r) ? 'journal' : 'fiches'
-        this.rayon = r.id
-        this.filtre = 'tous'
-        this.sel = fiche
-        this.neuve = fiche
-      }
+    // ouvert du dehors (touche, toast, objectif) : on repart d'une page
+    // blanche — un « retour » vers une lecture d'hier n'aurait pas de sens
+    this.retours = []
+    this.va(fiche)
+  }
+
+  /** Suit un lien : la fiche quittée s'empile, la visée s'ouvre. */
+  private suit(id: string): void {
+    if (id === this.sel || !placeDe(id)) return
+    if (this.sel) this.retours.push(this.sel)
+    // une lecture en étoile ne doit pas faire gonfler la pile sans fin
+    if (this.retours.length > 30) this.retours.shift()
+    this.va(id)
+  }
+
+  /** Revient à la fiche d'avant le dernier lien suivi. */
+  private retour(): void {
+    const id = this.retours.pop()
+    if (id) this.va(id)
+  }
+
+  private va(fiche?: string): void {
+    const place = fiche ? placeDe(fiche) : null
+    if (fiche && place) {
+      this.mode = place.mode
+      this.rayon = place.rayon.id
+      this.filtre = 'tous'
+      this.sel = fiche
+      this.neuve = fiche
     }
     this.host.hidden = false
     this.render()
@@ -224,7 +253,7 @@ export class EcranCodex {
       this.mode === 'journal' ? 'LE JOURNAL DU VAISSEAU' : 'LE MANUEL ÉCRIT PAR LA PARTIE'
     // l'objectif suivi : la première cible encore verrouillée
     const cible = [...this.cibles].find((id) => !this.hooks.connu(id))
-    const def = cible ? [...rayonsDe('fiches'), ...rayonsDe('journal')].flatMap(fichesDuRayon).find((d) => d.id === cible) : undefined
+    const def = cible ? toutesLesFiches().find((d) => d.id === cible) : undefined
     const suivi = this.el('cx-suivi')
     if (def) {
       suivi.innerHTML =
@@ -277,7 +306,7 @@ export class EcranCodex {
 
   /** Tout le codex est-il consigné, les deux modes confondus ? */
   private toutConnu(): boolean {
-    const toutes = [...rayonsDe('fiches'), ...rayonsDe('journal')].flatMap(fichesDuRayon)
+    const toutes = toutesLesFiches()
     return toutes.length > 0 && toutes.every((d) => this.hooks.connu(d.id))
   }
 
@@ -389,12 +418,16 @@ export class EcranCodex {
         `<video muted loop autoplay playsinline preload="metadata"${src.poster ? ` poster="${esc(src.poster)}"` : ''}><source src="${esc(src.src)}"></video>` +
         `<span class="cx-hex cx-hex--grand"><i>${d.icone}</i></span><em>APERÇU À VENIR</em></div>`
       : `<div class="cx-video cx-video--absente cx-video--verrou"><span class="cx-hex cx-hex--grand"><i>?</i></span></div>`
+    const precedente = this.retours.length ? toutesLesFiches().find((x) => x.id === this.retours[this.retours.length - 1]) : undefined
     panneau.innerHTML =
+      (precedente
+        ? `<button type="button" id="cx-retour" class="cx-retour">← RETOUR · ${esc(this.hooks.connu(precedente.id) ? this.hooks.lu(precedente).titre : '? ? ?')}</button>`
+        : '') +
       video +
       `<div class="cx-fiche-titres"><span class="cx-etiquette" style="color:${r.teinte}">${esc(etiquette)}</span>` +
       `<h3>${titre}</h3>` +
       `<small>${sous}</small></div>` +
-      `<p class="cx-texte${ok ? '' : ' cx-texte--muet'}">${ok ? esc(lu!.texte) : journal ? 'Rien n’est encore consigné à ce palier. Le vaisseau écrira cette page quand l’expédition l’aura méritée.' : 'Le vaisseau n’a rien consigné. Ce que le fluide fait ici reste à observer de vos propres yeux.'}</p>` +
+      `<p class="cx-texte${ok ? '' : ' cx-texte--muet'}">${ok ? this.texteLie(lu!.texte) : journal ? 'Rien n’est encore consigné à ce palier. Le vaisseau écrira cette page quand l’expédition l’aura méritée.' : 'Le vaisseau n’a rien consigné. Ce que le fluide fait ici reste à observer de vos propres yeux.'}</p>` +
       (ok
         ? journal
           ? // une entrée du journal n'a ni rareté ni contact : un seul fanion,
@@ -407,6 +440,7 @@ export class EcranCodex {
           // ce que la découverte rapporte se lit AVANT de tenter : c'est
           // l'appât de l'expérience (demande du concepteur)
           `<div class="cx-gain"><span>À LA DÉCOUVERTE</span><b class="cx-memoire">${reg.memoire > 0 ? `+${reg.memoire} MÉMOIRE` : 'RIEN À GAGNER'}</b><small style="color:${rar.teinte}">RARETÉ ${rar.nom}</small></div>`) +
+      (ok ? this.gabaritRenvois(d) : '') +
       (this.hooks.concepteur() ? this.gabaritAtelier(d, reg) : '')
     // la vidéo absente ne casse rien : le glyphe reste, avec « aperçu à venir »
     const v = panneau.querySelector<HTMLVideoElement>('.cx-video video')
@@ -420,6 +454,55 @@ export class EcranCodex {
         // lecture refusée (politique du navigateur) : le poster suffit
       })
     }
+  }
+
+  // ---- LES LIENS ENTRE FICHES ------------------------------------------------
+
+  /** Le texte d'une fiche, ses `[[liens]]` peints en liens. Un lien vers
+   *  une fiche verrouillée garde son libellé mais se marque « ? » : il mène
+   *  à l'indice, jamais au secret. Un <a> et non un <button> : un bouton
+   *  est un bloc insécable, et « la glace, d'un bloc » sautait à la ligne
+   *  d'un seul tenant au lieu de couler avec la phrase. */
+  private texteLie(texte: string): string {
+    const toutes = toutesLesFiches()
+    const parId = new Map(toutes.map((d) => [d.id, d]))
+    return decoupeLiens(texte, (id) => parId.has(id))
+      .map((s) => {
+        if ('texte' in s) return esc(s.texte)
+        const cible = parId.get(s.lien)!
+        const ok = this.hooks.connu(cible.id)
+        const libelle = s.libelle || (ok ? this.hooks.lu(cible).titre : '? ? ?')
+        return (
+          `<a role="link" tabindex="0" class="cx-lien${ok ? '' : ' cx-lien--verrou'}" data-lien="${esc(cible.id)}"` +
+          ` title="${esc(ok ? this.hooks.lu(cible).titre : 'Fiche à découvrir — voir son indice')}">${esc(libelle)}</a>`
+        )
+      })
+      .join('')
+  }
+
+  /** Sous le texte : le MÊME ÉLÉMENT aux autres états (d'office), puis les
+   *  fiches connues qui CITENT celle-ci — les « pages liées » du wiki. */
+  private gabaritRenvois(d: CodexDef): string {
+    const toutes = toutesLesFiches()
+    const connu = (id: string): boolean => this.hooks.connu(id)
+    const freres = memeElement(d, toutes)
+    const citee = liensEntrants(d.id, toutes, (x) => this.hooks.lu(x).texte, connu)
+    if (freres.length === 0 && citee.length === 0) return ''
+    const puce = (x: CodexDef): string => {
+      const ok = connu(x.id)
+      const place = placeDe(x.id)
+      return (
+        `<button type="button" class="cx-renvoi${ok ? '' : ' cx-verrou'}" data-lien="${esc(x.id)}" style="--t:${place?.rayon.teinte ?? 'var(--dim)'}">` +
+        `<i>${ok ? x.icone : '?'}</i><span>${esc(ok ? this.hooks.lu(x).titre : 'à découvrir')}</span>` +
+        `<small>${esc(place?.rayon.nom ?? '')}</small></button>`
+      )
+    }
+    return (
+      `<div class="cx-renvois">` +
+      (freres.length ? `<span>MÊME ÉLÉMENT, AUTRES ÉTATS</span><div>${freres.map(puce).join('')}</div>` : '') +
+      (citee.length ? `<span>CITÉE PAR</span><div>${citee.map(puce).join('')}</div>` : '') +
+      `</div>`
+    )
   }
 
   // ---- L'ATELIER DU CONCEPTEUR ----------------------------------------------
@@ -496,9 +579,18 @@ export class EcranCodex {
       this.open(suivi.dataset.fiche)
       return
     }
+    const lien = t.closest('[data-lien]') as HTMLElement | null
+    if (lien?.dataset.lien) {
+      this.suit(lien.dataset.lien)
+      return
+    }
     if (!b) return
     if (b.id === 'codex-fermer') {
       this.hooks.fermer()
+      return
+    }
+    if (b.id === 'cx-retour') {
+      this.retour()
       return
     }
     if (b.id === 'cx-atelier-journal') {
@@ -621,6 +713,15 @@ export class EcranCodex {
     if (this.host.hidden) return
     const t = e.target as HTMLElement | null
     if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT')) return
+    // un lien du texte atteint à la tabulation : Entrée le suit (un <a>
+    // sans href ne s'active pas tout seul)
+    const lien = t?.closest?.('[data-lien]') as HTMLElement | null | undefined
+    if (lien?.dataset.lien && e.key === 'Enter') {
+      e.preventDefault()
+      e.stopImmediatePropagation()
+      this.suit(lien.dataset.lien)
+      return
+    }
     const g = gesteClavier(e.key)
     if (!g) return
     e.preventDefault()

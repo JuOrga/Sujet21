@@ -15,6 +15,7 @@
 // s'affiche en petit, sans champ pour le changer — les registres des
 // joueurs s'en souviennent.
 
+import { CODEX_EXPERIENCES } from '../game/codex'
 import {
   JOURNAL_LIVRE,
   ajouteEntree,
@@ -173,7 +174,7 @@ export class AtelierJournal {
   /** Statut, boutons, verdicts, état — ce qui change à chaque frappe. */
   private peintEntete(): void {
     const j = this.brouillon
-    const verdicts = verifieJournal(j)
+    const verdicts = verifieJournal(j, (id) => CODEX_EXPERIENCES.some((d) => d.id === id))
     const erreurs = verdicts.filter((v) => !estAttention(v))
     const modifie = !memeJournal(j, this.reference())
     const statut = this.el('aj-statut')
@@ -226,7 +227,7 @@ export class AtelierJournal {
             `<button type="button" data-monte title="Monter" ${i === 0 ? 'disabled' : ''}>▲</button>` +
             `<button type="button" data-descend title="Descendre" ${i === liste.length - 1 ? 'disabled' : ''}>▼</button>` +
             `<button type="button" data-supprime title="Retirer">✕</button></div>` +
-            `<textarea class="aj-texte" data-champ="texte" rows="3" placeholder="Le texte que le joueur lira" maxlength="1200">${esc(e.texte)}</textarea>` +
+            `<textarea class="aj-texte" data-champ="texte" rows="3" placeholder="Le texte que le joueur lira — [[id|libellé]] pour lier une autre fiche" maxlength="1200">${esc(e.texte)}</textarea>` +
             `<small class="aj-id">${esc(e.id)}</small></article>`,
         )
         .join('') +

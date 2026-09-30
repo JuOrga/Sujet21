@@ -3058,6 +3058,24 @@
       .cx-fiche-titres small { font-size: calc(11px * var(--ui)); color: var(--dim); }
       .cx-texte { margin: 0; font-size: calc(12.5px * var(--ui)); line-height: 1.6; color: var(--ink); padding: 12px 14px; border-radius: 10px; background: rgba(3, 7, 16, 0.55); border: 1px solid rgba(150, 200, 235, 0.12); }
       .cx-texte--muet { color: var(--dim); }
+      /* LES LIENS ENTRE FICHES (codexLiens.ts) : soulignés comme un wiki —
+         en pointillé et ambre quand la fiche visée reste à découvrir : le
+         lien mène à son indice, pas à son secret */
+      #codex .cx-lien { color: #8fd3ff; text-decoration: underline; text-decoration-color: rgba(143, 211, 255, 0.45); text-underline-offset: 2px; cursor: pointer; }
+      #codex .cx-lien:hover, #codex .cx-lien:focus-visible { color: #eaf6ff; text-decoration-color: currentColor; outline: none; }
+      #codex .cx-lien--verrou { color: #ffd24a; text-decoration-style: dashed; text-decoration-color: rgba(255, 210, 74, 0.5); }
+      #codex .cx-lien--verrou::after { content: ' ?'; font-size: 0.85em; opacity: 0.8; }
+      #codex .cx-retour { align-self: flex-start; font-family: var(--font-display); font-size: calc(8.5px * var(--ui)); letter-spacing: 0.16em; padding: 6px 10px; border-radius: 6px; border: 1px solid rgba(150, 200, 235, 0.3); background: rgba(3, 7, 16, 0.6); color: #eaf6ff; cursor: pointer; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+      #codex .cx-retour:hover { background: rgba(99, 183, 230, 0.18); }
+      .cx-renvois { display: flex; flex-direction: column; gap: 6px; }
+      .cx-renvois > span { font-family: var(--font-display); font-size: calc(8.5px * var(--ui)); letter-spacing: 0.2em; color: var(--dim); }
+      .cx-renvois > div { display: flex; flex-wrap: wrap; gap: 6px; }
+      #codex .cx-renvoi { display: flex; align-items: center; gap: 6px; min-width: 0; max-width: 100%; padding: 6px 10px; border-radius: 999px; border: 1px solid color-mix(in srgb, var(--t) 40%, transparent); background: color-mix(in srgb, var(--t) 7%, transparent); color: #eaf6ff; cursor: pointer; font: inherit; font-size: calc(11px * var(--ui)); text-align: left; }
+      #codex .cx-renvoi:hover { background: color-mix(in srgb, var(--t) 20%, transparent); }
+      #codex .cx-renvoi i { font-style: normal; }
+      #codex .cx-renvoi span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+      #codex .cx-renvoi small { font-size: calc(8.5px * var(--ui)); letter-spacing: 0.14em; color: var(--t); }
+      #codex .cx-renvoi.cx-verrou { border-style: dashed; color: var(--dim); }
       .cx-stats { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
       .cx-stats div { padding: 10px; border-radius: 8px; border: 1px solid rgba(150, 200, 235, 0.12); display: flex; flex-direction: column; gap: 3px; min-width: 0; }
       .cx-stats span { font-size: calc(9px * var(--ui)); letter-spacing: 0.18em; color: var(--dim); }
