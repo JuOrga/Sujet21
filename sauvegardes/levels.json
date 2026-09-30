@@ -4946,7 +4946,7 @@
     {
       "id": "la-voie-de-la-fusion",
       "auteur": "BOIZ",
-      "majAt": "2026-09-20T17:07:17.124Z",
+      "majAt": "2026-09-29T15:20:00.191Z",
       "codeAuteur": "BOIZ",
       "codeAt": "2026-08-28T18:23:34.841Z",
       "level": {
@@ -5011,9 +5011,9 @@
             "material": 0
           },
           {
-            "minX": -745.5,
+            "minX": -747,
             "minY": -273,
-            "maxX": -377.5,
+            "maxX": -378,
             "maxY": -210,
             "material": 1
           },
@@ -5189,17 +5189,17 @@
             "material": 1
           },
           {
-            "minX": -1199,
-            "minY": -266,
-            "maxX": -990,
-            "maxY": -210,
+            "minX": -1200,
+            "minY": -210,
+            "maxX": -991,
+            "maxY": -154,
             "forme": 3,
             "material": 2
           },
           {
             "minX": -1199,
             "minY": 373,
-            "maxX": -1067,
+            "maxX": -1095.5,
             "maxY": 436,
             "material": 1
           },
@@ -5213,8 +5213,8 @@
           {
             "minX": -1200,
             "minY": -271,
-            "maxX": -745,
-            "maxY": -266,
+            "maxX": -747,
+            "maxY": -210,
             "material": 0
           },
           {
