@@ -1831,7 +1831,15 @@ Retro-futuristic 1970s orbital laboratory, flat orthographic 2D game asset. Mute
 Retro-futuristic 1970s orbital laboratory, flat orthographic 2D game asset. Muted cold palette: near-black #030710, steel blue-grey #0a1420 to #2a3542, pale frosted ice-blue #cfe6f2 to #8fb8cc, single cyan accent #63b7e6. Evenly lit, low brightness, no visible light source. Single sprite on a transparent background, STRICT FLAT FRONT orthographic view, in the exact steel style of the attached references: the END POST of an industrial cold-room strip curtain. A heavy vertical steel JAMB running the full height of the image, a square-section gunmetal post with a bolted mounting flange, a riveted corner bracket at the top where a horizontal steel rail arrives from the LEFT edge and ends against the post, and a small bolted foot plate at the bottom where a thin threshold bar arrives from the left. On the left side, the first frosted translucent PVC strip hangs from the rail, partly cut by the left edge of the image. On the post, one small round CYAN indicator lamp (lit, #63b7e6) and a tiny engraved-looking steel plate with no readable text. A light rime of frost on the lower part of the post. Everything upright and centred on the vertical axis of the post, whole post inside the image, clean edges, isolated on transparent background. Avoid: perspective, 3/4 view, isometric, top-down view, door leaf, handle, hinges, wall, floor, background, glow halo, warm colors, orange, amber, red, text, letters, numbers, logo, watermark, border, frame, drop shadow.
 ```
 
-## 33. LE DEHORS DU MODULE, REFAIT — voisins, sas, poutre et ailes 🎨 À GÉNÉRER (30/09)
+## 33. LE DEHORS DU MODULE, REFAIT — voisins, sas, poutre et ailes ⏸ EN ATTENTE (30/09)
+
+**En attente** : le concepteur garde les images actuelles (« les assets que nous
+avons me conviennent », 30/09) ; ce qui gêne est la COMPOSITION — la cuve posée
+seule dans le vide, flanquée de sas, se lit comme un module entre deux autres,
+pas comme un bassin d'essai dans un grand vaisseau. Des maquettes de mise en
+scène sont à l'étude (la cuve dans son laboratoire, le plan du pont, la salle
+des cuves…). Les prompts ci-dessous restent valables si la refonte des images
+revient.
 
 **Pourquoi refaire le §28.** Retour du concepteur, 30/09 : au dézoom, « les accès
 aux modules sur les côtés sont des couleurs immenses » et « la structure en haut
