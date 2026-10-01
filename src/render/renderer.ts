@@ -1029,6 +1029,11 @@ uniform float uLampeSpriteBande; // 1 : un asset dessine les bandes
 // éléments qu'on aborde. 0 : débranché. L'effet s'estompe au dézoom
 // (caméra lointaine = vue orthographique — le plan large reste une carte).
 uniform float uRelief;
+// RELIEF OBLIQUE : la caméra est « un peu sur le côté ». Non nul, c'est le
+// décalage FIXE du sommet (unités monde) — le même partout, toutes les
+// parois montrent la même face — et uRelief ne sert plus que
+// d'interrupteur. Nul : le relief radial ci-dessus. (render/relief.ts)
+uniform vec2 uReliefDecal;
 // Éclairage du VOLUME (le corps d'eau, la glace, la vapeur) : 1 branché —
 // le corps baigne dans la même carte de lumière que la pièce, les ombres
 // portées le traversent, le reflet suit la lampe dominante. 0 : l'eau garde
@@ -2642,9 +2647,11 @@ void main() {
 
   // Obstacles : remplissage texturé + liseré, couleur par matériau (§6)
   float edgeW = 2.5 / uZoom;
-  // relief : décalage du sommet des parois, proportionnel à l'écart au
-  // centre (en écran), fondu sous le zoom de carte
-  vec2 relDisp = (world - uCenter) * (uRelief * clamp(uZoom * 1.2, 0.0, 1.0));
+  // relief : décalage du sommet des parois — proportionnel à l'écart au
+  // centre (caméra au zénith) ou fixe (caméra oblique), fondu sous le zoom
+  // de carte. Jumeau testé : render/relief.ts (decalageSommet).
+  vec2 relDisp = (dot(uReliefDecal, uReliefDecal) > 0.0 ? uReliefDecal : (world - uCenter) * uRelief)
+               * clamp(uZoom * 1.2, 0.0, 1.0);
   float drainEye = 0.0; // œil du sas, retenu pour assombrir l'eau qui y coule
   // ——— LA COUVERTURE : quel solide recouvre ce pixel ? ————————————————
   // LE DÉFAUT qu'elle corrige : chaque boîte peignait son liseré sur TOUTE
@@ -5161,6 +5168,9 @@ export class Renderer {
   /** l'image du ciel demandée (plaque ou Terre), null pour les autres modes */
   private cielDemande: string | null = null
   private readonly terreCadre = new Float32Array(16)
+  // le décalage fixe du relief oblique (0, 0 : relief radial)
+  private reliefDecalX = 0
+  private reliefDecalY = 0
   /** la lumière de la scène sur la station (lumiereStation) ; w = 0 : inactive */
   private readonly lumScene = new Float32Array(8)
   /** La largeur de la photographie en pixels, 0 tant qu'elle n'est pas là :
@@ -5672,6 +5682,13 @@ export class Renderer {
   setLumiereScene(l: Float32Array | null): void {
     if (l) this.lumScene.set(l)
     else this.lumScene.fill(0)
+  }
+
+  /** Le décalage FIXE du sommet des parois (relief oblique, en unités
+   *  monde — parametresRelief, render/relief.ts) ; 0, 0 : relief radial. */
+  setReliefOblique(x: number, y: number): void {
+    this.reliefDecalX = x
+    this.reliefDecalY = y
   }
 
   /** Le cadre de la Terre pour cette image (cadreTerre, render/terre.ts). */
@@ -6525,6 +6542,7 @@ export class Renderer {
     gl.uniform1f(cu['uLampeSpriteRond'], this.texLampeRonde ? 1 : 0)
     gl.uniform1f(cu['uLampeSpriteBande'], this.texLampeBande ? 1 : 0)
     gl.uniform1f(cu['uRelief'], relief)
+    gl.uniform2f(cu['uReliefDecal'], this.reliefDecalX, this.reliefDecalY)
     // le volume n'a de lumière à recevoir que si la pièce en a une
     gl.uniform1f(
       cu['uLumiereEau'],

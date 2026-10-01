@@ -315,6 +315,7 @@ import {
 } from './bench/changelog'
 import { Camera } from './render/camera'
 import { MAX_BOXES, Renderer } from './render/renderer'
+import { parametresRelief, type ModeRelief } from './render/relief'
 import { Motes, VIE_STRIDE, remplitVie, toucheLeCorps } from './render/vie'
 import { panDepuis } from './game/ouie'
 import { dangerDevant, directionDeMarche, saccade, type Saccade } from './game/regard'
@@ -3895,11 +3896,9 @@ let lumiereEauActive = localStorage.getItem('sujet21-lumiere-eau') !== 'off'
 // latérale se révèle du côté qui regarde le centre — en se déplaçant, on
 // aperçoit les flancs des éléments qu'on aborde. EXPÉRIMENTAL : OFF par
 // défaut le temps de la validation à la manette ; LÉGER puis FORT à l'essai.
-let reliefChoix = (localStorage.getItem('sujet21-relief') ?? 'off') as
-  | 'off'
-  | 'leger'
-  | 'fort'
-const RELIEF_K = { off: 0, leger: 0.035, fort: 0.07 } as const
+// OBLIQUE : la caméra passe « un peu sur le côté » — toutes les parois
+// montrent leur face sud (render/relief.ts), le sol et la visée ne bougent pas.
+let reliefChoix = (localStorage.getItem('sujet21-relief') ?? 'off') as ModeRelief
 
 // L'ÉCHELLE DES TEXTES. Toute l'interface est écrite en `calc(Npx *
 // var(--ui))` : ce seul nombre grossit tout d'un coup, sans qu'aucune boîte
@@ -4167,6 +4166,7 @@ const paramsEl = document.getElementById('params') as HTMLDivElement
       ['off', 'OFF'],
       ['leger', 'LÉGER'],
       ['fort', 'FORT'],
+      ['oblique', 'OBLIQUE'],
     ] as const) {
       const b = document.createElement('button')
       b.type = 'button'
@@ -19858,6 +19858,8 @@ function corpsImage(now: number): boolean {
     g(par.semisSuivi, par.semisZoom),
     g(par.cuveSuivi, par.cuveZoom),
   )
+  const reliefParams = parametresRelief(reliefChoix)
+  renderer.setReliefOblique(reliefParams.decalX, reliefParams.decalY)
   const renderT0 = performance.now()
   renderer.render(
     sim,
@@ -19880,7 +19882,7 @@ function corpsImage(now: number): boolean {
     lumieresVives(),
     lumiereEauActive ? 1 : 0,
     level.ambiante ?? AMBIANTE_DEFAUT,
-    RELIEF_K[reliefChoix],
+    reliefParams.k,
     level.brume ?? 0,
     eauMiroir,
     level.plafond ?? '',
