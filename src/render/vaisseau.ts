@@ -190,11 +190,15 @@ export const MAT_PAROI = 0 // les faces qui s'enfoncent : vaisseau-paroi, répé
 export const MAT_FEU = 1 // un feu : émissif, sans brume
 export const MAT_TOIT = 2 // la face avant d'une salle : vaisseau-salle-toit, étiré
 export const MAT_ZONE = 3 // la zone intermédiaire : vaisseau-zone-<biome>, pavée
-export const MAT_MODULE = 4 // la face avant d'un grand module (son image viendra : le toit en attendant)
+export const MAT_MODULE = 4 // la face avant d'un grand module : vaisseau-module-toit, étiré
+export const MAT_COULOIR = 5 // un couloir : vaisseau-couloir, étiré d'un collier à l'autre
+export const MAT_MODULE_PAROI = 6 // les flancs d'un grand module : vaisseau-module-paroi, répétée
 /** Une répétition de la paroi tous les PAROI_TUILE u le long d'une arête ;
- *  de la zone tous les ZONE_TUILE u. */
+ *  de la zone tous les ZONE_TUILE u ; des ponts à hublots d'un module tous
+ *  les MODULE_TUILE u — plus large : un module fait trois à quatre salles. */
 export const PAROI_TUILE = 1300
 export const ZONE_TUILE = 760
+export const MODULE_TUILE = 2600
 
 /** Les flottants d'un sommet : position (x, y, z), uv, couleur (r, g, b), matériau. */
 export const FLOTTANTS_SOMMET = 9
@@ -226,28 +230,39 @@ export function geometrieVaisseau(boites: readonly Boite[], f: { x: number; y: n
     const t = b.teinte
     const ombre = (k: number): [number, number, number] => [t[0] * k, t[1] * k, t[2] * k]
     const lum = b.sorte === 'zone' ? 0.7 : b.sorte === 'module' ? 0.9 : b.etat === 0 ? 0.5 : b.etat === 2 ? 1.25 : 0.85
+    // LES FACES QUI S'ENFONCENT. Un couloir y montre sa longueur — il file
+    // d'un rang à l'autre EN PROFONDEUR, sa face avant n'est qu'une section :
+    // son image y est donc posée dans le sens de la profondeur (u : za → zb,
+    // les colliers aux deux bouts), étirée, jamais répétée. Un module y
+    // montre ses ponts à hublots ; le reste, la paroi.
+    const flanc = (pts: [number, number, number][], a: number, c: number, k: number) => {
+      if (b.sorte === 'couloir') quad(pts, [[0, 0], [0, 1], [1, 1], [1, 0]], ombre(k * lum), MAT_COULOIR)
+      else {
+        const tu = b.sorte === 'module' ? 1 / MODULE_TUILE : tuileParoi
+        quad(pts, [[a * tu, 1], [c * tu, 1], [c * tu, 0], [a * tu, 0]], ombre(k * lum), b.sorte === 'module' ? MAT_MODULE_PAROI : MAT_PAROI)
+      }
+    }
     // dessus (boîte sous le point de fuite) ou dessous
-    if (y1 < f.y)
-      quad([[x0, y1, za], [x1, y1, za], [x1, y1, zb], [x0, y1, zb]], [[x0 * tuileParoi, 1], [x1 * tuileParoi, 1], [x1 * tuileParoi, 0], [x0 * tuileParoi, 0]], ombre(0.7 * lum), MAT_PAROI)
-    else
-      quad([[x0, y0, za], [x1, y0, za], [x1, y0, zb], [x0, y0, zb]], [[x0 * tuileParoi, 1], [x1 * tuileParoi, 1], [x1 * tuileParoi, 0], [x0 * tuileParoi, 0]], ombre(0.4 * lum), MAT_PAROI)
+    if (y1 < f.y) flanc([[x0, y1, za], [x1, y1, za], [x1, y1, zb], [x0, y1, zb]], x0, x1, 0.7)
+    else flanc([[x0, y0, za], [x1, y0, za], [x1, y0, zb], [x0, y0, zb]], x0, x1, 0.4)
     // le flanc tourné vers le point de fuite
-    if (x1 < f.x)
-      quad([[x1, y0, za], [x1, y1, za], [x1, y1, zb], [x1, y0, zb]], [[y0 * tuileParoi, 1], [y1 * tuileParoi, 1], [y1 * tuileParoi, 0], [y0 * tuileParoi, 0]], ombre(0.55 * lum), MAT_PAROI)
-    else if (x0 > f.x)
-      quad([[x0, y0, za], [x0, y1, za], [x0, y1, zb], [x0, y0, zb]], [[y0 * tuileParoi, 1], [y1 * tuileParoi, 1], [y1 * tuileParoi, 0], [y0 * tuileParoi, 0]], ombre(0.55 * lum), MAT_PAROI)
-    // la face avant
+    if (x1 < f.x) flanc([[x1, y0, za], [x1, y1, za], [x1, y1, zb], [x1, y0, zb]], y0, y1, 0.55)
+    else if (x0 > f.x) flanc([[x0, y0, za], [x0, y1, za], [x0, y1, zb], [x0, y0, zb]], y0, y1, 0.55)
     // la face avant : le TOIT, vu de dessus comme la salle — étiré sur une
-    // salle ou un module, pavé de la zone du biome autour de la salle, la
-    // paroi répétée sur un couloir
+    // salle ou un module, pavé de la zone du biome autour de la salle. Un
+    // couloir couché (celui qui part en biais vers une voie voisine) montre
+    // son tube de face ; une simple section, la paroi.
     const avant: [number, number, number][] = [[x0, y0, za], [x1, y0, za], [x1, y1, za], [x0, y1, za]]
     if (b.sorte === 'zone')
       quad(avant, [[x0 * tuileZone, y0 * tuileZone], [x1 * tuileZone, y0 * tuileZone], [x1 * tuileZone, y1 * tuileZone], [x0 * tuileZone, y1 * tuileZone]], ombre(lum), MAT_ZONE)
+    else if (b.sorte === 'couloir' && x1 - x0 > 1.5 * (y1 - y0))
+      quad(avant, [[0, 0], [1, 0], [1, 1], [0, 1]], ombre(0.85 * lum), MAT_COULOIR)
     else if (b.sorte === 'couloir')
       quad(avant, [[x0 * tex, y0 * tex], [x1 * tex, y0 * tex], [x1 * tex, y1 * tex], [x0 * tex, y1 * tex]], ombre(0.85 * lum), MAT_PAROI)
     else quad(avant, [[0, 0], [1, 0], [1, 1], [0, 1]], ombre(0.95 * lum), b.sorte === 'module' ? MAT_MODULE : MAT_TOIT)
     // les feux : une paire en haut de la face avant d'une salle joignable,
-    // un seul, éteint, sur les autres ; un rang de hublots sur les modules
+    // un seul, éteint, sur les autres ; deux balises aux bouts d'un module —
+    // ses hublots sont peints sur ses flancs (module-paroi), pas sur son toit
     const feu = (x: number, y: number, r: number, c: [number, number, number]) =>
       quad([[x - r, y - r, za], [x + r, y - r, za], [x + r, y + r, za], [x - r, y + r, za]], [[0, 0], [1, 0], [1, 1], [0, 1]], c, MAT_FEU)
     const r = Math.min(x1 - x0, y1 - y0) * 0.05
@@ -257,7 +272,8 @@ export function geometrieVaisseau(boites: readonly Boite[], f: { x: number; y: n
         feu(x0 + (x1 - x0) * 0.8, y1 - r * 3, r, [0.39, 0.72, 0.9])
       } else if (b.etat === 1) feu(x0 + (x1 - x0) * 0.5, y1 - r * 3, r * 0.8, [0.35, 0.45, 0.55])
     } else if (b.sorte === 'module') {
-      for (let k = 1; k < 8; k++) feu(x0 + ((x1 - x0) * k) / 8, (y0 + y1) / 2, r * 0.5, [0.39, 0.72, 0.9])
+      feu(x0 + (x1 - x0) * 0.03, (y0 + y1) / 2, r * 0.35, [0.39, 0.72, 0.9])
+      feu(x1 - (x1 - x0) * 0.03, (y0 + y1) / 2, r * 0.35, [0.95, 0.42, 0.3])
     }
   }
   return new Float32Array(out)

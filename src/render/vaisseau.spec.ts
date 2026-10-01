@@ -6,7 +6,10 @@
 import { describe, expect, it } from 'vitest'
 import {
   FLOTTANTS_SOMMET,
+  MAT_COULOIR,
   MAT_FEU,
+  MAT_MODULE,
+  MAT_MODULE_PAROI,
   MAT_TOIT,
   MAT_ZONE,
   composeVaisseau,
@@ -131,6 +134,33 @@ describe('vaisseau — chaque face prend son image', () => {
   it('la zone est pavée de son biome, les salles portent leur toit', () => {
     expect(mats.has(MAT_ZONE)).toBe(true)
     expect(mats.has(MAT_TOIT)).toBe(true)
+  })
+
+  it('les modules portent leur toit et leurs flancs à hublots, les couloirs leur tube', () => {
+    expect(mats.has(MAT_MODULE)).toBe(true)
+    expect(mats.has(MAT_MODULE_PAROI)).toBe(true)
+    expect(mats.has(MAT_COULOIR)).toBe(true)
+  })
+
+  it('le tube d’un couloir est étiré, jamais répété : uv de 0 à 1, sa longueur dans la profondeur', () => {
+    let vus = 0
+    for (let i = 0; i < g.length; i += FLOTTANTS_SOMMET) {
+      if (g[i + 8] !== MAT_COULOIR) continue
+      vus++
+      for (const k of [3, 4]) {
+        expect(g[i + k]).toBeGreaterThanOrEqual(0)
+        expect(g[i + k]).toBeLessThanOrEqual(1)
+      }
+    }
+    expect(vus).toBeGreaterThan(0)
+    // sur une face qui s'enfonce, u suit z : 0 au bord proche, 1 au bord lointain
+    const couloirs = boites.filter((b) => b.sorte === 'couloir')
+    const zs = new Set(couloirs.flatMap((b) => [b.z0, b.z0 + b.dz]).map((z) => z.toFixed(5)))
+    for (let i = 0; i < g.length; i += FLOTTANTS_SOMMET) {
+      if (g[i + 8] !== MAT_COULOIR || !zs.has(g[i + 2].toFixed(5))) continue
+      const b = couloirs.find((c) => Math.abs(c.z0 - g[i + 2]) < 1e-5 || Math.abs(c.z0 + c.dz - g[i + 2]) < 1e-5)!
+      if (Math.abs(b.z0 + b.dz - g[i + 2]) < 1e-5) expect(g[i + 3]).toBe(1)
+    }
   })
 
   it('le toit d’une salle est étiré sur sa face avant (uv de 0 à 1)', () => {

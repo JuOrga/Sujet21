@@ -4992,6 +4992,10 @@ uniform sampler2D uParoi;  // vaisseau-paroi : les faces qui s'enfoncent
 uniform sampler2D uToit;   // vaisseau-salle-toit : la face avant d'une salle
 uniform sampler2D uZone;   // vaisseau-zone-<biome> : la zone intermédiaire
 uniform vec3 uHasMat;      // paroi, toit, zone : l'image est-elle là ?
+uniform sampler2D uCouloir;     // vaisseau-couloir : un tube, d'un collier à l'autre
+uniform sampler2D uModuleToit;  // vaisseau-module-toit : la face avant d'un module
+uniform sampler2D uModuleParoi; // vaisseau-module-paroi : ses flancs à hublots
+uniform vec3 uHasMat2;          // couloir, module-toit, module-paroi
 uniform vec4 uSalle;   // la salle : rien du vaisseau ne s'y peint
 uniform vec3 uBrume;   // la couleur du lointain
 out vec4 outColor;
@@ -5014,7 +5018,12 @@ void main() {
   if (mat < 0.5 && uHasMat.x > 0.5) { t = texture(uParoi, vUv).rgb; k = 1.6; }
   else if (mat > 1.5 && mat < 2.5 && uHasMat.y > 0.5) { t = texture(uToit, vUv).rgb; k = 1.5; }
   else if (mat > 2.5 && mat < 3.5 && uHasMat.z > 0.5) { t = texture(uZone, vUv).rgb; k = 1.0; }
-  else if (mat > 3.5 && uHasMat.y > 0.5) { t = texture(uToit, vUv).rgb; k = 1.3; }
+  else if (mat > 3.5 && mat < 4.5 && uHasMat2.y > 0.5) { t = texture(uModuleToit, vUv).rgb; k = 1.7; }
+  else if (mat > 3.5 && mat < 4.5 && uHasMat.y > 0.5) { t = texture(uToit, vUv).rgb; k = 1.3; }
+  else if (mat > 4.5 && mat < 5.5 && uHasMat2.x > 0.5) { t = texture(uCouloir, vUv).rgb; k = 1.2; }
+  else if (mat > 4.5 && mat < 5.5 && uHasMat.x > 0.5) { t = texture(uParoi, vUv).rgb; k = 1.6; }
+  else if (mat > 5.5 && uHasMat2.z > 0.5) { t = texture(uModuleParoi, vUv).rgb; k = 1.7; }
+  else if (mat > 5.5 && uHasMat.x > 0.5) { t = texture(uParoi, vUv).rgb; k = 1.6; }
   c = t * vCol.rgb * k;
   // LA DISTANCE : plus c'est loin, plus c'est sombre et bleu
   float b = 1.0 - exp(-vZ * 0.28);
@@ -5792,6 +5801,9 @@ export class Renderer {
     this.demandeTexVaisseau('salle-toit')
     // seule la zone du biome en cours : les autres ne se téléchargent pas
     this.demandeTexVaisseau(`zone-${zoneDuBiome(v.biome)}`)
+    this.demandeTexVaisseau('couloir')
+    this.demandeTexVaisseau('module-toit')
+    this.demandeTexVaisseau('module-paroi')
     this.vaisseau = { sommets: this.vaisseauSommets, fuite: v.fuite, salle: v.salle, biome: v.biome }
   }
   private vaisseauCle = ''
@@ -5822,6 +5834,15 @@ export class Renderer {
       gl.uniform1i(vu[nom], unite)
     }
     gl.uniform3f(vu['uHasMat'], paroi ? 1 : 0, toit ? 1 : 0, zone ? 1 : 0)
+    const couloir = this.texVaisseau.get('couloir') ?? null
+    const moduleToit = this.texVaisseau.get('module-toit') ?? null
+    const moduleParoi = this.texVaisseau.get('module-paroi') ?? null
+    for (const [unite, nom, t] of [[4, 'uCouloir', couloir], [5, 'uModuleToit', moduleToit], [6, 'uModuleParoi', moduleParoi]] as const) {
+      gl.activeTexture(gl.TEXTURE0 + unite)
+      gl.bindTexture(gl.TEXTURE_2D, t ?? this.texWallA)
+      gl.uniform1i(vu[nom], unite)
+    }
+    gl.uniform3f(vu['uHasMat2'], couloir ? 1 : 0, moduleToit ? 1 : 0, moduleParoi ? 1 : 0)
     gl.activeTexture(gl.TEXTURE0)
     gl.bindVertexArray(this.vaisseauVao)
     gl.drawArrays(gl.TRIANGLES, 0, v.sommets)

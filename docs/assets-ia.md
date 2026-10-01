@@ -2031,9 +2031,9 @@ peint. Sources dans `masters/images/vaisseau/`, puis
 | `zone-tempere`, `zone-cryo`, `zone-chaud` | dessus, raccord 4 sens | ✅ livrées 01/10 |
 | `salle-toit` (3:2, étiré) | dessus | ✅ livrée 01/10 |
 | `paroi` (raccord G/D) | élévation | ✅ livrée 01/10 |
-| `couloir` (4:1, raccord G/D) | dessus | à générer |
-| `module-toit` (2:1, gris neutre — le moteur teinte) | dessus | à générer |
-| `module-paroi` (4:1, raccord G/D, gris neutre) | élévation | à générer |
+| `couloir` (livré 3:1, colliers aux bouts) | dessus | ✅ livré 01/10 — recadré sur le tube, étiré, posé dans la profondeur |
+| `module-toit` (2:1, gris neutre — le moteur teinte) | dessus | ✅ livré 01/10 |
+| `module-paroi` (3:1, raccord G/D, gris neutre) | élévation | ✅ livrée 01/10 — répétée tous les 2600 u |
 | `zone-antichambre`, `zone-observatoire` | dessus, raccord 4 sens | à écrire — la tempérée en attendant |
 
 Les prompts complets des huit premières ont été donnés au concepteur le

@@ -12,7 +12,11 @@ moyen de 0,14 entre ses bords haut et bas). On mélange donc l'image avec
 elle-même DÉCALÉE d'une demi-taille, sous un masque qui vaut 1 près des
 bords et 0 au centre : aux bords, c'est l'image décalée — dont les bords
 sont deux colonnes voisines de l'original, donc continus — et au centre,
-l'original intact. Les parois et le couloir ne se raccordent qu'en largeur.
+l'original intact. Les parois ne se raccordent qu'en largeur.
+
+LE COULOIR NE SE RÉPÈTE PAS : livré avec ses colliers aux deux bouts et un
+fond de plaques autour du tube, il est RECADRÉ sur la bande du tube (ses
+tuyaux compris) puis étiré d'un bout à l'autre de chaque couloir.
 
     python3 tools/images/vaisseau.py
 """
@@ -33,10 +37,14 @@ PIECES = {
     'zone-tempere': (1024, True, True),
     'zone-cryo': (1024, True, True),
     'zone-chaud': (1024, True, True),
-    'couloir': (1536, True, False),
+    'couloir': (1536, False, False),
     'module-toit': (1400, False, False),
     'module-paroi': (1536, True, False),
 }
+
+# le recadrage vertical, en fraction de la hauteur source : la bande du
+# tube du couloir livré le 01/10 (2000×667 : lignes 115 à 525)
+RECADRES = {'couloir': (0.172, 0.787)}
 
 
 def raccorde(a: np.ndarray, horiz: bool, vert: bool, bande: float = 0.18) -> np.ndarray:
@@ -63,6 +71,9 @@ def main() -> None:
             print(f'  {nom} : pas de source — le moteur garde sa tôle de secours')
             continue
         im = Image.open(src).convert('RGB')
+        if nom in RECADRES:
+            h0, h1 = RECADRES[nom]
+            im = im.crop((0, round(h0 * im.height), im.width, round(h1 * im.height)))
         im = im.resize((larg, round(larg * im.height / im.width)), Image.LANCZOS)
         a = np.asarray(im, float) / 255
         avant = ecart(a)
