@@ -2,10 +2,10 @@
 //
 // La salle qu'on joue est le plan avant (z = 0), vue de dessus comme
 // toujours. Le reste du vaisseau est un PONT qui part du bord haut de la
-// salle et file vers un HORIZON bas, juste au-dessus d'elle (le concept du
-// concepteur, 01/10 — le premier jet mettait le point de fuite trois
-// hauteurs de salle plus haut : les volumes s'étageaient en gradins au lieu
-// de se poser sur un sol) :
+// salle et file vers un HORIZON au-dessus d'elle (le concept du concepteur,
+// 01/10 — le premier jet faisait monter chaque rang vers le point de fuite :
+// les volumes s'étageaient en gradins dans le vide au lieu de se poser sur
+// un sol) :
 //
 //   1. LA ZONE INTERMÉDIAIRE — le pont du module qui entoure la salle, entre
 //      elle et le vide : habillée selon le BIOME du module ;
@@ -83,8 +83,8 @@ export interface Boite {
 }
 
 export const ZONE_MARGE = 0.55 // la zone déborde de la salle de 55 % de sa petite dimension
-export const HORIZON = 0.8 // l'horizon au-dessus de la zone, en hauteurs de salle (le concept : ~0,8)
-export const ECART_VOIES = 0.4 // d'une voie à l'autre, en largeurs de salle : la mini-carte en MAQUETTE — le vaisseau est bien plus grand que la salle
+export const HORIZON = 1.7 // l'horizon au-dessus de la zone, en hauteurs de salle : à 0,8 (le concept), le vaisseau tenait dans une bande mince au zoom de jeu, où la salle ne fait qu'un cinquième de l'écran
+export const ECART_VOIES = 0.55 // d'une voie à l'autre, en largeurs de salle : la mini-carte en MAQUETTE — le vaisseau est bien plus grand que la salle
 export const PAS_RANG = 0.5 // la profondeur d'un rang à l'autre
 export const Z_RANG1 = 0.15 // la profondeur du premier rang à venir : juste derrière la zone
 export const PONT_LOIN = 7 // le bout du pont : au-delà, la brume l'a avalé
@@ -129,27 +129,35 @@ export function composeVaisseau(sc: SceneVaisseau): Boite[] {
   const m = ZONE_MARGE * Math.min(w, h)
   const teinte = teinteBiome(sc.biome)
   const boites: Boite[] = []
-  // 1. la zone intermédiaire : un pont épais autour de la salle
-  const zone: Rect = { minX: salle.minX - m, minY: salle.minY - m, maxX: salle.maxX + m, maxY: salle.maxY + m }
-  boites.push({ rect: zone, z0: 0.004, dz: 0.09, sorte: 'zone', teinte, etat: 1 })
-  const sol = zone.maxY
+  const sol = salle.maxY + m
   // tout ce qui est posé sur le pont reste SOUS l'horizon : on en voit le toit
   const libre = HORIZON * h
   const rangs = sc.carte?.rangs ?? 6
   const voies = sc.carte?.voies ?? 3
   const rang = sc.carte?.rang ?? 0
   const voie = sc.carte?.voie ?? Math.floor(voies / 2)
-  const sw = w * 0.32
-  const sh = Math.min(0.11 * w, 0.4 * libre)
-  // profondes : sous un horizon bas, un toit court ne se verrait pas
+  const sw = w * 0.46
+  const sh = Math.min(0.2 * w, 0.3 * libre)
+  // profondes : vu de si bas, un toit court ne se verrait pas
   const sdz = PAS_RANG * 0.78
   const xVoie = (v: number) => cx + (v - voie) * ECART_VOIES * w
   const zRang = (k: number) => Z_RANG1 + (k - 1) * PAS_RANG
   // les deux bords de l'allée : les modules de la station s'y alignent
   const demi = Math.max(voie, voies - 1 - voie) * ECART_VOIES * w + sw / 2
+  const mw = w * 1.1
+  const mh = libre * 0.5
+  // LE PONT a la largeur de l'allée et de ses deux rangées de modules, pas
+  // plus : un pont sans bord, large comme l'écran, se lisait comme une plaque
+  // grise posée dans le vide (aperçu du 01/10)
+  const bord = Math.max(demi + 0.1 * w + mw, w / 2 + m)
+  // 1. la zone intermédiaire : le pont du module autour de la salle, aussi
+  // large que l'allée qui en part — la plateforme se lit en T ; plus large,
+  // la zone plate mangeait l'écran
+  const zone: Rect = { minX: cx - Math.max(demi, w / 2 + m), minY: salle.minY - m, maxX: cx + Math.max(demi, w / 2 + m), maxY: sol }
+  boites.push({ rect: zone, z0: 0.004, dz: 0.09, sorte: 'zone', teinte, etat: 1 })
   // 0. le pont lui-même, jusqu'à la brume
   boites.push({
-    rect: { minX: cx - demi - 3 * w, minY: sol - m, maxX: cx + demi + 3 * w, maxY: sol },
+    rect: { minX: cx - bord, minY: sol - m, maxX: cx + bord, maxY: sol },
     z0: 0.004,
     dz: PONT_LOIN,
     sorte: 'pont',
@@ -157,7 +165,7 @@ export function composeVaisseau(sc: SceneVaisseau): Boite[] {
     etat: 1,
   })
   // 2. les salles du module, rang par rang, voie par voie, posées sur le pont
-  const tube = 0.045 * w
+  const tube = 0.06 * w
   for (let r = rang + 1; r < rangs; r++) {
     const k = r - rang
     const etats: number[] = []
@@ -201,27 +209,37 @@ export function composeVaisseau(sc: SceneVaisseau): Boite[] {
   }
   // 3. les autres modules de la station, le long de l'allée : à gauche ceux
   // de gauche sur la carte, à droite ceux de droite, à la file, d'autant plus
-  // loin qu'ils le sont sur la carte
-  const suivant = { [-1]: 0.1, [1]: 0.1 } as Record<number, number>
-  const mw = w * 1.0
-  const mh = libre * 0.45
+  // loin qu'ils le sont sur la carte. Les rangées sont CONTINUES jusqu'à la
+  // brume : là où la carte n'a rien à mettre (un trou, ou plus rien devant —
+  // la fin de la route), un module de la station sans biome. Sans eux,
+  // l'allée bordait le vide (aperçu du 01/10 : aucun module de visible).
+  const PAS_MODULE = 1.25
+  const suivant: Record<number, number> = { [-1]: 0.1, [1]: 0.1 }
+  const poser = (cote: number, t: [number, number, number], z: number) => {
+    const xi = cx + cote * (demi + 0.1 * w)
+    boites.push({
+      rect: { minX: Math.min(xi, xi + cote * mw), minY: sol, maxX: Math.max(xi, xi + cote * mw), maxY: sol + mh },
+      z0: z,
+      dz: PAS_MODULE * 0.92,
+      sorte: 'module',
+      teinte: t,
+      etat: 1,
+    })
+    suivant[cote] = z + PAS_MODULE
+  }
+  const neutre = teinteBiome('')
+  const comble = (cote: number, jusque: number) => {
+    while (suivant[cote] + PAS_MODULE <= jusque + 1e-9) poser(cote, neutre, suivant[cote])
+  }
   ;[...sc.modules]
     .sort((a, b) => a.distance - b.distance)
     .forEach((mod) => {
-      const d = Math.max(1, mod.distance)
       const cote = mod.cote < 0 ? -1 : 1
-      const z0 = Math.max(0.1 + (d - 1) * 1.3, suivant[cote])
-      suivant[cote] = z0 + 1.25
-      const xi = cx + cote * (demi + 0.15 * w)
-      boites.push({
-        rect: { minX: Math.min(xi, xi + cote * mw), minY: sol, maxX: Math.max(xi, xi + cote * mw), maxY: sol + mh },
-        z0,
-        dz: 1.15,
-        sorte: 'module',
-        teinte: teinteBiome(mod.biome),
-        etat: 1,
-      })
+      const zMin = 0.1 + (Math.max(1, mod.distance) - 1) * 1.3
+      comble(cote, zMin)
+      poser(cote, teinteBiome(mod.biome), Math.max(suivant[cote], zMin))
     })
+  for (const cote of [-1, 1]) comble(cote, PONT_LOIN * 0.7)
   return boites
 }
 

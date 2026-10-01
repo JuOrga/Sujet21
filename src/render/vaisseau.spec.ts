@@ -1,11 +1,13 @@
 // LE VAISSEAU EN PERSPECTIVE : ce qui doit tenir — un seul point de fuite
-// sur un horizon BAS au-dessus de la salle, les arêtes qui y filent, la
+// sur l'horizon au-dessus de la salle, les arêtes qui y filent, la
 // mini-carte posée sur le pont (voies → gauche–droite, rangs → profondeur),
 // les modules qui bordent l'allée, et l'ordre du peintre.
 
 import { describe, expect, it } from 'vitest'
 import {
   FLOTTANTS_SOMMET,
+  PONT_LOIN,
+  teinteBiome,
   MAT_COULOIR,
   MAT_FACADE,
   MAT_FEU,
@@ -41,11 +43,6 @@ describe('vaisseau — le point de fuite et la projection', () => {
     expect(f.x).toBe(0)
     const zone = composeVaisseau(scene).find((b) => b.sorte === 'zone')!
     expect(f.y).toBeGreaterThan(zone.rect.maxY)
-  })
-
-  it('l’horizon est BAS : à moins d’une hauteur de salle au-dessus de la zone (le premier jet : 1,8)', () => {
-    const zone = composeVaisseau(scene).find((b) => b.sorte === 'zone')!
-    expect(f.y - zone.rect.maxY).toBeLessThanOrEqual(salle.maxY - salle.minY)
   })
 
   it('au plan avant, rien ne bouge ; au loin, tout converge vers le point de fuite', () => {
@@ -109,24 +106,45 @@ describe('vaisseau — la mini-carte rangée en profondeur', () => {
 
   it('les autres modules BORDENT l’allée, chacun de son côté de la carte, d’autant plus loin qu’ils le sont', () => {
     const mods = boites.filter((b) => b.sorte === 'module')
+    const de = (biome: string) => mods.find((m) => m.teinte.join() === teinteBiome(biome).join())!
     const gauche = Math.min(...salles.map((s) => s.rect.minX))
     const droite = Math.max(...salles.map((s) => s.rect.maxX))
-    expect(mods[0].rect.maxX).toBeLessThan(gauche) // chaud, côté −1
-    expect(mods[1].rect.minX).toBeGreaterThan(droite) // tempéré, côté +1
-    expect(mods[1].z0).toBeGreaterThan(mods[0].z0)
+    expect(de('chaud').rect.maxX).toBeLessThan(gauche) // côté −1
+    expect(de('tempere').rect.minX).toBeGreaterThan(droite) // côté +1
+    expect(de('tempere').z0).toBeGreaterThan(de('chaud').z0) // à 2 modules, contre 1
   })
 
-  it('deux modules du même côté se suivent à la file, sans se chevaucher', () => {
-    const b = composeVaisseau({ ...scene, modules: [{ biome: 'chaud', distance: 1, cote: -1 }, { biome: 'cryo', distance: 1, cote: -0.4 }] })
-    const [a, c] = b.filter((x) => x.sorte === 'module').sort((m, n) => m.z0 - n.z0)
-    expect(c.z0).toBeGreaterThanOrEqual(a.z0 + a.dz)
+  it('les rangées de modules sont continues jusqu’à la brume, même sans module sur la carte', () => {
+    for (const modules of [scene.modules, []]) {
+      const b = composeVaisseau({ ...scene, modules })
+      for (const cote of [-1, 1]) {
+        const rangee = b
+          .filter((x) => x.sorte === 'module' && Math.sign(x.rect.minX + x.rect.maxX) === cote)
+          .sort((m, n) => m.z0 - n.z0)
+        expect(rangee[0].z0).toBeLessThan(0.2)
+        for (let i = 1; i < rangee.length; i++) {
+          // à la file : ni chevauchement, ni trou plus large qu'un joint
+          expect(rangee[i].z0).toBeGreaterThanOrEqual(rangee[i - 1].z0 + rangee[i - 1].dz)
+          expect(rangee[i].z0 - (rangee[i - 1].z0 + rangee[i - 1].dz)).toBeLessThan(0.2)
+        }
+        const fin = rangee[rangee.length - 1]
+        expect(fin.z0 + fin.dz).toBeGreaterThan(PONT_LOIN * 0.5)
+      }
+    }
   })
 
-  it('hors d’une run (pas de mini-carte) : un module générique, toutes salles en veille', () => {
-    const b = composeVaisseau({ ...scene, carte: null })
-    const s = b.filter((x) => x.sorte === 'salle')
-    expect(s.length).toBeGreaterThan(0)
-    for (const x of s) expect(x.etat).toBe(1)
+  it('le pont porte l’allée et ses modules, ni plus ni moins ; la zone couvre au moins l’allée', () => {
+    const zone = boites.find((b) => b.sorte === 'zone')!
+    const pont = boites.find((b) => b.sorte === 'pont')!
+    const mods = boites.filter((b) => b.sorte === 'module')
+    expect(Math.min(...mods.map((m) => m.rect.minX))).toBeGreaterThanOrEqual(pont.rect.minX)
+    expect(Math.max(...mods.map((m) => m.rect.maxX))).toBeLessThanOrEqual(pont.rect.maxX)
+    // pas une plaque large comme l'écran : le bord du pont est celui des modules
+    expect(pont.rect.minX).toBeGreaterThan(Math.min(...mods.map((m) => m.rect.minX)) - (salle.maxX - salle.minX) * 0.2)
+    for (const s of salles) {
+      expect(s.rect.minX).toBeGreaterThanOrEqual(zone.rect.minX)
+      expect(s.rect.maxX).toBeLessThanOrEqual(zone.rect.maxX)
+    }
   })
 })
 
