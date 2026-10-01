@@ -75,7 +75,7 @@ export interface Boite {
   z0: number
   dz: number
   /** ce que c'est — décide du matériau et de la lumière */
-  sorte: 'pont' | 'zone' | 'salle' | 'couloir' | 'module'
+  sorte: 'pont' | 'zone' | 'salle' | 'couloir' | 'module' | 'balise'
   /** teinte du biome (multiplie la tôle) */
   teinte: [number, number, number]
   /** 0 éteinte · 1 en veille · 2 joignable (feux allumés) */
@@ -145,7 +145,8 @@ export function composeVaisseau(sc: SceneVaisseau): Boite[] {
   // les deux bords de l'allée : les modules de la station s'y alignent
   const demi = Math.max(voie, voies - 1 - voie) * ECART_VOIES * w + sw / 2
   const mw = w * 1.1
-  const mh = libre * 0.5
+  // assez bas pour laisser voir l'horizon — la Terre — au bout de l'allée
+  const mh = libre * 0.4
   // LE PONT a la largeur de l'allée et de ses deux rangées de modules, pas
   // plus : un pont sans bord, large comme l'écran, se lisait comme une plaque
   // grise posée dans le vide (aperçu du 01/10)
@@ -227,9 +228,17 @@ export function composeVaisseau(sc: SceneVaisseau): Boite[] {
     })
     suivant[cote] = z + PAS_MODULE
   }
-  const neutre = teinteBiome('')
+  // les modules de remplissage : les trois climats tour à tour, voilés de
+  // gris — tout en neutre, les rangées se lisaient comme un seul bloc gris
+  const CLIMATS = ['cryo', 'tempere', 'chaud']
+  let nRemplis = 0
+  const voile = (b: string): [number, number, number] => {
+    const t = teinteBiome(b)
+    const n = teinteBiome('')
+    return [t[0] * 0.6 + n[0] * 0.4, t[1] * 0.6 + n[1] * 0.4, t[2] * 0.6 + n[2] * 0.4]
+  }
   const comble = (cote: number, jusque: number) => {
-    while (suivant[cote] + PAS_MODULE <= jusque + 1e-9) poser(cote, neutre, suivant[cote])
+    while (suivant[cote] + PAS_MODULE <= jusque + 1e-9) poser(cote, voile(CLIMATS[nRemplis++ % 3]), suivant[cote])
   }
   ;[...sc.modules]
     .sort((a, b) => a.distance - b.distance)
@@ -240,6 +249,14 @@ export function composeVaisseau(sc: SceneVaisseau): Boite[] {
       poser(cote, teinteBiome(mod.biome), Math.max(suivant[cote], zMin))
     })
   for (const cote of [-1, 1]) comble(cote, PONT_LOIN * 0.7)
+  // 4. les balises du bord de l'allée, à la file vers l'horizon : elles
+  // tracent la route dans le noir
+  const rb = 0.018 * w
+  for (let z = 0.2; z < PONT_LOIN * 0.6; z += 0.3)
+    for (const cote of [-1, 1]) {
+      const x = cx + cote * (demi + 0.05 * w)
+      boites.push({ rect: { minX: x - rb, minY: sol, maxX: x + rb, maxY: sol + 2 * rb }, z0: z, dz: 0, sorte: 'balise', teinte, etat: 2 })
+    }
   return boites
 }
 
@@ -295,8 +312,11 @@ export function geometrieVaisseau(boites: readonly Boite[], f: { x: number; y: n
     const zb = b.z0 + b.dz
     const t = b.teinte
     const ombre = (k: number): [number, number, number] => [t[0] * k, t[1] * k, t[2] * k]
+    // la zone reste sous la salle (la salle doit rester le plus lumineux) ;
+    // le reste un tiers plus clair qu'au premier essai en jeu : tout se
+    // fondait en un gris sombre
     const lum =
-      b.sorte === 'zone' || b.sorte === 'pont' ? 0.7 : b.sorte === 'module' ? 0.9 : b.etat === 0 ? 0.5 : b.etat === 2 ? 1.25 : 0.85
+      b.sorte === 'zone' ? 0.7 : b.sorte === 'pont' ? 0.9 : b.sorte === 'module' ? 1.2 : b.etat === 0 ? 0.65 : b.etat === 2 ? 1.6 : 1.1
     // les quatre coins d'une face qui s'enfonce : le toit (y = cst) ou un flanc (x = cst)
     const toit: [number, number, number][] = y1 < f.y
       ? [[x0, y1, za], [x1, y1, za], [x1, y1, zb], [x0, y1, zb]]
@@ -345,6 +365,28 @@ export function geometrieVaisseau(boites: readonly Boite[], f: { x: number; y: n
       const rb = Math.min(x1 - x0, y1 - y0) * 0.025
       feu(x0 + rb * 3, y1 - rb * 3, rb, [0.39, 0.72, 0.9])
       feu(x1 - rb * 3, y1 - rb * 3, rb, [0.95, 0.42, 0.3])
+      // DES HUBLOTS ALLUMÉS sur le flanc face à l'allée : peints, ils se
+      // perdaient dans la pénombre. Un sur trois environ, sur les trois ponts
+      // de module-paroi, au hasard fixe de la position du module
+      if (flanc) {
+        const xf = flanc[0][0]
+        const rh = (y1 - y0) * 0.045
+        const dzh = 0.022
+        let graine = Math.abs(Math.round(za * 1000 + x0)) | 0
+        for (let i = 0; i < 9; i++)
+          for (const fy of [0.2, 0.5, 0.8]) {
+            graine = (graine * 1103515245 + 12345) & 0x7fffffff
+            if (graine % 3 !== 0) continue
+            const z = za + (b.dz * (i + 0.5)) / 9
+            const y = y0 + (y1 - y0) * fy
+            const c: [number, number, number] = graine % 7 === 0 ? [0.95, 0.66, 0.3] : [0.39, 0.72, 0.9]
+            quad([[xf, y - rh, z - dzh], [xf, y + rh, z - dzh], [xf, y + rh, z + dzh], [xf, y - rh, z + dzh]], [[0, 0], [0, 1], [1, 1], [1, 0]], c, MAT_FEU)
+          }
+      }
+      continue
+    }
+    if (b.sorte === 'balise') {
+      feu((x0 + x1) / 2, (y0 + y1) / 2, (x1 - x0) / 2, [0.39, 0.72, 0.9])
       continue
     }
     // UNE SALLE posée sur le pont : son toit en fuite (le même toit que vu de
@@ -358,7 +400,7 @@ export function geometrieVaisseau(boites: readonly Boite[], f: { x: number; y: n
     // la porte (salle-facade livrée le 01/10 : à 36 % et 64 % de la largeur,
     // 51 % de la hauteur) : allumés orange sur une salle joignable, en veille
     // sur les autres, éteints sur une salle fermée
-    const r = (y1 - y0) * 0.05
+    const r = (y1 - y0) * 0.1
     const yh = y0 + (y1 - y0) * 0.51
     const c: [number, number, number] | null =
       b.etat === 2 ? [0.98, 0.62, 0.28] : b.etat === 1 ? [0.3, 0.4, 0.5] : null

@@ -133,6 +133,21 @@ describe('vaisseau — la mini-carte rangée en profondeur', () => {
     }
   })
 
+  it('sans module sur la carte, les rangées ne sont pas d’un seul gris : les climats tour à tour', () => {
+    const b = composeVaisseau({ ...scene, modules: [] })
+    const teintes = new Set(b.filter((x) => x.sorte === 'module').map((x) => x.teinte.join()))
+    expect(teintes.size).toBe(3)
+  })
+
+  it('des balises tracent les deux bords de l’allée vers l’horizon', () => {
+    const bal = boites.filter((b) => b.sorte === 'balise')
+    const g = bal.filter((b) => b.rect.maxX < 0)
+    const d = bal.filter((b) => b.rect.minX > 0)
+    expect(g.length).toBeGreaterThan(5)
+    expect(d.length).toBe(g.length)
+    expect(Math.max(...bal.map((b) => b.z0))).toBeGreaterThan(PONT_LOIN * 0.4)
+  })
+
   it('le pont porte l’allée et ses modules, ni plus ni moins ; la zone couvre au moins l’allée', () => {
     const zone = boites.find((b) => b.sorte === 'zone')!
     const pont = boites.find((b) => b.sorte === 'pont')!
@@ -213,6 +228,14 @@ describe('vaisseau — chaque face prend son image', () => {
     expect(xs[0]).toBeCloseTo(0.36, 3)
     expect(xs[1]).toBeCloseTo(0.64, 3)
     expect(feux(rang[2])).toHaveLength(0) // 3:2, fermée
+  })
+
+  it('des hublots s’allument sur le flanc des modules face à l’allée', () => {
+    const mods = boites.filter((b) => b.sorte === 'module')
+    const flancs = new Set(mods.map((m) => (m.rect.maxX < 0 ? m.rect.maxX : m.rect.minX).toFixed(3)))
+    let n = 0
+    for (let i = 0; i < g.length; i += FLOTTANTS_SOMMET) if (g[i + 8] === MAT_FEU && flancs.has(g[i].toFixed(3))) n++
+    expect(n / 6).toBeGreaterThan(mods.length) // plus d'un hublot par module en moyenne
   })
 
   it('les modules portent leur toit et leurs flancs à hublots, les couloirs leur tube', () => {
