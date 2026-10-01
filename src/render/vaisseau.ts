@@ -89,6 +89,13 @@ export function teinteBiome(biome: string): [number, number, number] {
   return TEINTES[biome] ?? [0.88, 0.9, 0.95]
 }
 
+/** L'IMAGE DE ZONE d'un biome : les trois livrées (01/10) ; l'antichambre,
+ *  l'observatoire et le hub prennent la tempérée en attendant les leurs. */
+export const ZONES_LIVREES = ['tempere', 'cryo', 'chaud'] as const
+export function zoneDuBiome(biome: string): string {
+  return (ZONES_LIVREES as readonly string[]).includes(biome) ? biome : 'tempere'
+}
+
 /** Le point de fuite : au centre de la salle, au-dessus de sa zone. */
 export function pointDeFuite(salle: Rect): { x: number; y: number } {
   const w = salle.maxX - salle.minX
@@ -176,7 +183,20 @@ export function composeVaisseau(sc: SceneVaisseau): Boite[] {
   return boites
 }
 
-/** Les flottants d'un sommet : position (x, y, z), uv, couleur (r, g, b), émission. */
+/** LES MATÉRIAUX, portés par le 4e canal de la couleur d'un sommet (le
+ *  shader les relit, renderer.ts VAISSEAU_FS) : chaque face prend l'image
+ *  qui lui revient, et la tôle de secours tant que l'image n'est pas là. */
+export const MAT_PAROI = 0 // les faces qui s'enfoncent : vaisseau-paroi, répétée
+export const MAT_FEU = 1 // un feu : émissif, sans brume
+export const MAT_TOIT = 2 // la face avant d'une salle : vaisseau-salle-toit, étiré
+export const MAT_ZONE = 3 // la zone intermédiaire : vaisseau-zone-<biome>, pavée
+export const MAT_MODULE = 4 // la face avant d'un grand module (son image viendra : le toit en attendant)
+/** Une répétition de la paroi tous les PAROI_TUILE u le long d'une arête ;
+ *  de la zone tous les ZONE_TUILE u. */
+export const PAROI_TUILE = 1300
+export const ZONE_TUILE = 760
+
+/** Les flottants d'un sommet : position (x, y, z), uv, couleur (r, g, b), matériau. */
 export const FLOTTANTS_SOMMET = 9
 
 /**
@@ -197,6 +217,8 @@ export function geometrieVaisseau(boites: readonly Boite[], f: { x: number; y: n
     for (const i of [0, 1, 2, 0, 2, 3]) out.push(...pts[i], ...uvs[i], ...c, em)
   }
   const tex = 1 / 900 // une répétition de la tôle tous les 900 u
+  const tuileParoi = 1 / PAROI_TUILE
+  const tuileZone = 1 / ZONE_TUILE
   for (const b of ordre) {
     const { minX: x0, minY: y0, maxX: x1, maxY: y1 } = b.rect
     const za = b.z0
@@ -206,20 +228,28 @@ export function geometrieVaisseau(boites: readonly Boite[], f: { x: number; y: n
     const lum = b.sorte === 'zone' ? 0.7 : b.sorte === 'module' ? 0.9 : b.etat === 0 ? 0.5 : b.etat === 2 ? 1.25 : 0.85
     // dessus (boîte sous le point de fuite) ou dessous
     if (y1 < f.y)
-      quad([[x0, y1, za], [x1, y1, za], [x1, y1, zb], [x0, y1, zb]], [[x0 * tex, 0], [x1 * tex, 0], [x1 * tex, 1], [x0 * tex, 1]], ombre(0.55 * lum), 0)
+      quad([[x0, y1, za], [x1, y1, za], [x1, y1, zb], [x0, y1, zb]], [[x0 * tuileParoi, 1], [x1 * tuileParoi, 1], [x1 * tuileParoi, 0], [x0 * tuileParoi, 0]], ombre(0.7 * lum), MAT_PAROI)
     else
-      quad([[x0, y0, za], [x1, y0, za], [x1, y0, zb], [x0, y0, zb]], [[x0 * tex, 0], [x1 * tex, 0], [x1 * tex, 1], [x0 * tex, 1]], ombre(0.3 * lum), 0)
+      quad([[x0, y0, za], [x1, y0, za], [x1, y0, zb], [x0, y0, zb]], [[x0 * tuileParoi, 1], [x1 * tuileParoi, 1], [x1 * tuileParoi, 0], [x0 * tuileParoi, 0]], ombre(0.4 * lum), MAT_PAROI)
     // le flanc tourné vers le point de fuite
     if (x1 < f.x)
-      quad([[x1, y0, za], [x1, y1, za], [x1, y1, zb], [x1, y0, zb]], [[y0 * tex, 0], [y1 * tex, 0], [y1 * tex, 1], [y0 * tex, 1]], ombre(0.42 * lum), 0)
+      quad([[x1, y0, za], [x1, y1, za], [x1, y1, zb], [x1, y0, zb]], [[y0 * tuileParoi, 1], [y1 * tuileParoi, 1], [y1 * tuileParoi, 0], [y0 * tuileParoi, 0]], ombre(0.55 * lum), MAT_PAROI)
     else if (x0 > f.x)
-      quad([[x0, y0, za], [x0, y1, za], [x0, y1, zb], [x0, y0, zb]], [[y0 * tex, 0], [y1 * tex, 0], [y1 * tex, 1], [y0 * tex, 1]], ombre(0.42 * lum), 0)
+      quad([[x0, y0, za], [x0, y1, za], [x0, y1, zb], [x0, y0, zb]], [[y0 * tuileParoi, 1], [y1 * tuileParoi, 1], [y1 * tuileParoi, 0], [y0 * tuileParoi, 0]], ombre(0.55 * lum), MAT_PAROI)
     // la face avant
-    quad([[x0, y0, za], [x1, y0, za], [x1, y1, za], [x0, y1, za]], [[x0 * tex, y0 * tex], [x1 * tex, y0 * tex], [x1 * tex, y1 * tex], [x0 * tex, y1 * tex]], ombre(0.85 * lum), 0)
+    // la face avant : le TOIT, vu de dessus comme la salle — étiré sur une
+    // salle ou un module, pavé de la zone du biome autour de la salle, la
+    // paroi répétée sur un couloir
+    const avant: [number, number, number][] = [[x0, y0, za], [x1, y0, za], [x1, y1, za], [x0, y1, za]]
+    if (b.sorte === 'zone')
+      quad(avant, [[x0 * tuileZone, y0 * tuileZone], [x1 * tuileZone, y0 * tuileZone], [x1 * tuileZone, y1 * tuileZone], [x0 * tuileZone, y1 * tuileZone]], ombre(lum), MAT_ZONE)
+    else if (b.sorte === 'couloir')
+      quad(avant, [[x0 * tex, y0 * tex], [x1 * tex, y0 * tex], [x1 * tex, y1 * tex], [x0 * tex, y1 * tex]], ombre(0.85 * lum), MAT_PAROI)
+    else quad(avant, [[0, 0], [1, 0], [1, 1], [0, 1]], ombre(0.95 * lum), b.sorte === 'module' ? MAT_MODULE : MAT_TOIT)
     // les feux : une paire en haut de la face avant d'une salle joignable,
     // un seul, éteint, sur les autres ; un rang de hublots sur les modules
     const feu = (x: number, y: number, r: number, c: [number, number, number]) =>
-      quad([[x - r, y - r, za], [x + r, y - r, za], [x + r, y + r, za], [x - r, y + r, za]], [[0, 0], [1, 0], [1, 1], [0, 1]], c, 1)
+      quad([[x - r, y - r, za], [x + r, y - r, za], [x + r, y + r, za], [x - r, y + r, za]], [[0, 0], [1, 0], [1, 1], [0, 1]], c, MAT_FEU)
     const r = Math.min(x1 - x0, y1 - y0) * 0.05
     if (b.sorte === 'salle') {
       if (b.etat === 2) {

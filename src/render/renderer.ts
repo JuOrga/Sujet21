@@ -64,7 +64,7 @@ import {
   composeCoque,
   empaquettePieces,
 } from './compositionCoque'
-import { FLOTTANTS_SOMMET } from './vaisseau'
+import { FLOTTANTS_SOMMET, zoneDuBiome } from './vaisseau'
 import { ATLAS_COQUE } from './coqueAtlas'
 import { sondeRetournement, type Retournement } from './retournement'
 import { boutsEnMur, cleBoite } from '../game/conduite'
@@ -4986,15 +4986,20 @@ in vec2 vUv;
 in vec4 vCol;
 in float vZ;
 in vec2 vMonde;
-uniform sampler2D uTole;
+uniform sampler2D uTole;   // la tôle de secours (wall-a)
 uniform float uHasTole;
+uniform sampler2D uParoi;  // vaisseau-paroi : les faces qui s'enfoncent
+uniform sampler2D uToit;   // vaisseau-salle-toit : la face avant d'une salle
+uniform sampler2D uZone;   // vaisseau-zone-<biome> : la zone intermédiaire
+uniform vec3 uHasMat;      // paroi, toit, zone : l'image est-elle là ?
 uniform vec4 uSalle;   // la salle : rien du vaisseau ne s'y peint
 uniform vec3 uBrume;   // la couleur du lointain
 out vec4 outColor;
 void main() {
   if (all(greaterThan(vMonde, uSalle.xy)) && all(lessThan(vMonde, uSalle.zw))) discard;
   vec3 c;
-  if (vCol.a > 0.5) {
+  float mat = floor(vCol.a + 0.5);
+  if (mat > 0.5 && mat < 1.5) {
     // UN FEU : un disque net et son halo, il ne prend pas la brume
     float d = length(vUv - 0.5) * 2.0;
     if (d > 1.0) discard;
@@ -5002,8 +5007,15 @@ void main() {
     outColor = vec4(c * (1.0 - 0.5 * (1.0 - exp(-vZ * 0.4))), 1.0);
     return;
   }
-  vec3 t = uHasTole > 0.5 ? texture(uTole, vUv).rgb : vec3(0.20, 0.24, 0.29);
-  c = t * vCol.rgb * 1.15;
+  // chaque face prend son image (MAT_*, render/vaisseau.ts) ; la tôle de
+  // secours tant qu'elle n'est pas chargée — ou pas encore livrée
+  vec3 t = uHasTole > 0.5 ? texture(uTole, vUv * vec2(1.0, 1.0)).rgb : vec3(0.20, 0.24, 0.29);
+  float k = 1.15;
+  if (mat < 0.5 && uHasMat.x > 0.5) { t = texture(uParoi, vUv).rgb; k = 1.6; }
+  else if (mat > 1.5 && mat < 2.5 && uHasMat.y > 0.5) { t = texture(uToit, vUv).rgb; k = 1.5; }
+  else if (mat > 2.5 && mat < 3.5 && uHasMat.z > 0.5) { t = texture(uZone, vUv).rgb; k = 1.0; }
+  else if (mat > 3.5 && uHasMat.y > 0.5) { t = texture(uToit, vUv).rgb; k = 1.3; }
+  c = t * vCol.rgb * k;
   // LA DISTANCE : plus c'est loin, plus c'est sombre et bleu
   float b = 1.0 - exp(-vZ * 0.28);
   outColor = vec4(mix(c, uBrume, b * 0.7), 1.0);
@@ -5116,7 +5128,16 @@ export class Renderer {
   private readonly vaisseauVbo: WebGLBuffer
   /** le vaisseau en perspective (render/vaisseau.ts) : sa géométrie, son
    *  point de fuite et la salle qu'il entoure — null : pas de vaisseau */
-  private vaisseau: { sommets: number; fuite: { x: number; y: number }; salle: { minX: number; minY: number; maxX: number; maxY: number } } | null = null
+  private vaisseau: { sommets: number; fuite: { x: number; y: number }; salle: { minX: number; minY: number; maxX: number; maxY: number }; biome: string } | null = null
+  /** les images du vaisseau (tools/images/vaisseau.py), chargées à la
+   *  première demande : la paroi, le toit de salle, la zone de chaque biome */
+  private readonly texVaisseau = new Map<string, WebGLTexture>()
+  private readonly texVaisseauDemandees = new Set<string>()
+  private demandeTexVaisseau(nom: string): void {
+    if (this.texVaisseauDemandees.has(nom)) return
+    this.texVaisseauDemandees.add(nom)
+    this.loadTexture(`/assets/vaisseau-${nom}.webp`, true, true, (t) => this.texVaisseau.set(nom, t))
+  }
   private readonly recopieProgram: WebGLProgram
   // LE DÉCOR NET (réglage « Décor », PARAMÈTRES). Aux résolutions réduites,
   // TOUTE l'image se calcule en moins de pixels puis s'agrandit ; au décor
@@ -5752,7 +5773,7 @@ export class Renderer {
    *  sa géométrie se renvoie au GPU seulement quand elle change (`cle`).
    *  null l'éteint. */
   setVaisseau(
-    v: { cle: string; geometrie: () => Float32Array; fuite: { x: number; y: number }; salle: { minX: number; minY: number; maxX: number; maxY: number } } | null,
+    v: { cle: string; geometrie: () => Float32Array; fuite: { x: number; y: number }; salle: { minX: number; minY: number; maxX: number; maxY: number }; biome: string } | null,
   ): void {
     if (!v) {
       this.vaisseau = null
@@ -5767,7 +5788,11 @@ export class Renderer {
       this.vaisseauCle = v.cle
       this.vaisseauSommets = g.length / FLOTTANTS_SOMMET
     }
-    this.vaisseau = { sommets: this.vaisseauSommets, fuite: v.fuite, salle: v.salle }
+    this.demandeTexVaisseau('paroi')
+    this.demandeTexVaisseau('salle-toit')
+    // seule la zone du biome en cours : les autres ne se téléchargent pas
+    this.demandeTexVaisseau(`zone-${zoneDuBiome(v.biome)}`)
+    this.vaisseau = { sommets: this.vaisseauSommets, fuite: v.fuite, salle: v.salle, biome: v.biome }
   }
   private vaisseauCle = ''
   private vaisseauSommets = 0
@@ -5788,6 +5813,16 @@ export class Renderer {
     gl.bindTexture(gl.TEXTURE_2D, this.texWallA)
     gl.uniform1i(vu['uTole'], 0)
     gl.uniform1f(vu['uHasTole'], this.texWallA ? 1 : 0)
+    const paroi = this.texVaisseau.get('paroi') ?? null
+    const toit = this.texVaisseau.get('salle-toit') ?? null
+    const zone = this.texVaisseau.get(`zone-${zoneDuBiome(v.biome)}`) ?? null
+    for (const [unite, nom, t] of [[1, 'uParoi', paroi], [2, 'uToit', toit], [3, 'uZone', zone]] as const) {
+      gl.activeTexture(gl.TEXTURE0 + unite)
+      gl.bindTexture(gl.TEXTURE_2D, t ?? this.texWallA)
+      gl.uniform1i(vu[nom], unite)
+    }
+    gl.uniform3f(vu['uHasMat'], paroi ? 1 : 0, toit ? 1 : 0, zone ? 1 : 0)
+    gl.activeTexture(gl.TEXTURE0)
     gl.bindVertexArray(this.vaisseauVao)
     gl.drawArrays(gl.TRIANGLES, 0, v.sommets)
     gl.bindVertexArray(null)

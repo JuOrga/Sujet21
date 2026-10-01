@@ -6,7 +6,11 @@
 import { describe, expect, it } from 'vitest'
 import {
   FLOTTANTS_SOMMET,
+  MAT_FEU,
+  MAT_TOIT,
+  MAT_ZONE,
   composeVaisseau,
+  zoneDuBiome,
   geometrieVaisseau,
   pointDeFuite,
   projette,
@@ -113,7 +117,38 @@ describe('vaisseau — la géométrie, du plus loin au plus près', () => {
     expect(g[2]).toBeGreaterThan(zMax * 0.5)
     // et que la dernière face opaque (émission 0) est à la profondeur de la zone
     let dernier = -1
-    for (let i = 0; i < g.length; i += FLOTTANTS_SOMMET) if (g[i + 8] === 0) dernier = i
+    for (let i = 0; i < g.length; i += FLOTTANTS_SOMMET) if (g[i + 8] !== MAT_FEU) dernier = i
     expect(g[dernier + 2]).toBeLessThan(0.1)
+  })
+})
+
+describe('vaisseau — chaque face prend son image', () => {
+  const boites = composeVaisseau(scene)
+  const g = geometrieVaisseau(boites, pointDeFuite(salle))
+  const mats = new Set<number>()
+  for (let i = 8; i < g.length; i += FLOTTANTS_SOMMET) mats.add(g[i])
+
+  it('la zone est pavée de son biome, les salles portent leur toit', () => {
+    expect(mats.has(MAT_ZONE)).toBe(true)
+    expect(mats.has(MAT_TOIT)).toBe(true)
+  })
+
+  it('le toit d’une salle est étiré sur sa face avant (uv de 0 à 1)', () => {
+    for (let i = 0; i < g.length; i += FLOTTANTS_SOMMET) {
+      if (g[i + 8] !== MAT_TOIT) continue
+      expect(g[i + 3]).toBeGreaterThanOrEqual(0)
+      expect(g[i + 3]).toBeLessThanOrEqual(1)
+      expect(g[i + 4]).toBeGreaterThanOrEqual(0)
+      expect(g[i + 4]).toBeLessThanOrEqual(1)
+    }
+  })
+})
+
+describe('vaisseau — la zone de chaque biome', () => {
+  it('les trois zones livrées, et la tempérée pour les biomes qui attendent la leur', () => {
+    expect(zoneDuBiome('cryo')).toBe('cryo')
+    expect(zoneDuBiome('chaud')).toBe('chaud')
+    expect(zoneDuBiome('antichambre')).toBe('tempere')
+    expect(zoneDuBiome('')).toBe('tempere')
   })
 })

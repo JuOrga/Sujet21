@@ -61,6 +61,11 @@ const NOMS: Record<string, string> = {
   'stars-far.webp': 'Ciel étoilé (lointain, station)',
   'ciel.webp': 'Plaque de ciel — la Voie lactée, à la taille de sa source (tools/ciel/prepare-plaque.py)',
   'terre.webp': 'La Terre vue de l’ISS — le jour en RVB, les villes dans l’alpha inversé (tools/ciel/prepare-terre.py)',
+  'vaisseau-paroi.webp': 'Le vaisseau en perspective — la paroi des modules, répétée (tools/images/vaisseau.py)',
+  'vaisseau-salle-toit.webp': 'Le vaisseau en perspective — le toit d’une salle du module (tools/images/vaisseau.py)',
+  'vaisseau-zone-tempere.webp': 'Le vaisseau en perspective — la zone intermédiaire, biome tempéré (tools/images/vaisseau.py)',
+  'vaisseau-zone-cryo.webp': 'Le vaisseau en perspective — la zone intermédiaire, biome cryo (tools/images/vaisseau.py)',
+  'vaisseau-zone-chaud.webp': 'Le vaisseau en perspective — la zone intermédiaire, biome chaud (tools/images/vaisseau.py)',
   'home.webp': 'Fiche — illustration d’accueil',
   'card-galerie.webp': 'Carton de journal — la galerie noyée',
   'fiole-pleine.webp': 'Fiole pleine (semblable)',
@@ -116,7 +121,7 @@ export function rubriqueDe(url: string): string {
     f.startsWith('plafond')
   )
     return 'Machinerie & décalques'
-  if (/^(hull|coque-|tank-bg|stars|ciel|terre|etoiles|home|card-)/.test(f)) return 'Coque & fonds'
+  if (/^(hull|coque-|tank-bg|stars|ciel|terre|vaisseau-|etoiles|home|card-)/.test(f)) return 'Coque & fonds'
   if (/^(fiole|badge)/.test(f)) return 'Objets & emblèmes'
   return 'Autres'
 }

@@ -19845,6 +19845,7 @@ function corpsImage(now: number): boolean {
       geometrie: () => geometrieVaisseau(composeVaisseau(scene), pointDeFuite(salle)),
       fuite: pointDeFuite(salle),
       salle: b,
+      biome: scene.biome,
     })
   } else renderer.setVaisseau(null)
   if (monitor.overview) {

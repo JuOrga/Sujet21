@@ -2014,3 +2014,28 @@ through lighting.
 luminance moyenne ≤ 0,22 par pièce, raccord haut/bas du tronçon et du treillis
 (écart moyen de la première et de la dernière ligne), aucune zone > 0,85 de
 luminance sur plus de 2 % de la pièce (le « blanc franc »).
+
+## 34. LE VAISSEAU EN PERSPECTIVE — zones, toits, parois (01/10)
+
+Le décor autour de la salle (`render/vaisseau.ts`) : la salle au plan avant,
+le reste du vaisseau en profondeur vers UN point de fuite au-dessus d'elle.
+**Orientation** : la face avant de chaque volume est parallèle à la salle,
+donc vue DE DESSUS (le toit) ; les faces qui s'enfoncent sont les PAROIS,
+vues DE FACE (élévation, répétée en largeur ; leur bord haut touche le toit).
+Le moteur éclaire, embrume et pose les feux lui-même : rien de cela ne se
+peint. Sources dans `masters/images/vaisseau/`, puis
+`python3 tools/images/vaisseau.py` (raccord forcé, mesure, WebP).
+
+| image | vue | état |
+| --- | --- | --- |
+| `zone-tempere`, `zone-cryo`, `zone-chaud` | dessus, raccord 4 sens | ✅ livrées 01/10 |
+| `salle-toit` (3:2, étiré) | dessus | ✅ livrée 01/10 |
+| `paroi` (raccord G/D) | élévation | ✅ livrée 01/10 |
+| `couloir` (4:1, raccord G/D) | dessus | à générer |
+| `module-toit` (2:1, gris neutre — le moteur teinte) | dessus | à générer |
+| `module-paroi` (4:1, raccord G/D, gris neutre) | élévation | à générer |
+| `zone-antichambre`, `zone-observatoire` | dessus, raccord 4 sens | à écrire — la tempérée en attendant |
+
+Les prompts complets des huit premières ont été donnés au concepteur le
+01/10 ; ils reprennent le préambule de la charte (§5), « DARK AND
+LOW-CONTRAST (average brightness about 20 %) », sans lumière peinte.
