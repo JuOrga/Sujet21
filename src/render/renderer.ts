@@ -5022,8 +5022,9 @@ void main() {
   else if (mat > 3.5 && mat < 4.5 && uHasMat.y > 0.5) { t = texture(uToit, vUv).rgb; k = 1.3; }
   else if (mat > 4.5 && mat < 5.5 && uHasMat2.x > 0.5) { t = texture(uCouloir, vUv).rgb; k = 1.2; }
   else if (mat > 4.5 && mat < 5.5 && uHasMat.x > 0.5) { t = texture(uParoi, vUv).rgb; k = 1.6; }
-  else if (mat > 5.5 && uHasMat2.z > 0.5) { t = texture(uModuleParoi, vUv).rgb; k = 1.7; }
-  else if (mat > 5.5 && uHasMat.x > 0.5) { t = texture(uParoi, vUv).rgb; k = 1.6; }
+  else if (mat > 5.5 && mat < 6.5 && uHasMat2.z > 0.5) { t = texture(uModuleParoi, vUv).rgb; k = 1.7; }
+  else if (mat > 5.5 && mat < 6.5 && uHasMat.x > 0.5) { t = texture(uParoi, vUv).rgb; k = 1.6; }
+  else if (mat > 6.5) k = 1.0; // le pont : la tôle
   c = t * vCol.rgb * k;
   // LA DISTANCE : plus c'est loin, plus c'est sombre et bleu
   float b = 1.0 - exp(-vZ * 0.28);

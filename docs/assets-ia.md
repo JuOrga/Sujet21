@@ -2018,10 +2018,13 @@ luminance sur plus de 2 % de la pièce (le « blanc franc »).
 ## 34. LE VAISSEAU EN PERSPECTIVE — zones, toits, parois (01/10)
 
 Le décor autour de la salle (`render/vaisseau.ts`) : la salle au plan avant,
-le reste du vaisseau en profondeur vers UN point de fuite au-dessus d'elle.
-**Orientation** : la face avant de chaque volume est parallèle à la salle,
-donc vue DE DESSUS (le toit) ; les faces qui s'enfoncent sont les PAROIS,
-vues DE FACE (élévation, répétée en largeur ; leur bord haut touche le toit).
+vue de dessus ; derrière elle, un PONT qui file vers un horizon bas, juste
+au-dessus (le concept du 01/10). Les salles à venir sont posées dessus, la
+mini-carte en maquette ; les modules de la station bordent l'allée.
+**Orientation** : une salle sur le pont montre sa FAÇADE de face (la paroi,
+en élévation, son bord haut contre le toit) et son TOIT en fuite (le même
+toit, vu de dessus, étiré) ; un module montre son flanc à hublots face à
+l'allée et son toit en fuite ; un tube, sa longueur dans le sens où il file.
 Le moteur éclaire, embrume et pose les feux lui-même : rien de cela ne se
 peint. Sources dans `masters/images/vaisseau/`, puis
 `python3 tools/images/vaisseau.py` (raccord forcé, mesure, WebP).
@@ -2035,6 +2038,8 @@ peint. Sources dans `masters/images/vaisseau/`, puis
 | `module-toit` (2:1, gris neutre — le moteur teinte) | dessus | ✅ livré 01/10 |
 | `module-paroi` (3:1, raccord G/D, gris neutre) | élévation | ✅ livrée 01/10 — répétée tous les 2600 u |
 | `zone-antichambre`, `zone-observatoire` | dessus, raccord 4 sens | à écrire — la tempérée en attendant |
+| `salle-facade` (élévation, une porte au centre) | élévation | à écrire — la paroi en attendant |
+| `pont` (le sol de l'allée, raccord 4 sens) | dessus | à écrire — la tôle en attendant |
 
 Les prompts complets des huit premières ont été donnés au concepteur le
 01/10 ; ils reprennent le préambule de la charte (§5), « DARK AND

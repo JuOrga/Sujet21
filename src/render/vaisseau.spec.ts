@@ -1,7 +1,7 @@
 // LE VAISSEAU EN PERSPECTIVE : ce qui doit tenir — un seul point de fuite
-// au-dessus de la salle, les arêtes qui y filent, la mini-carte rangée en
-// profondeur (voies → gauche–droite, rangs → profondeur), et l'ordre du
-// peintre.
+// sur un horizon BAS au-dessus de la salle, les arêtes qui y filent, la
+// mini-carte posée sur le pont (voies → gauche–droite, rangs → profondeur),
+// les modules qui bordent l'allée, et l'ordre du peintre.
 
 import { describe, expect, it } from 'vitest'
 import {
@@ -10,6 +10,7 @@ import {
   MAT_FEU,
   MAT_MODULE,
   MAT_MODULE_PAROI,
+  MAT_PONT,
   MAT_TOIT,
   MAT_ZONE,
   composeVaisseau,
@@ -39,6 +40,11 @@ describe('vaisseau — le point de fuite et la projection', () => {
     expect(f.x).toBe(0)
     const zone = composeVaisseau(scene).find((b) => b.sorte === 'zone')!
     expect(f.y).toBeGreaterThan(zone.rect.maxY)
+  })
+
+  it('l’horizon est BAS : à moins d’une hauteur de salle au-dessus de la zone (le premier jet : 1,8)', () => {
+    const zone = composeVaisseau(scene).find((b) => b.sorte === 'zone')!
+    expect(f.y - zone.rect.maxY).toBeLessThanOrEqual(salle.maxY - salle.minY)
   })
 
   it('au plan avant, rien ne bouge ; au loin, tout converge vers le point de fuite', () => {
@@ -83,16 +89,36 @@ describe('vaisseau — la mini-carte rangée en profondeur', () => {
     expect(etats).toEqual([2, 2, 0]) // 3:0 et 3:1 joignables, 3:2 fermée
   })
 
-  it('un couloir part vers chaque salle joignable, aucun vers une salle fermée', () => {
-    const couloirs = boites.filter((b) => b.sorte === 'couloir')
-    expect(couloirs).toHaveLength(joignables.size)
+  it('tout est POSÉ sur le pont, et reste sous l’horizon (on en voit le toit)', () => {
+    const sol = boites.find((b) => b.sorte === 'zone')!.rect.maxY
+    const f = pointDeFuite(salle)
+    for (const b of boites.filter((x) => x.sorte === 'salle' || x.sorte === 'module')) {
+      expect(b.rect.minY).toBe(sol)
+      expect(b.rect.maxY).toBeLessThan(f.y)
+    }
   })
 
-  it('les autres modules sont au-delà du dernier rang, et d’autant plus loin qu’ils le sont sur la carte', () => {
+  it('un tube part vers chaque salle joignable, aucun vers une salle fermée ; un tube couché relie deux voisines ouvertes', () => {
+    const couloirs = boites.filter((b) => b.sorte === 'couloir')
+    const vers = couloirs.filter((c) => c.rect.maxX - c.rect.minX < 1.5 * (c.rect.maxY - c.rect.minY))
+    expect(vers).toHaveLength(joignables.size)
+    // rang 3 : 3:0–3:1 ; rang 4 : 4:0–4:1 et 4:1–4:2 ; rang 5 : seule 5:1
+    expect(couloirs.length - vers.length).toBe(3)
+  })
+
+  it('les autres modules BORDENT l’allée, chacun de son côté de la carte, d’autant plus loin qu’ils le sont', () => {
     const mods = boites.filter((b) => b.sorte === 'module')
-    const zSalles = Math.max(...salles.map((s) => s.z0 + s.dz))
-    for (const m of mods) expect(m.z0).toBeGreaterThan(zSalles)
+    const gauche = Math.min(...salles.map((s) => s.rect.minX))
+    const droite = Math.max(...salles.map((s) => s.rect.maxX))
+    expect(mods[0].rect.maxX).toBeLessThan(gauche) // chaud, côté −1
+    expect(mods[1].rect.minX).toBeGreaterThan(droite) // tempéré, côté +1
     expect(mods[1].z0).toBeGreaterThan(mods[0].z0)
+  })
+
+  it('deux modules du même côté se suivent à la file, sans se chevaucher', () => {
+    const b = composeVaisseau({ ...scene, modules: [{ biome: 'chaud', distance: 1, cote: -1 }, { biome: 'cryo', distance: 1, cote: -0.4 }] })
+    const [a, c] = b.filter((x) => x.sorte === 'module').sort((m, n) => m.z0 - n.z0)
+    expect(c.z0).toBeGreaterThanOrEqual(a.z0 + a.dz)
   })
 
   it('hors d’une run (pas de mini-carte) : un module générique, toutes salles en veille', () => {
@@ -112,16 +138,20 @@ describe('vaisseau — la géométrie, du plus loin au plus près', () => {
     expect(g.length).toBeGreaterThan(0)
   })
 
-  it('l’ordre du peintre : la face avant de la zone (la plus proche) est tracée en dernier parmi les faces', () => {
-    // z de la face avant de chaque face tracée : non croissant en moyenne
-    // par boîte — on vérifie au moins que la première face est la plus loin
-    let zMax = 0
-    for (let i = 2; i < g.length; i += FLOTTANTS_SOMMET) zMax = Math.max(zMax, g[i])
-    expect(g[2]).toBeGreaterThan(zMax * 0.5)
-    // et que la dernière face opaque (émission 0) est à la profondeur de la zone
+  it('l’ordre du peintre : le pont d’abord, puis les modules, la face avant de la zone en dernier', () => {
+    expect(g[8]).toBe(MAT_PONT)
+    // les modules passent avant toute salle
+    let premiereSalle = -1
+    let dernierModule = -1
+    for (let i = 0; i < g.length; i += FLOTTANTS_SOMMET) {
+      if (g[i + 8] === MAT_TOIT && premiereSalle < 0) premiereSalle = i
+      if (g[i + 8] === MAT_MODULE_PAROI || g[i + 8] === MAT_MODULE) dernierModule = i
+    }
+    expect(dernierModule).toBeLessThan(premiereSalle)
+    // la dernière face opaque est la face avant de la zone
     let dernier = -1
     for (let i = 0; i < g.length; i += FLOTTANTS_SOMMET) if (g[i + 8] !== MAT_FEU) dernier = i
-    expect(g[dernier + 2]).toBeLessThan(0.1)
+    expect(g[dernier + 8]).toBe(MAT_ZONE)
   })
 })
 
@@ -153,14 +183,18 @@ describe('vaisseau — chaque face prend son image', () => {
       }
     }
     expect(vus).toBeGreaterThan(0)
-    // sur une face qui s'enfonce, u suit z : 0 au bord proche, 1 au bord lointain
-    const couloirs = boites.filter((b) => b.sorte === 'couloir')
-    const zs = new Set(couloirs.flatMap((b) => [b.z0, b.z0 + b.dz]).map((z) => z.toFixed(5)))
+    // le tube qui file vers le rang suivant : u suit z, 0 au bord proche,
+    // 1 au bord lointain — les colliers aux deux bouts
+    const vers = boites.filter((c) => c.sorte === 'couloir' && c.rect.maxX - c.rect.minX < 1.5 * (c.rect.maxY - c.rect.minY))
+    let loin = 0
     for (let i = 0; i < g.length; i += FLOTTANTS_SOMMET) {
-      if (g[i + 8] !== MAT_COULOIR || !zs.has(g[i + 2].toFixed(5))) continue
-      const b = couloirs.find((c) => Math.abs(c.z0 - g[i + 2]) < 1e-5 || Math.abs(c.z0 + c.dz - g[i + 2]) < 1e-5)!
-      if (Math.abs(b.z0 + b.dz - g[i + 2]) < 1e-5) expect(g[i + 3]).toBe(1)
+      if (g[i + 8] !== MAT_COULOIR) continue
+      const c = vers.find((t) => g[i] >= t.rect.minX - 1e-6 && g[i] <= t.rect.maxX + 1e-6 && Math.abs(t.z0 + t.dz - g[i + 2]) < 1e-5)
+      if (!c) continue
+      expect(g[i + 3]).toBe(1)
+      loin++
     }
+    expect(loin).toBeGreaterThan(0)
   })
 
   it('le toit d’une salle est étiré sur sa face avant (uv de 0 à 1)', () => {
