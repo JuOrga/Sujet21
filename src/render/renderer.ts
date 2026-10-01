@@ -67,7 +67,17 @@ import {
 import { ATLAS_COQUE } from './coqueAtlas'
 import { sondeRetournement, type Retournement } from './retournement'
 import { boutsEnMur, cleBoite } from '../game/conduite'
-import { PARALLAXE_HORIZON, type GabaritDecor, type PlacementDecor, type Rect as RectDecor } from './decor'
+import { LOINTAIN, PARALLAXE_HORIZON, type FeuDecor, type GabaritDecor, type PlacementDecor, type Rect as RectDecor } from './decor'
+
+/** Ce que le décor peint montre, image par image (main.ts le compose). */
+export interface DecorAffiche {
+  biome: string
+  gabarit: GabaritDecor
+  placement: PlacementDecor
+  lointain: RectDecor
+  salle: RectDecor
+  feux: readonly FeuDecor[]
+}
 
 // Budgets de rendu : au-delà, les éléments excédentaires ne sont plus
 // dessinés (la physique, elle, les voit tous) — l'éditeur avertit quand un
@@ -5046,6 +5056,8 @@ const FICHIER_DECAL: Record<DecalDef['kind'], string> = {
 /** Les planches de vues livrées, lues une fois : le glob de Vite. */
 const PLANCHES_LIVREES = planchesLivrees()
 
+const MAX_FEUX_DECOR = 16
+
 // LE DÉCOR PEINT autour de la salle (render/decor.ts) : une image par biome,
 // posée dans le monde de sorte que son ouverture tombe sous la salle. Un seul
 // quad ; le fragment retrouve son pixel d'image, avec la parallaxe de sa
@@ -5072,6 +5084,10 @@ uniform vec2 uTaille;  // l'image, en pixels
 uniform vec4 uGab;     // horizon, haut et bas de l'ouverture (fractions de la hauteur), parallaxe à l'horizon
 uniform vec2 uDecal;   // l'écart de la caméra au centre de la salle
 uniform vec4 uSalle;   // la salle : rien du décor ne s'y peint
+uniform float uLoin;   // 1 : la couche lointaine (parallaxe uniforme, voilée, découpée partout)
+uniform int uNbFeux;
+uniform vec4 uFeux[${MAX_FEUX_DECOR}];    // x, y, rayon (pixels d'image), force
+uniform vec3 uFeuxCol[${MAX_FEUX_DECOR}];
 out vec4 outColor;
 vec2 versImage(vec2 m) { return vec2(m.x - uImg.x, uImg.y - m.y) / uImg.z / uTaille; }
 void main() {
@@ -5079,26 +5095,49 @@ void main() {
   // la parallaxe de la ligne (le jumeau CPU : decor.ts, parallaxe())
   float v0 = versImage(vMonde).y;
   float t = clamp((uGab.y - v0) / (uGab.y - uGab.x), 0.0, 1.0);
-  float f = v0 >= uGab.y ? 0.0 : uGab.w * t * t;
+  float f = uLoin > 0.5 ? uGab.w : (v0 >= uGab.y ? 0.0 : uGab.w * t * t);
   vec2 uv = versImage(vMonde - uDecal * f);
-  if (uv.x < 0.0 || uv.x > 1.0 || uv.y < uGab.x - 0.01) discard;
+  if (uv.x < 0.0 || uv.x > 1.0 || uv.y < 0.0) discard;
   vec3 c = texture(uImage, vec2(uv.x, 1.0 - clamp(uv.y, 0.0, 1.0))).rgb;
   float lum = max(c.r, max(c.g, c.b));
   float a = 1.0;
-  // le ciel peint est noir : on le découpe, la Terre en direct passe
-  // derrière. Pas seulement au-dessus de l'horizon : sur les côtés, le noir
-  // descend jusqu'au toit des serres. Un « noir » de générateur n'est pas
-  // nul (5 à 8 sur 255) : à seuil trop bas, un liseré gris trahissait la
-  // découpe.
+  if (uLoin > 0.5) {
+    // LOIN : tout le noir découpé, et le voile de la distance — plus sombre,
+    // plus froid, moins contrasté que l'allée
+    a = smoothstep(0.03, 0.1, lum);
+    c = mix(c, vec3(0.04, 0.07, 0.12), 0.35) * 0.55;
+    a *= smoothstep(0.0, 0.06, min(uv.x, 1.0 - uv.x));
+    if (uv.y > 1.0) discard;
+    outColor = vec4(c * a, a);
+    return;
+  }
+  // le ciel peint est noir : on le découpe, la couche lointaine et la Terre
+  // en direct passent derrière. Pas seulement au-dessus de l'horizon : sur
+  // les côtés, le noir descend jusqu'au toit des serres. Un « noir » de
+  // générateur n'est pas nul (5 à 8 sur 255) : à seuil trop bas, un liseré
+  // gris trahissait la découpe.
   if (uv.y < 0.45) a *= smoothstep(0.035, 0.1, lum);
-  // l'ouverture noire, là où la salle ne la couvre pas (une salle très
-  // plate) : découpée aussi, plutôt qu'un trou noir sous la salle
+  // l'ouverture noire, là où la salle ne la couvre pas : découpée aussi
   if (uv.y > uGab.y - 0.01 && uv.y < uGab.z + 0.01 && abs(uv.x - 0.5) < 0.2) a *= smoothstep(0.02, 0.06, lum);
   // les bords de l'image s'effacent : la station se perd dans le noir
   a *= smoothstep(0.0, 0.08, min(uv.x, 1.0 - uv.x));
   // sous l'image, la station s'arrête et s'éteint vite : la dernière ligne
   // étirée faisait des traînées, un miroir y remontait l'ouverture noire
   if (uv.y > 1.0) a *= 1.0 - smoothstep(1.0, 1.05, uv.y);
+  // LES FEUX DE LA MINI-CARTE (decor.ts, feuxDecor) : sur les portes peintes
+  // éteintes, un disque qui s'allume et son halo — en coordonnées d'image,
+  // ils suivent donc la parallaxe de leur rang
+  vec2 px = uv * uTaille;
+  for (int i = 0; i < ${MAX_FEUX_DECOR}; i++) {
+    if (i >= uNbFeux) break;
+    float d = length(px - uFeux[i].xy) / uFeux[i].z;
+    // le hublot s'éclaire PAR-DERRIÈRE — sa peinture reste lisible —, une
+    // lueur déborde sur la façade ; un disque plein faisait une boule orange
+    float disque = 1.0 - smoothstep(0.7, 0.95, d);
+    float halo = exp(-d * d * 0.9);
+    c += uFeuxCol[i] * uFeux[i].w * (disque * (0.12 + lum * 1.6) + halo * 0.22);
+    a = max(a, uFeux[i].w * halo * 0.4);
+  }
   outColor = vec4(c * a, a);
 }`
 
@@ -5853,18 +5892,31 @@ export class Renderer {
   }
 
   /** LE DÉCOR PEINT (render/decor.ts) : son image, son placement, la salle
-   *  qu'il entoure. null l'éteint. L'image se charge à la première demande,
-   *  celle du biome en cours seulement. */
-  setDecor(d: { biome: string; gabarit: GabaritDecor; placement: PlacementDecor; salle: RectDecor } | null): void {
+   *  qu'il entoure, ses feux, et la couche lointaine. null l'éteint. Les
+   *  images se chargent à la première demande, celle du biome en cours
+   *  seulement. */
+  setDecor(d: DecorAffiche | null): void {
     this.decor = d
-    if (d && !this.texDecorDemandees.has(d.biome)) {
-      this.texDecorDemandees.add(d.biome)
-      this.loadTexture(`/assets/decor-${d.biome}.webp`, false, true, (t) => this.texDecor.set(d.biome, t))
+    if (!d) return
+    for (const nom of [d.biome, 'lointain'])
+      if (!this.texDecorDemandees.has(nom)) {
+        this.texDecorDemandees.add(nom)
+        this.loadTexture(`/assets/decor-${nom}.webp`, false, true, (t) => this.texDecor.set(nom, t))
+      }
+    const n = Math.min(d.feux.length, MAX_FEUX_DECOR)
+    for (let i = 0; i < n; i++) {
+      const f = d.feux[i]
+      this.feuxDecor.set([f.x, f.y, f.r, f.force], i * 4)
+      this.feuxDecorCol.set(f.couleur, i * 3)
     }
+    this.nbFeuxDecor = n
   }
-  private decor: { biome: string; gabarit: GabaritDecor; placement: PlacementDecor; salle: RectDecor } | null = null
+  private decor: DecorAffiche | null = null
   private readonly texDecor = new Map<string, WebGLTexture>()
   private readonly texDecorDemandees = new Set<string>()
+  private readonly feuxDecor = new Float32Array(MAX_FEUX_DECOR * 4)
+  private readonly feuxDecorCol = new Float32Array(MAX_FEUX_DECOR * 3)
+  private nbFeuxDecor = 0
 
   private drawDecor(camera: Camera, viewportW: number, viewportH: number): void {
     const d = this.decor
@@ -5875,24 +5927,44 @@ export class Renderer {
     const g = d.gabarit
     gl.useProgram(this.decorProgram)
     const u = this.uniforms['decor']
-    // le quad couvre l'image et, dessous, de quoi l'éteindre
-    const sous = (image.maxY - image.minY) * 0.06
-    gl.uniform4f(u['uRect'], image.minX, image.minY - sous, image.maxX, image.maxY)
     gl.uniform2f(u['uCenter'], camera.x, camera.y)
     gl.uniform2f(u['uViewport'], viewportW, viewportH)
     gl.uniform1f(u['uZoom'], camera.zoom)
-    gl.uniform3f(u['uImg'], image.minX, image.maxY, echelle)
-    gl.uniform2f(u['uTaille'], g.largeur, g.hauteur)
-    gl.uniform4f(u['uGab'], g.horizon / g.hauteur, g.ouvertureHaut / g.hauteur, g.ouvertureBas / g.hauteur, PARALLAXE_HORIZON)
     gl.uniform2f(u['uDecal'], camera.x - centre.x, camera.y - centre.y)
     gl.uniform4f(u['uSalle'], d.salle.minX, d.salle.minY, d.salle.maxX, d.salle.maxY)
-    gl.activeTexture(gl.TEXTURE0)
-    gl.bindTexture(gl.TEXTURE_2D, tex)
     gl.uniform1i(u['uImage'], 0)
+    gl.activeTexture(gl.TEXTURE0)
     // prémultiplié, comme la coque : le ciel découpé laisse voir la Terre
     gl.enable(gl.BLEND)
     gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA)
     gl.bindVertexArray(null)
+    // 1. la couche lointaine d'abord : l'allée passe devant elle
+    const loin = this.texDecor.get('lointain')
+    if (loin) {
+      const r = d.lointain
+      gl.uniform4f(u['uRect'], r.minX, r.minY, r.maxX, r.maxY)
+      const kl = (r.maxX - r.minX) / LOINTAIN.largeur
+      gl.uniform3f(u['uImg'], r.minX, r.maxY, kl)
+      gl.uniform2f(u['uTaille'], LOINTAIN.largeur, LOINTAIN.hauteur)
+      gl.uniform4f(u['uGab'], 0, 1, 1, LOINTAIN.parallaxe)
+      gl.uniform1f(u['uLoin'], 1)
+      gl.uniform1i(u['uNbFeux'], 0)
+      gl.bindTexture(gl.TEXTURE_2D, loin)
+      gl.drawArrays(gl.TRIANGLES, 0, 6)
+    }
+    // 2. l'image du module, ses feux
+    const sous = (image.maxY - image.minY) * 0.06
+    gl.uniform4f(u['uRect'], image.minX, image.minY - sous, image.maxX, image.maxY)
+    gl.uniform3f(u['uImg'], image.minX, image.maxY, echelle)
+    gl.uniform2f(u['uTaille'], g.largeur, g.hauteur)
+    gl.uniform4f(u['uGab'], g.horizon / g.hauteur, g.ouvertureHaut / g.hauteur, g.ouvertureBas / g.hauteur, PARALLAXE_HORIZON)
+    gl.uniform1f(u['uLoin'], 0)
+    gl.uniform1i(u['uNbFeux'], this.nbFeuxDecor)
+    if (this.nbFeuxDecor > 0) {
+      gl.uniform4fv(u['uFeux[0]'], this.feuxDecor)
+      gl.uniform3fv(u['uFeuxCol[0]'], this.feuxDecorCol)
+    }
+    gl.bindTexture(gl.TEXTURE_2D, tex)
     gl.drawArrays(gl.TRIANGLES, 0, 6)
     gl.disable(gl.BLEND)
     // l'unité 0 porte le champ du fluide : les passes suivantes l'y lisent

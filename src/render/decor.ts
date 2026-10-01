@@ -33,19 +33,115 @@ export interface Rect {
 export interface GabaritDecor {
   largeur: number
   hauteur: number
-  /** la ligne d'horizon : au-dessus, le ciel noir */
+  /** l'horizon de l'allée : là où sa parallaxe atteint PARALLAXE_HORIZON */
   horizon: number
   /** l'ouverture : son bord haut, son bord bas, et le bas du trapèze en x */
   ouvertureHaut: number
   ouvertureBas: number
   ouvertureGauche: number
   ouvertureDroite: number
+  /** le point où file l'allée : la couche lointaine s'y accroche */
+  fuite: { x: number; y: number }
+  /** les portes PEINTES ÉTEINTES, rang par rang (le rang +1 d'abord), voie
+   *  par voie de gauche à droite : x, y, rayon — le moteur les allume */
+  portes: [number, number, number][][]
+  /** le sas de la cloison de fin du module : x, y, rayon */
+  sas: [number, number, number]
 }
 
-/** Les images livrées, mesurées sur l'image elle-même (voir tools/images/decor.py). */
+/** Les images livrées, mesurées sur l'image elle-même (tools/images/decor.py,
+ *  portes relevées à la main sur l'image). */
 export const GABARITS: Record<string, GabaritDecor> = {
-  // livrée le 01/10 : 1672 × 941, ouverture de 596 à 863, 573 → 1097 en bas
-  tempere: { largeur: 1672, hauteur: 941, horizon: 191, ouvertureHaut: 596, ouvertureBas: 863, ouvertureGauche: 573, ouvertureDroite: 1097 },
+  // v2 livrée le 01/10 : 1672 × 941, la frise des modules lointains effacée
+  // (ils viennent de la couche lointaine) ; ouverture de 620 à 883, 615 →
+  // 1057 en bas ; quatre rangs de portes lisibles, le cinquième caché
+  tempere: {
+    largeur: 1672,
+    hauteur: 941,
+    horizon: 150,
+    ouvertureHaut: 620,
+    ouvertureBas: 883,
+    ouvertureGauche: 615,
+    ouvertureDroite: 1057,
+    fuite: { x: 840, y: 150 },
+    portes: [
+      [[443, 490, 45], [840, 490, 45], [1233, 490, 45]],
+      [[560, 363, 32], [840, 360, 32], [1123, 363, 32]],
+      [[630, 270, 22], [840, 270, 22], [1040, 270, 22]],
+      [[677, 220, 15], [840, 219, 15], [1003, 220, 15]],
+    ],
+    sas: [840, 160, 38],
+  },
+}
+
+/** LA COUCHE LOINTAINE : les autres modules de la station, une image pour
+ *  tous les biomes (livrée le 01/10, 1986 × 792), son point de fuite là où
+ *  ses poutres convergent. Accrochée au point de fuite de l'allée, plus
+ *  large qu'elle, elle suit la caméra bien plus que l'allée. */
+export const LOINTAIN = { largeur: 1986, hauteur: 792, fuite: { x: 993, y: 320 }, largeurRelative: 0.95, parallaxe: 0.6 }
+
+/** Où poser la couche lointaine, dans le monde, d'après le décor placé. */
+export function placeLointain(p: PlacementDecor, g: GabaritDecor): Rect {
+  const lImage = p.image.maxX - p.image.minX
+  const k = (lImage * LOINTAIN.largeurRelative) / LOINTAIN.largeur
+  const fx = p.image.minX + g.fuite.x * p.echelle
+  const fy = p.image.maxY - g.fuite.y * p.echelle
+  const minX = fx - LOINTAIN.fuite.x * k
+  const maxY = fy + LOINTAIN.fuite.y * k
+  return { minX, minY: maxY - LOINTAIN.hauteur * k, maxX: minX + LOINTAIN.largeur * k, maxY }
+}
+
+/** Ce que la mini-carte dit des salles devant soi (main.ts la remplit). */
+export interface VueCarte {
+  /** combien de rangs restent devant la salle courante dans le module */
+  rangsDevant: number
+  voies: number
+  /** les salles joignables : "k:v" — k = 1 pour le rang suivant */
+  joignables: ReadonlySet<string>
+}
+
+/** Un feu à poser sur l'image : x, y, rayon (pixels d'image), couleur, force. */
+export interface FeuDecor {
+  x: number
+  y: number
+  r: number
+  couleur: [number, number, number]
+  force: number
+}
+
+export const AMBRE: [number, number, number] = [1.0, 0.62, 0.25]
+export const BLEU: [number, number, number] = [0.39, 0.72, 0.9]
+
+/**
+ * LE LIEN AVEC LA MINI-CARTE, rien qu'en lumière : les portes sont peintes
+ * éteintes, le moteur allume celles qui comptent. Ambre franc sur les salles
+ * joignables du rang suivant — où l'on peut aller maintenant ; bleu pâle sur
+ * celles qu'on pourra joindre plus loin ; rien sur les salles que les choix
+ * ont fermées. Le sas de la cloison s'allume quand il ne reste plus de rang :
+ * la sortie du module. Hors d'une run, toutes les portes en veille.
+ * La peinture est fixe : la première rangée est TOUJOURS le rang +1.
+ */
+export function feuxDecor(g: GabaritDecor, vue: VueCarte | null): FeuDecor[] {
+  const feux: FeuDecor[] = []
+  if (!vue) {
+    for (const rang of g.portes) for (const [x, y, r] of rang) feux.push({ x, y, r, couleur: BLEU, force: 0.35 })
+    return feux
+  }
+  g.portes.forEach((rang, i) => {
+    const k = i + 1
+    if (k > vue.rangsDevant) return
+    rang.forEach(([x, y, r], j) => {
+      // les voies de la carte sur les trois portes peintes
+      const v = vue.voies === rang.length ? j : Math.round((j * (vue.voies - 1)) / Math.max(1, rang.length - 1))
+      if (!vue.joignables.has(`${k}:${v}`)) return
+      feux.push(k === 1 ? { x, y, r, couleur: AMBRE, force: 1 } : { x, y, r, couleur: BLEU, force: 0.55 })
+    })
+  })
+  if (vue.rangsDevant <= 0) {
+    const [x, y, r] = g.sas
+    feux.push({ x, y, r, couleur: AMBRE, force: 1 })
+  }
+  return feux
 }
 
 /** Le biome qui a son image ; les autres prennent la tempérée en attendant. */

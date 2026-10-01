@@ -2041,5 +2041,17 @@ ligne imprimée se recopie dans `GABARITS` (`render/decor.ts`).
 
 | biome | état |
 | --- | --- |
-| tempéré | ✅ livré 01/10 — 1672 × 941, horizon à 20 %, ouverture en trapèze (22 → 31 % de large, de 63 à 92 % de haut) |
+| tempéré | ✅ v2 livrée 01/10 — 1672 × 941 ; le module s'arrête sur une cloison à sas ; portes PEINTES ÉTEINTES (relevées : 4 rangs × 3 + le sas) ; la frise des modules lointains effacée (ils viennent de la couche lointaine) |
+| lointain (tous biomes) | ✅ livrée 01/10 — 1986 × 792, les autres modules de la station en perspective sur fond noir |
 | cryo, chaud, antichambre, observatoire | à générer — la tempérée en attendant |
+
+**Le lien avec la mini-carte, en lumière** (`feuxDecor`) : les portes sont
+peintes éteintes, le moteur allume — ambre sur les salles joignables du rang
+suivant, bleu pâle sur celles joignables plus loin, rien sur les fermées ; le
+sas de la cloison quand il ne reste plus de rang. La peinture est fixe : la
+première rangée est toujours le rang +1. Chaque nouvelle image demande donc
+son RELEVÉ des portes (`portes`, `sas` dans `GABARITS`).
+
+**La couche lointaine** se dessine d'abord, accrochée au point de fuite de
+l'allée (`placeLointain`), voilée et suivant la caméra à 60 % : l'allée passe
+devant elle, la Terre en direct derrière.

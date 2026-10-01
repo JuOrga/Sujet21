@@ -315,7 +315,16 @@ import {
 } from './bench/changelog'
 import { Camera } from './render/camera'
 import { COQUE_EPAISSEUR } from './render/coque'
-import { GABARITS, decorDuBiome, placeDecor } from './render/decor'
+import {
+  GABARITS,
+  decorDuBiome,
+  feuxDecor,
+  placeDecor,
+  placeLointain,
+  type FeuDecor,
+  type GabaritDecor,
+  type VueCarte,
+} from './render/decor'
 import { MAX_BOXES, Renderer } from './render/renderer'
 import { Motes, VIE_STRIDE, remplitVie, toucheLeCorps } from './render/vie'
 import { panDepuis } from './game/ouie'
@@ -1403,6 +1412,41 @@ function miniCarteDuModule(): MiniCarte | null {
   // le rang de la descente à l'entrée du module : les salles déjà
   // franchies dedans se retranchent du rang courant
   return tisseModule(m, carteRun.tissage, voieRang - carteRun.niveau)
+}
+/** CE QUE LE DÉCOR PEINT ALLUME (render/decor.ts, feuxDecor) : les salles
+ *  joignables devant soi, rang par rang (k = 1 : le rang suivant), et ce
+ *  qu'il reste de rangs dans le module. Retissé seulement quand la run
+ *  avance (la clé). null hors d'une run. */
+let vueDecorMemo: { cle: string; vue: VueCarte | null } | null = null
+function vueCarteDecor(): VueCarte | null {
+  const m = moduleEnCours()
+  const cle = `${m?.id ?? ''}|${carteRun.niveau}|${carteRun.trace.join(',')}|${carteRun.tissage}`
+  if (vueDecorMemo && vueDecorMemo.cle === cle) return vueDecorMemo.vue
+  const mini = miniCarteDuModule()
+  let vue: VueCarte | null = null
+  if (mini && mini.rangs.length > 0) {
+    const rang = Math.min(carteRun.niveau, mini.rangs.length - 1)
+    const tr = carteRun.trace[rang]
+    const voie = typeof tr === 'number' ? tr : (derniereVoie(carteRun) ?? Math.floor(mini.voies / 2))
+    // de proche en proche, par les suivants : ce qu'on peut encore joindre
+    const joignables = new Set<string>()
+    let front = [voie]
+    for (let r = rang; r < mini.rangs.length - 1 && front.length; r++) {
+      const suite = new Set<number>()
+      for (const v of front) for (const s2 of mini.rangs[r][v]?.suivants ?? []) suite.add(s2)
+      for (const v of suite) joignables.add(`${r + 1 - rang}:${v}`)
+      front = [...suite]
+    }
+    vue = { rangsDevant: mini.rangs.length - 1 - rang, voies: mini.voies, joignables }
+  }
+  vueDecorMemo = { cle, vue }
+  return vue
+}
+// les feux ne changent qu'avec la vue de la carte : pas d'allocation par image
+let feuxMemo: { g: GabaritDecor; vue: VueCarte | null; feux: FeuDecor[] } | null = null
+function feuxDuDecor(g: GabaritDecor, vue: VueCarte | null): FeuDecor[] {
+  if (!feuxMemo || feuxMemo.g !== g || feuxMemo.vue !== vue) feuxMemo = { g, vue, feux: feuxDecor(g, vue) }
+  return feuxMemo.feux
 }
 /** CE QU'ON TROUVERA dans un module qu'on n'a pas encore entré — les types,
  *  pas les comptes (le concepteur, 16/09). Le rang d'entrée s'estime par le
@@ -19782,7 +19826,15 @@ function corpsImage(now: number): boolean {
     const biome = decorDuBiome(moduleEnCours()?.biome ?? 'tempere')
     const gabarit = GABARITS[biome]
     const avecCoque = { minX: b.minX - T, minY: b.minY - T, maxX: b.maxX + T, maxY: b.maxY + T }
-    renderer.setDecor({ biome, gabarit, placement: placeDecor(avecCoque, gabarit), salle: b })
+    const placement = placeDecor(avecCoque, gabarit)
+    renderer.setDecor({
+      biome,
+      gabarit,
+      placement,
+      lointain: placeLointain(placement, gabarit),
+      salle: b,
+      feux: feuxDuDecor(gabarit, vueCarteDecor()),
+    })
   } else renderer.setDecor(null)
   if (monitor.overview) {
     const b = sim.bounds

@@ -60,6 +60,7 @@ const NOMS: Record<string, string> = {
   'stars.webp': 'Ciel étoilé (proche)',
   'stars-far.webp': 'Ciel étoilé (lointain, station)',
   'ciel.webp': 'Plaque de ciel — la Voie lactée, à la taille de sa source (tools/ciel/prepare-plaque.py)',
+  'decor-lointain.webp': 'Le décor peint — la couche lointaine : les autres modules de la station, sur fond noir (tools/images/decor.py)',
   'decor-tempere.webp': 'Le décor peint autour de la salle, biome tempéré — le vaisseau en perspective, ouverture au centre (tools/images/decor.py)',
   'terre.webp': 'La Terre vue de l’ISS — le jour en RVB, les villes dans l’alpha inversé (tools/ciel/prepare-terre.py)',
   'home.webp': 'Fiche — illustration d’accueil',

@@ -47,9 +47,11 @@ def mesure(im: Image.Image) -> dict:
     horizon = next(y for y in range(h) if (a[y] > 40).mean() > 0.02)
     lignes = []
     for y in range(horizon, h):
-        p = plage_noire(a[y], w // 2)
-        if p and p[1] - p[0] > 0.15 * w:
-            lignes.append((y, p))
+        # trois lignes de suite : une rainure sombre du plancher passait
+        # pour le bord de l'ouverture (la v2 tempérée : 613 au lieu de 620)
+        ps = [plage_noire(a[yy], w // 2) for yy in range(y, min(h, y + 3))]
+        if all(p and p[1] - p[0] > 0.15 * w for p in ps):
+            lignes.append((y, ps[0]))
     (haut, _), (bas, (g, d)) = lignes[0], lignes[-1]
     return dict(largeur=w, hauteur=h, horizon=horizon, ouvertureHaut=haut, ouvertureBas=bas, ouvertureGauche=g, ouvertureDroite=d)
 
@@ -59,6 +61,13 @@ def main() -> None:
         if src.suffix not in ('.png', '.webp'):
             continue
         im = Image.open(src).convert('RGB')
+        out = SORTIE / f'decor-{src.stem}.webp'
+        if src.stem == 'lointain':
+            # la couche lointaine n'a ni horizon ni ouverture : son point de
+            # fuite se règle à la main (LOINTAIN, render/decor.ts)
+            im.save(out, 'WEBP', quality=88, method=6)
+            print(f'  lointain : {im.width}×{im.height}, {out.stat().st_size // 1024} Ko')
+            continue
         m = mesure(im)
         out = SORTIE / f'decor-{src.stem}.webp'
         im.save(out, 'WEBP', quality=88, method=6)

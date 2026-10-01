@@ -2,7 +2,7 @@
 // sa taille, et l'allée suit la caméra de moins en moins vers l'horizon.
 
 import { describe, expect, it } from 'vitest'
-import { GABARITS, PARALLAXE_HORIZON, decorDuBiome, parallaxe, placeDecor } from './decor'
+import { AMBRE, BLEU, GABARITS, LOINTAIN, PARALLAXE_HORIZON, decorDuBiome, feuxDecor, parallaxe, placeDecor, placeLointain } from './decor'
 
 const g = GABARITS.tempere
 
@@ -60,5 +60,47 @@ describe('décor peint — les couches', () => {
   it('les biomes sans image prennent la tempérée', () => {
     expect(decorDuBiome('tempere')).toBe('tempere')
     expect(decorDuBiome('cryo')).toBe('tempere')
+  })
+})
+
+describe('décor peint — la couche lointaine', () => {
+  it('son point de fuite tombe sur celui de l’allée, à sa largeur relative', () => {
+    const p = placeDecor({ minX: -534, minY: -364, maxX: 534, maxY: 364 }, g)
+    const r = placeLointain(p, g)
+    const k = (r.maxX - r.minX) / LOINTAIN.largeur
+    const fx = p.image.minX + g.fuite.x * p.echelle
+    const fy = p.image.maxY - g.fuite.y * p.echelle
+    expect(r.minX + LOINTAIN.fuite.x * k).toBeCloseTo(fx, 6)
+    expect(r.maxY - LOINTAIN.fuite.y * k).toBeCloseTo(fy, 6)
+    expect((r.maxX - r.minX) / (p.image.maxX - p.image.minX)).toBeCloseTo(LOINTAIN.largeurRelative, 9)
+  })
+})
+
+describe('décor peint — le lien avec la mini-carte, en lumière', () => {
+  const vue = (rangsDevant: number, j: string[]) => ({ rangsDevant, voies: 3, joignables: new Set(j) })
+
+  it('ambre sur les joignables du rang suivant, bleu plus loin, rien sur les fermées', () => {
+    const f = feuxDecor(g, vue(4, ['1:0', '1:1', '2:1', '3:2']))
+    const ambre = f.filter((x) => x.couleur === AMBRE)
+    const bleu = f.filter((x) => x.couleur === BLEU)
+    expect(ambre.map((x) => [x.x, x.y])).toEqual([g.portes[0][0], g.portes[0][1]].map(([x, y]) => [x, y]))
+    expect(bleu.map((x) => [x.x, x.y])).toEqual([g.portes[1][1], g.portes[2][2]].map(([x, y]) => [x, y]))
+    expect(f).toHaveLength(4) // 1:2, et les autres rangs, restent éteints
+  })
+
+  it('les rangs au-delà de la fin du module ne s’allument pas', () => {
+    const f = feuxDecor(g, vue(1, ['1:1', '2:1']))
+    expect(f).toHaveLength(1)
+  })
+
+  it('plus de rang devant : le sas de la cloison s’allume — la sortie', () => {
+    const f = feuxDecor(g, vue(0, []))
+    expect(f).toEqual([{ x: g.sas[0], y: g.sas[1], r: g.sas[2], couleur: AMBRE, force: 1 }])
+  })
+
+  it('hors d’une run : toutes les portes en veille', () => {
+    const f = feuxDecor(g, null)
+    expect(f).toHaveLength(g.portes.flat().length)
+    for (const x of f) expect(x.couleur).toBe(BLEU)
   })
 })
