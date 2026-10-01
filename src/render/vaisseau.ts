@@ -228,14 +228,15 @@ export function composeVaisseau(sc: SceneVaisseau): Boite[] {
 /** LES MATÉRIAUX, portés par le 4e canal de la couleur d'un sommet (le
  *  shader les relit, renderer.ts VAISSEAU_FS) : chaque face prend l'image
  *  qui lui revient, et la tôle de secours tant que l'image n'est pas là. */
-export const MAT_PAROI = 0 // la façade et les flancs d'une salle : vaisseau-paroi, répétée
+export const MAT_PAROI = 0 // les flancs d'une salle : vaisseau-paroi, répétée
 export const MAT_FEU = 1 // un feu : émissif, sans brume
 export const MAT_TOIT = 2 // le toit d'une salle, en fuite : vaisseau-salle-toit, étiré
 export const MAT_ZONE = 3 // la zone intermédiaire : vaisseau-zone-<biome>, pavée
 export const MAT_MODULE = 4 // le toit (et le bout) d'un grand module : vaisseau-module-toit, étiré
 export const MAT_COULOIR = 5 // un couloir : vaisseau-couloir, étiré d'un collier à l'autre
 export const MAT_MODULE_PAROI = 6 // le flanc d'un grand module face à l'allée : vaisseau-module-paroi, répétée
-export const MAT_PONT = 7 // le pont, en fuite : la tôle, pavée
+export const MAT_PONT = 7 // le pont, en fuite : vaisseau-pont, pavé
+export const MAT_FACADE = 8 // la façade d'une salle, sa porte au centre : vaisseau-salle-facade, étirée
 /** Une répétition de la zone tous les ZONE_TUILE u. */
 export const ZONE_TUILE = 760
 /** Combien de fois les ponts à hublots se répètent le long d'un module, par
@@ -329,20 +330,24 @@ export function geometrieVaisseau(boites: readonly Boite[], f: { x: number; y: n
       continue
     }
     // UNE SALLE posée sur le pont : son toit en fuite (le même toit que vu de
-    // dessus, étiré), ses flancs et sa FAÇADE en paroi — l'élévation, son bord
-    // haut contre le toit, à ses proportions (3 : 1)
+    // dessus, étiré), ses flancs en paroi, et sa FAÇADE — l'élévation, sa
+    // porte au centre, étirée une fois : les salles d'un rang côte à côte
+    // montrent la même porte au même endroit
     quad(toit, profV, ombre(kToit * lum), MAT_TOIT)
-    const tu = 1 / (3 * (y1 - y0))
     if (flanc) quad(flanc, [[0, 0], [1, 0], [1, b.dz * 2], [0, b.dz * 2]], ombre(0.5 * lum), MAT_PAROI)
-    quad(avant, [[0, 0], [(x1 - x0) * tu, 0], [(x1 - x0) * tu, 1], [0, 1]], ombre(0.85 * lum), MAT_PAROI)
-    // les feux de porte, au bas de la façade : une paire allumée sur une
-    // salle joignable, un seul en veille, aucun sur une salle fermée
-    const r = Math.min(x1 - x0, y1 - y0) * 0.13
-    const xc = (x0 + x1) / 2
-    if (b.etat === 2) {
-      feu(xc - r * 2.2, y0 + r * 3, r, [0.98, 0.62, 0.28])
-      feu(xc + r * 2.2, y0 + r * 3, r, [0.98, 0.62, 0.28])
-    } else if (b.etat === 1) feu(xc, y0 + r * 3, r * 0.8, [0.35, 0.45, 0.55])
+    quad(avant, [[0, 0], [1, 0], [1, 1], [0, 1]], ombre(0.85 * lum), MAT_FACADE)
+    // les feux de porte DANS les deux hublots peints de part et d'autre de
+    // la porte (salle-facade livrée le 01/10 : à 36 % et 64 % de la largeur,
+    // 51 % de la hauteur) : allumés orange sur une salle joignable, en veille
+    // sur les autres, éteints sur une salle fermée
+    const r = (y1 - y0) * 0.05
+    const yh = y0 + (y1 - y0) * 0.51
+    const c: [number, number, number] | null =
+      b.etat === 2 ? [0.98, 0.62, 0.28] : b.etat === 1 ? [0.3, 0.4, 0.5] : null
+    if (c) {
+      feu(x0 + (x1 - x0) * 0.36, yh, r, c)
+      feu(x0 + (x1 - x0) * 0.64, yh, r, c)
+    }
   }
   return new Float32Array(out)
 }

@@ -2038,8 +2038,8 @@ peint. Sources dans `masters/images/vaisseau/`, puis
 | `module-toit` (2:1, gris neutre — le moteur teinte) | dessus | ✅ livré 01/10 |
 | `module-paroi` (3:1, raccord G/D, gris neutre) | élévation | ✅ livrée 01/10 — répétée tous les 2600 u |
 | `zone-antichambre`, `zone-observatoire` | dessus, raccord 4 sens | à écrire — la tempérée en attendant |
-| `salle-facade` (élévation, une porte au centre) | élévation | à écrire — la paroi en attendant |
-| `pont` (le sol de l'allée, raccord 4 sens) | dessus | à écrire — la tôle en attendant |
+| `salle-facade` (3:1, une porte au centre) | élévation | ✅ livrée 01/10 — étirée ; les feux de porte dans ses deux hublots (36 % et 64 % de la largeur, 51 % de la hauteur) |
+| `pont` (le sol de l'allée, raccord 4 sens) | dessus | ✅ livré 01/10 — l'axe vertical suit la profondeur |
 
 Les prompts complets des huit premières ont été donnés au concepteur le
 01/10 ; ils reprennent le préambule de la charte (§5), « DARK AND

@@ -7,6 +7,7 @@ import { describe, expect, it } from 'vitest'
 import {
   FLOTTANTS_SOMMET,
   MAT_COULOIR,
+  MAT_FACADE,
   MAT_FEU,
   MAT_MODULE,
   MAT_MODULE_PAROI,
@@ -164,6 +165,36 @@ describe('vaisseau — chaque face prend son image', () => {
   it('la zone est pavée de son biome, les salles portent leur toit', () => {
     expect(mats.has(MAT_ZONE)).toBe(true)
     expect(mats.has(MAT_TOIT)).toBe(true)
+  })
+
+  it('chaque salle montre sa façade, étirée une fois (uv de 0 à 1)', () => {
+    let n = 0
+    for (let i = 0; i < g.length; i += FLOTTANTS_SOMMET) {
+      if (g[i + 8] !== MAT_FACADE) continue
+      n++
+      for (const k of [3, 4]) expect([0, 1]).toContain(g[i + k])
+    }
+    expect(n).toBe(9 * 6) // neuf salles, deux triangles chacune
+  })
+
+  it('les feux d’une salle joignable sont dans ses deux hublots ; une salle fermée n’en a aucun', () => {
+    const feux = (b: (typeof boites)[number]) => {
+      const pts: number[][] = []
+      for (let i = 0; i < g.length; i += FLOTTANTS_SOMMET * 6) {
+        if (g[i + 8] !== MAT_FEU || Math.abs(g[i + 2] - b.z0) > 1e-6) continue
+        // centre du carré du feu : moyenne des sommets 0 et 2
+        const cx = (g[i] + g[i + FLOTTANTS_SOMMET * 2]) / 2
+        if (cx >= b.rect.minX && cx <= b.rect.maxX) pts.push([cx, (g[i + 1] + g[i + FLOTTANTS_SOMMET * 2 + 1]) / 2])
+      }
+      return pts
+    }
+    const rang = boites.filter((b) => b.sorte === 'salle').sort((a, b) => a.z0 - b.z0 || a.rect.minX - b.rect.minX).slice(0, 3)
+    const ouverte = rang[0]
+    const w = ouverte.rect.maxX - ouverte.rect.minX
+    const xs = feux(ouverte).map((p) => (p[0] - ouverte.rect.minX) / w).sort()
+    expect(xs[0]).toBeCloseTo(0.36, 3)
+    expect(xs[1]).toBeCloseTo(0.64, 3)
+    expect(feux(rang[2])).toHaveLength(0) // 3:2, fermée
   })
 
   it('les modules portent leur toit et leurs flancs à hublots, les couloirs leur tube', () => {

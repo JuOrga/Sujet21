@@ -4996,6 +4996,9 @@ uniform sampler2D uCouloir;     // vaisseau-couloir : un tube, d'un collier à l
 uniform sampler2D uModuleToit;  // vaisseau-module-toit : la face avant d'un module
 uniform sampler2D uModuleParoi; // vaisseau-module-paroi : ses flancs à hublots
 uniform vec3 uHasMat2;          // couloir, module-toit, module-paroi
+uniform sampler2D uPont;        // vaisseau-pont : le sol de l'allée
+uniform sampler2D uFacade;      // vaisseau-salle-facade : la façade d'une salle
+uniform vec2 uHasMat3;          // pont, façade
 uniform vec4 uSalle;   // la salle : rien du vaisseau ne s'y peint
 uniform vec3 uBrume;   // la couleur du lointain
 out vec4 outColor;
@@ -5024,7 +5027,10 @@ void main() {
   else if (mat > 4.5 && mat < 5.5 && uHasMat.x > 0.5) { t = texture(uParoi, vUv).rgb; k = 1.6; }
   else if (mat > 5.5 && mat < 6.5 && uHasMat2.z > 0.5) { t = texture(uModuleParoi, vUv).rgb; k = 1.7; }
   else if (mat > 5.5 && mat < 6.5 && uHasMat.x > 0.5) { t = texture(uParoi, vUv).rgb; k = 1.6; }
-  else if (mat > 6.5) k = 1.0; // le pont : la tôle
+  else if (mat > 6.5 && mat < 7.5 && uHasMat3.x > 0.5) { t = texture(uPont, vUv).rgb; k = 1.5; }
+  else if (mat > 6.5 && mat < 7.5) k = 1.0; // le pont, en attendant son image : la tôle
+  else if (mat > 7.5 && uHasMat3.y > 0.5) { t = texture(uFacade, vUv).rgb; k = 1.5; }
+  else if (mat > 7.5 && uHasMat.x > 0.5) { t = texture(uParoi, vUv * vec2(1.6, 1.0)).rgb; k = 1.6; }
   c = t * vCol.rgb * k;
   // LA DISTANCE : plus c'est loin, plus c'est sombre et bleu
   float b = 1.0 - exp(-vZ * 0.28);
@@ -5805,6 +5811,8 @@ export class Renderer {
     this.demandeTexVaisseau('couloir')
     this.demandeTexVaisseau('module-toit')
     this.demandeTexVaisseau('module-paroi')
+    this.demandeTexVaisseau('pont')
+    this.demandeTexVaisseau('salle-facade')
     this.vaisseau = { sommets: this.vaisseauSommets, fuite: v.fuite, salle: v.salle, biome: v.biome }
   }
   private vaisseauCle = ''
@@ -5844,6 +5852,14 @@ export class Renderer {
       gl.uniform1i(vu[nom], unite)
     }
     gl.uniform3f(vu['uHasMat2'], couloir ? 1 : 0, moduleToit ? 1 : 0, moduleParoi ? 1 : 0)
+    const pont = this.texVaisseau.get('pont') ?? null
+    const facade = this.texVaisseau.get('salle-facade') ?? null
+    for (const [unite, nom, t] of [[7, 'uPont', pont], [8, 'uFacade', facade]] as const) {
+      gl.activeTexture(gl.TEXTURE0 + unite)
+      gl.bindTexture(gl.TEXTURE_2D, t ?? this.texWallA)
+      gl.uniform1i(vu[nom], unite)
+    }
+    gl.uniform2f(vu['uHasMat3'], pont ? 1 : 0, facade ? 1 : 0)
     gl.activeTexture(gl.TEXTURE0)
     gl.bindVertexArray(this.vaisseauVao)
     gl.drawArrays(gl.TRIANGLES, 0, v.sommets)

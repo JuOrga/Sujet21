@@ -2,8 +2,7 @@
 """LE VAISSEAU EN PERSPECTIVE — prépare ses textures (assets-ia §34).
 
 Les sources, déposées dans masters/images/vaisseau/ (non versionné, comme
-les autres masters) : paroi, salle-toit, zone-tempere, zone-cryo,
-zone-chaud — en .png ou .webp. Le moteur les lit dans
+les autres masters) : les noms de PIECES ci-dessous, en .png ou .webp. Le moteur les lit dans
 public/assets/vaisseau-<nom>.webp (render/vaisseau.ts, renderer.ts).
 
 LE RACCORD, FORCÉ. Un générateur rend une texture « tileable » à peu près :
@@ -40,6 +39,8 @@ PIECES = {
     'couloir': (1536, False, False),
     'module-toit': (1400, False, False),
     'module-paroi': (1536, True, False),
+    'salle-facade': (1536, False, False),
+    'pont': (1024, True, True),
 }
 
 # le recadrage vertical, en fraction de la hauteur source : la bande du

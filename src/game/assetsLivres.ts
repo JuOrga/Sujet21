@@ -69,6 +69,8 @@ const NOMS: Record<string, string> = {
   'vaisseau-couloir.webp': 'Le vaisseau en perspective — un couloir entre deux salles, étiré d’un collier à l’autre (tools/images/vaisseau.py)',
   'vaisseau-module-toit.webp': 'Le vaisseau en perspective — le toit d’un grand module de la station (tools/images/vaisseau.py)',
   'vaisseau-module-paroi.webp': 'Le vaisseau en perspective — les flancs à hublots d’un grand module, répétés (tools/images/vaisseau.py)',
+  'vaisseau-salle-facade.webp': 'Le vaisseau en perspective — la façade d’une salle posée sur le pont, sa porte au centre (tools/images/vaisseau.py)',
+  'vaisseau-pont.webp': 'Le vaisseau en perspective — le sol de l’allée, pavé en fuite vers l’horizon (tools/images/vaisseau.py)',
   'home.webp': 'Fiche — illustration d’accueil',
   'card-galerie.webp': 'Carton de journal — la galerie noyée',
   'fiole-pleine.webp': 'Fiole pleine (semblable)',
