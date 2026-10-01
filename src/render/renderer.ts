@@ -2648,10 +2648,18 @@ void main() {
   // Obstacles : remplissage texturé + liseré, couleur par matériau (§6)
   float edgeW = 2.5 / uZoom;
   // relief : décalage du sommet des parois — proportionnel à l'écart au
-  // centre (caméra au zénith) ou fixe (caméra oblique), fondu sous le zoom
-  // de carte. Jumeau testé : render/relief.ts (decalageSommet).
-  vec2 relDisp = (dot(uReliefDecal, uReliefDecal) > 0.0 ? uReliefDecal : (world - uCenter) * uRelief)
-               * clamp(uZoom * 1.2, 0.0, 1.0);
+  // centre (caméra au zénith, fondu sous le zoom de carte) ou fixe (caméra
+  // oblique, jamais fondu : au zoom de jeu, ~0,14, le fondu radial ne
+  // laisse que 17 % du décalage — l'oblique y tombait à un pixel et ne se
+  // voyait pas). Jumeau testé : render/relief.ts (decalageSommet).
+  bool reliefOblique = dot(uReliefDecal, uReliefDecal) > 0.0;
+  vec2 relDisp = reliefOblique
+    ? uReliefDecal
+    : (world - uCenter) * (uRelief * clamp(uZoom * 1.2, 0.0, 1.0));
+  // la tranche s'échantillonne entre la base et le sommet : en oblique, le
+  // décalage est long (140 u) — dix pas de 14 u, sous l'épaisseur des murs
+  // ordinaires, pour qu'aucun jour ne s'ouvre dans le flanc
+  int pasTranche = reliefOblique ? 10 : 4;
   float drainEye = 0.0; // œil du sas, retenu pour assombrir l'eau qui y coule
   // ——— LA COUVERTURE : quel solide recouvre ce pixel ? ————————————————
   // LE DÉFAUT qu'elle corrige : chaque boîte peignait son liseré sur TOUTE
@@ -2763,8 +2771,8 @@ void main() {
         if (d <= 0.0) {
           flanc = 1.0; // sur la base, sous le vide : pleine tranche
         } else {
-          for (int fs = 1; fs <= 3; fs++) {
-            vec2 wM = world - relDisp * (float(fs) / 4.0);
+          for (int fs = 1; fs < pasTranche; fs++) {
+            vec2 wM = world - relDisp * (float(fs) / float(pasTranche));
             vec2 wbM = wM;
             if (abs(bAngR) > 0.0005) {
               vec2 relM = wM - bcR;

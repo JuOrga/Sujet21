@@ -22,22 +22,26 @@
 
 export type ModeRelief = 'off' | 'leger' | 'fort' | 'oblique'
 
-// La hauteur VUE des solides en mode oblique, en unités monde. Ce n'est pas
-// HAUTEUR_BLOCS (140, la hauteur des ombres) : vue sous une inclinaison
-// d'une vingtaine de degrés, une paroi de 140 ne décale son sommet que
-// d'une cinquantaine d'unités. Plus, et les murs minces (un dixième des
-// boîtes posées font 40 u d'épaisseur ou moins) laissent un jour entre
-// leur base et leur sommet ; c'est aussi ce qui garde l'eau lisible
-// derrière un mur. Les coques suivent la même hauteur vue : à leurs 2 400
-// u, elles recouvriraient la salle entière.
-export const HAUTEUR_VUE_OBLIQUE = 56
+// La hauteur VUE des solides en mode oblique, en unités monde : celle des
+// ombres, HAUTEUR_BLOCS (140), vue à 45°. LE PREMIER RÉGLAGE (56 u, fondu
+// sous le zoom de carte comme le radial) NE SE VOYAIT PAS : au zoom de jeu
+// (~0,14 px/u), le fondu n'en laissait que 17 % — un pixel à l'écran. À
+// 140 u et sans fondu, le sommet glisse d'une vingtaine de pixels en jeu.
+// Les coques suivent la même hauteur vue : à leurs 2 400 u d'ombre, elles
+// recouvriraient la salle entière.
+export const HAUTEUR_VUE_OBLIQUE = 140
+
+// La tranche (le flanc entre la base et le sommet) s'échantillonne en ce
+// nombre de pas — le même chiffre que pasTranche dans le shader. Un pas
+// plus large qu'un mur y ouvrirait un jour : 14 u, sous les 40 u d'une
+// coque ordinaire (EP_DEFAUT).
+export const PAS_TRANCHE_OBLIQUE = 10
 
 // D'où regarde la caméra : l'angle du décalage du sommet, en degrés depuis
 // l'axe +x du monde (+y monte à l'écran). 75° : le sommet monte et glisse
 // un peu vers la droite — la caméra est au sud, un rien à l'ouest. Bien
-// droit (90°), les parois verticales ne montraient aucun flanc et la vue
-// paraissait simplement écrasée ; de biais, les deux familles de faces se
-// lisent.
+// droit (90°), les parois verticales ne montreraient aucun flanc ; de
+// biais, les deux familles de faces se lisent.
 export const ANGLE_OBLIQUE_DEG = 75
 
 export interface ParametresRelief {
@@ -66,8 +70,8 @@ export function parametresRelief(mode: ModeRelief): ParametresRelief {
 }
 
 /** Le décalage du sommet au point `x, y` du monde — relDisp du shader, à
- *  l'identique. Il s'efface sous le zoom de carte : le plan large reste
- *  une carte, vue d'aplomb. */
+ *  l'identique. Le RADIAL s'efface sous le zoom de carte ; l'OBLIQUE ne
+ *  s'efface jamais : c'est une caméra inclinée, pas un effet de près. */
 export function decalageSommet(
   p: ParametresRelief,
   x: number,
@@ -76,7 +80,7 @@ export function decalageSommet(
   centreY: number,
   zoom: number,
 ): { x: number; y: number } {
+  if (p.decalX !== 0 || p.decalY !== 0) return { x: p.decalX, y: p.decalY }
   const fondu = Math.min(1, Math.max(0, zoom * 1.2))
-  if (p.decalX !== 0 || p.decalY !== 0) return { x: p.decalX * fondu, y: p.decalY * fondu }
   return { x: (x - centreX) * p.k * fondu, y: (y - centreY) * p.k * fondu }
 }
