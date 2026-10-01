@@ -314,6 +314,8 @@ import {
   versionDe,
 } from './bench/changelog'
 import { Camera } from './render/camera'
+import { COQUE_EPAISSEUR } from './render/coque'
+import { GABARITS, decorDuBiome, placeDecor } from './render/decor'
 import { MAX_BOXES, Renderer } from './render/renderer'
 import { Motes, VIE_STRIDE, remplitVie, toucheLeCorps } from './render/vie'
 import { panDepuis } from './game/ouie'
@@ -3756,6 +3758,17 @@ let decorRiche = localStorage.getItem('sujet21-decor') !== 'sobre'
 // temps de le mettre au point : seule la coque se dessine, avec les vides
 // qui la percent. ?exterieur=1 (ou 0) dans l'adresse l'impose et s'en
 // souvient — c'est le chemin des aperçus sur tablette.
+// LE DÉCOR PEINT (render/decor.ts) : ?decor=1 (ou 0) dans l'adresse
+// l'impose et s'en souvient, comme le dehors ; allumé par défaut.
+let decorActif = (() => {
+  const q = new URLSearchParams(location.search).get('decor')
+  try {
+    if (q === '1' || q === '0') localStorage.setItem('sujet21-decor', q === '1' ? 'on' : 'off')
+    return localStorage.getItem('sujet21-decor') !== 'off'
+  } catch {
+    return q !== '0'
+  }
+})()
 let exterieurActif = (() => {
   const q = new URLSearchParams(location.search).get('exterieur')
   try {
@@ -19761,6 +19774,16 @@ function corpsImage(now: number): boolean {
   // La salle d'abord : le plancher du recul se règle sur elle, quelle que
   // soit la façon dont elle a été ouverte (render/camera.ts, salle)
   camera.salle(sim.bounds)
+  // LE DÉCOR PEINT autour de la salle (render/decor.ts) : pas pour un
+  // tableau bâti en modules (il EST un module, ses coques sont ses parois)
+  if (decorActif && level.coque !== 'structures') {
+    const T = COQUE_EPAISSEUR
+    const b = sim.bounds
+    const biome = decorDuBiome(moduleEnCours()?.biome ?? 'tempere')
+    const gabarit = GABARITS[biome]
+    const avecCoque = { minX: b.minX - T, minY: b.minY - T, maxX: b.maxX + T, maxY: b.maxY + T }
+    renderer.setDecor({ biome, gabarit, placement: placeDecor(avecCoque, gabarit), salle: b })
+  } else renderer.setDecor(null)
   if (monitor.overview) {
     const b = sim.bounds
     const fitZoom =

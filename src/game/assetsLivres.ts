@@ -60,6 +60,7 @@ const NOMS: Record<string, string> = {
   'stars.webp': 'Ciel étoilé (proche)',
   'stars-far.webp': 'Ciel étoilé (lointain, station)',
   'ciel.webp': 'Plaque de ciel — la Voie lactée, à la taille de sa source (tools/ciel/prepare-plaque.py)',
+  'decor-tempere.webp': 'Le décor peint autour de la salle, biome tempéré — le vaisseau en perspective, ouverture au centre (tools/images/decor.py)',
   'terre.webp': 'La Terre vue de l’ISS — le jour en RVB, les villes dans l’alpha inversé (tools/ciel/prepare-terre.py)',
   'home.webp': 'Fiche — illustration d’accueil',
   'card-galerie.webp': 'Carton de journal — la galerie noyée',
@@ -116,7 +117,7 @@ export function rubriqueDe(url: string): string {
     f.startsWith('plafond')
   )
     return 'Machinerie & décalques'
-  if (/^(hull|coque-|tank-bg|stars|ciel|terre|etoiles|home|card-)/.test(f)) return 'Coque & fonds'
+  if (/^(hull|coque-|tank-bg|stars|ciel|terre|decor-|etoiles|home|card-)/.test(f)) return 'Coque & fonds'
   if (/^(fiole|badge)/.test(f)) return 'Objets & emblèmes'
   return 'Autres'
 }

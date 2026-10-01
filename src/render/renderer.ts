@@ -67,6 +67,7 @@ import {
 import { ATLAS_COQUE } from './coqueAtlas'
 import { sondeRetournement, type Retournement } from './retournement'
 import { boutsEnMur, cleBoite } from '../game/conduite'
+import { PARALLAXE_HORIZON, type GabaritDecor, type PlacementDecor, type Rect as RectDecor } from './decor'
 
 // Budgets de rendu : au-delà, les éléments excédentaires ne sont plus
 // dessinés (la physique, elle, les voit tous) — l'éditeur avertit quand un
@@ -5045,6 +5046,62 @@ const FICHIER_DECAL: Record<DecalDef['kind'], string> = {
 /** Les planches de vues livrées, lues une fois : le glob de Vite. */
 const PLANCHES_LIVREES = planchesLivrees()
 
+// LE DÉCOR PEINT autour de la salle (render/decor.ts) : une image par biome,
+// posée dans le monde de sorte que son ouverture tombe sous la salle. Un seul
+// quad ; le fragment retrouve son pixel d'image, avec la parallaxe de sa
+// ligne — l'allée suit de moins en moins la caméra vers l'horizon.
+const DECOR_VS = `#version 300 es
+uniform vec4 uRect;      // ce que le quad couvre, dans le monde
+uniform vec2 uCenter;
+uniform vec2 uViewport;
+uniform float uZoom;
+out vec2 vMonde;
+void main() {
+  int i = gl_VertexID;
+  vec2 c = vec2((i == 1 || i == 2 || i == 4) ? 1.0 : 0.0, (i == 2 || i == 4 || i == 5) ? 1.0 : 0.0);
+  vMonde = mix(uRect.xy, uRect.zw, c);
+  gl_Position = vec4((vMonde - uCenter) * uZoom / (uViewport * 0.5), 0.0, 1.0);
+}`
+
+const DECOR_FS = `#version 300 es
+precision highp float;
+in vec2 vMonde;
+uniform sampler2D uImage;
+uniform vec3 uImg;     // le coin haut-gauche de l'image dans le monde (x, y), unités par pixel
+uniform vec2 uTaille;  // l'image, en pixels
+uniform vec4 uGab;     // horizon, haut et bas de l'ouverture (fractions de la hauteur), parallaxe à l'horizon
+uniform vec2 uDecal;   // l'écart de la caméra au centre de la salle
+uniform vec4 uSalle;   // la salle : rien du décor ne s'y peint
+out vec4 outColor;
+vec2 versImage(vec2 m) { return vec2(m.x - uImg.x, uImg.y - m.y) / uImg.z / uTaille; }
+void main() {
+  if (all(greaterThan(vMonde, uSalle.xy)) && all(lessThan(vMonde, uSalle.zw))) discard;
+  // la parallaxe de la ligne (le jumeau CPU : decor.ts, parallaxe())
+  float v0 = versImage(vMonde).y;
+  float t = clamp((uGab.y - v0) / (uGab.y - uGab.x), 0.0, 1.0);
+  float f = v0 >= uGab.y ? 0.0 : uGab.w * t * t;
+  vec2 uv = versImage(vMonde - uDecal * f);
+  if (uv.x < 0.0 || uv.x > 1.0 || uv.y < uGab.x - 0.01) discard;
+  vec3 c = texture(uImage, vec2(uv.x, 1.0 - clamp(uv.y, 0.0, 1.0))).rgb;
+  float lum = max(c.r, max(c.g, c.b));
+  float a = 1.0;
+  // le ciel peint est noir : on le découpe, la Terre en direct passe
+  // derrière. Pas seulement au-dessus de l'horizon : sur les côtés, le noir
+  // descend jusqu'au toit des serres. Un « noir » de générateur n'est pas
+  // nul (5 à 8 sur 255) : à seuil trop bas, un liseré gris trahissait la
+  // découpe.
+  if (uv.y < 0.45) a *= smoothstep(0.035, 0.1, lum);
+  // l'ouverture noire, là où la salle ne la couvre pas (une salle très
+  // plate) : découpée aussi, plutôt qu'un trou noir sous la salle
+  if (uv.y > uGab.y - 0.01 && uv.y < uGab.z + 0.01 && abs(uv.x - 0.5) < 0.2) a *= smoothstep(0.02, 0.06, lum);
+  // les bords de l'image s'effacent : la station se perd dans le noir
+  a *= smoothstep(0.0, 0.08, min(uv.x, 1.0 - uv.x));
+  // sous l'image, la station s'arrête et s'éteint vite : la dernière ligne
+  // étirée faisait des traînées, un miroir y remontait l'ouverture noire
+  if (uv.y > 1.0) a *= 1.0 - smoothstep(1.0, 1.05, uv.y);
+  outColor = vec4(c * a, a);
+}`
+
 export class Renderer {
   private readonly gl: WebGL2RenderingContext
   private readonly canvas: HTMLCanvasElement
@@ -5108,6 +5165,7 @@ export class Renderer {
   private cibleW = 1
   private cibleH = 1
   private readonly decalProgram: WebGLProgram
+  private readonly decorProgram: WebGLProgram
   private readonly lightProgram: WebGLProgram
   private readonly vieProgram: WebGLProgram
   private readonly vieVao: WebGLVertexArrayObject
@@ -5290,6 +5348,7 @@ export class Renderer {
       { nom: 'sponge', vs: SPONGE_VS, fs: SPONGE_FS },
       { nom: 'hull', vs: HULL_VS, fs: HULL_FS },
       { nom: 'decal', vs: DECAL_VS, fs: DECAL_FS },
+      { nom: 'decor', vs: DECOR_VS, fs: DECOR_FS },
       { nom: 'light', vs: COMPOSE_VS, fs: LIGHT_FS },
       { nom: 'vie', vs: VIE_VS, fs: VIE_FS },
       { nom: 'recopie', vs: COMPOSE_VS, fs: RECOPIE_FS },
@@ -5299,6 +5358,7 @@ export class Renderer {
     this.spongeProgram = this.programmes.programme('sponge')
     this.hullProgram = this.programmes.programme('hull')
     this.decalProgram = this.programmes.programme('decal')
+    this.decorProgram = this.programmes.programme('decor')
     this.lightProgram = this.programmes.programme('light')
     this.vieProgram = this.programmes.programme('vie')
     this.recopieProgram = this.programmes.programme('recopie')
@@ -5618,7 +5678,7 @@ export class Renderer {
   pret(): boolean {
     if (this.programmesPrets) return true
     if (!this.programmes.pret()) return false
-    for (const nom of ['splat', 'compose', 'sponge', 'hull', 'decal', 'light', 'vie', 'recopie'])
+    for (const nom of ['splat', 'compose', 'sponge', 'hull', 'decal', 'light', 'vie', 'recopie', 'decor'])
       this.uniforms[nom] = this.programmes.uniformes(nom)
     this.programmesPrets = true
     return true
@@ -5790,6 +5850,53 @@ export class Renderer {
     gl.deleteTexture(tex)
     bitmap.close()
     return px[2] > 128 && px[0] < 128
+  }
+
+  /** LE DÉCOR PEINT (render/decor.ts) : son image, son placement, la salle
+   *  qu'il entoure. null l'éteint. L'image se charge à la première demande,
+   *  celle du biome en cours seulement. */
+  setDecor(d: { biome: string; gabarit: GabaritDecor; placement: PlacementDecor; salle: RectDecor } | null): void {
+    this.decor = d
+    if (d && !this.texDecorDemandees.has(d.biome)) {
+      this.texDecorDemandees.add(d.biome)
+      this.loadTexture(`/assets/decor-${d.biome}.webp`, false, true, (t) => this.texDecor.set(d.biome, t))
+    }
+  }
+  private decor: { biome: string; gabarit: GabaritDecor; placement: PlacementDecor; salle: RectDecor } | null = null
+  private readonly texDecor = new Map<string, WebGLTexture>()
+  private readonly texDecorDemandees = new Set<string>()
+
+  private drawDecor(camera: Camera, viewportW: number, viewportH: number): void {
+    const d = this.decor
+    const tex = d ? this.texDecor.get(d.biome) : undefined
+    if (!d || !tex) return
+    const gl = this.gl
+    const { image, echelle, centre } = d.placement
+    const g = d.gabarit
+    gl.useProgram(this.decorProgram)
+    const u = this.uniforms['decor']
+    // le quad couvre l'image et, dessous, de quoi l'éteindre
+    const sous = (image.maxY - image.minY) * 0.06
+    gl.uniform4f(u['uRect'], image.minX, image.minY - sous, image.maxX, image.maxY)
+    gl.uniform2f(u['uCenter'], camera.x, camera.y)
+    gl.uniform2f(u['uViewport'], viewportW, viewportH)
+    gl.uniform1f(u['uZoom'], camera.zoom)
+    gl.uniform3f(u['uImg'], image.minX, image.maxY, echelle)
+    gl.uniform2f(u['uTaille'], g.largeur, g.hauteur)
+    gl.uniform4f(u['uGab'], g.horizon / g.hauteur, g.ouvertureHaut / g.hauteur, g.ouvertureBas / g.hauteur, PARALLAXE_HORIZON)
+    gl.uniform2f(u['uDecal'], camera.x - centre.x, camera.y - centre.y)
+    gl.uniform4f(u['uSalle'], d.salle.minX, d.salle.minY, d.salle.maxX, d.salle.maxY)
+    gl.activeTexture(gl.TEXTURE0)
+    gl.bindTexture(gl.TEXTURE_2D, tex)
+    gl.uniform1i(u['uImage'], 0)
+    // prémultiplié, comme la coque : le ciel découpé laisse voir la Terre
+    gl.enable(gl.BLEND)
+    gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA)
+    gl.bindVertexArray(null)
+    gl.drawArrays(gl.TRIANGLES, 0, 6)
+    gl.disable(gl.BLEND)
+    // l'unité 0 porte le champ du fluide : les passes suivantes l'y lisent
+    gl.bindTexture(gl.TEXTURE_2D, this.fieldTex)
   }
 
   private loadTexture(
@@ -6634,6 +6741,10 @@ export class Renderer {
     // Passe B bis — coque texturée autour de la cuve. Un tableau bâti en
     // MODULES n'a pas de cuve : ses parois sont celles de ses coques, et
     // le dehors doit rester le vide.
+    // Passe B bis, avant la coque — LE DÉCOR PEINT autour de la salle
+    // (render/decor.ts) : par-dessus le ciel, jamais dans la salle, et la
+    // coque repasse par-dessus son bord
+    if (!this.solModules) this.drawDecor(camera, viewportW, viewportH)
     if (!this.solModules)
       this.drawHull(sim, camera, viewportW, viewportH, boxes, timeSec)
 

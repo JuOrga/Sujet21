@@ -2014,3 +2014,32 @@ through lighting.
 luminance moyenne ≤ 0,22 par pièce, raccord haut/bas du tronçon et du treillis
 (écart moyen de la première et de la dernière ligne), aucune zone > 0,85 de
 luminance sur plus de 2 % de la pièce (le « blanc franc »).
+
+## 34. LE DÉCOR PEINT — le vaisseau autour de la salle, une image par biome 🔎 EN APERÇU (01/10)
+
+Remplace le décor bâti en code (des boîtes texturées en perspective, branche
+`claude/vaisseau-perspective`, abandonnée : « on dirait un niveau du premier
+Doom »). Une image peinte par biome, le moteur y pose la salle
+(`render/decor.ts`), la découpe en profondeur et laisse la Terre en direct
+dans son ciel.
+
+**Le gabarit** — 16:9 (3840 × 2160 idéal, 1920 × 1080 au moins) :
+
+| élément | où | pourquoi |
+| --- | --- | --- |
+| ciel | au-dessus de l'horizon, NOIR PUR | le moteur le découpe : la Terre en direct passe derrière |
+| horizon et point de fuite | à 22 % du haut, au centre | le vaisseau occupe le haut de l'écran sans écraser la salle |
+| ouverture de la salle | centrée, 25 % de la largeur, de 55 à 85 % de la hauteur, NOIR UNI | la salle s'y pose (un trapèze en perspective est accepté : la salle le couvre) |
+| passerelle | du haut de l'ouverture vers l'allée | le lien entre la salle et le vaisseau |
+| plan moyen | l'allée, trois voies de salles à portes ambre, les grands modules de chaque côté | la mini-carte, lisible |
+| premier plan | passerelles, rambardes, décor du biome autour de l'ouverture | le pont du module |
+
+**À la livraison** : `masters/images/decor/<biome>.png`, puis
+`python3 tools/images/decor.py` — qui prépare le WebP et MESURE horizon et
+ouverture sur l'image (le générateur ne tient le gabarit qu'à peu près) ; la
+ligne imprimée se recopie dans `GABARITS` (`render/decor.ts`).
+
+| biome | état |
+| --- | --- |
+| tempéré | ✅ livré 01/10 — 1672 × 941, horizon à 20 %, ouverture en trapèze (22 → 31 % de large, de 63 à 92 % de haut) |
+| cryo, chaud, antichambre, observatoire | à générer — la tempérée en attendant |
