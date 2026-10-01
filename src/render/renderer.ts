@@ -64,6 +64,7 @@ import {
   composeCoque,
   empaquettePieces,
 } from './compositionCoque'
+import { FLOTTANTS_SOMMET } from './vaisseau'
 import { ATLAS_COQUE } from './coqueAtlas'
 import { sondeRetournement, type Retournement } from './retournement'
 import { boutsEnMur, cleBoite } from '../game/conduite'
@@ -4950,6 +4951,64 @@ void main() {
   outColor = acc;
 }`
 
+// LE VAISSEAU EN PERSPECTIVE (render/vaisseau.ts) : des boîtes projetées
+// vers UN point de fuite fixé dans le monde au-dessus de la salle. La
+// projection se fait AVANT la caméra et en coordonnées homogènes — w = 1 + z
+// — pour que le GPU interpole les textures en perspective vraie : la tôle ne
+// se déforme pas sur les faces qui s'enfoncent. Le jumeau CPU : projette().
+const VAISSEAU_VS = `#version 300 es
+layout(location = 0) in vec3 aPos;
+layout(location = 1) in vec2 aUv;
+layout(location = 2) in vec4 aCol;
+uniform vec2 uCenter;
+uniform vec2 uViewport;
+uniform float uZoom;
+uniform vec2 uFuite;
+out vec2 vUv;
+out vec4 vCol;
+out float vZ;
+out vec2 vMonde;
+void main() {
+  float z = max(aPos.z, 0.0);
+  vec2 A = (uFuite - uCenter) * uZoom / (uViewport * 0.5);
+  vec2 B = (aPos.xy - uCenter) * uZoom / (uViewport * 0.5);
+  // écran = A + (B − A) / (1 + z), écrit en homogène : (A·z + B) / (1 + z)
+  gl_Position = vec4(A * z + B, 0.0, 1.0 + z);
+  vMonde = uFuite + (aPos.xy - uFuite) / (1.0 + z);
+  vUv = aUv;
+  vCol = aCol;
+  vZ = z;
+}`
+
+const VAISSEAU_FS = `#version 300 es
+precision highp float;
+in vec2 vUv;
+in vec4 vCol;
+in float vZ;
+in vec2 vMonde;
+uniform sampler2D uTole;
+uniform float uHasTole;
+uniform vec4 uSalle;   // la salle : rien du vaisseau ne s'y peint
+uniform vec3 uBrume;   // la couleur du lointain
+out vec4 outColor;
+void main() {
+  if (all(greaterThan(vMonde, uSalle.xy)) && all(lessThan(vMonde, uSalle.zw))) discard;
+  vec3 c;
+  if (vCol.a > 0.5) {
+    // UN FEU : un disque net et son halo, il ne prend pas la brume
+    float d = length(vUv - 0.5) * 2.0;
+    if (d > 1.0) discard;
+    c = vCol.rgb * (1.6 * (1.0 - smoothstep(0.35, 0.55, d)) + 0.5 * (1.0 - d));
+    outColor = vec4(c * (1.0 - 0.5 * (1.0 - exp(-vZ * 0.4))), 1.0);
+    return;
+  }
+  vec3 t = uHasTole > 0.5 ? texture(uTole, vUv).rgb : vec3(0.20, 0.24, 0.29);
+  c = t * vCol.rgb * 1.15;
+  // LA DISTANCE : plus c'est loin, plus c'est sombre et bleu
+  float b = 1.0 - exp(-vZ * 0.28);
+  outColor = vec4(mix(c, uBrume, b * 0.7), 1.0);
+}`
+
 // Décalques de décor : machinerie posée sur les parois (tuyaux, vannes).
 // Purement décoratifs — aucune physique, aucune lecture de jeu à en tirer :
 // ils sont donc assombris et légèrement bleutés pour rester en arrière-plan
@@ -5052,6 +5111,12 @@ export class Renderer {
   private readonly composeProgram: WebGLProgram
   private readonly spongeProgram: WebGLProgram
   private readonly hullProgram: WebGLProgram
+  private readonly vaisseauProgram: WebGLProgram
+  private readonly vaisseauVao: WebGLVertexArrayObject
+  private readonly vaisseauVbo: WebGLBuffer
+  /** le vaisseau en perspective (render/vaisseau.ts) : sa géométrie, son
+   *  point de fuite et la salle qu'il entoure — null : pas de vaisseau */
+  private vaisseau: { sommets: number; fuite: { x: number; y: number }; salle: { minX: number; minY: number; maxX: number; maxY: number } } | null = null
   private readonly recopieProgram: WebGLProgram
   // LE DÉCOR NET (réglage « Décor », PARAMÈTRES). Aux résolutions réduites,
   // TOUTE l'image se calcule en moins de pixels puis s'agrandit ; au décor
@@ -5293,6 +5358,7 @@ export class Renderer {
       { nom: 'light', vs: COMPOSE_VS, fs: LIGHT_FS },
       { nom: 'vie', vs: VIE_VS, fs: VIE_FS },
       { nom: 'recopie', vs: COMPOSE_VS, fs: RECOPIE_FS },
+      { nom: 'vaisseau', vs: VAISSEAU_VS, fs: VAISSEAU_FS },
     ])
     this.splatProgram = this.programmes.programme('splat')
     this.composeProgram = this.programmes.programme('compose')
@@ -5302,6 +5368,21 @@ export class Renderer {
     this.lightProgram = this.programmes.programme('light')
     this.vieProgram = this.programmes.programme('vie')
     this.recopieProgram = this.programmes.programme('recopie')
+    this.vaisseauProgram = this.programmes.programme('vaisseau')
+    this.vaisseauVao = gl.createVertexArray()!
+    this.vaisseauVbo = gl.createBuffer()!
+    gl.bindVertexArray(this.vaisseauVao)
+    gl.bindBuffer(gl.ARRAY_BUFFER, this.vaisseauVbo)
+    {
+      const st = FLOTTANTS_SOMMET * 4
+      gl.enableVertexAttribArray(0)
+      gl.vertexAttribPointer(0, 3, gl.FLOAT, false, st, 0)
+      gl.enableVertexAttribArray(1)
+      gl.vertexAttribPointer(1, 2, gl.FLOAT, false, st, 12)
+      gl.enableVertexAttribArray(2)
+      gl.vertexAttribPointer(2, 4, gl.FLOAT, false, st, 20)
+    }
+    gl.bindVertexArray(null)
 
     this.scratch = new Float32Array(capacity * 7)
     this.splatVao = gl.createVertexArray()!
@@ -5618,7 +5699,7 @@ export class Renderer {
   pret(): boolean {
     if (this.programmesPrets) return true
     if (!this.programmes.pret()) return false
-    for (const nom of ['splat', 'compose', 'sponge', 'hull', 'decal', 'light', 'vie', 'recopie'])
+    for (const nom of ['splat', 'compose', 'sponge', 'hull', 'decal', 'light', 'vie', 'recopie', 'vaisseau'])
       this.uniforms[nom] = this.programmes.uniformes(nom)
     this.programmesPrets = true
     return true
@@ -5665,6 +5746,51 @@ export class Renderer {
       this.texPlaque = t
       this.plaqueTexels = img.naturalWidth
     })
+  }
+
+  /** LE VAISSEAU EN PERSPECTIVE autour de la salle (render/vaisseau.ts) :
+   *  sa géométrie se renvoie au GPU seulement quand elle change (`cle`).
+   *  null l'éteint. */
+  setVaisseau(
+    v: { cle: string; geometrie: () => Float32Array; fuite: { x: number; y: number }; salle: { minX: number; minY: number; maxX: number; maxY: number } } | null,
+  ): void {
+    if (!v) {
+      this.vaisseau = null
+      this.vaisseauCle = ''
+      return
+    }
+    if (v.cle !== this.vaisseauCle) {
+      const g = v.geometrie()
+      const gl = this.gl
+      gl.bindBuffer(gl.ARRAY_BUFFER, this.vaisseauVbo)
+      gl.bufferData(gl.ARRAY_BUFFER, g, gl.STATIC_DRAW)
+      this.vaisseauCle = v.cle
+      this.vaisseauSommets = g.length / FLOTTANTS_SOMMET
+    }
+    this.vaisseau = { sommets: this.vaisseauSommets, fuite: v.fuite, salle: v.salle }
+  }
+  private vaisseauCle = ''
+  private vaisseauSommets = 0
+
+  private drawVaisseau(camera: Camera, viewportW: number, viewportH: number): void {
+    const v = this.vaisseau
+    if (!v || v.sommets === 0) return
+    const gl = this.gl
+    gl.useProgram(this.vaisseauProgram)
+    const vu = this.uniforms['vaisseau']
+    gl.uniform2f(vu['uCenter'], camera.x, camera.y)
+    gl.uniform2f(vu['uViewport'], viewportW, viewportH)
+    gl.uniform1f(vu['uZoom'], camera.zoom)
+    gl.uniform2f(vu['uFuite'], v.fuite.x, v.fuite.y)
+    gl.uniform4f(vu['uSalle'], v.salle.minX, v.salle.minY, v.salle.maxX, v.salle.maxY)
+    gl.uniform3f(vu['uBrume'], 0.018, 0.03, 0.055)
+    gl.activeTexture(gl.TEXTURE0)
+    gl.bindTexture(gl.TEXTURE_2D, this.texWallA)
+    gl.uniform1i(vu['uTole'], 0)
+    gl.uniform1f(vu['uHasTole'], this.texWallA ? 1 : 0)
+    gl.bindVertexArray(this.vaisseauVao)
+    gl.drawArrays(gl.TRIANGLES, 0, v.sommets)
+    gl.bindVertexArray(null)
   }
 
   /** La lumière de la scène sur la station (lumiereStation, render/terre.ts) ;
@@ -6634,6 +6760,10 @@ export class Renderer {
     // Passe B bis — coque texturée autour de la cuve. Un tableau bâti en
     // MODULES n'a pas de cuve : ses parois sont celles de ses coques, et
     // le dehors doit rester le vide.
+    // Passe B bis, avant la coque — LE VAISSEAU EN PERSPECTIVE autour de la
+    // salle (render/vaisseau.ts) : par-dessus le ciel, jamais dans la salle,
+    // et la coque repasse par-dessus son bord
+    if (!this.solModules) this.drawVaisseau(camera, viewportW, viewportH)
     if (!this.solModules)
       this.drawHull(sim, camera, viewportW, viewportH, boxes, timeSec)
 

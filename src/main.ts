@@ -390,6 +390,16 @@ import {
 } from './render/parallaxe'
 import { TERRE_DEFAUTS, cadreTerre, lumiereStation, type VueTerre } from './render/terre'
 import { decalageStandardMin, lieuDuJoueur } from './render/lieu'
+import { COQUE_EPAISSEUR } from './render/coque'
+import {
+  composeVaisseau,
+  geometrieVaisseau,
+  pointDeFuite,
+  type ModuleLointain,
+  type Rect as RectVaisseau,
+  type SceneVaisseau,
+  type VueMiniCarte,
+} from './render/vaisseau'
 import { PerfCollector } from './game/perf'
 import {
   fetchLibrary,
@@ -1401,6 +1411,53 @@ function miniCarteDuModule(): MiniCarte | null {
   // le rang de la descente à l'entrée du module : les salles déjà
   // franchies dedans se retranchent du rang courant
   return tisseModule(m, carteRun.tissage, voieRang - carteRun.niveau)
+}
+/** LA SCÈNE DU VAISSEAU EN PERSPECTIVE (render/vaisseau.ts) : la salle,
+ *  le biome du module, sa mini-carte vue d'ici (ce qu'on peut encore
+ *  joindre), et les modules de la station qui restent devant nous. Retissée
+ *  seulement quand la run avance (la clé). */
+let vaisseauMemo: { cle: string; scene: SceneVaisseau } | null = null
+function sceneVaisseau(salle: RectVaisseau): { cle: string; scene: SceneVaisseau } {
+  const m = moduleEnCours()
+  const cle = `${salle.minX},${salle.minY},${salle.maxX},${salle.maxY}|${m?.id ?? ''}|${carteRun.niveau}|${carteRun.trace.join(',')}|${carteRun.tissage}`
+  if (vaisseauMemo && vaisseauMemo.cle === cle) return vaisseauMemo
+  const mini = miniCarteDuModule()
+  let vue: VueMiniCarte | null = null
+  if (mini && mini.rangs.length > 0) {
+    const rang = Math.min(carteRun.niveau, mini.rangs.length - 1)
+    const tr = carteRun.trace[rang]
+    const voie = typeof tr === 'number' ? tr : (derniereVoie(carteRun) ?? Math.floor(mini.voies / 2))
+    // ce qu'on peut encore joindre : de proche en proche, par les suivants
+    const joignables = new Set<string>()
+    let front = [voie]
+    for (let r = rang; r < mini.rangs.length - 1 && front.length; r++) {
+      const suite = new Set<number>()
+      for (const v of front) for (const s2 of mini.rangs[r][v]?.suivants ?? []) suite.add(s2)
+      for (const v of suite) joignables.add(`${r + 1}:${v}`)
+      front = [...suite]
+    }
+    vue = { rangs: mini.rangs.length, voies: mini.voies, rang, voie, joignables }
+  }
+  // les modules qui restent devant : ceux qu'on peut encore rejoindre
+  const modules: ModuleLointain[] = []
+  const ici = m ? carte.modules.find((x) => x.id === m.id) : undefined
+  if (ici) {
+    const ys = carte.modules.map((x) => x.y)
+    const etendue = Math.max(1, Math.max(...ys) - Math.min(...ys))
+    for (const x of carte.modules) {
+      if (x.id === ici.id) continue
+      const d = plusCourtVers(carte, ici.id, x.id)
+      if (d === null || d < 1) continue
+      modules.push({ biome: x.biome, distance: d, cote: Math.max(-1, Math.min(1, ((x.y - ici.y) / etendue) * 2)) })
+    }
+  } else {
+    // hors d'une run : une station générique, quelques modules de part et d'autre
+    for (const [b, d, c] of [['cryo', 1, -1], ['chaud', 1, 1], ['tempere', 2, -0.4], ['cryo', 3, 0.5]] as const)
+      modules.push({ biome: b, distance: d, cote: c })
+  }
+  const memo = { cle, scene: { salle, biome: m?.biome ?? 'tempere', carte: vue, modules } }
+  vaisseauMemo = memo
+  return memo
 }
 /** CE QU'ON TROUVERA dans un module qu'on n'a pas encore entré — les types,
  *  pas les comptes (le concepteur, 16/09). Le rang d'entrée s'estime par le
@@ -3756,6 +3813,19 @@ let decorRiche = localStorage.getItem('sujet21-decor') !== 'sobre'
 // temps de le mettre au point : seule la coque se dessine, avec les vides
 // qui la percent. ?exterieur=1 (ou 0) dans l'adresse l'impose et s'en
 // souvient — c'est le chemin des aperçus sur tablette.
+// LE VAISSEAU EN PERSPECTIVE autour de la salle (render/vaisseau.ts) : la
+// mini-carte du module en profondeur, les autres modules de la station au
+// loin, un point de fuite au-dessus de la salle. ?vaisseau=1 (ou 0) dans
+// l'adresse l'impose et s'en souvient, comme le dehors.
+let vaisseauActif = (() => {
+  const q = new URLSearchParams(location.search).get('vaisseau')
+  try {
+    if (q === '1' || q === '0') localStorage.setItem('sujet21-vaisseau', q === '1' ? 'on' : 'off')
+    return localStorage.getItem('sujet21-vaisseau') !== 'off'
+  } catch {
+    return q !== '0'
+  }
+})()
 let exterieurActif = (() => {
   const q = new URLSearchParams(location.search).get('exterieur')
   try {
@@ -19761,6 +19831,22 @@ function corpsImage(now: number): boolean {
   // La salle d'abord : le plancher du recul se règle sur elle, quelle que
   // soit la façon dont elle a été ouverte (render/camera.ts, salle)
   camera.salle(sim.bounds)
+  // le vaisseau en perspective : pas pour un tableau bâti en modules (il EST
+  // un module, ses coques sont ses parois), ni au banc de vue d'ensemble
+  const vaisseauIci = vaisseauActif && level.coque !== 'structures'
+  camera.reculVaisseau = vaisseauIci
+  if (vaisseauIci) {
+    const T = COQUE_EPAISSEUR
+    const b = sim.bounds
+    const salle: RectVaisseau = { minX: b.minX - T, minY: b.minY - T, maxX: b.maxX + T, maxY: b.maxY + T }
+    const { cle, scene } = sceneVaisseau(salle)
+    renderer.setVaisseau({
+      cle,
+      geometrie: () => geometrieVaisseau(composeVaisseau(scene), pointDeFuite(salle)),
+      fuite: pointDeFuite(salle),
+      salle: b,
+    })
+  } else renderer.setVaisseau(null)
   if (monitor.overview) {
     const b = sim.bounds
     const fitZoom =

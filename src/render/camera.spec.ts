@@ -4,7 +4,7 @@
 // livré (2400 × 1500, corps né au bord gauche) sur un écran 1280 × 720.
 
 import { describe, expect, it } from 'vitest'
-import { Camera } from './camera'
+import { Camera, RECUL_VAISSEAU } from './camera'
 import { DEFAULT_PARAMS } from '../sim/params'
 
 const VW = 1280
@@ -117,5 +117,28 @@ describe('caméra — le fond du recul suit la salle ouverte', () => {
     cam.salle({ minX: -4500, minY: -3000, maxX: 4500, maxY: 3000 })
     for (let i = 0; i < 300; i++) cam.zoomBy(0.8, DEFAULT_PARAMS)
     expect(cam.manualZoom).toBeCloseTo(Math.min(VW / 9000, VH / 6000) * 0.25, 6)
+  })
+})
+
+describe('caméra — le grand recul du vaisseau en perspective', () => {
+  const recule = (vaisseau: boolean): number => {
+    const cam = ouvre()
+    cam.salle(BOUNDS)
+    cam.reculVaisseau = vaisseau
+    for (let i = 0; i < 400; i++) cam.zoomBy(0.8, DEFAULT_PARAMS)
+    for (let i = 0; i < 200; i++) cam.update(1 / IPS, CORPS.x, CORPS.y, CORPS.r, VW, VH, DEFAULT_PARAMS)
+    return cam.zoom
+  }
+
+  it('sans le vaisseau, le plancher d’avant tient', () => {
+    const z = recule(false)
+    expect(z).toBeGreaterThan(DEFAULT_PARAMS.cameraMinZoom * 0.2 - 1e-9)
+  })
+
+  it('avec le vaisseau, on recule bien plus loin : la salle ne tient plus que 6 % de l’écran', () => {
+    const z = recule(true)
+    expect(z).toBeLessThan(recule(false))
+    const fit = Math.min(VW / (BOUNDS.maxX - BOUNDS.minX), VH / (BOUNDS.maxY - BOUNDS.minY))
+    expect(z).toBeCloseTo(fit * RECUL_VAISSEAU, 3) // au lissage près de la caméra
   })
 })

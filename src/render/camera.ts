@@ -16,6 +16,9 @@ const MANUAL_MAX_FACTOR = 5
 // fois. Le ciel ne se répète plus, le recul ne coûte donc plus rien au fond :
 // la salle tient désormais dans un quart.)
 const RECUL_MAX = 0.25
+/** Au grand recul, la salle ne tient plus que 6 % de l'écran (en largeur ou
+ *  en hauteur) : le vaisseau autour a la place de se montrer. */
+export const RECUL_VAISSEAU = 0.06
 
 // L'horloge du plan d'ouverture ne compte jamais plus qu'une image « lente »
 // par image réelle. Le début d'un tableau est précisément le moment des
@@ -174,8 +177,16 @@ export class Camera {
     if (this.nivL <= 0 || this.nivH <= 0 || this.vueL <= 0 || this.vueH <= 0)
       return absolu
     const salle = Math.min(this.vueL / this.nivL, this.vueH / this.nivH)
+    // LE GRAND RECUL : quand le vaisseau en perspective entoure la salle
+    // (render/vaisseau.ts), reculer révèle où l'on est — le module, la
+    // station, la route. La salle peut alors ne plus tenir que RECUL_VAISSEAU
+    // de l'écran, et l'ancien plancher absolu ne tient plus : c'est la salle
+    // qui fixe le fond.
+    if (this.reculVaisseau) return salle * RECUL_VAISSEAU
     return Math.max(absolu, salle * RECUL_MAX)
   }
+  /** Le grand recul est permis (main.ts, quand le vaisseau est affiché). */
+  reculVaisseau = false
 
   resetAutoZoom(): void {
     this.manualZoom = null
