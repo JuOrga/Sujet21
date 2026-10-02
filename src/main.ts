@@ -319,6 +319,8 @@ import {
   DUREE_TRANSITION,
   centreCellule,
   etatTransition,
+  fenetreProche,
+  formeDuBiome,
   miseEnPage,
   vueGenerique,
   transitionPermise,
@@ -1459,11 +1461,19 @@ function majModule2d(b: { minX: number; minY: number; maxX: number; maxY: number
   if (cle !== module2dCle) {
     module2dCle = cle
     module2dVersion++
-    const mp = miseEnPage(avecCoque, vueModule2d())
-    module2dToile = { toile: peintModule2d(mp, piecesModule2d), monde: mp.monde }
+    // une forme FIXE par type de module (module2d.ts, formeDuBiome)
+    const mp = miseEnPage(avecCoque, vueModule2d(), formeDuBiome(m?.biome ?? 'tempere'))
+    // et, autour de la salle, une toile plus fine : la toile entière était
+    // floue dès qu'on zoomait (aperçu du 02/10)
+    const fp = fenetreProche(mp)
+    module2dToile = {
+      toile: peintModule2d(mp, piecesModule2d),
+      monde: mp.monde,
+      proche: { toile: peintModule2d(mp, piecesModule2d, fp), monde: fp.monde },
+    }
   }
   if (module2dToile)
-    renderer.setModule2d({ ...module2dToile, version: module2dVersion, salle: b, cellule: piecesModule2d.get('cellule-neutre') })
+    renderer.setModule2d({ ...module2dToile, version: module2dVersion, salle: b, coque: avecCoque, cellule: piecesModule2d.get('cellule-neutre') })
   // la transition en cours : la cellule qui grossit sur la salle
   const tt = camera.piloteT
   renderer.setCouvertureModule2d(tt !== null && transition2d ? { salle: transition2d.salle, ...etatTransition(tt, transition2d) } : null)
@@ -1505,7 +1515,11 @@ function lanceTransition2d(
   )
   return true
 }
-let module2dToile: { toile: HTMLCanvasElement; monde: { minX: number; minY: number; maxX: number; maxY: number } } | null = null
+let module2dToile: {
+  toile: HTMLCanvasElement
+  monde: { minX: number; minY: number; maxX: number; maxY: number }
+  proche: { toile: HTMLCanvasElement; monde: { minX: number; minY: number; maxX: number; maxY: number } }
+} | null = null
 /** CE QU'ON TROUVERA dans un module qu'on n'a pas encore entré — les types,
  *  pas les comptes (le concepteur, 16/09). Le rang d'entrée s'estime par le
  *  plus court chemin ; seule la part des figures en dépend. */

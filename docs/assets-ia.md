@@ -2040,6 +2040,12 @@ quart et livre à moitié de la taille source) :
 | cellule de la mini-carte (quatre états précalculés) | ✅ livrée 01/10 |
 | équipements extérieurs (planche de six) | ✅ livrée 01/10 |
 
-**À venir** : les autres modules de la station, chacun sa silhouette
-(fuseau pour la chaufferie, dorsale pour l'observatoire) et ses pièces ;
-une deuxième variante de baie et de trappe.
+**Une forme fixe par type de module** (`formeDuBiome`) : étagée pour la
+serre tempérée, fuseau pour la chaufferie, dorsale pour le cryo — les
+marches accrochées aux rangs de la mini-carte, jamais à la salle jouée.
+Pièces livrées à 80 % des sources : près de la salle, une seconde toile à
+850 px par largeur de salle garde le décor net quand on zoome.
+
+**À venir** : les pièces propres de chaque module (la chaufferie et le
+cryo prennent celles de la serre en attendant) ; une deuxième variante de
+baie et de trappe.

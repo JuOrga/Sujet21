@@ -8,8 +8,10 @@ machinerie, la cellule de la mini-carte, la planche des équipements et le
 couloir. Le moteur les lit dans public/assets/coque2d-*.webp
 (render/module2d.ts, render/module2dCanvas.ts).
 
-· TOUT À MOITIÉ : les sources font 1024 à 1536 px ; à la densité où le
-  moteur compose le module (render/module2d.ts, DENSITE), la moitié suffit.
+· TOUT À 80 % : les sources font 1024 à 1536 px. La moitié suffisait au
+  zoom de jeu, mais près de la salle, zoomé, le décor était flou (aperçu du
+  02/10) : la toile proche (render/module2d.ts, DENSITE_PROCHE) demande
+  ~850 px par largeur de salle, soit 80 % des sources.
 · LE NOIR DÉTOURÉ PAR REMPLISSAGE depuis les bords de l'image : un seuil de
   luminance rendait transparentes les zones sombres de la coque elle-même
   (maquette du 01/10 : la machinerie « fantôme »).
@@ -34,7 +36,7 @@ from PIL import Image, ImageDraw, ImageFilter
 RACINE = Path(__file__).resolve().parents[2]
 SOURCES = RACINE / 'masters/images/coque2d'
 SORTIE = RACINE / 'public/assets'
-ECHELLE = 0.5
+ECHELLE = 0.8
 SOMBRE_COQUE = 0.72
 SOMBRE_EQUIPEMENT = 0.8
 

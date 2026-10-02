@@ -10,6 +10,7 @@ import {
   centreCellule,
   etatTransition,
   etats,
+  formeDuBiome,
   miseEnPage,
   transitionPermise,
   vueGenerique,
@@ -198,5 +199,67 @@ describe('module 2D — quand la transition joue', () => {
     const suivante = { module: 'C1', niveau: 2 }
     expect(transitionPermise(pendantLaCeremonie, suivante)).toBe(false) // le défaut
     expect(transitionPermise(auChargement, suivante)).toBe(true) // le correctif
+  })
+})
+
+describe('module 2D — une forme FIXE par type de module', () => {
+  // la silhouette, ramenée en largeurs de salle et à l'origine de la grille
+  // (la cellule du rang 0, voie 0) : ce qui doit rester identique
+  const forme = (sal: typeof salle, v: VueModule2d, f?: 'etagee' | 'fuseau' | 'dorsale') => {
+    const m = miseEnPage(sal, v, f)
+    const k = m.densite
+    const o = { x: (m.salle.minX + m.salle.maxX) / 2 - v.rang * 1.35 * k, y: (m.salle.minY + m.salle.maxY) / 2 }
+    return m.silhouette.map((q) => [+((q.x - o.x) / k).toFixed(4), +((q.y - o.y) / k).toFixed(4), q.piece])
+  }
+
+  it('la même d’une salle à l’autre du module, quelle que soit la taille ou la forme de la salle', () => {
+    const a = forme({ minX: 0, minY: 0, maxX: 1200, maxY: 800 }, { ...vue, rang: 1, voie: 1, joues: [1] })
+    const b = forme({ minX: 0, minY: 0, maxX: 2000, maxY: 1000 }, { ...vue, rang: 3, voie: 1, joues: [1, 1, 1] })
+    expect(b).toEqual(a)
+  })
+
+  it('le profil horizontal ne bouge pas non plus avec la voie jouée', () => {
+    const a = forme(salle, { ...vue, rang: 2, voie: 0, joues: [1, 0] })
+    const b = forme(salle, { ...vue, rang: 2, voie: 2, joues: [1, 2] })
+    expect(b.map((q) => q[0])).toEqual(a.map((q) => q[0])) // la hauteur suit la voie, pas le profil
+  })
+
+  it('une forme par biome : la serre étagée, la chaufferie en fuseau, le cryo dorsal', () => {
+    expect(formeDuBiome('tempere')).toBe('etagee')
+    expect(formeDuBiome('chaud')).toBe('fuseau')
+    expect(formeDuBiome('cryo')).toBe('dorsale')
+    expect(formeDuBiome('antichambre')).toBe('etagee')
+  })
+
+  for (const f of ['etagee', 'fuseau', 'dorsale'] as const)
+    it(`${f} : fermée, à angles droits, habillée selon le sens de chaque angle, et contenant la grille`, () => {
+      const m = miseEnPage(salle, vue, f)
+      const s = m.silhouette
+      const dir = (a: { x: number; y: number }, b: { x: number; y: number }) => (b.x > a.x ? 'E' : b.x < a.x ? 'O' : b.y > a.y ? 'S' : 'N')
+      const droite = new Set(['NE', 'ES', 'SO', 'ON'])
+      for (let i = 0; i < s.length; i++) {
+        const a = s[(i + s.length - 1) % s.length]
+        const b = s[(i + 1) % s.length]
+        expect(s[i].x === b.x || s[i].y === b.y).toBe(true)
+        expect(s[i].piece.startsWith('coin')).toBe(droite.has(dir(a, s[i]) + dir(s[i], b)))
+      }
+      // dedans : pair-impair sur une demi-droite horizontale
+      const dedans = (x: number, y: number) => {
+        let n = 0
+        for (let i = 0; i < s.length; i++) {
+          const a = s[i]
+          const b = s[(i + 1) % s.length]
+          if (a.x === b.x && x < a.x && y > Math.min(a.y, b.y) && y < Math.max(a.y, b.y)) n++
+        }
+        return n % 2 === 1
+      }
+      for (const c of m.cellules) expect(dedans(c.x, c.y)).toBe(true)
+      expect(dedans((m.salle.minX + m.salle.maxX) / 2, m.salle.minY + 1)).toBe(true)
+      expect(m.largeur).toBeLessThanOrEqual(TOILE_MAX + 1)
+    })
+
+  it('un module trop court pour ses marches garde une coque simple', () => {
+    const court = miseEnPage(salle, { ...vue, rangs: 2, rang: 0, joues: [] }, 'dorsale')
+    expect(court.silhouette).toHaveLength(4)
   })
 })

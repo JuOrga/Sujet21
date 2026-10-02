@@ -52,10 +52,12 @@ export function chargePiecesModule2d(): Promise<Pieces> {
   ).then((l) => new Map(l))
 }
 
-// LES PIÈCES MESURÉES (pixels des fichiers livrés, à moitié des sources) :
-// une largeur de salle vaut 533 px de pièce — l'échelle de la maquette
-// validée le 01/10 —, et chaque pièce dit où passe la ligne de coque.
+// LES PIÈCES MESURÉES, en pixels À LA MOITIÉ des sources (la première
+// livraison) : une largeur de salle vaut 533 de ces pixels — l'échelle de la
+// maquette validée le 01/10 —, et chaque pièce dit où passe la ligne de
+// coque. Les fichiers sont livrés à LIVRE des sources (tools/images/coque2d.py).
 const PX_PAR_SALLE = 533.3
+const LIVRE = 0.8
 const LIGNE_HAUT = 192 // bord-haut : le haut du rebord
 const LIGNE_BAS = 292.5 // bord-bas : le bas de la quille
 const LIGNE_GAUCHE = 225 // bout-gauche : le bord extérieur du capot
@@ -72,13 +74,26 @@ const COINS: Record<string, { ax: number; ay: number; k: number }> = {
   'rentrant-bas': { ax: 326, ay: 370, k: 0.6 },
 }
 
-/** PEINDRE le module sur une toile neuve. */
-export function peintModule2d(mp: MiseEnPage, p: Pieces): HTMLCanvasElement {
+/** Une fenêtre de la mise en page à peindre plus fin : son coin, sa taille
+ *  (pixels de la toile de base) et son grossissement. */
+export interface Fenetre {
+  x: number
+  y: number
+  l: number
+  h: number
+  k: number
+}
+
+/** PEINDRE le module sur une toile neuve — entière, ou une fenêtre plus fine. */
+export function peintModule2d(mp: MiseEnPage, p: Pieces, fen?: Fenetre): HTMLCanvasElement {
   const toile = document.createElement('canvas')
-  toile.width = mp.largeur
-  toile.height = mp.hauteur
+  toile.width = fen ? Math.round(fen.l * fen.k) : mp.largeur
+  toile.height = fen ? Math.round(fen.h * fen.k) : mp.hauteur
   const c = toile.getContext('2d')!
+  if (fen) c.setTransform(fen.k, 0, 0, fen.k, -fen.x * fen.k, -fen.y * fen.k)
+  // f : les mesures (à la moitié des sources) ; fi : les fichiers (à LIVRE)
   const f = mp.densite / PX_PAR_SALLE
+  const fi = (f * 0.5) / LIVRE
   const img = (n: string) => p.get(n)!
   // 1. la tôle, dans la silhouette : les deux variantes par rangées décalées
   c.save()
@@ -87,9 +102,9 @@ export function peintModule2d(mp: MiseEnPage, p: Pieces): HTMLCanvasElement {
   c.closePath()
   c.clip()
   const toles = [img('tempere-tole'), img('tempere-tole-2')]
-  const tl = toles[0].width * f
+  const tl = toles[0].width * fi
   for (let i = 0, y = 0; y < mp.hauteur; i++, y += tl) {
-    const dec = ((i * 211) % toles[0].width) * f
+    const dec = ((i * 211) % toles[0].width) * fi
     for (let x = -dec; x < mp.largeur; x += tl) c.drawImage(toles[i % 2], x, y, tl + 0.5, tl + 0.5)
   }
   // 2. les éléments uniques
@@ -140,16 +155,16 @@ export function peintModule2d(mp: MiseEnPage, p: Pieces): HTMLCanvasElement {
       const bh = BANDE_BOUT * f
       for (let y = Math.min(a.y, b.y); y < Math.max(a.y, b.y); y += bh) {
         const reste = Math.min(bh, Math.max(a.y, b.y) - y)
-        c.drawImage(im, 0, 0, im.width, (BANDE_BOUT * reste) / bh, ox, y, im.width * f, reste)
+        c.drawImage(im, 0, 0, im.width, (BANDE_BOUT * (LIVRE / 0.5) * reste) / bh, ox, y, im.width * fi, reste)
       }
     } else {
       const haut = b.x > a.x
       const im = img(haut ? 'tempere-bord-haut' : 'tempere-bord-bas')
       const oy = a.y - (haut ? LIGNE_HAUT : LIGNE_BAS) * f
-      const lw = im.width * f
+      const lw = im.width * fi
       for (let x = Math.min(a.x, b.x); x < Math.max(a.x, b.x); x += lw) {
         const reste = Math.min(lw, Math.max(a.x, b.x) - x)
-        c.drawImage(im, 0, 0, (im.width * reste) / lw, im.height, x, oy, reste, im.height * f)
+        c.drawImage(im, 0, 0, (im.width * reste) / lw, im.height, x, oy, reste, im.height * fi)
       }
     }
   }
@@ -158,22 +173,28 @@ export function peintModule2d(mp: MiseEnPage, p: Pieces): HTMLCanvasElement {
     [bandeG, mp.colliers.gauche, LIGNE_GAUCHE],
     [bandeD, mp.colliers.droite, LIGNE_DROITE],
   ] as const)
-    c.drawImage(im, pt.x - ligne * f, pt.y - (im.height * f) / 2, im.width * f, im.height * f)
+  {
+    // sur un bord plus court que l'image (le nez du fuseau), seule sa part
+    // centrale, celle du collier
+    const hTout = im.height * fi
+    const h = Math.min(hTout, pt.h)
+    const sy = ((hTout - h) / 2 / hTout) * im.height
+    c.drawImage(im, 0, sy, im.width, (h / hTout) * im.height, pt.x - ligne * f, pt.y - h / 2, im.width * fi, h)
+  }
   // 7. les coins et les angles rentrants
   for (const s of mp.silhouette) {
     const k = COINS[s.piece]
     const im = img(`tempere-${s.piece}`)
-    const kf = f * k.k
     c.save()
     c.translate(s.x, s.y)
     if (s.miroir) c.scale(-1, 1)
-    c.drawImage(im, -k.ax * kf, -k.ay * kf, im.width * kf, im.height * kf)
+    c.drawImage(im, -k.ax * f * k.k, -k.ay * f * k.k, im.width * fi * k.k, im.height * fi * k.k)
     c.restore()
   }
   // 8. les équipements, debout sur les bords hauts
   for (const e of mp.equipements) {
     const im = img(`equipement-${e.nom}`)
-    const k = f * 1.07
+    const k = fi * 1.07
     c.drawImage(im, e.x - (im.width * k) / 2, e.y - im.height * k + 0.02 * mp.densite, im.width * k, im.height * k)
   }
   return toile

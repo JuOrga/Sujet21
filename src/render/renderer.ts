@@ -5067,6 +5067,10 @@ in vec2 vMonde;
 uniform sampler2D uToile;
 uniform vec4 uRect;
 uniform vec4 uSalle;
+uniform sampler2D uProche; // la toile PROCHE, plus fine, autour de la salle
+uniform vec4 uRectP;
+uniform float uHasP;
+uniform vec4 uCoque;     // la salle et sa coque : le décor s'y fond
 uniform float uMode;     // 0 : autour de la salle ; 1 : la COUVERTURE de la transition
 uniform vec4 uCouv;      // la cellule qui grossit, dans le monde
 uniform float uCouvA;    // à quel point elle cache la salle
@@ -5075,9 +5079,24 @@ out vec4 outColor;
 void main() {
   bool dansSalle = all(greaterThan(vMonde, uSalle.xy)) && all(lessThan(vMonde, uSalle.zw));
   if (uMode < 0.5 && dansSalle) discard;
+  // LE FONDU AU BORD DE LA SALLE : la limite était une coupure nette entre
+  // la salle et le décor (aperçu du 02/10). Contre la coque, le décor est
+  // dans l'OMBRE de la salle et légèrement FLOU, comme une profondeur de
+  // champ ; à une demi-salle, il est net et pleinement éclairé.
+  vec2 dd = max(max(uCoque.xy - vMonde, vMonde - uCoque.zw), 0.0);
+  float d = length(dd) / (uCoque.z - uCoque.x);
+  float flou = uMode > 0.5 ? 0.0 : 2.2 * (1.0 - smoothstep(0.0, 0.14, d));
   // la toile a son origine EN HAUT (une toile 2D) : v descend avec y
   vec2 uv = vec2((vMonde.x - uRect.x) / (uRect.z - uRect.x), (uRect.w - vMonde.y) / (uRect.w - uRect.y));
-  vec4 c = texture(uToile, uv);
+  vec4 c = texture(uToile, uv, flou);
+  if (uHasP > 0.5) {
+    // près de la salle, la toile fine ; elle se fond dans l'autre sur ses bords
+    vec2 up = vec2((vMonde.x - uRectP.x) / (uRectP.z - uRectP.x), (uRectP.w - vMonde.y) / (uRectP.w - uRectP.y));
+    vec2 b = min(up, 1.0 - up);
+    float w = smoothstep(0.0, 0.06, min(b.x, b.y));
+    if (w > 0.0) c = mix(c, texture(uProche, up, flou), w);
+  }
+  if (uMode < 0.5) c.rgb *= mix(0.32, 1.0, smoothstep(0.0, 0.45, d));
   if (uMode > 0.5) {
     // LA TRANSITION : sur la salle, la tôle du module, et la cellule choisie
     // qui grossit — la salle n'apparaît qu'une fois la cellule à sa taille
@@ -5843,13 +5862,27 @@ export class Renderer {
   /** LE MODULE EN 2D (render/module2d.ts) : sa toile, où elle tombe dans le
    *  monde, la salle qui y est encastrée. La toile ne remonte au GPU que
    *  quand elle change (`version`). null l'éteint. */
-  setModule2d(m: { toile: TexImageSource; version: number; monde: { minX: number; minY: number; maxX: number; maxY: number }; salle: { minX: number; minY: number; maxX: number; maxY: number }; cellule?: TexImageSource } | null): void {
+  setModule2d(
+    m: {
+      toile: TexImageSource
+      version: number
+      monde: { minX: number; minY: number; maxX: number; maxY: number }
+      salle: { minX: number; minY: number; maxX: number; maxY: number }
+      coque?: { minX: number; minY: number; maxX: number; maxY: number }
+      proche?: { toile: TexImageSource; monde: { minX: number; minY: number; maxX: number; maxY: number } }
+      cellule?: TexImageSource
+    } | null,
+  ): void {
     if (!m) {
       this.module2d = null
       return
     }
     const gl = this.gl
     if (m.version !== this.module2dVersion || !this.texModule2d) {
+      if (m.proche) {
+        if (!this.texModule2dProche) this.texModule2dProche = gl.createTexture()!
+        this.envoieToile2d(this.texModule2dProche, m.proche.toile)
+      }
       if (!this.texModule2d) this.texModule2d = gl.createTexture()!
       gl.bindTexture(gl.TEXTURE_2D, this.texModule2d)
       // prémultipliée : le noir autour de la coque est transparent, le
@@ -5878,7 +5911,21 @@ export class Renderer {
       gl.bindTexture(gl.TEXTURE_2D, this.fieldTex)
       this.texCellule2d = t
     }
-    this.module2d = { monde: m.monde, salle: m.salle }
+    this.module2d = { monde: m.monde, salle: m.salle, coque: m.coque ?? m.salle, proche: m.proche?.monde ?? null }
+  }
+  private texModule2dProche: WebGLTexture | null = null
+  private envoieToile2d(t: WebGLTexture, toile: TexImageSource): void {
+    const gl = this.gl
+    gl.bindTexture(gl.TEXTURE_2D, t)
+    gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, true)
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, gl.RGBA, gl.UNSIGNED_BYTE, toile)
+    gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, false)
+    gl.generateMipmap(gl.TEXTURE_2D)
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR)
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR)
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE)
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE)
+    gl.bindTexture(gl.TEXTURE_2D, this.fieldTex)
   }
   private texCellule2d: WebGLTexture | null = null
   /** LA COUVERTURE de la transition entre deux salles (module2d.ts,
@@ -5888,7 +5935,12 @@ export class Renderer {
     this.couverture2d = c
   }
   private couverture2d: { salle: { minX: number; minY: number; maxX: number; maxY: number }; couvre: { minX: number; minY: number; maxX: number; maxY: number }; opacite: number } | null = null
-  private module2d: { monde: { minX: number; minY: number; maxX: number; maxY: number }; salle: { minX: number; minY: number; maxX: number; maxY: number } } | null = null
+  private module2d: {
+    monde: { minX: number; minY: number; maxX: number; maxY: number }
+    salle: { minX: number; minY: number; maxX: number; maxY: number }
+    coque: { minX: number; minY: number; maxX: number; maxY: number }
+    proche: { minX: number; minY: number; maxX: number; maxY: number } | null
+  } | null = null
   private texModule2d: WebGLTexture | null = null
   private module2dVersion = -1
 
@@ -5904,6 +5956,15 @@ export class Renderer {
     const q = couverture && cv ? cv.salle : m.monde
     gl.uniform4f(u['uQuad'], q.minX, q.minY, q.maxX, q.maxY)
     gl.uniform1f(u['uMode'], couverture ? 1 : 0)
+    gl.uniform4f(u['uCoque'], m.coque.minX, m.coque.minY, m.coque.maxX, m.coque.maxY)
+    const pr = m.proche && this.texModule2dProche ? m.proche : null
+    gl.uniform1f(u['uHasP'], pr ? 1 : 0)
+    if (pr) {
+      gl.uniform4f(u['uRectP'], pr.minX, pr.minY, pr.maxX, pr.maxY)
+      gl.activeTexture(gl.TEXTURE2)
+      gl.bindTexture(gl.TEXTURE_2D, this.texModule2dProche)
+      gl.uniform1i(u['uProche'], 2)
+    }
     if (couverture && cv) {
       gl.uniform4f(u['uCouv'], cv.couvre.minX, cv.couvre.minY, cv.couvre.maxX, cv.couvre.maxY)
       gl.uniform1f(u['uCouvA'], cv.opacite)
