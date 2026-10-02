@@ -19133,18 +19133,18 @@
     {
       "id": "nouveau-tableau-13",
       "auteur": "BOIZ",
-      "majAt": "2026-09-25T15:32:36.050Z",
+      "majAt": "2026-10-01T13:35:22.738Z",
       "codeAuteur": "BOIZ",
       "codeAt": "2026-09-25T14:23:24.054Z",
       "level": {
-        "name": "Nouveau tableau",
+        "name": "50/50",
         "code": "21-?",
         "journal": "Entrée de journal du protocole : ce que le laboratoire a observé dans cette cuve.",
         "bounds": {
           "minX": -1200,
-          "minY": -790,
-          "maxX": 1700,
-          "maxY": 750
+          "minY": -970,
+          "maxX": 2500,
+          "maxY": 940
         },
         "spawn": {
           "x": -1000,
@@ -19152,15 +19152,15 @@
           "n": 900
         },
         "exit": {
-          "minX": 1560,
+          "minX": 2260,
           "minY": -90,
-          "maxX": 1700,
+          "maxX": 2400,
           "maxY": 50
         },
         "boxes": [
           {
             "minX": -1200,
-            "minY": -790,
+            "minY": -970,
             "maxX": -700,
             "maxY": -270,
             "material": 0
@@ -19169,7 +19169,7 @@
             "minX": -1200,
             "minY": 230,
             "maxX": -700,
-            "maxY": 750,
+            "maxY": 940,
             "material": 0
           },
           {
@@ -19221,7 +19221,7 @@
           },
           {
             "minX": -700,
-            "minY": -790,
+            "minY": -970,
             "maxX": 0,
             "maxY": -330,
             "material": 0
@@ -19230,7 +19230,7 @@
             "minX": -700,
             "minY": 290,
             "maxX": 0,
-            "maxY": 750,
+            "maxY": 940,
             "material": 0
           },
           {
@@ -19270,7 +19270,7 @@
           },
           {
             "minX": 0,
-            "minY": -790,
+            "minY": -970,
             "maxX": 700,
             "maxY": -530,
             "material": 0
@@ -19286,15 +19286,15 @@
           {
             "minX": 700,
             "minY": 690,
-            "maxX": 1700,
-            "maxY": 750,
+            "maxX": 1300,
+            "maxY": 940,
             "material": 0
           },
           {
             "minX": 0,
             "minY": 490,
             "maxX": 700,
-            "maxY": 750,
+            "maxY": 940,
             "material": 0
           },
           {
@@ -19340,15 +19340,15 @@
           },
           {
             "minX": 700,
-            "minY": -790,
-            "maxX": 1700,
+            "minY": -970,
+            "maxX": 1300,
             "maxY": -730,
             "material": 0
           },
           {
-            "minX": -60,
+            "minX": -70,
             "minY": 80,
-            "maxX": 0,
+            "maxX": -10,
             "maxY": 290,
             "material": 0
           },
@@ -19360,25 +19360,123 @@
             "material": 0
           },
           {
-            "minX": 690,
-            "minY": -120,
-            "maxX": 1100,
-            "maxY": -25,
-            "material": 0
-          },
-          {
             "minX": 1070,
             "minY": -325,
             "maxX": 1130,
             "maxY": -120,
+            "material": 0
+          },
+          {
+            "minX": 1070,
+            "minY": 80,
+            "maxX": 1130,
+            "maxY": 285,
+            "material": 0
+          },
+          {
+            "minX": 1070,
+            "minY": 485,
+            "maxX": 1130,
+            "maxY": 690,
+            "material": 0
+          },
+          {
+            "minX": 1395,
+            "minY": 80,
+            "maxX": 1890,
+            "maxY": 280,
+            "forme": 2,
+            "material": 0
+          },
+          {
+            "minX": 1735,
+            "minY": -120,
+            "maxX": 1795,
+            "maxY": 80,
+            "material": 0
+          },
+          {
+            "minX": 1395,
+            "minY": -315,
+            "maxX": 1890,
+            "maxY": -120,
+            "forme": 2,
+            "material": 0
+          },
+          {
+            "minX": 1480,
+            "minY": -710,
+            "maxX": 1880,
+            "maxY": -515,
+            "forme": 2,
+            "material": 0
+          },
+          {
+            "minX": 1490,
+            "minY": 480,
+            "maxX": 1890,
+            "maxY": 680,
+            "forme": 2,
+            "material": 0
+          },
+          {
+            "minX": 1300,
+            "minY": 880,
+            "maxX": 2500,
+            "maxY": 940,
+            "material": 0
+          },
+          {
+            "minX": 1300,
+            "minY": -970,
+            "maxX": 2500,
+            "maxY": -910,
+            "material": 0
+          },
+          {
+            "minX": 1300,
+            "minY": -910,
+            "maxX": 1480,
+            "maxY": -730,
+            "forme": 3,
+            "material": 0
+          },
+          {
+            "minX": 1300,
+            "minY": 690,
+            "maxX": 1490,
+            "maxY": 880,
+            "forme": 3,
+            "p0": 3,
+            "material": 0
+          },
+          {
+            "minX": 1735,
+            "minY": 680,
+            "maxX": 1795,
+            "maxY": 880,
+            "material": 0
+          },
+          {
+            "minX": 1735,
+            "minY": -910,
+            "maxX": 1795,
+            "maxY": -710,
+            "material": 0
+          },
+          {
+            "minX": 1735,
+            "minY": -515,
+            "maxX": 1795,
+            "maxY": -315,
             "material": 0
           }
         ],
         "sponges": [],
         "labels": [
           {
-            "x": 1635,
-            "y": -25,
+            "x": 2330,
+            "y": -30,
             "text": "SAS",
             "tone": "sas"
           }
@@ -19388,32 +19486,326 @@
           {
             "minX": -220,
             "minY": 80,
-            "maxX": 5,
+            "maxX": 0,
             "maxY": 290
           },
           {
             "minX": -220,
             "minY": -330,
-            "maxX": 5,
+            "maxX": 0,
             "maxY": -120
           },
           {
-            "minX": 200,
+            "minX": 290,
             "minY": -530,
             "maxX": 505,
-            "maxY": -255
+            "maxY": -325
           },
           {
-            "minX": 200,
-            "minY": -205,
-            "maxX": 505,
-            "maxY": 155
+            "minX": 290,
+            "minY": -125,
+            "maxX": 510,
+            "maxY": 78.75
           },
           {
-            "minX": 200,
-            "minY": 205,
-            "maxX": 505,
+            "minX": 290,
+            "minY": 280,
+            "maxX": 510,
             "maxY": 490
+          },
+          {
+            "minX": 970,
+            "minY": 485,
+            "maxX": 1150,
+            "maxY": 690
+          },
+          {
+            "minX": 970,
+            "minY": 80,
+            "maxX": 1150,
+            "maxY": 285
+          },
+          {
+            "minX": 970,
+            "minY": -325,
+            "maxX": 1150,
+            "maxY": -120
+          },
+          {
+            "minX": 970,
+            "minY": -730,
+            "maxX": 1150,
+            "maxY": -525
+          },
+          {
+            "minX": 1630,
+            "minY": -910,
+            "maxX": 1810,
+            "maxY": -710
+          },
+          {
+            "minX": 1630,
+            "minY": -515,
+            "maxX": 1810,
+            "maxY": -315
+          },
+          {
+            "minX": 1630,
+            "minY": -120,
+            "maxX": 1810,
+            "maxY": 80
+          },
+          {
+            "minX": 1630,
+            "minY": 280,
+            "maxX": 1810,
+            "maxY": 480
+          },
+          {
+            "minX": 1630,
+            "minY": 680,
+            "maxX": 1810,
+            "maxY": 880
+          }
+        ],
+        "condensats": [
+          {
+            "x": -150,
+            "y": 180,
+            "cl": 6
+          },
+          {
+            "x": 360,
+            "y": -440,
+            "cl": 6
+          },
+          {
+            "x": 1020,
+            "y": 570,
+            "cl": 6
+          },
+          {
+            "x": 1680,
+            "y": 770,
+            "cl": 6
+          },
+          {
+            "x": 1680,
+            "y": -810,
+            "cl": 6
+          }
+        ]
+      }
+    },
+    {
+      "id": "nouveau-tableau-14",
+      "auteur": "BOIZ",
+      "majAt": "2026-10-01T15:56:58.804Z",
+      "codeAuteur": "BOIZ",
+      "codeAt": "2026-10-01T12:53:42.954Z",
+      "level": {
+        "name": "Gravityloop",
+        "code": "21-?",
+        "journal": "Entrée de journal du protocole : ce que le laboratoire a observé dans cette cuve.",
+        "bounds": {
+          "minX": -1500,
+          "minY": -599,
+          "maxX": 1760,
+          "maxY": 1163
+        },
+        "spawn": {
+          "x": -1229,
+          "y": 642,
+          "n": 900
+        },
+        "exit": {
+          "minX": 82,
+          "minY": 930,
+          "maxX": 222,
+          "maxY": 1070
+        },
+        "boxes": [
+          {
+            "minX": -1260,
+            "minY": 837,
+            "maxX": 983,
+            "maxY": 900,
+            "material": 0
+          },
+          {
+            "minX": -1530,
+            "minY": 380,
+            "maxX": -1230.121,
+            "maxY": 899.047,
+            "angle": -180,
+            "forme": 4,
+            "p0": 0.23,
+            "material": 0
+          },
+          {
+            "minX": -1260,
+            "minY": 380,
+            "maxX": 530,
+            "maxY": 440,
+            "material": 0
+          },
+          {
+            "minX": -800,
+            "minY": -265,
+            "maxX": -563,
+            "maxY": 110,
+            "material": 2
+          },
+          {
+            "minX": 935,
+            "minY": 120,
+            "maxX": 1235,
+            "maxY": 640,
+            "forme": 4,
+            "p0": 0.23,
+            "material": 2
+          },
+          {
+            "minX": 935,
+            "minY": -141,
+            "maxX": 1500,
+            "maxY": 900,
+            "forme": 4,
+            "p0": 0.12,
+            "material": 0
+          },
+          {
+            "minX": -563,
+            "minY": -141,
+            "maxX": 973,
+            "maxY": -78,
+            "material": 0
+          },
+          {
+            "minX": 530,
+            "minY": 120,
+            "maxX": 983,
+            "maxY": 640,
+            "material": 2
+          },
+          {
+            "minX": -1244,
+            "minY": -337.5,
+            "maxX": -724,
+            "maxY": 182.5,
+            "forme": 4,
+            "p1": 180,
+            "material": 0
+          },
+          {
+            "minX": -1500,
+            "minY": -598,
+            "maxX": -935,
+            "maxY": 443,
+            "angle": -180,
+            "forme": 4,
+            "p0": 0.12,
+            "material": 0
+          },
+          {
+            "minX": -563,
+            "minY": -78,
+            "maxX": -376.5,
+            "maxY": 110,
+            "forme": 3,
+            "material": 2
+          },
+          {
+            "minX": 271,
+            "minY": 120,
+            "maxX": 530,
+            "maxY": 379.5,
+            "forme": 3,
+            "p0": 2,
+            "material": 2
+          },
+          {
+            "minX": 271,
+            "minY": 440,
+            "maxX": 530,
+            "maxY": 640,
+            "forme": 3,
+            "p0": 1,
+            "material": 2
+          },
+          {
+            "minX": -563,
+            "minY": -265,
+            "maxX": -376.5,
+            "maxY": -141,
+            "forme": 3,
+            "p0": 3,
+            "material": 2
+          },
+          {
+            "minX": 530,
+            "minY": -405,
+            "maxX": 995,
+            "maxY": -342,
+            "material": 2
+          },
+          {
+            "minX": -961,
+            "minY": -599,
+            "maxX": 1760,
+            "maxY": -536,
+            "material": 0
+          },
+          {
+            "minX": 935,
+            "minY": -405,
+            "maxX": 1769,
+            "maxY": 1163,
+            "forme": 4,
+            "p0": 0.08,
+            "material": 2
+          },
+          {
+            "minX": 82,
+            "minY": 1100,
+            "maxX": 978,
+            "maxY": 1163,
+            "material": 0
+          },
+          {
+            "minX": 336,
+            "minY": -536,
+            "maxX": 530,
+            "maxY": -342,
+            "forme": 3,
+            "p0": 1,
+            "material": 2
+          }
+        ],
+        "sponges": [],
+        "labels": [
+          {
+            "x": 132,
+            "y": 999,
+            "text": "SAS",
+            "tone": "sas"
+          }
+        ],
+        "par": 3,
+        "puits": [
+          {
+            "x": 999,
+            "y": 380,
+            "force": 350,
+            "rayon": 240,
+            "portee": 700
+          },
+          {
+            "x": -983,
+            "y": -84,
+            "force": 300,
+            "rayon": 260,
+            "portee": 450
           }
         ]
       }
