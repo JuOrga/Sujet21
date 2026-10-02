@@ -323,3 +323,19 @@ export function etatTransition(t: number, p: ParamsTransition): EtatTransition {
   }
   return { camera, couvre, opacite }
 }
+
+/** Où se trouve une salle chargée : son module, son rang dans le module. */
+export interface PositionSalle {
+  module: string
+  niveau: number
+}
+
+/** LA TRANSITION NE JOUE que vers la salle SUIVANTE du même module : pas à un
+ *  nouvel essai (même rang), ni à l'entrée d'un module, ni après une halte
+ *  (deux rangs d'un coup). Les deux positions sont celles des salles AU
+ *  CHARGEMENT — le jeu compte la salle franchie dès le sas, avant la
+ *  cérémonie : une position relevée pendant la cérémonie avait déjà avancé,
+ *  et la transition ne jouait jamais (aperçu du 02/10). */
+export function transitionPermise(avant: PositionSalle | null, apres: PositionSalle): boolean {
+  return avant !== null && avant.module === apres.module && apres.niveau === avant.niveau + 1
+}

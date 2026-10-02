@@ -321,7 +321,9 @@ import {
   etatTransition,
   miseEnPage,
   vueGenerique,
+  transitionPermise,
   type ParamsTransition,
+  type PositionSalle,
   type VueModule2d,
 } from './render/module2d'
 import { chargePiecesModule2d, peintModule2d, type Pieces } from './render/module2dCanvas'
@@ -1419,15 +1421,20 @@ function miniCarteDuModule(): MiniCarte | null {
 function vueModule2d(): VueModule2d {
   const mini = miniCarteDuModule()
   if (!mini || mini.rangs.length === 0) return vueGenerique()
-  const rang = Math.min(carteRun.niveau, mini.rangs.length - 1)
-  const tr = carteRun.trace[rang]
+  // la position de la salle AU CHARGEMENT : pendant la cérémonie, la run a
+  // déjà compté la salle franchie — la mini-carte de la coque avançait
+  // d'un cran sous la salle encore affichée
+  const niveau = salle2d?.niveau ?? carteRun.niveau
+  const trace = salle2d?.trace ?? carteRun.trace
+  const rang = Math.min(niveau, mini.rangs.length - 1)
+  const tr = trace[rang]
   const voie = typeof tr === 'number' ? tr : (derniereVoie(carteRun) ?? Math.floor(mini.voies / 2))
   return {
     rangs: mini.rangs.length,
     voies: mini.voies,
     rang,
     voie,
-    joues: carteRun.trace.slice(0, rang),
+    joues: trace.slice(0, rang),
     suivants: (r, v) => mini.rangs[r]?.[v]?.suivants ?? [],
   }
 }
@@ -1446,7 +1453,7 @@ function majModule2d(b: { minX: number; minY: number; maxX: number; maxY: number
   }
   if (!piecesModule2d) return
   const m = moduleEnCours()
-  const cle = `${b.minX},${b.minY},${b.maxX},${b.maxY}|${m?.id ?? ''}|${carteRun.niveau}|${carteRun.trace.join(',')}|${carteRun.tissage}`
+  const cle = `${b.minX},${b.minY},${b.maxX},${b.maxY}|${m?.id ?? ''}|${salle2d?.niveau}|${salle2d?.trace.join(',')}|${carteRun.tissage}`
   const T = COQUE_EPAISSEUR
   const avecCoque = { minX: b.minX - T, minY: b.minY - T, maxX: b.maxX + T, maxY: b.maxY + T }
   if (cle !== module2dCle) {
@@ -1455,16 +1462,15 @@ function majModule2d(b: { minX: number; minY: number; maxX: number; maxY: number
     const mp = miseEnPage(avecCoque, vueModule2d())
     module2dToile = { toile: peintModule2d(mp, piecesModule2d), monde: mp.monde }
   }
-  module2dVu = { module: m?.id ?? '', niveau: carteRun.niveau }
   if (module2dToile)
     renderer.setModule2d({ ...module2dToile, version: module2dVersion, salle: b, cellule: piecesModule2d.get('cellule-neutre') })
   // la transition en cours : la cellule qui grossit sur la salle
   const tt = camera.piloteT
   renderer.setCouvertureModule2d(tt !== null && transition2d ? { salle: transition2d.salle, ...etatTransition(tt, transition2d) } : null)
 }
-/** La salle où le module en 2D a été vu pour la dernière fois : la
- *  transition ne joue que vers la salle SUIVANTE du même module. */
-let module2dVu: { module: string; niveau: number } | null = null
+/** LA SALLE CHARGÉE : son module, son rang, la trace des voies — relevés une
+ *  fois, au chargement (restart), et non à chaque image. */
+let salle2d: (PositionSalle & { trace: number[] }) | null = null
 let transition2d: ParamsTransition | null = null
 /** LA TRANSITION ENTRE DEUX SALLES (module2d.ts, etatTransition) : au lieu du
  *  plan large tenu, la salle quittée rétrécit dans sa cellule, la vue glisse
@@ -1472,11 +1478,14 @@ let transition2d: ParamsTransition | null = null
  *  que si l'on vient de la salle d'avant dans le même module — pas à un
  *  nouvel essai, ni à l'entrée d'un module, ni après une halte. Rend vrai
  *  si elle joue (le plan d'ouverture suivra, sans son plan large). */
-function lanceTransition2d(b: { minX: number; minY: number; maxX: number; maxY: number }, vw: number, vh: number): boolean {
-  const avant = module2dVu
-  const m = moduleEnCours()
-  if (!module2dActif || level.coque === 'structures' || !piecesModule2d || !avant) return false
-  if (avant.module !== (m?.id ?? '') || carteRun.niveau !== avant.niveau + 1) return false
+function lanceTransition2d(
+  avant: PositionSalle | null,
+  b: { minX: number; minY: number; maxX: number; maxY: number },
+  vw: number,
+  vh: number,
+): boolean {
+  if (!module2dActif || level.coque === 'structures' || !piecesModule2d || !salle2d) return false
+  if (!transitionPermise(avant, salle2d)) return false
   const vue = vueModule2d()
   const vient = vue.joues[vue.rang - 1]
   if (vue.rang < 1 || vient === undefined) return false
@@ -16872,8 +16881,11 @@ function restart(): void {
   // la mise en scène repart de zéro : lampes rendues, brèches refermées
   sequenceur.reinitialise()
   appliqueSequence()
+  // la salle chargée, relevée ICI une fois (module2d.ts, transitionPermise)
+  const salleAvant = salle2d
+  salle2d = { module: moduleEnCours()?.id ?? '', niveau: carteRun.niveau, trace: [...carteRun.trace] }
   if (document.body.classList.contains('playing')) {
-    const enTransition = lanceTransition2d(sim.bounds, window.innerWidth, window.innerHeight)
+    const enTransition = lanceTransition2d(salleAvant, sim.bounds, window.innerWidth, window.innerHeight)
     if (!enTransition) camera.startIntro(sim.bounds, window.innerWidth, window.innerHeight)
     // le RÉVEIL : tirage du petit scénario joué pendant l'intro caméra —
     // chronométré en temps RÉEL. Le plan d'ouverture, lui, tolère les

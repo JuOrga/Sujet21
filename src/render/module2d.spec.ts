@@ -11,6 +11,7 @@ import {
   etatTransition,
   etats,
   miseEnPage,
+  transitionPermise,
   vueGenerique,
   type VueModule2d,
 } from './module2d'
@@ -176,5 +177,26 @@ describe('module 2D — la transition entre deux salles', () => {
   it('la salle reste cachée tant que la cellule grossit', () => {
     for (let t = 0; t < TRANSITION.retrecit + TRANSITION.glisse + TRANSITION.grossit; t += 0.05)
       expect(etatTransition(t, p).opacite).toBe(1)
+  })
+})
+
+describe('module 2D — quand la transition joue', () => {
+  it('vers la salle suivante du même module, et seulement elle', () => {
+    expect(transitionPermise({ module: 'C1', niveau: 1 }, { module: 'C1', niveau: 2 })).toBe(true)
+    expect(transitionPermise({ module: 'C1', niveau: 2 }, { module: 'C1', niveau: 2 })).toBe(false) // nouvel essai
+    expect(transitionPermise({ module: 'C1', niveau: 3 }, { module: 'P2', niveau: 0 })).toBe(false) // autre module
+    expect(transitionPermise({ module: 'C1', niveau: 1 }, { module: 'C1', niveau: 3 })).toBe(false) // après une halte
+    expect(transitionPermise(null, { module: 'C1', niveau: 1 })).toBe(false) // première salle chargée
+  })
+
+  it('les positions sont celles AU CHARGEMENT : relevée pendant la cérémonie, la salle quittée a déjà avancé', () => {
+    // le scénario de l'aperçu du 02/10 : salle chargée au rang 1 ; au sas,
+    // la run compte la salle franchie (rang 2) AVANT la cérémonie ; la
+    // salle suivante se charge au rang 2
+    const auChargement = { module: 'C1', niveau: 1 }
+    const pendantLaCeremonie = { module: 'C1', niveau: 2 }
+    const suivante = { module: 'C1', niveau: 2 }
+    expect(transitionPermise(pendantLaCeremonie, suivante)).toBe(false) // le défaut
+    expect(transitionPermise(auChargement, suivante)).toBe(true) // le correctif
   })
 })
