@@ -25,6 +25,12 @@ export const PIECES_MODULE2D = [
   'tempere-colonne',
   'tempere-trappe',
   'tempere-machinerie',
+  'detail-panneau',
+  'detail-reparation',
+  'detail-vanne',
+  'detail-grille',
+  'detail-cuve',
+  'detail-aerations',
   'cellule-joue',
   'cellule-ambre',
   'cellule-bleu',
@@ -163,6 +169,13 @@ export function peintModule2d(mp: MiseEnPage, p: Pieces, fen?: Fenetre): HTMLCan
     c.strokeStyle = 'rgba(0,0,0,0.7)'
     c.lineWidth = 0.012 * mp.densite
     c.strokeRect(z.minX, z.minY, z.maxX - z.minX, z.maxY - z.minY)
+  }
+  // les petits détails, posés sur la tôle
+  for (const d of mp.details) {
+    const im = img(`detail-${d.nom}`)
+    const h = (d.l * im.height) / im.width
+    if (hors(d.x - d.l / 2, d.y - h / 2, d.x + d.l / 2, d.y + h / 2)) continue
+    c.drawImage(im, d.x - d.l / 2, d.y - h / 2, d.l, h)
   }
   // 2. les éléments uniques ; les vitrages de la serre débordent d'un halo
   // vert sur la tôle : sans lui, la serre ne se reconnaissait qu'au rebord

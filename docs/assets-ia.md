@@ -2042,7 +2042,7 @@ quart et livre à moitié de la taille source) :
 | **tôle calme** (deux variantes, sans tuyau traversant) | ✅ livrées 02/10, remplacent les premières |
 | tôle de la salle des machines | ✅ livrée 02/10 |
 | deuxième baie (rangée de hublots), colonne de culture | ✅ livrées 02/10 |
-| planche de petits détails (six) | ⏳ à intégrer |
+| planche de petits détails (six) | ✅ livrée 02/10 — semés sur la tôle, hors salle, cellules et éléments |
 
 **Une forme fixe par type de module** (`formeDuBiome`) : étagée pour la
 serre tempérée, fuseau pour la chaufferie, dorsale pour le cryo — les

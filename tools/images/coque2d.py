@@ -141,6 +141,18 @@ EQUIPEMENTS = {
 }
 
 
+# la planche des petits détails (livrée le 02/10, 1536 × 1024) : une case
+# large par détail — le détourage rogne au détail lui-même
+DETAILS = {
+    'panneau': (40, 40, 500, 520),
+    'reparation': (530, 40, 1030, 520),
+    'vanne': (1080, 10, 1530, 530),
+    'grille': (40, 545, 500, 1010),
+    'cuve': (510, 545, 1040, 1000),
+    'aerations': (1050, 545, 1530, 1000),
+}
+
+
 def main() -> None:
     b = 'tempere-'
     for n in ('tole', 'tole-2', 'tole-machines'):
@@ -157,6 +169,11 @@ def main() -> None:
     planche = lit('equipements')
     for n, (x0, y0, x1, y1) in EQUIPEMENTS.items():
         ecrit(f'equipement-{n}', sombre(detoure(planche[y0:y1, x0:x1], rogne=True), SOMBRE_EQUIPEMENT))
+    planche = lit('details')
+    for n, (x0, y0, x1, y1) in DETAILS.items():
+        # un cran plus sombres que la coque : posés dessus, leurs liserés bleus
+        # ressortaient plus que la tôle autour (rendu du 02/10)
+        ecrit(f'detail-{n}', sombre(detoure(planche[y0:y1, x0:x1], rogne=True), SOMBRE_COQUE * 0.85))
     # le tube : la bande du couloir, sans ses colliers d'extrémité
     c = lit('couloir')
     h = c.shape[0]

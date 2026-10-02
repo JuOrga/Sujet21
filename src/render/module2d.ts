@@ -70,6 +70,8 @@ export interface MiseEnPage {
   machines: Rect[]
   /** les éléments uniques posés sur la tôle : centre, largeur */
   elements: { nom: string; x: number; y: number; l: number }[]
+  /** les petits détails semés sur la tôle : centre, largeur */
+  details: { nom: string; x: number; y: number; l: number }[]
   /** les équipements extérieurs posés sur un bord haut : pied, largeur relative */
   equipements: { nom: string; x: number; y: number }[]
   /** les deux colliers : l'entrée (bord gauche) et la sortie (bord droit) */
@@ -246,6 +248,57 @@ function habille(c: [number, number][]): Sommet[] {
   })
 }
 
+const DETAILS = ['panneau', 'reparation', 'vanne', 'grille', 'cuve', 'aerations']
+/** un détail : sa largeur, en largeurs de salle — à peu près un panneau de tôle */
+export const DETAIL_L = 0.2
+/** au-delà de la bande du rebord (module2dCanvas, REBORD 0,28), que le moteur
+ *  fond vers la tôle : un détail dessous y serait à moitié caché */
+const MARGE_DETAIL_BORD = 0.3
+
+/** un tirage stable dans [0, 1[ : le même module sème toujours pareil */
+const tirage = (i: number, j: number) => ((((i * 73856093) ^ (j * 19349663)) >>> 0) % 1000) / 1000
+
+function dansPolygone(x: number, y: number, p: { x: number; y: number }[]): boolean {
+  let dedans = false
+  for (let i = 0, j = p.length - 1; i < p.length; j = i++)
+    if (p[i].y > y !== p[j].y > y && x < ((p[j].x - p[i].x) * (y - p[i].y)) / (p[j].y - p[i].y) + p[i].x) dedans = !dedans
+  return dedans
+}
+
+/** SEMER LES DÉTAILS sur la tôle, en pixels de toile : une grille décalée,
+ *  un tirage par case, et rien qui touche la salle, une cellule, un tube, un
+ *  élément ou le rebord. Une tôle nue se répétait encore à l'œil ; quelques
+ *  détails épars cassent la répétition. */
+function semeDetails(
+  densite: number,
+  bornes: { x0: number; y0: number; x1: number; y1: number },
+  silhouette: { x: number; y: number }[],
+  obstacles: Rect[],
+  tubes: MiseEnPage['tubes'],
+): MiseEnPage['details'] {
+  const out: MiseEnPage['details'] = []
+  const pas = 0.45 * densite
+  // la vanne, la plus haute, fait 1,5 fois sa largeur
+  const demi = 0.16 * densite
+  const bord = demi + MARGE_DETAIL_BORD * densite
+  for (let i = 0, y = bornes.y0; y < bornes.y1; i++, y += pas)
+    for (let j = 0, x = bornes.x0 + (i % 2) * pas * 0.5; x < bornes.x1; j++, x += pas) {
+      if (tirage(i, j) > 0.45) continue
+      const cx = x + (tirage(j, i + 17) - 0.5) * pas * 0.5
+      const cy = y + (tirage(i + 31, j) - 0.5) * pas * 0.5
+      if (![[-1, -1], [1, -1], [1, 1], [-1, 1]].every(([a, b]) => dansPolygone(cx + a * bord, cy + b * bord, silhouette))) continue
+      // contre un obstacle, la demi-largeur seule : il est peint par-dessus
+      const d = (DETAIL_L / 2) * densite
+      if (obstacles.some((o) => cx + d > o.minX && cx - d < o.maxX && cy + d > o.minY && cy - d < o.maxY)) continue
+      // un tube peut passer DESSUS (il est peint après, cerné d'ombre) ; mais
+      // pas sur son axe, où le détail lui ferait une bosse
+      if (tubes.some((t) => (t.ay === t.by ? Math.abs(cy - t.ay) < demi * 0.5 && cx > Math.min(t.ax, t.bx) && cx < Math.max(t.ax, t.bx) : Math.abs(cx - t.ax) < demi * 0.5 && cy > Math.min(t.ay, t.by) && cy < Math.max(t.ay, t.by))))
+        continue
+      out.push({ nom: DETAILS[Math.floor(tirage(i + 7, j + 3) * DETAILS.length)], x: cx, y: cy, l: DETAIL_L * densite })
+    }
+  return out
+}
+
 const EQUIPEMENTS = ['mat', 'grand-solaire', 'reservoir', 'antenne', 'radiateur', 'petit-solaire']
 
 /** METTRE EN PAGE le module autour de la salle (coque comprise). */
@@ -328,6 +381,18 @@ export function miseEnPage(salle: Rect, vue: VueModule2d, forme: FormeModule = '
   // la tour, la machinerie dans la poupe
   const signe = elementDeForme(forme, contour)
   if (signe) elements.push({ nom: signe.nom, x: X(signe.x), y: Y(signe.y), l: signe.l * densite })
+  // les détails, à l'écart de tout ce qui porte du sens
+  const silPx = contour.map(([u, w]) => ({ x: X(u), y: Y(w) }))
+  const pres = (x0: number, y0: number, x1: number, y1: number, m: number): Rect => ({ minX: x0 - m, minY: y0 - m, maxX: x1 + m, maxY: y1 + m })
+  const obstacles: Rect[] = [
+    pres(X(-0.5), Y(-hr / 2), X(0.5), Y(hr / 2), 0.1 * densite),
+    ...cellules.map((k) => pres(k.x - k.l / 2, k.y - k.h / 2, k.x + k.l / 2, k.y + k.h / 2, 0.03 * densite)),
+    ...elements.map((e) => {
+      const d = Math.max(e.l, e.nom === 'colonne' ? e.l * RATIO_COLONNE : e.l) / 2
+      return pres(e.x - d, e.y - d, e.x + d, e.y + d, 0.05 * densite)
+    }),
+  ]
+  const details = semeDetails(densite, { x0: X(xL), y0: Y(Math.min(...ys)), x1: X(Math.max(...xs)), y1: Y(Math.max(...ys)) }, silPx, obstacles, tubes)
   // les équipements, le long de chaque bord haut
   const equipements: MiseEnPage['equipements'] = []
   let n = 0
@@ -355,6 +420,7 @@ export function miseEnPage(salle: Rect, vue: VueModule2d, forme: FormeModule = '
     tubes,
     machines: zonesMachines(forme, contour).map(([x0, y0, x1, y1]) => ({ minX: X(x0), minY: Y(y0), maxX: X(x1), maxY: Y(y1) })),
     elements,
+    details,
     equipements,
     colliers: {
       gauche: { x: X(gauche[0][0]), y: Y((gauche[0][1] + gauche[1][1]) / 2), h: Math.abs(gauche[1][1] - gauche[0][1]) * densite },

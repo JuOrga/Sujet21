@@ -4,6 +4,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   CELLULE_L,
+  DETAIL_L,
   RATIO_COLONNE,
   DUREE_TRANSITION,
   TOILE_MAX,
@@ -317,5 +318,24 @@ describe('module 2D — les pièces de la serre', () => {
     const noms = miseEnPage(salle, vue).elements.map((e) => e.nom)
     expect(noms).toContain('baie')
     expect(noms).toContain('baie-2')
+  })
+
+  it('des petits détails semés dans la coque, jamais sur la salle', () => {
+    expect(miseEnPage(salle, vue).details.length).toBeGreaterThan(5)
+    for (const hr of [0.66, 1.0])
+      for (const voie of [0, 1, 2]) {
+        const m = miseEnPage({ minX: 0, minY: 0, maxX: 1000, maxY: 1000 * hr }, { ...vue, voie, joues: [voie] })
+        const xs = m.silhouette.map((s) => s.x)
+        const ys = m.silhouette.map((s) => s.y)
+        const d = (DETAIL_L / 2) * m.densite
+        for (const e of m.details) {
+          expect(e.x - d).toBeGreaterThan(Math.min(...xs))
+          expect(e.x + d).toBeLessThan(Math.max(...xs))
+          expect(e.y - d).toBeGreaterThan(Math.min(...ys))
+          expect(e.y + d).toBeLessThan(Math.max(...ys))
+          const surSalle = e.x + d > m.salle.minX && e.x - d < m.salle.maxX && e.y + d > m.salle.minY && e.y - d < m.salle.maxY
+          expect(surSalle).toBe(false)
+        }
+      }
   })
 })
