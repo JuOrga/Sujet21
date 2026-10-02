@@ -2039,12 +2039,30 @@ quart et livre à moitié de la taille source) :
 | baie de serre, trappe ronde, bloc de machinerie | ✅ livrés 01/10 |
 | cellule de la mini-carte (quatre états précalculés) | ✅ livrée 01/10 |
 | équipements extérieurs (planche de six) | ✅ livrée 01/10 |
+| **tôle calme** (deux variantes, sans tuyau traversant) | ✅ livrées 02/10, remplacent les premières |
+| tôle de la salle des machines | ✅ livrée 02/10 |
+| deuxième baie (rangée de hublots), colonne de culture | ✅ livrées 02/10 |
+| planche de petits détails (six) | ⏳ à intégrer |
 
 **Une forme fixe par type de module** (`formeDuBiome`) : étagée pour la
 serre tempérée, fuseau pour la chaufferie, dorsale pour le cryo — les
 marches accrochées aux rangs de la mini-carte, jamais à la salle jouée.
 Pièces livrées à 80 % des sources : près de la salle, une seconde toile à
 850 px par largeur de salle garde le décor net quand on zoome.
+
+**L'analyse du 02/10, et ce qu'elle a changé** : la tôle se répétait en
+bandes (une variante par rangée, le même motif ~8 fois d'affilée) — la
+variante est tirée au sort par rangée et chaque carreau retourné ou non ;
+les deux premières tôles n'avaient pas la même échelle et leurs tuyaux
+horizontaux se confondaient avec les tubes de la mini-carte — remplacées
+par des tôles calmes, les tubes cernés d'un liseré d'ombre ; les vitrages
+débordent d'un halo vert ; la marche de la salle des machines a sa tôle.
+Le générateur rate le raccord haut/bas des tôles : le script le refait
+(`raccorde`). Les bords, coins et angles portent l'ANCIENNE tôle dans leur
+moitié intérieure : le moteur ne garde que la bande du rebord (0,28 salle)
+et la fond vers la tôle. Coût mesuré (rendu logiciel, médiane de 5) : la
+peinture des deux toiles passe de ~610 à ~800 ms, dont ~110 ms pour le
+calque des bords.
 
 **À venir** : les pièces propres de chaque module (la chaufferie et le
 cryo prennent celles de la serre en attendant) ; une deuxième variante de

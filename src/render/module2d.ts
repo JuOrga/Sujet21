@@ -66,6 +66,8 @@ export interface MiseEnPage {
   salle: Rect
   cellules: { x: number; y: number; l: number; h: number; etat: EtatCellule }[]
   tubes: { ax: number; ay: number; bx: number; by: number; etat: EtatTube }[]
+  /** les zones peintes en tôle de salle des machines, en pixels de toile */
+  machines: Rect[]
   /** les éléments uniques posés sur la tôle : centre, largeur */
   elements: { nom: string; x: number; y: number; l: number }[]
   /** les équipements extérieurs posés sur un bord haut : pied, largeur relative */
@@ -204,6 +206,25 @@ function elementDeForme(forme: FormeModule, c: [number, number][]): { nom: strin
   return { nom: 'machinerie', x: c[4][0] + 0.3, y: (c[5][1] + c[10][1]) / 2, l: 0.5 }
 }
 
+/** LA SALLE DES MACHINES de chaque forme, en largeurs de salle : la marche
+ *  sous la poupe (étagée), les deux nacelles (dorsale), la tuyère (fuseau).
+ *  Peinte de la même tôle que le reste, la forme ne se lisait qu'à la
+ *  silhouette, jamais dedans (analyse du 02/10). */
+function zonesMachines(forme: FormeModule, c: [number, number][]): [number, number, number, number][] {
+  if (c.length === 4) return []
+  if (forme === 'etagee') return [[c[10][0], c[10][1], c[8][0], c[8][1]]]
+  if (forme === 'dorsale')
+    return [
+      [c[9][0], c[6][1], c[7][0], c[8][1]],
+      [c[13][0], c[10][1], c[11][0], c[12][1]],
+    ]
+  if (c.length < 16) return []
+  return [[c[6][0], c[6][1], c[7][0], c[8][1]]]
+}
+
+/** La colonne de culture : hauteur / largeur de sa pièce livrée. */
+export const RATIO_COLONNE = 3.26
+
 /** CHAQUE ANGLE PREND SA PIÈCE selon le sens du contour (horaire à l'écran) :
  *  un virage à droite est un coin saillant, à gauche un angle rentrant —
  *  les deux angles rentrants livrés, et leurs miroirs. */
@@ -294,8 +315,14 @@ export function miseEnPage(salle: Rect, vue: VueModule2d, forme: FormeModule = '
       const [u, w] = cel(r, v + 0.5)
       const k = (r * 2 + v) % 5
       const bout = r === 0 || r === vue.rangs - 1
-      const nom = bout && k % 2 === 1 ? 'machinerie' : k === 0 ? 'baie' : k === 3 ? 'trappe' : null
-      if (nom) elements.push({ nom, x: X(u), y: Y(w), l: (nom === 'baie' ? 0.95 : nom === 'trappe' ? 0.5 : 0.8) * densite })
+      // deux baies en alternance et une colonne de culture : les trois
+      // mêmes baies côte à côte se lisaient comme un copier-coller
+      const nom =
+        bout && k % 2 === 1 ? 'machinerie' : k === 0 ? (r % 2 ? 'baie-2' : 'baie') : k === 2 ? 'colonne' : k === 3 ? 'trappe' : null
+      if (!nom) continue
+      // la colonne, verticale, tient entre deux voies sans toucher leurs cellules
+      const l = { baie: 0.95, 'baie-2': 0.9, colonne: (0.6 * py) / RATIO_COLONNE, trappe: 0.5, machinerie: 0.8 }[nom]
+      elements.push({ nom, x: X(u), y: Y(w), l: l * densite })
     }
   // l'élément de la forme : la grande baie sur le pont, la trappe en haut de
   // la tour, la machinerie dans la poupe
@@ -326,6 +353,7 @@ export function miseEnPage(salle: Rect, vue: VueModule2d, forme: FormeModule = '
     salle: { minX: X(-0.5), maxX: X(0.5), minY: Y(-hr / 2), maxY: Y(hr / 2) },
     cellules,
     tubes,
+    machines: zonesMachines(forme, contour).map(([x0, y0, x1, y1]) => ({ minX: X(x0), minY: Y(y0), maxX: X(x1), maxY: Y(y1) })),
     elements,
     equipements,
     colliers: {

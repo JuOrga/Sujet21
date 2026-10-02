@@ -71,6 +71,21 @@ def ecrit(nom: str, a: np.ndarray) -> None:
     print(f'  {nom} : {im.width}×{im.height}, {out.stat().st_size // 1024} Ko')
 
 
+def raccorde(a: np.ndarray, b: int = 48) -> np.ndarray:
+    """Rend une tôle VRAIMENT raccordable : le générateur promet le raccord
+    mais le rate souvent en haut/bas (tôles du 02/10 : écart au bord 8 à 20
+    fois celui de deux lignes voisines, une couture visible à chaque rangée).
+    Les b dernières lignes (puis colonnes) sont fondues dans les b premières ;
+    l'image perd b pixels par côté et devient périodique."""
+    for _ in range(2):
+        h = a.shape[0]
+        w = np.linspace(0, 1, b)[:, None, None]
+        tete = a[h - b:] * (1 - w) + a[:b] * w
+        a = np.concatenate([tete, a[b:h - b]], axis=0)
+        a = a.transpose(1, 0, 2)
+    return a
+
+
 def sombre(a: np.ndarray, k: float) -> np.ndarray:
     b = a.copy()
     b[..., :3] *= k
@@ -128,15 +143,15 @@ EQUIPEMENTS = {
 
 def main() -> None:
     b = 'tempere-'
-    for n in ('tole', 'tole-2'):
-        ecrit(f'{b}{n}', sombre(lit(b + n), SOMBRE_COQUE))
+    for n in ('tole', 'tole-2', 'tole-machines'):
+        ecrit(f'{b}{n}', sombre(raccorde(lit(b + n)), SOMBRE_COQUE))
     for n in ('bord-haut', 'bord-bas', 'bout-gauche', 'bout-droit', 'coin-haut-gauche', 'coin-bas-gauche',
               'coin-bas-droit', 'rentrant-haut', 'rentrant-bas'):
         ecrit(f'{b}{n}', sombre(detoure(lit(b + n)), SOMBRE_COQUE))
     # le coin haut-droit : le haut-gauche en miroir (le générateur a rendu
     # deux fois le même coin)
     ecrit(f'{b}coin-haut-droit', sombre(detoure(lit(b + 'coin-haut-gauche')[:, ::-1]), SOMBRE_COQUE))
-    for n in ('baie', 'trappe', 'machinerie'):
+    for n in ('baie', 'baie-2', 'colonne', 'trappe', 'machinerie'):
         ecrit(f'{b}{n}', sombre(detoure(lit(b + n), rogne=True), SOMBRE_COQUE))
     cellule()
     planche = lit('equipements')

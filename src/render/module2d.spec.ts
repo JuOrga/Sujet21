@@ -4,6 +4,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   CELLULE_L,
+  RATIO_COLONNE,
   DUREE_TRANSITION,
   TOILE_MAX,
   TRANSITION,
@@ -277,4 +278,44 @@ describe('module 2D — rien ne se pose contre la salle jouée', () => {
         }
       }
     })
+})
+
+describe('module 2D — les pièces de la serre', () => {
+  it('chaque forme a sa salle des machines, dans la coque ; un module court n’en a pas', () => {
+    for (const forme of ['etagee', 'fuseau', 'dorsale'] as const) {
+      const m = miseEnPage(salle, vue, forme)
+      expect(m.machines.length).toBeGreaterThan(0)
+      const xs = m.silhouette.map((s) => s.x)
+      const ys = m.silhouette.map((s) => s.y)
+      for (const z of m.machines) {
+        expect(z.maxX - z.minX).toBeGreaterThan(0.2 * m.densite)
+        expect(z.maxY - z.minY).toBeGreaterThan(0.2 * m.densite)
+        expect(z.minX).toBeGreaterThanOrEqual(Math.min(...xs))
+        expect(z.maxX).toBeLessThanOrEqual(Math.max(...xs))
+        expect(z.minY).toBeGreaterThanOrEqual(Math.min(...ys))
+        expect(z.maxY).toBeLessThanOrEqual(Math.max(...ys))
+      }
+    }
+    expect(miseEnPage(salle, { ...vue, rangs: 2, rang: 0, joues: [] }).machines).toEqual([])
+  })
+
+  for (const hr of [0.66, 1.0])
+    it(`la colonne de culture tient entre deux voies sans toucher une cellule (salle ${hr === 1 ? 'carrée' : '3:2'})`, () => {
+      const m = miseEnPage({ minX: 0, minY: 0, maxX: 1000, maxY: 1000 * hr }, vue)
+      const colonnes = m.elements.filter((e) => e.nom === 'colonne')
+      expect(colonnes.length).toBeGreaterThan(0)
+      for (const e of colonnes) {
+        const h = e.l * RATIO_COLONNE
+        for (const k of m.cellules) {
+          const touche = Math.abs(e.x - k.x) < (e.l + k.l) / 2 && Math.abs(e.y - k.y) < (h + k.h) / 2
+          expect(touche).toBe(false)
+        }
+      }
+    })
+
+  it('deux baies différentes en alternance, plus de trois copies de la même', () => {
+    const noms = miseEnPage(salle, vue).elements.map((e) => e.nom)
+    expect(noms).toContain('baie')
+    expect(noms).toContain('baie-2')
+  })
 })
