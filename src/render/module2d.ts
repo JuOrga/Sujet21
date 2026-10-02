@@ -241,3 +241,85 @@ export function miseEnPage(salle: Rect, vue: VueModule2d): MiseEnPage {
 export function vueGenerique(): VueModule2d {
   return { rangs: 6, voies: 3, rang: 1, voie: 1, joues: [1], suivants: (_r, v) => [v - 1, v, v + 1].filter((w) => w >= 0 && w < 3) }
 }
+
+/** Le centre d'une salle de la mini-carte, DANS LE MONDE, la salle jouée
+ *  (coque comprise) posée à sa place — le jumeau de miseEnPage. */
+export function centreCellule(salle: Rect, vue: VueModule2d, r: number, v: number): { x: number; y: number } {
+  const R = salle.maxX - salle.minX
+  const hr = (salle.maxY - salle.minY) / R
+  return {
+    x: (salle.minX + salle.maxX) / 2 + (r - vue.rang) * PAS_RANG * R,
+    // la voie 0 en HAUT : y monde décroît quand la voie croît
+    y: (salle.minY + salle.maxY) / 2 - (v - vue.voie) * PAS_VOIE * hr * R,
+  }
+}
+
+// LA TRANSITION ENTRE DEUX SALLES (le croquis du concepteur) : la salle
+// quittée rétrécit jusqu'à sa cellule, la vue glisse vers la droite, la
+// cellule choisie grossit jusqu'à la taille de la salle, puis la salle
+// apparaît — le plan d'ouverture habituel prend la suite.
+export const TRANSITION = { retrecit: 0.55, glisse: 0.7, grossit: 0.8, revele: 0.35 }
+export const DUREE_TRANSITION = TRANSITION.retrecit + TRANSITION.glisse + TRANSITION.grossit + TRANSITION.revele
+// le module vu pendant la glissade : la salle y tient 20 % du plan large
+// (à 30 %, le module ne se voyait presque pas autour des deux cellules)
+const ZOOM_MODULE = 0.2
+
+export interface ParamsTransition {
+  /** la cellule de la salle quittée, dans le monde */
+  de: { x: number; y: number }
+  /** la nouvelle salle, coque comprise */
+  salle: Rect
+  /** le zoom du plan large sur la nouvelle salle (celui du plan d'ouverture) */
+  zoomSalle: number
+}
+
+export interface EtatTransition {
+  camera: { x: number; y: number; zoom: number }
+  /** la cellule qui couvre la nouvelle salle : où, et à quel point elle la cache */
+  couvre: Rect
+  opacite: number
+}
+
+const doux = (t: number) => {
+  const u = Math.min(1, Math.max(0, t))
+  return u * u * (3 - 2 * u)
+}
+const mix = (a: number, b: number, t: number) => a + (b - a) * t
+const mixLog = (a: number, b: number, t: number) => Math.exp(mix(Math.log(a), Math.log(b), t))
+
+/** L'état de la transition à l'instant t (secondes depuis son début). */
+export function etatTransition(t: number, p: ParamsTransition): EtatTransition {
+  const { retrecit, glisse, grossit, revele } = TRANSITION
+  const R = p.salle.maxX - p.salle.minX
+  const a = { x: (p.salle.minX + p.salle.maxX) / 2, y: (p.salle.minY + p.salle.maxY) / 2 }
+  // la cellule quittée remplit d'abord l'écran comme une salle
+  const zDepart = p.zoomSalle / CELLULE_L
+  const zModule = p.zoomSalle * ZOOM_MODULE
+  const cl = CELLULE_L * R
+  const cellule = { minX: a.x - cl / 2, maxX: a.x + cl / 2, minY: a.y - cl / 3, maxY: a.y + cl / 3 }
+  const t1 = retrecit
+  const t2 = t1 + glisse
+  const t3 = t2 + grossit
+  let camera: EtatTransition['camera']
+  let couvre = cellule
+  let opacite = 1
+  if (t < t1) camera = { ...p.de, zoom: mixLog(zDepart, zModule, doux(t / retrecit)) }
+  else if (t < t2) {
+    const e = doux((t - t1) / glisse)
+    camera = { x: mix(p.de.x, a.x, e), y: mix(p.de.y, a.y, e), zoom: zModule }
+  } else if (t < t3) {
+    const e = doux((t - t2) / grossit)
+    camera = { ...a, zoom: mixLog(zModule, p.zoomSalle, e) }
+    couvre = {
+      minX: mix(cellule.minX, p.salle.minX, e),
+      maxX: mix(cellule.maxX, p.salle.maxX, e),
+      minY: mix(cellule.minY, p.salle.minY, e),
+      maxY: mix(cellule.maxY, p.salle.maxY, e),
+    }
+  } else {
+    camera = { ...a, zoom: p.zoomSalle }
+    couvre = p.salle
+    opacite = 1 - doux((t - t3) / revele)
+  }
+  return { camera, couvre, opacite }
+}

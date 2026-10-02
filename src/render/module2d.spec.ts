@@ -2,7 +2,18 @@
 // se lit dans les cellules et les tubes, la silhouette est fermée et habillée.
 
 import { describe, expect, it } from 'vitest'
-import { CELLULE_L, TOILE_MAX, etats, miseEnPage, vueGenerique, type VueModule2d } from './module2d'
+import {
+  CELLULE_L,
+  DUREE_TRANSITION,
+  TOILE_MAX,
+  TRANSITION,
+  centreCellule,
+  etatTransition,
+  etats,
+  miseEnPage,
+  vueGenerique,
+  type VueModule2d,
+} from './module2d'
 
 const salle = { minX: -534, minY: -364, maxX: 534, maxY: 364 }
 // six rangs, trois voies ; on joue la voie 0 au rang 1, venu de la voie 1
@@ -115,5 +126,55 @@ describe('module 2D — la mise en page', () => {
   it('hors d’une run, une mini-carte d’attente', () => {
     const g = miseEnPage(salle, vueGenerique())
     expect(g.cellules).toHaveLength(17)
+  })
+})
+
+describe('module 2D — la transition entre deux salles', () => {
+  const mp = miseEnPage(salle, vue)
+  const de = centreCellule(salle, vue, 0, 1) // la salle quittée : rang 0, voie 1
+  const p = { de, salle, zoomSalle: 0.6 }
+
+  it('le centre d’une cellule dans le monde est bien celui que la toile dessine', () => {
+    const c = mp.cellules.find((k) => k.etat === 'joue')!
+    const versMondeX = (x: number) => mp.monde.minX + (x / mp.largeur) * (mp.monde.maxX - mp.monde.minX)
+    const versMondeY = (y: number) => mp.monde.maxY - (y / mp.hauteur) * (mp.monde.maxY - mp.monde.minY)
+    expect(versMondeX(c.x)).toBeCloseTo(de.x, 6)
+    expect(versMondeY(c.y)).toBeCloseTo(de.y, 6)
+  })
+
+  it('elle part sur la salle quittée, qui remplit l’écran comme une salle', () => {
+    const e = etatTransition(0, p)
+    expect(e.camera.x).toBeCloseTo(de.x, 9)
+    expect(e.camera.y).toBeCloseTo(de.y, 9)
+    expect(e.camera.zoom).toBeCloseTo(p.zoomSalle / CELLULE_L, 9)
+  })
+
+  it('elle finit sur la nouvelle salle, au plan large, la cellule à sa taille et effacée', () => {
+    const e = etatTransition(DUREE_TRANSITION, p)
+    expect(e.camera.x).toBeCloseTo(0, 9)
+    expect(e.camera.y).toBeCloseTo(0, 9)
+    expect(e.camera.zoom).toBeCloseTo(p.zoomSalle, 9)
+    expect(e.couvre).toEqual(salle)
+    expect(e.opacite).toBeCloseTo(0, 9)
+  })
+
+  it('rétrécir, puis glisser vers la DROITE, puis grossir : sans saut entre les temps', () => {
+    let av = etatTransition(0, p)
+    for (let t = 0.01; t <= DUREE_TRANSITION; t += 0.01) {
+      const e = etatTransition(t, p)
+      expect(Math.abs(Math.log(e.camera.zoom / av.camera.zoom))).toBeLessThan(0.08)
+      expect(Math.abs(e.camera.x - av.camera.x)).toBeLessThan(0.03 * (salle.maxX - salle.minX))
+      expect(e.camera.x).toBeGreaterThanOrEqual(av.camera.x - 1e-9) // toujours vers la droite
+      av = e
+    }
+    const g = TRANSITION.retrecit + TRANSITION.glisse
+    const l = (r: { minX: number; maxX: number }) => r.maxX - r.minX
+    expect(l(etatTransition(g, p).couvre)).toBeCloseTo(CELLULE_L * (salle.maxX - salle.minX), 6)
+    expect(l(etatTransition(g + TRANSITION.grossit / 2, p).couvre)).toBeGreaterThan(l(etatTransition(g, p).couvre))
+  })
+
+  it('la salle reste cachée tant que la cellule grossit', () => {
+    for (let t = 0; t < TRANSITION.retrecit + TRANSITION.glisse + TRANSITION.grossit; t += 0.05)
+      expect(etatTransition(t, p).opacite).toBe(1)
   })
 })

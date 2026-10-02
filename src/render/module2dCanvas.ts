@@ -26,6 +26,7 @@ export const PIECES_MODULE2D = [
   'cellule-ambre',
   'cellule-bleu',
   'cellule-ferme',
+  'cellule-neutre',
   'equipement-grand-solaire',
   'equipement-petit-solaire',
   'equipement-antenne',

@@ -315,7 +315,15 @@ import {
 } from './bench/changelog'
 import { Camera } from './render/camera'
 import { COQUE_EPAISSEUR } from './render/coque'
-import { miseEnPage, vueGenerique, type VueModule2d } from './render/module2d'
+import {
+  DUREE_TRANSITION,
+  centreCellule,
+  etatTransition,
+  miseEnPage,
+  vueGenerique,
+  type ParamsTransition,
+  type VueModule2d,
+} from './render/module2d'
 import { chargePiecesModule2d, peintModule2d, type Pieces } from './render/module2dCanvas'
 import { MAX_BOXES, Renderer } from './render/renderer'
 import { Motes, VIE_STRIDE, remplitVie, toucheLeCorps } from './render/vie'
@@ -1447,7 +1455,46 @@ function majModule2d(b: { minX: number; minY: number; maxX: number; maxY: number
     const mp = miseEnPage(avecCoque, vueModule2d())
     module2dToile = { toile: peintModule2d(mp, piecesModule2d), monde: mp.monde }
   }
-  if (module2dToile) renderer.setModule2d({ ...module2dToile, version: module2dVersion, salle: b })
+  module2dVu = { module: m?.id ?? '', niveau: carteRun.niveau }
+  if (module2dToile)
+    renderer.setModule2d({ ...module2dToile, version: module2dVersion, salle: b, cellule: piecesModule2d.get('cellule-neutre') })
+  // la transition en cours : la cellule qui grossit sur la salle
+  const tt = camera.piloteT
+  renderer.setCouvertureModule2d(tt !== null && transition2d ? { salle: transition2d.salle, ...etatTransition(tt, transition2d) } : null)
+}
+/** La salle où le module en 2D a été vu pour la dernière fois : la
+ *  transition ne joue que vers la salle SUIVANTE du même module. */
+let module2dVu: { module: string; niveau: number } | null = null
+let transition2d: ParamsTransition | null = null
+/** LA TRANSITION ENTRE DEUX SALLES (module2d.ts, etatTransition) : au lieu du
+ *  plan large tenu, la salle quittée rétrécit dans sa cellule, la vue glisse
+ *  vers la droite, la cellule choisie grossit jusqu'à la salle. Elle ne joue
+ *  que si l'on vient de la salle d'avant dans le même module — pas à un
+ *  nouvel essai, ni à l'entrée d'un module, ni après une halte. Rend vrai
+ *  si elle joue (le plan d'ouverture suivra, sans son plan large). */
+function lanceTransition2d(b: { minX: number; minY: number; maxX: number; maxY: number }, vw: number, vh: number): boolean {
+  const avant = module2dVu
+  const m = moduleEnCours()
+  if (!module2dActif || level.coque === 'structures' || !piecesModule2d || !avant) return false
+  if (avant.module !== (m?.id ?? '') || carteRun.niveau !== avant.niveau + 1) return false
+  const vue = vueModule2d()
+  const vient = vue.joues[vue.rang - 1]
+  if (vue.rang < 1 || vient === undefined) return false
+  const T = COQUE_EPAISSEUR
+  const salle = { minX: b.minX - T, minY: b.minY - T, maxX: b.maxX + T, maxY: b.maxY + T }
+  const zoomSalle = Math.min(vw / (b.maxX - b.minX), vh / (b.maxY - b.minY)) * 0.92
+  const p: ParamsTransition = { de: centreCellule(salle, vue, vue.rang - 1, vient), salle, zoomSalle }
+  transition2d = p
+  camera.piloter(
+    (t) => etatTransition(t, p).camera,
+    DUREE_TRANSITION,
+    () => {
+      transition2d = null
+      renderer.setCouvertureModule2d(null)
+      camera.startIntro(b, vw, vh, 0.25)
+    },
+  )
+  return true
 }
 let module2dToile: { toile: HTMLCanvasElement; monde: { minX: number; minY: number; maxX: number; maxY: number } } | null = null
 /** CE QU'ON TROUVERA dans un module qu'on n'a pas encore entré — les types,
@@ -16826,14 +16873,16 @@ function restart(): void {
   sequenceur.reinitialise()
   appliqueSequence()
   if (document.body.classList.contains('playing')) {
-    camera.startIntro(sim.bounds, window.innerWidth, window.innerHeight)
+    const enTransition = lanceTransition2d(sim.bounds, window.innerWidth, window.innerHeight)
+    if (!enTransition) camera.startIntro(sim.bounds, window.innerWidth, window.innerHeight)
     // le RÉVEIL : tirage du petit scénario joué pendant l'intro caméra —
     // chronométré en temps RÉEL. Le plan d'ouverture, lui, tolère les
     // accrocs (une image longue ne le fait pas sauter, voir camera.ts) : sur
     // une machine qui traîne, il dure un peu plus que le réveil — sans
     // conséquence, le réveil s'éteint de lui-même à la fin du plan.
     reveil.actif = true
-    reveil.t0 = performance.now() / 1000
+    // la transition passe d'abord : le réveil part avec le plan d'ouverture
+    reveil.t0 = performance.now() / 1000 + (enTransition ? DUREE_TRANSITION : 0)
     reveil.frissonT = Math.random() < 0.7 ? 0.4 + Math.random() * 1.2 : -1
     reveil.frissonFait = false
     const bv = level.bounds

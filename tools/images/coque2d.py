@@ -17,7 +17,8 @@ couloir. Le moteur les lit dans public/assets/coque2d-*.webp
   rester ce qui se lit en premier (maquette v0).
 · LA CELLULE EN QUATRE ÉTATS, précalculés : jouée (grise), joignable
   maintenant (ambre, lampes allumées), joignable plus loin (bleue), fermée
-  (éteinte, croix) — le moteur n'a qu'à choisir l'image.
+  (éteinte, croix) — le moteur n'a qu'à choisir l'image ; et neutre, celle
+  qui grossit jusqu'à la salle pendant la transition.
 · LE CORPS DE CHAQUE BOUT, sans son collier : une bande prise en haut de
   l'image, qui se répète le long d'un bord vertical de n'importe quelle
   hauteur.
@@ -78,8 +79,12 @@ def cellule() -> None:
     a = lit('cellule')
     gris = a.mean(2, keepdims=True)
     h, w = a.shape[:2]
-    for etat in ('joue', 'ambre', 'bleu', 'ferme'):
-        if etat == 'joue':
+    for etat in ('joue', 'ambre', 'bleu', 'ferme', 'neutre'):
+        if etat == 'neutre':
+            # celle qui grossit jusqu'à la salle pendant la transition : ses
+            # lampes allumées, à cette taille, faisaient deux taches orange
+            c = a
+        elif etat == 'joue':
             c = (gris * 0.9 + a * 0.1) * 0.95
         elif etat == 'ferme':
             c = np.repeat(gris * 0.35, 3, axis=2)

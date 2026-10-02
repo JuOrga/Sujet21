@@ -90,6 +90,7 @@ export class Camera {
   // « attrape » le monde — le doigt part à droite, la caméra part à gauche.
   // La caméra tient ensuite la position jusqu'au recadrage (⌖).
   panBy(dxPx: number, dyPx: number): void {
+    this.finitPilote() // d'abord : sa suite (le plan d'ouverture) s'annule aussitôt
     this.introTimer = 0
     this.manualPan = true
     this.glideVx = 0 // la main posée arrête toute glissade en cours
@@ -120,6 +121,7 @@ export class Camera {
     viewportH: number,
     p: SimParams,
   ): void {
+    this.finitPilote() // d'abord : sa suite (le plan d'ouverture) s'annule aussitôt
     this.introTimer = 0
     this.vueL = viewportW
     this.vueH = viewportH
@@ -137,12 +139,38 @@ export class Camera {
   }
 
   cancelIntro(): void {
+    this.finitPilote() // d'abord : sa suite (le plan d'ouverture) s'annule aussitôt
     this.introTimer = 0
   }
 
-  /** Le plan large d'ouverture joue encore ? (l'éveil attend sa fin) */
+  /** Le plan large d'ouverture joue encore ? (l'éveil attend sa fin) — la
+   *  transition entre deux salles en fait partie : on n'agit pas avant. */
   get introEnCours(): boolean {
-    return this.introTimer > 0
+    return this.introTimer > 0 || this.pilote !== null
+  }
+
+  // LE PILOTE : un plan dicté image par image (la transition entre deux
+  // salles du module en 2D, render/module2d.ts). Son horloge est celle du
+  // plan d'ouverture — plafonnée par image, pour la même raison (un accroc
+  // ne fait pas sauter le plan). La main qui reprend la caméra l'abrège.
+  private pilote: { f: (t: number) => { x: number; y: number; zoom: number }; duree: number; t: number; ensuite: () => void } | null = null
+  piloter(f: (t: number) => { x: number; y: number; zoom: number }, duree: number, ensuite: () => void): void {
+    this.pilote = { f, duree, t: 0, ensuite }
+    this.introTimer = 0
+    this.manualZoom = null
+    this.manualPan = false
+    const c = f(0)
+    this.snapTo(c.x, c.y, c.zoom)
+  }
+  /** Où en est le plan piloté (secondes), null s'il n'y en a pas. */
+  get piloteT(): number | null {
+    return this.pilote ? this.pilote.t : null
+  }
+  private finitPilote(): void {
+    const p = this.pilote
+    if (!p) return
+    this.pilote = null
+    p.ensuite()
   }
 
   snapTo(x: number, y: number, zoom: number): void {
@@ -153,6 +181,7 @@ export class Camera {
   }
 
   zoomBy(factor: number, p: SimParams): void {
+    this.finitPilote() // d'abord : sa suite (le plan d'ouverture) s'annule aussitôt
     this.introTimer = 0 // la molette reprend la main sur le zoom d'ouverture
     const base = this.manualZoom ?? this.zoom
     this.manualZoom = Math.min(
@@ -235,6 +264,17 @@ export class Camera {
     if (this.manualZoom !== null) {
       this.manualZoom = Math.max(this.manualZoom, this.plancher(p))
       targetZoom = this.manualZoom
+    }
+
+    if (this.pilote) {
+      const pl = this.pilote
+      pl.t = Math.min(pl.duree, pl.t + Math.min(dtReal, INTRO_DT_MAX))
+      const c = pl.f(pl.t)
+      this.x = c.x
+      this.y = c.y
+      this.zoom = c.zoom
+      if (pl.t >= pl.duree) this.finitPilote()
+      return
     }
 
     // Zoom d'ouverture : plan large tenu, puis plongée adoucie vers le corps
