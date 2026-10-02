@@ -5045,6 +5045,36 @@ const FICHIER_DECAL: Record<DecalDef['kind'], string> = {
 /** Les planches de vues livrées, lues une fois : le glob de Vite. */
 const PLANCHES_LIVREES = planchesLivrees()
 
+// LE MODULE EN 2D DE FACE autour de la salle (render/module2d.ts) : une toile
+// composée hors du moteur (module2dCanvas.ts), posée dans le monde comme un
+// seul quad. Rien ne s'en peint dans la salle — la salle y est encastrée.
+const MODULE2D_VS = `#version 300 es
+uniform vec4 uRect;
+uniform vec2 uCenter;
+uniform vec2 uViewport;
+uniform float uZoom;
+out vec2 vMonde;
+void main() {
+  int i = gl_VertexID;
+  vec2 c = vec2((i == 1 || i == 2 || i == 4) ? 1.0 : 0.0, (i == 2 || i == 4 || i == 5) ? 1.0 : 0.0);
+  vMonde = mix(uRect.xy, uRect.zw, c);
+  gl_Position = vec4((vMonde - uCenter) * uZoom / (uViewport * 0.5), 0.0, 1.0);
+}`
+
+const MODULE2D_FS = `#version 300 es
+precision highp float;
+in vec2 vMonde;
+uniform sampler2D uToile;
+uniform vec4 uRect;
+uniform vec4 uSalle;
+out vec4 outColor;
+void main() {
+  if (all(greaterThan(vMonde, uSalle.xy)) && all(lessThan(vMonde, uSalle.zw))) discard;
+  // la toile a son origine EN HAUT (une toile 2D) : v descend avec y
+  vec2 uv = vec2((vMonde.x - uRect.x) / (uRect.z - uRect.x), (uRect.w - vMonde.y) / (uRect.w - uRect.y));
+  outColor = texture(uToile, uv);
+}`
+
 export class Renderer {
   private readonly gl: WebGL2RenderingContext
   private readonly canvas: HTMLCanvasElement
@@ -5108,6 +5138,7 @@ export class Renderer {
   private cibleW = 1
   private cibleH = 1
   private readonly decalProgram: WebGLProgram
+  private readonly module2dProgram: WebGLProgram
   private readonly lightProgram: WebGLProgram
   private readonly vieProgram: WebGLProgram
   private readonly vieVao: WebGLVertexArrayObject
@@ -5290,6 +5321,7 @@ export class Renderer {
       { nom: 'sponge', vs: SPONGE_VS, fs: SPONGE_FS },
       { nom: 'hull', vs: HULL_VS, fs: HULL_FS },
       { nom: 'decal', vs: DECAL_VS, fs: DECAL_FS },
+      { nom: 'module2d', vs: MODULE2D_VS, fs: MODULE2D_FS },
       { nom: 'light', vs: COMPOSE_VS, fs: LIGHT_FS },
       { nom: 'vie', vs: VIE_VS, fs: VIE_FS },
       { nom: 'recopie', vs: COMPOSE_VS, fs: RECOPIE_FS },
@@ -5299,6 +5331,7 @@ export class Renderer {
     this.spongeProgram = this.programmes.programme('sponge')
     this.hullProgram = this.programmes.programme('hull')
     this.decalProgram = this.programmes.programme('decal')
+    this.module2dProgram = this.programmes.programme('module2d')
     this.lightProgram = this.programmes.programme('light')
     this.vieProgram = this.programmes.programme('vie')
     this.recopieProgram = this.programmes.programme('recopie')
@@ -5618,7 +5651,7 @@ export class Renderer {
   pret(): boolean {
     if (this.programmesPrets) return true
     if (!this.programmes.pret()) return false
-    for (const nom of ['splat', 'compose', 'sponge', 'hull', 'decal', 'light', 'vie', 'recopie'])
+    for (const nom of ['splat', 'compose', 'sponge', 'hull', 'decal', 'light', 'vie', 'recopie', 'module2d'])
       this.uniforms[nom] = this.programmes.uniformes(nom)
     this.programmesPrets = true
     return true
@@ -5790,6 +5823,60 @@ export class Renderer {
     gl.deleteTexture(tex)
     bitmap.close()
     return px[2] > 128 && px[0] < 128
+  }
+
+  /** LE MODULE EN 2D (render/module2d.ts) : sa toile, où elle tombe dans le
+   *  monde, la salle qui y est encastrée. La toile ne remonte au GPU que
+   *  quand elle change (`version`). null l'éteint. */
+  setModule2d(m: { toile: TexImageSource; version: number; monde: { minX: number; minY: number; maxX: number; maxY: number }; salle: { minX: number; minY: number; maxX: number; maxY: number } } | null): void {
+    if (!m) {
+      this.module2d = null
+      return
+    }
+    const gl = this.gl
+    if (m.version !== this.module2dVersion || !this.texModule2d) {
+      if (!this.texModule2d) this.texModule2d = gl.createTexture()!
+      gl.bindTexture(gl.TEXTURE_2D, this.texModule2d)
+      // prémultipliée : le noir autour de la coque est transparent, le
+      // fondu de ses bords ne laisse pas de liseré sombre
+      gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, true)
+      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, gl.RGBA, gl.UNSIGNED_BYTE, m.toile)
+      gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, false)
+      gl.generateMipmap(gl.TEXTURE_2D)
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR)
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR)
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE)
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE)
+      gl.bindTexture(gl.TEXTURE_2D, this.fieldTex)
+      this.module2dVersion = m.version
+    }
+    this.module2d = { monde: m.monde, salle: m.salle }
+  }
+  private module2d: { monde: { minX: number; minY: number; maxX: number; maxY: number }; salle: { minX: number; minY: number; maxX: number; maxY: number } } | null = null
+  private texModule2d: WebGLTexture | null = null
+  private module2dVersion = -1
+
+  private drawModule2d(camera: Camera, viewportW: number, viewportH: number): void {
+    const m = this.module2d
+    if (!m || !this.texModule2d) return
+    const gl = this.gl
+    gl.useProgram(this.module2dProgram)
+    const u = this.uniforms['module2d']
+    gl.uniform4f(u['uRect'], m.monde.minX, m.monde.minY, m.monde.maxX, m.monde.maxY)
+    gl.uniform2f(u['uCenter'], camera.x, camera.y)
+    gl.uniform2f(u['uViewport'], viewportW, viewportH)
+    gl.uniform1f(u['uZoom'], camera.zoom)
+    gl.uniform4f(u['uSalle'], m.salle.minX, m.salle.minY, m.salle.maxX, m.salle.maxY)
+    gl.activeTexture(gl.TEXTURE0)
+    gl.bindTexture(gl.TEXTURE_2D, this.texModule2d)
+    gl.uniform1i(u['uToile'], 0)
+    gl.enable(gl.BLEND)
+    gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA)
+    gl.bindVertexArray(null)
+    gl.drawArrays(gl.TRIANGLES, 0, 6)
+    gl.disable(gl.BLEND)
+    // l'unité 0 porte le champ du fluide : les passes suivantes l'y lisent
+    gl.bindTexture(gl.TEXTURE_2D, this.fieldTex)
   }
 
   private loadTexture(
@@ -6634,6 +6721,10 @@ export class Renderer {
     // Passe B bis — coque texturée autour de la cuve. Un tableau bâti en
     // MODULES n'a pas de cuve : ses parois sont celles de ses coques, et
     // le dehors doit rester le vide.
+    // Passe B bis, avant la coque — LE MODULE EN 2D autour de la salle
+    // (render/module2d.ts) : par-dessus le ciel, jamais dans la salle, et la
+    // coque de la salle repasse par-dessus son bord
+    if (!this.solModules) this.drawModule2d(camera, viewportW, viewportH)
     if (!this.solModules)
       this.drawHull(sim, camera, viewportW, viewportH, boxes, timeSec)
 

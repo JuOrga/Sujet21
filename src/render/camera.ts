@@ -16,6 +16,10 @@ const MANUAL_MAX_FACTOR = 5
 // fois. Le ciel ne se répète plus, le recul ne coûte donc plus rien au fond :
 // la salle tient désormais dans un quart.)
 const RECUL_MAX = 0.25
+// LE GRAND RECUL : quand le module en 2D entoure la salle (render/module2d.ts),
+// reculer révèle où l'on est dans le module — la salle n'y tient plus que
+// 8 % de l'écran, de quoi voir le module entier (six rangs).
+export const RECUL_MODULE = 0.08
 
 // L'horloge du plan d'ouverture ne compte jamais plus qu'une image « lente »
 // par image réelle. Le début d'un tableau est précisément le moment des
@@ -174,8 +178,12 @@ export class Camera {
     if (this.nivL <= 0 || this.nivH <= 0 || this.vueL <= 0 || this.vueH <= 0)
       return absolu
     const salle = Math.min(this.vueL / this.nivL, this.vueH / this.nivH)
+    if (this.reculModule) return salle * RECUL_MODULE
     return Math.max(absolu, salle * RECUL_MAX)
   }
+
+  /** Le grand recul est permis (main.ts, quand le module en 2D est affiché). */
+  reculModule = false
 
   resetAutoZoom(): void {
     this.manualZoom = null

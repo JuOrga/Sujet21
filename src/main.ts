@@ -314,6 +314,9 @@ import {
   versionDe,
 } from './bench/changelog'
 import { Camera } from './render/camera'
+import { COQUE_EPAISSEUR } from './render/coque'
+import { miseEnPage, vueGenerique, type VueModule2d } from './render/module2d'
+import { chargePiecesModule2d, peintModule2d, type Pieces } from './render/module2dCanvas'
 import { MAX_BOXES, Renderer } from './render/renderer'
 import { Motes, VIE_STRIDE, remplitVie, toucheLeCorps } from './render/vie'
 import { panDepuis } from './game/ouie'
@@ -1402,6 +1405,51 @@ function miniCarteDuModule(): MiniCarte | null {
   // franchies dedans se retranchent du rang courant
   return tisseModule(m, carteRun.tissage, voieRang - carteRun.niveau)
 }
+/** LE MODULE EN 2D autour de la salle (render/module2d.ts) : sa mini-carte
+ *  vue d'ici — la voie jouée à chaque rang franchi, ce qui part de chaque
+ *  salle —, ou une mini-carte d'attente hors d'une run. */
+function vueModule2d(): VueModule2d {
+  const mini = miniCarteDuModule()
+  if (!mini || mini.rangs.length === 0) return vueGenerique()
+  const rang = Math.min(carteRun.niveau, mini.rangs.length - 1)
+  const tr = carteRun.trace[rang]
+  const voie = typeof tr === 'number' ? tr : (derniereVoie(carteRun) ?? Math.floor(mini.voies / 2))
+  return {
+    rangs: mini.rangs.length,
+    voies: mini.voies,
+    rang,
+    voie,
+    joues: carteRun.trace.slice(0, rang),
+    suivants: (r, v) => mini.rangs[r]?.[v]?.suivants ?? [],
+  }
+}
+// la toile se recompose seulement quand la run avance (la clé) ; les pièces
+// se chargent une fois, à la première salle
+let piecesModule2d: Pieces | null = null
+let piecesModule2dDemandees = false
+let module2dCle = ''
+let module2dVersion = 0
+function majModule2d(b: { minX: number; minY: number; maxX: number; maxY: number }): void {
+  if (!piecesModule2dDemandees) {
+    piecesModule2dDemandees = true
+    chargePiecesModule2d()
+      .then((p) => (piecesModule2d = p))
+      .catch((e) => console.warn('module 2D :', e))
+  }
+  if (!piecesModule2d) return
+  const m = moduleEnCours()
+  const cle = `${b.minX},${b.minY},${b.maxX},${b.maxY}|${m?.id ?? ''}|${carteRun.niveau}|${carteRun.trace.join(',')}|${carteRun.tissage}`
+  const T = COQUE_EPAISSEUR
+  const avecCoque = { minX: b.minX - T, minY: b.minY - T, maxX: b.maxX + T, maxY: b.maxY + T }
+  if (cle !== module2dCle) {
+    module2dCle = cle
+    module2dVersion++
+    const mp = miseEnPage(avecCoque, vueModule2d())
+    module2dToile = { toile: peintModule2d(mp, piecesModule2d), monde: mp.monde }
+  }
+  if (module2dToile) renderer.setModule2d({ ...module2dToile, version: module2dVersion, salle: b })
+}
+let module2dToile: { toile: HTMLCanvasElement; monde: { minX: number; minY: number; maxX: number; maxY: number } } | null = null
 /** CE QU'ON TROUVERA dans un module qu'on n'a pas encore entré — les types,
  *  pas les comptes (le concepteur, 16/09). Le rang d'entrée s'estime par le
  *  plus court chemin ; seule la part des figures en dépend. */
@@ -3756,6 +3804,17 @@ let decorRiche = localStorage.getItem('sujet21-decor') !== 'sobre'
 // temps de le mettre au point : seule la coque se dessine, avec les vides
 // qui la percent. ?exterieur=1 (ou 0) dans l'adresse l'impose et s'en
 // souvient — c'est le chemin des aperçus sur tablette.
+// LE MODULE EN 2D (render/module2d.ts) : ?module2d=1 (ou 0) dans l'adresse
+// l'impose et s'en souvient, comme le dehors ; allumé par défaut.
+let module2dActif = (() => {
+  const q = new URLSearchParams(location.search).get('module2d')
+  try {
+    if (q === '1' || q === '0') localStorage.setItem('sujet21-module2d', q === '1' ? 'on' : 'off')
+    return localStorage.getItem('sujet21-module2d') !== 'off'
+  } catch {
+    return q !== '0'
+  }
+})()
 let exterieurActif = (() => {
   const q = new URLSearchParams(location.search).get('exterieur')
   try {
@@ -19761,6 +19820,12 @@ function corpsImage(now: number): boolean {
   // La salle d'abord : le plancher du recul se règle sur elle, quelle que
   // soit la façon dont elle a été ouverte (render/camera.ts, salle)
   camera.salle(sim.bounds)
+  // LE MODULE EN 2D autour de la salle : pas pour un tableau bâti en modules
+  // (il EST un module, ses coques sont ses parois)
+  const module2dIci = module2dActif && level.coque !== 'structures'
+  camera.reculModule = module2dIci
+  if (module2dIci) majModule2d(sim.bounds)
+  else renderer.setModule2d(null)
   if (monitor.overview) {
     const b = sim.bounds
     const fitZoom =
