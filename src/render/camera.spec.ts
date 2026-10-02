@@ -119,3 +119,52 @@ describe('caméra — le fond du recul suit la salle ouverte', () => {
     expect(cam.manualZoom).toBeCloseTo(Math.min(VW / 9000, VH / 6000) * 0.25, 6)
   })
 })
+
+describe('caméra — le plan PILOTÉ (la transition entre deux salles)', () => {
+  const plan = (t: number) => ({ x: t * 100, y: 0, zoom: 1 + t })
+
+  it('suit le plan image par image, compte comme l’ouverture, puis rend la main', () => {
+    const cam = new Camera()
+    let fini = 0
+    cam.piloter(plan, 1, () => fini++)
+    expect(cam.introEnCours).toBe(true)
+    expect(cam.x).toBe(0)
+    for (let i = 0; i < 30; i++) cam.update(1 / 60, 0, 0, 50, VW, VH, DEFAULT_PARAMS)
+    expect(cam.piloteT).toBeCloseTo(0.5, 6)
+    expect(cam.x).toBeCloseTo(50, 6)
+    for (let i = 0; i < 40; i++) cam.update(1 / 60, 0, 0, 50, VW, VH, DEFAULT_PARAMS)
+    expect(fini).toBe(1)
+    expect(cam.piloteT).toBeNull()
+  })
+
+  it('une image longue ne fait pas sauter le plan (horloge plafonnée)', () => {
+    const cam = new Camera()
+    cam.piloter(plan, 1, () => {})
+    cam.update(0.5, 0, 0, 50, VW, VH, DEFAULT_PARAMS)
+    expect(cam.piloteT!).toBeLessThan(0.05)
+  })
+
+  it('la main qui reprend la caméra l’abrège — et la suite joue quand même', () => {
+    const cam = new Camera()
+    let fini = 0
+    // la suite du jeu : le plan d'ouverture
+    cam.piloter(plan, 1, () => {
+      fini++
+      cam.startIntro(BOUNDS, VW, VH, 0.25)
+    })
+    cam.panBy(10, 0)
+    expect(fini).toBe(1)
+    expect(cam.piloteT).toBeNull()
+    expect(cam.introEnCours).toBe(false) // la main garde la caméra
+  })
+  it('un plan d’ouverture lancé en pleine transition l’arrête, sans jouer sa suite', () => {
+    const cam = new Camera()
+    let fini = 0
+    cam.piloter(plan, 1, () => fini++)
+    cam.update(1 / 60, 0, 0, 50, VW, VH, DEFAULT_PARAMS)
+    cam.startIntro(BOUNDS, VW, VH, TENUE, PLONGEE)
+    expect(cam.piloteT).toBeNull()
+    for (let i = 0; i < 120; i++) cam.update(1 / 60, CORPS.x, CORPS.y, CORPS.r, VW, VH, DEFAULT_PARAMS)
+    expect(fini).toBe(0)
+  })
+})

@@ -2014,3 +2014,38 @@ through lighting.
 luminance moyenne ≤ 0,22 par pièce, raccord haut/bas du tronçon et du treillis
 (écart moyen de la première et de la dernière ligne), aucune zone > 0,85 de
 luminance sur plus de 2 % de la pièce (le « blanc franc »).
+
+## 35. LE MODULE EN 2D DE FACE — la coque du module, la mini-carte dedans 🔎 EN APERÇU (02/10)
+
+Le décor autour de la salle, tout en 2D, dans le plan de la salle (le
+croquis du concepteur, 01/10) : le module est une grande coque, la salle
+jouée y est encastrée à sa place dans la grille de la mini-carte — rangs
+de gauche à droite, voies en lignes —, les autres salles en cellules au
+tiers de sa largeur, reliées par des tubes. Silhouette « étagée » : un pont
+surélevé au milieu, une salle des machines sous la fin du module
+(`render/module2d.ts`, `render/module2dCanvas.ts`).
+
+**Les pièces du module tempéré** (`masters/images/coque2d/`, puis
+`python3 tools/images/coque2d.py`, qui détoure, assombrit la coque d'un
+quart et livre à moitié de la taille source) :
+
+| pièce | état |
+| --- | --- |
+| tôle (deux variantes, raccord 4 sens) | ✅ livrées 01/10 |
+| bord haut (rebord à serres), bord bas (quille à tuyères) | ✅ livrés 01/10 |
+| bout gauche (collier d'entrée), bout droit (sas de sortie) | ✅ livrés 01/10 |
+| quatre coins saillants | ✅ livrés 01/10 (le haut-droit : le haut-gauche en miroir) |
+| deux angles rentrants (haut, bas ; les autres en miroir) | ✅ livrés 02/10 |
+| baie de serre, trappe ronde, bloc de machinerie | ✅ livrés 01/10 |
+| cellule de la mini-carte (quatre états précalculés) | ✅ livrée 01/10 |
+| équipements extérieurs (planche de six) | ✅ livrée 01/10 |
+
+**Une forme fixe par type de module** (`formeDuBiome`) : étagée pour la
+serre tempérée, fuseau pour la chaufferie, dorsale pour le cryo — les
+marches accrochées aux rangs de la mini-carte, jamais à la salle jouée.
+Pièces livrées à 80 % des sources : près de la salle, une seconde toile à
+850 px par largeur de salle garde le décor net quand on zoome.
+
+**À venir** : les pièces propres de chaque module (la chaufferie et le
+cryo prennent celles de la serre en attendant) ; une deuxième variante de
+baie et de trappe.

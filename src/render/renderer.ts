@@ -5045,6 +5045,78 @@ const FICHIER_DECAL: Record<DecalDef['kind'], string> = {
 /** Les planches de vues livrées, lues une fois : le glob de Vite. */
 const PLANCHES_LIVREES = planchesLivrees()
 
+// LE MODULE EN 2D DE FACE autour de la salle (render/module2d.ts) : une toile
+// composée hors du moteur (module2dCanvas.ts), posée dans le monde comme un
+// seul quad. Rien ne s'en peint dans la salle — la salle y est encastrée.
+const MODULE2D_VS = `#version 300 es
+uniform vec4 uQuad;      // ce que le quad couvre : la toile, ou la salle (la couverture)
+uniform vec2 uCenter;
+uniform vec2 uViewport;
+uniform float uZoom;
+out vec2 vMonde;
+void main() {
+  int i = gl_VertexID;
+  vec2 c = vec2((i == 1 || i == 2 || i == 4) ? 1.0 : 0.0, (i == 2 || i == 4 || i == 5) ? 1.0 : 0.0);
+  vMonde = mix(uQuad.xy, uQuad.zw, c);
+  gl_Position = vec4((vMonde - uCenter) * uZoom / (uViewport * 0.5), 0.0, 1.0);
+}`
+
+const MODULE2D_FS = `#version 300 es
+precision highp float;
+in vec2 vMonde;
+uniform sampler2D uToile;
+uniform vec4 uRect;
+uniform vec4 uSalle;
+uniform sampler2D uProche; // la toile PROCHE, plus fine, autour de la salle
+uniform vec4 uRectP;
+uniform float uHasP;
+uniform vec4 uCoque;     // la salle et sa coque : le décor s'y fond
+uniform float uMode;     // 0 : autour de la salle ; 1 : la COUVERTURE de la transition
+uniform vec4 uCouv;      // la cellule qui grossit, dans le monde
+uniform float uCouvA;    // à quel point elle cache la salle
+uniform sampler2D uCellule;
+out vec4 outColor;
+void main() {
+  bool dansSalle = all(greaterThan(vMonde, uSalle.xy)) && all(lessThan(vMonde, uSalle.zw));
+  if (uMode < 0.5 && dansSalle) discard;
+  // LE FONDU AU BORD DE LA SALLE : la limite était une coupure nette entre
+  // la salle et le décor (aperçu du 02/10). Contre la coque, le décor est
+  // dans l'OMBRE de la salle et légèrement FLOU, comme une profondeur de
+  // champ ; à une demi-salle, il est net et pleinement éclairé.
+  vec2 dd = max(max(uCoque.xy - vMonde, vMonde - uCoque.zw), 0.0);
+  float d = length(dd) / (uCoque.z - uCoque.x);
+  float flou = uMode > 0.5 ? 0.0 : 2.2 * (1.0 - smoothstep(0.0, 0.14, d));
+  // la toile a son origine EN HAUT (une toile 2D) : v descend avec y
+  vec2 uv = vec2((vMonde.x - uRect.x) / (uRect.z - uRect.x), (uRect.w - vMonde.y) / (uRect.w - uRect.y));
+  vec4 c = texture(uToile, uv, flou);
+  if (uHasP > 0.5) {
+    // près de la salle, la toile fine ; elle se fond dans l'autre sur ses bords
+    vec2 up = vec2((vMonde.x - uRectP.x) / (uRectP.z - uRectP.x), (uRectP.w - vMonde.y) / (uRectP.w - uRectP.y));
+    vec2 b = min(up, 1.0 - up);
+    float w = smoothstep(0.0, 0.06, min(b.x, b.y));
+    if (w > 0.0) c = mix(c, texture(uProche, up, flou), w);
+  }
+  if (uMode < 0.5) c.rgb *= mix(0.32, 1.0, smoothstep(0.0, 0.45, d));
+  if (uMode > 1.5) {
+    // la cellule quittée, peinte nette sur son quad
+    vec2 k = (vMonde - uCouv.xy) / (uCouv.zw - uCouv.xy);
+    outColor = texture(uCellule, vec2(k.x, 1.0 - k.y));
+    return;
+  }
+  if (uMode > 0.5) {
+    // LA TRANSITION : sur la salle, la tôle du module, et la cellule choisie
+    // qui grossit — la salle n'apparaît qu'une fois la cellule à sa taille
+    if (all(greaterThan(vMonde, uCouv.xy)) && all(lessThan(vMonde, uCouv.zw))) {
+      vec2 k = (vMonde - uCouv.xy) / (uCouv.zw - uCouv.xy);
+      c = texture(uCellule, vec2(k.x, 1.0 - k.y));
+    }
+    c *= uCouvA;
+  }
+  outColor = c;
+}`
+
+type Rect2d = { minX: number; minY: number; maxX: number; maxY: number }
+
 export class Renderer {
   private readonly gl: WebGL2RenderingContext
   private readonly canvas: HTMLCanvasElement
@@ -5108,6 +5180,7 @@ export class Renderer {
   private cibleW = 1
   private cibleH = 1
   private readonly decalProgram: WebGLProgram
+  private readonly module2dProgram: WebGLProgram
   private readonly lightProgram: WebGLProgram
   private readonly vieProgram: WebGLProgram
   private readonly vieVao: WebGLVertexArrayObject
@@ -5290,6 +5363,7 @@ export class Renderer {
       { nom: 'sponge', vs: SPONGE_VS, fs: SPONGE_FS },
       { nom: 'hull', vs: HULL_VS, fs: HULL_FS },
       { nom: 'decal', vs: DECAL_VS, fs: DECAL_FS },
+      { nom: 'module2d', vs: MODULE2D_VS, fs: MODULE2D_FS },
       { nom: 'light', vs: COMPOSE_VS, fs: LIGHT_FS },
       { nom: 'vie', vs: VIE_VS, fs: VIE_FS },
       { nom: 'recopie', vs: COMPOSE_VS, fs: RECOPIE_FS },
@@ -5299,6 +5373,7 @@ export class Renderer {
     this.spongeProgram = this.programmes.programme('sponge')
     this.hullProgram = this.programmes.programme('hull')
     this.decalProgram = this.programmes.programme('decal')
+    this.module2dProgram = this.programmes.programme('module2d')
     this.lightProgram = this.programmes.programme('light')
     this.vieProgram = this.programmes.programme('vie')
     this.recopieProgram = this.programmes.programme('recopie')
@@ -5618,7 +5693,7 @@ export class Renderer {
   pret(): boolean {
     if (this.programmesPrets) return true
     if (!this.programmes.pret()) return false
-    for (const nom of ['splat', 'compose', 'sponge', 'hull', 'decal', 'light', 'vie', 'recopie'])
+    for (const nom of ['splat', 'compose', 'sponge', 'hull', 'decal', 'light', 'vie', 'recopie', 'module2d'])
       this.uniforms[nom] = this.programmes.uniformes(nom)
     this.programmesPrets = true
     return true
@@ -5790,6 +5865,116 @@ export class Renderer {
     gl.deleteTexture(tex)
     bitmap.close()
     return px[2] > 128 && px[0] < 128
+  }
+
+  /** LE MODULE EN 2D (render/module2d.ts) : où ses toiles tombent dans le
+   *  monde, la salle qui y est encastrée et sa coque. Les toiles ne
+   *  remontent au GPU que quand elles changent (`version`) — elles ne sont
+   *  fournies qu'alors. null l'éteint. */
+  setModule2d(
+    m: {
+      version: number
+      monde: Rect2d
+      salle: Rect2d
+      coque: Rect2d
+      proche?: Rect2d
+      toile?: TexImageSource
+      procheToile?: TexImageSource
+      cellule?: TexImageSource
+      celluleDepart?: TexImageSource
+    } | null,
+  ): void {
+    if (!m) {
+      this.module2d = null
+      return
+    }
+    if (m.toile && m.version !== this.module2dVersion) {
+      this.texModule2d = this.envoieToile2d(this.texModule2d, m.toile)
+      if (m.procheToile) this.texModule2dProche = this.envoieToile2d(this.texModule2dProche, m.procheToile)
+      this.module2dVersion = m.version
+    }
+    if (m.cellule && !this.texCellule2d) this.texCellule2d = this.envoieToile2d(null, m.cellule)
+    if (m.celluleDepart && !this.texCelluleDepart2d) this.texCelluleDepart2d = this.envoieToile2d(null, m.celluleDepart)
+    this.module2d = { monde: m.monde, salle: m.salle, coque: m.coque, proche: m.proche ?? null }
+  }
+  private module2d: { monde: Rect2d; salle: Rect2d; coque: Rect2d; proche: Rect2d | null } | null = null
+  private texModule2d: WebGLTexture | null = null
+  private texModule2dProche: WebGLTexture | null = null
+  private texCellule2d: WebGLTexture | null = null
+  private texCelluleDepart2d: WebGLTexture | null = null
+  private module2dVersion = -1
+  /** Une toile (ou une pièce) vers le GPU : prémultipliée — le noir autour
+   *  de la coque est transparent, le fondu de ses bords sans liseré sombre —,
+   *  mipmaps, bords bloqués. */
+  private envoieToile2d(t: WebGLTexture | null, toile: TexImageSource): WebGLTexture {
+    const gl = this.gl
+    const tex = t ?? gl.createTexture()!
+    gl.bindTexture(gl.TEXTURE_2D, tex)
+    gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, true)
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, gl.RGBA, gl.UNSIGNED_BYTE, toile)
+    gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, false)
+    gl.generateMipmap(gl.TEXTURE_2D)
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR)
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR)
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE)
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE)
+    gl.bindTexture(gl.TEXTURE_2D, this.fieldTex)
+    return tex
+  }
+  /** LA COUVERTURE de la transition entre deux salles (module2d.ts,
+   *  etatTransition) : la salle et sa coque, la cellule qui grossit, son
+   *  opacité — et la cellule quittée, peinte nette (la transition s'ouvre
+   *  zoomée sur elle). null : pas de transition. */
+  setCouvertureModule2d(c: { salle: Rect2d; couvre: Rect2d; opacite: number; depart: Rect2d } | null): void {
+    this.couverture2d = c
+  }
+  private couverture2d: { salle: Rect2d; couvre: Rect2d; opacite: number; depart: Rect2d } | null = null
+
+  /** mode 0 : le module autour de la salle ; 1 : la couverture sur la
+   *  salle ; 2 : la cellule quittée, nette. */
+  private drawModule2d(camera: Camera, viewportW: number, viewportH: number, mode = 0): void {
+    const m = this.module2d
+    if (!m || !this.texModule2d) return
+    const cv = this.couverture2d
+    if (mode > 0 && (!cv || cv.opacite <= 0 || !this.texCellule2d || !this.texCelluleDepart2d)) return
+    const gl = this.gl
+    gl.useProgram(this.module2dProgram)
+    const u = this.uniforms['module2d']
+    gl.uniform4f(u['uRect'], m.monde.minX, m.monde.minY, m.monde.maxX, m.monde.maxY)
+    const q = mode === 1 && cv ? cv.salle : mode === 2 && cv ? cv.depart : m.monde
+    gl.uniform4f(u['uQuad'], q.minX, q.minY, q.maxX, q.maxY)
+    gl.uniform1f(u['uMode'], mode)
+    gl.uniform4f(u['uCoque'], m.coque.minX, m.coque.minY, m.coque.maxX, m.coque.maxY)
+    gl.uniform2f(u['uCenter'], camera.x, camera.y)
+    gl.uniform2f(u['uViewport'], viewportW, viewportH)
+    gl.uniform1f(u['uZoom'], camera.zoom)
+    gl.uniform4f(u['uSalle'], m.salle.minX, m.salle.minY, m.salle.maxX, m.salle.maxY)
+    const pr = m.proche && this.texModule2dProche ? m.proche : null
+    gl.uniform1f(u['uHasP'], pr ? 1 : 0)
+    if (pr) {
+      gl.uniform4f(u['uRectP'], pr.minX, pr.minY, pr.maxX, pr.maxY)
+      gl.activeTexture(gl.TEXTURE2)
+      gl.bindTexture(gl.TEXTURE_2D, this.texModule2dProche)
+      gl.uniform1i(u['uProche'], 2)
+    }
+    if (mode > 0 && cv) {
+      const k = mode === 2 ? cv.depart : cv.couvre
+      gl.uniform4f(u['uCouv'], k.minX, k.minY, k.maxX, k.maxY)
+      gl.uniform1f(u['uCouvA'], mode === 2 ? 1 : cv.opacite)
+      gl.activeTexture(gl.TEXTURE1)
+      gl.bindTexture(gl.TEXTURE_2D, mode === 2 ? this.texCelluleDepart2d : this.texCellule2d)
+      gl.uniform1i(u['uCellule'], 1)
+    }
+    gl.activeTexture(gl.TEXTURE0)
+    gl.bindTexture(gl.TEXTURE_2D, this.texModule2d)
+    gl.uniform1i(u['uToile'], 0)
+    gl.enable(gl.BLEND)
+    gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA)
+    gl.bindVertexArray(null)
+    gl.drawArrays(gl.TRIANGLES, 0, 6)
+    gl.disable(gl.BLEND)
+    // l'unité 0 porte le champ du fluide : les passes suivantes l'y lisent
+    gl.bindTexture(gl.TEXTURE_2D, this.fieldTex)
   }
 
   private loadTexture(
@@ -6634,6 +6819,10 @@ export class Renderer {
     // Passe B bis — coque texturée autour de la cuve. Un tableau bâti en
     // MODULES n'a pas de cuve : ses parois sont celles de ses coques, et
     // le dehors doit rester le vide.
+    // Passe B bis, avant la coque — LE MODULE EN 2D autour de la salle
+    // (render/module2d.ts) : par-dessus le ciel, jamais dans la salle, et la
+    // coque de la salle repasse par-dessus son bord
+    if (!this.solModules) this.drawModule2d(camera, viewportW, viewportH)
     if (!this.solModules)
       this.drawHull(sim, camera, viewportW, viewportH, boxes, timeSec)
 
@@ -6643,6 +6832,13 @@ export class Renderer {
 
     // Passe C — cellules d'éponge
     this.drawSponges(sim, camera, viewportW, viewportH, dprPasses)
+    // LA COUVERTURE de la transition entre deux salles (module2d.ts) : par-
+    // dessus TOUTE la salle — sa coque, ses décalques, ses éponges —, la
+    // cellule qui grossit ; et la cellule quittée, nette
+    if (!this.solModules) {
+      this.drawModule2d(camera, viewportW, viewportH, 1)
+      this.drawModule2d(camera, viewportW, viewportH, 2)
+    }
   }
 
   // LE DÉCOR NET (voir decorNet) : la couche d'eau vient d'être calculée
