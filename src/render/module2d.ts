@@ -1,9 +1,8 @@
 // LE MODULE EN 2D DE FACE — la coque du module autour de la salle, la
 // mini-carte posée dedans (le croquis du concepteur, 01/10).
 //
-// Pourquoi de face : le décor bâti en perspective (claude/vaisseau-
-// perspective) puis peint en perspective (claude/decor-peint) mêlait deux
-// projections — la salle vue de face dans un décor qui fuyait — et figeait la
+// Pourquoi de face : le décor bâti en perspective, puis peint en
+// perspective (deux essais abandonnés, 01/10), mêlait deux projections — la salle vue de face dans un décor qui fuyait — et figeait la
 // mini-carte dans une image. Ici tout est dans le plan de la salle : le
 // module est une grande coque, la salle jouée y est ENCASTRÉE à taille réelle,
 // à sa place dans la grille, et les autres salles de la mini-carte sont de
@@ -289,6 +288,9 @@ export function miseEnPage(salle: Rect, vue: VueModule2d, forme: FormeModule = '
   const elements: MiseEnPage['elements'] = []
   for (let r = 0; r < vue.rangs; r++)
     for (let v = 0; v + 1 < vue.voies; v++) {
+      // pas contre la salle jouée : elle est à taille réelle, pas une cellule,
+      // et un élément posé au pas des cellules la touchait (ou s'y cachait)
+      if (r === vue.rang && (v === vue.voie - 1 || v === vue.voie)) continue
       const [u, w] = cel(r, v + 0.5)
       const k = (r * 2 + v) % 5
       const bout = r === 0 || r === vue.rangs - 1

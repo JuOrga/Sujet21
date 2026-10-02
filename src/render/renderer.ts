@@ -5097,6 +5097,12 @@ void main() {
     if (w > 0.0) c = mix(c, texture(uProche, up, flou), w);
   }
   if (uMode < 0.5) c.rgb *= mix(0.32, 1.0, smoothstep(0.0, 0.45, d));
+  if (uMode > 1.5) {
+    // la cellule quittée, peinte nette sur son quad
+    vec2 k = (vMonde - uCouv.xy) / (uCouv.zw - uCouv.xy);
+    outColor = texture(uCellule, vec2(k.x, 1.0 - k.y));
+    return;
+  }
   if (uMode > 0.5) {
     // LA TRANSITION : sur la salle, la tôle du module, et la cellule choisie
     // qui grossit — la salle n'apparaît qu'une fois la cellule à sa taille
@@ -5108,6 +5114,8 @@ void main() {
   }
   outColor = c;
 }`
+
+type Rect2d = { minX: number; minY: number; maxX: number; maxY: number }
 
 export class Renderer {
   private readonly gl: WebGL2RenderingContext
@@ -5859,64 +5867,49 @@ export class Renderer {
     return px[2] > 128 && px[0] < 128
   }
 
-  /** LE MODULE EN 2D (render/module2d.ts) : sa toile, où elle tombe dans le
-   *  monde, la salle qui y est encastrée. La toile ne remonte au GPU que
-   *  quand elle change (`version`). null l'éteint. */
+  /** LE MODULE EN 2D (render/module2d.ts) : où ses toiles tombent dans le
+   *  monde, la salle qui y est encastrée et sa coque. Les toiles ne
+   *  remontent au GPU que quand elles changent (`version`) — elles ne sont
+   *  fournies qu'alors. null l'éteint. */
   setModule2d(
     m: {
-      toile: TexImageSource
       version: number
-      monde: { minX: number; minY: number; maxX: number; maxY: number }
-      salle: { minX: number; minY: number; maxX: number; maxY: number }
-      coque?: { minX: number; minY: number; maxX: number; maxY: number }
-      proche?: { toile: TexImageSource; monde: { minX: number; minY: number; maxX: number; maxY: number } }
+      monde: Rect2d
+      salle: Rect2d
+      coque: Rect2d
+      proche?: Rect2d
+      toile?: TexImageSource
+      procheToile?: TexImageSource
       cellule?: TexImageSource
+      celluleDepart?: TexImageSource
     } | null,
   ): void {
     if (!m) {
       this.module2d = null
       return
     }
-    const gl = this.gl
-    if (m.version !== this.module2dVersion || !this.texModule2d) {
-      if (m.proche) {
-        if (!this.texModule2dProche) this.texModule2dProche = gl.createTexture()!
-        this.envoieToile2d(this.texModule2dProche, m.proche.toile)
-      }
-      if (!this.texModule2d) this.texModule2d = gl.createTexture()!
-      gl.bindTexture(gl.TEXTURE_2D, this.texModule2d)
-      // prémultipliée : le noir autour de la coque est transparent, le
-      // fondu de ses bords ne laisse pas de liseré sombre
-      gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, true)
-      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, gl.RGBA, gl.UNSIGNED_BYTE, m.toile)
-      gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, false)
-      gl.generateMipmap(gl.TEXTURE_2D)
-      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR)
-      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR)
-      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE)
-      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE)
-      gl.bindTexture(gl.TEXTURE_2D, this.fieldTex)
+    if (m.toile && m.version !== this.module2dVersion) {
+      this.texModule2d = this.envoieToile2d(this.texModule2d, m.toile)
+      if (m.procheToile) this.texModule2dProche = this.envoieToile2d(this.texModule2dProche, m.procheToile)
       this.module2dVersion = m.version
     }
-    if (m.cellule && !this.texCellule2d) {
-      const t = gl.createTexture()!
-      gl.bindTexture(gl.TEXTURE_2D, t)
-      gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, true)
-      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, gl.RGBA, gl.UNSIGNED_BYTE, m.cellule)
-      gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, false)
-      gl.generateMipmap(gl.TEXTURE_2D)
-      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR)
-      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE)
-      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE)
-      gl.bindTexture(gl.TEXTURE_2D, this.fieldTex)
-      this.texCellule2d = t
-    }
-    this.module2d = { monde: m.monde, salle: m.salle, coque: m.coque ?? m.salle, proche: m.proche?.monde ?? null }
+    if (m.cellule && !this.texCellule2d) this.texCellule2d = this.envoieToile2d(null, m.cellule)
+    if (m.celluleDepart && !this.texCelluleDepart2d) this.texCelluleDepart2d = this.envoieToile2d(null, m.celluleDepart)
+    this.module2d = { monde: m.monde, salle: m.salle, coque: m.coque, proche: m.proche ?? null }
   }
+  private module2d: { monde: Rect2d; salle: Rect2d; coque: Rect2d; proche: Rect2d | null } | null = null
+  private texModule2d: WebGLTexture | null = null
   private texModule2dProche: WebGLTexture | null = null
-  private envoieToile2d(t: WebGLTexture, toile: TexImageSource): void {
+  private texCellule2d: WebGLTexture | null = null
+  private texCelluleDepart2d: WebGLTexture | null = null
+  private module2dVersion = -1
+  /** Une toile (ou une pièce) vers le GPU : prémultipliée — le noir autour
+   *  de la coque est transparent, le fondu de ses bords sans liseré sombre —,
+   *  mipmaps, bords bloqués. */
+  private envoieToile2d(t: WebGLTexture | null, toile: TexImageSource): WebGLTexture {
     const gl = this.gl
-    gl.bindTexture(gl.TEXTURE_2D, t)
+    const tex = t ?? gl.createTexture()!
+    gl.bindTexture(gl.TEXTURE_2D, tex)
     gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, true)
     gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, gl.RGBA, gl.UNSIGNED_BYTE, toile)
     gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, false)
@@ -5926,37 +5919,36 @@ export class Renderer {
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE)
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE)
     gl.bindTexture(gl.TEXTURE_2D, this.fieldTex)
+    return tex
   }
-  private texCellule2d: WebGLTexture | null = null
   /** LA COUVERTURE de la transition entre deux salles (module2d.ts,
    *  etatTransition) : la salle et sa coque, la cellule qui grossit, son
-   *  opacité. null : pas de transition. */
-  setCouvertureModule2d(c: { salle: { minX: number; minY: number; maxX: number; maxY: number }; couvre: { minX: number; minY: number; maxX: number; maxY: number }; opacite: number } | null): void {
+   *  opacité — et la cellule quittée, peinte nette (la transition s'ouvre
+   *  zoomée sur elle). null : pas de transition. */
+  setCouvertureModule2d(c: { salle: Rect2d; couvre: Rect2d; opacite: number; depart: Rect2d } | null): void {
     this.couverture2d = c
   }
-  private couverture2d: { salle: { minX: number; minY: number; maxX: number; maxY: number }; couvre: { minX: number; minY: number; maxX: number; maxY: number }; opacite: number } | null = null
-  private module2d: {
-    monde: { minX: number; minY: number; maxX: number; maxY: number }
-    salle: { minX: number; minY: number; maxX: number; maxY: number }
-    coque: { minX: number; minY: number; maxX: number; maxY: number }
-    proche: { minX: number; minY: number; maxX: number; maxY: number } | null
-  } | null = null
-  private texModule2d: WebGLTexture | null = null
-  private module2dVersion = -1
+  private couverture2d: { salle: Rect2d; couvre: Rect2d; opacite: number; depart: Rect2d } | null = null
 
-  private drawModule2d(camera: Camera, viewportW: number, viewportH: number, couverture = false): void {
+  /** mode 0 : le module autour de la salle ; 1 : la couverture sur la
+   *  salle ; 2 : la cellule quittée, nette. */
+  private drawModule2d(camera: Camera, viewportW: number, viewportH: number, mode = 0): void {
     const m = this.module2d
     if (!m || !this.texModule2d) return
     const cv = this.couverture2d
-    if (couverture && (!cv || cv.opacite <= 0 || !this.texCellule2d)) return
+    if (mode > 0 && (!cv || cv.opacite <= 0 || !this.texCellule2d || !this.texCelluleDepart2d)) return
     const gl = this.gl
     gl.useProgram(this.module2dProgram)
     const u = this.uniforms['module2d']
     gl.uniform4f(u['uRect'], m.monde.minX, m.monde.minY, m.monde.maxX, m.monde.maxY)
-    const q = couverture && cv ? cv.salle : m.monde
+    const q = mode === 1 && cv ? cv.salle : mode === 2 && cv ? cv.depart : m.monde
     gl.uniform4f(u['uQuad'], q.minX, q.minY, q.maxX, q.maxY)
-    gl.uniform1f(u['uMode'], couverture ? 1 : 0)
+    gl.uniform1f(u['uMode'], mode)
     gl.uniform4f(u['uCoque'], m.coque.minX, m.coque.minY, m.coque.maxX, m.coque.maxY)
+    gl.uniform2f(u['uCenter'], camera.x, camera.y)
+    gl.uniform2f(u['uViewport'], viewportW, viewportH)
+    gl.uniform1f(u['uZoom'], camera.zoom)
+    gl.uniform4f(u['uSalle'], m.salle.minX, m.salle.minY, m.salle.maxX, m.salle.maxY)
     const pr = m.proche && this.texModule2dProche ? m.proche : null
     gl.uniform1f(u['uHasP'], pr ? 1 : 0)
     if (pr) {
@@ -5965,17 +5957,14 @@ export class Renderer {
       gl.bindTexture(gl.TEXTURE_2D, this.texModule2dProche)
       gl.uniform1i(u['uProche'], 2)
     }
-    if (couverture && cv) {
-      gl.uniform4f(u['uCouv'], cv.couvre.minX, cv.couvre.minY, cv.couvre.maxX, cv.couvre.maxY)
-      gl.uniform1f(u['uCouvA'], cv.opacite)
+    if (mode > 0 && cv) {
+      const k = mode === 2 ? cv.depart : cv.couvre
+      gl.uniform4f(u['uCouv'], k.minX, k.minY, k.maxX, k.maxY)
+      gl.uniform1f(u['uCouvA'], mode === 2 ? 1 : cv.opacite)
       gl.activeTexture(gl.TEXTURE1)
-      gl.bindTexture(gl.TEXTURE_2D, this.texCellule2d)
+      gl.bindTexture(gl.TEXTURE_2D, mode === 2 ? this.texCelluleDepart2d : this.texCellule2d)
       gl.uniform1i(u['uCellule'], 1)
     }
-    gl.uniform2f(u['uCenter'], camera.x, camera.y)
-    gl.uniform2f(u['uViewport'], viewportW, viewportH)
-    gl.uniform1f(u['uZoom'], camera.zoom)
-    gl.uniform4f(u['uSalle'], m.salle.minX, m.salle.minY, m.salle.maxX, m.salle.maxY)
     gl.activeTexture(gl.TEXTURE0)
     gl.bindTexture(gl.TEXTURE_2D, this.texModule2d)
     gl.uniform1i(u['uToile'], 0)
@@ -6840,12 +6829,16 @@ export class Renderer {
     // Passe B ter — décalques de décor (tuyaux, vannes), effacés sous l'eau
     this.drawDecals(decals, camera, viewportW, viewportH, params, timeSec)
     this.drawLampes(lampes, camera, viewportW, viewportH, params)
-    // LA COUVERTURE de la transition entre deux salles (module2d.ts) : par-
-    // dessus la salle, sa coque et ses décalques — la cellule qui grossit
-    if (!this.solModules) this.drawModule2d(camera, viewportW, viewportH, true)
 
     // Passe C — cellules d'éponge
     this.drawSponges(sim, camera, viewportW, viewportH, dprPasses)
+    // LA COUVERTURE de la transition entre deux salles (module2d.ts) : par-
+    // dessus TOUTE la salle — sa coque, ses décalques, ses éponges —, la
+    // cellule qui grossit ; et la cellule quittée, nette
+    if (!this.solModules) {
+      this.drawModule2d(camera, viewportW, viewportH, 1)
+      this.drawModule2d(camera, viewportW, viewportH, 2)
+    }
   }
 
   // LE DÉCOR NET (voir decorNet) : la couche d'eau vient d'être calculée

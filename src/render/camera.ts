@@ -78,6 +78,10 @@ export class Camera {
         viewportW / (bounds.maxX - bounds.minX),
         viewportH / (bounds.maxY - bounds.minY),
       ) * 0.92
+    // une salle chargée en pleine transition (un nouvel essai, le hub) :
+    // la transition s'arrête là, SANS sa suite — elle recadrerait sur
+    // l'ancienne salle
+    this.pilote = null
     this.introHold = hold
     this.introTotal = hold + dive
     this.introTimer = this.introTotal

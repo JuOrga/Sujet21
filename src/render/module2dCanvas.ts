@@ -3,7 +3,7 @@
 // seulement quand la run avance (une salle franchie, un autre module) ; le
 // moteur la pose ensuite comme une texture (renderer.ts, setModule2d).
 
-import type { MiseEnPage } from './module2d'
+import { TUBE, type MiseEnPage } from './module2d'
 
 /** Les pièces, à charger une fois. */
 export const PIECES_MODULE2D = [
@@ -94,6 +94,13 @@ export function peintModule2d(mp: MiseEnPage, p: Pieces, fen?: Fenetre): HTMLCan
   // f : les mesures (à la moitié des sources) ; fi : les fichiers (à LIVRE)
   const f = mp.densite / PX_PAR_SALLE
   const fi = (f * 0.5) / LIVRE
+  // LA FENÊTRE ne peint que ce qu'elle montre : rejouer tout le module sous
+  // une transformation coûtait autant que la toile entière, à chaque salle
+  const marge = 0.6 * mp.densite
+  const vu = fen
+    ? { x0: fen.x - marge, y0: fen.y - marge, x1: fen.x + fen.l + marge, y1: fen.y + fen.h + marge }
+    : { x0: -Infinity, y0: -Infinity, x1: Infinity, y1: Infinity }
+  const hors = (x0: number, y0: number, x1: number, y1: number) => x1 < vu.x0 || x0 > vu.x1 || y1 < vu.y0 || y0 > vu.y1
   const img = (n: string) => p.get(n)!
   // 1. la tôle, dans la silhouette : les deux variantes par rangées décalées
   c.save()
@@ -104,23 +111,25 @@ export function peintModule2d(mp: MiseEnPage, p: Pieces, fen?: Fenetre): HTMLCan
   const toles = [img('tempere-tole'), img('tempere-tole-2')]
   const tl = toles[0].width * fi
   for (let i = 0, y = 0; y < mp.hauteur; i++, y += tl) {
+    if (hors(0, y, mp.largeur, y + tl)) continue
     const dec = ((i * 211) % toles[0].width) * fi
-    for (let x = -dec; x < mp.largeur; x += tl) c.drawImage(toles[i % 2], x, y, tl + 0.5, tl + 0.5)
+    for (let x = -dec; x < mp.largeur; x += tl) if (!hors(x, y, x + tl, y + tl)) c.drawImage(toles[i % 2], x, y, tl + 0.5, tl + 0.5)
   }
   // 2. les éléments uniques
   for (const e of mp.elements) {
     const im = img(`tempere-${e.nom}`)
     const h = (e.l * im.height) / im.width
+    if (hors(e.x - e.l / 2, e.y - h / 2, e.x + e.l / 2, e.y + h / 2)) continue
     c.drawImage(im, e.x - e.l / 2, e.y - h / 2, e.l, h)
   }
   c.restore()
   // 3. les tubes, sous les cellules
   const tube = img('tube')
-  const ep = 0.05 * mp.densite
+  const ep = TUBE * mp.densite
   const tw = (tube.width * ep) / tube.height
   for (const t of mp.tubes) {
     const long = Math.abs(t.bx - t.ax) + Math.abs(t.by - t.ay)
-    if (long < 1) continue
+    if (long < 1 || hors(Math.min(t.ax, t.bx) - ep, Math.min(t.ay, t.by) - ep, Math.max(t.ax, t.bx) + ep, Math.max(t.ay, t.by) + ep)) continue
     c.save()
     c.translate(t.ax, t.ay)
     if (t.ax === t.bx) c.rotate(t.by > t.ay ? Math.PI / 2 : -Math.PI / 2)
@@ -140,7 +149,7 @@ export function peintModule2d(mp: MiseEnPage, p: Pieces, fen?: Fenetre): HTMLCan
     c.restore()
   }
   // 4. les cellules
-  for (const k of mp.cellules) c.drawImage(img(`cellule-${k.etat}`), k.x - k.l / 2, k.y - k.h / 2, k.l, k.h)
+  for (const k of mp.cellules) if (!hors(k.x - k.l / 2, k.y - k.h / 2, k.x + k.l / 2, k.y + k.h / 2)) c.drawImage(img(`cellule-${k.etat}`), k.x - k.l / 2, k.y - k.h / 2, k.l, k.h)
   // 5. les bords : chaque arête selon son sens (silhouette horaire)
   const n = mp.silhouette.length
   const bandeG = img('tempere-bout-gauche')
@@ -148,6 +157,7 @@ export function peintModule2d(mp: MiseEnPage, p: Pieces, fen?: Fenetre): HTMLCan
   for (let i = 0; i < n; i++) {
     const a = mp.silhouette[i]
     const b = mp.silhouette[(i + 1) % n]
+    if (hors(Math.min(a.x, b.x), Math.min(a.y, b.y), Math.max(a.x, b.x), Math.max(a.y, b.y))) continue
     if (a.x === b.x) {
       const gauche = b.y < a.y
       const im = gauche ? bandeG : bandeD
@@ -183,6 +193,7 @@ export function peintModule2d(mp: MiseEnPage, p: Pieces, fen?: Fenetre): HTMLCan
   }
   // 7. les coins et les angles rentrants
   for (const s of mp.silhouette) {
+    if (hors(s.x, s.y, s.x, s.y)) continue
     const k = COINS[s.piece]
     const im = img(`tempere-${s.piece}`)
     c.save()
@@ -193,6 +204,7 @@ export function peintModule2d(mp: MiseEnPage, p: Pieces, fen?: Fenetre): HTMLCan
   }
   // 8. les équipements, debout sur les bords hauts
   for (const e of mp.equipements) {
+    if (hors(e.x, e.y - 0.6 * mp.densite, e.x, e.y)) continue
     const im = img(`equipement-${e.nom}`)
     const k = fi * 1.07
     c.drawImage(im, e.x - (im.width * k) / 2, e.y - im.height * k + 0.02 * mp.densite, im.width * k, im.height * k)

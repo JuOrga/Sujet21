@@ -157,4 +157,14 @@ describe('caméra — le plan PILOTÉ (la transition entre deux salles)', () => 
     expect(cam.piloteT).toBeNull()
     expect(cam.introEnCours).toBe(false) // la main garde la caméra
   })
+  it('un plan d’ouverture lancé en pleine transition l’arrête, sans jouer sa suite', () => {
+    const cam = new Camera()
+    let fini = 0
+    cam.piloter(plan, 1, () => fini++)
+    cam.update(1 / 60, 0, 0, 50, VW, VH, DEFAULT_PARAMS)
+    cam.startIntro(BOUNDS, VW, VH, TENUE, PLONGEE)
+    expect(cam.piloteT).toBeNull()
+    for (let i = 0; i < 120; i++) cam.update(1 / 60, CORPS.x, CORPS.y, CORPS.r, VW, VH, DEFAULT_PARAMS)
+    expect(fini).toBe(0)
+  })
 })

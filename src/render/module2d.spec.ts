@@ -263,3 +263,18 @@ describe('module 2D — une forme FIXE par type de module', () => {
     expect(court.silhouette).toHaveLength(4)
   })
 })
+
+describe('module 2D — rien ne se pose contre la salle jouée', () => {
+  for (const hr of [0.66, 1.0])
+    it(`aucun élément sur la salle ni contre elle (salle ${hr === 1 ? 'carrée' : '3:2'})`, () => {
+      const s = { minX: 0, minY: 0, maxX: 1000, maxY: 1000 * hr }
+      for (const voie of [0, 1, 2]) {
+        const m = miseEnPage(s, { ...vue, voie, joues: [voie] })
+        const marge = 0.25 * m.densite
+        for (const e of m.elements) {
+          const dedans = e.x > m.salle.minX - marge && e.x < m.salle.maxX + marge && e.y > m.salle.minY - marge && e.y < m.salle.maxY + marge
+          expect(dedans).toBe(false)
+        }
+      }
+    })
+})
