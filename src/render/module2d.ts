@@ -451,7 +451,9 @@ export function centreCellule(salle: Rect, vue: VueModule2d, r: number, v: numbe
 // quittée rétrécit jusqu'à sa cellule, la vue glisse vers la droite, la
 // cellule choisie grossit jusqu'à la taille de la salle, puis la salle
 // apparaît — le plan d'ouverture habituel prend la suite.
-export const TRANSITION = { retrecit: 0.55, glisse: 0.7, grossit: 0.8, revele: 0.35 }
+// Rétrécir et grossir durent autant : avec 0,55 s d'un côté et 0,8 s de
+// l'autre, les deux moitiés ne se répondaient pas (aperçu du 05/10)
+export const TRANSITION = { retrecit: 0.7, glisse: 0.7, grossit: 0.7, revele: 0.35 }
 export const DUREE_TRANSITION = TRANSITION.retrecit + TRANSITION.glisse + TRANSITION.grossit + TRANSITION.revele
 // le module vu pendant la glissade : la salle y tient 20 % du plan large
 // (à 30 %, le module ne se voyait presque pas autour des deux cellules)
@@ -471,6 +473,8 @@ export interface EtatTransition {
   /** la cellule qui couvre la nouvelle salle : où, et à quel point elle la cache */
   couvre: Rect
   opacite: number
+  /** la salle quittée, qui rétrécit jusqu'à sa cellule */
+  depart: Rect
 }
 
 const doux = (t: number) => {
@@ -484,37 +488,44 @@ const mixLog = (a: number, b: number, t: number) => Math.exp(mix(Math.log(a), Ma
 export function etatTransition(t: number, p: ParamsTransition): EtatTransition {
   const { retrecit, glisse, grossit, revele } = TRANSITION
   const R = p.salle.maxX - p.salle.minX
+  const H = p.salle.maxY - p.salle.minY
   const a = { x: (p.salle.minX + p.salle.maxX) / 2, y: (p.salle.minY + p.salle.maxY) / 2 }
-  // la cellule quittée remplit d'abord l'écran comme une salle
-  const zDepart = p.zoomSalle / CELLULE_L
   const zModule = p.zoomSalle * ZOOM_MODULE
   const cl = CELLULE_L * R
-  const cellule = { minX: a.x - cl / 2, maxX: a.x + cl / 2, minY: a.y - cl / 3, maxY: a.y + cl / 3 }
+  const autour = (c: { x: number; y: number }, l: number, h: number): Rect => ({ minX: c.x - l / 2, maxX: c.x + l / 2, minY: c.y - h / 2, maxY: c.y + h / 2 })
+  // LES DEUX MOITIÉS SONT LE MÊME GESTE, à l'endroit puis à l'envers : la
+  // salle quittée rétrécit DANS LE MONDE jusqu'à sa cellule pendant que la
+  // caméra recule, la cellule choisie grossit jusqu'à la salle pendant
+  // qu'elle avance — tailles et zoom suivent la même courbe logarithmique.
+  // Avant, la salle quittée était une cellule fixe sur laquelle la caméra
+  // partait zoomée 3,3 fois : le décor sautait au premier instant puis
+  // filait, quand la seconde moitié grossissait la cellule en ligne droite
+  // sous un zoom en courbe — les deux ne se répondaient pas (aperçu du 05/10)
+  const taille = (e: number, c: { x: number; y: number }) => autour(c, mixLog(R, cl, e), mixLog(H, cl / 1.5, e))
   const t1 = retrecit
   const t2 = t1 + glisse
   const t3 = t2 + grossit
   let camera: EtatTransition['camera']
-  let couvre = cellule
+  let depart = taille(1, p.de)
+  let couvre = taille(1, a)
   let opacite = 1
-  if (t < t1) camera = { ...p.de, zoom: mixLog(zDepart, zModule, doux(t / retrecit)) }
-  else if (t < t2) {
+  if (t < t1) {
+    const e = doux(t / retrecit)
+    camera = { ...p.de, zoom: mixLog(p.zoomSalle, zModule, e) }
+    depart = taille(e, p.de)
+  } else if (t < t2) {
     const e = doux((t - t1) / glisse)
     camera = { x: mix(p.de.x, a.x, e), y: mix(p.de.y, a.y, e), zoom: zModule }
   } else if (t < t3) {
-    const e = doux((t - t2) / grossit)
-    camera = { ...a, zoom: mixLog(zModule, p.zoomSalle, e) }
-    couvre = {
-      minX: mix(cellule.minX, p.salle.minX, e),
-      maxX: mix(cellule.maxX, p.salle.maxX, e),
-      minY: mix(cellule.minY, p.salle.minY, e),
-      maxY: mix(cellule.maxY, p.salle.maxY, e),
-    }
+    const e = 1 - doux((t - t2) / grossit)
+    camera = { ...a, zoom: mixLog(p.zoomSalle, zModule, e) }
+    couvre = taille(e, a)
   } else {
     camera = { ...a, zoom: p.zoomSalle }
     couvre = p.salle
     opacite = 1 - doux((t - t3) / revele)
   }
-  return { camera, couvre, opacite }
+  return { camera, couvre, opacite, depart }
 }
 
 /** Où se trouve une salle chargée : son module, son rang dans le module. */

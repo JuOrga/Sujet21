@@ -146,11 +146,25 @@ describe('module 2D — la transition entre deux salles', () => {
     expect(versMondeY(c.y)).toBeCloseTo(de.y, 6)
   })
 
-  it('elle part sur la salle quittée, qui remplit l’écran comme une salle', () => {
+  it('elle part sur la salle quittée, à sa taille et au zoom de la salle : le décor ne saute pas', () => {
     const e = etatTransition(0, p)
     expect(e.camera.x).toBeCloseTo(de.x, 9)
     expect(e.camera.y).toBeCloseTo(de.y, 9)
-    expect(e.camera.zoom).toBeCloseTo(p.zoomSalle / CELLULE_L, 9)
+    expect(e.camera.zoom).toBeCloseTo(p.zoomSalle, 9)
+    expect(e.depart.maxX - e.depart.minX).toBeCloseTo(salle.maxX - salle.minX, 6)
+    expect(e.depart.maxY - e.depart.minY).toBeCloseTo(salle.maxY - salle.minY, 6)
+    expect((e.depart.minX + e.depart.maxX) / 2).toBeCloseTo(de.x, 6)
+  })
+
+  it('rétrécir et grossir vont au MÊME rythme : la seconde moitié rejoue la première à l’envers', () => {
+    const g = TRANSITION.retrecit + TRANSITION.glisse
+    const ecran = (r: { minX: number; maxX: number }, zoom: number) => (r.maxX - r.minX) * zoom
+    for (let f = 0; f <= 1.0001; f += 0.1) {
+      const a = etatTransition(f * TRANSITION.retrecit, p)
+      const b = etatTransition(g + (1 - f) * TRANSITION.grossit, p)
+      expect(ecran(a.depart, a.camera.zoom)).toBeCloseTo(ecran(b.couvre, b.camera.zoom), 3)
+      expect(a.camera.zoom).toBeCloseTo(b.camera.zoom, 6)
+    }
   })
 
   it('elle finit sur la nouvelle salle, au plan large, la cellule à sa taille et effacée', () => {
