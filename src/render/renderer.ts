@@ -5075,7 +5075,7 @@ uniform float uMode;     // 0 : autour de la salle ; 1 : la COUVERTURE de la tra
 uniform vec4 uCouv;      // la cellule qui grossit, dans le monde
 uniform float uCouvA;    // à quel point elle cache la salle
 uniform sampler2D uCellule;
-uniform float uRatioCellule; // hauteur / largeur de l'image de la cellule
+uniform float uRatioCellule; // hauteur / largeur de l'image de la cellule ; 0 : étirée
 out vec4 outColor;
 // LA CELLULE TIENT À SES PROPORTIONS, centrée dans son rectangle : étirée à
 // la forme de la salle, la capsule de la serre (2,4 fois plus large que
@@ -5085,8 +5085,12 @@ vec2 dansCellule(vec2 p, vec4 r) {
   vec2 t = r.zw - r.xy;
   vec2 k = (p - r.xy) / t;
   float rr = t.y / t.x;
-  if (uRatioCellule < rr) k.y = (k.y - 0.5) * rr / uRatioCellule + 0.5;
-  else k.x = (k.x - 0.5) * uRatioCellule / rr + 0.5;
+  // les autres cellules, rectangles pleins, restent étirées : tenues à leurs
+  // proportions, elles laissaient des bandes sur les côtés de la salle
+  if (uRatioCellule > 0.0) {
+    if (uRatioCellule < rr) k.y = (k.y - 0.5) * rr / uRatioCellule + 0.5;
+    else k.x = (k.x - 0.5) * uRatioCellule / rr + 0.5;
+  }
   return vec2(k.x, 1.0 - k.y);
 }
 void main() {
@@ -5898,6 +5902,8 @@ export class Renderer {
       procheToile?: TexImageSource
       cellule?: TexImageSource
       celluleDepart?: TexImageSource
+      /** la cellule garde ses proportions (la capsule de la serre) */
+      proportions?: boolean
     } | null,
   ): void {
     if (!m) {
@@ -5914,8 +5920,10 @@ export class Renderer {
     if (m.cellule && m.cellule !== this.srcCellule2d) {
       this.texCellule2d = this.envoieToile2d(this.texCellule2d, m.cellule)
       this.srcCellule2d = m.cellule
+    }
+    if (m.cellule) {
       const im = m.cellule as { width: number; height: number }
-      this.ratioCellule2d = im.height / im.width
+      this.ratioCellule2d = m.proportions ? im.height / im.width : 0
     }
     if (m.celluleDepart && m.celluleDepart !== this.srcCelluleDepart2d) {
       this.texCelluleDepart2d = this.envoieToile2d(this.texCelluleDepart2d, m.celluleDepart)
@@ -5930,7 +5938,7 @@ export class Renderer {
   private texCelluleDepart2d: WebGLTexture | null = null
   private srcCellule2d: TexImageSource | null = null
   private srcCelluleDepart2d: TexImageSource | null = null
-  private ratioCellule2d = 1 / 1.5
+  private ratioCellule2d = 0
   private module2dVersion = -1
   /** Une toile (ou une pièce) vers le GPU : prémultipliée — le noir autour
    *  de la coque est transparent, le fondu de ses bords sans liseré sombre —,

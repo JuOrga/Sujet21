@@ -76,7 +76,7 @@ def raccorde(a: np.ndarray, b: int = 48, sens: int = 2) -> np.ndarray:
     mais le rate souvent en haut/bas (tôles du 02/10 : écart au bord 8 à 20
     fois celui de deux lignes voisines, une couture visible à chaque rangée).
     Les b dernières lignes (puis colonnes) sont fondues dans les b premières ;
-    l'image perd b pixels par côté et devient périodique. sens=1 : à gauche
+    l'image perd b pixels par axe traité et devient périodique. sens=1 : à gauche
     et à droite seulement (une tranche du cylindre a ses rebords en haut et
     en bas, qui ne se répètent pas)."""
     if sens == 1:

@@ -373,24 +373,25 @@ export function miseEnPage(salle: Rect, vue: VueModule2d, forme: FormeModule = '
   // rangs) ; la machinerie aux deux bouts du module ; la grande baie sur le pont
   const elements: MiseEnPage['elements'] = []
   // le cylindre est tout en vitrage : ni baie, ni trappe, ni machinerie
-  if (forme !== 'cylindre')
-  for (let r = 0; r < vue.rangs; r++)
-    for (let v = 0; v + 1 < vue.voies; v++) {
-      // pas contre la salle jouée : elle est à taille réelle, pas une cellule,
-      // et un élément posé au pas des cellules la touchait (ou s'y cachait)
-      if (r === vue.rang && (v === vue.voie - 1 || v === vue.voie)) continue
-      const [u, w] = cel(r, v + 0.5)
-      const k = (r * 2 + v) % 5
-      const bout = r === 0 || r === vue.rangs - 1
-      // deux baies en alternance et une colonne de culture : les trois
-      // mêmes baies côte à côte se lisaient comme un copier-coller
-      const nom =
-        bout && k % 2 === 1 ? 'machinerie' : k === 0 ? (r % 2 ? 'baie-2' : 'baie') : k === 2 ? 'colonne' : k === 3 ? 'trappe' : null
-      if (!nom) continue
-      // la colonne, verticale, tient entre deux voies sans toucher leurs cellules
-      const l = { baie: 0.95, 'baie-2': 0.9, colonne: (0.6 * py) / RATIO_COLONNE, trappe: 0.5, machinerie: 0.8 }[nom]
-      elements.push({ nom, x: X(u), y: Y(w), l: l * densite })
-    }
+  if (forme !== 'cylindre') {
+    for (let r = 0; r < vue.rangs; r++)
+      for (let v = 0; v + 1 < vue.voies; v++) {
+        // pas contre la salle jouée : elle est à taille réelle, pas une cellule,
+        // et un élément posé au pas des cellules la touchait (ou s'y cachait)
+        if (r === vue.rang && (v === vue.voie - 1 || v === vue.voie)) continue
+        const [u, w] = cel(r, v + 0.5)
+        const k = (r * 2 + v) % 5
+        const bout = r === 0 || r === vue.rangs - 1
+        // deux baies en alternance et une colonne de culture : les trois
+        // mêmes baies côte à côte se lisaient comme un copier-coller
+        const nom =
+          bout && k % 2 === 1 ? 'machinerie' : k === 0 ? (r % 2 ? 'baie-2' : 'baie') : k === 2 ? 'colonne' : k === 3 ? 'trappe' : null
+        if (!nom) continue
+        // la colonne, verticale, tient entre deux voies sans toucher leurs cellules
+        const l = { baie: 0.95, 'baie-2': 0.9, colonne: (0.6 * py) / RATIO_COLONNE, trappe: 0.5, machinerie: 0.8 }[nom]
+        elements.push({ nom, x: X(u), y: Y(w), l: l * densite })
+      }
+  }
   // l'élément de la forme : la grande baie sur le pont, la trappe en haut de
   // la tour, la machinerie dans la poupe
   const signe = elementDeForme(forme, contour)

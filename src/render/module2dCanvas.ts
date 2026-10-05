@@ -172,7 +172,7 @@ export function peintModule2d(mp: MiseEnPage, p: Pieces, fen?: Fenetre): HTMLCan
     c.rect(bx0, k.minY, bx1 - bx0, H * (1 + CYL_BERCEAU))
     c.clip()
     for (let x = bx0; x < bx1; x += berceau.width * sb)
-      if (!hors(x, k.maxY, x + berceau.width * sb, k.maxY + CYL_BERCEAU * H))
+      if (!hors(x, k.maxY - 0.03 * H - 166 * sb, x + berceau.width * sb, k.maxY + CYL_BERCEAU * H))
         c.drawImage(berceau, x, k.maxY - 0.03 * H - 166 * sb, berceau.width * sb + 0.5, berceau.height * sb)
     c.restore()
     const tranches = [img('serre-tranche'), img('serre-tranche-2')]
@@ -195,8 +195,8 @@ export function peintModule2d(mp: MiseEnPage, p: Pieces, fen?: Fenetre): HTMLCan
     const sd = H / 1202
     const dg = img('serre-dome-gauche')
     const dd = img('serre-dome-droit')
-    if (!hors(k.minX - 786 * sd, k.minY, k.minX, k.maxY)) c.drawImage(dg, k.minX - 786 * sd, k.minY, dg.width * sd, dg.height * sd)
-    if (!hors(k.maxX, k.minY, k.maxX + 790 * sd, k.maxY)) c.drawImage(dd, k.maxX - 30 * sd, k.minY, dd.width * sd, dd.height * sd)
+    if (!hors(k.minX - 786 * sd, k.minY, k.minX + 33 * sd, k.maxY)) c.drawImage(dg, k.minX - 786 * sd, k.minY, dg.width * sd, dg.height * sd)
+    if (!hors(k.maxX - 30 * sd, k.minY, k.maxX + 790 * sd, k.maxY)) c.drawImage(dd, k.maxX - 30 * sd, k.minY, dd.width * sd, dd.height * sd)
   }
   if (mp.forme === 'cylindre') peintCylindre()
   else {
@@ -209,12 +209,10 @@ export function peintModule2d(mp: MiseEnPage, p: Pieces, fen?: Fenetre): HTMLCan
     const tl = toles[0].width * fi
     for (let i = 0, y = 0; y < mp.hauteur; i++, y += tl) {
       if (hors(0, y, mp.largeur, y + tl)) continue
-      c.save()
-      c.beginPath()
-      c.rect(0, y, mp.largeur, tl)
-      c.clip()
+      // une rangée par appel, sans découpe à sa hauteur : une découpe sur une
+      // fraction de pixel ôtait le recouvrement d'un demi-pixel des carreaux,
+      // et un liseré sombre pouvait courir entre deux rangées (relecture 05/10)
       pave(toles[tire(i, 7) < 0.5 ? 0 : 1], 0, y, mp.largeur, y + tl, i * 37)
-      c.restore()
     }
     // la salle des machines, sa propre tôle, séparée du reste par un joint
     for (const z of mp.machines) {
@@ -350,8 +348,11 @@ export function peintModule2d(mp: MiseEnPage, p: Pieces, fen?: Fenetre): HTMLCan
     const calque = document.createElement('canvas')
     calque.width = toile.width
     calque.height = toile.height
-    const q = calque.getContext('2d')!
-    if (fen) q.setTransform(fen.k, 0, 0, fen.k, -fen.x * fen.k, -fen.y * fen.k)
+    // Safari refuse une toile au-delà de sa mémoire de toiles : sans calque,
+    // les bords se peignent droit sur la toile, sans fondu, plutôt que rien
+    const qc = calque.getContext('2d')
+    const q = qc ?? c
+    if (qc && fen) q.setTransform(fen.k, 0, 0, fen.k, -fen.x * fen.k, -fen.y * fen.k)
     // 5. les bords : chaque arête selon son sens (silhouette horaire)
     const n = mp.silhouette.length
     const bandeG = img('tempere-bout-gauche')
@@ -408,37 +409,41 @@ export function peintModule2d(mp: MiseEnPage, p: Pieces, fen?: Fenetre): HTMLCan
     const masque = document.createElement('canvas')
     masque.width = toile.width
     masque.height = toile.height
-    const m = masque.getContext('2d')!
-    if (fen) m.setTransform(fen.k, 0, 0, fen.k, -fen.x * fen.k, -fen.y * fen.k)
-    const contour = () => {
-      m.beginPath()
-      mp.silhouette.forEach((s, i) => (i ? m.lineTo(s.x, s.y) : m.moveTo(s.x, s.y)))
-      m.closePath()
-    }
-    contour()
-    m.fillStyle = '#000'
-    m.fill()
-    m.globalCompositeOperation = 'destination-out'
-    m.strokeStyle = '#000'
-    const D = REBORD * mp.densite
-    const F = FONDU_REBORD * mp.densite
-    for (let k = 0; k < 4; k++) {
-      m.globalAlpha = 0.5
-      m.lineWidth = 2 * (D + (F * (4 - k)) / 4)
+    const m = qc ? masque.getContext('2d') : null
+    if (m) {
+      if (fen) m.setTransform(fen.k, 0, 0, fen.k, -fen.x * fen.k, -fen.y * fen.k)
+      const contour = () => {
+        m.beginPath()
+        mp.silhouette.forEach((s, i) => (i ? m.lineTo(s.x, s.y) : m.moveTo(s.x, s.y)))
+        m.closePath()
+      }
+      contour()
+      m.fillStyle = '#000'
+      m.fill()
+      m.globalCompositeOperation = 'destination-out'
+      m.strokeStyle = '#000'
+      const D = REBORD * mp.densite
+      const F = FONDU_REBORD * mp.densite
+      for (let k = 0; k < 4; k++) {
+        m.globalAlpha = 0.5
+        m.lineWidth = 2 * (D + (F * (4 - k)) / 4)
+        contour()
+        m.stroke()
+      }
+      m.globalAlpha = 1
+      m.lineWidth = 2 * D
       contour()
       m.stroke()
+      q.setTransform(1, 0, 0, 1, 0, 0)
+      q.globalCompositeOperation = 'destination-out'
+      q.drawImage(masque, 0, 0)
     }
-    m.globalAlpha = 1
-    m.lineWidth = 2 * D
-    contour()
-    m.stroke()
-    q.setTransform(1, 0, 0, 1, 0, 0)
-    q.globalCompositeOperation = 'destination-out'
-    q.drawImage(masque, 0, 0)
-    c.save()
-    c.setTransform(1, 0, 0, 1, 0, 0)
-    c.drawImage(calque, 0, 0)
-    c.restore()
+    if (qc) {
+      c.save()
+      c.setTransform(1, 0, 0, 1, 0, 0)
+      c.drawImage(calque, 0, 0)
+      c.restore()
+    }
     // rendre la mémoire tout de suite : deux toiles de plus, à chaque salle
     calque.width = calque.height = masque.width = masque.height = 0
   }
