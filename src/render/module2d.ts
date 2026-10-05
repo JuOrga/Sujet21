@@ -565,7 +565,10 @@ export function transitionPermise(avant: PositionSalle | null, apres: PositionSa
 // toile entière, à 360 px par largeur de salle, était floue dès qu'on
 // zoomait près de la salle (aperçu du 02/10). 850 px : la finesse des
 // pièces livrées (80 % des sources) ; 0,9 salle de marge tout autour.
-export const DENSITE_PROCHE = 850
+// 1024 depuis le 06/10 : la finesse des pièces de la serre, livrées en
+// pleine résolution — à 850, le Steam Deck (1280 × 800, salle entière à
+// ~1380 px d'écran par largeur de salle) agrandissait encore la toile
+export const DENSITE_PROCHE = 1024
 export const MARGE_PROCHE = 0.9
 
 /** La fenêtre de la toile proche : ce qu'elle couvre (pixels de la toile
