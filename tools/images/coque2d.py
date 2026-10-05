@@ -202,6 +202,29 @@ def serre() -> None:
             ecrit(f'serre-{n}-{nl}-g', l[:, :200], 1)
             ecrit(f'serre-{n}-{nl}-m', raccorde(l[:, 200:820], sens=1), 1)
             ecrit(f'serre-{n}-{nl}-d', l[:, 820:], 1)
+    # LES ZONES (06/10) : une capsule entière par thème le long du cylindre,
+    # pour varier dans la longueur au lieu de répéter. Leur gabarit n'est pas
+    # celui des tranches (bacs aux lignes 424 et 871, rebord haut plus fin,
+    # rebord bas jusqu'à 1440) : neuf morceaux propres, les mêmes colonnes
+    def neuf(prefixe: str, a: np.ndarray, haut: int, bande: int, bas: int) -> None:
+        lignes = {
+            'haut': a[:haut],
+            'bande': raccorde(a[haut:bande].transpose(1, 0, 2), b=24, sens=1).transpose(1, 0, 2),
+            'bas': a[bande:bas],
+        }
+        for nl, l in lignes.items():
+            ecrit(f'{prefixe}-{nl}-g', l[:, :200], 1)
+            ecrit(f'{prefixe}-{nl}-m', raccorde(l[:, 200:830], sens=1), 1)
+            ecrit(f'{prefixe}-{nl}-d', l[:, 830:], 1)
+    for z in ('algues', 'champignons'):
+        neuf(f'serre-zone-{z}', sombre(raccorde(lit(f'serre-zone-{z}'), sens=1), 0.85), 424, 871, 1440)
+    # LES ÉTAGÈRES DE RECHANGE : une étagère (bacs toutes les 323 lignes),
+    # raccordée dans les deux sens — elles remplacent au hasard la bande du
+    # cœur des capsules du jardin d'air, cinq étagères au lieu de deux
+    for e in ('1', '3'):
+        t = lit(f'serre-etageres-{e}')[247:571]
+        t = raccorde(raccorde(t.transpose(1, 0, 2), b=24, sens=1).transpose(1, 0, 2), sens=1)
+        ecrit(f'serre-etagere-{e}', t, 1)
     # les pièces détourées, ramenées à la luminosité des tranches (~10 %)
     an = sombre(detoure(lit('serre-anneau')), 0.6)
     ys, xs = np.where(an[..., 3] > 0.5)

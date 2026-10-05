@@ -2100,6 +2100,21 @@ shader : laplacien moyen 1,47 → 2,66 (+81 %). Peinture des deux toiles
 Revers : deux bandes d'étagère seulement, la répétition se voit de près —
 des bandes de plus sont à générer.
 
+**Les zones (06/10)** : varier dans la longueur au lieu de répéter — une
+capsule par zone le long du cylindre (jardin d'air, algues, jardin d'air,
+champignonnière). Les zones livrées n'ont pas le gabarit des tranches
+(bacs aux lignes 424 et 871, rebord haut plus fin) : neuf morceaux propres,
+l'anneau couvre la marche de rebord à chaque jonction. Deux planches
+d'étagères (aromatiques, fougères ; bacs toutes les 323 lignes) remplacent
+au hasard le cœur d'une étagère sur deux du jardin d'air.
+
+| zone | état |
+| --- | --- |
+| jardin d'air (les deux tranches) | ✅ |
+| bioréacteurs d'algues, champignonnière | ✅ livrées 06/10 |
+| étagères aromatiques, fougères | ✅ livrées 06/10 |
+| potager, céréales, verger nain, pépinière | ⏳ à générer |
+
 **À venir** : les pièces propres de chaque module (la chaufferie et le
 cryo prennent celles de la serre en attendant) ; une deuxième variante de
 baie et de trappe.

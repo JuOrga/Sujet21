@@ -62,6 +62,26 @@ export const PIECES_MODULE2D = [
   'serre-tranche-2-bas-g',
   'serre-tranche-2-bas-m',
   'serre-tranche-2-bas-d',
+  'serre-zone-algues-haut-g',
+  'serre-zone-algues-haut-m',
+  'serre-zone-algues-haut-d',
+  'serre-zone-algues-bande-g',
+  'serre-zone-algues-bande-m',
+  'serre-zone-algues-bande-d',
+  'serre-zone-algues-bas-g',
+  'serre-zone-algues-bas-m',
+  'serre-zone-algues-bas-d',
+  'serre-zone-champignons-haut-g',
+  'serre-zone-champignons-haut-m',
+  'serre-zone-champignons-haut-d',
+  'serre-zone-champignons-bande-g',
+  'serre-zone-champignons-bande-m',
+  'serre-zone-champignons-bande-d',
+  'serre-zone-champignons-bas-g',
+  'serre-zone-champignons-bas-m',
+  'serre-zone-champignons-bas-d',
+  'serre-etagere-1',
+  'serre-etagere-3',
   'serre-anneau-haut',
   'serre-anneau-bande',
   'serre-anneau-bas',
@@ -215,21 +235,20 @@ export function peintModule2d(mp: MiseEnPage, p: Pieces, fen?: Fenetre): HTMLCan
     // cœur répété en largeur, son bord droit — d'un bloc, à pleine finesse,
     // les capsules devenaient étroites et hautes (06/10) ; elles gardent la
     // largeur de la tranche d'origine, deux tiers de la hauteur du cylindre
-    const tr = ['serre-tranche', 'serre-tranche-2'].map((n) =>
-      (['haut', 'bande', 'bas'] as const).map((l) => (['g', 'm', 'd'] as const).map((k) => img(`${n}-${l}-${k}`))),
-    )
-    const [hg, hm, hd] = tr[0][0]
-    const { nb, e } = empile(H, hg, tr[0][1][0], tr[0][2][0])
-    const nm = Math.max(1, Math.round(((2 / 3) * H / e - hg.width - hd.width) / hm.width))
-    const n = Math.max(1, Math.round(W / ((hg.width + nm * hm.width + hd.width) * e)))
+    const jeu = (nom: string) =>
+      (['haut', 'bande', 'bas'] as const).map((l) => (['g', 'm', 'd'] as const).map((c) => img(`${nom}-${l}-${c}`)))
+    const air = [jeu('serre-tranche'), jeu('serre-tranche-2')]
+    const zones = { algues: jeu('serre-zone-algues'), champignons: jeu('serre-zone-champignons') }
+    const etageres = [img('serre-etagere-1'), img('serre-etagere-3')]
+    const [hg, hm, hd] = air[0][0]
+    const { nb, e } = empile(H, hg, air[0][1][0], air[0][2][0])
+    const nmAir = Math.max(1, Math.round(((2 / 3) * H / e - hg.width - hd.width) / hm.width))
+    const n = Math.max(1, Math.round(W / ((hg.width + nmAir * hm.width + hd.width) * e)))
     const sw = W / n
-    // l'étirement en largeur qui fait tomber les capsules juste
-    const fx = sw / ((hg.width + nm * hm.width + hd.width) * e)
     // CASSER LA GRILLE : une bande répétée telle quelle faisait un papier
-    // peint, la même étagère en lignes et en colonnes (06/10). Chaque ligne
-    // d'étagères tire sa tranche (les deux partagent leurs rebords, la
-    // jonction tombe sur le bac), chaque cœur est retourné ou non (le miroir
-    // garde le raccord : son bord droit est le bord gauche de l'original)
+    // peint, la même étagère en lignes et en colonnes (06/10). Chaque cœur est
+    // retourné ou non (le miroir garde le raccord : son bord droit est le
+    // bord gauche de l'original)
     const piece = (im: HTMLImageElement, x: number, y: number, l: number, h: number, miroir: boolean) => {
       if (!miroir) return c.drawImage(im, x, y, l, h)
       c.save()
@@ -238,20 +257,45 @@ export function peintModule2d(mp: MiseEnPage, p: Pieces, fen?: Fenetre): HTMLCan
       c.drawImage(im, 0, 0, l, h)
       c.restore()
     }
+    // VARIER DANS LA LONGUEUR : une capsule par zone le long du cylindre —
+    // le jardin d'air, les algues, le jardin d'air, la champignonnière…
+    // (06/10, « des variations dans la longueur au lieu de répéter »)
+    const ZONES = ['air', 'algues', 'air', 'champignons'] as const
     for (let i = 0; i < n; i++) {
       const x0 = k.minX + i * sw
       if (hors(x0, k.minY, x0 + sw, k.maxY)) continue
+      const zone = ZONES[i % ZONES.length]
+      const j3 = zone === 'air' ? air[(i >> 1) % 2] : zones[zone]
+      const p = zone === 'air' ? { nb, e } : empile(H, j3[0][0], j3[1][0], j3[2][0])
+      const [g, m, d] = j3[0]
+      const nm = Math.max(1, Math.round((sw / p.e - g.width - d.width) / m.width))
+      const fx = sw / ((g.width + nm * m.width + d.width) * p.e)
       let y = k.minY
-      for (let r = 0; r < nb + 2; r++) {
-        const ligne = r === 0 ? 0 : r === nb + 1 ? 2 : 1
-        const v = ligne === 1 ? (tire(i * 31 + r, 5) < 0.5 ? 0 : 1) : i % 2
-        const rang = tr[v][ligne]
-        const h = rang[0].height * e
+      for (let r = 0; r < p.nb + 2; r++) {
+        const ligne = r === 0 ? 0 : r === p.nb + 1 ? 2 : 1
+        // au jardin d'air, chaque étagère tire la sienne : l'une des deux
+        // tranches (elles partagent leurs rebords) ou une étagère de rechange
+        const t = tire(i * 31 + r, 5)
+        const rang = zone === 'air' && ligne === 1 ? air[t < 0.5 ? 0 : 1][1] : j3[ligne]
+        const rechange = zone === 'air' && ligne === 1 && t >= 0.25 && t < 0.75 ? etageres[t < 0.5 ? 0 : 1] : null
+        const h = rang[0].height * p.e
         let x = x0
-        for (let j = 0; j < nm + 2; j++) {
-          const col = j === 0 ? 0 : j === nm + 1 ? 2 : 1
-          const l = rang[col].width * e * fx
-          if (!hors(x, y, x + l, y + h)) piece(rang[col], x, y, l + 0.5, h + 0.5, col === 1 && tire(i * 17 + j, r) < 0.5)
+        for (let jc = 0; jc < nm + 2; jc++) {
+          const col = jc === 0 ? 0 : jc === nm + 1 ? 2 : 1
+          const l = rang[col].width * p.e * fx
+          if (col === 1 && rechange) {
+            // l'étagère de rechange couvre tout le cœur d'un trait, répétée
+            if (jc === 1) {
+              const lc = nm * l
+              const tw = (rechange.width * h) / rechange.height
+              c.save()
+              c.beginPath()
+              c.rect(x, y, lc, h + 0.5)
+              c.clip()
+              for (let xx = x - tire(i, r) * tw; xx < x + lc; xx += tw) if (!hors(xx, y, xx + tw, y + h)) c.drawImage(rechange, xx, y, tw + 0.5, h + 0.5)
+              c.restore()
+            }
+          } else if (!hors(x, y, x + l, y + h)) piece(rang[col], x, y, l + 0.5, h + 0.5, col === 1 && tire(i * 17 + jc, r) < 0.5)
           x += l
         }
         y += h
