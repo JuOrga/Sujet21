@@ -2039,12 +2039,52 @@ quart et livre à moitié de la taille source) :
 | baie de serre, trappe ronde, bloc de machinerie | ✅ livrés 01/10 |
 | cellule de la mini-carte (quatre états précalculés) | ✅ livrée 01/10 |
 | équipements extérieurs (planche de six) | ✅ livrée 01/10 |
+| **tôle calme** (deux variantes, sans tuyau traversant) | ✅ livrées 02/10, remplacent les premières |
+| tôle de la salle des machines | ✅ livrée 02/10 |
+| deuxième baie (rangée de hublots), colonne de culture | ✅ livrées 02/10 |
+| planche de petits détails (six) | ✅ livrée 02/10 — semés sur la tôle, hors salle, cellules et éléments |
 
 **Une forme fixe par type de module** (`formeDuBiome`) : étagée pour la
 serre tempérée, fuseau pour la chaufferie, dorsale pour le cryo — les
 marches accrochées aux rangs de la mini-carte, jamais à la salle jouée.
 Pièces livrées à 80 % des sources : près de la salle, une seconde toile à
 850 px par largeur de salle garde le décor net quand on zoome.
+
+**L'analyse du 02/10, et ce qu'elle a changé** : la tôle se répétait en
+bandes (une variante par rangée, le même motif ~8 fois d'affilée) — la
+variante est tirée au sort par rangée et chaque carreau retourné ou non ;
+les deux premières tôles n'avaient pas la même échelle et leurs tuyaux
+horizontaux se confondaient avec les tubes de la mini-carte — remplacées
+par des tôles calmes, les tubes cernés d'un liseré d'ombre ; les vitrages
+débordent d'un halo vert ; la marche de la salle des machines a sa tôle.
+Le générateur rate le raccord haut/bas des tôles : le script le refait
+(`raccorde`). Les bords, coins et angles portent l'ANCIENNE tôle dans leur
+moitié intérieure : le moteur ne garde que la bande du rebord (0,28 salle)
+et la fond vers la tôle. Coût mesuré (rendu logiciel, médiane de 5) : la
+peinture des deux toiles passe de ~610 à ~800 ms, dont ~110 ms pour le
+calque des bords.
+
+**La serre en cylindre de culture (05/10)** : la serre quitte l'étagée
+(qui reste la coque des modules sans pièces propres) pour un immense
+cylindre couché — deux tranches vitrées alternées sur la longueur (en
+nombre entier, légèrement étirées : chaque capsule reste entière), un
+anneau de structure à chaque jonction, un dôme d'entrée et un dôme de sas,
+un berceau de machines dessous ; les cellules de la mini-carte sont des
+capsules de culture, tenues à leurs proportions jusque dans la transition.
+Sources : `masters/images/coque2d/serre-*.png` ; le script (`serre()`)
+refait le raccord gauche/droite des tranches et du berceau, baisse la rampe
+de culture d'un tiers et ramène dômes et anneau à la luminosité des
+tranches. La toile, élargie des deux dômes, touche plus tôt son plafond de
+4000 px : 301 px par salle au lieu de 360 sur six rangs (la toile proche
+reste à 850).
+
+| pièce de la serre | état |
+| --- | --- |
+| tranche du cylindre, et sa variante | ✅ livrées 05/10 |
+| anneau de structure | ✅ livré 05/10 |
+| dôme d'entrée, dôme du sas | ✅ livrés 05/10 |
+| berceau technique | ✅ livré 05/10 |
+| capsule de culture (cellule) | ✅ livrée 05/10 |
 
 **À venir** : les pièces propres de chaque module (la chaufferie et le
 cryo prennent celles de la serre en attendant) ; une deuxième variante de

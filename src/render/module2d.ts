@@ -54,6 +54,9 @@ export interface Sommet {
 }
 
 export interface MiseEnPage {
+  forme: FormeModule
+  /** le corps du module, sans dômes ni berceau, en pixels de toile */
+  corps: Rect
   largeur: number
   hauteur: number
   /** pixels de toile par largeur de salle */
@@ -66,8 +69,12 @@ export interface MiseEnPage {
   salle: Rect
   cellules: { x: number; y: number; l: number; h: number; etat: EtatCellule }[]
   tubes: { ax: number; ay: number; bx: number; by: number; etat: EtatTube }[]
+  /** les zones peintes en tôle de salle des machines, en pixels de toile */
+  machines: Rect[]
   /** les éléments uniques posés sur la tôle : centre, largeur */
   elements: { nom: string; x: number; y: number; l: number }[]
+  /** les petits détails semés sur la tôle : centre, largeur */
+  details: { nom: string; x: number; y: number; l: number }[]
   /** les équipements extérieurs posés sur un bord haut : pied, largeur relative */
   equipements: { nom: string; x: number; y: number }[]
   /** les deux colliers : l'entrée (bord gauche) et la sortie (bord droit) */
@@ -78,7 +85,7 @@ export interface MiseEnPage {
 export const PAS_RANG = 1.35 // d'un rang à l'autre
 export const PAS_VOIE = 1.3 // d'une voie à l'autre, en HAUTEURS de salle
 export const CELLULE_L = 0.3 // une cellule : 30 % de la largeur de la salle jouée
-export const TUBE = 0.05 // l'épaisseur d'un tube
+export const TUBE = 0.07 // l'épaisseur d'un tube : à 0,05, un trait (aperçu du 05/10)
 // la coque autour de la grille
 const MARGE_X = 0.15
 const MARGE_Y = 0.35 // en hauteurs de salle
@@ -132,9 +139,16 @@ export function etats(vue: VueModule2d): {
 // aux RANGS de la mini-carte, jamais à la salle jouée. Trois silhouettes
 // (maquette du 02/10) : étagée (un pont surélevé, une salle des machines),
 // fuseau (un nez à l'entrée, une poupe à moteurs), dorsale (une tour, deux
-// nacelles).
-export type FormeModule = 'etagee' | 'fuseau' | 'dorsale'
-const FORMES_PAR_BIOME: Record<string, FormeModule> = { tempere: 'etagee', chaud: 'fuseau', cryo: 'dorsale' }
+// nacelles). Et la serre en CYLINDRE de culture (05/10) : un immense
+// cylindre couché, en tranches vitrées, un dôme à chaque bout et un berceau
+// de machines dessous — l'étagée reste la coque des modules sans pièces
+// propres.
+export type FormeModule = 'etagee' | 'fuseau' | 'dorsale' | 'cylindre'
+const FORMES_PAR_BIOME: Record<string, FormeModule> = { tempere: 'cylindre', chaud: 'fuseau', cryo: 'dorsale' }
+/** le cylindre : chaque dôme déborde de 0,66 fois sa hauteur (mesuré sur les
+ *  dômes livrés : 0,654 et 0,651), le berceau descend de 0,3 fois dessous */
+export const CYL_DOME = 0.66
+export const CYL_BERCEAU = 0.3
 export function formeDuBiome(biome: string): FormeModule {
   return FORMES_PAR_BIOME[biome] ?? 'etagee'
 }
@@ -149,8 +163,9 @@ function silhouette(
   const b = (r: number) => g.rang(r) - PAS_RANG / 2
   const yM = (yT + yB) / 2
   const n = g.rangs
-  // un module trop court pour ses marches : la coque simple
-  if (n < 3) return [[xL, yT], [xR, yT], [xR, yB], [xL, yB]]
+  // un module trop court pour ses marches, et le cylindre (ses dômes et son
+  // berceau sont des pièces, hors du contour) : la coque simple
+  if (n < 3 || forme === 'cylindre') return [[xL, yT], [xR, yT], [xR, yB], [xL, yB]]
   if (forme === 'fuseau') {
     const nez = 0.75
     const poupe = 0.6
@@ -204,6 +219,25 @@ function elementDeForme(forme: FormeModule, c: [number, number][]): { nom: strin
   return { nom: 'machinerie', x: c[4][0] + 0.3, y: (c[5][1] + c[10][1]) / 2, l: 0.5 }
 }
 
+/** LA SALLE DES MACHINES de chaque forme, en largeurs de salle : la marche
+ *  sous la poupe (étagée), les deux nacelles (dorsale), la tuyère (fuseau).
+ *  Peinte de la même tôle que le reste, la forme ne se lisait qu'à la
+ *  silhouette, jamais dedans (analyse du 02/10). */
+function zonesMachines(forme: FormeModule, c: [number, number][]): [number, number, number, number][] {
+  if (c.length === 4) return []
+  if (forme === 'etagee') return [[c[10][0], c[10][1], c[8][0], c[8][1]]]
+  if (forme === 'dorsale')
+    return [
+      [c[9][0], c[6][1], c[7][0], c[8][1]],
+      [c[13][0], c[10][1], c[11][0], c[12][1]],
+    ]
+  if (c.length < 16) return []
+  return [[c[6][0], c[6][1], c[7][0], c[8][1]]]
+}
+
+/** La colonne de culture : hauteur / largeur de sa pièce livrée. */
+export const RATIO_COLONNE = 3.26
+
 /** CHAQUE ANGLE PREND SA PIÈCE selon le sens du contour (horaire à l'écran) :
  *  un virage à droite est un coin saillant, à gauche un angle rentrant —
  *  les deux angles rentrants livrés, et leurs miroirs. */
@@ -223,6 +257,57 @@ function habille(c: [number, number][]): Sommet[] {
     const [piece, miroir] = pieces[dir(c[(i + c.length - 1) % c.length], q) + dir(q, c[(i + 1) % c.length])]
     return { x: q[0], y: q[1], piece, miroir }
   })
+}
+
+const DETAILS = ['panneau', 'reparation', 'vanne', 'grille', 'cuve', 'aerations']
+/** un détail : sa largeur, en largeurs de salle — à peu près un panneau de tôle */
+export const DETAIL_L = 0.2
+/** au-delà de la bande du rebord (module2dCanvas, REBORD 0,28), que le moteur
+ *  fond vers la tôle : un détail dessous y serait à moitié caché */
+const MARGE_DETAIL_BORD = 0.3
+
+/** un tirage stable dans [0, 1[ : le même module sème toujours pareil */
+const tirage = (i: number, j: number) => ((((i * 73856093) ^ (j * 19349663)) >>> 0) % 1000) / 1000
+
+function dansPolygone(x: number, y: number, p: { x: number; y: number }[]): boolean {
+  let dedans = false
+  for (let i = 0, j = p.length - 1; i < p.length; j = i++)
+    if (p[i].y > y !== p[j].y > y && x < ((p[j].x - p[i].x) * (y - p[i].y)) / (p[j].y - p[i].y) + p[i].x) dedans = !dedans
+  return dedans
+}
+
+/** SEMER LES DÉTAILS sur la tôle, en pixels de toile : une grille décalée,
+ *  un tirage par case, et rien qui touche la salle, une cellule, un tube, un
+ *  élément ou le rebord. Une tôle nue se répétait encore à l'œil ; quelques
+ *  détails épars cassent la répétition. */
+function semeDetails(
+  densite: number,
+  bornes: { x0: number; y0: number; x1: number; y1: number },
+  silhouette: { x: number; y: number }[],
+  obstacles: Rect[],
+  tubes: MiseEnPage['tubes'],
+): MiseEnPage['details'] {
+  const out: MiseEnPage['details'] = []
+  const pas = 0.45 * densite
+  // la vanne, la plus haute, fait 1,5 fois sa largeur
+  const demi = 0.16 * densite
+  const bord = demi + MARGE_DETAIL_BORD * densite
+  for (let i = 0, y = bornes.y0; y < bornes.y1; i++, y += pas)
+    for (let j = 0, x = bornes.x0 + (i % 2) * pas * 0.5; x < bornes.x1; j++, x += pas) {
+      if (tirage(i, j) > 0.45) continue
+      const cx = x + (tirage(j, i + 17) - 0.5) * pas * 0.5
+      const cy = y + (tirage(i + 31, j) - 0.5) * pas * 0.5
+      if (![[-1, -1], [1, -1], [1, 1], [-1, 1]].every(([a, b]) => dansPolygone(cx + a * bord, cy + b * bord, silhouette))) continue
+      // contre un obstacle, la demi-largeur seule : il est peint par-dessus
+      const d = (DETAIL_L / 2) * densite
+      if (obstacles.some((o) => cx + d > o.minX && cx - d < o.maxX && cy + d > o.minY && cy - d < o.maxY)) continue
+      // un tube peut passer DESSUS (il est peint après, cerné d'ombre) ; mais
+      // pas sur son axe, où le détail lui ferait une bosse
+      if (tubes.some((t) => (t.ay === t.by ? Math.abs(cy - t.ay) < demi * 0.5 && cx > Math.min(t.ax, t.bx) && cx < Math.max(t.ax, t.bx) : Math.abs(cx - t.ax) < demi * 0.5 && cy > Math.min(t.ay, t.by) && cy < Math.max(t.ay, t.by))))
+        continue
+      out.push({ nom: DETAILS[Math.floor(tirage(i + 7, j + 3) * DETAILS.length)], x: cx, y: cy, l: DETAIL_L * densite })
+    }
+  return out
 }
 
 const EQUIPEMENTS = ['mat', 'grand-solaire', 'reservoir', 'antenne', 'radiateur', 'petit-solaire']
@@ -248,10 +333,11 @@ export function miseEnPage(salle: Rect, vue: VueModule2d, forme: FormeModule = '
   // la toile : la silhouette et ses abords
   const xs = contour.map((q) => q[0])
   const ys = contour.map((q) => q[1])
-  const bx0 = Math.min(...xs) - BORD_COTES
-  const bx1 = Math.max(...xs) + BORD_COTES
+  const dome = forme === 'cylindre' ? CYL_DOME * (yB - yT) : 0
+  const bx0 = Math.min(...xs) - BORD_COTES - dome
+  const bx1 = Math.max(...xs) + BORD_COTES + dome
   const by0 = Math.min(...ys) - BORD_HAUT
-  const by1 = Math.max(...ys) + BORD_BAS
+  const by1 = Math.max(...ys) + BORD_BAS + (forme === 'cylindre' ? CYL_BERCEAU * (yB - yT) : 0)
   const densite = Math.min(DENSITE, TOILE_MAX / (bx1 - bx0), TOILE_MAX / (by1 - by0))
   const X = (u: number) => (u - bx0) * densite
   const Y = (v: number) => (v - by0) * densite
@@ -286,21 +372,42 @@ export function miseEnPage(salle: Rect, vue: VueModule2d, forme: FormeModule = '
   // aucun tube n'y passe (ils courent sur les voies et à mi-chemin des
   // rangs) ; la machinerie aux deux bouts du module ; la grande baie sur le pont
   const elements: MiseEnPage['elements'] = []
-  for (let r = 0; r < vue.rangs; r++)
-    for (let v = 0; v + 1 < vue.voies; v++) {
-      // pas contre la salle jouée : elle est à taille réelle, pas une cellule,
-      // et un élément posé au pas des cellules la touchait (ou s'y cachait)
-      if (r === vue.rang && (v === vue.voie - 1 || v === vue.voie)) continue
-      const [u, w] = cel(r, v + 0.5)
-      const k = (r * 2 + v) % 5
-      const bout = r === 0 || r === vue.rangs - 1
-      const nom = bout && k % 2 === 1 ? 'machinerie' : k === 0 ? 'baie' : k === 3 ? 'trappe' : null
-      if (nom) elements.push({ nom, x: X(u), y: Y(w), l: (nom === 'baie' ? 0.95 : nom === 'trappe' ? 0.5 : 0.8) * densite })
-    }
+  // le cylindre est tout en vitrage : ni baie, ni trappe, ni machinerie
+  if (forme !== 'cylindre') {
+    for (let r = 0; r < vue.rangs; r++)
+      for (let v = 0; v + 1 < vue.voies; v++) {
+        // pas contre la salle jouée : elle est à taille réelle, pas une cellule,
+        // et un élément posé au pas des cellules la touchait (ou s'y cachait)
+        if (r === vue.rang && (v === vue.voie - 1 || v === vue.voie)) continue
+        const [u, w] = cel(r, v + 0.5)
+        const k = (r * 2 + v) % 5
+        const bout = r === 0 || r === vue.rangs - 1
+        // deux baies en alternance et une colonne de culture : les trois
+        // mêmes baies côte à côte se lisaient comme un copier-coller
+        const nom =
+          bout && k % 2 === 1 ? 'machinerie' : k === 0 ? (r % 2 ? 'baie-2' : 'baie') : k === 2 ? 'colonne' : k === 3 ? 'trappe' : null
+        if (!nom) continue
+        // la colonne, verticale, tient entre deux voies sans toucher leurs cellules
+        const l = { baie: 0.95, 'baie-2': 0.9, colonne: (0.6 * py) / RATIO_COLONNE, trappe: 0.5, machinerie: 0.8 }[nom]
+        elements.push({ nom, x: X(u), y: Y(w), l: l * densite })
+      }
+  }
   // l'élément de la forme : la grande baie sur le pont, la trappe en haut de
   // la tour, la machinerie dans la poupe
   const signe = elementDeForme(forme, contour)
   if (signe) elements.push({ nom: signe.nom, x: X(signe.x), y: Y(signe.y), l: signe.l * densite })
+  // les détails, à l'écart de tout ce qui porte du sens
+  const silPx = contour.map(([u, w]) => ({ x: X(u), y: Y(w) }))
+  const pres = (x0: number, y0: number, x1: number, y1: number, m: number): Rect => ({ minX: x0 - m, minY: y0 - m, maxX: x1 + m, maxY: y1 + m })
+  const obstacles: Rect[] = [
+    pres(X(-0.5), Y(-hr / 2), X(0.5), Y(hr / 2), 0.1 * densite),
+    ...cellules.map((k) => pres(k.x - k.l / 2, k.y - k.h / 2, k.x + k.l / 2, k.y + k.h / 2, 0.03 * densite)),
+    ...elements.map((e) => {
+      const d = Math.max(e.l, e.nom === 'colonne' ? e.l * RATIO_COLONNE : e.l) / 2
+      return pres(e.x - d, e.y - d, e.x + d, e.y + d, 0.05 * densite)
+    }),
+  ]
+  const details = forme === 'cylindre' ? [] : semeDetails(densite, { x0: X(xL), y0: Y(Math.min(...ys)), x1: X(Math.max(...xs)), y1: Y(Math.max(...ys)) }, silPx, obstacles, tubes)
   // les équipements, le long de chaque bord haut
   const equipements: MiseEnPage['equipements'] = []
   let n = 0
@@ -318,6 +425,8 @@ export function miseEnPage(salle: Rect, vue: VueModule2d, forme: FormeModule = '
   const largeur = Math.ceil((bx1 - bx0) * densite)
   const hauteur = Math.ceil((by1 - by0) * densite)
   return {
+    forme,
+    corps: { minX: X(xL), minY: Y(yT), maxX: X(xR), maxY: Y(yB) },
     largeur,
     hauteur,
     densite,
@@ -326,7 +435,9 @@ export function miseEnPage(salle: Rect, vue: VueModule2d, forme: FormeModule = '
     salle: { minX: X(-0.5), maxX: X(0.5), minY: Y(-hr / 2), maxY: Y(hr / 2) },
     cellules,
     tubes,
+    machines: zonesMachines(forme, contour).map(([x0, y0, x1, y1]) => ({ minX: X(x0), minY: Y(y0), maxX: X(x1), maxY: Y(y1) })),
     elements,
+    details,
     equipements,
     colliers: {
       gauche: { x: X(gauche[0][0]), y: Y((gauche[0][1] + gauche[1][1]) / 2), h: Math.abs(gauche[1][1] - gauche[0][1]) * densite },
@@ -357,7 +468,9 @@ export function centreCellule(salle: Rect, vue: VueModule2d, r: number, v: numbe
 // quittée rétrécit jusqu'à sa cellule, la vue glisse vers la droite, la
 // cellule choisie grossit jusqu'à la taille de la salle, puis la salle
 // apparaît — le plan d'ouverture habituel prend la suite.
-export const TRANSITION = { retrecit: 0.55, glisse: 0.7, grossit: 0.8, revele: 0.35 }
+// Rétrécir et grossir durent autant : avec 0,55 s d'un côté et 0,8 s de
+// l'autre, les deux moitiés ne se répondaient pas (aperçu du 05/10)
+export const TRANSITION = { retrecit: 0.7, glisse: 0.7, grossit: 0.7, revele: 0.35 }
 export const DUREE_TRANSITION = TRANSITION.retrecit + TRANSITION.glisse + TRANSITION.grossit + TRANSITION.revele
 // le module vu pendant la glissade : la salle y tient 20 % du plan large
 // (à 30 %, le module ne se voyait presque pas autour des deux cellules)
@@ -377,6 +490,8 @@ export interface EtatTransition {
   /** la cellule qui couvre la nouvelle salle : où, et à quel point elle la cache */
   couvre: Rect
   opacite: number
+  /** la salle quittée, qui rétrécit jusqu'à sa cellule */
+  depart: Rect
 }
 
 const doux = (t: number) => {
@@ -390,37 +505,44 @@ const mixLog = (a: number, b: number, t: number) => Math.exp(mix(Math.log(a), Ma
 export function etatTransition(t: number, p: ParamsTransition): EtatTransition {
   const { retrecit, glisse, grossit, revele } = TRANSITION
   const R = p.salle.maxX - p.salle.minX
+  const H = p.salle.maxY - p.salle.minY
   const a = { x: (p.salle.minX + p.salle.maxX) / 2, y: (p.salle.minY + p.salle.maxY) / 2 }
-  // la cellule quittée remplit d'abord l'écran comme une salle
-  const zDepart = p.zoomSalle / CELLULE_L
   const zModule = p.zoomSalle * ZOOM_MODULE
   const cl = CELLULE_L * R
-  const cellule = { minX: a.x - cl / 2, maxX: a.x + cl / 2, minY: a.y - cl / 3, maxY: a.y + cl / 3 }
+  const autour = (c: { x: number; y: number }, l: number, h: number): Rect => ({ minX: c.x - l / 2, maxX: c.x + l / 2, minY: c.y - h / 2, maxY: c.y + h / 2 })
+  // LES DEUX MOITIÉS SONT LE MÊME GESTE, à l'endroit puis à l'envers : la
+  // salle quittée rétrécit DANS LE MONDE jusqu'à sa cellule pendant que la
+  // caméra recule, la cellule choisie grossit jusqu'à la salle pendant
+  // qu'elle avance — tailles et zoom suivent la même courbe logarithmique.
+  // Avant, la salle quittée était une cellule fixe sur laquelle la caméra
+  // partait zoomée 3,3 fois : le décor sautait au premier instant puis
+  // filait, quand la seconde moitié grossissait la cellule en ligne droite
+  // sous un zoom en courbe — les deux ne se répondaient pas (aperçu du 05/10)
+  const taille = (e: number, c: { x: number; y: number }) => autour(c, mixLog(R, cl, e), mixLog(H, cl / 1.5, e))
   const t1 = retrecit
   const t2 = t1 + glisse
   const t3 = t2 + grossit
   let camera: EtatTransition['camera']
-  let couvre = cellule
+  let depart = taille(1, p.de)
+  let couvre = taille(1, a)
   let opacite = 1
-  if (t < t1) camera = { ...p.de, zoom: mixLog(zDepart, zModule, doux(t / retrecit)) }
-  else if (t < t2) {
+  if (t < t1) {
+    const e = doux(t / retrecit)
+    camera = { ...p.de, zoom: mixLog(p.zoomSalle, zModule, e) }
+    depart = taille(e, p.de)
+  } else if (t < t2) {
     const e = doux((t - t1) / glisse)
     camera = { x: mix(p.de.x, a.x, e), y: mix(p.de.y, a.y, e), zoom: zModule }
   } else if (t < t3) {
-    const e = doux((t - t2) / grossit)
-    camera = { ...a, zoom: mixLog(zModule, p.zoomSalle, e) }
-    couvre = {
-      minX: mix(cellule.minX, p.salle.minX, e),
-      maxX: mix(cellule.maxX, p.salle.maxX, e),
-      minY: mix(cellule.minY, p.salle.minY, e),
-      maxY: mix(cellule.maxY, p.salle.maxY, e),
-    }
+    const e = 1 - doux((t - t2) / grossit)
+    camera = { ...a, zoom: mixLog(p.zoomSalle, zModule, e) }
+    couvre = taille(e, a)
   } else {
     camera = { ...a, zoom: p.zoomSalle }
     couvre = p.salle
     opacite = 1 - doux((t - t3) / revele)
   }
-  return { camera, couvre, opacite }
+  return { camera, couvre, opacite, depart }
 }
 
 /** Où se trouve une salle chargée : son module, son rang dans le module. */

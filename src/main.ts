@@ -319,7 +319,6 @@ import {
   DUREE_TRANSITION,
   centreCellule,
   etatTransition,
-  CELLULE_L,
   fenetreProche,
   formeDuBiome,
   miseEnPage,
@@ -1493,8 +1492,10 @@ function majModule2d(b: Rect2d): void {
       version: module2dVersion,
       salle: b,
       coque: avecCoque,
-      cellule: piecesModule2d.get('cellule-neutre'),
-      celluleDepart: piecesModule2d.get('cellule-joue'),
+      // dans la serre, la capsule de culture
+      cellule: piecesModule2d.get(`${mp.forme === 'cylindre' ? 'serre-cellule' : 'cellule'}-neutre`),
+      celluleDepart: piecesModule2d.get(`${mp.forme === 'cylindre' ? 'serre-cellule' : 'cellule'}-joue`),
+      proportions: mp.forme === 'cylindre',
     })
     // envoyées au GPU, les toiles se libèrent tout de suite : deux toiles
     // de plusieurs dizaines de Mo par salle pesaient sur la mémoire (Safari)
@@ -1504,9 +1505,9 @@ function majModule2d(b: Rect2d): void {
   if (module2dMonde) renderer.setModule2d({ version: module2dVersion, ...module2dMonde, salle: b, coque: avecCoque })
   // la transition en cours : la cellule qui grossit sur la salle
   const tt = camera.piloteT
-  renderer.setCouvertureModule2d(tt !== null && transition2d ? { salle: transition2d.salle, depart: transition2d.depart, ...etatTransition(tt, transition2d) } : null)
+  renderer.setCouvertureModule2d(tt !== null && transition2d ? { salle: transition2d.salle, ...etatTransition(tt, transition2d) } : null)
 }
-let transition2d: (ParamsTransition & { depart: Rect2d }) | null = null
+let transition2d: ParamsTransition | null = null
 /** LA TRANSITION ENTRE DEUX SALLES (module2d.ts, etatTransition) : au lieu du
  *  plan large tenu, la salle quittée rétrécit dans sa cellule, la vue glisse
  *  vers la droite, la cellule choisie grossit jusqu'à la salle. Elle ne joue
@@ -1526,11 +1527,10 @@ function lanceTransition2d(avant: PositionSalle | null, b: Rect2d, vw: number, v
   const T = COQUE_EPAISSEUR
   const salle = { minX: b.minX - T, minY: b.minY - T, maxX: b.maxX + T, maxY: b.maxY + T }
   const zoomSalle = Math.min(vw / (b.maxX - b.minX), vh / (b.maxY - b.minY)) * 0.92
-  const de = centreCellule(salle, vue, vue.rang - 1, vient)
-  // la cellule quittée, peinte nette par-dessus la toile : la transition
-  // s'ouvre zoomée sur elle, et la toile n'y a que ~100 px
-  const l = (CELLULE_L * (salle.maxX - salle.minX)) / 2
-  const p = { de, salle, zoomSalle, depart: { minX: de.x - l, maxX: de.x + l, minY: de.y - l / 1.5, maxY: de.y + l / 1.5 } }
+  // la salle quittée rétrécit jusqu'à sa cellule (etatTransition, depart),
+  // peinte nette par-dessus la toile : à sa taille de salle, la toile n'y a
+  // que ~100 px
+  const p = { de: centreCellule(salle, vue, vue.rang - 1, vient), salle, zoomSalle }
   transition2d = p
   camera.piloter(
     (t) => etatTransition(t, p).camera,
