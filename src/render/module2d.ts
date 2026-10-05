@@ -82,7 +82,7 @@ export interface MiseEnPage {
 export const PAS_RANG = 1.35 // d'un rang à l'autre
 export const PAS_VOIE = 1.3 // d'une voie à l'autre, en HAUTEURS de salle
 export const CELLULE_L = 0.3 // une cellule : 30 % de la largeur de la salle jouée
-export const TUBE = 0.05 // l'épaisseur d'un tube
+export const TUBE = 0.07 // l'épaisseur d'un tube : à 0,05, un trait (aperçu du 05/10)
 // la coque autour de la grille
 const MARGE_X = 0.15
 const MARGE_Y = 0.35 // en hauteurs de salle

@@ -178,6 +178,9 @@ def main() -> None:
     c = lit('couloir')
     h = c.shape[0]
     ecrit('tube', c[round(0.172 * h):round(0.787 * h), 150:-150])
+    # son collier d'entrée, l'anneau seul : posé à chaque bout de tube, il en
+    # fait une conduite raccordée plutôt qu'un trait (aperçu du 05/10)
+    ecrit('tube-collier', c[105:580, 60:145])
 
 
 if __name__ == '__main__':

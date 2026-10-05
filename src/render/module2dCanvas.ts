@@ -43,6 +43,7 @@ export const PIECES_MODULE2D = [
   'equipement-radiateur',
   'equipement-reservoir',
   'tube',
+  'tube-collier',
 ] as const
 
 export type Pieces = Map<string, HTMLImageElement>
@@ -194,31 +195,79 @@ export function peintModule2d(mp: MiseEnPage, p: Pieces, fen?: Fenetre): HTMLCan
     c.drawImage(im, e.x - e.l / 2, e.y - h / 2, e.l, h)
   }
   c.restore()
-  // 3. les tubes, sous les cellules
+  // 3. les tubes, sous les cellules. Un tube est une CONDUITE : un halo de
+  // sa couleur s'il est praticable, le corps, une lueur au fil de son axe
+  // et un collier à chaque bout. Le corps seul, mince, avec un filet plat,
+  // se lisait comme un trait entre les cellules (aperçu du 05/10)
   const tube = img('tube')
+  const collier = img('tube-collier')
   const ep = TUBE * mp.densite
   const tw = (tube.width * ep) / tube.height
-  for (const t of mp.tubes) {
+  const ch = ep * 1.3
+  const cw = (collier.width * ch) / collier.height
+  const visibles = mp.tubes.filter((t) => {
     const long = Math.abs(t.bx - t.ax) + Math.abs(t.by - t.ay)
-    if (long < 1 || hors(Math.min(t.ax, t.bx) - ep, Math.min(t.ay, t.by) - ep, Math.max(t.ax, t.bx) + ep, Math.max(t.ay, t.by) + ep)) continue
+    return long >= 1 && !hors(Math.min(t.ax, t.bx) - ch, Math.min(t.ay, t.by) - ch, Math.max(t.ax, t.bx) + ch, Math.max(t.ay, t.by) + ch)
+  })
+  // l'emprise d'un tube, débordée de m de chaque côté et à chaque bout
+  const emprise = (t: (typeof visibles)[number], m: number) =>
+    c.rect(Math.min(t.ax, t.bx) - m, Math.min(t.ay, t.by) - m, Math.abs(t.bx - t.ax) + 2 * m, Math.abs(t.by - t.ay) + 2 * m)
+  // l'ombre et le halo, D'UN SEUL TRACÉ pour tout le réseau : tube par tube,
+  // ils s'empilaient en carrés plus sombres (ou plus vifs) à chaque coude
+  c.beginPath()
+  for (const t of visibles) emprise(t, ep * 0.8)
+  c.fillStyle = 'rgba(0,0,0,0.5)'
+  c.fill()
+  for (const [etat, lumiere, force] of [['bleu', '99,183,230', 0.5], ['ambre', '255,160,60', 0.75]] as const) {
+    const lot = visibles.filter((t) => t.etat === etat)
+    if (!lot.length) continue
+    c.save()
+    c.beginPath()
+    for (const t of lot) emprise(t, ep * 0.5)
+    // le flou d'une ombre se compte en pixels de la toile, hors transformation
+    c.shadowColor = `rgba(${lumiere},${force})`
+    c.shadowBlur = ep * 1.6 * (fen ? fen.k : 1)
+    c.fillStyle = `rgba(${lumiere},${force * 0.5})`
+    c.fill()
+    c.restore()
+  }
+  for (const t of visibles) {
+    const long = Math.abs(t.bx - t.ax) + Math.abs(t.by - t.ay)
     c.save()
     c.translate(t.ax, t.ay)
     if (t.ax === t.bx) c.rotate(t.by > t.ay ? Math.PI / 2 : -Math.PI / 2)
     else if (t.bx < t.ax) c.rotate(Math.PI)
-    // un liseré d'ombre : les tubes éteints se perdaient dans la tôle
-    c.fillStyle = 'rgba(0,0,0,0.5)'
-    c.fillRect(-ep * 0.8, -ep * 0.8, long + ep * 1.6, ep * 1.6)
+    const lumiere = t.etat === 'ambre' ? '255,160,60' : t.etat === 'bleu' ? '99,183,230' : null
+    c.save()
     c.beginPath()
     c.rect(-ep / 2, -ep / 2, long + ep, ep)
     c.clip()
     for (let x = -ep / 2; x < long + ep; x += tw) c.drawImage(tube, x, -ep / 2, tw + 0.5, ep)
-    // un tube éteint s'assombrit ; le chemin praticable porte un filet de lumière
+    // un tube éteint s'assombrit ; le chemin praticable porte une lueur
     const nuit = { ambre: 0, bleu: 0.15, joue: 0.3, eteint: 0.6 }[t.etat]
     c.fillStyle = `rgba(0,0,0,${nuit})`
     c.fillRect(-ep / 2, -ep / 2, long + ep, ep)
-    if (t.etat === 'ambre' || t.etat === 'bleu') {
-      c.fillStyle = t.etat === 'ambre' ? 'rgba(255,160,60,0.85)' : 'rgba(99,183,230,0.75)'
-      c.fillRect(-ep / 2, -ep * 0.09, long + ep, ep * 0.18)
+    if (lumiere) {
+      const g = c.createLinearGradient(0, -ep / 2, 0, ep / 2)
+      g.addColorStop(0, `rgba(${lumiere},0)`)
+      g.addColorStop(0.5, `rgba(${lumiere},0.55)`)
+      g.addColorStop(1, `rgba(${lumiere},0)`)
+      c.fillStyle = g
+      c.fillRect(-ep / 2, -ep * 0.18, long + ep, ep * 0.36)
+    }
+    c.restore()
+    // les colliers, aux deux bouts : là où le tube se raccorde ou tourne
+    const sombre = nuit * 0.6
+    for (const [x, sens] of [[-ep / 2, 1], [long + ep / 2, -1]] as const) {
+      c.save()
+      c.translate(x, 0)
+      c.scale(sens, 1)
+      c.drawImage(collier, 0, -ch / 2, cw, ch)
+      if (sombre > 0) {
+        c.fillStyle = `rgba(0,0,0,${sombre})`
+        c.fillRect(0, -ch / 2, cw, ch)
+      }
+      c.restore()
     }
     c.restore()
   }
