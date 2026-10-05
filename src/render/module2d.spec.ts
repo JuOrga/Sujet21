@@ -4,6 +4,10 @@
 import { describe, expect, it } from 'vitest'
 import {
   CELLULE_L,
+  CYL_BERCEAU,
+  CYL_DOME,
+  DETAIL_L,
+  RATIO_COLONNE,
   DUREE_TRANSITION,
   TOILE_MAX,
   TRANSITION,
@@ -144,11 +148,25 @@ describe('module 2D — la transition entre deux salles', () => {
     expect(versMondeY(c.y)).toBeCloseTo(de.y, 6)
   })
 
-  it('elle part sur la salle quittée, qui remplit l’écran comme une salle', () => {
+  it('elle part sur la salle quittée, à sa taille et au zoom de la salle : le décor ne saute pas', () => {
     const e = etatTransition(0, p)
     expect(e.camera.x).toBeCloseTo(de.x, 9)
     expect(e.camera.y).toBeCloseTo(de.y, 9)
-    expect(e.camera.zoom).toBeCloseTo(p.zoomSalle / CELLULE_L, 9)
+    expect(e.camera.zoom).toBeCloseTo(p.zoomSalle, 9)
+    expect(e.depart.maxX - e.depart.minX).toBeCloseTo(salle.maxX - salle.minX, 6)
+    expect(e.depart.maxY - e.depart.minY).toBeCloseTo(salle.maxY - salle.minY, 6)
+    expect((e.depart.minX + e.depart.maxX) / 2).toBeCloseTo(de.x, 6)
+  })
+
+  it('rétrécir et grossir vont au MÊME rythme : la seconde moitié rejoue la première à l’envers', () => {
+    const g = TRANSITION.retrecit + TRANSITION.glisse
+    const ecran = (r: { minX: number; maxX: number }, zoom: number) => (r.maxX - r.minX) * zoom
+    for (let f = 0; f <= 1.0001; f += 0.1) {
+      const a = etatTransition(f * TRANSITION.retrecit, p)
+      const b = etatTransition(g + (1 - f) * TRANSITION.grossit, p)
+      expect(ecran(a.depart, a.camera.zoom)).toBeCloseTo(ecran(b.couvre, b.camera.zoom), 3)
+      expect(a.camera.zoom).toBeCloseTo(b.camera.zoom, 6)
+    }
   })
 
   it('elle finit sur la nouvelle salle, au plan large, la cellule à sa taille et effacée', () => {
@@ -224,14 +242,14 @@ describe('module 2D — une forme FIXE par type de module', () => {
     expect(b.map((q) => q[0])).toEqual(a.map((q) => q[0])) // la hauteur suit la voie, pas le profil
   })
 
-  it('une forme par biome : la serre étagée, la chaufferie en fuseau, le cryo dorsal', () => {
-    expect(formeDuBiome('tempere')).toBe('etagee')
+  it('une forme par biome : la serre en cylindre, la chaufferie en fuseau, le cryo dorsal', () => {
+    expect(formeDuBiome('tempere')).toBe('cylindre')
     expect(formeDuBiome('chaud')).toBe('fuseau')
     expect(formeDuBiome('cryo')).toBe('dorsale')
     expect(formeDuBiome('antichambre')).toBe('etagee')
   })
 
-  for (const f of ['etagee', 'fuseau', 'dorsale'] as const)
+  for (const f of ['etagee', 'fuseau', 'dorsale', 'cylindre'] as const)
     it(`${f} : fermée, à angles droits, habillée selon le sens de chaque angle, et contenant la grille`, () => {
       const m = miseEnPage(salle, vue, f)
       const s = m.silhouette
@@ -277,4 +295,77 @@ describe('module 2D — rien ne se pose contre la salle jouée', () => {
         }
       }
     })
+})
+
+describe('module 2D — les pièces de la serre', () => {
+  it('chaque forme a sa salle des machines, dans la coque ; un module court n’en a pas', () => {
+    for (const forme of ['etagee', 'fuseau', 'dorsale'] as const) {
+      const m = miseEnPage(salle, vue, forme)
+      expect(m.machines.length).toBeGreaterThan(0)
+      const xs = m.silhouette.map((s) => s.x)
+      const ys = m.silhouette.map((s) => s.y)
+      for (const z of m.machines) {
+        expect(z.maxX - z.minX).toBeGreaterThan(0.2 * m.densite)
+        expect(z.maxY - z.minY).toBeGreaterThan(0.2 * m.densite)
+        expect(z.minX).toBeGreaterThanOrEqual(Math.min(...xs))
+        expect(z.maxX).toBeLessThanOrEqual(Math.max(...xs))
+        expect(z.minY).toBeGreaterThanOrEqual(Math.min(...ys))
+        expect(z.maxY).toBeLessThanOrEqual(Math.max(...ys))
+      }
+    }
+    expect(miseEnPage(salle, { ...vue, rangs: 2, rang: 0, joues: [] }).machines).toEqual([])
+  })
+
+  for (const hr of [0.66, 1.0])
+    it(`la colonne de culture tient entre deux voies sans toucher une cellule (salle ${hr === 1 ? 'carrée' : '3:2'})`, () => {
+      const m = miseEnPage({ minX: 0, minY: 0, maxX: 1000, maxY: 1000 * hr }, vue)
+      const colonnes = m.elements.filter((e) => e.nom === 'colonne')
+      expect(colonnes.length).toBeGreaterThan(0)
+      for (const e of colonnes) {
+        const h = e.l * RATIO_COLONNE
+        for (const k of m.cellules) {
+          const touche = Math.abs(e.x - k.x) < (e.l + k.l) / 2 && Math.abs(e.y - k.y) < (h + k.h) / 2
+          expect(touche).toBe(false)
+        }
+      }
+    })
+
+  it('deux baies différentes en alternance, plus de trois copies de la même', () => {
+    const noms = miseEnPage(salle, vue).elements.map((e) => e.nom)
+    expect(noms).toContain('baie')
+    expect(noms).toContain('baie-2')
+  })
+
+  it('des petits détails semés dans la coque, jamais sur la salle', () => {
+    expect(miseEnPage(salle, vue).details.length).toBeGreaterThan(5)
+    for (const hr of [0.66, 1.0])
+      for (const voie of [0, 1, 2]) {
+        const m = miseEnPage({ minX: 0, minY: 0, maxX: 1000, maxY: 1000 * hr }, { ...vue, voie, joues: [voie] })
+        const xs = m.silhouette.map((s) => s.x)
+        const ys = m.silhouette.map((s) => s.y)
+        const d = (DETAIL_L / 2) * m.densite
+        for (const e of m.details) {
+          expect(e.x - d).toBeGreaterThan(Math.min(...xs))
+          expect(e.x + d).toBeLessThan(Math.max(...xs))
+          expect(e.y - d).toBeGreaterThan(Math.min(...ys))
+          expect(e.y + d).toBeLessThan(Math.max(...ys))
+          const surSalle = e.x + d > m.salle.minX && e.x - d < m.salle.maxX && e.y + d > m.salle.minY && e.y - d < m.salle.maxY
+          expect(surSalle).toBe(false)
+        }
+      }
+  })
+
+  it('le cylindre : la toile porte ses deux dômes et son berceau ; aucune pièce de tôle sur le vitrage', () => {
+    for (const hr of [0.66, 1.0]) {
+      const m = miseEnPage({ minX: 0, minY: 0, maxX: 1000, maxY: 1000 * hr }, vue, 'cylindre')
+      const H = m.corps.maxY - m.corps.minY
+      expect(m.corps.minX).toBeGreaterThanOrEqual(CYL_DOME * H)
+      expect(m.largeur - m.corps.maxX).toBeGreaterThanOrEqual(CYL_DOME * H)
+      expect(m.hauteur - m.corps.maxY).toBeGreaterThanOrEqual(CYL_BERCEAU * H)
+      expect(m.elements).toEqual([])
+      expect(m.details).toEqual([])
+      expect(m.machines).toEqual([])
+      expect(m.largeur).toBeLessThanOrEqual(TOILE_MAX + 1)
+    }
+  })
 })

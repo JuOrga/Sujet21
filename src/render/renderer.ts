@@ -5075,7 +5075,24 @@ uniform float uMode;     // 0 : autour de la salle ; 1 : la COUVERTURE de la tra
 uniform vec4 uCouv;      // la cellule qui grossit, dans le monde
 uniform float uCouvA;    // à quel point elle cache la salle
 uniform sampler2D uCellule;
+uniform float uRatioCellule; // hauteur / largeur de l'image de la cellule ; 0 : étirée
 out vec4 outColor;
+// LA CELLULE TIENT À SES PROPORTIONS, centrée dans son rectangle : étirée à
+// la forme de la salle, la capsule de la serre (2,4 fois plus large que
+// haute) se déformait en grossissant (05/10). Rend ses coordonnées, hors de
+// [0, 1] en dehors de l'image.
+vec2 dansCellule(vec2 p, vec4 r) {
+  vec2 t = r.zw - r.xy;
+  vec2 k = (p - r.xy) / t;
+  float rr = t.y / t.x;
+  // les autres cellules, rectangles pleins, restent étirées : tenues à leurs
+  // proportions, elles laissaient des bandes sur les côtés de la salle
+  if (uRatioCellule > 0.0) {
+    if (uRatioCellule < rr) k.y = (k.y - 0.5) * rr / uRatioCellule + 0.5;
+    else k.x = (k.x - 0.5) * uRatioCellule / rr + 0.5;
+  }
+  return vec2(k.x, 1.0 - k.y);
+}
 void main() {
   bool dansSalle = all(greaterThan(vMonde, uSalle.xy)) && all(lessThan(vMonde, uSalle.zw));
   if (uMode < 0.5 && dansSalle) discard;
@@ -5099,16 +5116,19 @@ void main() {
   if (uMode < 0.5) c.rgb *= mix(0.32, 1.0, smoothstep(0.0, 0.45, d));
   if (uMode > 1.5) {
     // la cellule quittée, peinte nette sur son quad
-    vec2 k = (vMonde - uCouv.xy) / (uCouv.zw - uCouv.xy);
-    outColor = texture(uCellule, vec2(k.x, 1.0 - k.y));
+    vec2 k = dansCellule(vMonde, uCouv);
+    if (any(lessThan(k, vec2(0.0))) || any(greaterThan(k, vec2(1.0)))) discard;
+    outColor = texture(uCellule, k);
     return;
   }
   if (uMode > 0.5) {
     // LA TRANSITION : sur la salle, la tôle du module, et la cellule choisie
     // qui grossit — la salle n'apparaît qu'une fois la cellule à sa taille
-    if (all(greaterThan(vMonde, uCouv.xy)) && all(lessThan(vMonde, uCouv.zw))) {
-      vec2 k = (vMonde - uCouv.xy) / (uCouv.zw - uCouv.xy);
-      c = texture(uCellule, vec2(k.x, 1.0 - k.y));
+    vec2 k = dansCellule(vMonde, uCouv);
+    if (all(greaterThanEqual(k, vec2(0.0))) && all(lessThanEqual(k, vec2(1.0)))) {
+      // une capsule détourée laisse voir la toile autour d'elle
+      vec4 tx = texture(uCellule, k);
+      c = tx + c * (1.0 - tx.a);
     }
     c *= uCouvA;
   }
@@ -5882,6 +5902,8 @@ export class Renderer {
       procheToile?: TexImageSource
       cellule?: TexImageSource
       celluleDepart?: TexImageSource
+      /** la cellule garde ses proportions (la capsule de la serre) */
+      proportions?: boolean
     } | null,
   ): void {
     if (!m) {
@@ -5893,8 +5915,20 @@ export class Renderer {
       if (m.procheToile) this.texModule2dProche = this.envoieToile2d(this.texModule2dProche, m.procheToile)
       this.module2dVersion = m.version
     }
-    if (m.cellule && !this.texCellule2d) this.texCellule2d = this.envoieToile2d(null, m.cellule)
-    if (m.celluleDepart && !this.texCelluleDepart2d) this.texCelluleDepart2d = this.envoieToile2d(null, m.celluleDepart)
+    // la cellule change avec le module (la capsule dans la serre) : envoyée
+    // une seule fois, la première restait pour tous
+    if (m.cellule && m.cellule !== this.srcCellule2d) {
+      this.texCellule2d = this.envoieToile2d(this.texCellule2d, m.cellule)
+      this.srcCellule2d = m.cellule
+    }
+    if (m.cellule) {
+      const im = m.cellule as { width: number; height: number }
+      this.ratioCellule2d = m.proportions ? im.height / im.width : 0
+    }
+    if (m.celluleDepart && m.celluleDepart !== this.srcCelluleDepart2d) {
+      this.texCelluleDepart2d = this.envoieToile2d(this.texCelluleDepart2d, m.celluleDepart)
+      this.srcCelluleDepart2d = m.celluleDepart
+    }
     this.module2d = { monde: m.monde, salle: m.salle, coque: m.coque, proche: m.proche ?? null }
   }
   private module2d: { monde: Rect2d; salle: Rect2d; coque: Rect2d; proche: Rect2d | null } | null = null
@@ -5902,6 +5936,9 @@ export class Renderer {
   private texModule2dProche: WebGLTexture | null = null
   private texCellule2d: WebGLTexture | null = null
   private texCelluleDepart2d: WebGLTexture | null = null
+  private srcCellule2d: TexImageSource | null = null
+  private srcCelluleDepart2d: TexImageSource | null = null
+  private ratioCellule2d = 0
   private module2dVersion = -1
   /** Une toile (ou une pièce) vers le GPU : prémultipliée — le noir autour
    *  de la coque est transparent, le fondu de ses bords sans liseré sombre —,
@@ -5964,6 +6001,7 @@ export class Renderer {
       gl.activeTexture(gl.TEXTURE1)
       gl.bindTexture(gl.TEXTURE_2D, mode === 2 ? this.texCelluleDepart2d : this.texCellule2d)
       gl.uniform1i(u['uCellule'], 1)
+      gl.uniform1f(u['uRatioCellule'], this.ratioCellule2d)
     }
     gl.activeTexture(gl.TEXTURE0)
     gl.bindTexture(gl.TEXTURE_2D, this.texModule2d)
