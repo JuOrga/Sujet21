@@ -2086,6 +2086,20 @@ reste à 850).
 | berceau technique | ✅ livré 05/10 |
 | capsule de culture (cellule) | ✅ livrée 05/10 |
 
+**La finesse (06/10)** : étirées d'un bloc à la hauteur du module (~3
+salles), les tranches n'avaient que ~400 px par largeur de salle — floues
+zoomé sur la salle, au Steam Deck surtout. Le script les livre en pleine
+résolution et en morceaux : trois lignes (haut, bande d'étagère répétée,
+bas — les deux tranches partagent leurs rebords aux lignes 429, 703 et
+1281) et trois colonnes (bord gauche et son arc, cœur répété en largeur,
+bord droit) ; l'anneau en trois lignes aussi. Le moteur les empile à 1024
+px par salle ; la toile proche passe de 850 à 1024 px par salle, et le flou
+du bord de la salle de 2,2 à 1,0 cran. Mesuré au zoom 0,6 à travers le
+shader : laplacien moyen 1,47 → 2,66 (+81 %). Peinture des deux toiles
+~211 → ~290 ms (rendu logiciel), toile proche 2380 × 2083 → 2867 × 2510.
+Revers : deux bandes d'étagère seulement, la répétition se voit de près —
+des bandes de plus sont à générer.
+
 **À venir** : les pièces propres de chaque module (la chaufferie et le
 cryo prennent celles de la serre en attendant) ; une deuxième variante de
 baie et de trappe.

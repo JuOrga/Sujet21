@@ -5102,7 +5102,9 @@ void main() {
   // champ ; à une demi-salle, il est net et pleinement éclairé.
   vec2 dd = max(max(uCoque.xy - vMonde, vMonde - uCoque.zw), 0.0);
   float d = length(dd) / (uCoque.z - uCoque.x);
-  float flou = uMode > 0.5 ? 0.0 : 2.2 * (1.0 - smoothstep(0.0, 0.14, d));
+  // (le flou réduit de 2,2 à 1,0 crans le 06/10 : zoomé sur la salle, on ne
+  // voit presque que cette bande, et le décor y paraissait flou partout)
+  float flou = uMode > 0.5 ? 0.0 : 1.0 * (1.0 - smoothstep(0.0, 0.14, d));
   // la toile a son origine EN HAUT (une toile 2D) : v descend avec y
   vec2 uv = vec2((vMonde.x - uRect.x) / (uRect.z - uRect.x), (uRect.w - vMonde.y) / (uRect.w - uRect.y));
   vec4 c = texture(uToile, uv, flou);

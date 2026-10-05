@@ -44,9 +44,27 @@ export const PIECES_MODULE2D = [
   'equipement-reservoir',
   'tube',
   'tube-collier',
-  'serre-tranche',
-  'serre-tranche-2',
-  'serre-anneau',
+  'serre-tranche-haut-g',
+  'serre-tranche-haut-m',
+  'serre-tranche-haut-d',
+  'serre-tranche-bande-g',
+  'serre-tranche-bande-m',
+  'serre-tranche-bande-d',
+  'serre-tranche-bas-g',
+  'serre-tranche-bas-m',
+  'serre-tranche-bas-d',
+  'serre-tranche-2-haut-g',
+  'serre-tranche-2-haut-m',
+  'serre-tranche-2-haut-d',
+  'serre-tranche-2-bande-g',
+  'serre-tranche-2-bande-m',
+  'serre-tranche-2-bande-d',
+  'serre-tranche-2-bas-g',
+  'serre-tranche-2-bas-m',
+  'serre-tranche-2-bas-d',
+  'serre-anneau-haut',
+  'serre-anneau-bande',
+  'serre-anneau-bas',
   'serre-dome-gauche',
   'serre-dome-droit',
   'serre-berceau',
@@ -78,6 +96,9 @@ export function chargePiecesModule2d(): Promise<Pieces> {
 // maquette validée le 01/10 —, et chaque pièce dit où passe la ligne de
 // coque. Les fichiers sont livrés à LIVRE des sources (tools/images/coque2d.py).
 const PX_PAR_SALLE = 533.3
+// les pièces de la serre, livrées en pleine résolution : 1024 de leurs
+// pixels par largeur de salle — deux bandes par étagère d'origine
+const PX_SERRE = 1024
 const LIVRE = 0.8
 const LIGNE_HAUT = 192 // bord-haut : le haut du rebord
 const LIGNE_BAS = 292.5 // bord-bas : le bas de la quille
@@ -175,20 +196,75 @@ export function peintModule2d(mp: MiseEnPage, p: Pieces, fen?: Fenetre): HTMLCan
       if (!hors(x, k.maxY - 0.03 * H - 166 * sb, x + berceau.width * sb, k.maxY + CYL_BERCEAU * H))
         c.drawImage(berceau, x, k.maxY - 0.03 * H - 166 * sb, berceau.width * sb + 0.5, berceau.height * sb)
     c.restore()
-    const tranches = [img('serre-tranche'), img('serre-tranche-2')]
-    const n = Math.max(1, Math.round(W / ((tranches[0].width / tranches[0].height) * H)))
+    // UNE COLONNE EMPILÉE : le haut, la bande répétée, le bas — à l'échelle
+    // d'origine des pièces (PX_SERRE par salle), le nombre de bandes ajusté à
+    // la hauteur du module. Étirée d'un bloc à ~3 salles, une tranche n'avait
+    // que ~400 px par salle : floue dès qu'on zoomait (Steam Deck, 06/10)
+    const empile = (h: number, haut: HTMLImageElement, bande: HTMLImageElement, bas: HTMLImageElement) => {
+      const cible = mp.densite / PX_SERRE
+      const nb = Math.max(0, Math.round((h / cible - haut.height - bas.height) / bande.height))
+      return { nb, e: h / (haut.height + nb * bande.height + bas.height) }
+    }
+    const colonne = (x: number, y: number, l: number, e: number, nb: number, haut: HTMLImageElement, bande: HTMLImageElement, bas: HTMLImageElement) => {
+      c.drawImage(haut, x, y, l, haut.height * e + 0.5)
+      let yy = y + haut.height * e
+      for (let j = 0; j < nb; j++, yy += bande.height * e) c.drawImage(bande, x, yy, l, bande.height * e + 0.5)
+      c.drawImage(bas, x, yy, l, bas.height * e)
+    }
+    // chaque capsule en trois colonnes aussi : son bord gauche et son arc, le
+    // cœur répété en largeur, son bord droit — d'un bloc, à pleine finesse,
+    // les capsules devenaient étroites et hautes (06/10) ; elles gardent la
+    // largeur de la tranche d'origine, deux tiers de la hauteur du cylindre
+    const tr = ['serre-tranche', 'serre-tranche-2'].map((n) =>
+      (['haut', 'bande', 'bas'] as const).map((l) => (['g', 'm', 'd'] as const).map((k) => img(`${n}-${l}-${k}`))),
+    )
+    const [hg, hm, hd] = tr[0][0]
+    const { nb, e } = empile(H, hg, tr[0][1][0], tr[0][2][0])
+    const nm = Math.max(1, Math.round(((2 / 3) * H / e - hg.width - hd.width) / hm.width))
+    const n = Math.max(1, Math.round(W / ((hg.width + nm * hm.width + hd.width) * e)))
     const sw = W / n
+    // l'étirement en largeur qui fait tomber les capsules juste
+    const fx = sw / ((hg.width + nm * hm.width + hd.width) * e)
+    // CASSER LA GRILLE : une bande répétée telle quelle faisait un papier
+    // peint, la même étagère en lignes et en colonnes (06/10). Chaque ligne
+    // d'étagères tire sa tranche (les deux partagent leurs rebords, la
+    // jonction tombe sur le bac), chaque cœur est retourné ou non (le miroir
+    // garde le raccord : son bord droit est le bord gauche de l'original)
+    const piece = (im: HTMLImageElement, x: number, y: number, l: number, h: number, miroir: boolean) => {
+      if (!miroir) return c.drawImage(im, x, y, l, h)
+      c.save()
+      c.translate(x + l, y)
+      c.scale(-1, 1)
+      c.drawImage(im, 0, 0, l, h)
+      c.restore()
+    }
     for (let i = 0; i < n; i++) {
-      const x = k.minX + i * sw
-      if (!hors(x, k.minY, x + sw, k.maxY)) c.drawImage(tranches[i % 2], x, k.minY, sw + 0.5, H)
+      const x0 = k.minX + i * sw
+      if (hors(x0, k.minY, x0 + sw, k.maxY)) continue
+      let y = k.minY
+      for (let r = 0; r < nb + 2; r++) {
+        const ligne = r === 0 ? 0 : r === nb + 1 ? 2 : 1
+        const v = ligne === 1 ? (tire(i * 31 + r, 5) < 0.5 ? 0 : 1) : i % 2
+        const rang = tr[v][ligne]
+        const h = rang[0].height * e
+        let x = x0
+        for (let j = 0; j < nm + 2; j++) {
+          const col = j === 0 ? 0 : j === nm + 1 ? 2 : 1
+          const l = rang[col].width * e * fx
+          if (!hors(x, y, x + l, y + h)) piece(rang[col], x, y, l + 0.5, h + 0.5, col === 1 && tire(i * 17 + j, r) < 0.5)
+          x += l
+        }
+        y += h
+      }
     }
     // l'anneau : 98,6 % de la hauteur du cylindre, posé 0,65 % sous son haut
-    const anneau = img('serre-anneau')
+    const an = [img('serre-anneau-haut'), img('serre-anneau-bande'), img('serre-anneau-bas')] as const
     const ah = 0.986 * H
-    const aw = (anneau.width / anneau.height) * ah
+    const pa = empile(ah, ...an)
+    const aw = an[0].width * pa.e
     for (let i = 1; i < n; i++) {
       const x = k.minX + i * sw
-      if (!hors(x - aw / 2, k.minY, x + aw / 2, k.maxY)) c.drawImage(anneau, x - aw / 2, k.minY + 0.0065 * H, aw, ah)
+      if (!hors(x - aw / 2, k.minY, x + aw / 2, k.maxY)) colonne(x - aw / 2, k.minY + 0.0065 * H, aw, pa.e, pa.nb, ...an)
     }
     // les dômes : leur hauteur de cylindre est 1202 lignes sur 1229 ; la
     // bande plate tombe à x 786 (gauche) et 30 (droite) sur 819

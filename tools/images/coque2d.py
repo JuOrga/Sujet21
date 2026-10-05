@@ -62,10 +62,11 @@ def detoure(a: np.ndarray, rogne: bool = False) -> np.ndarray:
     return rgba
 
 
-def ecrit(nom: str, a: np.ndarray) -> None:
+def ecrit(nom: str, a: np.ndarray, echelle: float = ECHELLE) -> None:
     mode = 'RGBA' if a.shape[2] == 4 else 'RGB'
     im = Image.fromarray((np.clip(a, 0, 1) * 255).astype(np.uint8), mode)
-    im = im.resize((max(1, round(im.width * ECHELLE)), max(1, round(im.height * ECHELLE))), Image.LANCZOS)
+    if echelle != 1:
+        im = im.resize((max(1, round(im.width * echelle)), max(1, round(im.height * echelle))), Image.LANCZOS)
     out = SORTIE / f'coque2d-{nom}.webp'
     im.save(out, 'WEBP', quality=86, method=6)
     print(f'  {nom} : {im.width}×{im.height}, {out.stat().st_size // 1024} Ko')
@@ -169,16 +170,45 @@ DETAILS = {
 def serre() -> None:
     """LA SERRE EN CYLINDRE DE CULTURE (05/10) : des tranches vitrées répétées
     sur la longueur, un anneau à chaque jonction, un dôme à chaque bout, un
-    berceau de machines dessous, des capsules pour la mini-carte."""
+    berceau de machines dessous, des capsules pour la mini-carte.
+
+    · LES TRANCHES ET L'ANNEAU EN TROIS MORCEAUX, haut, bande, bas : la bande
+      se répète en hauteur. Étirée d'un bloc à la hauteur du module (~3
+      salles), une tranche n'avait que ~400 px par largeur de salle — floue
+      dès qu'on zoomait sur la salle, au Steam Deck surtout (06/10). Les deux
+      tranches partagent leurs étagères aux lignes 429, 703 et 1281 : la
+      bande 429–703 se répète, les étagères restent alignées d'une tranche à
+      l'autre. L'anneau : son chapeau et sa lampe (0–775), un module de
+      plaques (775–1035), son pied.
+    · EN PLEINE RÉSOLUTION (pas les 80 % des autres pièces) : posées à
+      deux bandes par étagère d'origine, elles donnent ~1000 px par salle."""
     for n in ('tranche', 'tranche-2'):
         a = raccorde(lit(f'serre-{n}'), sens=1)
         # la rampe de culture, en haut du vitrage : trois fois plus claire que
         # le reste de l'image, elle ferait un néon continu sur tout le module
         y = np.arange(a.shape[0])[:, None, None] / a.shape[0]
-        a = a * (1 - 0.3 * np.exp(-(((y - 0.145) / 0.03) ** 2)))
-        ecrit(f'serre-{n}', sombre(a, 0.9))
+        a = sombre(a * (1 - 0.3 * np.exp(-(((y - 0.145) / 0.03) ** 2))), 0.9)
+        # la bande, raccordée en haut et en bas pour se répéter sans couture
+        lignes = {
+            'haut': a[:429],
+            'bande': raccorde(a[429:703].transpose(1, 0, 2), b=24, sens=1).transpose(1, 0, 2),
+            'bas': a[1281:],
+        }
+        # ET EN TROIS COLONNES : le bord gauche et son arc (0–200), le cœur
+        # raccordé qui se répète en largeur, le bord droit et son arc (820–) —
+        # à pleine finesse, la tranche d'un bloc faisait des capsules étroites
+        # et hautes, neuf anneaux au lieu de quatre (06/10)
+        for nl, l in lignes.items():
+            ecrit(f'serre-{n}-{nl}-g', l[:, :200], 1)
+            ecrit(f'serre-{n}-{nl}-m', raccorde(l[:, 200:820], sens=1), 1)
+            ecrit(f'serre-{n}-{nl}-d', l[:, 820:], 1)
     # les pièces détourées, ramenées à la luminosité des tranches (~10 %)
-    ecrit('serre-anneau', sombre(detoure(lit('serre-anneau'), rogne=True), 0.6))
+    an = sombre(detoure(lit('serre-anneau')), 0.6)
+    ys, xs = np.where(an[..., 3] > 0.5)
+    an = an[:, xs.min():xs.max() + 1]
+    ecrit('serre-anneau-haut', an[ys.min():775], 1)
+    ecrit('serre-anneau-bande', raccorde(an[775:1035].transpose(1, 0, 2), b=16, sens=1).transpose(1, 0, 2), 1)
+    ecrit('serre-anneau-bas', an[1035:ys.max() + 1], 1)
     for n in ('dome-gauche', 'dome-droit'):
         ecrit(f'serre-{n}', sombre(detoure(lit(f'serre-{n}')), 0.65))
     b = detoure(lit('serre-berceau'))
