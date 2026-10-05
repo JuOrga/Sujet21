@@ -2115,6 +2115,12 @@ au hasard le cœur d'une étagère sur deux du jardin d'air.
 | étagères aromatiques, fougères | ✅ livrées 06/10 |
 | potager, céréales, verger nain, pépinière | ⏳ à générer |
 
+Les morceaux répétés se raccordent sans décaler leur coupe (`boucle`,
+`amorce` dans le script) : raccorde, qui fondait la fin dans le début,
+décalait le premier pixel, et chaque jonction bord|cœur ou haut|bande
+faisait couture (relecture du 06/10 : écart 13 à 28 contre 3 à 8 dans une
+pièce ; après, toutes les jonctions au niveau du raccord cœur|cœur).
+
 **À venir** : les pièces propres de chaque module (la chaufferie et le
 cryo prennent celles de la serre en attendant) ; une deuxième variante de
 baie et de trappe.

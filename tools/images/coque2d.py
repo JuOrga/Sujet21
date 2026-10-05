@@ -91,6 +91,50 @@ def raccorde(a: np.ndarray, b: int = 48, sens: int = 2) -> np.ndarray:
     return a
 
 
+def boucle(t: np.ndarray, avant: np.ndarray) -> np.ndarray:
+    """Rend t répétable SANS décaler sa coupe : ses len(avant) dernières
+    lignes se fondent dans `avant`, les lignes qui précèdent son début dans
+    l'image d'origine. Son premier pixel reste la ligne de coupe — raccorde,
+    qui fondait la fin dans le début, la décalait, et la jonction avec la
+    pièce voisine faisait couture (relecture du 06/10)."""
+    b = len(avant)
+    w = np.linspace(0, 1, b)[:, None, None]
+    t = t.copy()
+    t[-b:] = t[-b:] * (1 - w) + avant * w
+    return t
+
+
+def amorce(t: np.ndarray, suite: np.ndarray) -> np.ndarray:
+    """L'inverse, pour la pièce qui suit une pièce bouclée : ses premières
+    lignes partent de `suite` (ce qui suit la fin bouclée dans l'image
+    d'origine) et se fondent vers les siennes."""
+    b = len(suite)
+    w = np.linspace(0, 1, b)[:, None, None]
+    t = t.copy()
+    t[:b] = suite * (1 - w) + t[:b] * w
+    return t
+
+
+def neuf(prefixe: str, a: np.ndarray, haut: int, bande: int, bas: int, g: int = 200, d: int = 830, b: int = 24, debut_bas: int | None = None) -> None:
+    """Neuf morceaux : trois lignes (haut, bande répétée en hauteur, bas) et
+    trois colonnes (bord gauche et son arc, cœur répété en largeur, bord
+    droit). Les quatre jonctions se raccordent, miroir du cœur compris : le
+    bout bouclé d'un morceau répété retombe sur la ligne qui précède sa
+    coupe, et le morceau suivant part de celle qui la suit. debut_bas : le bas
+    peut commencer plus loin que la fin de la bande (les tranches sautent
+    une étagère, 703–1281)."""
+    T = lambda x: x.transpose(1, 0, 2)
+    lignes = {
+        'haut': a[:haut],
+        'bande': boucle(a[haut:bande], a[haut - b:haut]),
+        'bas': amorce(a[bande if debut_bas is None else debut_bas:bas], a[haut:haut + b]),
+    }
+    for nl, l in lignes.items():
+        ecrit(f'{prefixe}-{nl}-g', l[:, :g], 1)
+        ecrit(f'{prefixe}-{nl}-m', T(boucle(T(l[:, g:d]), T(l[:, g - 2 * b:g]))), 1)
+        ecrit(f'{prefixe}-{nl}-d', T(amorce(T(l[:, d:]), T(l[:, g:g + 2 * b]))), 1)
+
+
 def sombre(a: np.ndarray, k: float) -> np.ndarray:
     b = a.copy()
     b[..., :3] *= k
@@ -188,34 +232,14 @@ def serre() -> None:
         # le reste de l'image, elle ferait un néon continu sur tout le module
         y = np.arange(a.shape[0])[:, None, None] / a.shape[0]
         a = sombre(a * (1 - 0.3 * np.exp(-(((y - 0.145) / 0.03) ** 2))), 0.9)
-        # la bande, raccordée en haut et en bas pour se répéter sans couture
-        lignes = {
-            'haut': a[:429],
-            'bande': raccorde(a[429:703].transpose(1, 0, 2), b=24, sens=1).transpose(1, 0, 2),
-            'bas': a[1281:],
-        }
-        # ET EN TROIS COLONNES : le bord gauche et son arc (0–200), le cœur
-        # raccordé qui se répète en largeur, le bord droit et son arc (820–) —
-        # à pleine finesse, la tranche d'un bloc faisait des capsules étroites
-        # et hautes, neuf anneaux au lieu de quatre (06/10)
-        for nl, l in lignes.items():
-            ecrit(f'serre-{n}-{nl}-g', l[:, :200], 1)
-            ecrit(f'serre-{n}-{nl}-m', raccorde(l[:, 200:820], sens=1), 1)
-            ecrit(f'serre-{n}-{nl}-d', l[:, 820:], 1)
+        # en neuf morceaux : la bande d'étagère répétée en hauteur, le cœur en
+        # largeur — à pleine finesse, d'un bloc, la tranche faisait des
+        # capsules étroites et hautes, neuf anneaux au lieu de quatre (06/10)
+        neuf(f'serre-{n}', a, 429, 703, a.shape[0], d=820, debut_bas=1281)
     # LES ZONES (06/10) : une capsule entière par thème le long du cylindre,
     # pour varier dans la longueur au lieu de répéter. Leur gabarit n'est pas
     # celui des tranches (bacs aux lignes 424 et 871, rebord haut plus fin,
     # rebord bas jusqu'à 1440) : neuf morceaux propres, les mêmes colonnes
-    def neuf(prefixe: str, a: np.ndarray, haut: int, bande: int, bas: int) -> None:
-        lignes = {
-            'haut': a[:haut],
-            'bande': raccorde(a[haut:bande].transpose(1, 0, 2), b=24, sens=1).transpose(1, 0, 2),
-            'bas': a[bande:bas],
-        }
-        for nl, l in lignes.items():
-            ecrit(f'{prefixe}-{nl}-g', l[:, :200], 1)
-            ecrit(f'{prefixe}-{nl}-m', raccorde(l[:, 200:830], sens=1), 1)
-            ecrit(f'{prefixe}-{nl}-d', l[:, 830:], 1)
     for z in ('algues', 'champignons'):
         neuf(f'serre-zone-{z}', sombre(raccorde(lit(f'serre-zone-{z}'), sens=1), 0.85), 424, 871, 1440)
     # LES ÉTAGÈRES DE RECHANGE : une étagère (bacs toutes les 323 lignes),
@@ -230,8 +254,8 @@ def serre() -> None:
     ys, xs = np.where(an[..., 3] > 0.5)
     an = an[:, xs.min():xs.max() + 1]
     ecrit('serre-anneau-haut', an[ys.min():775], 1)
-    ecrit('serre-anneau-bande', raccorde(an[775:1035].transpose(1, 0, 2), b=16, sens=1).transpose(1, 0, 2), 1)
-    ecrit('serre-anneau-bas', an[1035:ys.max() + 1], 1)
+    ecrit('serre-anneau-bande', boucle(an[775:1035], an[775 - 16:775]), 1)
+    ecrit('serre-anneau-bas', amorce(an[1035:ys.max() + 1], an[775:775 + 16]), 1)
     for n in ('dome-gauche', 'dome-droit'):
         ecrit(f'serre-{n}', sombre(detoure(lit(f'serre-{n}')), 0.65))
     b = detoure(lit('serre-berceau'))

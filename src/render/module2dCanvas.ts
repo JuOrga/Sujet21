@@ -236,7 +236,7 @@ export function peintModule2d(mp: MiseEnPage, p: Pieces, fen?: Fenetre): HTMLCan
     // les capsules devenaient étroites et hautes (06/10) ; elles gardent la
     // largeur de la tranche d'origine, deux tiers de la hauteur du cylindre
     const jeu = (nom: string) =>
-      (['haut', 'bande', 'bas'] as const).map((l) => (['g', 'm', 'd'] as const).map((c) => img(`${nom}-${l}-${c}`)))
+      (['haut', 'bande', 'bas'] as const).map((l) => (['g', 'm', 'd'] as const).map((cote) => img(`${nom}-${l}-${cote}`)))
     const air = [jeu('serre-tranche'), jeu('serre-tranche-2')]
     const zones = { algues: jeu('serre-zone-algues'), champignons: jeu('serre-zone-champignons') }
     const etageres = [img('serre-etagere-1'), img('serre-etagere-3')]
@@ -283,19 +283,32 @@ export function peintModule2d(mp: MiseEnPage, p: Pieces, fen?: Fenetre): HTMLCan
         for (let jc = 0; jc < nm + 2; jc++) {
           const col = jc === 0 ? 0 : jc === nm + 1 ? 2 : 1
           const l = rang[col].width * p.e * fx
-          if (col === 1 && rechange) {
-            // l'étagère de rechange couvre tout le cœur d'un trait, répétée
-            if (jc === 1) {
-              const lc = nm * l
-              const tw = (rechange.width * h) / rechange.height
-              c.save()
-              c.beginPath()
-              c.rect(x, y, lc, h + 0.5)
-              c.clip()
-              for (let xx = x - tire(i, r) * tw; xx < x + lc; xx += tw) if (!hors(xx, y, xx + tw, y + h)) c.drawImage(rechange, xx, y, tw + 0.5, h + 0.5)
-              c.restore()
+          if (!hors(x, y, x + l, y + h)) piece(rang[col], x, y, l + 0.5, h + 0.5, col === 1 && tire(i * 17 + jc, r) < 0.5)
+          // l'étagère de rechange couvre le cœur d'un trait, par-dessus la
+          // tranche, et s'y fond à ses deux bouts : d'une autre image, sans
+          // vitrage, elle faisait une couture contre les bords (relecture
+          // 06/10) — huit crans d'opacité sur un huitième du cœur
+          if (col === 1 && rechange && jc === nm) {
+            const lc = nm * l
+            const xc = x + l - lc
+            const tw = (rechange.width * h) / rechange.height
+            const f = lc / 8
+            const dec = tire(i, r) * tw
+            for (let pas = 0; pas < 9; pas++) {
+              // pas 0 : le milieu, plein ; 1–8 : les crans des deux bouts
+              const [x0c, x1c, a] = pas === 0 ? [xc + f, xc + lc - f, 1] : [xc + ((pas - 1) * f) / 8, xc + (pas * f) / 8, pas / 9]
+              if (hors(xc, y, xc + lc, y + h)) continue
+              for (const [u0, u1] of pas === 0 ? [[x0c, x1c]] : [[x0c, x1c], [xc + lc - (x1c - xc), xc + lc - (x0c - xc)]]) {
+                c.save()
+                c.globalAlpha = a
+                c.beginPath()
+                c.rect(u0, y, u1 - u0, h + 0.5)
+                c.clip()
+                for (let xx = xc - dec; xx < xc + lc; xx += tw) if (xx + tw > u0 && xx < u1) c.drawImage(rechange, xx, y, tw + 0.5, h + 0.5)
+                c.restore()
+              }
             }
-          } else if (!hors(x, y, x + l, y + h)) piece(rang[col], x, y, l + 0.5, h + 0.5, col === 1 && tire(i * 17 + jc, r) < 0.5)
+          }
           x += l
         }
         y += h
