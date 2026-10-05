@@ -62,10 +62,11 @@ def detoure(a: np.ndarray, rogne: bool = False) -> np.ndarray:
     return rgba
 
 
-def ecrit(nom: str, a: np.ndarray) -> None:
+def ecrit(nom: str, a: np.ndarray, echelle: float = ECHELLE) -> None:
     mode = 'RGBA' if a.shape[2] == 4 else 'RGB'
     im = Image.fromarray((np.clip(a, 0, 1) * 255).astype(np.uint8), mode)
-    im = im.resize((max(1, round(im.width * ECHELLE)), max(1, round(im.height * ECHELLE))), Image.LANCZOS)
+    if echelle != 1:
+        im = im.resize((max(1, round(im.width * echelle)), max(1, round(im.height * echelle))), Image.LANCZOS)
     out = SORTIE / f'coque2d-{nom}.webp'
     im.save(out, 'WEBP', quality=86, method=6)
     print(f'  {nom} : {im.width}×{im.height}, {out.stat().st_size // 1024} Ko')
@@ -88,6 +89,50 @@ def raccorde(a: np.ndarray, b: int = 48, sens: int = 2) -> np.ndarray:
         a = np.concatenate([tete, a[b:h - b]], axis=0)
         a = a.transpose(1, 0, 2)
     return a
+
+
+def boucle(t: np.ndarray, avant: np.ndarray) -> np.ndarray:
+    """Rend t répétable SANS décaler sa coupe : ses len(avant) dernières
+    lignes se fondent dans `avant`, les lignes qui précèdent son début dans
+    l'image d'origine. Son premier pixel reste la ligne de coupe — raccorde,
+    qui fondait la fin dans le début, la décalait, et la jonction avec la
+    pièce voisine faisait couture (relecture du 06/10)."""
+    b = len(avant)
+    w = np.linspace(0, 1, b)[:, None, None]
+    t = t.copy()
+    t[-b:] = t[-b:] * (1 - w) + avant * w
+    return t
+
+
+def amorce(t: np.ndarray, suite: np.ndarray) -> np.ndarray:
+    """L'inverse, pour la pièce qui suit une pièce bouclée : ses premières
+    lignes partent de `suite` (ce qui suit la fin bouclée dans l'image
+    d'origine) et se fondent vers les siennes."""
+    b = len(suite)
+    w = np.linspace(0, 1, b)[:, None, None]
+    t = t.copy()
+    t[:b] = suite * (1 - w) + t[:b] * w
+    return t
+
+
+def neuf(prefixe: str, a: np.ndarray, haut: int, bande: int, bas: int, g: int = 200, d: int = 830, b: int = 24, debut_bas: int | None = None) -> None:
+    """Neuf morceaux : trois lignes (haut, bande répétée en hauteur, bas) et
+    trois colonnes (bord gauche et son arc, cœur répété en largeur, bord
+    droit). Les quatre jonctions se raccordent, miroir du cœur compris : le
+    bout bouclé d'un morceau répété retombe sur la ligne qui précède sa
+    coupe, et le morceau suivant part de celle qui la suit. debut_bas : le bas
+    peut commencer plus loin que la fin de la bande (les tranches sautent
+    une étagère, 703–1281)."""
+    T = lambda x: x.transpose(1, 0, 2)
+    lignes = {
+        'haut': a[:haut],
+        'bande': boucle(a[haut:bande], a[haut - b:haut]),
+        'bas': amorce(a[bande if debut_bas is None else debut_bas:bas], a[haut:haut + b]),
+    }
+    for nl, l in lignes.items():
+        ecrit(f'{prefixe}-{nl}-g', l[:, :g], 1)
+        ecrit(f'{prefixe}-{nl}-m', T(boucle(T(l[:, g:d]), T(l[:, g - 2 * b:g]))), 1)
+        ecrit(f'{prefixe}-{nl}-d', T(amorce(T(l[:, d:]), T(l[:, g:g + 2 * b]))), 1)
 
 
 def sombre(a: np.ndarray, k: float) -> np.ndarray:
@@ -169,16 +214,48 @@ DETAILS = {
 def serre() -> None:
     """LA SERRE EN CYLINDRE DE CULTURE (05/10) : des tranches vitrées répétées
     sur la longueur, un anneau à chaque jonction, un dôme à chaque bout, un
-    berceau de machines dessous, des capsules pour la mini-carte."""
+    berceau de machines dessous, des capsules pour la mini-carte.
+
+    · LES TRANCHES ET L'ANNEAU EN TROIS MORCEAUX, haut, bande, bas : la bande
+      se répète en hauteur. Étirée d'un bloc à la hauteur du module (~3
+      salles), une tranche n'avait que ~400 px par largeur de salle — floue
+      dès qu'on zoomait sur la salle, au Steam Deck surtout (06/10). Les deux
+      tranches partagent leurs étagères aux lignes 429, 703 et 1281 : la
+      bande 429–703 se répète, les étagères restent alignées d'une tranche à
+      l'autre. L'anneau : son chapeau et sa lampe (0–775), un module de
+      plaques (775–1035), son pied.
+    · EN PLEINE RÉSOLUTION (pas les 80 % des autres pièces) : posées à
+      deux bandes par étagère d'origine, elles donnent ~1000 px par salle."""
     for n in ('tranche', 'tranche-2'):
         a = raccorde(lit(f'serre-{n}'), sens=1)
         # la rampe de culture, en haut du vitrage : trois fois plus claire que
         # le reste de l'image, elle ferait un néon continu sur tout le module
         y = np.arange(a.shape[0])[:, None, None] / a.shape[0]
-        a = a * (1 - 0.3 * np.exp(-(((y - 0.145) / 0.03) ** 2)))
-        ecrit(f'serre-{n}', sombre(a, 0.9))
+        a = sombre(a * (1 - 0.3 * np.exp(-(((y - 0.145) / 0.03) ** 2))), 0.9)
+        # en neuf morceaux : la bande d'étagère répétée en hauteur, le cœur en
+        # largeur — à pleine finesse, d'un bloc, la tranche faisait des
+        # capsules étroites et hautes, neuf anneaux au lieu de quatre (06/10)
+        neuf(f'serre-{n}', a, 429, 703, a.shape[0], d=820, debut_bas=1281)
+    # LES ZONES (06/10) : une capsule entière par thème le long du cylindre,
+    # pour varier dans la longueur au lieu de répéter. Leur gabarit n'est pas
+    # celui des tranches (bacs aux lignes 424 et 871, rebord haut plus fin,
+    # rebord bas jusqu'à 1440) : neuf morceaux propres, les mêmes colonnes
+    for z in ('algues', 'champignons'):
+        neuf(f'serre-zone-{z}', sombre(raccorde(lit(f'serre-zone-{z}'), sens=1), 0.85), 424, 871, 1440)
+    # LES ÉTAGÈRES DE RECHANGE : une étagère (bacs toutes les 323 lignes),
+    # raccordée dans les deux sens — elles remplacent au hasard la bande du
+    # cœur des capsules du jardin d'air, cinq étagères au lieu de deux
+    for e in ('1', '3'):
+        t = lit(f'serre-etageres-{e}')[247:571]
+        t = raccorde(raccorde(t.transpose(1, 0, 2), b=24, sens=1).transpose(1, 0, 2), sens=1)
+        ecrit(f'serre-etagere-{e}', t, 1)
     # les pièces détourées, ramenées à la luminosité des tranches (~10 %)
-    ecrit('serre-anneau', sombre(detoure(lit('serre-anneau'), rogne=True), 0.6))
+    an = sombre(detoure(lit('serre-anneau')), 0.6)
+    ys, xs = np.where(an[..., 3] > 0.5)
+    an = an[:, xs.min():xs.max() + 1]
+    ecrit('serre-anneau-haut', an[ys.min():775], 1)
+    ecrit('serre-anneau-bande', boucle(an[775:1035], an[775 - 16:775]), 1)
+    ecrit('serre-anneau-bas', amorce(an[1035:ys.max() + 1], an[775:775 + 16]), 1)
     for n in ('dome-gauche', 'dome-droit'):
         ecrit(f'serre-{n}', sombre(detoure(lit(f'serre-{n}')), 0.65))
     b = detoure(lit('serre-berceau'))
