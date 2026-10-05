@@ -1492,8 +1492,9 @@ function majModule2d(b: Rect2d): void {
       version: module2dVersion,
       salle: b,
       coque: avecCoque,
-      cellule: piecesModule2d.get('cellule-neutre'),
-      celluleDepart: piecesModule2d.get('cellule-joue'),
+      // dans la serre, la capsule de culture
+      cellule: piecesModule2d.get(`${mp.forme === 'cylindre' ? 'serre-cellule' : 'cellule'}-neutre`),
+      celluleDepart: piecesModule2d.get(`${mp.forme === 'cylindre' ? 'serre-cellule' : 'cellule'}-joue`),
     })
     // envoyées au GPU, les toiles se libèrent tout de suite : deux toiles
     // de plusieurs dizaines de Mo par salle pesaient sur la mémoire (Safari)

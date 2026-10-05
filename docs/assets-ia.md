@@ -2064,6 +2064,28 @@ et la fond vers la tôle. Coût mesuré (rendu logiciel, médiane de 5) : la
 peinture des deux toiles passe de ~610 à ~800 ms, dont ~110 ms pour le
 calque des bords.
 
+**La serre en cylindre de culture (05/10)** : la serre quitte l'étagée
+(qui reste la coque des modules sans pièces propres) pour un immense
+cylindre couché — deux tranches vitrées alternées sur la longueur (en
+nombre entier, légèrement étirées : chaque capsule reste entière), un
+anneau de structure à chaque jonction, un dôme d'entrée et un dôme de sas,
+un berceau de machines dessous ; les cellules de la mini-carte sont des
+capsules de culture, tenues à leurs proportions jusque dans la transition.
+Sources : `masters/images/coque2d/serre-*.png` ; le script (`serre()`)
+refait le raccord gauche/droite des tranches et du berceau, baisse la rampe
+de culture d'un tiers et ramène dômes et anneau à la luminosité des
+tranches. La toile, élargie des deux dômes, touche plus tôt son plafond de
+4000 px : 301 px par salle au lieu de 360 sur six rangs (la toile proche
+reste à 850).
+
+| pièce de la serre | état |
+| --- | --- |
+| tranche du cylindre, et sa variante | ✅ livrées 05/10 |
+| anneau de structure | ✅ livré 05/10 |
+| dôme d'entrée, dôme du sas | ✅ livrés 05/10 |
+| berceau technique | ✅ livré 05/10 |
+| capsule de culture (cellule) | ✅ livrée 05/10 |
+
 **À venir** : les pièces propres de chaque module (la chaufferie et le
 cryo prennent celles de la serre en attendant) ; une deuxième variante de
 baie et de trappe.

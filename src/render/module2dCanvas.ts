@@ -3,7 +3,7 @@
 // seulement quand la run avance (une salle franchie, un autre module) ; le
 // moteur la pose ensuite comme une texture (renderer.ts, setModule2d).
 
-import { TUBE, type MiseEnPage } from './module2d'
+import { CYL_BERCEAU, TUBE, type MiseEnPage } from './module2d'
 
 /** Les pièces, à charger une fois. */
 export const PIECES_MODULE2D = [
@@ -44,6 +44,17 @@ export const PIECES_MODULE2D = [
   'equipement-reservoir',
   'tube',
   'tube-collier',
+  'serre-tranche',
+  'serre-tranche-2',
+  'serre-anneau',
+  'serre-dome-gauche',
+  'serre-dome-droit',
+  'serre-berceau',
+  'serre-cellule-joue',
+  'serre-cellule-ambre',
+  'serre-cellule-bleu',
+  'serre-cellule-ferme',
+  'serre-cellule-neutre',
 ] as const
 
 export type Pieces = Map<string, HTMLImageElement>
@@ -142,59 +153,107 @@ export function peintModule2d(mp: MiseEnPage, p: Pieces, fen?: Fenetre): HTMLCan
       }
     }
   }
-  c.save()
-  c.beginPath()
-  mp.silhouette.forEach((s, i) => (i ? c.lineTo(s.x, s.y) : c.moveTo(s.x, s.y)))
-  c.closePath()
-  c.clip()
-  const toles = [img('tempere-tole'), img('tempere-tole-2')]
-  const tl = toles[0].width * fi
-  for (let i = 0, y = 0; y < mp.hauteur; i++, y += tl) {
-    if (hors(0, y, mp.largeur, y + tl)) continue
+  // LE CYLINDRE DE LA SERRE : le berceau dessous, les tranches vitrées sur
+  // toute la longueur (en nombre entier, légèrement étirées : chaque capsule
+  // reste entière), un anneau à chaque jonction, un dôme à chaque bout. Les
+  // ancres viennent des pièces livrées (tools/images/coque2d.py, serre)
+  const peintCylindre = () => {
+    const k = mp.corps
+    const H = k.maxY - k.minY
+    const W = k.maxX - k.minX
+    const berceau = img('serre-berceau')
+    // ses brides (ligne 166 sur 819) mordent le bas du cylindre ; 625 lignes
+    // de machines dessous
+    const sb = (CYL_BERCEAU * H * 0.95) / 625
+    const bx0 = k.minX + 0.12 * H
+    const bx1 = k.maxX - 0.12 * H
     c.save()
     c.beginPath()
-    c.rect(0, y, mp.largeur, tl)
+    c.rect(bx0, k.minY, bx1 - bx0, H * (1 + CYL_BERCEAU))
     c.clip()
-    pave(toles[tire(i, 7) < 0.5 ? 0 : 1], 0, y, mp.largeur, y + tl, i * 37)
+    for (let x = bx0; x < bx1; x += berceau.width * sb)
+      if (!hors(x, k.maxY, x + berceau.width * sb, k.maxY + CYL_BERCEAU * H))
+        c.drawImage(berceau, x, k.maxY - 0.03 * H - 166 * sb, berceau.width * sb + 0.5, berceau.height * sb)
     c.restore()
-  }
-  // la salle des machines, sa propre tôle, séparée du reste par un joint
-  for (const z of mp.machines) {
-    if (hors(z.minX, z.minY, z.maxX, z.maxY)) continue
-    c.save()
-    c.beginPath()
-    c.rect(z.minX, z.minY, z.maxX - z.minX, z.maxY - z.minY)
-    c.clip()
-    pave(img('tempere-tole-machines'), z.minX, z.minY, z.maxX, z.maxY, 101)
-    c.restore()
-    c.strokeStyle = 'rgba(0,0,0,0.7)'
-    c.lineWidth = 0.012 * mp.densite
-    c.strokeRect(z.minX, z.minY, z.maxX - z.minX, z.maxY - z.minY)
-  }
-  // les petits détails, posés sur la tôle
-  for (const d of mp.details) {
-    const im = img(`detail-${d.nom}`)
-    const h = (d.l * im.height) / im.width
-    if (hors(d.x - d.l / 2, d.y - h / 2, d.x + d.l / 2, d.y + h / 2)) continue
-    c.drawImage(im, d.x - d.l / 2, d.y - h / 2, d.l, h)
-  }
-  // 2. les éléments uniques ; les vitrages de la serre débordent d'un halo
-  // vert sur la tôle : sans lui, la serre ne se reconnaissait qu'au rebord
-  for (const e of mp.elements) {
-    const im = img(`tempere-${e.nom}`)
-    const h = (e.l * im.height) / im.width
-    const r = Math.max(e.l, h) * 0.55
-    if (hors(e.x - r, e.y - r, e.x + r, e.y + r)) continue
-    if (e.nom === 'baie' || e.nom === 'baie-2' || e.nom === 'colonne') {
-      const g = c.createRadialGradient(e.x, e.y, 0, e.x, e.y, r)
-      g.addColorStop(0, 'rgba(90,200,120,0.09)')
-      g.addColorStop(1, 'rgba(90,200,120,0)')
-      c.fillStyle = g
-      c.fillRect(e.x - r, e.y - r, 2 * r, 2 * r)
+    const tranches = [img('serre-tranche'), img('serre-tranche-2')]
+    const n = Math.max(1, Math.round(W / ((tranches[0].width / tranches[0].height) * H)))
+    const sw = W / n
+    for (let i = 0; i < n; i++) {
+      const x = k.minX + i * sw
+      if (!hors(x, k.minY, x + sw, k.maxY)) c.drawImage(tranches[i % 2], x, k.minY, sw + 0.5, H)
     }
-    c.drawImage(im, e.x - e.l / 2, e.y - h / 2, e.l, h)
+    // l'anneau : 98,6 % de la hauteur du cylindre, posé 0,65 % sous son haut
+    const anneau = img('serre-anneau')
+    const ah = 0.986 * H
+    const aw = (anneau.width / anneau.height) * ah
+    for (let i = 1; i < n; i++) {
+      const x = k.minX + i * sw
+      if (!hors(x - aw / 2, k.minY, x + aw / 2, k.maxY)) c.drawImage(anneau, x - aw / 2, k.minY + 0.0065 * H, aw, ah)
+    }
+    // les dômes : leur hauteur de cylindre est 1202 lignes sur 1229 ; la
+    // bande plate tombe à x 786 (gauche) et 30 (droite) sur 819
+    const sd = H / 1202
+    const dg = img('serre-dome-gauche')
+    const dd = img('serre-dome-droit')
+    if (!hors(k.minX - 786 * sd, k.minY, k.minX, k.maxY)) c.drawImage(dg, k.minX - 786 * sd, k.minY, dg.width * sd, dg.height * sd)
+    if (!hors(k.maxX, k.minY, k.maxX + 790 * sd, k.maxY)) c.drawImage(dd, k.maxX - 30 * sd, k.minY, dd.width * sd, dd.height * sd)
   }
-  c.restore()
+  if (mp.forme === 'cylindre') peintCylindre()
+  else {
+    c.save()
+    c.beginPath()
+    mp.silhouette.forEach((s, i) => (i ? c.lineTo(s.x, s.y) : c.moveTo(s.x, s.y)))
+    c.closePath()
+    c.clip()
+    const toles = [img('tempere-tole'), img('tempere-tole-2')]
+    const tl = toles[0].width * fi
+    for (let i = 0, y = 0; y < mp.hauteur; i++, y += tl) {
+      if (hors(0, y, mp.largeur, y + tl)) continue
+      c.save()
+      c.beginPath()
+      c.rect(0, y, mp.largeur, tl)
+      c.clip()
+      pave(toles[tire(i, 7) < 0.5 ? 0 : 1], 0, y, mp.largeur, y + tl, i * 37)
+      c.restore()
+    }
+    // la salle des machines, sa propre tôle, séparée du reste par un joint
+    for (const z of mp.machines) {
+      if (hors(z.minX, z.minY, z.maxX, z.maxY)) continue
+      c.save()
+      c.beginPath()
+      c.rect(z.minX, z.minY, z.maxX - z.minX, z.maxY - z.minY)
+      c.clip()
+      pave(img('tempere-tole-machines'), z.minX, z.minY, z.maxX, z.maxY, 101)
+      c.restore()
+      c.strokeStyle = 'rgba(0,0,0,0.7)'
+      c.lineWidth = 0.012 * mp.densite
+      c.strokeRect(z.minX, z.minY, z.maxX - z.minX, z.maxY - z.minY)
+    }
+    // les petits détails, posés sur la tôle
+    for (const d of mp.details) {
+      const im = img(`detail-${d.nom}`)
+      const h = (d.l * im.height) / im.width
+      if (hors(d.x - d.l / 2, d.y - h / 2, d.x + d.l / 2, d.y + h / 2)) continue
+      c.drawImage(im, d.x - d.l / 2, d.y - h / 2, d.l, h)
+    }
+    // 2. les éléments uniques ; les vitrages de la serre débordent d'un halo
+    // vert sur la tôle : sans lui, la serre ne se reconnaissait qu'au rebord
+    for (const e of mp.elements) {
+      const im = img(`tempere-${e.nom}`)
+      const h = (e.l * im.height) / im.width
+      const r = Math.max(e.l, h) * 0.55
+      if (hors(e.x - r, e.y - r, e.x + r, e.y + r)) continue
+      if (e.nom === 'baie' || e.nom === 'baie-2' || e.nom === 'colonne') {
+        const g = c.createRadialGradient(e.x, e.y, 0, e.x, e.y, r)
+        g.addColorStop(0, 'rgba(90,200,120,0.09)')
+        g.addColorStop(1, 'rgba(90,200,120,0)')
+        c.fillStyle = g
+        c.fillRect(e.x - r, e.y - r, 2 * r, 2 * r)
+      }
+      c.drawImage(im, e.x - e.l / 2, e.y - h / 2, e.l, h)
+    }
+    c.restore()
+  }
   // 3. les tubes, sous les cellules. Un tube est une CONDUITE : un halo de
   // sa couleur s'il est praticable, le corps, une lueur au fil de son axe
   // et un collier à chaque bout. Le corps seul, mince, avec un filet plat,
@@ -272,106 +331,117 @@ export function peintModule2d(mp: MiseEnPage, p: Pieces, fen?: Fenetre): HTMLCan
     c.restore()
   }
   // 4. les cellules
-  for (const k of mp.cellules) if (!hors(k.x - k.l / 2, k.y - k.h / 2, k.x + k.l / 2, k.y + k.h / 2)) c.drawImage(img(`cellule-${k.etat}`), k.x - k.l / 2, k.y - k.h / 2, k.l, k.h)
-  // LES BORDS SUR UN CALQUE, FONDUS VERS L'INTÉRIEUR : bords, coins et
-  // angles rentrants ont été peints avec l'ANCIENNE tôle dans leur moitié
-  // intérieure — contre la nouvelle, une couture le long de toute la coque
-  // et des carrés plats aux angles (analyse du 02/10). Seule la bande du
-  // rebord, contre la silhouette, est gardée ; au-delà, elle s'efface
-  const calque = document.createElement('canvas')
-  calque.width = toile.width
-  calque.height = toile.height
-  const q = calque.getContext('2d')!
-  if (fen) q.setTransform(fen.k, 0, 0, fen.k, -fen.x * fen.k, -fen.y * fen.k)
-  // 5. les bords : chaque arête selon son sens (silhouette horaire)
-  const n = mp.silhouette.length
-  const bandeG = img('tempere-bout-gauche')
-  const bandeD = img('tempere-bout-droit')
-  for (let i = 0; i < n; i++) {
-    const a = mp.silhouette[i]
-    const b = mp.silhouette[(i + 1) % n]
-    if (hors(Math.min(a.x, b.x), Math.min(a.y, b.y), Math.max(a.x, b.x), Math.max(a.y, b.y))) continue
-    if (a.x === b.x) {
-      const gauche = b.y < a.y
-      const im = gauche ? bandeG : bandeD
-      const ox = a.x - (gauche ? LIGNE_GAUCHE : LIGNE_DROITE) * f
-      const bh = BANDE_BOUT * f
-      for (let y = Math.min(a.y, b.y); y < Math.max(a.y, b.y); y += bh) {
-        const reste = Math.min(bh, Math.max(a.y, b.y) - y)
-        q.drawImage(im, 0, 0, im.width, (BANDE_BOUT * (LIVRE / 0.5) * reste) / bh, ox, y, im.width * fi, reste)
-      }
-    } else {
-      const haut = b.x > a.x
-      const im = img(haut ? 'tempere-bord-haut' : 'tempere-bord-bas')
-      const oy = a.y - (haut ? LIGNE_HAUT : LIGNE_BAS) * f
-      const lw = im.width * fi
-      for (let x = Math.min(a.x, b.x); x < Math.max(a.x, b.x); x += lw) {
-        const reste = Math.min(lw, Math.max(a.x, b.x) - x)
-        q.drawImage(im, 0, 0, (im.width * reste) / lw, im.height, x, oy, reste, im.height * fi)
+  // dans la serre, des capsules de culture, à leurs proportions (plus
+  // allongées que la case de la mini-carte)
+  const capsules = mp.forme === 'cylindre'
+  for (const k of mp.cellules) {
+    if (hors(k.x - k.l / 2, k.y - k.h / 2, k.x + k.l / 2, k.y + k.h / 2)) continue
+    const im = img(`${capsules ? 'serre-cellule' : 'cellule'}-${k.etat}`)
+    const h = capsules ? (k.l * im.height) / im.width : k.h
+    c.drawImage(im, k.x - k.l / 2, k.y - h / 2, k.l, h)
+  }
+  // le cylindre n'a ni bords ni coins : ses tranches portent leurs rebords
+  if (mp.forme !== 'cylindre') {
+    // LES BORDS SUR UN CALQUE, FONDUS VERS L'INTÉRIEUR : bords, coins et
+    // angles rentrants ont été peints avec l'ANCIENNE tôle dans leur moitié
+    // intérieure — contre la nouvelle, une couture le long de toute la coque
+    // et des carrés plats aux angles (analyse du 02/10). Seule la bande du
+    // rebord, contre la silhouette, est gardée ; au-delà, elle s'efface
+    const calque = document.createElement('canvas')
+    calque.width = toile.width
+    calque.height = toile.height
+    const q = calque.getContext('2d')!
+    if (fen) q.setTransform(fen.k, 0, 0, fen.k, -fen.x * fen.k, -fen.y * fen.k)
+    // 5. les bords : chaque arête selon son sens (silhouette horaire)
+    const n = mp.silhouette.length
+    const bandeG = img('tempere-bout-gauche')
+    const bandeD = img('tempere-bout-droit')
+    for (let i = 0; i < n; i++) {
+      const a = mp.silhouette[i]
+      const b = mp.silhouette[(i + 1) % n]
+      if (hors(Math.min(a.x, b.x), Math.min(a.y, b.y), Math.max(a.x, b.x), Math.max(a.y, b.y))) continue
+      if (a.x === b.x) {
+        const gauche = b.y < a.y
+        const im = gauche ? bandeG : bandeD
+        const ox = a.x - (gauche ? LIGNE_GAUCHE : LIGNE_DROITE) * f
+        const bh = BANDE_BOUT * f
+        for (let y = Math.min(a.y, b.y); y < Math.max(a.y, b.y); y += bh) {
+          const reste = Math.min(bh, Math.max(a.y, b.y) - y)
+          q.drawImage(im, 0, 0, im.width, (BANDE_BOUT * (LIVRE / 0.5) * reste) / bh, ox, y, im.width * fi, reste)
+        }
+      } else {
+        const haut = b.x > a.x
+        const im = img(haut ? 'tempere-bord-haut' : 'tempere-bord-bas')
+        const oy = a.y - (haut ? LIGNE_HAUT : LIGNE_BAS) * f
+        const lw = im.width * fi
+        for (let x = Math.min(a.x, b.x); x < Math.max(a.x, b.x); x += lw) {
+          const reste = Math.min(lw, Math.max(a.x, b.x) - x)
+          q.drawImage(im, 0, 0, (im.width * reste) / lw, im.height, x, oy, reste, im.height * fi)
+        }
       }
     }
-  }
-  // 6. les colliers : l'entrée à gauche, la sortie à droite
-  for (const [im, pt, ligne] of [
-    [bandeG, mp.colliers.gauche, LIGNE_GAUCHE],
-    [bandeD, mp.colliers.droite, LIGNE_DROITE],
-  ] as const)
-  {
-    // sur un bord plus court que l'image (le nez du fuseau), seule sa part
-    // centrale, celle du collier
-    const hTout = im.height * fi
-    const h = Math.min(hTout, pt.h)
-    const sy = ((hTout - h) / 2 / hTout) * im.height
-    q.drawImage(im, 0, sy, im.width, (h / hTout) * im.height, pt.x - ligne * f, pt.y - h / 2, im.width * fi, h)
-  }
-  // 7. les coins et les angles rentrants
-  for (const s of mp.silhouette) {
-    if (hors(s.x, s.y, s.x, s.y)) continue
-    const k = COINS[s.piece]
-    const im = img(`tempere-${s.piece}`)
-    q.save()
-    q.translate(s.x, s.y)
-    if (s.miroir) q.scale(-1, 1)
-    q.drawImage(im, -k.ax * f * k.k, -k.ay * f * k.k, im.width * fi * k.k, im.height * fi * k.k)
-    q.restore()
-  }
-  // le masque : 1 au cœur de la coque, 0 contre la silhouette, un fondu entre
-  const masque = document.createElement('canvas')
-  masque.width = toile.width
-  masque.height = toile.height
-  const m = masque.getContext('2d')!
-  if (fen) m.setTransform(fen.k, 0, 0, fen.k, -fen.x * fen.k, -fen.y * fen.k)
-  const contour = () => {
-    m.beginPath()
-    mp.silhouette.forEach((s, i) => (i ? m.lineTo(s.x, s.y) : m.moveTo(s.x, s.y)))
-    m.closePath()
-  }
-  contour()
-  m.fillStyle = '#000'
-  m.fill()
-  m.globalCompositeOperation = 'destination-out'
-  m.strokeStyle = '#000'
-  const D = REBORD * mp.densite
-  const F = FONDU_REBORD * mp.densite
-  for (let k = 0; k < 4; k++) {
-    m.globalAlpha = 0.5
-    m.lineWidth = 2 * (D + (F * (4 - k)) / 4)
+    // 6. les colliers : l'entrée à gauche, la sortie à droite
+    for (const [im, pt, ligne] of [
+      [bandeG, mp.colliers.gauche, LIGNE_GAUCHE],
+      [bandeD, mp.colliers.droite, LIGNE_DROITE],
+    ] as const)
+    {
+      // sur un bord plus court que l'image (le nez du fuseau), seule sa part
+      // centrale, celle du collier
+      const hTout = im.height * fi
+      const h = Math.min(hTout, pt.h)
+      const sy = ((hTout - h) / 2 / hTout) * im.height
+      q.drawImage(im, 0, sy, im.width, (h / hTout) * im.height, pt.x - ligne * f, pt.y - h / 2, im.width * fi, h)
+    }
+    // 7. les coins et les angles rentrants
+    for (const s of mp.silhouette) {
+      if (hors(s.x, s.y, s.x, s.y)) continue
+      const k = COINS[s.piece]
+      const im = img(`tempere-${s.piece}`)
+      q.save()
+      q.translate(s.x, s.y)
+      if (s.miroir) q.scale(-1, 1)
+      q.drawImage(im, -k.ax * f * k.k, -k.ay * f * k.k, im.width * fi * k.k, im.height * fi * k.k)
+      q.restore()
+    }
+    // le masque : 1 au cœur de la coque, 0 contre la silhouette, un fondu entre
+    const masque = document.createElement('canvas')
+    masque.width = toile.width
+    masque.height = toile.height
+    const m = masque.getContext('2d')!
+    if (fen) m.setTransform(fen.k, 0, 0, fen.k, -fen.x * fen.k, -fen.y * fen.k)
+    const contour = () => {
+      m.beginPath()
+      mp.silhouette.forEach((s, i) => (i ? m.lineTo(s.x, s.y) : m.moveTo(s.x, s.y)))
+      m.closePath()
+    }
+    contour()
+    m.fillStyle = '#000'
+    m.fill()
+    m.globalCompositeOperation = 'destination-out'
+    m.strokeStyle = '#000'
+    const D = REBORD * mp.densite
+    const F = FONDU_REBORD * mp.densite
+    for (let k = 0; k < 4; k++) {
+      m.globalAlpha = 0.5
+      m.lineWidth = 2 * (D + (F * (4 - k)) / 4)
+      contour()
+      m.stroke()
+    }
+    m.globalAlpha = 1
+    m.lineWidth = 2 * D
     contour()
     m.stroke()
+    q.setTransform(1, 0, 0, 1, 0, 0)
+    q.globalCompositeOperation = 'destination-out'
+    q.drawImage(masque, 0, 0)
+    c.save()
+    c.setTransform(1, 0, 0, 1, 0, 0)
+    c.drawImage(calque, 0, 0)
+    c.restore()
+    // rendre la mémoire tout de suite : deux toiles de plus, à chaque salle
+    calque.width = calque.height = masque.width = masque.height = 0
   }
-  m.globalAlpha = 1
-  m.lineWidth = 2 * D
-  contour()
-  m.stroke()
-  q.setTransform(1, 0, 0, 1, 0, 0)
-  q.globalCompositeOperation = 'destination-out'
-  q.drawImage(masque, 0, 0)
-  c.save()
-  c.setTransform(1, 0, 0, 1, 0, 0)
-  c.drawImage(calque, 0, 0)
-  c.restore()
-  // rendre la mémoire tout de suite : deux toiles de plus, à chaque salle
-  calque.width = calque.height = masque.width = masque.height = 0
   // 8. les équipements, debout sur les bords hauts
   for (const e of mp.equipements) {
     if (hors(e.x, e.y - 0.6 * mp.densite, e.x, e.y)) continue

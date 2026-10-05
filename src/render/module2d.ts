@@ -54,6 +54,9 @@ export interface Sommet {
 }
 
 export interface MiseEnPage {
+  forme: FormeModule
+  /** le corps du module, sans dômes ni berceau, en pixels de toile */
+  corps: Rect
   largeur: number
   hauteur: number
   /** pixels de toile par largeur de salle */
@@ -136,9 +139,16 @@ export function etats(vue: VueModule2d): {
 // aux RANGS de la mini-carte, jamais à la salle jouée. Trois silhouettes
 // (maquette du 02/10) : étagée (un pont surélevé, une salle des machines),
 // fuseau (un nez à l'entrée, une poupe à moteurs), dorsale (une tour, deux
-// nacelles).
-export type FormeModule = 'etagee' | 'fuseau' | 'dorsale'
-const FORMES_PAR_BIOME: Record<string, FormeModule> = { tempere: 'etagee', chaud: 'fuseau', cryo: 'dorsale' }
+// nacelles). Et la serre en CYLINDRE de culture (05/10) : un immense
+// cylindre couché, en tranches vitrées, un dôme à chaque bout et un berceau
+// de machines dessous — l'étagée reste la coque des modules sans pièces
+// propres.
+export type FormeModule = 'etagee' | 'fuseau' | 'dorsale' | 'cylindre'
+const FORMES_PAR_BIOME: Record<string, FormeModule> = { tempere: 'cylindre', chaud: 'fuseau', cryo: 'dorsale' }
+/** le cylindre : chaque dôme déborde de 0,66 fois sa hauteur (mesuré sur les
+ *  dômes livrés : 0,654 et 0,651), le berceau descend de 0,3 fois dessous */
+export const CYL_DOME = 0.66
+export const CYL_BERCEAU = 0.3
 export function formeDuBiome(biome: string): FormeModule {
   return FORMES_PAR_BIOME[biome] ?? 'etagee'
 }
@@ -153,8 +163,9 @@ function silhouette(
   const b = (r: number) => g.rang(r) - PAS_RANG / 2
   const yM = (yT + yB) / 2
   const n = g.rangs
-  // un module trop court pour ses marches : la coque simple
-  if (n < 3) return [[xL, yT], [xR, yT], [xR, yB], [xL, yB]]
+  // un module trop court pour ses marches, et le cylindre (ses dômes et son
+  // berceau sont des pièces, hors du contour) : la coque simple
+  if (n < 3 || forme === 'cylindre') return [[xL, yT], [xR, yT], [xR, yB], [xL, yB]]
   if (forme === 'fuseau') {
     const nez = 0.75
     const poupe = 0.6
@@ -322,10 +333,11 @@ export function miseEnPage(salle: Rect, vue: VueModule2d, forme: FormeModule = '
   // la toile : la silhouette et ses abords
   const xs = contour.map((q) => q[0])
   const ys = contour.map((q) => q[1])
-  const bx0 = Math.min(...xs) - BORD_COTES
-  const bx1 = Math.max(...xs) + BORD_COTES
+  const dome = forme === 'cylindre' ? CYL_DOME * (yB - yT) : 0
+  const bx0 = Math.min(...xs) - BORD_COTES - dome
+  const bx1 = Math.max(...xs) + BORD_COTES + dome
   const by0 = Math.min(...ys) - BORD_HAUT
-  const by1 = Math.max(...ys) + BORD_BAS
+  const by1 = Math.max(...ys) + BORD_BAS + (forme === 'cylindre' ? CYL_BERCEAU * (yB - yT) : 0)
   const densite = Math.min(DENSITE, TOILE_MAX / (bx1 - bx0), TOILE_MAX / (by1 - by0))
   const X = (u: number) => (u - bx0) * densite
   const Y = (v: number) => (v - by0) * densite
@@ -360,6 +372,8 @@ export function miseEnPage(salle: Rect, vue: VueModule2d, forme: FormeModule = '
   // aucun tube n'y passe (ils courent sur les voies et à mi-chemin des
   // rangs) ; la machinerie aux deux bouts du module ; la grande baie sur le pont
   const elements: MiseEnPage['elements'] = []
+  // le cylindre est tout en vitrage : ni baie, ni trappe, ni machinerie
+  if (forme !== 'cylindre')
   for (let r = 0; r < vue.rangs; r++)
     for (let v = 0; v + 1 < vue.voies; v++) {
       // pas contre la salle jouée : elle est à taille réelle, pas une cellule,
@@ -392,7 +406,7 @@ export function miseEnPage(salle: Rect, vue: VueModule2d, forme: FormeModule = '
       return pres(e.x - d, e.y - d, e.x + d, e.y + d, 0.05 * densite)
     }),
   ]
-  const details = semeDetails(densite, { x0: X(xL), y0: Y(Math.min(...ys)), x1: X(Math.max(...xs)), y1: Y(Math.max(...ys)) }, silPx, obstacles, tubes)
+  const details = forme === 'cylindre' ? [] : semeDetails(densite, { x0: X(xL), y0: Y(Math.min(...ys)), x1: X(Math.max(...xs)), y1: Y(Math.max(...ys)) }, silPx, obstacles, tubes)
   // les équipements, le long de chaque bord haut
   const equipements: MiseEnPage['equipements'] = []
   let n = 0
@@ -410,6 +424,8 @@ export function miseEnPage(salle: Rect, vue: VueModule2d, forme: FormeModule = '
   const largeur = Math.ceil((bx1 - bx0) * densite)
   const hauteur = Math.ceil((by1 - by0) * densite)
   return {
+    forme,
+    corps: { minX: X(xL), minY: Y(yT), maxX: X(xR), maxY: Y(yB) },
     largeur,
     hauteur,
     densite,

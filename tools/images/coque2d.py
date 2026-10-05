@@ -71,13 +71,17 @@ def ecrit(nom: str, a: np.ndarray) -> None:
     print(f'  {nom} : {im.width}×{im.height}, {out.stat().st_size // 1024} Ko')
 
 
-def raccorde(a: np.ndarray, b: int = 48) -> np.ndarray:
+def raccorde(a: np.ndarray, b: int = 48, sens: int = 2) -> np.ndarray:
     """Rend une tôle VRAIMENT raccordable : le générateur promet le raccord
     mais le rate souvent en haut/bas (tôles du 02/10 : écart au bord 8 à 20
     fois celui de deux lignes voisines, une couture visible à chaque rangée).
     Les b dernières lignes (puis colonnes) sont fondues dans les b premières ;
-    l'image perd b pixels par côté et devient périodique."""
-    for _ in range(2):
+    l'image perd b pixels par côté et devient périodique. sens=1 : à gauche
+    et à droite seulement (une tranche du cylindre a ses rebords en haut et
+    en bas, qui ne se répètent pas)."""
+    if sens == 1:
+        a = a.transpose(1, 0, 2)
+    for _ in range(sens):
         h = a.shape[0]
         w = np.linspace(0, 1, b)[:, None, None]
         tete = a[h - b:] * (1 - w) + a[:b] * w
@@ -92,8 +96,14 @@ def sombre(a: np.ndarray, k: float) -> np.ndarray:
     return b
 
 
-def cellule() -> None:
-    a = lit('cellule')
+def cellule(source: str = 'cellule', prefixe: str = 'cellule', capsule: bool = False) -> None:
+    """capsule : la capsule de culture de la serre, détourée (fond
+    transparent) — pas de cadre rectangulaire à l'ambre, et la croix de la
+    salle fermée tenue dans le vitrage."""
+    a = lit(source)
+    if capsule:
+        r = detoure(a, rogne=True)
+        a, alpha = r[..., :3], r[..., 3:]
     gris = a.mean(2, keepdims=True)
     h, w = a.shape[:2]
     for etat in ('joue', 'ambre', 'bleu', 'ferme', 'neutre'):
@@ -110,6 +120,8 @@ def cellule() -> None:
         else:
             c = a * 1.05 + np.array([0, 0.04, 0.09]) * (gris / 0.24)
         im = Image.fromarray((np.clip(c, 0, 1) * 255).astype(np.uint8)).convert('RGBA')
+        if capsule:
+            im.putalpha(Image.fromarray((alpha[..., 0] * 255).astype(np.uint8)))
         d = ImageDraw.Draw(im)
         if etat in ('ambre', 'bleu'):
             # les deux lampes du cadre (x 23,5 % et 76,5 %, y 5,5 %) s'allument
@@ -121,12 +133,13 @@ def cellule() -> None:
                 dh.ellipse((cx - w * 0.07, cy - h * 0.05, cx + w * 0.07, cy + h * 0.05), fill=col + (255,))
             im.alpha_composite(halo.filter(ImageFilter.GaussianBlur(12)))
             im.alpha_composite(halo.filter(ImageFilter.GaussianBlur(4)))
-            if etat == 'ambre':
+            if etat == 'ambre' and not capsule:
                 d.rectangle((6, 6, w - 7, h - 7), outline=col + (200,), width=14)
         if etat == 'ferme':
-            d.line((60, 60, w - 60, h - 60), fill=(130, 55, 48, 255), width=26)
-            d.line((60, h - 60, w - 60, 60), fill=(130, 55, 48, 255), width=26)
-        ecrit(f'cellule-{etat}', np.asarray(im).astype(float) / 255)
+            x0, y0, x1, y1 = (0.15 * w, 0.22 * h, 0.85 * w, 0.78 * h) if capsule else (60, 60, w - 60, h - 60)
+            d.line((x0, y0, x1, y1), fill=(130, 55, 48, 255), width=26)
+            d.line((x0, y1, x1, y0), fill=(130, 55, 48, 255), width=26)
+        ecrit(f'{prefixe}-{etat}', np.asarray(im).astype(float) / 255)
 
 
 # la planche des équipements (livrée le 01/10, 1536 × 1024) : chaque élément
@@ -153,6 +166,26 @@ DETAILS = {
 }
 
 
+def serre() -> None:
+    """LA SERRE EN CYLINDRE DE CULTURE (05/10) : des tranches vitrées répétées
+    sur la longueur, un anneau à chaque jonction, un dôme à chaque bout, un
+    berceau de machines dessous, des capsules pour la mini-carte."""
+    for n in ('tranche', 'tranche-2'):
+        a = raccorde(lit(f'serre-{n}'), sens=1)
+        # la rampe de culture, en haut du vitrage : trois fois plus claire que
+        # le reste de l'image, elle ferait un néon continu sur tout le module
+        y = np.arange(a.shape[0])[:, None, None] / a.shape[0]
+        a = a * (1 - 0.3 * np.exp(-(((y - 0.145) / 0.03) ** 2)))
+        ecrit(f'serre-{n}', sombre(a, 0.9))
+    # les pièces détourées, ramenées à la luminosité des tranches (~10 %)
+    ecrit('serre-anneau', sombre(detoure(lit('serre-anneau'), rogne=True), 0.6))
+    for n in ('dome-gauche', 'dome-droit'):
+        ecrit(f'serre-{n}', sombre(detoure(lit(f'serre-{n}')), 0.65))
+    b = detoure(lit('serre-berceau'))
+    ecrit('serre-berceau', sombre(raccorde(b, sens=1), 0.7))
+    cellule('serre-capsule', 'serre-cellule', capsule=True)
+
+
 def main() -> None:
     b = 'tempere-'
     for n in ('tole', 'tole-2', 'tole-machines'):
@@ -166,6 +199,7 @@ def main() -> None:
     for n in ('baie', 'baie-2', 'colonne', 'trappe', 'machinerie'):
         ecrit(f'{b}{n}', sombre(detoure(lit(b + n), rogne=True), SOMBRE_COQUE))
     cellule()
+    serre()
     planche = lit('equipements')
     for n, (x0, y0, x1, y1) in EQUIPEMENTS.items():
         ecrit(f'equipement-{n}', sombre(detoure(planche[y0:y1, x0:x1], rogne=True), SOMBRE_EQUIPEMENT))

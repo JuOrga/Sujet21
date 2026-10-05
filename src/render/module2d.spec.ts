@@ -4,6 +4,8 @@
 import { describe, expect, it } from 'vitest'
 import {
   CELLULE_L,
+  CYL_BERCEAU,
+  CYL_DOME,
   DETAIL_L,
   RATIO_COLONNE,
   DUREE_TRANSITION,
@@ -240,14 +242,14 @@ describe('module 2D — une forme FIXE par type de module', () => {
     expect(b.map((q) => q[0])).toEqual(a.map((q) => q[0])) // la hauteur suit la voie, pas le profil
   })
 
-  it('une forme par biome : la serre étagée, la chaufferie en fuseau, le cryo dorsal', () => {
-    expect(formeDuBiome('tempere')).toBe('etagee')
+  it('une forme par biome : la serre en cylindre, la chaufferie en fuseau, le cryo dorsal', () => {
+    expect(formeDuBiome('tempere')).toBe('cylindre')
     expect(formeDuBiome('chaud')).toBe('fuseau')
     expect(formeDuBiome('cryo')).toBe('dorsale')
     expect(formeDuBiome('antichambre')).toBe('etagee')
   })
 
-  for (const f of ['etagee', 'fuseau', 'dorsale'] as const)
+  for (const f of ['etagee', 'fuseau', 'dorsale', 'cylindre'] as const)
     it(`${f} : fermée, à angles droits, habillée selon le sens de chaque angle, et contenant la grille`, () => {
       const m = miseEnPage(salle, vue, f)
       const s = m.silhouette
@@ -351,5 +353,19 @@ describe('module 2D — les pièces de la serre', () => {
           expect(surSalle).toBe(false)
         }
       }
+  })
+
+  it('le cylindre : la toile porte ses deux dômes et son berceau ; aucune pièce de tôle sur le vitrage', () => {
+    for (const hr of [0.66, 1.0]) {
+      const m = miseEnPage({ minX: 0, minY: 0, maxX: 1000, maxY: 1000 * hr }, vue, 'cylindre')
+      const H = m.corps.maxY - m.corps.minY
+      expect(m.corps.minX).toBeGreaterThanOrEqual(CYL_DOME * H)
+      expect(m.largeur - m.corps.maxX).toBeGreaterThanOrEqual(CYL_DOME * H)
+      expect(m.hauteur - m.corps.maxY).toBeGreaterThanOrEqual(CYL_BERCEAU * H)
+      expect(m.elements).toEqual([])
+      expect(m.details).toEqual([])
+      expect(m.machines).toEqual([])
+      expect(m.largeur).toBeLessThanOrEqual(TOILE_MAX + 1)
+    }
   })
 })
