@@ -1,0 +1,2 @@
+{ "nom": "r5_ronde", "hook": "__ronde", "dsf": 2, "fps": 30, "duree": 12, "preroll": 3.5, "zoom": 0.5, "params": { "cameraSmoothing": 3 }, "sansFx": true,
+  "actions": [] }

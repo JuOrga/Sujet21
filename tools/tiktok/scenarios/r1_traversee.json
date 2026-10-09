@@ -1,0 +1,6 @@
+{ "nom": "r1_traversee", "query": "?libre&tableau=1", "dsf": 2, "fps": 30, "duree": 10.5, "preroll": 2.5, "zoom": 1.7, "params": { "cameraSmoothing": 5 },
+  "actions": [
+    { "t": 1.8, "do": "zoom", "z": 1.05 },
+    { "t": 2.0, "do": "warp", "w": 2 },
+    { "t": 2.0, "do": "pilote", "wps": [[-500, 0], [-150, 260], [400, 230], [800, 0], [1110, 0]], "v": 350, "rayon": 110 }
+  ] }

@@ -1,0 +1,2 @@
+{ "nom": "r6_cibles", "hook": "__cibles", "dsf": 2, "fps": 30, "duree": 11, "preroll": 3.5, "zoom": 0.5, "params": { "cameraSmoothing": 4 }, "sansFx": true,
+  "actions": [ { "t": 0.0, "do": "tirauto", "mires": [[-800, -650], [0, -650], [800, -650]], "dur": 11, "cool": 0.9, "r": 380 } ] }

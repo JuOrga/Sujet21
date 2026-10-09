@@ -1,0 +1,6 @@
+{ "nom": "r3_glace", "query": "?libre&tableau=2", "dsf": 2, "fps": 30, "duree": 9, "preroll": 2.5, "zoom": 0.85, "params": { "cameraSmoothing": 4 },
+  "actions": [
+    { "t": 0.0, "do": "warp", "w": 2 },
+    { "t": 0.2, "do": "pilote", "wps": [[200, 600]], "v": 650, "dur": 1.5, "rayon": 60, "seuil": 0.25 },
+    { "t": 1.75, "do": "touche", "key": "f" }
+  ] }

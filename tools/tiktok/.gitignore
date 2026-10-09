@@ -1,0 +1,5 @@
+frames/
+fonts/
+out/
+audio/*.wav
+__pycache__/

@@ -1,0 +1,18 @@
+--- a/src/main.ts	2026-10-09 07:13:56.841178819 +0000
++++ b/src/main.ts	2026-10-09 07:56:58.812684941 +0000
+@@ -17405,6 +17405,7 @@
+     return p
+ })
+ input.onReset = resetAction
++;(window as unknown as { __input: unknown }).__input = input
+ input.onZoom = (factor, cx, cy) =>
+   camera.zoomAt(factor, cx, cy, window.innerWidth, window.innerHeight, params)
+ input.onPan = (dx, dy) => camera.panBy(dx, dy)
+@@ -17692,6 +17693,7 @@
+   vapeur: 'gaz',
+ } as const
+ function cycleGateActif(): boolean {
++  if (new URLSearchParams(location.search).has('libre')) return false
+   return testLevel === null && level.etats !== 'libres'
+ }
+ input.peutDevenir = (vers) => {

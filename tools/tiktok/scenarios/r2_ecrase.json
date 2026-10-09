@@ -1,0 +1,6 @@
+{ "nom": "r2_ecrase", "query": "?libre&tableau=1", "dsf": 2, "fps": 30, "duree": 9, "preroll": 2.5, "zoom": 1.1, "params": { "cameraSmoothing": 4 },
+  "actions": [
+    { "t": 0.0, "do": "warp", "w": 2 },
+    { "t": 0.3, "do": "tenir", "dir": [1, 0.35], "dur": 2.5, "r": 150 },
+    { "t": 4.6, "do": "tenir", "dir": [1, -0.5], "dur": 1.5, "r": 150 }
+  ] }

@@ -1,0 +1,7 @@
+{ "nom": "r4_vapeur", "query": "?libre&tableau=5", "dsf": 2, "fps": 30, "duree": 8.5, "preroll": 2.5, "zoom": 1.0, "params": { "cameraSmoothing": 4 },
+  "actions": [
+    { "t": 0.6, "do": "touche", "key": "g" },
+    { "t": 2.4, "do": "dash", "dir": [1, 0.2], "r": 240 },
+    { "t": 4.3, "do": "dash", "dir": [1, -0.5], "r": 240 },
+    { "t": 6.2, "do": "dash", "dir": [1, 0.4], "r": 240 }
+  ] }
