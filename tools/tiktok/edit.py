@@ -44,12 +44,13 @@ def image_seg(seg, u):
     return f0 if a <= 0.15 else frame(seg['rush'], i0 + 1)
 
 _vig = None
-def grade(img, sat=1.18, contraste=1.08, vign=0.35):
+def grade(img, sat=1.18, contraste=1.08, vign=0.35, lum=1.0):
     global _vig
     if _vig is None:
         y, x = np.mgrid[0:H, 0:W]
         r = np.sqrt(((x - W / 2) / (W / 2)) ** 2 + ((y - H / 2) / (H / 2)) ** 2)
         _vig = (1 - vign * np.clip(r - 0.45, 0, 1) ** 1.6)[..., None].astype(np.float32)
+    img = img * lum
     g = img.mean(2, keepdims=True)
     img = g + (img - g) * sat
     img = (img - 128) * contraste + 128

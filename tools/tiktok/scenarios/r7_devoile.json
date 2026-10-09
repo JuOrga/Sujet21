@@ -1,0 +1,6 @@
+{ "nom": "r7_devoile", "query": "?libre&tableau=1", "dsf": 2, "fps": 30, "duree": 4.6, "preroll": 2.5, "zoom": 1.6,
+  "params": { "particleRenderRadius": 2, "fieldThreshold": 0.5, "fieldSoftness": 0.05 },
+  "actions": [
+    { "t": 0.7, "do": "tenir", "dir": [1, 0.1], "dur": 0.7, "r": 140 },
+    { "t": 1.9, "do": "anim", "p": { "particleRenderRadius": [2, 13], "fieldThreshold": [0.5, 0.8], "fieldSoftness": [0.05, 0.3] }, "dur": 1.8 }
+  ] }

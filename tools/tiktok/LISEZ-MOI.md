@@ -73,6 +73,7 @@ Un scénario est une liste de gestes datés (`scenarios/*.json`) :
 | `dash` | vise puis relâche (le dash de vapeur) |
 | `tirauto` | en glace, tire un éclat quand le corps survole une mire |
 | `warp`, `zoom`, `params` | time warp, zoom de caméra, réglages du banc |
+| `anim` | fait glisser des réglages du banc dans le temps (ex. les particules qui se fondent en eau) |
 
 `rec.mjs` écrit aussi `journal.json` : l'état du corps toutes les 5 images
 et l'instant de chaque geste — le montage s'en sert pour le compteur de

@@ -29,6 +29,7 @@ if (sc.zoom) await p.evaluate((z) => { window.__cam.manualZoom = z }, sc.zoom)
 const N = Math.round(sc.duree * fps)
 const acts = [...sc.actions].sort((a, b) => a.t - b.t)
 let tenue = null // { dir:[dx,dy], r, jusqua }
+let anims = []
 let tirauto = null
 let pilote = null // { wps, v, seuil, r, jusqua, i }
 const journal = []
@@ -50,6 +51,7 @@ for (let f = 0; f < N; f++) {
       await p.mouse.move(px, py); await p.mouse.down(); souris = true; journal.push({ t, dash: 1 })
       tenue = { dir: [0, 0], r: 0, jusqua: t + (a.vise ?? 0.25), fixe: true }
     }
+    else if (a.do === 'anim') anims.push({ ...a, t0: t })
     else if (a.do === 'tirauto') { tirauto = { mires: a.mires, jusqua: t + a.dur, cool: a.cool ?? 1.2, fen: a.fen ?? 140, r: a.r ?? 400, vise: a.vise ?? 0.2, dernier: -9 } }
     else if (a.do === 'touche') await p.keyboard.press(a.key)
     else if (a.do === 'zoom') await p.evaluate((z) => { window.__cam.manualZoom = z }, a.z)
@@ -68,6 +70,12 @@ for (let f = 0; f < N; f++) {
     if (!souris) { await p.mouse.down(); souris = true; journal.push({ t, ejecte: 1 }) }
     if (t >= tenue.jusqua) { await p.mouse.up(); souris = false; tenue = null }
   }
+  for (const an of anims) {
+    const k = Math.min(1, Math.max(0, (t - an.t0) / an.dur)), e = k * k * (3 - 2 * k)
+    const o = {}; for (const [cle, [de, a]] of Object.entries(an.p)) o[cle] = de + (a - de) * e
+    await p.evaluate((o) => Object.assign(window.__params, o), o)
+  }
+  anims = anims.filter((an) => t - an.t0 <= an.dur + 0.05)
   if (tirauto && !tenue) {
     if (t >= tirauto.jusqua) tirauto = null
     else if (t - tirauto.dernier >= tirauto.cool) {

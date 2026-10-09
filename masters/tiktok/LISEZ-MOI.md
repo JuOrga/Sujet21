@@ -16,6 +16,29 @@ sans écran (temps virtuel : 30 images parfaites par seconde, aucune saccade).
 La fabrication est décrite dans `tools/tiktok/LISEZ-MOI.md`. Les gestes sont scriptés (pilote automatique qui dose les éjections) ; le
 temps est accéléré ×2 par le time warp du jeu sur les traversées.
 
+## V4 — le devlog (à publier en premier)
+
+`V4-devlog.mp4` (21,1 s), à la première personne : « J'ai codé un jeu où tu
+ES de l'eau ».
+
+1. **Accroche en suspens** : la goutte, percée en anneau par une membrane,
+   file vers un mur — coupée juste avant le choc.
+2. **Le dessous des cartes** : les 900 particules du corps affichées une à
+   une (le vrai moteur, rayon de rendu et seuil de champ abaissés), qui se
+   fondent en eau — « qui tiennent ensemble par tension de surface ».
+3. La mécanique : cracher son eau (compteur de volume), gelée, vapeur.
+4. **La scène du début, résolue** : le mur boit la goutte.
+5. Le sas, puis le logo et « Je continue le dev ? ».
+
+Image fidèle au jeu (ni couleurs forcées ni physique poussée). Musique :
+`zone-chambre-v2` dès 2:02, coupes sur ses temps (130 BPM).
+`V4-devlog-sans-musique.mp4` : bruitages seuls — idéal pour **lire les
+légendes en voix off** (le format devlog marche mieux avec la voix du
+développeur) ou poser un son tendance.
+
+> J'ai codé un jeu où tu ES de l'eau 💧 Chaque mouvement te coûte un bout de toi. Je continue ?
+> #devlog #indiegame #gamedev #jeuvideo #physics #indiedev #fyp #pourtoi
+
 ## Les trois vidéos
 
 | Fichier | Durée | Angle |
