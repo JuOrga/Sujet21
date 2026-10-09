@@ -3,7 +3,8 @@ import sys
 from edit import *
 from cartes import *
 SND = os.path.join(ICI, '../../public/sound')
-b = 60 / 130; bar = 4 * b
+# MUSIQUE, DEBUT et BPM (environnement) : poser un autre morceau, coupes recalées sur son tempo
+b = 60 / float(os.environ.get('BPM', 130)); bar = 4 * b
 REP = json.load(open('reperes.json'))
 def seg(rush, a, z, i, nb=1, **kw):
     return dict(rush=rush, out=i * bar, map=[(0, a), (nb * bar, z)], **kw)
@@ -52,6 +53,8 @@ for tt in REP['r6'].get('tirs', []):
     o = sortie('r6_cibles', tt)
     if o: sons.append((f'{SND}/impact-glace.mp3', o, 0.5))
 tl = dict(duree=8 * bar + 2.3, segs=segs, legendes=leg, punch=[i * bar for i in range(1, 9)] + [i * bar + 2 * b for i in range(1, 8) if i != 5],
-          punch_force=0.05, musique=sys.argv[2] if len(sys.argv) > 2 else 'audio/phonk.wav', sons=[s for s in sons if s[1] is not None],
+          punch_force=0.05, musique_debut=float(os.environ.get('DEBUT', 0)), sans_musique=os.environ.get('SANS', '1') == '1',
+          fondu=float(os.environ.get('FONDU', 0.4)), gain_musique=float(os.environ.get('GAIN', 1.0)),
+          musique=sys.argv[2] if len(sys.argv) > 2 else 'audio/phonk.wav', sons=[s for s in sons if s[1] is not None],
           shake=[(sortie('r2_ecrase', 4.75), 18), (sortie('r4_vapeur', 0.62), 12)])
 rend(tl, sys.argv[1])

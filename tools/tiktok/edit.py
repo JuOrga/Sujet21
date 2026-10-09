@@ -127,14 +127,16 @@ def pop(t, t0, t1, d_in=0.14, d_out=0.12):
     return 1.0, 1.0
 
 # ---------- audio ----------
-def charge_son(path, gain=1.0):
-    p = subprocess.run(['ffmpeg', '-v', 'error', '-i', path, '-f', 'f32le', '-ac', '2', '-ar', str(SR), '-'], capture_output=True)
+def charge_son(path, gain=1.0, debut=0.0):
+    p = subprocess.run(['ffmpeg', '-v', 'error', '-ss', str(debut), '-i', path, '-f', 'f32le', '-ac', '2', '-ar', str(SR), '-'], capture_output=True)
     return np.frombuffer(p.stdout, dtype=np.float32).reshape(-1, 2) * gain
-def mixe(duree, musique, sons, gain_mus=1.0, fondu=0.4):
+def mixe(duree, musique, sons, gain_mus=1.0, fondu=0.4, debut=0.0):
     L = int((duree + 0.1) * SR)
     out = np.zeros((L, 2), np.float32)
     if musique:
-        m = charge_son(musique, gain_mus)[:L]
+        m = charge_son(musique, gain_mus, debut)[:L].copy()
+        # un extrait pris en plein morceau : 30 ms d'entrée, sinon un clic au premier échantillon
+        n0 = int(0.03 * SR); m[:n0] *= np.linspace(0, 1, n0)[:, None]
         out[: len(m)] += m
     for (path, t, g) in sons:
         s = charge_son(path, g); i = int(t * SR)
@@ -196,9 +198,12 @@ def rend(tl, sortie):
 
 def muxe(tl, tmpv, sortie):
     duree = tl['duree']
-    for (dest, mus, g) in ((sortie, tl.get('musique'), 1.0), (sortie.replace('.mp4', '-sans-musique.mp4'), None, 1.6)):
+    variantes = [(sortie, tl.get('musique'), 1.0)]
+    if tl.get('sans_musique', True): variantes.append((sortie.replace('.mp4', '-sans-musique.mp4'), None, 1.6))
+    for (dest, mus, g) in variantes:
         wav = dest + '.wav'
-        ecrit_wav(wav, mixe(duree, mus, [(p, t, gg * g) for (p, t, gg) in tl.get('sons', [])], tl.get('gain_musique', 1.0)))
+        ecrit_wav(wav, mixe(duree, mus, [(p, t, gg * g) for (p, t, gg) in tl.get('sons', [])], tl.get('gain_musique', 1.0),
+                            tl.get('fondu', 0.4), tl.get('musique_debut', 0.0)))
         subprocess.run(['ffmpeg', '-y', '-v', 'error', '-i', tmpv, '-i', wav, '-c:v', 'copy',
                         # -14 LUFS, crête à -1,5 dB : la norme des plateformes — la boucle hypnotique
                         # sortait à +0,7 dBFS, écrêtée par l'encodeur AAC

@@ -86,3 +86,19 @@ coups de zoom sur les temps, les flashs aux coupes, les secousses, les
 légendes (`*mot*` en couleur, `|` saut de ligne) et mixe la musique avec
 les bruitages de `public/sound/`. Chaque montage sort en deux versions :
 avec musique, et `-sans-musique` pour poser un son tendance dans TikTok.
+
+## Changer de musique
+
+`audio/beat.py` mesure tempo et phase des temps d'un morceau ;
+`audio/extrait.py` choisit un départ sur un premier temps selon une courbe
+d'énergie voulue ; `audio/sync.py` contrôle après coup que les coupes
+tombent sur des attaques. Le montage prend le morceau en argument et trois
+variables d'environnement :
+
+```bash
+SANS=0 FONDU=1.2 GAIN=0.8 BPM=99 DEBUT=63.762 \
+  python3 v3.py out/V3-hypnotique-musique-du-jeu.mp4 ../../masters/sound/zone-hublot-v2.mp3
+```
+
+`BPM` recale les mesures (donc les coupes) sur le tempo du morceau,
+`DEBUT` est le premier temps où l'extrait commence.

@@ -3,7 +3,8 @@ import sys
 from edit import *
 from cartes import *
 SND = os.path.join(ICI, '../../public/sound')
-b = 60 / 100; bar = 4 * b
+# MUSIQUE, DEBUT et BPM (environnement) : poser un autre morceau, coupes recalées sur son tempo
+b = 60 / float(os.environ.get('BPM', 100)); bar = 4 * b
 REP = json.load(open('reperes.json'))
 R5, R6, C = 'r5_ronde', 'r6_cibles', REP['r6']
 segs = [
@@ -32,5 +33,7 @@ for tt in C.get('tirs', []):
     o = sortie(R6, tt)
     if o: sons.append((f'{SND}/ejection-{1 + len(sons) % 3}.mp3', o, 0.55))
 tl = dict(duree=6 * bar + 0.3, segs=segs, legendes=leg, punch=[i * bar for i in range(1, 6)], punch_force=0.03,
+          musique_debut=float(os.environ.get('DEBUT', 0)), sans_musique=os.environ.get('SANS', '1') == '1',
+          fondu=float(os.environ.get('FONDU', 0.4)), gain_musique=float(os.environ.get('GAIN', 1.0)),
           musique=sys.argv[2] if len(sys.argv) > 2 else 'audio/hypno.wav', sons=[s for s in sons if s[1] is not None])
 rend(tl, sys.argv[1])

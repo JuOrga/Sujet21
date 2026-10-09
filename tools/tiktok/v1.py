@@ -3,7 +3,8 @@ import sys
 from edit import *
 from cartes import *
 SND = os.path.join(ICI, '../../public/sound')
-b = 60 / 90; bar = 4 * b
+# MUSIQUE, DEBUT et BPM (environnement) : poser un autre morceau, coupes recalées sur son tempo
+b = 60 / float(os.environ.get('BPM', 90)); bar = 4 * b
 R1, R2 = 'r1_traversee', 'r2_ecrase'
 E = json.load(open('reperes.json'))['r2']  # repères mesurés sur le rush de l'échec
 segs = [
@@ -42,7 +43,9 @@ for e in journal(R1):
     if e.get('ejecte'):
         to = r1_vers_sortie(e['t'])
         if to is not None: sons.append((f'{SND}/ejection-{1 + len(sons) % 3}.mp3', to, 0.55))
-tl = dict(duree=7 * bar, segs=segs, legendes=leg, punch=[i * bar for i in range(1, 7)], musique=sys.argv[2] if len(sys.argv) > 2 else 'audio/lofi.wav',
+tl = dict(duree=7 * bar, segs=segs, legendes=leg, punch=[i * bar for i in range(1, 7)], musique_debut=float(os.environ.get('DEBUT', 0)), sans_musique=os.environ.get('SANS', '1') == '1',
+          fondu=float(os.environ.get('FONDU', 0.4)), gain_musique=float(os.environ.get('GAIN', 1.0)),
+          musique=sys.argv[2] if len(sys.argv) > 2 else 'audio/lofi.wav',
           sons=sons, shake=[(5 * bar + bar * 0.55, 14)],
           overlays=[dict(t0=bar, t1=4 * bar - 0.05, f=compteur(vol, y=1420))])
 rend(tl, sys.argv[1])
