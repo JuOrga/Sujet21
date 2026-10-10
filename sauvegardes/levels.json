@@ -20334,7 +20334,7 @@
     {
       "id": "courant-laser",
       "auteur": "BOIZ",
-      "majAt": "2026-10-08T15:52:50.802Z",
+      "majAt": "2026-10-09T15:44:13.863Z",
       "codeAuteur": "BOIZ",
       "codeAt": "2026-10-08T15:32:49.884Z",
       "level": {
@@ -20345,7 +20345,7 @@
           "minX": -1200,
           "minY": -750,
           "maxX": 1200,
-          "maxY": 850
+          "maxY": 1170
         },
         "spawn": {
           "x": -990,
@@ -20353,19 +20353,12 @@
           "n": 900
         },
         "exit": {
-          "minX": 1020,
-          "minY": 540,
-          "maxX": 1160,
-          "maxY": 680
+          "minX": 910,
+          "minY": -650,
+          "maxX": 1050,
+          "maxY": -510
         },
         "boxes": [
-          {
-            "minX": -1200,
-            "minY": 350,
-            "maxX": -710,
-            "maxY": 850,
-            "material": 0
-          },
           {
             "minX": -450,
             "minY": -550,
@@ -20395,10 +20388,31 @@
             "material": 7
           },
           {
-            "minX": -1510,
-            "minY": -100,
-            "maxX": -1450,
-            "maxY": 0,
+            "minX": -710,
+            "minY": 850,
+            "maxX": 60,
+            "maxY": 910,
+            "material": 0
+          },
+          {
+            "minX": 60,
+            "minY": 160,
+            "maxX": 120,
+            "maxY": 910,
+            "material": 0
+          },
+          {
+            "minX": -650,
+            "minY": 160,
+            "maxX": 60,
+            "maxY": 220,
+            "material": 0
+          },
+          {
+            "minX": -710,
+            "minY": 550,
+            "maxX": -410,
+            "maxY": 650,
             "material": 0
           },
           {
@@ -20409,18 +20423,77 @@
             "material": 0
           },
           {
-            "minX": -650,
-            "minY": 100,
-            "maxX": 120,
-            "maxY": 160,
+            "minX": 385,
+            "minY": -275,
+            "maxX": 785,
+            "maxY": 525,
+            "forme": 4,
+            "p0": 0.15,
+            "material": 0
+          },
+          {
+            "minX": 120,
+            "minY": 465,
+            "maxX": 440,
+            "maxY": 525,
+            "material": 9
+          },
+          {
+            "minX": 120,
+            "minY": -275,
+            "maxX": 440,
+            "maxY": -215,
+            "material": 5
+          },
+          {
+            "minX": 120,
+            "minY": 850,
+            "maxX": 420,
+            "maxY": 910,
+            "material": 5
+          },
+          {
+            "minX": 420,
+            "minY": 850,
+            "maxX": 785,
+            "maxY": 910,
+            "material": 0
+          },
+          {
+            "minX": 120,
+            "minY": 40,
+            "maxX": 360,
+            "maxY": 100,
+            "material": 0
+          },
+          {
+            "minX": 325,
+            "minY": 0,
+            "maxX": 515,
+            "maxY": 250,
+            "forme": 1,
+            "material": 2
+          },
+          {
+            "minX": 1420,
+            "minY": 395,
+            "maxX": 1620,
+            "maxY": 595,
+            "material": 0
+          },
+          {
+            "minX": -1200,
+            "minY": 1110,
+            "maxX": 1200,
+            "maxY": 1170,
             "material": 0
           }
         ],
         "sponges": [],
         "labels": [
           {
-            "x": 1080,
-            "y": 600,
+            "x": 990,
+            "y": -590,
             "text": "SAS",
             "tone": "sas"
           }
@@ -20437,15 +20510,35 @@
         "par": 3,
         "lasers": [
           {
-            "x": -150,
-            "y": -550,
+            "x": -223,
+            "y": -522,
             "angle": 90
+          },
+          {
+            "x": -250,
+            "y": 220,
+            "angle": 90
+          },
+          {
+            "x": 119,
+            "y": 1111,
+            "angle": 270
           }
         ],
         "cibles": [
           {
-            "x": -110,
-            "y": -550,
+            "x": -167,
+            "y": -524,
+            "r": 26
+          },
+          {
+            "x": 30,
+            "y": 820,
+            "r": 26
+          },
+          {
+            "x": 170,
+            "y": 1084,
             "r": 26
           }
         ],
@@ -20456,6 +20549,20 @@
             "maxX": -710,
             "maxY": 100,
             "canal": 1
+          },
+          {
+            "minX": -710,
+            "minY": 910,
+            "maxX": -650,
+            "maxY": 1110,
+            "canal": 2
+          },
+          {
+            "minX": 725,
+            "minY": 910,
+            "maxX": 785,
+            "maxY": 1110,
+            "canal": 3
           }
         ],
         "chasses": [
@@ -20487,7 +20594,7 @@
             "minX": -1070,
             "minY": 100,
             "maxX": -710,
-            "maxY": 350,
+            "maxY": 550,
             "angle": 90,
             "allure": 150
           },
@@ -20506,6 +20613,14 @@
             "maxY": 850,
             "angle": 0,
             "allure": 150
+          },
+          {
+            "minX": -650,
+            "minY": 910,
+            "maxX": 60,
+            "maxY": 1010,
+            "angle": 0,
+            "allure": 150
           }
         ],
         "caches": [
@@ -20514,6 +20629,32 @@
             "minY": 100,
             "maxX": -1070,
             "maxY": 350
+          },
+          {
+            "minX": -650,
+            "minY": 0,
+            "maxX": 60,
+            "maxY": 190
+          },
+          {
+            "minX": -650,
+            "minY": 220,
+            "maxX": -410,
+            "maxY": 350
+          }
+        ],
+        "rails": [
+          {
+            "points": [
+              {
+                "x": -224,
+                "y": 130
+              },
+              {
+                "x": 150,
+                "y": 131
+              }
+            ]
           }
         ]
       }
