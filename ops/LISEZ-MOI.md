@@ -30,6 +30,15 @@ endpoints **sans authentification** :
 | cinématiques (`/api/cinematiques`) | les montages partagés |
 | catalogue d'images (`/api/images`) | les noms et URL des visuels importés |
 | registres (`/api/records`) | les records |
+| **récit et fins** (`/api/journal`) | le journal publié depuis l'atelier RÉCIT & FINS |
+| réglages du codex (`/api/codex`) | la mémoire et la rareté de chaque fiche (les vidéos : URL seulement) |
+| **réglages** (`/api/reglages`, un fichier par domaine) | le plan de la descente, **la carte de la station**, les cartes de l'atelier des récompenses, les retouches de textes, les séquences |
+
+Ces trois dernières lignes datent du 07/09 : jusque-là, tout ce qui se
+publie depuis la régie n'était sauvegardé nulle part. Le test
+`src/game/sauvegardeCouverture.spec.ts` recense désormais ce que l'API
+sert contre ce que le script lit : un handler ou un domaine ajouté sans
+sa famille fait tomber `pnpm test`.
 
 `api/_magasin.ts` garde bien un historique de 4 versions, mais c'est un
 filet d'écriture, pas une sauvegarde : quatre enregistrements suffisent à
@@ -126,11 +135,15 @@ restauration, le serveur l'écrivant lui-même. L'auteur, le code et la
 provenance du code sont préservés : l'API ne redate la codification que si
 le code *change*, et il ne change pas.
 
-**Portée : tableaux et présets.** Ce sont les deux familles dont
-l'écriture est un remplacement par clé, donc rejouable sans risque. Les
-règles, fiches et cinématiques sont bien *sauvegardées* (elles sont dans le
-dossier) mais se rendent à la main depuis le jeu — écrire ici une
-restauration que personne n'a essayée serait un piège.
+**Portée : ce dont l'écriture est un remplacement par clé.** Les
+tableaux (par `id`), les présets (par `title`), et depuis le 07/09 le
+journal, les cinq domaines de réglages (un document chacun) et les
+réglages du codex (par fiche : mémoire et rareté — la vidéo reste celle
+que le serveur a). Un domaine sauvegardé « rien de publié » est sauté :
+le livré joue, on ne publie pas du vide. Les règles, fiches et
+cinématiques sont bien *sauvegardées* (elles sont dans le dossier) mais
+se rendent à la main depuis le jeu — écrire ici une restauration que
+personne n'a essayée serait un piège.
 
 ---
 
