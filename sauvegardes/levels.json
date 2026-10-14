@@ -20057,11 +20057,11 @@
     {
       "id": "nouveau-tableau-16",
       "auteur": "BOIZ",
-      "majAt": "2026-10-08T15:23:16.415Z",
+      "majAt": "2026-10-13T13:22:28.888Z",
       "codeAuteur": "BOIZ",
       "codeAt": "2026-10-08T14:15:40.788Z",
       "level": {
-        "name": "a travers le vie",
+        "name": "a travers le vide",
         "code": "21-?",
         "journal": "Entrée de journal du protocole : ce que le laboratoire a observé dans cette cuve.",
         "bounds": {
@@ -20334,7 +20334,7 @@
     {
       "id": "courant-laser",
       "auteur": "BOIZ",
-      "majAt": "2026-10-09T15:44:13.863Z",
+      "majAt": "2026-10-13T13:25:30.784Z",
       "codeAuteur": "BOIZ",
       "codeAt": "2026-10-08T15:32:49.884Z",
       "level": {
@@ -20353,10 +20353,10 @@
           "n": 900
         },
         "exit": {
-          "minX": 910,
-          "minY": -650,
-          "maxX": 1050,
-          "maxY": -510
+          "minX": 980,
+          "minY": -670,
+          "maxX": 1120,
+          "maxY": -530
         },
         "boxes": [
           {
@@ -20417,18 +20417,9 @@
           },
           {
             "minX": 60,
-            "minY": -750,
+            "minY": -450,
             "maxX": 120,
             "maxY": 100,
-            "material": 0
-          },
-          {
-            "minX": 385,
-            "minY": -275,
-            "maxX": 785,
-            "maxY": 525,
-            "forme": 4,
-            "p0": 0.15,
             "material": 0
           },
           {
@@ -20475,27 +20466,91 @@
             "material": 2
           },
           {
-            "minX": 1420,
-            "minY": 395,
-            "maxX": 1620,
-            "maxY": 595,
-            "material": 0
-          },
-          {
             "minX": -1200,
             "minY": 1110,
             "maxX": 1200,
             "maxY": 1170,
             "material": 0
+          },
+          {
+            "minX": 725,
+            "minY": 180,
+            "maxX": 785,
+            "maxY": 850,
+            "material": 5
+          },
+          {
+            "minX": 385,
+            "minY": -275,
+            "maxX": 785,
+            "maxY": 525,
+            "forme": 4,
+            "p0": 0.15,
+            "material": 0
+          },
+          {
+            "minX": 60,
+            "minY": -750,
+            "maxX": 120,
+            "maxY": -450,
+            "material": 9
           }
         ],
         "sponges": [],
         "labels": [
           {
-            "x": 990,
+            "x": 1050,
             "y": -590,
             "text": "SAS",
             "tone": "sas"
+          },
+          {
+            "x": -900,
+            "y": 40,
+            "text": "D1",
+            "tone": "mur"
+          },
+          {
+            "x": -170,
+            "y": -520,
+            "text": "T1",
+            "tone": "mur"
+          },
+          {
+            "x": -680,
+            "y": 1010,
+            "text": "D2",
+            "tone": "mur"
+          },
+          {
+            "x": 30,
+            "y": 820,
+            "text": "T2",
+            "tone": "mur"
+          },
+          {
+            "x": 170,
+            "y": 1080,
+            "text": "T3",
+            "tone": "mur"
+          },
+          {
+            "x": 750,
+            "y": 1000,
+            "text": "D3",
+            "tone": "mur"
+          },
+          {
+            "x": 860,
+            "y": -250,
+            "text": "D4",
+            "tone": "mur"
+          },
+          {
+            "x": 810,
+            "y": 130,
+            "text": "D4",
+            "tone": "mur"
           }
         ],
         "zones": [
@@ -20523,6 +20578,11 @@
             "x": 119,
             "y": 1111,
             "angle": 270
+          },
+          {
+            "x": 780,
+            "y": 190,
+            "angle": 0
           }
         ],
         "cibles": [
@@ -20539,6 +20599,11 @@
           {
             "x": 170,
             "y": 1084,
+            "r": 26
+          },
+          {
+            "x": 810,
+            "y": 130,
             "r": 26
           }
         ],
@@ -20563,6 +20628,13 @@
             "maxX": 785,
             "maxY": 1110,
             "canal": 3
+          },
+          {
+            "minX": 440,
+            "minY": -275,
+            "maxX": 1200,
+            "maxY": -215,
+            "canal": 4
           }
         ],
         "chasses": [
@@ -20621,6 +20693,14 @@
             "maxY": 1010,
             "angle": 0,
             "allure": 150
+          },
+          {
+            "minX": 1000,
+            "minY": 40,
+            "maxX": 1200,
+            "maxY": 850,
+            "angle": -90,
+            "allure": 150
           }
         ],
         "caches": [
@@ -20643,6 +20723,53 @@
             "maxY": 350
           }
         ],
+        "condensats": [
+          {
+            "x": -620,
+            "y": 120,
+            "cl": 12
+          },
+          {
+            "x": -1140,
+            "y": 140,
+            "cl": 12
+          },
+          {
+            "x": -620,
+            "y": 290,
+            "cl": 12
+          },
+          {
+            "x": 250,
+            "y": 400,
+            "cl": 12
+          },
+          {
+            "x": 700,
+            "y": 140,
+            "cl": 12
+          },
+          {
+            "x": 400,
+            "y": -150,
+            "cl": 12
+          },
+          {
+            "x": -260,
+            "y": 1090,
+            "cl": 6
+          },
+          {
+            "x": 250,
+            "y": 700,
+            "cl": 6
+          },
+          {
+            "x": -100,
+            "y": -660,
+            "cl": 6
+          }
+        ],
         "rails": [
           {
             "points": [
@@ -20653,6 +20780,437 @@
               {
                 "x": 150,
                 "y": 131
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "nouveau-tableau-17",
+      "auteur": "BOIZ",
+      "majAt": "2026-10-13T15:59:25.247Z",
+      "codeAuteur": "BOIZ",
+      "codeAt": "2026-10-13T13:36:29.065Z",
+      "level": {
+        "name": "E2",
+        "code": "21-?",
+        "journal": "Entrée de journal du protocole : ce que le laboratoire a observé dans cette cuve.",
+        "bounds": {
+          "minX": -1200,
+          "minY": -750,
+          "maxX": 1260,
+          "maxY": 810
+        },
+        "spawn": {
+          "x": -1020,
+          "y": -570,
+          "n": 900
+        },
+        "exit": {
+          "minX": 465,
+          "minY": -687.5,
+          "maxX": 640,
+          "maxY": -512.5
+        },
+        "boxes": [
+          {
+            "minX": -700,
+            "minY": -750,
+            "maxX": -640,
+            "maxY": -150,
+            "material": 0
+          },
+          {
+            "minX": -700,
+            "minY": 150,
+            "maxX": -570,
+            "maxY": 320,
+            "material": 0
+          },
+          {
+            "minX": -440,
+            "minY": 150,
+            "maxX": -140,
+            "maxY": 260,
+            "material": 0
+          },
+          {
+            "minX": -570,
+            "minY": 150,
+            "maxX": -440,
+            "maxY": 320,
+            "material": 0
+          },
+          {
+            "minX": -140,
+            "minY": -750,
+            "maxX": -80,
+            "maxY": -650,
+            "material": 0
+          },
+          {
+            "minX": -140,
+            "minY": -350,
+            "maxX": -80,
+            "maxY": 260,
+            "material": 0
+          },
+          {
+            "minX": -700,
+            "minY": -150,
+            "maxX": -640,
+            "maxY": 150,
+            "material": 8
+          },
+          {
+            "minX": -400,
+            "minY": -250,
+            "maxX": -140,
+            "maxY": -178,
+            "material": 7
+          },
+          {
+            "minX": -140,
+            "minY": -650,
+            "maxX": -80,
+            "maxY": -350,
+            "material": 5
+          },
+          {
+            "minX": -1070,
+            "minY": 690,
+            "maxX": -770,
+            "maxY": 810,
+            "material": 6
+          },
+          {
+            "minX": -770,
+            "minY": 690,
+            "maxX": -580,
+            "maxY": 810,
+            "material": 0
+          },
+          {
+            "minX": 640,
+            "minY": 690,
+            "maxX": 1140,
+            "maxY": 750,
+            "material": 0
+          },
+          {
+            "minX": -700,
+            "minY": 355,
+            "maxX": -640,
+            "maxY": 655,
+            "material": 5
+          },
+          {
+            "minX": -700,
+            "minY": 320,
+            "maxX": -640,
+            "maxY": 355,
+            "material": 0
+          },
+          {
+            "minX": -440,
+            "minY": 260,
+            "maxX": -140,
+            "maxY": 320,
+            "material": 9
+          },
+          {
+            "minX": -700,
+            "minY": 655,
+            "maxX": -640,
+            "maxY": 690,
+            "material": 0
+          },
+          {
+            "minX": -1200,
+            "minY": 690,
+            "maxX": -1070,
+            "maxY": 810,
+            "material": 0
+          },
+          {
+            "minX": 340,
+            "minY": 690,
+            "maxX": 640,
+            "maxY": 750,
+            "material": 9
+          },
+          {
+            "minX": -140,
+            "minY": 260,
+            "maxX": 700,
+            "maxY": 320,
+            "material": 10
+          },
+          {
+            "minX": -520,
+            "minY": 690,
+            "maxX": 340,
+            "maxY": 750,
+            "material": 0
+          },
+          {
+            "minX": 1140,
+            "minY": -480,
+            "maxX": 1200,
+            "maxY": 20,
+            "material": 0
+          },
+          {
+            "minX": 1140,
+            "minY": 320,
+            "maxX": 1200,
+            "maxY": 690,
+            "material": 0
+          },
+          {
+            "minX": 1140,
+            "minY": 690,
+            "maxX": 1200,
+            "maxY": 750,
+            "forme": 3,
+            "material": 0
+          },
+          {
+            "minX": 1140,
+            "minY": -750,
+            "maxX": 1260,
+            "maxY": -600,
+            "material": 0
+          },
+          {
+            "minX": 1140,
+            "minY": -540,
+            "maxX": 1200,
+            "maxY": -480,
+            "forme": 3,
+            "p0": 3,
+            "material": 0
+          },
+          {
+            "minX": 720,
+            "minY": -450,
+            "maxX": 1140,
+            "maxY": -390,
+            "material": 10
+          },
+          {
+            "minX": 420,
+            "minY": -450,
+            "maxX": 720,
+            "maxY": -390,
+            "material": 9
+          },
+          {
+            "minX": -80,
+            "minY": -10,
+            "maxX": 420,
+            "maxY": 50,
+            "material": 1
+          },
+          {
+            "minX": 1140,
+            "minY": 20,
+            "maxX": 1200,
+            "maxY": 320,
+            "material": 9
+          },
+          {
+            "minX": -80,
+            "minY": 50,
+            "maxX": -20,
+            "maxY": 260,
+            "material": 9
+          },
+          {
+            "minX": -80,
+            "minY": -70,
+            "maxX": 170,
+            "maxY": -10,
+            "material": 9
+          },
+          {
+            "minX": 170,
+            "minY": -70,
+            "maxX": 420,
+            "maxY": -10,
+            "material": 9
+          },
+          {
+            "minX": -1200,
+            "minY": -750,
+            "maxX": 1260,
+            "maxY": 810,
+            "material": 12
+          }
+        ],
+        "sponges": [
+          {
+            "minX": -640,
+            "minY": -250,
+            "cols": 10,
+            "rows": 3,
+            "cellSize": 24,
+            "capacityPerCell": 5
+          }
+        ],
+        "labels": [
+          {
+            "x": 550,
+            "y": -600,
+            "text": "SAS",
+            "tone": "sas"
+          },
+          {
+            "x": 60,
+            "y": 160,
+            "text": "ITEM",
+            "tone": "mur"
+          },
+          {
+            "x": 430,
+            "y": 0,
+            "text": "T1",
+            "tone": "mur"
+          },
+          {
+            "x": -120,
+            "y": 690,
+            "text": "D1",
+            "tone": "mur"
+          }
+        ],
+        "par": 3,
+        "lasers": [
+          {
+            "x": 350,
+            "y": 690,
+            "angle": 220
+          },
+          {
+            "x": 1140,
+            "y": 690,
+            "angle": 250
+          }
+        ],
+        "cibles": [
+          {
+            "x": 430,
+            "y": 0,
+            "r": 26,
+            "mode": "nor"
+          }
+        ],
+        "portes": [
+          {
+            "minX": -140,
+            "minY": 320,
+            "maxX": -80,
+            "maxY": 690,
+            "canal": 1
+          }
+        ],
+        "caches": [
+          {
+            "minX": -640,
+            "minY": -750,
+            "maxX": -80,
+            "maxY": -250
+          }
+        ],
+        "condensats": [
+          {
+            "x": 1000,
+            "y": -500,
+            "cl": 6
+          },
+          {
+            "x": 1010,
+            "y": -650,
+            "cl": 6
+          },
+          {
+            "x": 930,
+            "y": -580,
+            "cl": 6
+          },
+          {
+            "x": 950,
+            "y": -530,
+            "cl": 6
+          },
+          {
+            "x": 960,
+            "y": -630,
+            "cl": 6
+          },
+          {
+            "x": -270,
+            "y": -520,
+            "cl": 12
+          },
+          {
+            "x": -910,
+            "y": 620,
+            "cl": 6
+          },
+          {
+            "x": 200,
+            "y": 160,
+            "cl": 6
+          },
+          {
+            "x": 370,
+            "y": 160,
+            "cl": 6
+          },
+          {
+            "x": 390,
+            "y": -420,
+            "cl": 6
+          },
+          {
+            "x": 1100,
+            "y": 170,
+            "cl": 6
+          },
+          {
+            "x": 480,
+            "y": 660,
+            "cl": 6
+          }
+        ],
+        "rails": [
+          {
+            "points": [
+              {
+                "x": -550,
+                "y": 700
+              },
+              {
+                "x": -550,
+                "y": 780
+              },
+              {
+                "x": 1230,
+                "y": 780
+              },
+              {
+                "x": 1230,
+                "y": 95
+              },
+              {
+                "x": 1230,
+                "y": -570
+              },
+              {
+                "x": 1030,
+                "y": -570
               }
             ]
           }
