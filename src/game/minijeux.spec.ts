@@ -101,6 +101,9 @@ import {
   REGLES_PALET,
   tableauPalet,
   tireMiniJeu,
+  tireMiniJeuOuMaison,
+  auTirageClassique,
+  auTirageMiniJeu,
   VERDICTS_PALET,
   type ObservationPalet,
 } from './minijeux'
@@ -402,5 +405,46 @@ describe('les cibles — des éclats de glace, des mires, trente secondes', () =
     expect(lv.boxes.every((b) => b.maxY < lv.puits![0].y - 350)).toBe(true) // rien ne barre la ronde
     expect(sansSas(lv)).toBe(true)
     expect(lv.labels.filter((l) => /^[123] · /.test(l.text))).toHaveLength(3)
+  })
+})
+
+describe('le tirage des cases mini-jeu avec les tableaux maison', () => {
+  const tableau = (tirage?: 'minijeu' | 'partout') => ({ code: '21-7', tirage })
+
+  it('sans tableau maison, la graine tire le même mini-jeu qu’avant', () => {
+    for (let i = 0; i < 60; i++) {
+      const a = aleaDeGraine(`g${i}`)
+      const b = aleaDeGraine(`g${i}`)
+      expect(tireMiniJeuOuMaison(a, [])).toEqual({ type: tireMiniJeu(b) })
+    }
+  })
+
+  it('les tableaux maison entrent au chapeau à égalité avec les cinq', () => {
+    const maison = ['pachinko', 'flipper']
+    // 7 parts : les 5 du code d'abord, puis la maison
+    expect(tireMiniJeuOuMaison(() => 0, maison)).toEqual({ type: 'couperet' })
+    expect(tireMiniJeuOuMaison(() => 5 / 7 + 0.01, maison)).toEqual({ maison: 'pachinko' })
+    expect(tireMiniJeuOuMaison(() => 1, maison)).toEqual({ maison: 'flipper' })
+    const vus = new Set<string>()
+    for (let i = 0; i < 200; i++) {
+      const t = tireMiniJeuOuMaison(aleaDeGraine(`h${i}`), maison)
+      vus.add('type' in t ? t.type : t.maison)
+    }
+    expect(vus.size).toBe(7)
+  })
+
+  it('le réglage du tableau décide des cases mini-jeu et des portes classiques', () => {
+    expect(auTirageMiniJeu(tableau())).toBe(false)
+    expect(auTirageClassique(tableau())).toBe(true)
+    expect(auTirageMiniJeu(tableau('minijeu'))).toBe(true)
+    expect(auTirageClassique(tableau('minijeu'))).toBe(false)
+    expect(auTirageMiniJeu(tableau('partout'))).toBe(true)
+    expect(auTirageClassique(tableau('partout'))).toBe(true)
+  })
+
+  it('un mini-jeu ne sort jamais aux portes classiques : il n’a pas de sas', () => {
+    // publié sous MJ-PALET, il était jusqu'ici pioché comme une salle muette
+    expect(auTirageClassique(tableauPalet())).toBe(false)
+    expect(auTirageClassique({ ...tableauPalet(), tirage: 'partout' as const })).toBe(false)
   })
 })

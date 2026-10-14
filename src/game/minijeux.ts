@@ -82,6 +82,29 @@ export function tireMiniJeu(alea: () => number): MiniJeuId {
 
 export const NOMS_MINI_JEU: Record<MiniJeuId, string> = { couperet: 'LE COUPERET', palet: 'LE PALET', rafales: 'LES RAFALES', orbites: 'LES ORBITES', cibles: 'LES CIBLES' }
 
+/** LE TIRAGE d'un nœud AVEC LES MINI-JEUX MAISON : les tableaux publiés
+ *  que le concepteur a mis au tirage des cases mini-jeu (`tirage`) entrent
+ *  au chapeau à égalité avec les cinq du code. Un seul `alea()`, et la même
+ *  formule que tireMiniJeu : sans tableau maison, la graine du jour tire le
+ *  même mini-jeu qu'avant. */
+export function tireMiniJeuOuMaison<T>(alea: () => number, maison: readonly T[]): { type: MiniJeuId } | { maison: T } {
+  const n = MINI_JEUX.length + maison.length
+  const i = Math.min(n - 1, Math.floor(Math.max(0, Math.min(0.999999, alea())) * n))
+  return i < MINI_JEUX.length ? { type: MINI_JEUX[i] } : { maison: maison[i - MINI_JEUX.length] }
+}
+
+/** Ce tableau sort-il sur les cases mini-jeu de la descente ? */
+export function auTirageMiniJeu(level: { tirage?: 'minijeu' | 'partout' }): boolean {
+  return level.tirage === 'minijeu' || level.tirage === 'partout'
+}
+
+/** Ce tableau sort-il aux portes CLASSIQUES ? Ni un mini-jeu (pas de sas :
+ *  pioché comme une salle, il ne se conclurait pas), ni un tableau réservé
+ *  aux cases mini-jeu. */
+export function auTirageClassique(level: { code: string; minijeu?: MiniJeuDef; tirage?: 'minijeu' | 'partout' }): boolean {
+  return !estMiniJeu(level) && level.tirage !== 'minijeu'
+}
+
 /** Ce tableau est-il un mini-jeu ? (il n'a pas de sas : il mesure) */
 export function estMiniJeu(level: { code: string; minijeu?: MiniJeuDef }): boolean {
   return !!level.minijeu || level.code === CODE_COUPERET || level.code === CODE_PALET || level.code === CODE_RAFALES || level.code === CODE_ORBITES || level.code === CODE_CIBLES
