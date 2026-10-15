@@ -19602,7 +19602,7 @@
     {
       "id": "nouveau-tableau-14",
       "auteur": "BOIZ",
-      "majAt": "2026-10-08T14:05:25.229Z",
+      "majAt": "2026-10-14T15:32:50.544Z",
       "codeAuteur": "BOIZ",
       "codeAt": "2026-10-01T12:53:42.954Z",
       "level": {
@@ -19621,12 +19621,21 @@
           "n": 900
         },
         "exit": {
-          "minX": 82,
+          "minX": -365,
           "minY": 930,
-          "maxX": 222,
+          "maxX": -225,
           "maxY": 1070
         },
         "boxes": [
+          {
+            "minX": 935,
+            "minY": -404,
+            "maxX": 1769,
+            "maxY": 1164,
+            "forme": 4,
+            "p0": 0.08,
+            "material": 2
+          },
           {
             "minX": -1260,
             "minY": 837,
@@ -19646,6 +19655,13 @@
           },
           {
             "minX": -1260,
+            "minY": 380,
+            "maxX": -350,
+            "maxY": 440,
+            "material": 0
+          },
+          {
+            "minX": -50,
             "minY": 380,
             "maxX": 530,
             "maxY": 440,
@@ -19679,8 +19695,22 @@
           {
             "minX": -563,
             "minY": -141,
+            "maxX": -280,
+            "maxY": -78,
+            "material": 0
+          },
+          {
+            "minX": 20,
+            "minY": -141,
             "maxX": 973,
             "maxY": -78,
+            "material": 0
+          },
+          {
+            "minX": -280,
+            "minY": -141,
+            "maxX": 20,
+            "maxY": -140,
             "material": 0
           },
           {
@@ -19697,7 +19727,7 @@
             "maxY": 182.5,
             "forme": 4,
             "p1": 180,
-            "material": 0
+            "material": 2
           },
           {
             "minX": -1500,
@@ -19759,20 +19789,11 @@
             "material": 0
           },
           {
-            "minX": 935,
-            "minY": -405,
-            "maxX": 1769,
-            "maxY": 1163,
-            "forme": 4,
-            "p0": 0.08,
-            "material": 2
-          },
-          {
-            "minX": 82,
+            "minX": -50,
             "minY": 1100,
-            "maxX": 978,
+            "maxX": 590,
             "maxY": 1163,
-            "material": 0
+            "material": 4
           },
           {
             "minX": 336,
@@ -19784,21 +19805,57 @@
             "material": 2
           },
           {
-            "minX": -66.142,
+            "minX": -510,
             "minY": 837.511,
-            "maxX": 120,
+            "maxX": -323.858,
             "maxY": 1163,
-            "material": 0,
-            "forme": 4,
             "angle": -180,
-            "p0": 0.38
+            "forme": 4,
+            "p0": 0.38,
+            "material": 0
+          },
+          {
+            "minX": -50,
+            "minY": 1100,
+            "maxX": 30,
+            "maxY": 1164,
+            "sens": 2,
+            "material": 4
+          },
+          {
+            "minX": -365,
+            "minY": 1100,
+            "maxX": -50,
+            "maxY": 1163,
+            "material": 0
+          },
+          {
+            "minX": 590,
+            "minY": 1100,
+            "maxX": 983,
+            "maxY": 1163,
+            "material": 0
+          },
+          {
+            "minX": -280,
+            "minY": -140,
+            "maxX": 20,
+            "maxY": -78,
+            "material": 4
+          },
+          {
+            "minX": -350,
+            "minY": 380,
+            "maxX": -50,
+            "maxY": 440,
+            "material": 4
           }
         ],
         "sponges": [],
         "labels": [
           {
-            "x": 132,
-            "y": 999,
+            "x": -290,
+            "y": 1000,
             "text": "SAS",
             "tone": "sas"
           }
@@ -19808,16 +19865,58 @@
           {
             "x": 999,
             "y": 380,
-            "force": 350,
+            "force": 400,
             "rayon": 240,
             "portee": 700
           },
           {
             "x": -983,
             "y": -84,
-            "force": 300,
+            "force": 350,
             "rayon": 260,
-            "portee": 450
+            "portee": 500
+          }
+        ],
+        "condensats": [
+          {
+            "x": 50,
+            "y": 470,
+            "cl": 6
+          },
+          {
+            "x": 1360,
+            "y": 370,
+            "cl": 6
+          },
+          {
+            "x": 50,
+            "y": 350,
+            "cl": 6
+          },
+          {
+            "x": 120,
+            "y": -170,
+            "cl": 6
+          },
+          {
+            "x": 120,
+            "y": -50,
+            "cl": 6
+          },
+          {
+            "x": 700,
+            "y": 1070,
+            "cl": 6
+          },
+          {
+            "x": -1410,
+            "y": -80,
+            "cl": 6
+          },
+          {
+            "x": 1630,
+            "y": 380,
+            "cl": 6
           }
         ]
       }
@@ -21213,6 +21312,248 @@
                 "y": -570
               }
             ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "nouveau-tableau-18",
+      "auteur": "BOIZ",
+      "majAt": "2026-10-14T15:07:28.571Z",
+      "codeAuteur": "BOIZ",
+      "codeAt": "2026-10-14T14:22:47.475Z",
+      "level": {
+        "name": "vide ordure :)",
+        "code": "21-?",
+        "journal": "Entrée de journal du protocole : ce que le laboratoire a observé dans cette cuve.",
+        "bounds": {
+          "minX": -2000,
+          "minY": -500,
+          "maxX": 2000,
+          "maxY": 500
+        },
+        "spawn": {
+          "x": -1890,
+          "y": 0,
+          "n": 900
+        },
+        "exit": {
+          "minX": 900,
+          "minY": -15,
+          "maxX": 1010,
+          "maxY": 95
+        },
+        "boxes": [
+          {
+            "minX": -700,
+            "minY": -500,
+            "maxX": -200,
+            "maxY": 500,
+            "material": 11
+          },
+          {
+            "minX": 200,
+            "minY": -500,
+            "maxX": 600,
+            "maxY": 500,
+            "material": 11
+          },
+          {
+            "minX": 800,
+            "minY": -110,
+            "maxX": 860,
+            "maxY": 190,
+            "material": 0
+          },
+          {
+            "minX": 860,
+            "minY": -110,
+            "maxX": 1850,
+            "maxY": -50,
+            "material": 0
+          },
+          {
+            "minX": 860,
+            "minY": 130,
+            "maxX": 1850,
+            "maxY": 190,
+            "material": 0
+          },
+          {
+            "minX": 800,
+            "minY": 190,
+            "maxX": 1100,
+            "maxY": 500,
+            "material": 11
+          },
+          {
+            "minX": 800,
+            "minY": -500,
+            "maxX": 1000,
+            "maxY": -110,
+            "material": 11
+          },
+          {
+            "minX": 1150,
+            "minY": -500,
+            "maxX": 1300,
+            "maxY": -110,
+            "material": 11
+          },
+          {
+            "minX": 1400,
+            "minY": -500,
+            "maxX": 1500,
+            "maxY": -110,
+            "material": 11
+          },
+          {
+            "minX": 1250,
+            "minY": 190,
+            "maxX": 1650,
+            "maxY": 500,
+            "material": 11
+          },
+          {
+            "minX": 140,
+            "minY": 200,
+            "maxX": 200,
+            "maxY": 500,
+            "material": 0
+          },
+          {
+            "minX": 140,
+            "minY": -500,
+            "maxX": 200,
+            "maxY": -200,
+            "material": 0
+          },
+          {
+            "minX": 1600,
+            "minY": -500,
+            "maxX": 1800,
+            "maxY": -110,
+            "material": 11
+          },
+          {
+            "minX": 1100,
+            "minY": -50,
+            "maxX": 1300,
+            "maxY": 130,
+            "material": 11
+          },
+          {
+            "minX": 1550,
+            "minY": -50,
+            "maxX": 1850,
+            "maxY": 130,
+            "material": 11
+          },
+          {
+            "minX": -760,
+            "minY": -150,
+            "maxX": -700,
+            "maxY": 150,
+            "material": 0
+          },
+          {
+            "minX": -1600,
+            "minY": -500,
+            "maxX": -1200,
+            "maxY": 500,
+            "material": 11
+          },
+          {
+            "minX": 1650,
+            "minY": 350,
+            "maxX": 1850,
+            "maxY": 500,
+            "material": 0
+          },
+          {
+            "minX": 1800,
+            "minY": -305,
+            "maxX": 1850,
+            "maxY": -110,
+            "material": 0
+          },
+          {
+            "minX": 1300,
+            "minY": 10,
+            "maxX": 1550,
+            "maxY": 70,
+            "material": 0
+          },
+          {
+            "minX": 1100,
+            "minY": 190,
+            "maxX": 1250,
+            "maxY": 340,
+            "material": 0
+          },
+          {
+            "minX": 1300,
+            "minY": -500,
+            "maxX": 1400,
+            "maxY": -305,
+            "material": 0
+          }
+        ],
+        "sponges": [],
+        "labels": [
+          {
+            "x": 950,
+            "y": 40,
+            "text": "SAS",
+            "tone": "sas"
+          }
+        ],
+        "par": 3,
+        "condensats": [
+          {
+            "x": -450,
+            "y": 350,
+            "cl": 6
+          },
+          {
+            "x": -450,
+            "y": -350,
+            "cl": 6
+          },
+          {
+            "x": 170,
+            "y": 20,
+            "cl": 6
+          },
+          {
+            "x": 1350,
+            "y": -200,
+            "cl": 6
+          },
+          {
+            "x": 1170,
+            "y": 400,
+            "cl": 6
+          },
+          {
+            "x": 1430,
+            "y": 100,
+            "cl": 6
+          },
+          {
+            "x": 1430,
+            "y": -20,
+            "cl": 6
+          },
+          {
+            "x": 1570,
+            "y": 40,
+            "cl": 12
+          },
+          {
+            "x": -790,
+            "y": -10,
+            "cl": 6
           }
         ]
       }
