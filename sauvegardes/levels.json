@@ -1920,7 +1920,7 @@
     {
       "id": "le-premier-gel-2",
       "auteur": "BOIZ",
-      "majAt": "2026-09-26T12:47:52.165Z",
+      "majAt": "2026-10-15T14:07:02.253Z",
       "codeAuteur": "JU",
       "codeAt": "2026-08-30T20:45:24.471Z",
       "level": {
@@ -2011,7 +2011,6 @@
             "minY": -370,
             "maxX": -60,
             "maxY": -220,
-            "forme": 2,
             "material": 4
           },
           {
@@ -2019,15 +2018,13 @@
             "minY": 220,
             "maxX": -60,
             "maxY": 370,
-            "forme": 2,
             "material": 4
           },
           {
-            "minX": 220,
+            "minX": 232,
             "minY": -55,
-            "maxX": 540,
+            "maxX": 552,
             "maxY": 55,
-            "forme": 2,
             "material": 4
           },
           {
@@ -2035,16 +2032,7 @@
             "minY": -55,
             "maxX": -434,
             "maxY": 55,
-            "forme": 1,
             "material": 4
-          },
-          {
-            "minX": -540,
-            "minY": -380,
-            "maxX": -340,
-            "maxY": -260,
-            "material": 4,
-            "forme": 1
           }
         ],
         "sponges": [],
@@ -3049,298 +3037,6 @@
             "x": -1100,
             "y": 220,
             "cl": 6
-          }
-        ]
-      }
-    },
-    {
-      "id": "la-halte",
-      "auteur": "JU",
-      "majAt": "2026-08-30T21:06:36.098Z",
-      "codeAuteur": "JU",
-      "codeAt": "2026-08-30T21:06:36.098Z",
-      "level": {
-        "name": "La halte",
-        "code": "101",
-        "journal": "Cellule 10, bornes de surchauffe. Chaque borne frôlée en vapeur rend UNE impulsion de nuage — une seule, puis elle s’éteint. Il a tracé sa route de borne en borne comme un pilote lit ses balises, et il est arrivé au dépôt avec de la réserve. Nous appelions ça une halte. Lui, un ravitaillement. — Dr N. Véga",
-        "bounds": {
-          "minX": -1200,
-          "minY": -750,
-          "maxX": 1200,
-          "maxY": 750
-        },
-        "spawn": {
-          "x": -950,
-          "y": 0,
-          "n": 900
-        },
-        "exit": {
-          "minX": 1040,
-          "minY": -120,
-          "maxX": 1180,
-          "maxY": 120
-        },
-        "boxes": [
-          {
-            "minX": -700,
-            "minY": -500,
-            "maxX": -500,
-            "maxY": -420,
-            "material": 6
-          },
-          {
-            "minX": -660,
-            "minY": 120,
-            "maxX": -600,
-            "maxY": 320,
-            "material": 9
-          },
-          {
-            "minX": -80,
-            "minY": -260,
-            "maxX": -20,
-            "maxY": -60,
-            "material": 9
-          },
-          {
-            "minX": 320,
-            "minY": 60,
-            "maxX": 380,
-            "maxY": 260,
-            "material": 9
-          },
-          {
-            "minX": 640,
-            "minY": -750,
-            "maxX": 700,
-            "maxY": 420,
-            "material": 0
-          },
-          {
-            "minX": 560,
-            "minY": 480,
-            "maxX": 620,
-            "maxY": 680,
-            "material": 9
-          },
-          {
-            "minX": 760,
-            "minY": -200,
-            "maxX": 900,
-            "maxY": -140,
-            "material": 4
-          }
-        ],
-        "sponges": [],
-        "labels": [
-          {
-            "x": -630,
-            "y": 400,
-            "text": "BORNE — UN DASH, UNE FOIS",
-            "tone": "chaud",
-            "picto": {
-              "couleur": "#f2c98e",
-              "eau": 0,
-              "glace": 0,
-              "vapeur": 3
-            }
-          },
-          {
-            "x": -600,
-            "y": -580,
-            "text": "CHAUDIÈRE",
-            "tone": "chaud"
-          },
-          {
-            "x": 150,
-            "y": -360,
-            "text": "LA LIGNE DE RAVITAILLEMENT",
-            "tone": "chaud"
-          },
-          {
-            "x": 830,
-            "y": -280,
-            "text": "DÉPÔT FROID",
-            "tone": "froid"
-          },
-          {
-            "x": 1110,
-            "y": 180,
-            "text": "SAS",
-            "tone": "sas"
-          }
-        ],
-        "par": 8,
-        "ambiante": 0,
-        "brume": 0.1,
-        "decals": [
-          {
-            "x": 1090,
-            "y": 560,
-            "w": 165,
-            "h": 165,
-            "kind": "tuyaux",
-            "fade": 0.42
-          }
-        ],
-        "lumieres": [
-          {
-            "x": -600,
-            "y": -560,
-            "h": 160,
-            "portee": 780,
-            "intensite": 1.05,
-            "couleur": "#e8a05a",
-            "forme": "bandeau",
-            "longueur": 420
-          },
-          {
-            "x": 150,
-            "y": 0,
-            "h": 190,
-            "portee": 820,
-            "intensite": 1.1,
-            "forme": "bandeau",
-            "longueur": 920,
-            "angle": 90
-          },
-          {
-            "x": 830,
-            "y": -240,
-            "h": 150,
-            "portee": 480,
-            "intensite": 0.9,
-            "couleur": "#8fc8ee",
-            "forme": "bandeau",
-            "longueur": 280
-          },
-          {
-            "x": 1110,
-            "y": 0,
-            "h": 300,
-            "portee": 480,
-            "couleur": "#3fd69b"
-          }
-        ]
-      }
-    },
-    {
-      "id": "la-voie-lumineuse",
-      "auteur": "JU",
-      "majAt": "2026-08-30T21:11:57.686Z",
-      "codeAuteur": "JU",
-      "codeAt": "2026-08-30T21:11:57.686Z",
-      "level": {
-        "name": "La voie lumineuse",
-        "code": "101",
-        "journal": "Cellule 11, éclairage réduit. Nous avons éteint la salle pour mesurer sa dépendance au visuel. Il a suivi les flaques de lumière comme des pierres de gué, s’est posé dans chacune, et n’a jamais dévié dans le noir. La lumière n’est pas un décor. C’est une carte, et il la lit. — Dr N. Véga",
-        "bounds": {
-          "minX": -1200,
-          "minY": -750,
-          "maxX": 1200,
-          "maxY": 750
-        },
-        "spawn": {
-          "x": -950,
-          "y": 0,
-          "n": 900
-        },
-        "exit": {
-          "minX": 1040,
-          "minY": -120,
-          "maxX": 1180,
-          "maxY": 120
-        },
-        "boxes": [
-          {
-            "minX": -400,
-            "minY": -300,
-            "maxX": -280,
-            "maxY": -120,
-            "material": 0
-          },
-          {
-            "minX": -100,
-            "minY": 200,
-            "maxX": 60,
-            "maxY": 340,
-            "material": 0
-          },
-          {
-            "minX": 400,
-            "minY": -350,
-            "maxX": 520,
-            "maxY": -200,
-            "material": 0
-          },
-          {
-            "minX": 660,
-            "minY": 300,
-            "maxX": 780,
-            "maxY": 460,
-            "material": 0
-          },
-          {
-            "minX": -160,
-            "minY": -120,
-            "maxX": 0,
-            "maxY": -60,
-            "material": 1
-          },
-          {
-            "minX": 340,
-            "minY": 80,
-            "maxX": 500,
-            "maxY": 160,
-            "material": 1
-          }
-        ],
-        "sponges": [],
-        "labels": [
-          {
-            "x": 1110,
-            "y": 180,
-            "text": "SAS",
-            "tone": "sas"
-          }
-        ],
-        "par": 6,
-        "ambiante": 0,
-        "brume": 0.1,
-        "lumieres": [
-          {
-            "x": -840,
-            "y": 0,
-            "h": 180,
-            "portee": 620,
-            "intensite": 1.1,
-            "forme": "bandeau",
-            "longueur": 480,
-            "angle": 90
-          },
-          {
-            "x": -80,
-            "y": -40,
-            "h": 240,
-            "portee": 480,
-            "intensite": 1.05,
-            "couleur": "#63b7e6"
-          },
-          {
-            "x": 420,
-            "y": 160,
-            "h": 240,
-            "portee": 480,
-            "intensite": 1.05,
-            "couleur": "#63b7e6"
-          },
-          {
-            "x": 1110,
-            "y": 0,
-            "h": 320,
-            "portee": 620,
-            "intensite": 1.15,
-            "couleur": "#3fd69b"
           }
         ]
       }
@@ -7534,7 +7230,7 @@
     {
       "id": "la-serre",
       "auteur": "BOIZ",
-      "majAt": "2026-10-04T21:02:54.599Z",
+      "majAt": "2026-10-15T14:03:33.552Z",
       "codeAuteur": "JU",
       "codeAt": "2026-08-30T21:15:55.772Z",
       "level": {
@@ -7744,6 +7440,13 @@
             "maxX": 220,
             "maxY": 402,
             "material": 9
+          },
+          {
+            "minX": -1040,
+            "minY": -900,
+            "maxX": 1660,
+            "maxY": 840,
+            "material": 12
           }
         ],
         "sponges": [],
@@ -9509,188 +9212,6 @@
       }
     },
     {
-      "id": "les-deux-verrous",
-      "auteur": "EXPÉDITION L",
-      "majAt": "2026-08-14T22:36:32.036Z",
-      "level": {
-        "name": "Les deux verrous",
-        "code": "21-K",
-        "journal": "Deux verrous, deux états. Il s’est figé pour renvoyer le premier faisceau, puis répandu pour plier le second — sans une hésitation entre les deux. Nous pensions tester sa mémoire. C’est lui qui teste notre imagination. — Dr N. Véga",
-        "bounds": {
-          "minX": -1200,
-          "minY": -750,
-          "maxX": 1200,
-          "maxY": 750
-        },
-        "spawn": {
-          "x": -950,
-          "y": 0,
-          "n": 900
-        },
-        "exit": {
-          "minX": 1040,
-          "minY": -120,
-          "maxX": 1180,
-          "maxY": 120
-        },
-        "boxes": [
-          {
-            "minX": 520,
-            "minY": -300,
-            "maxX": 580,
-            "maxY": 100,
-            "material": 0
-          },
-          {
-            "minX": -160,
-            "minY": -280,
-            "maxX": 200,
-            "maxY": -220,
-            "material": 4
-          },
-          {
-            "minX": 40,
-            "minY": 260,
-            "maxX": 400,
-            "maxY": 330,
-            "material": 1
-          },
-          {
-            "minX": 860,
-            "minY": -750,
-            "maxX": 900,
-            "maxY": -170,
-            "material": 0
-          },
-          {
-            "minX": 860,
-            "minY": 170,
-            "maxX": 900,
-            "maxY": 750,
-            "material": 0
-          },
-          {
-            "minX": 950,
-            "minY": -750,
-            "maxX": 990,
-            "maxY": -160,
-            "material": 0
-          },
-          {
-            "minX": 950,
-            "minY": 160,
-            "maxX": 990,
-            "maxY": 750,
-            "material": 0
-          },
-          {
-            "minX": -600,
-            "minY": 660,
-            "maxX": -380,
-            "maxY": 750,
-            "material": 0
-          }
-        ],
-        "sponges": [],
-        "labels": [
-          {
-            "x": -700,
-            "y": -160,
-            "text": "ÉMETTEUR I",
-            "tone": "chaud"
-          },
-          {
-            "x": -900,
-            "y": 420,
-            "text": "ÉMETTEUR II",
-            "tone": "chaud"
-          },
-          {
-            "x": 20,
-            "y": -330,
-            "text": "BERCEAU FROID",
-            "tone": "froid"
-          },
-          {
-            "x": 220,
-            "y": 210,
-            "text": "HYDROPHILE",
-            "tone": "phile"
-          },
-          {
-            "x": -440,
-            "y": 350,
-            "text": "RÉCEPTEUR I",
-            "tone": "sas"
-          },
-          {
-            "x": 660,
-            "y": 380,
-            "text": "RÉCEPTEUR II",
-            "tone": "sas"
-          },
-          {
-            "x": 880,
-            "y": -80,
-            "text": "PORTE I",
-            "tone": "chaud"
-          },
-          {
-            "x": 970,
-            "y": 220,
-            "text": "PORTE II",
-            "tone": "chaud"
-          },
-          {
-            "x": 1110,
-            "y": 160,
-            "text": "SAS",
-            "tone": "sas"
-          }
-        ],
-        "lasers": [
-          {
-            "x": -700,
-            "y": -80,
-            "angle": 0
-          },
-          {
-            "x": -900,
-            "y": 500,
-            "angle": 0
-          }
-        ],
-        "cibles": [
-          {
-            "x": -440,
-            "y": 260,
-            "r": 46
-          },
-          {
-            "x": 660,
-            "y": 280,
-            "r": 52
-          }
-        ],
-        "portes": [
-          {
-            "minX": 860,
-            "minY": -170,
-            "maxX": 900,
-            "maxY": 170,
-            "cible": 0
-          },
-          {
-            "minX": 950,
-            "minY": -160,
-            "maxX": 990,
-            "maxY": 160,
-            "cible": 1
-          }
-        ]
-      }
-    },
-    {
       "id": "a-travers-l-event",
       "auteur": "EXPÉDITION L",
       "majAt": "2026-08-14T22:36:32.361Z",
@@ -10479,68 +10000,6 @@
       }
     },
     {
-      "id": "test-tableau-ju-niv2",
-      "auteur": "JU",
-      "majAt": "2026-08-10T12:43:36.713Z",
-      "level": {
-        "name": "test tableau ju niv2",
-        "code": "21-?",
-        "journal": "Entrée de journal du protocole : ce que le laboratoire a observé dans cette cuve.",
-        "bounds": {
-          "minX": -1200,
-          "minY": -750,
-          "maxX": 1200,
-          "maxY": 750
-        },
-        "spawn": {
-          "x": -1040,
-          "y": 20,
-          "n": 900
-        },
-        "exit": {
-          "minX": 1040,
-          "minY": -120,
-          "maxX": 1180,
-          "maxY": 120
-        },
-        "boxes": [
-          {
-            "minX": -460,
-            "minY": 0,
-            "maxX": -420,
-            "maxY": 680,
-            "material": 0
-          },
-          {
-            "minX": -460,
-            "minY": -740,
-            "maxX": -380,
-            "maxY": -460,
-            "material": 0
-          }
-        ],
-        "sponges": [
-          {
-            "minX": -320,
-            "minY": -180,
-            "cols": 13,
-            "rows": 19,
-            "cellSize": 24,
-            "capacityPerCell": 5
-          }
-        ],
-        "labels": [
-          {
-            "x": 1110,
-            "y": 0,
-            "text": "SAS",
-            "tone": "sas"
-          }
-        ],
-        "par": 3
-      }
-    },
-    {
       "id": "test-tableau-ju",
       "auteur": "JU",
       "majAt": "2026-08-10T17:37:00.674Z",
@@ -10630,380 +10089,6 @@
           }
         ],
         "par": 3
-      }
-    },
-    {
-      "id": "nouveau-tableau",
-      "auteur": "JU",
-      "majAt": "2026-08-11T11:19:23.000Z",
-      "level": {
-        "name": "Nouveau tableau",
-        "code": "21-?",
-        "journal": "Entrée de journal du protocole : ce que le laboratoire a observé dans cette cuve.",
-        "bounds": {
-          "minX": -1200,
-          "minY": -750,
-          "maxX": 1200,
-          "maxY": 750
-        },
-        "spawn": {
-          "x": -950,
-          "y": 0,
-          "n": 900
-        },
-        "exit": {
-          "minX": 1040,
-          "minY": -120,
-          "maxX": 1180,
-          "maxY": 120
-        },
-        "boxes": [
-          {
-            "minX": -120,
-            "minY": 100,
-            "maxX": -60,
-            "maxY": 320,
-            "material": 6
-          },
-          {
-            "minX": 0,
-            "minY": -600,
-            "maxX": 480,
-            "maxY": 80,
-            "material": 2
-          },
-          {
-            "minX": -480,
-            "minY": -620,
-            "maxX": -360,
-            "maxY": -300,
-            "material": 5
-          },
-          {
-            "minX": 280,
-            "minY": 240,
-            "maxX": 640,
-            "maxY": 480,
-            "material": 4
-          },
-          {
-            "minX": -1040,
-            "minY": 280,
-            "maxX": -640,
-            "maxY": 600,
-            "material": 4
-          }
-        ],
-        "sponges": [],
-        "labels": [
-          {
-            "x": 1110,
-            "y": 0,
-            "text": "SAS",
-            "tone": "sas"
-          }
-        ],
-        "par": 3,
-        "lasers": [
-          {
-            "x": -800,
-            "y": -400,
-            "angle": 30
-          }
-        ],
-        "cibles": [
-          {
-            "x": 120,
-            "y": 540,
-            "r": 26
-          },
-          {
-            "x": -340,
-            "y": 300,
-            "r": 26
-          }
-        ]
-      }
-    },
-    {
-      "id": "test-surfaces",
-      "auteur": "BOIZ",
-      "majAt": "2026-08-12T20:58:48.577Z",
-      "level": {
-        "name": "test surfaces",
-        "code": "21-?",
-        "journal": "Entrée de journal du protocole : ce que le laboratoire a observé dans cette cuve.",
-        "bounds": {
-          "minX": -1200,
-          "minY": -750,
-          "maxX": 1200,
-          "maxY": 750
-        },
-        "spawn": {
-          "x": -950,
-          "y": 0,
-          "n": 900
-        },
-        "exit": {
-          "minX": 1040,
-          "minY": -120,
-          "maxX": 1180,
-          "maxY": 120
-        },
-        "boxes": [
-          {
-            "minX": -1071,
-            "minY": 420,
-            "maxX": -840,
-            "maxY": 630,
-            "material": 6
-          },
-          {
-            "minX": -1092,
-            "minY": -630,
-            "maxX": -882,
-            "maxY": -420,
-            "material": 4
-          },
-          {
-            "minX": -420,
-            "minY": -672,
-            "maxX": -315,
-            "maxY": -273,
-            "material": 8
-          },
-          {
-            "minX": 483,
-            "minY": 294,
-            "maxX": 546,
-            "maxY": 756,
-            "material": 2
-          },
-          {
-            "minX": 483,
-            "minY": -378,
-            "maxX": 556.5,
-            "maxY": 27,
-            "material": 1
-          },
-          {
-            "minX": -420,
-            "minY": 210,
-            "maxX": -315,
-            "maxY": 693,
-            "material": 5
-          },
-          {
-            "minX": -420,
-            "minY": -273,
-            "maxX": -315,
-            "maxY": 210,
-            "material": 7
-          },
-          {
-            "minX": -651,
-            "minY": -756,
-            "maxX": -294,
-            "maxY": -735,
-            "material": 0
-          },
-          {
-            "minX": -210,
-            "minY": -672,
-            "maxX": -84,
-            "maxY": -357,
-            "material": 0
-          },
-          {
-            "minX": 0,
-            "minY": -750,
-            "maxX": 126,
-            "maxY": -735,
-            "material": 5
-          },
-          {
-            "minX": 21,
-            "minY": -672,
-            "maxX": 147,
-            "maxY": -378,
-            "material": 0
-          },
-          {
-            "minX": 210,
-            "minY": -672,
-            "maxX": 315,
-            "maxY": -399,
-            "material": 0
-          },
-          {
-            "minX": 210,
-            "minY": -750,
-            "maxX": 315,
-            "maxY": -735,
-            "material": 8
-          }
-        ],
-        "sponges": [
-          {
-            "minX": -21,
-            "minY": -168,
-            "cols": 2,
-            "rows": 14,
-            "cellSize": 24,
-            "capacityPerCell": 5
-          }
-        ],
-        "labels": [
-          {
-            "x": 1110,
-            "y": 0,
-            "text": "SAS",
-            "tone": "sas"
-          }
-        ],
-        "par": 3
-      }
-    },
-    {
-      "id": "le-berceau-2",
-      "auteur": "JU",
-      "majAt": "2026-08-24T17:42:26.895Z",
-      "level": {
-        "name": "Le berceau 2",
-        "code": "21-01",
-        "journal": "Étalonnage, cellule 1. Première dérive libre : chaque impulsion éjecte une part de lui-même — il l’a compris au deuxième essai, et depuis il économise ses gouttes comme un vieux pilote son carburant. — Dr N. Véga",
-        "bounds": {
-          "minX": -1200,
-          "minY": -750,
-          "maxX": 1200,
-          "maxY": 750
-        },
-        "spawn": {
-          "x": -950,
-          "y": 0,
-          "n": 900
-        },
-        "exit": {
-          "minX": 1040,
-          "minY": -120,
-          "maxX": 1180,
-          "maxY": 120
-        },
-        "boxes": [
-          {
-            "minX": -560,
-            "minY": -750,
-            "maxX": -480,
-            "maxY": -320,
-            "material": 0
-          },
-          {
-            "minX": -560,
-            "minY": 320,
-            "maxX": -480,
-            "maxY": 750,
-            "material": 0
-          },
-          {
-            "minX": -40,
-            "minY": -140,
-            "maxX": 240,
-            "maxY": 140,
-            "forme": 1,
-            "material": 0
-          },
-          {
-            "minX": 760,
-            "minY": -750,
-            "maxX": 840,
-            "maxY": -340,
-            "material": 0
-          },
-          {
-            "minX": 760,
-            "minY": 340,
-            "maxX": 840,
-            "maxY": 750,
-            "material": 0
-          }
-        ],
-        "sponges": [],
-        "labels": [
-          {
-            "x": -520,
-            "y": 260,
-            "text": "PAROI — ABSORBE",
-            "tone": "mur",
-            "picto": {
-              "couleur": "#5b7ba6",
-              "eau": 1,
-              "glace": 0,
-              "vapeur": 1
-            }
-          },
-          {
-            "x": 100,
-            "y": 240,
-            "text": "CHAQUE IMPULSION COÛTE UNE GOUTTE",
-            "tone": "mur",
-            "rang": "secteur"
-          },
-          {
-            "x": 1110,
-            "y": 180,
-            "text": "SAS — LE COLLECTEUR",
-            "tone": "sas"
-          }
-        ],
-        "par": 5,
-        "ambiante": 0,
-        "decals": [
-          {
-            "x": -1080,
-            "y": 420,
-            "w": 160,
-            "h": 160,
-            "kind": "tuyaux",
-            "fade": 0.45
-          },
-          {
-            "x": 460,
-            "y": -640,
-            "w": 150,
-            "h": 225,
-            "kind": "vanne",
-            "fade": 0.4
-          }
-        ],
-        "lumieres": [
-          {
-            "x": -450,
-            "y": 0,
-            "h": 170,
-            "portee": 850,
-            "intensite": 1.15,
-            "forme": "bandeau",
-            "longueur": 620,
-            "angle": 90
-          },
-          {
-            "x": 700,
-            "y": 0,
-            "h": 150,
-            "portee": 700,
-            "couleur": "#dfe8f2",
-            "forme": "bandeau",
-            "longueur": 520,
-            "angle": 90
-          },
-          {
-            "x": 1110,
-            "y": 0,
-            "h": 300,
-            "portee": 520,
-            "couleur": "#3fd69b"
-          }
-        ]
       }
     },
     {
@@ -21554,6 +20639,396 @@
             "x": -790,
             "y": -10,
             "cl": 6
+          }
+        ]
+      }
+    },
+    {
+      "id": "nouveau-tableau",
+      "auteur": "BOIZ",
+      "majAt": "2026-10-15T15:47:25.423Z",
+      "codeAuteur": "BOIZ",
+      "codeAt": "2026-10-15T14:49:19.676Z",
+      "level": {
+        "name": "Nouveau tableau",
+        "code": "21-?",
+        "journal": "Entrée de journal du protocole : ce que le laboratoire a observé dans cette cuve.",
+        "bounds": {
+          "minX": -1200,
+          "minY": -1000,
+          "maxX": 1800,
+          "maxY": 810
+        },
+        "spawn": {
+          "x": -950,
+          "y": 306,
+          "n": 900
+        },
+        "exit": {
+          "minX": 787,
+          "minY": -939,
+          "maxX": 927,
+          "maxY": -799
+        },
+        "boxes": [
+          {
+            "minX": -700,
+            "minY": -750,
+            "maxX": -640,
+            "maxY": 140,
+            "material": 10
+          },
+          {
+            "minX": -1200,
+            "minY": -436,
+            "maxX": -1140,
+            "maxY": 810,
+            "material": 0
+          },
+          {
+            "minX": -800,
+            "minY": 440,
+            "maxX": 1100,
+            "maxY": 500,
+            "material": 10
+          },
+          {
+            "minX": -1140,
+            "minY": 750,
+            "maxX": 1200,
+            "maxY": 810,
+            "material": 0
+          },
+          {
+            "minX": -914.493,
+            "minY": -1287.33,
+            "maxX": -416.507,
+            "maxY": -212.67,
+            "angle": -90,
+            "forme": 4,
+            "p0": 0.11,
+            "material": 10
+          },
+          {
+            "minX": -700,
+            "minY": 140,
+            "maxX": -640,
+            "maxY": 440,
+            "material": 7
+          },
+          {
+            "minX": -191,
+            "minY": -580,
+            "maxX": -128,
+            "maxY": 140,
+            "material": 2
+          },
+          {
+            "minX": 1100,
+            "minY": -1079,
+            "maxX": 1800,
+            "maxY": 829,
+            "forme": 4,
+            "p0": 0.08,
+            "material": 0
+          },
+          {
+            "minX": 1035,
+            "minY": -750,
+            "maxX": 1492,
+            "maxY": 500,
+            "forme": 4,
+            "p0": 0.09,
+            "material": 0
+          },
+          {
+            "minX": -191,
+            "minY": -750,
+            "maxX": 1100,
+            "maxY": -690,
+            "material": 0
+          },
+          {
+            "minX": 650.4721644121937,
+            "minY": -1054.2810463323324,
+            "maxX": 874,
+            "maxY": -690,
+            "angle": -180,
+            "forme": 4,
+            "p0": 0.3,
+            "material": 0
+          },
+          {
+            "minX": -1200,
+            "minY": -580,
+            "maxX": -1140,
+            "maxY": -436,
+            "material": 2
+          },
+          {
+            "minX": 1100,
+            "minY": -25,
+            "maxX": 1248,
+            "maxY": 239,
+            "forme": 4,
+            "p0": 0.45,
+            "material": 0
+          },
+          {
+            "minX": 1100,
+            "minY": -490,
+            "maxX": 1248,
+            "maxY": -226,
+            "forme": 4,
+            "p0": 0.44,
+            "material": 0
+          },
+          {
+            "minX": 675,
+            "minY": 179,
+            "maxX": 1131,
+            "maxY": 239,
+            "material": 0
+          },
+          {
+            "minX": 857,
+            "minY": -25,
+            "maxX": 1131,
+            "maxY": 35,
+            "material": 0
+          },
+          {
+            "minX": 857,
+            "minY": -286,
+            "maxX": 1131,
+            "maxY": -226,
+            "material": 0
+          },
+          {
+            "minX": 647,
+            "minY": -490,
+            "maxX": 1131,
+            "maxY": -430,
+            "material": 0
+          },
+          {
+            "minX": 559,
+            "minY": -25,
+            "maxX": 707,
+            "maxY": 239,
+            "angle": -180,
+            "forme": 4,
+            "p0": 0.45,
+            "material": 10
+          },
+          {
+            "minX": 675,
+            "minY": -286,
+            "maxX": 707,
+            "maxY": -226,
+            "material": 0
+          },
+          {
+            "minX": 675,
+            "minY": -25,
+            "maxX": 707,
+            "maxY": 35,
+            "material": 0
+          },
+          {
+            "minX": 559,
+            "minY": -489.5,
+            "maxX": 707,
+            "maxY": -225.5,
+            "angle": -180,
+            "forme": 4,
+            "p0": 0.44,
+            "material": 10
+          }
+        ],
+        "sponges": [],
+        "labels": [
+          {
+            "x": 845,
+            "y": -882,
+            "text": "SAS",
+            "tone": "sas"
+          },
+          {
+            "x": -433,
+            "y": 413,
+            "text": "T2",
+            "tone": "mur"
+          },
+          {
+            "x": -161,
+            "y": 306,
+            "text": "D2",
+            "tone": "mur"
+          },
+          {
+            "x": -87,
+            "y": -120,
+            "text": "T1",
+            "tone": "mur"
+          },
+          {
+            "x": -981,
+            "y": 468,
+            "text": "D1",
+            "tone": "mur"
+          }
+        ],
+        "par": 3,
+        "lasers": [
+          {
+            "x": -1137,
+            "y": -446,
+            "angle": 270
+          }
+        ],
+        "cibles": [
+          {
+            "x": -430,
+            "y": 410,
+            "r": 26,
+            "canal": 2
+          },
+          {
+            "x": -89,
+            "y": -122,
+            "r": 26,
+            "canal": 1
+          }
+        ],
+        "portes": [
+          {
+            "minX": -1140,
+            "minY": 440,
+            "maxX": -800,
+            "maxY": 500,
+            "canal": 1
+          },
+          {
+            "minX": -191,
+            "minY": 140,
+            "maxX": -128,
+            "maxY": 440,
+            "canal": 2
+          }
+        ],
+        "chasses": [
+          {
+            "minX": -700,
+            "minY": 140,
+            "maxX": -640,
+            "maxY": 440,
+            "angle": 180,
+            "allure": 150
+          },
+          {
+            "minX": 196,
+            "minY": 500,
+            "maxX": 696,
+            "maxY": 750,
+            "angle": 0,
+            "allure": 500
+          },
+          {
+            "minX": 647,
+            "minY": -690,
+            "maxX": 997,
+            "maxY": -490,
+            "angle": 0,
+            "allure": 250
+          },
+          {
+            "minX": 997,
+            "minY": -690,
+            "maxX": 1238,
+            "maxY": -490,
+            "angle": 16,
+            "allure": 250
+          },
+          {
+            "minX": 646,
+            "minY": 240,
+            "maxX": 996,
+            "maxY": 440,
+            "angle": 0,
+            "allure": 150
+          },
+          {
+            "minX": 996,
+            "minY": 240,
+            "maxX": 1240,
+            "maxY": 440,
+            "angle": -16,
+            "allure": 150
+          },
+          {
+            "minX": 857,
+            "minY": -225,
+            "maxX": 1450,
+            "maxY": -25,
+            "angle": -180,
+            "allure": 250
+          }
+        ],
+        "caches": [
+          {
+            "minX": 675,
+            "minY": -490,
+            "maxX": 1131,
+            "maxY": -226
+          },
+          {
+            "minX": 675,
+            "minY": -26,
+            "maxX": 1131,
+            "maxY": 239
+          }
+        ],
+        "condensats": [
+          {
+            "x": 702,
+            "y": 107,
+            "cl": 6
+          },
+          {
+            "x": 1114,
+            "y": 107,
+            "cl": 6
+          },
+          {
+            "x": 689,
+            "y": -361,
+            "cl": 6
+          },
+          {
+            "x": 1114,
+            "y": -356,
+            "cl": 6
+          },
+          {
+            "x": 1330,
+            "y": -360,
+            "cl": 6
+          },
+          {
+            "x": 1328,
+            "y": 105,
+            "cl": 6
+          },
+          {
+            "x": -671,
+            "y": 287,
+            "cl": 6
+          },
+          {
+            "x": 1521,
+            "y": -110,
+            "cl": 12
           }
         ]
       }
