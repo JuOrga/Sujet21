@@ -61,7 +61,7 @@ import {
   COUPELLE_SEUIL_DEFAUT,
   type PorteMaterialisation,
 } from '../game/level'
-import { bornerSeuil } from '../game/coupelle'
+import { bornerAspiration, bornerSeuil, champCoupelle } from '../game/coupelle'
 import { traceTrajectoire } from '../game/trajectoire'
 import { periodeCoeur } from '../game/puits'
 import { tableauCibles, tableauCouperet, tableauOrbites, tableauPalet, tableauRafales } from '../game/minijeux'
@@ -6092,13 +6092,14 @@ export class LevelEditor {
     } else if (s.kind === 'coupelle') {
       const k = (this.level.coupelles ?? [])[s.index]
       rows.push(rangeField('Trait (% du corps à l’entrée)', 'p-kseuil', Math.round(k.seuil * 100), 1, 90, 1))
+      rows.push(rangeField('Aspiration (%) — 0 : la bouche seule · 100 : à trois rayons', 'p-kasp', Math.round(bornerAspiration(k.aspiration) * 100), 0, 100, 5))
       rows.push(numField('N° (canal)', 'p-kcanal', k.canal, 1))
       rows.push(numField('Rayon de la bouche (u)', 'p-kr', k.r, 5))
       rows.push(numField('X', 'p-kx', k.x), numField('Y', 'p-ky', k.y))
       const portes = (this.level.portes ?? []).filter((q) => q.canal === k.canal).length
       const chasses = (this.level.chasses ?? []).filter((q) => q.canal === k.canal).length
       rows.push(
-        `<p class="ed-empty">UNE COUPELLE : elle boit tout le liquide qui y entre — le corps comme les gouttes du jet — jusqu'à son trait, puis un couvercle la ferme et son canal reste allumé pour de bon. Rien ne se reprend. Le trait se compte en part du corps À L'ENTRÉE du tableau : la même énigme pour un corps gros ou maigre. Aucune traînée : le corps y entre et en sort librement ; la glace et la vapeur passent sans payer. Son canal se mêle aux cibles laser du même numéro. Canal nº ${k.canal} : ${portes} porte${portes > 1 ? 's' : ''}, ${chasses} chasse${chasses > 1 ? 's' : ''}.</p>`,
+        `<p class="ed-empty">UNE COUPELLE : une bouche d'aspiration et son outre. Son courant attire le liquide à portée (le cercle pointillé) ; elle boit ce qui entre dans la bouche — le corps comme les gouttes du jet — à débit borné, jusqu'à son trait. Pleine, l'outre est tendue, elle n'aspire plus et son canal reste allumé pour de bon. Rien ne se reprend. Le trait se compte en part du corps À L'ENTRÉE du tableau : la même énigme pour un corps gros ou maigre. La glace et la vapeur passent sans payer. Son canal se mêle aux cibles laser du même numéro. Canal nº ${k.canal} : ${portes} porte${portes > 1 ? 's' : ''}, ${chasses} chasse${chasses > 1 ? 's' : ''}.</p>`,
       )
     } else if (s.kind === 'cible') {
       const t = (this.level.cibles ?? [])[s.index]
@@ -7059,6 +7060,7 @@ export class LevelEditor {
     } else if (s.kind === 'coupelle') {
       const k = (this.level.coupelles ?? [])[s.index]
       k.seuil = bornerSeuil(Math.round(val('p-kseuil')) / 100)
+      k.aspiration = bornerAspiration(Math.round(val('p-kasp')) / 100)
       k.canal = Math.max(1, Math.round(val('p-kcanal') || 1))
       k.r = Math.max(8, Math.round(val('p-kr')))
       k.x = val('p-kx')
@@ -8714,6 +8716,15 @@ export class LevelEditor {
           g.beginPath()
           g.moveTo(c.sx, c.sy)
           g.lineTo(b.sx, b.sy)
+          g.stroke()
+        }
+        // la PORTÉE de son courant, au-delà de la bouche
+        const P = champCoupelle(k.r, k.aspiration).portee * this.zoom
+        if (P > R + 1) {
+          g.setLineDash([2, 5])
+          g.strokeStyle = 'rgba(140,215,255,0.4)'
+          g.beginPath()
+          g.arc(c.sx, c.sy, P, 0, Math.PI * 2)
           g.stroke()
         }
         g.setLineDash([])

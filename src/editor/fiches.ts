@@ -10,6 +10,7 @@
 // et les VALEURS VIVES (dimensions, canal, angle…), recalculées à chaque
 // survol et ajoutées après — une modification ne les perd jamais.
 
+import { bornerAspiration, champCoupelle } from '../game/coupelle'
 import { PUITS_FORCE_DEFAUT, PUITS_RAYON_DEFAUT, type LevelDef, type ObstacleBox } from '../game/level'
 import {
   MAT_WALL,
@@ -246,12 +247,13 @@ export const FICHES_GENRES: Record<string, Fiche> = {
   },
   'genre:coupelle': {
     titre: 'Coupelle (péage en volume)',
-    resume: 'Une bouche qui boit le liquide jusqu’à son trait, puis se ferme et allume son canal pour de bon.',
+    resume: 'Une bouche d’aspiration et son outre : elle attire le liquide, le boit jusqu’à son trait, puis allume son canal pour de bon.',
     lignes: [
       { cle: '·', txt: 'Le trait est une part de la masse de référence : le corps à l’entrée du tableau (10 % = un dixième de soi).' },
-      { cle: '·', txt: 'Elle boit le corps qui y entre comme les gouttes du jet — le joueur habile tire dedans en se propulsant vers la porte.' },
-      { cle: '·', txt: 'Pleine, un couvercle la ferme : rien ne se reprend, on ne paie jamais plus que le trait.' },
-      { cle: '·', txt: 'Aucune traînée : le corps y entre et en sort librement. La glace et la vapeur passent sans payer.' },
+      { cle: '·', txt: 'Son courant attire le liquide à portée ; elle boit ce qui entre dans la bouche, à débit borné — on voit l’eau couler dedans, l’outre gonfler.' },
+      { cle: '·', txt: 'Elle boit le corps comme les gouttes du jet — le joueur habile tire dedans en se propulsant vers la porte.' },
+      { cle: '·', txt: 'Pleine, l’outre est tendue : elle n’aspire plus, rien ne se reprend, on ne paie jamais plus que le trait.' },
+      { cle: '·', txt: 'La glace et la vapeur passent sans payer.' },
       { cle: '·', txt: 'Son canal se mêle aux pastilles laser du même numéro : une porte en ET les attend toutes.' },
     ],
   },
@@ -504,7 +506,10 @@ export function lignesVives(sel: SelFiche, level: LevelDef): FicheLigne[] {
     case 'coupelle': {
       const k = (level.coupelles ?? [])[sel.index ?? -1]
       if (!k) return []
-      return [{ cle: '·', txt: `Trait à ${Math.round(k.seuil * 100)} % du corps, canal nº ${k.canal}, bouche de ${k.r} u.` }]
+      return [
+        { cle: '·', txt: `Trait à ${Math.round(k.seuil * 100)} % du corps, canal nº ${k.canal}, bouche de ${k.r} u.` },
+        { cle: '·', txt: `Aspiration à ${Math.round(bornerAspiration(k.aspiration) * 100)} % : son courant porte à ${Math.round(champCoupelle(k.r, k.aspiration).portee)} u.` },
+      ]
     }
     case 'puits': {
       const pu = (level.puits ?? [])[sel.index ?? -1]

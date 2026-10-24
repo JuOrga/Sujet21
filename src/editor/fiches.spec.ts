@@ -177,5 +177,6 @@ describe('la fiche de la coupelle', () => {
     const txt = f.lignes.map((l) => l.txt).join(' ')
     expect(txt).toContain('Trait à 15 % du corps, canal nº 3, bouche de 70 u.')
     expect(txt).toContain('rien ne se reprend')
+    expect(txt).toContain('Aspiration à 30 % : son courant porte à 112 u.')
   })
 })

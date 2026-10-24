@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
-import { bornerSeuil, capaciteCoupelle, sourcesCoupelles } from './coupelle'
+import { bornerAspiration, bornerSeuil, capaciteCoupelle, champCoupelle, COUPELLE_COURANT, sourcesCoupelles } from './coupelle'
 import { canalActif, creerEtatRecepteurs, avancerRecepteurs } from './laser'
-import { COUPELLE_SEUIL_MAX, COUPELLE_SEUIL_MIN } from './level'
+import { COUPELLE_ASPIRATION_DEFAUT, COUPELLE_SEUIL_MAX, COUPELLE_SEUIL_MIN } from './level'
 
 describe('la coupelle — le trait en part du corps', () => {
   it('le trait est borné : ni une goutte, ni le corps entier', () => {
@@ -28,6 +28,25 @@ describe('la coupelle — le trait en part du corps', () => {
       { canal: 2, active: true },
       { canal: 3, active: false },
     ])
+  })
+})
+
+describe('le champ d’aspiration', () => {
+  it('l’aspiration est bornée à 0..1, absente elle prend le défaut', () => {
+    expect(bornerAspiration(undefined)).toBe(COUPELLE_ASPIRATION_DEFAUT)
+    expect(bornerAspiration(Number.NaN)).toBe(COUPELLE_ASPIRATION_DEFAUT)
+    expect(bornerAspiration(-1)).toBe(0)
+    expect(bornerAspiration(3)).toBe(1)
+  })
+
+  it('à 0 il ne porte que dans la bouche, doucement ; à 1, à trois rayons et à plein courant', () => {
+    expect(champCoupelle(60, 0)).toEqual({ portee: 60, courant: COUPELLE_COURANT * 0.25 })
+    expect(champCoupelle(60, 1)).toEqual({ portee: 180, courant: COUPELLE_COURANT })
+    // plus d'aspiration, c'est plus loin ET plus fort
+    const doux = champCoupelle(60, 0.3)
+    const fort = champCoupelle(60, 0.7)
+    expect(fort.portee).toBeGreaterThan(doux.portee)
+    expect(fort.courant).toBeGreaterThan(doux.courant)
   })
 })
 
