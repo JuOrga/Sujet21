@@ -57,8 +57,11 @@ import {
   PUITS_RAYON_DEFAUT,
   MIRE_POINTS_DEFAUT,
   MIRE_R_DEFAUT,
+  COUPELLE_R_DEFAUT,
+  COUPELLE_SEUIL_DEFAUT,
   type PorteMaterialisation,
 } from '../game/level'
+import { bornerSeuil } from '../game/coupelle'
 import { traceTrajectoire } from '../game/trajectoire'
 import { periodeCoeur } from '../game/puits'
 import { tableauCibles, tableauCouperet, tableauOrbites, tableauPalet, tableauRafales } from '../game/minijeux'
@@ -355,6 +358,7 @@ type Tool =
   | { kind: 'cible' }
   | { kind: 'puits' }
   | { kind: 'mire' }
+  | { kind: 'coupelle' }
   | { kind: 'porte' }
   | { kind: 'chasse' }
   // Le MÉTA : la pastille de condensat (la monnaie de run, bue au contact)
@@ -393,6 +397,7 @@ type Sel =
   | { kind: 'cible'; index: number }
   | { kind: 'puits'; index: number }
   | { kind: 'mire'; index: number }
+  | { kind: 'coupelle'; index: number }
   | { kind: 'porte'; index: number }
   | { kind: 'chasse'; index: number }
   | { kind: 'condensat'; index: number }
@@ -571,6 +576,8 @@ export class LevelEditor {
     | { mode: 'rayon'; index: number }
     // la mire vient d'être posée : glisser règle son rayon
     | { mode: 'rayonMire'; index: number }
+    // la coupelle vient d'être posée : glisser règle le rayon de sa bouche
+    | { mode: 'rayonCoupelle'; index: number }
     // un nœud de rail au bout du doigt. `trace` : le point vient d'être
     // POSÉ à l'outil Rail (le relâcher juge alors s'il compte) ; sans lui,
     // c'est un coude existant qu'on reprend, et il reste où on le laisse.
@@ -1052,6 +1059,10 @@ export class LevelEditor {
       const m = (this.level.mires ?? [])[s.index]
       return m ? { minX: m.x - m.r, minY: m.y - m.r, maxX: m.x + m.r, maxY: m.y + m.r } : null
     }
+    if (s.kind === 'coupelle') {
+      const k = (this.level.coupelles ?? [])[s.index]
+      return k ? { minX: k.x - k.r, minY: k.y - k.r, maxX: k.x + k.r, maxY: k.y + k.r } : null
+    }
     if (s.kind === 'condensat') {
       const c = (this.level.condensats ?? [])[s.index]
       return c
@@ -1148,6 +1159,12 @@ export class LevelEditor {
       if (m) {
         m.x += dx
         m.y += dy
+      }
+    } else if (s.kind === 'coupelle') {
+      const k = (this.level.coupelles ?? [])[s.index]
+      if (k) {
+        k.x += dx
+        k.y += dy
       }
     } else if (s.kind === 'condensat') {
       const c = (this.level.condensats ?? [])[s.index]
@@ -1383,6 +1400,10 @@ export class LevelEditor {
     const mires = this.level.mires ?? []
     for (let i = mires.length - 1; i >= 0; i--) {
       if (Math.hypot(mires[i].x - x, mires[i].y - y) < mires[i].r + 8) return { kind: 'mire', index: i }
+    }
+    const coupelles = this.level.coupelles ?? []
+    for (let i = coupelles.length - 1; i >= 0; i--) {
+      if (Math.hypot(coupelles[i].x - x, coupelles[i].y - y) < coupelles[i].r + 8) return { kind: 'coupelle', index: i }
     }
     const condensats = this.level.condensats ?? []
     for (let i = condensats.length - 1; i >= 0; i--) {
@@ -2482,6 +2503,14 @@ export class LevelEditor {
               oy: w.y - m.y,
               start: { minX: 0, minY: 0, maxX: 0, maxY: 0 },
             }
+          } else if (hit.kind === 'coupelle') {
+            const k = (this.level.coupelles ?? [])[hit.index]
+            this.drag = {
+              mode: 'move',
+              ox: w.x - k.x,
+              oy: w.y - k.y,
+              start: { minX: 0, minY: 0, maxX: 0, maxY: 0 },
+            }
           } else if (hit.kind === 'condensat') {
             const c = (this.level.condensats ?? [])[hit.index]
             this.drag = {
@@ -2849,6 +2878,22 @@ export class LevelEditor {
         this.draw()
         return
       }
+      if (this.tool.kind === 'coupelle') {
+        if (!this.level.coupelles) this.level.coupelles = []
+        // le canal : le premier qu'aucune pastille ni coupelle ne porte —
+        // une coupelle neuve n'ouvre pas par accident la porte d'une autre
+        const pris = new Set<number>()
+        for (let i = 0; i < (this.level.cibles ?? []).length; i++) pris.add(canalDeCible(this.level.cibles!, i))
+        for (const k of this.level.coupelles) pris.add(k.canal)
+        let canal = 1
+        while (pris.has(canal)) canal++
+        this.level.coupelles.push({ x: this.snapped(w.x), y: this.snapped(w.y), r: COUPELLE_R_DEFAUT, seuil: COUPELLE_SEUIL_DEFAUT, canal })
+        const index = this.level.coupelles.length - 1
+        this.sel = { kind: 'coupelle', index }
+        this.drag = { mode: 'rayonCoupelle', index } // glisser pour régler la bouche
+        this.draw()
+        return
+      }
       if (this.tool.kind === 'rail') {
         // UN RAIL NE SE SOUDE PLUS À SON VOISIN. Auparavant, presser près
         // de l'extrémité de N'IMPORTE QUEL rail prolongeait ce rail : deux
@@ -3061,6 +3106,12 @@ export class LevelEditor {
           const r = Math.round(Math.hypot(w.x - m.x, w.y - m.y) / 5) * 5
           if (r >= 20) m.r = Math.min(600, r) // un glisser trop court laisse le défaut
         }
+      } else if (d.mode === 'rayonCoupelle') {
+        const k = (this.level.coupelles ?? [])[d.index]
+        if (k) {
+          const r = Math.round(Math.hypot(w.x - k.x, w.y - k.y) / 5) * 5
+          if (r >= 20) k.r = Math.min(400, r) // un glisser trop court laisse le défaut
+        }
       } else if (d.mode === 'railpt') {
         const r = (this.level.rails ?? [])[d.index]
         const p = r?.points[d.point]
@@ -3151,6 +3202,10 @@ export class LevelEditor {
           const m = (this.level.mires ?? [])[this.sel.index]
           m.x = this.snapped(w.x - d.ox)
           m.y = this.snapped(w.y - d.oy)
+        } else if (this.sel?.kind === 'coupelle') {
+          const k = (this.level.coupelles ?? [])[this.sel.index]
+          k.x = this.snapped(w.x - d.ox)
+          k.y = this.snapped(w.y - d.oy)
         } else if (this.sel?.kind === 'condensat') {
           const c = (this.level.condensats ?? [])[this.sel.index]
           c.x = this.snapped(w.x - d.ox)
@@ -3782,12 +3837,20 @@ export class LevelEditor {
           canal = canalDeCible(this.level.cibles!, i)
         }
       }
+      // une coupelle est une source comme une autre : la plus proche gagne
+      for (const k of this.level.coupelles ?? []) {
+        const d2 = Math.hypot(k.x - cx, k.y - cy)
+        if (d2 < best) {
+          best = d2
+          canal = k.canal
+        }
+      }
       this.level.portes.push({ ...r, canal })
       this.sel = { kind: 'porte', index: this.level.portes.length - 1 }
       this.commit(
-        (this.level.cibles ?? []).length > 0
+        Number.isFinite(best)
           ? `Porte posée, asservie au canal nº ${canal}.`
-          : 'Porte posée — posez une cible et asservissez-la dans le panneau.',
+          : 'Porte posée — posez une cible ou une coupelle et asservissez-la dans le panneau.',
       )
     } else if (t.kind === 'exit') {
       Object.assign(this.level.exit, r)
@@ -3863,6 +3926,7 @@ export class LevelEditor {
     else if (s.kind === 'eclat') (this.level.eclats ?? []).splice(s.index, 1)
     else if (s.kind === 'puits') (this.level.puits ?? []).splice(s.index, 1)
     else if (s.kind === 'mire') (this.level.mires ?? []).splice(s.index, 1)
+    else if (s.kind === 'coupelle') (this.level.coupelles ?? []).splice(s.index, 1)
     else if (s.kind === 'cible') {
       // les numéros sont LOGIQUES : avant de retirer la pastille, chaque
       // survivante fige le sien — rien ne se renumérote, les portes tiennent
@@ -4150,6 +4214,12 @@ export class LevelEditor {
       const m = (this.level.mires ?? [])[s.index]
       this.level.mires!.push({ ...m, x: m.x + off })
       this.sel = { kind: 'mire', index: this.level.mires!.length - 1 }
+    } else if (s.kind === 'coupelle') {
+      // le double garde le canal : deux coupelles du même numéro, c'est une
+      // porte en ET qui les attend toutes les deux (ou en OU, l'une suffit)
+      const k = (this.level.coupelles ?? [])[s.index]
+      this.level.coupelles!.push({ ...k, x: k.x + off })
+      this.sel = { kind: 'coupelle', index: this.level.coupelles!.length - 1 }
     } else if (s.kind === 'condensat') {
       const c = (this.level.condensats ?? [])[s.index]
       this.level.condensats!.push({ ...c, x: c.x + off })
@@ -4348,6 +4418,7 @@ export class LevelEditor {
         else if (key === 'cible') this.setTool({ kind: 'cible' })
         else if (key === 'puits') this.setTool({ kind: 'puits' })
         else if (key === 'mire') this.setTool({ kind: 'mire' })
+        else if (key === 'coupelle') this.setTool({ kind: 'coupelle' })
         else if (key === 'condensat') this.setTool({ kind: 'condensat' })
         else if (key === 'fiole') this.setTool({ kind: 'fiole' })
         else if (key.startsWith('plot:'))
@@ -6018,6 +6089,17 @@ export class LevelEditor {
       rows.push(
         `<p class="ed-empty">UNE MIRE : une cible à points pour les ÉCLATS DE GLACE. Une touche vaut ses points au prorata de la taille de l'éclat (le premier tir vaut plein, un amas jusqu'au double) ; l'éclat disparaît, la mire reste. Le tir n'existe que si le tableau l'active : la physique « ⚙ Tir de glace » (panneau Tableau).</p>`,
       )
+    } else if (s.kind === 'coupelle') {
+      const k = (this.level.coupelles ?? [])[s.index]
+      rows.push(rangeField('Trait (% du corps à l’entrée)', 'p-kseuil', Math.round(k.seuil * 100), 1, 90, 1))
+      rows.push(numField('N° (canal)', 'p-kcanal', k.canal, 1))
+      rows.push(numField('Rayon de la bouche (u)', 'p-kr', k.r, 5))
+      rows.push(numField('X', 'p-kx', k.x), numField('Y', 'p-ky', k.y))
+      const portes = (this.level.portes ?? []).filter((q) => q.canal === k.canal).length
+      const chasses = (this.level.chasses ?? []).filter((q) => q.canal === k.canal).length
+      rows.push(
+        `<p class="ed-empty">UNE COUPELLE : elle boit tout le liquide qui y entre — le corps comme les gouttes du jet — jusqu'à son trait, puis un couvercle la ferme et son canal reste allumé pour de bon. Rien ne se reprend. Le trait se compte en part du corps À L'ENTRÉE du tableau : la même énigme pour un corps gros ou maigre. Aucune traînée : le corps y entre et en sort librement ; la glace et la vapeur passent sans payer. Son canal se mêle aux cibles laser du même numéro. Canal nº ${k.canal} : ${portes} porte${portes > 1 ? 's' : ''}, ${chasses} chasse${chasses > 1 ? 's' : ''}.</p>`,
+      )
     } else if (s.kind === 'cible') {
       const t = (this.level.cibles ?? [])[s.index]
       const canal = canalDeCible(this.level.cibles ?? [], s.index)
@@ -6215,8 +6297,8 @@ export class LevelEditor {
       rows.push(numField('Canal (0 permanente · −1 séquence seule)', 'p-chc', q.canal ?? 0, 1))
       rows.push(
         `<label class="ed-f"><span>Règle</span><select id="p-chregle">` +
-          `<option value="ou"${q.regle !== 'et' ? ' selected' : ''}>OU — une cible du canal suffit</option>` +
-          `<option value="et"${q.regle === 'et' ? ' selected' : ''}>ET — toutes les cibles du canal</option>` +
+          `<option value="ou"${q.regle !== 'et' ? ' selected' : ''}>OU — une source du canal suffit (cible ou coupelle)</option>` +
+          `<option value="et"${q.regle === 'et' ? ' selected' : ''}>ET — toutes les sources du canal</option>` +
           `</select></label>`,
       )
       rows.push(numField('Bouffée par séquence (s)', 'p-chd', q.duree ?? CHASSE_DUREE_DEFAUT, 0.5))
@@ -6243,11 +6325,11 @@ export class LevelEditor {
       // Le canal de la CIBLE (« p-ccanal ») passait bien 1 ; celui de la
       // PORTE l'avait perdu. Pas de « min » : le canal −1 est la porte
       // SCÉNARISÉE, qu'aucun faisceau n'ouvre — et le pas 1 l'accepte.
-      rows.push(numField('Canal visé (nº de cible)', 'p-pc', q.canal, 1))
+      rows.push(numField('Canal visé (nº de cible ou de coupelle)', 'p-pc', q.canal, 1))
       rows.push(
         `<label class="ed-f"><span>Règle</span><select id="p-pregle">` +
-          `<option value="ou"${q.regle !== 'et' ? ' selected' : ''}>OU — une cible du canal suffit</option>` +
-          `<option value="et"${q.regle === 'et' ? ' selected' : ''}>ET — toutes les cibles du canal</option>` +
+          `<option value="ou"${q.regle !== 'et' ? ' selected' : ''}>OU — une source du canal suffit (cible ou coupelle)</option>` +
+          `<option value="et"${q.regle === 'et' ? ' selected' : ''}>ET — toutes les sources du canal</option>` +
           `</select></label>`,
       )
       // LA MATÉRIALISATION : comment la paroi apparaît à la fermeture (et
@@ -6481,6 +6563,8 @@ export class LevelEditor {
                         ? 'Puits de gravité'
                         : s.kind === 'mire'
                         ? `Mire (${(this.level.mires ?? [])[s.index]?.points ?? 0} pts)`
+                        : s.kind === 'coupelle'
+                        ? `Coupelle nº ${(this.level.coupelles ?? [])[s.index]?.canal ?? 0} (${Math.round(((this.level.coupelles ?? [])[s.index]?.seuil ?? 0) * 100)} %)`
                         : s.kind === 'cible'
                         ? `Cible nº ${canalDeCible(this.level.cibles ?? [], s.index)}`
                         : s.kind === 'condensat'
@@ -6972,6 +7056,13 @@ export class LevelEditor {
       m.r = Math.max(8, Math.round(val('p-mr')))
       m.x = val('p-mx')
       m.y = val('p-my')
+    } else if (s.kind === 'coupelle') {
+      const k = (this.level.coupelles ?? [])[s.index]
+      k.seuil = bornerSeuil(Math.round(val('p-kseuil')) / 100)
+      k.canal = Math.max(1, Math.round(val('p-kcanal') || 1))
+      k.r = Math.max(8, Math.round(val('p-kr')))
+      k.x = val('p-kx')
+      k.y = val('p-ky')
     } else if (s.kind === 'cible') {
       const t = (this.level.cibles ?? [])[s.index]
       // le n° est LOGIQUE : il se pose sur la pastille et les portes le
@@ -8598,6 +8689,52 @@ export class LevelEditor {
         g.font = LevelEditor.POLICE_LABEL
         g.textAlign = 'center'
         g.fillText(`${m.points} pts`, c.sx, c.sy + 4)
+        g.textAlign = 'start'
+      }
+    }
+    // LES COUPELLES : la bouche cerclée du jeu, son trait en clair et son
+    // canal — et un fil pointillé vers chaque porte et chasse qu'elle
+    // alimente : le péage se lit avec ce qu'il ouvre
+    {
+      const coupelles = this.level.coupelles ?? []
+      for (let i = 0; i < coupelles.length; i++) {
+        const k = coupelles[i]
+        const c = this.toScreen(k.x, k.y)
+        const R = Math.max(5, k.r * this.zoom)
+        const sel = this.sel?.kind === 'coupelle' && this.sel.index === i
+        g.setLineDash([4, 6])
+        g.strokeStyle = 'rgba(140,215,255,0.55)'
+        g.lineWidth = 1
+        const fils = [
+          ...(this.level.portes ?? []).filter((q) => q.canal === k.canal),
+          ...(this.level.chasses ?? []).filter((q) => q.canal === k.canal),
+        ]
+        for (const q of fils) {
+          const b = this.toScreen((q.minX + q.maxX) / 2, (q.minY + q.maxY) / 2)
+          g.beginPath()
+          g.moveTo(c.sx, c.sy)
+          g.lineTo(b.sx, b.sy)
+          g.stroke()
+        }
+        g.setLineDash([])
+        g.beginPath()
+        g.arc(c.sx, c.sy, R, 0, Math.PI * 2)
+        g.fillStyle = 'rgba(12,22,30,0.7)'
+        g.fill()
+        g.lineWidth = sel ? 3 : 2
+        g.strokeStyle = sel ? '#e8f4ff' : '#8cd7ff'
+        g.stroke()
+        // le cran du trait, à midi, comme en jeu
+        g.beginPath()
+        g.moveTo(c.sx, c.sy - R - 4)
+        g.lineTo(c.sx, c.sy - R + 6)
+        g.strokeStyle = '#e8f4ff'
+        g.lineWidth = 2
+        g.stroke()
+        g.fillStyle = 'rgba(232,244,255,0.95)'
+        g.font = LevelEditor.POLICE_LABEL
+        g.textAlign = 'center'
+        g.fillText(`nº ${k.canal} · ${Math.round(k.seuil * 100)} %`, c.sx, c.sy + 4)
         g.textAlign = 'start'
       }
     }

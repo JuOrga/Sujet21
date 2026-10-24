@@ -168,3 +168,14 @@ describe('la fiche de la mire', () => {
     expect(txt).toContain('Tir de glace')
   })
 })
+
+describe('la fiche de la coupelle', () => {
+  it('la coupelle dit son trait en part du corps, son canal et sa bouche', () => {
+    const lv = { ...niveau, coupelles: [{ x: 0, y: 0, r: 70, seuil: 0.15, canal: 3 }] }
+    const f = ficheElement({ kind: 'coupelle', index: 0 }, lv)!
+    expect(f.titre).toBe('Coupelle (péage en volume)')
+    const txt = f.lignes.map((l) => l.txt).join(' ')
+    expect(txt).toContain('Trait à 15 % du corps, canal nº 3, bouche de 70 u.')
+    expect(txt).toContain('rien ne se reprend')
+  })
+})

@@ -777,20 +777,30 @@ export function canalDeCible(cibles: { canal?: number }[], c: number): number {
   return cibles[c]?.canal ?? c + 1
 }
 
+/** Une source de canal qui n'est pas une pastille laser — la coupelle
+ *  pleine (coupelle.ts) : son numéro et son état de l'instant. */
+export interface SourceCanal {
+  canal: number
+  active: boolean
+}
+
 /** Le canal d'une porte l'alimente-t-il en cet instant ?
- * Négatif (porte scénarisée) ou sans pastille : jamais. */
+ * Négatif (porte scénarisée) ou sans source : jamais. Les `autres` sources
+ * comptent EXACTEMENT comme des pastilles du même numéro : une porte en ET
+ * sur le canal 2 attend la pastille ET la coupelle qui le portent. */
 export function canalActif(
   cibles: { mode?: 'tor' | 'nor'; canal?: number }[],
   canal: number,
   regle: 'et' | undefined,
   etat: EtatRecepteurs,
   now: number,
+  autres: readonly SourceCanal[] = [],
 ): boolean {
   if (canal < 0) return false
-  let pastilles = 0
+  let sources = 0
   for (let c = 0; c < cibles.length; c++) {
     if (canalDeCible(cibles, c) !== canal) continue
-    pastilles++
+    sources++
     const active = cibleActive(cibles[c], etat, c, now)
     if (regle === 'et') {
       if (!active) return false
@@ -798,5 +808,14 @@ export function canalActif(
       return true
     }
   }
-  return regle === 'et' && pastilles > 0
+  for (const s of autres) {
+    if (s.canal !== canal) continue
+    sources++
+    if (regle === 'et') {
+      if (!s.active) return false
+    } else if (s.active) {
+      return true
+    }
+  }
+  return regle === 'et' && sources > 0
 }

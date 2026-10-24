@@ -254,6 +254,12 @@ export class FluidSim {
 
   boxes: ObstacleBox[] = []
   sponges: Sponge[] = []
+  // LES COUPELLES (docs/coupelle.md) : des bouches qui boivent le liquide
+  // jusqu'à leur capacité, puis se ferment. Le jeu fixe la capacité (le
+  // trait × la masse de référence) et lit l'état : `pleine` allume le canal,
+  // `fermee` fait tomber le couvercle — une paroi côté jeu, comme une porte.
+  // Les deux ne coïncident pas : le couvercle attend que la bouche soit vide.
+  coupelles: { x: number; y: number; r: number; capacite: number; bu: number; pleine: boolean; fermee: boolean }[] = []
   contactTime: Float32Array // temps de contact continu avec l'éponge
   // LES CONDUITS (rails marqués `conduit`) : des tubes qui ne se comportent
   // pas pareil selon l'état. Rangés à part des boîtes parce qu'un tube est
@@ -2124,6 +2130,7 @@ export class FluidSim {
   copiePourPrevision(): FluidSim {
     const c = new FluidSim(this.params, this.bounds, this.capacity)
     c.setLevel(this.baseBoxes, this.spongeDefs)
+    c.coupelles = this.coupelles.map((k) => ({ ...k }))
     if (this.boxes !== this.baseBoxes) c.setDoors(this.boxes.slice(this.baseBoxes.length))
     for (let k = 0; k < this.sponges.length && k < c.sponges.length; k++) c.sponges[k].saturation.set(this.sponges[k].saturation)
     const n = this.count
@@ -2609,6 +2616,9 @@ export class FluidSim {
 
     // 5ter. Éponge : traînée, temps de contact, absorption (§6)
     if (this.sponges.length > 0) this.processSponges(dt)
+
+    // 5ter-b. Coupelles : le liquide qui entre est bu, jusqu'au trait
+    if (this.coupelles.length > 0) this.processCoupelles()
 
     this.stepIndex++
     if (this.stepIndex % Math.max(1, Math.round(p.componentEvery)) === 0) {
@@ -3446,6 +3456,89 @@ export class FluidSim {
       if (removed) continue // l'indice i contient maintenant une autre particule
       if (!touching) this.contactTime[i] = 0
       i++
+    }
+  }
+
+  /** Pose les coupelles du tableau, vides. `capacite` : ce que chacune boit
+   *  avant de se fermer, en particules (capaciteCoupelle, coupelle.ts). */
+  setCoupelles(defs: readonly { x: number; y: number; r: number; capacite: number }[]): void {
+    this.coupelles = defs.map((d) => ({
+      x: d.x,
+      y: d.y,
+      r: d.r,
+      capacite: Math.max(1, Math.round(d.capacite)),
+      bu: 0,
+      pleine: false,
+      fermee: false,
+    }))
+  }
+
+  // LA COUPELLE BOIT. Aucune traînée, aucun délai de contact — c'est ce qui
+  // la sépare de l'éponge : une goutte du jet qui la traverse en un pas
+  // doit compter, et le corps qui y passe ne doit pas s'engluer (la paroi
+  // hydrophile « retenait le corps comme un aimant », l'éponge l'englue :
+  // une bouche qui retient serait un piège, pas un péage). Elle boit le
+  // corps comme les gouttes libres — UNE règle, pas deux : une coupelle qui
+  // épargnait le corps grignotait quand même les fragments que le remous
+  // détache au passage. La glace et la vapeur passent sans payer. Pleine,
+  // elle ne boit plus rien : on ne paie jamais plus que le trait.
+  private processCoupelles(): void {
+    let ouvertes = 0
+    for (const k of this.coupelles) if (!k.pleine) ouvertes++
+    if (ouvertes > 0) this.boitCoupelles(ouvertes)
+    this.fermeCoupellesVides()
+  }
+
+  private boitCoupelles(ouvertes: number): void {
+    let i = 0
+    while (i < this.count) {
+      if (this.frozen[i] === 1 || this.gaseous[i] === 1) {
+        i++
+        continue
+      }
+      const x = this.posX[i]
+      const y = this.posY[i]
+      let bue = false
+      for (const k of this.coupelles) {
+        if (k.pleine) continue
+        const dx = x - k.x
+        const dy = y - k.y
+        if (dx * dx + dy * dy > k.r * k.r) continue
+        k.bu++
+        if (k.bu >= k.capacite) {
+          k.pleine = true
+          ouvertes--
+        }
+        this.removeParticle(i)
+        bue = true
+        break
+      }
+      if (ouvertes === 0) return
+      if (!bue) i++ // sinon l'indice i contient maintenant une autre particule
+    }
+  }
+
+  // LE COUVERCLE ATTEND QUE LA BOUCHE SOIT VIDE. Pleine, la coupelle allume
+  // son canal tout de suite, mais le disque plein ne tombe que lorsque plus
+  // rien ne se trouve dans la bouche — liquide, glace ou vapeur. Fermé d'un
+  // coup (la première version), il naissait AU MILIEU du corps qui
+  // traversait encore : l'essai du 24/10 l'a vu faire éclater un corps de
+  // 2,5 L jusqu'à la réserve à sec. Une paroi qui apparaît repousse ce
+  // qu'elle contient vers sa face la plus proche — sur un disque, en étoile.
+  private fermeCoupellesVides(): void {
+    for (const k of this.coupelles) {
+      if (!k.pleine || k.fermee) continue
+      const r2 = k.r * k.r
+      let occupee = false
+      for (let i = 0; i < this.count; i++) {
+        const dx = this.posX[i] - k.x
+        const dy = this.posY[i] - k.y
+        if (dx * dx + dy * dy <= r2) {
+          occupee = true
+          break
+        }
+      }
+      if (!occupee) k.fermee = true
     }
   }
 
