@@ -779,7 +779,7 @@ const sfx = {
   dropTimer: 0,
   lastCall: false,
   spent: false,
-  // les coupelles déjà fermées : chaque nouvelle fermeture s'entend une fois
+  // les coupelles déjà payées : chaque trait atteint s'entend une fois
   coupellesPleines: [] as boolean[],
 }
 
@@ -10525,8 +10525,9 @@ function drawMecanismes(vw: number, vh: number, dpr: number): void {
   // les COUPELLES : une bouche cerclée de métal où l'eau bue monte du fond
   // — sa surface est la part payée, l'anneau qui se referme la part qui
   // reste à payer. Pleine, le cerclage s'allume du vert des pastilles : le
-  // canal est acquis ; le couvercle et ses rayons tombent, bouche vide. Dessin propre, pas celui de
-  // l'éponge — ce n'est pas un feutre qui englue, c'est un péage.
+  // canal est acquis ; bouche vide, le couvercle et ses rayons tombent.
+  // Dessin propre, pas celui de l'éponge — ce n'est pas un feutre qui
+  // englue, c'est un péage.
   {
     const defs = level.coupelles ?? []
     const nowCoupelles = performance.now() / 1000
@@ -13842,11 +13843,12 @@ function cataloguePupitre(): {
  *  cas. (Pour mémoire, la note de CHASSE_ALLURE_DEFAUT : à 700 u/s le corps
  *  s'écrase sur la paroi d'en face jusqu'à se disperser.) */
 /** Les coupelles comme sources de canal, à l'état de l'instant — mêlées
- *  aux pastilles laser du même numéro (canalActif). */
-const SANS_SOURCE: SourceCanal[] = []
+ *  aux pastilles laser du même numéro (canalActif). Pas de constante de
+ *  module pour le cas vide : la fonction peut servir avant que le module
+ *  ait fini de s'initialiser. */
 function sourcesCanal(): SourceCanal[] {
   const coupelles = level.coupelles ?? []
-  if (coupelles.length === 0) return SANS_SOURCE
+  if (coupelles.length === 0) return []
   return sourcesCoupelles(coupelles, sim.coupelles.map((k) => k.pleine))
 }
 
