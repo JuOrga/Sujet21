@@ -244,6 +244,17 @@ export const FICHES_GENRES: Record<string, Fiche> = {
       { cle: '·', txt: 'Le tir n’existe que si le tableau le donne : le preset « ⚙ Tir de glace », ou la carte « Éclateur » imposée (Tableau → Cartes imposées).' },
     ],
   },
+  'genre:coupelle': {
+    titre: 'Coupelle (péage en volume)',
+    resume: 'Une bouche qui boit le liquide jusqu’à son trait, puis se ferme et allume son canal pour de bon.',
+    lignes: [
+      { cle: '·', txt: 'Le trait est une part de la masse de référence : le corps à l’entrée du tableau (10 % = un dixième de soi).' },
+      { cle: '·', txt: 'Elle boit le corps qui y entre comme les gouttes du jet — le joueur habile tire dedans en se propulsant vers la porte.' },
+      { cle: '·', txt: 'Pleine, un couvercle la ferme : rien ne se reprend, on ne paie jamais plus que le trait.' },
+      { cle: '·', txt: 'Aucune traînée : le corps y entre et en sort librement. La glace et la vapeur passent sans payer.' },
+      { cle: '·', txt: 'Son canal se mêle aux pastilles laser du même numéro : une porte en ET les attend toutes.' },
+    ],
+  },
   'genre:cible-tor': {
     titre: 'Pastille réceptrice TOR',
     resume: 'Un verrou OUVRANT : un seul passage du faisceau suffit.',
@@ -423,6 +434,8 @@ export function cleFiche(sel: SelFiche, level: LevelDef): string | null {
       return 'genre:puits'
     case 'mire':
       return 'genre:mire'
+    case 'coupelle':
+      return 'genre:coupelle'
     case 'cible': {
       const t = (level.cibles ?? [])[sel.index ?? -1]
       return t?.mode === 'nor' ? 'genre:cible-nor' : 'genre:cible-tor'
@@ -487,6 +500,11 @@ export function lignesVives(sel: SelFiche, level: LevelDef): FicheLigne[] {
       const m = (level.mires ?? [])[sel.index ?? -1]
       if (!m) return []
       return [{ cle: '·', txt: `${m.points} point${m.points > 1 ? 's' : ''} la touche pleine, rayon ${m.r} u.` }]
+    }
+    case 'coupelle': {
+      const k = (level.coupelles ?? [])[sel.index ?? -1]
+      if (!k) return []
+      return [{ cle: '·', txt: `Trait à ${Math.round(k.seuil * 100)} % du corps, canal nº ${k.canal}, bouche de ${k.r} u.` }]
     }
     case 'puits': {
       const pu = (level.puits ?? [])[sel.index ?? -1]

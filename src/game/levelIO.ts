@@ -43,7 +43,8 @@ import {
   type ZoneDef,
   type ZoneForce,
 } from './level'
-import { IMPULSION_VITESSE_MAX, MIRE_POINTS_DEFAUT, MIRE_R_DEFAUT, PORTE_SENS_DEFAUT, PUITS_RAYON_DEFAUT, type ChasseDef, type MireDef, type PuitsDef } from './level'
+import { COUPELLE_R_DEFAUT, COUPELLE_SEUIL_DEFAUT, IMPULSION_VITESSE_MAX, MIRE_POINTS_DEFAUT, MIRE_R_DEFAUT, PORTE_SENS_DEFAUT, PUITS_RAYON_DEFAUT, type ChasseDef, type CoupelleDef, type MireDef, type PuitsDef } from './level'
+import { bornerSeuil } from './coupelle'
 import { DEFAULT_PARAMS, type SimParams } from '../sim/params'
 import { MINI_JEUX, REGLES_CIBLES, REGLES_ORBITES, REGLES_PALET, REGLES_RAFALES, RYTHME_COUPERET, type MiniJeuDef, type MiniJeuId } from './minijeux'
 import { ARTICLES_ETAL_IDS } from './economat'
@@ -731,6 +732,29 @@ export function parseLevel(input: unknown): {
   }
   if (mires.length > 0) level.mires = mires
 
+  // Les COUPELLES (péages en volume) : un centre, un rayon, un trait en part
+  // de la masse de référence, un canal. Un centre illisible n'est pas une
+  // coupelle ; le trait est borné (bornerSeuil), le canal vaut au moins 1 —
+  // une coupelle n'a pas de mode scénarisé, elle se remplit ou pas.
+  const coupelles: CoupelleDef[] = []
+  for (const raw of Array.isArray(o.coupelles) ? o.coupelles : []) {
+    const q = (raw ?? {}) as Record<string, unknown>
+    const x = num(q.x, NaN)
+    const y = num(q.y, NaN)
+    if (!Number.isFinite(x) || !Number.isFinite(y)) {
+      rejets.push('une coupelle a été écartée (centre illisible)')
+      continue
+    }
+    coupelles.push({
+      x,
+      y,
+      r: Math.max(8, Math.round(num(q.r, COUPELLE_R_DEFAUT))),
+      seuil: bornerSeuil(num(q.seuil, COUPELLE_SEUIL_DEFAUT)),
+      canal: Math.max(1, Math.round(num(q.canal, 1))),
+    })
+  }
+  if (coupelles.length > 0) level.coupelles = coupelles
+
   // LE MINI-JEU : le type (du catalogue) et ses règles sont relus tels
   // quels — les règles sont celles du code, l'éditeur ne les édite pas ;
   // ses réglages se filtrent comme ceux du tableau. Sans cela, une salle
@@ -1098,6 +1122,7 @@ export function serializeLevel(level: LevelDef): string {
   if (level.chasses && level.chasses.length > 0) out.chasses = level.chasses
   if (level.puits && level.puits.length > 0) out.puits = level.puits
   if (level.mires && level.mires.length > 0) out.mires = level.mires
+  if (level.coupelles && level.coupelles.length > 0) out.coupelles = level.coupelles
   if (level.minijeu) out.minijeu = level.minijeu
   if (level.reglages && Object.keys(level.reglages).length > 0) out.reglages = level.reglages
   if (level.rails && level.rails.length > 0) out.rails = level.rails
@@ -1268,14 +1293,16 @@ export function checkLevel(brut: LevelDef, catalogue: InstrumentDef[] = catalogu
   // pastille porte vraiment, et un émetteur sans cible n'ouvre rien.
   // Un canal NÉGATIF est le contrat des portes SCÉNARISÉES : aucun laser
   // ne les ouvre — seule une séquence in-map le fait (la brèche).
+  // Une COUPELLE porte un canal au même titre qu'une pastille.
   const nCibles = level.cibles?.length ?? 0
   const canaux = new Set<number>()
   for (let c = 0; c < nCibles; c++) canaux.add(canalDeCible(level.cibles!, c))
+  for (const k of level.coupelles ?? []) canaux.add(k.canal)
   for (const porte of level.portes ?? []) {
     if (porte.canal >= 0 && !canaux.has(porte.canal)) {
       v.push({
         niveau: 'erreur',
-        message: `Une porte est asservie au canal nº ${porte.canal} — aucune cible ne porte ce numéro.`,
+        message: `Une porte est asservie au canal nº ${porte.canal} — aucune cible ni coupelle ne porte ce numéro.`,
       })
     }
   }
@@ -1284,10 +1311,38 @@ export function checkLevel(brut: LevelDef, catalogue: InstrumentDef[] = catalogu
     if (chasse.canal !== undefined && chasse.canal >= 1 && !canaux.has(chasse.canal)) {
       v.push({
         niveau: 'erreur',
-        message: `Une chasse est asservie au canal nº ${chasse.canal} — aucune cible ne porte ce numéro.`,
+        message: `Une chasse est asservie au canal nº ${chasse.canal} — aucune cible ni coupelle ne porte ce numéro.`,
       })
     }
   }
+  // LES COUPELLES : hors cuve, elle ne boit que le vide ; sans porte ni
+  // chasse sur son canal, le corps paie pour rien ; posée sur le départ,
+  // elle boit dès la première image, avant le moindre geste ; et des traits
+  // qui dépassent ensemble le corps entier ne se paieront jamais tous
+  const visesParCanal = new Set<number>()
+  for (const porte of level.portes ?? []) visesParCanal.add(porte.canal)
+  for (const chasse of level.chasses ?? []) if (chasse.canal !== undefined) visesParCanal.add(chasse.canal)
+  let traits = 0
+  for (const k of level.coupelles ?? []) {
+    traits += k.seuil
+    if (!inBounds(k.x, k.y)) v.push({ niveau: 'erreur', message: 'Une coupelle est hors de la cuve.' })
+    if (!visesParCanal.has(k.canal))
+      v.push({
+        niveau: 'avertissement',
+        message: `Une coupelle allume le canal nº ${k.canal}, qu’aucune porte ni chasse ne vise : le corps y paiera pour rien.`,
+      })
+    // le rayon d'un corps de n particules : ≈ 105 u pour 900, en racine (l'estimation de l'éditeur)
+    if (Math.hypot(level.spawn.x - k.x, level.spawn.y - k.y) < k.r + 105 * Math.sqrt(Math.max(50, level.spawn.n) / 900))
+      v.push({
+        niveau: 'avertissement',
+        message: 'Une coupelle touche le départ : elle boira le corps dès la première image.',
+      })
+  }
+  if (traits >= 0.9)
+    v.push({
+      niveau: 'avertissement',
+      message: `Les coupelles demandent ensemble ${Math.round(traits * 100)} % du corps : un joueur ne pourra pas toutes les payer.`,
+    })
   // L'IMPULSION : au-delà de maxSpeed, le solveur brime — le tableau mentirait
   if (level.spawn.impulsion && level.spawn.impulsion.vitesse > IMPULSION_VITESSE_MAX) {
     v.push({

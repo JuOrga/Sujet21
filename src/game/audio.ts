@@ -570,6 +570,17 @@ export class AudioFx {
     this.blip(1568, 1568, 0.42, 0.045, 'sine', 0.3, pan)
   }
 
+  // LE TRAIT D'UNE COUPELLE ATTEINT : un verrou d'acier qui claque, puis
+  // deux notes qui montent — le canal est acquis, la porte s'ouvre. Là où
+  // est la coupelle (pan). La coupelle boit en silence, comme l'éponge :
+  // c'est le paiement achevé qui s'entend, pas chaque gorgée.
+  couvercle(pan = 0): void {
+    this.blip(120, 48, 0.18, 0.18, 'square', 0, pan)
+    this.noiseBurst(1400, 1.2, 0.08, 0.06, 'lowpass', 0, pan)
+    this.blip(523, 523, 0.2, 0.05, 'sine', 0.14, pan)
+    this.blip(784, 784, 0.34, 0.05, 'sine', 0.26, pan)
+  }
+
   // LES CIBLES (le mini-jeu, 17/09) : une touche sonne d'autant plus haut
   // qu'elle vaut (force 0…1), le tic des dernières secondes, le coup final
   toucheMire(force: number, pan = 0): void {
