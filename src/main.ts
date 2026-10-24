@@ -10557,7 +10557,7 @@ function drawMecanismes(vw: number, vh: number, dpr: number): void {
       const bu0 = coupelleVue[i] ?? k.bu
       if (k.bu > bu0) coupelleFrisson[i] = 1
       coupelleVue[i] = k.bu
-      const frisson = (coupelleFrisson[i] ?? 0)
+      const frisson = coupelleFrisson[i] ?? 0
       coupelleFrisson[i] = frisson * 0.9
       // LE COURANT : des traits qui filent vers la bouche, dans la portée
       if (!k.pleine && k.courant > 0) {

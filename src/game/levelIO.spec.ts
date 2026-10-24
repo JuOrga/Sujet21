@@ -1593,6 +1593,10 @@ describe('les coupelles (péages en volume)', () => {
     expect(msgs([{ x: 5000, y: 0, r: 60, seuil: 0.1, canal: 2 }]).some((m) => /coupelle est hors de la cuve/.test(m))).toBe(true)
     expect(msgs([{ x: 0, y: 0, r: 60, seuil: 0.1, canal: 7 }]).some((m) => /canal nº 7.*pour rien/.test(m))).toBe(true)
     expect(msgs([{ x: -780, y: 0, r: 60, seuil: 0.1, canal: 2 }]).some((m) => /touche le départ/.test(m))).toBe(true)
+    // hors de portée de la bouche seule, mais pas de son courant à pleine aspiration
+    const loin = { x: -550, y: 0, r: 60, seuil: 0.1, canal: 2 }
+    expect(msgs([{ ...loin, aspiration: 0 }]).some((m) => /touche le départ/.test(m))).toBe(false)
+    expect(msgs([{ ...loin, aspiration: 1 }]).some((m) => /touche le départ/.test(m))).toBe(true)
     expect(
       msgs([
         { x: 0, y: 0, r: 60, seuil: 0.5, canal: 2 },

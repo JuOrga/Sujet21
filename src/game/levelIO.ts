@@ -44,7 +44,7 @@ import {
   type ZoneForce,
 } from './level'
 import { COUPELLE_R_DEFAUT, COUPELLE_SEUIL_DEFAUT, IMPULSION_VITESSE_MAX, MIRE_POINTS_DEFAUT, MIRE_R_DEFAUT, PORTE_SENS_DEFAUT, PUITS_RAYON_DEFAUT, type ChasseDef, type CoupelleDef, type MireDef, type PuitsDef } from './level'
-import { bornerAspiration, bornerSeuil } from './coupelle'
+import { bornerAspiration, bornerSeuil, champCoupelle } from './coupelle'
 import { DEFAULT_PARAMS, type SimParams } from '../sim/params'
 import { MINI_JEUX, REGLES_CIBLES, REGLES_ORBITES, REGLES_PALET, REGLES_RAFALES, RYTHME_COUPERET, type MiniJeuDef, type MiniJeuId } from './minijeux'
 import { ARTICLES_ETAL_IDS } from './economat'
@@ -1334,11 +1334,14 @@ export function checkLevel(brut: LevelDef, catalogue: InstrumentDef[] = catalogu
         niveau: 'avertissement',
         message: `Une coupelle allume le canal nº ${k.canal}, qu’aucune porte ni chasse ne vise : le corps y paiera pour rien.`,
       })
-    // le rayon d'un corps de n particules : ≈ 105 u pour 900, en racine (l'estimation de l'éditeur)
-    if (Math.hypot(level.spawn.x - k.x, level.spawn.y - k.y) < k.r + 105 * Math.sqrt(Math.max(50, level.spawn.n) / 900))
+    // le rayon d'un corps de n particules : ≈ 105 u pour 900, en racine
+    // (l'estimation de l'éditeur) ; et la PORTÉE du courant, pas la seule
+    // bouche — une coupelle gourmande happe le corps de trois rayons
+    const portee = champCoupelle(k.r, k.aspiration).portee
+    if (Math.hypot(level.spawn.x - k.x, level.spawn.y - k.y) < portee + 105 * Math.sqrt(Math.max(50, level.spawn.n) / 900))
       v.push({
         niveau: 'avertissement',
-        message: 'Une coupelle touche le départ : elle boira le corps dès la première image.',
+        message: 'Une coupelle touche le départ : elle aspirera le corps dès la première image.',
       })
   }
   if (traits >= 0.9)
