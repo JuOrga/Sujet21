@@ -44,7 +44,7 @@ import {
   type ZoneForce,
 } from './level'
 import { COUPELLE_R_DEFAUT, COUPELLE_SEUIL_DEFAUT, IMPULSION_VITESSE_MAX, MIRE_POINTS_DEFAUT, MIRE_R_DEFAUT, PORTE_SENS_DEFAUT, PUITS_RAYON_DEFAUT, type ChasseDef, type CoupelleDef, type MireDef, type PuitsDef } from './level'
-import { bornerSeuil } from './coupelle'
+import { bornerAspiration, bornerSeuil } from './coupelle'
 import { DEFAULT_PARAMS, type SimParams } from '../sim/params'
 import { MINI_JEUX, REGLES_CIBLES, REGLES_ORBITES, REGLES_PALET, REGLES_RAFALES, RYTHME_COUPERET, type MiniJeuDef, type MiniJeuId } from './minijeux'
 import { ARTICLES_ETAL_IDS } from './economat'
@@ -745,13 +745,16 @@ export function parseLevel(input: unknown): {
       rejets.push('une coupelle a été écartée (centre illisible)')
       continue
     }
-    coupelles.push({
+    const coupelle: CoupelleDef = {
       x,
       y,
       r: Math.max(8, Math.round(num(q.r, COUPELLE_R_DEFAUT))),
       seuil: bornerSeuil(num(q.seuil, COUPELLE_SEUIL_DEFAUT)),
       canal: Math.max(1, Math.round(num(q.canal, 1))),
-    })
+    }
+    // l'aspiration absente reste absente : le défaut vit dans le code
+    if (q.aspiration !== undefined) coupelle.aspiration = bornerAspiration(num(q.aspiration, NaN))
+    coupelles.push(coupelle)
   }
   if (coupelles.length > 0) level.coupelles = coupelles
 

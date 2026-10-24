@@ -1563,17 +1563,17 @@ describe('les coupelles (péages en volume)', () => {
       ...base,
       portes: [porte],
       coupelles: [
-        { x: 100, y: -200, r: 80, seuil: 0.25, canal: 2 },
-        { x: 300, y: 0 }, // rayon, trait et canal par défaut
-        { x: 0, y: 300, seuil: 5, canal: -3 }, // trait plafonné, canal ramené à 1
+        { x: 100, y: -200, r: 80, seuil: 0.25, canal: 2, aspiration: 0.8 },
+        { x: 300, y: 0 }, // rayon, trait et canal par défaut, aspiration absente
+        { x: 0, y: 300, seuil: 5, canal: -3, aspiration: 4 }, // trait et aspiration plafonnés, canal ramené à 1
         { x: 'ici', y: 0 }, // écarté
       ],
     })
     expect(rejets).toEqual(['une coupelle a été écartée (centre illisible)'])
     expect(level!.coupelles).toEqual([
-      { x: 100, y: -200, r: 80, seuil: 0.25, canal: 2 },
+      { x: 100, y: -200, r: 80, seuil: 0.25, canal: 2, aspiration: 0.8 },
       { x: 300, y: 0, r: COUPELLE_R_DEFAUT, seuil: COUPELLE_SEUIL_DEFAUT, canal: 1 },
-      { x: 0, y: 300, r: COUPELLE_R_DEFAUT, seuil: COUPELLE_SEUIL_MAX, canal: 1 },
+      { x: 0, y: 300, r: COUPELLE_R_DEFAUT, seuil: COUPELLE_SEUIL_MAX, canal: 1, aspiration: 1 },
     ])
     expect(parseLevel(JSON.parse(serializeLevel(level!))).level!.coupelles).toEqual(level!.coupelles)
     expect(JSON.parse(serializeLevel(parseLevel(base).level!)).coupelles).toBeUndefined()
