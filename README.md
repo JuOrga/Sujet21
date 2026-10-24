@@ -39,6 +39,8 @@ péages en volume qui aspirent le liquide dans leur outre jusqu'à leur trait,
 puis ouvrent leur canal ([`docs/coupelle.md`](docs/coupelle.md)). Des faisceaux laser, des
 pastilles mémoire et des portes qui forment une algèbre complète — le cabinet
 logique en fait cinq salles de démonstration sans ajouter un seul mécanisme.
+Les récepteurs à maintien et à bascule, le OU exclusif et les portes ouvertes
+au repos en font de vraies fonctions logiques ([`docs/logique.md`](docs/logique.md)).
 Des rails à champ qui convoient la vapeur et l'ionisent en plasma. Des puits
 de gravité autour desquels le corps orbite, sa trajectoire prédite à l'écran,
 et une ronde sans fin en glace entre trois puits ([`docs/puits.md`](docs/puits.md)) — d'où l'on
