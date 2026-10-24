@@ -376,6 +376,7 @@ import {
   avancerRecepteurs,
   cibleActive,
   canalActif,
+  etatPorte,
   type PorteFermee,
   type SourceCanal,
   type TraceResultat,
@@ -10481,7 +10482,10 @@ function drawMecanismes(vw: number, vh: number, dpr: number): void {
   }
 
   // cibles : pastille éteinte / embrasée — et pour le NOR, l'anneau ambré
-  // dit « à maintien », la pastille GRILLÉE dit que la coupure est passée
+  // dit « à maintien », la pastille GRILLÉE dit que la coupure est passée ;
+  // le MAINTIEN porte un anneau pointillé bleu (il suit le faisceau, sans
+  // jamais griller), la BASCULE deux demi-anneaux (elle change d'état à
+  // chaque passage)
   const nowCibles = performance.now() / 1000
   for (let c = 0; c < cibles.length; c++) {
     const t = cibles[c]
@@ -10517,6 +10521,22 @@ function drawMecanismes(vw: number, vh: number, dpr: number): void {
       g.lineWidth = 1.5
       g.stroke()
       g.setLineDash([])
+    } else if (t.mode === 'maintien') {
+      g.beginPath()
+      g.setLineDash([2, 4])
+      g.arc(p.sx, p.sy, r * 0.72, 0, Math.PI * 2)
+      g.strokeStyle = lit ? '#bfe8ff' : '#5f8fb0'
+      g.lineWidth = 1.5
+      g.stroke()
+      g.setLineDash([])
+    } else if (t.mode === 'bascule') {
+      for (const a0 of [0.15, Math.PI + 0.15]) {
+        g.beginPath()
+        g.arc(p.sx, p.sy, r * 0.72, a0, a0 + Math.PI - 0.3)
+        g.strokeStyle = lit ? '#e2c6ff' : '#8a6cb0'
+        g.lineWidth = 1.8
+        g.stroke()
+      }
     }
     g.beginPath()
     g.arc(p.sx, p.sy, r * 0.45, 0, Math.PI * 2)
@@ -13896,15 +13916,16 @@ function majPortes(dt: number): void {
       laserEtat.portesOuvertes[i] = true
   }
   // SANS ÉMETTEUR, personne n'établit l'état des canaux (le bloc des lasers
-  // ne tourne pas) : ce sont les coupelles qui le font, ici, à chaque
-  // sous-pas — la porte s'ouvre à la goutte qui remplit la bouche
-  if ((level.lasers?.length ?? 0) === 0 && sim.coupelles.length > 0) {
+  // ne tourne pas) : c'est fait ici, à chaque sous-pas — la porte s'ouvre
+  // à la goutte qui remplit la coupelle, et une porte OUVERTE AU REPOS
+  // l'est dès la première image, même sans la moindre source
+  if ((level.lasers?.length ?? 0) === 0) {
     const autres = sourcesCanal()
     const cibles = level.cibles ?? []
     for (let i = 0; i < portes.length; i++) {
       laserEtat.portesOuvertes[i] =
         sequenceur.etat.brechesOuvertes.has(i) ||
-        canalActif(cibles, portes[i].canal, portes[i].regle, laserEtat.recepteurs, 0, autres)
+        etatPorte(portes[i], canalActif(cibles, portes[i].canal, portes[i].regle, laserEtat.recepteurs, 0, autres))
     }
   }
   majCouperet()
@@ -19465,13 +19486,16 @@ function corpsImage(now: number): boolean {
     laserEtat.portesOuvertes = portes.map(
       (p, i) =>
         sequenceur.etat.brechesOuvertes.has(i) ||
-        canalActif(
-          cibles,
-          p.canal,
-          p.regle,
-          laserEtat.recepteurs,
-          nowRecepteurs,
-          sourcesCanal(),
+        etatPorte(
+          p,
+          canalActif(
+            cibles,
+            p.canal,
+            p.regle,
+            laserEtat.recepteurs,
+            nowRecepteurs,
+            sourcesCanal(),
+          ),
         ),
     )
     // LA POSE des portes : l'état des canaux vient d'être établi pour la

@@ -1607,3 +1607,47 @@ describe('les coupelles (péages en volume)', () => {
     expect(msgs([{ x: 0, y: 0, r: 60, seuil: 0.1, canal: 2 }]).filter((m) => /coupelle/i.test(m))).toEqual([])
   })
 })
+
+describe('les fonctions logiques : récepteurs, règles, état de repos', () => {
+  const base = {
+    name: 'Essai logique',
+    code: '21-TEST',
+    bounds: { minX: -1000, minY: -600, maxX: 1000, maxY: 600 },
+    spawn: { x: -800, y: 0, n: 700 },
+    exit: { minX: 860, minY: -60, maxX: 940, maxY: 60 },
+    boxes: [],
+  }
+
+  it('les récepteurs MAINTIEN et BASCULE, la règle OUEX et la porte ouverte au repos se relisent ; l’inconnu retombe au défaut', () => {
+    const { level } = parseLevel({
+      ...base,
+      cibles: [
+        { x: 0, y: 0, r: 30, mode: 'maintien', canal: 1 },
+        { x: 100, y: 0, r: 30, mode: 'bascule', canal: 1 },
+        { x: 200, y: 0, r: 30, mode: 'clignotant', canal: 2 }, // inconnu : TOR
+      ],
+      portes: [
+        { minX: 400, minY: -100, maxX: 440, maxY: 100, canal: 1, regle: 'ouex', repos: 'ouverte' },
+        { minX: 500, minY: -100, maxX: 540, maxY: 100, canal: 2, regle: 'peut-etre', repos: 'entrouverte' }, // inconnus : OU, fermée
+      ],
+      chasses: [{ minX: 0, minY: 200, maxX: 100, maxY: 300, angle: 0, canal: 1, regle: 'ouex' }],
+    })
+    expect(level!.cibles!.map((c) => c.mode)).toEqual(['maintien', 'bascule', undefined])
+    expect(level!.portes![0]).toMatchObject({ regle: 'ouex', repos: 'ouverte' })
+    expect(level!.portes![1].regle).toBeUndefined()
+    expect(level!.portes![1].repos).toBeUndefined()
+    expect(level!.chasses![0].regle).toBe('ouex')
+    const relu = parseLevel(JSON.parse(serializeLevel(level!))).level!
+    // (un canal égal à la position s'omet à l'écriture : on compare les modes)
+    expect(relu.cibles!.map((c) => c.mode)).toEqual(level!.cibles!.map((c) => c.mode))
+    expect(relu.portes).toEqual(level!.portes)
+    expect(relu.chasses![0].regle).toBe('ouex')
+  })
+
+  it('une porte scénarisée ouverte au repos : l’éditeur prévient que rien ne la fermera', () => {
+    const msgs = (repos?: 'ouverte'): string[] =>
+      checkLevel(parseLevel({ ...base, portes: [{ minX: 400, minY: -100, maxX: 440, maxY: 100, canal: -1, ...(repos ? { repos } : {}) }] }).level!).map((v) => v.message)
+    expect(msgs('ouverte').some((m) => /scénarisée est ouverte au repos/.test(m))).toBe(true)
+    expect(msgs().some((m) => /ouverte au repos/.test(m))).toBe(false)
+  })
+})

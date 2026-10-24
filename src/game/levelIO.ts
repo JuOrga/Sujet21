@@ -582,8 +582,9 @@ export function parseLevel(input: unknown): {
       y: num(c.y, 0),
       r: Math.max(8, num(c.r, 26)),
     }
-    // récepteur NOR (à maintien, la coupure scelle) — tout le reste est TOR
-    if (c.mode === 'nor') cible.mode = 'nor'
+    // récepteur NOR (à maintien, la coupure scelle), MAINTIEN (suit le
+    // faisceau), BASCULE (chaque passage inverse) — tout le reste est TOR
+    if (c.mode === 'nor' || c.mode === 'maintien' || c.mode === 'bascule') cible.mode = c.mode
     // le n° logique (canal) : conservé s'il est explicite et valable ;
     // absent, la pastille vaut sa position (indice + 1)
     const canal = Math.round(num(c.canal, 0))
@@ -614,7 +615,9 @@ export function parseLevel(input: unknown): {
       maxY: Math.max(num(q.minY), num(q.maxY)),
       canal,
     }
-    if (q.regle === 'et') porte.regle = 'et'
+    if (q.regle === 'et' || q.regle === 'ouex') porte.regle = q.regle
+    // l'état de repos : seule « ouverte » s'écrit, fermée est le défaut
+    if (q.repos === 'ouverte') porte.repos = 'ouverte'
     // la MATÉRIALISATION : une façon connue, ou rien (d'un coup). Ses
     // réglages ne s'écrivent que s'ils s'écartent du défaut — comme ceux
     // d'une chasse, le défaut vit dans le code.
@@ -667,7 +670,7 @@ export function parseLevel(input: unknown): {
       if (brut >= 1) chasse.canal = brut
       else if (brut < 0) chasse.canal = -1
     }
-    if (q.regle === 'et') chasse.regle = 'et'
+    if (q.regle === 'et' || q.regle === 'ouex') chasse.regle = q.regle
     if (q.duree !== undefined && num(q.duree) > 0) chasse.duree = num(q.duree)
     if (chasse.maxX - chasse.minX < 1 || chasse.maxY - chasse.minY < 1) {
       rejets.push('une chasse a été écartée (taille nulle)')
@@ -1308,6 +1311,15 @@ export function checkLevel(brut: LevelDef, catalogue: InstrumentDef[] = catalogu
         message: `Une porte est asservie au canal nº ${porte.canal} — aucune cible ni coupelle ne porte ce numéro.`,
       })
     }
+  }
+  // une porte SCÉNARISÉE ouverte au repos : aucun canal ne la fermera
+  // jamais, et la brèche ne sait que l'ouvrir — elle ne sert à rien
+  for (const porte of level.portes ?? []) {
+    if (porte.canal < 0 && porte.repos === 'ouverte')
+      v.push({
+        niveau: 'avertissement',
+        message: 'Une porte scénarisée est ouverte au repos : rien ne la fermera jamais.',
+      })
   }
   // même contrat pour une chasse asservie : son canal doit exister
   for (const chasse of level.chasses ?? []) {

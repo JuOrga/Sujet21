@@ -30,8 +30,10 @@ import {
   MAT_GRILLE,
   MAT_MIROIR,
   sansPhysique,
+  type CibleMode,
   type LaserDef,
   type ObstacleBox,
+  type RegleCanal,
 } from './level'
 import { dansForme, type Coupe } from './formes'
 import { formesPhysiques } from './conduite'
@@ -706,21 +708,27 @@ export function traceLaser(em: LaserDef, monde: TraceMonde): TraceResultat {
   return { points, touchees, railsSuivis, rebondsGlace: bounces }
 }
 
-// ---- Les récepteurs (TOR / NOR) : la mémoire des cibles, pure et testable ----
-// Deux familles, chacune à transition UNIQUE :
+// ---- Les récepteurs : la mémoire des cibles, pure et testable ----------
+// Quatre familles (level.ts, CibleMode) :
 //   · TOR : un passage du faisceau allume POUR DE BON — la porte asservie
 //     s'ouvre et le reste (l'activation est acquise jusqu'au Recommencer) ;
 //   · NOR : active TANT QUE le faisceau la tient — à la PREMIÈRE coupure,
-//     la pastille grille : scellée, la porte se referme définitivement.
+//     la pastille grille : scellée, la porte se referme définitivement ;
+//   · MAINTIEN : active tant que le faisceau la tient, éteinte sinon,
+//     jamais grillée ;
+//   · BASCULE : chaque NOUVEAU passage inverse son état.
 // La persistance absorbe le tremblement d'une image (miroir de glace qui
 // frémit, porte qui s'ouvre et déplace le trajet à l'image suivante) : une
-// micro-coupure sous ce délai ne scelle pas.
+// micro-coupure sous ce délai ne scelle pas, n'éteint pas un maintien, et
+// ne compte pas comme un nouveau passage pour une bascule — sans elle, un
+// faisceau qui scintille ferait battre l'interrupteur.
 export const CIBLE_PERSISTANCE = 0.12 // s
 
 export interface EtatRecepteurs {
   vues: boolean[] // touchée au moins une fois depuis le début (TOR : verrou)
   dernierPhoton: number[] // date du dernier photon reçu, en secondes
   scellees: boolean[] // NOR : la coupure est passée par là — plus rien ne bouge
+  basculees: boolean[] // BASCULE : son état courant (allumée ou éteinte)
 }
 
 export function creerEtatRecepteurs(n: number): EtatRecepteurs {
@@ -728,19 +736,29 @@ export function creerEtatRecepteurs(n: number): EtatRecepteurs {
     vues: Array.from({ length: n }, () => false),
     dernierPhoton: Array.from({ length: n }, () => -Infinity),
     scellees: Array.from({ length: n }, () => false),
+    basculees: Array.from({ length: n }, () => false),
   }
 }
 
+/** Le faisceau tient-il la pastille en cet instant (persistance comprise) ? */
+function sousFaisceau(etat: EtatRecepteurs, c: number, now: number): boolean {
+  return etat.vues[c] === true && now - etat.dernierPhoton[c] <= CIBLE_PERSISTANCE
+}
+
 /** Avancé une fois par image, APRÈS le traçage : consigne les photons reçus
- * puis scelle les NOR dont le faisceau vient de se couper. */
+ * (une BASCULE s'inverse au front montant : touchée alors qu'elle ne
+ * l'était plus), puis scelle les NOR dont le faisceau vient de se couper. */
 export function avancerRecepteurs(
-  cibles: { mode?: 'tor' | 'nor'; canal?: number }[],
+  cibles: { mode?: CibleMode; canal?: number }[],
   touchees: number[],
   etat: EtatRecepteurs,
   now: number,
 ): void {
   for (const c of touchees) {
     if (c < 0 || c >= cibles.length) continue
+    // deux faisceaux sur la même pastille dans la même image : le second
+    // la trouve déjà sous faisceau, il ne la rebascule pas
+    if (cibles[c].mode === 'bascule' && !sousFaisceau(etat, c, now)) etat.basculees[c] = !etat.basculees[c]
     etat.vues[c] = true
     etat.dernierPhoton[c] = now
   }
@@ -754,23 +772,33 @@ export function avancerRecepteurs(
 
 /** Une cible alimente-t-elle ses portes en cet instant ?
  * TOR : oui dès qu'elle a été vue. NOR : oui sous le faisceau (persistance
- * comprise), plus jamais une fois scellée. */
+ * comprise), plus jamais une fois scellée. MAINTIEN : oui sous le faisceau,
+ * toujours. BASCULE : selon son dernier basculement. */
 export function cibleActive(
-  cible: { mode?: 'tor' | 'nor'; canal?: number },
+  cible: { mode?: CibleMode; canal?: number },
   etat: EtatRecepteurs,
   c: number,
   now: number,
 ): boolean {
-  if ((cible.mode ?? 'tor') === 'nor') {
-    return etat.vues[c] && !etat.scellees[c] && now - etat.dernierPhoton[c] <= CIBLE_PERSISTANCE
+  switch (cible.mode ?? 'tor') {
+    case 'nor':
+      return sousFaisceau(etat, c, now) && !etat.scellees[c]
+    case 'maintien':
+      return sousFaisceau(etat, c, now)
+    case 'bascule':
+      return etat.basculees[c] === true
+    default:
+      return etat.vues[c] === true
   }
-  return etat.vues[c] === true
 }
 
 // ---- Les CANAUX : le numéro d'une pastille est logique, pas positionnel ----
 // Plusieurs pastilles peuvent porter le même numéro ; une porte vise ce
-// numéro et choisit sa règle : OU (défaut) — une pastille active du canal
-// suffit ; ET — il les faut toutes en même temps.
+// numéro et choisit sa règle : OU (défaut) — une source active du canal
+// suffit ; ET — il les faut toutes en même temps ; OUEX — il en faut UNE
+// SEULE (le OU exclusif : à deux entrées, « l'une ou l'autre, pas les
+// deux »). Avec l'état de repos de la porte (etatPorte), c'est l'algèbre
+// entière : NON, NON-ET, NON-OU, OU exclusif et son contraire.
 
 /** Le numéro affiché sur une pastille : le sien, sinon sa position. */
 export function canalDeCible(cibles: { canal?: number }[], c: number): number {
@@ -789,33 +817,34 @@ export interface SourceCanal {
  * comptent EXACTEMENT comme des pastilles du même numéro : une porte en ET
  * sur le canal 2 attend la pastille ET la coupelle qui le portent. */
 export function canalActif(
-  cibles: { mode?: 'tor' | 'nor'; canal?: number }[],
+  cibles: { mode?: CibleMode; canal?: number }[],
   canal: number,
-  regle: 'et' | undefined,
+  regle: RegleCanal | undefined,
   etat: EtatRecepteurs,
   now: number,
   autres: readonly SourceCanal[] = [],
 ): boolean {
   if (canal < 0) return false
   let sources = 0
+  let actives = 0
   for (let c = 0; c < cibles.length; c++) {
     if (canalDeCible(cibles, c) !== canal) continue
     sources++
-    const active = cibleActive(cibles[c], etat, c, now)
-    if (regle === 'et') {
-      if (!active) return false
-    } else if (active) {
-      return true
-    }
+    if (cibleActive(cibles[c], etat, c, now)) actives++
   }
   for (const s of autres) {
     if (s.canal !== canal) continue
     sources++
-    if (regle === 'et') {
-      if (!s.active) return false
-    } else if (s.active) {
-      return true
-    }
+    if (s.active) actives++
   }
-  return regle === 'et' && sources > 0
+  if (regle === 'et') return sources > 0 && actives === sources
+  if (regle === 'ouex') return actives === 1
+  return actives > 0
+}
+
+/** L'ÉTAT D'UNE PORTE selon son canal : alimentée, elle quitte son état de
+ *  repos — une porte fermée au repos s'ouvre, une porte OUVERTE au repos se
+ *  ferme (le NON). Ouverte = vrai. */
+export function etatPorte(porte: { repos?: 'ouverte' }, alimentee: boolean): boolean {
+  return porte.repos === 'ouverte' ? !alimentee : alimentee
 }
