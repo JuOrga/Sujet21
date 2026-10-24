@@ -74,6 +74,7 @@ export const FAMILLES_MOTIF = [
   'decals',
   'puits',
   'mires',
+  'coupelles',
 ] as const
 export type FamilleMotif = (typeof FAMILLES_MOTIF)[number]
 
@@ -200,6 +201,10 @@ export function rectDe(level: LevelDef, f: FamilleMotif, i: number): Rect | null
       const m = (level.mires ?? [])[i]
       return pt(m, m?.r ?? 0)
     }
+    case 'coupelles': {
+      const k = (level.coupelles ?? [])[i]
+      return pt(k, k?.r ?? 0)
+    }
     case 'condensats':
       return pt((level.condensats ?? [])[i], R_POINT)
     case 'eclats':
@@ -304,6 +309,7 @@ export const FAMILLE_DE_SORTE: Record<string, FamilleMotif> = {
   decal: 'decals',
   puits: 'puits',
   mire: 'mires',
+  coupelle: 'coupelles',
 }
 
 export const NOMS_UNIQUES: Record<string, string> = {
@@ -503,12 +509,19 @@ export function pave(
 
   // ---- Les canaux -------------------------------------------------------
   const ciblesAvant = level.cibles ?? []
+  // une COUPELLE porte un canal comme une pastille : la cellule copiée
+  // reçoit le sien, ses portes suivent
+  const coupellesAvant = level.coupelles ?? []
   const canauxMotif = [
-    ...new Set(motif.cibles.map((i) => canalDeCible(ciblesAvant, i))),
+    ...new Set([
+      ...motif.cibles.map((i) => canalDeCible(ciblesAvant, i)),
+      ...motif.coupelles.flatMap((i) => (coupellesAvant[i] ? [coupellesAvant[i].canal] : [])),
+    ]),
   ].sort((a, b) => a - b)
   const pris = new Set<number>()
   for (let i = 0; i < ciblesAvant.length; i++)
     pris.add(canalDeCible(ciblesAvant, i))
+  for (const k of coupellesAvant) pris.add(k.canal)
   const prochainLibre = (): number => {
     let n = 1
     while (pris.has(n)) n++
@@ -755,6 +768,16 @@ export function pave(
         })
       }
     level.cibles = ajoute(ciblesAvant, items)
+  }
+  if (motif.coupelles.length > 0) {
+    const items: typeof coupellesAvant = []
+    for (const cel of copies)
+      for (const i of motif.coupelles) {
+        const k = coupellesAvant[i]
+        if (!k) continue
+        items.push({ ...decalePt(k, cel.dx, cel.dy), canal: canalDe(cel.canaux, k.canal) ?? k.canal })
+      }
+    level.coupelles = ajoute(coupellesAvant, items)
   }
   if (motif.chasses.length > 0) {
     const src = level.chasses ?? []

@@ -624,6 +624,43 @@ export interface MireDef {
 export const MIRE_R_DEFAUT = 70
 export const MIRE_POINTS_DEFAUT = 10
 
+// UNE COUPELLE (24/10) : le PÉAGE EN VOLUME du doc fonctionnel (§6 :
+// « payer un passage en volume, saturer une zone et ouvrir une brèche
+// permanente »), rendu lisible. Une bouche d'aspiration reliée à son outre :
+// elle ATTIRE le liquide proche et BOIT ce qui entre — le corps comme les
+// gouttes du jet — à débit borné, jusqu'à son trait ; l'outre gonfle, puis,
+// tendue, la coupelle allume son CANAL pour de bon, comme une pastille TOR. Les portes et les chasses la visent par ce numéro, avec
+// leur règle ET/OU : elle se mêle aux pastilles laser du même canal.
+// Rien ne la rend : ce qu'elle a bu est payé (voir docs/coupelle.md — la
+// reprise a été essayée sur le papier et écartée : un aller-retour en
+// gravité nulle est une corvée, et un sacrifice remboursé ne pèse rien).
+// Pas de traînée ni d'adhérence : seul son courant tire, et la coupelle ne
+// prend que sa part. La glace et la vapeur la traversent sans payer — c'est
+// l'eau liquide qu'elle aspire et qu'elle boit.
+export interface CoupelleDef {
+  x: number
+  y: number
+  r: number // le rayon de la bouche (u)
+  // LE TRAIT, en part de la MASSE DE RÉFÉRENCE : le volume du corps à
+  // l'entrée du tableau (0,1 = un dixième de soi). En part et pas en
+  // litres : l'énigme est la même pour un corps gros ou maigre.
+  seuil: number
+  canal: number // ≥ 1 : le numéro que les portes et les chasses visent
+  // L'ASPIRATION, 0..1 : la force et la portée de son courant (champCoupelle,
+  // coupelle.ts). 0 : elle ne tire que dans sa bouche ; 1 : elle happe le
+  // corps qui passe à trois rayons. Absente : COUPELLE_ASPIRATION_DEFAUT.
+  aspiration?: number
+}
+export const COUPELLE_R_DEFAUT = 60
+export const COUPELLE_SEUIL_DEFAUT = 0.1
+// douce par défaut : elle happe les gouttes et tire un peu le corps qui
+// la frôle — la régler plus fort reste un choix de salle
+export const COUPELLE_ASPIRATION_DEFAUT = 0.3
+// les bornes du trait : sous 1 %, une goutte de jet la remplit ; au-delà
+// de 90 %, elle boit le corps entier — ni l'une ni l'autre n'est un péage
+export const COUPELLE_SEUIL_MIN = 0.01
+export const COUPELLE_SEUIL_MAX = 0.9
+
 export const PUITS_RAYON_DEFAUT = 300
 export const PUITS_FORCE_DEFAUT = 540
 export const PUITS_FONDU = 0.25
@@ -855,6 +892,7 @@ export interface LevelDef {
   chasses?: ChasseDef[] // courants de poussée : l'éjection sans déchirure
   puits?: PuitsDef[] // puits de gravité : le corps y orbite
   mires?: MireDef[] // cibles à points : les éclats de glace les touchent
+  coupelles?: CoupelleDef[] // péages en volume : boivent jusqu'au trait, puis allument leur canal
   rails?: RailDef[]
   caches?: CacheDef[] // cachettes voilées (brouillard levé à l'entrée du corps)
   condensats?: CondensatPose[] // pastilles posées main (sinon : semis auto)

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { MIRE_POINTS_DEFAUT, MIRE_R_DEFAUT } from './level'
+import { COUPELLE_R_DEFAUT, COUPELLE_SEUIL_DEFAUT, COUPELLE_SEUIL_MAX, MIRE_POINTS_DEFAUT, MIRE_R_DEFAUT } from './level'
 import { tableauCibles, tableauOrbites } from './minijeux'
 import {
   checkLevel,
@@ -1544,5 +1544,66 @@ describe('un mini-jeu survit à l’enregistrement', () => {
     const verdicts = checkLevel(mal as typeof lv)
     expect(verdicts.some((v) => v.niveau === 'erreur' && /paliers/.test(v.message))).toBe(true)
     expect(verdicts.some((v) => v.niveau === 'erreur' && /cinq secondes/.test(v.message))).toBe(true)
+  })
+})
+
+describe('les coupelles (péages en volume)', () => {
+  const base = {
+    name: 'Essai coupelles',
+    code: '21-TEST',
+    bounds: { minX: -1000, minY: -600, maxX: 1000, maxY: 600 },
+    spawn: { x: -800, y: 0, n: 700 },
+    exit: { minX: 860, minY: -60, maxX: 940, maxY: 60 },
+    boxes: [],
+  }
+  const porte = { minX: 400, minY: -100, maxX: 440, maxY: 100, canal: 2 }
+
+  it('une coupelle se relit telle quelle ; les absents prennent le défaut, le trait est borné, un centre illisible est écarté et dit', () => {
+    const { level, rejets } = parseLevel({
+      ...base,
+      portes: [porte],
+      coupelles: [
+        { x: 100, y: -200, r: 80, seuil: 0.25, canal: 2, aspiration: 0.8 },
+        { x: 300, y: 0 }, // rayon, trait et canal par défaut, aspiration absente
+        { x: 0, y: 300, seuil: 5, canal: -3, aspiration: 4 }, // trait et aspiration plafonnés, canal ramené à 1
+        { x: 'ici', y: 0 }, // écarté
+      ],
+    })
+    expect(rejets).toEqual(['une coupelle a été écartée (centre illisible)'])
+    expect(level!.coupelles).toEqual([
+      { x: 100, y: -200, r: 80, seuil: 0.25, canal: 2, aspiration: 0.8 },
+      { x: 300, y: 0, r: COUPELLE_R_DEFAUT, seuil: COUPELLE_SEUIL_DEFAUT, canal: 1 },
+      { x: 0, y: 300, r: COUPELLE_R_DEFAUT, seuil: COUPELLE_SEUIL_MAX, canal: 1, aspiration: 1 },
+    ])
+    expect(parseLevel(JSON.parse(serializeLevel(level!))).level!.coupelles).toEqual(level!.coupelles)
+    expect(JSON.parse(serializeLevel(parseLevel(base).level!)).coupelles).toBeUndefined()
+  })
+
+  it('une porte peut viser le canal d’une coupelle sans aucune cible laser', () => {
+    const { level } = parseLevel({ ...base, portes: [porte], coupelles: [{ x: 0, y: 0, r: 60, seuil: 0.1, canal: 2 }] })
+    expect(checkLevel(level!).some((v) => v.niveau === 'erreur' && /canal nº 2/.test(v.message))).toBe(false)
+    // sans la coupelle, la même porte vise un canal que personne ne porte
+    const { level: seule } = parseLevel({ ...base, portes: [porte] })
+    expect(checkLevel(seule!).some((v) => v.niveau === 'erreur' && /canal nº 2/.test(v.message))).toBe(true)
+  })
+
+  it('l’éditeur prévient : coupelle hors cuve, sans rien à ouvrir, sur le départ, traits impayables', () => {
+    const msgs = (coupelles: unknown[]): string[] =>
+      checkLevel(parseLevel({ ...base, portes: [porte], coupelles }).level!).map((v) => v.message)
+    expect(msgs([{ x: 5000, y: 0, r: 60, seuil: 0.1, canal: 2 }]).some((m) => /coupelle est hors de la cuve/.test(m))).toBe(true)
+    expect(msgs([{ x: 0, y: 0, r: 60, seuil: 0.1, canal: 7 }]).some((m) => /canal nº 7.*pour rien/.test(m))).toBe(true)
+    expect(msgs([{ x: -780, y: 0, r: 60, seuil: 0.1, canal: 2 }]).some((m) => /touche le départ/.test(m))).toBe(true)
+    // hors de portée de la bouche seule, mais pas de son courant à pleine aspiration
+    const loin = { x: -550, y: 0, r: 60, seuil: 0.1, canal: 2 }
+    expect(msgs([{ ...loin, aspiration: 0 }]).some((m) => /touche le départ/.test(m))).toBe(false)
+    expect(msgs([{ ...loin, aspiration: 1 }]).some((m) => /touche le départ/.test(m))).toBe(true)
+    expect(
+      msgs([
+        { x: 0, y: 0, r: 60, seuil: 0.5, canal: 2 },
+        { x: 0, y: 300, r: 60, seuil: 0.5, canal: 2 },
+      ]).some((m) => /ensemble 100 % du corps/.test(m)),
+    ).toBe(true)
+    // une coupelle bien posée ne dit rien
+    expect(msgs([{ x: 0, y: 0, r: 60, seuil: 0.1, canal: 2 }]).filter((m) => /coupelle/i.test(m))).toEqual([])
   })
 })

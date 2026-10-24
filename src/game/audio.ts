@@ -570,6 +570,25 @@ export class AudioFx {
     this.blip(1568, 1568, 0.42, 0.045, 'sine', 0.3, pan)
   }
 
+  // LA GORGÉE D'UNE COUPELLE : un glouglou plus grave et plus discret que
+  // celui du sas — un seul par appel, quel que soit le nombre de gouttes
+  // (à 90 gouttes/s, compter chaque goutte ferait un crépitement)
+  gorgee(count: number): void {
+    if (count <= 0 || Math.random() > 0.35) return
+    this.blip(210 + Math.random() * 80, 80, 0.12, 0.035, 'sine')
+  }
+
+  // LE TRAIT D'UNE COUPELLE ATTEINT : la vanne de l'outre claque, puis
+  // deux notes qui montent — le canal est acquis, la porte s'ouvre. Là où
+  // est la coupelle (pan). Pendant qu'elle boit, c'est la gorgée (plus haut)
+  // qui s'entend, discrète.
+  vanne(pan = 0): void {
+    this.blip(120, 48, 0.18, 0.18, 'square', 0, pan)
+    this.noiseBurst(1400, 1.2, 0.08, 0.06, 'lowpass', 0, pan)
+    this.blip(523, 523, 0.2, 0.05, 'sine', 0.14, pan)
+    this.blip(784, 784, 0.34, 0.05, 'sine', 0.26, pan)
+  }
+
   // LES CIBLES (le mini-jeu, 17/09) : une touche sonne d'autant plus haut
   // qu'elle vaut (force 0…1), le tic des dernières secondes, le coup final
   toucheMire(force: number, pan = 0): void {

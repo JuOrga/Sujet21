@@ -377,8 +377,10 @@ import {
   cibleActive,
   canalActif,
   type PorteFermee,
+  type SourceCanal,
   type TraceResultat,
 } from './game/laser'
+import { capaciteCoupelle, champCoupelle, COUPELLE_DEBIT, sourcesCoupelles } from './game/coupelle'
 import { BOUTON, Manette } from './game/manette'
 import {
   MANOEUVRES,
@@ -777,7 +779,15 @@ const sfx = {
   dropTimer: 0,
   lastCall: false,
   spent: false,
+  // les coupelles déjà payées : chaque trait atteint s'entend une fois
+  coupellesPleines: [] as boolean[],
+  // les gouttes déjà bues par les coupelles : la gorgée s'entend
+  coupelleBues: 0,
 }
+// LE FRÉMISSEMENT des outres (le dessin) : ce que chacune avait bu à
+// l'image précédente, et l'onde de la dernière gorgée (1 → 0)
+const coupelleVue: number[] = []
+const coupelleFrisson: number[] = []
 
 // Registres du labo (§10) : records par tableau et historique des essais.
 const records = new Records(coffre.stockage)
@@ -933,6 +943,20 @@ function createSim(level: LevelDef): FluidSim {
   // le temps que la vaporisation progressive s'achève
   if (naitVapeur) sim.naitEnVapeur()
   sim.relabel()
+  // LES COUPELLES : leur trait devient une capacité ICI, sur le corps qui
+  // vient de naître — la masse de référence est le volume à l'entrée du
+  // tableau, et Recommencer la retrouve à l'identique
+  const reference = sim.aliveCount()
+  sim.setCoupelles(
+    (level.coupelles ?? []).map((c) => ({
+      x: c.x,
+      y: c.y,
+      r: c.r,
+      capacite: capaciteCoupelle(c.seuil, reference),
+      ...champCoupelle(c.r, c.aspiration),
+      debit: COUPELLE_DEBIT,
+    })),
+  )
   return sim
 }
 
@@ -9084,6 +9108,7 @@ function drawMecanismes(vw: number, vh: number, dpr: number): void {
       (level.chasses?.length ?? 0) + // un tableau qui n'a QU'une chasse se dessine aussi
       (level.puits?.length ?? 0) + // les puits et la ligne prédite
       (level.mires?.length ?? 0) + // les cibles à points
+      (level.coupelles?.length ?? 0) + // les péages en volume
       pastilles.length +
       eclatsEssai.length +
       (level.plots?.length ?? 0) +
@@ -10507,6 +10532,105 @@ function drawMecanismes(vw: number, vh: number, dpr: number): void {
       g.strokeStyle = '#8a5a50'
       g.lineWidth = 1.5
       g.stroke()
+    }
+  }
+
+  // les COUPELLES : une bouche d'aspiration au centre de son OUTRE. Le
+  // cercle qui se remplissait « en mode gaming » ne disait pas que de l'eau
+  // partait (essai du 24/10) : c'est l'outre qui le dit — en apesanteur, un
+  // réservoir n'a pas de fond où l'eau tombe, il a une poche souple qui
+  // gonfle (les réservoirs spatiaux à vessie). Vide, elle pend fripée autour
+  // de la grille ; chaque gorgée la gonfle et la fait frémir ; pleine, elle
+  // est tendue et luisante, la vanne s'allume du vert des pastilles. Le
+  // courant d'aspiration se lit aux traits qui filent vers la bouche. Le
+  // corps qui s'y étire, lui, c'est la physique qui le dessine.
+  {
+    const defs = level.coupelles ?? []
+    const t = performance.now() / 1000
+    for (let i = 0; i < defs.length && i < sim.coupelles.length; i++) {
+      const k = sim.coupelles[i]
+      if (dansCacheVoilee(k.x, k.y)) continue
+      const p = S(k.x, k.y)
+      const R = Math.max(6, k.r * z)
+      const part = Math.min(1, k.bu / k.capacite)
+      // la gorgée récente fait frémir l'outre (elle retombe en ~0,4 s)
+      const bu0 = coupelleVue[i] ?? k.bu
+      if (k.bu > bu0) coupelleFrisson[i] = 1
+      coupelleVue[i] = k.bu
+      const frisson = coupelleFrisson[i] ?? 0
+      coupelleFrisson[i] = frisson * 0.9
+      // LE COURANT : des traits qui filent vers la bouche, dans la portée
+      if (!k.pleine && k.courant > 0) {
+        const P = k.portee * z
+        g.strokeStyle = 'rgba(160,220,255,0.35)'
+        g.lineWidth = Math.max(1, R * 0.04)
+        for (let n = 0; n < 10; n++) {
+          const a = n * 2.399963 + i
+          const f = (t * (k.courant / Math.max(1, k.portee)) * 0.6 + n * 0.37) % 1
+          const r1 = R * 0.7 + (P - R * 0.7) * (1 - f)
+          const r2 = Math.max(R * 0.6, r1 - Math.max(6, R * 0.35))
+          g.beginPath()
+          g.moveTo(p.sx + Math.cos(a) * r1, p.sy + Math.sin(a) * r1)
+          g.lineTo(p.sx + Math.cos(a) * r2, p.sy + Math.sin(a) * r2)
+          g.stroke()
+        }
+      }
+      // L'OUTRE : de 55 % du rayon (fripée) au rayon entier (tendue)
+      const Ro = R * (0.55 + 0.45 * part) * (1 + 0.05 * frisson * Math.sin(t * 40))
+      const fripes = (1 - part) * 0.08
+      g.beginPath()
+      for (let n = 0; n <= 48; n++) {
+        const a = (n / 48) * Math.PI * 2
+        const rr = Ro * (1 + fripes * Math.sin(a * 7 + i) + fripes * 0.5 * Math.sin(a * 11 + t))
+        const x = p.sx + Math.cos(a) * rr
+        const y = p.sy + Math.sin(a) * rr
+        if (n === 0) g.moveTo(x, y)
+        else g.lineTo(x, y)
+      }
+      g.closePath()
+      const eau = g.createRadialGradient(p.sx - Ro * 0.3, p.sy - Ro * 0.35, Ro * 0.1, p.sx, p.sy, Ro)
+      eau.addColorStop(0, `rgba(170,225,255,${0.25 + 0.45 * part})`)
+      eau.addColorStop(1, `rgba(60,140,205,${0.18 + 0.5 * part})`)
+      g.fillStyle = eau
+      g.fill()
+      g.strokeStyle = k.pleine ? 'rgba(109,255,184,0.9)' : 'rgba(180,215,235,0.7)'
+      g.lineWidth = Math.max(1.5, R * 0.05)
+      g.stroke()
+      // le reflet d'une outre tendue
+      if (part > 0.5) {
+        g.beginPath()
+        g.ellipse(p.sx - Ro * 0.35, p.sy - Ro * 0.4, Ro * 0.22, Ro * 0.1, -0.6, 0, Math.PI * 2)
+        g.fillStyle = `rgba(255,255,255,${0.35 * (part - 0.5) * 2})`
+        g.fill()
+      }
+      // LA BOUCHE : une grille d'acier au centre ; la vanne, verte une fois pleine
+      const Rb = Math.max(4, R * 0.28)
+      g.beginPath()
+      g.arc(p.sx, p.sy, Rb, 0, Math.PI * 2)
+      g.fillStyle = k.pleine ? '#1d4a3a' : '#16222c'
+      g.fill()
+      g.strokeStyle = k.pleine ? '#6dffb8' : '#7b93a8'
+      g.lineWidth = Math.max(1.5, R * 0.05)
+      g.stroke()
+      g.strokeStyle = k.pleine ? 'rgba(109,255,184,0.8)' : 'rgba(123,147,168,0.8)'
+      g.lineWidth = Math.max(1, R * 0.025)
+      for (let n = -1; n <= 1; n++) {
+        g.beginPath()
+        g.moveTo(p.sx - Rb * 0.7, p.sy + n * Rb * 0.45)
+        g.lineTo(p.sx + Rb * 0.7, p.sy + n * Rb * 0.45)
+        g.stroke()
+      }
+      // le numéro de canal, sur une étiquette au pied de l'outre
+      if (R >= 14) {
+        const fs = Math.round(Math.max(9, Math.min(15, R * 0.24)))
+        g.font = `600 ${fs}px system-ui, sans-serif`
+        g.textAlign = 'center'
+        g.textBaseline = 'middle'
+        g.fillStyle = k.pleine ? '#6dffb8' : '#cfe3f2'
+        g.fillText(String(defs[i].canal), p.sx, p.sy + R + fs * 0.9)
+        g.textAlign = 'start'
+        g.textBaseline = 'alphabetic'
+      }
     }
   }
 
@@ -13748,6 +13872,16 @@ function cataloguePupitre(): {
  *  deux, 1 480 à quatre, 2 243 à huit. Au sous-pas : 488 u/s dans les quatre
  *  cas. (Pour mémoire, la note de CHASSE_ALLURE_DEFAUT : à 700 u/s le corps
  *  s'écrase sur la paroi d'en face jusqu'à se disperser.) */
+/** Les coupelles comme sources de canal, à l'état de l'instant — mêlées
+ *  aux pastilles laser du même numéro (canalActif). Pas de constante de
+ *  module pour le cas vide : la fonction peut servir avant que le module
+ *  ait fini de s'initialiser. */
+function sourcesCanal(): SourceCanal[] {
+  const coupelles = level.coupelles ?? []
+  if (coupelles.length === 0) return []
+  return sourcesCoupelles(coupelles, sim.coupelles.map((k) => k.pleine))
+}
+
 function majPortes(dt: number): void {
   const portes = level.portes ?? []
   if (portes.length === 0) return
@@ -13760,6 +13894,18 @@ function majPortes(dt: number): void {
   for (let i = 0; i < portes.length; i++) {
     if (sequenceur.etat.brechesOuvertes.has(i))
       laserEtat.portesOuvertes[i] = true
+  }
+  // SANS ÉMETTEUR, personne n'établit l'état des canaux (le bloc des lasers
+  // ne tourne pas) : ce sont les coupelles qui le font, ici, à chaque
+  // sous-pas — la porte s'ouvre à la goutte qui remplit la bouche
+  if ((level.lasers?.length ?? 0) === 0 && sim.coupelles.length > 0) {
+    const autres = sourcesCanal()
+    const cibles = level.cibles ?? []
+    for (let i = 0; i < portes.length; i++) {
+      laserEtat.portesOuvertes[i] =
+        sequenceur.etat.brechesOuvertes.has(i) ||
+        canalActif(cibles, portes[i].canal, portes[i].regle, laserEtat.recepteurs, 0, autres)
+    }
   }
   majCouperet()
   // un tableau SANS émetteur n'attend rien d'un faisceau : ses portes se
@@ -18970,7 +19116,7 @@ function corpsImage(now: number): boolean {
         laserEtat.chassesActives[i] =
           laserEtat.chasseBouffee[i] > 0 ||
           c.canal === undefined ||
-          canalActif(cibles, c.canal, c.regle, laserEtat.recepteurs, now)
+          canalActif(cibles, c.canal, c.regle, laserEtat.recepteurs, now, sourcesCanal())
       }
       // AUX RAFALES, les chasses sont scénarisées et c'est le rythme qui les
       // allume — toutes ensemble, une seconde toutes les quatre — tant que
@@ -19325,6 +19471,7 @@ function corpsImage(now: number): boolean {
           p.regle,
           laserEtat.recepteurs,
           nowRecepteurs,
+          sourcesCanal(),
         ),
     )
     // LA POSE des portes : l'état des canaux vient d'être établi pour la
@@ -20597,6 +20744,19 @@ function corpsImage(now: number): boolean {
   sfx.aiming = vise
   // L'éponge boit en silence : son bruit de succion agaçait plus qu'il
   // n'informait — la jauge et le feutre qui se remplit suffisent à le dire.
+  // La coupelle, elle, doit se faire entendre : sans son, on ne savait pas
+  // que de l'eau y partait (essai du 24/10). Son TRAIT atteint s'entend
+  // aussi : c'est l'instant où la porte s'ouvre, souvent hors du cadre.
+  for (let i = 0; i < sim.coupelles.length; i++) {
+    const k = sim.coupelles[i]
+    if (k.pleine && sfx.coupellesPleines[i] !== true && audible)
+      audio.vanne(panDepuis(sim.stats.centroidX, k.x))
+  }
+  sfx.coupellesPleines = sim.coupelles.map((k) => k.pleine)
+  // LA GORGÉE : la coupelle qui boit s'entend, plus bas que le sas — on
+  // sait que l'eau part même quand l'outre est hors du cadre
+  if (sim.coupelleBues > sfx.coupelleBues && audible) audio.gorgee(sim.coupelleBues - sfx.coupelleBues)
+  sfx.coupelleBues = sim.coupelleBues
   if (endgame.lastCall && !sfx.lastCall)
     bande.ponctuation('sting-derniere-impulsion', 0.8)
   sfx.lastCall = endgame.lastCall

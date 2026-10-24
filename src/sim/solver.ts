@@ -38,6 +38,20 @@ import {
 } from '../game/level'
 
 export const KIND_FREE = 0
+
+/** L'état d'une coupelle dans le solveur (setCoupelles). */
+export interface CoupelleSim {
+  x: number
+  y: number
+  r: number
+  capacite: number
+  portee: number
+  courant: number
+  debit: number
+  bu: number
+  pleine: boolean
+  reserve: number
+}
 /** LE PLANCHER DU TIR DE GLACE : un éclat n'a jamais moins de particules, et le corps n'en garde jamais moins. */
 export const ECLAT_MIN = 3
 export const KIND_PLAYER = 1
@@ -184,6 +198,8 @@ export class FluidSim {
   iceImpact = 0
   // Gouttes bues par les éponges depuis le début (consommé par l'audio)
   spongeBites = 0
+  // Gouttes bues par les coupelles depuis le début (la gorgée s'entend)
+  coupelleBues = 0
   // LIVRÉ PAR LE CHAMP : cette particule est sortie par la bouche d'un rail,
   // et le champ ne la reprend plus à cette bouche. Sans ce cran d'arrêt, le
   // nuage se garait sur le SEUIL de livraison : poussé dehors, relâché,
@@ -254,6 +270,12 @@ export class FluidSim {
 
   boxes: ObstacleBox[] = []
   sponges: Sponge[] = []
+  // LES COUPELLES (docs/coupelle.md) : des bouches d'aspiration qui boivent
+  // le liquide jusqu'à leur capacité. Le jeu fixe la capacité (le trait × la
+  // masse de référence) et le champ (portée, courant — champCoupelle), et lit
+  // `bu` et `pleine` pour le canal et le dessin. `reserve` : la part de débit
+  // pas encore bue (le débit est borné, voir boitCoupelle).
+  coupelles: CoupelleSim[] = []
   contactTime: Float32Array // temps de contact continu avec l'éponge
   // LES CONDUITS (rails marqués `conduit`) : des tubes qui ne se comportent
   // pas pareil selon l'état. Rangés à part des boîtes parce qu'un tube est
@@ -2124,6 +2146,7 @@ export class FluidSim {
   copiePourPrevision(): FluidSim {
     const c = new FluidSim(this.params, this.bounds, this.capacity)
     c.setLevel(this.baseBoxes, this.spongeDefs)
+    c.coupelles = this.coupelles.map((k) => ({ ...k }))
     if (this.boxes !== this.baseBoxes) c.setDoors(this.boxes.slice(this.baseBoxes.length))
     for (let k = 0; k < this.sponges.length && k < c.sponges.length; k++) c.sponges[k].saturation.set(this.sponges[k].saturation)
     const n = this.count
@@ -2609,6 +2632,9 @@ export class FluidSim {
 
     // 5ter. Éponge : traînée, temps de contact, absorption (§6)
     if (this.sponges.length > 0) this.processSponges(dt)
+
+    // 5ter-b. Coupelles : le liquide qui entre est bu, jusqu'au trait
+    if (this.coupelles.length > 0) this.processCoupelles(dt)
 
     this.stepIndex++
     if (this.stepIndex % Math.max(1, Math.round(p.componentEvery)) === 0) {
@@ -3447,6 +3473,107 @@ export class FluidSim {
       if (!touching) this.contactTime[i] = 0
       i++
     }
+  }
+
+  /** Pose les coupelles du tableau, vides. `capacite` : ce que chacune boit
+   *  avant d'être pleine, en particules (capaciteCoupelle) ; `portee`,
+   *  `courant` : son champ d'aspiration (champCoupelle) ; `debit` : ce
+   *  qu'elle boit au plus par seconde (COUPELLE_DEBIT) — tout dans coupelle.ts. */
+  setCoupelles(
+    defs: readonly { x: number; y: number; r: number; capacite: number; portee: number; courant: number; debit: number }[],
+  ): void {
+    this.coupelles = defs.map((d) => ({
+      x: d.x,
+      y: d.y,
+      r: d.r,
+      capacite: Math.max(1, Math.round(d.capacite)),
+      portee: Math.max(d.r, d.portee),
+      courant: Math.max(0, d.courant),
+      debit: Math.max(1, d.debit),
+      bu: 0,
+      pleine: false,
+      reserve: 0,
+    }))
+  }
+
+  // LA COUPELLE ASPIRE, PUIS BOIT. La première version avalait d'un coup
+  // tout ce qui entrait dans la bouche : à l'essai, le concepteur « ne se
+  // rend pas compte que cela aspire du liquide » — l'eau s'évanouissait, une
+  // jauge se remplissait. La leçon était déjà écrite au vide (« un
+  // clignement, pas une aspiration ») : il faut un courant qu'on voit tirer
+  // et un débit borné. Deux temps, donc :
+  //  · LE CHAMP : dans sa portée, un courant rentrant entraîne le liquide
+  //    vers le centre — le corps qui passe s'étire vers la bouche, la goutte
+  //    du jet y est happée. Pas de giration : sans elle, pas d'orbite
+  //    d'équilibre, l'eau entre droit (le piège que le cœur de Rankine du
+  //    sas a dû résoudre). Aucune traînée hors du champ, aucune adhérence.
+  //  · LA GORGÉE : dans la bouche, au plus `debit` particules par seconde,
+  //    les plus proches du centre d'abord — l'eau s'écoule dedans, on la
+  //    voit partir. La réserve tolère une courte rafale (un quart de seconde
+  //    de débit) : une goutte du jet qui traverse la bouche en quelques pas
+  //    est bue, pas manquée.
+  // UNE règle pour le corps et les gouttes libres : une coupelle qui
+  // épargnait le corps grignotait quand même les fragments que le remous
+  // détache. La glace et la vapeur n'y sont pas sensibles. Pleine, elle
+  // n'aspire plus et ne boit plus rien : on ne paie jamais plus que le trait,
+  // et elle n'a pas besoin de devenir une paroi (la version au couvercle
+  // solide faisait éclater le corps qui traversait encore, essai du 24/10).
+  private processCoupelles(dt: number): void {
+    for (const k of this.coupelles) {
+      if (k.pleine) continue
+      this.aspireCoupelle(k, dt)
+      this.boitCoupelle(k, dt)
+    }
+  }
+
+  private aspireCoupelle(k: CoupelleSim, dt: number): void {
+    if (k.courant <= 0) return
+    const R = k.portee
+    const R2 = R * R
+    const blend = 1 - Math.exp(-4 * dt)
+    for (let i = 0; i < this.count; i++) {
+      if (this.frozen[i] === 1 || this.gaseous[i] === 1) continue
+      const dx = k.x - this.posX[i]
+      const dy = k.y - this.posY[i]
+      const d2 = dx * dx + dy * dy
+      if (d2 >= R2 || d2 < 1e-6) continue
+      const d = Math.sqrt(d2)
+      const rim = Math.min(1, (1 - d / R) * 2) // fondu au bord de la portée
+      // le courant se renforce dans la bouche, et se pose au centre au lieu
+      // de le dépasser (sans ce frein, l'eau oscillait de part et d'autre)
+      const boost = d < k.r ? 1.6 : 1
+      const settle = Math.min(1, d / (k.r * 0.15))
+      const v = k.courant * boost * settle * rim
+      this.velX[i] += ((dx / d) * v - this.velX[i]) * blend * rim
+      this.velY[i] += ((dy / d) * v - this.velY[i]) * blend * rim
+    }
+  }
+
+  private boitCoupelle(k: CoupelleSim, dt: number): void {
+    const rafale = k.debit * 0.25
+    k.reserve = Math.min(rafale + 1, k.reserve + k.debit * dt)
+    const n = Math.min(Math.floor(k.reserve), k.capacite - k.bu)
+    if (n <= 0) return
+    const r2 = k.r * k.r
+    const prises: { i: number; d2: number }[] = []
+    for (let i = 0; i < this.count; i++) {
+      if (this.frozen[i] === 1 || this.gaseous[i] === 1) continue
+      const dx = this.posX[i] - k.x
+      const dy = this.posY[i] - k.y
+      const d2 = dx * dx + dy * dy
+      if (d2 <= r2) prises.push({ i, d2 })
+    }
+    if (prises.length === 0) return
+    prises.sort((a, b) => a.d2 - b.d2)
+    const bues = prises.slice(0, n).map((q) => q.i)
+    // retirer par indices DÉCROISSANTS : removeParticle échange avec la
+    // dernière particule, un indice plus petit reste donc valable
+    bues.sort((a, b) => b - a)
+    for (const i of bues) this.removeParticle(i)
+    k.bu += bues.length
+    k.reserve -= bues.length
+    this.coupelleBues += bues.length
+    if (k.bu >= k.capacite) k.pleine = true
   }
 
   /** Le plasma RETOMBE. Hors de la bande d'un champ engagé, l'ionisation

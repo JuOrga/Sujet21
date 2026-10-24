@@ -352,3 +352,27 @@ describe('les garde-fous', () => {
     expect(phrase).toContain('cuve agrandie')
   })
 })
+
+describe('le pavage et les COUPELLES', () => {
+  it('une coupelle à la place de la pastille : chaque cellule copiée reçoit un canal libre, ses portes suivent', () => {
+    const lv = tableauDemineur({ cibles: [], coupelles: [{ x: 650, y: 650, r: 40, seuil: 0.1, canal: 1 }] })
+    pave(lv, motifCellule(lv), reglages({ colonnes: 2, rangees: 1 }))
+    expect(lv.coupelles!.map((k) => k.canal)).toEqual([1, 2])
+    expect(lv.coupelles![1]).toMatchObject({ y: 650, r: 40, seuil: 0.1 })
+    // la copie est décalée d'une cellule et ses portes visent SON canal
+    expect(lv.coupelles![1].x).toBeGreaterThan(650)
+    expect(lv.portes!.some((p) => p.canal === 2)).toBe(true)
+  })
+
+  it('un canal déjà porté par une coupelle hors motif n’est pas redonné', () => {
+    const lv = tableauDemineur({
+      cibles: [],
+      coupelles: [
+        { x: 650, y: 650, r: 40, seuil: 0.1, canal: 1 },
+        { x: 3000, y: 3000, r: 40, seuil: 0.1, canal: 2 }, // étrangère au motif
+      ],
+    })
+    pave(lv, motifCellule(lv), reglages({ colonnes: 2, rangees: 1 }))
+    expect(lv.coupelles!.map((k) => k.canal)).toEqual([1, 2, 3])
+  })
+})
