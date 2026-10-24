@@ -6109,17 +6109,21 @@ export class LevelEditor {
       rows.push(numField('Rayon', 'p-cr', t.r, 2))
       rows.push(
         `<label class="ed-f"><span>Récepteur</span><select id="p-cmode">` +
-          `<option value="tor"${t.mode !== 'nor' ? ' selected' : ''}>TOR — un passage verrouille OUVERT</option>` +
+          `<option value="tor"${(t.mode ?? 'tor') === 'tor' ? ' selected' : ''}>TOR — un passage verrouille OUVERT</option>` +
           `<option value="nor"${t.mode === 'nor' ? ' selected' : ''}>NOR — maintien : la coupure SCELLE</option>` +
+          `<option value="maintien"${t.mode === 'maintien' ? ' selected' : ''}>MAINTIEN — active tant que le faisceau tient</option>` +
+          `<option value="bascule"${t.mode === 'bascule' ? ' selected' : ''}>BASCULE — chaque passage inverse</option>` +
           `</select></label>`,
       )
+      const explications: Record<string, string> = {
+        tor: 'un seul passage du faisceau l’allume pour de bon ; les portes s’y asservissent par ce numéro.',
+        nor: 'la porte n’est ouverte que FAISCEAU TENU ; à la première coupure, la pastille grille et la porte se scelle pour de bon.',
+        maintien: 'active TANT QUE le faisceau la tient, éteinte dès qu’il part — jamais grillée. Le bouton-poussoir : l’entrée qui suit son opérande.',
+        bascule: 'chaque NOUVEAU passage du faisceau inverse son état — allumée, éteinte, allumée… L’interrupteur : une mémoire qu’on peut effacer.',
+      }
+      rows.push(`<p class="ed-empty">Cible nº ${canal} — ${explications[t.mode ?? 'tor']}</p>`)
       rows.push(
-        t.mode === 'nor'
-          ? `<p class="ed-empty">Cible nº ${canal} — la porte n’est ouverte que FAISCEAU TENU ; à la première coupure, la pastille grille et la porte se scelle pour de bon.</p>`
-          : `<p class="ed-empty">Cible nº ${canal} — un seul passage du faisceau l’allume pour de bon ; les portes s’y asservissent par ce numéro.</p>`,
-      )
-      rows.push(
-        `<p class="ed-empty">Le N° se choisit librement : plusieurs pastilles peuvent porter le même — la porte décide alors si UNE suffit (OU) ou s’il les faut TOUTES (ET).</p>`,
+        `<p class="ed-empty">Le N° se choisit librement : plusieurs pastilles peuvent porter le même — la porte décide alors si UNE suffit (OU), s’il les faut TOUTES (ET), ou s’il en faut UNE SEULE (OUEX). Son état de repos (ouverte) en fait le contraire : NON, NON-ET, NON-OU.</p>`,
       )
     } else if (s.kind === 'condensat') {
       const c = (this.level.condensats ?? [])[s.index]
@@ -6298,8 +6302,9 @@ export class LevelEditor {
       rows.push(numField('Canal (0 permanente · −1 séquence seule)', 'p-chc', q.canal ?? 0, 1))
       rows.push(
         `<label class="ed-f"><span>Règle</span><select id="p-chregle">` +
-          `<option value="ou"${q.regle !== 'et' ? ' selected' : ''}>OU — une source du canal suffit (cible ou coupelle)</option>` +
+          `<option value="ou"${!q.regle ? ' selected' : ''}>OU — une source du canal suffit (cible ou coupelle)</option>` +
           `<option value="et"${q.regle === 'et' ? ' selected' : ''}>ET — toutes les sources du canal</option>` +
+          `<option value="ouex"${q.regle === 'ouex' ? ' selected' : ''}>OUEX — une SEULE source du canal (OU exclusif)</option>` +
           `</select></label>`,
       )
       rows.push(numField('Bouffée par séquence (s)', 'p-chd', q.duree ?? CHASSE_DUREE_DEFAUT, 0.5))
@@ -6329,8 +6334,18 @@ export class LevelEditor {
       rows.push(numField('Canal visé (nº de cible ou de coupelle)', 'p-pc', q.canal, 1))
       rows.push(
         `<label class="ed-f"><span>Règle</span><select id="p-pregle">` +
-          `<option value="ou"${q.regle !== 'et' ? ' selected' : ''}>OU — une source du canal suffit (cible ou coupelle)</option>` +
+          `<option value="ou"${!q.regle ? ' selected' : ''}>OU — une source du canal suffit (cible ou coupelle)</option>` +
           `<option value="et"${q.regle === 'et' ? ' selected' : ''}>ET — toutes les sources du canal</option>` +
+          `<option value="ouex"${q.regle === 'ouex' ? ' selected' : ''}>OUEX — une SEULE source du canal (OU exclusif)</option>` +
+          `</select></label>`,
+      )
+      // L'ÉTAT DE REPOS : fermée (l'historique) ou OUVERTE — alimentée par
+      // son canal, la porte quitte son repos ; ouverte au repos, elle se
+      // ferme donc quand le canal s'allume (le NON)
+      rows.push(
+        `<label class="ed-f"><span>État de repos</span><select id="p-prepos">` +
+          `<option value="fermee"${q.repos !== 'ouverte' ? ' selected' : ''}>FERMÉE — s’ouvre quand le canal l’alimente</option>` +
+          `<option value="ouverte"${q.repos === 'ouverte' ? ' selected' : ''}>OUVERTE — se ferme quand le canal l’alimente</option>` +
           `</select></label>`,
       )
       // LA MATÉRIALISATION : comment la paroi apparaît à la fermeture (et
@@ -7074,7 +7089,8 @@ export class LevelEditor {
       t.y = val('p-cy')
       t.r = Math.max(8, val('p-cr'))
       // TOR reste implicite (clé absente) : les fichiers existants ne changent pas
-      if (text('p-cmode') === 'nor') t.mode = 'nor'
+      const mode = text('p-cmode')
+      if (mode === 'nor' || mode === 'maintien' || mode === 'bascule') t.mode = mode
       else delete t.mode
     } else if (s.kind === 'condensat') {
       const c = (this.level.condensats ?? [])[s.index]
@@ -7173,7 +7189,8 @@ export class LevelEditor {
       if (canal >= 1) q.canal = canal
       else if (canal < 0) q.canal = -1
       else delete q.canal
-      if (text('p-chregle') === 'et') q.regle = 'et'
+      const regleCh = text('p-chregle')
+      if (regleCh === 'et' || regleCh === 'ouex') q.regle = regleCh
       else delete q.regle
       const duree = val('p-chd')
       if (duree > 0 && duree !== CHASSE_DUREE_DEFAUT) q.duree = duree
@@ -7191,8 +7208,11 @@ export class LevelEditor {
       const q = (this.level.portes ?? [])[s.index]
       const canal = Math.round(val('p-pc'))
       q.canal = canal >= 1 ? canal : -1
-      if (text('p-pregle') === 'et') q.regle = 'et'
+      const regle = text('p-pregle')
+      if (regle === 'et' || regle === 'ouex') q.regle = regle
       else delete q.regle
+      if (text('p-prepos') === 'ouverte') q.repos = 'ouverte'
+      else delete q.repos
       // la matérialisation : ses réglages ne s'écrivent qu'à l'écart du
       // défaut, et disparaissent tous avec elle (une porte d'un coup n'a
       // ni sens ni charnière). Un champ absent de la fiche (l'autre façon)
@@ -8095,17 +8115,25 @@ export class LevelEditor {
       const q = portes[i]
       const p = this.toScreen(q.minX, q.maxY)
       const r = this.toScreen(q.maxX, q.minY)
-      g.fillStyle = 'rgba(255,90,90,0.16)'
-      g.fillRect(p.sx, p.sy, r.sx - p.sx, r.sy - p.sy)
+      // OUVERTE AU REPOS : un cadre pointillé, sans aplat — comme une porte
+      // ouverte en jeu ; elle se fermera quand son canal l'alimentera
+      const ouverte = q.repos === 'ouverte'
+      if (!ouverte) {
+        g.fillStyle = 'rgba(255,90,90,0.16)'
+        g.fillRect(p.sx, p.sy, r.sx - p.sx, r.sy - p.sy)
+      }
       g.strokeStyle = '#ff5a5a'
       g.lineWidth = 1.5
+      if (ouverte) g.setLineDash([6, 4])
       g.strokeRect(p.sx, p.sy, r.sx - p.sx, r.sy - p.sy)
+      g.setLineDash([])
       g.fillStyle = '#ff9a8a'
       g.font = '600 10px ui-monospace, monospace'
+      const regle = q.regle === 'et' ? ' (ET)' : q.regle === 'ouex' ? ' (OUEX)' : ''
       g.fillText(
         q.canal < 0
           ? 'PORTE SCÉNARISÉE'
-          : `PORTE → CANAL ${q.canal}${q.regle === 'et' ? ' (ET)' : ''}`,
+          : `PORTE → CANAL ${q.canal}${regle}${ouverte ? ' · OUVERTE AU REPOS' : ''}`,
         p.sx + 4,
         p.sy - 4,
       )
@@ -8351,7 +8379,9 @@ export class LevelEditor {
       const t = traceLaser(em, {
         bounds: this.level.bounds,
         boxes: this.level.boxes,
-        portesFermees: portes,
+        // l'aperçu se trace AU REPOS : une porte ouverte au repos laisse
+        // passer le rayon
+        portesFermees: portes.filter((q) => q.repos !== 'ouverte'),
         cibles,
         iceNormal: null,
         eau: null, // pas de corps dans l'aperçu : ni miroir, ni prisme…
@@ -8399,6 +8429,22 @@ export class LevelEditor {
         g.lineWidth = 1.5
         g.stroke()
         g.setLineDash([])
+      } else if (t.mode === 'maintien') {
+        g.beginPath()
+        g.setLineDash([2, 4])
+        g.arc(p.sx, p.sy, rr * 0.72, 0, Math.PI * 2)
+        g.strokeStyle = '#5f8fb0'
+        g.lineWidth = 1.5
+        g.stroke()
+        g.setLineDash([])
+      } else if (t.mode === 'bascule') {
+        for (const a0 of [0.15, Math.PI + 0.15]) {
+          g.beginPath()
+          g.arc(p.sx, p.sy, rr * 0.72, a0, a0 + Math.PI - 0.3)
+          g.strokeStyle = '#8a6cb0'
+          g.lineWidth = 1.8
+          g.stroke()
+        }
       }
       g.fillStyle = touchees.has(i) ? '#0c1a14' : '#cfe2ef'
       g.font = '700 10px ui-monospace, monospace'

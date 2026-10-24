@@ -451,13 +451,21 @@ export interface LaserDef {
   angle: number // degrés, 0 = vers +x, sens trigonométrique
 }
 
-// Deux familles de récepteurs, chacune à transition UNIQUE (pas de va-et-vient) :
+// Quatre familles de récepteurs. Les deux premières sont à transition
+// UNIQUE (pas de va-et-vient) :
 //   · TOR (défaut) : un seul passage du faisceau l'allume POUR DE BON — la
 //     porte asservie s'ouvre et reste ouverte, pas besoin de tenir le rayon ;
 //   · NOR : la porte n'est ouverte que TANT QUE le faisceau tient la cible —
 //     et à la PREMIÈRE coupure, la pastille grille : la porte se referme et
 //     se scelle définitivement. Traverser se joue faisceau maintenu.
-export type CibleMode = 'tor' | 'nor'
+// Les deux suivantes (25/10) vont et viennent — ce qu'il manquait pour
+// écrire de vraies fonctions logiques (le concepteur était « bloqué ») :
+//   · MAINTIEN : active TANT QUE le faisceau la tient, éteinte dès qu'il
+//     part, et jamais grillée — le bouton-poussoir, l'entrée qui suit son
+//     opérande ;
+//   · BASCULE : chaque NOUVEAU passage du faisceau inverse son état
+//     (allumée ↔ éteinte) — l'interrupteur, la mémoire qu'on peut effacer.
+export type CibleMode = 'tor' | 'nor' | 'maintien' | 'bascule'
 
 export interface CibleDef {
   x: number
@@ -492,6 +500,9 @@ export interface CibleDef {
 // se ferment au même rythme quelle que soit leur façon.
 export type PorteMaterialisation = 'rideau' | 'eventail'
 
+// LA RÈGLE d'un canal à plusieurs sources (absente : OU, une suffit)
+export type RegleCanal = 'et' | 'ouex'
+
 export interface PorteDef {
   minX: number
   minY: number
@@ -502,9 +513,16 @@ export interface PorteDef {
   // n'ouvre. Elle reste une paroi pleine jusqu'à ce qu'une séquence in-map
   // la crève (la brèche).
   canal: number
-  // Quand PLUSIEURS pastilles portent ce numéro : 'et' exige qu'elles
-  // soient TOUTES actives en même temps ; absente ('ou'), une seule suffit.
-  regle?: 'et'
+  // Quand PLUSIEURS sources portent ce numéro : 'et' exige qu'elles
+  // soient TOUTES actives en même temps ; 'ouex' qu'UNE SEULE le soit (le
+  // OU exclusif) ; absente ('ou'), une seule suffit.
+  regle?: RegleCanal
+  // L'ÉTAT DE REPOS (25/10) : 'ouverte' — la porte est OUVERTE tant que
+  // son canal ne l'alimente pas, et se FERME quand il l'alimente (le NON de
+  // l'algèbre). Absente : fermée au repos, l'historique. Le concepteur était
+  // bloqué « à cause des portes qui ne peuvent pas avoir un état différent
+  // de base ». Une brèche (séquence) l'ouvre de toute façon.
+  repos?: 'ouverte'
   // Absente : d'un coup. Voir le commentaire de tête.
   materialisation?: PorteMaterialisation
   // RIDEAU : la direction du front, en degrés. Absente : PORTE_SENS_DEFAUT.
@@ -554,7 +572,7 @@ export interface ChasseDef {
   // Le CANAL des pastilles qui l'alimentent (comme une porte). Absent :
   // permanente. Négatif : que la séquence.
   canal?: number
-  regle?: 'et'
+  regle?: RegleCanal
   // La durée d'une bouffée déclenchée par séquence (s). Absente :
   // CHASSE_DUREE_DEFAUT.
   duree?: number

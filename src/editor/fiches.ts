@@ -285,11 +285,29 @@ export const FICHES_GENRES: Record<string, Fiche> = {
       },
     ],
   },
+  'genre:cible-maintien': {
+    titre: 'Pastille réceptrice MAINTIEN',
+    resume: 'Un bouton-poussoir : active tant que le faisceau la tient.',
+    lignes: [
+      { cle: '·', txt: 'Faisceau là : active. Faisceau parti : éteinte. Elle ne grille jamais — on peut la rallumer autant qu’on veut.' },
+      { cle: '·', txt: 'L’entrée qui suit son opérande : le corps gelé qui renvoie le rayon, la vapeur qui le laisse passer.' },
+      { cle: '·', txt: 'Plusieurs pastilles du même canal : la porte choisit sa règle (OU, ET, OUEX).' },
+    ],
+  },
+  'genre:cible-bascule': {
+    titre: 'Pastille réceptrice BASCULE',
+    resume: 'Un interrupteur : chaque nouveau passage du faisceau inverse son état.',
+    lignes: [
+      { cle: '·', txt: 'Éteinte au départ ; un passage l’allume, le suivant l’éteint, et ainsi de suite.' },
+      { cle: '·', txt: 'Un faisceau qui tient ne compte qu’une fois : il faut le couper puis le rendre pour rebasculer.' },
+      { cle: '·', txt: 'Une mémoire qu’on peut effacer — de quoi écrire des énigmes à états.' },
+    ],
+  },
   'genre:porte': {
     titre: 'Porte asservie',
     resume: 'Une paroi commandée par ses pastilles.',
     lignes: [
-      { cle: '·', txt: 'Fermée tant que sa pastille est éteinte.' },
+      { cle: '·', txt: 'Fermée au repos : elle s’ouvre quand son canal l’alimente. Ouverte au repos : elle se ferme quand il l’alimente (le NON).' },
       { cle: '·', txt: 'Ouverte, elle devient traversante — en pointillé.' },
       { cle: '·', txt: 'D’un coup, la paroi apparaît et coupe ce qui est au milieu. En RIDEAU ou en ÉVENTAIL, un front la déploie et pousse le corps devant lui — propulsé, jamais déchiré.' },
     ],
@@ -440,7 +458,13 @@ export function cleFiche(sel: SelFiche, level: LevelDef): string | null {
       return 'genre:coupelle'
     case 'cible': {
       const t = (level.cibles ?? [])[sel.index ?? -1]
-      return t?.mode === 'nor' ? 'genre:cible-nor' : 'genre:cible-tor'
+      return t?.mode === 'nor'
+        ? 'genre:cible-nor'
+        : t?.mode === 'maintien'
+          ? 'genre:cible-maintien'
+          : t?.mode === 'bascule'
+            ? 'genre:cible-bascule'
+            : 'genre:cible-tor'
     }
     case 'porte': {
       const p = (level.portes ?? [])[sel.index ?? -1]
@@ -551,10 +575,19 @@ export function lignesVives(sel: SelFiche, level: LevelDef): FicheLigne[] {
           cle: '·',
           txt: `Canal n° ${p.canal} · ${
             p.regle === 'et'
-              ? 'Règle ET : toutes les pastilles du canal doivent être actives ensemble.'
-              : 'Règle OU : une seule pastille active suffit.'
+              ? 'Règle ET : toutes les sources du canal doivent être actives ensemble.'
+              : p.regle === 'ouex'
+                ? 'Règle OUEX : il faut UNE SEULE source active, pas plus.'
+                : 'Règle OU : une seule source active suffit.'
           }`,
         })
+      l.push({
+        cle: '·',
+        txt:
+          p.repos === 'ouverte'
+            ? 'Ouverte au repos : elle se FERME quand son canal l’alimente.'
+            : 'Fermée au repos : elle s’ouvre quand son canal l’alimente.',
+      })
       if (p.materialisation === 'rideau')
         l.push({
           cle: '·',
