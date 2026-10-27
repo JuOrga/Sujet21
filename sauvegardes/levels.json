@@ -22091,6 +22091,113 @@
         ],
         "chasses": []
       }
+    },
+    {
+      "id": "nouveau-tableau-22",
+      "auteur": "BOIZ",
+      "majAt": "2026-10-26T14:38:29.667Z",
+      "codeAuteur": "BOIZ",
+      "codeAt": "2026-10-26T14:21:57.592Z",
+      "level": {
+        "name": "mise en coupelle",
+        "code": "21-?",
+        "journal": "Entrée de journal du protocole : ce que le laboratoire a observé dans cette cuve.",
+        "bounds": {
+          "minX": -1200,
+          "minY": -750,
+          "maxX": 1200,
+          "maxY": 750
+        },
+        "spawn": {
+          "x": -790,
+          "y": -200,
+          "n": 900
+        },
+        "exit": {
+          "minX": 1040,
+          "minY": -120,
+          "maxX": 1180,
+          "maxY": 120
+        },
+        "boxes": [
+          {
+            "minX": -1200,
+            "minY": -750,
+            "maxX": -930,
+            "maxY": -680,
+            "material": 0
+          },
+          {
+            "minX": -1200,
+            "minY": -850,
+            "maxX": -450,
+            "maxY": -780,
+            "material": 0
+          },
+          {
+            "minX": -810,
+            "minY": -750,
+            "maxX": -450,
+            "maxY": -680,
+            "material": 0
+          },
+          {
+            "minX": -908.964,
+            "minY": -818.667,
+            "maxX": -831.356,
+            "maxY": -647,
+            "angle": -90,
+            "forme": 4,
+            "p0": 0.34,
+            "p1": 85,
+            "material": 0
+          }
+        ],
+        "sponges": [],
+        "labels": [
+          {
+            "x": 1110,
+            "y": 0,
+            "text": "SAS",
+            "tone": "sas"
+          }
+        ],
+        "par": 3,
+        "coupelles": [
+          {
+            "x": -870,
+            "y": -688,
+            "r": 60,
+            "seuil": 0.2,
+            "canal": 1,
+            "aspiration": 0
+          },
+          {
+            "x": 500,
+            "y": -360,
+            "r": 60,
+            "seuil": 0.1,
+            "canal": 2
+          },
+          {
+            "x": -901,
+            "y": 637,
+            "r": 100,
+            "seuil": 0.2,
+            "canal": 3,
+            "aspiration": 0
+          }
+        ],
+        "portes": [
+          {
+            "minX": 0,
+            "minY": -750,
+            "maxX": 189,
+            "maxY": 744,
+            "canal": 1
+          }
+        ]
+      }
     }
   ]
 }
