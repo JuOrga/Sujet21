@@ -1,6 +1,6 @@
 # Sauvegarde des documents partagés
 
-Prise le **2026-11-03T10:57:28.314Z** depuis `https://sujet21.vercel.app/api`.
+Prise le **2026-11-04T11:01:20.610Z** depuis `https://sujet21.vercel.app/api`.
 
 | Famille | Fichier | Entrées | Détail |
 | --- | --- | ---: | --- |
