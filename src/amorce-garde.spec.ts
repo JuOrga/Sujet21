@@ -35,7 +35,9 @@ interface Element {
 
 type Ecouteur = (e: unknown) => void
 
-function monde(options: { webgl2?: boolean; moduleArrive?: boolean } = {}) {
+function monde(
+  options: { webgl2?: boolean; moduleArrive?: boolean; jeuArrive?: boolean; preRendu?: boolean } = {},
+) {
   const elements = new Map<string, Element>()
   const el = (id: string): Element => {
     let e = elements.get(id)
@@ -61,14 +63,29 @@ function monde(options: { webgl2?: boolean; moduleArrive?: boolean } = {}) {
       ecouteurs.set(nom, [...(ecouteurs.get(nom) ?? []), f])
     },
   }
+  let sondesWebGL = 0
+  const ecouteursDoc = new Map<string, Ecouteur[]>()
   const document = {
+    prerendering: options.preRendu ?? false,
+    addEventListener: (nom: string, f: Ecouteur) => {
+      ecouteursDoc.set(nom, [...(ecouteursDoc.get(nom) ?? []), f])
+    },
     getElementById: el,
-    createElement: () => ({ getContext: () => (options.webgl2 ?? true ? {} : null) }),
-    querySelector: () => ({ src: 'http://jeu/assets/index.js' }),
+    createElement: () => {
+      sondesWebGL++
+      return { getContext: () => (options.webgl2 ?? true ? {} : null) }
+    },
+    querySelectorAll: () => [
+      { src: 'http://jeu/assets/index.js' },
+      { href: 'http://jeu/assets/main.js' },
+    ],
     body: { innerHTML: '' },
   }
   const performance = {
-    getEntriesByName: () => (options.moduleArrive ?? true ? [{}] : []),
+    getEntriesByName: (url: string) =>
+      (options.moduleArrive ?? true) && ((options.jeuArrive ?? true) || !url.endsWith('/main.js'))
+        ? [{}]
+        : [],
   }
   // les minuteries se lisent au moment de l'appel : ce sont celles, factices,
   // que vitest a posées sur globalThis
@@ -93,6 +110,12 @@ function monde(options: { webgl2?: boolean; moduleArrive?: boolean } = {}) {
       (w.__sujet21Compile as (f: number, t: number) => void)(fait, total),
     erreur: (message: string) => {
       for (const f of ecouteurs.get('error') ?? []) f({ message })
+    },
+    sondesWebGL: () => sondesWebGL,
+    /** Chrome affiche enfin la page pré-rendue. */
+    active: () => {
+      document.prerendering = false
+      for (const f of ecouteursDoc.get('prerenderingchange') ?? []) f({})
     },
   }
 }
@@ -251,6 +274,42 @@ describe('La garde d’amorçage', () => {
     expect(m.panne.classList.contains('visible')).toBe(false)
     vi.advanceTimersByTime(24_000) // 96 s : la patience a une fin
     expect(m.panne.classList.contains('visible')).toBe(true)
+  })
+
+  // LA PANNE VÉCUE (Chrome, 05/11/2026) : taper « su » dans la barre
+  // d'adresse figeait le navigateur plusieurs minutes — Chrome pré-rendait
+  // le jeu en coulisse (voir src/activation.ts). Le jeu attend désormais
+  // l'affichage ; la garde aussi. Sinon sa veille sonnait au bout de douze
+  // secondes d'un pré-rendu où, par construction, rien ne démarre, et le
+  // joueur arrivait sur « met trop longtemps ».
+  it('pendant un pré-rendu, la garde dort : ni sonde WebGL2, ni veille — elle s’arme à l’affichage', () => {
+    const m = monde({ preRendu: true })
+    expect(m.sondesWebGL()).toBe(0)
+    expect(vi.getTimerCount()).toBe(0)
+    vi.advanceTimersByTime(120_000) // la page reste pré-rendue deux minutes
+    expect(m.panne.classList.contains('visible')).toBe(false)
+    m.active()
+    expect(m.sondesWebGL()).toBe(1)
+    // la veille compte depuis l'affichage, pas depuis le pré-rendu
+    vi.advanceTimersByTime(11_900)
+    expect(m.panne.classList.contains('visible')).toBe(false)
+    vi.advanceTimersByTime(200)
+    expect(m.panne.classList.contains('visible')).toBe(true)
+  })
+
+  it('une erreur pendant le pré-rendu reste signalée', () => {
+    const m = monde({ preRendu: true })
+    m.erreur('module introuvable')
+    expect(m.panne.classList.contains('visible')).toBe(true)
+  })
+
+  // L'entrée de la page (src/amorce.ts) ne pèse que deux kilo-octets : la
+  // savoir arrivée ne dit rien du jeu, annoncé à côté en modulepreload.
+  it('l’entrée arrivée sans le module du jeu, c’est encore la connexion : on patiente', () => {
+    const m = monde({ jeuArrive: false })
+    vi.advanceTimersByTime(12_100)
+    expect(m.panne.classList.contains('visible')).toBe(false)
+    expect(m.etape.textContent).toMatch(/connexion est lente/)
   })
 
   it('sans WebGL2, le panneau est là tout de suite et la veille ne s’arme pas', () => {

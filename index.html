@@ -11225,13 +11225,19 @@
           }
         }
 
-        // Le module est-il arrivé ? Son entrée de ressource n'existe qu'une
-        // fois le fichier reçu : avant, la lenteur est celle de la connexion.
+        // Les modules sont-ils arrivés ? Leur entrée de ressource n'existe
+        // qu'une fois le fichier reçu : avant, la lenteur est celle de la
+        // connexion. L'entrée (src/amorce.ts) est minuscule ; le gros du jeu
+        // est le module annoncé en modulepreload — c'est lui qu'on attend.
         function moduleArrive() {
           try {
-            var m = document.querySelector('script[type="module"][src]')
-            if (!m) return true
-            return performance.getEntriesByName(m.src).length > 0
+            var ms = document.querySelectorAll(
+              'script[type="module"][src], link[rel="modulepreload"][href]',
+            )
+            for (var i = 0; i < ms.length; i++) {
+              if (!performance.getEntriesByName(ms[i].src || ms[i].href).length) return false
+            }
+            return true
           } catch (e) {
             return true
           }
@@ -11318,30 +11324,24 @@
           )
         }
 
-        // 1. WebGL2 — la panne qu'on sait nommer.
-        var aWebGL2 = false
-        try {
-          aWebGL2 = !!document.createElement('canvas').getContext('webgl2')
-        } catch (e) {
-          aWebGL2 = false
-        }
-        if (!aWebGL2) {
-          affiche(
-            'CE NAVIGATEUR NE SAIT PAS AFFICHER LE PROTOCOLE',
-            '<p>Le jeu dessine son fluide avec <b>WebGL&nbsp;2</b>, que ce' +
-              ' navigateur ne fournit pas. Rien de cassé de votre côté&nbsp;:' +
-              ' il manque une capacité, pas un fichier.</p>' +
-              '<ul>' +
-              '<li>Essayez un Chrome, Edge, Firefox ou Safari <b>à jour</b>.</li>' +
-              '<li>Sur un poste ancien, l’accélération matérielle est parfois' +
-              ' désactivée dans les réglages du navigateur.</li>' +
-              '<li>En bureau à distance ou en machine virtuelle, le GPU n’est' +
-              ' souvent pas transmis.</li>' +
-              '</ul>',
-          )
+        // 0. LE PRÉ-RENDU. Chrome exécute en coulisse la page qu'il devine
+        // dès les premières lettres tapées dans la barre d'adresse (voir
+        // src/activation.ts : navigateur figé, écran bleu). Le jeu attend
+        // désormais que la page soit affichée ; la garde aussi — sans quoi
+        // la veille sonnait au bout de douze secondes d'un pré-rendu où,
+        // par construction, rien ne démarre, et la sonde WebGL2 réveillait
+        // le processus graphique pour une page que personne ne regarde.
+        function quandAffichee(f) {
+          try {
+            if (document.prerendering) {
+              document.addEventListener('prerenderingchange', f, { once: true })
+              return
+            }
+          } catch (e) {}
+          f()
         }
 
-        // 2. Une exception pendant l'amorçage. On écarte les erreurs de
+        // 1. Une exception pendant l'amorçage. On écarte les erreurs de
         // CHARGEMENT de ressource (image, son) : elles arrivent sans
         // `message`, et une image manquante n'est pas une panne de démarrage.
         window.addEventListener('error', function (e) {
@@ -11364,12 +11364,40 @@
           )
         })
 
-        // 3. La veille, armée dès maintenant : douze secondes sans signe de
-        // vie — large pour une étape, court comparé à l'attente devant un
-        // écran noir. Sans WebGL2, le panneau est déjà là.
-        if (aWebGL2) arme()
+        quandAffichee(function () {
+          // le compte de la patience part de l'affichage, pas du pré-rendu
+          depuis = Date.now()
+
+          // 2. WebGL2 — la panne qu'on sait nommer.
+          var aWebGL2 = false
+          try {
+            aWebGL2 = !!document.createElement('canvas').getContext('webgl2')
+          } catch (e) {
+            aWebGL2 = false
+          }
+          if (!aWebGL2) {
+            affiche(
+              'CE NAVIGATEUR NE SAIT PAS AFFICHER LE PROTOCOLE',
+              '<p>Le jeu dessine son fluide avec <b>WebGL&nbsp;2</b>, que ce' +
+                ' navigateur ne fournit pas. Rien de cassé de votre côté&nbsp;:' +
+                ' il manque une capacité, pas un fichier.</p>' +
+                '<ul>' +
+                '<li>Essayez un Chrome, Edge, Firefox ou Safari <b>à jour</b>.</li>' +
+                '<li>Sur un poste ancien, l’accélération matérielle est parfois' +
+                ' désactivée dans les réglages du navigateur.</li>' +
+                '<li>En bureau à distance ou en machine virtuelle, le GPU n’est' +
+                ' souvent pas transmis.</li>' +
+                '</ul>',
+            )
+          }
+
+          // 3. La veille, armée dès l'affichage : douze secondes sans signe
+          // de vie — large pour une étape, court comparé à l'attente devant
+          // un écran noir. Sans WebGL2, le panneau est déjà là.
+          if (aWebGL2) arme()
+        })
       })()
     </script>
-    <script type="module" src="/src/main.ts"></script>
+    <script type="module" src="/src/amorce.ts"></script>
   </body>
 </html>

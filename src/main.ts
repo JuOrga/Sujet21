@@ -1,6 +1,5 @@
-import '@fontsource/michroma'
-import '@fontsource/ibm-plex-mono/400.css'
-import '@fontsource/ibm-plex-mono/600.css'
+// Les polices sont importées par l'entrée, src/amorce.ts, qui charge ce
+// module une fois la page affichée.
 import { DEFAULT_PARAMS, type SimParams } from './sim/params'
 import { FluidSim, KIND_PLAYER, COEUR_PART } from './sim/solver'
 import { NoyauxWasm } from './sim/wasm'
