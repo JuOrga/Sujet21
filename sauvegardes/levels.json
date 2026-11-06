@@ -21720,7 +21720,7 @@
     {
       "id": "nouveau-tableau-21",
       "auteur": "BOIZ",
-      "majAt": "2026-10-21T16:08:49.413Z",
+      "majAt": "2026-11-05T15:45:35.787Z",
       "codeAuteur": "BOIZ",
       "codeAt": "2026-10-19T15:04:19.953Z",
       "level": {
@@ -21762,8 +21762,8 @@
           {
             "minX": -1440,
             "minY": -950,
-            "maxX": 1500,
-            "maxY": -890,
+            "maxX": -430,
+            "maxY": -690,
             "material": 0
           },
           {
@@ -21789,7 +21789,7 @@
           },
           {
             "minX": -430,
-            "minY": -890,
+            "minY": -390,
             "maxX": -370,
             "maxY": 333.5,
             "material": 0
@@ -21821,6 +21821,53 @@
             "maxX": 90,
             "maxY": 950,
             "material": 0
+          },
+          {
+            "minX": 30,
+            "minY": -910,
+            "maxX": 90,
+            "maxY": -490,
+            "material": 8
+          },
+          {
+            "minX": -550.116,
+            "minY": -569.956,
+            "maxX": -249.884,
+            "maxY": -509.812,
+            "angle": -90,
+            "forme": 3,
+            "material": 4
+          },
+          {
+            "minX": -430,
+            "minY": -950,
+            "maxX": -160,
+            "maxY": -690,
+            "forme": 3,
+            "material": 2
+          },
+          {
+            "minX": -170,
+            "minY": -950,
+            "maxX": 90,
+            "maxY": -890,
+            "forme": 3,
+            "p0": 1,
+            "material": 4
+          },
+          {
+            "minX": 30,
+            "minY": -490,
+            "maxX": 90,
+            "maxY": 98,
+            "material": 0
+          },
+          {
+            "minX": -1060,
+            "minY": -950,
+            "maxX": -760,
+            "maxY": -690,
+            "material": 2
           }
         ],
         "sponges": [],
@@ -21835,9 +21882,9 @@
         "zones": [
           {
             "minX": -1500,
-            "minY": -944,
+            "minY": -940,
             "maxX": 1500,
-            "maxY": 42,
+            "maxY": 46,
             "force": "glace"
           },
           {
