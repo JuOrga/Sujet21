@@ -12,6 +12,7 @@
 import type { SimParams } from './params'
 import type { NoyauxWasm } from './wasm'
 import { SpatialGrid } from './grid'
+import { GrilleObstacles, horsBoite } from './grilleObstacles'
 import { makeKernels, computeRestDensity, type Kernels } from './kernels'
 import { labelComponents } from './components'
 import { accelerationPuits, type Accel } from '../game/puits'
@@ -79,36 +80,6 @@ export interface PlayerStats {
   velX: number
   velY: number
   rmsRadius: number
-}
-
-// Rejet rapide d'une boîte : hors de portée « marge » ? Pour une boîte
-// OBLIQUE ou une FORME (toujours inscrite dans sa boîte englobante), on
-// rejette sur le cercle englobant — conservateur mais sûr.
-function horsBoite(
-  b: {
-    minX: number
-    minY: number
-    maxX: number
-    maxY: number
-    angle?: number
-    forme?: number
-  },
-  x: number,
-  y: number,
-  marge: number,
-): boolean {
-  if (b.angle) {
-    const r = Math.hypot(b.maxX - b.minX, b.maxY - b.minY) / 2 + marge
-    const cx = (b.minX + b.maxX) / 2
-    const cy = (b.minY + b.maxY) / 2
-    return Math.abs(x - cx) > r || Math.abs(y - cy) > r
-  }
-  return (
-    x < b.minX - marge ||
-    x > b.maxX + marge ||
-    y < b.minY - marge ||
-    y > b.maxY + marge
-  )
 }
 
 /** L'ÉTAT d'une particule tel que le RENDU l'encode, en un seul nombre :
@@ -414,6 +385,16 @@ export class FluidSim {
   // le pas s'exécute sur le moteur JavaScript historique, inchangé.
   noyauxWasm: NoyauxWasm | null = null
   moteurWasm = false
+  // La grille des parois (grilleObstacles.ts) : la poussée hors des parois
+  // et les bandes chimiques ne regardent plus que les parois de la case de
+  // chaque particule. À false, les deux boucles reviennent au balayage
+  // complet historique — c'est l'étalon du test de parité, au bit près.
+  grilleParois = true
+  private readonly casesParois = new GrilleObstacles()
+  private readonly casesChimie = new GrilleObstacles()
+  // 0, 1, 2… : la « liste de candidats » du balayage complet, pour que les
+  // deux parcours partagent la même boucle (voir resolveObstacles)
+  private toutesParois = new Int32Array(0)
 
   constructor(params: SimParams, bounds: Bounds, capacity = 4096) {
     this.params = params
@@ -3158,6 +3139,18 @@ export class FluidSim {
 
   private readonly scratchCP: ClosestPoint = { dist: 0, nx: 0, ny: 0 }
 
+  /** 0, 1, 2… jusqu'à n au moins : le parcours « toutes les parois » sous
+   *  la forme d'une liste de candidats, pour qu'il partage la boucle de
+   *  celui de la grille. Agrandie au besoin, jamais réallouée sinon. */
+  private indicesParois(n: number): Int32Array {
+    if (this.toutesParois.length < n) {
+      const t = new Int32Array(Math.max(n, this.toutesParois.length * 2))
+      for (let k = 0; k < t.length; k++) t[k] = k
+      this.toutesParois = t
+    }
+    return this.toutesParois
+  }
+
   // Pousse les particules hors des solides et enregistre le contact (normale,
   // vitesse normale entrante, matériau) pour la réponse en vitesse.
   private resolveObstacles(dt: number): void {
@@ -3175,6 +3168,11 @@ export class FluidSim {
     this.expulseDesConduits()
     if (this.boxes.length === 0 && this.sponges.length === 0) return
 
+    const boxes = this.boxes
+    const toutes = this.indicesParois(boxes.length)
+    const cases = this.grilleParois ? this.casesParois : null
+    if (cases && !cases.aJour(boxes, rp)) cases.construit(boxes, this.bounds, rp)
+
     for (let i = 0; i < n; i++) {
       let x = this.prdX[i]
       let y = this.prdY[i]
@@ -3190,7 +3188,24 @@ export class FluidSim {
       )
         continue
 
-      for (const b of this.boxes) {
+      // LES PAROIS DE LA CASE D'ABORD. Tant que la particule n'a pas bougé,
+      // une paroi hors de sa case est une paroi que horsBoite rejetterait :
+      // la sauter ne change rien. Dès qu'une paroi la REPOUSSE, elle a bougé
+      // et peut atteindre une paroi d'une autre case — elle reprend alors le
+      // balayage complet à la paroi suivante, exactement comme avant. Les
+      // trajectoires restent identiques au bit près (grilleObstacles.spec.ts).
+      let liste = toutes
+      let q = 0
+      let fin = boxes.length
+      if (cases) {
+        const c = cases.caseDe(x, y)
+        liste = cases.liste
+        q = cases.debut[c]
+        fin = cases.debut[c + 1]
+      }
+      for (; q < fin; q++) {
+        const bi = liste[q]
+        const b = boxes[bi]
         // Chaque état a sa porte : la grille laisse passer la VAPEUR, la
         // membrane gorgée d'eau laisse suinter l'EAU, le rideau lamellaire
         // s'écarte devant la GLACE — tout le reste bute.
@@ -3248,6 +3263,11 @@ export class FluidSim {
           this.contactNX[i] = cp.nx
           this.contactNY[i] = cp.ny
           this.contactVn[i] = vn
+          if (liste !== toutes) {
+            liste = toutes
+            q = bi // la boucle repart à bi + 1
+            fin = boxes.length
+          }
         }
       }
 
@@ -3313,6 +3333,18 @@ export class FluidSim {
     const wallBand = p.wallSplashBand
     const bite = p.surfaceBite // mordant global : les surfaces pèsent plus
     const philDamp = Math.exp(-p.hydrophileFriction * bite * dt)
+    // La grille de la chimie s'inscrit à la PLUS LONGUE portée de bande
+    // (mur, chimie, chimie vue par la vapeur) : chaque paroi absente d'une
+    // case y est hors de portée quel que soit l'état. Les réglages bougent
+    // en direct au banc — une portée changée reconstruit la grille.
+    const chem = this.chemBoxes
+    const toutes = this.indicesParois(chem.length)
+    const cases = this.grilleParois ? this.casesChimie : null
+    if (cases) {
+      const portee =
+        Math.max(wallBand, band, band * p.hydroGasReach) + rp
+      if (!cases.aJour(chem, portee)) cases.construit(chem, this.bounds, portee)
+    }
 
     for (let i = 0; i < n; i++) {
       const gel = this.frozen[i] === 1
@@ -3388,7 +3420,19 @@ export class FluidSim {
       // jamais être happé ni claqué
       const poidsBande = gaz ? p.hydroGasWeight : 1
       const porteeGaz = gaz ? p.hydroGasReach : 1
-      for (const b of this.chemBoxes) {
+      // Les positions ne bougent pas dans cette boucle (seules les vitesses) :
+      // les parois de la case suffisent, sans reprise.
+      let liste = toutes
+      let q = 0
+      let fin = chem.length
+      if (cases) {
+        const c = cases.caseDe(x, y)
+        liste = cases.liste
+        q = cases.debut[c]
+        fin = cases.debut[c + 1]
+      }
+      for (; q < fin; q++) {
+        const b = chem[liste[q]]
         // Le mur neutre n'agit qu'au ras de la paroi ; la chimie porte loin,
         // et encore plus loin pour la vapeur (en sourdine).
         const reach = b.material === MAT_WALL ? wallBand : band * porteeGaz
