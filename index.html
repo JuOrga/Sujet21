@@ -9015,7 +9015,10 @@
       /* ---- LA CARTE DANS LA CÉRÉMONIE : le module épuisé, le plan se
          déploie ; la scène s'élargit le temps du choix, le module élu
          S'AGRANDIT (la scène zoome sur lui) puis ses salles arrivent ---- */
-      .mb-scene.mb-large { width: min(1240px, 97vw); }
+      /* 1500 et non 1240 : sur un écran de 1920 × 1080 le plan s'arrêtait à
+         1240 px de large, donc 475 de haut, quand la feuille lui en permet
+         691 (64vh) — mesuré le 10/11 ; à 1500 il en prend 574 */
+      .mb-scene.mb-large { width: min(1500px, 97vw); }
       .mb-cartes.mb-station { grid-template-columns: 1fr; gap: 6px; }
       .mb-station-carte {
         /* les proportions viennent du plan lui-même (main.ts pose --cadre
