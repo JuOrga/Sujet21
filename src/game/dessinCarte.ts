@@ -21,6 +21,7 @@
 // par la matrice du SVG, sans rien calculer.
 
 import {
+  accessibles,
   couleurTemperature,
   orbeRequis,
   liensDepuis,
@@ -75,8 +76,70 @@ export const GLYPHES: Record<TypeModule, string> = {
   inconnu: '?',
 }
 
-const COURANT = '#a7ddf5' // le givre : la couleur du « vous êtes ici »
+const COURANT = '#a7ddf5' // le givre : les lumières du décor, le trait du socle
+// LE « VOUS ÊTES ICI » EST BLANC, et lui seul : le givre (#a7ddf5) est AUSSI
+// la couleur de la zone des coursives — au deuxième choix de la descente, le
+// module où l'on se tient et les trois qu'il ouvre portaient le même bord, et
+// rien ne disait lequel était « ici » (capture du 10/11). La légende de
+// l'écran LA STATION le promettait déjà blanc.
+const ICI = '#eef8ff'
 const INERTE = '#4a6478' // un module hors de portée
+
+// ---- CE QUE LA RUN DIT D'UN MODULE -----------------------------------------------
+
+/** L'ÉTAT D'UN MODULE pour le joueur, là où il se tient. UNE seule lecture,
+ *  que le dessin, l'étiquette d'accessibilité et les fiches partagent : avant,
+ *  le plan ne distinguait pas « plus loin sur ma route » de « je ne pourrai
+ *  plus y aller » — les deux à 60 % —, et la fiche répondait la même phrase
+ *  aux deux (« aucune coursive n'y mène d'ici »). */
+export type EtatModule =
+  | 'ici'
+  /** une coursive ouverte y mène d'ici */
+  | 'joignable'
+  /** une coursive y mène, mais l'orbe manque */
+  | 'verrou'
+  /** le cul-de-sac : le module d'où l'on vient, par où l'on repart */
+  | 'retour'
+  | 'traverse'
+  /** pas encore : il reste sur une route qu'on peut prendre */
+  | 'plus-loin'
+  /** plus jamais de cette descente : aucune coursive n'y mène plus */
+  | 'ferme'
+  /** pas de joueur (l'éditeur) */
+  | 'neutre'
+
+type Lecture = Pick<OptionsDessin, 'courant' | 'visites' | 'orbes' | 'retour'>
+
+/** Ce qu'on peut encore atteindre d'ici — et, depuis un cul-de-sac, ce que
+ *  rouvre le module par où l'on repart. */
+function encoreJoignables(c: CarteStation, o: Lecture): Set<string> {
+  if (o.courant === null) return new Set()
+  const s = accessibles(c, o.courant)
+  if (o.retour) for (const id of accessibles(c, o.retour)) s.add(id)
+  return s
+}
+
+export function etatModule(c: CarteStation, o: Lecture, id: string, joignables?: ReadonlySet<string>): EtatModule {
+  if (o.courant === null) return 'neutre'
+  if (id === o.courant) return 'ici'
+  const arete = liensDepuis(c, o.courant).find((l) => l.vers === id)
+  if (arete) return orbeRequis(c, arete, o.orbes) !== null ? 'verrou' : 'joignable'
+  if (o.retour === id) return 'retour'
+  if (o.visites.includes(id)) return 'traverse'
+  return (joignables ?? encoreJoignables(c, o)).has(id) ? 'plus-loin' : 'ferme'
+}
+
+/** L'état, en mots — pour qui ne voit pas les couleurs, et pour les fiches. */
+export const ETATS_DITS: Record<EtatModule, string> = {
+  ici: 'vous êtes ici',
+  joignable: 'joignable d’ici',
+  verrou: 'verrouillé — un orbe manque',
+  retour: 'retour sur ses pas',
+  traverse: 'déjà traversé',
+  'plus-loin': 'plus loin sur la route — pas encore joignable',
+  ferme: 'hors de portée — plus aucune coursive n’y mène',
+  neutre: '',
+}
 
 /** Un nombre au dixième, sans traîne flottante (« 14 », pas « 14.000000002 »). */
 const n1 = (v: number): string => {
@@ -232,22 +295,37 @@ interface LienDessine {
   badge: string | null
   active: boolean
   parcourue: boolean
+  /** elle part d'ici, mais l'orbe manque */
+  fermee: boolean
+  /** elle part d'un module qu'on ne peut plus atteindre */
+  morte: boolean
 }
 
 function liensDessines(c: CarteStation, o: OptionsDessin): LienDessine[] {
   const out: LienDessine[] = []
+  const joignables = encoreJoignables(c, o)
   c.liens.forEach((l, i) => {
     const t = traceLien(c, l)
     const st = c.typesLiens[l.type]
     if (!t || !st) return
-    const active = o.courant !== null && l.de === o.courant
+    const dIci = o.courant !== null && l.de === o.courant
+    // UNE COURSIVE VERROUILLÉE NE COULE PAS : les trois coursives du hub
+    // défilaient vers leurs modules, deux cadenas compris — le flux disait
+    // « par ici » devant une porte close
+    const fermee = dIci && orbeRequis(c, l, o.orbes) !== null
+    const active = dIci && !fermee
     const parcourue =
       o.visites.includes(l.de) && (o.visites.includes(l.vers) || l.vers === o.courant)
+    // CE QU'ON NE PRENDRA PLUS : une coursive qui part d'un module hors de
+    // portée. Elle restait à 75 % — plus vive que la trace du chemin parcouru
+    // (35 %) —, et la voie principale gardait son halo jusque dans le dos du
+    // joueur : le réseau mort criait plus fort que la route
+    const morte = o.courant !== null && !dIci && !parcourue && !joignables.has(l.de)
     out.push({
       i, l, ...t,
       couleur: st.couleur, epaisseur: st.epaisseur, coque: st.coque,
       tirets: st.tirets ?? (active ? '14 14' : null),
-      badge: st.badge ?? null, active, parcourue,
+      badge: st.badge ?? null, active, parcourue, fermee, morte,
     })
   })
   return out
@@ -271,10 +349,16 @@ function routes(L: LienDessine[], o: OptionsDessin): string {
     L.map((e) => {
       const sel = o.lienSelection === e.i
       const cl =
-        'cs-route' + (e.l.type === 'main' ? ' cs-principale' : '') + (e.active ? ' cs-active' : '') + (e.parcourue ? ' cs-parcourue' : '') + (sel ? ' cs-lien-sel' : '')
-      const op = e.parcourue ? 0.35 : e.active ? 1 : e.l.type === 'main' ? 0.9 : 0.75
+        'cs-route' + (e.l.type === 'main' ? ' cs-principale' : '') + (e.active ? ' cs-active' : '') + (e.parcourue ? ' cs-parcourue' : '') +
+        (e.fermee ? ' cs-fermee' : '') + (e.morte ? ' cs-morte' : '') + (sel ? ' cs-lien-sel' : '')
+      // quatre intensités, de ce qui se décide maintenant à ce qui ne compte
+      // plus : la coursive ouverte d'ici, celles de la suite, la trace, le mort
+      const op = e.parcourue ? 0.35 : e.active ? 1 : e.morte ? 0.2 : e.fermee ? 0.6 : e.l.type === 'main' ? 0.9 : 0.75
+      // la coursive qu'on peut prendre s'épaissit : une « alt » ouverte d'ici
+      // ne se distinguait de ses voisines que par un halo gris sur gris
+      const ep = e.active ? e.epaisseur + 1.5 : e.epaisseur
       let s =
-        `<path class="${cl}" data-lien="${e.i}" d="${e.d}" stroke="${e.couleur}" stroke-width="${n1(e.epaisseur)}"` +
+        `<path class="${cl}" data-lien="${e.i}" d="${e.d}" stroke="${e.couleur}" stroke-width="${n1(ep)}"` +
         (e.tirets ? ` stroke-dasharray="${e.tirets}"` : '') +
         ` opacity="${op}" style="--c:${e.couleur}"/>`
       if (o.mode === 'editeur') {
@@ -343,7 +427,7 @@ function vecteurs(m: ModuleCarte, accent: string, P: CarteStation['palette']): s
   return corps
 }
 
-function module(c: CarteStation, m0: ModuleCarte, k: number, o: OptionsDessin): string {
+function module(c: CarteStation, m0: ModuleCarte, k: number, o: OptionsDessin, joignables: ReadonlySet<string>): string {
   const P = c.palette
   // un « ? » révélé se dessine sous sa nature — glyphe, nom, cran
   const nature = o.revelations?.[m0.id]
@@ -352,20 +436,28 @@ function module(c: CarteStation, m0: ModuleCarte, k: number, o: OptionsDessin): 
   const rond = m.forme === 'rond'
   const boss = m.type === 'boss'
   const jonction = m.type === 'jonction'
-  const estCourant = o.courant === m.id
+  const etat = etatModule(c, o, m.id, joignables)
+  const estCourant = etat === 'ici'
   const visite = o.visites.includes(m.id)
-  const arete = o.courant !== null ? liensDepuis(c, o.courant).find((l) => l.vers === m.id) : undefined
-  const verrou = arete ? orbeRequis(c, arete, o.orbes) !== null : false
-  const cliquable = !!arete || o.retour === m.id
+  const verrou = etat === 'verrou'
+  const cliquable = etat === 'joignable' || verrou || etat === 'retour'
+  const ferme = etat === 'ferme'
+  const objectif = o.courant !== null && m.id === c.regles.objectif
   const sel = o.selection === m.id
   const edition = o.mode === 'editeur'
 
-  const bord = estCourant ? COURANT : sel ? P.texte : cliquable ? (verrou ? P.texteSecondaire : zc)
+  const bord = estCourant ? ICI : sel ? P.texte : cliquable ? (verrou ? P.texteSecondaire : zc)
     : visite ? c.zones[0]?.couleur ?? COURANT : jonction ? P.texteSecondaire : edition ? zc : INERTE
   const fond = estCourant ? 'rgba(99,183,230,.35)' : visite ? 'rgba(99,183,230,.18)' : boss ? 'rgba(201,154,255,.2)' : P.plaqueSombre
-  const texte = estCourant || sel ? P.texte : cliquable || edition ? zc : P.texteSecondaire
-  const opacite = edition || visite || estCourant || cliquable || boss ? 1 : 0.6
-  const accent = estCourant ? COURANT : zc
+  // un module verrouillé n'invite pas : son nom en teinte de zone le faisait
+  // lire comme ouvert, à côté de celui qui l'était
+  const texte = estCourant || sel ? P.texte : (cliquable && !verrou) || edition ? zc : P.texteSecondaire
+  // LE CORPS DIT L'ÉTAT, en quatre crans : ce qui se joue maintenant (ici, les
+  // portes, l'objectif) à plein ; le chemin parcouru en retrait — il brillait
+  // autant que le module où l'on se tient ; la suite à 60 % ; et ce qu'on ne
+  // pourra plus atteindre, presque éteint
+  const opacite = edition || estCourant || cliquable || objectif || (boss && !ferme) ? 1 : etat === 'traverse' ? 0.7 : ferme ? 0.3 : 0.6
+  const accent = estCourant ? ICI : zc
   const glyphe = estCourant ? '◈' : GLYPHES[m.type]
   const fonte = boss ? 30 : jonction ? 0 : 20
 
@@ -378,13 +470,19 @@ function module(c: CarteStation, m0: ModuleCarte, k: number, o: OptionsDessin): 
   const classes =
     'cs-mod cs-' + m.type +
     (estCourant ? ' cs-courant' : '') + (visite && !estCourant ? ' cs-visite' : '') +
+    (ferme ? ' cs-ferme' : '') + (objectif ? ' cs-objectif' : '') +
     (cliquable ? (verrou ? ' cs-verrou' : ' cs-cible') : '') + (sel ? ' cs-sel' : '') +
     (edition ? ' cs-editable' : '')
   const clip = `cs-clip-${k}`
 
+  // L'ÉTAT SE DIT AUSSI EN MOTS : un lecteur d'écran n'entendait que le nom et
+  // la nature — rien de ce que le plan dit par la couleur et l'éclat
+  const dit =
+    `${esc(m.nom)} — ${esc(c.types[m.type])}${m.cran > 0 ? ` — confinement +${m.cran}` : ''}` +
+    (objectif && !estCourant ? ' — objectif' : '') + (etat !== 'neutre' ? ` — ${ETATS_DITS[etat]}` : '')
   let s =
-    `<g class="${classes}" data-mod="${esc(m.id)}" tabindex="0" role="button" style="--z:${zc};--bord:${bord}" aria-label="${esc(m.nom)} — ${esc(c.types[m.type])}${m.cran > 0 ? ` — confinement +${m.cran}` : ''}">` +
-    `<title>${esc(m.nom)} — ${esc(c.types[m.type])}${m.cran > 0 ? ` — confinement +${m.cran}` : ''}</title>` +
+    `<g class="${classes}" data-mod="${esc(m.id)}" tabindex="0" role="button" style="--z:${zc};--bord:${bord}" aria-label="${dit}">` +
+    `<title>${dit}</title>` +
     `<clipPath id="${clip}">${forme(3)}/></clipPath>` +
     // LE SOCLE OPAQUE, sous le fût : les coursives vont de centre à centre,
     // donc PASSENT SOUS chaque module. L'extinction (60 %) portait sur tout le
@@ -425,7 +523,7 @@ function module(c: CarteStation, m0: ModuleCarte, k: number, o: OptionsDessin): 
     const y0 = t + m.h + 8 + 12
     const lignes = lignesNom(m.nom)
     s +=
-      `<text class="cs-nom" x="${n1(m.x)}" y="${n1(y0)}" fill="${texte}">` +
+      `<text class="cs-nom" x="${n1(m.x)}" y="${n1(y0)}" fill="${texte}"${ferme ? ' opacity="0.45"' : ''}>` +
       lignes.map((li, i) => `<tspan x="${n1(m.x)}" dy="${i === 0 ? 0 : 15}">${esc(li)}</tspan>`).join('') +
       `</text>`
     if (o.afficherTemp) {
@@ -433,7 +531,7 @@ function module(c: CarteStation, m0: ModuleCarte, k: number, o: OptionsDessin): 
       const tc = couleurTemperature(c, m.temp)
       const larg = Math.max(4, Math.min(100, (m.temp + 60) / 1.6))
       s +=
-        `<g class="cs-temp" transform="translate(${n1(m.x)} ${n1(yt)})">` +
+        `<g class="cs-temp" transform="translate(${n1(m.x)} ${n1(yt)})"${ferme ? ' opacity="0.45"' : ''}>` +
         `<rect x="-31" y="-2" width="40" height="4" fill="rgba(150,200,235,.12)"/>` +
         `<rect x="-31" y="-2" width="${n1((40 * larg) / 100)}" height="4" fill="${tc}"/>` +
         `<text x="14" y="4" fill="${tc}">${n1(m.temp)}°</text></g>`
@@ -442,6 +540,21 @@ function module(c: CarteStation, m0: ModuleCarte, k: number, o: OptionsDessin): 
         s += `<text class="cs-niv" x="${n1(m.x)}" y="${n1(yt + 15)}" fill="${P.texteSecondaire}">${m.niveaux} NIV.${m.biome ? ' · ' + esc(m.biome) : ''}</text>`
     }
   }
+  // LES DEUX PLAQUES QUI RÉPONDENT AUX DEUX QUESTIONS DU PLAN, en toutes
+  // lettres au-dessus du fût : où suis-je, où vais-je. Le courant ne se
+  // disait que par un éclat et un glyphe, l'objectif par rien du tout — il
+  // fallait survoler pour l'apprendre. Des mots : ni la couleur ni la forme
+  // ne portent seules le sens.
+  const plaque = (mot: string, couleur: string, classe: string): string => {
+    const w = mot.length * 8.7 + 18
+    return (
+      `<g class="cs-plaque ${classe}" transform="translate(${n1(m.x)} ${n1(t - 18)})">` +
+      `<rect x="${n1(-w / 2)}" y="-11" width="${n1(w)}" height="22" rx="3" fill="${P.plaqueSombre}" stroke="${couleur}"/>` +
+      `<text x="0" y="4.5" fill="${couleur}">${mot}</text></g>`
+    )
+  }
+  if (estCourant) s += plaque('VOUS ÊTES ICI', ICI, 'cs-plaque-ici')
+  else if (objectif) s += plaque('OBJECTIF', zc, 'cs-plaque-objectif')
   if (edition && sel) {
     // les poignées de redimensionnement, aux quatre coins
     const poignees: [string, number, number][] = [
@@ -484,6 +597,7 @@ function grille(c: CarteStation, pas: number): string {
 /** LA CARTE COMPLÈTE, en une chaîne SVG. */
 export function dessinCarteSVG(c: CarteStation, o: OptionsDessin): string {
   const L = liensDessines(c, o)
+  const joignables = encoreJoignables(c, o)
   const W = c.scene.width
   const H = c.scene.height
   const brouillon = o.brouillon
@@ -500,7 +614,7 @@ export function dessinCarteSVG(c: CarteStation, o: OptionsDessin): string {
     coursives(c, L) +
     routes(L, o) +
     badges(c, L) +
-    `<g class="cs-modules">${c.modules.map((m, k) => module(c, m, k, o)).join('')}</g>` +
+    `<g class="cs-modules">${c.modules.map((m, k) => module(c, m, k, o, joignables)).join('')}</g>` +
     brouillon +
     `</svg>`
   )

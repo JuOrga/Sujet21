@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { CARTE_LIVREE, cloneCarte } from './carteStation'
-import { dessinCarteSVG, octogone, type OptionsDessin } from './dessinCarte'
+import { ETATS_DITS, dessinCarteSVG, etatModule, octogone, type OptionsDessin } from './dessinCarte'
 
 const base: OptionsDessin = {
   courant: null,
@@ -60,8 +60,10 @@ describe('dessinCarteSVG — le plan, depuis les données', () => {
     expect(svg).toMatch(/cs-verrou" data-mod="T1"/)
     expect(svg).toMatch(/cs-verrou" data-mod="T3"/)
     expect(compte(svg, /🔒/g)).toBe(2)
-    // les coursives actives (depuis le courant) portent l'animation
-    expect(compte(svg, /cs-active/g)).toBe(3)
+    // seule la coursive OUVERTE coule : les deux verrouillées ne disent pas « par ici »
+    expect(compte(svg, /cs-active/g)).toBe(1)
+    expect(compte(svg, /cs-fermee/g)).toBe(2)
+    expect(svg).toMatch(/class="cs-route cs-principale cs-active" data-lien="1"/)
   })
 
   it('un module éteint ne laisse pas voir les coursives qui passent dessous', () => {
@@ -130,5 +132,80 @@ describe('le « ? » sur le plan', () => {
     const apres = dessinCarteSVG(c, { ...base, revelations: { INC: 'combat' } })
     expect(apres).toContain('aria-label="? — COMBAT — COMBAT — confinement +1"')
     expect(compte(apres, /class="cs-cran"/g)).toBe(4)
+  })
+})
+
+describe('l’état d’un module — où suis-je, où puis-je aller, pourquoi pas ailleurs', () => {
+  const jeu: OptionsDessin = { ...base, mode: 'jeu', grille: 0 }
+  // au milieu d'une descente : HUB → T2 → C2, l'orbe de glace en poche
+  const milieu: OptionsDessin = { ...jeu, courant: 'C2', visites: ['HUB', 'T2'], orbes: ['solidification'] }
+
+  it('distingue ce qui reste sur la route de ce qu’on ne pourra plus atteindre', () => {
+    const e = (id: string) => etatModule(CARTE_LIVREE, milieu, id)
+    expect(e('C2')).toBe('ici')
+    expect(['P1', 'P2', 'P3'].map(e)).toEqual(['joignable', 'joignable', 'joignable'])
+    expect(['HUB', 'T2'].map(e)).toEqual(['traverse', 'traverse'])
+    expect(['ANTI', 'OBS'].map(e)).toEqual(['plus-loin', 'plus-loin'])
+    // derrière le joueur : aucune coursive n'y mène plus
+    expect(['T1', 'T3', 'C1', 'C3'].map(e)).toEqual(['ferme', 'ferme', 'ferme', 'ferme'])
+    // au hub, sans orbe : les deux transfos sont verrouillées, pas fermées
+    expect(etatModule(CARTE_LIVREE, { ...jeu, courant: 'HUB' }, 'T1')).toBe('verrou')
+    expect(etatModule(CARTE_LIVREE, { ...jeu, courant: 'HUB' }, 'P1')).toBe('plus-loin')
+    // sans joueur (l'éditeur), aucun état
+    expect(etatModule(CARTE_LIVREE, base, 'T1')).toBe('neutre')
+  })
+
+  it('depuis un cul-de-sac, ce que rouvre le retour n’est pas fermé', () => {
+    const c = cloneCarte(CARTE_LIVREE)
+    c.liens = c.liens.filter((l) => l.de !== 'P1')
+    const o: OptionsDessin = { ...jeu, courant: 'P1', visites: ['HUB', 'T2', 'C2'], retour: 'C2' }
+    expect(etatModule(c, o, 'C2')).toBe('retour')
+    expect(etatModule(c, o, 'P2')).toBe('plus-loin')
+    expect(etatModule(c, o, 'C1')).toBe('ferme')
+  })
+
+  it('écrit « VOUS ÊTES ICI » et « OBJECTIF » en toutes lettres, et borde le courant de blanc', () => {
+    const svg = dessinCarteSVG(CARTE_LIVREE, milieu)
+    expect(compte(svg, /class="cs-plaque /g)).toBe(2)
+    expect(svg).toMatch(/data-mod="C2".*?class="cs-bord" fill="#eef8ff".*?cs-plaque-ici.*?VOUS ÊTES ICI/s)
+    expect(svg).toMatch(/data-mod="OBS".*?cs-plaque-objectif.*?OBJECTIF/s)
+    // arrivé à l'objectif, une seule plaque : on y est
+    const fin = dessinCarteSVG(CARTE_LIVREE, { ...jeu, courant: 'OBS', visites: ['HUB'] })
+    expect(compte(fin, /class="cs-plaque /g)).toBe(1)
+    expect(fin).not.toContain('cs-plaque-objectif')
+    // l'éditeur n'a pas de joueur : pas de plaque
+    expect(dessinCarteSVG(CARTE_LIVREE, base)).not.toContain('class="cs-plaque ')
+  })
+
+  it('met le chemin parcouru en retrait et éteint ce qui est fermé', () => {
+    const svg = dessinCarteSVG(CARTE_LIVREE, milieu)
+    const corps = (id: string) => new RegExp(`data-mod="${id}".*?<g class="cs-corps" opacity="([\\d.]+)"`, 's').exec(svg)![1]
+    expect(corps('C2')).toBe('1')
+    expect(corps('P1')).toBe('1')
+    expect(corps('OBS')).toBe('1') // l'objectif reste allumé : c'est le cap
+    expect(corps('T2')).toBe('0.7')
+    expect(corps('ANTI')).toBe('0.6')
+    expect(corps('C1')).toBe('0.3')
+    expect(svg).toMatch(/cs-ferme" data-mod="C1"/)
+  })
+
+  it('dit l’état dans l’étiquette d’accessibilité', () => {
+    const svg = dessinCarteSVG(CARTE_LIVREE, milieu)
+    expect(svg).toContain(`aria-label="CONDUITS — ÉNIGME — ${ETATS_DITS.ici}"`)
+    expect(svg).toContain(`aria-label="PUITS FROID — COMBAT — ${ETATS_DITS.joignable}"`)
+    expect(svg).toContain(`aria-label="CRYOSTAT — COMBAT — confinement +1 — ${ETATS_DITS.ferme}"`)
+    expect(svg).toContain(`aria-label="OBSERVATOIRE — TERMINAL — confinement +1 — objectif — ${ETATS_DITS['plus-loin']}"`)
+  })
+
+  it('range les coursives : l’ouverte s’épaissit, la morte s’efface', () => {
+    const svg = dessinCarteSVG(CARTE_LIVREE, milieu)
+    // C2 → P1 (une « alt » ouverte d'ici) : 2,5 + 1,5 d'épaisseur, pleine
+    expect(svg).toMatch(/class="cs-route cs-active" data-lien="12"[^>]*stroke-width="4"[^>]*opacity="1"/)
+    // T1 → C1 part d'un module hors de portée
+    expect(svg).toMatch(/class="cs-route cs-morte" data-lien="3"[^>]*opacity="0.2"/)
+    // la voie principale, devant : C2 → P2 active, P2 → ANTI à venir
+    expect(svg).toMatch(/class="cs-route cs-principale" data-lien="18"[^>]*opacity="0.9"/)
+    // aucune coursive morte sans joueur
+    expect(dessinCarteSVG(CARTE_LIVREE, base)).not.toContain('cs-morte')
   })
 })
