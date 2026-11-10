@@ -124,7 +124,7 @@ import {
   fermeParPorte,
   REPERES_VOIE,
 } from './game/voiesModule'
-import { armeAuToucher, ARMEE } from './game/porteArmee'
+import { armeAuToucher, ARMEE, viseePuisEntree } from './game/porteArmee'
 import { CLE_MANQUES, inventairePool, litManques, noteManque, type Manque } from './game/manques'
 import {
   arriveRafales,
@@ -15532,7 +15532,7 @@ function mbMontreCarte(raison: 'depart' | 'suite'): void {
       if (k >= 0) scene.querySelector(`.cs-route[data-lien="${k}"]`)?.classList.add('cs-projet')
     })
   }
-  const dit = (id: string | null): void => {
+  const dit = (id: string | null, auDoigt = false): void => {
     // un « ? » révélé se lit sous sa nature ; non révélé, il garde son secret
     const mod = id ? moduleEffectif(carte, carteRun, moduleParId(carte, id)) : undefined
     const vise = mod && choix.some((c) => c.module.id === id) ? mod.id : null
@@ -15565,7 +15565,10 @@ function mbMontreCarte(raison: 'depart' | 'suite'): void {
         ? 'nature inconnue — se révèle à l’entrée'
         : `${carte.types[mod.type].toLowerCase()} · ${mod.niveaux > 0 ? `${mod.niveaux} salle${mod.niveaux > 1 ? 's' : ''}` : 'sans salle'}`
     lignes(
-      `${mod.nom} · ${nature}` +
+      // visé au doigt : la consigne d'abord — en fin de ligne, les points de
+      // suspension d'un écran étroit la mangeaient
+      (auDoigt ? 'TOUCHEZ ENCORE POUR ENTRER ▸ ' : '') +
+        `${mod.nom} · ${nature}` +
         (mod.cran > 0 ? ` · confinement +${mod.cran}, mémoire ×${primeMemoireDu(mod)}` : '') +
         ` · ${mod.temp}°C · ${acces}`,
       types.length ? `on y trouve : ${types.join(', ')}` : '',
@@ -15610,8 +15613,18 @@ function mbMontreCarte(raison: 'depart' | 'suite'): void {
       scene.classList.add('mb-station-refus')
       return
     }
+    // AU DOIGT, LE PREMIER TOUCHER VISE (game/porteArmee, viseePuisEntree) :
+    // la fiche, la route et ce qui s'éteint se montrent, le second toucher entre
+    if (!garde.clic(x.module.id)) {
+      for (const el of scene.querySelectorAll('.cs-sel')) el.classList.remove('cs-sel')
+      scene.querySelector(`[data-mod="${CSS.escape(x.module.id)}"]`)?.classList.add('cs-sel')
+      dit(x.module.id, true)
+      return
+    }
     elit(x)
   }
+  const garde = viseePuisEntree()
+  scene.addEventListener('pointerdown', (e) => garde.pointeur(e.pointerType))
   scene.addEventListener('click', (e) => choisit(litId(e)))
   scene.addEventListener('keydown', (e) => {
     if (e.key === 'Enter' || e.key === ' ') {

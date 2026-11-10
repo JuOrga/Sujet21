@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { ARMEE, armeAuToucher, TEXTE_ARMEE, TEXTE_ENTRER, type PorteArmable } from './porteArmee'
+import { ARMEE, armeAuToucher, TEXTE_ARMEE, TEXTE_ENTRER, viseePuisEntree, type PorteArmable } from './porteArmee'
 
 // une porte factice : ses classes, son bouton « ENTRER », les événements
 // qu'elle reçoit, et le toucher qu'on lui fait
@@ -73,5 +73,44 @@ describe('armeAuToucher — au doigt, une porte se vise puis s’ouvre', () => {
     const clic = armeAuToucher(p, false)
     p.appuie('touch')
     expect(clic()).toBe(true)
+  })
+})
+
+describe('viseePuisEntree — au doigt, un module du plan se vise puis s’ouvre', () => {
+  it('au doigt : le premier toucher vise, le second du même module entre', () => {
+    const g = viseePuisEntree()
+    g.pointeur('touch')
+    expect(g.clic('P1')).toBe(false)
+    expect(g.visee()).toBe('P1')
+    g.pointeur('touch')
+    expect(g.clic('P1')).toBe(true)
+    expect(g.visee()).toBeNull()
+  })
+
+  it('viser un autre module le vise à son tour, sans entrer nulle part', () => {
+    const g = viseePuisEntree()
+    g.pointeur('touch')
+    expect(g.clic('P1')).toBe(false)
+    g.pointeur('touch')
+    expect(g.clic('P2')).toBe(false)
+    expect(g.visee()).toBe('P2')
+    g.pointeur('touch')
+    expect(g.clic('P2')).toBe(true)
+  })
+
+  it('souris, clavier, manette : chaque clic entre', () => {
+    const g = viseePuisEntree()
+    g.pointeur('mouse')
+    expect(g.clic('P1')).toBe(true)
+    // Entrée au clavier, bouton de manette : aucun appui de pointeur
+    expect(g.clic('P2')).toBe(true)
+  })
+
+  it('le doigt ne vaut que pour son clic : une validation à la manette qui suit entre', () => {
+    const g = viseePuisEntree()
+    g.pointeur('touch')
+    expect(g.clic('P1')).toBe(false)
+    // la manette valide un AUTRE module sans appui de pointeur : elle entre
+    expect(g.clic('P3')).toBe(true)
   })
 })
