@@ -1338,6 +1338,11 @@
         .st-bas { flex-direction: column; }
         .st-legende { flex-direction: row; flex-wrap: wrap; }
         .st-avance { font-size: calc(10px * var(--ui)); }
+        /* en portrait, la ligne d'avance passe SOUS le titre : à côté, il ne
+           lui restait presque rien et elle sortait de l’écran par la droite */
+        .st-tete { flex-wrap: wrap; row-gap: 6px; }
+        .st-titres { flex: 1; min-width: 0; }
+        .st-avance { order: 3; flex: 1 0 100%; text-align: left; }
       }
       @media (prefers-reduced-motion: reduce) {
         .ps-route-trait, .ps-sujet, .ps-courant .ps-halo { animation: none; }
@@ -6530,7 +6535,7 @@
       #carte-editeur .ce-etat { flex: 1; padding: 8px 0; }
       .ce-orbes { display: flex; flex-wrap: wrap; gap: 4px; }
       #carte-editeur .ce-orbes .ce-etat { flex: none; padding: 5px 8px; font-size: calc(10.5px * var(--ui)); text-transform: none; letter-spacing: 0.04em; }
-      .cs-niv { font-size: 10px; letter-spacing: 0.12em; text-anchor: middle; pointer-events: none; }
+      .cs-niv { font-size: 11px; letter-spacing: 0.12em; text-anchor: middle; pointer-events: none; }
 
       /* la visée manette sur un module du plan : le même liseré que la sélection */
       .cs-mod.pad-focus { filter: drop-shadow(0 0 12px rgba(238, 248, 255, 0.8)); outline: none; }
@@ -6538,9 +6543,14 @@
          comme pour un futur écran de jeu. Les couleurs de la carte voyagent
          en attributs (elles viennent des données) ; ici, les états. */
       .cs-svg { display: block; width: 100%; height: 100%; font-family: var(--font-mono); }
-      .cs-badge text { font-size: 12px; letter-spacing: 0.1em; text-anchor: middle; }
-      .cs-decor-nom { font-family: var(--font-display); font-size: 10px; letter-spacing: 0.14em; fill: #7f9cb0; text-anchor: middle; }
-      .cs-decor-sous { font-size: 10px; letter-spacing: 0.18em; fill: #4a6478; text-anchor: middle; }
+      /* LES TAILLES SONT EN UNITÉS DE SCÈNE, et la scène se réduit à l'écran :
+         à 11 et 12, un nom de module faisait 6,3 px dans la cérémonie d'un
+         écran de 1280 × 800, une température 6,9 px (mesuré le 10/11). Avec
+         le cadre serré du jeu (dessinCarte, cadreCarte), 15 et 13 tombent
+         autour de 11 et 10 px. Les pas de l'étiquette suivent, dans le dessin. */
+      .cs-badge text { font-size: 13px; letter-spacing: 0.1em; text-anchor: middle; }
+      .cs-decor-nom { font-family: var(--font-display); font-size: 12px; letter-spacing: 0.14em; fill: #7f9cb0; text-anchor: middle; }
+      .cs-decor-sous { font-size: 11px; letter-spacing: 0.18em; fill: #4a6478; text-anchor: middle; }
       .cs-lumieres { filter: drop-shadow(0 0 5px #63b7e6); }
       .cs-route.cs-active { filter: drop-shadow(0 0 6px var(--c)); animation: cs-flux 1.2s linear infinite; }
       /* la voie principale garde son halo là où elle compte encore : il
@@ -6581,11 +6591,12 @@
       .cs-jeu .cs-mod:hover { filter: drop-shadow(0 0 10px var(--z)); }
       @keyframes cs-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.7; } }
       .cs-glyphe { text-anchor: middle; dominant-baseline: central; paint-order: stroke; stroke: #030710; stroke-width: 3px; }
-      .cs-cadenas { text-anchor: middle; dominant-baseline: central; font-size: 15px; }
-      .cs-coche { text-anchor: middle; dominant-baseline: central; font-size: 10px; fill: #63b7e6; }
-      .cs-cran { text-anchor: middle; dominant-baseline: central; font-size: 11px; font-weight: 600; letter-spacing: 0.04em; paint-order: stroke; stroke: #030710; stroke-width: 3px; }
-      .cs-nom { font-family: var(--font-display); font-size: 11px; letter-spacing: 0.1em; text-anchor: middle; pointer-events: none; }
-      .cs-temp text { font-size: 12px; text-anchor: start; }
+      .cs-cadenas { text-anchor: middle; dominant-baseline: central; font-size: 22px; }
+      .cs-coche { text-anchor: middle; dominant-baseline: central; font-size: 15px; font-weight: 600; fill: #63b7e6; paint-order: stroke; stroke: #030710; stroke-width: 3px; }
+      .cs-cran { text-anchor: middle; dominant-baseline: central; font-size: 15px; font-weight: 600; letter-spacing: 0.04em; paint-order: stroke; stroke: #030710; stroke-width: 3px; }
+      /* le nom se détoure du fond : il croise parfois une coursive */
+      .cs-nom { font-family: var(--font-display); font-size: 15px; letter-spacing: 0.08em; text-anchor: middle; pointer-events: none; paint-order: stroke; stroke: #030710; stroke-width: 4px; stroke-linejoin: round; }
+      .cs-temp text { font-size: 13px; text-anchor: start; paint-order: stroke; stroke: #030710; stroke-width: 3px; }
       .cs-temp { pointer-events: none; }
       .cs-poignee { fill: #eef8ff; stroke: #030710; stroke-width: 1.5; cursor: nwse-resize; }
       .cs-poignee[data-poignee="ne"], .cs-poignee[data-poignee="sw"] { cursor: nesw-resize; }
@@ -8990,13 +9001,32 @@
       .mb-scene.mb-large { width: min(1240px, 97vw); }
       .mb-cartes.mb-station { grid-template-columns: 1fr; gap: 6px; }
       .mb-station-carte {
-        aspect-ratio: 1600 / 804; max-height: 64vh; width: 100%; margin: 0 auto;
+        /* les proportions viennent du plan lui-même (main.ts pose --cadre
+           depuis cadreCarte) : la feuille les tenait à 1600 / 804, la taille
+           d'une scène qui en fait 2100 depuis le 16/09 */
+        aspect-ratio: var(--cadre, 1616 / 616); max-height: 64vh; width: 100%; margin: 0 auto;
         border: 1px solid #27405a; border-radius: 10px; overflow: hidden; background: #020509;
         box-shadow: 0 0 0 1px rgba(99, 183, 230, 0.1), 0 20px 60px rgba(0, 0, 0, 0.6), inset 0 0 60px rgba(99, 183, 230, 0.06);
         transition: transform 0.42s cubic-bezier(0.2, 0.7, 0.2, 1), opacity 0.42s ease;
         animation: mb-carte-monte 0.5s cubic-bezier(0.2, 1, 0.3, 1) backwards;
       }
       .mb-station-carte .cs-svg { width: 100%; height: 100%; }
+      /* LE PETIT ÉCRAN FAIT DÉFILER LE PLAN au lieu de le réduire : entier
+         dans un téléphone, un nom de module faisait 3 px (2 px en portrait,
+         mesuré le 10/11) et un module 20 px de côté, sous le doigt. Le plan
+         garde une hauteur lisible et glisse dans son cadre ; main.ts l'ouvre
+         sur le module où l'on se tient (centrePlanSurIci). */
+      @media (max-width: 700px), (pointer: coarse) and (max-height: 620px) {
+        .mb-station-carte, .st-plan {
+          aspect-ratio: auto; overflow: auto; overscroll-behavior: contain;
+          -webkit-overflow-scrolling: touch; scrollbar-width: thin;
+        }
+        .mb-station-carte { height: min(56vh, 520px); max-height: none; }
+        .st-plan { flex: none; height: min(52vh, 520px); }
+        .mb-station-carte .cs-svg, .st-plan .cs-svg {
+          width: auto; height: max(100%, 400px); aspect-ratio: var(--cadre, 1616 / 616);
+        }
+      }
       .mb-station-carte.mb-station-zoom { transform: scale(2.4); opacity: 0; }
       .mb-station-carte.mb-station-refus { animation: mb-secousse 0.32s ease; }
       @keyframes mb-secousse {

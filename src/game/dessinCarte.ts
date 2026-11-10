@@ -172,6 +172,57 @@ function lignesNom(nom: string, seuil = 14): string[] {
   return [nom.slice(0, coupe), nom.slice(coupe + 1)]
 }
 
+// ---- LE CADRE ----------------------------------------------------------------
+
+// L'ÉTIQUETTE SOUS LE FÛT, en unités de scène. Les tailles de police vivent
+// dans la feuille (.cs-nom 15, .cs-temp 13) ; ces pas-ci doivent les suivre.
+const NOM_BASE = 22 // du bas du fût à la ligne de base du nom
+const NOM_PAS = 18 // d'une ligne du nom à la suivante
+const TEMP_PAS = 16 // du nom à la jauge de température
+const PLAQUE_HAUT = 30 // la plaque « vous êtes ici » / « objectif », au-dessus du fût
+
+export interface Cadre {
+  x: number
+  y: number
+  w: number
+  h: number
+}
+
+/** CE QUE LE PLAN MONTRE. L'éditeur voit toute la scène. Le JEU cadre ce qui
+ *  se joue : les modules, leurs étiquettes, leurs plaques, les badges.
+ *
+ *  Pourquoi : la scène fait 2100 de large pour loger le télescope, et l'arc
+ *  de coque la tient à 804 de haut — le jouable n'en occupe que les deux
+ *  tiers. Cadrée entière dans la cérémonie d'un écran de 1280 × 800, elle
+ *  tombait à 0,58 : un nom de module à 6,3 px, une température à 6,9 px
+ *  (mesuré le 10/11). Le décor déborde du cadre au lieu de le remplir — et
+ *  comme un SVG ne coupe qu'à sa boîte, un cadre plus large que le plan en
+ *  montre davantage tout seul. */
+export function cadreCarte(c: CarteStation, mode: OptionsDessin['mode']): Cadre {
+  const tout: Cadre = { x: 0, y: 0, w: c.scene.width, h: c.scene.height }
+  if (mode === 'editeur' || c.modules.length === 0) return tout
+  let x0 = Infinity
+  let y0 = Infinity
+  let x1 = -Infinity
+  let y1 = -Infinity
+  for (const m of c.modules) {
+    x0 = Math.min(x0, m.x - m.w / 2)
+    x1 = Math.max(x1, m.x + m.w / 2)
+    y0 = Math.min(y0, m.y - m.h / 2 - PLAQUE_HAUT)
+    y1 = Math.max(y1, m.y + m.h / 2 + NOM_BASE + (lignesNom(m.nom).length - 1) * NOM_PAS + TEMP_PAS + 8)
+  }
+  // la marge des côtés laisse voir d'où part la station (l'arc de coque) et
+  // où elle finit (le tube du télescope) ; celle du haut et du bas est juste
+  // de quoi respirer — c'est la hauteur qui décide de l'échelle
+  // LA MARGE s'arrête au bord de la scène ; un module, jamais — posé à cheval
+  // sur le bord par l'éditeur, il doit rester entier dans le cadre
+  x0 = Math.min(x0, Math.max(0, x0 - 110))
+  x1 = Math.max(x1, Math.min(c.scene.width, x1 + 110))
+  y0 = Math.min(y0, Math.max(0, y0 - 14))
+  y1 = Math.max(y1, Math.min(c.scene.height, y1 + 14))
+  return { x: x0, y: y0, w: x1 - x0, h: y1 - y0 }
+}
+
 // ---- LE DÉCOR ----------------------------------------------------------------
 
 type Pt = [number, number]
@@ -386,11 +437,11 @@ function badges(c: CarteStation, L: LienDessine[]): string {
         const x = (e.x1 + e.x2) / 2
         const y = (e.y1 + e.y2) / 2 + (e.y2 < e.y1 ? -20 : 20)
         const texte = e.badge!
-        const w = texte.length * 7.6 + 18
+        const w = texte.length * 8.3 + 18
         return (
           `<g class="cs-badge" transform="translate(${n1(x)} ${n1(y)})">` +
-          `<rect x="${n1(-w / 2)}" y="-10" width="${n1(w)}" height="20" rx="3" fill="${c.palette.plaqueSombre}" stroke="${e.couleur}"/>` +
-          `<text x="0" y="4" fill="${e.couleur}">${esc(texte)}</text></g>`
+          `<rect x="${n1(-w / 2)}" y="-11" width="${n1(w)}" height="22" rx="3" fill="${c.palette.plaqueSombre}" stroke="${e.couleur}"/>` +
+          `<text x="0" y="4.5" fill="${e.couleur}">${esc(texte)}</text></g>`
         )
       })
       .join('') +
@@ -459,7 +510,7 @@ function module(c: CarteStation, m0: ModuleCarte, k: number, o: OptionsDessin, j
   const opacite = edition || estCourant || cliquable || objectif || (boss && !ferme) ? 1 : etat === 'traverse' ? 0.7 : ferme ? 0.3 : 0.6
   const accent = estCourant ? ICI : zc
   const glyphe = estCourant ? '◈' : GLYPHES[m.type]
-  const fonte = boss ? 30 : jonction ? 0 : 20
+  const fonte = boss ? 34 : jonction ? 0 : 26
 
   const l = m.x - m.w / 2
   const t = m.y - m.h / 2
@@ -510,34 +561,34 @@ function module(c: CarteStation, m0: ModuleCarte, k: number, o: OptionsDessin, j
   if (verrou)
     s += `${forme(0)} class="cs-voile" fill="rgba(3,7,16,.55)"/><text class="cs-cadenas" x="${n1(m.x)}" y="${n1(m.y)}">🔒</text>`
   if (visite && !estCourant)
-    s += `<text class="cs-coche" x="${n1(l + m.w - 12)}" y="${n1(t + 12)}">✓</text>`
+    s += `<text class="cs-coche" x="${n1(l + m.w - 10)}" y="${n1(t + 10)}">✓</text>`
   // LE CONFINEMENT SUPÉRIEUR se lit sur le plan avant qu'on s'y engage : le
   // joueur pèse la route en voyant la marque, comme l'élite d'un Slay the
   // Spire — plus dur, plus généreux
   if (m.cran > 0)
-    s += `<text class="cs-cran" x="${n1(l + m.w - 16)}" y="${n1(t + m.h - 14)}" fill="${P.chaud}">+${m.cran}</text>`
+    s += `<text class="cs-cran" x="${n1(l + m.w - 12)}" y="${n1(t + m.h - 10)}" fill="${P.chaud}">+${m.cran}</text>`
 
   // l'étiquette : le nom sous le fût, puis la température
   const etiquette = !jonction || sel || estCourant || edition
   if (etiquette) {
-    const y0 = t + m.h + 8 + 12
+    const y0 = t + m.h + NOM_BASE
     const lignes = lignesNom(m.nom)
     s +=
       `<text class="cs-nom" x="${n1(m.x)}" y="${n1(y0)}" fill="${texte}"${ferme ? ' opacity="0.45"' : ''}>` +
-      lignes.map((li, i) => `<tspan x="${n1(m.x)}" dy="${i === 0 ? 0 : 15}">${esc(li)}</tspan>`).join('') +
+      lignes.map((li, i) => `<tspan x="${n1(m.x)}" dy="${i === 0 ? 0 : NOM_PAS}">${esc(li)}</tspan>`).join('') +
       `</text>`
     if (o.afficherTemp) {
-      const yt = y0 + (lignes.length - 1) * 15 + 12
+      const yt = y0 + (lignes.length - 1) * NOM_PAS + TEMP_PAS
       const tc = couleurTemperature(c, m.temp)
       const larg = Math.max(4, Math.min(100, (m.temp + 60) / 1.6))
       s +=
         `<g class="cs-temp" transform="translate(${n1(m.x)} ${n1(yt)})"${ferme ? ' opacity="0.45"' : ''}>` +
-        `<rect x="-31" y="-2" width="40" height="4" fill="rgba(150,200,235,.12)"/>` +
-        `<rect x="-31" y="-2" width="${n1((40 * larg) / 100)}" height="4" fill="${tc}"/>` +
-        `<text x="14" y="4" fill="${tc}">${n1(m.temp)}°</text></g>`
+        `<rect x="-38" y="-2.5" width="44" height="5" fill="rgba(150,200,235,.12)"/>` +
+        `<rect x="-38" y="-2.5" width="${n1((44 * larg) / 100)}" height="5" fill="${tc}"/>` +
+        `<text x="12" y="4.5" fill="${tc}">${n1(m.temp)}°</text></g>`
       // en édition, la mesure qui compte pour la run : les niveaux du biome
       if (edition && m.niveaux > 0)
-        s += `<text class="cs-niv" x="${n1(m.x)}" y="${n1(yt + 15)}" fill="${P.texteSecondaire}">${m.niveaux} NIV.${m.biome ? ' · ' + esc(m.biome) : ''}</text>`
+        s += `<text class="cs-niv" x="${n1(m.x)}" y="${n1(yt + 17)}" fill="${P.texteSecondaire}">${m.niveaux} NIV.${m.biome ? ' · ' + esc(m.biome) : ''}</text>`
     }
   }
   // LES DEUX PLAQUES QUI RÉPONDENT AUX DEUX QUESTIONS DU PLAN, en toutes
@@ -600,11 +651,12 @@ export function dessinCarteSVG(c: CarteStation, o: OptionsDessin): string {
   const joignables = encoreJoignables(c, o)
   const W = c.scene.width
   const H = c.scene.height
+  const K = cadreCarte(c, o.mode)
   const brouillon = o.brouillon
     ? `<path class="cs-brouillon" d="M${n1(o.brouillon.x1)} ${n1(o.brouillon.y1)} L${n1(o.brouillon.x2)} ${n1(o.brouillon.y2)}"/>`
     : ''
   return (
-    `<svg class="cs-svg cs-${o.mode}" viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid meet" ` +
+    `<svg class="cs-svg cs-${o.mode}" viewBox="${n1(K.x)} ${n1(K.y)} ${n1(K.w)} ${n1(K.h)}" preserveAspectRatio="xMidYMid meet" ` +
     `role="group" aria-label="Carte de la station : ${c.modules.length} modules, ${c.liens.length} coursives" ` +
     `style="background:${c.palette.fond}">` +
     defs(c) +

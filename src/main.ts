@@ -180,7 +180,7 @@ import {
   type EtatJoueur,
   type EvenementDef,
 } from './game/evenements'
-import { dessinCarteSVG, type OptionsDessin } from './game/dessinCarte'
+import { cadreCarte, dessinCarteSVG, type OptionsDessin } from './game/dessinCarte'
 import {
   choisitVoie,
   choixModules,
@@ -6663,6 +6663,8 @@ function renderStation(): void {
   const hote = document.getElementById('station-plan')
   if (!hote) return
   hote.innerHTML = dessinCarteSVG(carte, optionsStation())
+  const cadre = cadreCarte(carte, 'jeu')
+  hote.style.setProperty('--cadre', `${cadre.w} / ${cadre.h}`)
   peintAvanceStation()
   peintFicheStation()
   peintLegendeStation()
@@ -6690,6 +6692,9 @@ function ouvreStation(v: boolean): void {
       stationAPose = true
     }
     stationEl.hidden = false
+    // une fois l'écran affiché : caché, le plan n'a pas de taille à défiler
+    const plan = document.getElementById('station-plan')
+    if (plan) centrePlanSurIci(plan)
   } else {
     stationEl.hidden = true
     if (stationAPose && input.paused) input.togglePause()
@@ -15446,6 +15451,11 @@ function mbMontreCarte(raison: 'depart' | 'suite'): void {
   const choix = choixModules(carte, carteRun, orbes)
   const scene = document.createElement('div')
   scene.className = 'mb-station-carte'
+  // LE CADRE DE L'ÉCRAN ÉPOUSE CELUI DU PLAN (dessinCarte, cadreCarte) : la
+  // feuille le tenait à 1600 / 804, la taille d'une scène qui en fait 2100
+  // depuis le 16/09 — le plan flottait dans un cadre qui n'était plus le sien
+  const cadre = cadreCarte(carte, 'jeu')
+  scene.style.setProperty('--cadre', `${cadre.w} / ${cadre.h}`)
   scene.innerHTML = dessinCarteSVG(carte, {
     mode: 'jeu',
     courant: carteRun.module,
@@ -15556,7 +15566,12 @@ function mbMontreCarte(raison: 'depart' | 'suite'): void {
     if (elu) return
     elu = true
     const mod = x.module
-    scene.style.transformOrigin = `${((mod.x / carte.scene.width) * 100).toFixed(1)}% ${((mod.y / carte.scene.height) * 100).toFixed(1)}%`
+    // LE ZOOM PART DU MODULE ÉLU, là où il est À L'ÉCRAN : calculé en parts de
+    // la scène entière, il visait à côté dès que le plan n'emplit pas son
+    // cadre (bandes du « meet ») — et plus encore depuis que le jeu cadre serré
+    const fut = scene.querySelector(`[data-mod="${CSS.escape(mod.id)}"] .cs-bord`)?.getBoundingClientRect()
+    const boite = scene.getBoundingClientRect()
+    if (fut) scene.style.transformOrigin = `${(fut.left + fut.width / 2 - boite.left).toFixed(1)}px ${(fut.top + fut.height / 2 - boite.top).toFixed(1)}px`
     scene.querySelector(`[data-mod="${CSS.escape(mod.id)}"]`)?.classList.add('cs-sel')
     scene.classList.add('mb-station-zoom')
     dit(mod.id)
@@ -15590,6 +15605,21 @@ function mbMontreCarte(raison: 'depart' | 'suite'): void {
   })
   host.appendChild(scene)
   host.appendChild(fiche)
+  centrePlanSurIci(scene)
+}
+
+/** SUR UN PETIT ÉCRAN LE PLAN SE FAIT DÉFILER (la feuille : .mb-station-carte,
+ *  .st-plan) — il s'ouvre donc sur le module où l'on se tient, au tiers
+ *  gauche : les portes qu'il ouvre sont à sa droite. Sans défilement (un
+ *  écran de bureau, un Deck), rien ne bouge. */
+function centrePlanSurIci(hote: HTMLElement): void {
+  requestAnimationFrame(() => {
+    const ici = hote.querySelector('.cs-courant .cs-bord')?.getBoundingClientRect()
+    if (!ici) return
+    const b = hote.getBoundingClientRect()
+    if (hote.scrollWidth > hote.clientWidth) hote.scrollLeft += ici.left + ici.width / 2 - (b.left + b.width / 3)
+    if (hote.scrollHeight > hote.clientHeight) hote.scrollTop += ici.top + ici.height / 2 - (b.top + b.height / 2)
+  })
 }
 
 /** LA CACHE REND SON ORBE quand le module qui le recèle est ÉPUISÉ — une

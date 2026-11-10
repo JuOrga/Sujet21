@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { CARTE_LIVREE, cloneCarte } from './carteStation'
-import { ETATS_DITS, dessinCarteSVG, etatModule, octogone, type OptionsDessin } from './dessinCarte'
+import { ETATS_DITS, cadreCarte, dessinCarteSVG, etatModule, octogone, type OptionsDessin } from './dessinCarte'
 
 const base: OptionsDessin = {
   courant: null,
@@ -207,5 +207,42 @@ describe('l’état d’un module — où suis-je, où puis-je aller, pourquoi p
     expect(svg).toMatch(/class="cs-route cs-principale" data-lien="18"[^>]*opacity="0.9"/)
     // aucune coursive morte sans joueur
     expect(dessinCarteSVG(CARTE_LIVREE, base)).not.toContain('cs-morte')
+  })
+})
+
+describe('le cadre du plan — ce qui se joue, pas toute la scène', () => {
+  it('l’éditeur voit la scène entière, le jeu cadre les modules', () => {
+    expect(cadreCarte(CARTE_LIVREE, 'editeur')).toEqual({ x: 0, y: 0, w: 2100, h: 804 })
+    // HUB (bord gauche 207) à OBSERVATOIRE (bord droit 1603), 110 de marge ;
+    // de la plaque au-dessus de T1 à la température sous T3, 14 de marge
+    expect(cadreCarte(CARTE_LIVREE, 'jeu')).toEqual({ x: 97, y: 102, w: 1616, h: 616 })
+    const svg = dessinCarteSVG(CARTE_LIVREE, { ...base, mode: 'jeu', courant: 'HUB' })
+    expect(svg).toContain('viewBox="97 102 1616 616"')
+  })
+
+  it('tient chaque module, son étiquette et sa plaque dans le cadre, sans sortir de la scène', () => {
+    const c = cloneCarte(CARTE_LIVREE)
+    // un nom sur deux lignes tout en bas, un module à cheval sur le bord droit
+    c.modules.find((m) => m.id === 'T3')!.nom = 'TRANSFORMATEUR À GAZ'
+    c.modules.find((m) => m.id === 'OBS')!.x = 2040
+    const k = cadreCarte(c, 'jeu')
+    for (const m of c.modules) {
+      expect(m.x - m.w / 2).toBeGreaterThanOrEqual(k.x)
+      expect(m.x + m.w / 2).toBeLessThanOrEqual(k.x + k.w)
+      expect(m.y - m.h / 2 - 30).toBeGreaterThanOrEqual(k.y) // la plaque
+      expect(m.y + m.h / 2 + 46).toBeLessThanOrEqual(k.y + k.h) // nom + température
+    }
+    // la seconde ligne du nom de T3 allonge le cadre d'un pas
+    expect(k.h).toBe(616 + 18)
+    // la marge s'arrête à la scène ; le module qui dépasse reste entier, sans marge
+    expect(k.x + k.w).toBe(2040 + 166 / 2)
+    expect(k.y).toBeGreaterThanOrEqual(0)
+  })
+
+  it('une carte sans module garde la scène', () => {
+    const c = cloneCarte(CARTE_LIVREE)
+    c.modules = []
+    c.liens = []
+    expect(cadreCarte(c, 'jeu')).toEqual({ x: 0, y: 0, w: 2100, h: 804 })
   })
 })
