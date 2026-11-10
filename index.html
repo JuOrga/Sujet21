@@ -6549,7 +6549,11 @@
       .cs-route.cs-projet { stroke: #eef8ff; stroke-width: 5; opacity: 1; stroke-dasharray: none; animation: none; filter: drop-shadow(0 0 7px #eef8ff); }
       .cs-mod.cs-projet { filter: drop-shadow(0 0 10px rgba(238, 248, 255, 0.75)); }
       /* ce que la porte survolée FERME : les modules qu'on ne pourra plus joindre */
-      .cs-mod.cs-hors { opacity: 0.22 !important; filter: none; transition: opacity 0.18s ease; }
+      /* ce que la porte visée ferme s'éteint — tout le module SAUF son socle
+         opaque : éteint d'un bloc, il devenait une vitre et les coursives
+         qui passent dessous se croisaient sur son glyphe */
+      .cs-mod.cs-hors { filter: none; }
+      .cs-mod.cs-hors > :not(.cs-socle) { opacity: 0.22; transition: opacity 0.18s ease; }
       .cs-route.cs-hors { opacity: 0.18; filter: none; animation: none; transition: opacity 0.18s ease; }
       .cs-sens { fill: none; opacity: 0.85; }
       .cs-lien-prise { cursor: pointer; }

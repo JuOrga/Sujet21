@@ -383,9 +383,17 @@ function module(c: CarteStation, m0: ModuleCarte, k: number, o: OptionsDessin): 
   const clip = `cs-clip-${k}`
 
   let s =
-    `<g class="${classes}" data-mod="${esc(m.id)}" tabindex="0" role="button" style="--z:${zc};--bord:${bord}" opacity="${opacite}" aria-label="${esc(m.nom)} — ${esc(c.types[m.type])}${m.cran > 0 ? ` — confinement +${m.cran}` : ''}">` +
+    `<g class="${classes}" data-mod="${esc(m.id)}" tabindex="0" role="button" style="--z:${zc};--bord:${bord}" aria-label="${esc(m.nom)} — ${esc(c.types[m.type])}${m.cran > 0 ? ` — confinement +${m.cran}` : ''}">` +
     `<title>${esc(m.nom)} — ${esc(c.types[m.type])}${m.cran > 0 ? ` — confinement +${m.cran}` : ''}</title>` +
     `<clipPath id="${clip}">${forme(3)}/></clipPath>` +
+    // LE SOCLE OPAQUE, sous le fût : les coursives vont de centre à centre,
+    // donc PASSENT SOUS chaque module. L'extinction (60 %) portait sur tout le
+    // groupe : un module éteint devenait une vitre, et l'on voyait jusqu'à six
+    // coursives se croiser sur son glyphe — le plan se lisait comme un nœud de
+    // traits partout où le joueur ne pouvait pas aller (capture du 10/11).
+    // Le socle est plein, à la couleur du fond ; seul le CORPS s'éteint dessus.
+    `${forme(0)} class="cs-socle" fill="${P.fond}"/>` +
+    `<g class="cs-corps" opacity="${opacite}">` +
     `${forme(0)} class="cs-bord" fill="${bord}"/>` +
     `${forme(3)} class="cs-fond" fill="${fond}"/>` +
     // les détails du fût, dessinés en repère 0-100 puis ÉTIRÉS au module.
@@ -400,6 +408,7 @@ function module(c: CarteStation, m0: ModuleCarte, k: number, o: OptionsDessin): 
     `</g></g>`
   if (fonte > 0 && glyphe)
     s += `<text class="cs-glyphe" x="${n1(m.x)}" y="${n1(m.y)}" font-size="${fonte}" fill="${estCourant ? P.texte : zc}">${glyphe}</text>`
+  s += `</g>`
   if (verrou)
     s += `${forme(0)} class="cs-voile" fill="rgba(3,7,16,.55)"/><text class="cs-cadenas" x="${n1(m.x)}" y="${n1(m.y)}">🔒</text>`
   if (visite && !estCourant)

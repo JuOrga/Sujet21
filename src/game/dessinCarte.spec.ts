@@ -64,6 +64,18 @@ describe('dessinCarteSVG — le plan, depuis les données', () => {
     expect(compte(svg, /cs-active/g)).toBe(3)
   })
 
+  it('un module éteint ne laisse pas voir les coursives qui passent dessous', () => {
+    // les coursives vont de centre à centre : sous un groupe à 60 %, elles se
+    // croisaient à travers le fût. Le socle est plein, seul le corps s'éteint
+    const svg = dessinCarteSVG(CARTE_LIVREE, { ...base, mode: 'jeu', courant: 'HUB' })
+    const p1 = /<g class="cs-mod[^"]*" data-mod="P1"[^>]*>(.*?)<text class="cs-nom"/s.exec(svg)
+    expect(p1).not.toBeNull()
+    // le groupe du module n'est plus transparent
+    expect(/<g class="cs-mod[^"]*" data-mod="P1"[^>]*>/.exec(svg)![0]).not.toContain('opacity=')
+    // un socle à la couleur du fond, PUIS le corps éteint
+    expect(p1![1]).toMatch(/class="cs-socle" fill="#030710"\/><g class="cs-corps" opacity="0\.6">/)
+  })
+
   it('avec l’orbe de solidification, la transfo glace s’ouvre et la transfo gaz reste close', () => {
     const svg = dessinCarteSVG(CARTE_LIVREE, { ...base, mode: 'jeu', courant: 'HUB', orbes: ['solidification'] })
     expect(svg).toMatch(/cs-cible" data-mod="T1"/)
