@@ -1,6 +1,16 @@
 import { describe, expect, it } from 'vitest'
 import { CARTE_LIVREE, cloneCarte } from './carteStation'
-import { ETATS_DITS, cadreCarte, dessinCarteSVG, etatModule, octogone, type OptionsDessin } from './dessinCarte'
+import {
+  ETATS_DITS,
+  cadreCarte,
+  dessinCarteSVG,
+  etatModule,
+  legendeCarte,
+  legendeCarteHTML,
+  nomLien,
+  octogone,
+  type OptionsDessin,
+} from './dessinCarte'
 
 const base: OptionsDessin = {
   courant: null,
@@ -244,5 +254,53 @@ describe('le cadre du plan — ce qui se joue, pas toute la scène', () => {
     c.modules = []
     c.liens = []
     expect(cadreCarte(c, 'jeu')).toEqual({ x: 0, y: 0, w: 2100, h: 804 })
+  })
+})
+
+describe('la légende — ce que le plan montre sans le dire', () => {
+  it('nomme les coursives pour le joueur, jamais par leur clé de données', () => {
+    expect(nomLien(CARTE_LIVREE, 'main')).toBe('voie principale')
+    expect(nomLien(CARTE_LIVREE, 'alt')).toBe('voie secondaire')
+    // une coursive conditionnelle porte le nom de son badge, celui du plan
+    expect(nomLien(CARTE_LIVREE, 'glace')).toBe('❄ glace')
+    expect(nomLien(CARTE_LIVREE, 'retour')).toBe('retour sur ses pas')
+    // une clé inconnue se montre telle quelle plutôt que rien
+    expect(nomLien(CARTE_LIVREE, 'tunnel')).toBe('tunnel')
+  })
+
+  it('suit la carte livrée : états, natures présentes, coursives utilisées', () => {
+    const l = legendeCarte(CARTE_LIVREE)
+    expect(l.filter((e) => e.genre === 'etat').map((e) => e.cle)).toEqual(['allume', 'eteint', 'traverse', 'verrou', 'cran'])
+    // les natures dans l'ordre de la carte ; ni halte ni « ? » : il n'y en a pas
+    expect(l.filter((e) => e.genre === 'nature').map((e) => `${e.signe} ${e.texte}`)).toEqual(['⊕ hub', '▦ énigme', '⚔ combat', '⬢ terminal'])
+    expect(l.filter((e) => e.genre === 'coursive').map((e) => e.texte)).toEqual([
+      'voie principale', 'voie secondaire', '❄ glace — orbe requis', '💨 gaz — orbe requis',
+    ])
+    expect(l.find((e) => e.cle === 'alt')!.tirets).toBe(true)
+    expect(l).toHaveLength(13)
+    // aucune clé de données ne passe dans le texte montré
+    expect(l.map((e) => e.texte).join(' ')).not.toMatch(/\b(main|alt)\b/)
+  })
+
+  it('ne montre ni cadenas ni cran ni type de coursive que la carte n’a pas', () => {
+    const c = cloneCarte(CARTE_LIVREE)
+    c.liens = c.liens.map((l) => ({ ...l, type: 'main' }))
+    c.modules.forEach((m) => (m.cran = 0))
+    c.modules.find((m) => m.id === 'C1')!.type = 'inconnu'
+    const l = legendeCarte(c)
+    expect(l.map((e) => e.cle)).not.toContain('verrou')
+    expect(l.map((e) => e.cle)).not.toContain('cran')
+    expect(l.filter((e) => e.genre === 'coursive').map((e) => e.cle)).toEqual(['main'])
+    expect(l.find((e) => e.cle === 'inconnu')!.signe).toBe('?')
+  })
+
+  it('se rend en éléments de liste, textes échappés', () => {
+    const c = cloneCarte(CARTE_LIVREE)
+    c.types.combat = 'COMBAT <DUR>'
+    const html = legendeCarteHTML(c)
+    expect((html.match(/<li class="cs-lg /g) ?? []).length).toBe(13)
+    expect(html).toContain('combat &lt;dur&gt;')
+    expect(html).toContain('<i class="cs-lg-trait cs-lg-tirets" style="--c:#7f9cb0"></i>voie secondaire')
+    expect(html).toContain('<i class="cs-lg-fut cs-lg-allume"></i>allumé : joignable d’ici')
   })
 })

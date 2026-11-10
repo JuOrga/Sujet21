@@ -172,6 +172,81 @@ function lignesNom(nom: string, seuil = 14): string[] {
   return [nom.slice(0, coupe), nom.slice(coupe + 1)]
 }
 
+// ---- LA LÉGENDE --------------------------------------------------------------
+
+// LES COURSIVES ONT UN NOM POUR LE JOUEUR. Les clés de `typesLiens` sont des
+// identifiants de données : la fiche de la cérémonie disait « coursive « alt »
+// ouverte », la légende de LA STATION listait « main » et « alt ». Une
+// coursive conditionnelle se nomme par son badge (« ❄ GLACE »), celui que le
+// plan porte déjà ; une clé inconnue se montre telle quelle plutôt que rien.
+const NOMS_LIENS: Record<string, string> = {
+  main: 'voie principale',
+  alt: 'voie secondaire',
+  retour: 'retour sur ses pas',
+}
+export function nomLien(c: CarteStation, type: string): string {
+  return NOMS_LIENS[type] ?? (c.typesLiens[type]?.badge ?? type).toLowerCase()
+}
+
+/** Une ligne de la légende : ce que le plan montre SANS le dire. */
+export interface EntreeLegende {
+  genre: 'etat' | 'nature' | 'coursive'
+  cle: string
+  /** le signe tel que le plan le porte ; vide : une pastille dessinée par la feuille */
+  signe: string
+  texte: string
+  couleur?: string
+  tirets?: boolean
+}
+
+/** LA LÉGENDE, DEPUIS LES DONNÉES : seulement ce que CETTE carte montre — pas
+ *  de cadenas sur une carte sans orbe, pas de glyphe pour une nature absente.
+ *  « Vous êtes ici » et « objectif » n'y sont pas : le plan les écrit en
+ *  toutes lettres. Elle n'existait que sur l'écran LA STATION, réduite aux
+ *  types de coursive ; la cérémonie, où le choix se prend, n'en avait pas. */
+export function legendeCarte(c: CarteStation): EntreeLegende[] {
+  const out: EntreeLegende[] = [
+    { genre: 'etat', cle: 'allume', signe: '', texte: 'allumé : joignable d’ici' },
+    { genre: 'etat', cle: 'eteint', signe: '', texte: 'éteint : hors de portée' },
+    { genre: 'etat', cle: 'traverse', signe: '✓', texte: 'déjà traversé' },
+  ]
+  const typesUtilises = new Set(c.liens.map((l) => l.type))
+  if ([...typesUtilises].some((t) => c.typesLiens[t]?.condition))
+    out.push({ genre: 'etat', cle: 'verrou', signe: '🔒', texte: 'un orbe manque' })
+  if (c.modules.some((m) => m.cran > 0))
+    out.push({ genre: 'etat', cle: 'cran', signe: '+1', texte: 'confinement : plus dur, paie plus', couleur: c.palette.chaud })
+  // les natures, dans l'ordre de leur première apparition sur la carte
+  const vues = new Set<TypeModule>()
+  for (const m of c.modules) {
+    if (vues.has(m.type) || !GLYPHES[m.type]) continue
+    vues.add(m.type)
+    out.push({ genre: 'nature', cle: m.type, signe: GLYPHES[m.type], texte: c.types[m.type].toLowerCase() })
+  }
+  for (const [type, st] of Object.entries(c.typesLiens)) {
+    if (!typesUtilises.has(type)) continue
+    out.push({
+      genre: 'coursive', cle: type, signe: '', couleur: st.couleur, tirets: !!st.tirets,
+      texte: nomLien(c, type) + (st.condition ? ' — orbe requis' : ''),
+    })
+  }
+  return out
+}
+
+/** La légende en éléments de liste, pour les deux écrans qui montrent le plan. */
+export function legendeCarteHTML(c: CarteStation): string {
+  return legendeCarte(c)
+    .map((e) => {
+      const signe =
+        e.genre === 'coursive'
+          ? `<i class="cs-lg-trait${e.tirets ? ' cs-lg-tirets' : ''}" style="--c:${esc(e.couleur ?? '')}"></i>`
+          : e.signe
+            ? `<i class="cs-lg-signe"${e.couleur ? ` style="color:${esc(e.couleur)}"` : ''}>${esc(e.signe)}</i>`
+            : `<i class="cs-lg-fut cs-lg-${esc(e.cle)}"></i>`
+      return `<li class="cs-lg cs-lg-${e.genre}">${signe}${esc(e.texte)}</li>`
+    })
+    .join('')
+}
+
 // ---- LE CADRE ----------------------------------------------------------------
 
 // L'ÉTIQUETTE SOUS LE FÛT, en unités de scène. Les tailles de police vivent

@@ -180,7 +180,15 @@ import {
   type EtatJoueur,
   type EvenementDef,
 } from './game/evenements'
-import { cadreCarte, dessinCarteSVG, type OptionsDessin } from './game/dessinCarte'
+import {
+  ETATS_DITS,
+  cadreCarte,
+  dessinCarteSVG,
+  etatModule,
+  legendeCarteHTML,
+  nomLien,
+  type OptionsDessin,
+} from './game/dessinCarte'
 import {
   choisitVoie,
   choixModules,
@@ -6605,17 +6613,21 @@ function peintFicheStation(): void {
     : undefined
   const salles =
     m.niveaux > 0 ? `${m.niveaux} salle${m.niveaux > 1 ? 's' : ''}` : 'sans salle'
+  // hors des cas qui ont leur phrase, l'état se dit comme le plan le dessine
+  // (dessinCarte, etatModule) : « plus loin sur la route » ou « hors de portée »
   const etat = ici
     ? `vous êtes ici · salle ${Math.min(m.niveaux, carteRun.niveau + 1)} / ${m.niveaux}`
     : enRunCarte() && carteRun.visites.includes(id)
       ? 'traversé'
       : choix
         ? choix.orbeManquant
-          ? `verrouillé — orbe nécessaire : ${choix.orbeManquant}`
+          ? `verrouillé — orbe nécessaire : ${nomOrbe(choix.orbeManquant)}`
           : choix.retour
             ? 'revenir sur ses pas — l’objectif est hors de portée d’ici'
             : 'accessible depuis votre position'
-        : salles
+        : enRunCarte()
+          ? `${salles} · ${ETATS_DITS[etatModule(carte, optionsStation(), id)]}`
+          : salles
   fiche.innerHTML =
     `<h3>${esc(m.nom)}</h3>` +
     `<span class="st-rangs">${esc(`${z ? `${z.code} · ${z.nom}` : ''} · ${etat}`)}</span>` +
@@ -6644,19 +6656,17 @@ function peintAvanceStation(): void {
     `<small>salle ${Math.min(total, voieRang + 1)} / ${total} de la descente · objectif : ${objectif}</small>`
 }
 
-/** La légende suit les types de coursive de la carte, jamais une liste en dur. */
+/** L'orbe, par son nom (ORBES) : la fiche disait son identifiant de données. */
+function nomOrbe(id: string): string {
+  return ORBES.find((o) => o.id === id)?.nom ?? id
+}
+
+/** La légende suit la carte, jamais une liste en dur — et c'est la même que
+ *  celle de la cérémonie (dessinCarte, legendeCarte) : elle ne nommait que
+ *  les types de coursive, par leur clé de données (« main », « alt »). */
 function peintLegendeStation(): void {
   const l = document.getElementById('station-legende')
-  if (!l) return
-  const esc = htmlSafe
-  l.innerHTML =
-    Object.entries(carte.typesLiens)
-      .map(
-        ([k, st]) =>
-          `<li><i style="${st.tirets ? `height:0;border-top:2px dashed ${st.couleur};background:none` : `background:${st.couleur}`}"></i>` +
-          `${esc((st.badge ?? k).toLowerCase())}${st.condition ? ' 🔒' : ''}</li>`,
-      )
-      .join('') + `<li><i class="st-p-courant"></i>vous êtes ici</li>`
+  if (l) l.innerHTML = legendeCarteHTML(carte)
 }
 
 function renderStation(): void {
@@ -15480,9 +15490,11 @@ function mbMontreCarte(raison: 'depart' | 'suite'): void {
   }
   const ouvertes = choix.filter((x) => !x.orbeManquant).length
   const defaut = `${ouvertes} coursive${ouvertes > 1 ? 's' : ''} ouverte${ouvertes > 1 ? 's' : ''} · descente ${voieRang} / ${longueurRun()} salles`
+  // « visez un module », pas « survolez une porte » : le plan montre des
+  // modules, et ni le doigt ni la manette ne survolent
   const aideDefaut = [
-    'survolez une porte : sa fiche, ce qu’on y trouve, et la route la plus courte jusqu’à l’objectif s’allume sur le plan',
-    'les modules qui s’éteignent ne seront plus joignables par cette porte — c’est ce qu’elle ferme',
+    'visez un module allumé : ce qu’on y trouve, et la route la plus courte jusqu’à l’objectif se trace en blanc sur le plan',
+    'ce qui s’éteint alors ne sera plus joignable par là — c’est ce que ce choix ferme',
   ] as const
   const litId = (e: Event): string | null =>
     (e.target as Element | null)?.closest?.('[data-mod]')?.getAttribute('data-mod') ?? null
@@ -15530,15 +15542,19 @@ function mbMontreCarte(raison: 'depart' | 'suite'): void {
       return
     }
     const x = choix.find((c) => c.module.id === id)
+    // LA FICHE PARLE COMME LE PLAN : le nom de la coursive, pas sa clé de
+    // données (« coursive « alt » ouverte ») ; et pour un module qu'on ne
+    // peut pas viser, pourquoi — plus loin sur la route, ou hors de portée
+    // pour de bon (« aucune coursive n'y mène d'ici » répondait aux deux)
     const acces = x
       ? x.orbeManquant
-        ? `verrouillé — orbe nécessaire : ${x.orbeManquant}`
+        ? `verrouillé — orbe nécessaire : ${nomOrbe(x.orbeManquant)}`
         : x.retour
           ? 'revenir sur ses pas — l’objectif est hors de portée d’ici'
-          : `coursive « ${x.lien.type} » ouverte`
-      : id === carteRun.module
-        ? 'vous êtes ici'
-        : 'aucune coursive n’y mène d’ici'
+          : `${nomLien(carte, x.lien.type)} — ouverte`
+      : ETATS_DITS[
+          etatModule(carte, { courant: carteRun.module, visites: carteRun.visites, orbes, retour: choix.find((c) => c.retour)?.module.id ?? null }, mod.id)
+        ]
     const projection = vise ? projectionDepuis(carte, vise) : null
     // CE QU'ON Y TROUVERA, par types : les mécaniques des salles, les
     // formes, les rencontres et les haltes de sa mini-carte — pas les
@@ -15604,6 +15620,13 @@ function mbMontreCarte(raison: 'depart' | 'suite'): void {
     }
   })
   host.appendChild(scene)
+  // LA LÉGENDE, là où le choix se prend : elle n'existait que sur l'écran LA
+  // STATION, qu'on n'ouvre pas pendant la cérémonie
+  const legende = document.createElement('ul')
+  legende.className = 'mb-station-legende'
+  legende.setAttribute('aria-label', 'Légende du plan')
+  legende.innerHTML = legendeCarteHTML(carte)
+  host.appendChild(legende)
   host.appendChild(fiche)
   centrePlanSurIci(scene)
 }

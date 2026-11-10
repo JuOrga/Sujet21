@@ -1327,8 +1327,8 @@
         background: rgba(16, 24, 37, 0.7);
         font-size: calc(11px * var(--ui)); color: var(--dim);
       }
-      .st-legende li { display: flex; align-items: center; gap: 8px; }
-      .st-legende i { width: 15px; height: 9px; border-radius: 2px; flex: none; }
+      /* treize lignes en une colonne dépassaient la fiche : trois colonnes */
+      .st-legende { display: grid; grid-template-columns: repeat(3, max-content); gap: 6px 18px; align-content: center; }
       .st-p-franchi { background: rgba(99, 183, 230, 0.65); }
       .st-p-courant { background: #eef8ff; box-shadow: 0 0 7px rgba(99, 183, 230, 0.9); }
       .st-p-avenir { background: rgba(99, 183, 230, 0.16); }
@@ -1336,7 +1336,7 @@
 
       @media (max-width: 760px) {
         .st-bas { flex-direction: column; }
-        .st-legende { flex-direction: row; flex-wrap: wrap; }
+        .st-legende { display: flex; flex-direction: row; flex-wrap: wrap; gap: 7px 16px; }
         .st-avance { font-size: calc(10px * var(--ui)); }
         /* en portrait, la ligne d'avance passe SOUS le titre : à côté, il ne
            lui restait presque rien et elle sortait de l’écran par la droite */
@@ -6535,6 +6535,23 @@
       #carte-editeur .ce-etat { flex: 1; padding: 8px 0; }
       .ce-orbes { display: flex; flex-wrap: wrap; gap: 4px; }
       #carte-editeur .ce-orbes .ce-etat { flex: none; padding: 5px 8px; font-size: calc(10.5px * var(--ui)); text-transform: none; letter-spacing: 0.04em; }
+      /* LA LÉGENDE DU PLAN (dessinCarte, legendeCarteHTML), la même sur l'écran
+         LA STATION et dans la cérémonie : ce que le plan montre sans le dire */
+      .cs-lg { display: flex; align-items: center; gap: 7px; white-space: nowrap; }
+      .cs-lg i { font-style: normal; flex: none; }
+      .cs-lg-signe { min-width: 14px; text-align: center; color: #cfe2ef; font-weight: 600; }
+      .cs-lg-fut { width: 11px; height: 11px; border-radius: 3px; border: 2px solid #a7ddf5; background: #0b1420; }
+      .cs-lg-allume { box-shadow: 0 0 7px rgba(167, 221, 245, 0.9); }
+      .cs-lg-eteint { border-color: #4a6478; opacity: 0.5; }
+      .cs-lg-trait { width: 20px; height: 0; border-top: 3px solid var(--c); }
+      .cs-lg-trait.cs-lg-tirets { border-top: 2px dashed var(--c); }
+      .mb-station-legende {
+        list-style: none; margin: 4px 0 0; padding: 0; min-width: 0;
+        display: flex; flex-wrap: wrap; justify-content: center; gap: 3px 16px;
+        font-size: calc(10.5px * var(--ui)); letter-spacing: 0.04em; color: #8ba3b8;
+      }
+      /* sur un écran bas, la place va au plan : la légende reste sur LA STATION */
+      @media (max-height: 620px) { .mb-station-legende { display: none; } }
       .cs-niv { font-size: 11px; letter-spacing: 0.12em; text-anchor: middle; pointer-events: none; }
 
       /* la visée manette sur un module du plan : le même liseré que la sélection */
