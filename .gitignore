@@ -18,3 +18,7 @@ masters/images/*
 
 # le cache de Python (tools/images importe conduite_atlas)
 __pycache__/
+
+# Les clips tournés par tools/clips (films, pistes son, planches) : lourds, et
+# refaits à la demande — seule la chaîne voyage.
+clips-sortie/
