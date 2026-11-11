@@ -9,7 +9,7 @@ rien ici n'entre dans le paquet, ne casse le build ni ne fait tomber un test.
 pnpm build                              # le film se tourne sur dist/
 node tools/clips/tourne.mjs ronde --apercu   # régler : ~1 min, une planche d'images
 node tools/clips/tourne.mjs ronde            # tourner : 1080×1920, 5 à 10 min
-node tools/clips/montage.mjs ronde           # monter : marque, son, encodage
+node tools/clips/montage.mjs ronde           # monter : carton de fin, son, encodage
 ```
 
 Tout sort dans `clips-sortie/` (ignoré par git ; `CLIPS_SORTIE` le déplace) :
@@ -45,7 +45,7 @@ simulation du joueur, pas une imitation.
 | `horloge.js` | l'horloge pilotée, le hasard semé, le son hors ligne |
 | `pilote.mjs` | le navigateur (fenêtre sous Xvfb, ANGLE sur l'OpenGL de Mesa), l'entrée en salle, les gestes, le tuyau vers ffmpeg |
 | `tourne.mjs` | tourne une scène, en aperçu ou en grand |
-| `montage.mjs` | pose la ligne de marque (et des textes, si la scène en a), normalise le son (−15 LUFS), encode |
+| `montage.mjs` | ajoute le carton de fin (et des textes, si la scène en a), normalise le son (−15 LUFS), encode |
 | `scenes/outils.mjs` | le pilote automatique et la caméra qui suit |
 | `scenes/*.mjs` | une scène par clip : la salle, le cadre, les gestes, la légende |
 
@@ -75,10 +75,14 @@ et au besoin `sansEcrit`, `montage` et `publication`.
   score. `masque: 'jauge'` garde la jauge de volume, recentrée sous la ligne
   de marque ; `tourne.mjs <scène> --jauge` l'ajoute à une scène qui ne l'a
   pas (fichier `<scène>-jauge`, monté par `montage.mjs <scène> jauge`).
+- Le montage termine chaque clip par un **carton de fin** (2,4 s) : le plan
+  fond vers un ciel étoilé où le titre apparaît. `montage: { carton: false }`
+  le retire et rend au plan sa ligne de marque, en haut
+  (`montage.marqueY` la déplace) — c'est ce qu'il faut pour publier la ronde
+  en boucle, que le carton interrompt.
 - `montage.textes` (facultatif) incruste des textes aux polices du jeu, dans
-  un bandeau en haut ; sans textes, seule reste la ligne de marque
-  (`montage.marqueY` la déplace). Un fichier `.json`
-  `{ garde: [[début, fin], …] }` posé à côté du film demande une coupe franche.
+  un bandeau en haut. Un fichier `.json` `{ garde: [[début, fin], …] }`
+  posé à côté du film demande une coupe franche.
 
 ## Les huit scènes livrées
 
@@ -86,8 +90,9 @@ Le concepteur (10/11) : « je ne souhaite pas expliquer le jeu, mais que tu
 clipes des moments du jeu avec la physique très intéressante. Sans l'écran
 des scores. » Puis (11/11) : « un peu de HUD peut être intéressant tout de
 même », et le regroupement — toucher le corps étiré, « ça lui fait faire
-complètement autre chose ». Aucune scène n'a de texte ni de verdict ; les
-deux dernières gardent la jauge.
+complètement autre chose », et le carton de fin. Aucune scène n'a de texte
+ni de verdict ; les deux dernières gardent la jauge. Les durées sont celles
+du plan, carton non compris (+2,0 s).
 
 | Scène | Le moment | Durée |
 | --- | --- | --- |

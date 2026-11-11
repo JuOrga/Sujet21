@@ -7,6 +7,14 @@
 // Une scène qui porte des textes (montage.textes) sort en plus
 // final/<scène>-sans-texte.mp4, le même plan nu.
 //
+// LE CARTON DE FIN. Le concepteur (11/11) : « il faut peut-être mettre
+// quelque chose à la fin, écran noir avec étoiles, et marqué le titre ».
+// Le plan fond donc vers un ciel étoilé où le titre apparaît — 2,4 s, dont
+// 0,4 de fondu. Avec lui, la ligne de marque qui courait en haut du plan
+// n'a plus de raison d'être : l'image reste nue, le nom arrive à la fin.
+// `montage: { carton: false }` le retire (et rend sa ligne de marque au
+// plan) — c'est ce qu'il faut à une boucle, que le carton interrompt.
+//
 // LES TEXTES sont dessinés par le navigateur, pas par ffmpeg : mêmes polices
 // que le jeu (Michroma, IBM Plex Mono — celles de dist/), même palette
 // (docs/charte-visuelle.md). Une image transparente par texte, que ffmpeg
@@ -89,7 +97,53 @@ const blocTexte = (t) =>
   `</div>`
 const blocMarque = (y) => `<div class="marque" style="top:${y}px"><b>SUJET 21</b> · TENSION DE SURFACE</div>`
 
+// LE CIEL DU CARTON : dessiné, pas photographié — un noir d'encre (la nuit de
+// la charte, #030710) et des étoiles posées par un hasard SEMÉ : le même
+// ciel à chaque montage, net au pixel. Une lueur très faible derrière le
+// titre, celle de la capsule Steam.
+const cielCarton = () => {
+  let g = 21
+  const alea = () => {
+    g = (g + 0x6d2b79f5) >>> 0
+    let x = g
+    x = Math.imul(x ^ (x >>> 15), x | 1)
+    x ^= x + Math.imul(x ^ (x >>> 7), x | 61)
+    return ((x ^ (x >>> 14)) >>> 0) / 4294967296
+  }
+  let etoiles = ''
+  for (let i = 0; i < 520; i++) {
+    const x = (alea() * L).toFixed(1)
+    const y = (alea() * H).toFixed(1)
+    const k = alea()
+    // beaucoup de poussière, quelques étoiles franches
+    const r = k > 0.985 ? 2.6 : k > 0.93 ? 1.7 : k > 0.6 ? 1.1 : 0.7
+    const o = (k > 0.93 ? 0.95 : 0.25 + alea() * 0.5).toFixed(2)
+    const c = alea() > 0.82 ? '#a7ddf5' : alea() > 0.9 ? '#f2e3c9' : '#eef7fd'
+    etoiles += `<circle cx="${x}" cy="${y}" r="${r}" fill="${c}" opacity="${o}"/>`
+  }
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${L}" height="${H}" style="position:absolute;inset:0">${etoiles}</svg>`
+}
+const pageCarton = (fond) =>
+  page(
+    `<style>
+html,body{background:${fond ? '#030710' : 'transparent'}}
+.lueur{position:absolute;left:50%;top:860px;width:1500px;height:1100px;margin:-550px 0 0 -750px;
+  background:radial-gradient(closest-side,rgba(24,58,92,.55),rgba(10,24,40,.25) 55%,rgba(3,7,16,0) 100%)}
+.nom{position:absolute;left:0;right:0;top:770px;text-align:center;font:400 104px/1 'Michroma',sans-serif;color:#eef7fd;
+  letter-spacing:.1em;padding-left:.1em;text-shadow:0 0 34px rgba(99,183,230,.35)}
+.filet{position:absolute;left:50%;top:912px;width:120px;height:4px;margin-left:-60px;background:#63b7e6;box-shadow:0 0 16px rgba(99,183,230,.8)}
+.sousnom{position:absolute;left:0;right:0;top:948px;text-align:center;font:600 32px/1 'Plex',monospace;color:#63b7e6;
+  letter-spacing:.46em;padding-left:.46em}
+</style>` +
+      (fond
+        ? `<div class="lueur"></div>${cielCarton()}`
+        : `<div class="nom">SUJET 21</div><div class="filet"></div><div class="sousnom">TENSION DE SURFACE</div>`),
+  )
+
 const textes = m.textes ?? []
+const avecCarton = m.carton !== false
+const CARTON = 2.4 // secondes, fondu compris
+const FONDU = 0.4
 const nav = await chromium.launch()
 const pg = await nav.newPage({ viewport: { width: L, height: H } })
 const calques = []
@@ -105,7 +159,18 @@ for (const [i, t] of textes.entries()) {
 }
 const marque = path.join(tmp, 'marque.png')
 await dessine(blocMarque(m.marqueY ?? 146), marque)
+const cartonFond = path.join(tmp, 'carton-fond.png')
+const cartonTitre = path.join(tmp, 'carton-titre.png')
+if (avecCarton) {
+  await pg.setContent(pageCarton(true))
+  await pg.evaluate(() => document.fonts.ready)
+  await pg.screenshot({ path: cartonFond })
+  await pg.setContent(pageCarton(false))
+  await pg.evaluate(() => document.fonts.ready)
+  await pg.screenshot({ path: cartonTitre, omitBackground: true })
+}
 await nav.close()
+const total = avecCarton ? duree + CARTON - FONDU : duree
 
 // ---- l'assemblage -------------------------------------------------------------
 function assemble(sortie, avecTextes) {
@@ -139,18 +204,36 @@ function assemble(sortie, avecTextes) {
   // la marque reste, discrète, du début à la fin, AU-DESSUS du texte : pas
   // de carton de fin (il casserait la boucle, et c'est la seconde où l'on
   // décroche), et pas en bas, où la légende de TikTok la recouvrirait
-  if (m.marque !== false) pose({ f: marque, de: 0, a: duree })
+  // (avec un carton de fin, la marque n'y est plus par défaut : le titre
+  // arrive à la fin ; `marque: true` la remet)
+  if (m.marque ?? !avecCarton) pose({ f: marque, de: 0, a: duree })
+  if (avecCarton) {
+    args.push('-loop', '1', '-framerate', '60', '-t', String(CARTON), '-i', cartonFond)
+    const kf = n++
+    args.push('-loop', '1', '-framerate', '60', '-t', String(CARTON), '-i', cartonTitre)
+    const kt = n++
+    // le titre n'arrive qu'une fois le ciel installé
+    filtres.push(`[${kt}:v]format=rgba,fade=t=in:st=${FONDU + 0.15}:d=0.55:alpha=1[ct]`)
+    filtres.push(`[${kf}:v][ct]overlay=0:0:format=auto,fps=60,format=yuv444p,settb=AVTB,setsar=1[carton]`)
+    filtres.push(`[${v}]fps=60,format=yuv444p,settb=AVTB,setsar=1[plan]`)
+    filtres.push(`[plan][carton]xfade=transition=fade:duration=${FONDU}:offset=${(duree - FONDU).toFixed(4)}[vx]`)
+    v = 'vx'
+  }
   filtres.push(`[${v}]format=yuv420p[vf]`)
   if (aSon) {
     // −15 LUFS : le niveau où une vidéo ne paraît ni faible ni écrasée à
     // côté des autres dans le fil ; un fondu de sortie pour que la boucle
     // ne claque pas
-    filtres.push(`[${a0}]afade=t=in:d=0.06,afade=t=out:st=${(duree - 0.3).toFixed(3)}:d=0.3,loudnorm=I=-15:TP=-1.5:LRA=11,aresample=48000[af]`)
+    // le son s'éteint pendant le fondu ; le carton est muet
+    const queue = avecCarton ? FONDU : 0.3
+    filtres.push(
+      `[${a0}]afade=t=in:d=0.06,afade=t=out:st=${(duree - queue).toFixed(3)}:d=${queue},loudnorm=I=-15:TP=-1.5:LRA=11,aresample=48000,apad=whole_dur=${total.toFixed(4)}[af]`,
+    )
   }
   args.push('-filter_complex', filtres.join(';'), '-map', '[vf]')
   if (aSon) args.push('-map', '[af]', '-c:a', 'aac', '-b:a', '256k')
   args.push(
-    '-t', String(duree), '-r', '60',
+    '-t', total.toFixed(4), '-r', '60',
     // crf 15 en preset slow : ~20 Mbit/s sur ces images sombres. TikTok
     // recompresse tout — on lui donne une source où il n'y a rien à abîmer.
     '-c:v', 'libx264', '-preset', 'slow', '-crf', '15', '-profile:v', 'high', '-level', '4.2',
@@ -159,7 +242,7 @@ function assemble(sortie, avecTextes) {
   )
   execFileSync('ffmpeg', args, { stdio: 'inherit' })
   const ko = Math.round(fs.statSync(sortie).size / 1024)
-  console.log(`${path.basename(sortie)} : ${duree.toFixed(2)} s, ${ko} Ko`)
+  console.log(`${path.basename(sortie)} : ${total.toFixed(2)} s${avecCarton ? ' (carton compris)' : ''}, ${ko} Ko`)
 }
 // la légende et les mots-dièse voyagent avec le clip : à coller tels quels
 if (scene.publication) {
