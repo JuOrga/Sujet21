@@ -286,9 +286,10 @@ export function cadreCarte(c: CarteStation, mode: OptionsDessin['mode']): Cadre 
     y0 = Math.min(y0, m.y - m.h / 2 - PLAQUE_HAUT)
     y1 = Math.max(y1, m.y + m.h / 2 + NOM_BASE + (lignesNom(m.nom).length - 1) * NOM_PAS + TEMP_PAS + 8)
   }
-  // la marge des côtés laisse voir d'où part la station (l'arc de coque) et
-  // où elle finit (le tube du télescope) ; celle du haut et du bas est juste
-  // de quoi respirer — c'est la hauteur qui décide de l'échelle
+  // la marge des côtés laisse voir d'où part la station (l'arc de coque) ;
+  // celle du haut et du bas est juste de quoi respirer — c'est la hauteur
+  // qui décide de l'échelle. Le télescope s'amarre DANS ce cadre, au-dessus
+  // de son module (amarrageTelescope)
   // LA MARGE s'arrête au bord de la scène ; un module, jamais — posé à cheval
   // sur le bord par l'éditeur, il doit rester entier dans le cadre
   x0 = Math.min(x0, Math.max(0, x0 - 110))
@@ -353,22 +354,99 @@ function arcDeCoque(c: CarteStation, d: DecorCarte): string {
   )
 }
 
-/** LE TÉLESCOPE AMARRÉ : les vecteurs de la maquette, en repère local —
- *  la position, la rotation et le tube coudé viennent des données. */
+// LE TÉLESCOPE, en repère local (la maquette du concepteur) : son amarre à
+// l'origine, le fût le long de x jusqu'au pare-soleil (436), les panneaux
+// solaires de part et d'autre (±150)
+const TEL_LONG = 436
+const TEL_DEMI = 150
+/** réduit : à sa taille de maquette il faisait deux fois et demie l'observatoire */
+const TEL_ECHELLE = 0.45
+/** penché de huit degrés : à plat, il se lisait comme un bandeau du plan */
+const TEL_PENTE = 8
+
+export interface AmarrageTelescope {
+  /** l'amarre du télescope, dans la scène */
+  x: number
+  y: number
+  rotation: number
+  echelle: number
+  /** le tube coudé, du module à l'amarre */
+  tube: string
+  /** où s'écrit son nom */
+  nom: { x: number; y: number }
+  /** ce que le télescope occupe, nom compris */
+  boite: { x0: number; y0: number; x1: number; y1: number }
+}
+
+/** OÙ LE TÉLESCOPE S'AMARRE : au-dessus de son module d'ancrage, réduit,
+ *  relié par un tube coudé qui sort du coin du module et l'aborde dans son
+ *  axe — CALCULÉ, plus lu dans les données.
+ *
+ *  Pourquoi : la maquette le posait à droite de l'observatoire, à pleine
+ *  taille, par des coordonnées écrites dans la carte. Depuis que le jeu
+ *  cadre ce qui se joue (cadreCarte), il sortait du plan — on n'en voyait
+ *  que le tube. Et des coordonnées en dur ne suivaient ni un observatoire
+ *  déplacé dans l'éditeur, ni une carte PUBLIÉE, qui remplace la livrée avec
+ *  son propre décor. Sans place au-dessus (un module contre le haut de la
+ *  scène), il s'amarre dessous. null : l'ancrage n'existe pas. */
+export function amarrageTelescope(c: CarteStation, d: DecorCarte): AmarrageTelescope | null {
+  const m = moduleParId(c, d.ancrage)
+  if (!m) return null
+  const E = TEL_ECHELLE
+  const cos = Math.cos((TEL_PENTE * Math.PI) / 180)
+  const sin = Math.sin((TEL_PENTE * Math.PI) / 180)
+  // sa demi-hauteur et sa demi-longueur dans la scène, penché
+  const demiH = (TEL_DEMI * cos + (TEL_LONG / 2) * sin) * E
+  const demiL = ((TEL_LONG / 2) * cos + TEL_DEMI * sin) * E
+  // au-dessus : la plaque du module (« objectif ») reste dégagée ; dessous :
+  // son nom et sa température
+  const dessus = m.y - m.h / 2 - PLAQUE_HAUT - 12 - 2 * demiH >= 0
+  const s = dessus ? -1 : 1
+  const cx = m.x - 20
+  const cy = dessus
+    ? m.y - m.h / 2 - PLAQUE_HAUT - 12 - demiH
+    : m.y + m.h / 2 + NOM_BASE + (lignesNom(m.nom).length - 1) * NOM_PAS + TEMP_PAS + 20 + demiH
+  // l'axe du fût : il pointe à droite, relevé du côté opposé au module
+  const ax = cos
+  const ay = s * sin
+  const x = cx - (TEL_LONG / 2) * E * ax
+  const y = cy - (TEL_LONG / 2) * E * ay
+  // le tube part de l'intérieur du coin du module (le fût du module, dessiné
+  // après le décor, couvre son départ) et arrive dans l'axe de l'amarre
+  const dx = m.x - 0.36 * m.w
+  const dy = m.y + s * 0.33 * m.h
+  const k = 118 * E
+  const tube = `M${n1(dx)} ${n1(dy)} C ${n1(dx - 30)} ${n1(dy + s * 37)}, ${n1(x - k * ax)} ${n1(y - k * ay)}, ${n1(x)} ${n1(y)}`
+  // le nom, à gauche de l'amarre : sous le télescope, il touchait la plaque
+  const nom = { x: x - 100, y: cy }
+  return {
+    x,
+    y,
+    rotation: s * TEL_PENTE,
+    echelle: E,
+    tube,
+    nom,
+    boite: { x0: nom.x - 82, y0: cy - demiH, x1: cx + demiL, y1: cy + demiH },
+  }
+}
+
+/** LE TÉLESCOPE AMARRÉ : les vecteurs de la maquette, en repère local — sa
+ *  place, son échelle et son tube viennent de l'amarrage. */
 function telescope(c: CarteStation, d: DecorCarte): string {
+  const a = amarrageTelescope(c, d)
+  if (!a) return ''
   const P = c.palette
-  const x = d.x ?? 0
-  const y = d.y ?? 0
-  const tube = d.tube
-    ? `<path d="${esc(d.tube)}" fill="none" stroke="${P.couloirParoi}" stroke-width="18"/>` +
-      `<path d="${esc(d.tube)}" fill="none" stroke="${P.couloirSol}" stroke-width="12"/>` +
-      `<path d="${esc(d.tube)}" fill="none" stroke="${P.couloirAnneau}" stroke-width="22" stroke-dasharray="4 40"/>`
-    : ''
+  // le tube suit l'échelle du télescope, sans descendre sous un trait lisible
+  const ep = (l: number) => n1(l * Math.max(0.6, a.echelle))
+  const tube =
+    `<path d="${a.tube}" fill="none" stroke="${P.couloirParoi}" stroke-width="${ep(18)}"/>` +
+    `<path d="${a.tube}" fill="none" stroke="${P.couloirSol}" stroke-width="${ep(12)}"/>` +
+    `<path d="${a.tube}" fill="none" stroke="${P.couloirAnneau}" stroke-width="${ep(22)}" stroke-dasharray="4 26"/>`
   const cyan = c.zones[0]?.couleur ?? COURANT
   return (
     `<g class="cs-telescope" data-decor="${esc(d.id)}">` +
     tube +
-    `<g transform="translate(${n1(x)} ${n1(y)}) rotate(${n1(d.rotation ?? 0)})" filter="url(#cs-ombre)">` +
+    `<g transform="translate(${n1(a.x)} ${n1(a.y)}) rotate(${n1(a.rotation)}) scale(${n4(a.echelle)})" filter="url(#cs-ombre)">` +
     `<rect x="0" y="-14" width="40" height="28" rx="3" fill="${P.plaque}" stroke="#4a6478" stroke-width="2"/>` +
     `<path d="M8 -14V14 M20 -14V14 M32 -14V14" stroke="${P.bord}" stroke-width="1.5"/>` +
     `<path d="M200 -36 V-150 M200 36 V150" stroke="#5a7a96" stroke-width="4"/>` +
@@ -390,8 +468,8 @@ function telescope(c: CarteStation, d: DecorCarte): string {
     `<ellipse cx="100" cy="84" rx="16" ry="10" fill="#16253a" stroke="#5a7a96" stroke-width="2"/>` +
     `<path d="M100 84 V70" stroke="${COURANT}" stroke-width="1.5"/>` +
     `</g>` +
-    `<text class="cs-decor-nom" x="${n1(x + 248)}" y="${n1(y + 154)}">TÉLESCOPE SPATIAL</text>` +
-    `<text class="cs-decor-sous" x="${n1(x + 248)}" y="${n1(y + 168)}">AMARRÉ · HORS ACCÈS</text>` +
+    `<text class="cs-decor-nom" x="${n1(a.nom.x)}" y="${n1(a.nom.y - 3)}">TÉLESCOPE SPATIAL</text>` +
+    `<text class="cs-decor-sous" x="${n1(a.nom.x)}" y="${n1(a.nom.y + 12)}">AMARRÉ · HORS ACCÈS</text>` +
     `</g>`
   )
 }

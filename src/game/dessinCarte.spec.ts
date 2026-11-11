@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest'
-import { CARTE_LIVREE, cloneCarte } from './carteStation'
+import { CARTE_LIVREE, cloneCarte, parseCarte } from './carteStation'
 import {
   ETATS_DITS,
+  amarrageTelescope,
   cadreCarte,
   dessinCarteSVG,
   etatModule,
@@ -23,6 +24,7 @@ const base: OptionsDessin = {
   grille: 8,
 }
 const compte = (s: string, re: RegExp): number => (s.match(re) ?? []).length
+const telescope = CARTE_LIVREE.decor.find((d) => d.type === 'telescope-hubble')!
 
 describe('dessinCarteSVG — le plan, depuis les données', () => {
   it('dessine chaque module et chaque coursive, dans un seul SVG', () => {
@@ -117,10 +119,78 @@ describe('dessinCarteSVG — le plan, depuis les données', () => {
     const svg = dessinCarteSVG(CARTE_LIVREE, base)
     expect(svg).toContain('data-decor="arc"')
     expect(svg).toContain('data-decor="telescope"')
-    expect(svg).toContain('translate(1714 443) rotate(-33)')
+    const a = amarrageTelescope(CARTE_LIVREE, telescope)!
+    expect(svg).toContain(`rotate(${a.rotation}) scale(${a.echelle})`)
+    expect(svg).toContain(`d="${a.tube}"`)
     const sans = cloneCarte(CARTE_LIVREE)
     sans.decor = []
     expect(dessinCarteSVG(sans, base)).not.toContain('data-decor')
+  })
+
+  describe('le télescope s’amarre de lui-même à son module', () => {
+    const obs = CARTE_LIVREE.modules.find((m) => m.id === 'OBS')!
+    const a = amarrageTelescope(CARTE_LIVREE, telescope)!
+
+    it('EN JEU IL SE VOIT ENTIER : tout le télescope, son nom compris, tient dans le cadre du plan', () => {
+      // le défaut du 10/11 : posé à droite de l'observatoire à pleine taille,
+      // il sortait du cadre serré du jeu — on n'en voyait que le tube
+      const cadre = cadreCarte(CARTE_LIVREE, 'jeu')
+      expect(a.boite.x0).toBeGreaterThanOrEqual(cadre.x)
+      expect(a.boite.y0).toBeGreaterThanOrEqual(cadre.y)
+      expect(a.boite.x1).toBeLessThanOrEqual(cadre.x + cadre.w)
+      expect(a.boite.y1).toBeLessThanOrEqual(cadre.y + cadre.h)
+    })
+
+    it('au-dessus de l’observatoire, réduit, sans toucher sa plaque ni aucun module', () => {
+      expect(a.echelle).toBeLessThan(0.6)
+      // sous lui, la place de la plaque « objectif » (30 au-dessus du fût)
+      expect(a.boite.y1).toBeLessThanOrEqual(obs.y - obs.h / 2 - 30)
+      for (const m of CARTE_LIVREE.modules) {
+        const touche = a.boite.x1 > m.x - m.w / 2 && a.boite.x0 < m.x + m.w / 2 && a.boite.y1 > m.y - m.h / 2 - 30 && a.boite.y0 < m.y + m.h / 2 + 60
+        expect(touche, m.id).toBe(false)
+      }
+    })
+
+    it('le tube part du module et finit à l’amarre', () => {
+      const n = a.tube.match(/-?\d+(?:\.\d+)?/g)!.map(Number)
+      // son départ est DANS le fût, que le module, dessiné après, recouvre
+      expect(Math.abs(n[0] - obs.x)).toBeLessThan(obs.w / 2)
+      expect(Math.abs(n[1] - obs.y)).toBeLessThan(obs.h / 2)
+      expect(n[n.length - 2]).toBeCloseTo(a.x, 1)
+      expect(n[n.length - 1]).toBeCloseTo(a.y, 1)
+    })
+
+    it('il SUIT son module : déplacé dans l’éditeur, l’observatoire emmène le télescope', () => {
+      const c = cloneCarte(CARTE_LIVREE)
+      const m = c.modules.find((x) => x.id === 'OBS')!
+      m.x -= 300
+      m.y += 60
+      const b = amarrageTelescope(c, telescope)!
+      expect(b.x - a.x).toBeCloseTo(-300, 6)
+      expect(b.y - a.y).toBeCloseTo(60, 6)
+      expect(b.nom.x - a.nom.x).toBeCloseTo(-300, 6)
+    })
+
+    it('sans place au-dessus (un module contre le haut de la scène), il s’amarre dessous', () => {
+      const c = cloneCarte(CARTE_LIVREE)
+      const m = c.modules.find((x) => x.id === 'OBS')!
+      m.y = m.h / 2 + 20
+      const b = amarrageTelescope(c, telescope)!
+      expect(b.boite.y0).toBeGreaterThan(m.y + m.h / 2)
+      expect(b.rotation).toBe(-a.rotation)
+    })
+
+    it('une carte d’avant, qui portait ses coordonnées, se lit et les oublie ; un ancrage inconnu ne dessine rien', () => {
+      const ancienne = JSON.parse(JSON.stringify(CARTE_LIVREE)) as { decor: Record<string, unknown>[] }
+      Object.assign(ancienne.decor.find((d) => d.type === 'telescope-hubble')!, { x: 1714, y: 443, rotation: -33, tube: 'M1597 402 H1652' })
+      const { carte, erreurs } = parseCarte(ancienne)
+      expect(erreurs).toEqual([])
+      expect(amarrageTelescope(carte!, carte!.decor.find((d) => d.type === 'telescope-hubble')!)).toEqual(a)
+      expect(amarrageTelescope(CARTE_LIVREE, { ...telescope, ancrage: 'NULLE-PART' })).toBeNull()
+      const c = cloneCarte(CARTE_LIVREE)
+      c.decor = [{ ...telescope, ancrage: 'NULLE-PART' }]
+      expect(dessinCarteSVG(c, base)).not.toContain('data-decor="telescope"')
+    })
   })
 
   it('échappe les noms : un « < » dans un nom ne casse pas le SVG', () => {

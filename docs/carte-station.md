@@ -122,8 +122,11 @@ dépôt (annulable).
   (`null` = libre, sinon `orbe == solidification` — un id d'orbe, voir
   ci-dessous), `badge` (optionnel).
 - `decor[]` : le non-jouable, ancré à un module — l'arc de coque
-  (`coque-croissant`, deux courbes) et le télescope (`telescope-hubble`,
-  position, rotation, tube). Les nervures et lumières de l'arc sont
+  (`coque-croissant`, deux courbes) et le télescope (`telescope-hubble`).
+  Le télescope ne porte que son `ancrage` : il s'amarre de lui-même
+  au-dessus de ce module, réduit, par un tube coudé (`amarrageTelescope`)
+  — il suit donc un observatoire déplacé dans l'éditeur, et une carte
+  publiée avec ses anciennes coordonnées se lit et les oublie. Les nervures et lumières de l'arc sont
   calculées sur ses courbes : l'arc peut changer de forme sans qu'on les
   refasse.
 - `palette` : les couleurs du dessin.
@@ -197,8 +200,11 @@ est l'objectif.**
   1280 × 800 : un nom de module à 6,3 px. Le jeu cadre les modules, leurs
   étiquettes et leurs plaques (110 de marge sur les côtés, 14 en haut et
   en bas) ; le décor **déborde** du cadre. Mesuré après : nom 11,3 px,
-  température 9,8 px, module de 84 px. Conséquence assumée : le télescope
-  ne se voit plus qu'à son tube, à droite — il reste entier dans l'éditeur.
+  température 9,8 px, module de 84 px. Le télescope, posé à droite de
+  l'observatoire à pleine taille, en sortait : depuis le 11/11 il s'amarre
+  au-dessus de l'observatoire, à 0,45 fois sa taille, entier dans le cadre.
+  La scène garde ses 2100 de large ; son tiers droit est désormais libre
+  dans l'éditeur.
 - **L'état d'un module** (`etatModule`), une seule lecture pour le dessin,
   l'étiquette d'accessibilité et les fiches :
 
