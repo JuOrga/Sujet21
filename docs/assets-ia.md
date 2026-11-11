@@ -2034,10 +2034,10 @@ quart et livre à moitié de la taille source) :
 | tôle (deux variantes, raccord 4 sens) | ✅ livrées 01/10 |
 | bord haut (rebord à serres), bord bas (quille à tuyères) | ✅ livrés 01/10 |
 | bout gauche (collier d'entrée), bout droit (sas de sortie) | ✅ livrés 01/10 |
-| quatre coins saillants | ✅ livrés 01/10 (le haut-droit : le haut-gauche en miroir) |
-| deux angles rentrants (haut, bas ; les autres en miroir) | ✅ livrés 02/10 |
+| quatre coins saillants | ⛔ retirés le 10/11 — un gousset dessiné à chaque sommet (voir plus bas) |
+| deux angles rentrants (haut, bas ; les autres en miroir) | ⛔ retirés le 10/11 |
 | baie de serre, trappe ronde, bloc de machinerie | ✅ livrés 01/10 |
-| cellule de la mini-carte (quatre états précalculés) | ✅ livrée 01/10 |
+| cellule de la mini-carte | ✅ livrée 01/10 — la neutre seule depuis le 10/11 : état et icône se peignent |
 | équipements extérieurs (planche de six) | ✅ livrée 01/10 |
 | **tôle calme** (deux variantes, sans tuyau traversant) | ✅ livrées 02/10, remplacent les premières |
 | tôle de la salle des machines | ✅ livrée 02/10 |
@@ -2063,6 +2063,49 @@ moitié intérieure : le moteur ne garde que la bande du rebord (0,28 salle)
 et la fond vers la tôle. Coût mesuré (rendu logiciel, médiane de 5) : la
 peinture des deux toiles passe de ~610 à ~800 ms, dont ~110 ms pour le
 calque des bords.
+
+**La refonte du 10/11** (« refaire et compléter tout ce qui entoure les
+tableaux ») :
+
+- **Une teinte par biome** (`module2dCanvas.ts`, `THEMES`). Seule la serre
+  avait son décor ; la chaufferie, le cryo, l'antichambre et l'observatoire
+  portaient la même tôle grise à vitrages verts. Aucune image de plus : la
+  tôle, les bandes de bord, les baies et les détails sont RETEINTÉS au
+  chargement (`teintePixels`) — la tôle prend une dominante, et tout ce qui
+  était vert prend la couleur du biome (braise, givre, blanc froid, bleu
+  nuit). La mousse de la tôle devient rouille ou givre. Régler un biome :
+  ses trois valeurs dans `THEMES`.
+- **Le cadre de coque ne s'assemble plus, il se dessine.** Coins et angles
+  rentrants avaient été peints à 0,55 – 0,7 fois l'échelle des bords, avec
+  l'ancienne tôle dans leur moitié intérieure : tuyaux qui ne se
+  raccordaient pas, carrés clairs aux angles, et trois pièces empilées sur
+  toute arête courte (la poupe du fuseau). Désormais un profilé dessiné suit
+  la silhouette ; sur chaque arête assez longue, la bande peinte découpée à
+  son seul relief (le rail vitré du bord haut, la quille à tuyères, la
+  quille tournée sur les flancs) ; à chaque sommet un gousset octogonal — la
+  forme des modules sur le plan de la station — couvre la jonction. Des
+  bouts, il ne reste que le collier d'amarrage, ce qui dépasse de la coque.
+- **Une cellule dit ce qu'elle est** : l'icône de son nœud dans un écusson
+  (les tracés de la mini-carte de la cérémonie, `voiesModule.ts`,
+  `ICONES_NOEUD` — une seule source pour les deux), l'anneau d'or de la
+  prime, une barre pour la salle fermée par les choix.
+- **La coque est éclairée** : halo du module sur le ciel, dégradé de volume,
+  ombre du cadre, lueur ambre ou bleue des salles praticables sur la tôle ;
+  et le shader fait battre ce qui luit, en une onde qui court vers la droite
+  (`uTemps` ; coupé sous « moins d'animations »).
+- **Les transitions** (`module2d.ts`) : elles jouent aussi après une
+  rencontre ou une halte, en passant par la case traversée ; l'entrée d'un
+  module s'ouvre sur un plan d'ensemble du module entier ; pendant qu'elles
+  jouent, la salle ne porte plus son ombre, les tubes rejoignent la cellule
+  (`raccords`), la couverture cache aussi la frange de la coque et la toile
+  des effets se tait.
+
+Coût mesuré le 10/11 (rendu logiciel, les deux toiles, médiane de 5, deux
+passes) : étagée 266 – 276 → 219 – 260 ms, fuseau 259 – 262 → 213 – 218 ms,
+dorsale 264 – 280 → 211 – 216 ms, cylindre 146 – 162 → 178 – 184 ms (les
+écussons et la lueur des capsules). La première toile d'un biome reteinté
+coûte une fois de plus, ~110 à 200 ms. Quatorze images retirées de
+`public/assets` (20 → 18 Mo).
 
 **La serre en cylindre de culture (05/10)** : la serre quitte l'étagée
 (qui reste la coque des modules sans pièces propres) pour un immense

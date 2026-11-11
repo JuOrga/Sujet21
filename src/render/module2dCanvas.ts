@@ -2,8 +2,25 @@
 // habillée des pièces de tools/images/coque2d.py. La toile se recompose
 // seulement quand la run avance (une salle franchie, un autre module) ; le
 // moteur la pose ensuite comme une texture (renderer.ts, setModule2d).
+//
+// REFAIT LE 10/11. Le module n'avait d'identité que dans la serre : les
+// quatre autres biomes portaient la même tôle grise aux vitrages verts, et
+// leurs bords — des pièces peintes une à une, à des échelles différentes —
+// se chevauchaient dès qu'une arête était courte (la poupe du fuseau : trois
+// coins empilés, un collier par-dessus). Désormais :
+//   · CHAQUE BIOME A SA TEINTE (THEMES) : la tôle et ses vitrages sont
+//     reteintés une fois par biome, au chargement — la chaufferie braise, le
+//     cryo givre, l'observatoire bleu nuit ;
+//   · LE CADRE DE COQUE EST DESSINÉ, plus assemblé : un profilé qui suit
+//     n'importe quelle silhouette, coins arrondis, nervures, hublots à la
+//     lumière du biome — aucune couture, aucun chevauchement possible ;
+//   · UNE CELLULE DIT CE QU'ELLE EST : l'icône de son nœud, celle de la
+//     mini-carte de la cérémonie (game/voiesModule.ts, ICONES_NOEUD) ;
+//   · LA COQUE EST ÉCLAIRÉE : l'ombre du cadre, un dégradé de volume, la
+//     lueur de chaque salle praticable sur la tôle autour d'elle.
 
-import { CYL_BERCEAU, TUBE, type MiseEnPage } from './module2d'
+import { ICONES_NOEUD } from '../game/voiesModule'
+import { CYL_BERCEAU, TUBE, type EtatCellule, type EtatTube, type FormeModule, type MiseEnPage } from './module2d'
 
 /** Les pièces, à charger une fois. */
 export const PIECES_MODULE2D = [
@@ -14,12 +31,6 @@ export const PIECES_MODULE2D = [
   'tempere-bord-bas',
   'tempere-bout-gauche',
   'tempere-bout-droit',
-  'tempere-coin-haut-gauche',
-  'tempere-coin-haut-droit',
-  'tempere-coin-bas-gauche',
-  'tempere-coin-bas-droit',
-  'tempere-rentrant-haut',
-  'tempere-rentrant-bas',
   'tempere-baie',
   'tempere-baie-2',
   'tempere-colonne',
@@ -31,10 +42,6 @@ export const PIECES_MODULE2D = [
   'detail-grille',
   'detail-cuve',
   'detail-aerations',
-  'cellule-joue',
-  'cellule-ambre',
-  'cellule-bleu',
-  'cellule-ferme',
   'cellule-neutre',
   'equipement-grand-solaire',
   'equipement-petit-solaire',
@@ -88,14 +95,13 @@ export const PIECES_MODULE2D = [
   'serre-dome-gauche',
   'serre-dome-droit',
   'serre-berceau',
-  'serre-cellule-joue',
-  'serre-cellule-ambre',
-  'serre-cellule-bleu',
-  'serre-cellule-ferme',
   'serre-cellule-neutre',
 ] as const
 
 export type Pieces = Map<string, HTMLImageElement>
+/** une pièce telle qu'on la peint : l'image livrée, ou sa copie reteintée */
+type Img = HTMLImageElement | HTMLCanvasElement
+type C2D = CanvasRenderingContext2D
 
 export function chargePiecesModule2d(): Promise<Pieces> {
   return Promise.all(
@@ -111,34 +117,315 @@ export function chargePiecesModule2d(): Promise<Pieces> {
   ).then((l) => new Map(l))
 }
 
+// LES THÈMES — un par biome de la carte (game/carteStation.json, biomes).
+// Les pièces livrées sont celles de la serre : tôle sombre, vitrages verts.
+// Plutôt qu'un jeu d'images par biome (cinq fois le poids), chaque pièce est
+// RETEINTÉE à la volée : la tôle prend une dominante, et tout ce qui était
+// vert — les vitrages, les cultures derrière, les coulures de mousse sur la
+// tôle — prend la couleur du biome. La mousse devient rouille en chaufferie
+// et givre au cryo sans qu'on l'ait dessinée.
+export interface Theme {
+  nom: string
+  /** la dominante de la tôle : ce par quoi chaque canal est multiplié */
+  tole: readonly [number, number, number]
+  /** ce que devient le vert : sa teinte (degrés), sa saturation et sa clarté
+   *  (multipliées) — null : la serre reste verte */
+  vitrage: { teinte: number; sat: number; val: number } | null
+  /** la lumière du biome, « r,g,b » : hublots du cadre, halos, veilleuses */
+  lueur: string
+}
+/** la charte (docs/charte-visuelle.md, §3) : le vert n'appartient qu'à la
+ *  serre, l'ambre à ce qui chauffe, le cyan est l'accent de tout le reste */
+export const THEMES: Record<string, Theme> = {
+  tempere: { nom: 'tempere', tole: [1, 1, 1], vitrage: null, lueur: '127,227,168' },
+  chaud: { nom: 'chaud', tole: [1.2, 0.96, 0.8], vitrage: { teinte: 19, sat: 1.45, val: 1.5 }, lueur: '255,140,50' },
+  cryo: { nom: 'cryo', tole: [0.84, 1.02, 1.22], vitrage: { teinte: 196, sat: 0.75, val: 1.3 }, lueur: '167,221,245' },
+  antichambre: { nom: 'antichambre', tole: [0.98, 1, 1.08], vitrage: { teinte: 204, sat: 0.3, val: 1.25 }, lueur: '214,232,245' },
+  observatoire: { nom: 'observatoire', tole: [0.88, 0.92, 1.25], vitrage: { teinte: 232, sat: 0.95, val: 1.3 }, lueur: '167,184,255' },
+}
+/** un module sans biome (un outil, la mini-carte d'attente) : l'acier et le
+ *  cyan de la charte */
+const THEME_NEUTRE: Theme = { nom: 'neutre', tole: [1, 1, 1.04], vitrage: { teinte: 200, sat: 0.85, val: 1.15 }, lueur: '99,183,230' }
+export function themeDuBiome(biome: string): Theme {
+  return THEMES[biome] ?? THEME_NEUTRE
+}
+
+/** RETEINTER les pixels d'une pièce (RGBA, sur place) — pur : testé sans
+ *  toile. Le vert se reconnaît à ce qu'il DOMINE le rouge et le bleu ; plus
+ *  il domine, plus il prend la teinte du biome (un fondu : un seuil net
+ *  découpait les feuilles en aplats). */
+export function teintePixels(px: Uint8ClampedArray | number[], th: Theme): void {
+  const [tr, tg, tb] = th.tole
+  const v = th.vitrage
+  // la teinte pure du biome, en parts de rouge, vert, bleu
+  const pur = (dec: number) => {
+    const k = (((v?.teinte ?? 0) / 60 + dec) % 6 + 6) % 6
+    return 1 - Math.max(0, Math.min(1, Math.min(k, 4 - k)))
+  }
+  const [hr, hg, hb] = [pur(5), pur(3), pur(1)]
+  for (let i = 0; i < px.length; i += 4) {
+    const r = px[i]
+    const g = px[i + 1]
+    const b = px[i + 2]
+    let R = r * tr
+    let G = g * tg
+    let B = b * tb
+    const vert = g - Math.max(r, b)
+    if (v && vert > 4) {
+      const w = Math.min(1, (vert - 4) / 22)
+      const val = g * v.val
+      const sat = Math.min(1, ((g - Math.min(r, b)) / g) * v.sat)
+      R += (val * (1 - sat * (1 - hr)) - R) * w
+      G += (val * (1 - sat * (1 - hg)) - G) * w
+      B += (val * (1 - sat * (1 - hb)) - B) * w
+    }
+    px[i] = Math.min(255, R)
+    px[i + 1] = Math.min(255, G)
+    px[i + 2] = Math.min(255, B)
+  }
+}
+
+// une pièce reteintée se garde : la run repasse par le même biome, et une
+// toile se repeint à chaque salle
+const TEINTES = new WeakMap<Pieces, Map<string, Img>>()
+function pieceTeintee(p: Pieces, nom: string, th: Theme): Img {
+  const im = p.get(nom)!
+  if (!th.vitrage && th.tole.every((k) => k === 1)) return im
+  let cache = TEINTES.get(p)
+  if (!cache) TEINTES.set(p, (cache = new Map()))
+  const cle = `${th.nom}|${nom}`
+  const deja = cache.get(cle)
+  if (deja) return deja
+  const t = document.createElement('canvas')
+  t.width = im.width
+  t.height = im.height
+  const g = t.getContext('2d', { willReadFrequently: true })
+  let out: Img = im
+  if (g) {
+    g.drawImage(im, 0, 0)
+    try {
+      const d = g.getImageData(0, 0, t.width, t.height)
+      teintePixels(d.data, th)
+      g.putImageData(d, 0, 0)
+      out = t
+    } catch {
+      // une toile que le navigateur refuse de relire : la pièce d'origine,
+      // sans sa teinte, plutôt que rien
+    }
+  }
+  cache.set(cle, out)
+  return out
+}
+
 // LES PIÈCES MESURÉES, en pixels À LA MOITIÉ des sources (la première
 // livraison) : une largeur de salle vaut 533 de ces pixels — l'échelle de la
-// maquette validée le 01/10 —, et chaque pièce dit où passe la ligne de
-// coque. Les fichiers sont livrés à LIVRE des sources (tools/images/coque2d.py).
+// maquette validée le 01/10. Les fichiers sont livrés à LIVRE des sources
+// (tools/images/coque2d.py).
 const PX_PAR_SALLE = 533.3
 // les pièces de la serre, livrées en pleine résolution : 1024 de leurs
 // pixels par largeur de salle — deux bandes par étagère d'origine
 const PX_SERRE = 1024
 const LIVRE = 0.8
-const LIGNE_HAUT = 192 // bord-haut : le haut du rebord
-const LIGNE_BAS = 292.5 // bord-bas : le bas de la quille
-const LIGNE_GAUCHE = 225 // bout-gauche : le bord extérieur du capot
-const LIGNE_DROITE = 294.5 // bout-droit
-const BANDE_BOUT = 150 // la bande du capot, sans collier, prise en haut de l'image
-// la bande gardée des bords, depuis la silhouette, en largeurs de salle :
-// le rebord et la rangée de vitrages qu'il porte (0,26 mesuré sur le bord
-// haut peint), puis le fondu vers la tôle
-const REBORD = 0.28
-const FONDU_REBORD = 0.12
-// les coins : où tombe le sommet de la silhouette, et leur échelle propre
-// — le générateur ne les a pas peints à l'échelle des bords
-const COINS: Record<string, { ax: number; ay: number; k: number }> = {
-  'coin-haut-gauche': { ax: 100, ay: 123.5, k: 0.66 },
-  'coin-haut-droit': { ax: 526.5, ay: 123.5, k: 0.66 },
-  'coin-bas-gauche': { ax: 114.5, ay: 492.5, k: 0.55 },
-  'coin-bas-droit': { ax: 530.5, ay: 495, k: 0.55 },
-  'rentrant-haut': { ax: 325, ay: 259, k: 0.7 },
-  'rentrant-bas': { ax: 326, ay: 370, k: 0.6 },
+// LES COLLIERS D'AMARRAGE, pris dans les deux pièces de bout : où passe la
+// ligne de coque (en pixels du fichier), et les lignes que le collier occupe
+// (mesuré le 10/11 sur ce qui dépasse de la coque : 240 à 880 sur 1229)
+const COLLIER = { gauche: 360, droite: 471, haut: 215, bas: 905, morsure: 70 }
+// LES BANDES DE BORD, en pixels de leurs fichiers : la ligne de coque, ce que
+// la bande occupe dedans (son seul relief — le rail vitré du bord haut, le
+// tuyau et le treillis de la quille ; au-delà c'était l'ancienne tôle), et ce
+// qui dépasse dehors (les tuyères, sous la quille)
+const BANDE = { haut: { ligne: 307, dedans: 195, dehors: 7 }, bas: { ligne: 468, dedans: 150, dehors: 52 } }
+/** en deçà (largeurs de salle, goussets déduits), une arête garde le profilé nu */
+const BANDE_MIN = 0.55
+/** le côté d'un gousset : il couvre le bout des bandes (0,23 salle au plus haut) */
+const GOUSSET = 0.25
+/** entre deux arêtes sans bande, il n'a que le profilé à couvrir */
+const GOUSSET_NU = 0.13
+
+// LE CADRE DE COQUE, en largeurs de salle : un profilé de 8,5 % de salle
+const CADRE = 0.085
+const RAYON_SAILLANT = 0.1
+const RAYON_RENTRANT = 0.045
+/** d'un hublot au suivant, le long du cadre */
+const PAS_HUBLOT = 0.27
+
+// LES ÉTATS, en couleurs : la lumière (« r,g,b »), celle de l'icône, et de
+// combien la cellule s'assombrit
+const ETATS: Record<EtatCellule, { lumiere: string; icone: string; nuit: number }> = {
+  ambre: { lumiere: '255,160,60', icone: '#ffcf94', nuit: 0 },
+  bleu: { lumiere: '99,183,230', icone: '#9bd6f5', nuit: 0.18 },
+  joue: { lumiere: '150,170,188', icone: '#b3c2cf', nuit: 0.42 },
+  ferme: { lumiere: '70,84,98', icone: '#56636f', nuit: 0.74 },
+}
+const OR_PRIME = '#ffd977'
+
+type Pt = { x: number; y: number }
+
+/** un tirage stable dans [0, 1[ */
+const tire = (i: number, j: number) => ((((i * 73856093) ^ (j * 19349663)) >>> 0) % 1000) / 1000
+
+/** LE CONTOUR ARRONDI d'un polygone à angles droits : de milieu d'arête en
+ *  milieu d'arête, un arc à chaque sommet — le rayon ne dépasse jamais la
+ *  moitié de la plus courte des deux arêtes qu'il raccorde. */
+function traceContour(c: C2D, s: readonly Pt[], rayon: (i: number) => number): void {
+  const n = s.length
+  const mi = (a: Pt, b: Pt) => ({ x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 })
+  const long = (a: Pt, b: Pt) => Math.abs(b.x - a.x) + Math.abs(b.y - a.y)
+  const d = mi(s[n - 1], s[0])
+  c.beginPath()
+  c.moveTo(d.x, d.y)
+  for (let i = 0; i < n; i++) {
+    const av = s[(i + n - 1) % n]
+    const ap = s[(i + 1) % n]
+    const m = mi(s[i], ap)
+    c.arcTo(s[i].x, s[i].y, m.x, m.y, Math.min(rayon(i), 0.45 * long(av, s[i]), 0.45 * long(s[i], ap)))
+  }
+  c.closePath()
+}
+
+/** Une icône de nœud (repère 24 × 24), centrée en (x, y), haute de t. */
+function peintIcone(c: C2D, nom: string, x: number, y: number, t: number, couleur: string, alpha = 1): void {
+  const traits = ICONES_NOEUD[nom]
+  if (!traits) return
+  c.save()
+  c.translate(x - t / 2, y - t / 2)
+  c.scale(t / 24, t / 24)
+  c.lineCap = 'round'
+  c.lineJoin = 'round'
+  c.strokeStyle = couleur
+  c.fillStyle = couleur
+  // EN GRAND, LE TRAIT S'AFFINE : les icônes sont dessinées pour 22 px (la
+  // mini-carte de la cérémonie) ; à la taille d'une salle, pendant la
+  // transition, le même trait empâtait les branches du flocon en flèches
+  const fin = t > 48 ? 0.7 : 1
+  for (const tr of traits) {
+    const ch = new Path2D(tr.d)
+    c.globalAlpha = alpha * (tr.opacite ?? 1)
+    if (tr.plein) c.fill(ch)
+    if (tr.ep) {
+      c.lineWidth = tr.ep * fin
+      c.stroke(ch)
+    }
+  }
+  c.restore()
+}
+
+/** UNE CELLULE de la mini-carte, centrée en (x, y), large de l : la pièce
+ *  livrée (une petite salle vide, ou la capsule de la serre), assombrie selon
+ *  son état, son liseré, et au milieu l'ÉCUSSON de son nœud. Les quatre
+ *  images d'état précalculées portaient leurs lampes en aplats ovales et ne
+ *  disaient rien du nœud : une seule pièce neutre, le reste se dessine.
+ *  `k` : le grossissement de la toile (les flous se comptent en pixels). */
+function peintCellule(
+  c: C2D,
+  im: Img,
+  capsule: boolean,
+  q: { x: number; y: number; l: number; etat: EtatCellule; icone: string; prime: boolean },
+  k: number,
+  lueur = true,
+): void {
+  const E = ETATS[q.etat]
+  const l = q.l
+  const h = capsule ? (l * im.height) / im.width : l / 1.5
+  const x0 = q.x - l / 2
+  const y0 = q.y - h / 2
+  // le coin de la cellule : la capsule est un stade, la salle un rectangle
+  const r = capsule ? h * 0.46 : l * 0.035
+  const forme = (m: number) => {
+    c.beginPath()
+    c.roundRect(x0 - m, y0 - m, l + 2 * m, h + 2 * m, r + m)
+  }
+  // la lueur d'une salle praticable déborde sur la tôle
+  if (lueur && (q.etat === 'ambre' || q.etat === 'bleu')) {
+    c.save()
+    forme(0)
+    c.shadowColor = `rgba(${E.lumiere},${q.etat === 'ambre' ? 0.9 : 0.55})`
+    c.shadowBlur = l * 0.16 * k
+    c.fillStyle = `rgba(${E.lumiere},0.5)`
+    c.fill()
+    c.restore()
+  }
+  c.save()
+  forme(0)
+  c.clip()
+  c.drawImage(im, x0, y0, l, h)
+  // l'état : la nuit, puis un voile à sa couleur
+  c.fillStyle = `rgba(2,5,10,${E.nuit})`
+  c.fillRect(x0, y0, l, h)
+  if (q.etat === 'ambre' || q.etat === 'bleu') {
+    const g = c.createLinearGradient(0, y0, 0, y0 + h)
+    g.addColorStop(0, `rgba(${E.lumiere},0.3)`)
+    g.addColorStop(0.55, `rgba(${E.lumiere},0.08)`)
+    g.addColorStop(1, `rgba(${E.lumiere},0.2)`)
+    c.fillStyle = g
+    c.fillRect(x0, y0, l, h)
+  }
+  c.restore()
+  // le liseré
+  forme(-l * 0.008)
+  c.lineWidth = l * (q.etat === 'ambre' ? 0.026 : 0.016)
+  c.strokeStyle = `rgba(${E.lumiere},${q.etat === 'ferme' ? 0.5 : 0.95})`
+  c.stroke()
+  // L'ÉCUSSON : un disque sombre, cerclé, l'icône du nœud dedans — sur la
+  // pièce nue, l'icône se perdait dans les tuyaux peints
+  // (la capsule de la serre est si plate que l'écusson en prend la hauteur)
+  const rayon = h * (capsule ? 0.5 : 0.36)
+  c.beginPath()
+  c.arc(q.x, q.y, rayon, 0, Math.PI * 2)
+  c.fillStyle = `rgba(4,9,16,${q.etat === 'ferme' ? 0.55 : 0.82})`
+  c.fill()
+  c.lineWidth = rayon * 0.09
+  c.strokeStyle = `rgba(${E.lumiere},${q.etat === 'ferme' ? 0.35 : 0.8})`
+  c.stroke()
+  if (q.icone) peintIcone(c, q.icone, q.x, q.y, rayon * 1.3, E.icone, q.etat === 'ferme' ? 0.6 : 1)
+  // une salle FERMÉE par les choix : barrée, d'un trait discret — la croix
+  // rouge pleine largeur criait plus fort que les salles où l'on peut aller
+  if (q.etat === 'ferme') {
+    c.beginPath()
+    c.moveTo(q.x - rayon * 0.72, q.y + rayon * 0.72)
+    c.lineTo(q.x + rayon * 0.72, q.y - rayon * 0.72)
+    c.lineWidth = rayon * 0.11
+    c.lineCap = 'round'
+    c.strokeStyle = 'rgba(190,84,76,0.7)'
+    c.stroke()
+  }
+  // LA PRIME : un anneau d'or en pointillé autour de l'écusson, le signe de
+  // la mini-carte de la cérémonie (mv-prime-anneau)
+  if (q.prime && q.etat !== 'ferme') {
+    c.save()
+    c.beginPath()
+    c.arc(q.x, q.y, rayon * 1.24, 0, Math.PI * 2)
+    c.setLineDash([rayon * 0.26, rayon * 0.2])
+    c.lineWidth = rayon * 0.1
+    c.strokeStyle = OR_PRIME
+    c.globalAlpha = q.etat === 'joue' ? 0.5 : 1
+    c.stroke()
+    c.restore()
+  }
+}
+
+/** UNE CELLULE SEULE, sur sa propre toile — celle que la transition fait
+ *  rétrécir (la salle quittée, « joue ») ou grossir (la salle où l'on entre,
+ *  « ambre » : la porte qu'on vient de choisir). Peinte par le même geste que
+ *  celles du module : à la fin du rétrécissement, elle tombe exactement sur
+ *  sa jumelle de la toile. */
+export function peintCelluleSeule(
+  p: Pieces,
+  forme: FormeModule,
+  etat: EtatCellule,
+  noeud: { icone: string; prime: boolean },
+  largeur = 768,
+): HTMLCanvasElement {
+  const capsule = forme === 'cylindre'
+  const im = p.get(capsule ? 'serre-cellule-neutre' : 'cellule-neutre')!
+  const t = document.createElement('canvas')
+  t.width = largeur
+  t.height = Math.round(capsule ? (largeur * im.height) / im.width : largeur / 1.5)
+  const c = t.getContext('2d')
+  // sans sa lueur : coupée au bord de la toile, elle faisait un rectangle
+  // roux derrière la capsule (vu dans le vrai moteur le 10/11)
+  if (c) peintCellule(c, im, capsule, { x: t.width / 2, y: t.height / 2, l: t.width, etat, ...noeud }, 1, false)
+  return t
 }
 
 /** Une fenêtre de la mise en page à peindre plus fin : son coin, sa taille
@@ -157,26 +444,30 @@ export function peintModule2d(mp: MiseEnPage, p: Pieces, fen?: Fenetre): HTMLCan
   toile.width = fen ? Math.round(fen.l * fen.k) : mp.largeur
   toile.height = fen ? Math.round(fen.h * fen.k) : mp.hauteur
   const c = toile.getContext('2d')!
-  if (fen) c.setTransform(fen.k, 0, 0, fen.k, -fen.x * fen.k, -fen.y * fen.k)
+  const K = fen ? fen.k : 1
+  if (fen) c.setTransform(K, 0, 0, K, -fen.x * K, -fen.y * K)
+  const D = mp.densite
   // f : les mesures (à la moitié des sources) ; fi : les fichiers (à LIVRE)
-  const f = mp.densite / PX_PAR_SALLE
+  const f = D / PX_PAR_SALLE
   const fi = (f * 0.5) / LIVRE
   // LA FENÊTRE ne peint que ce qu'elle montre : rejouer tout le module sous
   // une transformation coûtait autant que la toile entière, à chaque salle
-  const marge = 0.6 * mp.densite
+  const marge = 0.6 * D
   const vu = fen
     ? { x0: fen.x - marge, y0: fen.y - marge, x1: fen.x + fen.l + marge, y1: fen.y + fen.h + marge }
     : { x0: -Infinity, y0: -Infinity, x1: Infinity, y1: Infinity }
   const hors = (x0: number, y0: number, x1: number, y1: number) => x1 < vu.x0 || x0 > vu.x1 || y1 < vu.y0 || y0 > vu.y1
-  const img = (n: string) => p.get(n)!
+  const th = themeDuBiome(mp.biome)
+  const brut = (n: string): Img => p.get(n)!
+  /** une pièce de la coque, à la teinte du biome */
+  const img = (n: string): Img => pieceTeintee(p, n, th)
   // 1. la tôle, dans la silhouette. Une variante par rangée, tirée au sort,
   // et chaque carreau retourné ou non : une rangée d'une seule variante
   // montrait le même motif ~8 fois d'affilée (analyse du 02/10). Le miroir
   // horizontal garde le raccord — le bord droit d'un carreau retourné est
   // le bord gauche de l'original —, mélanger les variantes dans une rangée
   // ferait des coutures
-  const tire = (i: number, j: number) => (((i * 73856093) ^ (j * 19349663)) >>> 0) % 1000 / 1000
-  const pave = (im: HTMLImageElement, x0: number, y0: number, x1: number, y1: number, graine: number) => {
+  const pave = (im: Img, x0: number, y0: number, x1: number, y1: number, graine: number) => {
     const tl = im.width * fi
     for (let i = 0, y = y0; y < y1; i++, y += tl) {
       if (hors(x0, y, x1, y + tl)) continue
@@ -220,12 +511,12 @@ export function peintModule2d(mp: MiseEnPage, p: Pieces, fen?: Fenetre): HTMLCan
     // d'origine des pièces (PX_SERRE par salle), le nombre de bandes ajusté à
     // la hauteur du module. Étirée d'un bloc à ~3 salles, une tranche n'avait
     // que ~400 px par salle : floue dès qu'on zoomait (Steam Deck, 06/10)
-    const empile = (h: number, haut: HTMLImageElement, bande: HTMLImageElement, bas: HTMLImageElement) => {
+    const empile = (h: number, haut: Img, bande: Img, bas: Img) => {
       const cible = mp.densite / PX_SERRE
       const nb = Math.max(0, Math.round((h / cible - haut.height - bas.height) / bande.height))
       return { nb, e: h / (haut.height + nb * bande.height + bas.height) }
     }
-    const colonne = (x: number, y: number, l: number, e: number, nb: number, haut: HTMLImageElement, bande: HTMLImageElement, bas: HTMLImageElement) => {
+    const colonne = (x: number, y: number, l: number, e: number, nb: number, haut: Img, bande: Img, bas: Img) => {
       c.drawImage(haut, x, y, l, haut.height * e + 0.5)
       let yy = y + haut.height * e
       for (let j = 0; j < nb; j++, yy += bande.height * e) c.drawImage(bande, x, yy, l, bande.height * e + 0.5)
@@ -249,7 +540,7 @@ export function peintModule2d(mp: MiseEnPage, p: Pieces, fen?: Fenetre): HTMLCan
     // peint, la même étagère en lignes et en colonnes (06/10). Chaque cœur est
     // retourné ou non (le miroir garde le raccord : son bord droit est le
     // bord gauche de l'original)
-    const piece = (im: HTMLImageElement, x: number, y: number, l: number, h: number, miroir: boolean) => {
+    const piece = (im: Img, x: number, y: number, l: number, h: number, miroir: boolean) => {
       if (!miroir) return c.drawImage(im, x, y, l, h)
       c.save()
       c.translate(x + l, y)
@@ -331,12 +622,25 @@ export function peintModule2d(mp: MiseEnPage, p: Pieces, fen?: Fenetre): HTMLCan
     if (!hors(k.minX - 786 * sd, k.minY, k.minX + 33 * sd, k.maxY)) c.drawImage(dg, k.minX - 786 * sd, k.minY, dg.width * sd, dg.height * sd)
     if (!hors(k.maxX - 30 * sd, k.minY, k.maxX + 790 * sd, k.maxY)) c.drawImage(dd, k.maxX - 30 * sd, k.minY, dd.width * sd, dd.height * sd)
   }
-  if (mp.forme === 'cylindre') peintCylindre()
+  const capsules = mp.forme === 'cylindre'
+  const S = mp.silhouette
+  const contour = () =>
+    traceContour(c, S, (i) => (S[i].piece.startsWith('coin') ? RAYON_SAILLANT : RAYON_RENTRANT) * D)
+  if (capsules) peintCylindre()
   else {
+    // LE HALO DU MODULE sur le ciel : quatre liserés de plus en plus larges à
+    // la lumière du biome — la coque sombre se fondait dans la nuit, sans bord
     c.save()
-    c.beginPath()
-    mp.silhouette.forEach((s, i) => (i ? c.lineTo(s.x, s.y) : c.moveTo(s.x, s.y)))
-    c.closePath()
+    c.lineJoin = 'round'
+    for (let i = 4; i >= 1; i--) {
+      contour()
+      c.lineWidth = i * 0.045 * D
+      c.strokeStyle = `rgba(${th.lueur},0.035)`
+      c.stroke()
+    }
+    c.restore()
+    c.save()
+    contour()
     c.clip()
     const toles = [img('tempere-tole'), img('tempere-tole-2')]
     const tl = toles[0].width * fi
@@ -357,7 +661,7 @@ export function peintModule2d(mp: MiseEnPage, p: Pieces, fen?: Fenetre): HTMLCan
       pave(img('tempere-tole-machines'), z.minX, z.minY, z.maxX, z.maxY, 101)
       c.restore()
       c.strokeStyle = 'rgba(0,0,0,0.7)'
-      c.lineWidth = 0.012 * mp.densite
+      c.lineWidth = 0.012 * D
       c.strokeRect(z.minX, z.minY, z.maxX - z.minX, z.maxY - z.minY)
     }
     // les petits détails, posés sur la tôle
@@ -367,38 +671,88 @@ export function peintModule2d(mp: MiseEnPage, p: Pieces, fen?: Fenetre): HTMLCan
       if (hors(d.x - d.l / 2, d.y - h / 2, d.x + d.l / 2, d.y + h / 2)) continue
       c.drawImage(im, d.x - d.l / 2, d.y - h / 2, d.l, h)
     }
-    // 2. les éléments uniques ; les vitrages de la serre débordent d'un halo
-    // vert sur la tôle : sans lui, la serre ne se reconnaissait qu'au rebord
+    // les éléments uniques ; leurs vitrages débordent d'un halo à la lumière
+    // du biome sur la tôle
     for (const e of mp.elements) {
       const im = img(`tempere-${e.nom}`)
       const h = (e.l * im.height) / im.width
-      const r = Math.max(e.l, h) * 0.55
+      const r = Math.max(e.l, h) * 0.6
       if (hors(e.x - r, e.y - r, e.x + r, e.y + r)) continue
       if (e.nom === 'baie' || e.nom === 'baie-2' || e.nom === 'colonne') {
         const g = c.createRadialGradient(e.x, e.y, 0, e.x, e.y, r)
-        g.addColorStop(0, 'rgba(90,200,120,0.09)')
-        g.addColorStop(1, 'rgba(90,200,120,0)')
+        g.addColorStop(0, `rgba(${th.lueur},0.13)`)
+        g.addColorStop(1, `rgba(${th.lueur},0)`)
         c.fillStyle = g
         c.fillRect(e.x - r, e.y - r, 2 * r, 2 * r)
       }
       c.drawImage(im, e.x - e.l / 2, e.y - h / 2, e.l, h)
     }
+    // LE VOLUME : la coque est éclairée d'en haut (la charte : « froide,
+    // égale, venue du haut ») — elle s'assombrit vers la quille. Uniforme,
+    // elle se lisait comme un papier peint, pas comme un objet
+    const ys = S.map((q) => q.y)
+    const y0 = Math.min(...ys)
+    const y1 = Math.max(...ys)
+    const vol = c.createLinearGradient(0, y0, 0, y1)
+    vol.addColorStop(0, 'rgba(0,0,0,0)')
+    vol.addColorStop(1, 'rgba(0,0,0,0.34)')
+    c.fillStyle = vol
+    c.fillRect(0, y0, mp.largeur, y1 - y0)
+    // L'OMBRE DU CADRE sur la tôle : six traits de plus en plus étroits le
+    // long du contour (un flou de toile sur 4 000 px coûterait une seconde)
+    c.lineJoin = 'round'
+    for (let i = 6; i >= 1; i--) {
+      contour()
+      c.lineWidth = 2 * (CADRE + i * 0.03) * D
+      c.strokeStyle = 'rgba(0,0,0,0.07)'
+      c.stroke()
+    }
     c.restore()
   }
-  // 3. les tubes, sous les cellules. Un tube est une CONDUITE : un halo de
-  // sa couleur s'il est praticable, le corps, une lueur au fil de son axe
-  // et un collier à chaque bout. Le corps seul, mince, avec un filet plat,
-  // se lisait comme un trait entre les cellules (aperçu du 05/10)
-  const tube = img('tube')
-  const collier = img('tube-collier')
-  const ep = TUBE * mp.densite
+  // LA LUEUR DES SALLES PRATICABLES sur la coque : ambre pour celles qu'on
+  // peut ouvrir maintenant, bleue pour la suite — d'un coup d'œil, la partie
+  // du module encore devant soi est éclairée, le reste dans la nuit
+  c.save()
+  if (capsules) {
+    c.beginPath()
+    c.rect(mp.corps.minX, mp.corps.minY, mp.corps.maxX - mp.corps.minX, mp.corps.maxY - mp.corps.minY)
+  } else contour()
+  c.clip()
+  c.globalCompositeOperation = 'lighter'
+  for (const k of mp.cellules) {
+    if (k.etat !== 'ambre' && k.etat !== 'bleu') continue
+    const r = (k.etat === 'ambre' ? 0.62 : 0.5) * D
+    if (hors(k.x - r, k.y - r, k.x + r, k.y + r)) continue
+    const g = c.createRadialGradient(k.x, k.y, 0, k.x, k.y, r)
+    g.addColorStop(0, `rgba(${ETATS[k.etat].lumiere},${k.etat === 'ambre' ? 0.2 : 0.11})`)
+    g.addColorStop(1, `rgba(${ETATS[k.etat].lumiere},0)`)
+    c.fillStyle = g
+    c.fillRect(k.x - r, k.y - r, 2 * r, 2 * r)
+  }
+  c.restore()
+  if (!capsules) peintCadre()
+  // LES TUBES, sous les cellules. Un tube est une CONDUITE : un halo de sa
+  // couleur s'il est praticable, le corps, une lueur au fil de son axe et un
+  // collier à chaque bout. Le corps seul, mince, avec un filet plat, se
+  // lisait comme un trait entre les cellules (aperçu du 05/10)
+  const tube = brut('tube')
+  const collier = brut('tube-collier')
+  const ep = TUBE * D
   const tw = (tube.width * ep) / tube.height
   const ch = ep * 1.3
   const cw = (collier.width * ch) / collier.height
-  const visibles = mp.tubes.filter((t) => {
-    const long = Math.abs(t.bx - t.ax) + Math.abs(t.by - t.ay)
-    return long >= 1 && !hors(Math.min(t.ax, t.bx) - ch, Math.min(t.ay, t.by) - ch, Math.max(t.ax, t.bx) + ch, Math.max(t.ay, t.by) + ch)
-  })
+  // les raccords sous la salle jouée se peignent comme les tubes : la salle
+  // les couvre en jeu, la transition les découvre (module2d.ts, raccords)
+  // DU PLUS ÉTEINT AU PLUS VIF : plusieurs tubes partagent leur dernier
+  // tronçon vers une même salle — peints dans l'ordre de la grille, un tube
+  // éteint pouvait recouvrir le chemin joué ou la voie praticable
+  const VIF: Record<EtatTube, number> = { eteint: 0, joue: 1, bleu: 2, ambre: 3 }
+  const visibles = [...mp.tubes, ...mp.raccords]
+    .filter((t) => {
+      const long = Math.abs(t.bx - t.ax) + Math.abs(t.by - t.ay)
+      return long >= 1 && !hors(Math.min(t.ax, t.bx) - ch, Math.min(t.ay, t.by) - ch, Math.max(t.ax, t.bx) + ch, Math.max(t.ay, t.by) + ch)
+    })
+    .sort((a, b) => VIF[a.etat] - VIF[b.etat])
   // l'emprise d'un tube, débordée de m de chaque côté et à chaque bout
   const emprise = (t: (typeof visibles)[number], m: number) =>
     c.rect(Math.min(t.ax, t.bx) - m, Math.min(t.ay, t.by) - m, Math.abs(t.bx - t.ax) + 2 * m, Math.abs(t.by - t.ay) + 2 * m)
@@ -408,16 +762,17 @@ export function peintModule2d(mp: MiseEnPage, p: Pieces, fen?: Fenetre): HTMLCan
   for (const t of visibles) emprise(t, ep * 0.8)
   c.fillStyle = 'rgba(0,0,0,0.5)'
   c.fill()
-  for (const [etat, lumiere, force] of [['bleu', '99,183,230', 0.5], ['ambre', '255,160,60', 0.75]] as const) {
+  const LUMIERE_TUBE: Record<EtatTube, string | null> = { ambre: ETATS.ambre.lumiere, bleu: ETATS.bleu.lumiere, joue: null, eteint: null }
+  for (const [etat, force] of [['bleu', 0.5], ['ambre', 0.8]] as const) {
     const lot = visibles.filter((t) => t.etat === etat)
     if (!lot.length) continue
     c.save()
     c.beginPath()
     for (const t of lot) emprise(t, ep * 0.5)
     // le flou d'une ombre se compte en pixels de la toile, hors transformation
-    c.shadowColor = `rgba(${lumiere},${force})`
-    c.shadowBlur = ep * 1.6 * (fen ? fen.k : 1)
-    c.fillStyle = `rgba(${lumiere},${force * 0.5})`
+    c.shadowColor = `rgba(${LUMIERE_TUBE[etat]},${force})`
+    c.shadowBlur = ep * 1.6 * K
+    c.fillStyle = `rgba(${LUMIERE_TUBE[etat]},${force * 0.5})`
     c.fill()
     c.restore()
   }
@@ -427,23 +782,26 @@ export function peintModule2d(mp: MiseEnPage, p: Pieces, fen?: Fenetre): HTMLCan
     c.translate(t.ax, t.ay)
     if (t.ax === t.bx) c.rotate(t.by > t.ay ? Math.PI / 2 : -Math.PI / 2)
     else if (t.bx < t.ax) c.rotate(Math.PI)
-    const lumiere = t.etat === 'ambre' ? '255,160,60' : t.etat === 'bleu' ? '99,183,230' : null
+    const lumiere = LUMIERE_TUBE[t.etat]
     c.save()
     c.beginPath()
     c.rect(-ep / 2, -ep / 2, long + ep, ep)
     c.clip()
     for (let x = -ep / 2; x < long + ep; x += tw) c.drawImage(tube, x, -ep / 2, tw + 0.5, ep)
     // un tube éteint s'assombrit ; le chemin praticable porte une lueur
-    const nuit = { ambre: 0, bleu: 0.15, joue: 0.3, eteint: 0.6 }[t.etat]
+    const nuit = { ambre: 0, bleu: 0.15, joue: 0.25, eteint: 0.62 }[t.etat]
     c.fillStyle = `rgba(0,0,0,${nuit})`
     c.fillRect(-ep / 2, -ep / 2, long + ep, ep)
-    if (lumiere) {
+    // LE CHEMIN JOUÉ garde un fil pâle : assombri comme un tube éteint, on ne
+    // retrouvait plus par où l'on était passé
+    const fil = lumiere ? `${lumiere},0.6` : t.etat === 'joue' ? '196,214,228,0.4' : null
+    if (fil) {
       const g = c.createLinearGradient(0, -ep / 2, 0, ep / 2)
-      g.addColorStop(0, `rgba(${lumiere},0)`)
-      g.addColorStop(0.5, `rgba(${lumiere},0.55)`)
-      g.addColorStop(1, `rgba(${lumiere},0)`)
+      g.addColorStop(0, `rgba(${fil.replace(/,[\d.]+$/, ',0')})`)
+      g.addColorStop(0.5, `rgba(${fil})`)
+      g.addColorStop(1, `rgba(${fil.replace(/,[\d.]+$/, ',0')})`)
       c.fillStyle = g
-      c.fillRect(-ep / 2, -ep * 0.18, long + ep, ep * 0.36)
+      c.fillRect(-ep / 2, -ep * 0.2, long + ep, ep * 0.4)
     }
     c.restore()
     // les colliers, aux deux bouts : là où le tube se raccorde ou tourne
@@ -461,131 +819,308 @@ export function peintModule2d(mp: MiseEnPage, p: Pieces, fen?: Fenetre): HTMLCan
     }
     c.restore()
   }
-  // 4. les cellules
-  // dans la serre, des capsules de culture, à leurs proportions (plus
-  // allongées que la case de la mini-carte)
-  const capsules = mp.forme === 'cylindre'
+  // LES CELLULES — dans la serre, des capsules de culture, à leurs
+  // proportions (plus allongées que la case de la mini-carte)
+  const pieceCellule = brut(capsules ? 'serre-cellule-neutre' : 'cellule-neutre')
   for (const k of mp.cellules) {
-    if (hors(k.x - k.l / 2, k.y - k.h / 2, k.x + k.l / 2, k.y + k.h / 2)) continue
-    const im = img(`${capsules ? 'serre-cellule' : 'cellule'}-${k.etat}`)
-    const h = capsules ? (k.l * im.height) / im.width : k.h
-    c.drawImage(im, k.x - k.l / 2, k.y - h / 2, k.l, h)
+    const m = k.l * 0.3
+    if (hors(k.x - k.l / 2 - m, k.y - k.h / 2 - m, k.x + k.l / 2 + m, k.y + k.h / 2 + m)) continue
+    peintCellule(c, pieceCellule, capsules, k, K)
   }
-  // le cylindre n'a ni bords ni coins : ses tranches portent leurs rebords
-  if (mp.forme !== 'cylindre') {
-    // LES BORDS SUR UN CALQUE, FONDUS VERS L'INTÉRIEUR : bords, coins et
-    // angles rentrants ont été peints avec l'ANCIENNE tôle dans leur moitié
-    // intérieure — contre la nouvelle, une couture le long de toute la coque
-    // et des carrés plats aux angles (analyse du 02/10). Seule la bande du
-    // rebord, contre la silhouette, est gardée ; au-delà, elle s'efface
-    const calque = document.createElement('canvas')
-    calque.width = toile.width
-    calque.height = toile.height
-    // Safari refuse une toile au-delà de sa mémoire de toiles : sans calque,
-    // les bords se peignent droit sur la toile, sans fondu, plutôt que rien
-    const qc = calque.getContext('2d')
-    const q = qc ?? c
-    if (qc && fen) q.setTransform(fen.k, 0, 0, fen.k, -fen.x * fen.k, -fen.y * fen.k)
-    // 5. les bords : chaque arête selon son sens (silhouette horaire)
-    const n = mp.silhouette.length
-    const bandeG = img('tempere-bout-gauche')
-    const bandeD = img('tempere-bout-droit')
-    for (let i = 0; i < n; i++) {
-      const a = mp.silhouette[i]
-      const b = mp.silhouette[(i + 1) % n]
-      if (hors(Math.min(a.x, b.x), Math.min(a.y, b.y), Math.max(a.x, b.x), Math.max(a.y, b.y))) continue
-      if (a.x === b.x) {
-        const gauche = b.y < a.y
-        const im = gauche ? bandeG : bandeD
-        const ox = a.x - (gauche ? LIGNE_GAUCHE : LIGNE_DROITE) * f
-        const bh = BANDE_BOUT * f
-        for (let y = Math.min(a.y, b.y); y < Math.max(a.y, b.y); y += bh) {
-          const reste = Math.min(bh, Math.max(a.y, b.y) - y)
-          q.drawImage(im, 0, 0, im.width, (BANDE_BOUT * (LIVRE / 0.5) * reste) / bh, ox, y, im.width * fi, reste)
-        }
-      } else {
-        const haut = b.x > a.x
-        const im = img(haut ? 'tempere-bord-haut' : 'tempere-bord-bas')
-        const oy = a.y - (haut ? LIGNE_HAUT : LIGNE_BAS) * f
-        const lw = im.width * fi
-        for (let x = Math.min(a.x, b.x); x < Math.max(a.x, b.x); x += lw) {
-          const reste = Math.min(lw, Math.max(a.x, b.x) - x)
-          q.drawImage(im, 0, 0, (im.width * reste) / lw, im.height, x, oy, reste, im.height * fi)
-        }
-      }
-    }
-    // 6. les colliers : l'entrée à gauche, la sortie à droite
-    for (const [im, pt, ligne] of [
-      [bandeG, mp.colliers.gauche, LIGNE_GAUCHE],
-      [bandeD, mp.colliers.droite, LIGNE_DROITE],
-    ] as const)
-    {
-      // sur un bord plus court que l'image (le nez du fuseau), seule sa part
-      // centrale, celle du collier
-      const hTout = im.height * fi
-      const h = Math.min(hTout, pt.h)
-      const sy = ((hTout - h) / 2 / hTout) * im.height
-      q.drawImage(im, 0, sy, im.width, (h / hTout) * im.height, pt.x - ligne * f, pt.y - h / 2, im.width * fi, h)
-    }
-    // 7. les coins et les angles rentrants
-    for (const s of mp.silhouette) {
-      if (hors(s.x, s.y, s.x, s.y)) continue
-      const k = COINS[s.piece]
-      const im = img(`tempere-${s.piece}`)
-      q.save()
-      q.translate(s.x, s.y)
-      if (s.miroir) q.scale(-1, 1)
-      q.drawImage(im, -k.ax * f * k.k, -k.ay * f * k.k, im.width * fi * k.k, im.height * fi * k.k)
-      q.restore()
-    }
-    // le masque : 1 au cœur de la coque, 0 contre la silhouette, un fondu entre
-    const masque = document.createElement('canvas')
-    masque.width = toile.width
-    masque.height = toile.height
-    const m = qc ? masque.getContext('2d') : null
-    if (m) {
-      if (fen) m.setTransform(fen.k, 0, 0, fen.k, -fen.x * fen.k, -fen.y * fen.k)
-      const contour = () => {
-        m.beginPath()
-        mp.silhouette.forEach((s, i) => (i ? m.lineTo(s.x, s.y) : m.moveTo(s.x, s.y)))
-        m.closePath()
-      }
-      contour()
-      m.fillStyle = '#000'
-      m.fill()
-      m.globalCompositeOperation = 'destination-out'
-      m.strokeStyle = '#000'
-      const D = REBORD * mp.densite
-      const F = FONDU_REBORD * mp.densite
-      for (let k = 0; k < 4; k++) {
-        m.globalAlpha = 0.5
-        m.lineWidth = 2 * (D + (F * (4 - k)) / 4)
-        contour()
-        m.stroke()
-      }
-      m.globalAlpha = 1
-      m.lineWidth = 2 * D
-      contour()
-      m.stroke()
-      q.setTransform(1, 0, 0, 1, 0, 0)
-      q.globalCompositeOperation = 'destination-out'
-      q.drawImage(masque, 0, 0)
-    }
-    if (qc) {
-      c.save()
-      c.setTransform(1, 0, 0, 1, 0, 0)
-      c.drawImage(calque, 0, 0)
-      c.restore()
-    }
-    // rendre la mémoire tout de suite : deux toiles de plus, à chaque salle
-    calque.width = calque.height = masque.width = masque.height = 0
-  }
-  // 8. les équipements, debout sur les bords hauts
+  // LES ÉQUIPEMENTS, debout sur les bords hauts
   for (const e of mp.equipements) {
-    if (hors(e.x, e.y - 0.6 * mp.densite, e.x, e.y)) continue
-    const im = img(`equipement-${e.nom}`)
+    if (hors(e.x, e.y - 0.6 * D, e.x, e.y)) continue
+    const im = brut(`equipement-${e.nom}`)
     const k = fi * 1.07
-    c.drawImage(im, e.x - (im.width * k) / 2, e.y - im.height * k + 0.02 * mp.densite, im.width * k, im.height * k)
+    c.drawImage(im, e.x - (im.width * k) / 2, e.y - im.height * k + 0.02 * D, im.width * k, im.height * k)
   }
   return toile
+
+  // LE CADRE DE COQUE. Les bords, coins et angles rentrants avaient été
+  // peints un à un, à des échelles différentes (les coins à 0,55 – 0,7 fois
+  // les bords), chacun avec l'ANCIENNE tôle dans sa moitié intérieure : des
+  // tuyaux qui ne se raccordaient pas, des carrés de tôle claire aux angles,
+  // et sur une arête courte trois pièces l'une sur l'autre (la poupe du
+  // fuseau). Désormais, trois couches qui ne peuvent pas se chevaucher :
+  //   1. un PROFILÉ dessiné, qui suit toute la silhouette, coins arrondis ;
+  //   2. sur chaque arête assez longue, la BANDE peinte — le rail vitré du
+  //      bord haut, la quille et ses tuyères du bord bas, la quille encore,
+  //      tournée, sur les flancs —, découpée à son seul relief (plus de tôle
+  //      d'emprunt) et arrêtée avant les sommets ;
+  //   3. à chaque sommet, un GOUSSET boulonné qui couvre la jonction.
+  function peintCadre(): void {
+    const e = CADRE * D
+    const n = S.length
+    const long = (a: Pt, b: Pt) => Math.abs(b.x - a.x) + Math.abs(b.y - a.y)
+    // une arête porte sa bande peinte si elle est assez longue pour la
+    // montrer entre ses deux goussets
+    const longue = S.map((v, i) => long(v, S[(i + 1) % n]) >= (BANDE_MIN + 2 * GOUSSET) * D)
+    // le gousset de chaque sommet : son côté — grand s'il doit couvrir le bout
+    // d'une bande, petit entre deux arêtes nues —, borné par ses deux arêtes
+    const gousset = S.map((v, i) =>
+      Math.min((longue[i] || longue[(i + n - 1) % n] ? GOUSSET : GOUSSET_NU) * D, 0.42 * long(S[(i + n - 1) % n], v), 0.42 * long(v, S[(i + 1) % n])),
+    )
+    c.save()
+    contour()
+    c.clip()
+    c.lineJoin = 'round'
+    // la coupe du profilé, de l'intérieur vers le dehors : chaque trait, plus
+    // étroit que le précédent, laisse dépasser une bande du précédent
+    const coupe: [number, string][] = [
+      [1, '#33414f'], // la lèvre intérieure, claire
+      [0.93, '#070b11'], // la gorge, dans l'ombre
+      [0.78, '#1a2430'], // le rail
+      [0.5, '#0c1219'], // sa rainure
+      [0.45, '#202b38'], // le rail, côté dehors
+      [0.13, '#52647a'], // la lèvre extérieure : l'arête qui prend la lumière
+    ]
+    for (const [part, teinte] of coupe) {
+      contour()
+      c.lineWidth = 2 * e * part
+      c.strokeStyle = teinte
+      c.stroke()
+    }
+    // le grain de l'acier : le profilé, lisse, jurait contre la tôle peinte
+    const grain = c.createPattern(grainAcier(), 'repeat')
+    if (grain) {
+      contour()
+      c.lineWidth = 2 * e
+      c.strokeStyle = grain
+      c.stroke()
+    }
+    c.restore()
+    // les bandes peintes débordent de la silhouette (les tuyères de la
+    // quille) : elles se peignent sans découpe
+    const haut = img('tempere-bord-haut')
+    const bas = img('tempere-bord-bas')
+    for (let i = 0; i < n; i++) {
+      const a = S[i]
+      const b = S[(i + 1) % n]
+      const L = long(a, b)
+      const m = BANDE.haut.dedans * fi + e
+      if (hors(Math.min(a.x, b.x) - m, Math.min(a.y, b.y) - m, Math.max(a.x, b.x) + m, Math.max(a.y, b.y) + m)) continue
+      // À UN ANGLE RENTRANT, l'arête va jusqu'au sommet : son gousset est de
+      // l'autre côté, dans le coin de tôle que les deux bandes encadrent. La
+      // retenue de sa largeur ne vaut qu'aux angles saillants, où les deux
+      // bandes se recouvriraient (arrêtée partout, la quille laissait un
+      // tronçon de profilé nu avant chaque marche — banc du 10/11)
+      const retenue = (j: number) => (S[j].piece.startsWith('coin') ? gousset[j] : 0)
+      const g0 = retenue(i)
+      const g1 = retenue((i + 1) % n)
+      const sens = b.x > a.x ? 'haut' : b.x < a.x ? 'bas' : b.y < a.y ? 'gauche' : 'droite'
+      if (longue[i]) {
+        // LA BANDE PEINTE, dans le repère de SON image : x le long de l'arête,
+        // y vers le bas de l'image. Le bord haut est peint le dehors en haut ;
+        // la quille le dehors en bas, et se tourne d'un quart de tour pour
+        // habiller un flanc (le dehors à gauche, ou à droite)
+        const B = sens === 'haut' ? BANDE.haut : BANDE.bas
+        const im = sens === 'haut' ? haut : bas
+        // l'origine : le bout de l'arête d'où part l'axe x de l'image
+        const [o, og, fg] = sens === 'haut' ? [a, g0, g1] : [b, g1, g0]
+        c.save()
+        c.translate(o.x, o.y)
+        if (sens === 'gauche') c.rotate(Math.PI / 2)
+        if (sens === 'droite') c.rotate(-Math.PI / 2)
+        // les tuyères ne garnissent que la quille : sur un flanc, la bande
+        // s'arrête à la ligne de coque
+        const dehors = sens === 'haut' ? B.dehors : sens === 'bas' ? B.dehors : 0
+        const y0 = sens === 'haut' ? -B.dehors * fi : -B.dedans * fi
+        const hb = (B.dedans + dehors) * fi
+        const sy = sens === 'haut' ? B.ligne - B.dehors : B.ligne - B.dedans
+        c.beginPath()
+        c.rect(og, y0 - 1, L - og - fg, hb + 2)
+        c.clip()
+        const lw = im.width * fi
+        // la bande part d'un décalage tiré par arête : toutes calées sur leur
+        // coin, deux arêtes voisines montraient le même motif au même endroit
+        for (let x = og - tire(i + 3, 17) * lw; x < L - fg; x += lw)
+          c.drawImage(im, 0, sy, im.width, B.dedans + dehors, x, y0, lw + 0.5, hb)
+        c.restore()
+        // l'ombre de la bande sur la tôle, vers l'intérieur
+        c.save()
+        c.translate(a.x, a.y)
+        c.rotate(Math.atan2(b.y - a.y, b.x - a.x))
+        const yb = B.dedans * fi
+        const ob = c.createLinearGradient(0, yb, 0, yb + 0.14 * D)
+        ob.addColorStop(0, 'rgba(0,0,0,0.5)')
+        ob.addColorStop(1, 'rgba(0,0,0,0)')
+        c.fillStyle = ob
+        c.fillRect(g0, yb, L - g0 - g1, 0.14 * D)
+        c.restore()
+        continue
+      }
+      // UNE ARÊTE COURTE garde le profilé nu, garni de nervures et de hublots
+      // à la lumière du biome. Le repère : x le long d'elle, y vers
+      // l'INTÉRIEUR de la coque (la silhouette tourne en sens horaire à l'écran)
+      c.save()
+      contour()
+      c.clip()
+      c.translate(a.x, a.y)
+      c.rotate(Math.atan2(b.y - a.y, b.x - a.x))
+      // la lumière vient du haut : le dessus s'éclaire, la quille reste dans
+      // l'ombre, les flancs entre les deux
+      c.fillStyle = sens === 'haut' ? 'rgba(170,205,235,0.07)' : sens === 'bas' ? 'rgba(0,0,0,0.3)' : 'rgba(0,0,0,0.12)'
+      c.fillRect(g0, 0, L - g0 - g1, e)
+      const nb = Math.max(1, Math.round((L - g0 - g1) / (PAS_HUBLOT * D)))
+      const pas = (L - g0 - g1) / nb
+      for (let j = 0; j < nb; j++) {
+        const x = g0 + j * pas
+        if (j > 0) {
+          // la nervure : un collier qui ceinture le profilé
+          const ln = 0.02 * D
+          c.fillStyle = '#0a0f15'
+          c.fillRect(x - ln / 2 - 0.004 * D, 0, ln + 0.008 * D, e)
+          const gn = c.createLinearGradient(x - ln / 2, 0, x + ln / 2, 0)
+          gn.addColorStop(0, '#3c4b5c')
+          gn.addColorStop(0.45, '#566a80')
+          gn.addColorStop(1, '#232e3b')
+          c.fillStyle = gn
+          c.fillRect(x - ln / 2, 0, ln, e * 0.96)
+        }
+        // le hublot : une fente de verre à la lumière du biome, dans le rail
+        const lh = Math.min(0.1 * D, pas * 0.5)
+        const hh = 0.019 * D
+        const xm = x + pas / 2
+        const ym = 0.615 * e
+        c.save()
+        c.beginPath()
+        c.roundRect(xm - lh / 2, ym - hh / 2, lh, hh, hh / 2)
+        c.shadowColor = `rgba(${th.lueur},${sens === 'bas' ? 0.4 : 0.7})`
+        c.shadowBlur = 0.025 * D * K
+        c.fillStyle = `rgba(${th.lueur},${sens === 'bas' ? 0.5 : 0.85})`
+        c.fill()
+        c.restore()
+      }
+      c.restore()
+    }
+    // LES GOUSSETS : à chaque sommet, une plaque boulonnée couvre la
+    // rencontre des deux arêtes ; aux angles saillants, un feu de position
+    c.save()
+    contour()
+    c.clip()
+    for (let i = 0; i < n; i++) {
+      const v = S[i]
+      const av = S[(i + n - 1) % n]
+      const ap = S[(i + 1) % n]
+      // vers l'intérieur de chacune des deux arêtes (horaire à l'écran : la
+      // normale intérieure est la direction tournée d'un quart de tour)
+      const dedans = (p0: Pt, p1: Pt): Pt => ({ x: -Math.sign(p1.y - p0.y), y: Math.sign(p1.x - p0.x) })
+      const n1 = dedans(av, v)
+      const n2 = dedans(v, ap)
+      const t = gousset[i]
+      const gx = n1.x + n2.x
+      const gy = n1.y + n2.y
+      const x0 = Math.min(v.x, v.x + gx * t)
+      const yy0 = Math.min(v.y, v.y + gy * t)
+      if (hors(x0, yy0, x0 + t, yy0 + t)) continue
+      // L'OCTOGONE de la station (le plan de la carte, game/dessinCarte.ts :
+      // coins coupés à 22 % / 28 %) : un carré plein faisait une caisse posée
+      // sur l'angle
+      const octo = (m: number) => {
+        const u = t - 2 * m
+        const P: [number, number][] = [[0.24, 0], [0.76, 0], [1, 0.24], [1, 0.76], [0.76, 1], [0.24, 1], [0, 0.76], [0, 0.24]]
+        c.beginPath()
+        P.forEach(([ux, uy], j) => (j ? c.lineTo(x0 + m + ux * u, yy0 + m + uy * u) : c.moveTo(x0 + m + ux * u, yy0 + m + uy * u)))
+        c.closePath()
+      }
+      // sous l'octogone, le profilé continue : ses coins coupés laissent voir
+      // l'acier, pas la tôle
+      c.fillStyle = '#121a23'
+      c.fillRect(x0, yy0, t, t)
+      const g = c.createLinearGradient(0, yy0, 0, yy0 + t)
+      g.addColorStop(0, '#2a3644')
+      g.addColorStop(1, '#111820')
+      octo(t * 0.03)
+      c.fillStyle = g
+      c.fill()
+      if (grain) {
+        c.fillStyle = grain
+        c.fill()
+      }
+      c.lineWidth = Math.max(1, 0.007 * D)
+      c.strokeStyle = '#05080c'
+      c.stroke()
+      // l'arête du dessus prend la lumière
+      c.beginPath()
+      c.moveTo(x0 + t * 0.26, yy0 + t * 0.045)
+      c.lineTo(x0 + t * 0.74, yy0 + t * 0.045)
+      c.lineWidth = Math.max(1, 0.005 * D)
+      c.strokeStyle = 'rgba(150,185,215,0.45)'
+      c.stroke()
+      octo(t * 0.17)
+      c.fillStyle = 'rgba(4,8,13,0.55)'
+      c.fill()
+      c.lineWidth = Math.max(1, 0.005 * D)
+      c.strokeStyle = 'rgba(120,150,180,0.25)'
+      c.stroke()
+      for (const [ux, uy] of [[0.5, 0.1], [0.5, 0.9], [0.1, 0.5], [0.9, 0.5]]) {
+        c.beginPath()
+        c.arc(x0 + ux * t, yy0 + uy * t, Math.max(0.0045 * D, t * 0.026), 0, Math.PI * 2)
+        c.fillStyle = '#05080c'
+        c.fill()
+      }
+      const mx = x0 + t / 2
+      const my = yy0 + t / 2
+      if (S[i].piece.startsWith('coin')) {
+        // le feu de position d'un angle saillant, sous son verre
+        c.save()
+        c.beginPath()
+        c.arc(mx, my, t * 0.085, 0, Math.PI * 2)
+        c.shadowColor = 'rgba(242,201,142,0.9)'
+        c.shadowBlur = t * 0.2 * K
+        c.fillStyle = '#f2c98e'
+        c.fill()
+        c.restore()
+      } else {
+        // un angle rentrant : une bouche d'aération, trois lames
+        c.lineWidth = Math.max(1, t * 0.035)
+        c.strokeStyle = 'rgba(120,150,180,0.4)'
+        for (const dy of [-0.11, 0, 0.11]) {
+          c.beginPath()
+          c.moveTo(mx - t * 0.15, my + dy * t)
+          c.lineTo(mx + t * 0.15, my + dy * t)
+          c.stroke()
+        }
+      }
+    }
+    c.restore()
+    // LES DEUX COLLIERS D'AMARRAGE — l'entrée à gauche, la sortie à droite —,
+    // pris dans les pièces de bout : seulement ce qui dépasse de la coque, et
+    // la bride qui la mord. Le reste de ces pièces (une colonne de l'ancienne
+    // tôle) ne se peint plus
+    const hc = (COLLIER.bas - COLLIER.haut) * fi
+    for (const cote of ['gauche', 'droite'] as const) {
+      const pt = mp.colliers[cote]
+      const im = brut(cote === 'gauche' ? 'tempere-bout-gauche' : 'tempere-bout-droit')
+      // sur un bord plus court que le collier (le nez du fuseau), il rétrécit
+      const k = Math.min(1, (pt.h * 1.5) / hc)
+      const morsure = COLLIER.morsure * fi * k
+      const dehors = (cote === 'gauche' ? COLLIER.gauche : im.width - COLLIER.droite) * fi * k
+      const x0 = cote === 'gauche' ? pt.x - dehors : pt.x - morsure
+      if (hors(x0, pt.y - (hc * k) / 2, x0 + dehors + morsure, pt.y + (hc * k) / 2)) continue
+      const sx = cote === 'gauche' ? 0 : COLLIER.droite - COLLIER.morsure
+      const sw = (cote === 'gauche' ? COLLIER.gauche : im.width - COLLIER.droite) + COLLIER.morsure
+      c.drawImage(im, sx, COLLIER.haut, sw, COLLIER.bas - COLLIER.haut, x0, pt.y - (hc * k) / 2, dehors + morsure, hc * k)
+    }
+  }
+}
+
+/** LE GRAIN DE L'ACIER : une tuile de bruit, tirée une fois — des piqûres
+ *  claires et sombres, presque transparentes. */
+let grain: HTMLCanvasElement | null = null
+function grainAcier(): HTMLCanvasElement {
+  if (grain) return grain
+  const t = document.createElement('canvas')
+  t.width = t.height = 96
+  const g = t.getContext('2d')
+  if (g)
+    for (let y = 0; y < 96; y += 2)
+      for (let x = 0; x < 96; x += 2) {
+        const v = tire(x + 3, y + 11)
+        g.fillStyle = v < 0.5 ? `rgba(0,0,0,${(0.5 - v) * 0.5})` : `rgba(190,215,240,${(v - 0.5) * 0.12})`
+        // des rayures : une piqûre sur douze s'étire
+        g.fillRect(x, y, tire(y, x + 7) < 0.08 ? 14 : 2, 2)
+      }
+  grain = t
+  return t
 }
