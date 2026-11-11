@@ -21720,7 +21720,7 @@
     {
       "id": "nouveau-tableau-21",
       "auteur": "BOIZ",
-      "majAt": "2026-11-05T15:45:35.787Z",
+      "majAt": "2026-11-10T15:45:07.056Z",
       "codeAuteur": "BOIZ",
       "codeAt": "2026-10-19T15:04:19.953Z",
       "level": {
@@ -21730,7 +21730,7 @@
         "bounds": {
           "minX": -1500,
           "minY": -950,
-          "maxX": 1500,
+          "maxX": 1760,
           "maxY": 950
         },
         "spawn": {
@@ -21739,10 +21739,10 @@
           "n": 900
         },
         "exit": {
-          "minX": 1279,
-          "minY": -70,
-          "maxX": 1419,
-          "maxY": 70
+          "minX": 1275,
+          "minY": -863,
+          "maxX": 1415,
+          "maxY": -723
         },
         "boxes": [
           {
@@ -21764,13 +21764,6 @@
             "minY": -950,
             "maxX": -430,
             "maxY": -690,
-            "material": 0
-          },
-          {
-            "minX": -1159,
-            "minY": 1124,
-            "maxX": -910,
-            "maxY": 1374,
             "material": 0
           },
           {
@@ -21816,17 +21809,17 @@
             "material": 7
           },
           {
-            "minX": 30,
-            "minY": 98,
-            "maxX": 90,
+            "minX": 1700,
+            "minY": -948.25,
+            "maxX": 1760,
             "maxY": 950,
-            "material": 0
+            "material": 2
           },
           {
             "minX": 30,
             "minY": -910,
             "maxX": 90,
-            "maxY": -490,
+            "maxY": -410,
             "material": 8
           },
           {
@@ -21857,9 +21850,9 @@
           },
           {
             "minX": 30,
-            "minY": -490,
+            "minY": -410,
             "maxX": 90,
-            "maxY": 98,
+            "maxY": 950,
             "material": 0
           },
           {
@@ -21868,6 +21861,79 @@
             "maxX": -760,
             "maxY": -690,
             "material": 2
+          },
+          {
+            "minX": 90,
+            "minY": 98,
+            "maxX": 590,
+            "maxY": 158,
+            "material": 8
+          },
+          {
+            "minX": 590,
+            "minY": 98,
+            "maxX": 1120,
+            "maxY": 158,
+            "material": 0
+          },
+          {
+            "minX": 90,
+            "minY": -950,
+            "maxX": 930,
+            "maxY": -890,
+            "material": 0
+          },
+          {
+            "minX": 930,
+            "minY": -948.25,
+            "maxX": 990,
+            "maxY": 98,
+            "material": 2
+          },
+          {
+            "minX": 580,
+            "minY": -890,
+            "maxX": 930,
+            "maxY": -490,
+            "forme": 3,
+            "p0": 1,
+            "material": 2
+          },
+          {
+            "minX": 190,
+            "minY": -460,
+            "maxX": 290,
+            "maxY": -360,
+            "forme": 2,
+            "material": 2
+          },
+          {
+            "minX": 1120,
+            "minY": 98,
+            "maxX": 1570,
+            "maxY": 158,
+            "material": 5
+          },
+          {
+            "minX": 90,
+            "minY": 890,
+            "maxX": 1700,
+            "maxY": 950,
+            "material": 9
+          },
+          {
+            "minX": 990,
+            "minY": -372,
+            "maxX": 1305,
+            "maxY": -302,
+            "material": 4
+          },
+          {
+            "minX": 1570,
+            "minY": 98,
+            "maxX": 1700,
+            "maxY": 158,
+            "material": 0
           }
         ],
         "sponges": [],
@@ -21882,8 +21948,8 @@
         "zones": [
           {
             "minX": -1500,
-            "minY": -940,
-            "maxX": 1500,
+            "minY": -950,
+            "maxX": 1700,
             "maxY": 46,
             "force": "glace"
           },
@@ -21891,6 +21957,13 @@
             "minX": -910,
             "minY": 213,
             "maxX": -400,
+            "maxY": 950,
+            "force": "vapeur"
+          },
+          {
+            "minX": 80,
+            "minY": 189,
+            "maxX": 1700,
             "maxY": 950,
             "force": "vapeur"
           }
