@@ -157,7 +157,8 @@ const CARTON = 2.2 // secondes
 const transition = drapeaux.includes('--noir') ? 'noir' : (m.transition ?? 'coupe')
 // ce qu'on retire à la fin du plan avant le carton — et, en coupe franche,
 // ce pendant quoi le son de la scène continue dessous
-const ROGNE = avecCarton ? (m.rogne ?? 1) : 0
+// (montage.plan fixe la durée du plan gardé, à la place d'une rogne)
+const ROGNE = avecCarton ? (m.plan ? Math.max(0, duree - m.plan) : (m.rogne ?? 1)) : 0
 const NOIR = 0.3 // la durée de chaque demi-fondu de la variante « noir »
 const nav = await chromium.launch()
 const pg = await nav.newPage({ viewport: { width: L, height: H } })
@@ -249,8 +250,8 @@ function assemble(sortie, avecTextes) {
     // Coupe franche : le son COURT sous le carton pendant la seconde rognée,
     // et s'éteint sur ses huit derniers dixièmes. Au noir : il s'éteint avec
     // l'image.
-    const finSon = !avecCarton ? duree : transition === 'noir' ? plan : duree
-    const queue = !avecCarton ? 0.3 : transition === 'noir' ? NOIR : Math.min(0.8, ROGNE)
+    const finSon = !avecCarton ? duree : transition === 'noir' ? plan : Math.min(duree, plan + 1)
+    const queue = !avecCarton ? 0.3 : transition === 'noir' ? NOIR : Math.min(0.8, finSon - plan)
     filtres.push(
       `[${a0}]atrim=duration=${finSon.toFixed(4)},afade=t=in:d=0.06,afade=t=out:st=${(finSon - queue).toFixed(3)}:d=${queue},loudnorm=I=-15:TP=-1.5:LRA=11,aresample=48000,apad=whole_dur=${total.toFixed(4)}[af]`,
     )

@@ -153,7 +153,10 @@ export async function ouvre({
       document.getElementById('sig-valider').click()
     }
   })
-  await page.evaluate(() => document.getElementById('start').click())
+  await page.evaluate((g) => {
+    window.__clipSeme(g) // même hasard à partir d'ici, quel qu'ait été le chargement
+    document.getElementById('start').click()
+  }, graine)
   if (css) await page.addStyleTag({ content: css })
   dit('en jeu :', await page.evaluate(() => document.body.className))
 
@@ -162,6 +165,34 @@ export async function ouvre({
   let sonDebut = 0
   let images = 0
   let visee = false
+  let dernier = { x: 0, y: 0 }
+  // LES GESTES sont des événements de pointeur posés DANS la page, sur le
+  // canvas du jeu, et non des mouvements de vraie souris. Chromium aligne
+  // les déplacements de souris sur ses images réelles : sous charge, un
+  // déplacement pouvait arriver une image pilotée trop tard, et deux
+  // tournages du même scénario divergeaient (vécu le 11/11 : la ressaisie
+  // tournée pendant un montage n'était plus celle de son aperçu). Un
+  // événement dispatché à la main est traité sur-le-champ, toujours.
+  const pointeur = (type, x, y) =>
+    page.evaluate(
+      ([type, x, y]) => {
+        document.getElementById('glcanvas').dispatchEvent(
+          new PointerEvent(type, {
+            bubbles: true,
+            cancelable: true,
+            pointerId: 1,
+            pointerType: 'mouse',
+            isPrimary: true,
+            button: type === 'pointermove' ? -1 : 0,
+            buttons: type === 'pointerup' ? 0 : 1,
+            clientX: x,
+            clientY: y,
+          }),
+        )
+      },
+      [type, x, y],
+    )
+  let ancreDoigt = null // où le doigt est posé sur le corps, tant qu'il le tient
 
   const jeu = {
     page,
@@ -219,11 +250,9 @@ export async function ouvre({
     async viseEcran(x, y) {
       const px = Math.max(2, Math.min(largeur - 2, x))
       const py = Math.max(2, Math.min(hauteur - 2, y))
-      await page.mouse.move(px, py)
-      if (!visee) {
-        await page.mouse.down()
-        visee = true
-      }
+      await pointeur(visee ? 'pointermove' : 'pointerdown', px, py)
+      visee = true
+      dernier = { x: px, y: py }
     },
 
     /** Pose le pointeur sur un point du MONDE. */
@@ -233,28 +262,39 @@ export async function ouvre({
     },
 
     /** Pose le pointeur SUR le corps et le tient : le geste se retourne
-     *  vers l'intérieur, le corps se rassemble (solver.ts, rassemble). On
-     *  vise la particule la plus proche du centre, pas le centre : sur un
-     *  corps étiré en arc, le centre de masse tombe dans le vide, et le jeu
-     *  n'y verrait qu'une éjection. */
-    async toucheCorps() {
-      const p = await page.evaluate(() => {
-        const s = window.__sim
-        const cx = s.stats.centroidX
-        const cy = s.stats.centroidY
-        let mieux = null
-        let d2 = Infinity
-        for (let i = 0; i < s.count; i++) {
-          if (s.kind[i] !== 1 || s.gaseous[i] === 1) continue // 1 : KIND_PLAYER
-          const d = (s.posX[i] - cx) ** 2 + (s.posY[i] - cy) ** 2
-          if (d < d2) {
-            d2 = d
-            mieux = { x: s.posX[i], y: s.posY[i] }
+     *  vers l'intérieur, le corps se rassemble (solver.ts, rassemble).
+     *  `ou: 'centre'` vise la particule la plus proche du centre de masse —
+     *  pas le centre lui-même : sur un corps étiré en arc il tombe dans le
+     *  vide, et le jeu n'y verrait qu'une éjection. `ou: 'bout'` vise le
+     *  bout le plus étiré, la particule la plus loin du centre (le
+     *  concepteur, 11/11 : « ne clique pas au centre mais plutôt sur le bout
+     *  étiré »). Une fois posé, le doigt SUIT : à chaque image il reste sur
+     *  la particule la plus proche de là où il était — il accompagne le
+     *  bout qui revient au lieu de sauter d'un point à l'autre. */
+    async toucheCorps({ ou = 'centre' } = {}) {
+      const p = await page.evaluate(
+        ([ou, ancre]) => {
+          const s = window.__sim
+          // tenu : on colle à l'endroit d'avant ; posé : le centre ou le bout
+          const cx = ancre ? ancre.x : s.stats.centroidX
+          const cy = ancre ? ancre.y : s.stats.centroidY
+          const loin = !ancre && ou === 'bout'
+          let mieux = null
+          let d2 = loin ? -1 : Infinity
+          for (let i = 0; i < s.count; i++) {
+            if (s.kind[i] !== 1 || s.gaseous[i] === 1) continue // 1 : KIND_PLAYER
+            const d = (s.posX[i] - cx) ** 2 + (s.posY[i] - cy) ** 2
+            if (loin ? d > d2 : d < d2) {
+              d2 = d
+              mieux = { x: s.posX[i], y: s.posY[i] }
+            }
           }
-        }
-        return mieux
-      })
+          return mieux
+        },
+        [ou, ancreDoigt],
+      )
       if (!p) return
+      ancreDoigt = p
       await jeu.vise(p.x, p.y)
       // LE DOIGT. Le jeu ne dessine rien là où l'on touche, et un corps qui
       // se rassemble « tout seul » ne raconte pas le geste. On pose donc un
@@ -283,8 +323,9 @@ export async function ouvre({
 
     async lache() {
       if (!visee) return
-      await page.mouse.up()
+      await pointeur('pointerup', dernier.x, dernier.y)
       visee = false
+      ancreDoigt = null
       await page.evaluate(() => {
         const d = document.getElementById('clip-doigt')
         if (d) d.style.opacity = '0'

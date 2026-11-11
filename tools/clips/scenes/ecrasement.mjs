@@ -29,19 +29,25 @@ export default {
         debut = i
         await jeu.filme(fichier)
       }
-      if (choc < 0 && debut >= 0 && Math.hypot(e.vx, e.vy) < 95) choc = i
+      // « enlacé » : le corps s'est étalé autour de l'îlot. On le lit à son
+      // ÉTENDUE (rayon quadratique, 67 u en boule) et non à sa vitesse : il
+      // ralentit dès le premier contact, bien avant de s'être enroulé — un
+      // toucher déclenché là le gardait en boule, et il n'y avait rien à voir
+      if (choc < 0 && debut >= 0 && e.r > 132) choc = i
       if (debut < 0) {
         // l'élan, caméra libre : droit sur l'îlot
-        const g = geste(e, ILOT, 190)
+        const g = geste(e, ILOT, 225)
         if (g.pousse) await jeu.vise(g.vise.x, g.vise.y)
         else await jeu.lache()
-      } else if (choc >= 0 && i - choc >= 22 && i - choc < 22 + 130) {
-        // enroulé autour de l'îlot : le doigt se pose sur le corps, deux secondes
-        await jeu.toucheCorps()
+      } else if (choc >= 0 && i - choc >= 6 && i - choc < 6 + 130) {
+        // enroulé autour de l'îlot : le doigt se pose sur le BOUT le plus
+        // étiré de l'anneau (« pas au centre », le concepteur, 11/11) et
+        // l'accompagne pendant qu'il revient
+        await jeu.toucheCorps({ ou: 'bout' })
       } else await jeu.lache()
       e = await jeu.image({ cam: debut < 0 ? { libre: true } : { x: ILOT.x - 250, y: ILOT.y + 30, z } })
       if (i % 30 === 0) jeu.dit(i, debut < 0 ? 'hors champ' : ((i - debut) / 60).toFixed(1) + ' s', 'pos', e.x.toFixed(0), e.y.toFixed(0), 'v', Math.hypot(e.vx, e.vy).toFixed(0), 'r', e.r.toFixed(0), 'n', e.n, e.rassemble ? 'RASSEMBLE' : '')
-      if (choc >= 0 && i - choc > 240) break // le corps a quitté le cadre
+      if (choc >= 0 && i - choc > 225) break // le corps a quitté le cadre
     }
     await jeu.lache()
   },

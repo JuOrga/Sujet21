@@ -63,10 +63,16 @@ et au besoin `sansEcrit`, `montage` et `publication`.
   champ ne se pilote pas** (le point visé est ramené au bord du cadre et la
   poussée s'inverse — vécu le 11/11, le corps du gel repartait en arrière).
   Une scène à plan fixe prend son élan caméra libre, puis filme.
-- `jeu.toucheCorps()` pose le pointeur SUR le corps et le tient : il se
-  rassemble (`rassemble`, `src/sim/solver.ts`). Un anneau discret marque le
-  toucher à l'image — le seul élément du film qui ne vient pas du jeu ;
-  `doigt: false` dans la scène le retire.
+- `jeu.toucheCorps({ ou })` pose le pointeur SUR le corps et le tient : il
+  se rassemble (`rassemble`, `src/sim/solver.ts`). `ou: 'bout'` vise le bout
+  le plus étiré, `'centre'` (défaut) le milieu ; le doigt suit ensuite le
+  point qu'il a touché. Un anneau discret marque le toucher à l'image — le
+  seul élément du film qui ne vient pas du jeu ; `doigt: false` le retire.
+- Les gestes sont des événements de pointeur posés dans la page, et le
+  hasard est ressemé à l'entrée en salle : deux tournages du même scénario
+  donnent la même partie, quelle que soit la charge de la machine (vérifié
+  le 11/11 : deux aperçus de l'écrasement lancés en même temps, journaux
+  identiques ligne à ligne).
 - `jeu.dans(() => window.__ronde())` appelle les sondes que `main.ts`
   expose déjà (`__ronde`, `__orbites`, `__cibles`, `__palet`, `__zones`…).
 - `sansEcrit: true` rend muets les écriteaux que le jeu dessine dans son
@@ -104,13 +110,13 @@ du plan TOURNÉ ; au montage, le plan perd sa dernière seconde et gagne
 | Scène | Le moment | Durée |
 | --- | --- | --- |
 | `ronde` | le bloc de glace en huit autour de trois puits — boucle parfaite (un tour = 807 images) | 13,45 s |
-| `goutte` | la ronde sans sa zone de glace : le bloc fond en vol, le puits du haut capture la goutte, qui s'étire en comète | 10,83 s |
+| `goutte` | la ronde sans sa zone de glace : le bloc fond en vol, le puits du haut capture la goutte, qui s'étire en comète | 10,83 s tournées, 6 gardées (`montage.plan`) |
 | `repulsion` | « Le rebond » : l'eau ne touche jamais la paroi hydrophobe et s'aplatit en arc devant elle | 6,70 s |
 | `gel` | « Le premier gel » : l'eau s'écrase sur la plaque froide et se fige en pleine éclaboussure | 7,03 s |
 | `vapeur` | « Le premier souffle » : le corps bout sur la chaudière et part en nuage doré | 8,70 s |
 | `eponge` | « La buveuse » : le corps s'étale sur le mur d'éponge, qui le boit | 6,17 s |
-| `ecrasement` | « Le berceau » : le corps enlace l'îlot neutre en anneau ; touché, l'anneau se contracte en boule et repart en arrière | 6,42 s |
-| `ressaisie` | « Le rebond » : l'arc étiré devant la paroi hydrophobe, rappelé d'un toucher — les deux bouts reviennent d'un coup | 8,78 s |
+| `ecrasement` | « Le berceau » : le corps enlace l'îlot neutre ; le doigt se pose sur le bout étiré de l'arc et l'accompagne, la boule se reforme et repart | 5,93 s |
+| `ressaisie` | « Le rebond » : l'arc étiré devant la paroi hydrophobe, rappelé d'UN toucher (1,8 s, sans anneau) — les deux bouts reviennent d'un coup | 8,78 s |
 
 ## Ce qui ne marche pas (encore)
 

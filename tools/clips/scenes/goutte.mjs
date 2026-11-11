@@ -31,7 +31,9 @@ export default {
     }
   },
   // la ligne de marque descend sous le mur du haut, qui passe dans le cadre
-  montage: { marqueY: 196 },
+  // le plan est coupé à 6 s (le concepteur, 11/11) : le bloc fond, la goutte
+  // fait son premier tour en comète, et on part
+  montage: { marqueY: 196, plan: 6 },
   publication: {
     legende: 'Elle ne retombera pas.',
     mots: ['#jeuindé', '#indiegame', '#physique', '#gravité', '#gamedev', '#simulation'],

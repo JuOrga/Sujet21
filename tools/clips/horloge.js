@@ -34,6 +34,13 @@
   // partie. C'est ce qui permet de régler un clip sur un APERÇU rapide en
   // petite taille, puis de le tourner en grand en sachant ce qu'on aura.
   let graine = (Number(reglages.graine) || 21) >>> 0
+  // Le pilote RESSÈME au moment d'entrer en salle : le chargement de la page
+  // dure un nombre d'images qui dépend de la machine, et chaque image tire
+  // au sort — sans cela le corps ne naissait pas deux fois pareil (vécu le
+  // 11/11 : l'écrasement arrivait sur l'îlot à y = +6 en aperçu, −17 en grand).
+  window.__clipSeme = (g) => {
+    graine = (Number(g) || 21) >>> 0
+  }
   Math.random = () => {
     graine = (graine + 0x6d2b79f5) >>> 0
     let x = graine
