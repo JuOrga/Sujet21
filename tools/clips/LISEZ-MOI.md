@@ -63,22 +63,31 @@ et au besoin `sansEcrit`, `montage` et `publication`.
   champ ne se pilote pas** (le point visé est ramené au bord du cadre et la
   poussée s'inverse — vécu le 11/11, le corps du gel repartait en arrière).
   Une scène à plan fixe prend son élan caméra libre, puis filme.
+- `jeu.toucheCorps()` pose le pointeur SUR le corps et le tient : il se
+  rassemble (`rassemble`, `src/sim/solver.ts`). Un anneau discret marque le
+  toucher à l'image — le seul élément du film qui ne vient pas du jeu ;
+  `doigt: false` dans la scène le retire.
 - `jeu.dans(() => window.__ronde())` appelle les sondes que `main.ts`
   expose déjà (`__ronde`, `__orbites`, `__cibles`, `__palet`, `__zones`…).
 - `sansEcrit: true` rend muets les écriteaux que le jeu dessine dans son
-  calque 2D ; l'interface HTML (jauge, boutons, panneaux de verdict et de
-  fin de run) est masquée d'office : un clip montre un moment de physique,
-  pas son score.
+  calque 2D ; l'interface HTML (boutons, panneaux de verdict et de fin de
+  run) est masquée d'office : un clip montre un moment de physique, pas son
+  score. `masque: 'jauge'` garde la jauge de volume, recentrée sous la ligne
+  de marque ; `tourne.mjs <scène> --jauge` l'ajoute à une scène qui ne l'a
+  pas (fichier `<scène>-jauge`, monté par `montage.mjs <scène> jauge`).
 - `montage.textes` (facultatif) incruste des textes aux polices du jeu, dans
   un bandeau en haut ; sans textes, seule reste la ligne de marque
   (`montage.marqueY` la déplace). Un fichier `.json`
   `{ garde: [[début, fin], …] }` posé à côté du film demande une coupe franche.
 
-## Les six scènes livrées
+## Les huit scènes livrées
 
 Le concepteur (10/11) : « je ne souhaite pas expliquer le jeu, mais que tu
 clipes des moments du jeu avec la physique très intéressante. Sans l'écran
-des scores. » Aucune scène n'a donc de texte, de jauge ni de verdict.
+des scores. » Puis (11/11) : « un peu de HUD peut être intéressant tout de
+même », et le regroupement — toucher le corps étiré, « ça lui fait faire
+complètement autre chose ». Aucune scène n'a de texte ni de verdict ; les
+deux dernières gardent la jauge.
 
 | Scène | Le moment | Durée |
 | --- | --- | --- |
@@ -88,6 +97,8 @@ des scores. » Aucune scène n'a donc de texte, de jauge ni de verdict.
 | `gel` | « Le premier gel » : l'eau s'écrase sur la plaque froide et se fige en pleine éclaboussure | 7,03 s |
 | `vapeur` | « Le premier souffle » : le corps bout sur la chaudière et part en nuage doré | 8,70 s |
 | `eponge` | « La buveuse » : le corps s'étale sur le mur d'éponge, qui le boit | 6,17 s |
+| `ecrasement` | « Le berceau » : le corps enlace l'îlot neutre en anneau ; touché, l'anneau se contracte en boule et repart en arrière | 6,42 s |
+| `ressaisie` | « Le rebond » : l'arc étiré devant la paroi hydrophobe, rappelé d'un toucher — les deux bouts reviennent d'un coup | 8,78 s |
 
 ## Ce qui ne marche pas (encore)
 

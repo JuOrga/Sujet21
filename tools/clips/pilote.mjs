@@ -84,6 +84,7 @@ export async function ouvre({
   dureeSon = 150,
   graine = 21,
   sansEcrit = false,
+  doigt = true,
   requete = '',
   css = '',
   journal = true,
@@ -231,10 +232,63 @@ export async function ouvre({
       await jeu.viseEcran(e.x, e.y)
     },
 
+    /** Pose le pointeur SUR le corps et le tient : le geste se retourne
+     *  vers l'intérieur, le corps se rassemble (solver.ts, rassemble). On
+     *  vise la particule la plus proche du centre, pas le centre : sur un
+     *  corps étiré en arc, le centre de masse tombe dans le vide, et le jeu
+     *  n'y verrait qu'une éjection. */
+    async toucheCorps() {
+      const p = await page.evaluate(() => {
+        const s = window.__sim
+        const cx = s.stats.centroidX
+        const cy = s.stats.centroidY
+        let mieux = null
+        let d2 = Infinity
+        for (let i = 0; i < s.count; i++) {
+          if (s.kind[i] !== 1 || s.gaseous[i] === 1) continue // 1 : KIND_PLAYER
+          const d = (s.posX[i] - cx) ** 2 + (s.posY[i] - cy) ** 2
+          if (d < d2) {
+            d2 = d
+            mieux = { x: s.posX[i], y: s.posY[i] }
+          }
+        }
+        return mieux
+      })
+      if (!p) return
+      await jeu.vise(p.x, p.y)
+      // LE DOIGT. Le jeu ne dessine rien là où l'on touche, et un corps qui
+      // se rassemble « tout seul » ne raconte pas le geste. On pose donc un
+      // anneau discret sous le pointeur, le temps du toucher — c'est le seul
+      // élément du film qui ne vient pas du jeu (comme le rond des captures
+      // d'écran de téléphone). `doigt: false` à l'ouverture le retire.
+      if (doigt) {
+        const e = await jeu.versEcran(p.x, p.y)
+        await page.evaluate(([x, y]) => {
+          let d = document.getElementById('clip-doigt')
+          if (!d) {
+            d = document.createElement('div')
+            d.id = 'clip-doigt'
+            d.style.cssText =
+              'position:fixed;z-index:99;width:46px;height:46px;margin:-23px 0 0 -23px;border-radius:50%;pointer-events:none;' +
+              'border:2px solid rgba(214,232,245,.85);background:rgba(214,232,245,.14);box-shadow:0 0 14px rgba(99,183,230,.55);' +
+              'opacity:0;transition:opacity .12s linear'
+            document.body.appendChild(d)
+          }
+          d.style.left = x + 'px'
+          d.style.top = y + 'px'
+          d.style.opacity = '1'
+        }, [e.x, e.y])
+      }
+    },
+
     async lache() {
       if (!visee) return
       await page.mouse.up()
       visee = false
+      await page.evaluate(() => {
+        const d = document.getElementById('clip-doigt')
+        if (d) d.style.opacity = '0'
+      })
     },
 
     touche: (k) => page.keyboard.press(k),
@@ -355,6 +409,7 @@ export async function ouvre({
           return s.count ? g / s.count : 0
         })(),
         tout: s.count,
+        rassemble: !!window.__rass,
         salle: window.__run ? window.__run.tableauTime : 0,
       }
     }

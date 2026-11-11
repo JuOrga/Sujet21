@@ -30,8 +30,9 @@ const { chromium } = createRequire(import.meta.url)('playwright')
 const L = 1080
 const H = 1920
 
-const nom = process.argv[2]
-const scene = (await import(`./scenes/${nom}.mjs`)).default
+// `montage.mjs <scène> jauge` monte la variante tournée avec --jauge
+const scene = (await import(`./scenes/${process.argv[2]}.mjs`)).default
+const nom = process.argv[2] + (process.argv[3] ? `-${process.argv[3]}` : '')
 const m = scene.montage ?? {}
 const brut = path.join(SORTIE, 'brut', `${nom}.mkv`)
 const son = path.join(SORTIE, 'brut', `${nom}.wav`)
