@@ -8,9 +8,6 @@ export default {
   dureeSon: 60,
   masque: 'jauge',
   sansEcrit: true,
-  // pas d'anneau sous le doigt : le concepteur (11/11) l'a fait retirer ici —
-  // le rappel se lit tout seul, deux bouts d'arc qui reviennent
-  doigt: false,
   async tourne(jeu, fichier) {
     await jeu.pas(170)
     let e = await jeu.etat()

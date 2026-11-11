@@ -84,7 +84,7 @@ export async function ouvre({
   dureeSon = 150,
   graine = 21,
   sansEcrit = false,
-  doigt = true,
+  doigt = false,
   requete = '',
   css = '',
   journal = true,
@@ -296,11 +296,11 @@ export async function ouvre({
       if (!p) return
       ancreDoigt = p
       await jeu.vise(p.x, p.y)
-      // LE DOIGT. Le jeu ne dessine rien là où l'on touche, et un corps qui
-      // se rassemble « tout seul » ne raconte pas le geste. On pose donc un
-      // anneau discret sous le pointeur, le temps du toucher — c'est le seul
-      // élément du film qui ne vient pas du jeu (comme le rond des captures
-      // d'écran de téléphone). `doigt: false` à l'ouverture le retire.
+      // LE DOIGT. Le jeu ne dessine rien là où l'on touche. Un anneau sous le
+      // pointeur a été essayé pour raconter le geste ; le concepteur (11/11)
+      // l'a fait retirer des deux scènes qui touchent le corps — le
+      // regroupement se lit tout seul. Il reste disponible, éteint par
+      // défaut : `doigt: true` dans une scène le rallume.
       if (doigt) {
         const e = await jeu.versEcran(p.x, p.y)
         await page.evaluate(([x, y]) => {

@@ -52,7 +52,7 @@ const jeu = await ouvre({
   // rouge, qu'un spectateur lit comme une image manquante
   requete: scene.requete ?? 'module2d=0',
   sansEcrit: scene.sansEcrit ?? false,
-  doigt: scene.doigt ?? true,
+  doigt: scene.doigt ?? false,
   css: css(MASQUES[masque]) + (masque === 'jauge' ? JAUGE : '') + (scene.css ?? ''),
 })
 jeu.apercu = apercu

@@ -66,8 +66,9 @@ et au besoin `sansEcrit`, `montage` et `publication`.
 - `jeu.toucheCorps({ ou })` pose le pointeur SUR le corps et le tient : il
   se rassemble (`rassemble`, `src/sim/solver.ts`). `ou: 'bout'` vise le bout
   le plus étiré, `'centre'` (défaut) le milieu ; le doigt suit ensuite le
-  point qu'il a touché. Un anneau discret marque le toucher à l'image — le
-  seul élément du film qui ne vient pas du jeu ; `doigt: false` le retire.
+  point qu'il a touché. Rien ne marque le toucher à l'image : un anneau
+  sous le pointeur a été essayé puis retiré à la demande du concepteur
+  (`doigt: true` dans une scène le rallume).
 - Les gestes sont des événements de pointeur posés dans la page, et le
   hasard est ressemé à l'entrée en salle : deux tournages du même scénario
   donnent la même partie, quelle que soit la charge de la machine (vérifié
@@ -116,7 +117,7 @@ du plan TOURNÉ ; au montage, le plan perd sa dernière seconde et gagne
 | `vapeur` | « Le premier souffle » : le corps bout sur la chaudière et part en nuage doré | 8,70 s |
 | `eponge` | « La buveuse » : le corps s'étale sur le mur d'éponge, qui le boit | 6,17 s |
 | `ecrasement` | « Le berceau » : le corps enlace l'îlot neutre ; le doigt se pose sur le bout étiré de l'arc et l'accompagne, la boule se reforme et repart | 5,93 s |
-| `ressaisie` | « Le rebond » : l'arc étiré devant la paroi hydrophobe, rappelé d'UN toucher (1,8 s, sans anneau) — les deux bouts reviennent d'un coup | 8,78 s |
+| `ressaisie` | « Le rebond » : l'arc étiré devant la paroi hydrophobe, rappelé d'UN toucher de 1,8 s — les deux bouts reviennent d'un coup | 8,78 s |
 
 ## Ce qui ne marche pas (encore)
 
