@@ -83,6 +83,7 @@ export async function ouvre({
   densite = 2,
   dureeSon = 150,
   graine = 21,
+  sansEcrit = false,
   requete = '',
   css = '',
   journal = true,
@@ -110,6 +111,16 @@ export async function ouvre({
   page.on('response', (r) => r.status() >= 400 && dit('ABSENT', r.status(), r.url().replace(/^http:\/\/[^/]+/, '')))
   await page.addInitScript(`window.__clipReglages = ${JSON.stringify({ dureeSon, graine })}`)
   await page.addInitScript(fs.readFileSync(path.join(ICI, 'horloge.js'), 'utf8'))
+  // SANS ÉCRIT : les écriteaux que le jeu dessine dans son calque 2D
+  // (« ANNEAU 1 / 3 », les numéros des anneaux, les consignes) ne sont pas
+  // des éléments de page qu'un style masquerait. On rend muettes les deux
+  // fonctions qui écrivent dans un canvas : les formes restent, les mots
+  // partent — le plan montre la physique, pas le mode d'emploi.
+  if (sansEcrit)
+    await page.addInitScript(() => {
+      CanvasRenderingContext2D.prototype.fillText = () => {}
+      CanvasRenderingContext2D.prototype.strokeText = () => {}
+    })
   // ?horsligne : le contenu LIVRÉ fait foi, aucun appel à l'API (que le bac
   // à sable ne joint pas de toute façon)
   await page.goto(`http://127.0.0.1:${serveur.port}/?tableau=${tableau}&horsligne${requete ? '&' + requete : ''}`, { waitUntil: 'load' })
@@ -332,6 +343,18 @@ export async function ouvre({
         // la jauge, telle que le joueur la lit
         litres: document.querySelector('#hud .ath-vital')?.innerText?.split('\n')[0] ?? '',
         disperse: !!s.dispersed,
+        // la part du corps prise en glace, et celle passée en vapeur
+        gel: (() => {
+          let g = 0
+          for (let i = 0; i < st.count && i < s.frozen.length; i++) if (s.frozen[i]) g++
+          return s.count ? g / s.count : 0
+        })(),
+        gaz: (() => {
+          let g = 0
+          for (let i = 0; i < s.count; i++) if (s.gaseous && s.gaseous[i]) g++
+          return s.count ? g / s.count : 0
+        })(),
+        tout: s.count,
         salle: window.__run ? window.__run.tableauTime : 0,
       }
     }

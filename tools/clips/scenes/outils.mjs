@@ -18,7 +18,12 @@ export function pilote({ haut = 55, bas = 22 } = {}) {
     const ecart = Math.hypot(ex, ey)
     if (pousse ? ecart < bas : ecart > haut) pousse = !pousse
     // le point visé : derrière le corps, à l'opposé de l'accélération voulue
-    return { pousse, d, vise: { x: e.x - (ex / ecart) * 300, y: e.y - (ey / ecart) * 300 } }
+    // (à 160 u du centre, pas plus loin : le geste passe par un vrai
+    // pointeur, donc par l'ÉCRAN — un point visé hors du cadre est ramené au
+    // bord, et la direction s'en trouve faussée, jusqu'à s'inverser quand le
+    // corps lui-même est hors champ. Une scène à plan fixe prend donc son
+    // élan caméra libre, voir gel.mjs.)
+    return { pousse, d, vise: { x: e.x - (ex / ecart) * 160, y: e.y - (ey / ecart) * 160 } }
   }
 }
 

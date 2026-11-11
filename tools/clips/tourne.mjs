@@ -16,11 +16,11 @@ const ICI = path.dirname(fileURLToPath(import.meta.url))
 export const SORTIE = process.env.CLIPS_SORTIE || path.resolve(ICI, '../../clips-sortie')
 
 /** Les calques d'interface qu'un plan « propre » retire : le clip montre le
- *  corps et la salle, le texte vient du montage. */
+ *  corps et la salle, rien d'autre. */
 export const MASQUES = {
-  tout: '#hud,#statebar,#trophee-toast,#obj-arrow,#voie-carte,#touchbar,#world-labels',
-  // la jauge reste : c'est elle qui prouve « se déplacer, c'est rétrécir »
-  jauge: '#hud .ath-etat,#statebar,#trophee-toast,#obj-arrow,#voie-carte,#touchbar,#world-labels',
+  // (les panneaux de verdict et de fin de run compris : un plan « propre »
+  // montre un moment de physique, pas son score)
+  tout: '#hud,#statebar,#trophee-toast,#obj-arrow,#voie-carte,#touchbar,#world-labels,#overlay,#dash-aim,#dash-cost,#relance,#continuer,#hud-danger',
 }
 const css = (liste) => `${liste}{display:none!important}`
 
@@ -41,6 +41,7 @@ const jeu = await ouvre({
   // module — en essai, ses cellules fermées se dessinent barrées d'une croix
   // rouge, qu'un spectateur lit comme une image manquante
   requete: scene.requete ?? 'module2d=0',
+  sansEcrit: scene.sansEcrit ?? false,
   css: css(MASQUES[scene.masque ?? 'tout']) + (scene.css ?? ''),
 })
 jeu.apercu = apercu

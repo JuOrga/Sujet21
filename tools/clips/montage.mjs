@@ -1,11 +1,11 @@
 // LE MONTAGE — `node tools/clips/montage.mjs <scène>`
 //
-// Prend le film brut et la piste son d'une scène (tourne.mjs) et livre deux
-// fichiers prêts pour TikTok, Reels et Shorts (1080×1920, 60 i/s, H.264 + AAC) :
-//   final/<scène>.mp4             avec les textes incrustés
-//   final/<scène>-sans-texte.mp4  le même plan nu, pour écrire le texte dans
-//                                 l'application (il y est alors indexé)
-//   final/<scène>.txt             la légende et les mots-dièse, à coller
+// Prend le film brut et la piste son d'une scène (tourne.mjs) et livre un
+// fichier prêt pour TikTok, Reels et Shorts (1080×1920, 60 i/s, H.264 + AAC) :
+//   final/<scène>.mp4   le plan, sa ligne de marque, le son du jeu
+//   final/<scène>.txt   la légende et les mots-dièse, à coller
+// Une scène qui porte des textes (montage.textes) sort en plus
+// final/<scène>-sans-texte.mp4, le même plan nu.
 //
 // LES TEXTES sont dessinés par le navigateur, pas par ffmpeg : mêmes polices
 // que le jeu (Michroma, IBM Plex Mono — celles de dist/), même palette
@@ -165,4 +165,5 @@ if (scene.publication) {
   fs.writeFileSync(path.join(dossier, `${nom}.txt`), `${scene.publication.legende}\n\n${scene.publication.mots.join(' ')}\n`)
 }
 assemble(path.join(dossier, `${nom}.mp4`), true)
-assemble(path.join(dossier, `${nom}-sans-texte.mp4`), false)
+// une scène sans texte n'a qu'une version : la seconde serait la même
+if (textes.length > 0) assemble(path.join(dossier, `${nom}-sans-texte.mp4`), false)

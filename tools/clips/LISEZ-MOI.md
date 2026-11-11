@@ -9,7 +9,7 @@ rien ici n'entre dans le paquet, ne casse le build ni ne fait tomber un test.
 pnpm build                              # le film se tourne sur dist/
 node tools/clips/tourne.mjs ronde --apercu   # régler : ~1 min, une planche d'images
 node tools/clips/tourne.mjs ronde            # tourner : 1080×1920, 5 à 10 min
-node tools/clips/montage.mjs ronde           # monter : textes, son, encodage
+node tools/clips/montage.mjs ronde           # monter : marque, son, encodage
 ```
 
 Tout sort dans `clips-sortie/` (ignoré par git ; `CLIPS_SORTIE` le déplace) :
@@ -45,43 +45,57 @@ simulation du joueur, pas une imitation.
 | `horloge.js` | l'horloge pilotée, le hasard semé, le son hors ligne |
 | `pilote.mjs` | le navigateur (fenêtre sous Xvfb, ANGLE sur l'OpenGL de Mesa), l'entrée en salle, les gestes, le tuyau vers ffmpeg |
 | `tourne.mjs` | tourne une scène, en aperçu ou en grand |
-| `montage.mjs` | incruste les textes, normalise le son (−15 LUFS), encode |
+| `montage.mjs` | pose la ligne de marque (et des textes, si la scène en a), normalise le son (−15 LUFS), encode |
 | `scenes/outils.mjs` | le pilote automatique et la caméra qui suit |
-| `scenes/*.mjs` | une scène par clip : la salle, le cadre, les gestes, les textes, la légende |
+| `scenes/*.mjs` | une scène par clip : la salle, le cadre, les gestes, la légende |
 
 ## Écrire une scène
 
-Une scène exporte `tableau` (la salle, `?tableau=N`), `masque` (`tout` ou
-`jauge` : ce que le HUD garde), `tourne(jeu, fichier)` et `montage.textes`.
+Une scène exporte `tableau` (la salle, `?tableau=N`), `tourne(jeu, fichier)`,
+et au besoin `sansEcrit`, `montage` et `publication`.
 
 - `jeu.image({ cam })` avance d'une image, la filme, et rend l'état du monde
-  (position, vitesse, particules, jauge). `cam` tient le cadre :
-  `{ x, y, z }` en unités du monde et pixels CSS par unité.
+  (position, vitesse, particules, part gelée, part en vapeur). `cam` tient
+  le cadre : `{ x, y, z }` en unités du monde et pixels CSS par unité ;
+  `{ libre: true }` rend la caméra au jeu.
 - `jeu.vise(x, y)` / `jeu.lache()` : le seul geste du jeu, en coordonnées du
-  MONDE — c'est ce qui rend l'aperçu fidèle au tournage.
-- `jeu.dans(() => window.__orbites())` appelle les sondes que `main.ts`
-  expose déjà (`__ronde`, `__orbites`, `__cibles`, `__palet`…).
-- Un fichier `.json` `{ garde: [[début, fin], …] }` posé à côté du film
-  demande une coupe franche au montage (voir `scenes/eponge.mjs`).
+  MONDE. Il passe par un vrai pointeur, donc par l'écran : **un corps hors
+  champ ne se pilote pas** (le point visé est ramené au bord du cadre et la
+  poussée s'inverse — vécu le 11/11, le corps du gel repartait en arrière).
+  Une scène à plan fixe prend son élan caméra libre, puis filme.
+- `jeu.dans(() => window.__ronde())` appelle les sondes que `main.ts`
+  expose déjà (`__ronde`, `__orbites`, `__cibles`, `__palet`, `__zones`…).
+- `sansEcrit: true` rend muets les écriteaux que le jeu dessine dans son
+  calque 2D ; l'interface HTML (jauge, boutons, panneaux de verdict et de
+  fin de run) est masquée d'office : un clip montre un moment de physique,
+  pas son score.
+- `montage.textes` (facultatif) incruste des textes aux polices du jeu, dans
+  un bandeau en haut ; sans textes, seule reste la ligne de marque
+  (`montage.marqueY` la déplace). Un fichier `.json`
+  `{ garde: [[début, fin], …] }` posé à côté du film demande une coupe franche.
 
-Les textes tiennent dans un bandeau en haut (140 à 345 px) : TikTok recouvre
-le haut, le bas et la droite de l'image. Les scènes cadrent la salle dessous.
+## Les six scènes livrées
 
-## Les quatre scènes livrées
+Le concepteur (10/11) : « je ne souhaite pas expliquer le jeu, mais que tu
+clipes des moments du jeu avec la physique très intéressante. Sans l'écran
+des scores. » Aucune scène n'a donc de texte, de jauge ni de verdict.
 
-| Scène | Ce qu'elle montre | Durée |
+| Scène | Le moment | Durée |
 | --- | --- | --- |
 | `ronde` | le bloc de glace en huit autour de trois puits — boucle parfaite (un tour = 807 images) | 13,45 s |
-| `orbites` | un lancer, trois anneaux, le croissant, le verdict du jeu — sans un geste | 11,15 s |
-| `retrecir` | « Le berceau » traversé par le pilote automatique, la jauge qui descend, la mise en bonbonne | 16,57 s |
-| `eponge` | « La buveuse » : le corps s'écrase sur le péage et se fait boire, coupe franche jusqu'au panneau de fin | 8,10 s |
+| `goutte` | la ronde sans sa zone de glace : le bloc fond en vol, le puits du haut capture la goutte, qui s'étire en comète | 10,83 s |
+| `repulsion` | « Le rebond » : l'eau ne touche jamais la paroi hydrophobe et s'aplatit en arc devant elle | 6,70 s |
+| `gel` | « Le premier gel » : l'eau s'écrase sur la plaque froide et se fige en pleine éclaboussure | 7,03 s |
+| `vapeur` | « Le premier souffle » : le corps bout sur la chaudière et part en nuage doré | 8,70 s |
+| `eponge` | « La buveuse » : le corps s'étale sur le mur d'éponge, qui le boit | 6,17 s |
 
 ## Ce qui ne marche pas (encore)
 
-- **Les états à la main.** Geler ou vaporiser d'une touche est refusé tant
-  que les mémoires ne sont pas tissées (essayé le 10/11 dans « Le premier
-  gel » : `F` ne gèle rien). Une scène de gel doit passer par le décor
-  (plaques, zones) ou préparer une sauvegarde.
+- **Geler ou vaporiser d'une touche.** Refusé tant que les mémoires ne sont
+  pas tissées (essayé le 10/11 dans « Le premier gel » : `F` ne gèle rien).
+  Le gel et la vapeur des scènes passent par le décor (plaque froide,
+  chaudière) ; seul le retour à l'eau se demande (`#state-eau`, voir
+  `goutte.mjs`).
 - **Les cibles.** Pas encore de scène, et rien d'essayé : le commentaire
   d'`arcMire` (`src/game/minijeux.ts`) dit que les éclats n'entrent sous
   les arcs que de biais ou par le sol qui renvoie — un pilote devra
