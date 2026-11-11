@@ -38,6 +38,8 @@ export default {
     }
     await jeu.lache()
   },
+  // le plan commence une demi-seconde avant l'événement (montage « B »)
+  montage: { debut: 1.3 },
   publication: {
     legende: 'Rappelée.',
     mots: ['#jeuindé', '#indiegame', '#physique', '#satisfaisant', '#gamedev', '#simulation'],

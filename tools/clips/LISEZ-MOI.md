@@ -83,23 +83,27 @@ et au besoin `sansEcrit`, `montage` et `publication`.
   score. `masque: 'jauge'` garde la jauge de volume, recentrée sous la ligne
   de marque ; `tourne.mjs <scène> --jauge` l'ajoute à une scène qui ne l'a
   pas (fichier `<scène>-jauge`, monté par `montage.mjs <scène> jauge`).
-- Le montage termine chaque clip par un **carton de fin** (2,2 s) : coupe
-  franche une seconde avant la fin du plan (`montage.rogne`, 1 par défaut),
-  le ciel étoilé, le titre en deux dixièmes, et le son de la scène qui
-  continue dessous pendant la seconde coupée. Le fondu enchaîné du premier
-  essai a été jugé « pas génial » : deux images sombres superposées, puis
-  un second fondu pour le titre, et le silence au même instant.
-  `montage.mjs <scène> --noir` monte l'autre fin (le plan s'éteint au noir,
-  le carton s'en relève ; fichier `<scène>-noir`).
-  `montage: { carton: false }` retire le carton et rend au plan sa ligne de
-  marque (`montage.marqueY` la déplace) — c'est ce qu'il faut pour publier
-  la ronde en boucle, que le carton interrompt.
-- Des drapeaux d'essai comparent deux montages de la même prise sans
-  toucher aux défauts : `--debut=0.8` (entrer dans l'action), `--eclaircir`
-  (une courbe qui relève le corps et les tons moyens en gardant le noir),
-  `--carton=1.2`, `--suffixe=b`. Mesuré le 11/11 sur les huit clips : 10 à
-  24 % de luminance moyenne, 15 à 30 % de la durée en carton, et un moment
-  fort qui ne dépasse le fond sonore que de 2,4 à 3,5 dB dans cinq d'entre eux.
+- **Le montage « B »** est la règle depuis le 11/11 : le concepteur a comparé
+  deux montages de l'écrasement et choisi celui-là. Le plan commence une
+  demi-seconde avant son événement (`montage.debut`, en secondes de la
+  prise, dit par chaque scène), il finit une seconde avant la fin de la
+  prise (`montage.fin` pour un autre point), et l'image est éclaircie par
+  une courbe qui relève le corps et les tons moyens en gardant le noir
+  (`montage.eclaircir: false` ou `--sombre` la laisse telle que tournée).
+- Chaque clip finit par un **carton** de 1,2 s : coupe franche, le ciel
+  étoilé, le titre en deux dixièmes, et le son de la scène qui continue
+  dessous avant de s'éteindre. Le fondu enchaîné du premier essai a été
+  jugé « pas génial » : deux images sombres superposées, puis un second
+  fondu pour le titre, et le silence au même instant.
+  `montage: { carton: false }` ou `--sans-carton` retire le carton, garde
+  la prise entière et rend au plan sa ligne de marque (`montage.marqueY` la
+  déplace) — c'est ainsi que se monte la ronde en boucle.
+- Des drapeaux essaient un autre montage de la même prise sans toucher à la
+  scène : `--debut=0.8`, `--sombre`, `--carton=2.2`, `--sans-carton`,
+  `--noir` (fondu au noir), `--suffixe=b` (le nom du fichier).
+  `mesure.py` chiffre le résultat. Avant le montage B, les huit clips
+  faisaient 10 à 24 % de luminance moyenne et leur carton prenait 15 à 30 %
+  de la durée ; après, 15 à 33 % et 9 à 24 %.
 - `montage.textes` (facultatif) incruste des textes aux polices du jeu, dans
   un bandeau en haut. Un fichier `.json` `{ garde: [[début, fin], …] }`
   posé à côté du film demande une coupe franche.
@@ -109,22 +113,24 @@ et au besoin `sansEcrit`, `montage` et `publication`.
 Le concepteur (10/11) : « je ne souhaite pas expliquer le jeu, mais que tu
 clipes des moments du jeu avec la physique très intéressante. Sans l'écran
 des scores. » Puis (11/11) : « un peu de HUD peut être intéressant tout de
-même », et le regroupement — toucher le corps étiré, « ça lui fait faire
-complètement autre chose », et le carton de fin. Aucune scène n'a de texte
-ni de verdict ; les deux dernières gardent la jauge. Les durées sont celles
-du plan TOURNÉ ; au montage, le plan perd sa dernière seconde et gagne
-2,2 s de carton (+1,2 s au total).
+même », le regroupement — toucher le corps étiré, « ça lui fait faire
+complètement autre chose » —, le carton de fin, et le montage B. Aucune
+scène n'a de texte ni de verdict ; six gardent la jauge de volume (la ronde
+et la goutte non : elle y resterait figée à 4,50 L).
 
-| Scène | Le moment | Durée |
-| --- | --- | --- |
-| `ronde` | le bloc de glace en huit autour de trois puits — boucle parfaite (un tour = 807 images) | 13,45 s |
-| `goutte` | la ronde sans sa zone de glace : le bloc fond en vol, le puits du haut capture la goutte, qui s'étire en comète | 10,83 s tournées, 6 gardées (`montage.plan`) |
-| `repulsion` | « Le rebond » : l'eau ne touche jamais la paroi hydrophobe et s'aplatit en arc devant elle | 6,70 s |
-| `gel` | « Le premier gel » : l'eau s'écrase sur la plaque froide et se fige en pleine éclaboussure | 7,03 s |
-| `vapeur` | « Le premier souffle » : le corps bout sur la chaudière et part en nuage doré | 8,70 s |
-| `eponge` | « La buveuse » : le corps s'étale sur le mur d'éponge, qui le boit | 6,17 s |
-| `ecrasement` | « Le berceau » : le corps enlace l'îlot neutre ; le doigt se pose sur le bout étiré de l'arc et l'accompagne, la boule se reforme et repart | 5,93 s |
-| `ressaisie` | « Le rebond » : l'arc étiré devant la paroi hydrophobe, rappelé d'UN toucher de 1,8 s — les deux bouts reviennent d'un coup | 8,78 s |
+| Scène | Le moment | Plan monté | Clip |
+| --- | --- | --- | --- |
+| `ecrasement` | « Le berceau » : le corps enlace l'îlot neutre ; touché au bout étiré de l'arc, il se reforme en boule et repart | 4,37 s | 5,57 s |
+| `ressaisie` | « Le rebond » : l'arc étiré devant la paroi hydrophobe, rappelé d'UN toucher de 1,8 s — les deux bouts reviennent d'un coup | 6,48 s | 7,68 s |
+| `goutte` | la ronde sans sa zone de glace : le bloc fond en vol, le puits du haut capture la goutte, qui s'étire en comète | 5,50 s | 6,70 s |
+| `repulsion` | « Le rebond » : l'eau ne touche jamais la paroi hydrophobe et s'aplatit en arc devant elle | 4,40 s | 5,60 s |
+| `gel` | « Le premier gel » : l'eau s'écrase sur la plaque froide et se fige en pleine éclaboussure | 4,98 s | 6,18 s |
+| `vapeur` | « Le premier souffle » : le corps bout sur la chaudière et part en nuage doré | 6,80 s | 8,00 s |
+| `eponge` | « La buveuse » : le corps s'étale sur le mur d'éponge, qui le boit | 3,73 s | 4,93 s |
+| `ronde` | le bloc de glace en huit autour de trois puits ; `--sans-carton` en fait une boucle parfaite (un tour = 807 images, 13,45 s) | 12,45 s | 13,65 s |
+
+`ressaisie` et `repulsion` s'ouvrent sur le même plan (même salle, même
+approche) : à ne pas publier l'une derrière l'autre.
 
 ## Ce qui ne marche pas (encore)
 

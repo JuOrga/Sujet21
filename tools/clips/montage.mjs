@@ -18,11 +18,24 @@
 // D'où la fin actuelle : COUPE FRANCHE, une seconde avant la fin du plan
 // (« tu peux couper 1 seconde avant ») — on quitte l'action pendant qu'elle
 // vit encore —, le titre est là en deux dixièmes, et le son de la scène
-// CONTINUE sous le carton pendant la seconde coupée, puis s'éteint.
+// CONTINUE sous le carton, puis s'éteint.
 // `--noir` (ou montage.transition: 'noir') donne l'autre grammaire : le plan
 // s'éteint au noir, le carton s'en relève.
-// `montage: { carton: false }` retire le carton (et rend sa ligne de marque
-// au plan) — c'est ce qu'il faut à une boucle, que le carton interrompt.
+// `montage: { carton: false }` ou `--sans-carton` retire le carton (et rend
+// sa ligne de marque au plan) — c'est ce qu'il faut à une boucle, que le
+// carton interrompt.
+//
+// LE MONTAGE « B ». Les huit premiers clips mesurés (mesure.py, 11/11) :
+// 10 à 24 % de luminance moyenne, 1,2 à 2,7 s avant qu'il se passe quelque
+// chose, un carton de 2,2 s qui prenait 22 à 30 % de la durée. Deux montages
+// de l'écrasement ont été soumis au concepteur — A, l'ancien ; B : entrée
+// dans l'action, image éclaircie, carton de 1,2 s. Il a choisi B. C'est
+// devenu la règle :
+//   montage.debut   où le plan commence, en secondes de la prise (chaque
+//                   scène le dit : une demi-seconde avant son événement)
+//   montage.fin     où il finit (défaut : une seconde avant la fin de la prise)
+//   l'image est éclaircie par une courbe (montage.eclaircir: false ou
+//   --sombre la laisse telle que tournée) ; le carton dure 1,2 s.
 //
 // LES TEXTES sont dessinés par le navigateur, pas par ffmpeg : mêmes polices
 // que le jeu (Michroma, IBM Plex Mono — celles de dist/), même palette
@@ -47,15 +60,14 @@ const { chromium } = createRequire(import.meta.url)('playwright')
 const L = 1080
 const H = 1920
 
-// `montage.mjs <scène> jauge` monte la variante tournée avec --jauge
-// Les drapeaux d'ESSAI ne changent aucun défaut ; ils servent à comparer deux
-// montages de la même prise :
-//   --debut=0.8      retire les N premières secondes du plan (entrer dans
-//                    l'action au lieu de la regarder arriver)
-//   --eclaircir      relève les tons moyens du plan (les plans mesurés le
-//                    11/11 font 10 à 24 % de luminance moyenne : sur un
-//                    téléphone en plein jour, presque un écran noir)
-//   --carton=1.2     la durée du carton de fin, en secondes
+// `montage.mjs <scène> jauge` monte la variante tournée avec --jauge.
+// Les drapeaux servent à essayer un autre montage de la même prise sans
+// toucher à la scène :
+//   --debut=0.8      où le plan commence (à la place de montage.debut)
+//   --sombre         pas d'éclaircissement
+//   --carton=2.2     la durée du carton de fin, en secondes
+//   --sans-carton    pas de carton : le plan entier, sa ligne de marque
+//   --noir           fondu au noir au lieu de la coupe franche
 //   --suffixe=b      le nom du fichier produit (<scène>-b.mp4)
 const drapeaux = process.argv.slice(3).filter((x) => x.startsWith('--'))
 const valeur = (nom) => drapeaux.find((x) => x.startsWith(`--${nom}=`))?.split('=')[1]
@@ -81,12 +93,17 @@ const dureeBrute = Number(
 const fCoupes = brut.replace(/\.mkv$/, '.json')
 // (bornées au film : une scène qui s'arrête un peu tôt ne doit pas faire
 // compter des images qui n'existent pas)
-const DEBUT = Number(valeur('debut')) || 0
-const garde = fs.existsSync(fCoupes)
+const avecCarton = m.carton !== false && !drapeaux.includes('--sans-carton')
+// le plan gardé, en secondes de la prise : [DEBUT, FIN]. Sans carton, la
+// prise entière — une boucle ne se rogne pas.
+const DEBUT = avecCarton ? Number(valeur('debut') ?? m.debut ?? 0) : 0
+const FIN = avecCarton ? Math.min(dureeBrute, m.fin ?? dureeBrute - (m.rogne ?? 1)) : dureeBrute
+const gardeFichier = fs.existsSync(fCoupes)
   ? JSON.parse(fs.readFileSync(fCoupes, 'utf8')).garde.map(([a, b]) => [Math.max(0, a), Math.min(dureeBrute, b)])
-  : DEBUT > 0
-    ? [[DEBUT, dureeBrute]]
-    : null
+  : null
+// (on garde la prise jusqu'au bout, au-delà de FIN : c'est de là que vient
+// le son qui court sous le carton)
+const garde = gardeFichier ?? (DEBUT > 0 ? [[DEBUT, dureeBrute]] : null)
 const duree = garde ? garde.reduce((s, [a, b]) => s + (Math.round(b * 60) - Math.round(a * 60)) / 60, 0) : dureeBrute
 
 // ---- les images des textes --------------------------------------------------
@@ -165,13 +182,12 @@ html,body{background:${fond ? '#030710' : 'transparent'}}
   )
 
 const textes = m.textes ?? []
-const avecCarton = m.carton !== false
-const CARTON = Number(valeur('carton')) || 2.2 // secondes
+const CARTON = Number(valeur('carton') ?? m.cartonDuree ?? 1.2) // secondes
 const transition = drapeaux.includes('--noir') ? 'noir' : (m.transition ?? 'coupe')
-// ce qu'on retire à la fin du plan avant le carton — et, en coupe franche,
-// ce pendant quoi le son de la scène continue dessous
-// (montage.plan fixe la durée du plan gardé, à la place d'une rogne)
-const ROGNE = avecCarton ? (m.plan ? Math.max(0, duree - m.plan) : (m.rogne ?? 1)) : 0
+const eclaircir = !drapeaux.includes('--sombre') && m.eclaircir !== false
+// ce qu'on retire à la fin de la prise avant le carton — et, en coupe
+// franche, ce d'où vient le son qui continue dessous
+const ROGNE = !avecCarton ? 0 : gardeFichier ? (m.rogne ?? 1) : dureeBrute - FIN
 const NOIR = 0.3 // la durée de chaque demi-fondu de la variante « noir »
 const nav = await chromium.launch()
 const pg = await nav.newPage({ viewport: { width: L, height: H } })
@@ -221,6 +237,21 @@ function assemble(sortie, avecTextes) {
       a0 = 'ag'
     }
   }
+  // L'ÉCLAIRCISSEMENT : une COURBE, pas un gamma. Essayé le 11/11 : un gamma
+  // de 1,35 relevait tout d'un bloc, le décor virait au gris laiteux et le
+  // corps ne ressortait pas mieux. La courbe laisse le noir où il est
+  // (0,08 → 0,10), pousse les tons moyens (0,25 → 0,36) et le corps
+  // (0,55 → 0,76) ; un rien de saturation pour que le bleu ne pâlisse pas en
+  // montant. Elle travaille en RVB : la matrice BT.709 est dite à l'aller
+  // comme au retour (courbe neutre vérifiée : PSNR 83 dB, l'image ressort
+  // inchangée). Posée AVANT les calques : ni le texte ni la marque ne
+  // passent dedans.
+  if (eclaircir) {
+    filtres.push(
+      `[${v}]format=yuv444p,eq=saturation=1.15,scale=in_color_matrix=bt709:in_range=tv,format=gbrp,curves=all='0/0 0.08/0.10 0.25/0.36 0.55/0.76 1/1',scale=out_color_matrix=bt709:out_range=tv,format=yuv444p[ve]`,
+    )
+    v = 've'
+  }
   const pose = (c, fondu = 0.22) => {
     args.push('-loop', '1', '-framerate', '60', '-t', String(duree), '-i', c.f)
     const k = n++
@@ -249,19 +280,8 @@ function assemble(sortie, avecTextes) {
     filtres.push(
       `[${kf}:v][ct]overlay=0:0:format=auto,fps=60,format=yuv444p,settb=AVTB,setsar=1${noir ? `,fade=t=in:st=0:d=${NOIR}` : ''}[carton]`,
     )
-    // --eclaircir : une COURBE, pas un gamma. Essayé le 11/11 : un gamma de
-    // 1,35 relevait tout d'un bloc, le décor virait au gris laiteux et le
-    // corps ne ressortait pas mieux. La courbe laisse le noir où il est
-    // (0,08 → 0,10), pousse les tons moyens (0,25 → 0,36) et le corps
-    // (0,55 → 0,76) ; un rien de saturation pour que le bleu ne pâlisse pas
-    // en montant. Elle travaille en RVB : la matrice BT.709 est dite à
-    // l'aller comme au retour (courbe neutre vérifiée : PSNR 83 dB, l'image
-    // ressort inchangée).
-    const etalonnage = drapeaux.includes('--eclaircir')
-      ? ",eq=saturation=1.15,scale=in_color_matrix=bt709:in_range=tv,format=gbrp,curves=all='0/0 0.08/0.10 0.25/0.36 0.55/0.76 1/1',scale=out_color_matrix=bt709:out_range=tv,format=yuv444p"
-      : ''
     filtres.push(
-      `[${v}]trim=duration=${plan.toFixed(4)},setpts=PTS-STARTPTS,fps=60,format=yuv444p${etalonnage},settb=AVTB,setsar=1${noir ? `,fade=t=out:st=${(plan - NOIR).toFixed(4)}:d=${NOIR}` : ''}[plan]`,
+      `[${v}]trim=duration=${plan.toFixed(4)},setpts=PTS-STARTPTS,fps=60,format=yuv444p,settb=AVTB,setsar=1${noir ? `,fade=t=out:st=${(plan - NOIR).toFixed(4)}:d=${NOIR}` : ''}[plan]`,
     )
     filtres.push(`[plan][carton]concat=n=2:v=1:a=0[vx]`)
     v = 'vx'
@@ -271,10 +291,11 @@ function assemble(sortie, avecTextes) {
     // −15 LUFS : le niveau où une vidéo ne paraît ni faible ni écrasée à
     // côté des autres dans le fil.
     // Sans carton : un fondu de sortie pour que la boucle ne claque pas.
-    // Coupe franche : le son COURT sous le carton pendant la seconde rognée,
-    // et s'éteint sur ses huit derniers dixièmes. Au noir : il s'éteint avec
-    // l'image.
-    const finSon = !avecCarton ? duree : transition === 'noir' ? plan : Math.min(duree, plan + 1)
+    // Coupe franche : le son COURT sous le carton et s'y éteint. Au noir : il
+    // s'éteint avec l'image.
+    // (sous le carton, jamais plus d'une seconde, et il reste deux dixièmes
+    // de silence avant la fin)
+    const finSon = !avecCarton ? duree : transition === 'noir' ? plan : Math.min(duree, plan + Math.min(1, CARTON - 0.2))
     const queue = !avecCarton ? 0.3 : transition === 'noir' ? NOIR : Math.min(0.8, finSon - plan)
     filtres.push(
       `[${a0}]atrim=duration=${finSon.toFixed(4)},afade=t=in:d=0.06,afade=t=out:st=${(finSon - queue).toFixed(3)}:d=${queue},loudnorm=I=-15:TP=-1.5:LRA=11,aresample=48000,apad=whole_dur=${total.toFixed(4)}[af]`,

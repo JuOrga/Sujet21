@@ -8,7 +8,7 @@ import { pilote } from './outils.mjs'
 export default {
   tableau: 2,
   dureeSon: 60,
-  masque: 'tout',
+  masque: 'jauge',
   sansEcrit: true,
   async tourne(jeu, fichier) {
     await jeu.pas(170)
@@ -31,6 +31,8 @@ export default {
       if (debut >= 0 && i - debut > 400) break
     }
   },
+  // le plan commence une demi-seconde avant l'événement (montage « B »)
+  montage: { debut: 1.3 },
   publication: {
     legende: 'Elle refuse de toucher le mur.',
     mots: ['#jeuindé', '#indiegame', '#physique', '#satisfaisant', '#gamedev', '#simulation'],

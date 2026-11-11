@@ -51,6 +51,8 @@ export default {
     }
     await jeu.lache()
   },
+  // le plan commence une demi-seconde avant l'événement (montage « B »)
+  montage: { debut: 0.8 },
   publication: {
     legende: 'Il se ramasse.',
     mots: ['#jeuindé', '#indiegame', '#physique', '#satisfaisant', '#gamedev', '#simulation'],

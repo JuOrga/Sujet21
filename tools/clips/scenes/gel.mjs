@@ -12,7 +12,7 @@ const PLAQUE = { x: 610, y: 0 }
 export default {
   tableau: 4,
   dureeSon: 60,
-  masque: 'tout',
+  masque: 'jauge',
   sansEcrit: true,
   async tourne(jeu, fichier) {
     await jeu.pas(170)
@@ -44,6 +44,8 @@ export default {
       if (pris >= 0 && i - pris > 215) break
     }
   },
+  // le plan commence une demi-seconde avant l'événement (montage « B »)
+  montage: { debut: 1.0 },
   publication: {
     legende: 'Trop vite. Trop froid.',
     mots: ['#jeuindé', '#indiegame', '#physique', '#satisfaisant', '#gamedev', '#simulation'],

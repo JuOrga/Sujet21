@@ -11,7 +11,7 @@ const AVANT = 190 // l'élan se prend hors champ : le film s'ouvre corps lancé
 export default {
   tableau: 6,
   dureeSon: 60,
-  masque: 'tout',
+  masque: 'jauge',
   sansEcrit: true,
   async tourne(jeu, fichier) {
     await jeu.pas(170)
@@ -52,6 +52,8 @@ export default {
     }
     await jeu.lache()
   },
+  // le plan commence une demi-seconde avant l'événement (montage « B »)
+  montage: { debut: 1.8 },
   publication: {
     legende: 'Le mur avait soif.',
     mots: ['#jeuindé', '#indiegame', '#physique', '#satisfaisant', '#gamedev', '#simulation'],

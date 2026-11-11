@@ -12,7 +12,7 @@ const CHAUDIERE = { x: -540, y: -440 }
 export default {
   tableau: 5,
   dureeSon: 60,
-  masque: 'tout',
+  masque: 'jauge',
   sansEcrit: true,
   async tourne(jeu, fichier) {
     await jeu.pas(170)
@@ -38,6 +38,8 @@ export default {
       if (debut >= 0 && i - debut > 520) break
     }
   },
+  // le plan commence une demi-seconde avant l'événement (montage « B »)
+  montage: { debut: 0.9 },
   publication: {
     legende: 'Il ne fallait pas se poser là.',
     mots: ['#jeuindé', '#indiegame', '#physique', '#satisfaisant', '#gamedev', '#simulation'],

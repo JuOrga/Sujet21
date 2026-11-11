@@ -30,10 +30,12 @@ export default {
       if (i % 60 === 0) jeu.dit(i, 'pos', e.x.toFixed(0), e.y.toFixed(0), 'n', e.n, '/', e.tout, 'gel', e.gel.toFixed(2))
     }
   },
-  // la ligne de marque descend sous le mur du haut, qui passe dans le cadre
-  // le plan est coupé à 6 s (le concepteur, 11/11) : le bloc fond, la goutte
-  // fait son premier tour en comète, et on part
-  montage: { marqueY: 196, plan: 6 },
+  // le plan va de 0,5 à 6 s de la prise : le bloc fond une demi-seconde après
+  // le début, la goutte fait son premier tour en comète, et on part (« tu
+  // peux la couper à 6 secondes », le concepteur, 11/11). marqueY ne sert
+  // qu'à un montage sans carton : la ligne de marque descend sous le mur du
+  // haut, qui passe dans le cadre.
+  montage: { debut: 0.5, fin: 6, marqueY: 196 },
   publication: {
     legende: 'Elle ne retombera pas.',
     mots: ['#jeuindé', '#indiegame', '#physique', '#gravité', '#gamedev', '#simulation'],
