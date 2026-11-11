@@ -48,7 +48,17 @@ const L = 1080
 const H = 1920
 
 // `montage.mjs <scène> jauge` monte la variante tournée avec --jauge
+// Les drapeaux d'ESSAI ne changent aucun défaut ; ils servent à comparer deux
+// montages de la même prise :
+//   --debut=0.8      retire les N premières secondes du plan (entrer dans
+//                    l'action au lieu de la regarder arriver)
+//   --eclaircir      relève les tons moyens du plan (les plans mesurés le
+//                    11/11 font 10 à 24 % de luminance moyenne : sur un
+//                    téléphone en plein jour, presque un écran noir)
+//   --carton=1.2     la durée du carton de fin, en secondes
+//   --suffixe=b      le nom du fichier produit (<scène>-b.mp4)
 const drapeaux = process.argv.slice(3).filter((x) => x.startsWith('--'))
+const valeur = (nom) => drapeaux.find((x) => x.startsWith(`--${nom}=`))?.split('=')[1]
 const variante = process.argv.slice(3).find((x) => !x.startsWith('--'))
 const scene = (await import(`./scenes/${process.argv[2]}.mjs`)).default
 const nom = process.argv[2] + (variante ? `-${variante}` : '')
@@ -71,9 +81,12 @@ const dureeBrute = Number(
 const fCoupes = brut.replace(/\.mkv$/, '.json')
 // (bornées au film : une scène qui s'arrête un peu tôt ne doit pas faire
 // compter des images qui n'existent pas)
+const DEBUT = Number(valeur('debut')) || 0
 const garde = fs.existsSync(fCoupes)
   ? JSON.parse(fs.readFileSync(fCoupes, 'utf8')).garde.map(([a, b]) => [Math.max(0, a), Math.min(dureeBrute, b)])
-  : null
+  : DEBUT > 0
+    ? [[DEBUT, dureeBrute]]
+    : null
 const duree = garde ? garde.reduce((s, [a, b]) => s + (Math.round(b * 60) - Math.round(a * 60)) / 60, 0) : dureeBrute
 
 // ---- les images des textes --------------------------------------------------
@@ -153,7 +166,7 @@ html,body{background:${fond ? '#030710' : 'transparent'}}
 
 const textes = m.textes ?? []
 const avecCarton = m.carton !== false
-const CARTON = 2.2 // secondes
+const CARTON = Number(valeur('carton')) || 2.2 // secondes
 const transition = drapeaux.includes('--noir') ? 'noir' : (m.transition ?? 'coupe')
 // ce qu'on retire à la fin du plan avant le carton — et, en coupe franche,
 // ce pendant quoi le son de la scène continue dessous
@@ -236,8 +249,19 @@ function assemble(sortie, avecTextes) {
     filtres.push(
       `[${kf}:v][ct]overlay=0:0:format=auto,fps=60,format=yuv444p,settb=AVTB,setsar=1${noir ? `,fade=t=in:st=0:d=${NOIR}` : ''}[carton]`,
     )
+    // --eclaircir : une COURBE, pas un gamma. Essayé le 11/11 : un gamma de
+    // 1,35 relevait tout d'un bloc, le décor virait au gris laiteux et le
+    // corps ne ressortait pas mieux. La courbe laisse le noir où il est
+    // (0,08 → 0,10), pousse les tons moyens (0,25 → 0,36) et le corps
+    // (0,55 → 0,76) ; un rien de saturation pour que le bleu ne pâlisse pas
+    // en montant. Elle travaille en RVB : la matrice BT.709 est dite à
+    // l'aller comme au retour (courbe neutre vérifiée : PSNR 83 dB, l'image
+    // ressort inchangée).
+    const etalonnage = drapeaux.includes('--eclaircir')
+      ? ",eq=saturation=1.15,scale=in_color_matrix=bt709:in_range=tv,format=gbrp,curves=all='0/0 0.08/0.10 0.25/0.36 0.55/0.76 1/1',scale=out_color_matrix=bt709:out_range=tv,format=yuv444p"
+      : ''
     filtres.push(
-      `[${v}]trim=duration=${plan.toFixed(4)},setpts=PTS-STARTPTS,fps=60,format=yuv444p,settb=AVTB,setsar=1${noir ? `,fade=t=out:st=${(plan - NOIR).toFixed(4)}:d=${NOIR}` : ''}[plan]`,
+      `[${v}]trim=duration=${plan.toFixed(4)},setpts=PTS-STARTPTS,fps=60,format=yuv444p${etalonnage},settb=AVTB,setsar=1${noir ? `,fade=t=out:st=${(plan - NOIR).toFixed(4)}:d=${NOIR}` : ''}[plan]`,
     )
     filtres.push(`[plan][carton]concat=n=2:v=1:a=0[vx]`)
     v = 'vx'
@@ -274,6 +298,7 @@ function assemble(sortie, avecTextes) {
 if (scene.publication) {
   fs.writeFileSync(path.join(dossier, `${nom}.txt`), `${scene.publication.legende}\n\n${scene.publication.mots.join(' ')}\n`)
 }
-assemble(path.join(dossier, `${nom}${drapeaux.includes('--noir') ? '-noir' : ''}.mp4`), true)
+const suffixe = valeur('suffixe') ? `-${valeur('suffixe')}` : drapeaux.includes('--noir') ? '-noir' : ''
+assemble(path.join(dossier, `${nom}${suffixe}.mp4`), true)
 // une scène sans texte n'a qu'une version : la seconde serait la même
 if (textes.length > 0) assemble(path.join(dossier, `${nom}-sans-texte.mp4`), false)

@@ -46,6 +46,7 @@ simulation du joueur, pas une imitation.
 | `pilote.mjs` | le navigateur (fenêtre sous Xvfb, ANGLE sur l'OpenGL de Mesa), l'entrée en salle, les gestes, le tuyau vers ffmpeg |
 | `tourne.mjs` | tourne une scène, en aperçu ou en grand |
 | `montage.mjs` | ajoute le carton de fin (et des textes, si la scène en a), normalise le son (−15 LUFS), encode |
+| `mesure.py` | mesure les clips finis : durée, part du carton, luminance, part claire de l'image, accent sonore |
 | `scenes/outils.mjs` | le pilote automatique et la caméra qui suit |
 | `scenes/*.mjs` | une scène par clip : la salle, le cadre, les gestes, la légende |
 
@@ -93,6 +94,12 @@ et au besoin `sansEcrit`, `montage` et `publication`.
   `montage: { carton: false }` retire le carton et rend au plan sa ligne de
   marque (`montage.marqueY` la déplace) — c'est ce qu'il faut pour publier
   la ronde en boucle, que le carton interrompt.
+- Des drapeaux d'essai comparent deux montages de la même prise sans
+  toucher aux défauts : `--debut=0.8` (entrer dans l'action), `--eclaircir`
+  (une courbe qui relève le corps et les tons moyens en gardant le noir),
+  `--carton=1.2`, `--suffixe=b`. Mesuré le 11/11 sur les huit clips : 10 à
+  24 % de luminance moyenne, 15 à 30 % de la durée en carton, et un moment
+  fort qui ne dépasse le fond sonore que de 2,4 à 3,5 dB dans cinq d'entre eux.
 - `montage.textes` (facultatif) incruste des textes aux polices du jeu, dans
   un bandeau en haut. Un fichier `.json` `{ garde: [[début, fin], …] }`
   posé à côté du film demande une coupe franche.
