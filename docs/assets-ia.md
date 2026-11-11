@@ -2107,6 +2107,13 @@ dorsale 264 – 280 → 211 – 216 ms, cylindre 146 – 162 → 178 – 184 ms 
 coûte une fois de plus, ~110 à 200 ms. Quatorze images retirées de
 `public/assets` (20 → 18 Mo).
 
+**Juger le décor sans le jeu** : `tools/banc-module2d/` monte le peintre et
+le VRAI shader sur une page servie par `pnpm dev` — la toile d'un biome,
+la vue de jeu, une transition image par image (`capture.cjs`, dont
+l'en-tête liste les réglages). `vrai-jeu.cjs` lance le jeu complet à
+320 × 200 : sans carte graphique il y tient ~2 images par seconde, assez
+pour voir une salle se monter et lire la console.
+
 **La serre en cylindre de culture (05/10)** : la serre quitte l'étagée
 (qui reste la coque des modules sans pièces propres) pour un immense
 cylindre couché — deux tranches vitrées alternées sur la longueur (en

@@ -1,0 +1,55 @@
+<!doctype html>
+<!-- LE BANC DU MODULE 2D — la transition et la vue de jeu, à travers le vrai shader. Voir capture.cjs. -->
+<meta charset="utf-8" />
+<style>html, body { margin: 0; background: #030710; } canvas { display: block; }</style>
+<canvas id="c"></canvas>
+<script type="module">
+  import * as M from '/src/render/module2d.ts'
+  import { chargePiecesModule2d, peintModule2d, peintCelluleSeule } from '/src/render/module2dCanvas.ts'
+  import { q, num, vueDEssai } from './commun.js'
+  import { creeScene } from './scene.js'
+  import { COQUE_EPAISSEUR, COQUE_FRANGE } from '/src/render/coque.ts'
+  const { biome, forme, vue } = vueDEssai()
+  const { rang, voie, joues } = vue
+  const hr = num('hr', 0.66)
+  const W = num('w', 1280), H = num('h', 800)
+  const c = document.getElementById('c')
+  c.width = W; c.height = H
+  // une cuve de 1068 unités de large, comme une salle du jeu, et sa coque
+  const R = 1068, T = COQUE_EPAISSEUR
+  const b = { minX: -R / 2, maxX: R / 2, minY: (-R * hr) / 2, maxY: (R * hr) / 2 }
+  const coque = { minX: b.minX - T, minY: b.minY - T, maxX: b.maxX + T, maxY: b.maxY + T }
+  const pieces = await chargePiecesModule2d()
+  const mp = M.miseEnPage(coque, vue, forme, biome)
+  const fp = M.fenetreProche(mp)
+  const sc = creeScene(c)
+  const serre = mp.forme === 'cylindre'
+  const ici = peintCelluleSeule(pieces, mp.forme, 'ambre', mp.ici)
+  const temps = num('temps', 0)
+  const s = {
+    toile: sc.tex(peintModule2d(mp, pieces)), proche: sc.tex(peintModule2d(mp, pieces, fp)),
+    cellule: sc.tex(ici), celluleDepart: sc.tex(peintCelluleSeule(pieces, mp.forme, 'joue', vue.noeud(rang - 1, joues[rang - 1]))),
+    monde: mp.monde, procheMonde: fp.monde, salle: b, coque, ratio: serre ? ici.height / ici.width : 0,
+    extra: (mode, cv) => ({ uOmbre: cv ? cv.ombre : 1, uTemps: temps }),
+  }
+  const zoomSalle = Math.min(W / R, H / (R * hr)) * 0.92
+  // la transition d'essai : ?saut=2 passe par la case du rang d'avant (une rencontre)
+  const saut = num('saut', 1)
+  const de = M.centreCellule(coque, vue, rang - saut, joues[rang - saut])
+  const par = []
+  for (let r = rang - saut + 1; r < rang; r++) par.push(M.centreCellule(coque, vue, r, joues[r]))
+  const p = { de, par, salle: coque, zoomSalle }
+  const pe = { module: mp.monde, zoomModule: M.zoomEnsemble(mp.monde, W, H, zoomSalle), salle: coque, zoomSalle }
+  const entree = q.get('genre') === 'entree'
+  // la couverture déborde de la frange de la coque, comme dans main.ts (lanceTransition2d)
+  const F = COQUE_FRANGE
+  const couvert = { minX: coque.minX - F, minY: coque.minY - F, maxX: coque.maxX + F, maxY: coque.maxY + F }
+  window.__image = (t) => {
+    if (t === null) return sc.dessine(s, { x: num('cx', 0), y: num('cy', 0), zoom: zoomSalle * num('z', 1) }, null)
+    const e = entree ? M.etatEntree(t, pe) : M.etatTransition(t, p)
+    sc.dessine(s, e.camera, { salle: couvert, ...e })
+  }
+  window.__duree = entree ? M.DUREE_ENTREE : M.dureeTransition(p)
+  window.__image(q.has('t') ? num('t', 0) : null)
+  document.title = 'pret'
+</script>
