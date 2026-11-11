@@ -9,11 +9,20 @@
 //
 // LE CARTON DE FIN. Le concepteur (11/11) : « il faut peut-être mettre
 // quelque chose à la fin, écran noir avec étoiles, et marqué le titre ».
-// Le plan fond donc vers un ciel étoilé où le titre apparaît — 2,4 s, dont
-// 0,4 de fondu. Avec lui, la ligne de marque qui courait en haut du plan
-// n'a plus de raison d'être : l'image reste nue, le nom arrive à la fin.
-// `montage: { carton: false }` le retire (et rend sa ligne de marque au
-// plan) — c'est ce qu'il faut à une boucle, que le carton interrompt.
+// Premier essai : un fondu enchaîné de 0,4 s vers le ciel, puis le titre en
+// fondu. Verdict du concepteur : « pas génial ». Trois défauts, à l'analyse :
+// le fondu enchaîné superpose deux images sombres (la salle et le ciel), ce
+// qui se lit comme un voile gris, pas comme un passage ; le titre arrivait
+// par un SECOND fondu, deux transitions molles d'affilée ; et le son tombait
+// au silence au même instant, laissant le carton vide.
+// D'où la fin actuelle : COUPE FRANCHE, une seconde avant la fin du plan
+// (« tu peux couper 1 seconde avant ») — on quitte l'action pendant qu'elle
+// vit encore —, le titre est là en deux dixièmes, et le son de la scène
+// CONTINUE sous le carton pendant la seconde coupée, puis s'éteint.
+// `--noir` (ou montage.transition: 'noir') donne l'autre grammaire : le plan
+// s'éteint au noir, le carton s'en relève.
+// `montage: { carton: false }` retire le carton (et rend sa ligne de marque
+// au plan) — c'est ce qu'il faut à une boucle, que le carton interrompt.
 //
 // LES TEXTES sont dessinés par le navigateur, pas par ffmpeg : mêmes polices
 // que le jeu (Michroma, IBM Plex Mono — celles de dist/), même palette
@@ -39,8 +48,10 @@ const L = 1080
 const H = 1920
 
 // `montage.mjs <scène> jauge` monte la variante tournée avec --jauge
+const drapeaux = process.argv.slice(3).filter((x) => x.startsWith('--'))
+const variante = process.argv.slice(3).find((x) => !x.startsWith('--'))
 const scene = (await import(`./scenes/${process.argv[2]}.mjs`)).default
-const nom = process.argv[2] + (process.argv[3] ? `-${process.argv[3]}` : '')
+const nom = process.argv[2] + (variante ? `-${variante}` : '')
 const m = scene.montage ?? {}
 const brut = path.join(SORTIE, 'brut', `${nom}.mkv`)
 const son = path.join(SORTIE, 'brut', `${nom}.wav`)
@@ -142,8 +153,12 @@ html,body{background:${fond ? '#030710' : 'transparent'}}
 
 const textes = m.textes ?? []
 const avecCarton = m.carton !== false
-const CARTON = 2.4 // secondes, fondu compris
-const FONDU = 0.4
+const CARTON = 2.2 // secondes
+const transition = drapeaux.includes('--noir') ? 'noir' : (m.transition ?? 'coupe')
+// ce qu'on retire à la fin du plan avant le carton — et, en coupe franche,
+// ce pendant quoi le son de la scène continue dessous
+const ROGNE = avecCarton ? (m.rogne ?? 1) : 0
+const NOIR = 0.3 // la durée de chaque demi-fondu de la variante « noir »
 const nav = await chromium.launch()
 const pg = await nav.newPage({ viewport: { width: L, height: H } })
 const calques = []
@@ -170,7 +185,8 @@ if (avecCarton) {
   await pg.screenshot({ path: cartonTitre, omitBackground: true })
 }
 await nav.close()
-const total = avecCarton ? duree + CARTON - FONDU : duree
+const plan = duree - ROGNE // ce qui reste du plan à l'image
+const total = avecCarton ? plan + CARTON : duree
 
 // ---- l'assemblage -------------------------------------------------------------
 function assemble(sortie, avecTextes) {
@@ -212,22 +228,31 @@ function assemble(sortie, avecTextes) {
     const kf = n++
     args.push('-loop', '1', '-framerate', '60', '-t', String(CARTON), '-i', cartonTitre)
     const kt = n++
-    // le titre n'arrive qu'une fois le ciel installé
-    filtres.push(`[${kt}:v]format=rgba,fade=t=in:st=${FONDU + 0.15}:d=0.55:alpha=1[ct]`)
-    filtres.push(`[${kf}:v][ct]overlay=0:0:format=auto,fps=60,format=yuv444p,settb=AVTB,setsar=1[carton]`)
-    filtres.push(`[${v}]fps=60,format=yuv444p,settb=AVTB,setsar=1[plan]`)
-    filtres.push(`[plan][carton]xfade=transition=fade:duration=${FONDU}:offset=${(duree - FONDU).toFixed(4)}[vx]`)
+    const noir = transition === 'noir'
+    // coupe franche : le titre est là presque aussitôt ; au noir : il attend
+    // que le ciel se soit relevé
+    filtres.push(`[${kt}:v]format=rgba,fade=t=in:st=${noir ? NOIR + 0.1 : 0.04}:d=${noir ? 0.4 : 0.2}:alpha=1[ct]`)
+    filtres.push(
+      `[${kf}:v][ct]overlay=0:0:format=auto,fps=60,format=yuv444p,settb=AVTB,setsar=1${noir ? `,fade=t=in:st=0:d=${NOIR}` : ''}[carton]`,
+    )
+    filtres.push(
+      `[${v}]trim=duration=${plan.toFixed(4)},setpts=PTS-STARTPTS,fps=60,format=yuv444p,settb=AVTB,setsar=1${noir ? `,fade=t=out:st=${(plan - NOIR).toFixed(4)}:d=${NOIR}` : ''}[plan]`,
+    )
+    filtres.push(`[plan][carton]concat=n=2:v=1:a=0[vx]`)
     v = 'vx'
   }
   filtres.push(`[${v}]format=yuv420p[vf]`)
   if (aSon) {
     // −15 LUFS : le niveau où une vidéo ne paraît ni faible ni écrasée à
-    // côté des autres dans le fil ; un fondu de sortie pour que la boucle
-    // ne claque pas
-    // le son s'éteint pendant le fondu ; le carton est muet
-    const queue = avecCarton ? FONDU : 0.3
+    // côté des autres dans le fil.
+    // Sans carton : un fondu de sortie pour que la boucle ne claque pas.
+    // Coupe franche : le son COURT sous le carton pendant la seconde rognée,
+    // et s'éteint sur ses huit derniers dixièmes. Au noir : il s'éteint avec
+    // l'image.
+    const finSon = !avecCarton ? duree : transition === 'noir' ? plan : duree
+    const queue = !avecCarton ? 0.3 : transition === 'noir' ? NOIR : Math.min(0.8, ROGNE)
     filtres.push(
-      `[${a0}]afade=t=in:d=0.06,afade=t=out:st=${(duree - queue).toFixed(3)}:d=${queue},loudnorm=I=-15:TP=-1.5:LRA=11,aresample=48000,apad=whole_dur=${total.toFixed(4)}[af]`,
+      `[${a0}]atrim=duration=${finSon.toFixed(4)},afade=t=in:d=0.06,afade=t=out:st=${(finSon - queue).toFixed(3)}:d=${queue},loudnorm=I=-15:TP=-1.5:LRA=11,aresample=48000,apad=whole_dur=${total.toFixed(4)}[af]`,
     )
   }
   args.push('-filter_complex', filtres.join(';'), '-map', '[vf]')
@@ -242,12 +267,12 @@ function assemble(sortie, avecTextes) {
   )
   execFileSync('ffmpeg', args, { stdio: 'inherit' })
   const ko = Math.round(fs.statSync(sortie).size / 1024)
-  console.log(`${path.basename(sortie)} : ${total.toFixed(2)} s${avecCarton ? ' (carton compris)' : ''}, ${ko} Ko`)
+  console.log(`${path.basename(sortie)} : ${total.toFixed(2)} s${avecCarton ? ` (plan ${plan.toFixed(2)} s + carton, ${transition})` : ''}, ${ko} Ko`)
 }
 // la légende et les mots-dièse voyagent avec le clip : à coller tels quels
 if (scene.publication) {
   fs.writeFileSync(path.join(dossier, `${nom}.txt`), `${scene.publication.legende}\n\n${scene.publication.mots.join(' ')}\n`)
 }
-assemble(path.join(dossier, `${nom}.mp4`), true)
+assemble(path.join(dossier, `${nom}${drapeaux.includes('--noir') ? '-noir' : ''}.mp4`), true)
 // une scène sans texte n'a qu'une version : la seconde serait la même
 if (textes.length > 0) assemble(path.join(dossier, `${nom}-sans-texte.mp4`), false)

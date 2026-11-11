@@ -75,11 +75,17 @@ et au besoin `sansEcrit`, `montage` et `publication`.
   score. `masque: 'jauge'` garde la jauge de volume, recentrée sous la ligne
   de marque ; `tourne.mjs <scène> --jauge` l'ajoute à une scène qui ne l'a
   pas (fichier `<scène>-jauge`, monté par `montage.mjs <scène> jauge`).
-- Le montage termine chaque clip par un **carton de fin** (2,4 s) : le plan
-  fond vers un ciel étoilé où le titre apparaît. `montage: { carton: false }`
-  le retire et rend au plan sa ligne de marque, en haut
-  (`montage.marqueY` la déplace) — c'est ce qu'il faut pour publier la ronde
-  en boucle, que le carton interrompt.
+- Le montage termine chaque clip par un **carton de fin** (2,2 s) : coupe
+  franche une seconde avant la fin du plan (`montage.rogne`, 1 par défaut),
+  le ciel étoilé, le titre en deux dixièmes, et le son de la scène qui
+  continue dessous pendant la seconde coupée. Le fondu enchaîné du premier
+  essai a été jugé « pas génial » : deux images sombres superposées, puis
+  un second fondu pour le titre, et le silence au même instant.
+  `montage.mjs <scène> --noir` monte l'autre fin (le plan s'éteint au noir,
+  le carton s'en relève ; fichier `<scène>-noir`).
+  `montage: { carton: false }` retire le carton et rend au plan sa ligne de
+  marque (`montage.marqueY` la déplace) — c'est ce qu'il faut pour publier
+  la ronde en boucle, que le carton interrompt.
 - `montage.textes` (facultatif) incruste des textes aux polices du jeu, dans
   un bandeau en haut. Un fichier `.json` `{ garde: [[début, fin], …] }`
   posé à côté du film demande une coupe franche.
@@ -92,7 +98,8 @@ des scores. » Puis (11/11) : « un peu de HUD peut être intéressant tout de
 même », et le regroupement — toucher le corps étiré, « ça lui fait faire
 complètement autre chose », et le carton de fin. Aucune scène n'a de texte
 ni de verdict ; les deux dernières gardent la jauge. Les durées sont celles
-du plan, carton non compris (+2,0 s).
+du plan TOURNÉ ; au montage, le plan perd sa dernière seconde et gagne
+2,2 s de carton (+1,2 s au total).
 
 | Scène | Le moment | Durée |
 | --- | --- | --- |
