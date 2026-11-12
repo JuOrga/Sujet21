@@ -730,9 +730,20 @@ export function genreTransition(avant: PositionSalle | null, apres: PositionSall
 export const DENSITE_PROCHE = 1536
 export const MARGE_PROCHE = 0.6
 
+/** Une fenêtre de toile fine : ce qu'elle couvre (pixels de la toile de
+ *  base), son grossissement, et où elle tombe dans le monde. */
+export interface FenetreMonde {
+  x: number
+  y: number
+  l: number
+  h: number
+  k: number
+  monde: Rect
+}
+
 /** La fenêtre de la toile proche : ce qu'elle couvre (pixels de la toile
  *  de base), son grossissement, et où elle tombe dans le monde. */
-export function fenetreProche(mp: MiseEnPage): { x: number; y: number; l: number; h: number; k: number; monde: Rect } {
+export function fenetreProche(mp: MiseEnPage): FenetreMonde {
   const m = MARGE_PROCHE * mp.densite
   const x0 = Math.max(0, mp.salle.minX - m)
   const y0 = Math.max(0, mp.salle.minY - m)
@@ -752,4 +763,106 @@ export function fenetreProche(mp: MiseEnPage): { x: number; y: number; l: number
     k,
     monde: { minX: mp.monde.minX + x0 * ux, maxX: mp.monde.minX + x1 * ux, maxY: mp.monde.maxY - y0 * uy, minY: mp.monde.maxY - y1 * uy },
   }
+}
+
+// LA TOILE FINE SUIT LA VUE (capture du 13/11) : nette près du tableau, la
+// coque redevenait floue au dôme et aux étagères du bas dès qu'on dézoomait
+// ou déplaçait la vue — la toile proche ne couvre que la salle ± 0,6, et
+// au-delà la toile entière (360 px par salle) s'agrandissait près de deux
+// fois. La vue arrêtée, une fenêtre se repeint sur ce que l'écran montre, à
+// SA finesse : une salle à 650 px d'écran n'a pas besoin de 1536 px par
+// salle, et la toile reste à la taille de l'écran (≈ 3 Mpx en 1080p) au lieu
+// de couvrir tout le module à pleine finesse.
+/** la marge autour de la vue, par côté : un léger glissement ne repeint pas */
+export const MARGE_VUE = 0.15
+/** un rien plus fine que l'écran : le filtrage d'une toile pile à l'échelle
+ *  adoucit déjà le grain */
+export const SUR_ECHANTILLON = 1.05
+
+/** La fenêtre fine qui couvre la VUE (rectangle du monde visible, y vers le
+ *  haut) pour un écran à `pxEcranParUnite` pixels physiques par unité monde.
+ *  null : la vue ne touche pas la toile, ou la toile entière y suffit. */
+export function fenetreVue(mp: MiseEnPage, vue: Rect, pxEcranParUnite: number): FenetreMonde | null {
+  const ux = (mp.monde.maxX - mp.monde.minX) / mp.largeur
+  const uy = (mp.monde.maxY - mp.monde.minY) / mp.hauteur
+  const mx = (vue.maxX - vue.minX) * MARGE_VUE
+  const my = (vue.maxY - vue.minY) * MARGE_VUE
+  // en pixels de la toile de base, l'origine EN HAUT
+  const x0 = Math.max(0, (vue.minX - mx - mp.monde.minX) / ux)
+  const x1 = Math.min(mp.largeur, (vue.maxX + mx - mp.monde.minX) / ux)
+  const y0 = Math.max(0, (mp.monde.maxY - vue.maxY - my) / uy)
+  const y1 = Math.min(mp.hauteur, (mp.monde.maxY - vue.minY + my) / uy)
+  if (x1 <= x0 || y1 <= y0) return null
+  const l = x1 - x0
+  const h = y1 - y0
+  const k = Math.min(pxEcranParUnite * SUR_ECHANTILLON * ux, DENSITE_PROCHE / mp.densite, TOILE_MAX / l, TOILE_MAX / h)
+  // à peine plus fine que la toile entière : elle suffit
+  if (k <= 1.02) return null
+  return {
+    x: x0,
+    y: y0,
+    l,
+    h,
+    k,
+    monde: { minX: mp.monde.minX + x0 * ux, maxX: mp.monde.minX + x1 * ux, maxY: mp.monde.maxY - y0 * uy, minY: mp.monde.maxY - y1 * uy },
+  }
+}
+
+/** La fenêtre fine `fp` suffit-elle à la vue ? Elle doit couvrir ce que
+ *  l'écran montre de la toile — hors de la bande où elle se fond dans
+ *  l'autre (module2dShader : 6 % de chaque côté), sauf contre le bord de la
+ *  toile — et être au moins aussi fine que la fenêtre qu'on repeindrait. */
+export function vueCouverte(fp: FenetreMonde | null, mp: MiseEnPage, vue: Rect, pxEcranParUnite: number): boolean {
+  const voulu = fenetreVue(mp, vue, pxEcranParUnite)
+  if (!voulu) return true
+  if (!fp) return false
+  // 10 % de tolérance : un zoom d'un cran ne repeint pas
+  if (fp.k < voulu.k * 0.9) return false
+  const f = fp.monde
+  const bx = (f.maxX - f.minX) * 0.06
+  const by = (f.maxY - f.minY) * 0.06
+  const e = 1e-6
+  const vu = {
+    minX: Math.max(vue.minX, mp.monde.minX),
+    maxX: Math.min(vue.maxX, mp.monde.maxX),
+    minY: Math.max(vue.minY, mp.monde.minY),
+    maxY: Math.min(vue.maxY, mp.monde.maxY),
+  }
+  // un côté collé au bord de la toile n'a pas de fondu qui compte : au-delà,
+  // il n'y a que le vide autour de la coque
+  const g = f.minX <= mp.monde.minX + e ? f.minX : f.minX + bx
+  const d = f.maxX >= mp.monde.maxX - e ? f.maxX : f.maxX - bx
+  const b = f.minY <= mp.monde.minY + e ? f.minY : f.minY + by
+  const h = f.maxY >= mp.monde.maxY - e ? f.maxY : f.maxY - by
+  return vu.minX >= g - e && vu.maxX <= d + e && vu.minY >= b - e && vu.maxY <= h + e
+}
+
+/** la caméra arrêtée depuis si longtemps (ms), la fenêtre fine se repeint :
+ *  pas pendant un glissement ni une molette, où chaque image en paierait une */
+export const VUE_POSEE_MS = 250
+export interface SuiviCamera {
+  x: number
+  y: number
+  zoom: number
+  /** depuis quand (ms) la caméra ne bouge plus */
+  depuis: number
+}
+/** LA VUE EST-ELLE POSÉE ? Arrêtée à un souffle près : la caméra suit le
+ *  corps, un fluide qui ne s'immobilise jamais tout à fait — à l'égalité
+ *  stricte, la vue n'était jamais posée et rien ne se repeignait. Moins de
+ *  0,3 % de l'écran (ou du zoom) par image ; une dérive lente finit par
+ *  sortir de la fenêtre, et la repeint. `demiL`, `demiH` : la demi-vue, en
+ *  unités monde. */
+export function suisCamera(
+  avant: SuiviCamera | null,
+  cam: { x: number; y: number; zoom: number },
+  demiL: number,
+  demiH: number,
+  maintenant: number,
+): { suivi: SuiviCamera; posee: boolean } {
+  const bouge =
+    !avant ||
+    !(Math.abs(cam.x - avant.x) < demiL * 0.006 && Math.abs(cam.y - avant.y) < demiH * 0.006 && Math.abs(cam.zoom / avant.zoom - 1) < 0.003)
+  const depuis = bouge || !avant ? maintenant : avant.depuis
+  return { suivi: { x: cam.x, y: cam.y, zoom: cam.zoom, depuis }, posee: !bouge && maintenant - depuis >= VUE_POSEE_MS }
 }

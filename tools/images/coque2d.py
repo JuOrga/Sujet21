@@ -68,13 +68,13 @@ def detoure(a: np.ndarray, rogne: bool = False) -> np.ndarray:
     return rgba
 
 
-def ecrit(nom: str, a: np.ndarray, echelle: float = ECHELLE) -> None:
+def ecrit(nom: str, a: np.ndarray, echelle: float = ECHELLE, qualite: int = 86) -> None:
     mode = 'RGBA' if a.shape[2] == 4 else 'RGB'
     im = Image.fromarray((np.clip(a, 0, 1) * 255).astype(np.uint8), mode)
     if echelle != 1:
         im = im.resize((max(1, round(im.width * echelle)), max(1, round(im.height * echelle))), Image.LANCZOS)
     out = SORTIE / f'coque2d-{nom}.webp'
-    im.save(out, 'WEBP', quality=86, method=6)
+    im.save(out, 'WEBP', quality=qualite, method=6)
     print(f'  {nom} : {im.width}×{im.height}, {out.stat().st_size // 1024} Ko')
 
 
@@ -226,7 +226,9 @@ def serre() -> None:
         # cylindre de trois (trois voies). Livré aux trois quarts, il était
         # agrandi 1,4 à 2 fois au premier et au dernier tableau
         d = d.resize((round(d.width * DOME_SERRE), d.height), Image.LANCZOS)
-        ecrit(f'serre-{n}', affine(np.asarray(d).astype(float) / 255), 1)
+        # qualité 74 : à 86, 430 et 352 Ko, au-dessus des 350 Ko qu'un
+        # décalque peut peser sur un téléphone (prepare.py --audit, 13/11)
+        ecrit(f'serre-{n}', affine(np.asarray(d).astype(float) / 255), 1, 74)
     ecrit('serre-berceau', affine(sombre(lit_alpha('serre-berceau'), 0.72)), 1)
     # la capsule de la mini-carte reste petite à l'écran : 1024 de large
     ecrit('serre-cellule-neutre', lit_alpha('serre-cellule'), 1024 / 1536)
