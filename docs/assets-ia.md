@@ -697,7 +697,16 @@ comme le reste.
 **Ce qui vaut la peine d'être animé** (dans cet ordre) : la vanne (elle
 tourne), l'écran allumé (il scintille), la gouttière de la serre (l'eau y
 coule), le blé nain (il ondule). Pas le sas de raccord ni les fioles : rien
-n'y bouge par nature. **Aucune bande n'est livrée au 10/09/2026.**
+n'y bouge par nature.
+
+**Livrées le 13/11/2026** : la vanne (`decal-vanne-anime`, 8 vues — le volant
+de cinq rayons tourne de 72°, la boucle se referme exactement) et l'image
+fixe avec elle, refaites dans Blender (`tools/images/blender/vanne.py`) ;
+l'écran allumé (`decal-ecran-on-anime`, 8 vues : balayage, voyants,
+`tools/images/ecran_anime.py`, tiré de l'image fixe livrée) ; l'éclat de
+mémoire (`meta-eclat`, une bande de 24 vues carrées, `tools/images/blender/
+eclat.py`). Le même jour, `wall` et `tank-bg` refaits raccordables
+(`tools/images/blender/surfaces.py`).
 
 **La phrase du mouvement, pièce par pièce** (à substituer dans le gabarit
 ci-dessus ; la vanne a la sienne en §19, après sa reprise) :
@@ -2171,6 +2180,90 @@ décalait le premier pixel, et chaque jonction bord|cœur ou haut|bande
 faisait couture (relecture du 06/10 : écart 13 à 28 contre 3 à 8 dans une
 pièce ; après, toutes les jonctions au niveau du raccord cœur|cœur).
 
-**À venir** : les pièces propres de chaque module (la chaufferie et le
-cryo prennent celles de la serre en attendant) ; une deuxième variante de
-baie et de trappe.
+**La chaufferie a ses pièces (12/11)** : reteintée, elle gardait des
+cultures derrière ses vitres et de la mousse en guise de rouille. Ses douze
+pièces ne sortent pas d'un générateur mais d'une scène Blender, modélisée
+par script (`tools/images/blender/chaud_biome.py`, qui charge
+`chaud_tole.py` ; rendu Cycles) : vue orthographique de face, deux soleils
+froids (un du haut à 50°, un débouché partagé entre la face et le dessous),
+fond noir, **1024 px par largeur de salle pour toutes** — même caméra, seul
+le cadrage change. Les tôles et les bords se raccordent par construction :
+le bruit des matières est pris sur un tore, le carreau est rendu au milieu
+de ses copies, et une marge de 64 px est rognée. `python3
+tools/images/coque2d.py chaud` les ramène à 853 px par salle (l'échelle
+livrée des pièces tempérées), assombrit la coque à la luminance de la tôle
+tempérée (0,083 contre 0,085, mesuré) sans éteindre ce qui luit, et lit le
+détourage dans la couche alpha du rendu. Douze images, 240 Ko. Le moteur
+choisit le jeu par biome (`module2dCanvas.ts`, `JEUX`) : ses pièces ne se
+reteintent pas, et ses ancres (ligne de coque des bords, colliers) sont les
+siennes ; les petits détails et les équipements restent communs.
+
+| pièce de la chaufferie | état |
+| --- | --- |
+| tôle (deux tirages), tôle de la salle des machines | ✅ livrées 12/11 |
+| bord haut (rail de résistances), bord bas (quille à tuyères), période de deux salles | ✅ livrés 12/11 |
+| collier d'entrée, sas de sortie | ✅ livrés 12/11 |
+| baie de résistances, rangée de regards, colonne d'échangeur | ✅ livrées 12/11 |
+| trappe de foyer, machinerie (deux ballons, un corps de chauffe) | ✅ livrées 12/11 |
+
+Refaire une pièce : ouvrir Blender, `DOSSIER = r'…/tools/images/blender'`,
+exécuter `chaud_biome.py`, puis `biome()` et `lance([...], sortie)` ; copier
+`chaud-*.png` et `alpha/` dans `masters/images/coque2d/`, relancer
+`coque2d.py chaud`. Les ancres de chaque pièce, en largeurs de salle, sont
+dans le `journal.jsonl` que le rendu écrit.
+
+**La serre orbitale, refaite dans Blender (12/11)** : la serre peinte
+n'avait que deux bandes d'étagère pour tout le cylindre — découpées en neuf
+morceaux, retournées, doublées d'étagères de rechange, le motif se voyait
+quand même — et personne ne semblait y travailler. Elle est refaite dans le
+même atelier que la chaufferie (`tools/images/blender/serre.py`), en lieu de
+travail **en orbite** : culture hors-sol, aucun outil de jardin terrestre.
+
+- **Des bandes entières qui s'empilent dans n'importe quel ordre** (2048 ×
+  274, période de deux salles) : chacune va du substrat d'un bac au dessus
+  du bac suivant, sa rampe de culture, sa ligne de goutte-à-goutte et ses
+  étiquettes de lot. Six cultures (feuillus, fougères, aromates, mixte,
+  semis, bioréacteurs d'algues), plantées chacune par un tirage : en rendre
+  une de plus, c'est une graine de plus dans `BANDES`.
+- **Une bande sur trois, comptée du bas, porte une passerelle et un poste** :
+  analyse (paillasse, plateaux d'échantillons, loupe, pupitre à tube),
+  nutriments (râtelier de bonbonnes sanglées, doseur, caisses à loquets),
+  semis (table basse sous sa rampe). L'échelle humaine : 1 m = 0,244 salle.
+- **La cloison entre deux capsules** remplace l'anneau, au même gabarit
+  (218 px ; tête 765, bande 260 répétée, pied 491) : une porte étanche à
+  taille humaine en bas, une échelle sur toute la hauteur (quatre barreaux
+  par bande répétée).
+- **Le berceau** : les selles qui portent le cylindre, deux cuves, une
+  pompe, et la coursive d'où on les entretient. **Les dômes** : un jardin de
+  repos à l'entrée (des arbres en bac, un banc), la réserve à la sortie ;
+  rendus pour un cylindre de deux salles de haut, livrés resserrés pour
+  déborder de 0,655 hauteur (`CYL_DOME`).
+- **Le végétal** est fait de modèles 3D de Poly Haven (CC0 : `fern_02`,
+  `anthurium_botany_01`, `calathea_orbifolia_01`, `nettle_plant`,
+  `shrub_04`, `shrub_01`, `pachira_aquatica_01`), importés dans la scène par
+  l'addon MCP de Blender, puis copiés, tournés et mis à l'échelle par le
+  script ; leur clarté est multipliée par 2,1 (sous les soleils de
+  l'atelier, réglés pour l'acier, la serre sortait noire).
+
+Le moteur (`module2dCanvas.ts`, `peintCylindre`) empile haut, bandes et bas
+par capsule, chaque bande à un décalage tiré ; la cloison couvre la jonction.
+Dix-huit images en remplacent quarante-cinq. Livrer :
+`python3 tools/images/coque2d.py serre`.
+
+**La netteté (12/11, le soir)** : « pas net du tout » quand le tableau tient
+l'écran. Trois causes, trois réponses. Les rendus Blender ont trois à quatre
+fois moins de détail fin que les pièces peintes (contraste local 3 contre 12
+pour la tôle, 5 contre 18 pour la serre) : l'acier a reçu un grain en relief
+et des griffures, le débruiteur de Cycles — qui les gommait — est coupé (384
+échantillons à la place), les plantes ont leurs textures en 2k, et la
+livraison accentue les arêtes (`affine`). La toile proche était peinte à
+1024 px par salle pour une salle qui en occupe ~1900 à l'écran : toutes les
+pièces de la chaufferie et de la serre sont re-rendues à **1536 px par
+salle** et livrées sans réduction, la toile proche passe à 1536 sur 0,6
+salle de marge (`module2d.ts`). Enfin le shader floutait d'un cran le décor
+contre la salle : 0,35 cran. Poids : chaufferie 532 Ko, serre 1,4 Mo.
+
+**À venir** : des cultures de plus (potager, céréales, verger nain) ; les
+pièces propres du cryo, de l'antichambre et de
+l'observatoire (ils prennent les pièces tempérées en attendant) ; une
+deuxième variante de baie et de trappe.

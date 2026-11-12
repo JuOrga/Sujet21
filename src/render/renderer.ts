@@ -5412,18 +5412,13 @@ export class Renderer {
       (t) => (this.texStarsFar = t),
       true,
     )
-    // Le fond de cuve n'est PAS raccordable (mesuré : écart de bord ~5 contre
-    // 1,5 en interne) — en répétition simple, chaque frontière de tuile
-    // coupait les conduites net et désalignait les caissons. La répétition
-    // EN MIROIR raccorde par construction : les bords coïncident, les
-    // conduites font demi-tour au lieu de disparaître.
-    this.loadTexture(
-      '/assets/tank-bg.webp',
-      true,
-      true,
-      (t) => (this.texTank = t),
-      true,
-    )
+    // Le fond de cuve se répète SIMPLEMENT depuis le 13/11 : refait dans
+    // Blender (tools/images/blender/surfaces.py), il se raccorde par
+    // construction (raccord 0,6 / 0,4, seuil 3,0). L'ancien, généré, ne se
+    // raccordait pas (écart de bord ~5 contre 1,5 en interne) et se répétait
+    // EN MIROIR — les bords coïncidaient, mais les caissons et les conduites
+    // se répondaient en symétrie, ce qui trahissait la répétition.
+    this.loadTexture('/assets/tank-bg.webp', true, true, (t) => (this.texTank = t))
     this.loadTexture('/assets/wall.webp', true, true, (t) => (this.texWall = t))
     this.loadTexture(
       '/assets/wall-a.webp',
@@ -5804,7 +5799,8 @@ export class Renderer {
   /** LE MODULE EN 2D (render/module2d.ts) : où ses toiles tombent dans le
    *  monde, la salle qui y est encastrée et sa coque. Les toiles ne
    *  remontent au GPU que quand elles changent (`version`) — elles ne sont
-   *  fournies qu'alors. null l'éteint. */
+   *  fournies qu'alors ; la toile fine (`procheToile`) peut venir seule,
+   *  quand elle suit la vue. null l'éteint. */
   setModule2d(
     m: {
       version: number
@@ -5826,9 +5822,11 @@ export class Renderer {
     }
     if (m.toile && m.version !== this.module2dVersion) {
       this.texModule2d = this.envoieToile2d(this.texModule2d, m.toile)
-      if (m.procheToile) this.texModule2dProche = this.envoieToile2d(this.texModule2dProche, m.procheToile)
       this.module2dVersion = m.version
     }
+    // la toile fine voyage aussi SEULE : elle suit la vue (main.ts,
+    // suisVueModule2d) sans que la toile entière change
+    if (m.procheToile) this.texModule2dProche = this.envoieToile2d(this.texModule2dProche, m.procheToile)
     // la cellule change avec le module (la capsule dans la serre) : envoyée
     // une seule fois, la première restait pour tous
     if (m.cellule && m.cellule !== this.srcCellule2d) {

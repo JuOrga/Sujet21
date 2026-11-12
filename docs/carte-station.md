@@ -276,8 +276,13 @@ d'accès plus qu'un lieu.
   dans la sauvegarde de run et se relit à la reprise (une sauvegarde d'avant
   la carte repart du départ).
 - **Au sas de lancement**, la carte s'ouvre dans la cérémonie : le premier
-  module se choisit sur le plan. Au bout des salles d'un module, elle se
-  rouvre. Un module fermé dit l'orbe qui manque (et secoue la scène), un
+  module se choisit sur le plan. Au bout des salles d'un module, **le
+  bilan du module** passe d'abord (`mbMontreBilanModule`) : ses salles et
+  leur régime, le volume livré, puis ce qu'il a rendu en condensat, en
+  mémoire, en paliers de maîtrise, en instruments et en orbes — le compte
+  est tenu dans `run.recolte` (`game/recolte.ts`), remis à neuf à chaque
+  entrée de module et écrit avec la sauvegarde. Puis la carte se rouvre
+  (un module sans salle la rouvre sans bilan). Un module fermé dit l'orbe qui manque (et secoue la scène), un
   module hors de portée dit qu'aucune coursive n'y mène. **Survoler un
   module joignable projette** la route la plus courte qui en part jusqu'à
   l'objectif (`projectionDepuis`) : modules et coursives s'allument, les
