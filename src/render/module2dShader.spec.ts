@@ -28,9 +28,12 @@ describe('module 2D — le shader et le moteur', () => {
     for (const u of declares) expect(envoyes.has(u), u).toBe(true)
   })
 
-  it('la couverture peint le décor comme le mode 0 — même ombre, même flou : son quad déborde de la salle', () => {
-    // seul le mode 2 (la cellule quittée, nette) y échappe
-    expect(MODULE2D_FS).toContain('float flou = uMode > 1.5 ? 0.0 :')
+  it('la couverture peint le décor comme le mode 0 — même ombre, aucun flou : son quad déborde de la salle', () => {
+    // le décor ne se floute plus contre la salle (13/11, « flou par endroit ») :
+    // aucun mode ne lit les toiles autrement qu'un autre
+    expect(MODULE2D_FS).not.toMatch(/float flou/)
+    expect(MODULE2D_FS).not.toMatch(/texture\(uToile, uv, /)
+    expect(MODULE2D_FS).not.toMatch(/texture\(uProche, up, /)
     expect(MODULE2D_FS).toMatch(/if \(uMode < 1\.5\) c\.rgb \*= mix\(1\.0, mix\(0\.32/)
     expect(MODULE2D_FS).not.toMatch(/uMode < 0\.5\) c\.rgb \*=/)
   })

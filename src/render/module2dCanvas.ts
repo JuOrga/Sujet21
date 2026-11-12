@@ -213,6 +213,10 @@ const PX_PAR_SALLE = 533.3
 // finesse qu'on veut, et à 1024 le tableau en plein écran (une salle sur
 // ~1900 px) les agrandissait près de deux fois
 const PX_SERRE = 1536
+/** les équipements de coque, rendus dans Blender (13/11) : à 853 px par
+ *  salle, posés à 1,07 fois leur taille, le tableau plein écran les agrandissait
+ *  1,9 fois — l'endroit le plus flou du décor */
+const PX_EQUIPEMENT = 1536
 // LA SERRE ORBITALE (12/11, tools/images/blender/serre.py) : ses bandes de
 // culture, qui s'empilent dans n'importe quel ordre, et celles qui portent
 // une passerelle et un poste de travail
@@ -223,7 +227,7 @@ const SERRE_POSTES = ['analyse', 'nutriments', 'semis'] as const
 const SERRE_BERCEAU = { bride: 261, machines: 1344 }
 /** un dôme, en pixels de son image : il a la hauteur du cylindre, et sa
  *  couronne mord le cylindre de `plat` */
-const SERRE_DOME = { hauteur: 2304, plat: 29 }
+const SERRE_DOME = { hauteur: 4608, plat: 58 }
 const LIVRE = 0.8
 // LES COLLIERS D'AMARRAGE, pris dans les deux pièces de bout : où passe la
 // ligne de coque (en pixels du fichier), et les lignes que le collier occupe
@@ -259,13 +263,21 @@ const JEUX: Record<string, Jeu> = {
     teinte: false,
     // livrées telles que rendues, à 1536 px par salle (12/11 : à 853, le
     // tableau en plein écran les agrandissait plus de deux fois)
-    echelle: PX_PAR_SALLE / LIVRE / 1536,
+    // (PX_PAR_SALLE / LIVRE / 1536 jusqu'au 13/11 : 0,43 au lieu de 0,56, les
+    // tôles et les bords se posaient 22 % trop petits)
+    echelle: (2 * PX_PAR_SALLE * LIVRE) / 1536,
     // le rail des résistances : la ligne de coque à 0,04 salle du haut, tout
     // le reste dedans ; la quille : 0,2 salle dedans, les tuyères 0,1 dehors
     bande: { haut: { ligne: 61, dedans: 399, dehors: 0 }, bas: { ligne: 307, dedans: 307, dehors: 153 } },
     // chaque image n'est QUE son collier : 0,44 salle dehors, 0,1 de morsure
     collier: { gauche: 676, droite: 153, haut: 0, bas: 1290, morsure: 153 },
   },
+}
+/** la finesse des fichiers d'un jeu, en px par largeur de salle, telle que
+ *  le peintre la pose (853 pour les pièces tempérées, livrées à LIVRE de
+ *  sources à 2 × PX_PAR_SALLE) */
+export function pxParSalleDuJeu(j: Jeu): number {
+  return (2 * PX_PAR_SALLE * LIVRE) / j.echelle
 }
 /** les pièces de coque d'un biome : les siennes, sinon celles de la serre tempérée */
 export function jeuDuBiome(biome: string): Jeu {
@@ -825,7 +837,7 @@ export function peintModule2d(mp: MiseEnPage, p: Pieces, fen?: Fenetre): HTMLCan
   for (const e of mp.equipements) {
     if (hors(e.x, e.y - 0.6 * D, e.x, e.y)) continue
     const im = brut(`equipement-${e.nom}`)
-    const k = fi * 1.07
+    const k = D / PX_EQUIPEMENT
     c.drawImage(im, e.x - (im.width * k) / 2, e.y - im.height * k + 0.02 * D, im.width * k, im.height * k)
   }
   return toile

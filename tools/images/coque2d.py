@@ -28,6 +28,7 @@ planche des équipements et le couloir. Le moteur les lit dans public/assets/coq
     python3 tools/images/coque2d.py            (tout)
     python3 tools/images/coque2d.py chaud      (les seules pièces de la chaufferie)
     python3 tools/images/coque2d.py serre      (le cylindre de culture)
+    python3 tools/images/coque2d.py equipements (ce qui se dresse sur la coque)
     python3 tools/images/coque2d.py tempere    (tout le reste)
 """
 
@@ -187,8 +188,8 @@ DETAILS = {
 }
 
 
-# le dôme rendu fait 2457 × 3072, livré aux trois quarts ; son débord doit
-# valoir 0,655 hauteur
+# le dôme rendu fait 3686 × 4608 ; resserré en largeur, son débord vaut
+# 0,655 hauteur (CYL_DOME)
 DOME_SERRE = 0.834
 
 
@@ -220,7 +221,11 @@ def serre() -> None:
     ecrit('serre-anneau-bas', amorce(an[1538:], an[1148:1148 + 24]), 1)
     for n in ('dome-gauche', 'dome-droit'):
         d = Image.fromarray((np.clip(lit_alpha(f'serre-{n}'), 0, 1) * 255).astype(np.uint8), 'RGBA')
-        d = d.resize((round(d.width * 0.75 * DOME_SERRE), round(d.height * 0.75)), Image.LANCZOS)
+        # À PLEINE HAUTEUR (13/11) : rendu à 2304 px par salle pour un cylindre
+        # de deux salles, le dôme a la finesse de la toile proche jusqu'à un
+        # cylindre de trois (trois voies). Livré aux trois quarts, il était
+        # agrandi 1,4 à 2 fois au premier et au dernier tableau
+        d = d.resize((round(d.width * DOME_SERRE), d.height), Image.LANCZOS)
         ecrit(f'serre-{n}', affine(np.asarray(d).astype(float) / 255), 1)
     ecrit('serre-berceau', affine(sombre(lit_alpha('serre-berceau'), 0.72)), 1)
     # la capsule de la mini-carte reste petite à l'écran : 1024 de large
@@ -314,9 +319,6 @@ def tempere() -> None:
     for n in ('baie', 'baie-2', 'colonne', 'trappe', 'machinerie'):
         ecrit(f'{b}{n}', sombre(detoure(lit(b + n), rogne=True), SOMBRE_COQUE))
     cellule()
-    planche = lit('equipements')
-    for n, (x0, y0, x1, y1) in EQUIPEMENTS.items():
-        ecrit(f'equipement-{n}', sombre(detoure(planche[y0:y1, x0:x1], rogne=True), SOMBRE_EQUIPEMENT))
     planche = lit('details')
     for n, (x0, y0, x1, y1) in DETAILS.items():
         # un cran plus sombres que la coque : posés dessus, leurs liserés bleus
@@ -331,6 +333,17 @@ def tempere() -> None:
     ecrit('tube-collier', c[105:580, 60:145])
 
 
+def equipements() -> None:
+    """LES ÉQUIPEMENTS DE COQUE (13/11) : refaits dans Blender
+    (tools/images/blender/equipements.py) à 1536 px par salle, aux dimensions
+    des anciens. Ceux de la planche (EQUIPEMENTS), livrés à 853 px par salle,
+    étaient agrandis 1,9 fois quand le tableau tient l'écran : l'endroit le
+    plus flou du décor. Le moteur les pose à 1536 px par salle
+    (module2dCanvas.ts, PX_EQUIPEMENT)."""
+    for n in EQUIPEMENTS:
+        ecrit(f'equipement-{n}', affine(sombre(lit_alpha(f'equipement-{n}'), SOMBRE_EQUIPEMENT)), 1)
+
+
 def main() -> None:
     quoi = sys.argv[1:]
     if not quoi or 'tempere' in quoi:
@@ -339,6 +352,8 @@ def main() -> None:
         chaud()
     if not quoi or 'serre' in quoi:
         serre()
+    if not quoi or 'equipements' in quoi:
+        equipements()
 
 
 if __name__ == '__main__':

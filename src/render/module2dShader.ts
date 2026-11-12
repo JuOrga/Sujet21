@@ -82,16 +82,18 @@ void main() {
   // (et de 1,0 à 0,35 le 12/11 : le tableau en plein écran ne montre que
   // cette bande, et un cran de flou sur une toile déjà agrandie la rendait
   // « pas nette du tout » — l'ombre suffit à détacher la salle)
-  float flou = uMode > 1.5 ? 0.0 : 0.35 * uOmbre * (1.0 - smoothstep(0.0, 0.14, d));
+  // (puis supprimé le 13/11 : même à 0,35 cran la bande contre la salle
+  // restait « floue par endroits » ; l'ombre suffit à détacher la salle.
+  // Plus de flou du tout : la couverture et le mode 0 lisent la même chose)
   // la toile a son origine EN HAUT (une toile 2D) : v descend avec y
   vec2 uv = vec2((vMonde.x - uRect.x) / (uRect.z - uRect.x), (uRect.w - vMonde.y) / (uRect.w - uRect.y));
-  vec4 c = texture(uToile, uv, flou);
+  vec4 c = texture(uToile, uv);
   if (uHasP > 0.5) {
     // près de la salle, la toile fine ; elle se fond dans l'autre sur ses bords
     vec2 up = vec2((vMonde.x - uRectP.x) / (uRectP.z - uRectP.x), (uRectP.w - vMonde.y) / (uRectP.w - uRectP.y));
     vec2 b = min(up, 1.0 - up);
     float w = smoothstep(0.0, 0.06, min(b.x, b.y));
-    if (w > 0.0) c = mix(c, texture(uProche, up, flou), w);
+    if (w > 0.0) c = mix(c, texture(uProche, up), w);
   }
   if (uMode < 1.5) c.rgb = respire(c.rgb, vMonde);
   // l'ombre s'efface quand la salle n'est qu'une cellule (uOmbre, voir

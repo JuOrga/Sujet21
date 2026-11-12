@@ -5,7 +5,7 @@ import { existsSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import carte from '../game/carteStation.json'
-import { PIECES_MODULE2D, THEMES, jeuDuBiome, teintePixels, themeDuBiome } from './module2dCanvas'
+import { PIECES_MODULE2D, THEMES, jeuDuBiome, pxParSalleDuJeu, teintePixels, themeDuBiome } from './module2dCanvas'
 
 describe('module 2D — une teinte par biome', () => {
   it('chaque biome de la carte a son thème : aucun module ne retombe sur l’acier neutre', () => {
@@ -93,6 +93,11 @@ describe('module 2D — un jeu de pièces par biome', () => {
 
   it('la chaufferie a ses pièces, et elles ne passent pas par la teinte : déjà à leurs couleurs, la dominante les réchaufferait deux fois', () => {
     expect(jeuDuBiome('chaud')).toMatchObject({ prefixe: 'chaud', teinte: false })
+  })
+
+  it('les pièces de la chaufferie se posent à la finesse où elles sont rendues (1536 px par salle) : un facteur faux les rapetissait de 22 %', () => {
+    expect(pxParSalleDuJeu(jeuDuBiome('chaud'))).toBeCloseTo(1536, 0)
+    expect(pxParSalleDuJeu(jeuDuBiome('cryo'))).toBeCloseTo(853.3, 0)
   })
 
   it('un biome sans pièces propres emprunte celles de la serre tempérée, reteintées', () => {
