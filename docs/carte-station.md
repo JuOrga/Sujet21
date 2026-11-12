@@ -3,9 +3,10 @@
 > Le plan à routes ramifiées du §9 du document fonctionnel, parti du dessin
 > du concepteur (handoff « Carte de la station », septembre 2026, copié dans
 > `docs/carte-station/`) et refait le 15/09 pour que les routes se
-> distinguent (voir « Les routes »). Treize modules, dix-neuf coursives,
+> distinguent (voir « Les routes »). Douze modules, vingt et une coursives,
 > cinq zones, des conditions d'accès selon l'état du sujet (eau · glace ·
-> vapeur), deux haltes et deux secteurs sous confinement supérieur.
+> vapeur) et trois secteurs sous confinement supérieur (compté sur la carte
+> livrée le 10/11).
 
 > La MÉCANIQUE des routes — ce qu'une route met en jeu, où chaque paramètre
 > se règle, les natures de salle et les pistes propres au jeu — est dans
@@ -18,7 +19,7 @@
 | `src/game/carteStation.json` | **La source de vérité.** Ce que l'éditeur exporte, ce que le jeu lit. Rien de la carte n'est écrit en dur ailleurs. |
 | `src/game/cartePartage.ts` | Le partage : la carte PUBLIÉE (magasin `/api/reglages`, domaine `carte`) joue pour tout le monde si elle est lisible et sans erreur ; la livrée reste le filet. |
 | `src/game/carteStation.ts` | Le modèle : types, lecture (`parseCarte`), sérialisation à l'identique, vérification de fond (`verifieCarte`), et les questions pures — où passe une coursive (`traceLien`), quel module est atteignable, quelle couleur pour cette température. |
-| `src/game/dessinCarte.ts` | Le dessin, en une chaîne SVG (`dessinCarteSVG`). Pur : il sert à l'éditeur aujourd'hui, et servira tel quel à l'écran de jeu. |
+| `src/game/dessinCarte.ts` | Le dessin, en une chaîne SVG (`dessinCarteSVG`), et ce que le plan dit au joueur : l'état d'un module (`etatModule`), le cadre du jeu (`cadreCarte`), la légende (`legendeCarte`), le nom des coursives (`nomLien`). Pur : il sert à l'éditeur, à la cérémonie et à l'écran LA STATION. |
 | `src/editor/carteOperations.ts` | Les gestes, purs : déplacer, redimensionner, lier, renommer, supprimer, l'historique. |
 | `src/editor/editeurCarte.ts` | L'éditeur lui-même (DOM) : la barre, les listes, la scène, les formulaires, l'aperçu jeu. |
 | `docs/carte-station/` | Le handoff du concepteur : le cahier, la maquette interactive (`.dc.html`, à ouvrir avec le runtime Claude Design — non inclus), les prompts d'assets. |
@@ -86,7 +87,9 @@ dépôt (annulable).
 
 ## Le modèle de données (`carteStation.json`)
 
-- `scene` : la taille de la scène (1600 × 804), le repère de tout le reste.
+- `scene` : la taille de la scène (2100 × 804 depuis le 16/09), le repère
+  de tout le reste. L'éditeur la montre entière ; le jeu n'en cadre que ce
+  qui se joue (voir « Lire le plan en jeu »).
 - `zones[]` : `id`, `code` (« Z-02 »), `nom`, `couleur`.
 - `types` : le libellé de chaque nature de module — `sas`, `jonction`,
   `combat`, `enigme`, `coffre`, `boss`, les trois HALTES sans salle,
@@ -119,8 +122,11 @@ dépôt (annulable).
   (`null` = libre, sinon `orbe == solidification` — un id d'orbe, voir
   ci-dessous), `badge` (optionnel).
 - `decor[]` : le non-jouable, ancré à un module — l'arc de coque
-  (`coque-croissant`, deux courbes) et le télescope (`telescope-hubble`,
-  position, rotation, tube). Les nervures et lumières de l'arc sont
+  (`coque-croissant`, deux courbes) et le télescope (`telescope-hubble`).
+  Le télescope ne porte que son `ancrage` : il s'amarre de lui-même
+  au-dessus de ce module, réduit, par un tube coudé (`amarrageTelescope`)
+  — il suit donc un observatoire déplacé dans l'éditeur, et une carte
+  publiée avec ses anciennes coordonnées se lit et les oublie. Les nervures et lumières de l'arc sont
   calculées sur ses courbes : l'arc peut changer de forme sans qu'on les
   refasse.
 - `palette` : les couleurs du dessin.
@@ -141,7 +147,7 @@ les cadenas suivent.
 **Le trajet en niveaux.** `longueursTrajet` compte les salles du départ à
 l'objectif, au plus court et au plus long ; la ligne de vérification de
 l'éditeur l'affiche. La longueur d'une run n'est plus un réglage, c'est une
-conséquence de la carte : sur la carte livrée, 9 niveaux.
+conséquence de la carte : sur la carte livrée, de 27 à 30 salles.
 
 **La règle du hub.** « Un lien partant du HUB sort à
 y = clamp(cible.y, HUB.y − 110, HUB.y + 110) ». Le 110 est h/2 − 36 pour
@@ -179,6 +185,58 @@ HUB ─vapeur T3 TRANSFO GAZ ───┘ └ C3 CHAUFFERIE            ┘ └ P
   cryostat et du réacteur pose un nœud cache, une fois par poste.
 - **La scène fait 2100 × 804** ; l'arc de coque ne bouge pas (le HUB reste
   à x = 263), l'observatoire et le télescope glissent à droite.
+
+## Lire le plan en jeu (10/11/2026)
+
+Revue de lisibilité faite sur une page d'aperçu qui monte le vrai dessin
+dans les vrais styles (le jeu complet ne se rend pas dans le navigateur
+sans tête de l'environnement d'analyse). Ce que le plan doit dire sans
+qu'on survole : **où suis-je, où puis-je aller, pourquoi pas ailleurs, où
+est l'objectif.**
+
+- **Le cadre** (`cadreCarte`). La scène fait 2100 × 804 pour loger le
+  télescope et l'arc de coque ; le jouable n'en occupe que les deux tiers.
+  Cadrée entière, elle tombait à 0,58 dans la cérémonie d'un écran de
+  1280 × 800 : un nom de module à 6,3 px. Le jeu cadre les modules, leurs
+  étiquettes et leurs plaques (110 de marge sur les côtés, 14 en haut et
+  en bas) ; le décor **déborde** du cadre. Mesuré après : nom 11,3 px,
+  température 9,8 px, module de 84 px. Le télescope, posé à droite de
+  l'observatoire à pleine taille, en sortait : depuis le 11/11 il s'amarre
+  au-dessus de l'observatoire, à 0,45 fois sa taille, entier dans le cadre.
+  La scène garde ses 2100 de large ; son tiers droit est désormais libre
+  dans l'éditeur.
+- **L'état d'un module** (`etatModule`), une seule lecture pour le dessin,
+  l'étiquette d'accessibilité et les fiches :
+
+  | état | ce que le plan montre |
+  | --- | --- |
+  | `ici` | bord blanc, plaque « VOUS ÊTES ICI », le fût pulse |
+  | `joignable` | allumé à la teinte de sa zone, sa coursive s'épaissit et coule |
+  | `verrou` | cadenas, nom en gris, coursive fixe (elle ne coule pas) |
+  | `retour` | allumé : le module par où l'on repart d'un cul-de-sac |
+  | `traverse` | coche, corps à 70 % |
+  | `plus-loin` | corps à 60 % : encore sur une route qu'on peut prendre |
+  | `ferme` | corps à 30 %, nom à 45 % : plus aucune coursive n'y mène |
+
+  L'objectif porte la plaque « OBJECTIF » et reste allumé. Les coursives
+  qui partent d'un module hors de portée tombent à 20 % et perdent leur halo.
+- **Le socle.** Les coursives vont de centre à centre, donc passent sous
+  chaque module : un socle plein les cache, seul le corps s'éteint dessus.
+- **La légende** (`legendeCarte`) est bâtie depuis la carte — seulement ce
+  qu'elle montre — et s'affiche sur les deux écrans. Les coursives s'y
+  nomment pour le joueur (`nomLien` : voie principale, voie secondaire, le
+  badge pour une coursive à orbe), jamais par leur clé de données.
+- **Le petit écran** (≤ 700 px de large, ou tactile de moins de 620 px de
+  haut) : le plan garde une hauteur lisible et **défile** dans son cadre,
+  ouvert sur le module courant. **Au doigt**, le premier toucher vise un
+  module (fiche, route, ce qui s'éteint), le second y entre
+  (`game/porteArmee.ts`, `viseePuisEntree`).
+
+Laissé au concepteur : la teinte d'un module joignable reste celle de sa
+ZONE (vert, givre, bleu, violet selon la colonne) — la maquette le veut,
+mais « joignable » change donc de couleur à chaque acte ; et les noms
+« TRANSFO GLACE », « AUCUNE TRANSFO », « TRANSFO GAZ » disent une règle
+d'accès plus qu'un lieu.
 
 ## La conception retenue (concepteur, 03/09/2026)
 

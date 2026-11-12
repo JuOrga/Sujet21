@@ -181,13 +181,12 @@ export interface StyleLien {
 export interface DecorCarte {
   id: string
   type: string
+  /** le module auquel le décor tient : le télescope s'y amarre de lui-même
+   *  (dessinCarte, amarrageTelescope) — sa position, sa rotation et son tube
+   *  ne se stockent plus : écrits en dur, ils ne suivaient pas le module */
   ancrage: string
-  x?: number
-  y?: number
-  rotation?: number
   exterieur?: string
   interieur?: string
-  tube?: string
 }
 
 export interface PaletteCarte {
@@ -374,12 +373,10 @@ export function parseCarte(entree: unknown): {
         return
       }
       const e: DecorCarte = { id: d.id, type: d.type, ancrage: d.ancrage }
-      if (estNombre(d.x)) e.x = d.x
-      if (estNombre(d.y)) e.y = d.y
-      if (estNombre(d.rotation)) e.rotation = d.rotation
+      // (x, y, rotation et tube d'une carte d'avant le 11/11 se lisent sans
+      // faute et s'oublient : le télescope se place tout seul)
       if (estChaine(d.exterieur)) e.exterieur = d.exterieur
       if (estChaine(d.interieur)) e.interieur = d.interieur
-      if (estChaine(d.tube)) e.tube = d.tube
       decor.push(e)
     })
 

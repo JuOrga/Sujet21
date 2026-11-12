@@ -110,6 +110,7 @@ import {
   portesDuRang,
   tisseMiniCarte,
   ICONES_MINI_CARTE,
+  iconeDuNoeud,
   typesDuModule,
   type MiniCarte,
   type NatureNoeud,
@@ -123,7 +124,7 @@ import {
   fermeParPorte,
   REPERES_VOIE,
 } from './game/voiesModule'
-import { armeAuToucher, ARMEE } from './game/porteArmee'
+import { armeAuToucher, ARMEE, viseePuisEntree } from './game/porteArmee'
 import { CLE_MANQUES, inventairePool, litManques, noteManque, type Manque } from './game/manques'
 import {
   arriveRafales,
@@ -179,7 +180,15 @@ import {
   type EtatJoueur,
   type EvenementDef,
 } from './game/evenements'
-import { dessinCarteSVG, type OptionsDessin } from './game/dessinCarte'
+import {
+  ETATS_DITS,
+  cadreCarte,
+  dessinCarteSVG,
+  etatModule,
+  legendeCarteHTML,
+  nomLien,
+  type OptionsDessin,
+} from './game/dessinCarte'
 import {
   choisitVoie,
   choixModules,
@@ -313,22 +322,25 @@ import {
   versionDe,
 } from './bench/changelog'
 import { Camera } from './render/camera'
-import { COQUE_EPAISSEUR } from './render/coque'
+import { COQUE_EPAISSEUR, COQUE_FRANGE } from './render/coque'
 import {
-  DUREE_TRANSITION,
+  DUREE_ENTREE,
   centreCellule,
+  dureeTransition,
+  etatEntree,
   etatTransition,
   fenetreProche,
   formeDuBiome,
+  genreTransition,
   miseEnPage,
   vueGenerique,
-  transitionPermise,
+  zoomEnsemble,
+  type EtatTransition,
   type FormeModule,
-  type ParamsTransition,
   type PositionSalle,
   type VueModule2d,
 } from './render/module2d'
-import { chargePiecesModule2d, peintModule2d, type Pieces } from './render/module2dCanvas'
+import { chargePiecesModule2d, peintCelluleSeule, peintModule2d, type Pieces } from './render/module2dCanvas'
 import { MAX_BOXES, Renderer } from './render/renderer'
 import { Motes, VIE_STRIDE, remplitVie, toucheLeCorps } from './render/vie'
 import { panDepuis } from './game/ouie'
@@ -1462,6 +1474,12 @@ function vueModule2d(): { vue: VueModule2d; reel: boolean } {
       voie,
       joues: carteRun.trace.slice(0, rang),
       suivants: (r, v) => mini.rangs[r]?.[v]?.suivants ?? [],
+      // ce qu'est chaque nœud : la cellule le dit par son icône, comme la
+      // mini-carte de la cérémonie
+      noeud: (r, v) => {
+        const nd = mini.rangs[r]?.[v]
+        return nd ? { icone: iconeDuNoeud(nd), prime: nd.prime !== null } : undefined
+      },
     },
     reel: true,
   }
@@ -1469,12 +1487,14 @@ function vueModule2d(): { vue: VueModule2d; reel: boolean } {
 /** LA SALLE CHARGÉE, relevée une fois au chargement (restart) : sa position
  *  (module2d.ts, transitionPermise), et tout ce que la coque en montre — sa
  *  mini-carte, la forme de son module. Rien n'y est relu à chaque image. */
-let salle2d: (PositionSalle & { vue: VueModule2d; reel: boolean; forme: FormeModule; num: number }) | null = null
+let salle2d: (PositionSalle & { vue: VueModule2d; reel: boolean; forme: FormeModule; biome: string; num: number }) | null = null
 let salle2dNum = 0
 function releveSalle2d(): void {
   const m = moduleEnCours()
   const { vue, reel } = vueModule2d()
-  salle2d = { module: m?.id ?? '', niveau: carteRun.niveau, vue, reel, forme: formeDuBiome(m?.biome ?? 'tempere'), num: ++salle2dNum }
+  // le biome donne la forme du module ET sa teinte (module2dCanvas, THEMES)
+  const biome = m?.biome ?? 'tempere'
+  salle2d = { module: m?.id ?? '', niveau: carteRun.niveau, vue, reel, forme: formeDuBiome(biome), biome, num: ++salle2dNum }
 }
 // les pièces se chargent à la première salle ; un échec se retente au bout
 // de dix secondes (une seule image manquante laissait le module invisible
@@ -1486,7 +1506,7 @@ let module2dCle = ''
 let module2dVersion = 0
 let module2dMonde: { monde: Rect2d; proche: Rect2d } | null = null
 type Rect2d = { minX: number; minY: number; maxX: number; maxY: number }
-function majModule2d(b: Rect2d): void {
+function demandePiecesModule2d(): void {
   const maintenant = performance.now()
   if (!piecesModule2d && maintenant - piecesModule2dDemandeesA > 10000) {
     piecesModule2dDemandeesA = maintenant
@@ -1494,6 +1514,9 @@ function majModule2d(b: Rect2d): void {
       .then((p) => (piecesModule2d = p))
       .catch((e) => console.warn('module 2D :', e))
   }
+}
+function majModule2d(b: Rect2d): void {
+  demandePiecesModule2d()
   if (!piecesModule2d || !salle2d) return
   const cle = `${b.minX},${b.minY},${b.maxX},${b.maxY}|${salle2d.num}`
   const T = COQUE_EPAISSEUR
@@ -1502,7 +1525,7 @@ function majModule2d(b: Rect2d): void {
     module2dCle = cle
     module2dVersion++
     // une forme FIXE par type de module (module2d.ts, formeDuBiome)
-    const mp = miseEnPage(avecCoque, salle2d.vue, salle2d.forme)
+    const mp = miseEnPage(avecCoque, salle2d.vue, salle2d.forme, salle2d.biome)
     // et, autour de la salle, une toile plus fine : la toile entière était
     // floue dès qu'on zoomait (aperçu du 02/10)
     const fp = fenetreProche(mp)
@@ -1516,9 +1539,12 @@ function majModule2d(b: Rect2d): void {
       version: module2dVersion,
       salle: b,
       coque: avecCoque,
-      // dans la serre, la capsule de culture
-      cellule: piecesModule2d.get(`${mp.forme === 'cylindre' ? 'serre-cellule' : 'cellule'}-neutre`),
-      celluleDepart: piecesModule2d.get(`${mp.forme === 'cylindre' ? 'serre-cellule' : 'cellule'}-joue`),
+      // LES DEUX CELLULES DE LA TRANSITION, peintes comme celles du module
+      // (icône comprise) : celle où l'on entre — la porte qu'on vient de
+      // choisir, ambre — et celle qu'on quitte, la dernière du chemin joué
+      cellule: peintCelluleSeule(piecesModule2d, mp.forme, 'ambre', mp.ici),
+      celluleDepart: peintCelluleSeule(piecesModule2d, mp.forme, 'joue', celluleQuittee(salle2d.vue)),
+      // dans la serre, la capsule de culture garde ses proportions
       proportions: mp.forme === 'cylindre',
     })
     // envoyées au GPU, les toiles se libèrent tout de suite : deux toiles
@@ -1529,43 +1555,98 @@ function majModule2d(b: Rect2d): void {
   if (module2dMonde) renderer.setModule2d({ version: module2dVersion, ...module2dMonde, salle: b, coque: avecCoque })
   // la transition en cours : la cellule qui grossit sur la salle
   const tt = camera.piloteT
-  renderer.setCouvertureModule2d(tt !== null && transition2d ? { salle: transition2d.salle, ...etatTransition(tt, transition2d) } : null)
+  const etat = tt !== null && transition2d ? transition2d.etat(tt) : null
+  renderer.setCouvertureModule2d(etat && transition2d ? { salle: transition2d.salle, ...etat } : null)
+  voileEffets2d(etat ? etat.ombre : 1)
 }
-let transition2d: ParamsTransition | null = null
-/** LA TRANSITION ENTRE DEUX SALLES (module2d.ts, etatTransition) : au lieu du
- *  plan large tenu, la salle quittée rétrécit dans sa cellule, la vue glisse
- *  vers la droite, la cellule choisie grossit jusqu'à la salle. Elle ne joue
- *  que si l'on vient de la salle d'avant dans le même module — pas à un
- *  nouvel essai, ni à l'entrée d'un module, ni après une halte, ni sans
- *  vraie mini-carte. Rend vrai si elle joue (le plan d'ouverture suivra,
+/** LA TOILE DES EFFETS SE TAIT SOUS LA COUVERTURE. Les faisceaux, les éclats
+ *  de mémoire, les fantômes, les cadres des cachettes se dessinent sur une
+ *  toile 2D posée PAR-DESSUS celle du moteur : pendant une transition, la
+ *  salle était couverte mais eux restaient — des points et des cadres à la
+ *  taille de la salle, flottant sur le module autour d'une cellule
+ *  minuscule (vu dans le vrai moteur le 10/11). Ils reviennent avec la
+ *  salle, au même rythme que son ombre. */
+let effets2dVisibles = 1
+function voileEffets2d(visible: number): void {
+  if (visible === effets2dVisibles) return
+  effets2dVisibles = visible
+  fxCanvas.style.opacity = visible >= 1 ? '' : String(visible)
+}
+/** La case d'où l'on arrive : la dernière du chemin joué — une salle, ou la
+ *  rencontre, la halte qu'on vient de traverser. */
+function celluleQuittee(vue: VueModule2d): { icone: string; prime: boolean } {
+  const voie = vue.joues[vue.rang - 1]
+  return (vue.rang > 0 && voie !== undefined && voie >= 0 ? vue.noeud?.(vue.rang - 1, voie) : undefined) ?? { icone: '', prime: false }
+}
+/** La transition en cours : ce que sa couverture cache (la salle où elle
+ *  mène, sa coque et la frange de sa coque) et son état à chaque instant —
+ *  entre deux salles, ou l'entrée dans le module. */
+let transition2d: { salle: Rect2d; etat: (t: number) => EtatTransition } | null = null
+/** LA TRANSITION À L'ARRIVÉE DANS UNE SALLE (module2d.ts) : au lieu du plan
+ *  large tenu, soit la salle quittée rétrécit dans sa cellule, la vue glisse
+ *  le long du chemin joué et la cellule choisie grossit jusqu'à la salle ;
+ *  soit — à l'entrée d'un module — le module entier tient l'écran, puis la
+ *  vue plonge sur la salle. Rien à un nouvel essai, ni sans vraie mini-carte.
+ *  Rend sa durée en secondes, 0 si rien ne joue (le plan d'ouverture suivra,
  *  sans son plan large). */
-function lanceTransition2d(avant: PositionSalle | null, b: Rect2d, vw: number, vh: number): boolean {
+function lanceTransition2d(avant: PositionSalle | null, b: Rect2d, vw: number, vh: number): number {
   // une transition en cours s'arrête là, sans sa suite : la salle a changé
   transition2d = null
   renderer.setCouvertureModule2d(null)
-  if (!module2dActif || level.coque === 'structures' || !piecesModule2d || !salle2d?.reel) return false
-  if (!transitionPermise(avant, salle2d)) return false
+  voileEffets2d(1)
+  if (!module2dActif || level.coque === 'structures' || !piecesModule2d || !salle2d?.reel) return 0
+  const genre = genreTransition(avant, salle2d)
+  if (genre === 'aucune') return 0
   const vue = salle2d.vue
-  const vient = vue.joues[vue.rang - 1]
-  if (vue.rang < 1 || vient === undefined) return false
   const T = COQUE_EPAISSEUR
   const salle = { minX: b.minX - T, minY: b.minY - T, maxX: b.maxX + T, maxY: b.maxY + T }
   const zoomSalle = Math.min(vw / (b.maxX - b.minX), vh / (b.maxY - b.minY)) * 0.92
-  // la salle quittée rétrécit jusqu'à sa cellule (etatTransition, depart),
-  // peinte nette par-dessus la toile : à sa taille de salle, la toile n'y a
-  // que ~100 px
-  const p = { de: centreCellule(salle, vue, vue.rang - 1, vient), salle, zoomSalle }
-  transition2d = p
+  let etat: (t: number) => EtatTransition
+  let duree: number
+  // LE CHEMIN JOUÉ depuis la salle quittée : sa cellule, puis chaque case
+  // traversée sans salle (une rencontre, une halte franchissent un rang) —
+  // la glissade passe par elles. La trace peut avoir un trou (une salle
+  // franchie sans porte, VOIE_INCONNUE) : sans chemin sûr, le plan d'ensemble
+  const chemin: { x: number; y: number }[] = []
+  if (genre === 'salle' && avant)
+    for (let r = avant.niveau; r < vue.rang; r++) {
+      const v = vue.joues[r]
+      if (v === undefined || v < 0) break
+      chemin.push(centreCellule(salle, vue, r, v))
+    }
+  if (genre === 'salle' && avant && chemin.length === vue.rang - avant.niveau && chemin.length > 0) {
+    // la salle quittée rétrécit jusqu'à sa cellule (etatTransition, depart),
+    // peinte nette par-dessus la toile : à sa taille de salle, la toile n'y a
+    // que ~100 px
+    const p = { de: chemin[0], par: chemin.slice(1), salle, zoomSalle }
+    etat = (t) => etatTransition(t, p)
+    duree = dureeTransition(p)
+  } else {
+    // le module entier : la toile de la salle n'est pas encore composée
+    // (majModule2d, à la prochaine image) — la mise en page, pure, suffit
+    const module = miseEnPage(salle, vue, salle2d.forme, salle2d.biome).monde
+    const p = { module, zoomModule: zoomEnsemble(module, vw, vh, zoomSalle), salle, zoomSalle }
+    etat = (t) => etatEntree(t, p)
+    duree = DUREE_ENTREE
+  }
+  // LA COUVERTURE DÉBORDE DE LA SALLE, de toute la frange de sa coque : le
+  // moteur peint autour de la coque un liseré qui s'éteint sur 560 unités, et
+  // une couverture arrêtée à la coque le laissait dépasser — un fin cadre à
+  // la taille de la salle autour de la cellule, pendant toute la transition
+  // (vu dans le vrai moteur le 10/11)
+  const F = COQUE_FRANGE
+  transition2d = { salle: { minX: salle.minX - F, minY: salle.minY - F, maxX: salle.maxX + F, maxY: salle.maxY + F }, etat }
   camera.piloter(
-    (t) => etatTransition(t, p).camera,
-    DUREE_TRANSITION,
+    (t) => etat(t).camera,
+    duree,
     () => {
       transition2d = null
       renderer.setCouvertureModule2d(null)
+      voileEffets2d(1)
       camera.startIntro(b, vw, vh, 0.25)
     },
   )
-  return true
+  return duree
 }
 /** CE QU'ON TROUVERA dans un module qu'on n'a pas encore entré — les types,
  *  pas les comptes (le concepteur, 16/09). Le rang d'entrée s'estime par le
@@ -6532,17 +6613,21 @@ function peintFicheStation(): void {
     : undefined
   const salles =
     m.niveaux > 0 ? `${m.niveaux} salle${m.niveaux > 1 ? 's' : ''}` : 'sans salle'
+  // hors des cas qui ont leur phrase, l'état se dit comme le plan le dessine
+  // (dessinCarte, etatModule) : « plus loin sur la route » ou « hors de portée »
   const etat = ici
     ? `vous êtes ici · salle ${Math.min(m.niveaux, carteRun.niveau + 1)} / ${m.niveaux}`
     : enRunCarte() && carteRun.visites.includes(id)
       ? 'traversé'
       : choix
         ? choix.orbeManquant
-          ? `verrouillé — orbe nécessaire : ${choix.orbeManquant}`
+          ? `verrouillé — orbe nécessaire : ${nomOrbe(choix.orbeManquant)}`
           : choix.retour
             ? 'revenir sur ses pas — l’objectif est hors de portée d’ici'
             : 'accessible depuis votre position'
-        : salles
+        : enRunCarte()
+          ? `${salles} · ${ETATS_DITS[etatModule(carte, optionsStation(), id)]}`
+          : salles
   fiche.innerHTML =
     `<h3>${esc(m.nom)}</h3>` +
     `<span class="st-rangs">${esc(`${z ? `${z.code} · ${z.nom}` : ''} · ${etat}`)}</span>` +
@@ -6571,25 +6656,25 @@ function peintAvanceStation(): void {
     `<small>salle ${Math.min(total, voieRang + 1)} / ${total} de la descente · objectif : ${objectif}</small>`
 }
 
-/** La légende suit les types de coursive de la carte, jamais une liste en dur. */
+/** L'orbe, par son nom (ORBES) : la fiche disait son identifiant de données. */
+function nomOrbe(id: string): string {
+  return ORBES.find((o) => o.id === id)?.nom ?? id
+}
+
+/** La légende suit la carte, jamais une liste en dur — et c'est la même que
+ *  celle de la cérémonie (dessinCarte, legendeCarte) : elle ne nommait que
+ *  les types de coursive, par leur clé de données (« main », « alt »). */
 function peintLegendeStation(): void {
   const l = document.getElementById('station-legende')
-  if (!l) return
-  const esc = htmlSafe
-  l.innerHTML =
-    Object.entries(carte.typesLiens)
-      .map(
-        ([k, st]) =>
-          `<li><i style="${st.tirets ? `height:0;border-top:2px dashed ${st.couleur};background:none` : `background:${st.couleur}`}"></i>` +
-          `${esc((st.badge ?? k).toLowerCase())}${st.condition ? ' 🔒' : ''}</li>`,
-      )
-      .join('') + `<li><i class="st-p-courant"></i>vous êtes ici</li>`
+  if (l) l.innerHTML = legendeCarteHTML(carte)
 }
 
 function renderStation(): void {
   const hote = document.getElementById('station-plan')
   if (!hote) return
   hote.innerHTML = dessinCarteSVG(carte, optionsStation())
+  const cadre = cadreCarte(carte, 'jeu')
+  hote.style.setProperty('--cadre', `${cadre.w} / ${cadre.h}`)
   peintAvanceStation()
   peintFicheStation()
   peintLegendeStation()
@@ -6617,6 +6702,9 @@ function ouvreStation(v: boolean): void {
       stationAPose = true
     }
     stationEl.hidden = false
+    // une fois l'écran affiché : caché, le plan n'a pas de taille à défiler
+    const plan = document.getElementById('station-plan')
+    if (plan) centrePlanSurIci(plan)
   } else {
     stationEl.hidden = true
     if (stationAPose && input.paused) input.togglePause()
@@ -15373,6 +15461,11 @@ function mbMontreCarte(raison: 'depart' | 'suite'): void {
   const choix = choixModules(carte, carteRun, orbes)
   const scene = document.createElement('div')
   scene.className = 'mb-station-carte'
+  // LE CADRE DE L'ÉCRAN ÉPOUSE CELUI DU PLAN (dessinCarte, cadreCarte) : la
+  // feuille le tenait à 1600 / 804, la taille d'une scène qui en fait 2100
+  // depuis le 16/09 — le plan flottait dans un cadre qui n'était plus le sien
+  const cadre = cadreCarte(carte, 'jeu')
+  scene.style.setProperty('--cadre', `${cadre.w} / ${cadre.h}`)
   scene.innerHTML = dessinCarteSVG(carte, {
     mode: 'jeu',
     courant: carteRun.module,
@@ -15397,9 +15490,11 @@ function mbMontreCarte(raison: 'depart' | 'suite'): void {
   }
   const ouvertes = choix.filter((x) => !x.orbeManquant).length
   const defaut = `${ouvertes} coursive${ouvertes > 1 ? 's' : ''} ouverte${ouvertes > 1 ? 's' : ''} · descente ${voieRang} / ${longueurRun()} salles`
+  // « visez un module », pas « survolez une porte » : le plan montre des
+  // modules, et ni le doigt ni la manette ne survolent
   const aideDefaut = [
-    'survolez une porte : sa fiche, ce qu’on y trouve, et la route la plus courte jusqu’à l’objectif s’allume sur le plan',
-    'les modules qui s’éteignent ne seront plus joignables par cette porte — c’est ce qu’elle ferme',
+    'visez un module allumé : ce qu’on y trouve, et la route la plus courte jusqu’à l’objectif se trace en blanc sur le plan',
+    'ce qui s’éteint alors ne sera plus joignable par là — c’est ce que ce choix ferme',
   ] as const
   const litId = (e: Event): string | null =>
     (e.target as Element | null)?.closest?.('[data-mod]')?.getAttribute('data-mod') ?? null
@@ -15437,7 +15532,7 @@ function mbMontreCarte(raison: 'depart' | 'suite'): void {
       if (k >= 0) scene.querySelector(`.cs-route[data-lien="${k}"]`)?.classList.add('cs-projet')
     })
   }
-  const dit = (id: string | null): void => {
+  const dit = (id: string | null, auDoigt = false): void => {
     // un « ? » révélé se lit sous sa nature ; non révélé, il garde son secret
     const mod = id ? moduleEffectif(carte, carteRun, moduleParId(carte, id)) : undefined
     const vise = mod && choix.some((c) => c.module.id === id) ? mod.id : null
@@ -15447,15 +15542,19 @@ function mbMontreCarte(raison: 'depart' | 'suite'): void {
       return
     }
     const x = choix.find((c) => c.module.id === id)
+    // LA FICHE PARLE COMME LE PLAN : le nom de la coursive, pas sa clé de
+    // données (« coursive « alt » ouverte ») ; et pour un module qu'on ne
+    // peut pas viser, pourquoi — plus loin sur la route, ou hors de portée
+    // pour de bon (« aucune coursive n'y mène d'ici » répondait aux deux)
     const acces = x
       ? x.orbeManquant
-        ? `verrouillé — orbe nécessaire : ${x.orbeManquant}`
+        ? `verrouillé — orbe nécessaire : ${nomOrbe(x.orbeManquant)}`
         : x.retour
           ? 'revenir sur ses pas — l’objectif est hors de portée d’ici'
-          : `coursive « ${x.lien.type} » ouverte`
-      : id === carteRun.module
-        ? 'vous êtes ici'
-        : 'aucune coursive n’y mène d’ici'
+          : `${nomLien(carte, x.lien.type)} — ouverte`
+      : ETATS_DITS[
+          etatModule(carte, { courant: carteRun.module, visites: carteRun.visites, orbes, retour: choix.find((c) => c.retour)?.module.id ?? null }, mod.id)
+        ]
     const projection = vise ? projectionDepuis(carte, vise) : null
     // CE QU'ON Y TROUVERA, par types : les mécaniques des salles, les
     // formes, les rencontres et les haltes de sa mini-carte — pas les
@@ -15466,7 +15565,10 @@ function mbMontreCarte(raison: 'depart' | 'suite'): void {
         ? 'nature inconnue — se révèle à l’entrée'
         : `${carte.types[mod.type].toLowerCase()} · ${mod.niveaux > 0 ? `${mod.niveaux} salle${mod.niveaux > 1 ? 's' : ''}` : 'sans salle'}`
     lignes(
-      `${mod.nom} · ${nature}` +
+      // visé au doigt : la consigne d'abord — en fin de ligne, les points de
+      // suspension d'un écran étroit la mangeaient
+      (auDoigt ? 'TOUCHEZ ENCORE POUR ENTRER ▸ ' : '') +
+        `${mod.nom} · ${nature}` +
         (mod.cran > 0 ? ` · confinement +${mod.cran}, mémoire ×${primeMemoireDu(mod)}` : '') +
         ` · ${mod.temp}°C · ${acces}`,
       types.length ? `on y trouve : ${types.join(', ')}` : '',
@@ -15483,7 +15585,12 @@ function mbMontreCarte(raison: 'depart' | 'suite'): void {
     if (elu) return
     elu = true
     const mod = x.module
-    scene.style.transformOrigin = `${((mod.x / carte.scene.width) * 100).toFixed(1)}% ${((mod.y / carte.scene.height) * 100).toFixed(1)}%`
+    // LE ZOOM PART DU MODULE ÉLU, là où il est À L'ÉCRAN : calculé en parts de
+    // la scène entière, il visait à côté dès que le plan n'emplit pas son
+    // cadre (bandes du « meet ») — et plus encore depuis que le jeu cadre serré
+    const fut = scene.querySelector(`[data-mod="${CSS.escape(mod.id)}"] .cs-bord`)?.getBoundingClientRect()
+    const boite = scene.getBoundingClientRect()
+    if (fut) scene.style.transformOrigin = `${(fut.left + fut.width / 2 - boite.left).toFixed(1)}px ${(fut.top + fut.height / 2 - boite.top).toFixed(1)}px`
     scene.querySelector(`[data-mod="${CSS.escape(mod.id)}"]`)?.classList.add('cs-sel')
     scene.classList.add('mb-station-zoom')
     dit(mod.id)
@@ -15506,8 +15613,18 @@ function mbMontreCarte(raison: 'depart' | 'suite'): void {
       scene.classList.add('mb-station-refus')
       return
     }
+    // AU DOIGT, LE PREMIER TOUCHER VISE (game/porteArmee, viseePuisEntree) :
+    // la fiche, la route et ce qui s'éteint se montrent, le second toucher entre
+    if (!garde.clic(x.module.id)) {
+      for (const el of scene.querySelectorAll('.cs-sel')) el.classList.remove('cs-sel')
+      scene.querySelector(`[data-mod="${CSS.escape(x.module.id)}"]`)?.classList.add('cs-sel')
+      dit(x.module.id, true)
+      return
+    }
     elit(x)
   }
+  const garde = viseePuisEntree()
+  scene.addEventListener('pointerdown', (e) => garde.pointeur(e.pointerType))
   scene.addEventListener('click', (e) => choisit(litId(e)))
   scene.addEventListener('keydown', (e) => {
     if (e.key === 'Enter' || e.key === ' ') {
@@ -15516,7 +15633,29 @@ function mbMontreCarte(raison: 'depart' | 'suite'): void {
     }
   })
   host.appendChild(scene)
+  // LA LÉGENDE, là où le choix se prend : elle n'existait que sur l'écran LA
+  // STATION, qu'on n'ouvre pas pendant la cérémonie
+  const legende = document.createElement('ul')
+  legende.className = 'mb-station-legende'
+  legende.setAttribute('aria-label', 'Légende du plan')
+  legende.innerHTML = legendeCarteHTML(carte)
+  host.appendChild(legende)
   host.appendChild(fiche)
+  centrePlanSurIci(scene)
+}
+
+/** SUR UN PETIT ÉCRAN LE PLAN SE FAIT DÉFILER (la feuille : .mb-station-carte,
+ *  .st-plan) — il s'ouvre donc sur le module où l'on se tient, au tiers
+ *  gauche : les portes qu'il ouvre sont à sa droite. Sans défilement (un
+ *  écran de bureau, un Deck), rien ne bouge. */
+function centrePlanSurIci(hote: HTMLElement): void {
+  requestAnimationFrame(() => {
+    const ici = hote.querySelector('.cs-courant .cs-bord')?.getBoundingClientRect()
+    if (!ici) return
+    const b = hote.getBoundingClientRect()
+    if (hote.scrollWidth > hote.clientWidth) hote.scrollLeft += ici.left + ici.width / 2 - (b.left + b.width / 3)
+    if (hote.scrollHeight > hote.clientHeight) hote.scrollTop += ici.top + ici.height / 2 - (b.top + b.height / 2)
+  })
 }
 
 /** LA CACHE REND SON ORBE quand le module qui le recèle est ÉPUISÉ — une
@@ -17088,8 +17227,8 @@ function restart(): void {
   const salleAvant = salle2d
   releveSalle2d()
   if (document.body.classList.contains('playing')) {
-    const enTransition = lanceTransition2d(salleAvant, sim.bounds, window.innerWidth, window.innerHeight)
-    if (!enTransition) camera.startIntro(sim.bounds, window.innerWidth, window.innerHeight)
+    const dureeTransition2d = lanceTransition2d(salleAvant, sim.bounds, window.innerWidth, window.innerHeight)
+    if (dureeTransition2d <= 0) camera.startIntro(sim.bounds, window.innerWidth, window.innerHeight)
     // le RÉVEIL : tirage du petit scénario joué pendant l'intro caméra —
     // chronométré en temps RÉEL. Le plan d'ouverture, lui, tolère les
     // accrocs (une image longue ne le fait pas sauter, voir camera.ts) : sur
@@ -17097,7 +17236,7 @@ function restart(): void {
     // conséquence, le réveil s'éteint de lui-même à la fin du plan.
     reveil.actif = true
     // la transition passe d'abord : le réveil part avec le plan d'ouverture
-    reveil.t0 = performance.now() / 1000 + (enTransition ? DUREE_TRANSITION : 0)
+    reveil.t0 = performance.now() / 1000 + dureeTransition2d
     reveil.frissonT = Math.random() < 0.7 ? 0.4 + Math.random() * 1.2 : -1
     reveil.frissonFait = false
     const bv = level.bounds
@@ -18687,6 +18826,8 @@ function corpsImage(now: number): boolean {
   // (renderer.ts, passeNetteRequise)
   renderer.dprNatif = Math.min(window.devicePixelRatio || 1, PLAFOND_DPR)
   renderer.decorNet = decorNet
+  // le module en 2D respire (module2dShader) — sauf sous « moins d'animations »
+  renderer.module2dAnime = !sansAnimation()
   renderer.boitesMurs = level.boxes
   // mesures brutes de CETTE image, pour le collecteur de performance
   let physRaw = 0
@@ -20092,7 +20233,14 @@ function corpsImage(now: number): boolean {
   // (il EST un module, ses coques sont ses parois)
   const module2dIci = module2dActif && level.coque !== 'structures'
   if (module2dIci) majModule2d(sim.bounds)
-  else renderer.setModule2d(null)
+  else {
+    renderer.setModule2d(null)
+    // LES PIÈCES SE DEMANDENT DÈS QU'ON JOUE, même dans une salle sans module
+    // autour (le hub bâti en structures) : attendues à la première salle d'un
+    // module, elles arrivaient après son chargement, et le plan d'ensemble de
+    // l'entrée — qui a besoin d'elles — ne jouait pas pour le premier module
+    if (module2dActif && document.body.classList.contains('playing')) demandePiecesModule2d()
+  }
   // le grand recul seulement quand le module est là pour le montrer
   camera.reculModule = module2dIci && module2dMonde !== null
   if (monitor.overview) {

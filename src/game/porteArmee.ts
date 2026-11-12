@@ -50,3 +50,39 @@ function desarme(p: PorteArmable): void {
   if (e) e.textContent = TEXTE_ENTRER
   p.dispatchEvent(new Event('pad-quitte'))
 }
+
+/** LE MÊME GESTE SUR LE PLAN DE LA STATION. Le choix d'une coursive ne se
+ *  reprend pas, et tout ce qui aide à le prendre — la fiche du module, la
+ *  route tracée, ce qui s'éteint — ne paraît qu'au survol : au doigt, le
+ *  premier toucher entrait dans le module sans rien avoir montré. Ici il
+ *  VISE, et le second toucher du MÊME module entre ; en viser un autre le
+ *  vise à son tour. Souris, clavier et manette : chaque clic entre.
+ *
+ *  Sans DOM : le plan est un SVG dont les modules ne sont pas des boutons,
+ *  la garde ne connaît que leur identifiant. */
+export function viseePuisEntree(): {
+  /** à chaque appui, le type du pointeur (« touch », « mouse », « pen ») */
+  pointeur(type: string): void
+  /** au clic sur un module ouvert : true s'il faut entrer, false s'il vient d'être visé */
+  clic(id: string): boolean
+  /** le module visé au doigt, en attente du second toucher */
+  visee(): string | null
+} {
+  let doigt = false
+  let visee: string | null = null
+  return {
+    pointeur: (type) => void (doigt = type === 'touch'),
+    clic: (id) => {
+      // le doigt ne vaut que pour son clic, comme pour les portes
+      const auDoigt = doigt
+      doigt = false
+      if (!auDoigt || visee === id) {
+        visee = null
+        return true
+      }
+      visee = id
+      return false
+    },
+    visee: () => visee,
+  }
+}

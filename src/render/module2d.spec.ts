@@ -8,16 +8,21 @@ import {
   CYL_DOME,
   DETAIL_L,
   RATIO_COLONNE,
+  DUREE_ENTREE,
   DUREE_TRANSITION,
+  ENTREE,
   TOILE_MAX,
   TRANSITION,
   centreCellule,
+  dureeTransition,
+  etatEntree,
   etatTransition,
   etats,
   formeDuBiome,
+  genreTransition,
   miseEnPage,
-  transitionPermise,
   vueGenerique,
+  zoomEnsemble,
   type VueModule2d,
 } from './module2d'
 
@@ -133,6 +138,35 @@ describe('module 2D — la mise en page', () => {
     const g = miseEnPage(salle, vueGenerique())
     expect(g.cellules).toHaveLength(17)
   })
+
+  it('sous la salle jouée, chaque tube se prolonge jusqu’à son centre : la transition la montre en cellule', () => {
+    // la salle (1, 0) : deux tubes y arrivent (de 0:0, éteint, et de 0:1,
+    // joué), deux en partent — un raccord par côté, le plus vif l'emporte
+    expect(mp.raccords).toHaveLength(2)
+    const cx = (mp.salle.minX + mp.salle.maxX) / 2
+    const cy = (mp.salle.minY + mp.salle.maxY) / 2
+    for (const t of mp.raccords) {
+      expect(t.ay).toBeCloseTo(cy, 6)
+      expect(t.by).toBeCloseTo(cy, 6)
+      // du centre de la salle à l'un de ses bords, là où le tube visible s'arrête
+      expect(Math.min(Math.abs(t.ax - cx), Math.abs(t.bx - cx))).toBeCloseTo(0, 6)
+      const bord = Math.max(Math.abs(t.ax - cx), Math.abs(t.bx - cx))
+      expect(bord).toBeCloseTo((mp.salle.maxX - mp.salle.minX) / 2, 6)
+      expect(mp.tubes.some((u) => u.ay === t.ay && (Math.abs(u.ax - cx) === bord || Math.abs(u.bx - cx) === bord))).toBe(true)
+    }
+    expect(mp.raccords.map((t) => t.etat)).toEqual(['joue', 'ambre'])
+  })
+
+  it('chaque cellule porte l’icône et la prime de son nœud ; sans nœuds, aucune', () => {
+    const noeud = (r: number, v: number) => ({ icone: r === 2 && v === 1 ? 'rencontre' : 'eau', prime: r === 3 && v === 2 })
+    const m = miseEnPage(salle, { ...vue, noeud })
+    expect(m.cellules.find((c) => c.rang === 2 && c.voie === 1)!.icone).toBe('rencontre')
+    expect(m.cellules.find((c) => c.rang === 2 && c.voie === 0)!.icone).toBe('eau')
+    expect(m.cellules.filter((c) => c.prime).map((c) => [c.rang, c.voie])).toEqual([[3, 2]])
+    expect(m.ici).toEqual({ icone: 'eau', prime: false })
+    expect(mp.cellules.every((c) => c.icone === '' && !c.prime)).toBe(true)
+    expect(mp.ici.icone).toBe('')
+  })
 })
 
 describe('module 2D — la transition entre deux salles', () => {
@@ -199,13 +233,150 @@ describe('module 2D — la transition entre deux salles', () => {
   })
 })
 
-describe('module 2D — quand la transition joue', () => {
-  it('vers la salle suivante du même module, et seulement elle', () => {
-    expect(transitionPermise({ module: 'C1', niveau: 1 }, { module: 'C1', niveau: 2 })).toBe(true)
-    expect(transitionPermise({ module: 'C1', niveau: 2 }, { module: 'C1', niveau: 2 })).toBe(false) // nouvel essai
-    expect(transitionPermise({ module: 'C1', niveau: 3 }, { module: 'P2', niveau: 0 })).toBe(false) // autre module
-    expect(transitionPermise({ module: 'C1', niveau: 1 }, { module: 'C1', niveau: 3 })).toBe(false) // après une halte
-    expect(transitionPermise(null, { module: 'C1', niveau: 1 })).toBe(false) // première salle chargée
+describe('module 2D — la transition après une rencontre ou une halte', () => {
+  // trois rangs joués : la salle 0:1, une rencontre en 1:1 (aucune salle),
+  // puis la salle 2:2 où l'on arrive
+  const v2: VueModule2d = { ...vue, rang: 2, voie: 2, joues: [1, 1] }
+  const de = centreCellule(salle, v2, 0, 1)
+  const etape = centreCellule(salle, v2, 1, 1)
+  const p = { de, par: [etape], salle, zoomSalle: 0.6 }
+  const t1 = TRANSITION.retrecit
+
+  it('elle dure plus longtemps qu’un seul saut, et un seul saut garde sa durée', () => {
+    expect(dureeTransition({ de, salle, zoomSalle: 0.6 })).toBeCloseTo(DUREE_TRANSITION, 9)
+    expect(dureeTransition(p)).toBeGreaterThan(DUREE_TRANSITION)
+  })
+
+  it('la glissade PASSE par la case traversée, puis finit sur la nouvelle salle', () => {
+    const glisse = dureeTransition(p) - TRANSITION.retrecit - TRANSITION.grossit - TRANSITION.revele
+    const milieu = etatTransition(t1 + glisse / 2, p).camera
+    expect(milieu.x).toBeCloseTo(etape.x, 6)
+    expect(milieu.y).toBeCloseTo(etape.y, 6)
+    const fin = etatTransition(dureeTransition(p), p)
+    expect(fin.camera.x).toBeCloseTo(0, 9)
+    expect(fin.camera.y).toBeCloseTo(0, 9)
+    expect(fin.opacite).toBeCloseTo(0, 9)
+  })
+
+  it('toujours vers la droite, sans saut ; elle quitte et aborde chaque case à l’horizontale, comme le tube', () => {
+    let av = etatTransition(0, p)
+    for (let t = 0.01; t <= dureeTransition(p); t += 0.01) {
+      const e = etatTransition(t, p)
+      expect(e.camera.x).toBeGreaterThanOrEqual(av.camera.x - 1e-9)
+      expect(Math.abs(e.camera.x - av.camera.x)).toBeLessThan(0.04 * (salle.maxX - salle.minX))
+      expect(Math.abs(e.camera.y - av.camera.y)).toBeLessThan(0.04 * (salle.maxX - salle.minX))
+      av = e
+    }
+    // le second saut change de voie (de 1:1 à 2:2) : à un dixième du saut en
+    // x, la vue n'a pas fait trois centièmes du chemin en y — et de même à
+    // l'arrivée
+    const glisse = dureeTransition(p) - TRANSITION.retrecit - TRANSITION.grossit - TRANSITION.revele
+    const part = (c: { x: number; y: number }) => [(c.x - etape.x) / (0 - etape.x), (c.y - etape.y) / (0 - etape.y)]
+    let vu = 0
+    for (let t = t1 + glisse / 2; t < t1 + glisse; t += 0.002) {
+      const [px, py] = part(etatTransition(t, p).camera)
+      if (px > 0.02 && px < 0.1) {
+        expect(py).toBeLessThan(0.03)
+        vu++
+      }
+      if (px > 0.9 && px < 0.98) {
+        expect(py).toBeGreaterThan(0.97)
+        vu++
+      }
+    }
+    expect(vu).toBeGreaterThan(2)
+  })
+})
+
+describe('module 2D — l’ombre de la salle pendant la transition', () => {
+  const p = { de: centreCellule(salle, vue, 0, 1), salle, zoomSalle: 0.6 }
+
+  it('aucune tant que la salle n’est qu’une cellule ; elle revient avec la salle', () => {
+    const cache = TRANSITION.retrecit + TRANSITION.glisse + TRANSITION.grossit
+    for (let t = 0; t < cache; t += 0.05) expect(etatTransition(t, p).ombre).toBe(0)
+    const mi = etatTransition(cache + TRANSITION.revele / 2, p)
+    expect(mi.ombre).toBeCloseTo(1 - mi.opacite, 9)
+    expect(mi.ombre).toBeGreaterThan(0)
+    expect(etatTransition(DUREE_TRANSITION, p).ombre).toBeCloseTo(1, 9)
+  })
+})
+
+describe('module 2D — l’entrée dans un module : le plan d’ensemble', () => {
+  const v0: VueModule2d = { ...vue, rang: 0, voie: 1, joues: [] }
+  const mp = miseEnPage(salle, v0)
+  const ecran = { l: 1280, h: 800 }
+  const zoomSalle = Math.min(ecran.l / (salle.maxX - salle.minX), ecran.h / (salle.maxY - salle.minY)) * 0.92
+  const p = { module: mp.monde, zoomModule: zoomEnsemble(mp.monde, ecran.l, ecran.h, zoomSalle), salle, zoomSalle }
+
+  it('le module entier tient dans l’écran, puis la vue finit sur la salle au plan large', () => {
+    const e0 = etatEntree(0, p)
+    const demiL = ecran.l / 2 / e0.camera.zoom
+    const demiH = ecran.h / 2 / e0.camera.zoom
+    expect(e0.camera.x - demiL).toBeLessThanOrEqual(mp.monde.minX)
+    expect(e0.camera.x + demiL).toBeGreaterThanOrEqual(mp.monde.maxX)
+    expect(e0.camera.y - demiH).toBeLessThanOrEqual(mp.monde.minY)
+    expect(e0.camera.y + demiH).toBeGreaterThanOrEqual(mp.monde.maxY)
+    const fin = etatEntree(DUREE_ENTREE, p)
+    expect(fin.camera.x).toBeCloseTo(0, 9)
+    expect(fin.camera.y).toBeCloseTo(0, 9)
+    expect(fin.camera.zoom).toBeCloseTo(zoomSalle, 9)
+    expect(fin.couvre).toEqual(salle)
+    expect(fin.opacite).toBeCloseTo(0, 9)
+    expect(fin.ombre).toBeCloseTo(1, 9)
+  })
+
+  it('on ne quitte aucune salle ; la salle reste couverte, sans ombre, jusqu’à la fin de la plongée', () => {
+    for (let t = 0; t < ENTREE.tenue + ENTREE.plonge; t += 0.05) {
+      const e = etatEntree(t, p)
+      expect(e.depart).toBeNull()
+      expect(e.opacite).toBe(1)
+      expect(e.ombre).toBe(0)
+    }
+  })
+
+  it('pendant la plongée, la salle visée ne s’éloigne jamais du centre de l’écran, et rien ne saute', () => {
+    const ecart = (t: number) => {
+      const c = etatEntree(t, p).camera
+      return Math.hypot((0 - c.x) * c.zoom, (0 - c.y) * c.zoom)
+    }
+    let av = ecart(ENTREE.tenue)
+    let cam = etatEntree(0, p).camera
+    for (let t = 0.01; t <= DUREE_ENTREE; t += 0.01) {
+      const c = etatEntree(t, p).camera
+      expect(Math.abs(Math.log(c.zoom / cam.zoom))).toBeLessThan(0.08)
+      cam = c
+      if (t <= ENTREE.tenue) continue
+      const e = ecart(t)
+      expect(e).toBeLessThanOrEqual(av + 1e-6)
+      av = e
+    }
+    expect(av).toBeCloseTo(0, 6)
+  })
+
+  it('un module si court qu’il tient presque au plan de la salle garde une plongée', () => {
+    const petit = { minX: -600, maxX: 600, minY: -400, maxY: 400 }
+    expect(zoomEnsemble(petit, ecran.l, ecran.h, zoomSalle)).toBeLessThanOrEqual(zoomSalle / 2)
+  })
+})
+
+describe('module 2D — quelle transition joue', () => {
+  it('vers une salle d’après dans le même module : la transition entre salles', () => {
+    expect(genreTransition({ module: 'C1', niveau: 1 }, { module: 'C1', niveau: 2 })).toBe('salle')
+  })
+
+  it('APRÈS UNE RENCONTRE OU UNE HALTE aussi : elles franchissent un rang sans salle', () => {
+    // le défaut signalé le 10/11 : après un « ? », la salle suivante surgissait
+    // sans transition — deux rangs d'un coup la coupaient
+    expect(genreTransition({ module: 'C1', niveau: 1 }, { module: 'C1', niveau: 3 })).toBe('salle')
+  })
+
+  it('un nouvel essai de la même salle : aucune', () => {
+    expect(genreTransition({ module: 'C1', niveau: 2 }, { module: 'C1', niveau: 2 })).toBe('aucune')
+  })
+
+  it('un autre module, ou la première salle chargée : l’entrée, le plan d’ensemble', () => {
+    expect(genreTransition({ module: 'C1', niveau: 3 }, { module: 'P2', niveau: 0 })).toBe('entree')
+    expect(genreTransition(null, { module: 'C1', niveau: 1 })).toBe('entree')
   })
 
   it('les positions sont celles AU CHARGEMENT : relevée pendant la cérémonie, la salle quittée a déjà avancé', () => {
@@ -215,8 +386,8 @@ describe('module 2D — quand la transition joue', () => {
     const auChargement = { module: 'C1', niveau: 1 }
     const pendantLaCeremonie = { module: 'C1', niveau: 2 }
     const suivante = { module: 'C1', niveau: 2 }
-    expect(transitionPermise(pendantLaCeremonie, suivante)).toBe(false) // le défaut
-    expect(transitionPermise(auChargement, suivante)).toBe(true) // le correctif
+    expect(genreTransition(pendantLaCeremonie, suivante)).toBe('aucune') // le défaut
+    expect(genreTransition(auChargement, suivante)).toBe('salle') // le correctif
   })
 })
 

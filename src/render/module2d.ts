@@ -11,7 +11,9 @@
 //     voie 0 en haut) — sur la ligne du haut, on voit le bord supérieur du
 //     module au-dessus de la salle ; sur celle du bas, sa quille dessous ;
 //   · une cellule dit son état : jouée (grise), joignable maintenant (ambre),
-//     joignable plus loin (bleue), fermée par les choix (éteinte, croix) ;
+//     joignable plus loin (bleue), fermée par les choix (éteinte, barrée) —
+//     et CE QU'ELLE EST, par l'icône de son nœud (une salle et sa mécanique,
+//     une rencontre, l'économat…) ;
 //   · des tubes les relient comme les liens de la mini-carte, allumés sur le
 //     chemin encore praticable.
 // La silhouette n'est pas un rectangle : un pont surélevé au milieu, une
@@ -39,22 +41,55 @@ export interface VueModule2d {
   suivants: (r: number, v: number) => readonly number[]
   /** la voie jouée à chaque rang déjà franchi (rangs 0 … rang − 1) */
   joues: readonly number[]
+  /** ce qu'est chaque nœud — absent : rien que des salles (la vue d'attente) */
+  noeud?: (r: number, v: number) => NoeudVue | undefined
+}
+
+/** CE QU'UNE CELLULE DIT DE SON NŒUD : son icône — le vocabulaire de la
+ *  mini-carte de la cérémonie (game/voiesModule.ts, ICONES_NOEUD : la goutte,
+ *  le flocon, le « ? » de la rencontre, la balance de l'économat…) — et sa
+ *  prime. Sans cela, le module montrait dix-sept boîtes identiques : on y
+ *  lisait où aller, jamais VERS QUOI (relecture du 10/11). */
+export interface NoeudVue {
+  icone: string
+  /** une salle scellée : plus dure, elle paie plus */
+  prime: boolean
 }
 
 export type EtatCellule = 'joue' | 'ambre' | 'bleu' | 'ferme'
 export type EtatTube = 'joue' | 'ambre' | 'bleu' | 'eteint'
 
-/** Un sommet de la silhouette, et la pièce qui l'habille. */
+/** Un sommet de la silhouette, et le sens de son angle. */
 export interface Sommet {
   x: number
   y: number
-  /** coin saillant (coin-*) ou angle rentrant (rentrant-*, miroir : retourné) */
+  /** coin saillant (coin-*) ou angle rentrant (rentrant-*, miroir : retourné).
+   *  Ces noms étaient ceux des pièces peintes posées sur chaque angle ; le
+   *  cadre se dessine désormais (module2dCanvas.ts, peintCadre), qui n'en lit
+   *  plus que le sens — saillant : les bandes s'y arrêtent, un feu de
+   *  position ; rentrant : elles courent jusqu'au sommet. */
   piece: string
   miroir: boolean
 }
 
+/** Une cellule de la mini-carte, en pixels de toile. */
+export interface Cellule {
+  x: number
+  y: number
+  l: number
+  h: number
+  etat: EtatCellule
+  rang: number
+  voie: number
+  /** l'icône de son nœud — vide : aucune (la vue d'attente) */
+  icone: string
+  prime: boolean
+}
+
 export interface MiseEnPage {
   forme: FormeModule
+  /** le biome du module : sa teinte, ses vitrages (module2dCanvas, THEMES) */
+  biome: string
   /** le corps du module, sans dômes ni berceau, en pixels de toile */
   corps: Rect
   largeur: number
@@ -67,8 +102,15 @@ export interface MiseEnPage {
   silhouette: Sommet[]
   /** le trou de la salle jouée, en pixels de toile */
   salle: Rect
-  cellules: { x: number; y: number; l: number; h: number; etat: EtatCellule }[]
+  cellules: Cellule[]
+  /** la salle jouée, vue comme une cellule : ce que la transition fait grossir */
+  ici: { icone: string; prime: boolean }
   tubes: { ax: number; ay: number; bx: number; by: number; etat: EtatTube }[]
+  /** LES RACCORDS : le bout de chaque tube SOUS la salle jouée, de son bord à
+   *  son centre. Jamais vus en jeu (la salle les couvre) ; pendant la
+   *  transition, la salle n'est encore qu'une cellule au milieu de son trou,
+   *  et sans eux les tubes s'arrêtaient à 0,35 salle d'elle, dans le vide */
+  raccords: { ax: number; ay: number; bx: number; by: number; etat: EtatTube }[]
   /** les zones peintes en tôle de salle des machines, en pixels de toile */
   machines: Rect[]
   /** les éléments uniques posés sur la tôle : centre, largeur */
@@ -313,7 +355,7 @@ function semeDetails(
 const EQUIPEMENTS = ['mat', 'grand-solaire', 'reservoir', 'antenne', 'radiateur', 'petit-solaire']
 
 /** METTRE EN PAGE le module autour de la salle (coque comprise). */
-export function miseEnPage(salle: Rect, vue: VueModule2d, forme: FormeModule = 'etagee'): MiseEnPage {
+export function miseEnPage(salle: Rect, vue: VueModule2d, forme: FormeModule = 'etagee', biome = ''): MiseEnPage {
   const R = salle.maxX - salle.minX
   const hr = (salle.maxY - salle.minY) / R
   const px = PAS_RANG
@@ -346,12 +388,20 @@ export function miseEnPage(salle: Rect, vue: VueModule2d, forme: FormeModule = '
   const e = etats(vue)
   const cellules: MiseEnPage['cellules'] = []
   const tubes: MiseEnPage['tubes'] = []
+  // un raccord par côté de la salle : plusieurs tubes y arrivent par le même
+  // dernier tronçon — le plus vif l'emporte (le chemin joué sur un tube éteint)
+  const raccord: Partial<Record<'g' | 'd', MiseEnPage['raccords'][number]>> = {}
+  const VIF: Record<EtatTube, number> = { eteint: 0, joue: 1, bleu: 2, ambre: 3 }
+  const raccorde = (cote: 'g' | 'd', t: MiseEnPage['raccords'][number]) => {
+    if (!raccord[cote] || VIF[t.etat] > VIF[raccord[cote].etat]) raccord[cote] = t
+  }
+  const noeud = (r: number, v: number) => vue.noeud?.(r, v) ?? { icone: '', prime: false }
   for (let r = 0; r < vue.rangs; r++)
     for (let v = 0; v < vue.voies; v++) {
       const [u, w] = cel(r, v)
       const etat = e.cellule(r, v)
       if (etat !== 'ici')
-        cellules.push({ x: X(u), y: Y(w), l: CELLULE_L * densite, h: (CELLULE_L / 1.5) * densite, etat })
+        cellules.push({ x: X(u), y: Y(w), l: CELLULE_L * densite, h: (CELLULE_L / 1.5) * densite, etat, rang: r, voie: v, ...noeud(r, v) })
       if (r === vue.rangs - 1) continue
       // le tube vers chaque suivant : à l'horizontale jusqu'à mi-chemin, à
       // la verticale jusqu'à sa voie, à l'horizontale jusqu'à lui
@@ -366,6 +416,8 @@ export function miseEnPage(salle: Rect, vue: VueModule2d, forme: FormeModule = '
         tubes.push({ ax: X(ua), ay: Y(w), bx: X(um), by: Y(w), etat: et })
         if (s2 !== v) tubes.push({ ax: X(um), ay: Y(w), bx: X(um), by: Y(w2), etat: et })
         tubes.push({ ax: X(um), ay: Y(w2), bx: X(ub), by: Y(w2), etat: et })
+        if (ua !== u) raccorde('d', { ax: X(u), ay: Y(w), bx: X(ua), by: Y(w), etat: et })
+        if (ub !== u2) raccorde('g', { ax: X(ub), ay: Y(w2), bx: X(u2), by: Y(w2), etat: et })
       }
     }
   // les éléments uniques : dans les vides ENTRE deux voies, sous un rang —
@@ -426,6 +478,7 @@ export function miseEnPage(salle: Rect, vue: VueModule2d, forme: FormeModule = '
   const hauteur = Math.ceil((by1 - by0) * densite)
   return {
     forme,
+    biome,
     corps: { minX: X(xL), minY: Y(yT), maxX: X(xR), maxY: Y(yB) },
     largeur,
     hauteur,
@@ -434,7 +487,9 @@ export function miseEnPage(salle: Rect, vue: VueModule2d, forme: FormeModule = '
     silhouette: habille(contour).map((q) => ({ ...q, x: X(q.x), y: Y(q.y) })),
     salle: { minX: X(-0.5), maxX: X(0.5), minY: Y(-hr / 2), maxY: Y(hr / 2) },
     cellules,
+    ici: noeud(vue.rang, vue.voie),
     tubes,
+    raccords: [raccord.g, raccord.d].filter((t) => t !== undefined),
     machines: zonesMachines(forme, contour).map(([x0, y0, x1, y1]) => ({ minX: X(x0), minY: Y(y0), maxX: X(x1), maxY: Y(y1) })),
     elements,
     details,
@@ -471,14 +526,27 @@ export function centreCellule(salle: Rect, vue: VueModule2d, r: number, v: numbe
 // Rétrécir et grossir durent autant : avec 0,55 s d'un côté et 0,8 s de
 // l'autre, les deux moitiés ne se répondaient pas (aperçu du 05/10)
 export const TRANSITION = { retrecit: 0.7, glisse: 0.7, grossit: 0.7, revele: 0.35 }
+/** la durée d'une transition vers la salle VOISINE (un seul saut) */
 export const DUREE_TRANSITION = TRANSITION.retrecit + TRANSITION.glisse + TRANSITION.grossit + TRANSITION.revele
+// chaque case traversée sans salle (une rencontre, une halte) allonge la
+// glissade de 60 % : deux sauts à la durée d'un seul filaient trop vite pour
+// qu'on reconnaisse la case par où l'on passe
+const PART_ETAPE = 0.6
 // le module vu pendant la glissade : la salle y tient 20 % du plan large
 // (à 30 %, le module ne se voyait presque pas autour des deux cellules)
 const ZOOM_MODULE = 0.2
 
+type Pt = { x: number; y: number }
+
 export interface ParamsTransition {
   /** la cellule de la salle quittée, dans le monde */
-  de: { x: number; y: number }
+  de: Pt
+  /** LES CASES TRAVERSÉES SANS SALLE entre les deux — une rencontre, une
+   *  alcôve, une cache : la glissade passe par elles, dans l'ordre. Avant,
+   *  deux rangs franchis d'un coup coupaient la transition tout court
+   *  (transitionPermise) : après un « ? », la salle suivante surgissait sans
+   *  qu'on voie d'où l'on venait (le concepteur, 10/11) */
+  par?: readonly Pt[]
   /** la nouvelle salle, coque comprise */
   salle: Rect
   /** le zoom du plan large sur la nouvelle salle (celui du plan d'ouverture) */
@@ -490,8 +558,15 @@ export interface EtatTransition {
   /** la cellule qui couvre la nouvelle salle : où, et à quel point elle la cache */
   couvre: Rect
   opacite: number
-  /** la salle quittée, qui rétrécit jusqu'à sa cellule */
-  depart: Rect
+  /** la salle quittée, qui rétrécit jusqu'à sa cellule — null : on n'en quitte
+   *  aucune (l'entrée dans un module) */
+  depart: Rect | null
+  /** L'OMBRE DE LA SALLE sur le décor (module2dShader), de 0 à 1. Tant que la
+   *  salle n'est qu'une cellule, elle n'en porte pas : laissée, l'ombre
+   *  cernait un rectangle de tôle claire de la taille de la salle, la
+   *  cellule perdue au milieu — un fantôme de salle pendant toute la
+   *  glissade (banc du 10/11). Elle revient avec la salle. */
+  ombre: number
 }
 
 const doux = (t: number) => {
@@ -500,16 +575,44 @@ const doux = (t: number) => {
 }
 const mix = (a: number, b: number, t: number) => a + (b - a) * t
 const mixLog = (a: number, b: number, t: number) => Math.exp(mix(Math.log(a), Math.log(b), t))
+const autour = (c: Pt, l: number, h: number): Rect => ({ minX: c.x - l / 2, maxX: c.x + l / 2, minY: c.y - h / 2, maxY: c.y + h / 2 })
+const centre = (r: Rect): Pt => ({ x: (r.minX + r.maxX) / 2, y: (r.minY + r.maxY) / 2 })
+/** la salle ramenée à une cellule (e = 1) ou à sa taille (e = 0) : tailles en
+ *  courbe logarithmique, comme le zoom qui les accompagne */
+function taille(salle: Rect, e: number, c: Pt): Rect {
+  const R = salle.maxX - salle.minX
+  const cl = CELLULE_L * R
+  return autour(c, mixLog(R, cl, e), mixLog(salle.maxY - salle.minY, cl / 1.5, e))
+}
+
+/** La durée de la glissade : un saut, plus une part par case traversée. */
+function dureeGlisse(p: ParamsTransition): number {
+  return TRANSITION.glisse * (1 + PART_ETAPE * (p.par?.length ?? 0))
+}
+/** La durée de TOUTE la transition (DUREE_TRANSITION pour un seul saut). */
+export function dureeTransition(p: ParamsTransition): number {
+  return TRANSITION.retrecit + dureeGlisse(p) + TRANSITION.grossit + TRANSITION.revele
+}
+
+/** LA GLISSADE SUIT LES TUBES : d'une case à la suivante, la vue quitte la
+ *  première et aborde la seconde À L'HORIZONTALE, comme le tube qui les
+ *  relie, et change de voie entre les deux — en ligne droite, elle coupait
+ *  de biais à travers la tôle, et cassait sa course à chaque case traversée.
+ *  `e` : l'avancée sur tout le trajet, 0 → 1. */
+function surLeChemin(pts: readonly Pt[], e: number): Pt {
+  const n = pts.length - 1
+  const f = Math.min(n, Math.max(0, e * n))
+  const i = Math.min(n - 1, Math.floor(f))
+  const k = f - i
+  return { x: mix(pts[i].x, pts[i + 1].x, k), y: mix(pts[i].y, pts[i + 1].y, doux(k)) }
+}
 
 /** L'état de la transition à l'instant t (secondes depuis son début). */
-export function etatTransition(t: number, p: ParamsTransition): EtatTransition {
-  const { retrecit, glisse, grossit, revele } = TRANSITION
-  const R = p.salle.maxX - p.salle.minX
-  const H = p.salle.maxY - p.salle.minY
-  const a = { x: (p.salle.minX + p.salle.maxX) / 2, y: (p.salle.minY + p.salle.maxY) / 2 }
+export function etatTransition(t: number, p: ParamsTransition): EtatTransition & { depart: Rect } {
+  const { retrecit, grossit, revele } = TRANSITION
+  const glisse = dureeGlisse(p)
+  const a = centre(p.salle)
   const zModule = p.zoomSalle * ZOOM_MODULE
-  const cl = CELLULE_L * R
-  const autour = (c: { x: number; y: number }, l: number, h: number): Rect => ({ minX: c.x - l / 2, maxX: c.x + l / 2, minY: c.y - h / 2, maxY: c.y + h / 2 })
   // LES DEUX MOITIÉS SONT LE MÊME GESTE, à l'endroit puis à l'envers : la
   // salle quittée rétrécit DANS LE MONDE jusqu'à sa cellule pendant que la
   // caméra recule, la cellule choisie grossit jusqu'à la salle pendant
@@ -518,31 +621,76 @@ export function etatTransition(t: number, p: ParamsTransition): EtatTransition {
   // partait zoomée 3,3 fois : le décor sautait au premier instant puis
   // filait, quand la seconde moitié grossissait la cellule en ligne droite
   // sous un zoom en courbe — les deux ne se répondaient pas (aperçu du 05/10)
-  const taille = (e: number, c: { x: number; y: number }) => autour(c, mixLog(R, cl, e), mixLog(H, cl / 1.5, e))
   const t1 = retrecit
   const t2 = t1 + glisse
   const t3 = t2 + grossit
   let camera: EtatTransition['camera']
-  let depart = taille(1, p.de)
-  let couvre = taille(1, a)
+  let depart = taille(p.salle, 1, p.de)
+  let couvre = taille(p.salle, 1, a)
   let opacite = 1
   if (t < t1) {
     const e = doux(t / retrecit)
     camera = { ...p.de, zoom: mixLog(p.zoomSalle, zModule, e) }
-    depart = taille(e, p.de)
+    depart = taille(p.salle, e, p.de)
   } else if (t < t2) {
-    const e = doux((t - t1) / glisse)
-    camera = { x: mix(p.de.x, a.x, e), y: mix(p.de.y, a.y, e), zoom: zModule }
+    camera = { ...surLeChemin([p.de, ...(p.par ?? []), a], doux((t - t1) / glisse)), zoom: zModule }
   } else if (t < t3) {
     const e = 1 - doux((t - t2) / grossit)
     camera = { ...a, zoom: mixLog(p.zoomSalle, zModule, e) }
-    couvre = taille(e, a)
+    couvre = taille(p.salle, e, a)
   } else {
     camera = { ...a, zoom: p.zoomSalle }
     couvre = p.salle
     opacite = 1 - doux((t - t3) / revele)
   }
-  return { camera, couvre, opacite, depart }
+  return { camera, couvre, opacite, depart, ombre: 1 - opacite }
+}
+
+// L'ENTRÉE DANS UN MODULE : le plan d'ensemble. On arrivait dans la première
+// salle sans avoir vu le module — sa forme, ses voies, ce qu'il recèle ne se
+// découvraient qu'en reculant à la main, si l'on savait que c'était possible.
+// Le module entier tient l'écran un instant, puis la vue plonge sur la
+// cellule où l'on entre, qui grossit jusqu'à la salle : le même geste que la
+// fin d'une transition, parti de plus loin.
+export const ENTREE = { tenue: 0.9, plonge: 1.2, revele: 0.35 }
+export const DUREE_ENTREE = ENTREE.tenue + ENTREE.plonge + ENTREE.revele
+
+export interface ParamsEntree {
+  /** le module entier, dans le monde */
+  module: Rect
+  /** le zoom qui le montre en entier (zoomEnsemble) */
+  zoomModule: number
+  salle: Rect
+  zoomSalle: number
+}
+
+/** Le zoom qui montre le module entier à l'écran, avec sa marge — jamais
+ *  plus près que la moitié du plan large de la salle : un module si court
+ *  qu'il tiendrait presque à ce zoom n'aurait pas de plongée. */
+export function zoomEnsemble(module: Rect, ecranL: number, ecranH: number, zoomSalle: number): number {
+  return Math.min(zoomSalle * 0.5, Math.min(ecranL / (module.maxX - module.minX), ecranH / (module.maxY - module.minY)) * 0.94)
+}
+
+export function etatEntree(t: number, p: ParamsEntree): EtatTransition {
+  const { tenue, plonge, revele } = ENTREE
+  const a = centre(p.salle)
+  const m = centre(p.module)
+  if (t < tenue + plonge) {
+    // pendant la tenue, une poussée de 4 % : un plan fixe d'une seconde
+    // ressemblait à un arrêt sur image
+    const z0 = p.zoomModule * 1.04
+    if (t < tenue) return { camera: { ...m, zoom: mixLog(p.zoomModule, z0, t / tenue) }, couvre: taille(p.salle, 1, a), opacite: 1, depart: null, ombre: 0 }
+    const e = doux((t - tenue) / plonge)
+    const zoom = mixLog(z0, p.zoomSalle, e)
+    // LA SALLE VISÉE GLISSE VERS LE CENTRE DE L'ÉCRAN EN LIGNE DROITE : sa
+    // distance À L'ÉCRAN décroît de façon linéaire. Mêler la position dans le
+    // monde pendant que le zoom décuple l'envoyait d'abord vers le bord —
+    // (a − m)(1 − e) × zoom grandit tant que le zoom gagne plus vite
+    const k = ((1 - e) * z0) / zoom
+    return { camera: { x: a.x + (m.x - a.x) * k, y: a.y + (m.y - a.y) * k, zoom }, couvre: taille(p.salle, 1 - e, a), opacite: 1, depart: null, ombre: 0 }
+  }
+  const opacite = 1 - doux((t - tenue - plonge) / revele)
+  return { camera: { ...a, zoom: p.zoomSalle }, couvre: p.salle, opacite, depart: null, ombre: 1 - opacite }
 }
 
 /** Où se trouve une salle chargée : son module, son rang dans le module. */
@@ -551,14 +699,20 @@ export interface PositionSalle {
   niveau: number
 }
 
-/** LA TRANSITION NE JOUE que vers la salle SUIVANTE du même module : pas à un
- *  nouvel essai (même rang), ni à l'entrée d'un module, ni après une halte
- *  (deux rangs d'un coup). Les deux positions sont celles des salles AU
- *  CHARGEMENT — le jeu compte la salle franchie dès le sas, avant la
- *  cérémonie : une position relevée pendant la cérémonie avait déjà avancé,
- *  et la transition ne jouait jamais (aperçu du 02/10). */
-export function transitionPermise(avant: PositionSalle | null, apres: PositionSalle): boolean {
-  return avant !== null && avant.module === apres.module && apres.niveau === avant.niveau + 1
+/** QUELLE TRANSITION JOUE à l'arrivée dans une salle :
+ *  · `salle` — on vient d'une salle d'AVANT dans le même module : la voisine,
+ *    ou plus loin quand une rencontre ou une halte s'est glissée entre les
+ *    deux (elles franchissent un rang sans salle) ;
+ *  · `entree` — on entre dans le module (un autre module, ou la première
+ *    salle chargée) : le plan d'ensemble ;
+ *  · `aucune` — un nouvel essai de la même salle.
+ *  Les deux positions sont celles des salles AU CHARGEMENT — le jeu compte
+ *  la salle franchie dès le sas, avant la cérémonie : une position relevée
+ *  pendant la cérémonie avait déjà avancé, et la transition ne jouait jamais
+ *  (aperçu du 02/10). */
+export function genreTransition(avant: PositionSalle | null, apres: PositionSalle): 'salle' | 'entree' | 'aucune' {
+  if (avant === null || avant.module !== apres.module) return 'entree'
+  return apres.niveau > avant.niveau ? 'salle' : 'aucune'
 }
 
 // LA TOILE PROCHE : autour de la salle, une seconde toile plus fine — la
