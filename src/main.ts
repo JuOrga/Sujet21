@@ -330,6 +330,12 @@ import {
   etatEntree,
   etatTransition,
   fenetreProche,
+  fenetreVue,
+  vueCouverte,
+  suisCamera,
+  type FenetreMonde,
+  type SuiviCamera,
+  type MiseEnPage,
   formeDuBiome,
   genreTransition,
   miseEnPage,
@@ -1527,6 +1533,11 @@ let piecesModule2dDemandeesA = -Infinity
 let module2dCle = ''
 let module2dVersion = 0
 let module2dMonde: { monde: Rect2d; proche: Rect2d } | null = null
+// LA TOILE FINE SUIT LA VUE (module2d.ts, fenetreVue) : la mise en page de la
+// salle, la fenêtre fine en place, et depuis quand la caméra est arrêtée
+let module2dMp: MiseEnPage | null = null
+let module2dFenetre: FenetreMonde | null = null
+let module2dCam: SuiviCamera | null = null
 type Rect2d = { minX: number; minY: number; maxX: number; maxY: number }
 function demandePiecesModule2d(): void {
   const maintenant = performance.now()
@@ -1573,13 +1584,40 @@ function majModule2d(b: Rect2d): void {
     // de plusieurs dizaines de Mo par salle pesaient sur la mémoire (Safari)
     toile.width = toile.height = proche.width = proche.height = 0
     module2dMonde = { monde: mp.monde, proche: fp.monde }
+    module2dMp = mp
+    module2dFenetre = fp
   }
+  suisVueModule2d(b, avecCoque)
   if (module2dMonde) renderer.setModule2d({ version: module2dVersion, ...module2dMonde, salle: b, coque: avecCoque })
   // la transition en cours : la cellule qui grossit sur la salle
   const tt = camera.piloteT
   const etat = tt !== null && transition2d ? transition2d.etat(tt) : null
   renderer.setCouvertureModule2d(etat && transition2d ? { salle: transition2d.salle, ...etat } : null)
   voileEffets2d(etat ? etat.ombre : 1)
+}
+/** LA TOILE FINE SUIT LA VUE : la caméra posée, si la fenêtre fine ne couvre
+ *  plus ce que l'écran montre (on a dézoomé, ou glissé vers le dôme), une
+ *  autre se repeint sur la vue, à la finesse de l'écran. Pas pendant une
+ *  transition : la caméra y est pilotée, et la salle d'après repeindra. */
+function suisVueModule2d(salle: Rect2d, coque: Rect2d): void {
+  const mp = module2dMp
+  if (!mp || !piecesModule2d || !module2dMonde || camera.piloteT !== null) return
+  const dl = window.innerWidth / (2 * camera.zoom)
+  const dh = window.innerHeight / (2 * camera.zoom)
+  const { suivi, posee } = suisCamera(module2dCam, camera, dl, dh, performance.now())
+  module2dCam = suivi
+  if (!posee) return
+  const vue = { minX: camera.x - dl, maxX: camera.x + dl, minY: camera.y - dh, maxY: camera.y + dh }
+  // pixels PHYSIQUES par unité : la toile se lit à la densité de l'écran
+  const px = camera.zoom * (renderer.dprNatif || window.devicePixelRatio || 1)
+  if (vueCouverte(module2dFenetre, mp, vue, px)) return
+  const fv = fenetreVue(mp, vue, px)
+  if (!fv) return
+  const proche = peintModule2d(mp, piecesModule2d, fv)
+  module2dFenetre = fv
+  module2dMonde = { monde: module2dMonde.monde, proche: fv.monde }
+  renderer.setModule2d({ version: module2dVersion, ...module2dMonde, procheToile: proche, salle, coque })
+  proche.width = proche.height = 0
 }
 /** LA TOILE DES EFFETS SE TAIT SOUS LA COUVERTURE. Les faisceaux, les éclats
  *  de mémoire, les fantômes, les cadres des cachettes se dessinent sur une
