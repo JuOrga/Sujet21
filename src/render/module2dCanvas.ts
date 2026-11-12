@@ -36,6 +36,18 @@ export const PIECES_MODULE2D = [
   'tempere-colonne',
   'tempere-trappe',
   'tempere-machinerie',
+  'chaud-tole',
+  'chaud-tole-2',
+  'chaud-tole-machines',
+  'chaud-bord-haut',
+  'chaud-bord-bas',
+  'chaud-bout-gauche',
+  'chaud-bout-droit',
+  'chaud-baie',
+  'chaud-baie-2',
+  'chaud-colonne',
+  'chaud-trappe',
+  'chaud-machinerie',
   'detail-panneau',
   'detail-reparation',
   'detail-vanne',
@@ -235,6 +247,37 @@ const COLLIER = { gauche: 360, droite: 471, haut: 215, bas: 905, morsure: 70 }
 // tuyau et le treillis de la quille ; au-delà c'était l'ancienne tôle), et ce
 // qui dépasse dehors (les tuyères, sous la quille)
 const BANDE = { haut: { ligne: 307, dedans: 195, dehors: 7 }, bas: { ligne: 468, dedans: 150, dehors: 52 } }
+// LE JEU DE PIÈCES D'UN BIOME. La chaufferie a les siennes (12/11) : la
+// reteinte des pièces de la serre lui donnait la braise aux vitrages, mais
+// des cultures derrière les vitres et de la mousse en guise de rouille. Ses
+// pièces sortent d'une scène Blender, déjà à leurs couleurs — elles ne se
+// reteintent pas (la dominante [1,2 ; 0,96 ; 0,8] les réchaufferait deux
+// fois) — et à la même échelle livrée que les tempérées : seules leurs
+// ancres diffèrent (tools/images/coque2d.py, chaud ; 853 px par salle).
+export interface Jeu {
+  /** le préfixe de ses fichiers : coque2d-<prefixe>-<pièce>.webp */
+  prefixe: string
+  /** ses pièces passent-elles par la teinte du biome ? */
+  teinte: boolean
+  bande: typeof BANDE
+  collier: typeof COLLIER
+}
+const JEU_TEMPERE: Jeu = { prefixe: 'tempere', teinte: true, bande: BANDE, collier: COLLIER }
+const JEUX: Record<string, Jeu> = {
+  chaud: {
+    prefixe: 'chaud',
+    teinte: false,
+    // le rail des résistances : la ligne de coque à 0,04 salle du haut, tout
+    // le reste dedans ; la quille : 0,2 salle dedans, les tuyères 0,1 dehors
+    bande: { haut: { ligne: 34, dedans: 222, dehors: 0 }, bas: { ligne: 171, dedans: 171, dehors: 85 } },
+    // chaque image n'est QUE son collier : 0,44 salle dehors, 0,1 de morsure
+    collier: { gauche: 375, droite: 85, haut: 0, bas: 716, morsure: 85 },
+  },
+}
+/** les pièces de coque d'un biome : les siennes, sinon celles de la serre tempérée */
+export function jeuDuBiome(biome: string): Jeu {
+  return JEUX[biome] ?? JEU_TEMPERE
+}
 /** en deçà (largeurs de salle, goussets déduits), une arête garde le profilé nu */
 const BANDE_MIN = 0.55
 /** le côté d'un gousset : il couvre le bout des bandes (0,23 salle au plus haut) */
@@ -461,6 +504,9 @@ export function peintModule2d(mp: MiseEnPage, p: Pieces, fen?: Fenetre): HTMLCan
   const brut = (n: string): Img => p.get(n)!
   /** une pièce de la coque, à la teinte du biome */
   const img = (n: string): Img => pieceTeintee(p, n, th)
+  const jeu = jeuDuBiome(mp.biome)
+  /** une pièce du jeu du biome : reteintée si elle est d'emprunt, telle quelle si elle est à lui */
+  const coque = (n: string): Img => (jeu.teinte ? img(`${jeu.prefixe}-${n}`) : brut(`${jeu.prefixe}-${n}`))
   // 1. la tôle, dans la silhouette. Une variante par rangée, tirée au sort,
   // et chaque carreau retourné ou non : une rangée d'une seule variante
   // montrait le même motif ~8 fois d'affilée (analyse du 02/10). Le miroir
@@ -642,7 +688,7 @@ export function peintModule2d(mp: MiseEnPage, p: Pieces, fen?: Fenetre): HTMLCan
     c.save()
     contour()
     c.clip()
-    const toles = [img('tempere-tole'), img('tempere-tole-2')]
+    const toles = [coque('tole'), coque('tole-2')]
     const tl = toles[0].width * fi
     for (let i = 0, y = 0; y < mp.hauteur; i++, y += tl) {
       if (hors(0, y, mp.largeur, y + tl)) continue
@@ -658,7 +704,7 @@ export function peintModule2d(mp: MiseEnPage, p: Pieces, fen?: Fenetre): HTMLCan
       c.beginPath()
       c.rect(z.minX, z.minY, z.maxX - z.minX, z.maxY - z.minY)
       c.clip()
-      pave(img('tempere-tole-machines'), z.minX, z.minY, z.maxX, z.maxY, 101)
+      pave(coque('tole-machines'), z.minX, z.minY, z.maxX, z.maxY, 101)
       c.restore()
       c.strokeStyle = 'rgba(0,0,0,0.7)'
       c.lineWidth = 0.012 * D
@@ -674,7 +720,7 @@ export function peintModule2d(mp: MiseEnPage, p: Pieces, fen?: Fenetre): HTMLCan
     // les éléments uniques ; leurs vitrages débordent d'un halo à la lumière
     // du biome sur la tôle
     for (const e of mp.elements) {
-      const im = img(`tempere-${e.nom}`)
+      const im = coque(e.nom)
       const h = (e.l * im.height) / im.width
       const r = Math.max(e.l, h) * 0.6
       if (hors(e.x - r, e.y - r, e.x + r, e.y + r)) continue
@@ -891,13 +937,13 @@ export function peintModule2d(mp: MiseEnPage, p: Pieces, fen?: Fenetre): HTMLCan
     c.restore()
     // les bandes peintes débordent de la silhouette (les tuyères de la
     // quille) : elles se peignent sans découpe
-    const haut = img('tempere-bord-haut')
-    const bas = img('tempere-bord-bas')
+    const haut = coque('bord-haut')
+    const bas = coque('bord-bas')
     for (let i = 0; i < n; i++) {
       const a = S[i]
       const b = S[(i + 1) % n]
       const L = long(a, b)
-      const m = BANDE.haut.dedans * fi + e
+      const m = jeu.bande.haut.dedans * fi + e
       if (hors(Math.min(a.x, b.x) - m, Math.min(a.y, b.y) - m, Math.max(a.x, b.x) + m, Math.max(a.y, b.y) + m)) continue
       // À UN ANGLE RENTRANT, l'arête va jusqu'au sommet : son gousset est de
       // l'autre côté, dans le coin de tôle que les deux bandes encadrent. La
@@ -913,7 +959,7 @@ export function peintModule2d(mp: MiseEnPage, p: Pieces, fen?: Fenetre): HTMLCan
         // y vers le bas de l'image. Le bord haut est peint le dehors en haut ;
         // la quille le dehors en bas, et se tourne d'un quart de tour pour
         // habiller un flanc (le dehors à gauche, ou à droite)
-        const B = sens === 'haut' ? BANDE.haut : BANDE.bas
+        const B = sens === 'haut' ? jeu.bande.haut : jeu.bande.bas
         const im = sens === 'haut' ? haut : bas
         // l'origine : le bout de l'arête d'où part l'axe x de l'image
         const [o, og, fg] = sens === 'haut' ? [a, g0, g1] : [b, g1, g0]
@@ -1088,19 +1134,19 @@ export function peintModule2d(mp: MiseEnPage, p: Pieces, fen?: Fenetre): HTMLCan
     // pris dans les pièces de bout : seulement ce qui dépasse de la coque, et
     // la bride qui la mord. Le reste de ces pièces (une colonne de l'ancienne
     // tôle) ne se peint plus
-    const hc = (COLLIER.bas - COLLIER.haut) * fi
+    const hc = (jeu.collier.bas - jeu.collier.haut) * fi
     for (const cote of ['gauche', 'droite'] as const) {
       const pt = mp.colliers[cote]
-      const im = brut(cote === 'gauche' ? 'tempere-bout-gauche' : 'tempere-bout-droit')
+      const im = brut(`${jeu.prefixe}-bout-${cote === 'gauche' ? 'gauche' : 'droit'}`)
       // sur un bord plus court que le collier (le nez du fuseau), il rétrécit
       const k = Math.min(1, (pt.h * 1.5) / hc)
-      const morsure = COLLIER.morsure * fi * k
-      const dehors = (cote === 'gauche' ? COLLIER.gauche : im.width - COLLIER.droite) * fi * k
+      const morsure = jeu.collier.morsure * fi * k
+      const dehors = (cote === 'gauche' ? jeu.collier.gauche : im.width - jeu.collier.droite) * fi * k
       const x0 = cote === 'gauche' ? pt.x - dehors : pt.x - morsure
       if (hors(x0, pt.y - (hc * k) / 2, x0 + dehors + morsure, pt.y + (hc * k) / 2)) continue
-      const sx = cote === 'gauche' ? 0 : COLLIER.droite - COLLIER.morsure
-      const sw = (cote === 'gauche' ? COLLIER.gauche : im.width - COLLIER.droite) + COLLIER.morsure
-      c.drawImage(im, sx, COLLIER.haut, sw, COLLIER.bas - COLLIER.haut, x0, pt.y - (hc * k) / 2, dehors + morsure, hc * k)
+      const sx = cote === 'gauche' ? 0 : jeu.collier.droite - jeu.collier.morsure
+      const sw = (cote === 'gauche' ? jeu.collier.gauche : im.width - jeu.collier.droite) + jeu.collier.morsure
+      c.drawImage(im, sx, jeu.collier.haut, sw, jeu.collier.bas - jeu.collier.haut, x0, pt.y - (hc * k) / 2, dehors + morsure, hc * k)
     }
   }
 }

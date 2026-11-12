@@ -2171,6 +2171,38 @@ décalait le premier pixel, et chaque jonction bord|cœur ou haut|bande
 faisait couture (relecture du 06/10 : écart 13 à 28 contre 3 à 8 dans une
 pièce ; après, toutes les jonctions au niveau du raccord cœur|cœur).
 
-**À venir** : les pièces propres de chaque module (la chaufferie et le
-cryo prennent celles de la serre en attendant) ; une deuxième variante de
-baie et de trappe.
+**La chaufferie a ses pièces (12/11)** : reteintée, elle gardait des
+cultures derrière ses vitres et de la mousse en guise de rouille. Ses douze
+pièces ne sortent pas d'un générateur mais d'une scène Blender, modélisée
+par script (`tools/images/blender/chaud_biome.py`, qui charge
+`chaud_tole.py` ; rendu Cycles) : vue orthographique de face, deux soleils
+froids (un du haut à 50°, un débouché partagé entre la face et le dessous),
+fond noir, **1024 px par largeur de salle pour toutes** — même caméra, seul
+le cadrage change. Les tôles et les bords se raccordent par construction :
+le bruit des matières est pris sur un tore, le carreau est rendu au milieu
+de ses copies, et une marge de 64 px est rognée. `python3
+tools/images/coque2d.py chaud` les ramène à 853 px par salle (l'échelle
+livrée des pièces tempérées), assombrit la coque à la luminance de la tôle
+tempérée (0,083 contre 0,085, mesuré) sans éteindre ce qui luit, et lit le
+détourage dans la couche alpha du rendu. Douze images, 240 Ko. Le moteur
+choisit le jeu par biome (`module2dCanvas.ts`, `JEUX`) : ses pièces ne se
+reteintent pas, et ses ancres (ligne de coque des bords, colliers) sont les
+siennes ; les petits détails et les équipements restent communs.
+
+| pièce de la chaufferie | état |
+| --- | --- |
+| tôle (deux tirages), tôle de la salle des machines | ✅ livrées 12/11 |
+| bord haut (rail de résistances), bord bas (quille à tuyères), période de deux salles | ✅ livrés 12/11 |
+| collier d'entrée, sas de sortie | ✅ livrés 12/11 |
+| baie de résistances, rangée de regards, colonne d'échangeur | ✅ livrées 12/11 |
+| trappe de foyer, machinerie (deux ballons, un corps de chauffe) | ✅ livrées 12/11 |
+
+Refaire une pièce : ouvrir Blender, `DOSSIER = r'…/tools/images/blender'`,
+exécuter `chaud_biome.py`, puis `biome()` et `lance([...], sortie)` ; copier
+`chaud-*.png` et `alpha/` dans `masters/images/coque2d/`, relancer
+`coque2d.py chaud`. Les ancres de chaque pièce, en largeurs de salle, sont
+dans le `journal.jsonl` que le rendu écrit.
+
+**À venir** : les pièces propres du cryo, de l'antichambre et de
+l'observatoire (ils prennent celles de la serre en attendant) ; une
+deuxième variante de baie et de trappe.
