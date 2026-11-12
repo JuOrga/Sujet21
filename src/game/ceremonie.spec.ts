@@ -9,6 +9,7 @@ import {
   SEUILS_RANG,
   sortieDouce,
   TEMPS_BILAN,
+  titreDuTirage,
 } from './ceremonie'
 
 describe('le rang d’une salle', () => {
@@ -110,6 +111,28 @@ describe('le mot de la note', () => {
   it('monte avec la note', () => {
     const mots = [0, 80, 180, 300].map(motDeNote)
     expect(new Set(mots).size).toBe(4)
+  })
+})
+
+describe('le titre d’un tirage', () => {
+  it('numérote le palier qu’on vient de franchir', () => {
+    expect(titreDuTirage(1, 1, false)).toBe('PALIER DE MAÎTRISE 1 — EMPORTEZ UN INSTRUMENT')
+    // deux paliers d'un coup : le premier tirage est celui du palier 2, puis le 3
+    expect(titreDuTirage(3, 2, false)).toContain('PALIER DE MAÎTRISE 2')
+    expect(titreDuTirage(3, 1, false)).toContain('PALIER DE MAÎTRISE 3')
+  })
+
+  it('n’appelle pas « palier 0 » le tirage garanti d’une salle scellée', () => {
+    // la panne : aucun palier franchi, un tirage garanti → « PALIER DE MAÎTRISE 0 »
+    const t = titreDuTirage(0, 1, true)
+    expect(t).not.toContain('PALIER')
+    expect(t).toContain('TIRAGE GARANTI')
+  })
+
+  it('sert les paliers d’abord, le tirage garanti en dernier, sans décaler les numéros', () => {
+    // un palier franchi (le 2) ET une salle scellée : deux tirages
+    expect(titreDuTirage(2, 2, true)).toContain('PALIER DE MAÎTRISE 2')
+    expect(titreDuTirage(2, 1, true)).toContain('TIRAGE GARANTI')
   })
 })
 
