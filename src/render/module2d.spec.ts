@@ -10,6 +10,7 @@ import {
   RATIO_COLONNE,
   DUREE_ENTREE,
   DUREE_TRANSITION,
+  DENSITE_PROCHE,
   ENTREE,
   TOILE_MAX,
   TRANSITION,
@@ -18,9 +19,14 @@ import {
   etatEntree,
   etatTransition,
   etats,
+  fenetreProche,
+  fenetreVue,
   formeDuBiome,
   genreTransition,
   miseEnPage,
+  vueCouverte,
+  suisCamera,
+  VUE_POSEE_MS,
   vueGenerique,
   zoomEnsemble,
   type VueModule2d,
@@ -538,5 +544,115 @@ describe('module 2D — les pièces de la serre', () => {
       expect(m.machines).toEqual([])
       expect(m.largeur).toBeLessThanOrEqual(TOILE_MAX + 1)
     }
+  })
+})
+
+// LA TOILE FINE SUIT LA VUE (capture du 13/11) : nette près du tableau, floue
+// au dôme et aux étagères du bas dès qu'on dézoomait ou déplaçait la vue — la
+// toile fine ne couvrait que la salle ± 0,6, au-delà la toile grossière
+// (360 px par salle) s'agrandissait près de deux fois.
+describe('module 2D — la toile fine suit la vue', () => {
+  const mp = miseEnPage(salle, vue, 'cylindre', 'serre')
+  const R = salle.maxX - salle.minX
+  /** la vue d'un écran de l × h pixels, centrée en (x, y), à px pixels par unité */
+  const vueEcran = (x: number, y: number, px: number, l = 1920, h = 1080) => ({
+    minX: x - l / 2 / px,
+    maxX: x + l / 2 / px,
+    minY: y - h / 2 / px,
+    maxY: y + h / 2 / px,
+  })
+  /** pixels de toile par unité monde dans une fenêtre */
+  const finesse = (f: { k: number }) => (f.k * mp.largeur) / (mp.monde.maxX - mp.monde.minX)
+  const contient = (a: { minX: number; minY: number; maxX: number; maxY: number }, b: typeof a) =>
+    a.minX <= b.minX + 1e-6 && a.minY <= b.minY + 1e-6 && a.maxX >= b.maxX - 1e-6 && a.maxY >= b.maxY - 1e-6
+
+  it('le module entier à l’écran : la fenêtre le couvre, à la finesse de l’écran', () => {
+    // la salle à ~650 px d'écran : la toile grossière y était agrandie ×1,8
+    const px = 650 / R
+    const v = vueEcran(0, 0, px)
+    const f = fenetreVue(mp, v, px)!
+    expect(f).not.toBeNull()
+    const vu = { minX: Math.max(v.minX, mp.monde.minX), maxX: Math.min(v.maxX, mp.monde.maxX), minY: Math.max(v.minY, mp.monde.minY), maxY: Math.min(v.maxY, mp.monde.maxY) }
+    expect(contient(f.monde, vu)).toBe(true)
+    // au moins la finesse de l'écran, à peine plus (le grain se perd au-delà)
+    expect(finesse(f)).toBeGreaterThanOrEqual(px)
+    expect(finesse(f)).toBeLessThan(px * 1.2)
+    expect(f.l * f.k).toBeLessThanOrEqual(TOILE_MAX + 1e-6)
+    expect(f.h * f.k).toBeLessThanOrEqual(TOILE_MAX + 1e-6)
+  })
+
+  it('jamais plus fine que les pièces, jamais plus de TOILE_MAX de côté', () => {
+    // tout près : l'écran demande plus que les sources n'ont
+    const f = fenetreVue(mp, vueEcran(0, 0, 3000 / R), 3000 / R)!
+    expect(f.k).toBeCloseTo(DENSITE_PROCHE / mp.densite, 6)
+    // un écran 4K, le module entier : bornée par TOILE_MAX
+    const g = fenetreVue(mp, vueEcran(0, 0, 1300 / R, 3840, 2160), 1300 / R)!
+    expect(Math.max(g.l * g.k, g.h * g.k)).toBeLessThanOrEqual(TOILE_MAX + 1e-6)
+  })
+
+  it('hors de la toile, ou quand la toile entière suffit : pas de fenêtre', () => {
+    expect(fenetreVue(mp, vueEcran(mp.monde.maxX + 50 * R, 0, 1), 1)).toBeNull()
+    // la salle à 200 px d'écran : la toile de base (360 px par salle) suffit
+    expect(fenetreVue(mp, vueEcran(0, 0, 200 / R), 200 / R)).toBeNull()
+  })
+
+  it('la toile proche couvre le tableau en plein écran ; pas le module dézoomé', () => {
+    const fp = fenetreProche(mp)
+    const pres = 1900 / R
+    expect(vueCouverte(fp, mp, vueEcran(0, 0, pres), pres)).toBe(true)
+    const loin = 650 / R
+    expect(vueCouverte(fp, mp, vueEcran(0, 0, loin), loin)).toBe(false)
+    // ni une vue décentrée vers le dôme, même de près
+    expect(vueCouverte(fp, mp, vueEcran(mp.monde.minX + 0.3 * R, 0, pres), pres)).toBe(false)
+  })
+
+  it('une fois repeinte, la vue est couverte — pas de repeinte en boucle', () => {
+    for (const [x, px] of [
+      [0, 650 / R],
+      [mp.monde.minX + 0.3 * R, 1900 / R],
+      [mp.monde.maxX, 900 / R],
+      [0, 1300 / R],
+    ]) {
+      const v = vueEcran(x, 0, px)
+      const f = fenetreVue(mp, v, px)
+      expect(f).not.toBeNull()
+      expect(vueCouverte(f, mp, v, px)).toBe(true)
+      // un léger glissement (5 % de l'écran) ne repeint pas
+      const dx = (0.05 * 1920) / px
+      expect(vueCouverte(f, mp, { ...v, minX: v.minX + dx, maxX: v.maxX + dx }, px)).toBe(true)
+    }
+  })
+
+  it('dézoomée puis rezoomée : la fenêtre trop grossière se repeint', () => {
+    const loin = 650 / R
+    const f = fenetreVue(mp, vueEcran(0, 0, loin), loin)
+    const pres = 1900 / R
+    expect(vueCouverte(f, mp, vueEcran(0, 0, pres), pres)).toBe(false)
+  })
+
+  it('sans fenêtre fine, une vue qui en demande une n’est pas couverte', () => {
+    expect(vueCouverte(null, mp, vueEcran(0, 0, 650 / R), 650 / R)).toBe(false)
+    expect(vueCouverte(null, mp, vueEcran(0, 0, 200 / R), 200 / R)).toBe(true)
+  })
+})
+
+describe('module 2D — la vue posée', () => {
+  it('une caméra qui frémit avec le corps est posée au bout de VUE_POSEE_MS', () => {
+    // le corps est un fluide : la caméra qui le suit bouge d'un rien à chaque image
+    let s = suisCamera(null, { x: 0, y: 0, zoom: 1 }, 960, 540, 0).suivi
+    let posee = false
+    for (let t = 16, i = 0; t <= VUE_POSEE_MS + 50; t += 16, i++) {
+      const r = suisCamera(s, { x: (i % 2) * 0.5, y: (i % 3) * 0.3, zoom: 1 + (i % 2) * 1e-4 }, 960, 540, t)
+      s = r.suivi
+      posee ||= r.posee
+    }
+    expect(posee).toBe(true)
+  })
+  it('un glissement ou une molette remet le compte à zéro', () => {
+    const s = suisCamera(null, { x: 0, y: 0, zoom: 1 }, 960, 540, 0).suivi
+    expect(suisCamera(s, { x: 30, y: 0, zoom: 1 }, 960, 540, 1000).posee).toBe(false)
+    expect(suisCamera(s, { x: 0, y: 0, zoom: 1.05 }, 960, 540, 1000).posee).toBe(false)
+    expect(suisCamera(s, { x: 0, y: 0, zoom: 1 }, 960, 540, VUE_POSEE_MS - 1).posee).toBe(false)
+    expect(suisCamera(s, { x: 0, y: 0, zoom: 1 }, 960, 540, VUE_POSEE_MS).posee).toBe(true)
   })
 })
