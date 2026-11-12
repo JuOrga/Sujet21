@@ -3,9 +3,8 @@
 
 Les sources, déposées dans masters/images/coque2d/ (non versionné, comme les
 autres masters) : la tôle (deux variantes), les bords haut et bas, les deux
-bouts, les quatre coins, les deux angles rentrants, la baie, la trappe, la
-machinerie, la cellule de la mini-carte, la planche des équipements et le
-couloir. Le moteur les lit dans public/assets/coque2d-*.webp
+bouts, la baie, la trappe, la machinerie, la cellule de la mini-carte, la
+planche des équipements et le couloir. Le moteur les lit dans public/assets/coque2d-*.webp
 (render/module2d.ts, render/module2dCanvas.ts).
 
 · TOUT À 80 % : les sources font 1024 à 1536 px. La moitié suffisait au
@@ -17,10 +16,8 @@ couloir. Le moteur les lit dans public/assets/coque2d-*.webp
   (maquette du 01/10 : la machinerie « fantôme »).
 · LA COQUE ASSOMBRIE d'un quart : la salle jouée et les cellules doivent
   rester ce qui se lit en premier (maquette v0).
-· LA CELLULE EN QUATRE ÉTATS, précalculés : jouée (grise), joignable
-  maintenant (ambre, lampes allumées), joignable plus loin (bleue), fermée
-  (éteinte, croix) — le moteur n'a qu'à choisir l'image ; et neutre, celle
-  qui grossit jusqu'à la salle pendant la transition.
+· LA CELLULE, NEUTRE : ses états (jouée, joignable maintenant, plus loin,
+  fermée) et l'icône de son nœud se peignent dans le moteur.
 · LE CORPS DE CHAQUE BOUT, sans son collier : une bande prise en haut de
   l'image, qui se répète le long d'un bord vertical de n'importe quelle
   hauteur.
@@ -142,49 +139,20 @@ def sombre(a: np.ndarray, k: float) -> np.ndarray:
 
 
 def cellule(source: str = 'cellule', prefixe: str = 'cellule', capsule: bool = False) -> None:
-    """capsule : la capsule de culture de la serre, détourée (fond
-    transparent) — pas de cadre rectangulaire à l'ambre, et la croix de la
-    salle fermée tenue dans le vitrage."""
+    """La cellule NEUTRE, seule : l'état (jouée, joignable, fermée), son
+    liseré et l'icône de son nœud se peignent dans le moteur
+    (render/module2dCanvas.ts, peintCellule) — les quatre images d'état
+    précalculées portaient leurs lampes en aplats ovales et ne disaient rien
+    du nœud (10/11).
+
+    capsule : la capsule de culture de la serre, détourée (fond transparent)."""
     a = lit(source)
+    im = Image.fromarray((np.clip(a, 0, 1) * 255).astype(np.uint8)).convert('RGBA')
     if capsule:
         r = detoure(a, rogne=True)
-        a, alpha = r[..., :3], r[..., 3:]
-    gris = a.mean(2, keepdims=True)
-    h, w = a.shape[:2]
-    for etat in ('joue', 'ambre', 'bleu', 'ferme', 'neutre'):
-        if etat == 'neutre':
-            # celle qui grossit jusqu'à la salle pendant la transition : ses
-            # lampes allumées, à cette taille, faisaient deux taches orange
-            c = a
-        elif etat == 'joue':
-            c = (gris * 0.9 + a * 0.1) * 0.95
-        elif etat == 'ferme':
-            c = np.repeat(gris * 0.35, 3, axis=2)
-        elif etat == 'ambre':
-            c = a * 1.25 + np.array([0.16, 0.09, 0.02]) * (gris / 0.24)
-        else:
-            c = a * 1.05 + np.array([0, 0.04, 0.09]) * (gris / 0.24)
-        im = Image.fromarray((np.clip(c, 0, 1) * 255).astype(np.uint8)).convert('RGBA')
-        if capsule:
-            im.putalpha(Image.fromarray((alpha[..., 0] * 255).astype(np.uint8)))
-        d = ImageDraw.Draw(im)
-        if etat in ('ambre', 'bleu'):
-            # les deux lampes du cadre (x 23,5 % et 76,5 %, y 5,5 %) s'allument
-            col = (255, 170, 70) if etat == 'ambre' else (110, 190, 240)
-            halo = Image.new('RGBA', im.size, (0, 0, 0, 0))
-            dh = ImageDraw.Draw(halo)
-            for fx in (0.235, 0.765):
-                cx, cy = fx * w, 0.055 * h
-                dh.ellipse((cx - w * 0.07, cy - h * 0.05, cx + w * 0.07, cy + h * 0.05), fill=col + (255,))
-            im.alpha_composite(halo.filter(ImageFilter.GaussianBlur(12)))
-            im.alpha_composite(halo.filter(ImageFilter.GaussianBlur(4)))
-            if etat == 'ambre' and not capsule:
-                d.rectangle((6, 6, w - 7, h - 7), outline=col + (200,), width=14)
-        if etat == 'ferme':
-            x0, y0, x1, y1 = (0.15 * w, 0.22 * h, 0.85 * w, 0.78 * h) if capsule else (60, 60, w - 60, h - 60)
-            d.line((x0, y0, x1, y1), fill=(130, 55, 48, 255), width=26)
-            d.line((x0, y1, x1, y0), fill=(130, 55, 48, 255), width=26)
-        ecrit(f'{prefixe}-{etat}', np.asarray(im).astype(float) / 255)
+        im = Image.fromarray((np.clip(r[..., :3], 0, 1) * 255).astype(np.uint8)).convert('RGBA')
+        im.putalpha(Image.fromarray((r[..., 3] * 255).astype(np.uint8)))
+    ecrit(f'{prefixe}-neutre', np.asarray(im).astype(float) / 255)
 
 
 # la planche des équipements (livrée le 01/10, 1536 × 1024) : chaque élément
@@ -267,12 +235,11 @@ def main() -> None:
     b = 'tempere-'
     for n in ('tole', 'tole-2', 'tole-machines'):
         ecrit(f'{b}{n}', sombre(raccorde(lit(b + n)), SOMBRE_COQUE))
-    for n in ('bord-haut', 'bord-bas', 'bout-gauche', 'bout-droit', 'coin-haut-gauche', 'coin-bas-gauche',
-              'coin-bas-droit', 'rentrant-haut', 'rentrant-bas'):
+    # les bords et les bouts ; les coins et les angles rentrants ne se livrent
+    # plus — peints à d'autres échelles que les bords, ils ne s'y raccordaient
+    # pas : le moteur dessine un gousset à chaque sommet (module2dCanvas.ts)
+    for n in ('bord-haut', 'bord-bas', 'bout-gauche', 'bout-droit'):
         ecrit(f'{b}{n}', sombre(detoure(lit(b + n)), SOMBRE_COQUE))
-    # le coin haut-droit : le haut-gauche en miroir (le générateur a rendu
-    # deux fois le même coin)
-    ecrit(f'{b}coin-haut-droit', sombre(detoure(lit(b + 'coin-haut-gauche')[:, ::-1]), SOMBRE_COQUE))
     for n in ('baie', 'baie-2', 'colonne', 'trappe', 'machinerie'):
         ecrit(f'{b}{n}', sombre(detoure(lit(b + n), rogne=True), SOMBRE_COQUE))
     cellule()

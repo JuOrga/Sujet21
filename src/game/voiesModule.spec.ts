@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { aleaDeGraine } from './voie'
-import { cheminDePorte, ditNoeud, dessinMiniCarteSVG, fermeParPorte, REPERES_VOIE, portesDuRang, tisseMiniCarte, TISSAGE_DEFAUT, typesDuModule, VOIES, type MiniCarte } from './voiesModule'
+import { cheminDePorte, ditNoeud, dessinMiniCarteSVG, fermeParPorte, ICONES_MINI_CARTE, ICONES_NOEUD, iconeDuNoeud, REPERES_VOIE, portesDuRang, tisseMiniCarte, TISSAGE_DEFAUT, typesDuModule, VOIES, type MiniCarte, type NoeudVoie } from './voiesModule'
 
 // SANS HALTE par défaut : les tests des salles et des rencontres regardent la
 // grille nue ; les haltes ont leur propre bloc
@@ -407,5 +407,41 @@ describe('cheminDePorte — ce que le survol d’une porte allume', () => {
     expect(ditNoeud(mc.rangs[0][0])).toBe('salle · eau')
     expect(ditNoeud({ ...mc.rangs[0][0], prime: 'tirage' })).toContain('PRIME : tirage garanti')
     expect(ditNoeud({ ...mc.rangs[0][0], nature: 'evenement' })).toBe('une rencontre — on ne sait pas laquelle')
+  })
+})
+
+describe('les icônes des nœuds — un seul vocabulaire pour la cérémonie et le module en 2D', () => {
+  const noeud = (n: Partial<NoeudVoie>): NoeudVoie => ({ rang: 0, voie: 0, mecanique: 0, figure: false, ecrite: false, nature: 'salle', prime: null, suivants: [], ...n })
+
+  it('chaque nœud possible a une icône dessinée', () => {
+    const tous: NoeudVoie[] = [
+      ...([0, 1, 2, 3] as const).map((mecanique) => noeud({ mecanique })),
+      noeud({ figure: true }),
+      noeud({ ecrite: true }),
+      ...(['evenement', 'economat', 'repos', 'don', 'coffre', 'minijeu'] as const).map((nature) => noeud({ nature })),
+    ]
+    const noms = tous.map(iconeDuNoeud)
+    expect(new Set(noms).size).toBe(tous.length) // douze nœuds, douze icônes
+    for (const nom of noms) expect(ICONES_NOEUD[nom]?.length, nom).toBeGreaterThan(0)
+  })
+
+  it('une rencontre porte le point d’interrogation ; le tableau du pool prime sur la figure, la figure sur la mécanique', () => {
+    expect(iconeDuNoeud(noeud({ nature: 'evenement' }))).toBe('rencontre')
+    expect(iconeDuNoeud(noeud({ ecrite: true, figure: true, mecanique: 1 }))).toBe('pool')
+    expect(iconeDuNoeud(noeud({ figure: true, mecanique: 1 }))).toBe('figure')
+    expect(iconeDuNoeud(noeud({ mecanique: 1 }))).toBe('glace')
+  })
+
+  it('le SVG de la cérémonie est tiré des mêmes tracés : un symbole par icône, tous ses traits', () => {
+    for (const [nom, traits] of Object.entries(ICONES_NOEUD)) {
+      const symbole = ICONES_MINI_CARTE.split('<symbol ').find((x) => x.startsWith(`id="mv-i-${nom}"`))
+      expect(symbole, nom).toBeDefined()
+      for (const t of traits) expect(symbole).toContain(`d="${t.d}"`)
+      expect(symbole!.split('<path ').length - 1).toBe(traits.length)
+    }
+  })
+
+  it('un trait se voit toujours : tracé, plein, ou les deux', () => {
+    for (const traits of Object.values(ICONES_NOEUD)) for (const t of traits) expect(Boolean(t.ep) || Boolean(t.plein)).toBe(true)
   })
 })

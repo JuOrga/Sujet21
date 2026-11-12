@@ -477,16 +477,6 @@ export function dessinMiniCarteSVG(
       : nd.nature !== 'salle'
         ? `<circle class="${cl}" r="${S * k}"/>`
         : `<polygon class="${cl}" points="${k === 1 ? tuile : tuile.split(' ').map((pt) => pt.split(',').map((c) => Number(c) * k).join(',')).join(' ')}"/>`
-  const icone = (nd: NoeudVoie): string =>
-    nd.nature !== 'salle'
-      ? nd.nature === 'evenement'
-        ? 'rencontre'
-        : nd.nature
-      : nd.ecrite
-        ? 'pool'
-        : nd.figure
-          ? 'figure'
-          : (['eau', 'glace', 'vapeur', 'toutes'] as const)[nd.mecanique] ?? 'eau'
   const teinte = (nd: NoeudVoie): string =>
     nd.nature === 'evenement'
       ? 'mv-evenement'
@@ -531,7 +521,7 @@ export function dessinMiniCarteSVG(
         (nd.prime ? forme(nd, `mv-prime-anneau mv-prime-${nd.prime}`, 1.3) : '') +
         forme(nd, 'mv-halo') +
         forme(nd, 'mv-tuile') +
-        `<use href="#mv-i-${icone(nd)}" x="-11" y="-11" width="22" height="22"/>` +
+        `<use href="#mv-i-${iconeDuNoeud(nd)}" x="-11" y="-11" width="22" height="22"/>` +
         (joueIci ? `<circle class="mv-coche" cx="${S - 3}" cy="${-S + 3}" r="4"/>` : '') +
         // LA PRIME : un losange au coin bas droit, teinté par ce qu'elle paie
         (nd.prime
@@ -576,33 +566,105 @@ export function dessinMiniCarteSVG(
   )
 }
 
-/** LES ICÔNES, en symboles SVG dessinés dans un repère 24 × 24 — le trait
- *  hérite de la couleur du nœud (currentColor). Une goutte, un flocon, des
+/** Un trait d'icône : son tracé (syntaxe des chemins SVG), l'épaisseur de
+ *  son trait (absente : pas de trait), s'il est plein, son opacité. */
+export interface TraitIcone {
+  d: string
+  ep?: number
+  plein?: boolean
+  opacite?: number
+}
+const cercle = (cx: number, cy: number, r: number): string => `M${cx - r} ${cy}a${r} ${r} 0 1 0 ${2 * r} 0a${r} ${r} 0 1 0 ${-2 * r} 0Z`
+
+/** LES ICÔNES, dessinées dans un repère 24 × 24. Une goutte, un flocon, des
  *  volutes, trois anneaux, une carte, une étoile, un point d'interrogation :
- *  le vocabulaire de la mini-carte, lisible sans légende. */
+ *  le vocabulaire de la mini-carte, lisible sans légende.
+ *
+ *  EN DONNÉES, plus en une chaîne SVG : le module en 2D autour de la salle
+ *  (render/module2dCanvas.ts) peint les MÊMES icônes sur ses cellules, sur
+ *  une toile — une seconde copie des tracés aurait dérivé de la première. Le
+ *  SVG de la cérémonie (ICONES_MINI_CARTE) en est tiré. */
+export const ICONES_NOEUD: Record<string, readonly TraitIcone[]> = {
+  // l'eau : la goutte
+  eau: [
+    { d: 'M12 3 C12 3 6 10 6 14.5 A6 6 0 0 0 18 14.5 C18 10 12 3 12 3 Z', ep: 2 },
+    { d: 'M9.5 15 A2.5 2.5 0 0 0 12 17.5', ep: 1.4, opacite: 0.7 },
+  ],
+  // la glace : le flocon
+  glace: [
+    { d: 'M12 3v18M4.2 7.5l15.6 9M4.2 16.5l15.6-9', ep: 1.8 },
+    { d: 'M12 3l-2.4 2.4M12 3l2.4 2.4M12 21l-2.4-2.4M12 21l2.4-2.4M4.2 7.5l3.3.2M4.2 7.5l.2 3.3M19.8 16.5l-3.3-.2M19.8 16.5l-.2-3.3M4.2 16.5l.2-3.3M4.2 16.5l3.3-.2M19.8 7.5l-.2 3.3M19.8 7.5l-3.3.2', ep: 1.8 },
+  ],
+  // la vapeur : trois volutes qui montent
+  vapeur: [{ d: 'M7 20c-2-2-2-4 0-6s2-4 0-6M12 20c-2-2-2-4 0-6s2-4 0-6M17 20c-2-2-2-4 0-6s2-4 0-6', ep: 1.9 }],
+  // toutes les mécaniques : trois anneaux liés
+  toutes: [{ d: cercle(12, 8, 4.2) + cercle(7.5, 15.5, 4.2) + cercle(16.5, 15.5, 4.2), ep: 1.8 }],
+  // le tableau du pool : une carte
+  pool: [
+    { d: 'M7 3.5h10a2 2 0 0 1 2 2v13a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2v-13a2 2 0 0 1 2-2Z', ep: 1.8 },
+    { d: 'M8.5 8.5h7M8.5 12h7M8.5 15.5h4.5', ep: 1.8 },
+  ],
+  // la figure : l'étoile à quatre pointes
+  figure: [{ d: 'M12 2.5 L14.2 9.8 L21.5 12 L14.2 14.2 L12 21.5 L9.8 14.2 L2.5 12 L9.8 9.8 Z', ep: 1.8 }],
+  // la rencontre : le point d'interrogation, gras
+  rencontre: [
+    { d: 'M8.5 9a3.5 3.5 0 1 1 5.2 3.1c-1.3.8-1.7 1.5-1.7 3', ep: 2.4 },
+    { d: cercle(12, 19, 1.5), plein: true },
+  ],
+  // l'économat : la balance du Semblable
+  economat: [{ d: 'M12 3v17M7 20h10M4 9h16M6.5 9l-3 6h6l-3-6ZM17.5 9l-3 6h6l-3-6Z', ep: 1.8 }],
+  // l'alcôve : la lune, le repos
+  repos: [{ d: 'M15.5 3.5a8.5 8.5 0 1 0 5 15.5 7 7 0 0 1-5-15.5Z', ep: 1.9 }],
+  // la bonbonne oubliée : le flacon
+  don: [
+    { d: 'M9.5 3h5M10 3v4.5L6.5 12v7a2 2 0 0 0 2 2h7a2 2 0 0 0 2-2v-7L14 7.5V3', ep: 1.8 },
+    { d: 'M7.5 15.5h9', ep: 1.8, opacite: 0.6 },
+  ],
+  // le mini-jeu : la cuve graduée
+  minijeu: [
+    { d: 'M7 3h10v16a2 2 0 0 1-2 2H9a2 2 0 0 1-2-2Z', ep: 1.8 },
+    { d: 'M7 8h3M7 12h3M7 16h3', ep: 1.8 },
+    { d: 'M9 13.5c1.5-1 4.5-1 6 0V19H9Z', plein: true, opacite: 0.5 },
+  ],
+  // la cache : le losange, l'orbe qui dort
+  coffre: [
+    { d: 'M12 3 21 12 12 21 3 12Z', ep: 1.8 },
+    { d: 'M12 8.5 15.5 12 12 15.5 8.5 12Z', ep: 1.8, plein: true, opacite: 0.55 },
+  ],
+}
+
+/** L'ICÔNE D'UN NŒUD : sa nature s'il n'est pas une salle ; sinon le tableau
+ *  du pool, la figure, ou la mécanique de la salle. */
+export function iconeDuNoeud(nd: NoeudVoie): string {
+  return nd.nature !== 'salle'
+    ? nd.nature === 'evenement'
+      ? 'rencontre'
+      : nd.nature
+    : nd.ecrite
+      ? 'pool'
+      : nd.figure
+        ? 'figure'
+        : (['eau', 'glace', 'vapeur', 'toutes'] as const)[nd.mecanique] ?? 'eau'
+}
+
+/** Les mêmes icônes en symboles SVG, pour la mini-carte de la cérémonie — le
+ *  trait hérite de la couleur du nœud (currentColor). */
 export const ICONES_MINI_CARTE =
   '<defs>' +
-  // l'eau : la goutte
-  '<symbol id="mv-i-eau" viewBox="0 0 24 24"><path d="M12 3 C12 3 6 10 6 14.5 A6 6 0 0 0 18 14.5 C18 10 12 3 12 3 Z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><path d="M9.5 15 A2.5 2.5 0 0 0 12 17.5" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" opacity=".7"/></symbol>' +
-  // la glace : le flocon
-  '<symbol id="mv-i-glace" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M12 3v18M4.2 7.5l15.6 9M4.2 16.5l15.6-9"/><path d="M12 3l-2.4 2.4M12 3l2.4 2.4M12 21l-2.4-2.4M12 21l2.4-2.4M4.2 7.5l3.3.2M4.2 7.5l.2 3.3M19.8 16.5l-3.3-.2M19.8 16.5l-.2-3.3M4.2 16.5l.2-3.3M4.2 16.5l3.3-.2M19.8 7.5l-.2 3.3M19.8 7.5l-3.3.2"/></g></symbol>' +
-  // la vapeur : trois volutes qui montent
-  '<symbol id="mv-i-vapeur" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><path d="M7 20c-2-2-2-4 0-6s2-4 0-6M12 20c-2-2-2-4 0-6s2-4 0-6M17 20c-2-2-2-4 0-6s2-4 0-6"/></g></symbol>' +
-  // toutes les mécaniques : trois anneaux liés
-  '<symbol id="mv-i-toutes" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="8" r="4.2"/><circle cx="7.5" cy="15.5" r="4.2"/><circle cx="16.5" cy="15.5" r="4.2"/></g></symbol>' +
-  // le tableau du pool : une carte
-  '<symbol id="mv-i-pool" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><rect x="5" y="3.5" width="14" height="17" rx="2"/><path d="M8.5 8.5h7M8.5 12h7M8.5 15.5h4.5"/></g></symbol>' +
-  // la figure : l'étoile à quatre pointes
-  '<symbol id="mv-i-figure" viewBox="0 0 24 24"><path d="M12 2.5 L14.2 9.8 L21.5 12 L14.2 14.2 L12 21.5 L9.8 14.2 L2.5 12 L9.8 9.8 Z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></symbol>' +
-  // la rencontre : le point d'interrogation, gras
-  '<symbol id="mv-i-rencontre" viewBox="0 0 24 24"><path d="M8.5 9a3.5 3.5 0 1 1 5.2 3.1c-1.3.8-1.7 1.5-1.7 3" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/><circle cx="12" cy="19" r="1.5" fill="currentColor"/></symbol>' +
-  // l'économat : la balance du Semblable
-  '<symbol id="mv-i-economat" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v17M7 20h10M4 9h16M6.5 9l-3 6h6l-3-6ZM17.5 9l-3 6h6l-3-6Z"/></g></symbol>' +
-  // l'alcôve : la lune, le repos
-  '<symbol id="mv-i-repos" viewBox="0 0 24 24"><path d="M15.5 3.5a8.5 8.5 0 1 0 5 15.5 7 7 0 0 1-5-15.5Z" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linejoin="round"/></symbol>' +
-  // la bonbonne oubliée : le flacon
-  '<symbol id="mv-i-don" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9.5 3h5M10 3v4.5L6.5 12v7a2 2 0 0 0 2 2h7a2 2 0 0 0 2-2v-7L14 7.5V3"/><path d="M7.5 15.5h9" opacity=".6"/></g></symbol>' +
-  // la cache : le losange, l'orbe qui dort
-  '<symbol id="mv-i-minijeu" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M7 3h10v16a2 2 0 0 1-2 2H9a2 2 0 0 1-2-2Z"/><path d="M7 8h3M7 12h3M7 16h3"/><path d="M9 13.5c1.5-1 4.5-1 6 0V19H9Z" fill="currentColor" opacity=".5" stroke="none"/></g></symbol>' +
-  '<symbol id="mv-i-coffre" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M12 3 21 12 12 21 3 12Z"/><path d="M12 8.5 15.5 12 12 15.5 8.5 12Z" fill="currentColor" opacity=".55"/></g></symbol>' +
+  Object.entries(ICONES_NOEUD)
+    .map(
+      ([nom, traits]) =>
+        `<symbol id="mv-i-${nom}" viewBox="0 0 24 24">` +
+        traits
+          .map(
+            (t) =>
+              `<path d="${t.d}" fill="${t.plein ? 'currentColor' : 'none'}"` +
+              (t.ep ? ` stroke="currentColor" stroke-width="${t.ep}" stroke-linecap="round" stroke-linejoin="round"` : '') +
+              (t.opacite !== undefined ? ` opacity="${t.opacite}"` : '') +
+              '/>',
+          )
+          .join('') +
+        '</symbol>',
+    )
+    .join('') +
   '</defs>'

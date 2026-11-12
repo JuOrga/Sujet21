@@ -67,6 +67,7 @@ import {
 import { ATLAS_COQUE } from './coqueAtlas'
 import { sondeRetournement, type Retournement } from './retournement'
 import { boutsEnMur, cleBoite } from '../game/conduite'
+import { MODULE2D_FS, MODULE2D_VS } from './module2dShader'
 
 // Budgets de rendu : au-delà, les éléments excédentaires ne sont plus
 // dessinés (la physique, elle, les voit tous) — l'éditeur avertit quand un
@@ -5045,99 +5046,10 @@ const FICHIER_DECAL: Record<DecalDef['kind'], string> = {
 /** Les planches de vues livrées, lues une fois : le glob de Vite. */
 const PLANCHES_LIVREES = planchesLivrees()
 
-// LE MODULE EN 2D DE FACE autour de la salle (render/module2d.ts) : une toile
-// composée hors du moteur (module2dCanvas.ts), posée dans le monde comme un
-// seul quad. Rien ne s'en peint dans la salle — la salle y est encastrée.
-const MODULE2D_VS = `#version 300 es
-uniform vec4 uQuad;      // ce que le quad couvre : la toile, ou la salle (la couverture)
-uniform vec2 uCenter;
-uniform vec2 uViewport;
-uniform float uZoom;
-out vec2 vMonde;
-void main() {
-  int i = gl_VertexID;
-  vec2 c = vec2((i == 1 || i == 2 || i == 4) ? 1.0 : 0.0, (i == 2 || i == 4 || i == 5) ? 1.0 : 0.0);
-  vMonde = mix(uQuad.xy, uQuad.zw, c);
-  gl_Position = vec4((vMonde - uCenter) * uZoom / (uViewport * 0.5), 0.0, 1.0);
-}`
-
-const MODULE2D_FS = `#version 300 es
-precision highp float;
-in vec2 vMonde;
-uniform sampler2D uToile;
-uniform vec4 uRect;
-uniform vec4 uSalle;
-uniform sampler2D uProche; // la toile PROCHE, plus fine, autour de la salle
-uniform vec4 uRectP;
-uniform float uHasP;
-uniform vec4 uCoque;     // la salle et sa coque : le décor s'y fond
-uniform float uMode;     // 0 : autour de la salle ; 1 : la COUVERTURE de la transition
-uniform vec4 uCouv;      // la cellule qui grossit, dans le monde
-uniform float uCouvA;    // à quel point elle cache la salle
-uniform sampler2D uCellule;
-uniform float uRatioCellule; // hauteur / largeur de l'image de la cellule ; 0 : étirée
-out vec4 outColor;
-// LA CELLULE TIENT À SES PROPORTIONS, centrée dans son rectangle : étirée à
-// la forme de la salle, la capsule de la serre (2,4 fois plus large que
-// haute) se déformait en grossissant (05/10). Rend ses coordonnées, hors de
-// [0, 1] en dehors de l'image.
-vec2 dansCellule(vec2 p, vec4 r) {
-  vec2 t = r.zw - r.xy;
-  vec2 k = (p - r.xy) / t;
-  float rr = t.y / t.x;
-  // les autres cellules, rectangles pleins, restent étirées : tenues à leurs
-  // proportions, elles laissaient des bandes sur les côtés de la salle
-  if (uRatioCellule > 0.0) {
-    if (uRatioCellule < rr) k.y = (k.y - 0.5) * rr / uRatioCellule + 0.5;
-    else k.x = (k.x - 0.5) * uRatioCellule / rr + 0.5;
-  }
-  return vec2(k.x, 1.0 - k.y);
-}
-void main() {
-  bool dansSalle = all(greaterThan(vMonde, uSalle.xy)) && all(lessThan(vMonde, uSalle.zw));
-  if (uMode < 0.5 && dansSalle) discard;
-  // LE FONDU AU BORD DE LA SALLE : la limite était une coupure nette entre
-  // la salle et le décor (aperçu du 02/10). Contre la coque, le décor est
-  // dans l'OMBRE de la salle et légèrement FLOU, comme une profondeur de
-  // champ ; à une demi-salle, il est net et pleinement éclairé.
-  vec2 dd = max(max(uCoque.xy - vMonde, vMonde - uCoque.zw), 0.0);
-  float d = length(dd) / (uCoque.z - uCoque.x);
-  // (le flou réduit de 2,2 à 1,0 crans le 06/10 : zoomé sur la salle, on ne
-  // voit presque que cette bande, et le décor y paraissait flou partout)
-  float flou = uMode > 0.5 ? 0.0 : 1.0 * (1.0 - smoothstep(0.0, 0.14, d));
-  // la toile a son origine EN HAUT (une toile 2D) : v descend avec y
-  vec2 uv = vec2((vMonde.x - uRect.x) / (uRect.z - uRect.x), (uRect.w - vMonde.y) / (uRect.w - uRect.y));
-  vec4 c = texture(uToile, uv, flou);
-  if (uHasP > 0.5) {
-    // près de la salle, la toile fine ; elle se fond dans l'autre sur ses bords
-    vec2 up = vec2((vMonde.x - uRectP.x) / (uRectP.z - uRectP.x), (uRectP.w - vMonde.y) / (uRectP.w - uRectP.y));
-    vec2 b = min(up, 1.0 - up);
-    float w = smoothstep(0.0, 0.06, min(b.x, b.y));
-    if (w > 0.0) c = mix(c, texture(uProche, up, flou), w);
-  }
-  if (uMode < 0.5) c.rgb *= mix(0.32, 1.0, smoothstep(0.0, 0.45, d));
-  if (uMode > 1.5) {
-    // la cellule quittée, peinte nette sur son quad
-    vec2 k = dansCellule(vMonde, uCouv);
-    if (any(lessThan(k, vec2(0.0))) || any(greaterThan(k, vec2(1.0)))) discard;
-    outColor = texture(uCellule, k);
-    return;
-  }
-  if (uMode > 0.5) {
-    // LA TRANSITION : sur la salle, la tôle du module, et la cellule choisie
-    // qui grossit — la salle n'apparaît qu'une fois la cellule à sa taille
-    vec2 k = dansCellule(vMonde, uCouv);
-    if (all(greaterThanEqual(k, vec2(0.0))) && all(lessThanEqual(k, vec2(1.0)))) {
-      // une capsule détourée laisse voir la toile autour d'elle
-      vec4 tx = texture(uCellule, k);
-      c = tx + c * (1.0 - tx.a);
-    }
-    c *= uCouvA;
-  }
-  outColor = c;
-}`
-
 type Rect2d = { minX: number; minY: number; maxX: number; maxY: number }
+/** La couverture d'une transition du module 2D (module2d.ts, EtatTransition) :
+ *  `depart` est null quand on ne quitte aucune salle (l'entrée d'un module). */
+type Couverture2d = { salle: Rect2d; couvre: Rect2d; opacite: number; depart: Rect2d | null; ombre: number }
 
 export class Renderer {
   private readonly gl: WebGL2RenderingContext
@@ -5964,25 +5876,32 @@ export class Renderer {
    *  etatTransition) : la salle et sa coque, la cellule qui grossit, son
    *  opacité — et la cellule quittée, peinte nette (la transition s'ouvre
    *  zoomée sur elle). null : pas de transition. */
-  setCouvertureModule2d(c: { salle: Rect2d; couvre: Rect2d; opacite: number; depart: Rect2d } | null): void {
+  setCouvertureModule2d(c: Couverture2d | null): void {
     this.couverture2d = c
   }
-  private couverture2d: { salle: Rect2d; couvre: Rect2d; opacite: number; depart: Rect2d } | null = null
+  private couverture2d: Couverture2d | null = null
+  /** Le module respire-t-il (module2dShader, respire) ? Faux sous le réglage
+   *  système « moins d'animations » (main.ts). */
+  module2dAnime = true
 
   /** mode 0 : le module autour de la salle ; 1 : la couverture sur la
    *  salle ; 2 : la cellule quittée, nette. */
-  private drawModule2d(camera: Camera, viewportW: number, viewportH: number, mode = 0): void {
+  private drawModule2d(camera: Camera, viewportW: number, viewportH: number, timeSec: number, mode = 0): void {
     const m = this.module2d
     if (!m || !this.texModule2d) return
     const cv = this.couverture2d
     if (mode > 0 && (!cv || cv.opacite <= 0 || !this.texCellule2d || !this.texCelluleDepart2d)) return
+    if (mode === 2 && !cv?.depart) return
     const gl = this.gl
     gl.useProgram(this.module2dProgram)
     const u = this.uniforms['module2d']
     gl.uniform4f(u['uRect'], m.monde.minX, m.monde.minY, m.monde.maxX, m.monde.maxY)
-    const q = mode === 1 && cv ? cv.salle : mode === 2 && cv ? cv.depart : m.monde
+    const q = mode === 1 && cv ? cv.salle : mode === 2 && cv?.depart ? cv.depart : m.monde
     gl.uniform4f(u['uQuad'], q.minX, q.minY, q.maxX, q.maxY)
     gl.uniform1f(u['uMode'], mode)
+    // hors transition, la salle porte toute son ombre
+    gl.uniform1f(u['uOmbre'], cv ? cv.ombre : 1)
+    gl.uniform1f(u['uTemps'], this.module2dAnime ? timeSec : 0)
     gl.uniform4f(u['uCoque'], m.coque.minX, m.coque.minY, m.coque.maxX, m.coque.maxY)
     gl.uniform2f(u['uCenter'], camera.x, camera.y)
     gl.uniform2f(u['uViewport'], viewportW, viewportH)
@@ -5997,7 +5916,7 @@ export class Renderer {
       gl.uniform1i(u['uProche'], 2)
     }
     if (mode > 0 && cv) {
-      const k = mode === 2 ? cv.depart : cv.couvre
+      const k = mode === 2 && cv.depart ? cv.depart : cv.couvre
       gl.uniform4f(u['uCouv'], k.minX, k.minY, k.maxX, k.maxY)
       gl.uniform1f(u['uCouvA'], mode === 2 ? 1 : cv.opacite)
       gl.activeTexture(gl.TEXTURE1)
@@ -6862,7 +6781,7 @@ export class Renderer {
     // Passe B bis, avant la coque — LE MODULE EN 2D autour de la salle
     // (render/module2d.ts) : par-dessus le ciel, jamais dans la salle, et la
     // coque de la salle repasse par-dessus son bord
-    if (!this.solModules) this.drawModule2d(camera, viewportW, viewportH)
+    if (!this.solModules) this.drawModule2d(camera, viewportW, viewportH, timeSec)
     if (!this.solModules)
       this.drawHull(sim, camera, viewportW, viewportH, boxes, timeSec)
 
@@ -6876,8 +6795,8 @@ export class Renderer {
     // dessus TOUTE la salle — sa coque, ses décalques, ses éponges —, la
     // cellule qui grossit ; et la cellule quittée, nette
     if (!this.solModules) {
-      this.drawModule2d(camera, viewportW, viewportH, 1)
-      this.drawModule2d(camera, viewportW, viewportH, 2)
+      this.drawModule2d(camera, viewportW, viewportH, timeSec, 1)
+      this.drawModule2d(camera, viewportW, viewportH, timeSec, 2)
     }
   }
 

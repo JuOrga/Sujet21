@@ -1,0 +1,34 @@
+<!doctype html>
+<!-- LE BANC DU MODULE 2D — la toile entière, telle que le peintre la compose. Voir capture.cjs. -->
+<meta charset="utf-8" />
+<style>
+  html, body { margin: 0; background: #030710; }
+  canvas { display: block; }
+</style>
+<canvas id="c"></canvas>
+<script type="module">
+  import * as M from '/src/render/module2d.ts'
+  import { chargePiecesModule2d, peintModule2d } from '/src/render/module2dCanvas.ts'
+  import { num, vueDEssai } from './commun.js'
+  const { biome, forme, vue } = vueDEssai()
+  const hr = num('hr', 0.66)
+  const R = 12
+  const salle = { minX: 0, maxX: R, minY: 0, maxY: R * hr }
+  const pieces = await chargePiecesModule2d()
+  const t0 = performance.now()
+  const mp = M.miseEnPage(salle, vue, forme, biome)
+  const toile = peintModule2d(mp, pieces)
+  const tPeint = performance.now() - t0
+  // la seconde peinture : sans le décodage des images ni la reteinte du biome
+  const t1 = performance.now(); peintModule2d(mp, pieces); const tPeint2 = performance.now() - t1
+  const c = document.getElementById('c')
+  const W = num('w', 1600), H = num('h', 900)
+  c.width = W; c.height = H
+  const g = c.getContext('2d')
+  g.fillStyle = '#030710'; g.fillRect(0, 0, W, H)
+  const k = Math.min(W / toile.width, H / toile.height)
+  g.drawImage(toile, (W - toile.width * k) / 2, (H - toile.height * k) / 2, toile.width * k, toile.height * k)
+  window.__toile = toile
+  window.__info = { l: toile.width, h: toile.height, densite: mp.densite, tPeint, tPeint2 }
+  document.title = 'pret'
+</script>

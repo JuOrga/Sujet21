@@ -403,11 +403,7 @@
     {
       "id": "telescope",
       "type": "telescope-hubble",
-      "ancrage": "OBS",
-      "x": 1714,
-      "y": 443,
-      "rotation": -33,
-      "tube": "M1597 402 H1652 C 1688 402, 1688 443, 1718 443"
+      "ancrage": "OBS"
     }
   ],
   "palette": {

@@ -1327,8 +1327,8 @@
         background: rgba(16, 24, 37, 0.7);
         font-size: calc(11px * var(--ui)); color: var(--dim);
       }
-      .st-legende li { display: flex; align-items: center; gap: 8px; }
-      .st-legende i { width: 15px; height: 9px; border-radius: 2px; flex: none; }
+      /* treize lignes en une colonne dépassaient la fiche : trois colonnes */
+      .st-legende { display: grid; grid-template-columns: repeat(3, max-content); gap: 6px 18px; align-content: center; }
       .st-p-franchi { background: rgba(99, 183, 230, 0.65); }
       .st-p-courant { background: #eef8ff; box-shadow: 0 0 7px rgba(99, 183, 230, 0.9); }
       .st-p-avenir { background: rgba(99, 183, 230, 0.16); }
@@ -1336,8 +1336,13 @@
 
       @media (max-width: 760px) {
         .st-bas { flex-direction: column; }
-        .st-legende { flex-direction: row; flex-wrap: wrap; }
+        .st-legende { display: flex; flex-direction: row; flex-wrap: wrap; gap: 7px 16px; }
         .st-avance { font-size: calc(10px * var(--ui)); }
+        /* en portrait, la ligne d'avance passe SOUS le titre : à côté, il ne
+           lui restait presque rien et elle sortait de l’écran par la droite */
+        .st-tete { flex-wrap: wrap; row-gap: 6px; }
+        .st-titres { flex: 1; min-width: 0; }
+        .st-avance { order: 3; flex: 1 0 100%; text-align: left; }
       }
       @media (prefers-reduced-motion: reduce) {
         .ps-route-trait, .ps-sujet, .ps-courant .ps-halo { animation: none; }
@@ -6530,7 +6535,24 @@
       #carte-editeur .ce-etat { flex: 1; padding: 8px 0; }
       .ce-orbes { display: flex; flex-wrap: wrap; gap: 4px; }
       #carte-editeur .ce-orbes .ce-etat { flex: none; padding: 5px 8px; font-size: calc(10.5px * var(--ui)); text-transform: none; letter-spacing: 0.04em; }
-      .cs-niv { font-size: 10px; letter-spacing: 0.12em; text-anchor: middle; pointer-events: none; }
+      /* LA LÉGENDE DU PLAN (dessinCarte, legendeCarteHTML), la même sur l'écran
+         LA STATION et dans la cérémonie : ce que le plan montre sans le dire */
+      .cs-lg { display: flex; align-items: center; gap: 7px; white-space: nowrap; }
+      .cs-lg i { font-style: normal; flex: none; }
+      .cs-lg-signe { min-width: 14px; text-align: center; color: #cfe2ef; font-weight: 600; }
+      .cs-lg-fut { width: 11px; height: 11px; border-radius: 3px; border: 2px solid #a7ddf5; background: #0b1420; }
+      .cs-lg-allume { box-shadow: 0 0 7px rgba(167, 221, 245, 0.9); }
+      .cs-lg-eteint { border-color: #4a6478; opacity: 0.5; }
+      .cs-lg-trait { width: 20px; height: 0; border-top: 3px solid var(--c); }
+      .cs-lg-trait.cs-lg-tirets { border-top: 2px dashed var(--c); }
+      .mb-station-legende {
+        list-style: none; margin: 4px 0 0; padding: 0; min-width: 0;
+        display: flex; flex-wrap: wrap; justify-content: center; gap: 3px 16px;
+        font-size: calc(10.5px * var(--ui)); letter-spacing: 0.04em; color: #8ba3b8;
+      }
+      /* sur un écran bas, la place va au plan : la légende reste sur LA STATION */
+      @media (max-height: 620px) { .mb-station-legende { display: none; } }
+      .cs-niv { font-size: 11px; letter-spacing: 0.12em; text-anchor: middle; pointer-events: none; }
 
       /* la visée manette sur un module du plan : le même liseré que la sélection */
       .cs-mod.pad-focus { filter: drop-shadow(0 0 12px rgba(238, 248, 255, 0.8)); outline: none; }
@@ -6538,18 +6560,29 @@
          comme pour un futur écran de jeu. Les couleurs de la carte voyagent
          en attributs (elles viennent des données) ; ici, les états. */
       .cs-svg { display: block; width: 100%; height: 100%; font-family: var(--font-mono); }
-      .cs-badge text { font-size: 12px; letter-spacing: 0.1em; text-anchor: middle; }
-      .cs-decor-nom { font-family: var(--font-display); font-size: 10px; letter-spacing: 0.14em; fill: #7f9cb0; text-anchor: middle; }
-      .cs-decor-sous { font-size: 10px; letter-spacing: 0.18em; fill: #4a6478; text-anchor: middle; }
+      /* LES TAILLES SONT EN UNITÉS DE SCÈNE, et la scène se réduit à l'écran :
+         à 11 et 12, un nom de module faisait 6,3 px dans la cérémonie d'un
+         écran de 1280 × 800, une température 6,9 px (mesuré le 10/11). Avec
+         le cadre serré du jeu (dessinCarte, cadreCarte), 15 et 13 tombent
+         autour de 11 et 10 px. Les pas de l'étiquette suivent, dans le dessin. */
+      .cs-badge text { font-size: 13px; letter-spacing: 0.1em; text-anchor: middle; }
+      .cs-decor-nom { font-family: var(--font-display); font-size: 12px; letter-spacing: 0.14em; fill: #7f9cb0; text-anchor: middle; }
+      .cs-decor-sous { font-size: 11px; letter-spacing: 0.18em; fill: #4a6478; text-anchor: middle; }
       .cs-lumieres { filter: drop-shadow(0 0 5px #63b7e6); }
       .cs-route.cs-active { filter: drop-shadow(0 0 6px var(--c)); animation: cs-flux 1.2s linear infinite; }
-      .cs-route.cs-principale:not(.cs-active):not(.cs-parcourue) { filter: drop-shadow(0 0 6px var(--c)); }
+      /* la voie principale garde son halo là où elle compte encore : il
+         brillait jusque dans le dos du joueur, sur des coursives mortes */
+      .cs-route.cs-principale:not(.cs-active):not(.cs-parcourue):not(.cs-morte) { filter: drop-shadow(0 0 6px var(--c)); }
       .cs-route.cs-lien-sel { stroke: #eef8ff; filter: drop-shadow(0 0 8px #eef8ff); }
       /* le survol qui projette : la route la plus courte jusqu'à l'objectif */
       .cs-route.cs-projet { stroke: #eef8ff; stroke-width: 5; opacity: 1; stroke-dasharray: none; animation: none; filter: drop-shadow(0 0 7px #eef8ff); }
       .cs-mod.cs-projet { filter: drop-shadow(0 0 10px rgba(238, 248, 255, 0.75)); }
       /* ce que la porte survolée FERME : les modules qu'on ne pourra plus joindre */
-      .cs-mod.cs-hors { opacity: 0.22 !important; filter: none; transition: opacity 0.18s ease; }
+      /* ce que la porte visée ferme s'éteint — tout le module SAUF son socle
+         opaque : éteint d'un bloc, il devenait une vitre et les coursives
+         qui passent dessous se croisaient sur son glyphe */
+      .cs-mod.cs-hors { filter: none; }
+      .cs-mod.cs-hors > :not(.cs-socle) { opacity: 0.22; transition: opacity 0.18s ease; }
       .cs-route.cs-hors { opacity: 0.18; filter: none; animation: none; transition: opacity 0.18s ease; }
       .cs-sens { fill: none; opacity: 0.85; }
       .cs-lien-prise { cursor: pointer; }
@@ -6559,23 +6592,34 @@
       .cs-mod:focus { outline: none; }
       .cs-mod.cs-cible { filter: drop-shadow(0 0 8px var(--z)); }
       .cs-mod.cs-sel, .cs-mod:focus-visible { filter: drop-shadow(0 0 10px rgba(217, 236, 247, 0.6)); }
-      .cs-mod.cs-courant { filter: drop-shadow(0 0 14px rgba(99, 183, 230, 0.9)); animation: cs-pulse 1.8s ease-out infinite; }
+      /* LE FOCUS A UN TRAIT, pas seulement une lueur : au clavier ou à la
+         manette, le module visé ne se distinguait d'une porte allumée que
+         par la teinte de son halo */
+      .cs-mod:focus-visible .cs-bord, .cs-mod.pad-focus .cs-bord { stroke: #eef8ff; stroke-width: 3; }
+      .cs-mod.cs-courant { filter: drop-shadow(0 0 14px rgba(238, 248, 255, 0.75)); }
+      /* seul le fût respire : pulser tout le groupe faisait clignoter le nom
+         et la plaque « vous êtes ici », qu'on doit pouvoir lire */
+      .cs-mod.cs-courant .cs-corps { animation: cs-pulse 1.8s ease-out infinite; }
+      /* les plaques « vous êtes ici » et « objectif » : des mots, lisibles sans la couleur */
+      .cs-plaque { pointer-events: none; }
+      .cs-plaque text { font-size: 12px; font-weight: 600; letter-spacing: 0.12em; text-anchor: middle; }
       .cs-editable { cursor: grab; }
       .cs-editable:active { cursor: grabbing; }
       .cs-jeu .cs-mod:hover { filter: drop-shadow(0 0 10px var(--z)); }
       @keyframes cs-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.7; } }
       .cs-glyphe { text-anchor: middle; dominant-baseline: central; paint-order: stroke; stroke: #030710; stroke-width: 3px; }
-      .cs-cadenas { text-anchor: middle; dominant-baseline: central; font-size: 15px; }
-      .cs-coche { text-anchor: middle; dominant-baseline: central; font-size: 10px; fill: #63b7e6; }
-      .cs-cran { text-anchor: middle; dominant-baseline: central; font-size: 11px; font-weight: 600; letter-spacing: 0.04em; paint-order: stroke; stroke: #030710; stroke-width: 3px; }
-      .cs-nom { font-family: var(--font-display); font-size: 11px; letter-spacing: 0.1em; text-anchor: middle; pointer-events: none; }
-      .cs-temp text { font-size: 12px; text-anchor: start; }
+      .cs-cadenas { text-anchor: middle; dominant-baseline: central; font-size: 22px; }
+      .cs-coche { text-anchor: middle; dominant-baseline: central; font-size: 15px; font-weight: 600; fill: #63b7e6; paint-order: stroke; stroke: #030710; stroke-width: 3px; }
+      .cs-cran { text-anchor: middle; dominant-baseline: central; font-size: 15px; font-weight: 600; letter-spacing: 0.04em; paint-order: stroke; stroke: #030710; stroke-width: 3px; }
+      /* le nom se détoure du fond : il croise parfois une coursive */
+      .cs-nom { font-family: var(--font-display); font-size: 15px; letter-spacing: 0.08em; text-anchor: middle; pointer-events: none; paint-order: stroke; stroke: #030710; stroke-width: 4px; stroke-linejoin: round; }
+      .cs-temp text { font-size: 13px; text-anchor: start; paint-order: stroke; stroke: #030710; stroke-width: 3px; }
       .cs-temp { pointer-events: none; }
       .cs-poignee { fill: #eef8ff; stroke: #030710; stroke-width: 1.5; cursor: nwse-resize; }
       .cs-poignee[data-poignee="ne"], .cs-poignee[data-poignee="sw"] { cursor: nesw-resize; }
       .cs-grille { pointer-events: none; }
       @media (prefers-reduced-motion: reduce) {
-        .cs-route.cs-active, .cs-mod.cs-courant { animation: none; }
+        .cs-route.cs-active, .cs-mod.cs-courant .cs-corps { animation: none; }
       }
 
       /* ==== LE MARCHAND DU HUB (game/ecranMarchand.ts) — la maquette « Marchand v2 » ====
@@ -8971,16 +9015,38 @@
       /* ---- LA CARTE DANS LA CÉRÉMONIE : le module épuisé, le plan se
          déploie ; la scène s'élargit le temps du choix, le module élu
          S'AGRANDIT (la scène zoome sur lui) puis ses salles arrivent ---- */
-      .mb-scene.mb-large { width: min(1240px, 97vw); }
+      /* 1500 et non 1240 : sur un écran de 1920 × 1080 le plan s'arrêtait à
+         1240 px de large, donc 475 de haut, quand la feuille lui en permet
+         691 (64vh) — mesuré le 10/11 ; à 1500 il en prend 574 */
+      .mb-scene.mb-large { width: min(1500px, 97vw); }
       .mb-cartes.mb-station { grid-template-columns: 1fr; gap: 6px; }
       .mb-station-carte {
-        aspect-ratio: 1600 / 804; max-height: 64vh; width: 100%; margin: 0 auto;
+        /* les proportions viennent du plan lui-même (main.ts pose --cadre
+           depuis cadreCarte) : la feuille les tenait à 1600 / 804, la taille
+           d'une scène qui en fait 2100 depuis le 16/09 */
+        aspect-ratio: var(--cadre, 1616 / 616); max-height: 64vh; width: 100%; margin: 0 auto;
         border: 1px solid #27405a; border-radius: 10px; overflow: hidden; background: #020509;
         box-shadow: 0 0 0 1px rgba(99, 183, 230, 0.1), 0 20px 60px rgba(0, 0, 0, 0.6), inset 0 0 60px rgba(99, 183, 230, 0.06);
         transition: transform 0.42s cubic-bezier(0.2, 0.7, 0.2, 1), opacity 0.42s ease;
         animation: mb-carte-monte 0.5s cubic-bezier(0.2, 1, 0.3, 1) backwards;
       }
       .mb-station-carte .cs-svg { width: 100%; height: 100%; }
+      /* LE PETIT ÉCRAN FAIT DÉFILER LE PLAN au lieu de le réduire : entier
+         dans un téléphone, un nom de module faisait 3 px (2 px en portrait,
+         mesuré le 10/11) et un module 20 px de côté, sous le doigt. Le plan
+         garde une hauteur lisible et glisse dans son cadre ; main.ts l'ouvre
+         sur le module où l'on se tient (centrePlanSurIci). */
+      @media (max-width: 700px), (pointer: coarse) and (max-height: 620px) {
+        .mb-station-carte, .st-plan {
+          aspect-ratio: auto; overflow: auto; overscroll-behavior: contain;
+          -webkit-overflow-scrolling: touch; scrollbar-width: thin;
+        }
+        .mb-station-carte { height: min(56vh, 520px); max-height: none; }
+        .st-plan { flex: none; height: min(52vh, 520px); }
+        .mb-station-carte .cs-svg, .st-plan .cs-svg {
+          width: auto; height: max(100%, 400px); aspect-ratio: var(--cadre, 1616 / 616);
+        }
+      }
       .mb-station-carte.mb-station-zoom { transform: scale(2.4); opacity: 0; }
       .mb-station-carte.mb-station-refus { animation: mb-secousse 0.32s ease; }
       @keyframes mb-secousse {
