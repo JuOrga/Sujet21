@@ -697,7 +697,16 @@ comme le reste.
 **Ce qui vaut la peine d'être animé** (dans cet ordre) : la vanne (elle
 tourne), l'écran allumé (il scintille), la gouttière de la serre (l'eau y
 coule), le blé nain (il ondule). Pas le sas de raccord ni les fioles : rien
-n'y bouge par nature. **Aucune bande n'est livrée au 10/09/2026.**
+n'y bouge par nature.
+
+**Livrées le 13/11/2026** : la vanne (`decal-vanne-anime`, 8 vues — le volant
+de cinq rayons tourne de 72°, la boucle se referme exactement) et l'image
+fixe avec elle, refaites dans Blender (`tools/images/blender/vanne.py`) ;
+l'écran allumé (`decal-ecran-on-anime`, 8 vues : balayage, voyants,
+`tools/images/ecran_anime.py`, tiré de l'image fixe livrée) ; l'éclat de
+mémoire (`meta-eclat`, une bande de 24 vues carrées, `tools/images/blender/
+eclat.py`). Le même jour, `wall` et `tank-bg` refaits raccordables
+(`tools/images/blender/surfaces.py`).
 
 **La phrase du mouvement, pièce par pièce** (à substituer dans le gabarit
 ci-dessus ; la vanne a la sienne en §19, après sa reprise) :

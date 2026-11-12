@@ -5412,18 +5412,13 @@ export class Renderer {
       (t) => (this.texStarsFar = t),
       true,
     )
-    // Le fond de cuve n'est PAS raccordable (mesuré : écart de bord ~5 contre
-    // 1,5 en interne) — en répétition simple, chaque frontière de tuile
-    // coupait les conduites net et désalignait les caissons. La répétition
-    // EN MIROIR raccorde par construction : les bords coïncident, les
-    // conduites font demi-tour au lieu de disparaître.
-    this.loadTexture(
-      '/assets/tank-bg.webp',
-      true,
-      true,
-      (t) => (this.texTank = t),
-      true,
-    )
+    // Le fond de cuve se répète SIMPLEMENT depuis le 13/11 : refait dans
+    // Blender (tools/images/blender/surfaces.py), il se raccorde par
+    // construction (raccord 0,6 / 0,4, seuil 3,0). L'ancien, généré, ne se
+    // raccordait pas (écart de bord ~5 contre 1,5 en interne) et se répétait
+    // EN MIROIR — les bords coïncidaient, mais les caissons et les conduites
+    // se répondaient en symétrie, ce qui trahissait la répétition.
+    this.loadTexture('/assets/tank-bg.webp', true, true, (t) => (this.texTank = t))
     this.loadTexture('/assets/wall.webp', true, true, (t) => (this.texWall = t))
     this.loadTexture(
       '/assets/wall-a.webp',
