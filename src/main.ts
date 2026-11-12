@@ -444,7 +444,19 @@ import {
 } from './game/soundtrack'
 import { Jukebox, PISTES_ECOUTE } from './game/jukebox'
 import { auteurAvis, avisDe, ligneAvis, ligneBilan, lisAvisEcoute, poseAvis, type Avis, type DocumentAvis } from './game/ecouteAvis'
-import { compteur, douce, motDeNote, PAS_LIGNE_MS, rangDeSalle, TEMPS_BILAN } from './game/ceremonie'
+import { compteur, douce, motDeNote, PAS_LIGNE_MS, rangDeSalle, TEMPS_BILAN, titreDuTirage } from './game/ceremonie'
+import {
+  condensatDuSas,
+  gainsDeModule,
+  gainsDeSalle,
+  litRecolte,
+  memoireDuSas,
+  pastillesDeSalles,
+  recolteNeuve,
+  virgule,
+  type Gain,
+  type RecolteModule,
+} from './game/recolte'
 import { Feu, type Rafale } from './game/ceremonieFx'
 import {
   CINEMATIQUES_LIVREES,
@@ -637,6 +649,10 @@ const run = {
   // de la mini-carte, servie au sas (mémoire ×2, condensat ×2, tirage
   // garanti), effacée à l'entrée de la salle suivante
   primeSalle: null as PrimeNoeud | null,
+  // LA RÉCOLTE DU MODULE EN COURS : ce qu'il a rendu depuis qu'on y est
+  // entré (game/recolte.ts) — le bilan de fin de module la lit, la
+  // sauvegarde l'écrit, l'entrée dans un autre module la remet à neuf
+  recolte: recolteNeuve('') as RecolteModule,
 }
 const VIES_MAX = 3 // plafond, étalonnage et instruments compris
 // Sonde de test : l'état de la run depuis la console (comme __sim, __cam)
@@ -653,6 +669,9 @@ let condensat = 0
 function gagneCondensat(cl: number): void {
   if (cl <= 0) return
   condensat += Math.round(cl)
+  // tout ce qui entre en bourse compte à la récolte du module, d'où que ça
+  // vienne (sas, pastille, halte, rencontre) : un seul point de passage
+  run.recolte.condensatCl += Math.round(cl)
   majCondensatUI()
 }
 /** Débite la réserve de la run si elle suffit (cartes payantes de la mise
@@ -816,12 +835,15 @@ function majMemoireUI(): void {
 }
 /** Grave la mémoire ET tient le compteur de butin de la run courante.
  * La fiole de SOUVENIR majore chaque gain de 25 %. */
-function gagneMemoireRun(n: number): void {
-  if (n <= 0) return
+function gagneMemoireRun(n: number): number {
+  if (n <= 0) return 0
   const majore = Math.round(n * (records.fioleEquipee('souvenir') ? 1.25 : 1))
   records.gagneMemoire(majore)
   run.memoireGagnee += majore
+  run.recolte.memoire += majore // la récolte du module, comme le condensat
   majMemoireUI()
+  // ce qui s'est VRAIMENT gravé, fiole comprise : la cérémonie l'affiche tel quel
+  return majore
 }
 // L'HÉRITAGE : l'ancien condensat persistant (d'avant la purge) devient de
 // la mémoire, une fois pour toutes — 10 cL de matière = 1 souvenir. La clé
@@ -5200,6 +5222,7 @@ interface RunSauvee {
   confinementDu?: number // les crans promis à la prochaine salle
   evenementsVus?: string[] // les rencontres déjà traversées
   primeSalle?: string // la prime de la salle en cours (voiesModule.ts)
+  recolte?: unknown // la récolte du module en cours (game/recolte.ts, litRecolte)
 }
 function runSauvee(): RunSauvee | null {
   try {
@@ -5233,6 +5256,8 @@ function runSauvee(): RunSauvee | null {
         ? d.evenementsVus.filter((x): x is string => typeof x === 'string')
         : undefined,
       primeSalle: typeof d.primeSalle === 'string' ? d.primeSalle : undefined,
+      // lue telle quelle : litRecolte la valide à la reprise
+      recolte: d.recolte,
     }
   } catch {
     return null
@@ -5266,6 +5291,7 @@ function sauveRun(): void {
           confinementDu: run.confinementDu,
           evenementsVus: run.evenementsVus,
           primeSalle: run.primeSalle ?? undefined,
+          recolte: run.recolte,
         }),
       )
   } catch {
@@ -5310,6 +5336,9 @@ function reprendreRun(save: RunSauvee): void {
   run.confinementDu = Math.max(0, Math.round(save.confinementDu ?? 0))
   run.evenementsVus = (save.evenementsVus ?? []).slice()
   run.primeSalle = PRIMES.includes(save.primeSalle as PrimeNoeud) ? (save.primeSalle as PrimeNoeud) : null
+  // le compte du module reprend où il en était — ou repart d'ici si la
+  // sauvegarde date d'avant lui (le bilan sous-comptera, sans rien inventer)
+  run.recolte = litRecolte(save.recolte, carteRun.module, run.instruments, paliersAtteints(run.xp))
   hasPlayed = true
   document.body.classList.add('playing')
   input.paused = false
@@ -12675,8 +12704,17 @@ function simuleBonbonne(surplus = 2): void {
     recVol: '',
     recChr: '',
     note: 0,
-    gainCl: Math.round(surplus * 10),
-    totalCl: condensat,
+    // rien n'est crédité par une cérémonie simulée : les tuiles montrent ce
+    // que la salle AURAIT rendu, sur la bourse et les registres tels quels
+    gains: gainsDeSalle({
+      condensat: condensatDuSas({ surplusL: surplus, rendement: 1, primeDouble: false, pastillesCl: 0 }),
+      bourseCl: condensat,
+      memoire: 5,
+      memoireDetail: 'traversée +5',
+      memoireSolde: records.memoire(),
+      tirageGaranti: false,
+      orbe: null,
+    }),
   })
 }
 // Sonde de test : la cérémonie depuis la console — __bonbonne(2.5) ouvre la
@@ -14803,9 +14841,12 @@ let mbEtape:
   | 'carte'
   | 'repos'
   | 'evenement'
+  | 'module'
   | 'salles'
   | 'fin' = 'bilan'
 let mbDraftsRestants = 0
+// le dernier tirage de la file vient de la SALLE SCELLÉE, pas d'un palier
+let mbTirageGaranti = false
 let mbBilanCourant: BilanSalle | null = null
 
 /** Le sas mène à la salle suivante (raccourci éventuel compris). */
@@ -14909,8 +14950,8 @@ interface BilanSalle {
   recVol: string
   recChr: string
   note: number
-  gainCl: number
-  totalCl: number // réserve APRÈS le gain
+  /** LA RÉCOLTE de la salle, en tuiles (game/recolte.ts, gainsDeSalle) */
+  gains: Gain[]
 }
 
 function mbEl(id: string): HTMLElement {
@@ -14942,20 +14983,23 @@ function mbFigeBilan(): void {
       if (i < etoiles) e.classList.add('mb-on')
     })
     mbEl('mb-eau').style.height = `${Math.min(100, b.pct * 100).toFixed(0)}%`
-    mbEl('mb-l').textContent = `${b.surplus.toFixed(2)} L`
+    mbEl('mb-l').textContent = fmtL(b.surplus)
     if (b.prime >= 0.01) {
       const pr = mbEl('mb-prime')
       pr.hidden = false
-      pr.textContent = `+${b.prime.toFixed(2)} L — PRIME DE GLACE`
+      pr.textContent = `dont +${fmtL(b.prime)} de PRIME DE GLACE`
       mbEl('mb-glace').hidden = false
     }
     for (const l of Array.from(mbVeil.querySelectorAll('.mb-ligne'))) {
       l.classList.add('mb-on')
     }
-    const cond = mbEl('mb-cond')
-    cond.hidden = false
-    cond.classList.add('mb-on')
-    mbEl('mb-cond-n').textContent = String(b.totalCl)
+    // la récolte, à son état final : chaque tuile posée, son chiffre exact
+    mbEl('mb-recolte').classList.add('mb-on')
+    Array.from(mbEl('mb-gains').children).forEach((tuile, i) => {
+      tuile.classList.add('mb-on')
+      const val = tuile.querySelector('.mb-gain-val')
+      if (val && b.gains[i]) val.textContent = b.gains[i].valeur
+    })
   }
   mbEl('mb-passer').hidden = true
 }
@@ -15026,8 +15070,16 @@ function mbMontreVersement(): void {
         `<span class="mb-dest-jauge" style="--a:${niveauAvant.toFixed(3)};--g:${(niveauApres - niveauAvant).toFixed(3)}"></span>` +
         `<small class="mb-dest-mot">à reverser dans le corps, en pleine salle</small>` +
         (spill > 0.01 ? `<em class="mb-dest-plus">+ ${fmt(spill)} L d’excédent vers la maîtrise</em>` : ''))
+  // le bandeau replié dira où le surplus est parti (il le disait « livré »,
+  // sans dire qu'il était versé, ni où)
+  const noteVersement = (texte: string): void => {
+    const v = mbEl('mb-verse')
+    v.textContent = texte
+    v.hidden = false
+  }
   cb.addEventListener('click', () => {
     run.bonbonneLiters = Math.min(cap, run.bonbonneLiters + verse)
+    noteVersement(spill > 0.01 ? `→ réserve, ${fmt(spill)} L à la maîtrise` : '→ versé à la réserve')
     bande.ponctuation('sting-collecte', 0.55)
     mbEclate(cb, { n: 36, teintes: MB_EAU, vitesse: 320, gravite: 700 })
     mbVerseXp(spill)
@@ -15053,6 +15105,7 @@ function mbMontreVersement(): void {
     `<small class="mb-dest-mot">chaque palier ouvre un tirage d’instrument</small>` +
     (franchit ? `<em class="mb-dest-plus mb-dest-ouvre">UN PALIER SE FRANCHIT — TIRAGE OUVERT</em>` : '')
   cx.addEventListener('click', () => {
+    noteVersement('→ versé à la maîtrise')
     bande.ponctuation('sting-collecte', 0.55)
     mbEclate(cx, { n: 36, teintes: MB_MENTHE, vitesse: 320, gravite: 700 })
     mbVerseXp(b.surplus)
@@ -15099,7 +15152,7 @@ function mbPeintEtal(xp: number): void {
   const pct = `${(part * 100).toFixed(2)}%`
   mbEl('mb-etal-fluide').style.width = pct
   mbEl('mb-etal-lueur').style.left = pct
-  mbEl('mb-etal-l').textContent = xp.toFixed(1)
+  mbEl('mb-etal-l').textContent = virgule(xp, 1)
   mbEl('mb-etal-pg').querySelector('b')!.textContent = String(
     paliersAtteints(xp),
   )
@@ -15108,6 +15161,142 @@ function mbPeintEtal(xp: number): void {
     seg.cible === null ? '★' : `${seg.cible} L`
   pd.querySelector('small')!.textContent =
     seg.cible === null ? 'complet' : 'prochain'
+}
+
+/** LA JAUGE REPLIÉE : la coulée finie, elle tient sur une ligne. En grand,
+ *  tampon « TIRAGE OUVERT » compris, elle restait en scène après le tirage —
+ *  160 px qui poussaient les portes sous le bas d'un écran de 800 px, sous
+ *  un tampon qui annonçait un tirage déjà pris. */
+function mbJaugeMince(): void {
+  const etal = mbEl('mb-etal')
+  etal.hidden = false
+  etal.classList.remove('coule')
+  etal.classList.add('mb-mince')
+  mbEl('mb-etal-tampon').hidden = true
+  mbEl('mb-etal-gain').hidden = true
+  mbPeintEtal(run.xp)
+}
+
+/** LE RELEVÉ DE LA SALLE SE RETIRE : passé le choix de la porte, il parle
+ *  d'une salle qui n'est plus le sujet. Il restait pourtant en tête des
+ *  rencontres, des haltes et du plan — « SUPERFLUIDE · 4,50 L » au-dessus
+ *  d'un Semblable endormi, puis d'un module qu'on venait de finir. */
+function mbReleveHors(): void {
+  mbEl('mb-releve').hidden = true
+}
+
+/** UNE TUILE DE RÉCOLTE (game/recolte.ts dit ce qu'elle contient) : le
+ *  gain en grand, le solde à droite, le rôle et la provenance dessous. */
+function mbGainHTML(g: Gain, i: number): string {
+  const esc = (t: string): string => t.replace(/&/g, '&amp;').replace(/</g, '&lt;')
+  return (
+    `<div class="mb-gain mb-gain-${g.cle}" style="--i:${i}">` +
+    // le condensat et la mémoire ont leur icône DESSINÉE (la planche du
+    // dossier et de l'ATH) : la même partout, le glyphe n'est que le repli
+    `<i class="mb-gain-ico" aria-hidden="true">${
+      g.cle === 'condensat' || g.cle === 'memoire' ? iconeMetaHTML(g.cle, g.icone) : g.icone
+    }</i>` +
+    // le gain et son solde partagent un rang QUI SE PLIE : à l'étroit, le
+    // solde passe dessous plutôt que de tronquer le gain (« +450 … »)
+    `<span class="mb-gain-haut"><span class="mb-gain-tete"><span class="mb-gain-nom">${esc(g.nom)}</span>` +
+    `<b class="mb-gain-val">${esc(g.valeur)}</b></span>` +
+    (g.solde
+      ? `<span class="mb-gain-solde"><small>${esc(g.solde.nom)}</small><b>${esc(g.solde.valeur)}</b></span>`
+      : '') +
+    `</span>` +
+    `<small class="mb-gain-role">${esc(g.role)}</small>` +
+    (g.detail ? `<small class="mb-gain-detail">${esc(g.detail)}</small>` : '') +
+    `</div>`
+  )
+}
+
+/** LE BILAN DU MODULE. Le module épuisé, le plan se rouvrait d'office : rien
+ *  ne marquait qu'un module venait de se finir, ni ce qu'on en rapportait.
+ *  Ce temps-là le dit — les salles franchies et leur régime, le volume, la
+ *  bourse, la mémoire, la maîtrise, les instruments, l'orbe — puis rend la
+ *  main au plan. Un module sans salle (cache, halte) n'a rien traversé : le
+ *  plan revient tout de suite, comme avant. */
+function mbMontreBilanModule(): void {
+  const m = moduleEnCours()
+  const r = run.recolte
+  if (!m || m.niveaux <= 0 || r.salles.length + r.haltes === 0) {
+    mbMontreCarte('suite')
+    return
+  }
+  mbEtape = 'module'
+  const esc = (t: string): string => t.replace(/&/g, '&amp;').replace(/</g, '&lt;')
+  mbScene.classList.remove('mb-large')
+  mbScene.classList.add('mb-compact')
+  mbReleveHors()
+  mbQuestion('MODULE TRAVERSÉ')
+  mbEl('mb-choix-titre').textContent = `DESCENTE ${voieRang} / ${longueurRun()} · CE QUE LE MODULE A RENDU`
+  mbEl('mb-etal').hidden = true
+  mbEl('mb-passer').hidden = true
+  mbEl('mb-choix').hidden = false
+  const host = mbCartes()
+  host.innerHTML = ''
+  const nSalles = r.salles.length
+  const sous = [
+    carte.types[m.type].toLowerCase(),
+    `${nSalles} salle${nSalles > 1 ? 's' : ''} franchie${nSalles > 1 ? 's' : ''}`,
+    r.haltes > 0 ? `${r.haltes} rencontre${r.haltes > 1 ? 's' : ''} ou halte${r.haltes > 1 ? 's' : ''}` : '',
+    m.cran > 0 ? `confinement +${m.cran}` : '',
+  ].filter(Boolean)
+  const gains = gainsDeModule({
+    recolte: r,
+    bourseCl: condensat,
+    memoireSolde: records.memoire(),
+    instruments: run.instruments,
+    nomInstrument: (id) => {
+      const d = carteDef(id)
+      return d ? { icone: d.icone, nom: d.nom } : null
+    },
+    paliers: paliersAtteints(run.xp),
+  })
+  // le VOLUME est le grand chiffre de la plaque, au-dessus de ses salles —
+  // les autres gains suivent en tuiles
+  const livre = gains.find((g) => g.cle === 'livre')
+  const bloc = document.createElement('div')
+  bloc.className = 'mb-module'
+  bloc.innerHTML =
+    `<div class="mb-module-tete">` +
+    `<i class="mb-module-sceau" aria-hidden="true">✓</i>` +
+    `<div class="mb-module-nom"><b>${esc(m.nom)}</b><small>${esc(sous.join(' · '))}</small></div>` +
+    (livre
+      ? `<div class="mb-module-total"><small>${esc(livre.nom)}</small><b>${esc(livre.valeur)}</b></div>`
+      : '') +
+    `<ol class="mb-module-salles" aria-label="Les salles franchies">` +
+    pastillesDeSalles(r)
+      .map(
+        (p, i) =>
+          `<li style="--t:${p.teinte};--i:${i}"><span>${esc(p.code)}</span><b>${p.nom}</b>` +
+          `<i aria-hidden="true">${'★'.repeat(p.etoiles)}</i><small>${p.litres}</small></li>`,
+      )
+      .join('') +
+    `</ol></div>` +
+    `<div class="mb-gains">` +
+    gains
+      .filter((g) => g !== livre)
+      .map(mbGainHTML)
+      .join('') +
+    `</div>`
+  host.appendChild(bloc)
+  bande.ponctuation('sting-record', 0.6)
+  mbEclate(bloc.querySelector('.mb-module-sceau'), {
+    n: 70, teintes: [...MB_MENTHE, ...MB_OR], vitesse: 420, gravite: 480, forme: 'confetti', duree: 1.4, taille: 6,
+  })
+  const btn = document.createElement('button')
+  btn.type = 'button'
+  btn.className = 'mb-continuer'
+  btn.textContent = 'CHOISIR LA COURSIVE SUIVANTE ▸'
+  btn.addEventListener('click', () => {
+    if (btn.disabled) return
+    btn.disabled = true
+    bande.ponctuation('sting-collecte', 0.6)
+    mbMontreCarte('suite')
+  })
+  host.appendChild(btn)
+  btn.focus()
 }
 
 /** Fait COULER la jauge de `depart` à `arrivee` : le fluide monte, chaque
@@ -15119,12 +15308,14 @@ function mbAnimeEtalonnage(
 ): void {
   const etal = mbEl('mb-etal')
   etal.hidden = false
+  etal.classList.remove('mb-mince') // la coulée se regarde en grand
   mbEl('mb-etal-tampon').hidden = true
   const gainEl = mbEl('mb-etal-gain')
   const gain = arrivee - depart
   if (gain > 0.005) {
     gainEl.hidden = false
-    gainEl.textContent = `+${gain.toFixed(2)} L`
+    // au même format que le total qu'il fait monter (« 4.5 L +4.50 L »)
+    gainEl.textContent = `+${virgule(gain, 2)} L`
   } else {
     gainEl.hidden = true
   }
@@ -15220,7 +15411,8 @@ function mbVerseXp(litres: number): void {
   // LE TIRAGE GARANTI de la salle scellée s'ajoute aux paliers franchis ;
   // la prime est servie, elle s'éteint ici (les portes suivantes en posent
   // une autre ou aucune)
-  mbDraftsRestants = paliersAtteints(run.xp) - avant + (run.primeSalle === 'tirage' ? 1 : 0)
+  mbTirageGaranti = run.primeSalle === 'tirage'
+  mbDraftsRestants = paliersAtteints(run.xp) - avant + (mbTirageGaranti ? 1 : 0)
   run.primeSalle = null
   mbEtape = 'etalonnage'
   // le bilan est lu : il se replie en bandeau, la jauge prend la scène —
@@ -15254,9 +15446,11 @@ function mbCartes(): HTMLElement {
  * une — certaines payantes en condensat, jamais toutes. */
 function mbMontreDraft(): void {
   mbEtape = 'draft'
-  const palierNo = paliersAtteints(run.xp) - mbDraftsRestants + 1
+  // le titre dit d'où vient le tirage (ceremonie.ts, titreDuTirage) ; et la
+  // BOURSE se lit là où l'on paie : le bandeau ne porte plus de solde (il
+  // rappelle la salle), une carte payante se juge sur ce qu'on a
   mbEl('mb-choix-titre').textContent =
-    `PALIER DE MAÎTRISE ${palierNo} — EMPORTEZ UN INSTRUMENT`
+    `${titreDuTirage(paliersAtteints(run.xp), mbDraftsRestants, mbTirageGaranti)} · EN BOURSE : ${condensat} cL`
   const host = mbCartes()
   host.innerHTML = ''
   // le CARNET DU SEMBLABLE ouvre une quatrième carte
@@ -15372,7 +15566,7 @@ let salleChoisie: LevelDef | null = null
 function mbApresRecompense(): void {
   // LA CARTE : le module épuisé, la coursive suivante se choisit sur le plan
   if (moduleFini(carte, carteRun)) {
-    mbMontreCarte('suite')
+    mbMontreBilanModule()
     return
   }
   mbMontreSallesDuModule()
@@ -15441,6 +15635,7 @@ function montreCarteRun(raison: 'depart' | 'suite'): void {
 
 function mbMontreCarte(raison: 'depart' | 'suite'): void {
   mbEtape = 'carte'
+  mbReleveHors()
   mbQuestion('CHOISISSEZ LA COURSIVE')
   mbScene.classList.add('mb-large')
   mbEl('mb-etal').hidden = true
@@ -15664,26 +15859,30 @@ function centrePlanSurIci(hote: HTMLElement): void {
  *  d'une cache qui se joue, ET l'entrée dans une cache SANS salle (une
  *  chambre au trésor, qu'on ouvre et qu'on quitte) — sans ce second appel,
  *  une cache à zéro niveau ne donnait jamais rien, en silence. */
-function prendOrbeDuModule(): void {
+function prendOrbeDuModule(): string | null {
   const mod = moduleEnCours()
-  if (!mod?.orbe || !moduleFini(carte, carteRun)) return
+  if (!mod?.orbe || !moduleFini(carte, carteRun)) return null
   // UN MODULE TISSÉ porte sa cache EN NŒUD de sa mini-carte (reglagesTissage,
   // coffre: !!m.orbe) : l'orbe se prend là, ou pas — le sas de la dernière
   // salle ne le donnait pas moins, et le nœud n'était plus un choix (revue
   // du 16/09). Seule une cache sans salle, ou un module d'avant les voies,
   // rend son orbe à l'épuisement.
-  if (carteRun.tissage && mod.niveaux > 0 && mod.type !== 'coffre') return
+  if (carteRun.tissage && mod.niveaux > 0 && mod.type !== 'coffre') return null
   // un orbe déjà en poche ou déjà tissé ne se gagne pas deux fois : la
   // cache se vide quand même, et le toast le dit tel quel
   const dejaTenu = records.aOrbe(mod.orbe) || records.eveilTient(mod.orbe)
-  if (!records.videCache(mod.id, mod.orbe)) return
+  if (!records.videCache(mod.id, mod.orbe)) return null
   const nomOrbe = ORBES.find((o) => o.id === mod.orbe)?.nom ?? mod.orbe
+  if (!dejaTenu) run.recolte.orbes.push(nomOrbe)
   toastFile.push(
     dejaTenu
       ? { nom: `LA CACHE EST VIDE — l’orbe ${nomOrbe}, vous l’aviez déjà`, icone: '🔮', sur: mod.nom }
       : { nom: `ORBE D’ESSENCE — ${nomOrbe.toUpperCase()}`, icone: '🔮', sur: `TROUVÉ DANS ${mod.nom}` },
   )
   majMemoireUI()
+  // le nom de l'orbe VRAIMENT gagné : le relevé de la salle le montre en
+  // tuile — le toast seul passait pendant que la médaille tombait
+  return dejaTenu ? null : nomOrbe
 }
 
 /** Entrer dans un module de la carte : un nœud rouvre la carte, un biome
@@ -15700,6 +15899,9 @@ function entreModuleRun(id: string): void {
     id,
     descenteDuJour() ? aleaDeGraine(`${new Date().toISOString().slice(0, 10)}@?${id}`) : Math.random,
   )
+  // UN AUTRE MODULE, UN AUTRE COMPTE : la récolte repart de ce qu'on tient
+  // en entrant — le bilan de fin de module ne dira que ce que CE module a rendu
+  run.recolte = recolteNeuve(id, run.instruments, paliersAtteints(run.xp))
   const m = moduleEnCours()
   // LES HALTES, à la manière du marchand et du feu de camp de Slay the
   // Spire : l'ÉCONOMAT est une salle qu'on joue (la cérémonie se ferme, le
@@ -15737,6 +15939,7 @@ function entreModuleRun(id: string): void {
  *  donnerait rien reste visible mais grisée. Puis la carte se rouvre. */
 function mbMontreRepos(m: ModuleCarte, suite: () => void = () => mbMontreCarte('suite')): void {
   mbEtape = 'repos'
+  mbReleveHors()
   mbScene.classList.remove('mb-large')
   mbQuestion('UNE HALTE — UNE SEULE OFFRE')
   mbEl('mb-choix-titre').textContent = `${m.nom} — ${carte.types[m.type]} : PRENEZ UNE OFFRE, PUIS LA CARTE SE ROUVRE`
@@ -15784,6 +15987,7 @@ function mbMontreRepos(m: ModuleCarte, suite: () => void = () => mbMontreCarte('
  *  bonbonne est pleine. */
 function mbMontreDon(m: ModuleCarte, suite: () => void = () => mbMontreCarte('suite')): void {
   mbEtape = 'repos'
+  mbReleveHors()
   mbScene.classList.remove('mb-large')
   mbQuestion('UNE HALTE — PRENEZ')
   mbEl('mb-choix-titre').textContent = `${m.nom} — ${carte.types[m.type]} : QUELQU’UN A LAISSÉ ÇA LÀ`
@@ -16168,9 +16372,8 @@ function mbMontreSallesVoie(cartes: CarteVoie[]): void {
     (descenteDuJour() ? ' · DESCENTE DU JOUR' : '') +
     stadeNeuf
   // les JAUGES restent en scène, comme à la fin ordinaire : le choix se
-  // prend en voyant ce qu'on possède — étalonnage en grand, réserve en ligne
-  mbEl('mb-etal').hidden = false
-  mbPeintEtal(run.xp)
+  // prend en voyant ce qu'on possède — maîtrise et réserve, chacune en ligne
+  mbJaugeMince()
   // le COMPACT : le bilan déjà lu se replie, les portes prennent la scène
   mbScene.classList.add('mb-compact')
   const host = mbCartes()
@@ -16315,6 +16518,7 @@ function mbMontreSalles(props: LevelDef[]): void {
   mbEtape = 'salles'
   mbQuestion('CHOISISSEZ LA SALLE SUIVANTE')
   mbEl('mb-choix-titre').textContent = 'PAROI DU SAS OUVERTE — DEUX SALLES SE PROPOSENT'
+  mbJaugeMince()
   mbScene.classList.add('mb-compact')
   const host = mbCartes()
   host.innerHTML = ''
@@ -16356,7 +16560,8 @@ function mbJauges(): HTMLElement {
   const jauges = document.createElement('div')
   jauges.className = 'mb-jauges'
   jauges.innerHTML =
-    `<span>🫙 réserve <b>${run.bonbonneLiters.toFixed(2)} / ${capBonbonne()} L</b></span>` +
+    `<span>🫙 réserve <b>${virgule(run.bonbonneLiters)} / ${capBonbonne()} L</b></span>` +
+    `<span>◈ bourse <b>${condensat} cL</b></span>` +
     `<span>💠 vies <b>×${run.vies}</b></span>` +
     `<span>⇣ profondeur <b>${voieRang} / ${longueurRun()}</b></span>`
   return jauges
@@ -16594,8 +16799,9 @@ function mbMontreResultatMiniJeu(r: NonNullable<typeof minijeuResultat>, suite: 
 function mbApresHalte(): void {
   voieRang += 1
   carteRun = franchitSalle(carteRun)
+  run.recolte.haltes += 1
   sauveRun()
-  if (moduleFini(carte, carteRun)) mbMontreCarte('suite')
+  if (moduleFini(carte, carteRun)) mbMontreBilanModule()
   else mbMontreSallesDuModule()
 }
 
@@ -16619,6 +16825,7 @@ function montreSuiteRun(): void {
 function mbMontreCache(m: ModuleCarte): void {
   mbEtape = 'repos'
   const esc = (t: string): string => t.replace(/&/g, '&amp;').replace(/</g, '&lt;')
+  mbReleveHors()
   mbScene.classList.remove('mb-large')
   mbQuestion('LA CACHE')
   mbEl('mb-choix-titre').textContent = `${m.nom} — UNE CHAMBRE CLOSE`
@@ -16632,6 +16839,7 @@ function mbMontreCache(m: ModuleCarte): void {
   // sous un outil rien ne s'écrit ; sinon la cache se vide, une fois par poste
   const prise = !!orbe && !testLevel && records.videCache(m.id, orbe)
   if (prise) majMemoireUI()
+  if (prise && !dejaTenu) run.recolte.orbes.push(nomOrbe)
   const texte = !orbe
     ? 'La chambre est vide. Quelqu’un est passé avant vous.'
     : prise
@@ -16734,6 +16942,7 @@ function appliqueEffets(effets: readonly EffetEvenement[]): string[] {
         const libre = ORBES.filter((o) => !records.aOrbe(o.id) && !records.eveilTient(o.id))
         const pris = libre[Math.floor(Math.random() * libre.length)]
         if (pris && records.gagneOrbe(pris.id)) {
+          run.recolte.orbes.push(pris.nom)
           majMemoireUI()
           lignes.push(`🔮 orbe d’essence — ${pris.nom}`)
         }
@@ -16783,6 +16992,7 @@ function mbMontreEvenement(): void {
 
 function mbPeintEvenement(ev: EvenementDef, alea: () => number): void {
   const esc = (t: string): string => t.replace(/&/g, '&amp;').replace(/</g, '&lt;')
+  mbReleveHors()
   mbScene.classList.remove('mb-large')
   mbScene.classList.add('mb-compact')
   mbQuestion(ev.titre)
@@ -16857,9 +17067,8 @@ function mbTranche(ev: EvenementDef, choix: ChoixEvenement, alea: () => number):
 function mbMontreFin(): void {
   mbEtape = 'fin'
   mbEl('mb-choix-titre').textContent = 'PAROI DU SAS OUVERTE'
-  // la jauge d'étalonnage reste en scène (l'XP se lit dessus, en grand)
-  mbEl('mb-etal').hidden = false
-  mbPeintEtal(run.xp)
+  // la jauge d'étalonnage reste en scène, repliée sur une ligne
+  mbJaugeMince()
   mbScene.classList.add('mb-compact')
   const host = mbCartes()
   host.innerHTML = ''
@@ -16887,6 +17096,7 @@ function montreMiseEnBonbonne(b: BilanSalle): void {
   miseEnBonbonne = true
   mbEtape = 'bilan'
   mbDraftsRestants = 0
+  mbTirageGaranti = false
   mbBilanCourant = b
   mbVeil.hidden = false
   mbFeuDimensionne()
@@ -16910,12 +17120,15 @@ function montreMiseEnBonbonne(b: BilanSalle): void {
   mbEl('mb-eau').style.height = '0%'
   mbEl('mb-l').textContent = '0,00 L'
   mbEl('mb-prime').hidden = true
+  mbEl('mb-verse').hidden = true
   mbEl('mb-glace').hidden = true
   mbEl('mb-choix').hidden = true
-  mbEl('mb-cond').hidden = true
-  mbEl('mb-cond').classList.remove('mb-on')
+  // LA RÉCOLTE : les tuiles sont posées d'emblée, invisibles — elles
+  // tiennent leur place, le relevé ne grandit pas quand elles paraissent
+  mbEl('mb-recolte').classList.remove('mb-on')
+  mbEl('mb-gains').innerHTML = b.gains.map(mbGainHTML).join('')
   mbEl('mb-etal').hidden = true
-  mbEl('mb-etal').classList.remove('coule')
+  mbEl('mb-etal').classList.remove('coule', 'mb-mince')
   mbEl('mb-etal-tampon').hidden = true
   mbEl('mb-etal-gain').hidden = true
   mbEl('mb-palier-eclair').hidden = true
@@ -16960,7 +17173,7 @@ function montreMiseEnBonbonne(b: BilanSalle): void {
       // la valeur finale : on vérifie l'étape avant d'écrire
       if (mbEtape !== 'bilan') return
       const t = Math.min(1, (performance.now() - t0) / 1300)
-      mbEl('mb-l').textContent = `${compteur(0, b.surplus, t).toFixed(2)} L`
+      mbEl('mb-l').textContent = fmtL(compteur(0, b.surplus, t))
       if (t < 1) requestAnimationFrame(litres)
     }
     requestAnimationFrame(litres)
@@ -16969,7 +17182,8 @@ function montreMiseEnBonbonne(b: BilanSalle): void {
     apres(TEMPS_BILAN.prime, () => {
       const pr = mbEl('mb-prime')
       pr.hidden = false
-      pr.textContent = `+${b.prime.toFixed(2)} L — PRIME DE GLACE`
+      // « dont » : la prime est DANS le volume affiché, elle ne s'y ajoute pas
+      pr.textContent = `dont +${fmtL(b.prime)} de PRIME DE GLACE`
       mbEl('mb-glace').hidden = false
       audio.iceImpact(1)
       mbEclate(mbVeil.querySelector('.mb-flacon'), { n: 24, teintes: MB_EAU, vitesse: 240, gravite: 500 })
@@ -16977,22 +17191,28 @@ function montreMiseEnBonbonne(b: BilanSalle): void {
   }
   // Temps 3 — la LECTURE DU PROTOCOLE : les lignes glissent une à une,
   // chacune avec sa barre ; un record se TAMPONNE, en or, avec son feu
+  // Trois lignes, trois chiffres DIFFÉRENTS : la première redisait le volume
+  // du grand compteur voisin (« 4.50 L » deux fois à trente pixels d'écart) —
+  // elle dit maintenant la PART livrée, celle dont le rang se déduit. Sous la
+  // barre, ce que le chiffre veut dire et le record à battre ; un record
+  // absent ne s'écrit plus (« record : — » sous deux lignes sur trois).
   const tampon = (neuf: boolean): string =>
     neuf ? `<em class="mb-record">RECORD DU PROTOCOLE</em>` : ''
   const ligne = (ico: string, nom: string, f: number, val: string, sous: string, neuf: boolean, record: string): string =>
     `<div class="mb-ligne${neuf ? ' mb-neuf' : ''}">` +
     `<span class="mb-ligne-nom"><i>${ico}</i>${nom}</span>` +
     `<span class="mb-ligne-barre" style="--f:${Math.max(0, Math.min(1, f)).toFixed(3)}"></span>` +
-    `<span class="mb-ligne-val"><b>${val}</b><small>${sous}</small></span>` +
+    `<span class="mb-ligne-val"><b>${val}</b></span>` +
+    `<small class="mb-ligne-sous">${sous}${!neuf && record && record !== '—' ? `${sous ? ' · ' : ''}<em>record ${record}</em>` : ''}</small>` +
     tampon(neuf) +
-    (neuf || !record ? '' : `<small class="mb-ligne-rec">record : ${record}</small>`) +
     `</div>`
   const lignes = [
-    ligne('💧', 'VOLUME LIVRÉ', b.pct, `${b.surplus.toFixed(2)} L`, `${Math.round(b.pct * 100)} % du départ`, b.newVolume, b.recVol),
+    ligne('💧', 'PART LIVRÉE', b.pct, `${Math.round(b.pct * 100)} %`, 'du volume de départ', b.newVolume, b.recVol),
     // la barre du chrono se remplit d'autant que la salle est vite passée :
     // une minute la remplit à moitié, dix secondes presque en entier
     ligne('⏱', 'CHRONO', 60 / (60 + Math.max(0, b.temps)), fmtTime(b.temps), '', b.newChrono, b.recChr),
-    ligne('◈', 'NOTE', b.note / 300, String(b.note), motDeNote(b.note), false, ''),
+    // la note se disait sans dire d'où elle sort : le volume, pesé par la vitesse
+    ligne('❖', 'NOTE', b.note / 300, String(b.note), `${motDeNote(b.note)} — le volume, pesé par la vitesse`, false, ''),
   ]
   const hostLignes = mbEl('mb-lignes')
   hostLignes.innerHTML = lignes.join('')
@@ -17009,23 +17229,31 @@ function montreMiseEnBonbonne(b: BilanSalle): void {
       }
     })
   })
-  // Temps 4 — le CONDENSAT : les centilitres s'égrènent vers la réserve
+  // Temps 4 — LA RÉCOLTE : chaque tuile se pose à son tour, son chiffre
+  // ROULE jusqu'au gain — condensat, mémoire, puis l'exceptionnel
   apres(TEMPS_BILAN.condensat, () => {
-    const cond = mbEl('mb-cond')
-    cond.hidden = false
-    cond.classList.add('mb-on')
-    mbEl('mb-cond-gain').textContent = `+${b.gainCl} cL`
-    mbEclate(mbEl('mb-cond-n'), { n: 26, teintes: MB_MENTHE, vitesse: 220, gravite: 420, duree: 0.8, taille: 3 })
-    const c0 = performance.now()
-    const roule = (): void => {
-      if (mbEtape !== 'bilan') return // même garde que les litres
-      const t = Math.min(1, (performance.now() - c0) / 1100)
-      mbEl('mb-cond-n').textContent = String(
-        Math.round(compteur(b.totalCl - b.gainCl, b.totalCl, t)),
-      )
-      if (t < 1) requestAnimationFrame(roule)
-    }
-    requestAnimationFrame(roule)
+    mbEl('mb-recolte').classList.add('mb-on')
+    Array.from(mbEl('mb-gains').children).forEach((tuile, i) => {
+      const g = b.gains[i]
+      if (!g) return
+      apres(i * 170, () => {
+        tuile.classList.add('mb-on')
+        const teinte = getComputedStyle(tuile).getPropertyValue('--t').trim() || '#6dffb8'
+        mbEclate(tuile.querySelector('.mb-gain-ico'), { n: 22, teintes: [teinte, '#eaf6ff'], vitesse: 220, gravite: 420, duree: 0.8, taille: 3 })
+        if (g.cle === 'orbe' || g.cle === 'tirage') bande.ponctuation('sting-record', 0.5)
+        const val = tuile.querySelector('.mb-gain-val')
+        if (!val || g.n <= 0) return
+        const c0 = performance.now()
+        const roule = (): void => {
+          if (mbEtape !== 'bilan') return // sauté : mbFigeBilan a écrit la valeur finale
+          const t = Math.min(1, (performance.now() - c0) / 1000)
+          // arrivé, le chiffre est celui du module de règles, à la lettre
+          val.textContent = t >= 1 ? g.valeur : `${g.prefixe}${Math.round(compteur(0, g.n, t))}${g.suffixe}`
+          if (t < 1) requestAnimationFrame(roule)
+        }
+        requestAnimationFrame(roule)
+      })
+    })
   })
   // Temps 5 — LE VERSEMENT
   apres(TEMPS_BILAN.versement, mbMontreVersement)
@@ -17403,6 +17631,9 @@ function newExpedition(avecCarte = false): void {
   appliqueProvisions()
   carteRun = { ...departCarte(carte), graineRun: graineRun() }
   premiereSalleDeLaRun = avecCarte
+  // la récolte repart avec la run ; l'entrée dans le premier module la
+  // rattachera à lui (entreModuleRun)
+  run.recolte = recolteNeuve(carteRun.module, run.instruments, paliersAtteints(run.xp))
   if (avecCarte) {
     // AU SAS DE LANCEMENT, la carte s'ouvre : le premier module se choisit
     // sur le plan, puis ses salles en vignettes — la première salle de la
@@ -17419,6 +17650,7 @@ function newExpedition(avecCarte = false): void {
     carteRun =
       entreModule(carte, carteRun, premiere.module.id, orbesAcquis()) ??
       carteRun
+  run.recolte = recolteNeuve(carteRun.module, run.instruments, paliersAtteints(run.xp))
   restart()
 }
 
@@ -19970,7 +20202,16 @@ function corpsImage(now: number): boolean {
     // purgée à la fin) — y compris sur la
     // dernière salle : rien de ce qui atteint le sas n'est jamais perdu
     // LA PRIME DE CONDENSAT : la salle scellée paie double dans la bourse
-    gagneCondensat(surplus * 100 * rendement * (run.primeSalle === 'condensat' ? 2 : 1))
+    // UN SEUL CALCUL pour le crédit et pour l'écran (game/recolte.ts) : le
+    // relevé annonçait le gain sans le doublement de la salle scellée —
+    // 900 cL versés, « +450 cL » affichés
+    const condSas = condensatDuSas({
+      surplusL: surplus,
+      rendement,
+      primeDouble: run.primeSalle === 'condensat',
+      pastillesCl: run.pastillesCl,
+    })
+    gagneCondensat(condSas.verse)
     // Trophées de collecte : « Sans une goutte » (≥ 95 % du volume de
     // départ livré) et « Opérateur de nuit » (21 collectes cumulées)
     if (!sasOutil) {
@@ -20003,16 +20244,18 @@ function corpsImage(now: number): boolean {
       stationDebout('mur-records', records.estRepare('mur-records')) && (newVolume || newChrono) ? 2 : 0
     // LE CONFINEMENT SUPÉRIEUR paie : la mémoire du sas se multiplie par
     // 1 + cran du module — « plus difficile, plus généreux » (§9.3)
-    gagneMemoireRun(
-      (5 +
-        (premiereFois ? 5 : 0) +
-        (newVolume ? 2 : 0) +
-        (newChrono ? 2 : 0) +
-        primeMur) *
-        primeMemoireDu(moduleEnCours()) *
-        // LA PRIME DE MÉMOIRE : la salle scellée paie double au sas
-        (run.primeSalle === 'memoire' ? 2 : 1),
-    )
+    // (le calcul vit dans game/recolte.ts : le relevé de la salle en montre
+    // le détail — cette mémoire se gravait jusqu'ici sans paraître à l'écran)
+    const memSas = memoireDuSas({
+      premiereFois,
+      newVolume,
+      newChrono,
+      primeMur,
+      facteurModule: primeMemoireDu(moduleEnCours()),
+      // LA PRIME DE MÉMOIRE : la salle scellée paie double au sas
+      primeDouble: run.primeSalle === 'memoire',
+    })
+    const memoireGravee = gagneMemoireRun(memSas.brut)
     // Publication au tableau d'honneur partagé : le serveur ne garde que le
     // meilleur — la réponse remet les registres affichés à jour.
     if (!sasOutil)
@@ -20059,7 +20302,10 @@ function corpsImage(now: number): boolean {
     voieRang += 1 // la descente avance : c'est la progression, pas un titre
     carteRun = franchitSalle(carteRun) // et le module se vide d'une salle
     // LA CACHE : un module qui recèle un orbe le donne quand il est épuisé
-    if (!sasOutil) prendOrbeDuModule()
+    const orbeRendu = sasOutil ? null : prendOrbeDuModule()
+    // la salle s'inscrit à la récolte du module : son code, sa part, ses litres
+    const partLivree = surplus / Math.max(0.01, volumeDepart() * params.litersPerParticle)
+    run.recolte.salles.push({ code: level.code, pct: partLivree, litres: surplus })
     voieVues.add(level.code) // la pioche ne la reproposera pas de la run
     if (!sasOutil) {
       const p = chargePalmaresVoie()
@@ -20162,7 +20408,7 @@ function corpsImage(now: number): boolean {
       montreMiseEnBonbonne({
         surplus,
         prime,
-        pct: surplus / Math.max(0.01, volumeDepart() * params.litersPerParticle),
+        pct: partLivree,
         temps: run.tableauTime,
         newVolume,
         newChrono,
@@ -20173,8 +20419,17 @@ function corpsImage(now: number): boolean {
           ? `${fmtTime(bests.chrono.time)}${bests.chrono.name ? ' · ' + htmlSafe(bests.chrono.name) : ''}`
           : '—',
         note: Math.round((surplus * 100 * 60) / (60 + run.tableauTime)),
-        gainCl: Math.round(surplus * 100 * rendement) + run.pastillesCl,
-        totalCl: condensat,
+        // LA RÉCOLTE : ce que le sas a réellement crédité, en tuiles
+        gains: gainsDeSalle({
+          condensat: condSas,
+          bourseCl: condensat,
+          memoire: memoireGravee,
+          memoireDetail:
+            memSas.detail + (records.fioleEquipee('souvenir') ? ' · fiole de souvenir +25 %' : ''),
+          memoireSolde: records.memoire(),
+          tirageGaranti: run.primeSalle === 'tirage',
+          orbe: orbeRendu,
+        }),
       })
     }
     // la cinématique de CONCLUSION du tableau : par-dessus le bilan — la
