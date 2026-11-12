@@ -27,6 +27,7 @@ planche des équipements et le couloir. Le moteur les lit dans public/assets/coq
 
     python3 tools/images/coque2d.py            (tout)
     python3 tools/images/coque2d.py chaud      (les seules pièces de la chaufferie)
+    python3 tools/images/coque2d.py serre      (le cylindre de culture)
     python3 tools/images/coque2d.py tempere    (tout le reste)
 """
 
@@ -186,56 +187,42 @@ DETAILS = {
 }
 
 
-def serre() -> None:
-    """LA SERRE EN CYLINDRE DE CULTURE (05/10) : des tranches vitrées répétées
-    sur la longueur, un anneau à chaque jonction, un dôme à chaque bout, un
-    berceau de machines dessous, des capsules pour la mini-carte.
+# le dôme rendu fait 1638 × 2048 ; son débord doit valoir 0,655 hauteur
+DOME_SERRE = 0.834
 
-    · LES TRANCHES ET L'ANNEAU EN TROIS MORCEAUX, haut, bande, bas : la bande
-      se répète en hauteur. Étirée d'un bloc à la hauteur du module (~3
-      salles), une tranche n'avait que ~400 px par largeur de salle — floue
-      dès qu'on zoomait sur la salle, au Steam Deck surtout (06/10). Les deux
-      tranches partagent leurs étagères aux lignes 429, 703 et 1281 : la
-      bande 429–703 se répète, les étagères restent alignées d'une tranche à
-      l'autre. L'anneau : son chapeau et sa lampe (0–775), un module de
-      plaques (775–1035), son pied.
-    · EN PLEINE RÉSOLUTION (pas les 80 % des autres pièces) : posées à
-      deux bandes par étagère d'origine, elles donnent ~1000 px par salle."""
-    for n in ('tranche', 'tranche-2'):
-        a = raccorde(lit(f'serre-{n}'), sens=1)
-        # la rampe de culture, en haut du vitrage : trois fois plus claire que
-        # le reste de l'image, elle ferait un néon continu sur tout le module
-        y = np.arange(a.shape[0])[:, None, None] / a.shape[0]
-        a = sombre(a * (1 - 0.3 * np.exp(-(((y - 0.145) / 0.03) ** 2))), 0.9)
-        # en neuf morceaux : la bande d'étagère répétée en hauteur, le cœur en
-        # largeur — à pleine finesse, d'un bloc, la tranche faisait des
-        # capsules étroites et hautes, neuf anneaux au lieu de quatre (06/10)
-        neuf(f'serre-{n}', a, 429, 703, a.shape[0], d=820, debut_bas=1281)
-    # LES ZONES (06/10) : une capsule entière par thème le long du cylindre,
-    # pour varier dans la longueur au lieu de répéter. Leur gabarit n'est pas
-    # celui des tranches (bacs aux lignes 424 et 871, rebord haut plus fin,
-    # rebord bas jusqu'à 1440) : neuf morceaux propres, les mêmes colonnes
-    for z in ('algues', 'champignons'):
-        neuf(f'serre-zone-{z}', sombre(raccorde(lit(f'serre-zone-{z}'), sens=1), 0.85), 424, 871, 1440)
-    # LES ÉTAGÈRES DE RECHANGE : une étagère (bacs toutes les 323 lignes),
-    # raccordée dans les deux sens — elles remplacent au hasard la bande du
-    # cœur des capsules du jardin d'air, cinq étagères au lieu de deux
-    for e in ('1', '3'):
-        t = lit(f'serre-etageres-{e}')[247:571]
-        t = raccorde(raccorde(t.transpose(1, 0, 2), b=24, sens=1).transpose(1, 0, 2), sens=1)
-        ecrit(f'serre-etagere-{e}', t, 1)
-    # les pièces détourées, ramenées à la luminosité des tranches (~10 %)
-    an = sombre(detoure(lit('serre-anneau')), 0.6)
-    ys, xs = np.where(an[..., 3] > 0.5)
-    an = an[:, xs.min():xs.max() + 1]
-    ecrit('serre-anneau-haut', an[ys.min():775], 1)
-    ecrit('serre-anneau-bande', boucle(an[775:1035], an[775 - 16:775]), 1)
-    ecrit('serre-anneau-bas', amorce(an[1035:ys.max() + 1], an[775:775 + 16]), 1)
+
+def serre() -> None:
+    """LA SERRE ORBITALE (12/11) : le cylindre de culture, refait dans Blender
+    (tools/images/blender/serre.py) — des bandes qui s'empilent dans n'importe
+    quel ordre, plantées chacune par un tirage, une sur trois avec sa
+    passerelle et son poste de travail ; la cloison et son échelle ; le
+    berceau, les dômes, la capsule de la mini-carte.
+
+    · LES BANDES EN PLEINE RÉSOLUTION (1024 px par salle, comme les tranches
+      qu'elles remplacent : floues à 80 %, 06/10), 2048 px de long : elles se
+      raccordent à gauche et à droite par construction.
+    · LA COQUE ASSOMBRIE à la luminance des pièces remplacées (tranche 0,097,
+      anneau 0,095 — mesuré le 12/11 ; le berceau un cran dessous), pour que la salle et
+      les capsules restent ce qui se lit en premier.
+    · LA CLOISON EN TROIS MORCEAUX, au gabarit de l'ancien anneau : sa tête
+      (765 lignes), une bande d'échelle répétée (260 : quatre barreaux), son
+      pied et sa porte (491).
+    · LES DÔMES RESSERRÉS en largeur : rendus à 0,785 fois leur hauteur, ils
+      débordent de 0,655 dans le moteur (render/module2d.ts, CYL_DOME)."""
+    for n, k in (('haut', 0.8), ('bas', 0.75), ('bande-feuillus', 0.8), ('bande-fougeres', 0.8), ('bande-aromates', 0.75),
+                 ('bande-mixte', 0.8), ('bande-semis', 0.8), ('bande-algues', 0.6), ('poste-analyse', 0.75),
+                 ('poste-nutriments', 0.75), ('poste-semis', 0.72)):
+        ecrit(f'serre-{n}', sombre(lit(f'serre-{n}'), k), 1)
+    an = sombre(lit('serre-anneau'), 0.78)
+    ecrit('serre-anneau-haut', an[:765], 1)
+    ecrit('serre-anneau-bande', boucle(an[765:1025], an[765 - 16:765]), 1)
+    ecrit('serre-anneau-bas', amorce(an[1025:], an[765:765 + 16]), 1)
     for n in ('dome-gauche', 'dome-droit'):
-        ecrit(f'serre-{n}', sombre(detoure(lit(f'serre-{n}')), 0.65))
-    b = detoure(lit('serre-berceau'))
-    ecrit('serre-berceau', sombre(raccorde(b, sens=1), 0.7))
-    cellule('serre-capsule', 'serre-cellule', capsule=True)
+        d = Image.fromarray((np.clip(lit_alpha(f'serre-{n}'), 0, 1) * 255).astype(np.uint8), 'RGBA')
+        d = d.resize((round(d.width * 0.75 * DOME_SERRE), round(d.height * 0.75)), Image.LANCZOS)
+        ecrit(f'serre-{n}', np.asarray(d).astype(float) / 255, 1)
+    ecrit('serre-berceau', sombre(lit_alpha('serre-berceau'), 0.72), 1)
+    ecrit('serre-cellule-neutre', lit_alpha('serre-cellule'), 1)
 
 
 # LA CHAUFFERIE — douze pièces rendues dans Blender, toutes à la même caméra
@@ -311,7 +298,6 @@ def tempere() -> None:
     for n in ('baie', 'baie-2', 'colonne', 'trappe', 'machinerie'):
         ecrit(f'{b}{n}', sombre(detoure(lit(b + n), rogne=True), SOMBRE_COQUE))
     cellule()
-    serre()
     planche = lit('equipements')
     for n, (x0, y0, x1, y1) in EQUIPEMENTS.items():
         ecrit(f'equipement-{n}', sombre(detoure(planche[y0:y1, x0:x1], rogne=True), SOMBRE_EQUIPEMENT))
@@ -335,6 +321,8 @@ def main() -> None:
         tempere()
     if not quoi or 'chaud' in quoi:
         chaud()
+    if not quoi or 'serre' in quoi:
+        serre()
 
 
 if __name__ == '__main__':

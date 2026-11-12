@@ -30,6 +30,8 @@ _src = os.path.join(DOSSIER, 'chaud_tole.py')
 exec(compile(open(_src, encoding='utf-8').read(), _src, 'exec'), globals())
 
 PIECES = {}
+# le préfixe des fichiers rendus (la serre, qui charge cet atelier, le vide)
+PREFIXE = 'chaud-'
 BISEAU = {'peinture': 0.003, 'tuyau': 0.0015, 'lame': 0.0008}
 
 
@@ -571,7 +573,8 @@ def rend(nom, sortie, echantillons=ECHANTILLONS, pourcent=100):
     sc = bpy.context.scene
     p = PIECES[nom]
     for q in PIECES.values():
-        q['coll'].hide_render = q is not p
+        # (par collection : plusieurs pièces peuvent cadrer la même, découpée)
+        q['coll'].hide_render = q['coll'] is not p['coll']
     w = p['x1'] - p['x0'] + 2 * p['mx'] / PX
     h = p['z1'] - p['z0'] + 2 * p['mz'] / PX
     cam = sc.camera
@@ -584,7 +587,7 @@ def rend(nom, sortie, echantillons=ECHANTILLONS, pourcent=100):
     sc.cycles.samples = echantillons
     r.image_settings.file_format = 'PNG'
     r.image_settings.color_mode = 'RGBA'
-    brut = os.path.join(sortie, 'brut', f'chaud-{nom}.png')
+    brut = os.path.join(sortie, 'brut', f'{PREFIXE}{nom}.png')
     r.filepath = brut
     bpy.ops.render.render(write_still=True)
     r.resolution_percentage = 100
@@ -606,9 +609,9 @@ def rend(nom, sortie, echantillons=ECHANTILLONS, pourcent=100):
         o.file_format = 'PNG'
         o.save()
         bpy.data.images.remove(o)
-    ecrit(os.path.join(sortie, f'chaud-{nom}.png'), noir, False)
+    ecrit(os.path.join(sortie, f'{PREFIXE}{nom}.png'), noir, False)
     if p['alpha']:
-        ecrit(os.path.join(sortie, 'alpha', f'chaud-{nom}.png'), np.concatenate([a[..., :3], al], axis=2), True)
+        ecrit(os.path.join(sortie, 'alpha', f'{PREFIXE}{nom}.png'), np.concatenate([a[..., :3], al], axis=2), True)
     rgb = a[..., :3]
     poids = al[..., 0]
     tot = max(float(poids.sum()), 1.0)
