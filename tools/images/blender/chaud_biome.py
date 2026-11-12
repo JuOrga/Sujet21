@@ -114,6 +114,15 @@ def mat_tuyau():
     c = melange(nt, op(nt, 'MULTIPLY', rampe(nt, sale, 0.4, 0.7), 0.7), lin((0x3e, 0x48, 0x54)), lin(FOND))
     rouil = bruit_tore(nt, 14, 5, 12, detail=4, rugo=0.5)
     c = melange(nt, op(nt, 'MULTIPLY', rampe(nt, rouil, 0.6, 0.72), 0.6), c, lin(ROUILLE))
+    # le piqué fin, comme la peinture (chaud_tole.py)
+    pique = bruit_tore(nt, 60, 60, 25, detail=6, rugo=0.75)
+    c = melange(nt, op(nt, 'MULTIPLY', rampe(nt, pique, 0.47, 0.3), 0.6), c, lin(FOND))
+    c = melange(nt, op(nt, 'MULTIPLY', rampe(nt, pique, 0.58, 0.74), 0.35), c, lin((0x70, 0x7a, 0x86)))
+    bosse = nt.nodes.new('ShaderNodeBump')
+    bosse.inputs['Strength'].default_value = 0.5
+    bosse.inputs['Distance'].default_value = 0.0015
+    nt.links.new(pique, bosse.inputs['Height'])
+    nt.links.new(bosse.outputs[0], b.inputs['Normal'])
     nt.links.new(c, b.inputs['Base Color'])
     return mat
 

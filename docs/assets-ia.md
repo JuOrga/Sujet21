@@ -2238,8 +2238,21 @@ travail **en orbite** : culture hors-sol, aucun outil de jardin terrestre.
 
 Le moteur (`module2dCanvas.ts`, `peintCylindre`) empile haut, bandes et bas
 par capsule, chaque bande à un décalage tiré ; la cloison couvre la jonction.
-Dix-huit images (640 Ko) en remplacent quarante-cinq (1 804 Ko). Livrer :
+Dix-huit images en remplacent quarante-cinq. Livrer :
 `python3 tools/images/coque2d.py serre`.
+
+**La netteté (12/11, le soir)** : « pas net du tout » quand le tableau tient
+l'écran. Trois causes, trois réponses. Les rendus Blender ont trois à quatre
+fois moins de détail fin que les pièces peintes (contraste local 3 contre 12
+pour la tôle, 5 contre 18 pour la serre) : l'acier a reçu un grain en relief
+et des griffures, le débruiteur de Cycles — qui les gommait — est coupé (384
+échantillons à la place), les plantes ont leurs textures en 2k, et la
+livraison accentue les arêtes (`affine`). La toile proche était peinte à
+1024 px par salle pour une salle qui en occupe ~1900 à l'écran : toutes les
+pièces de la chaufferie et de la serre sont re-rendues à **1536 px par
+salle** et livrées sans réduction, la toile proche passe à 1536 sur 0,6
+salle de marge (`module2d.ts`). Enfin le shader floutait d'un cran le décor
+contre la salle : 0,35 cran. Poids : chaufferie 532 Ko, serre 1,4 Mo.
 
 **À venir** : des cultures de plus (potager, céréales, verger nain) ; les
 pièces propres du cryo, de l'antichambre et de

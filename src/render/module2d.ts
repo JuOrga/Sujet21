@@ -722,8 +722,13 @@ export function genreTransition(avant: PositionSalle | null, apres: PositionSall
 // 1024 depuis le 06/10 : la finesse des pièces de la serre, livrées en
 // pleine résolution — à 850, le Steam Deck (1280 × 800, salle entière à
 // ~1380 px d'écran par largeur de salle) agrandissait encore la toile
-export const DENSITE_PROCHE = 1024
-export const MARGE_PROCHE = 0.9
+// 1536 depuis le 12/11, sur 0,6 salle de marge au lieu de 0,9 : le tableau
+// en plein écran tient une salle sur ~1900 px, la toile à 1024 s'y voyait
+// agrandie près de deux fois. La marge réduite garde la toile sous les
+// 10 millions de pixels (3379 × 2765 pour une salle de 0,6 de haut ; elle en
+// faisait 7,2 à 1024 sur 0,9)
+export const DENSITE_PROCHE = 1536
+export const MARGE_PROCHE = 0.6
 
 /** La fenêtre de la toile proche : ce qu'elle couvre (pixels de la toile
  *  de base), son grossissement, et où elle tombe dans le monde. */

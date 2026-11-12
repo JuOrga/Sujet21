@@ -187,7 +187,8 @@ DETAILS = {
 }
 
 
-# le dôme rendu fait 1638 × 2048 ; son débord doit valoir 0,655 hauteur
+# le dôme rendu fait 2457 × 3072, livré aux trois quarts ; son débord doit
+# valoir 0,655 hauteur
 DOME_SERRE = 0.834
 
 
@@ -198,39 +199,42 @@ def serre() -> None:
     passerelle et son poste de travail ; la cloison et son échelle ; le
     berceau, les dômes, la capsule de la mini-carte.
 
-    · LES BANDES EN PLEINE RÉSOLUTION (1024 px par salle, comme les tranches
-      qu'elles remplacent : floues à 80 %, 06/10), 2048 px de long : elles se
-      raccordent à gauche et à droite par construction.
+    · LES BANDES TELLES QUE RENDUES, à 1536 px par salle (3072 × 411) : elles
+      se raccordent à gauche et à droite par construction. À 1024, le tableau
+      en plein écran les agrandissait près de deux fois (12/11).
     · LA COQUE ASSOMBRIE à la luminance des pièces remplacées (tranche 0,097,
       anneau 0,095 — mesuré le 12/11 ; le berceau un cran dessous), pour que la salle et
       les capsules restent ce qui se lit en premier.
     · LA CLOISON EN TROIS MORCEAUX, au gabarit de l'ancien anneau : sa tête
-      (765 lignes), une bande d'échelle répétée (260 : quatre barreaux), son
-      pied et sa porte (491).
+      (1148 lignes), une bande d'échelle répétée (390 : quatre barreaux), son
+      pied et sa porte.
     · LES DÔMES RESSERRÉS en largeur : rendus à 0,785 fois leur hauteur, ils
       débordent de 0,655 dans le moteur (render/module2d.ts, CYL_DOME)."""
     for n, k in (('haut', 0.8), ('bas', 0.75), ('bande-feuillus', 0.8), ('bande-fougeres', 0.8), ('bande-aromates', 0.75),
                  ('bande-mixte', 0.8), ('bande-semis', 0.8), ('bande-algues', 0.6), ('poste-analyse', 0.75),
                  ('poste-nutriments', 0.75), ('poste-semis', 0.72)):
-        ecrit(f'serre-{n}', sombre(lit(f'serre-{n}'), k), 1)
-    an = sombre(lit('serre-anneau'), 0.78)
-    ecrit('serre-anneau-haut', an[:765], 1)
-    ecrit('serre-anneau-bande', boucle(an[765:1025], an[765 - 16:765]), 1)
-    ecrit('serre-anneau-bas', amorce(an[1025:], an[765:765 + 16]), 1)
+        ecrit(f'serre-{n}', affine(sombre(lit(f'serre-{n}'), k)), 1)
+    an = affine(sombre(lit('serre-anneau'), 0.78))
+    ecrit('serre-anneau-haut', an[:1148], 1)
+    ecrit('serre-anneau-bande', boucle(an[1148:1538], an[1148 - 24:1148]), 1)
+    ecrit('serre-anneau-bas', amorce(an[1538:], an[1148:1148 + 24]), 1)
     for n in ('dome-gauche', 'dome-droit'):
         d = Image.fromarray((np.clip(lit_alpha(f'serre-{n}'), 0, 1) * 255).astype(np.uint8), 'RGBA')
         d = d.resize((round(d.width * 0.75 * DOME_SERRE), round(d.height * 0.75)), Image.LANCZOS)
-        ecrit(f'serre-{n}', np.asarray(d).astype(float) / 255, 1)
-    ecrit('serre-berceau', sombre(lit_alpha('serre-berceau'), 0.72), 1)
-    ecrit('serre-cellule-neutre', lit_alpha('serre-cellule'), 1)
+        ecrit(f'serre-{n}', affine(np.asarray(d).astype(float) / 255), 1)
+    ecrit('serre-berceau', affine(sombre(lit_alpha('serre-berceau'), 0.72)), 1)
+    # la capsule de la mini-carte reste petite à l'écran : 1024 de large
+    ecrit('serre-cellule-neutre', lit_alpha('serre-cellule'), 1024 / 1536)
 
 
 # LA CHAUFFERIE — douze pièces rendues dans Blender, toutes à la même caméra
-# de face et à 1024 px par largeur de salle. Le moteur compte 853 px livrés
-# par salle (PX_PAR_SALLE × 2 × LIVRE dans module2dCanvas.ts) : elles sont
-# ramenées à cette échelle, et se posent comme les pièces tempérées.
-PX_BLENDER = 1024
-PX_LIVRE = 853
+# de face. D'abord rendues à 1024 px par largeur de salle et ramenées à 853
+# (l'échelle livrée des tempérées) ; le tableau en plein écran — une salle sur
+# ~1900 px — les agrandissait alors plus de deux fois, « pas net du tout »
+# (12/11). Elles sont rendues à 1536 px par salle et livrées TELLES QUELLES :
+# le moteur connaît leur échelle (module2dCanvas.ts, JEUX, echelle).
+PX_BLENDER = 1536
+PX_LIVRE = 1536
 # la tôle sort de Blender à 0,135 de luminance ; la tôle tempérée LIVRÉE
 # mesure 0,085 (12/11) — la coque ne doit pas passer devant la salle
 SOMBRE_CHAUD = 0.63
@@ -254,10 +258,22 @@ def sombre_sauf_braise(a: np.ndarray, k: float) -> np.ndarray:
     return b
 
 
+def affine(a: np.ndarray, force: int = 70) -> np.ndarray:
+    """Accentue les arêtes (masque flou, rayon 1,2 px) : un rendu Blender est
+    plus doux qu'une peinture — trois à quatre fois moins de contraste local
+    que les pièces générées, mesuré le 12/11. La couche alpha n'y passe pas."""
+    im = Image.fromarray((np.clip(a[..., :3], 0, 1) * 255).astype(np.uint8), 'RGB').filter(ImageFilter.UnsharpMask(radius=1.2, percent=force, threshold=1))
+    b = a.copy()
+    b[..., :3] = np.asarray(im).astype(float) / 255
+    return b
+
+
 def reduit(a: np.ndarray, boucle_x: bool = False, boucle_y: bool = False) -> np.ndarray:
     """De 1024 à 853 px par salle. Une pièce qui se répète est réduite ENTRE
     DEUX COPIES d'elle-même, puis recoupée : réduite seule, le filtre lisait
     son bord comme une fin d'image, et la couture revenait."""
+    if PX_LIVRE == PX_BLENDER:
+        return affine(a)
     h, w = a.shape[:2]
     nh, nw = round(h * PX_LIVRE / PX_BLENDER), round(w * PX_LIVRE / PX_BLENDER)
     t = np.tile(a, (3 if boucle_y else 1, 3 if boucle_x else 1, 1))

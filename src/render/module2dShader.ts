@@ -79,7 +79,10 @@ void main() {
   // LA COUVERTURE (mode 1) PEINT LE MÊME DÉCOR que le mode 0 — même flou,
   // même ombre : elle déborde de la salle (main.ts la gonfle de la frange de
   // la coque), et la moindre différence dessinait le bord de son quad
-  float flou = uMode > 1.5 ? 0.0 : uOmbre * (1.0 - smoothstep(0.0, 0.14, d));
+  // (et de 1,0 à 0,35 le 12/11 : le tableau en plein écran ne montre que
+  // cette bande, et un cran de flou sur une toile déjà agrandie la rendait
+  // « pas nette du tout » — l'ombre suffit à détacher la salle)
+  float flou = uMode > 1.5 ? 0.0 : 0.35 * uOmbre * (1.0 - smoothstep(0.0, 0.14, d));
   // la toile a son origine EN HAUT (une toile 2D) : v descend avec y
   vec2 uv = vec2((vMonde.x - uRect.x) / (uRect.z - uRect.x), (uRect.w - vMonde.y) / (uRect.w - uRect.y));
   vec4 c = texture(uToile, uv, flou);

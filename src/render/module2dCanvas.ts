@@ -208,8 +208,11 @@ function pieceTeintee(p: Pieces, nom: string, th: Theme): Img {
 // (tools/images/coque2d.py).
 const PX_PAR_SALLE = 533.3
 // les pièces de la serre, livrées en pleine résolution : 1024 de leurs
-// pixels par largeur de salle — deux bandes par étagère d'origine
-const PX_SERRE = 1024
+// pixels par largeur de salle — deux bandes par étagère d'origine. 1536
+// depuis le 12/11 : les pièces rendues dans Blender se re-rendent à la
+// finesse qu'on veut, et à 1024 le tableau en plein écran (une salle sur
+// ~1900 px) les agrandissait près de deux fois
+const PX_SERRE = 1536
 // LA SERRE ORBITALE (12/11, tools/images/blender/serre.py) : ses bandes de
 // culture, qui s'empilent dans n'importe quel ordre, et celles qui portent
 // une passerelle et un poste de travail
@@ -217,10 +220,10 @@ const SERRE_CULTURES = ['feuillus', 'fougeres', 'aromates', 'mixte', 'semis', 'a
 const SERRE_POSTES = ['analyse', 'nutriments', 'semis'] as const
 /** le berceau, en lignes de son image : ce que ses selles mordent du cylindre,
  *  puis les machines dessous */
-const SERRE_BERCEAU = { bride: 174, machines: 896 }
+const SERRE_BERCEAU = { bride: 261, machines: 1344 }
 /** un dôme, en pixels de son image : il a la hauteur du cylindre, et sa
  *  couronne mord le cylindre de `plat` */
-const SERRE_DOME = { hauteur: 1536, plat: 19 }
+const SERRE_DOME = { hauteur: 2304, plat: 29 }
 const LIVRE = 0.8
 // LES COLLIERS D'AMARRAGE, pris dans les deux pièces de bout : où passe la
 // ligne de coque (en pixels du fichier), et les lignes que le collier occupe
@@ -243,19 +246,25 @@ export interface Jeu {
   prefixe: string
   /** ses pièces passent-elles par la teinte du biome ? */
   teinte: boolean
+  /** de combien ses fichiers sont plus fins que les pièces tempérées (853
+   *  px par salle) : leurs pixels se posent à cette fraction */
+  echelle: number
   bande: typeof BANDE
   collier: typeof COLLIER
 }
-const JEU_TEMPERE: Jeu = { prefixe: 'tempere', teinte: true, bande: BANDE, collier: COLLIER }
+const JEU_TEMPERE: Jeu = { prefixe: 'tempere', teinte: true, echelle: 1, bande: BANDE, collier: COLLIER }
 const JEUX: Record<string, Jeu> = {
   chaud: {
     prefixe: 'chaud',
     teinte: false,
+    // livrées telles que rendues, à 1536 px par salle (12/11 : à 853, le
+    // tableau en plein écran les agrandissait plus de deux fois)
+    echelle: PX_PAR_SALLE / LIVRE / 1536,
     // le rail des résistances : la ligne de coque à 0,04 salle du haut, tout
     // le reste dedans ; la quille : 0,2 salle dedans, les tuyères 0,1 dehors
-    bande: { haut: { ligne: 34, dedans: 222, dehors: 0 }, bas: { ligne: 171, dedans: 171, dehors: 85 } },
+    bande: { haut: { ligne: 61, dedans: 399, dehors: 0 }, bas: { ligne: 307, dedans: 307, dehors: 153 } },
     // chaque image n'est QUE son collier : 0,44 salle dehors, 0,1 de morsure
-    collier: { gauche: 375, droite: 85, haut: 0, bas: 716, morsure: 85 },
+    collier: { gauche: 676, droite: 153, haut: 0, bas: 1290, morsure: 153 },
   },
 }
 /** les pièces de coque d'un biome : les siennes, sinon celles de la serre tempérée */
@@ -489,6 +498,8 @@ export function peintModule2d(mp: MiseEnPage, p: Pieces, fen?: Fenetre): HTMLCan
   /** une pièce de la coque, à la teinte du biome */
   const img = (n: string): Img => pieceTeintee(p, n, th)
   const jeu = jeuDuBiome(mp.biome)
+  /** fj : les fichiers du jeu de coque, qui peuvent être plus fins */
+  const fj = fi * jeu.echelle
   /** une pièce du jeu du biome : reteintée si elle est d'emprunt, telle quelle si elle est à lui */
   const coque = (n: string): Img => (jeu.teinte ? img(`${jeu.prefixe}-${n}`) : brut(`${jeu.prefixe}-${n}`))
   // 1. la tôle, dans la silhouette. Une variante par rangée, tirée au sort,
@@ -498,10 +509,10 @@ export function peintModule2d(mp: MiseEnPage, p: Pieces, fen?: Fenetre): HTMLCan
   // le bord gauche de l'original —, mélanger les variantes dans une rangée
   // ferait des coutures
   const pave = (im: Img, x0: number, y0: number, x1: number, y1: number, graine: number) => {
-    const tl = im.width * fi
+    const tl = im.width * fj
     for (let i = 0, y = y0; y < y1; i++, y += tl) {
       if (hors(x0, y, x1, y + tl)) continue
-      const dec = ((i * 211 + graine) % im.width) * fi
+      const dec = ((i * 211 + graine) % im.width) * fj
       for (let j = 0, x = x0 - dec; x < x1; j++, x += tl) {
         if (hors(x, y, x + tl, y + tl)) continue
         if (tire(i + graine, j) < 0.5) c.drawImage(im, x, y, tl + 0.5, tl + 0.5)
@@ -626,7 +637,7 @@ export function peintModule2d(mp: MiseEnPage, p: Pieces, fen?: Fenetre): HTMLCan
     contour()
     c.clip()
     const toles = [coque('tole'), coque('tole-2')]
-    const tl = toles[0].width * fi
+    const tl = toles[0].width * fj
     for (let i = 0, y = 0; y < mp.hauteur; i++, y += tl) {
       if (hors(0, y, mp.largeur, y + tl)) continue
       // une rangée par appel, sans découpe à sa hauteur : une découpe sur une
@@ -880,7 +891,7 @@ export function peintModule2d(mp: MiseEnPage, p: Pieces, fen?: Fenetre): HTMLCan
       const a = S[i]
       const b = S[(i + 1) % n]
       const L = long(a, b)
-      const m = jeu.bande.haut.dedans * fi + e
+      const m = jeu.bande.haut.dedans * fj + e
       if (hors(Math.min(a.x, b.x) - m, Math.min(a.y, b.y) - m, Math.max(a.x, b.x) + m, Math.max(a.y, b.y) + m)) continue
       // À UN ANGLE RENTRANT, l'arête va jusqu'au sommet : son gousset est de
       // l'autre côté, dans le coin de tôle que les deux bandes encadrent. La
@@ -907,13 +918,13 @@ export function peintModule2d(mp: MiseEnPage, p: Pieces, fen?: Fenetre): HTMLCan
         // les tuyères ne garnissent que la quille : sur un flanc, la bande
         // s'arrête à la ligne de coque
         const dehors = sens === 'haut' ? B.dehors : sens === 'bas' ? B.dehors : 0
-        const y0 = sens === 'haut' ? -B.dehors * fi : -B.dedans * fi
-        const hb = (B.dedans + dehors) * fi
+        const y0 = sens === 'haut' ? -B.dehors * fj : -B.dedans * fj
+        const hb = (B.dedans + dehors) * fj
         const sy = sens === 'haut' ? B.ligne - B.dehors : B.ligne - B.dedans
         c.beginPath()
         c.rect(og, y0 - 1, L - og - fg, hb + 2)
         c.clip()
-        const lw = im.width * fi
+        const lw = im.width * fj
         // la bande part d'un décalage tiré par arête : toutes calées sur leur
         // coin, deux arêtes voisines montraient le même motif au même endroit
         for (let x = og - tire(i + 3, 17) * lw; x < L - fg; x += lw)
@@ -923,7 +934,7 @@ export function peintModule2d(mp: MiseEnPage, p: Pieces, fen?: Fenetre): HTMLCan
         c.save()
         c.translate(a.x, a.y)
         c.rotate(Math.atan2(b.y - a.y, b.x - a.x))
-        const yb = B.dedans * fi
+        const yb = B.dedans * fj
         const ob = c.createLinearGradient(0, yb, 0, yb + 0.14 * D)
         ob.addColorStop(0, 'rgba(0,0,0,0.5)')
         ob.addColorStop(1, 'rgba(0,0,0,0)')
@@ -1071,14 +1082,14 @@ export function peintModule2d(mp: MiseEnPage, p: Pieces, fen?: Fenetre): HTMLCan
     // pris dans les pièces de bout : seulement ce qui dépasse de la coque, et
     // la bride qui la mord. Le reste de ces pièces (une colonne de l'ancienne
     // tôle) ne se peint plus
-    const hc = (jeu.collier.bas - jeu.collier.haut) * fi
+    const hc = (jeu.collier.bas - jeu.collier.haut) * fj
     for (const cote of ['gauche', 'droite'] as const) {
       const pt = mp.colliers[cote]
       const im = brut(`${jeu.prefixe}-bout-${cote === 'gauche' ? 'gauche' : 'droit'}`)
       // sur un bord plus court que le collier (le nez du fuseau), il rétrécit
       const k = Math.min(1, (pt.h * 1.5) / hc)
-      const morsure = jeu.collier.morsure * fi * k
-      const dehors = (cote === 'gauche' ? jeu.collier.gauche : im.width - jeu.collier.droite) * fi * k
+      const morsure = jeu.collier.morsure * fj * k
+      const dehors = (cote === 'gauche' ? jeu.collier.gauche : im.width - jeu.collier.droite) * fj * k
       const x0 = cote === 'gauche' ? pt.x - dehors : pt.x - morsure
       if (hors(x0, pt.y - (hc * k) / 2, x0 + dehors + morsure, pt.y + (hc * k) / 2)) continue
       const sx = cote === 'gauche' ? 0 : jeu.collier.droite - jeu.collier.morsure
