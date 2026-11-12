@@ -22,8 +22,15 @@ planche des équipements et le couloir. Le moteur les lit dans public/assets/coq
   l'image, qui se répète le long d'un bord vertical de n'importe quelle
   hauteur.
 
-    python3 tools/images/coque2d.py
+· LA CHAUFFERIE A SES PIÈCES (12/11) : elles ne sortent pas d'un générateur
+  mais d'une scène Blender (tools/images/blender/chaud_biome.py) — voir chaud().
+
+    python3 tools/images/coque2d.py            (tout)
+    python3 tools/images/coque2d.py chaud      (les seules pièces de la chaufferie)
+    python3 tools/images/coque2d.py tempere    (tout le reste)
 """
+
+import sys
 
 from pathlib import Path
 
@@ -231,7 +238,68 @@ def serre() -> None:
     cellule('serre-capsule', 'serre-cellule', capsule=True)
 
 
-def main() -> None:
+# LA CHAUFFERIE — douze pièces rendues dans Blender, toutes à la même caméra
+# de face et à 1024 px par largeur de salle. Le moteur compte 853 px livrés
+# par salle (PX_PAR_SALLE × 2 × LIVRE dans module2dCanvas.ts) : elles sont
+# ramenées à cette échelle, et se posent comme les pièces tempérées.
+PX_BLENDER = 1024
+PX_LIVRE = 853
+# la tôle sort de Blender à 0,135 de luminance ; la tôle tempérée LIVRÉE
+# mesure 0,085 (12/11) — la coque ne doit pas passer devant la salle
+SOMBRE_CHAUD = 0.63
+
+
+def lit_alpha(nom: str) -> np.ndarray:
+    """Une pièce détourée PAR SON RENDU (film transparent) : le remplissage du
+    noir depuis les bords mordrait le dessous des fûts, presque noir."""
+    return np.asarray(Image.open(SOURCES / 'alpha' / f'{nom}.png').convert('RGBA')).astype(float) / 255
+
+
+def sombre_sauf_braise(a: np.ndarray, k: float) -> np.ndarray:
+    """Assombrit la coque SANS éteindre ce qui luit : une résistance ou une
+    veilleuse (clair ET chaud) garde son éclat, le fondu entre les deux est
+    continu — un seuil net cernerait chaque barreau."""
+    rgb = a[..., :3]
+    clair = np.clip((rgb.max(2) - 0.45) / 0.25, 0, 1)
+    chaud = np.clip((rgb[..., 0] - rgb[..., 2] - 0.15) / 0.2, 0, 1)
+    b = a.copy()
+    b[..., :3] *= (k + (1 - k) * clair * chaud)[..., None]
+    return b
+
+
+def reduit(a: np.ndarray, boucle_x: bool = False, boucle_y: bool = False) -> np.ndarray:
+    """De 1024 à 853 px par salle. Une pièce qui se répète est réduite ENTRE
+    DEUX COPIES d'elle-même, puis recoupée : réduite seule, le filtre lisait
+    son bord comme une fin d'image, et la couture revenait."""
+    h, w = a.shape[:2]
+    nh, nw = round(h * PX_LIVRE / PX_BLENDER), round(w * PX_LIVRE / PX_BLENDER)
+    t = np.tile(a, (3 if boucle_y else 1, 3 if boucle_x else 1, 1))
+    mode = 'RGBA' if a.shape[2] == 4 else 'RGB'
+    im = Image.fromarray((np.clip(t, 0, 1) * 255).astype(np.uint8), mode)
+    im = im.resize((nw * (3 if boucle_x else 1), nh * (3 if boucle_y else 1)), Image.LANCZOS)
+    r = np.asarray(im).astype(float) / 255
+    return r[(nh if boucle_y else 0):(2 * nh if boucle_y else nh), (nw if boucle_x else 0):(2 * nw if boucle_x else nw)]
+
+
+def chaud() -> None:
+    """LES PIÈCES DE LA CHAUFFERIE. Sources : chaud-<pièce>.png (les tôles,
+    opaques) et alpha/chaud-<pièce>.png (le reste, détouré par le rendu),
+    sorties de chaud_biome.py. Ni raccorde() ni detoure() : les tôles et les
+    bords se raccordent par construction (rendus au milieu de leurs copies)."""
+    b = 'chaud-'
+    # la salle des machines, un cran plus sombre que le reste de la coque,
+    # comme la tempérée (0,057 contre 0,085, mesuré le 12/11)
+    for n, k in (('tole', 1), ('tole-2', 1), ('tole-machines', 0.7)):
+        ecrit(b + n, reduit(sombre_sauf_braise(lit(b + n), SOMBRE_CHAUD * k), True, True), 1)
+    for n in ('bord-haut', 'bord-bas'):
+        ecrit(b + n, reduit(sombre_sauf_braise(lit_alpha(b + n), SOMBRE_CHAUD), boucle_x=True), 1)
+    for n in ('bout-gauche', 'bout-droit', 'baie', 'baie-2', 'colonne', 'trappe', 'machinerie'):
+        ecrit(b + n, reduit(sombre_sauf_braise(lit_alpha(b + n), SOMBRE_CHAUD)), 1)
+
+
+def tempere() -> None:
+    """Tout ce qui n'est pas la chaufferie : le module tempéré, la serre, les
+    équipements, les détails, le tube."""
     b = 'tempere-'
     for n in ('tole', 'tole-2', 'tole-machines'):
         ecrit(f'{b}{n}', sombre(raccorde(lit(b + n)), SOMBRE_COQUE))
@@ -259,6 +327,14 @@ def main() -> None:
     # son collier d'entrée, l'anneau seul : posé à chaque bout de tube, il en
     # fait une conduite raccordée plutôt qu'un trait (aperçu du 05/10)
     ecrit('tube-collier', c[105:580, 60:145])
+
+
+def main() -> None:
+    quoi = sys.argv[1:]
+    if not quoi or 'tempere' in quoi:
+        tempere()
+    if not quoi or 'chaud' in quoi:
+        chaud()
 
 
 if __name__ == '__main__':
