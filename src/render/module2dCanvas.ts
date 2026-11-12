@@ -63,44 +63,17 @@ export const PIECES_MODULE2D = [
   'equipement-reservoir',
   'tube',
   'tube-collier',
-  'serre-tranche-haut-g',
-  'serre-tranche-haut-m',
-  'serre-tranche-haut-d',
-  'serre-tranche-bande-g',
-  'serre-tranche-bande-m',
-  'serre-tranche-bande-d',
-  'serre-tranche-bas-g',
-  'serre-tranche-bas-m',
-  'serre-tranche-bas-d',
-  'serre-tranche-2-haut-g',
-  'serre-tranche-2-haut-m',
-  'serre-tranche-2-haut-d',
-  'serre-tranche-2-bande-g',
-  'serre-tranche-2-bande-m',
-  'serre-tranche-2-bande-d',
-  'serre-tranche-2-bas-g',
-  'serre-tranche-2-bas-m',
-  'serre-tranche-2-bas-d',
-  'serre-zone-algues-haut-g',
-  'serre-zone-algues-haut-m',
-  'serre-zone-algues-haut-d',
-  'serre-zone-algues-bande-g',
-  'serre-zone-algues-bande-m',
-  'serre-zone-algues-bande-d',
-  'serre-zone-algues-bas-g',
-  'serre-zone-algues-bas-m',
-  'serre-zone-algues-bas-d',
-  'serre-zone-champignons-haut-g',
-  'serre-zone-champignons-haut-m',
-  'serre-zone-champignons-haut-d',
-  'serre-zone-champignons-bande-g',
-  'serre-zone-champignons-bande-m',
-  'serre-zone-champignons-bande-d',
-  'serre-zone-champignons-bas-g',
-  'serre-zone-champignons-bas-m',
-  'serre-zone-champignons-bas-d',
-  'serre-etagere-1',
-  'serre-etagere-3',
+  'serre-haut',
+  'serre-bas',
+  'serre-bande-feuillus',
+  'serre-bande-fougeres',
+  'serre-bande-aromates',
+  'serre-bande-mixte',
+  'serre-bande-semis',
+  'serre-bande-algues',
+  'serre-poste-analyse',
+  'serre-poste-nutriments',
+  'serre-poste-semis',
   'serre-anneau-haut',
   'serre-anneau-bande',
   'serre-anneau-bas',
@@ -235,8 +208,26 @@ function pieceTeintee(p: Pieces, nom: string, th: Theme): Img {
 // (tools/images/coque2d.py).
 const PX_PAR_SALLE = 533.3
 // les pièces de la serre, livrées en pleine résolution : 1024 de leurs
-// pixels par largeur de salle — deux bandes par étagère d'origine
-const PX_SERRE = 1024
+// pixels par largeur de salle — deux bandes par étagère d'origine. 1536
+// depuis le 12/11 : les pièces rendues dans Blender se re-rendent à la
+// finesse qu'on veut, et à 1024 le tableau en plein écran (une salle sur
+// ~1900 px) les agrandissait près de deux fois
+const PX_SERRE = 1536
+/** les équipements de coque, rendus dans Blender (13/11) : à 853 px par
+ *  salle, posés à 1,07 fois leur taille, le tableau plein écran les agrandissait
+ *  1,9 fois — l'endroit le plus flou du décor */
+const PX_EQUIPEMENT = 1536
+// LA SERRE ORBITALE (12/11, tools/images/blender/serre.py) : ses bandes de
+// culture, qui s'empilent dans n'importe quel ordre, et celles qui portent
+// une passerelle et un poste de travail
+const SERRE_CULTURES = ['feuillus', 'fougeres', 'aromates', 'mixte', 'semis', 'algues'] as const
+const SERRE_POSTES = ['analyse', 'nutriments', 'semis'] as const
+/** le berceau, en lignes de son image : ce que ses selles mordent du cylindre,
+ *  puis les machines dessous */
+const SERRE_BERCEAU = { bride: 261, machines: 1344 }
+/** un dôme, en pixels de son image : il a la hauteur du cylindre, et sa
+ *  couronne mord le cylindre de `plat` */
+const SERRE_DOME = { hauteur: 4608, plat: 58 }
 const LIVRE = 0.8
 // LES COLLIERS D'AMARRAGE, pris dans les deux pièces de bout : où passe la
 // ligne de coque (en pixels du fichier), et les lignes que le collier occupe
@@ -259,20 +250,34 @@ export interface Jeu {
   prefixe: string
   /** ses pièces passent-elles par la teinte du biome ? */
   teinte: boolean
+  /** de combien ses fichiers sont plus fins que les pièces tempérées (853
+   *  px par salle) : leurs pixels se posent à cette fraction */
+  echelle: number
   bande: typeof BANDE
   collier: typeof COLLIER
 }
-const JEU_TEMPERE: Jeu = { prefixe: 'tempere', teinte: true, bande: BANDE, collier: COLLIER }
+const JEU_TEMPERE: Jeu = { prefixe: 'tempere', teinte: true, echelle: 1, bande: BANDE, collier: COLLIER }
 const JEUX: Record<string, Jeu> = {
   chaud: {
     prefixe: 'chaud',
     teinte: false,
+    // livrées telles que rendues, à 1536 px par salle (12/11 : à 853, le
+    // tableau en plein écran les agrandissait plus de deux fois)
+    // (PX_PAR_SALLE / LIVRE / 1536 jusqu'au 13/11 : 0,43 au lieu de 0,56, les
+    // tôles et les bords se posaient 22 % trop petits)
+    echelle: (2 * PX_PAR_SALLE * LIVRE) / 1536,
     // le rail des résistances : la ligne de coque à 0,04 salle du haut, tout
     // le reste dedans ; la quille : 0,2 salle dedans, les tuyères 0,1 dehors
-    bande: { haut: { ligne: 34, dedans: 222, dehors: 0 }, bas: { ligne: 171, dedans: 171, dehors: 85 } },
+    bande: { haut: { ligne: 61, dedans: 399, dehors: 0 }, bas: { ligne: 307, dedans: 307, dehors: 153 } },
     // chaque image n'est QUE son collier : 0,44 salle dehors, 0,1 de morsure
-    collier: { gauche: 375, droite: 85, haut: 0, bas: 716, morsure: 85 },
+    collier: { gauche: 676, droite: 153, haut: 0, bas: 1290, morsure: 153 },
   },
+}
+/** la finesse des fichiers d'un jeu, en px par largeur de salle, telle que
+ *  le peintre la pose (853 pour les pièces tempérées, livrées à LIVRE de
+ *  sources à 2 × PX_PAR_SALLE) */
+export function pxParSalleDuJeu(j: Jeu): number {
+  return (2 * PX_PAR_SALLE * LIVRE) / j.echelle
 }
 /** les pièces de coque d'un biome : les siennes, sinon celles de la serre tempérée */
 export function jeuDuBiome(biome: string): Jeu {
@@ -505,6 +510,8 @@ export function peintModule2d(mp: MiseEnPage, p: Pieces, fen?: Fenetre): HTMLCan
   /** une pièce de la coque, à la teinte du biome */
   const img = (n: string): Img => pieceTeintee(p, n, th)
   const jeu = jeuDuBiome(mp.biome)
+  /** fj : les fichiers du jeu de coque, qui peuvent être plus fins */
+  const fj = fi * jeu.echelle
   /** une pièce du jeu du biome : reteintée si elle est d'emprunt, telle quelle si elle est à lui */
   const coque = (n: string): Img => (jeu.teinte ? img(`${jeu.prefixe}-${n}`) : brut(`${jeu.prefixe}-${n}`))
   // 1. la tôle, dans la silhouette. Une variante par rangée, tirée au sort,
@@ -514,10 +521,10 @@ export function peintModule2d(mp: MiseEnPage, p: Pieces, fen?: Fenetre): HTMLCan
   // le bord gauche de l'original —, mélanger les variantes dans une rangée
   // ferait des coutures
   const pave = (im: Img, x0: number, y0: number, x1: number, y1: number, graine: number) => {
-    const tl = im.width * fi
+    const tl = im.width * fj
     for (let i = 0, y = y0; y < y1; i++, y += tl) {
       if (hors(x0, y, x1, y + tl)) continue
-      const dec = ((i * 211 + graine) % im.width) * fi
+      const dec = ((i * 211 + graine) % im.width) * fj
       for (let j = 0, x = x0 - dec; x < x1; j++, x += tl) {
         if (hors(x, y, x + tl, y + tl)) continue
         if (tire(i + graine, j) < 0.5) c.drawImage(im, x, y, tl + 0.5, tl + 0.5)
@@ -540,9 +547,8 @@ export function peintModule2d(mp: MiseEnPage, p: Pieces, fen?: Fenetre): HTMLCan
     const H = k.maxY - k.minY
     const W = k.maxX - k.minX
     const berceau = img('serre-berceau')
-    // ses brides (ligne 166 sur 819) mordent le bas du cylindre ; 625 lignes
-    // de machines dessous
-    const sb = (CYL_BERCEAU * H * 0.95) / 625
+    // ses selles mordent le bas du cylindre ; les machines dessous
+    const sb = (CYL_BERCEAU * H * 0.95) / SERRE_BERCEAU.machines
     const bx0 = k.minX + 0.12 * H
     const bx1 = k.maxX - 0.12 * H
     c.save()
@@ -550,8 +556,8 @@ export function peintModule2d(mp: MiseEnPage, p: Pieces, fen?: Fenetre): HTMLCan
     c.rect(bx0, k.minY, bx1 - bx0, H * (1 + CYL_BERCEAU))
     c.clip()
     for (let x = bx0; x < bx1; x += berceau.width * sb)
-      if (!hors(x, k.maxY - 0.03 * H - 166 * sb, x + berceau.width * sb, k.maxY + CYL_BERCEAU * H))
-        c.drawImage(berceau, x, k.maxY - 0.03 * H - 166 * sb, berceau.width * sb + 0.5, berceau.height * sb)
+      if (!hors(x, k.maxY - 0.03 * H - SERRE_BERCEAU.bride * sb, x + berceau.width * sb, k.maxY + CYL_BERCEAU * H))
+        c.drawImage(berceau, x, k.maxY - 0.03 * H - SERRE_BERCEAU.bride * sb, berceau.width * sb + 0.5, berceau.height * sb)
     c.restore()
     // UNE COLONNE EMPILÉE : le haut, la bande répétée, le bas — à l'échelle
     // d'origine des pièces (PX_SERRE par salle), le nombre de bandes ajusté à
@@ -568,105 +574,59 @@ export function peintModule2d(mp: MiseEnPage, p: Pieces, fen?: Fenetre): HTMLCan
       for (let j = 0; j < nb; j++, yy += bande.height * e) c.drawImage(bande, x, yy, l, bande.height * e + 0.5)
       c.drawImage(bas, x, yy, l, bas.height * e)
     }
-    // chaque capsule en trois colonnes aussi : son bord gauche et son arc, le
-    // cœur répété en largeur, son bord droit — d'un bloc, à pleine finesse,
-    // les capsules devenaient étroites et hautes (06/10) ; elles gardent la
-    // largeur de la tranche d'origine, deux tiers de la hauteur du cylindre
-    const jeu = (nom: string) =>
-      (['haut', 'bande', 'bas'] as const).map((l) => (['g', 'm', 'd'] as const).map((cote) => img(`${nom}-${l}-${cote}`)))
-    const air = [jeu('serre-tranche'), jeu('serre-tranche-2')]
-    const zones = { algues: jeu('serre-zone-algues'), champignons: jeu('serre-zone-champignons') }
-    const etageres = [img('serre-etagere-1'), img('serre-etagere-3')]
-    const [hg, hm, hd] = air[0][0]
-    const { nb, e } = empile(H, hg, air[0][1][0], air[0][2][0])
-    const nmAir = Math.max(1, Math.round(((2 / 3) * H / e - hg.width - hd.width) / hm.width))
-    const n = Math.max(1, Math.round(W / ((hg.width + nmAir * hm.width + hd.width) * e)))
+    // LE CORPS : des bandes entières, empilées. La serre peinte n'avait que
+    // deux bandes d'étagère, découpées en neuf morceaux et retournées pour
+    // faire illusion — le motif se voyait (avis du 12/11). Chaque capsule
+    // (deux tiers de la hauteur du cylindre) tire désormais ses bandes parmi
+    // six cultures, à un décalage tiré lui aussi ; une bande sur trois,
+    // comptée du bas, porte une passerelle et un poste de travail : on monte
+    // par l'échelle de la cloison, on travaille à hauteur d'étagère
+    const haut = img('serre-haut')
+    const bas = img('serre-bas')
+    const cultures = SERRE_CULTURES.map((n) => img(`serre-bande-${n}`))
+    const postes = SERRE_POSTES.map((n) => img(`serre-poste-${n}`))
+    const { nb, e } = empile(H, haut, cultures[0], bas)
+    const n = Math.max(1, Math.round(W / ((2 / 3) * H)))
     const sw = W / n
-    // CASSER LA GRILLE : une bande répétée telle quelle faisait un papier
-    // peint, la même étagère en lignes et en colonnes (06/10). Chaque cœur est
-    // retourné ou non (le miroir garde le raccord : son bord droit est le
-    // bord gauche de l'original)
-    const piece = (im: Img, x: number, y: number, l: number, h: number, miroir: boolean) => {
-      if (!miroir) return c.drawImage(im, x, y, l, h)
-      c.save()
-      c.translate(x + l, y)
-      c.scale(-1, 1)
-      c.drawImage(im, 0, 0, l, h)
-      c.restore()
-    }
-    // VARIER DANS LA LONGUEUR : une capsule par zone le long du cylindre —
-    // le jardin d'air, les algues, le jardin d'air, la champignonnière…
-    // (06/10, « des variations dans la longueur au lieu de répéter »)
-    const ZONES = ['air', 'algues', 'air', 'champignons'] as const
-    for (let i = 0; i < n; i++) {
-      const x0 = k.minX + i * sw
-      if (hors(x0, k.minY, x0 + sw, k.maxY)) continue
-      const zone = ZONES[i % ZONES.length]
-      const j3 = zone === 'air' ? air[(i >> 1) % 2] : zones[zone]
-      const p = zone === 'air' ? { nb, e } : empile(H, j3[0][0], j3[1][0], j3[2][0])
-      const [g, m, d] = j3[0]
-      const nm = Math.max(1, Math.round((sw / p.e - g.width - d.width) / m.width))
-      const fx = sw / ((g.width + nm * m.width + d.width) * p.e)
-      let y = k.minY
-      for (let r = 0; r < p.nb + 2; r++) {
-        const ligne = r === 0 ? 0 : r === p.nb + 1 ? 2 : 1
-        // au jardin d'air, chaque étagère tire la sienne : l'une des deux
-        // tranches (elles partagent leurs rebords) ou une étagère de rechange
-        const t = tire(i * 31 + r, 5)
-        const rang = zone === 'air' && ligne === 1 ? air[t < 0.5 ? 0 : 1][1] : j3[ligne]
-        const rechange = zone === 'air' && ligne === 1 && t >= 0.25 && t < 0.75 ? etageres[t < 0.5 ? 0 : 1] : null
-        const h = rang[0].height * p.e
-        let x = x0
-        for (let jc = 0; jc < nm + 2; jc++) {
-          const col = jc === 0 ? 0 : jc === nm + 1 ? 2 : 1
-          const l = rang[col].width * p.e * fx
-          if (!hors(x, y, x + l, y + h)) piece(rang[col], x, y, l + 0.5, h + 0.5, col === 1 && tire(i * 17 + jc, r) < 0.5)
-          // l'étagère de rechange couvre le cœur d'un trait, par-dessus la
-          // tranche, et s'y fond à ses deux bouts : d'une autre image, sans
-          // vitrage, elle faisait une couture contre les bords (relecture
-          // 06/10) — huit crans d'opacité sur un huitième du cœur
-          if (col === 1 && rechange && jc === nm) {
-            const lc = nm * l
-            const xc = x + l - lc
-            const tw = (rechange.width * h) / rechange.height
-            const f = lc / 8
-            const dec = tire(i, r) * tw
-            for (let pas = 0; pas < 9; pas++) {
-              // pas 0 : le milieu, plein ; 1–8 : les crans des deux bouts
-              const [x0c, x1c, a] = pas === 0 ? [xc + f, xc + lc - f, 1] : [xc + ((pas - 1) * f) / 8, xc + (pas * f) / 8, pas / 9]
-              if (hors(xc, y, xc + lc, y + h)) continue
-              for (const [u0, u1] of pas === 0 ? [[x0c, x1c]] : [[x0c, x1c], [xc + lc - (x1c - xc), xc + lc - (x0c - xc)]]) {
-                c.save()
-                c.globalAlpha = a
-                c.beginPath()
-                c.rect(u0, y, u1 - u0, h + 0.5)
-                c.clip()
-                for (let xx = xc - dec; xx < xc + lc; xx += tw) if (xx + tw > u0 && xx < u1) c.drawImage(rechange, xx, y, tw + 0.5, h + 0.5)
-                c.restore()
-              }
-            }
-          }
-          x += l
-        }
-        y += h
+    const choix = <T,>(l: readonly T[], t: number): T => l[Math.min(l.length - 1, Math.floor(t * l.length))]
+    let y = k.minY
+    for (let r = 0; r < nb + 2; r++) {
+      const h = (r === 0 ? haut : r === nb + 1 ? bas : cultures[0]).height * e
+      for (let i = 0; i < n; i++) {
+        const x0 = k.minX + i * sw
+        if (hors(x0, y, x0 + sw, y + h)) continue
+        // la poutre de coque file d'un bout à l'autre ; une bande part d'où
+        // le tirage la pose — la cloison couvre la jonction de deux capsules
+        const bord = r === 0 || r === nb + 1
+        const im = r === 0 ? haut : r === nb + 1 ? bas : (nb - r) % 3 === 1 ? choix(postes, tire(i * 31 + r, 5)) : choix(cultures, tire(i * 31 + r, 5))
+        const lw = im.width * e
+        c.save()
+        c.beginPath()
+        c.rect(x0, y, sw + 0.5, h + 0.5)
+        c.clip()
+        const dec = bord ? (x0 - k.minX) % lw : tire(i * 17 + r, 3) * lw
+        for (let x = x0 - dec; x < x0 + sw; x += lw) c.drawImage(im, x, y, lw + 0.5, h + 0.5)
+        c.restore()
       }
+      y += h
     }
-    // l'anneau : 98,6 % de la hauteur du cylindre, posé 0,65 % sous son haut
+    // la cloison entre deux capsules, sur toute la hauteur : sa porte en bas,
+    // son échelle répétée jusqu'en haut
     const an = [img('serre-anneau-haut'), img('serre-anneau-bande'), img('serre-anneau-bas')] as const
-    const ah = 0.986 * H
-    const pa = empile(ah, ...an)
+    const pa = empile(H, ...an)
     const aw = an[0].width * pa.e
     for (let i = 1; i < n; i++) {
       const x = k.minX + i * sw
-      if (!hors(x - aw / 2, k.minY, x + aw / 2, k.maxY)) colonne(x - aw / 2, k.minY + 0.0065 * H, aw, pa.e, pa.nb, ...an)
+      if (!hors(x - aw / 2, k.minY, x + aw / 2, k.maxY)) colonne(x - aw / 2, k.minY, aw, pa.e, pa.nb, ...an)
     }
-    // les dômes : leur hauteur de cylindre est 1202 lignes sur 1229 ; la
-    // bande plate tombe à x 786 (gauche) et 30 (droite) sur 819
-    const sd = H / 1202
+    // les dômes : à la hauteur du cylindre, leur couronne sur son bout
+    const sd = H / SERRE_DOME.hauteur
     const dg = img('serre-dome-gauche')
     const dd = img('serre-dome-droit')
-    if (!hors(k.minX - 786 * sd, k.minY, k.minX + 33 * sd, k.maxY)) c.drawImage(dg, k.minX - 786 * sd, k.minY, dg.width * sd, dg.height * sd)
-    if (!hors(k.maxX - 30 * sd, k.minY, k.maxX + 790 * sd, k.maxY)) c.drawImage(dd, k.maxX - 30 * sd, k.minY, dd.width * sd, dd.height * sd)
+    const xg = k.minX - (dg.width - SERRE_DOME.plat) * sd
+    const xd = k.maxX - SERRE_DOME.plat * sd
+    if (!hors(xg, k.minY, xg + dg.width * sd, k.maxY)) c.drawImage(dg, xg, k.minY, dg.width * sd, dg.height * sd)
+    if (!hors(xd, k.minY, xd + dd.width * sd, k.maxY)) c.drawImage(dd, xd, k.minY, dd.width * sd, dd.height * sd)
   }
   const capsules = mp.forme === 'cylindre'
   const S = mp.silhouette
@@ -689,7 +649,7 @@ export function peintModule2d(mp: MiseEnPage, p: Pieces, fen?: Fenetre): HTMLCan
     contour()
     c.clip()
     const toles = [coque('tole'), coque('tole-2')]
-    const tl = toles[0].width * fi
+    const tl = toles[0].width * fj
     for (let i = 0, y = 0; y < mp.hauteur; i++, y += tl) {
       if (hors(0, y, mp.largeur, y + tl)) continue
       // une rangée par appel, sans découpe à sa hauteur : une découpe sur une
@@ -877,7 +837,7 @@ export function peintModule2d(mp: MiseEnPage, p: Pieces, fen?: Fenetre): HTMLCan
   for (const e of mp.equipements) {
     if (hors(e.x, e.y - 0.6 * D, e.x, e.y)) continue
     const im = brut(`equipement-${e.nom}`)
-    const k = fi * 1.07
+    const k = D / PX_EQUIPEMENT
     c.drawImage(im, e.x - (im.width * k) / 2, e.y - im.height * k + 0.02 * D, im.width * k, im.height * k)
   }
   return toile
@@ -943,7 +903,7 @@ export function peintModule2d(mp: MiseEnPage, p: Pieces, fen?: Fenetre): HTMLCan
       const a = S[i]
       const b = S[(i + 1) % n]
       const L = long(a, b)
-      const m = jeu.bande.haut.dedans * fi + e
+      const m = jeu.bande.haut.dedans * fj + e
       if (hors(Math.min(a.x, b.x) - m, Math.min(a.y, b.y) - m, Math.max(a.x, b.x) + m, Math.max(a.y, b.y) + m)) continue
       // À UN ANGLE RENTRANT, l'arête va jusqu'au sommet : son gousset est de
       // l'autre côté, dans le coin de tôle que les deux bandes encadrent. La
@@ -970,13 +930,13 @@ export function peintModule2d(mp: MiseEnPage, p: Pieces, fen?: Fenetre): HTMLCan
         // les tuyères ne garnissent que la quille : sur un flanc, la bande
         // s'arrête à la ligne de coque
         const dehors = sens === 'haut' ? B.dehors : sens === 'bas' ? B.dehors : 0
-        const y0 = sens === 'haut' ? -B.dehors * fi : -B.dedans * fi
-        const hb = (B.dedans + dehors) * fi
+        const y0 = sens === 'haut' ? -B.dehors * fj : -B.dedans * fj
+        const hb = (B.dedans + dehors) * fj
         const sy = sens === 'haut' ? B.ligne - B.dehors : B.ligne - B.dedans
         c.beginPath()
         c.rect(og, y0 - 1, L - og - fg, hb + 2)
         c.clip()
-        const lw = im.width * fi
+        const lw = im.width * fj
         // la bande part d'un décalage tiré par arête : toutes calées sur leur
         // coin, deux arêtes voisines montraient le même motif au même endroit
         for (let x = og - tire(i + 3, 17) * lw; x < L - fg; x += lw)
@@ -986,7 +946,7 @@ export function peintModule2d(mp: MiseEnPage, p: Pieces, fen?: Fenetre): HTMLCan
         c.save()
         c.translate(a.x, a.y)
         c.rotate(Math.atan2(b.y - a.y, b.x - a.x))
-        const yb = B.dedans * fi
+        const yb = B.dedans * fj
         const ob = c.createLinearGradient(0, yb, 0, yb + 0.14 * D)
         ob.addColorStop(0, 'rgba(0,0,0,0.5)')
         ob.addColorStop(1, 'rgba(0,0,0,0)')
@@ -1134,14 +1094,14 @@ export function peintModule2d(mp: MiseEnPage, p: Pieces, fen?: Fenetre): HTMLCan
     // pris dans les pièces de bout : seulement ce qui dépasse de la coque, et
     // la bride qui la mord. Le reste de ces pièces (une colonne de l'ancienne
     // tôle) ne se peint plus
-    const hc = (jeu.collier.bas - jeu.collier.haut) * fi
+    const hc = (jeu.collier.bas - jeu.collier.haut) * fj
     for (const cote of ['gauche', 'droite'] as const) {
       const pt = mp.colliers[cote]
       const im = brut(`${jeu.prefixe}-bout-${cote === 'gauche' ? 'gauche' : 'droit'}`)
       // sur un bord plus court que le collier (le nez du fuseau), il rétrécit
       const k = Math.min(1, (pt.h * 1.5) / hc)
-      const morsure = jeu.collier.morsure * fi * k
-      const dehors = (cote === 'gauche' ? jeu.collier.gauche : im.width - jeu.collier.droite) * fi * k
+      const morsure = jeu.collier.morsure * fj * k
+      const dehors = (cote === 'gauche' ? jeu.collier.gauche : im.width - jeu.collier.droite) * fj * k
       const x0 = cote === 'gauche' ? pt.x - dehors : pt.x - morsure
       if (hors(x0, pt.y - (hc * k) / 2, x0 + dehors + morsure, pt.y + (hc * k) / 2)) continue
       const sx = cote === 'gauche' ? 0 : jeu.collier.droite - jeu.collier.morsure

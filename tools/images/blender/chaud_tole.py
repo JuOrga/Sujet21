@@ -450,6 +450,18 @@ def mat_peinture():
     # le grain de la peinture, fin
     grain = bruit_tore(nt, 40, 40, 2, detail=8, rugo=0.7)
     base = melange(nt, op(nt, 'MULTIPLY', rampe(nt, grain, 0.3, 0.7), 0.35), base, lin(FOND))
+    # LE GRAIN FIN et les rayures : sans eux la tôle, agrandie deux fois quand
+    # le tableau tient l'écran, paraissait floue — trois à quatre fois moins de
+    # détail fin que les pièces peintes (contraste local 3 contre 12, mesuré le
+    # 12/11). Un piqué serré, et des griffures horizontales jusqu'au métal
+    # (à 190 tours de tore le grain passait sous le pixel : rien au rendu. 60 :
+    # des grains de 4 à 5 px à 1536 px par salle)
+    pique = bruit_tore(nt, 60, 60, 22, detail=6, rugo=0.75)
+    base = melange(nt, op(nt, 'MULTIPLY', rampe(nt, pique, 0.47, 0.3), 0.6), base, lin(FOND))
+    base = melange(nt, op(nt, 'MULTIPLY', rampe(nt, pique, 0.58, 0.74), 0.4), base, lin((0x62, 0x6c, 0x78)))
+    griffe = bruit_tore(nt, 5, 70, 23, detail=3, rugo=0.6)
+    ou = bruit_tore(nt, 4, 4, 24, detail=2, rugo=0.5)
+    base = melange(nt, op(nt, 'MULTIPLY', op(nt, 'MULTIPLY', rampe(nt, griffe, 0.66, 0.7), rampe(nt, ou, 0.5, 0.6)), 0.3), base, lin(METAL_NU))
     # les coulures de crasse, verticales et nombreuses, puis celles de
     # rouille, plus rares : un bruit étiré en hauteur, seuillé, qu'un second
     # bruit large n'allume que par endroits
@@ -479,7 +491,14 @@ def mat_peinture():
     L.new(arete, bsdf.inputs['Metallic'])
     rug = op(nt, 'MULTIPLY_ADD', grain, 0.3, 0.45)
     L.new(op(nt, 'SUBTRACT', rug, op(nt, 'MULTIPLY', arete, 0.25)), bsdf.inputs['Roughness'])
-    L.new(bev.outputs[0], bsdf.inputs['Normal'])
+    # le relief du grain : c'est la lumière du haut qui le fait lire, bien
+    # plus que sa couleur sur un acier aussi sombre
+    bosse = N.new('ShaderNodeBump')
+    bosse.inputs['Strength'].default_value = 0.6
+    bosse.inputs['Distance'].default_value = 0.0015
+    L.new(op(nt, 'ADD', pique, op(nt, 'MULTIPLY', grain, 0.5)), bosse.inputs['Height'])
+    L.new(bev.outputs[0], bosse.inputs['Normal'])
+    L.new(bosse.outputs[0], bsdf.inputs['Normal'])
     return mat
 
 
@@ -611,7 +630,10 @@ def lumiere_camera(sc):
     except TypeError as e:
         print('moteur :', e)
     sc.cycles.samples = ECHANTILLONS
-    sc.cycles.use_denoising = True
+    # PAS DE DÉBRUITAGE : il gommait le grain avec le bruit, et tout sortait
+    # lisse (12/11). Des échantillons à la place — la carte graphique suit
+    sc.cycles.use_denoising = False
+    sc.cycles.use_adaptive_sampling = False
     r.resolution_x = r.resolution_y = PX + 2 * MARGE
     r.resolution_percentage = 100
     r.film_transparent = False
