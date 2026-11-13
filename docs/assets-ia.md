@@ -2419,3 +2419,70 @@ gravure s'y lit.
 **70 Ko** (qualité 82) ; chaque octogone occupe 4 à 507 px de sa case, et
 remplit 80,2 % du carré — l'aire de l'octogone régulier à cette taille. La
 planche est dans `LIVREES`, et sa taille (3 × 512 sur 2 × 512) est vérifiée.
+
+### 36c. La bonbonne, les deux cuves et l'anneau — `ceremonie-{bonbonne,reserve,maitrise}-{dos,verre}.webp`, `ceremonie-anneau.webp` ✅ LIVRÉ (13/11)
+
+**Trois cuves en deux calques, transparents** : la bonbonne (512×1024), le
+bocal de réserve (880×1024), la colonne de maîtrise (512×1024) ; et
+**l'anneau de palier** (1024×512 : intact, brisé). `cuveHTML`
+(`src/game/ceremonieObjets.ts`) empile le DOS, un liquide CSS — un
+RECTANGLE, qui monte —, puis le VERRE.
+
+- **La bonbonne**, le héros du bilan : un fût d'acier à col, robinet à volant
+  et petit manomètre, deux cerclages, un pied à bandes de danger, l'étiquette
+  « SUJET 21 », et la jauge — une fente vitrée dans un cadre boulonné et
+  gradué, où le fluide se voit.
+- **La réserve** : un bocal large, socle et couvercle d'acier, quatre
+  montants, une graduation sur la vitre.
+- **La maîtrise** : un tube de verre entre un socle et un chapeau
+  octogonaux, deux tirants, et trois sièges d'anneau VIDES (un collier et sa
+  gorge sombre).
+- **L'anneau** : le collier du siège avec une gorge qui LUIT d'or (charte : ce
+  qui luit, les paliers). Brisé, il éclate en six morceaux écartés et tombés,
+  qui ne gardent qu'une braise, et quelques éclats.
+
+**Les calques se trient par la PROFONDEUR, pas par une liste.** Le DOS est la
+cuve entière, vide, sans sa vitre. Le VERRE est tout ce qui n'est pas
+derrière le liquide plein : celui-ci y est rendu en cache (holdout). Un
+premier essai rangeait les objets à la main ; un socle ou un siège entoure
+le liquide, et sa moitié arrière, classée au verre, passait devant lui
+(croissant sombre au fond du bocal, sièges en double anneau). La vitre des
+cuves (`mat_vitre`) est claire de face : le verre des icônes, en tube fermé,
+voilait le liquide à 63 %.
+
+**La fenêtre du liquide se mesure.** Une troisième passe, la SONDE, rend le
+liquide plein seul, en blanc, tous les opaques en cache : la boîte de ce qui
+s'en voit est la fenêtre. L'assemblage vérifie que chaque pixel de la
+fenêtre où le liquide ne se voit pas est sous un opaque du verre (sinon le
+rectangle déborderait : il échoue), et que la vitre ne voile pas plus de 25 %
+du liquide visible. Mesuré : aucun pixel nu ; voile 0,06 % (bonbonne),
+0,36 % (bocal), 0,15 % (colonne).
+
+**L'anneau se pose sur la colonne.** Il est rendu dans la vue de la colonne,
+autour d'un cache de la taille de son tube (sa moitié arrière passe
+derrière). `ANNEAUX_MAITRISE` donne, pour chacun des trois sièges, du plus
+bas au plus haut, la boîte (carrée en pixels) où poser une case de l'anneau,
+en fractions de l'image de la colonne : posée par-dessus le verre, elle
+recouvre le siège vide.
+
+**Refaire** — même atelier, même appel unique : `cuves() ;
+lance_cuves(SORTIE, 192)` (SORTIE : `masters\images\cuves`, avec `brut\`
+et `alpha\` ; la fenêtre bascule sur la scène `ceremonie`). Puis :
+
+```bash
+python -I tools/images/blender/ceremonie.py cuves masters/images/cuves masters/images controle.png
+python3 tools/images/prepare.py ceremonie-bonbonne-dos ceremonie-bonbonne-verre ceremonie-reserve-dos \
+  ceremonie-reserve-verre ceremonie-maitrise-dos ceremonie-maitrise-verre ceremonie-anneau
+```
+
+et recopier dans `OBJETS` et `ANNEAUX_MAITRISE` ce que l'assemblage imprime.
+La planche de contrôle montre chaque cuve remplie aux deux tiers et la
+colonne avec un anneau intact et un brisé posés.
+
+**Mesuré à la livraison** (qualité 82) : dos 20 à 21 Ko ; verres 33 Ko
+(bonbonne), 61 Ko (colonne), 113 Ko (bocal) ; luminance 0,15 à 0,24 ; 0 à
+5 % de chauds (les bandes de danger). L'anneau : 17 Ko, luminance 0,43,
+**33 % de chauds** — son or est voulu : il a sa famille dans `prepare.py`
+(« anneau de palier », plafond de chauds 40 %), pour ne pas relever celui
+des icônes.
+

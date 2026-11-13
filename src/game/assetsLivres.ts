@@ -86,6 +86,13 @@ const NOMS: Record<string, string> = {
   // LA CÉRÉMONIE STATION — rendue dans Blender (docs/assets-ia.md § 36)
   'ceremonie-icones.webp': 'Cérémonie — planche d’icônes (7×4)',
   'ceremonie-sceaux.webp': 'Cérémonie — sceaux de rang et de module (3×2)',
+  'ceremonie-bonbonne-dos.webp': 'Cérémonie — bonbonne (dos)',
+  'ceremonie-bonbonne-verre.webp': 'Cérémonie — bonbonne (verre)',
+  'ceremonie-reserve-dos.webp': 'Cérémonie — bocal de réserve (dos)',
+  'ceremonie-reserve-verre.webp': 'Cérémonie — bocal de réserve (verre)',
+  'ceremonie-maitrise-dos.webp': 'Cérémonie — colonne de maîtrise (dos)',
+  'ceremonie-maitrise-verre.webp': 'Cérémonie — colonne de maîtrise (verre)',
+  'ceremonie-anneau.webp': 'Cérémonie — anneau de palier (intact, brisé)',
   // les illustrations du tableau des avaries (public/assets/avaries/<id>.webp),
   // une par station de reparations.ts — la même image éteinte ou allumée
   'eclairage.webp': 'Avarie — réseau d’éclairage',

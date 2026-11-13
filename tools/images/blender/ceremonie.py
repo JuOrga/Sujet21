@@ -25,14 +25,19 @@ le rendu ne bloque pas : lance() passe par un minuteur) :
     exec(compile(open(DOSSIER + r'\ceremonie.py', encoding='utf-8').read(), DOSSIER + r'\ceremonie.py', 'exec'))
     atelier() ; lance(ICONES, SORTIE, 192)       # la planche d'icônes
     sceaux() ; lance(SCEAUX, SORTIE, 192)        # la planche des sceaux
-atelier() et sceaux() rendent dans une scène À EUX, `ceremonie`, et y
+    cuves() ; lance_cuves(SORTIE, 192)           # les cuves (dos, verre, sonde) et l'anneau
+atelier(), sceaux() et cuves() rendent dans une scène À EUX, `ceremonie`, et y
 basculent la fenêtre : la scène d'origine reste intacte, on y revient à la
 main. Puis, hors de Blender, l'assemblage (et une planche de contrôle
 réduite à 32 et 64 px, pour juger la lisibilité) :
     python -I tools/images/blender/ceremonie.py icones <rendus> masters/images/ceremonie-icones.png [contrôle.png]
     python -I tools/images/blender/ceremonie.py sceaux <rendus> masters/images/ceremonie-sceaux.png [contrôle.png]
+    python -I tools/images/blender/ceremonie.py cuves <rendus> masters/images [contrôle.png]
+(la dernière écrit les sept masters des cuves et de l'anneau, et IMPRIME les
+fenêtres de liquide et les boîtes des sièges à recopier dans
+src/game/ceremonieObjets.ts ; elle échoue si le liquide déborderait)
 """
-import math, os, random, sys
+import json, math, os, random, sys
 
 DANS_BLENDER = 'bpy' in sys.modules
 
@@ -47,6 +52,10 @@ COLONNES, RANGEES, CASE = 7, 4, 512
 # l'ORDRE des sceaux : recopié de ORDRE_SCEAUX (ceremonieObjets.ts), 3 × 2
 SCEAUX = ['S', 'A', 'B', 'C', 'D', 'module']
 COLONNES_SCEAUX, RANGEES_SCEAUX = 3, 2
+# les cuves : un DOS et un VERRE chacune (le liquide CSS passe entre eux),
+# et l'anneau de palier, intact puis brisé (ceremonieObjets.ts)
+CUVES = ['bonbonne', 'reserve', 'maitrise']
+ANNEAUX = ['intact', 'brise']
 
 if DANS_BLENDER:
     import bpy, bmesh
@@ -893,6 +902,383 @@ if DANS_BLENDER:
         sc.cycles.device = 'GPU'
         return sc
 
+    # -------------------------------------------------------------- les cuves
+    # LA BONBONNE, LA RÉSERVE ET LA COLONNE DE MAÎTRISE, en deux calques. Le
+    # jeu pose entre eux un liquide CSS qui est un RECTANGLE (cuveHTML,
+    # ceremonieObjets.ts) ; il monte et descend.
+    #   · le DOS : la cuve entière, vide, sans son verre — l'intérieur sombre
+    #     est ce qu'on voit au-dessus du liquide ;
+    #   · le VERRE : tout ce qui n'est PAS derrière le liquide plein — la
+    #     vitre, et tous les opaques qui passent devant lui (cadre de la
+    #     jauge, socle, couvercle, chapeau, moitié avant des sièges). Le
+    #     liquide plein y est rendu en CACHE (holdout) : c'est la profondeur
+    #     qui trie, pas une liste. (Premier essai, objet par objet : un socle
+    #     ou un siège entoure le liquide, et sa moitié ARRIÈRE, classée au
+    #     verre, passait devant lui — un croissant sombre au fond du bocal,
+    #     des sièges en double anneau sur la colonne.)
+    #   · la SONDE : le liquide plein seul, en blanc, tous les opaques en
+    #     cache, la vitre ôtée. Ce qui en reste visible est la fenêtre du
+    #     liquide : elle ne se devine pas, elle se MESURE (assemble_cuves,
+    #     hors de Blender), qui vérifie aussi que chaque pixel de la fenêtre
+    #     où le liquide ne se voit pas est sous un opaque du verre.
+    #
+    # Vue de face, inclinée de INCL_CUVE vers la caméra comme les icônes (on
+    # voit le dessus des fûts) : une cuve fait une unité de haut, rendue à
+    # 2048 px, livrée à 1024. Les bâtisseurs ci-dessous reçoivent encore trois
+    # ateliers (D, V, S) : seule la SONDE (S) a un rôle à part ; D et V ne
+    # font que ranger, le rôle d'un objet tient à sa matière (vitre,
+    # intérieur, opaque).
+    INCL_CUVE = 8
+    PX_CUVE = 2048
+    SIEGES = (-0.2, 0.0, 0.2)       # la hauteur des trois sièges d'anneau de la colonne
+    COTE_ANNEAU = 0.44              # le côté de la case de l'anneau, en unités
+    COUCHES = ('dos', 'verre', 'sonde')
+
+    def _secteur(self, mat, profil, a0, a1, M=None, seg=48, var=0.0):
+        """un morceau de couronne : le profil FERMÉ (r, z) balayé de a0 à a1
+        autour de l'axe Z local, fermé à ses deux bouts (l'anneau brisé)"""
+        bm = self._bm(mat)
+        M = M if M is not None else Matrix.Identity(4)
+        V = []
+        for i in range(seg + 1):
+            a = a0 + (a1 - a0) * i / seg
+            V.append([bm.verts.new(M @ Vector((r * math.cos(a), r * math.sin(a), h))) for r, h in profil])
+        n = len(profil)
+        faces = []
+        for A, B in zip(V, V[1:]):
+            for j in range(n):
+                k = (j + 1) % n
+                faces.append(bm.faces.new((A[j], A[k], B[k], B[j])))
+        faces += [bm.faces.new(V[0]), bm.faces.new(list(reversed(V[-1])))]
+        bmesh.ops.recalc_face_normals(bm, faces=faces)
+        self._marque(mat, [v for a in V for v in a], var)
+
+    Atelier.secteur = _secteur
+
+    def couronne(at, mat, E, I, yf, yb, var=0.0):
+        """une couronne entre deux contours au même nombre de sommets (un
+        cadre à coins coupés)"""
+        for k in range(len(E)):
+            j = (k + 1) % len(E)
+            at.prisme(mat, [E[k], E[j], I[j], I[k]], yf, yb, var=var)
+
+    def mat_sonde():
+        mat = bpy.data.materials.new('cuve-sonde')
+        nt, N, L = noeuds(mat)
+        out = N.new('ShaderNodeOutputMaterial')
+        em = N.new('ShaderNodeEmission')
+        em.inputs['Strength'].default_value = 1.0
+        L.new(em.outputs[0], out.inputs[0])
+        return mat
+
+    def mat_vitre():
+        """la vitre des cuves : CLAIRE de face (le liquide CSS se voit au
+        travers), teintée et reflétante au rasant seulement. Le verre des
+        icônes, posé ici en tube fermé, voilait le liquide à 63 % (deux parois
+        et une transmission teintée, premier essai) : il éteignait le fluide"""
+        mat = bpy.data.materials.new('cuve-vitre')
+        nt, N, L = noeuds(mat)
+        out = N.new('ShaderNodeOutputMaterial')
+        tr = N.new('ShaderNodeBsdfTransparent')
+        b = N.new('ShaderNodeBsdfPrincipled')
+        b.inputs['Base Color'].default_value = lin((0x22, 0x34, 0x3e))
+        b.inputs['Roughness'].default_value = 0.06
+        lw = N.new('ShaderNodeLayerWeight')
+        lw.inputs['Blend'].default_value = 0.4
+        fac = op(nt, 'MULTIPLY_ADD', op(nt, 'POWER', lw.outputs['Facing'], 2.0), 0.8, 0.05)
+        mix = N.new('ShaderNodeMixShader')
+        L.new(fac, mix.inputs[0])
+        L.new(tr.outputs[0], mix.inputs[1])
+        L.new(b.outputs[0], mix.inputs[2])
+        L.new(mix.outputs[0], out.inputs[0])
+        return mat
+
+    VITRES = ('ico-verre', 'cuve-vitre')
+
+    def matieres_cuves():
+        mats = matieres_ceremonie()
+        mats['vitre'] = mat_vitre()
+        mats['corps'] = mats['acier']
+        # l'intérieur vide : un noir d'eau profonde, à peine sarcelle — ce
+        # qu'on voit au-dessus du liquide quand la cuve n'est pas pleine
+        mats['interieur'] = mat_simple('cuve-interieur', (0x08, 0x12, 0x16), rug=0.35, emission=(0x0c, 0x2a, 0x30), force=0.25)
+        mats['creux'] = mat_simple('cuve-creux', (0x0a, 0x0c, 0x0e), rug=0.7)
+        mats['sonde'] = mat_sonde()
+        # l'anneau franchi s'ALLUME (l'or des paliers, charte : ce qui luit),
+        # puis se brise : ses morceaux ne gardent qu'une braise
+        mats['ambre'] = mat_simple('anneau-ambre', (0x6a, 0x3c, 0x0e), rug=0.2, emission=(0xff, 0xc0, 0x50), force=1.6)
+        mats['braise'] = mat_simple('anneau-braise', (0x3a, 0x22, 0x0a), rug=0.3, emission=(0xff, 0xa0, 0x38), force=0.35)
+        mats['trou'] = mat_simple('anneau-trou', (0, 0, 0))
+        return mats
+
+    def vitre(V, R, z0, z1, seg):
+        """un tube de verre mince et OUVERT : fermé, son fond vu presque à
+        plat se teintait au rasant et voilait le bas du liquide"""
+        V.secteur('vitre', [(R - 0.002, z0), (R, z0), (R, z1), (R - 0.002, z1)], 0, 2 * math.pi, seg=seg)
+
+    def cuve_bonbonne(D, V, S):
+        """LA BONBONNE, le héros du bilan : un fût d'acier à col et robinet
+        (avec son petit manomètre), deux cerclages, un pied à bandes de
+        danger, l'étiquette du sujet, et la JAUGE — une fente vitrée, dans un
+        cadre boulonné et gradué, où le fluide monte"""
+        R = 0.2
+        D.tour('corps', [(0, -0.43), (0.17, -0.43), (0.19, -0.424), (R, -0.41), (R, 0.17), (0.192, 0.225), (0.168, 0.27),
+                         (0.125, 0.302), (0.07, 0.32), (0, 0.325)], seg=96, var=0.1)
+        D.tour('sombre', [(0.15, -0.47), (0.193, -0.47), (0.197, -0.458), (0.197, -0.418), (0.15, -0.418)], seg=96, ferme=True)
+        D.tour('rayures', [(0.1972, -0.462), (0.1985, -0.462), (0.1985, -0.426), (0.1972, -0.426)], seg=96, ferme=True)
+        for z in (-0.375, 0.125):
+            D.tore('sombre', R + 0.004, 0.011, T(0, 0, z), seg=96, segr=12)
+        D.tour('clair', [(0, 0.318), (0.05, 0.318), (0.05, 0.345), (0.064, 0.345), (0.064, 0.365), (0.045, 0.372), (0.045, 0.395), (0, 0.395)])
+        D.boite('acier', -0.042, 0.042, 0.39, 0.445, -0.036, 0.036, var=-0.3)
+        D.tube('clair', (0.04, 0, 0.418), (0.09, 0, 0.418), 0.015)
+        D.tube('sombre', (0.09, 0, 0.418), (0.1, 0, 0.418), 0.019)
+        D.tour('acier', [(0, 0.444), (0.012, 0.444), (0.012, 0.458), (0, 0.458)])
+        D.tore('sombre', 0.058, 0.0085, T(0, 0, 0.462), segr=10)
+        for a in (0, 120, 240):
+            c, s_ = math.cos(math.radians(a)), math.sin(math.radians(a))
+            D.tube('sombre', (0.0, 0.0, 0.462), (0.058 * c, 0.058 * s_, 0.462), 0.005)
+        # le petit manomètre du robinet
+        D.tube('clair', (-0.04, 0, 0.418), (-0.07, 0, 0.418), 0.008)
+        M = T(-0.085, -0.02, 0.418) @ FACE
+        D.tour('clair', [(0, 0.0), (0.03, 0.0), (0.03, 0.012), (0, 0.012)], M=M)
+        D.tour('cadran', [(0, 0.012), (0.024, 0.012), (0.024, 0.014), (0, 0.014)], M=M)
+        D.boite('aiguille', -0.085 - 0.002, -0.085 + 0.002, 0.418, 0.438, -0.0365, -0.0345, rot=RY(-35))
+        # l'étiquette du sujet
+        D.boite('etiquette', -0.09, 0.09, 0.165, 0.21, -0.206, -0.178, var=0)
+        for x in (-0.078, 0.078):
+            D.dome('clair', x, 0.1875, 0.005, -0.206)
+        # la jauge : l'intérieur au dos, le cadre et sa vitre au verre
+        fen = chanfrein(-0.07, 0.07, -0.335, 0.105, (0.014,) * 4)
+        D.prisme('interieur', fen, -0.203, -0.17)
+        S.prisme('sonde', fen, -0.204, -0.171)
+        ext = chanfrein(-0.102, 0.102, -0.367, 0.137, (0.03,) * 4)
+        couronne(V, 'acier', ext, fen, -0.218, -0.165, var=0.3)
+        for z in (-0.33, -0.22, -0.11, 0.0, 0.1):
+            for x in (-0.087, 0.087):
+                V.dome('clair', x, z, 0.0062, -0.218)
+        for k in range(13):
+            z = -0.31 + 0.4 * k / 12
+            long = 0.016 if k % 3 == 0 else 0.009
+            V.boite('cyan', -0.07 + 0.002, -0.07 + 0.002 + long, z - 0.0018, z + 0.0018, -0.2085, -0.2075)
+        V.prisme('vitre', fen, -0.209, -0.207)
+
+    def cuve_reserve(D, V, S):
+        """LA RÉSERVE : un bocal large, socle et couvercle d'acier, quatre
+        montants (les deux de devant au verre), une graduation sur la vitre"""
+        Rg, Ri = 0.34, 0.33
+        D.tour('interieur', [(0, -0.36), (Ri, -0.36), (Ri, 0.26), (0, 0.26)], seg=128)
+        S.tour('sonde', [(0, -0.36), (Ri, -0.36), (Ri, 0.26), (0, 0.26)], seg=128)
+        vitre(V, Rg, -0.361, 0.261, 128)
+        # le socle en couronne autour du verre, et son plancher un rien plus
+        # bas que le liquide : à la même cote, le fond du liquide en cache et
+        # le dessus du socle se disputaient les mêmes pixels
+        V.tour('acier', [(Rg - 0.004, -0.47), (0.38, -0.47), (0.395, -0.458), (0.395, -0.395), (0.372, -0.378), (0.35, -0.36),
+                         (Rg - 0.004, -0.36)], seg=128, ferme=True, var=0.2)
+        D.tour('acier', [(0, -0.47), (Rg, -0.47), (Rg, -0.362), (0, -0.362)], seg=128, var=0.2)
+        V.tour('rayures', [(0.3955, -0.452), (0.397, -0.452), (0.397, -0.402), (0.3955, -0.402)], seg=128, ferme=True)
+        V.tour('acier', [(0, 0.258), (0.375, 0.258), (0.392, 0.272), (0.392, 0.33), (0.362, 0.354), (0.15, 0.368), (0.13, 0.392),
+                         (0.08, 0.405), (0, 0.408)], seg=128, var=-0.2)
+        V.tour('clair', [(0, 0.404), (0.045, 0.404), (0.05, 0.425), (0.035, 0.44), (0, 0.443)])
+        for a in (30, 150, 210, 330):
+            x, y = 0.372 * math.cos(math.radians(a)), 0.372 * math.sin(math.radians(a))
+            (V if y < 0 else D).tube('clair', (x, y, -0.37), (x, y, 0.265), 0.014)
+        for k in range(11):
+            z = -0.3 + 0.5 * k / 10
+            x = -0.22
+            y = -math.sqrt(Rg * Rg - x * x) - 0.0015
+            long = 0.04 if k % 5 == 0 else 0.022
+            V.boite('cyan', x, x + long, z - 0.0022, z + 0.0022, y - 0.0015, y + 0.006, rot=RZ(-math.degrees(math.asin(x / Rg))))
+
+    def siege(at, z):
+        """un siège d'anneau vide : un collier, sa gorge sombre"""
+        at.tour('acier', [(0.112, z - 0.02), (0.146, z - 0.02), (0.146, z - 0.008), (0.139, z - 0.008), (0.139, z + 0.008),
+                          (0.146, z + 0.008), (0.146, z + 0.02), (0.112, z + 0.02)], seg=96, ferme=True, var=0.2)
+        at.tour('creux', [(0.13, z - 0.008), (0.14, z - 0.008), (0.14, z + 0.008), (0.13, z + 0.008)], seg=96, ferme=True)
+
+    def cuve_maitrise(D, V, S):
+        """LA COLONNE DE MAÎTRISE : un tube de verre entre un socle et un
+        chapeau octogonaux, deux tirants, trois sièges d'anneau VIDES — l'anneau
+        (une case à part) vient s'y poser"""
+        Rt, ri = 0.11, 0.1
+        D.tour('interieur', [(0, -0.38), (ri, -0.38), (ri, 0.36), (0, 0.36)], seg=64)
+        S.tour('sonde', [(0, -0.38), (ri, -0.38), (ri, 0.36), (0, 0.36)], seg=64)
+        vitre(V, Rt, -0.381, 0.361, 96)
+        # (le socle en couronne, son plancher un rien plus bas : voir le bocal)
+        V.tour('acier', [(Rt - 0.004, -0.47), (0.21, -0.47), (0.222, -0.456), (0.222, -0.42), (0.175, -0.4), (0.15, -0.38),
+                         (Rt - 0.004, -0.38)], seg=8, phase=0.5, ferme=True, var=0.2)
+        D.tour('acier', [(0, -0.47), (Rt, -0.47), (Rt, -0.382), (0, -0.382)], seg=64, var=0.2)
+        V.tour('acier', [(0, 0.358), (0.15, 0.358), (0.172, 0.378), (0.2, 0.398), (0.2, 0.43), (0.172, 0.452), (0, 0.46)], seg=8, phase=0.5, var=-0.2)
+        for z in SIEGES:
+            siege(V, z)
+        for x in (-0.176, 0.176):
+            D.tube('clair', (x, 0, -0.4), (x, 0, 0.385), 0.012)
+            for z in (-0.39, 0.37):
+                D.tour('sombre', [(0, -0.008), (0.02, -0.008), (0.02, 0.008), (0, 0.008)], M=T(x, 0, z), seg=6, phase=0.5)
+
+    def anneau(A, brise):
+        """l'ANNEAU DE PALIER, au siège du milieu : un collier d'acier et sa
+        gorge qui luit. Brisé : six morceaux écartés, tombés, une braise"""
+        col = [(0.113, -0.024), (0.153, -0.024), (0.157, -0.016), (0.157, 0.016), (0.153, 0.024), (0.113, 0.024)]
+        gorge = [(0.15, -0.009), (0.16, -0.009), (0.16, 0.009), (0.15, 0.009)]
+        if not brise:
+            A.tour('clair', col, seg=96, ferme=True)
+            A.tour('ambre', gorge, seg=96, ferme=True)
+        else:
+            rng = random.Random(7)
+            coupes = [0, 52, 118, 170, 236, 298, 360]
+            for a, b in zip(coupes, coupes[1:]):
+                a0, a1 = math.radians(a + 4), math.radians(b - 4)
+                m = math.radians((a + b) / 2)
+                d = rng.uniform(0.012, 0.03)
+                M = T(d * math.cos(m), d * math.sin(m), -rng.uniform(0.004, 0.03)) @ Matrix.Rotation(math.radians(rng.uniform(-9, 9)), 4, Vector((-math.sin(m), math.cos(m), 0)))
+                A.secteur('clair', col, a0, a1, M=M, seg=24)
+                A.secteur('braise', gorge, a0, a1, M=M, seg=24)
+            for k in range(9):
+                a = math.radians(rng.uniform(200, 340))
+                r = rng.uniform(0.12, 0.2)
+                c = (r * math.cos(a), r * math.sin(a), -rng.uniform(0.03, 0.11))
+                e = rng.uniform(0.004, 0.009)
+                A.boite('clair', c[0] - e, c[0] + e, c[2] - e, c[2] + e, c[1] - e, c[1] + e, rot=RY(rng.uniform(0, 90)))
+
+    BATIS_CUVES = {'bonbonne': cuve_bonbonne, 'reserve': cuve_reserve, 'maitrise': cuve_maitrise}
+    GROUPES = {}      # nom de pièce → {couche: [objets]}
+    GEOMETRIE = {}    # ce que l'assemblage hors de Blender doit savoir (cadres, sièges)
+
+    def poser(ateliers, pose):
+        for at in ateliers:
+            for bm in at.bm.values():
+                bmesh.ops.transform(bm, matrix=pose, verts=bm.verts[:])
+
+    def cuves():
+        global PREFIXE
+        PREFIXE = 'cuve-'
+        sc = scene_neuve()
+        GROUPES.clear()
+        GEOMETRIE.clear()
+        mats = matieres_cuves()
+        biseau = {'corps': 0.004, 'acier': 0.004, 'sombre': 0.003, 'clair': 0.0025}
+        incl = RX(INCL_CUVE)
+        for nom in CUVES:
+            P = parent(sc, nom)
+            at = {c: Atelier() for c in COUCHES}
+            BATIS_CUVES[nom](at['dos'], at['verre'], at['sonde'])
+            poser(at.values(), incl)
+            # recentrée sur sa boîte (dos et verre), une unité de haut
+            pts = [v.co for c in ('dos', 'verre') for bm in at[c].bm.values() for v in bm.verts]
+            cx = (max(p.x for p in pts) + min(p.x for p in pts)) / 2
+            cz = (max(p.z for p in pts) + min(p.z for p in pts)) / 2
+            centre = T(-cx, 0, -cz)
+            poser(at.values(), centre)
+            pose = centre @ incl
+            larg = max(p.x for p in pts) - min(p.x for p in pts)
+            if nom == 'maitrise':
+                larg = max(larg, COTE_ANNEAU)
+            wpx = math.ceil((larg + 0.06) * PX_CUVE / 32) * 32
+            w = wpx / PX_CUVE
+            GROUPES[nom] = {}
+            for c in COUCHES:
+                C = sous(P, f'{nom}-{c}')
+                at[c].objets(C, mats, biseau, lisse=True, prefixe=f'cuve-{nom}-{c}')
+                GROUPES[nom][c] = list(C.objects)
+                declare(f'{nom}-{c}', P, -w / 2, w / 2, -0.5, 0.5, alpha=True)
+            if nom == 'bonbonne':
+                cu = bpy.data.curves.new('sujet21', 'FONT')
+                cu.body = 'SUJET 21'
+                cu.size = 0.028
+                cu.align_x = 'CENTER'
+                cu.align_y = 'CENTER'
+                cu.extrude = 0.0006
+                cu.space_character = 1.2
+                ob = bpy.data.objects.new('cuve-bonbonne-dos-marquage', cu)
+                ob.data.materials.append(mats['trait'])
+                ob.matrix_world = pose @ T(0, -0.2068, 0.1875) @ RX(90)
+                sous_dos = next(c for c in P.children if c.name.startswith('bonbonne-dos'))
+                sous_dos.objects.link(ob)
+                GROUPES[nom]['dos'].append(ob)
+            GEOMETRIE[nom] = {'cadre': [-w / 2, w / 2, -0.5, 0.5], 'px': [wpx, PX_CUVE]}
+            if nom == 'maitrise':
+                GEOMETRIE[nom]['sieges'] = [[(pose @ Vector((0, 0, z))).x, (pose @ Vector((0, 0, z))).z] for z in SIEGES]
+                for etat in ANNEAUX:
+                    Q = parent(sc, 'anneau-' + etat)
+                    A, H = Atelier(), Atelier()
+                    anneau(A, etat == 'brise')
+                    # le tube de la colonne, en CACHE : la moitié arrière de
+                    # l'anneau passe derrière lui
+                    H.tour('trou', [(0, -0.12), (0.1105, -0.12), (0.1105, 0.12), (0, 0.12)], seg=96)
+                    poser((A, H), T(0, 0, SIEGES[1]))
+                    poser((A, H), pose)
+                    A.objets(Q, mats, {'clair': 0.0025}, lisse=True, prefixe='anneau-' + etat)
+                    H.objets(Q, mats, {}, lisse=True, prefixe='anneau-' + etat + '-cache')
+                    for ob in Q.objects:
+                        ob.is_holdout = ob.name.startswith(f'anneau-{etat}-cache')
+                    sx, sz = GEOMETRIE[nom]['sieges'][1]
+                    declare('anneau-' + etat, Q, sx - COTE_ANNEAU / 2, sx + COTE_ANNEAU / 2, sz - COTE_ANNEAU / 2, sz + COTE_ANNEAU / 2, alpha=True)
+                GEOMETRIE['anneau'] = {'cote': COTE_ANNEAU}
+        lumiere_camera(sc)
+        sc.cycles.device = 'GPU'
+        return sc
+
+    def role(ob, sonde):
+        """le rôle d'un objet dans les passes : 'sonde', 'vitre', 'interieur'
+        ou 'opaque' — il tient à sa matière, pas au calque où on l'a rangé"""
+        if ob in sonde:
+            return 'sonde'
+        mat = ob.data.materials[0].name if ob.data and ob.data.materials else ''
+        if mat.startswith(VITRES):
+            return 'vitre'
+        return 'interieur' if mat.startswith('cuve-interieur') else 'opaque'
+
+    def couche(nom):
+        """prépare une passe — dos, verre ou sonde (voir plus haut) ; rend le
+        nombre de px par unité de la pièce"""
+        if nom.startswith('anneau-'):
+            return 1024 / COTE_ANNEAU
+        objet, c = nom.rsplit('-', 1)
+        G = GROUPES[objet]
+        sonde = set(G['sonde'])
+        visible = {
+            'dos': {'opaque', 'interieur'},
+            'verre': {'opaque', 'vitre', 'sonde'},
+            'sonde': {'opaque', 'sonde'},
+        }[c]
+        cache = {'dos': set(), 'verre': {'sonde'}, 'sonde': {'opaque'}}[c]
+        for obs in G.values():
+            for ob in obs:
+                r = role(ob, sonde)
+                ob.hide_render = r not in visible
+                ob.visible_camera = True
+                ob.is_holdout = r in cache
+        return PX_CUVE
+
+    def lance_cuves(sortie, echantillons=192):
+        """comme lance(), passe par passe ; écrit aussi cuves.json (les cadres
+        et la place des sièges, pour l'assemblage)"""
+        import time
+        json.dump(GEOMETRIE, open(os.path.join(sortie, 'cuves.json'), 'w'))
+        file = [f'{n}-{c}' for n in CUVES for c in COUCHES] + ['anneau-' + e for e in ANNEAUX]
+        journal = os.path.join(sortie, 'journal.jsonl')
+        for f in (journal, os.path.join(sortie, 'fini.txt')):
+            if os.path.exists(f):
+                os.remove(f)
+
+        def pas():
+            global PX
+            if not file:
+                open(os.path.join(sortie, 'fini.txt'), 'w').write('fini')
+                return None
+            n = file.pop(0)
+            t = time.time()
+            try:
+                PX = couche(n)
+                m = rend(n, sortie, 16 if n.endswith('-sonde') else echantillons, 100)
+                m['secondes'] = round(time.time() - t, 1)
+            except Exception as e:
+                import traceback
+                m = {'nom': n, 'erreur': repr(e), 'trace': traceback.format_exc()[-600:]}
+            open(journal, 'a', encoding='utf-8').write(json.dumps(m, ensure_ascii=False) + '\n')
+            return 0.2
+        bpy.app.timers.register(pas, first_interval=0.5)
+
 
 # ------------------------------------------------- l'assemblage, hors de Blender
 PLANCHES = {
@@ -930,5 +1316,113 @@ def assemble(planche_nom, dossier, sortie, controle=None):
         ctl.save(controle)
 
 
+# la part du liquide visible que le verre peut voiler à plus de moitié : ses
+# bords seulement, là où le tube fuit vers le rasant. Mesuré le 13/11 : la
+# jauge plate de la bonbonne 0,01, le bocal 0,13, la colonne 0,21 (un tube
+# étroit : ses deux bords rasants pèsent plus) ; un verre qui éteint le
+# liquide, le premier essai, mesurait 1,0
+VOILE_MAX = 0.25
+
+
+def _reduit(chemin, taille):
+    from PIL import Image
+    im = Image.open(chemin).convert('RGBA')
+    return im.convert('RGBa').resize(taille, Image.LANCZOS).convert('RGBA')
+
+
+def assemble_cuves(dossier, masters, controle=None):
+    """les cuves : chaque calque réduit de moitié (2048 → 1024 de haut) en
+    master ; la fenêtre du liquide MESURÉE sur la sonde ; l'anneau (deux
+    cases de 512²) ; et ce qu'il faut recopier dans OBJETS / ANNEAUX_MAITRISE
+    (ceremonieObjets.ts). Renvoie les mesures, et lève une erreur si un
+    pixel de la fenêtre où le liquide ne se voit pas n'est pas sous un opaque
+    du verre — le liquide y déborderait."""
+    import numpy as np
+    from PIL import Image
+    geo = json.load(open(os.path.join(dossier, 'cuves.json')))
+    res = {}
+    vues = []
+    for nom in CUVES:
+        wpx, hpx = geo[nom]['px']
+        taille = (wpx // 2, hpx // 2)
+        calques = {}
+        for c in ('dos', 'verre', 'sonde'):
+            calques[c] = _reduit(os.path.join(dossier, 'alpha', f'cuve-{nom}-{c}.png'), taille)
+        for c in ('dos', 'verre'):
+            calques[c].save(os.path.join(masters, f'ceremonie-{nom}-{c}.png'))
+        sonde = np.asarray(calques['sonde'])[..., 3] / 255.0
+        verre = np.asarray(calques['verre'])[..., 3] / 255.0
+        ys, xs = np.nonzero(sonde > 0.5)
+        x0, x1, y0, y1 = xs.min(), xs.max() + 1, ys.min(), ys.max() + 1
+        # un pixel de plus d'un côté s'il tombe SOUS un opaque du verre : la
+        # lisière anticrénelée ne laisse pas voir le fond entre liquide et
+        # cadre. Contre une paroi de verre clair, non : le liquide s'y
+        # verrait dans l'épaisseur du verre (premier essai, partout élargie,
+        # la colonne avait deux colonnes de pixels nus)
+        couvert = lambda bande: float((verre[bande] > 0.5).mean()) > 0.95
+        x0 -= couvert((slice(y0, y1), x0 - 1))
+        x1 += couvert((slice(y0, y1), x1))
+        y0 -= couvert((y0 - 1, slice(x0, x1)))
+        y1 += couvert((y1, slice(x0, x1)))
+        boite = (slice(y0, y1), slice(x0, x1))
+        # « nu » : ni liquide visible, ni verre à moitié opaque. (Au seuil de
+        # 0,9, premier essai, les lisières anticrénelées des cadres et des
+        # colliers — 0,86 d'opacité en médiane — passaient pour des trous :
+        # 279, 125 et 1266 pixels ; à 0,5, aucun.)
+        nu = (sonde[boite] < 0.5) & (verre[boite] < 0.5)
+        W, H = taille
+        res[nom] = {'largeur': W, 'hauteur': H,
+                    'liquide': {'x': round(x0 / W, 4), 'y': round(y0 / H, 4), 'l': round((x1 - x0) / W, 4), 'h': round((y1 - y0) / H, 4)},
+                    'pixels_nus': int(nu.sum()),
+                    # la part de la zone où le liquide SE VOIT que le verre
+                    # voile à plus de moitié : le verre transparent doit
+                    # laisser voir le liquide (le fond d'un tube fermé, vu au
+                    # rasant, l'assombrissait en ellipse — premier essai)
+                    'voile': round(float(((sonde > 0.5) & (verre > 0.5)).sum() / max((sonde > 0.5).sum(), 1)), 4)}
+        vues.append((nom, calques, (x0, y0, x1, y1)))
+    # l'anneau : intact | brisé
+    planche = Image.new('RGBA', (2 * CASE, CASE), (0, 0, 0, 0))
+    for i, e in enumerate(ANNEAUX):
+        planche.paste(_reduit(os.path.join(dossier, 'alpha', f'cuve-anneau-{e}.png'), (CASE, CASE)), (i * CASE, 0))
+    planche.save(os.path.join(masters, 'ceremonie-anneau.png'))
+    # où poser la case de l'anneau sur chaque siège, en fractions de l'image
+    # de la colonne (un carré : l·largeur = h·hauteur en pixels)
+    x0, x1, z0, z1 = geo['maitrise']['cadre']
+    c = geo['anneau']['cote']
+    res['anneaux'] = [{'x': round((sx - c / 2 - x0) / (x1 - x0), 4), 'y': round((z1 - sz - c / 2) / (z1 - z0), 4),
+                       'l': round(c / (x1 - x0), 4), 'h': round(c / (z1 - z0), 4)} for sx, sz in geo['maitrise']['sieges']]
+    if controle:
+        # chaque cuve remplie aux deux tiers d'un sarcelle uni (ce que fera le
+        # CSS), et la colonne avec un anneau intact et un brisé posés
+        fond = (0x0b, 0x12, 0x18, 255)
+        larg = sum(cal['dos'].width for _, cal, _ in vues) + 40 * len(vues)
+        ctl = Image.new('RGBA', (larg, 1024), fond)
+        x = 20
+        for nom, cal, (a, b, c_, d) in vues:
+            img = Image.new('RGBA', cal['dos'].size, (0, 0, 0, 0))
+            img.alpha_composite(cal['dos'])
+            hauteur = round((d - b) * 0.66)
+            img.alpha_composite(Image.new('RGBA', (c_ - a, hauteur), (0x2a, 0xc8, 0xbc, 235)), (a, d - hauteur))
+            img.alpha_composite(cal['verre'])
+            if nom == 'maitrise':
+                an = Image.open(os.path.join(masters, 'ceremonie-anneau.png')).convert('RGBA')
+                for k, f in enumerate(res['anneaux'][:2]):
+                    case = an.crop(((1 - k) * CASE, 0, (2 - k) * CASE, CASE))
+                    cote = round(f['l'] * img.width)
+                    img.alpha_composite(case.resize((cote, cote), Image.LANCZOS), (round(f['x'] * img.width), round(f['y'] * img.height)))
+            ctl.alpha_composite(img, (x, 0))
+            x += img.width + 40
+        ctl.save(controle)
+    return res
+
+
 if __name__ == '__main__' and not DANS_BLENDER:
-    assemble(sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4] if len(sys.argv) > 4 else None)
+    if sys.argv[1] == 'cuves':
+        r = assemble_cuves(sys.argv[2], sys.argv[3], sys.argv[4] if len(sys.argv) > 4 else None)
+        print(json.dumps(r, indent=1))
+        if any(v.get('pixels_nus') for v in r.values() if isinstance(v, dict)):
+            sys.exit('des pixels de la fenêtre ne sont couverts ni par le liquide visible, ni par le verre')
+        if any(v.get('voile', 0) > VOILE_MAX for v in r.values() if isinstance(v, dict)):
+            sys.exit(f'le verre voile plus de {VOILE_MAX:.0%} du liquide visible')
+    else:
+        assemble(sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4] if len(sys.argv) > 4 else None)
