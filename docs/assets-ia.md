@@ -93,6 +93,13 @@ Négatif : négatif commun + `green, emerald, brown background, perspective,
 tilt, off-center, motion blur`
 
 ## 5. Texture mur neutre — `wall.webp` ✗ À REFAIRE
+
+> ✅ **Le mur et la seconde paroi sont dessinés dans Blender** (`tools/images/blender/surfaces.py`) : `wall` le 12/11, `wall-a` le 13/11 —
+> la mise en page de la tôle de la chaufferie dans l'acier froid du mur,
+> nervures, trappes, évents, petits boîtiers, deux faisceaux de conduites
+> verticales ; luminance 0,15 (0,17 avant), raccord 0,5 / 0,3 (1,0 / 1,7),
+> 19 Ko (207), livrée à 1024² comme le reste de la famille. Ce qui suit
+> reste pour mémoire.
 **1024×1024 · PNG · tileable sur les deux axes**
 
 Le mur par défaut montre sa couture : raccord vertical **4,7** (seuil 3,0),
@@ -110,6 +117,9 @@ join, in the exact style of the attached reference (wall-a.webp)
 Négatif : négatif commun + `rust, strong highlights, panel border, frame`
 
 ## 6. Texture paroi hydrophobe
+
+> ✅ **Redessinée dans Blender le 13/11** (`tools/images/blender/surfaces.py`, `mat_phobe`) :
+> une cire violette martelée où l'eau perle (260 gouttes semées en distance périodique) — luminance 0,15, raccord 0,8 / 1,0 (2,3 / 2,5 avant), 28 Ko. Le prompt ci-dessous reste pour mémoire.
 **512×512 · PNG · tileable**
 
 ```
@@ -121,6 +131,9 @@ perfect tiling, no text
 Négatif : `wet film, puddles, bright purple, glitter, text`
 
 ## 7. Texture paroi hydrophile
+
+> ✅ **Redessinée dans Blender le 13/11** (`tools/images/blender/surfaces.py`, `mat_phile`) :
+> un émail sarcelle sous un film d'eau, reflet teinté à demi métallique — luminance 0,18, raccord 0,6 / 0,9 (1,8 / 1,6 avant), 49 Ko. Le prompt ci-dessous reste pour mémoire.
 **512×512 · PNG · tileable**
 
 ```
@@ -755,7 +768,16 @@ matte finish, low contrast, uniform grain
 Négatif : négatif commun + `rust, hexagonal mesh, warped grid, uneven holes,
 large holes, bright reflections, panel border`
 
-### 18b. Le fond de cuve — `tank-bg.webp` ✗ À REFAIRE
+### 18b. Le fond de cuve — `tank-bg.webp` ✅ REDESSINÉ DANS BLENDER (13/11)
+
+> Plus de prompt à envoyer : le fond se dessine dans l'atelier
+> (`tools/images/blender/surfaces.py`, `cuve()`) — une ossature de cuve
+> d'essai : deux montants en I et une traverse par carreau, une baie au
+> hublot (lueur sarcelle de l'eau voisine) et à réglette graduée, une baie
+> à évent et boîtier de mesure, deux conduites qui traversent, le marquage
+> « CUVE 21 ». Mesuré à la livraison : luminance 0,11, raccord 0,5 / 1,0,
+> aucun chaud, 15 Ko. Le texte ci-dessous reste pour mémoire.
+
 **1024×1024 · tileable · pas de transparence · luminance visée 0,10 à 0,15**
 
 Le fond est ce qu'on voit sous l'eau : il doit rester **plus sombre que les
@@ -1118,6 +1140,16 @@ bright neon`
 ---
 
 ## 24. L'ATLAS DES PAROIS N° 2 — les biomes (phase 2)
+
+> ✅ **L'atlas n° 1 est redessiné dans Blender le 13/11**
+> (`tools/images/blender/habillages.py`). Ce sont les mêmes huit sujets, dans l'acier
+> et la lumière du mur et du fond de cuve. Chaque case est un carreau raccordable,
+> rendu seul ; le script assemble ensuite l'atlas hors de Blender
+> (`python -I tools/images/blender/habillages.py <rendus> masters/images/paroi-atlas.png`).
+> Mesures : luminance 0,13 (0,14 avant), 1 % de pixels chauds (les chevrons, les câbles ocre
+> et sang), 107 Ko (1 056 avant). Les cases mesurent 0,2 à 1,1 au raccord, sauf les
+> caissons (4,2 en x) : le bord tombe sur le biseau continu d'une caisse, et à l'œil
+> en 2×2 rien ne se voit. L'atlas n° 2 ci-dessous se fera dans le même atelier.
 
 L'atlas livré (`paroi-atlas.webp`, huit habillages : caissons, conduites,
 poutrelle, blindage, aération, hublot, écrans, câbles) est **neutre** : la

@@ -100,14 +100,17 @@ def fond(P, mats, nom='fond'):
     P.objects.link(bpy.data.objects.new(P.name + '-fond', me))
 
 
-def carreau(sc, mats, nom, bati):
+def carreau(sc, mats, nom, bati, extra=None):
     """un carreau : `bati(at, rng)` pose la géométrie dans [0,1]², les huit
-    copies l'entourent, la caméra cadre le carreau et sa marge"""
+    copies l'entourent, la caméra cadre le carreau et sa marge ; `extra(C,
+    mats)` y ajoute ce que l'atelier ne sait pas faire (un texte)"""
     P = parent(sc, nom)
     C = sous(P, nom + '-carreau')
     at = Atelier()
     bati(at, random.Random(len(nom) * 97))
-    at.objets(C, mats, {'panneau': 0.0022, 'rail': 0.0016, 'lame': 0.0006}, prefixe=nom)
+    at.objets(C, mats, {'panneau': 0.0022, 'peinture': 0.0022, 'rail': 0.0016, 'lame': 0.0006, 'plat': 0.0012}, prefixe=nom)
+    if extra:
+        extra(C, mats)
     fond(P, mats)
     copies(P, C, [(dx, dz) for dx in (-1, 0, 1) for dz in (-1, 0, 1) if dx or dz])
     declare(nom, P, 0, 1, 0, 1, mx=MARGE, mz=MARGE, alpha=False)
@@ -147,27 +150,26 @@ def mur(at, rng):
 
 
 # ------------------------------------------------------------ le fond de cuve
-RAILS = (0.24, 0.745)       # le milieu des deux rails à voyants, relevés sur l'ancien
+# LA PAROI DU FOND DE LA CUVE D'ESSAI (13/11, deuxième version). La première
+# reprenait l'ancien dessin généré — des panneaux plats barrés de deux rails —
+# et rien n'y disait qu'on était dans une cuve : on aurait dit un mur de plus,
+# plus sombre. Celle-ci est une OSSATURE : deux montants en I par carreau, une
+# traverse, et entre eux des baies en retrait qui portent chacune un
+# équipement de banc d'essai — un hublot d'inspection, une réglette graduée,
+# un évent, un boîtier de mesure, deux conduites qui courent d'un bord à
+# l'autre. Le carreau couvre 900 unités de jeu : un montant toutes les 450,
+# assez rare pour ne pas faire grille avec la trame de mesure du shader
+# (100 et 500 unités), assez proche pour que toute cuve en montre deux.
+#
+# Ce que le fond doit rester (assets-ia §18b) : PLUS SOMBRE QUE LES PAROIS
+# (luminance visée 0,10 à 0,15 ; le mur mesure 0,15), sans chaud, sans
+# contraste fort — l'eau passe devant et doit se lire dessus.
 
-
-def rail(at, zc):
-    """un rail horizontal : deux plats rivetés, une gorge, trois voyants"""
-    h = 0.032
-    # les deux plats courent d'un bord à l'autre SANS biseau ('plat') : biseauté,
-    # leur bout marquait une encoche au bord du carreau, là où la copie reprend
-    at.boite('plat', -0.01, 1.01, zc + h * 0.55, zc + h * 1.6, -0.006, FOND_Y, 0.3)
-    at.boite('plat', -0.01, 1.01, zc - h * 1.6, zc - h * 0.55, -0.006, FOND_Y, 0.3)
-    at.boite('fond', -0.01, 1.01, zc - h * 0.55, zc + h * 0.55, 0.004, FOND_Y, 0)
-    for k in range(32):
-        x = (k + 0.5) / 32
-        at.dome('rivet', x, zc + h * 1.08, 0.0032, -0.006, 0)
-        at.dome('rivet', x, zc - h * 1.08, 0.0032, -0.006, 0)
-    # les fentes de la gorge, et les voyants dans trois d'entre elles
-    for k in range(6):
-        x0 = k / 6 + 0.012
-        at.boite('rail', x0, x0 + 1 / 6 - 0.024, zc - h * 0.32, zc + h * 0.32, -0.002, 0.004, -0.4)
-        if k % 2 == 0:
-            at.boite('voyant', x0 + 0.04, x0 + 0.1, zc - h * 0.1, zc + h * 0.1, -0.0035, -0.002, 0)
+MONTANTS = (0.0, 0.5)     # l'axe des deux montants en I
+DEMI_MONTANT = 0.032
+TRAVERSE = 0.0            # l'axe de la traverse, au bord bas du carreau
+DEMI_TRAVERSE = 0.026
+CONDUITES = (0.405, 0.442)  # les deux conduites qui traversent le carreau
 
 
 def grille(at, x0, x1, z0, z1, var):
@@ -178,9 +180,10 @@ def grille(at, x0, x1, z0, z1, var):
         at.boite('fond', x0 + 0.012, x1 - 0.012, z - 0.004, z + 0.004, -0.0025, -0.001, 0)
 
 
-def panneau_cadre(at, x0, x1, z0, z1, var, rng):
+def panneau_cadre(at, x0, x1, z0, z1, var, rng, evente=True):
     """un panneau : sa plaque, un cadre en relief, ses rivets ; parfois une
-    grille d'aération dans un coin"""
+    grille d'aération dans un coin (pas dans une baie qui porte déjà son
+    équipement : evente=False)"""
     g = JEU / 2
     x0, x1, z0, z1 = x0 + g, x1 - g, z0 + g, z1 - g
     at.boite('panneau', x0, x1, z0, z1, 0.0, FOND_Y, var)
@@ -192,57 +195,334 @@ def panneau_cadre(at, x0, x1, z0, z1, var, rng):
     for (x, z) in ((x0 + 0.02, z0 + 0.02), (x1 - 0.02, z0 + 0.02), (x1 - 0.02, z1 - 0.02), (x0 + 0.02, z1 - 0.02)):
         at.dome('rivet', x, z, 0.004, -0.004, var)
     w, h = x1 - x0, z1 - z0
-    if w > 0.14 and h > 0.12 and rng.random() < 0.35:
+    if evente and w > 0.14 and h > 0.12 and rng.random() < 0.35:
         gx = x0 + 0.03 if rng.random() < 0.5 else x1 - 0.03 - 0.11
         gz = z1 - 0.03 - 0.06
         grille(at, gx, gx + 0.11, gz, gz + 0.06, var)
 
 
-def faisceau(at, z, x0, xc, zb, r=0.0075):
-    """trois conduites côte à côte, à l'horizontale de x0 à xc, puis un coude
-    qui descend jusqu'à zb — et des colliers"""
-    for k in range(3):
-        dz = (k - 1) * 0.018
-        R = 0.035 + dz
-        at.fut('tuyau', x0, xc - R, r, 0, -0.012, z + dz)
-        prev = Vector((xc - R, -0.012, z + dz))
-        for i in range(1, 9):
-            t = (math.pi / 2) * i / 8
-            p = Vector((xc - R + R * math.sin(t), -0.012, z + dz - R + R * math.cos(t)))
-            at.tube('tuyau', prev, p, r, seg=12)
-            prev = p
-        at.tube('tuyau', prev, (prev.x, -0.012, zb), r, seg=12)
-    for x in (x0 + 0.06, x0 + 0.26, x0 + 0.42):
-        if x < xc - 0.06:
-            at.boite('rail', x - 0.008, x + 0.008, z - 0.034, z + 0.034, -0.024, -0.004, 0)
+def montant(at, xc):
+    """un montant en I vu de face : l'âme en retrait, deux semelles devant,
+    une file de boulons sur chaque semelle"""
+    h = DEMI_MONTANT
+    at.boite('rail', xc - h * 0.55, xc + h * 0.55, -0.01, 1.01, -0.006, FOND_Y, 0.2)
+    for s in (-1, 1):
+        x0, x1 = sorted((xc + s * h * 0.55, xc + s * h))
+        at.boite('plat', x0, x1, -0.01, 1.01, -0.02, FOND_Y, 0.4)
+    for k in range(16):
+        z = (k + 0.5) / 16
+        for s in (-1, 1):
+            at.dome('rivet', xc + s * h * 0.78, z, 0.0042, -0.02, 0.4)
+
+
+def traverse(at):
+    """la traverse : une poutre couchée entre les montants, un cran en retrait
+    d'eux (ils passent devant), un plat d'appui dessus et dessous"""
+    h = DEMI_TRAVERSE
+    zc = TRAVERSE
+    at.boite('rail', -0.01, 1.01, zc - h, zc + h, -0.012, FOND_Y, -0.2)
+    at.boite('plat', -0.01, 1.01, zc + h, zc + h + 0.008, -0.016, FOND_Y, 0.3)
+    at.boite('plat', -0.01, 1.01, zc - h - 0.008, zc - h, -0.016, FOND_Y, 0.3)
+    for k in range(24):
+        x = (k + 0.5) / 24
+        at.dome('rivet', x, zc, 0.0036, -0.012, -0.2)
+
+
+def baie(at, x0, x1, z0, z1, coutures, rng):
+    """le fond d'une baie : des plaques à cadre, coupées en hauteur aux
+    fractions données — le décor de la baie se pose dessus"""
+    for j in range(len(coutures) - 1):
+        za = z0 + (z1 - z0) * coutures[j]
+        zb = z0 + (z1 - z0) * coutures[j + 1]
+        panneau_cadre(at, x0, x1, za, zb, rng.uniform(-1, 1), rng, evente=False)
+
+
+def hublot(at, x, z, r):
+    """le hublot d'inspection : une couronne boulonnée, un verre sombre en
+    retrait — l'œil par lequel on regarde dans la cuve d'à côté"""
+    at.anneau('plat', x, z, r * 1.32, r * 0.98, -0.022, 0.004, 0.3, seg=64)
+    at.anneau('rail', x, z, r * 1.0, r * 0.9, -0.012, 0.004, 0.0, seg=64)
+    # la lueur de l'eau voisine, sous un verre poli : opaque et noir, le
+    # hublot se lisait comme une simple couronne (essai 1) ; un verre qui
+    # transmet sortait gris uni (essai 2) — le verre est donc la lueur même
+    # (devant la plaque de la baie, dont la face est à 0 : derrière, il
+    # disparaissait, essai 4)
+    at.disque('lueur', x, z, r * 0.92, -0.007, -0.003, 0.0, seg=64)
+    at.boulons(x, z, r * 1.17, 16, -0.022, rr=0.0042, var=0.3, phase=0.5)
+
+
+def reglette(at, x, z0, z1):
+    """une réglette graduée, le long d'un montant : la cuve est un instrument
+    de mesure (le shader y trace déjà sa trame). Un trait par quarantième,
+    long tous les cinq et tous les dix"""
+    at.boite('plat', x, x + 0.03, z0, z1, -0.008, 0.0, -0.5)
+    n = 40
+    for k in range(n + 1):
+        z = z0 + 0.01 + (z1 - z0 - 0.02) * k / n
+        long = 0.022 if k % 10 == 0 else (0.015 if k % 5 == 0 else 0.009)
+        at.boite('trait', x + 0.004, x + 0.004 + long, z - 0.0011, z + 0.0011, -0.0095, -0.007, 0)
+
+
+def boitier(at, x0, x1, z0, z1, rng):
+    """un boîtier de mesure : une caisse en saillie, une fenêtre d'afficheur
+    éteinte, trois voyants dont un seul allumé"""
+    at.boite('panneau', x0, x1, z0, z1, -0.02, 0.0, rng.uniform(-1, 1))
+    m = 0.01
+    at.boite('fond', x0 + m * 2, x1 - m * 2, z1 - 0.06, z1 - 0.022, -0.0215, -0.019, 0)
+    at.boite('ecran', x0 + m * 2.4, x1 - m * 2.4, z1 - 0.057, z1 - 0.025, -0.022, -0.0205, 0)
+    for i, mat in enumerate(('voyant', 'eteint', 'eteint')):
+        at.cylindre(mat, x0 + 0.03 + i * 0.026, z0 + 0.026, 0.0065, -0.026, -0.02, 0, seg=20)
+    for (x, z) in ((x0 + 0.012, z0 + 0.012), (x1 - 0.012, z0 + 0.012), (x1 - 0.012, z1 - 0.012), (x0 + 0.012, z1 - 0.012)):
+        at.dome('rivet', x, z, 0.0035, -0.02, 0)
+
+
+def conduites(at):
+    """deux conduites qui traversent tout le carreau (elles se raccordent à
+    elles-mêmes au bord), des brides à mi-baie, un collier sur chaque montant"""
+    for i, z in enumerate(CONDUITES):
+        r = 0.011 if i == 0 else 0.0085
+        at.fut('tuyau', -0.02, 1.02, r, 0, -0.034, z)
+        for xb in (0.25, 0.75):
+            at.anneau('tuyau', xb, z, r * 1.55, r * 0.6, -0.034 - r * 1.1, -0.034 + r * 1.1, 0, seg=32)
+    for xc in MONTANTS:
+        at.boite('plat', xc - 0.012, xc + 0.012, CONDUITES[0] - 0.024, CONDUITES[1] + 0.02, -0.05, -0.02, 0.3)
+
+
+def mat_lueur():
+    """le hublot : un verre poli presque noir (le soleil du haut y pose son
+    reflet) qui laisse monter la lueur sarcelle de l'eau voisine, ondoyante"""
+    mat = mat_simple('lueur', (0x02, 0x08, 0x0a), rug=0.3, emission=(0x2a, 0x8a, 0x96), force=0.35)
+    nt = mat.node_tree
+    N, L = nt.nodes, nt.links
+    b = next(n for n in N if n.type == 'BSDF_PRINCIPLED')
+    # le soleil « de face » frappe le disque d'aplomb et revient droit dans
+    # la caméra : poli et à plein spéculaire, le hublot sortait gris clair
+    # (essais 2 et 6) — un reflet faible et étalé suffit à dire « verre »
+    for nom in ('Specular IOR Level', 'Specular'):
+        if nom in b.inputs:
+            b.inputs[nom].default_value = 0.08
+            break
+    ondes = bruit_tore(nt, 6, 6, 41, detail=3, rugo=0.5)
+    # (à 0,7 – 2,1 le hublot sortait en lampe cyan, essai 5)
+    L.new(op(nt, 'MULTIPLY_ADD', ondes, 0.36, 0.08), b.inputs['Emission Strength'])
+    return mat
+
+
+def marquage(C, mats):
+    """le numéro de la cuve, peint au pochoir sur la plaque basse de la baie
+    du hublot — « 21 » : c'est le sujet qu'on y essaie"""
+    for corps, taille, z in (('CUVE 21', 0.044, 0.19), ('ESSAI · NE PAS VIDANGER', 0.016, 0.145)):
+        cu = bpy.data.curves.new('marquage', 'FONT')
+        cu.body = corps
+        cu.size = taille
+        cu.align_x = 'CENTER'
+        cu.extrude = 0.0004
+        cu.space_character = 1.15
+        ob = bpy.data.objects.new('tank-bg-marquage', cu)
+        # le texte se pose dans XY ; tourné d'un quart autour de X, il se
+        # dresse dans le plan du mur et regarde la caméra (-Y)
+        ob.rotation_euler = (math.pi / 2, 0, 0)
+        ob.location = (0.235, -0.0015, z)
+        ob.data.materials.append(mats['trait'])
+        C.objects.link(ob)
 
 
 def cuve(at, rng):
-    for zc in RAILS:
-        rail(at, zc)
-    # les bandes entre les rails : panneaux encadrés, une gorge verticale
-    # rainurée (un rythme qui ne suit pas les panneaux)
-    bandes = [(RAILS[0] + 0.052, RAILS[1] - 0.052), (RAILS[1] + 0.052, RAILS[0] + 1 - 0.052)]
-    coutures = [((0.27, 0.36, 0.39, 0.60, 0.80, 0.86), (0.0, 0.42, 1.0)),
-                ((0.0, 0.25, 0.31, 0.47, 0.70), (0.0, 0.55, 1.0))]
-    for (b0, b1), (cx, fz) in zip(bandes, coutures):
-        H = b1 - b0
-        for (x0, x1) in rangee(cx):
-            if x1 - x0 < 0.08:
-                # une gorge rainurée verticale
-                at.boite('fond', x0 + 0.004, x1 - 0.004, b0, b1, 0.006, FOND_Y, 0)
-                n = int(H / 0.008)
-                for k in range(n):
-                    z = b0 + (k + 0.5) * H / n
-                    at.boite('lame', x0 + 0.012, x1 - 0.012, z - 0.0018, z + 0.0018, 0.002, 0.006, 0)
-                continue
-            # chaque plaque coupée en hauteur aux fractions fz
-            for j in range(len(fz) - 1):
-                z0, z1 = b0 + H * fz[j], b0 + H * fz[j + 1]
-                panneau_cadre(at, x0, x1, z0, z1, rng.uniform(-1, 1), rng)
-    # les faisceaux de conduites, l'un en haut à droite, l'autre en bas à gauche
-    faisceau(at, RAILS[1] + 0.16, 0.47, 0.97, RAILS[1] + 0.06)
-    faisceau(at, RAILS[0] - 0.17, -0.03, 0.30, 0.04)
+    for xc in MONTANTS:
+        montant(at, xc)
+    traverse(at)
+    bas = TRAVERSE + DEMI_TRAVERSE + 0.008
+    haut = TRAVERSE + 1 - DEMI_TRAVERSE - 0.008
+    gA = (MONTANTS[0] + DEMI_MONTANT, MONTANTS[1] - DEMI_MONTANT)
+    gB = (MONTANTS[1] + DEMI_MONTANT, MONTANTS[0] + 1 - DEMI_MONTANT)
+    # la baie du hublot : la réglette contre le montant de droite
+    baie(at, gA[0], gA[1], bas, haut, (0.0, 0.36, 0.40, 1.0), rng)
+    hublot(at, (gA[0] + gA[1]) / 2 - 0.02, 0.70, 0.105)
+    reglette(at, gA[1] - 0.042, 0.50, 0.94)
+    # la baie de l'évent : un grand évent à lames en haut, le boîtier en bas
+    baie(at, gB[0], gB[1], bas, haut, (0.0, 0.34, 0.40, 1.0), rng)
+    grille(at, gB[0] + 0.05, gB[1] - 0.05, 0.56, 0.90, 0.2)
+    boitier(at, gB[0] + 0.04, gB[0] + 0.17, 0.10, 0.28, rng)
+    conduites(at)
+
+
+# ------------------------------------------- les parois hydrophile et hydrophobe
+# Les deux matières que le joueur apprend à lire : l'une ATTIRE l'eau
+# (turquoise, mouillée, brillante — le shader y fait glisser un reflet),
+# l'autre la REPOUSSE (violette, cireuse — l'eau y perle). Les anciennes
+# sortaient du générateur et montraient leur couture (prepare.py --audit du
+# 13/11 : phile 1,8 / 1,6, phobe 2,3 / 2,5) ; ici, tout le grain est pris sur
+# le tore, les perles sont semées en distance PÉRIODIQUE et le carreau a ses
+# huit copies : le raccord vient par construction. Luminance gardée sur les
+# anciennes (0,15 et 0,16) : le shader les assombrit déjà (×0,85 à ×1,1 pour
+# l'une, ×0,75 pour l'autre).
+
+def mat_phile():
+    """une céramique sarcelle sous un film d'eau : des marbrures larges, des
+    pores sombres, une surface polie que le film ride (le relief seul)"""
+    mat = bpy.data.materials.new('phile')
+    nt, N, L = noeuds(mat)
+    out = N.new('ShaderNodeOutputMaterial')
+    b = N.new('ShaderNodeBsdfPrincipled')
+    L.new(b.outputs[0], out.inputs[0])
+    marbre = bruit_tore(nt, 2.5, 2.5, 51, detail=5, rugo=0.55)
+    c = melange(nt, rampe(nt, marbre, 0.3, 0.75), lin((0x03, 0x17, 0x1a)), lin((0x09, 0x34, 0x38)))
+    pores = bruit_tore(nt, 70, 70, 52, detail=4, rugo=0.6)
+    c = melange(nt, op(nt, 'MULTIPLY', rampe(nt, pores, 0.64, 0.72), 0.5), c, lin((0x02, 0x0e, 0x12)))
+    L.new(c, b.inputs['Base Color'])
+    # LE FILM D'EAU : des vagues franches sous un poli de miroir — seules
+    # les crêtes tournées vers la caméra renvoient le soleil de face, en
+    # éclats, et le reste plonge dans le sarcelle. Un frisson fin renvoyait
+    # ce soleil en grésil gris (essai 1, 0,33 de luminance) ; un film doux à
+    # demi poli, en voile gris uniforme (essai 2, 0,31) ; des vagues trop
+    # fouillées (six octaves), en granit pailleté (essai 3)
+    b.inputs['Roughness'].default_value = 0.1
+    # (et des pentes trop raides, en pluie d'éclats, essai 4 ; trop douces,
+    # le soleil de face se mirait partout : 0,45, essai 5). Le soleil de
+    # face, renvoyé d'aplomb, est le piège de toute matière polie ici : un
+    # reflet blanc sur des pentes moyennes faisait un camouflage gris et
+    # noir (essai 6). Le reflet est donc TEINTÉ (à demi métallique, comme
+    # un émail) : là où le film regarde la caméra, il luit sarcelle
+    b.inputs['Metallic'].default_value = 0.7
+    b.inputs['Roughness'].default_value = 0.16
+    # la part non métallique renvoie du blanc : bridée, sinon la luminance
+    # restait à 0,23 quelle que soit la teinte (essai 8)
+    for nom in ('Specular IOR Level', 'Specular'):
+        if nom in b.inputs:
+            b.inputs[nom].default_value = 0.12
+            break
+    rides = bruit_tore(nt, 2.5, 2.5, 53, detail=1.5, rugo=0.35)
+    bump = N.new('ShaderNodeBump')
+    bump.inputs['Strength'].default_value = 1.0
+    bump.inputs['Distance'].default_value = 0.008
+    L.new(rides, bump.inputs['Height'])
+    L.new(bump.outputs['Normal'], b.inputs['Normal'])
+    return mat
+
+
+def mat_phobe():
+    """une cire violette : mate, une peau d'orange fine, des voiles plus
+    clairs là où la couche est épaisse"""
+    mat = bpy.data.materials.new('phobe')
+    nt, N, L = noeuds(mat)
+    out = N.new('ShaderNodeOutputMaterial')
+    b = N.new('ShaderNodeBsdfPrincipled')
+    L.new(b.outputs[0], out.inputs[0])
+    voile = bruit_tore(nt, 2.0, 2.0, 61, detail=4, rugo=0.5)
+    c = melange(nt, rampe(nt, voile, 0.3, 0.75), lin((0x26, 0x17, 0x34)), lin((0x4a, 0x30, 0x5e)))
+    L.new(c, b.inputs['Base Color'])
+    b.inputs['Roughness'].default_value = 0.55
+    # un martelé large (la cire coulée en couche inégale) et une peau
+    # d'orange fine dessus
+    martele = bruit_tore(nt, 14, 14, 63, detail=2, rugo=0.4)
+    peau = bruit_tore(nt, 55, 55, 62, detail=3, rugo=0.5)
+    bump = N.new('ShaderNodeBump')
+    bump.inputs['Strength'].default_value = 0.5
+    bump.inputs['Distance'].default_value = 0.003
+    L.new(op(nt, 'ADD', martele, op(nt, 'MULTIPLY', peau, 0.3)), bump.inputs['Height'])
+    L.new(bump.outputs['Normal'], b.inputs['Normal'])
+    return mat
+
+
+def bati_phile(at, rng):
+    # la plaque tient JUSTE le carreau : débordant de 0,01, elle se
+    # superposait à ses copies et le bord sortait en liseré sombre (essai 1)
+    at.boite('phile', 0.0, 1.0, 0.0, 1.0, 0.0, FOND_Y, 0)
+
+
+def perles(rng, n, rmin, rmax, essais=6000):
+    """des perles qui ne se touchent pas, semées en distance PÉRIODIQUE (une
+    perle au bord se mesure aussi à celles de l'autre bord) — la plupart
+    petites, quelques grosses (une loi en puissance sur le rayon)"""
+    pts = []
+    for _ in range(essais):
+        if len(pts) >= n:
+            break
+        x, z = rng.random(), rng.random()
+        r = rmin + (rmax - rmin) * rng.random() ** 3
+        ok = True
+        for (a, c, q) in pts:
+            dx = min(abs(x - a), 1 - abs(x - a))
+            dz = min(abs(z - c), 1 - abs(z - c))
+            if dx * dx + dz * dz < (r + q + 0.004) ** 2:
+                ok = False
+                break
+        if ok:
+            pts.append((x, z, r))
+    return pts
+
+
+def bati_phobe(at, rng):
+    at.boite('phobe', 0.0, 1.0, 0.0, 1.0, 0.0, FOND_Y, 0)
+    # l'eau perle : des gouttes presque rondes (l'angle de contact d'une
+    # surface qui repousse), posées sur la cire
+    for (x, z, r) in perles(rng, 260, 0.0035, 0.022):
+        at.dome('goutte', x, z, r, 0.0, 0, aplati=0.75)
+
+
+# ------------------------------------------------------- la seconde paroi
+# wall-a : la paroi qui alterne avec le mur sur les longs murs (le shader
+# fond l'une dans l'autre selon un bruit très lent, à l'échelle 520 contre
+# 230). Elle doit donc être PLUS FOUILLÉE que le mur, dans le même acier
+# froid — c'est le relief qui rompt la répétition, pas la couleur. La mise
+# en page et les panneaux sont ceux de la tôle de la chaufferie (dispose,
+# plaque, nervures, trappe), sans ce qui y dit la chaleur : ni matelas, ni
+# suie, ni veilleuse ambre.
+
+def bati_wall_a(at, rng):
+    g = JEU / 2
+    for (x0, x1, z0, z1, sorte) in dispose(rng, [0.2, 0.26, 0.18, 0.36], [0.16, 0.22, 0.3, 0.4]):
+        w, h = x1 - x0, z1 - z0
+        a = (x0 + g, x1 - g, z0 + g, z1 - g)
+        yf = rng.choice((0.0, 0.0, -0.003, -0.006))
+        var = rng.uniform(-1, 1)
+        t = rng.random()
+        if sorte is None and t < 0.2 and w >= 0.16:
+            nervures(at, *a, yf, var)
+        elif sorte is None and t < 0.34 and w >= 0.14 and h >= 0.14:
+            trappe(at, *a, yf, var)
+        elif sorte is None and t < 0.48 and w >= 0.2 and h >= 0.16:
+            plaque(at, *a, yf, var)
+            grille(at, a[0] + 0.03, a[1] - 0.03, a[2] + 0.03, a[3] - 0.03, var)
+        else:
+            plaque(at, *a, yf, var)
+            # une plaque nue sur deux porte un petit équipement : sans eux, la
+            # paroi sortait plus propre et plus sage que le mur (essai 1)
+            if w >= 0.1 and h >= 0.1 and rng.random() < 0.55:
+                petit_equipement(at, *a, yf, var, rng)
+    # deux faisceaux de conduites verticales, qui font le tour du carreau
+    for xc in (rng.uniform(0.05, 0.4), rng.uniform(0.55, 0.9)):
+        for k, dx in enumerate((-0.011, 0.011)):
+            at.tube('tuyau', (xc + dx, -0.016, -0.02), (xc + dx, -0.016, 1.02), 0.0075, seg=16)
+        for i in range(4):
+            z = (i + 0.5) / 4 + rng.uniform(-0.04, 0.04)
+            at.boite('lame', xc - 0.024, xc + 0.024, z - 0.007, z + 0.007, -0.026, -0.006, 0)
+
+
+def petit_equipement(at, x0, x1, z0, z1, yf, var, rng):
+    """un boîtier de raccordement, ou des fentes d'aération, dans un coin de
+    la plaque"""
+    if rng.random() < 0.5:
+        bw, bh = min(0.08, (x1 - x0) * 0.5), min(0.06, (z1 - z0) * 0.5)
+        bx = x0 + 0.02 if rng.random() < 0.5 else x1 - 0.02 - bw
+        bz = z0 + 0.02 if rng.random() < 0.5 else z1 - 0.02 - bh
+        at.boite('peinture', bx, bx + bw, bz, bz + bh, yf - 0.01, yf, var)
+        at.boite('fond', bx + 0.008, bx + bw - 0.008, bz + bh - 0.016, bz + bh - 0.01, yf - 0.0105, yf - 0.009, 0)
+    else:
+        n = rng.randint(3, 5)
+        sx = x0 + 0.025
+        sz = z1 - 0.03
+        for i in range(n):
+            z = sz - i * 0.012
+            at.boite('fond', sx, sx + min(0.07, (x1 - x0) * 0.45), z - 0.0025, z + 0.0025, yf - 0.0005, yf + 0.002, 0)
+
+
+def gouttes_lisses(C, mats):
+    """les gouttes en facettes de dix sur six se lisaient comme des clous :
+    lissées, elles prennent un reflet rond"""
+    for ob in C.objects:
+        if ob.name.endswith('goutte'):
+            ob.data.polygons.foreach_set('use_smooth', [True] * len(ob.data.polygons))
 
 
 def surfaces():
@@ -263,6 +543,32 @@ def surfaces():
     mats_cuve = dict(mats)
     mats_cuve['panneau'] = mat_brosse('cuve', (0x10, 0x1a, 0x20), (0x24, 0x32, 0x3a), 37, brosse=0.04, rouille=(0x22, 0x2a, 0x2a))
     mats_cuve['rivet'] = mats_cuve['panneau']
-    carreau(sc, mats_cuve, 'tank-bg', cuve)
+    # les semelles des montants, un cran plus claires que l'âme : à la même
+    # teinte, l'ossature ne se lisait pas (essai 1)
+    mats_cuve['plat'] = mat_brosse('semelle', (0x1e, 0x2a, 0x32), (0x3a, 0x4a, 0x54), 39, brosse=0.08)
+    # derrière le hublot, l'eau de la cuve voisine : une lueur sarcelle —
+    # assez faible pour rester sous la luminance des parois
+    mats_cuve['lueur'] = mat_lueur()
+    # l'afficheur éteint : mat (poli, il renvoyait le soleil du haut et
+    # sortait gris clair, essai 1)
+    mats_cuve['ecran'] = mat_simple('ecran', (0x04, 0x0a, 0x0c), rug=0.45)
+    # les traits de la réglette et le marquage : le cyan de la charte, terni
+    mats_cuve['trait'] = mat_simple('trait', (0x2c, 0x5a, 0x6a), rug=0.6)
+    mats_cuve['eteint'] = mat_simple('eteint', (0x0c, 0x18, 0x1a), rug=0.3)
+    carreau(sc, mats_cuve, 'tank-bg', cuve, extra=marquage)
+    mats['phile'] = mat_phile()
+    carreau(sc, mats, 'phile', bati_phile)
+    mats['phobe'] = mat_phobe()
+    # la goutte : une eau claire teintée par la cire dessous, polie — c'est
+    # son reflet qui la dessine
+    mats['goutte'] = mat_simple('goutte', (0x3c, 0x2c, 0x52), rug=0.04)
+    carreau(sc, mats, 'phobe', bati_phobe, extra=gouttes_lisses)
+    # la seconde paroi : l'acier du mur, un rien plus vert et plus usé
+    # (l'ancienne mesurait 0,17 de luminance ; à 223032 / 46585a, 0,137 :
+    # plus sombre que le mur, elle s'y lisait en tache)
+    mats_a = dict(mats)
+    mats_a['peinture'] = mat_brosse('paroi-a', (0x27, 0x36, 0x38), (0x50, 0x63, 0x65), 43, brosse=0.08, rouille=(0x2c, 0x32, 0x2c))
+    mats_a['rivet'] = mats_a['panneau'] = mats_a['peinture']
+    carreau(sc, mats_a, 'wall-a', bati_wall_a)
     lumiere_camera(sc)
     sc.cycles.device = 'GPU'
