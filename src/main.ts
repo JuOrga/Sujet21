@@ -416,6 +416,13 @@ import {
 } from './game/commandes'
 import { picto, type NomPicto } from './game/athPictos'
 import { entreesTiroir } from './game/athTiroir'
+import {
+  gesteEtat,
+  gestesFermerDossier,
+  motCoque,
+  peripheriqueALaMain,
+  type Peripherique,
+} from './game/dossier'
 import { pancarteLibre, zonesInterdites, type Rect } from './game/athZones'
 import { CLE_REGLAGE_ATH, athAuRepos, litReglageAth, pointeurPres, type ReglageAth } from './game/athRepos'
 import {
@@ -8564,8 +8571,8 @@ interface CoucheMenu {
   id: string
   /** ce que B déclenche : l'id du bouton de fermeture de l'écran */
   retour?: string
-  /** couche LÉGÈRE (légende, états, panneau d'instruments, ouverts en
-   * pleine partie) : seul B est capté — le jeu garde tous ses boutons */
+  /** couche LÉGÈRE (légende, états, panneau d'instruments, dossier, ouverts
+   * en pleine partie) : seul B est capté — le jeu garde tous ses boutons */
   legere?: boolean
   /** condition d'activation supplémentaire (défaut : le conteneur est visible) */
   actif?: () => boolean
@@ -8597,6 +8604,16 @@ const COUCHES_MENU: CoucheMenu[] = [
   // l'écran des commandes se pose SUR les paramètres : il passe donc avant
   { id: 'touches', retour: 'touches-fermer' },
   { id: 'params', retour: 'params-fermer' },
+  // le dossier vit HORS-CHAMP, jamais masqué (c'est le glissement qui le
+  // montre) : sans cette condition il passerait pour visible, fermé, et
+  // volerait B et le stick droit à toute la partie
+  {
+    id: 'dossier',
+    retour: 'do-fermer',
+    legere: true,
+    actif: () =>
+      document.getElementById('dossier')?.classList.contains('ouvert') === true,
+  },
   { id: 'legend', retour: 'legend-close', legere: true },
   { id: 'states', retour: 'states-close', legere: true },
   { id: 'instr-panel', retour: 'hud-instr-chip', legere: true },
@@ -17351,6 +17368,19 @@ function voieHudVisible(): boolean {
   return longueurRun() > 1
 }
 
+/** Le MOMENT d'un rang de la descente (début · milieu · fin) — le rail
+ *  pose une couture à chaque changement. En VOIE le plan donne le moment de
+ *  chaque rang ; en descente ordinaire, c'est le code de la salle elle-même
+ *  qui le dit. */
+function momentDuRang(r: number, total: number): 1 | 2 | 3 {
+  if (voiePlan.longueur > 0) return momentAuRang(r, planEffectif())
+  const lv = playedLevels()[r - 1]
+  const id = lv ? identiteAtelier(lv) : null
+  if (id) return id.moment
+  // sans code lisible, on retombe sur les tiers de la séquence
+  return r <= total / 3 ? 1 : r <= (2 * total) / 3 ? 2 : 3
+}
+
 /** Reconstruit le rail : appelé à chaque entrée de salle (restart). */
 function majVoieHud(): void {
   const montre = voieHudVisible()
@@ -18370,213 +18400,137 @@ function majCadranEtats(zoneActive: ZoneForce): void {
     stateZoneEl.innerHTML = `${picto('verrou')} ${ZONE_CAUSES[zoneActive]} — RÉGIME IMPOSÉ`
 }
 
-// ---- LE DOSSIER DE DESCENTE : tout le relevé, d'un seul geste -----------
+// ---- LE DOSSIER DE DESCENTE : un carnet court, lu en jouant -------------
 // TAB (l'entrée DOSSIER du tiroir ≡, R3 à la manette) fait glisser le panneau
-// depuis la droite : la salle et son identité, le corps et ses réserves,
-// le cycle et ce qu'il permet ICI, le butin, l'équipement embarqué. Il ne
-// fige RIEN — la descente continue derrière, c'est un dossier qu'on
-// consulte en jouant. Rafraîchi quatre fois par seconde tant qu'il est
-// ouvert ; fermé, il ne coûte pas une instruction.
+// depuis la droite. Il ne fige RIEN — la descente continue derrière —, il
+// doit donc se lire d'un coup d'œil entre deux gestes : l'objectif de la
+// salle, le corps, les états, le butin, l'équipement, et pas une phrase.
+// La première version expliquait chaque ligne (huit phrases, un rail des
+// salles, des pastilles d'atelier) ; un joueur l'a trouvée « beaucoup trop
+// chargée » : les explications vivent dans les infobulles, plus à l'écran.
+// Rafraîchi quatre fois par seconde tant qu'il est ouvert ; fermé, il ne
+// coûte pas une instruction.
 const dossierEl = document.getElementById('dossier') as HTMLElement
 const doCorps = document.getElementById('do-corps') as HTMLDivElement
 const doChrono = document.getElementById('do-chrono') as HTMLElement
+const doPied = document.getElementById('dossier-pied') as HTMLElement
 dossierEl.hidden = false // le panneau vit hors-champ : c'est le glissement qui le montre
 dossierEl.setAttribute('aria-hidden', 'true')
 let dossierOuvert = false
 let dossierProchainMaj = 0
+let doPiedEcrit = ''
+// Le dernier appui CLAVIER : le reste du jeu ne départage que la manette et
+// le pointeur, or c'est Tab qui ouvre le dossier — sans cette heure, un
+// joueur passé de la manette au clavier se voyait réclamer « B ».
+let dossierClavierAt = -1e9
+window.addEventListener('keydown', () => {
+  dossierClavierAt = performance.now() / 1000
+})
+const dossierTactile = window.matchMedia('(pointer: coarse)')
 
-// Les briques du dossier : une barre, une rangée de pastilles, une tuile.
-// Elles disent toutes la même chose de la même façon — une icône, un mot en
-// capitales, la mesure à droite —, pour que l'œil apprenne la grammaire du
-// panneau en une lecture.
-const doPastilles = (n: number, max: number, cls = ''): string => {
-  let h = ''
-  for (let i = 0; i < max; i++)
-    h += `<i class="${cls}${i < n ? ' plein' : ''}"></i>`
-  return h
+function peripheriqueDossier(): Peripherique {
+  return peripheriqueALaMain({
+    manetteConnectee: manette.connectee,
+    manetteAt: manette.lastActivity,
+    pointeurAt: input.lastPointerAt,
+    clavierAt: dossierClavierAt,
+    tactile: dossierTactile.matches,
+  })
 }
 
-/** Une BARRE : l'icône, le mot, la valeur, la jauge — et sous elle, la
- *  précision chiffrée pour qui veut la lire (elle éclaire la barre, elle ne
- *  la remplace pas). */
-function doBarre(
-  icone: string,
-  nom: string,
+/** Des pastilles : une réserve qui se compte sur les doigts, pas un ratio. */
+const doPastilles = (n: number, max: number, cls = ''): string => {
+  let h = '<span class="do-pastilles">'
+  for (let i = 0; i < max; i++)
+    h += `<i class="${cls}${i < n ? ' plein' : ''}"></i>`
+  return h + '</span>'
+}
+
+/** Une LIGNE de jauge : le mot, la barre, la valeur — rien dessous. */
+function doLigne(
+  mot: string,
   valeur: string,
   frac: number,
-  o: { cls?: string; jauge?: string; note?: string } = {},
+  o: { cls?: string; jauge?: string; titre?: string } = {},
 ): string {
   const p = Math.max(0, Math.min(1, frac)) * 100
   return (
-    '<div class="do-barre">' +
-    `<div><u>${icone}</u>${nom}<b class="${o.cls ?? ''}">${valeur}</b></div>` +
+    `<div class="do-ligne ${o.cls ?? ''}"${o.titre ? ` title="${o.titre}"` : ''}>` +
+    `<span>${mot}</span>` +
     `<div class="do-jauge ${o.jauge ?? ''}"><i style="width:${p}%"></i></div>` +
-    '</div>' +
-    (o.note ? `<p class="do-note">${o.note}</p>` : '')
+    `<b>${valeur}</b></div>`
   )
 }
 
-/** Une RÉSERVE qui se compte sur les doigts : des pastilles, pas un ratio. */
-function doPastilleLigne(
-  icone: string,
-  nom: string,
-  n: number,
-  max: number,
-  cls: string,
-  note: string,
-): string {
-  return (
-    '<div class="do-barre">' +
-    `<div><u>${icone}</u>${nom}<div class="do-pastilles">${doPastilles(n, max, cls)}</div></div>` +
-    '</div>' +
-    `<p class="do-note">${note}</p>`
-  )
-}
-
-/** Une TUILE de butin : le gain se regarde, il ne se lit pas dans un tableau. */
-const doTuile = (icone: string, val: string, quoi: string, cls = ''): string =>
-  `<div class="do-tuile ${cls}"><u>${icone}</u><b>${val}</b><span>${quoi}</span></div>`
-
-/** LE RAIL de la descente, en crans — une couture à chaque changement de
- *  moment (début · milieu · fin). En VOIE le plan donne le moment de chaque
- *  rang ; en descente ordinaire, c'est le code de la salle elle-même qui le
- *  dit. Au-delà de soixante salles, le rail ne veut plus rien dire : on
- *  l'omet plutôt que d'aligner des cheveux. */
-function momentDuRang(r: number, total: number): 1 | 2 | 3 {
-  if (voiePlan.longueur > 0) return momentAuRang(r, planEffectif())
-  const lv = playedLevels()[r - 1]
-  const id = lv ? identiteAtelier(lv) : null
-  if (id) return id.moment
-  // sans code lisible, on retombe sur les tiers de la séquence
-  return r <= total / 3 ? 1 : r <= (2 * total) / 3 ? 2 : 3
-}
-
-function railDescente(rang: number, total: number): string {
-  if (total < 2 || total > 60) return ''
-  let h = '<div class="do-rail">'
-  for (let r = 1; r <= total; r++) {
-    if (r > 1 && momentDuRang(r, total) !== momentDuRang(r - 1, total))
-      h += '<i class="coupe"></i>'
-    h += `<i class="${r < rang ? 'franchi' : r === rang ? 'courant' : ''}"></i>`
-  }
-  return h + '</div>'
-}
-
-/** LE DOSSIER, ÉCRIT POUR CELUI QUI DESCEND. Il répond à trois questions,
- *  dans cet ordre : qu'est-ce que je dois faire ICI, qu'est-ce qu'il me
- *  RESTE, qu'est-ce que j'EMPORTE. D'où un objectif en tête avec sa jauge,
- *  des barres et des pastilles plutôt que des colonnes de chiffres, et des
- *  mots de joueur. Les mesures fines (compte de gouttes, degrés de coque)
- *  restent là, mais en second rang : elles éclairent la barre. */
+/** LE DOSSIER, ÉCRIT POUR CELUI QUI DESCEND : ce que je dois faire ICI,
+ *  ce qu'il me RESTE, ce que je PEUX, ce que j'EMPORTE. Hors descente (le
+ *  laboratoire, un essai isolé), seul ce qui s'y applique s'affiche. */
 function majDossier(): void {
   const enRun = !auHub && testLevel === null
   doChrono.textContent = enRun ? fmtTime(run.tableauTime) : '—'
   const litres = sim.liters()
+  const p = peripheriqueDossier()
 
-  // ---- TA MISSION : où l'on est, et ce qu'on vient chercher
-  const id = identiteAtelier(level)
+  // ---- LA SALLE : où l'on est, et ce qu'on vient chercher
   const total = longueurRun()
   const rang = Math.min(total, voieRang + 1)
-  let mission = '<section class="do-sec do-salle"><h4><u>🎯</u>TA MISSION</h4>'
-  if (enRun && total > 1) {
-    mission +=
-      `<div class="do-place">SALLE <b>${rang} / ${total}</b>` +
-      `${descenteDuJour() ? ' · DESCENTE DU JOUR' : ''}</div>` +
-      railDescente(rang, total)
-  }
-  mission +=
-    '<div class="do-mission">' +
-    `<div class="do-nom">${salleHub() ? 'LE LABORATOIRE' : level.name}</div>` +
-    `<div class="do-code">${level.code}${estEconomat(level) ? ' · L’ÉCONOMAT' : ''}</div>`
-  if (id)
-    mission +=
-      `<div class="do-chips"><i>${MOMENT_COURT[id.moment]}</i>` +
-      `<i>${MECANIQUE_NOMS[id.mecanique].toUpperCase()}</i>` +
-      `<i>DIFF ${id.difficulte}</i></div>`
+  let salle =
+    '<section class="do-sec do-salle"><div class="do-titre">' +
+    `<b>${salleHub() ? 'LE LABORATOIRE' : level.name}</b>` +
+    (enRun && total > 1 ? `<span>· salle ${rang}/${total}</span>` : '') +
+    '</div>'
   if (enRun) {
-    // L'OBJECTIF, en clair : le volume à ramener, et ce qu'il en manque —
-    // c'est LA question du joueur, elle passe donc avant tout le reste
+    // l'objectif passe avant tout : c'est LA question du joueur
     if (level.par) {
       const atteint = litres >= level.par
-      const reste = Math.max(0, level.par - litres)
-      mission +=
-        `<div class="do-objectif${atteint ? ' atteint' : ''}">` +
-        `<b>RAMENER<em>${fmtL(level.par)}</em></b>` +
-        `<div class="do-jauge j-but${atteint ? ' plein' : ''}" style="margin-top:8px">` +
-        `<i style="width:${Math.min(100, (litres / level.par) * 100)}%"></i></div>` +
-        `<p>${
-          atteint
-            ? 'Tu as de quoi. Le sas t’attend — tout litre en plus part à la bonbonne.'
-            : `Il t’en manque ${fmtL(reste)} : ne laisse pas de gouttes derrière toi.`
-        }</p></div>`
+      salle += doLigne(`RAMENER ${fmtL(level.par)}`, fmtL(litres), litres / level.par, {
+        cls: `do-but${atteint ? ' atteint' : ''}`,
+        jauge: `j-but${atteint ? ' plein' : ''}`,
+        titre: atteint
+          ? 'Le compte y est : le sas t’attend, le surplus part à la bonbonne.'
+          : `Il manque ${fmtL(Math.max(0, level.par - litres))}.`,
+      })
     } else {
-      mission +=
-        '<div class="do-objectif"><b>ATTEINDRE LE SAS</b>' +
-        '<p>Aucun volume minimum ici : ressors, simplement — mais ce que tu ramènes compte quand même.</p></div>'
+      salle += '<div class="do-but"><span>ATTEINDRE LE SAS</span></div>'
     }
-  }
-  mission += '</div>'
-  // LES RECORDS, en défis à battre
-  if (enRun) {
     const rec = records.tableauRecord(level.code)
-    mission +=
-      '<div class="do-defis">' +
-      (rec
-        ? `<div class="do-defi"><span>✦ TON VOLUME</span><b>${fmtL(rec.volume.liters)}</b></div>` +
-          `<div class="do-defi"><span>✦ TON CHRONO</span><b>${fmtTime(rec.chrono.time)}</b></div>`
-        : '<div class="do-defi vierge"><span>AUCUN RECORD</span><b>à écrire</b></div>') +
-      '</div>'
+    salle += rec
+      ? `<div class="do-record">✦ record ${fmtL(rec.volume.liters)} · ${fmtTime(rec.chrono.time)}</div>`
+      : '<div class="do-record vierge">aucun record</div>'
   }
-  mission += '</section>'
+  salle += '</section>'
 
-  // ---- TON CORPS : ce qu'il reste, et ce qui presse
+  // ---- LE CORPS : ce qu'il reste, et ce qui presse
   const depart = sim.baseVolume > 0 ? sim.baseVolume : volumeDepart()
-  const frac = depart > 0 ? sim.playerCount / depart : 0
   const coque = Math.round(21 - 81 * chillNow())
+  // sous ce seuil, le protocole conclut : la couleur suffit à le crier
   const critique = litres < params.criticalVolumeLiters * 1.7
-  const motCoque =
-    coque <= -40
-      ? 'glaciale'
-      : coque <= -10
-        ? 'froide'
-        : coque <= 5
-          ? 'fraîche'
-          : 'tiède'
   const corps =
-    '<section class="do-sec do-corps"><h4><u>💧</u>TON CORPS</h4>' +
-    doBarre('💧', 'VOLUME', fmtL(litres), frac, {
-      cls: critique ? 'chaud' : '',
+    '<section class="do-sec do-reserves">' +
+    doLigne('VOLUME', fmtL(litres), depart > 0 ? sim.playerCount / depart : 0, {
+      cls: critique ? 'alerte' : '',
       jauge: critique ? 'j-alerte' : '',
-      note:
-        `${sim.playerCount} gouttes sur ${depart}` +
-        (critique ? ' — sous ce seuil, le protocole conclut. Ramasse.' : ''),
+      titre: `${sim.playerCount} gouttes sur ${depart}`,
     }) +
-    doBarre('❄', 'COQUE', `${coque > 0 ? '+' : ''}${coque}°`, chillNow(), {
+    doLigne('COQUE', motCoque(coque), chillNow(), {
       cls: coque < -20 ? 'froid' : '',
       jauge: 'j-froid',
-      note: `Coque ${motCoque} : elle ne se rembobine pas d’une salle à l’autre.`,
+      titre: `${coque > 0 ? '+' : ''}${coque}° — la coque ne se réchauffe pas d’une salle à l’autre`,
     }) +
-    doPastilleLigne(
-      '⚡',
-      'DASHS',
-      sim.dashBudget,
-      Math.max(sim.dashBudgetMax, sim.dashBudget),
-      '',
-      'Trois par salle. Se changer en vapeur SOI-MÊME les rend ; les subir, non.',
-    ) +
+    '<div class="do-duo">' +
+    '<span title="Trois par salle ; se changer en vapeur soi-même les rend">DASHS' +
+    doPastilles(sim.dashBudget, Math.max(sim.dashBudgetMax, sim.dashBudget)) +
+    '</span>' +
     (enRun
-      ? doPastilleLigne(
-          '🧪',
-          'SECOURS',
-          run.vies,
-          VIES_MAX,
-          'vie',
-          'Un échantillon te relève d’une dispersion, une seule fois chacun.',
-        )
+      ? '<span title="Un échantillon relève d’une dispersion, une fois chacun">SECOURS' +
+        doPastilles(run.vies, VIES_MAX, 'vie') +
+        '</span>'
       : '') +
-    '</section>'
+    '</div></section>'
 
-  // ---- TES ÉTATS : ce que les mémoires permettent ICI, à cet instant
+  // ---- LES ÉTATS, sur une ligne : l'actuel marqué, les autres avec LEUR
+  // commande vraie (celle de la table, redéfinie ou non, de l'appareil qui
+  // a la main), ou le verrou si la mémoire n'est pas tissée
   const cur = input.etatManuel()
   const acquis = records.eveilAcquis()
   const verrous = records.verrousCycle()
@@ -18586,64 +18540,39 @@ function majDossier(): void {
     glace: 'GLACE',
     vapeur: 'VAPEUR',
   }
-  const ICO: Record<EtatManuel, string> = {
-    eau: '💧',
-    glace: '❄',
-    vapeur: '💨',
-  }
-  let cycle = '<section class="do-sec do-cycle"><h4><u>🔄</u>TES ÉTATS</h4>'
+  let cycle = '<section class="do-sec do-cycle">'
   for (const e of ['glace', 'eau', 'vapeur'] as EtatManuel[]) {
     if (e === cur) {
-      cycle += `<div class="do-etat actuel"><i>${ICO[e]}</i><em>${NOMS[e]}</em><small>TU Y ES</small></div>`
+      cycle += `<span class="do-etat actuel" title="L’état du corps">${NOMS[e]}<i>◀</i></span>`
       continue
     }
     const t = transfoEntre(CYCLE_PAR_ETAT[cur], CYCLE_PAR_ETAT[e])
     const tenue = t !== null && (!gate || transfoTenue(t.id, acquis, verrous))
-    // LA COMMANDE VRAIE : celle de la table, redéfinie ou non — l'écrire en
-    // dur, c'était mentir dès que le joueur change une touche
-    const k = toucheDe(e)
-    const b = boutonDe(e)
-    const geste = k !== null ? nomTouche(k) : b !== null ? nomBouton(b) : '—'
+    if (!tenue) {
+      cycle +=
+        `<span class="do-etat verrou" title="${t ? t.nom : NOMS[e]} — mémoire non tissée : repasse par le liquide">` +
+        `${NOMS[e]}${picto('verrou')}</span>`
+      continue
+    }
+    const g = gesteEtat(p, toucheDe(e), boutonDe(e))
     cycle +=
-      `<div class="do-etat${tenue ? '' : ' verrou'}"><i>${ICO[e]}</i>` +
-      `<em>${t ? t.nom : NOMS[e]}</em>` +
-      (tenue
-        ? `<small>D’UN GESTE</small><kbd>${geste}</kbd>`
-        : `<small>🔒 MÉMOIRE À TISSER</small>`) +
-      '</div>'
+      `<span class="do-etat" title="${t.nom}">${NOMS[e]}` +
+      (g !== null ? `<kbd>${g}</kbd>` : '') +
+      '</span>'
   }
-  cycle +=
-    '<p class="do-vide">Un lien non tissé se contourne : repasse par le LIQUIDE. ' +
-    'Les régimes imposés par le décor, eux, te transforment de toute façon.</p></section>'
+  cycle += '</section>'
 
-  // ---- TON BUTIN : ce que la descente t'a déjà rapporté
+  // ---- LE BUTIN, sur une ligne : ce que la descente a déjà rapporté
   const butin = enRun
-    ? '<section class="do-sec do-butin"><h4><u>💎</u>TON BUTIN</h4>' +
-      '<div class="do-tuiles">' +
-      doTuile('🫙', `${run.bonbonneLiters.toFixed(1)} L`, 'BONBONNE', 'or') +
-      doTuile(
-        iconeMetaHTML('condensat', '💠'),
-        `${condensat}`,
-        'CONDENSAT cL',
-        'or',
-      ) +
-      doTuile(
-        iconeMetaHTML('memoire', '🧠'),
-        `+${run.memoireGagnee}`,
-        'MÉMOIRE',
-        'vert',
-      ) +
-      '</div>' +
-      `<div class="do-jauge j-but"><i style="width:${Math.min(100, (run.bonbonneLiters / capBonbonne()) * 100)}%"></i></div>` +
-      `<p class="do-note" style="margin-top:6px">Bonbonne : ${run.bonbonneLiters.toFixed(2)} L sur ${capBonbonne()} — le surplus de chaque salle s’y range, et se reverse d’un geste.</p>` +
-      '<div class="do-tuiles">' +
-      doTuile('🔹', `${run.pastillesCl}`, 'PASTILLES cL') +
-      doTuile('🚪', `${run.conclues}`, 'SALLES') +
-      doTuile('⏱', fmtDuree(run.runTime), 'DESCENTE') +
-      '</div></section>'
+    ? '<section class="do-sec do-butin">' +
+      `<span title="Bonbonne : ${run.bonbonneLiters.toFixed(2).replace('.', ',')} L sur ${capBonbonne()}">🫙<b>${run.bonbonneLiters.toFixed(1).replace('.', ',')} L</b></span>` +
+      `<span title="Condensat">${iconeMetaHTML('condensat', '💠')}<b>${condensat} cL</b></span>` +
+      `<span class="vert" title="Mémoire gagnée pendant la descente">${iconeMetaHTML('memoire', '🧠')}<b>+${run.memoireGagnee}</b></span>` +
+      '</section>'
     : ''
 
-  // ---- TON ÉQUIPEMENT : ce que tu portes sur toi
+  // ---- L'ÉQUIPEMENT : des icônes et des noms ; ce que fait chaque objet,
+  // l'infobulle le dit. Les mains vides n'occupent pas de place.
   const instrs = run.instruments
     .map((i) => carteDef(i))
     .filter((d): d is NonNullable<typeof d> => d !== null)
@@ -18651,25 +18580,31 @@ function majDossier(): void {
     .fiolesEquipees()
     .map((f) => fioleDef(f))
     .filter((d): d is NonNullable<typeof d> => d !== null)
+  const objets = [
+    ...instrs.map((d) => ({ icone: d.icone, nom: d.nom, desc: d.desc })),
+    ...fioles.map((d) => ({ icone: '⚗', nom: d.nom, desc: d.desc })),
+  ]
   const equip =
-    '<section class="do-sec do-equip"><h4><u>🎒</u>TON ÉQUIPEMENT</h4>' +
-    (instrs.length === 0 && fioles.length === 0
-      ? '<p class="do-vide">Les mains vides. Les instruments se gagnent aux paliers de maîtrise, en fin de salle ; les fioles s’équipent au placard du laboratoire.</p>'
-      : instrs
+    objets.length === 0
+      ? ''
+      : '<section class="do-sec do-equip">' +
+        objets
           .map(
-            (d) =>
-              `<div class="do-objet"><i>${d.icone}</i><div><b>${d.nom}</b><small>${d.desc}</small></div></div>`,
+            (o) =>
+              `<span title="${o.desc.replace(/"/g, '&quot;')}"><i>${o.icone}</i>${o.nom}</span>`,
           )
           .join('') +
-        fioles
-          .map(
-            (d) =>
-              `<div class="do-objet"><i>⚗</i><div><b>${d.nom}</b><small>${d.desc}</small></div></div>`,
-          )
-          .join('')) +
-    '</section>'
+        '</section>'
 
-  doCorps.innerHTML = mission + corps + cycle + butin + equip
+  doCorps.innerHTML = salle + corps + cycle + butin + equip
+
+  // LE PIED dit le geste de l'appareil qui a la main — réécrit seulement
+  // s'il change, il est relu quatre fois par seconde
+  const pied = `<kbd>${gestesFermerDossier(p, toucheDe('dossier'), boutonDe('dossier')).join(' / ')}</kbd>FERMER`
+  if (pied !== doPiedEcrit) {
+    doPied.innerHTML = pied
+    doPiedEcrit = pied
+  }
 }
 
 function ouvreDossier(v: boolean): void {
@@ -19116,8 +19051,8 @@ function corpsImage(now: number): boolean {
     // l'écran de menu au-dessus, s'il y en a un — codex, sous-menus de la
     // fiche, cérémonie, fiche elle-même… B y est TOUJOURS le retour
     const couche = coucheMenuActive()
-    // une couche LÉGÈRE (légende, états, instruments — ouvertes en pleine
-    // partie) : B la referme et se consume, le jeu garde tout le reste
+    // une couche LÉGÈRE (légende, états, instruments, dossier — ouvertes en
+    // pleine partie) : B la referme et se consume, le jeu garde tout le reste
     let bConsomme = false
     if (couche?.legere) {
       // le stick droit défile le panneau (la caméra lui cède le geste)
@@ -19183,7 +19118,9 @@ function corpsImage(now: number): boolean {
       // enfoncer le stick GAUCHE recadre : la caméra revient au suivi auto
       if (manetteFait('recadrer')) camera.resetAutoZoom()
       // le stick DROIT ouvre le DOSSIER — la convention manette pour « la
-      // fiche d'état » ; la descente continue derrière, comme au clavier
+      // fiche d'état » ; la descente continue derrière, comme au clavier.
+      // Ouvert, c'est une couche LÉGÈRE (COUCHES_MENU) : B le referme
+      // plus haut, sans repasser le corps à l'eau
       if (manetteFait('dossier')) ouvreDossier(!dossierOuvert)
       // CONCLURE : valide CONTINUER quand il s'offre. Sur la croix ↓, il
       // prend alors le pas sur le zoom arrière (LT dézoome toujours) — la
