@@ -730,11 +730,11 @@
       }
       #planche-retour:hover { border-color: var(--specimen); color: #d5f3e8; }
       body.playing #planche-retour:not([hidden]) { display: block; }
-      /* ---- LE DOSSIER DE DESCENTE : le récapitulatif complet, en panneau
-         qui glisse par la droite. Pensé pour le paysage (PC, console,
-         Steam Deck) : une colonne d'instrument, sections à filet coloré,
-         valeurs en chiffres monospace lisibles à distance de canapé. La
-         descente CONTINUE derrière — le dossier informe, il ne fige pas. */
+      /* ---- LE DOSSIER DE DESCENTE : un carnet court, en panneau qui
+         glisse par la droite. Pensé pour le paysage (PC, console, Steam
+         Deck) : une colonne d'instrument, valeurs en chiffres monospace
+         lisibles à distance de canapé. La descente CONTINUE derrière — le
+         dossier informe, il ne fige pas. */
       #dossier {
         position: fixed;
         top: 0;
@@ -802,145 +802,50 @@
         margin-right: 7px;
         color: var(--ink);
       }
-      /* ---- LE CARNET, CÔTÉ JOUEUR -----------------------------------------
-         Ce panneau ne s'adresse pas à l'atelier mais à celui qui descend :
-         il répond à trois questions, dans cet ordre — QU'EST-CE QUE JE DOIS
-         FAIRE ICI, QU'EST-CE QU'IL ME RESTE, QU'EST-CE QUE J'EMPORTE. D'où
-         un objectif en tête avec sa jauge, des barres et des pastilles
-         plutôt que des colonnes de chiffres, et des mots de joueur. Les
-         mesures fines (compte de particules, degrés de coque) restent
-         lisibles, mais en second rang : elles éclairent la barre, elles ne
-         la remplacent pas. */
-      .do-sec { padding: 13px 18px 15px; border-bottom: 1px solid rgba(99, 183, 230, 0.1); }
-      .do-sec > h4 {
-        display: flex; align-items: center; gap: 8px;
-        font-family: var(--font-display);
-        font-size: calc(9px * var(--ui));
-        letter-spacing: 0.26em;
-        color: var(--dim);
-        margin: 0 0 11px;
-        font-weight: 600;
-      }
-      .do-sec > h4::after {
-        content: ''; flex: 1; height: 1px;
-        background: linear-gradient(90deg, currentColor, transparent);
-        opacity: 0.35;
-      }
-      .do-sec > h4 u { text-decoration: none; font-size: calc(12px * var(--ui)); line-height: 1; }
-      .do-sec.do-salle > h4 { color: #8fd8c8; }
-      .do-sec.do-corps > h4 { color: #63b7e6; }
-      .do-sec.do-cycle > h4 { color: #6dffb8; }
-      .do-sec.do-butin > h4 { color: #f2c98e; }
-      .do-sec.do-equip > h4 { color: #c99aff; }
+      /* ---- LE CARNET COURT, CÔTÉ JOUEUR ----------------------------------
+         Le dossier se lit EN JOUANT, la descente continue derrière : chaque
+         section tient en une ou deux lignes, sans titre ni phrase — un mot,
+         une barre, une valeur, et les explications dans les infobulles. La
+         première version (huit phrases, rail des salles, pastilles
+         d'atelier, deux rangées de tuiles) se défilait et se lisait ; un
+         joueur l'a jugée « beaucoup trop chargée ». En pleine descente, à
+         1280×720, tout tient désormais sans défiler. */
+      .do-sec { padding: 12px 18px; border-bottom: 1px solid rgba(99, 183, 230, 0.1); }
+      .do-sec:last-child { border-bottom: none; }
 
-      /* ---- LA MISSION : la carte de la salle, en tête ---- */
-      .do-mission {
-        border: 1px solid rgba(99, 183, 230, 0.28);
-        border-radius: 10px;
-        padding: 12px 13px 13px;
-        background:
-          radial-gradient(120% 100% at 0% 0%, rgba(99, 183, 230, 0.13), transparent 62%),
-          rgba(8, 16, 26, 0.72);
+      /* la salle : son nom et son rang, l'objectif, le record */
+      .do-titre { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+      .do-titre b {
+        font-family: var(--font-display); font-weight: 600;
+        font-size: calc(13px * var(--ui)); letter-spacing: 0.1em; color: #eaf6ff;
       }
-      .do-nom {
-        font-family: var(--font-display);
-        font-size: calc(15px * var(--ui));
-        letter-spacing: 0.08em;
-        color: #eaf6ff;
-        line-height: 1.25;
-      }
-      .do-code { font-size: calc(11px * var(--ui)); letter-spacing: 0.14em; color: var(--specimen); margin-top: 4px; }
-      .do-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
-      .do-chips i {
-        font-style: normal;
-        font-family: var(--font-display);
-        font-size: calc(8px * var(--ui));
-        letter-spacing: 0.16em;
-        padding: 3px 9px;
-        border: 1px solid var(--line);
-        border-radius: 999px;
-        color: var(--dim);
-      }
-      /* L'OBJECTIF : ce qu'on vient chercher, et où l'on en est */
-      .do-objectif {
-        margin-top: 12px; padding-top: 11px;
-        border-top: 1px dashed rgba(99, 183, 230, 0.22);
-      }
-      .do-objectif > b {
-        display: flex; align-items: baseline; gap: 8px;
-        font-family: var(--font-display);
-        font-size: calc(9.5px * var(--ui));
-        letter-spacing: 0.16em;
-        color: #f2c98e;
-        font-weight: 600;
-      }
-      .do-objectif > b em {
-        font-style: normal; margin-left: auto;
-        font-family: var(--font-mono);
-        font-size: calc(13px * var(--ui));
-        letter-spacing: 0.02em;
-        color: var(--ink);
-      }
-      .do-objectif > p {
-        margin: 7px 0 0;
-        font-size: calc(11px * var(--ui));
-        color: var(--dim);
-        line-height: 1.45;
-      }
-      .do-objectif.atteint > b, .do-objectif.atteint > p { color: #6dffb8; }
-      .do-objectif.atteint > b em { color: #6dffb8; }
+      .do-titre span { font-size: calc(11px * var(--ui)); color: var(--dim); }
+      .do-salle .do-titre + * { margin-top: 10px; }
+      .do-record { margin-top: 2px; font-size: calc(11px * var(--ui)); color: #f2c98e; }
+      .do-record.vierge { color: var(--dim); }
 
-      /* ---- LE RAIL de la descente : les salles, en crans ---- */
-      .do-place {
-        display: flex; align-items: baseline; gap: 9px; margin-bottom: 10px;
-        font-family: var(--font-display); letter-spacing: 0.2em;
-        font-size: calc(9px * var(--ui)); color: var(--dim);
+      /* une LIGNE : le mot, la barre, la valeur — rien dessous */
+      .do-ligne {
+        display: grid; grid-template-columns: 6.4em 1fr 4.8em;
+        align-items: center; gap: 10px; margin-bottom: 8px;
       }
-      .do-place b { font-size: calc(13px * var(--ui)); color: #eaf6ff; letter-spacing: 0.1em; }
-      .do-rail { display: flex; align-items: center; gap: 3px; margin-bottom: 13px; flex-wrap: wrap; }
-      .do-rail i {
-        flex: 1 1 6px; min-width: 6px; max-width: 15px; height: 7px;
-        border: 1px solid #2d4a63; border-radius: 2px;
-      }
-      .do-rail i.franchi { background: #2d6f8f; border-color: #4d90b5; }
-      .do-rail i.courant {
-        background: #6dffb8; border-color: #6dffb8;
-        box-shadow: 0 0 9px rgba(109, 255, 184, 0.6);
-      }
-      .do-rail i.coupe { flex: 0 0 1px; min-width: 1px; height: 11px; background: rgba(99, 183, 230, 0.35); border: none; }
-
-      /* ---- LES RECORDS, présentés comme des DÉFIS ---- */
-      .do-defis { display: flex; gap: 8px; margin-top: 11px; }
-      .do-defi {
-        flex: 1; text-align: center; padding: 8px 4px 9px;
-        border: 1px solid rgba(242, 201, 142, 0.28); border-radius: 8px;
-        background: rgba(24, 19, 10, 0.5);
-      }
-      .do-defi span {
-        display: block; font-family: var(--font-display);
-        font-size: calc(7.5px * var(--ui)); letter-spacing: 0.18em; color: #b99a6a;
-      }
-      .do-defi b { display: block; margin-top: 4px; font-size: calc(13px * var(--ui)); color: #f2c98e; }
-      .do-defi.vierge { border-color: var(--line); background: rgba(8, 16, 26, 0.5); }
-      .do-defi.vierge span, .do-defi.vierge b { color: var(--dim); }
-
-      /* ---- LES BARRES : une icône, un mot, une barre, une valeur ---- */
-      .do-barre { margin-bottom: 11px; }
-      .do-barre > div {
-        display: flex; align-items: baseline; gap: 8px; margin-bottom: 5px;
+      .do-ligne > span, .do-but > span, .do-duo > span {
         font-family: var(--font-display); font-size: calc(8.5px * var(--ui));
-        letter-spacing: 0.18em; color: var(--dim);
+        letter-spacing: 0.18em; color: var(--dim); white-space: nowrap;
       }
-      .do-barre > div u { text-decoration: none; font-size: calc(12px * var(--ui)); line-height: 1; }
-      .do-barre > div b {
-        margin-left: auto; font-family: var(--font-mono);
-        font-size: calc(12px * var(--ui)); letter-spacing: 0.02em; color: var(--ink);
+      .do-ligne > b {
+        text-align: right; white-space: nowrap; font-weight: normal;
+        font-size: calc(12px * var(--ui)); color: var(--ink);
       }
-      .do-barre > div b.chaud { color: #ffb36b; }
-      .do-barre > div b.froid { color: #a7ddf5; }
-      .do-barre > div b.vert { color: #6dffb8; }
+      .do-ligne.do-but { grid-template-columns: auto 1fr 4.8em; }
+      .do-but > span { color: #f2c98e; }
+      .do-but.atteint > span, .do-but.atteint > b { color: #6dffb8; }
+      div.do-but:not(.do-ligne) { margin-bottom: 8px; }
+      /* sous le seuil où le protocole conclut : la couleur suffit à le crier */
+      .do-ligne.alerte > span, .do-ligne.alerte > b { color: #ffb36b; }
+      .do-ligne.froid > b { color: #a7ddf5; }
       .do-jauge {
-        height: 9px; border-radius: 5px; overflow: hidden;
+        height: 8px; border-radius: 5px; overflow: hidden;
         border: 1px solid var(--line); background: rgba(6, 12, 20, 0.9);
       }
       .do-jauge i {
@@ -952,70 +857,44 @@
       .do-jauge.j-but i { background: linear-gradient(90deg, #a9762e, #f2c98e); }
       .do-jauge.j-but.plein i { background: linear-gradient(90deg, #2c9c6e, #6dffb8); }
       .do-jauge.j-alerte i { background: linear-gradient(90deg, #9c3b2c, #ff8a6b); }
-      .do-note { font-size: calc(10.5px * var(--ui)); color: var(--dim); margin: -5px 0 12px; line-height: 1.4; }
 
-      /* ---- LES PASTILLES : dashs et échantillons, en gros ---- */
-      .do-pastilles { display: flex; gap: 6px; margin-left: auto; }
-      .do-pastilles i { width: 13px; height: 13px; border-radius: 50%; border: 1px solid #2d4a63; }
-      .do-pastilles i.plein { background: #f2c98e; border-color: #f2c98e; box-shadow: 0 0 9px rgba(242, 201, 142, 0.55); }
+      /* dashs et secours : des pastilles, côte à côte */
+      .do-duo { display: flex; flex-wrap: wrap; gap: 8px 26px; }
+      .do-duo > span { display: inline-flex; align-items: center; gap: 9px; }
+      .do-pastilles { display: inline-flex; gap: 5px; }
+      .do-pastilles i { width: 11px; height: 11px; border-radius: 50%; border: 1px solid #2d4a63; }
+      .do-pastilles i.plein { background: #f2c98e; border-color: #f2c98e; box-shadow: 0 0 8px rgba(242, 201, 142, 0.5); }
       .do-pastilles i.vie { border-radius: 3px; }
-      .do-pastilles i.vie.plein { background: #63b7e6; border-color: #63b7e6; box-shadow: 0 0 9px rgba(99, 183, 230, 0.55); }
+      .do-pastilles i.vie.plein { background: #63b7e6; border-color: #63b7e6; box-shadow: 0 0 8px rgba(99, 183, 230, 0.5); }
 
-      /* ---- LES TROIS ÉTATS : des cartes, avec leur touche VRAIE ---- */
+      /* les trois états sur UNE ligne : l'actuel marqué, les autres avec
+         leur commande vraie, ou le verrou */
+      .do-cycle { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 20px; }
       .do-etat {
-        display: flex; align-items: center; gap: 11px;
-        padding: 10px 12px; border-radius: 9px;
-        border: 1px solid var(--line);
-        margin-bottom: 8px;
-        background: rgba(8, 16, 26, 0.7);
+        display: inline-flex; align-items: center; gap: 7px;
+        font-family: var(--font-display); font-size: calc(9.5px * var(--ui));
+        letter-spacing: 0.16em; color: var(--ink);
       }
-      .do-etat > i { font-style: normal; font-size: calc(19px * var(--ui)); line-height: 1; }
-      .do-etat.actuel {
-        border-color: rgba(109, 255, 184, 0.55);
-        background: linear-gradient(90deg, rgba(12, 40, 33, 0.85), rgba(8, 20, 26, 0.7));
-        box-shadow: inset 0 0 22px rgba(109, 255, 184, 0.12);
-      }
-      .do-etat.verrou { opacity: 0.5; }
-      .do-etat em {
-        font-style: normal; font-family: var(--font-display);
-        font-size: calc(10px * var(--ui)); letter-spacing: 0.16em; color: var(--ink);
-      }
-      .do-etat small {
-        margin-left: auto; font-family: var(--font-display);
-        font-size: calc(8px * var(--ui)); letter-spacing: 0.14em; color: var(--dim);
-      }
-      .do-etat.actuel small { color: #6dffb8; }
+      .do-etat.actuel { color: #6dffb8; }
+      .do-etat.actuel i { font-style: normal; font-size: 0.85em; }
+      .do-etat.verrou { color: var(--dim); opacity: 0.65; }
       .do-etat kbd {
-        font-family: var(--font-mono); font-size: calc(10px * var(--ui));
+        font-family: var(--font-mono); font-size: calc(10px * var(--ui)); letter-spacing: 0;
         border: 1px solid var(--line-strong); border-bottom-width: 2px; border-radius: 4px;
-        padding: 2px 7px; color: var(--ink); background: rgba(3, 7, 16, 0.8);
+        padding: 1px 6px; color: var(--ink); background: rgba(3, 7, 16, 0.8);
       }
 
-      /* ---- LE BUTIN : des tuiles, pas un tableau ---- */
-      .do-tuiles { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; margin-bottom: 12px; }
-      .do-tuile {
-        text-align: center; padding: 9px 4px 10px; border-radius: 9px;
-        border: 1px solid var(--line); background: rgba(8, 16, 26, 0.65);
+      /* le butin et l'équipement : une rangée chacun, l'icône et le mot */
+      .do-butin, .do-equip { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 20px; }
+      .do-butin > span { display: inline-flex; align-items: center; gap: 6px; font-size: calc(13px * var(--ui)); }
+      .do-butin b { font-weight: normal; color: #f2c98e; }
+      .do-butin .vert b { color: #6dffb8; }
+      .do-equip > span {
+        display: inline-flex; align-items: center; gap: 7px; cursor: help;
+        font-family: var(--font-display); font-size: calc(9px * var(--ui));
+        letter-spacing: 0.12em; color: var(--ink);
       }
-      .do-tuile u { text-decoration: none; display: block; font-size: calc(15px * var(--ui)); line-height: 1.1; }
-      .do-tuile b { display: block; margin-top: 5px; font-size: calc(13px * var(--ui)); color: var(--ink); }
-      .do-tuile span {
-        display: block; margin-top: 2px; font-family: var(--font-display);
-        font-size: calc(7px * var(--ui)); letter-spacing: 0.14em; color: var(--dim);
-      }
-      .do-tuile.or b { color: #f2c98e; }
-      .do-tuile.vert b { color: #6dffb8; }
-
-      /* ---- L'ÉQUIPEMENT : des cartes d'inventaire ---- */
-      .do-objet {
-        display: flex; gap: 11px; padding: 9px 11px; align-items: flex-start;
-        border: 1px solid var(--line); border-radius: 9px;
-        background: rgba(8, 16, 26, 0.6); margin-bottom: 7px;
-      }
-      .do-objet > i { font-style: normal; font-size: calc(17px * var(--ui)); line-height: 1.1; }
-      .do-objet b { display: block; font-family: var(--font-display); font-size: calc(9.5px * var(--ui)); letter-spacing: 0.14em; color: var(--ink); }
-      .do-objet small { display: block; font-size: calc(10.5px * var(--ui)); color: var(--dim); margin-top: 3px; line-height: 1.45; }
-      .do-vide { font-size: calc(11px * var(--ui)); color: var(--dim); line-height: 1.55; margin: 0; }
+      .do-equip > span i { font-style: normal; font-size: calc(14px * var(--ui)); line-height: 1; }
       /* au doigt et sur petit écran, le carnet prend toute la largeur */
       @media (max-width: 760px) {
         #dossier { width: 100%; }
@@ -11227,17 +11106,19 @@
     <div id="panne-boucle" role="alert" hidden></div>
     <div id="obj-arrow" aria-hidden="true"><i>➤</i><span id="obj-dist"></span></div>
 
-    <!-- La CARTE D'ENTRÉE de salle (voie) : l'identité complète, en fondu,
-         sans rien bloquer — elle s'efface seule -->
+    <!-- Le DOSSIER : le pied est réécrit selon l'appareil qui a la main -->
     <aside id="dossier" hidden aria-label="Dossier de descente">
       <div id="dossier-tete">
-        <b>DOSSIER DE DESCENTE</b>
+        <b>DOSSIER</b>
         <span class="do-chrono" id="do-chrono">0,0 s</span>
         <button type="button" id="do-fermer" aria-label="Fermer le dossier">✕</button>
       </div>
       <div id="do-corps"></div>
-      <div id="dossier-pied"><kbd>TAB</kbd>FERMER · LA DESCENTE CONTINUE DERRIÈRE</div>
+      <div id="dossier-pied"><kbd>TAB</kbd>FERMER</div>
     </aside>
+
+    <!-- La CARTE D'ENTRÉE de salle (voie) : l'identité complète, en fondu,
+         sans rien bloquer — elle s'efface seule -->
 
     <div id="voie-carte" hidden aria-live="polite">
       <em id="vc-rang"></em>
