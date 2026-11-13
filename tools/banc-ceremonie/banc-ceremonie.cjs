@@ -16,7 +16,14 @@ const path = require('path')
 const port = process.argv[2] || '5291'
 const OUT = path.join(__dirname, 'captures')
 fs.mkdirSync(OUT, { recursive: true })
+// import.meta.glob est une macro de VITE (planche.ts : les planches livrées,
+// tirées par voiesModule → voie → … → renderer) ; esbuild la laisse telle
+// quelle sur un import.meta vide, et fabrique.js mourait au chargement
+// (« import_meta.glob is not a function ») — window.FAB n'existait plus,
+// aucune pose ne se dressait. Hors de Vite, aucune planche n'est livrée :
+// le glob rend un catalogue vide.
 const FAB = fs.readFileSync(path.join(__dirname, 'fabrique.js'), 'utf-8')
+  .replace(/\bimport_meta(\d*)\.glob\(/g, '(() => ({}))(')
 const POSES = fs.readFileSync(path.join(__dirname, 'poses.js'), 'utf-8')
 
 const MENTHE = ['#6dffb8', '#a9ffd6', '#8fd8c8', '#eaf6ff']
