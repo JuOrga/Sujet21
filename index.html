@@ -8762,14 +8762,17 @@
       .mb-carte.mb-pauvre { opacity: 0.45; cursor: not-allowed; }
       /* ---- LES SALLES ÉVÉNEMENT (game/evenements.ts) ---- */
       /* la porte d'une rencontre : pas de plan, un point d'interrogation */
-      .mb-ev-vue { display: grid; place-items: center; background: linear-gradient(180deg, #16233a, #0b1220); }
+      .mb-ev-vue { display: grid; place-items: center; background: linear-gradient(180deg, #16233a, #0b1220); aspect-ratio: 440 / 252; }
+      /* l'icône a SA taille : sans elle, le SVG prenait les 300 × 150 par
+         défaut du navigateur, et une rencontre parmi trois portes grandissait
+         tout le rang de 148 px (221 → 369, mesuré à 1280 × 720 le 13/11) */
+      .mb-ev-icone { width: calc(56px * var(--ui)); height: calc(56px * var(--ui)); }
       .mb-ev-vue i {
         font-style: normal; font-family: var(--font-display);
         font-size: calc(46px * var(--ui)); color: var(--mb-or, #ffd977);
         text-shadow: 0 0 18px rgba(255, 217, 119, 0.45); animation: mb-ev-bat 2.6s ease-in-out infinite;
       }
       @keyframes mb-ev-bat { 0%, 100% { opacity: 0.75; } 50% { opacity: 1; } }
-      .mb-porte-tag.mb-voie-ev { color: var(--mb-or, #ffd977); border-color: rgba(255, 217, 119, 0.4); }
       .mb-porte-ev:hover, .mb-porte-ev:focus-visible {
         border-color: var(--mb-or, #ffd977);
         box-shadow: 0 22px 44px rgba(0, 0, 0, 0.55), 0 0 30px rgba(255, 217, 119, 0.25);
@@ -8967,12 +8970,6 @@
         font-size: calc(14px * var(--ui)); letter-spacing: 0.34em; color: var(--mb-encre);
         text-shadow: 0 0 18px rgba(99, 183, 230, 0.45);
       }
-      /* LA CONSIGNE des portes : ce que sont ces vignettes, et ce qu'on en fait */
-      .mb-portes-consigne {
-        grid-column: 1 / -1; margin: -4px 0 2px; text-align: center;
-        font-size: calc(12px * var(--ui)); letter-spacing: 0.06em; color: #a9c3de;
-      }
-      .mb-portes-consigne i { font-style: normal; color: var(--mb-menthe); margin-right: 4px; }
       /* ---- LE BILAN DU MODULE : le module traversé dit ce qu'il a rendu
          AVANT que le plan ne se rouvre. Le plan arrivait d'office, sous le
          bandeau de la dernière salle : rien ne marquait qu'un module venait
@@ -9116,14 +9113,6 @@
       }
       /* le repère de voie : le signe se lit d'abord, comme au bord de la mini-carte */
       .mb-porte-no.mb-porte-repere i { font-style: normal; font-size: 1.35em; margin-right: 3px; }
-      .mb-porte-tag {
-        font-style: normal; font-family: var(--font-display); font-size: calc(7px * var(--ui));
-        letter-spacing: 0.18em; color: var(--dim);
-        border: 1px solid var(--line); border-radius: 4px; padding: 3px 7px; width: fit-content;
-        max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-      }
-      .mb-porte-tag.mb-voie-gen { color: var(--mb-menthe); border-color: rgba(109, 255, 184, 0.4); }
-      .mb-porte-tag.mb-voie-pool { color: var(--mb-or); border-color: rgba(255, 217, 119, 0.4); }
       .mb-porte b {
         font-family: var(--font-display); font-size: calc(11px * var(--ui));
         letter-spacing: 0.12em; color: var(--mb-encre); line-height: 1.3;
@@ -9133,7 +9122,18 @@
         color: #8ba3b8; font-size: calc(11.5px * var(--ui)); line-height: 1.35;
         display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
       }
-      .mb-porte .salle-chips { margin-top: auto; }
+      /* LA LIGNE COURTE de la porte : DIFF, et la prime ou la figure quand
+         il y en a — une seule ligne, coupée plutôt que repliée ; le reste
+         est à l'infobulle (l'épure du 13/11) */
+      .mb-porte-ligne {
+        margin-top: auto; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+        font-family: var(--font-display); font-size: calc(8.5px * var(--ui));
+        letter-spacing: 0.12em; color: #9fb6c8;
+      }
+      .mb-porte-ligne i { font-style: normal; }
+      .mb-porte-ligne i + i::before { content: ' · '; color: #55708c; }
+      .mb-porte-ligne .mb-porte-prime { color: var(--mb-or); }
+      .mb-porte-ligne-ev { color: var(--mb-or, #ffd977); }
       /* la mention ENTRER, qui n'apparaît qu'à la visée */
       .mb-porte-entrer {
         position: absolute; right: 16px; top: 16px; z-index: 1;
@@ -9167,8 +9167,11 @@
       /* la mini-carte à voies du module (game/voiesModule.ts) : rangs de
          gauche à droite, voies de haut en bas — des TUILES octogonales, la
          silhouette des modules de la station, une icône par nature */
-      .mb-voies { grid-column: 1 / -1; display: flex; flex-direction: column; align-items: center; padding: 4px 0 6px; overflow-x: auto; }
-      .mv-svg { max-width: 100%; height: auto; font-family: var(--font-mono); }
+      .mb-voies { grid-column: 1 / -1; position: relative; display: flex; flex-direction: column; align-items: center; padding: 2px 0; overflow-x: auto; }
+      /* LA HAUTEUR PLAFONNÉE : 186 px de dessin pour six rangs, à pleine
+         taille — c'est la carte qui cède quand l'écran est court, pas les
+         portes (l'épure du 13/11) */
+      .mv-svg { max-width: 100%; max-height: 22vh; width: auto; height: auto; font-family: var(--font-mono); }
       /* un lien joignable se lit à pleine intensité : c'est l'éteint qui recule */
       .mv-lien { stroke: #4a6680; stroke-width: 2.5; stroke-linecap: round; }
       .mv-lien.mv-joue { stroke: var(--mb-menthe); stroke-width: 3; filter: drop-shadow(0 0 5px rgba(109, 255, 184, 0.5)); }
@@ -9230,15 +9233,22 @@
       /* LE SAS : la sortie du module */
       .mv-sas rect { fill: #0e1724; stroke: #8aa6bc; stroke-width: 1.5; }
       .mv-sas path { fill: none; stroke: #d5f3e8; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
-      /* LA FICHE sous la mini-carte : une ligne, hauteur fixe */
+      /* LA FICHE de la mini-carte : une ligne, EN SURIMPRESSION au pied de
+         la carte (sur les titres « SALLE n »), et seulement à la visée. Une
+         ligne réservée sous la carte coûtait sa hauteur à chaque écran, et
+         sa consigne par défaut se lisait comme une information de plus */
       .mv-fiche {
-        margin: 2px 0 0; max-width: 100%; min-height: 1.5em; font-size: calc(11px * var(--ui)); letter-spacing: 0.06em;
+        position: absolute; left: 50%; bottom: 2px; transform: translateX(-50%);
+        margin: 0; max-width: 100%; padding: 2px 10px; border-radius: 4px;
+        background: rgba(5, 10, 18, 0.94); border: 1px solid rgba(150, 200, 235, 0.18);
+        font-size: calc(11px * var(--ui)); letter-spacing: 0.06em; pointer-events: none;
         color: #b8cddd; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-align: center;
       }
+      .mv-fiche[hidden] { display: none; }
       /* au doigt : la porte armée attend un second toucher */
       .mb-porte.mb-armee { outline: 2px solid #eaf6ff; outline-offset: 2px; }
       @media (prefers-reduced-motion: reduce) { .mv-noeud.mv-porte .mv-halo { animation: none; } }
-      /* les jauges en tête du choix : on décide en voyant ce qu'on possède */
+      /* les jauges de la fin ordinaire (le choix de salle ne les montre plus) */
       .mb-jauges {
         grid-column: 1 / -1; display: flex; justify-content: center; align-items: center;
         gap: 22px; flex-wrap: wrap; font-size: calc(12px * var(--ui)); color: #9fb6c8;
@@ -9376,6 +9386,7 @@
         .mb-litres b { font-size: calc(32px * var(--ui)); }
         .mb-pli, .mb-pli .crt-draft { min-height: 160px; }
         .mb-porte-vue canvas { max-height: 132px; object-fit: contain; }
+        .mb-ev-vue { aspect-ratio: auto; height: 132px; }
         .mb-station-carte { max-height: 58vh; }
       }
       /* ---- MOINS D'ANIMATIONS : le jeu reste le même, sans le spectacle.

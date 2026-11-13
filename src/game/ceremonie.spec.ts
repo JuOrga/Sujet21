@@ -200,3 +200,49 @@ describe('la cérémonie — la carte ne bouge pas sous le survol', () => {
     expect(regle('.mb-station-fiche')).toMatch(/overflow:\s*hidden/)
   })
 })
+
+// LE CHOIX DE LA SALLE TIENT DANS L'ÉCRAN. « La page de choix des niveaux
+// déborde souvent dans le bas de l'écran, il y a trop d'informations » (le
+// joueur, 13/11) : au-dessus des portes s'empilaient le relevé de la salle
+// déjà lue, la jauge de maîtrise, le rang des jauges, la consigne et une
+// fiche réservée sous la mini-carte — à 1280 × 720, les portes passaient
+// sous le bas de l'écran. L'étape a été épurée ; ces gardes tiennent
+// l'épure, faute de navigateur pour mesurer les pixels sous Vitest.
+describe('la cérémonie — le choix de la salle tient dans l’écran', () => {
+  const HTML = readFileSync(new URL('../../index.html', import.meta.url), 'utf-8')
+  const MAIN = readFileSync(new URL('../main.ts', import.meta.url), 'utf-8')
+  const corps = (nom: string): string => {
+    const debut = MAIN.indexOf(`\nfunction ${nom}(`)
+    expect(debut, `la fonction ${nom} manque`).toBeGreaterThan(-1)
+    return MAIN.slice(debut, MAIN.indexOf('\n}\n', debut))
+  }
+  const regle = (selecteur: string): string => {
+    const debut = HTML.indexOf(`\n      ${selecteur} {`)
+    expect(debut, `la règle « ${selecteur} » manque`).toBeGreaterThan(-1)
+    return HTML.slice(debut, HTML.indexOf('}', debut))
+  }
+
+  it('ni relevé, ni jauge de maîtrise, ni jauges, ni consigne au-dessus des portes', () => {
+    for (const nom of ['mbMontreSallesVoie', 'mbMontreSalles']) {
+      const f = corps(nom)
+      expect(f, `${nom} retire le relevé`).toContain('mbReleveHors()')
+      expect(f, `${nom} retire la jauge de maîtrise`).toContain(`mbEl('mb-etal').hidden = true`)
+      expect(f, `${nom} remet la jauge mince`).not.toContain('mbJaugeMince()')
+      expect(f, `${nom} remet le rang des jauges`).not.toContain('mbJauges()')
+      expect(f, `${nom} remet une consigne`).not.toMatch(/Consigne/)
+    }
+  })
+
+  it('la porte tient en une ligne courte : plus d’étiquette en pastille', () => {
+    expect(corps('mbPorte')).not.toContain('mb-porte-tag')
+    expect(corps('mbPorteNoeud')).not.toContain('mb-porte-tag')
+    expect(regle('.mb-porte-ligne')).toMatch(/white-space:\s*nowrap/)
+  })
+
+  it('la mini-carte plafonne sa hauteur, sa fiche ne prend aucune place', () => {
+    expect(regle('.mv-svg')).toMatch(/max-height:\s*22vh/)
+    expect(regle('.mv-fiche')).toMatch(/position:\s*absolute/)
+    // au repos, la fiche se tait : plus de consigne par défaut
+    expect(corps('mbMontreSallesVoie')).not.toContain('visez une porte')
+  })
+})
