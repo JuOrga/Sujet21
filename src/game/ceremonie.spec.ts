@@ -388,6 +388,29 @@ describe('la cérémonie — « moins d’animations », règle par règle', () 
   })
 })
 
+// LES SÉLECTEURS MORTS (relecture finale, m3). Laissés par les fusions et
+// les lots successifs : une classe que plus personne ne pose (.mb-grande,
+// que la base ajoutait au versement), une autre qu'aucun élément ne porte
+// (.mb-ico), une transition de bordure sur une porte sans bordure. Ils ne
+// font rien, mais font croire qu'ils font quelque chose.
+describe('la cérémonie — pas de sélecteur mort', () => {
+  it('ni .mb-grande, ni .mb-ico, ni bordure qui transite sur une porte sans bordure', () => {
+    expect(HTML).not.toContain('mb-grande')
+    expect(MAIN).not.toContain('mb-grande')
+    expect(HTML).not.toMatch(/\.mb-ico\b(?!-)/)
+    expect(regle('.mb-porte')).toMatch(/border:\s*0/)
+    expect(regle('.mb-porte')).not.toContain('border-color')
+  })
+  // la taille et l'interlettrage de la question en compact ne s'écrivent
+  // qu'une fois : la règle groupée qui les donnait aussi était écrasée
+  it('la question en compact ne s’écrit qu’à un endroit, couleur comprise', () => {
+    expect(HTML).not.toMatch(/\.mb-scene\.mb-question \.mb-titre,\s*\n\s*\.mb-scene\.mb-compact\.mb-question \.mb-titre/)
+    // sa couleur et son halo l'emportent sur la poutre repliée (sarcelle, sans halo)
+    expect(regle('.mb-scene.mb-compact.mb-question .mb-titre')).toMatch(/color:\s*var\(--mb-encre\)/)
+    expect(regle('.mb-scene.mb-compact.mb-question .mb-titre')).toMatch(/text-shadow:\s*0 0 22px/)
+  })
+})
+
 // LES CONSTATS DE LA RELECTURE DU BILAN (F2) : trois règles que la cascade
 // rendait muettes — une taille du Steam Deck qui écrasait celle des
 // téléphones couchés, une bande de poutre trop large sur écran étroit, deux

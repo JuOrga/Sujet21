@@ -9119,9 +9119,8 @@
       .mb-versement[data-verse='g'] .mb-dest-maitrise,
       .mb-versement[data-verse='d'] .mb-dest-reserve { opacity: 0.3; }
       /* LA QUESTION : le titre de scène qui demande quelque chose au joueur
-         se lit en grand et en clair, même en compact */
-      .mb-scene.mb-question .mb-titre,
-      .mb-scene.mb-compact.mb-question .mb-titre {
+         se lit en grand et en clair */
+      .mb-scene.mb-question .mb-titre {
         font-size: calc(clamp(18px, 2.6vw, 26px) * var(--ui)); letter-spacing: 0.3em;
         color: var(--mb-encre); text-shadow: 0 0 22px rgba(109, 255, 184, 0.45);
       }
@@ -9130,12 +9129,11 @@
          cassait en deux (« CHOISISSEZ LA SALLE SUIVANTE », vu en F3) — la
          poutre s'élargit, le titre se resserre un peu */
       .mb-scene.mb-compact.mb-question .mb-banniere.mb-poutre { width: min(100%, 940px); --mb-bande: 64px; min-height: 46px; }
+      /* en clair aussi, même en compact : la règle de la poutre repliée
+         (.mb-scene.mb-compact .mb-titre) l'éteindrait en sarcelle, sans halo */
       .mb-scene.mb-compact.mb-question .mb-titre {
         font-size: calc(clamp(15px, 1.6vw, 20px) * var(--ui)); letter-spacing: 0.2em; white-space: nowrap;
-      }
-      .mb-choix-titre.mb-grande {
-        font-size: calc(14px * var(--ui)); letter-spacing: 0.34em; color: var(--mb-encre);
-        text-shadow: 0 0 18px rgba(99, 183, 230, 0.45);
+        color: var(--mb-encre); text-shadow: 0 0 22px rgba(109, 255, 184, 0.45);
       }
       /* ---- LE BILAN DU MODULE : le module traversé dit ce qu'il a rendu
          AVANT que le plan ne se rouvre. C'était une plaque arrondie de
@@ -9245,7 +9243,7 @@
         color: var(--mb-texte); font: inherit; cursor: pointer;
         animation: mb-porte-monte 0.5s cubic-bezier(0.2, 1, 0.3, 1) backwards;
         animation-delay: calc(0.05s + var(--i) * 0.12s);
-        transition: transform 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease;
+        transition: transform 0.18s ease, box-shadow 0.18s ease;
       }
       @keyframes mb-porte-monte {
         from { opacity: 0; transform: translateY(34px) scale(0.94); }
@@ -9729,7 +9727,7 @@
         .mb-prime, .mb-record, .mb-etal, .mb-etal-palier.saute,
         .mb-module-sceau, .mb-salle, .mb-etal-tampon, .mb-anneau.mb-anneau-casse,
         .mb-palier-eclair, .mb-choix, .mb-pli, .mb-pli .crt-draft, .mb-pli-dos, .mb-pli .crt-draft::after,
-        .mb-cartes.mb-elu .mb-pli:not(.mb-elu-c), .mb-pli.mb-elu-c, .mb-halte-heros, .mb-ico,
+        .mb-cartes.mb-elu .mb-pli:not(.mb-elu-c), .mb-pli.mb-elu-c, .mb-halte-heros,
         .mb-goutte, .mb-goutte-corps, .mb-flux, .mb-dest, .mb-dest.mb-dest-palier, .mb-anneau-franchit,
         .mb-porte,
         .mb-porte-vue::after, .mb-cartes.mb-elu .mb-porte:not(.mb-elue), .mb-porte.mb-elue,

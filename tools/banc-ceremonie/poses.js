@@ -66,14 +66,12 @@
     h.className = 'mb-cartes'
     h.style.removeProperty('--n')
     h.innerHTML = ''
-    $('mb-choix-titre').classList.remove('mb-grande')
     scene.classList.remove('mb-question')
     return h
   }
   function question(t) { // main.ts:16613 mbQuestion
     $('mb-titre').textContent = t
     scene.classList.add('mb-question')
-    $('mb-choix-titre').classList.remove('mb-grande')
   }
 
   // main.ts mbPoseCuve : une image en échec se cache (jamais l'icône d'image

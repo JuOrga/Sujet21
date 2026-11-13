@@ -15817,9 +15817,6 @@ function mbCartes(): HTMLElement {
   const h = mbEl('mb-cartes')
   h.classList.remove('mb-draft', 'mb-isole', 'mb-elu', 'mb-station', 'mb-trio')
   h.style.removeProperty('--n')
-  // le titre du choix redevient une ligne de contexte ; l'étape qui pose
-  // une QUESTION le regrossit elle-même
-  mbEl('mb-choix-titre').classList.remove('mb-grande')
   mbScene.classList.remove('mb-question')
   return h
 }
@@ -17014,7 +17011,6 @@ function mbMontreSalles(props: LevelDef[]): void {
 function mbQuestion(texte: string): void {
   mbEl('mb-titre').textContent = texte
   mbScene.classList.add('mb-question')
-  mbEl('mb-choix-titre').classList.remove('mb-grande')
 }
 
 /** Les jauges de la fin ordinaire : la réserve, la bourse, les vies, la
