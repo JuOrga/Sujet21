@@ -23,14 +23,35 @@ export interface Fenetre { x: number; y: number; l: number; h: number }
  *  cerclages) encadrent le liquide, qui monte dans la `liquide` fenêtre. */
 export interface ObjetCuve { dos: string; verre: string; largeur: number; hauteur: number; liquide: Fenetre }
 
-// Valeurs PROVISOIRES : 512×1024 et une fenêtre de liquide au jugé. Seul le
-// lot Blender les remplace, par les mesures de ses rendus — deviner la
-// fenêtre ici ferait déborder l'eau du verre.
-const PROVISOIRE = { largeur: 512, hauteur: 1024, liquide: { x: 0.3, y: 0.2, l: 0.4, h: 0.65 } }
+// Les valeurs sont MESURÉES dans les rendus (13/11), pas devinées : la taille
+// est celle des images livrées, et la fenêtre du liquide est la boîte de ce
+// qui se voit d'un liquide plein, rendu à part (la « sonde » de
+// tools/images/blender/ceremonie.py, assemble_cuves). Chaque pixel de la
+// fenêtre où le liquide ne se voit pas y est vérifié sous un opaque du verre :
+// le rectangle ne déborde nulle part. Re-rendre une cuve, c'est recopier ici
+// ce que l'assemblage imprime.
 export const OBJETS: Record<'bonbonne' | 'reserve' | 'maitrise', ObjetCuve> = {
-  bonbonne: { dos: '/assets/ceremonie-bonbonne-dos.webp', verre: '/assets/ceremonie-bonbonne-verre.webp', ...PROVISOIRE },
-  reserve: { dos: '/assets/ceremonie-reserve-dos.webp', verre: '/assets/ceremonie-reserve-verre.webp', ...PROVISOIRE },
-  maitrise: { dos: '/assets/ceremonie-maitrise-dos.webp', verre: '/assets/ceremonie-maitrise-verre.webp', ...PROVISOIRE },
+  bonbonne: {
+    dos: '/assets/ceremonie-bonbonne-dos.webp',
+    verre: '/assets/ceremonie-bonbonne-verre.webp',
+    largeur: 512,
+    hauteur: 1024,
+    liquide: { x: 0.3574, y: 0.4141, l: 0.2852, h: 0.4375 },
+  },
+  reserve: {
+    dos: '/assets/ceremonie-reserve-dos.webp',
+    verre: '/assets/ceremonie-reserve-verre.webp',
+    largeur: 880,
+    hauteur: 1024,
+    liquide: { x: 0.1398, y: 0.2334, l: 0.7205, h: 0.6309 },
+  },
+  maitrise: {
+    dos: '/assets/ceremonie-maitrise-dos.webp',
+    verre: '/assets/ceremonie-maitrise-verre.webp',
+    largeur: 512,
+    hauteur: 1024,
+    liquide: { x: 0.2988, y: 0.1455, l: 0.4023, h: 0.7344 },
+  },
 }
 
 /** La cuve assemblée : dos, LIQUIDE, verre — dans cet ordre, pour que l'eau
@@ -49,4 +70,16 @@ export function cuveHTML(o: keyof typeof OBJETS, idLiquide: string): string {
 }
 
 export const ANNEAU_URL = '/assets/ceremonie-anneau.webp' // 2 × 1 cases de 512² : intact, brisé
+
+/** Où poser une case de l'anneau (512², intact ou brisé) sur la colonne de
+ *  maîtrise : une boîte par siège, du palier le plus BAS au plus haut, en
+ *  fractions de l'image de la colonne (carrée en pixels). L'anneau est rendu
+ *  dans la même vue que la colonne, autour de son tube : posé dans sa boîte
+ *  par-dessus le verre, il recouvre exactement le siège vide. Mesuré dans la
+ *  scène (ceremonie.py, cuves.json), pas au jugé. */
+export const ANNEAUX_MAITRISE: readonly Fenetre[] = [
+  { x: 0.06, y: 0.4667, l: 0.88, h: 0.44 },
+  { x: 0.06, y: 0.2686, l: 0.88, h: 0.44 },
+  { x: 0.06, y: 0.0706, l: 0.88, h: 0.44 },
+]
 export const SCENES_FIN = { bouclee: '/assets/fin-capsule.webp', perdue: '/assets/fin-fiole-brisee.webp' } as const

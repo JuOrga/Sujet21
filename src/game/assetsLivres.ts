@@ -24,6 +24,7 @@ export const RUBRIQUES = [
   'Zones d’état',
   'Machinerie & décalques',
   'Méta & commerce',
+  'Cérémonie station',
   'Avaries — stations',
   'Codex — aperçus',
   'Serre & cultures',
@@ -82,6 +83,16 @@ const NOMS: Record<string, string> = {
   'sas-raccord-v.webp': 'Sas de raccord (quart de tour)',
   'meta-eclat.webp': 'Méta — éclat de mémoire',
   'meta-icones.webp': 'Méta — planche d’icônes (4×2)',
+  // LA CÉRÉMONIE STATION — rendue dans Blender (docs/assets-ia.md § 36)
+  'ceremonie-icones.webp': 'Cérémonie — planche d’icônes (7×4)',
+  'ceremonie-sceaux.webp': 'Cérémonie — sceaux de rang et de module (3×2)',
+  'ceremonie-bonbonne-dos.webp': 'Cérémonie — bonbonne (dos)',
+  'ceremonie-bonbonne-verre.webp': 'Cérémonie — bonbonne (verre)',
+  'ceremonie-reserve-dos.webp': 'Cérémonie — bocal de réserve (dos)',
+  'ceremonie-reserve-verre.webp': 'Cérémonie — bocal de réserve (verre)',
+  'ceremonie-maitrise-dos.webp': 'Cérémonie — colonne de maîtrise (dos)',
+  'ceremonie-maitrise-verre.webp': 'Cérémonie — colonne de maîtrise (verre)',
+  'ceremonie-anneau.webp': 'Cérémonie — anneau de palier (intact, brisé)',
   // les illustrations du tableau des avaries (public/assets/avaries/<id>.webp),
   // une par station de reparations.ts — la même image éteinte ou allumée
   'eclairage.webp': 'Avarie — réseau d’éclairage',
@@ -108,6 +119,10 @@ export function rubriqueDe(url: string): string {
   if (f.startsWith('zone-')) return 'Zones d’état'
   if (f.startsWith('serre-')) return 'Serre & cultures'
   if (f.startsWith('meta-')) return 'Méta & commerce'
+  // les planches, objets et scènes de fin rendus pour la cérémonie : leurs
+  // noms sont un contrat (iconesStation.ts, ceremonieObjets.ts) ; sans cette
+  // règle, chacune tombait dans « Autres » à sa livraison
+  if (/^(ceremonie-|instruments-icones|fin-)/.test(f)) return 'Cérémonie station'
   if (f.startsWith('sas-')) return 'Coque & fonds'
   if (
     f.startsWith('decal-') ||
