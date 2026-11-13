@@ -12,6 +12,8 @@ import {
   RAPPORT_SAS,
   caseIcone,
   decalsDuMeta,
+  iconeMetaHTML,
+  iconeMonnaieHTML,
   vuesEclat,
 } from './metaAssets'
 import { jonctionsDesStructures } from './structures'
@@ -137,6 +139,31 @@ describe('la planche d’icônes du méta', () => {
 
   it('le viatique et la fiole de gouttes partagent leur case (même objet)', () => {
     expect(caseIcone('viatique')).toBe(caseIcone('gouttes'))
+  })
+})
+
+// UNE MONNAIE, UN SEUL DESSIN : le condensat, la mémoire et la vie (et
+// l'échantillon de secours, qui DONNE une vie) prennent l'icône de la
+// cérémonie partout où l'interface les montre — un toast d'éclat ne doit pas
+// dessiner la mémoire autrement que le bilan de la salle.
+describe('les monnaies du méta prennent le dessin de la cérémonie', () => {
+  it('condensat, mémoire, vie et secours sortent par la planche de la cérémonie', () => {
+    expect(iconeMetaHTML('condensat', '💠')).toContain('ico-ceremonie')
+    expect(iconeMetaHTML('memoire', '🧠')).toContain('ico-ceremonie')
+    expect(iconeMetaHTML('vie', '💠')).toBe(iconeMetaHTML('secours', '💠'))
+    expect(iconeMetaHTML('secours', '💠')).toContain('ico-ceremonie')
+    for (const id of ['condensat', 'memoire', 'vie', 'secours']) expect(iconeMetaHTML(id, '?'), id).not.toContain('ico-meta')
+  })
+
+  it('les autres articles du commerce restent sur leur planche', () => {
+    for (const id of ['gouttes', 'viatique', 'dashs', 'clef', 'sac']) expect(iconeMetaHTML(id, '?'), id).toContain('ico-meta')
+  })
+
+  it('iconeMonnaieHTML ne répond que pour une monnaie — jamais pour un nom hérité d’Object', () => {
+    expect(iconeMonnaieHTML('memoire')).toContain('ico-ceremonie')
+    expect(iconeMonnaieHTML('gouttes')).toBeNull()
+    expect(iconeMonnaieHTML('toString')).toBeNull()
+    expect(iconeMonnaieHTML('constructor')).toBeNull()
   })
 })
 

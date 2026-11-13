@@ -3101,10 +3101,12 @@ function majToast(): void {
   tropheeToast.style.setProperty('--tt', TOAST_TEINTE[genre])
   tropheeToast.style.setProperty('--dur', `${duree}s`)
   tropheeToast.dataset.genre = genre
+  // un article passe par sa planche (la mémoire d'un éclat, l'échantillon de
+  // secours : le dessin de la cérémonie) ; un trophée, une fiche ou une
+  // fiole n'ont pas de dessin rendu et gardent leur glyphe
+  const glyphe = t.article ? iconeMetaHTML(t.article, t.icone) : `<i>${t.icone}</i>`
   tropheeToast.innerHTML =
-    `<span class="tt-cartouche">${
-      t.article ? iconeMetaHTML(t.article, t.icone) : `<i>${t.icone}</i>`
-    }</span>` +
+    `<span class="tt-cartouche">${glyphe}</span>` +
     `<span class="tt-corps"><b>${t.sur ?? 'TROPHÉE DÉBLOQUÉ'}</b>` +
     `<span class="tt-nom">${htmlSafe(t.nom)}</span>${voir}</span>` +
     `<span class="tt-vie"></span>`
