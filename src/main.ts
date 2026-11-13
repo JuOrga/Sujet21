@@ -458,7 +458,7 @@ import {
 } from './game/soundtrack'
 import { Jukebox, PISTES_ECOUTE } from './game/jukebox'
 import { auteurAvis, avisDe, ligneAvis, ligneBilan, lisAvisEcoute, poseAvis, type Avis, type DocumentAvis } from './game/ecouteAvis'
-import { compteur, douce, motDeNote, rangDeSalle, TEMPS_BILAN, titreDuTirage } from './game/ceremonie'
+import { compteur, douce, gesteTropTot, motDeNote, rangDeSalle, TEMPS_BILAN, titreDuTirage } from './game/ceremonie'
 import { cartoucheHTML } from './game/cartouches'
 import { cuveHTML, sceauHTML } from './game/ceremonieObjets'
 import { iconeCeremonieHTML } from './game/iconesStation'
@@ -15101,16 +15101,12 @@ function mbPoseCuve(hote: HTMLElement, html: string): HTMLElement | null {
   return hote.querySelector<HTMLElement>('.mb-cuve-liquide')
 }
 
-/** LE GESTE QUI OUVRE N'EST PAS CELUI QUI CHOISIT. Le bilan se passe d'un
- *  geste, et le versement s'ouvre SOUS ce geste : le second clic d'un double
- *  clic, ou A martelé, tombait sur la première cuve — le surplus partait
- *  dans la réserve sans qu'on l'ait choisi. Le versement n'obéit qu'après
- *  ce délai : il absorbe le second clic d'un double clic, le A suivant
- *  d'une rafale. */
-const MB_GARDE_GESTE_MS = 400
+/** LE GESTE QUI OUVRE N'EST PAS CELUI QUI CHOISIT : le versement ignore les
+ *  gestes de ses premières 400 ms (la règle et ses bornes : ceremonie.ts,
+ *  gesteTropTot). Ici, l'horloge du jeu. */
 let mbVersementOuvertA = -Infinity
 function mbGesteTropTot(): boolean {
-  return performance.now() - mbVersementOuvertA < MB_GARDE_GESTE_MS
+  return gesteTropTot(performance.now(), mbVersementOuvertA)
 }
 
 /** LE VERSEMENT : le surplus choisit sa destination — la RÉSERVE (bonbonne,

@@ -3,6 +3,8 @@ import { describe, expect, it } from 'vitest'
 import {
   compteur,
   douce,
+  GARDE_GESTE_MS,
+  gesteTropTot,
   motDeNote,
   PAS_LIGNE_MS,
   rangDeSalle,
@@ -91,6 +93,30 @@ describe('les temps de la lecture', () => {
 
   it('tiennent en moins de six secondes — au-delà, on saute', () => {
     expect(TEMPS_BILAN.versement).toBeLessThan(6000)
+  })
+})
+
+// LE GESTE QUI OUVRE N'EST PAS CELUI QUI CHOISIT : le versement s'ouvre sous
+// le geste qui a passé le bilan, et le second clic d'un double clic (ou le A
+// suivant d'une rafale) choisissait la première cuve. La règle n'était
+// gardée qu'en texte ; l'horloge fournie, elle se teste à ses bornes.
+describe('la garde du geste qui ouvre le versement', () => {
+  it('ignore tout geste pendant 400 ms, et rien après', () => {
+    expect(GARDE_GESTE_MS).toBe(400)
+    const ouvert = 10_000
+    expect(gesteTropTot(ouvert, ouvert)).toBe(true) // le geste même qui ouvre
+    expect(gesteTropTot(ouvert + 399.9, ouvert)).toBe(true)
+    expect(gesteTropTot(ouvert + 400, ouvert)).toBe(false) // la borne : on obéit
+    expect(gesteTropTot(ouvert + 5000, ouvert)).toBe(false)
+  })
+  it('obéit quand le versement ne s’est jamais ouvert', () => {
+    expect(gesteTropTot(0, -Infinity)).toBe(false)
+    expect(gesteTropTot(123, -Infinity)).toBe(false)
+  })
+  it('ne bloque pas pour toujours sur une horloge qui recule', () => {
+    // performance.now() ne recule pas, mais une horloge fournie peut : un
+    // écart négatif n'est pas « trop tôt », il est faux — on obéit
+    expect(gesteTropTot(900, 1000)).toBe(false)
   })
 })
 

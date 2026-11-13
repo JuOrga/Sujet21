@@ -80,6 +80,24 @@ export const TEMPS_BILAN = {
 /** L'écart entre deux lignes du relevé : chacune tombe après l'autre. */
 export const PAS_LIGNE_MS = 240
 
+/** LE GESTE QUI OUVRE N'EST PAS CELUI QUI CHOISIT. Le bilan se passe d'un
+ *  geste, et le versement s'ouvre SOUS ce geste : le second clic d'un double
+ *  clic, ou A martelé, tombait sur la première cuve — le surplus partait
+ *  dans la réserve sans qu'on l'ait choisi. Le versement n'obéit qu'après
+ *  ce délai : il absorbe le second clic d'un double clic, le A suivant
+ *  d'une rafale. Le prix : un vrai clic plus rapide est ignoré (on reclique). */
+export const GARDE_GESTE_MS = 400
+
+/** Le geste tombe-t-il dans la garde ? `maintenant` et `ouvertA` viennent de
+ *  la même horloge (performance.now() dans le jeu) ; `ouvertA` vaut
+ *  -Infinity tant que le versement ne s'est pas ouvert. Un écart négatif
+ *  (une horloge qui recule) n'est pas « trop tôt » : on obéit plutôt que de
+ *  bloquer les cuves pour de bon. */
+export function gesteTropTot(maintenant: number, ouvertA: number): boolean {
+  const ecart = maintenant - ouvertA
+  return ecart >= 0 && ecart < GARDE_GESTE_MS
+}
+
 /** Sortie douce : un compteur qui file vite puis se pose. */
 export function sortieDouce(t: number): number {
   const x = Math.max(0, Math.min(1, t))
