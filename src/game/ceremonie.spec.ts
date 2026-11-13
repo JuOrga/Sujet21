@@ -467,6 +467,29 @@ describe('la cérémonie — le choix de la salle tient dans l’écran', () => 
     expect(regle('.mb-porte-ligne')).toMatch(/white-space:\s*nowrap/)
   })
 
+  // une halte, le levier de « MODULE TRAVERSÉ » ou de la cache posent les
+  // portes (et le plan) dans le même appel que le geste qui les ferme : un
+  // A martelé ouvrait la première porte, encore invisible. Une rafale saute
+  // une étape, pas deux — et la garde passe avant l'armement au doigt
+  it('la porte et le plan ignorent le geste qui vient de les ouvrir', () => {
+    for (const [nom, arme] of [
+      ['mbPorte', 'if (!ouvre()) return'],
+      ['mbPorteNoeud', 'if (!arme()) return'],
+    ] as const) {
+      const f = corps(nom)
+      expect(f, nom).toMatch(/const ouvertA = performance\.now\(\)/)
+      const garde = f.indexOf('if (gesteTropTot(performance.now(), ouvertA)) return')
+      expect(garde, nom).toBeGreaterThan(-1)
+      expect(garde, `${nom} : la garde avant l'armement`).toBeLessThan(f.indexOf(arme))
+    }
+    const c = corps('mbMontreCarte')
+    expect(c).toMatch(/const ouvertA = performance\.now\(\)/)
+    const choisit = c.slice(c.indexOf('const choisit = '))
+    const garde = choisit.indexOf('if (gesteTropTot(performance.now(), ouvertA)) return')
+    expect(garde, 'choisit garde le geste').toBeGreaterThan(-1)
+    expect(garde, 'la garde avant la visée').toBeLessThan(choisit.indexOf('garde.clic('))
+  })
+
   it('la mini-carte plafonne sa hauteur, sa fiche ne prend aucune place', () => {
     expect(regle('.mv-svg')).toMatch(/max-height:\s*22vh/)
     expect(regle('.mv-fiche')).toMatch(/position:\s*absolute/)

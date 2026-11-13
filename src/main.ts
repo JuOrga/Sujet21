@@ -16057,6 +16057,7 @@ function montreCarteRun(raison: 'depart' | 'suite'): void {
 
 function mbMontreCarte(raison: 'depart' | 'suite'): void {
   mbEtape = 'carte'
+  const ouvertA = performance.now() // la garde du geste qui l'ouvre (choisit)
   mbReleveHors()
   mbScene.classList.add('mb-large')
   mbEl('mb-etal').hidden = true
@@ -16218,6 +16219,11 @@ function mbMontreCarte(raison: 'depart' | 'suite'): void {
     window.setTimeout(() => entreModuleRun(mod.id), sansAnimation() ? 0 : 420)
   }
   const choisit = (id: string | null): void => {
+    // LE PLAN S'OUVRE DANS LE GESTE QUI CLÔT L'ÉTAPE D'AVANT (le levier de
+    // « MODULE TRAVERSÉ », une halte, le don) : un A martelé retombait sur
+    // le premier module et y entrait — un choix qui ne se reprend pas, pris
+    // sans avoir vu le plan. Avant la visée : un toucher trop tôt ne vise pas
+    if (gesteTropTot(performance.now(), ouvertA)) return
     if (!id) return
     const x = choix.find((c) => c.module.id === id)
     if (!x) {
@@ -17065,8 +17071,16 @@ function mbPorte(
     `<b>${htmlSafe(lv.code)}</b><small>${htmlSafe(lv.name)}</small>` +
     (ligne ? `<span class="mb-porte-ligne">${ligne}</span>` : '')
   dessineMiniCarte(btn.querySelector('canvas') as HTMLCanvasElement, lv)
+  // LA PORTE NAÎT DANS LE GESTE QUI CLÔT L'ÉTAPE D'AVANT : une halte, le
+  // tirage, le levier de la cache posent les portes dans le même appel. Un A
+  // martelé retombait sur la première porte (la cible disparue, la manette
+  // reprend le premier élément), encore invisible à l'opacité 0 de son
+  // entrée — une salle choisie sans avoir été vue. La garde passe AVANT
+  // l'armement : un toucher trop tôt n'arme pas non plus
+  const ouvertA = performance.now()
   const ouvre = armeAuToucher(btn, o.voie !== undefined)
   btn.addEventListener('click', () => {
+    if (gesteTropTot(performance.now(), ouvertA)) return
     if (!ouvre()) return
     const host = btn.parentElement
     if (!host || host.classList.contains('mb-elu')) return
@@ -17175,8 +17189,12 @@ function mbPorteNoeud(
     `<span class="mb-porte-entrer mb-levier">ENTRER ▸</span></span>` +
     `<b>${htmlSafe(d.titre)}</b><small>${htmlSafe(d.court)}</small>` +
     `<span class="mb-porte-ligne mb-porte-ligne-ev"><i>${htmlSafe(etiquette)}</i></span>`
+  // la même garde que la porte d'une salle (mbPorte) : le geste qui l'a
+  // fait naître ne l'ouvre pas, et un toucher trop tôt ne l'arme pas
+  const ouvertA = performance.now()
   const arme = armeAuToucher(btn, voie !== undefined)
   btn.addEventListener('click', () => {
+    if (gesteTropTot(performance.now(), ouvertA)) return
     if (!arme()) return
     const host = btn.parentElement
     if (!host || host.classList.contains('mb-elu')) return
