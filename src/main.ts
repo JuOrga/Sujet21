@@ -17625,6 +17625,9 @@ function mbTranche(ev: EvenementDef, choix: ChoixEvenement, alea: () => number):
 /** La FIN : l'état des jauges, et le levier mène à la salle suivante. */
 function mbMontreFin(): void {
   mbEtape = 'fin'
+  // après une halte au dernier rang, la poutre portait encore son titre
+  // (« REPOS », posé en question) : la fin ordinaire reprend le sien
+  mbEl('mb-titre').textContent = 'SALLE FRANCHIE'
   mbEl('mb-choix-titre').textContent = 'PAROI DU SAS OUVERTE'
   // la jauge d'étalonnage reste en scène, repliée sur une ligne
   mbJaugeMince()

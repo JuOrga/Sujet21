@@ -939,6 +939,12 @@ describe('la cérémonie — « MODULE TRAVERSÉ »', () => {
 // étapes 9–12). Chaque halte prend son objet rendu en héros, ses offres et
 // ses issues en cartouches, un levier ; un choix claque comme les autres.
 describe('la cérémonie — les haltes', () => {
+  // une halte au dernier rang (propositionsVoie rend null) mène à la fin
+  // ordinaire : sans titre à elle, elle gardait celui de la halte — « REPOS »
+  // au-dessus de « PAROI DU SAS OUVERTE » et des jauges
+  it('la fin ordinaire qui suit une halte reprend son titre', () => {
+    expect(corps('mbMontreFin')).toContain("mbEl('mb-titre').textContent = 'SALLE FRANCHIE'")
+  })
   it('l’alcôve s’appelle REPOS, quel que soit le module', () => {
     expect(corps('mbMontreRepos')).toMatch(/'REPOS/)
   })
