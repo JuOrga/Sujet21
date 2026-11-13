@@ -87,8 +87,14 @@ describe('iconesStation', () => {
 describe('les planches de la station dans index.html', () => {
   const css = readFileSync(resolve(__dirname, '../../index.html'), 'utf8')
   const regle = (sel: string): string => {
-    const i = css.lastIndexOf(`${sel} {`) // la dernière : la première est la fin du groupe de sélecteurs
-    expect(i, sel).toBeGreaterThan(-1)
+    // la règle PROPRE à la classe : le sélecteur seul en tête de ligne. Ni la
+    // fin du groupe « .ico-ceremonie, .ico-instrument, .ico-sceau { », ni une
+    // règle contextuelle posée plus bas (« .hud-chip .ico-ceremonie { »), ni
+    // un commentaire qui cite la classe ne doivent passer pour elle
+    const echappe = sel.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+    const trouvees = [...css.matchAll(new RegExp(`^[ \\t]*${echappe} \\{`, 'gm'))]
+    expect(trouvees.length, sel).toBeGreaterThan(0)
+    const i = trouvees[trouvees.length - 1].index!
     return css.slice(i, css.indexOf('}', i))
   }
   it('peint la planche AU-DESSUS de l’alvéole, jamais l’inverse', () => {

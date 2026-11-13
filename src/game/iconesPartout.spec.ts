@@ -40,11 +40,17 @@ function sources(): string[] {
 const lire = (f: string): string => readFileSync(join(RACINE, f), 'utf-8')
 
 /** Les formes d'une icône d'instrument posée en émoji : interpolée dans du
- *  HTML ou du texte, peinte au canvas, ou mise bout à bout dans un compte. */
+ *  HTML ou du texte, peinte au canvas (jusqu'au bout de l'instruction : un
+ *  « fillText(carteDef(id)?.icone …) » ne s'arrête pas à la première
+ *  parenthèse), mise bout à bout dans un compte, collée à une chaîne, ou
+ *  écrite en textContent. */
 const MOTIFS = [
   /\$\{[^}]*\.icone\b[^}]*\}/g,
-  /fillText\([^)]*\.icone/g,
+  /fillText\([^;\n]*\.icone/g,
   /\.icone\b[^;\n]*\)\.join\(/g,
+  /\+\s*[\w$]+\??\.icone\b/g,
+  /\.icone\b\s*\+/g,
+  /\.textContent\s*=[^;\n]*\.icone\b/g,
 ]
 
 /** Une interpolation qui passe déjà par une planche rendue n'est pas un reste. */
@@ -52,10 +58,11 @@ const DEJA_RENDUE = /icone(Ceremonie|Instrument)HTML\(/
 
 /** Les `.icone` qui NE SONT PAS des instruments, et que rien ne remplace : la
  *  conception ne donne de dessin rendu qu'aux instruments, aux contreparties
- *  et aux marques de la cérémonie. Une ligne est excusée si elle contient
- *  l'extrait, dans ce fichier — un extrait assez long pour ne pas couvrir un
- *  instrument qui viendrait s'asseoir à côté. */
-const AUTRES_GLYPHES: { fichier: string; extrait: string; pourquoi: string }[] = [
+ *  et aux marques de la cérémonie. Une excuse couvre UNE correspondance (ou
+ *  `fois`) : celle que son extrait ENGLOBE dans le texte du fichier — pas la
+ *  ligne entière, sans quoi un instrument posé à côté d'un glyphe excusé
+ *  passerait. */
+const AUTRES_GLYPHES: { fichier: string; extrait: string; pourquoi: string; fois?: number }[] = [
   // ---- les champs de saisie : la DONNÉE, telle que le concepteur la tape
   { fichier: 'src/editor/atelierJournal.ts', extrait: 'data-champ="icone" value="${esc(e.icone)}"', pourquoi: 'champ de saisie du glyphe d’une entrée du journal' },
   { fichier: 'src/editor/regieAvaries.ts', extrait: 'data-champ="icone" value="${esc(f.icone)}"', pourquoi: 'champ de saisie du picto d’une station' },
@@ -86,12 +93,13 @@ const AUTRES_GLYPHES: { fichier: string; extrait: string; pourquoi: string }[] =
   { fichier: 'src/game/ecranMarchand.ts', extrait: 'mr-apercu" style="--t:${r.teinte}"><i>${r.icone}</i></span>', pourquoi: 'rayon du marchand' },
   { fichier: 'src/game/marchandVue.ts', extrait: "iconeMonnaieHTML(a.id)) || `<i>${a.icone}</i>`", pourquoi: 'orbe ou amélioration : pas de dessin rendu' },
   // ---- l'éditeur des récompenses : un refus qui cite un NOM, pas une icône
-  { fichier: 'src/game/recompenses.ts', extrait: 'autres.find((c) => c.icone === icone)?.nom', pourquoi: 'refus de l’atelier, qui nomme la carte' },
+  { fichier: 'src/game/recompenses.ts', extrait: '${autres.find((c) => c.icone === icone)?.nom}', pourquoi: 'refus de l’atelier, qui nomme la carte' },
   // ---- main.ts : trophées, fiches, fioles — et la cérémonie, déjà rendue
   { fichier: 'src/main.ts', extrait: 'iconeMetaHTML(t.article, t.icone) : `<i>${t.icone}</i>`', pourquoi: 'toast d’un trophée, d’une fiche ou d’une fiole' },
   { fichier: 'src/main.ts', extrait: '<div class="tro-carte${ok ? \'\' : \' verrou\'}"><i>${t.icone}</i>', pourquoi: 'trophée' },
-  { fichier: 'src/main.ts', extrait: '<div class="cdx-carte" data-fiole="${f.id}"', pourquoi: 'fiole du dossier' },
-  { fichier: 'src/main.ts', extrait: 'mb-cartouche-${iconeDuGlyphe(o.icone) ?? \'offre\'}', pourquoi: 'nom de classe tiré du glyphe (cérémonie, déjà rendue)' },
+  { fichier: 'src/main.ts', extrait: '<i>${f.icone}</i><div><b>${f.nom}', pourquoi: 'fiole du dossier' },
+  { fichier: 'src/main.ts', extrait: "g.fillText(fichePupitre(q.ecran)?.icone ?? '?', cx, cy)", pourquoi: 'écran de pupitre, au canvas du jeu' },
+  { fichier: 'src/main.ts', extrait: 'mb-cartouche-${iconeDuGlyphe(o.icone) ?? \'offre\'}', pourquoi: 'nom de classe tiré du glyphe (cérémonie, déjà rendue)', fois: 2 },
   {
     fichier: 'src/main.ts',
     extrait: 'lignes.push(`${pris.icone} ${e.bon ?',
@@ -105,40 +113,80 @@ interface Reste {
   texte: string
 }
 
-function restes(): { restes: Reste[]; excusesVues: Set<number> } {
-  const out: Reste[] = []
-  const excusesVues = new Set<number>()
-  for (const f of sources()) {
-    const t = lire(f)
-    const lignes = t.split('\n')
-    for (const motif of MOTIFS) {
-      for (const m of t.matchAll(motif)) {
-        if (DEJA_RENDUE.test(m[0])) continue
-        const n = t.slice(0, m.index).split('\n').length
-        const ligne = lignes[n - 1]
-        const excuse = AUTRES_GLYPHES.findIndex((a) => a.fichier === f && ligne.includes(a.extrait))
-        if (excuse >= 0) {
-          excusesVues.add(excuse)
-          continue
-        }
-        out.push({ fichier: f, ligne: n, texte: m[0].replace(/\s+/g, ' ').slice(0, 120) })
+/** Les restes d'UN fichier, et combien de correspondances chaque excuse a
+ *  couvertes (par indice dans `excuses`). */
+function restesDe(
+  fichier: string,
+  t: string,
+  excuses: readonly { fichier: string; extrait: string }[] = AUTRES_GLYPHES,
+): { restes: Reste[]; couvertes: Map<number, number> } {
+  const restes: Reste[] = []
+  const couvertes = new Map<number, number>()
+  const englobe = (extrait: string, debut: number, fin: number): boolean => {
+    for (let p = t.indexOf(extrait); p >= 0; p = t.indexOf(extrait, p + 1))
+      if (p <= debut && fin <= p + extrait.length) return true
+    return false
+  }
+  for (const motif of MOTIFS) {
+    for (const m of t.matchAll(motif)) {
+      if (DEJA_RENDUE.test(m[0])) continue
+      const debut = m.index!
+      const fin = debut + m[0].length
+      const excuse = excuses.findIndex((a) => a.fichier === fichier && englobe(a.extrait, debut, fin))
+      if (excuse >= 0) {
+        couvertes.set(excuse, (couvertes.get(excuse) ?? 0) + 1)
+        continue
       }
+      restes.push({ fichier, ligne: t.slice(0, debut).split('\n').length, texte: m[0].replace(/\s+/g, ' ').slice(0, 120) })
     }
   }
-  return { restes: out, excusesVues }
+  return { restes, couvertes }
+}
+
+function restes(): { restes: Reste[]; couvertes: Map<number, number> } {
+  const out: Reste[] = []
+  const couvertes = new Map<number, number>()
+  for (const f of sources()) {
+    const r = restesDe(f, lire(f))
+    out.push(...r.restes)
+    for (const [i, n] of r.couvertes) couvertes.set(i, (couvertes.get(i) ?? 0) + n)
+  }
+  return { restes: out, couvertes }
 }
 
 describe('les icônes d’instruments, partout rendues', () => {
-  const { restes: r, excusesVues } = restes()
+  const { restes: r, couvertes } = restes()
 
   it('aucune icône d’instrument n’est plus interpolée en émoji, ni peinte en texte au canvas', () => {
     const liste = r.map((x) => `  ${x.fichier}:${x.ligne}  ${x.texte}`).join('\n')
     expect(r, `des icônes d’instrument restent en émoji :\n${liste}`).toEqual([])
   })
 
-  it('chaque excuse sert encore — une excuse orpheline couvrirait n’importe quoi plus tard', () => {
-    const orphelines = AUTRES_GLYPHES.filter((_, i) => !excusesVues.has(i)).map((a) => `  ${a.fichier} : ${a.extrait}`)
-    expect(orphelines, `excuses qui ne servent plus :\n${orphelines.join('\n')}`).toEqual([])
+  it('chaque excuse couvre exactement ses correspondances — orpheline ou trop large, elle couvrirait n’importe quoi plus tard', () => {
+    const faussees = AUTRES_GLYPHES.flatMap((a, i) => {
+      const n = couvertes.get(i) ?? 0
+      return n === (a.fois ?? 1) ? [] : [`  ${a.fichier} : ${a.extrait} — ${n} au lieu de ${a.fois ?? 1}`]
+    })
+    expect(faussees, `excuses à reprendre :\n${faussees.join('\n')}`).toEqual([])
+  })
+
+  // la garde elle-même : chaque forme d'un reste est vue, et une excuse ne
+  // couvre pas un instrument posé sur la même ligne qu'un glyphe excusé
+  it('voit un instrument posé à côté d’un glyphe excusé, sur la même ligne', () => {
+    const excuse = [{ fichier: 'x.ts', extrait: '<i>${t.icone}</i>' }]
+    const t = 'h += `<i>${t.icone}</i><b>${d.icone}</b>`'
+    const r = restesDe('x.ts', t, excuse)
+    expect(r.restes.map((x) => x.texte)).toEqual(['${d.icone}'])
+    expect(r.couvertes.get(0)).toBe(1)
+  })
+
+  it.each([
+    ['un canvas après une parenthèse', "g.fillText(carteDef(id)?.icone ?? '?', x, y)"],
+    ['une chaîne collée', "const s = 'carte ' + d.icone"],
+    ['une chaîne collée devant', "const s = d.icone + ' ' + d.nom"],
+    ['un textContent', 'el.textContent = carteDef(id)?.icone ?? ""'],
+  ])('voit %s', (_, t) => {
+    expect(restesDe('x.ts', t, []).restes.length).toBeGreaterThan(0)
   })
 })
 

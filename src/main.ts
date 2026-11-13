@@ -15504,7 +15504,7 @@ function mbMontreBilanModule(): void {
     instruments: run.instruments,
     nomInstrument: (id) => {
       const d = carteDef(id)
-      return d ? { icone: d.icone, nom: d.nom } : null
+      return d ? { nom: d.nom } : null
     },
     paliers: paliersAtteints(run.xp),
   })

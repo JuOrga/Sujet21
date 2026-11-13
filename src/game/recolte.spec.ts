@@ -124,7 +124,7 @@ describe('la récolte d’un module', () => {
     bourseCl: 550,
     memoireSolde: 300,
     instruments: ['vanne', 'filtre', 'tamis'],
-    nomInstrument: (id: string) => (id === 'inconnu' ? null : { icone: '•', nom: id.toUpperCase() }),
+    nomInstrument: (id: string) => (id === 'inconnu' ? null : { nom: id.toUpperCase() }),
     paliers: 3,
   })
 
