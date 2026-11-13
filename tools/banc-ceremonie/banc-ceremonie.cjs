@@ -65,6 +65,7 @@ const PRISES = [
   ['14-rencontre-issue', 'evenement', 'issue', null, 1500],
   ['15-cache', 'cache', null, null, 1500],
   ['16-minijeu', 'minijeu', null, null, 1500],
+  ['16b-palet-choix', 'palet', null, null, 1500],
   ['17-fin-ordinaire', 'fin', null, null, 1500],
   ['18-fin-bouclee', 'finDescente', 'bouclee', null, 3000],
   ['18b-fin-bouclee-sceau-t900ms', 'finDescente', 'bouclee', 'finSceau', 0],
@@ -111,8 +112,10 @@ function prepare(quoi, M, O) {
     P.fige([['.mb-porte', 260], ['.mb-flash', 260], ['.mb-scene', 260]], null)
     P.feu([{ el: p, age: 0.26, r: { n: 80, teintes: M, vitesse: 520, gravite: 260, forme: 'etincelle', duree: 0.9, taille: 4 } }])
   } else if (quoi === 'sceau') {
-    P.fige([['.mb-module, .mb-module *', 350], ['.mb-continuer', 350], ['.mb-choix', 350]], 900)
-    P.feu([{ el: $('.mb-module-sceau'), age: 0.35, r: { n: 70, teintes: [...M, ...O], vitesse: 420, gravite: 480, forme: 'confetti', duree: 1.4, taille: 6 } }])
+    // à 350 ms le sceau du module tombe encore : le choc, le flash et le feu
+    // partent à son impact (main.ts, MB_SCEAU_MODULE_MS = 440) — pas de feu
+    // ici ; les petits sceaux et les cartouches attendent leur tour
+    P.fige([['.mb-module, .mb-module *', 350], ['.mb-module-levier', 350], ['.mb-choix', 350]], 900)
   } else if (quoi === 'finSceau') {
     // le sceau du module touche (0,5 s de retard + 55 % de ses 0,62 s) : le
     // feu d'or que main.ts y jette, et le flash

@@ -22,7 +22,7 @@ import { cuveHTML, sceauHTML, SCENES_FIN } from '../../src/game/ceremonieObjets'
 import { finDescenteHTML, levierFin, releveDescente, titresFin } from '../../src/game/finDescente'
 import { fmtL } from '../../src/game/formats'
 import { anneauxHTML, colonneMaitrise, couleeColonne, niveauColonne } from '../../src/game/colonneMaitrise'
-import { cartoucheHTML } from '../../src/game/cartouches'
+import { cartoucheHTML, iconeDuGlyphe, offreHTML, plaqueHTML, puceHTML } from '../../src/game/cartouches'
 import { offresRepos, offreDon } from '../../src/game/descenteCarte'
 import { tireEvenement, offresDe, detailOffre, resoutChoix, ditEffet } from '../../src/game/evenements'
 void W
@@ -120,6 +120,7 @@ const FAB = {
   graine, Feu, memoireDuSas, resoutChoix, ditEffet, titreDuTirage, tirageInstruments,
   iconeCeremonieHTML, sceauHTML, cuveHTML, colonneMaitrise, couleeColonne, niveauColonne, anneauxHTML,
   SCENES_FIN, finDescenteHTML, levierFin, releveDescente, titresFin, fmtL,
+  iconeDuGlyphe, offreHTML, plaqueHTML, puceHTML, iconeInstrumentHTML,
   /** dessine le plan d'une salle générée dans un canvas de porte */
   plan(canvas: HTMLCanvasElement, mecanique: 0 | 1 | 2 | 3, diff: number, variante: string): string {
     const lv = genereNiveauAtelier({ moment: 2, mecanique, difficulte: diff } as never, variante)

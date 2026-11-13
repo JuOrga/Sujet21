@@ -378,17 +378,17 @@
     }
   }
 
-  // ---- LE CHOIX DE LA SALLE (main.ts:16413 mbMontreSallesVoie, 16642 mbPorte, 16766 mbPorteNoeud) ----
+  // ---- LE CHOIX DE LA SALLE (main.ts mbMontreSallesVoie, mbPorte, mbPorteNoeud) ----
   function salles(variante) {
     ouvre()
     $('mb-releve').hidden = true
     $('mb-etal').hidden = true
     $('mb-passer').hidden = true
     $('mb-choix').hidden = false
-    question('CHOISISSEZ LA SALLE SUIVANTE')
     $('mb-choix-titre').textContent = `${RUN.module} · SALLE 3/6 · DESCENTE ${RUN.rang + 1}/${RUN.longueur}`
     scene.classList.add('mb-compact')
     const host = cartes()
+    question('CHOISISSEZ LA SALLE SUIVANTE') // après le porte-cartes, comme main.ts
     host.classList.add('mb-trio')
     host.innerHTML = `<div class="mb-voies">${F.miniCarte()}<p class="mv-fiche" hidden></p></div>`
     const REP = [['▲', 'HAUT'], ['●', 'MILIEU'], ['▼', 'BAS']]
@@ -403,12 +403,12 @@
       btn.type = 'button'
       btn.style.setProperty('--i', String(i))
       if (p.noeud) {
-        btn.className = 'mb-porte mb-porte-ev mb-porte-evenement'
-        btn.innerHTML = `<span class="mb-porte-vue mb-ev-vue">${no}<svg class="mb-ev-icone" viewBox="0 0 24 24" aria-hidden="true">${F.ICONES_MINI_CARTE}<use href="#mv-i-rencontre" width="24" height="24"/></svg></span>` +
-          `<b>SIGNAL</b><small>Quelque chose vit encore derrière.</small><span class="mb-porte-ligne mb-porte-ligne-ev"><i>RENCONTRE</i></span><span class="mb-porte-entrer">ENTRER ▸</span>`
+        btn.className = 'mb-porte mb-coupe mb-porte-ev mb-porte-evenement'
+        btn.innerHTML = `<span class="mb-porte-vue mb-ev-vue">${no}<span class="mb-ev-objet">${F.iconeCeremonieHTML('rencontre')}</span><span class="mb-porte-entrer mb-levier">ENTRER ▸</span></span>` +
+          `<b>SIGNAL</b><small>Quelque chose vit encore derrière.</small><span class="mb-porte-ligne mb-porte-ligne-ev"><i>RENCONTRE</i></span>`
       } else {
-        btn.className = 'mb-porte'
-        btn.innerHTML = `<span class="mb-porte-vue">${no}<canvas width="440" height="252"></canvas></span><b></b><small></small><span class="mb-porte-ligne"></span><span class="mb-porte-entrer">ENTRER ▸</span>`
+        btn.className = 'mb-porte mb-coupe'
+        btn.innerHTML = `<span class="mb-porte-vue">${no}<canvas width="440" height="252"></canvas><span class="mb-porte-entrer mb-levier">ENTRER ▸</span></span><b></b><small></small><span class="mb-porte-ligne"></span>`
         const [code, nom] = F.plan(btn.querySelector('canvas'), p.mec, p.diff, p.v).split('|')
         btn.querySelector('b').textContent = code
         btn.querySelector('small').textContent = nom
@@ -418,21 +418,24 @@
     })
   }
 
-  // ---- LE BILAN DU MODULE (main.ts:15274 mbMontreBilanModule) ----
+  // ---- LE BILAN DU MODULE (main.ts:15400 mbMontreBilanModule) ----
+  // la scène « station » : le sceau du module en héros, le nom, le volume ;
+  // la rangée des petits sceaux de rang (SIX salles : le plus long module de
+  // carteStation.json, le pire cas de la rangée) ; les cartouches ; le levier
   function module(etat) {
     ouvre()
     scene.classList.add('mb-compact')
     $('mb-releve').hidden = true
-    question('MODULE TRAVERSÉ')
     $('mb-choix-titre').textContent = `DESCENTE 6 / ${RUN.longueur} · CE QUE LE MODULE A RENDU`
     $('mb-etal').hidden = true; $('mb-passer').hidden = true; $('mb-choix').hidden = false
     const host = cartes()
+    question('MODULE TRAVERSÉ')
     const r = {
       module: 'T1', haltes: 1, condensatCl: 1235, memoire: 22, orbes: [], instrumentsEntree: [], paliersEntree: 1,
       salles: [
         { code: 'G-102-AB12', pct: 0.93, litres: 4.18 }, { code: '21B7-031', pct: 0.78, litres: 3.4 },
         { code: 'G-213-K3F9', pct: 0.55, litres: 2.31 }, { code: 'G-221-PQ2Z', pct: 0.95, litres: 4.6 },
-        { code: 'G-232-ZZ01', pct: 0.34, litres: 1.42 },
+        { code: 'G-232-ZZ01', pct: 0.34, litres: 1.42 }, { code: 'G-240-QX7M', pct: 0.12, litres: 0.48 },
       ],
     }
     const gains = F.gainsDeModule({
@@ -441,34 +444,39 @@
       paliers: 2,
     })
     const livre = gains.find((g) => g.cle === 'livre')
-    const sous = ['énigme', '5 salles franchies', '1 rencontre ou halte']
+    const sous = ['énigme', '6 salles franchies', '1 rencontre ou halte']
     const bloc = document.createElement('div')
     bloc.className = 'mb-module'
-    bloc.innerHTML = `<div class="mb-module-tete"><i class="mb-module-sceau" aria-hidden="true">✓</i>` +
+    bloc.innerHTML =
+      `<div class="mb-module-sceau mb-sceau">${F.sceauHTML('module')}</div>` +
       `<div class="mb-module-nom"><b>${esc(RUN.module)}</b><small>${esc(sous.join(' · '))}</small></div>` +
       `<div class="mb-module-total"><small>${esc(livre.nom)}</small><b>${esc(livre.valeur)}</b></div>` +
       `<ol class="mb-module-salles" aria-label="Les salles franchies">` +
-      F.pastillesDeSalles(r).map((p, i) => `<li style="--t:${p.teinte};--i:${i}"><span>${esc(p.code)}</span><b>${p.nom}</b><i aria-hidden="true">${'★'.repeat(p.etoiles)}</i><small>${p.litres}</small></li>`).join('') +
-      `</ol></div><div class="mb-gains">${gains.filter((g) => g !== livre).map(F.cartoucheHTML).join('')}</div>`
+      F.pastillesDeSalles(r).map((p, i) =>
+        `<li class="mb-salle" style="--mb-rang:${p.teinte};--i:${i}" title="${esc(p.nom)}">` +
+        `<span class="mb-salle-sceau mb-sceau" role="img" aria-label="${esc(p.nom)}">${F.sceauHTML(p.rang)}</span>` +
+        `<span class="mb-salle-code">${esc(p.code)}</span><b class="mb-salle-l">${p.litres}</b></li>`).join('') +
+      `</ol>` +
+      `<div class="mb-gains">${gains.filter((g) => g !== livre).map((g, i) => F.cartoucheHTML(g, i)).join('')}</div>`
     host.appendChild(bloc)
     const btn = document.createElement('button')
-    btn.type = 'button'; btn.className = 'mb-continuer'; btn.textContent = 'CHOISIR LA COURSIVE SUIVANTE ▸'
+    btn.type = 'button'; btn.className = 'mb-levier mb-module-levier'; btn.textContent = 'CHOISIR LA COURSIVE SUIVANTE ▸'
     host.appendChild(btn)
   }
 
-  // ---- LA CARTE DE LA STATION (main.ts:15691 mbMontreCarte) ----
+  // ---- LA CARTE DE LA STATION (main.ts mbMontreCarte) ----
   function carte() {
     ouvre()
     scene.classList.add('mb-compact')
     $('mb-releve').hidden = true; $('mb-etal').hidden = true; $('mb-passer').hidden = true; $('mb-choix').hidden = false
-    question('CHOISISSEZ LA COURSIVE')
     scene.classList.add('mb-large')
     const st = F.station()
     $('mb-choix-titre').textContent = `${st.nomCourant} TRAVERSÉ — CHOISISSEZ LA COURSIVE SUIVANTE`
     const host = cartes()
+    question('CHOISISSEZ LA COURSIVE') // après le porte-cartes, comme main.ts
     host.classList.add('mb-station')
     const sc = document.createElement('div')
-    sc.className = 'mb-station-carte'
+    sc.className = 'mb-station-carte mb-coupe'
     sc.style.setProperty('--cadre', st.cadre)
     sc.innerHTML = st.svg
     host.appendChild(sc)
@@ -481,45 +489,64 @@
     host.appendChild(fiche)
   }
 
-  // ---- HALTES (main.ts:15995 mbMontreRepos, 16043 mbMontreDon, 16918 mbMontreCache) ----
+  // ---- HALTES (main.ts mbMontreRepos, mbMontreDon, mbMontreCache) ----
+  // la scène « station » : l'objet rendu en héros, les offres en
+  // cartouches (le glyphe des données par ICONE_DE_GLYPHE), un levier
   function halteBase(q, titre) {
     ouvre(); scene.classList.add('mb-compact')
     $('mb-releve').hidden = true; $('mb-etal').hidden = true; $('mb-passer').hidden = true; $('mb-choix').hidden = false
-    question(q)
     $('mb-choix-titre').textContent = titre
-    return cartes()
+    const host = cartes()
+    question(q) // après le porte-cartes, comme main.ts
+    return host
+  }
+  function halte(host, icone, recit) {
+    const h = document.createElement('div')
+    h.className = recit ? 'mb-halte mb-halte-a-recit' : 'mb-halte'
+    h.innerHTML = `<div class="mb-halte-heros">${F.iconeCeremonieHTML(icone)}</div>`
+    host.appendChild(h)
+    return h
+  }
+  function rangee(h) {
+    const r = document.createElement('div'); r.className = 'mb-halte-offres'; h.appendChild(r); return r
+  }
+  function levier(h, texte) {
+    const btn = document.createElement('button'); btn.type = 'button'; btn.className = 'mb-levier mb-halte-levier'; btn.textContent = texte
+    h.appendChild(btn)
+    return btn
   }
   function repos() {
-    const host = halteBase('UNE HALTE — UNE SEULE OFFRE', `${RUN.module} — ÉNIGME : PRENEZ UNE OFFRE, PUIS LA CARTE SE ROUVRE`)
-    host.classList.add('mb-trio')
+    const host = halteBase('REPOS', `${RUN.module} — UNE SEULE OFFRE`)
+    const r = rangee(halte(host, 'repos'))
     F.offresRepos({ vies: 2, viesMax: 3, bonbonne: RUN.bonbonne, cap: RUN.cap }).forEach((o, i) => {
       const b = document.createElement('button'); b.type = 'button'
-      b.className = 'mb-carte mb-repos' + (o.possible ? '' : ' mb-pauvre'); b.disabled = !o.possible
+      b.className = `mb-cartouche mb-offre mb-cartouche-${F.iconeDuGlyphe(o.icone) ?? 'offre'}` + (o.possible ? '' : ' mb-pauvre')
+      b.disabled = !o.possible
       b.style.setProperty('--i', String(i))
-      b.innerHTML = `<i class="mb-repos-icone">${o.icone}</i><b>${esc(o.nom)}</b><small>${esc(o.detail)}</small>`
-      host.appendChild(b)
+      b.innerHTML = F.offreHTML({ glyphe: o.icone, nom: o.nom, detail: o.detail })
+      r.appendChild(b)
     })
   }
   function don() {
-    const host = halteBase('UNE HALTE — PRENEZ', `${RUN.module} — ÉNIGME : QUELQU’UN A LAISSÉ ÇA LÀ`)
-    host.classList.add('mb-trio')
+    const host = halteBase('UNE HALTE — PRENEZ', `${RUN.module} — QUELQU’UN A LAISSÉ ÇA LÀ`)
     const o = F.offreDon({ bonbonne: RUN.bonbonne, cap: RUN.cap })
-    const b = document.createElement('button'); b.type = 'button'; b.className = 'mb-carte mb-repos'; b.style.gridColumn = '2'
-    b.innerHTML = `<i class="mb-repos-icone">${o.icone}</i><b>${esc(o.nom)}</b><small>${esc(o.detail)}</small>`
-    host.appendChild(b)
+    const b = document.createElement('button'); b.type = 'button'
+    b.className = `mb-cartouche mb-offre mb-cartouche-${F.iconeDuGlyphe(o.icone) ?? 'offre'}`
+    b.innerHTML = F.offreHTML({ glyphe: o.icone, nom: o.nom, detail: o.detail })
+    rangee(halte(host, 'don')).appendChild(b)
   }
   function cache() {
     const host = halteBase('LA CACHE', 'SOUTES — UNE CHAMBRE CLOSE')
     const nom = F.ORBES[0].nom
-    const bl = document.createElement('div'); bl.className = 'mb-ev-recit mb-ev-issue'
-    bl.innerHTML = `<em>SOUTES</em><p>${esc(`L’orbe d’essence de conscience — ${nom}. Il vous suit.`)}</p><ul class="mb-ev-gains"><li>🔮 orbe d’essence — ${esc(nom)}</li></ul>`
-    host.appendChild(bl)
-    const btn = document.createElement('button'); btn.type = 'button'; btn.className = 'mb-continuer'; btn.textContent = 'REPRENDRE LA DESCENTE ▸'
-    host.appendChild(btn)
+    const h = halte(host, 'cache', true)
+    h.insertAdjacentHTML('beforeend',
+      `<div class="mb-ev-recit mb-ev-issue mb-coupe-diag"><em>SOUTES</em><p>${esc(`L’orbe d’essence de conscience — ${nom}. Il vous suit.`)}</p></div>` +
+      `<div class="mb-halte-puces">${F.plaqueHTML({ cle: 'orbe', icone: 'orbe', valeur: nom, nom: 'ORBE D’ESSENCE' }, 0)}</div>`)
+    levier(h, 'REPRENDRE LA DESCENTE ▸')
   }
 
-  // ---- LA RENCONTRE (main.ts:17086 mbPeintEvenement, 17129 mbTranche) ----
-  function ligneEffet(e) { // main.ts:16982 appliqueEffets, au format affiché
+  // ---- LA RENCONTRE (main.ts mbPeintEvenement, mbTranche) ----
+  function ligneEffet(e) { // main.ts appliqueEffets, au format affiché
     switch (e.quoi) {
       case 'bonbonne': return `🫙 réserve ${e.litres >= 0 ? '+' : ''}${virgule(e.litres, 1)} L`
       case 'condensat': return `💧 condensat ${e.cl >= 0 ? '+' : ''}${Math.round(e.cl)} cL`
@@ -527,49 +554,73 @@
       case 'vies': return `💠 ${e.n > 0 ? '+' : ''}${e.n} échantillon de secours`
       case 'essence': return `🜄 essence maximale ${Math.round(e.part * 100)} % — le corps naîtra à ${Math.round((1 + e.part) * 100)} % du plein`
       case 'confinement': return `⚠️ confinement +${e.crans} à la prochaine salle`
+      case 'instrument': { const d = F.INSTRUMENTS.find((x) => x.id === 'aimant-rosee'); return `${d.icone} ${d.nom} : ${d.desc}` }
       default: return F.ditEffet(e)
     }
+  }
+  // l'émoji d'un instrument : sa case rendue, retrouvée par son nom (main.ts mbTranche)
+  function instrument(glyphe, texte) {
+    const d = F.INSTRUMENTS.find((x) => x.icone === glyphe && texte.includes(x.nom))
+    return d ? F.iconeInstrumentHTML(d) : null
   }
   function evenement(etat) {
     const ev = F.tireEvenement([], F.graine(11))
     const host = halteBase(ev.titre, `${RUN.module} — RENCONTRE · DESCENTE ${RUN.rang + 1} / ${RUN.longueur}`)
+    const h = halte(host, 'rencontre', true)
     if (etat === 'issue') {
       const choix = ev.choix[0]
       const issue = F.resoutChoix(choix, F.graine(3))
-      const lignes = issue.effets.map(ligneEffet).filter(Boolean)
-      const bl = document.createElement('div'); bl.className = 'mb-ev-recit mb-ev-issue'
-      bl.innerHTML = `<em>${esc(choix.libelle)} — ${esc(choix.detail)}</em><p>${esc(issue.texte)}</p><ul class="mb-ev-gains">${(lignes.length ? lignes : ['rien']).map((l) => `<li>${esc(l)}</li>`).join('')}</ul>`
-      host.appendChild(bl)
-      const btn = document.createElement('button'); btn.type = 'button'; btn.className = 'mb-continuer'; btn.textContent = 'REPRENDRE LA DESCENTE ▸'
-      host.appendChild(btn)
+      // l'issue tirée, et une ligne d'instrument et une ligne de glyphe
+      // inconnu de plus : le banc montre les trois sortes de puce
+      const lignes = [...issue.effets.map(ligneEffet).filter(Boolean), ligneEffet({ quoi: 'instrument', bon: true }), '🧪 un glyphe que la table ne connaît pas']
+      h.insertAdjacentHTML('beforeend',
+        `<div class="mb-ev-recit mb-ev-issue mb-coupe-diag"><em>${esc(choix.libelle)} — ${esc(choix.detail)}</em><p>${esc(issue.texte)}</p></div>` +
+        `<ul class="mb-halte-puces">${lignes.map((l, i) => F.puceHTML(l, i, instrument)).join('')}</ul>`)
+      levier(h, 'REPRENDRE LA DESCENTE ▸')
       return
     }
-    host.classList.add('mb-trio')
-    const rc = document.createElement('div'); rc.className = 'mb-ev-recit'
+    const rc = document.createElement('div'); rc.className = 'mb-ev-recit mb-coupe-diag'
     rc.innerHTML = `<em>${esc(ev.lieu)}</em><p>${esc(ev.texte)}</p>`
-    host.appendChild(rc)
+    h.appendChild(rc)
+    const r = rangee(h)
     const etatJ = { bonbonne: RUN.bonbonne, cap: RUN.cap, vies: 2, viesMax: 3, essence: 1, plancher: 0.5, orbeAPrendre: true, inconnuALire: true }
     F.offresDe(ev, etatJ).forEach(({ choix, possible }, i) => {
       const b = document.createElement('button'); b.type = 'button'
-      b.className = 'mb-carte mb-ev-offre' + (possible ? '' : ' mb-pauvre'); b.disabled = !possible
+      b.className = 'mb-cartouche mb-offre' + (possible ? '' : ' mb-pauvre'); b.disabled = !possible
       b.style.setProperty('--i', String(i))
       const d = F.detailOffre(choix, i === 0, possible)
-      b.innerHTML = `<b>${esc(choix.libelle)}</b><small${d.voilee ? ' class="mb-ev-voile"' : ''}>${esc(d.texte)}</small>` +
-        (choix.issues.length > 1 ? `<em class="mb-ev-pari">⚄ ${choix.issues.length} issues possibles</em>` : `<em class="mb-ev-sur">▸ sans risque</em>`)
-      host.appendChild(b)
+      b.innerHTML = F.offreHTML({
+        nom: choix.libelle, detail: d.texte, voile: d.voilee,
+        mention: choix.issues.length > 1 ? `<em class="mb-ev-pari">⚄ ${choix.issues.length} issues possibles</em>` : `<em class="mb-ev-sur">▸ sans risque</em>`,
+      })
+      r.appendChild(b)
     })
   }
 
-  // ---- LE RÉSULTAT D'UN MINI-JEU (main.ts:16854) ----
+  // ---- LE RÉSULTAT D'UN MINI-JEU (main.ts mbMontreResultatMiniJeu) ----
   function minijeu() {
     const host = halteBase('LES RAFALES', '3,62 L À L\'ARRIVÉE SUR 4,50 L AU DÉPART — 80 % GARDÉS, EN 21,4 S')
-    host.classList.add('mb-trio')
-    const b = document.createElement('button'); b.type = 'button'; b.className = 'mb-carte mb-repos'; b.style.gridColumn = '2'
-    b.innerHTML = `<i class="mb-repos-icone">🌬️</i><b>ÉCORNÉ</b><small>+6 mémoire · continuer</small>`
-    host.appendChild(b)
+    const h = halte(host, 'rafales')
+    h.insertAdjacentHTML('beforeend', `<b class="mb-halte-verdict">ÉCORNÉ</b>` +
+      `<div class="mb-halte-puces">${F.plaqueHTML({ cle: 'memoire', icone: 'memoire', valeur: '+6', nom: 'MÉMOIRE' }, 0)}</div>`)
+    levier(h, 'REPRENDRE LA DESCENTE ▸')
   }
 
-  // ---- LA FIN ORDINAIRE (main.ts:17160 mbMontreFin) ----
+  // ---- LE CHOIX APRÈS UN LANCER DE PALET (main.ts mbMontreChoixPalet) ----
+  function palet() {
+    const host = halteBase('LE PALET', 'LANCER 1 / 3 — 42 u DU CENTRE · ÉCORNÉ')
+    const r = rangee(halte(host, 'palet'))
+    const offre = (i, icone, nom, detail) => {
+      const b = document.createElement('button'); b.type = 'button'; b.className = 'mb-cartouche mb-offre'
+      b.style.setProperty('--i', String(i))
+      b.innerHTML = F.offreHTML({ icone, nom, detail })
+      r.appendChild(b)
+    }
+    offre(0, 'palet', 'LANCER 2 / 3', 'remise en place au départ, même volume de base')
+    offre(1, 'note', 'VALIDER', 'garder le meilleur : 42 u · ÉCORNÉ')
+  }
+
+  // ---- LA FIN ORDINAIRE (main.ts mbMontreFin, mbJauges) ----
   function fin() {
     bandeau()
     $('mb-titre').textContent = 'SALLE FRANCHIE'
@@ -579,9 +630,14 @@
     peintEtal(RUN.xp + RUN.surplus)
     const host = cartes()
     const j = document.createElement('div'); j.className = 'mb-jauges'
-    j.innerHTML = `<span>🫙 réserve <b>${virgule(RUN.bonbonne)} / ${RUN.cap} L</b></span><span>◈ bourse <b>${RUN.condensat} cL</b></span><span>💠 vies <b>×2</b></span><span>⇣ profondeur <b>${RUN.rang} / ${RUN.longueur}</b></span>`
+    j.innerHTML = [
+      F.plaqueHTML({ cle: 'reserve', icone: 'reserve', valeur: `${virgule(RUN.bonbonne)} / ${RUN.cap} L`, nom: 'RÉSERVE' }, 0),
+      F.plaqueHTML({ cle: 'condensat', icone: 'condensat', valeur: `${RUN.condensat} cL`, nom: 'BOURSE' }, 1),
+      F.plaqueHTML({ cle: 'secours', icone: 'secours', valeur: '×2', nom: 'ÉCHANTILLONS' }, 2),
+      F.plaqueHTML({ cle: 'profondeur', icone: 'profondeur', valeur: `${RUN.rang} / ${RUN.longueur}`, nom: 'PROFONDEUR' }, 3),
+    ].join('')
     host.appendChild(j)
-    const btn = document.createElement('button'); btn.type = 'button'; btn.className = 'mb-continuer'; btn.textContent = 'SALLE SUIVANTE ▸'
+    const btn = document.createElement('button'); btn.type = 'button'; btn.className = 'mb-levier mb-halte-levier'; btn.textContent = 'SALLE SUIVANTE ▸'
     host.appendChild(btn)
   }
 
@@ -641,5 +697,5 @@
     btn.focus({ preventScroll: true })
   }
 
-  window.POSE = { vocabulaire, bilan, versement, etalonnage, draft, salles, module, carte, repos, don, cache, evenement, minijeu, fin, finDescente, feu, fige, MB_OR, MB_MENTHE, MB_EAU, RUN }
+  window.POSE = { vocabulaire, bilan, versement, etalonnage, draft, salles, module, carte, repos, don, cache, evenement, minijeu, palet, fin, finDescente, feu, fige, MB_OR, MB_MENTHE, MB_EAU, RUN }
 })()

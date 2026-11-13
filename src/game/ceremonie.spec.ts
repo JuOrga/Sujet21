@@ -798,6 +798,237 @@ describe('la cérémonie — le palier', () => {
   })
 })
 
+// « MODULE TRAVERSÉ » (étape 5). La fin de module était une plaque arrondie
+// de tableau de bord : une coche dans un octogone menthe, des pastilles de
+// salle en rectangles à étoiles, des tuiles en deux colonnes et une pilule
+// qui respirait (inventaire, étape 7). Elle devient une scène de station :
+// le sceau du module en héros, une rangée de petits sceaux de rang (un par
+// salle, teinté de son régime), les gains en cartouches, un levier.
+describe('la cérémonie — « MODULE TRAVERSÉ »', () => {
+  it('pose le sceau du module en héros, et les gains en cartouches', () => {
+    expect(corps('mbMontreBilanModule')).toContain('cartoucheHTML(')
+    expect(corps('mbMontreBilanModule')).toContain("sceauHTML('module')")
+    expect(corps('mbMontreBilanModule')).not.toContain('mbGainHTML(')
+  })
+  it('range les salles en petits sceaux de rang teintés, avec le code et les litres', () => {
+    const f = corps('mbMontreBilanModule')
+    expect(f).toContain('sceauHTML(p.rang)')
+    expect(f).toMatch(/--mb-rang:\$\{p\.teinte\}/)
+    expect(f).toContain('p.code')
+    expect(f).toContain('p.litres')
+    // le régime se lit au sceau (et dans l'infobulle) : plus d'étoiles en texte
+    expect(f).not.toContain("'★'.repeat")
+  })
+  it('n’a plus ni émoji ni coche dans son gabarit', () => {
+    expect(corps('mbMontreBilanModule')).not.toMatch(/\p{Extended_Pictographic}|✓/u)
+  })
+  // le sceau rendu de cinq rangs est un acier neutre que --mb-rang teinte :
+  // sans teinte à lui, le sceau du module prendrait celle de la dernière
+  // salle, restée sur le voile
+  it('donne au sceau du module sa propre teinte', () => {
+    expect(regle('.mb-module-sceau')).toMatch(/--mb-rang:/)
+  })
+  it('se passe d’un geste : un levier focalisé, à sa voix', () => {
+    const f = corps('mbMontreBilanModule')
+    expect(f).toContain('mb-levier')
+    expect(f).not.toContain("'mb-continuer'")
+    expect(f).toMatch(/\.focus\(\{ preventScroll: true \}\)/)
+    expect(f).toContain("sonCeremonie('levier'")
+  })
+  // le geste qui ferme l'étape d'avant (A martelé, double clic, Entrée)
+  // trouverait le levier sous lui, focalisé : il sauterait le bilan du
+  // module sans qu'on l'ait vu. Une rafale saute une étape, pas deux.
+  it('ignore le geste qui vient de l’ouvrir', () => {
+    const f = corps('mbMontreBilanModule')
+    expect(f).toMatch(/const ouvertA = performance\.now\(\)/)
+    expect(f).toMatch(/gesteTropTot\(performance\.now\(\), ouvertA\)\) return/)
+  })
+  // le choc part à l'impact du sceau ; si le joueur a déjà passé, le
+  // minuteur ne fait plus rien (pas de flash ni de choc sur le plan)
+  it('fait sonner le sceau qui tombe, tant que l’étape est là', () => {
+    const f = corps('mbMontreBilanModule')
+    expect(f).toContain("sonCeremonie('sceau'")
+    expect(f).toMatch(/if \(mbEtape !== 'module'\) return/)
+  })
+  it('n’écrit plus d’étiquette sous 10 px', () => {
+    for (const s of ['.mb-module-total small', '.mb-module-nom small', '.mb-salle-code']) {
+      const t = /font-size:\s*calc\((\d+(?:\.\d+)?)px/.exec(regle(s))
+      expect(t, s).not.toBeNull()
+      expect(Number(t![1]), s).toBeGreaterThanOrEqual(10)
+    }
+  })
+  // six salles (le plus grand module de la station) tiennent sur une rangée
+  // à 1280 px — mesuré au banc ; un module plus long (l'éditeur n'a pas de
+  // plafond) passe à la ligne au lieu de pousser la scène de côté
+  it('garde ses petits sceaux à taille fixe, et passe à la ligne au-delà', () => {
+    expect(regle('.mb-salle-sceau')).toMatch(/--mb-sceau-l:\s*\d+px/)
+    expect(regle('.mb-module-salles')).toMatch(/flex-wrap:\s*wrap/)
+  })
+})
+
+// LES HALTES, RENCONTRES, CACHE ET MINI-JEU (étape 6). Des cartes arrondies
+// à émoji (💠 🫙 💧, 🥌 🌬️ 🪐 🎯 🔪), des puces de texte (🫙 💧 🧠 💠 🜄 🗺️
+// ⚠️ 🔮), une pilule ; un choix ne faisait qu'un sting, ni feu ni flash ; et
+// l'alcôve s'appelait du type de son module, « ÉNIGME » (inventaire,
+// étapes 9–12). Chaque halte prend son objet rendu en héros, ses offres et
+// ses issues en cartouches, un levier ; un choix claque comme les autres.
+describe('la cérémonie — les haltes', () => {
+  it('l’alcôve s’appelle REPOS, quel que soit le module', () => {
+    expect(corps('mbMontreRepos')).toMatch(/'REPOS/)
+  })
+  it('un choix de halte claque comme les autres choix', () => {
+    for (const f of ['mbMontreRepos', 'mbMontreDon', 'mbTranche', 'mbMontreCache'])
+      expect(corps(f), f).toMatch(/mbFlash\(\)/)
+  })
+  it('aucun émoji ne reste dans les haltes', () => {
+    for (const f of ['mbMontreRepos', 'mbMontreDon', 'mbPeintEvenement', 'mbTranche', 'mbMontreCache', 'mbMontreResultatMiniJeu', 'mbMontreChoixPalet'])
+      expect(corps(f), f).not.toMatch(/\p{Extended_Pictographic}/u)
+  })
+
+  // « ÉNIGME » venait du type du module où l'alcôve se tient (une halte
+  // tirée en voie vit dans un module d'énigmes) : ce n'est pas son nom
+  it('ne nomme plus l’alcôve ni le don du type de leur module', () => {
+    for (const f of ['mbMontreRepos', 'mbMontreDon']) expect(corps(f), f).not.toContain('carte.types[m.type]')
+  })
+  it('pose l’objet de chaque halte en héros', () => {
+    expect(corps('mbMontreRepos')).toContain("iconeCeremonieHTML('repos')")
+    expect(corps('mbMontreDon')).toContain("iconeCeremonieHTML('don')")
+    expect(corps('mbPeintEvenement')).toContain("iconeCeremonieHTML('rencontre')")
+    expect(corps('mbTranche')).toContain("iconeCeremonieHTML('rencontre')")
+    expect(corps('mbMontreCache')).toContain("iconeCeremonieHTML('cache')")
+    expect(corps('mbMontreChoixPalet')).toContain("iconeCeremonieHTML('palet')")
+    // le mini-jeu par son identifiant : couperet, palet, rafales, orbites, cibles
+    expect(corps('mbMontreResultatMiniJeu')).toMatch(/iconeCeremonieHTML\(level\.minijeu\?\.type \?\? 'couperet'\)/)
+    for (const f of ['mbMontreRepos', 'mbMontreDon', 'mbPeintEvenement', 'mbTranche', 'mbMontreCache', 'mbMontreChoixPalet', 'mbMontreResultatMiniJeu'])
+      expect(corps(f), f).toContain('mb-halte-heros')
+  })
+  it('met les offres et les issues en cartouches', () => {
+    for (const f of ['mbMontreRepos', 'mbMontreDon', 'mbPeintEvenement', 'mbMontreChoixPalet'])
+      expect(corps(f), f).toContain('offreHTML(')
+    // le glyphe des données passe par la table, jamais tel quel dans le gabarit
+    for (const f of ['mbMontreRepos', 'mbMontreDon']) expect(corps(f), f).toContain('glyphe: o.icone')
+    expect(corps('mbTranche')).toContain('puceHTML(')
+    expect(corps('mbMontreCache')).toMatch(/plaqueHTML\(|puceHTML\(/)
+    for (const f of ['mbMontreRepos', 'mbMontreDon', 'mbPeintEvenement', 'mbMontreChoixPalet', 'mbTranche', 'mbMontreCache', 'mbMontreResultatMiniJeu'])
+      expect(corps(f), f).not.toContain("'mb-carte ")
+  })
+  it('garde le récit d’une rencontre, dans un cadre de la station', () => {
+    expect(corps('mbPeintEvenement')).toContain('htmlSafe(ev.texte)')
+    expect(corps('mbPeintEvenement')).toMatch(/className = 'mb-ev-recit mb-coupe/)
+    expect(corps('mbTranche')).toContain('htmlSafe(issue.texte)')
+  })
+  it('fait sonner chaque choix et chaque levier de sa voix', () => {
+    for (const f of ['mbMontreRepos', 'mbMontreDon', 'mbPeintEvenement', 'mbTranche', 'mbMontreCache', 'mbMontreResultatMiniJeu', 'mbMontreChoixPalet', 'mbMontreFin'])
+      expect(corps(f), f).toContain("sonCeremonie('levier'")
+  })
+  it('se passe d’un geste : un levier ou une offre focalisés, sous une garde de rafale', () => {
+    for (const f of ['mbMontreRepos', 'mbMontreDon', 'mbPeintEvenement', 'mbTranche', 'mbMontreCache', 'mbMontreResultatMiniJeu', 'mbMontreChoixPalet', 'mbMontreFin']) {
+      expect(corps(f), f).toMatch(/\.focus\(\{ preventScroll: true \}\)/)
+      expect(corps(f), f).toMatch(/gesteTropTot\(performance\.now\(\), ouvertA\)/)
+    }
+    for (const f of ['mbTranche', 'mbMontreCache', 'mbMontreResultatMiniJeu', 'mbMontreFin']) {
+      expect(corps(f), f).toContain('mb-levier')
+      expect(corps(f), f).not.toContain("'mb-continuer'")
+    }
+  })
+  it('n’écrit plus d’étiquette sous 10 px', () => {
+    for (const s of ['.mb-ev-recit em', '.mb-ev-pari, .mb-ev-sur', '.mb-offre-detail', '.mb-puce-texte']) {
+      const t = /font-size:\s*calc\((\d+(?:\.\d+)?)px/.exec(regle(s))
+      expect(t, s).not.toBeNull()
+      expect(Number(t![1]), s).toBeGreaterThanOrEqual(10)
+    }
+  })
+  // le bouton d'une offre est taillé : le clip-path rogne l'outline, le
+  // focus (clavier et manette) se dessine DANS la forme
+  it('dessine la visée d’une offre dans sa forme', () => {
+    expect(corps('mbMontreRepos')).toContain('mb-cartouche mb-offre')
+    expect(HTML).toMatch(/\.mb-offre:focus-visible, \.mb-offre\.pad-focus \{[^}]*outline: none;[^}]*box-shadow: inset/)
+  })
+})
+
+// LA RELECTURE DES HALTES (tour 1)
+describe('la cérémonie — les haltes, relues', () => {
+  // le flash et le feu vivent dans #mb-veil : fermer la cérémonie dans le
+  // même tour les cachait avant leur première image — le palet ne claquait
+  // pas. Le motif de la fin ordinaire : on ferme 260 ms plus tard, si la
+  // cérémonie est encore ouverte.
+  it('laisse claquer le choix du palet avant de fermer la cérémonie', () => {
+    const f = corps('mbMontreChoixPalet')
+    expect(f).toMatch(/mbEclate\(btn[\s\S]*?window\.setTimeout\(\(\) => \{\s*if \(!miseEnBonbonne\) return\s*fermeMiseEnBonbonne\(\)\s*action\(\)/)
+    expect(f).toMatch(/sansAnimation\(\) \? 0 : 260/)
+  })
+  it('pose le héros en grand, et la colonne du récit suit sa taille', () => {
+    const l = (s: string): number => Number(/--mb-heros-l:\s*(\d+)px/.exec(regle(s))?.[1] ?? 0)
+    expect(l('.mb-halte')).toBeGreaterThanOrEqual(200)
+    expect(l('.mb-halte-a-recit')).toBeGreaterThanOrEqual(160)
+    expect(regle('.mb-halte-a-recit')).toMatch(/grid-template-columns:[^;]*var\(--mb-heros-l\)/)
+  })
+  it('ne laisse pas d’explication à l’écran du repos', () => {
+    expect(corps('mbMontreRepos')).not.toContain('PUIS LA CARTE SE ROUVRE')
+  })
+  // un risque ne luit pas : l'or est réservé à ce qui luit
+  it('ne met pas en or la mention d’un pari', () => {
+    expect(regle('.mb-ev-pari')).not.toMatch(/--mb-or|#ffd977/i)
+  })
+})
+
+// LA FIN ORDINAIRE (étape 13, hors voie) : une rangée de jauges en texte à
+// émojis (🫙 ◈ 💠 ⇣) et une pilule. Le même traitement que les haltes.
+describe('la cérémonie — la fin ordinaire', () => {
+  it('dit ses jauges en cartouches, sans émoji', () => {
+    expect(corps('mbJauges')).toContain('plaqueHTML(')
+    for (const f of ['mbJauges', 'mbMontreFin']) expect(corps(f), f).not.toMatch(/\p{Extended_Pictographic}/u)
+  })
+})
+
+// LE CHOIX DE LA SALLE ET LA CARTE DE LA STATION, HABILLÉS (M3) : la
+// disposition, l'épure du 13/11 et le plan ne bougent pas — les portes
+// prennent le chanfrein, ENTRER devient un levier, l'icône d'un nœud vient
+// de la planche rendue, le plan se taille comme un module.
+describe('la cérémonie — les portes et le plan, habillés', () => {
+  it('les portes sont taillées au chanfrein, ENTRER est un levier', () => {
+    expect(regle('.mb-porte')).toMatch(/clip-path:\s*polygon\(/)
+    expect(corps('mbPorte')).toContain('mb-levier')
+  })
+  it('la porte d’un nœud aussi, et son icône vient de la planche de cérémonie', () => {
+    const f = corps('mbPorteNoeud')
+    expect(f).toContain('mb-coupe')
+    expect(f).toContain('mb-levier')
+    expect(f).toContain('iconeCeremonieHTML(d.ceremonie)')
+    expect(f).not.toContain('mb-ev-icone')
+    expect(corps('mbPorte')).toContain('mb-coupe')
+  })
+  // le clip-path rogne l'outline : la porte armée au doigt et la visée de
+  // la manette se dessinaient DEHORS, et auraient disparu
+  it('dessine la porte armée et la visée de la manette dans sa forme', () => {
+    expect(regle('.mb-porte.mb-armee')).not.toMatch(/outline:\s*2px/)
+    expect(regle('.mb-porte.mb-armee')).toMatch(/box-shadow:\s*inset/)
+    expect(HTML).toMatch(/\.mb-porte\.pad-focus[^{]*\{[^}]*box-shadow:\s*inset/)
+  })
+  it('taille le plan de la station comme un module', () => {
+    expect(corps('mbMontreCarte')).toContain("'mb-station-carte mb-coupe'")
+  })
+  // la manette vise les portes et le plan par « pad-vise » : l'habillage ne
+  // doit pas l'avoir débranché
+  it('garde la visée de la manette sur les portes et sur le plan', () => {
+    expect(corps('mbMontreSallesVoie')).toContain("'pad-vise'")
+    expect(corps('mbMontreCarte')).toContain("'pad-vise'")
+  })
+  it('échappe les portes comme le reste : guillemets compris', () => {
+    for (const f of ['mbPorte', 'mbPorteNoeud']) {
+      expect(corps(f), f).not.toContain('const esc')
+      expect(corps(f), f).toContain('htmlSafe(')
+    }
+  })
+  it('n’écrit plus d’étiquette sous 10 px sur une porte', () => {
+    for (const s of ['.mb-porte-no', '.mb-porte-ligne', '.mb-porte-entrer']) {
+      const t = /font-size:\s*calc\((\d+(?:\.\d+)?)px/.exec(regle(s))
+      expect(t, s).not.toBeNull()
+      expect(Number(t![1]), s).toBeGreaterThanOrEqual(10)
+    }
+  })
+})
+
 // LE TIRAGE « EMPORTEZ UN INSTRUMENT » (étape 4). La colonne de maîtrise et
 // son tampon restaient au-dessus des cartes ; les cartes portaient un émoji,
 // un paragraphe et une étiquette de 7,5 px ; et le retournement montrait,
@@ -889,5 +1120,39 @@ describe('la cérémonie — le tirage', () => {
       expect(t, s).not.toBeNull()
       expect(Number(t![1]), s).toBeGreaterThanOrEqual(10)
     }
+  })
+})
+
+// LA QUESTION RESTAIT REPLIÉE. mbQuestion() pose « mb-question » (le titre
+// en grand), mbCartes() la retire (le porte-cartes repart à neuf pour une
+// étape sans question) : appelées dans cet ordre, la question s'effaçait
+// aussitôt — les salles, la carte, le module et les haltes s'affichaient
+// dans le style replié. Le commentaire de mbCartes le dit : « l'étape qui
+// pose une QUESTION le regrossit elle-même », donc APRÈS.
+describe('la cérémonie — la question se pose après le porte-cartes', () => {
+  it('chaque étape qui pose une question la pose après mbCartes()', () => {
+    const fonctions = [...MAIN.matchAll(/\nfunction (\w+)\(/g)].map((m) => m[1])
+    const fautives: string[] = []
+    let vues = 0
+    for (const nom of fonctions) {
+      const f = corps(nom)
+      const q = f.lastIndexOf('mbQuestion(')
+      const c = f.indexOf('mbCartes()')
+      if (q < 0 || c < 0 || nom === 'mbQuestion' || nom === 'mbCartes') continue
+      vues++
+      if (q < c) fautives.push(nom)
+    }
+    expect(vues).toBeGreaterThan(8) // la garde regarde bien quelque chose
+    expect(fautives).toEqual([])
+  })
+  // en grand, la question cassait sur deux lignes dans la poutre repliée
+  // (F3, « CHOISISSEZ LA SALLE SUIVANTE ») : la poutre s'élargit, le titre
+  // tient sur une ligne ; sur téléphone il retourne à la ligne et la
+  // bande reste resserrée
+  it('tient la question sur une ligne dans la poutre repliée', () => {
+    expect(regle('.mb-scene.mb-compact.mb-question .mb-banniere.mb-poutre')).toMatch(/width:\s*min\(100%,/)
+    expect(HTML).toMatch(/\.mb-scene\.mb-compact\.mb-question \.mb-titre \{[^}]*white-space:\s*nowrap/)
+    const petit = HTML.slice(HTML.indexOf('@media (max-width: 760px) {', HTML.indexOf('/* ==== LA CÉRÉMONIE DE FIN DE SALLE')))
+    expect(petit.slice(0, petit.indexOf('\n      }\n'))).toMatch(/\.mb-scene\.mb-compact\.mb-question \.mb-banniere\.mb-poutre \{[^}]*--mb-bande: 36px/)
   })
 })
