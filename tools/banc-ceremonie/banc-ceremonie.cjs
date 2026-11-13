@@ -90,7 +90,11 @@ function prepare(quoi, M, O) {
     const h = $('#mb-cartes'); h.classList.add('mb-isole')
     const pli = h.children[0]; pli.classList.add('mb-vise'); pli.style.setProperty('--ry', '-5deg'); pli.style.setProperty('--rx', '3deg')
   } else if (quoi === 'elue') {
-    P.fige([['.mb-pli, .mb-pli *', 250], ['.mb-scene', 250]], 2600)
+    // le choix arrive cartes posées : seuls l'élan de l'élue, la chute des
+    // autres et la secousse ont 250 ms ; l'apparition des faces et l'éclat
+    // sont finis depuis longtemps (figés à 250 ms, la face, encore dans son
+    // délai, était invisible)
+    P.fige([['.mb-pli', 250], ['.mb-scene', 250]], 2600)
     const b = $('.mb-elu-c .crt-draft')
     const fam = getComputedStyle(b).getPropertyValue('--fam').trim() || '#6dffb8'
     P.feu([

@@ -8650,40 +8650,89 @@
       }
       .mb-choix-titre::after { background: linear-gradient(90deg, rgba(150, 200, 235, 0.3), transparent); }
       .mb-cartes { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
-      /* ---- LE TIRAGE : les cartes arrivent DOS VISIBLE et se retournent
+      /* ---- LE TIRAGE : trois CARTOUCHES D'INSTRUMENT (quatre avec le
+         Carnet du Semblable). Elles arrivent DOS VISIBLE et se retournent
          une à une ; sous le pointeur, elles s'inclinent (--rx/--ry posés
          par main.ts) ; l'élue s'embrase et grandit, les autres tombent.
-         La face est le composant `.crt` partagé avec l'atelier : ce que le
-         concepteur fabrique a exactement la tête de ce que le joueur tire. */
-      .mb-cartes.mb-draft { grid-template-columns: repeat(var(--n, 3), 1fr); perspective: 1400px; }
+         La face est le composant `.crt` partagé avec l'atelier, taillé ici
+         au chanfrein de la station : l'icône rendue dans son alvéole, le
+         nom, les effets, le prix ; la phrase et le calibre passent dans
+         l'infobulle (carteHTML). */
+      .mb-cartes.mb-draft {
+        grid-template-columns: repeat(var(--n, 3), minmax(0, 1fr)); gap: 16px;
+        max-width: 1000px; width: 100%; margin: 0 auto; perspective: 1400px;
+      }
+      /* LE PLI porte la 3D et ses deux faces, la carte et son dos. Rien de
+         ce qui l'APLATIT ne se pose sur lui tant qu'il peut tourner — ni
+         opacité sous 1, ni filtre, ni clip-path (CSS Transforms 2, les
+         « grouping properties ») : aplati, il peint ses faces à plat puis
+         tourne le tout, et c'est la face EN MIROIR qu'on voyait au lieu du
+         dos (banc, 13/11). L'apparition et l'effacement passent aux faces. */
       .mb-pli {
-        position: relative; transform-style: preserve-3d; min-height: 176px;
+        position: relative; transform-style: preserve-3d; min-height: 210px;
         transform: rotateX(var(--rx, 0deg)) rotateY(var(--ry, 0deg));
-        transition: transform 0.16s ease, opacity 0.2s ease;
+        transition: transform 0.16s ease;
         animation: mb-retourne 0.8s cubic-bezier(0.3, 1, 0.3, 1) backwards;
         animation-delay: calc(0.15s + var(--i, 0) * 0.2s);
       }
       @keyframes mb-retourne {
-        0% { transform: translateY(-48px) rotateY(180deg); opacity: 0; }
-        30% { opacity: 1; transform: translateY(-10px) rotateY(180deg); }
-        100% { transform: translateY(0) rotateY(0); opacity: 1; }
+        0% { transform: translateY(-48px) rotateY(180deg); }
+        30% { transform: translateY(-10px) rotateY(180deg); }
+        100% { transform: translateY(0) rotateY(0); }
       }
-      /* le DOS de la carte : un motif de stries et l'emblème du protocole */
-      .mb-pli::before {
-        content: '◈'; position: absolute; inset: 0; border-radius: 10px;
-        display: flex; align-items: center; justify-content: center;
-        font-size: calc(44px * var(--ui)); color: rgba(143, 216, 200, 0.55);
-        background:
-          repeating-linear-gradient(45deg, rgba(143, 216, 200, 0.07) 0 6px, transparent 6px 14px),
-          radial-gradient(circle at 50% 50%, #14283a, var(--mb-coque) 70%);
-        border: 1px solid rgba(143, 216, 200, 0.35);
-        box-shadow: inset 0 0 0 5px var(--mb-coque), inset 0 0 0 6px rgba(143, 216, 200, 0.25);
-        transform: rotateY(180deg); backface-visibility: hidden;
+      /* les deux faces apparaissent ensemble, au départ du retournement */
+      @keyframes mb-pli-parait {
+        from { opacity: 0; }
       }
+      /* LA FACE : une cartouche à deux coins coupés (le chanfrein de
+         .mb-coupe-diag), l'arête et la lueur à la teinte de la famille ;
+         le calibre se voit à l'arête qui s'avive (le halo, lui, est celui
+         de l'atelier). Le clip-path rogne outline et ombres portées : la
+         visée et le focus s'éclairent DANS la forme. */
       .mb-pli .crt-draft {
-        position: relative; width: 100%; height: 100%; min-height: 176px;
-        cursor: pointer; align-items: stretch; backface-visibility: hidden;
-        transition: border-color 0.16s ease, box-shadow 0.16s ease;
+        --c: calc(var(--mb-chanfrein) * 1.1);
+        --crt-arete: color-mix(in srgb, var(--fam) 30%, transparent);
+        position: relative; width: 100%; height: 100%; min-height: 210px; box-sizing: border-box;
+        align-items: center; gap: 8px; padding: 16px 14px 12px; text-align: center;
+        border: 0; border-radius: 0; cursor: pointer; backface-visibility: hidden;
+        clip-path: polygon(0 0, calc(100% - var(--c)) 0, 100% var(--c), 100% 100%, var(--c) 100%, 0 calc(100% - var(--c)));
+        background:
+          linear-gradient(225deg, transparent 50%, var(--crt-arete) 50% calc(50% + 1.2px), transparent calc(50% + 1.2px)) right top / var(--c) var(--c) no-repeat,
+          linear-gradient(45deg, transparent 50%, var(--crt-arete) 50% calc(50% + 1.2px), transparent calc(50% + 1.2px)) left bottom / var(--c) var(--c) no-repeat,
+          radial-gradient(90% 55% at 50% 20%, color-mix(in srgb, var(--fam) 13%, transparent), transparent 72%),
+          linear-gradient(180deg, var(--mb-tole-haut), var(--mb-tole-bas));
+        box-shadow: inset 0 0 0 1px var(--crt-arete);
+        animation: mb-pli-parait 0.24s ease-out backwards;
+        animation-delay: calc(0.15s + var(--i, 0) * 0.2s);
+        transition: opacity 0.2s ease, box-shadow 0.16s ease;
+      }
+      .mb-pli .crt-draft.cal-notable { --crt-arete: color-mix(in srgb, var(--fam) 50%, transparent); }
+      .mb-pli .crt-draft.cal-majeur { --crt-arete: color-mix(in srgb, var(--fam) 72%, transparent); }
+      /* l'icône rendue, dans son alvéole hexagonale ; une carte d'atelier
+         y pose son émoji */
+      .mb-pli .crt-tete { flex-direction: column; align-items: center; gap: 8px; }
+      .mb-pli .crt-ico {
+        display: grid; place-items: center; width: 1.5em; height: 1.3em;
+        font-size: calc(46px * var(--ui)); filter: none;
+        clip-path: polygon(25% 0, 75% 0, 100% 50%, 75% 100%, 25% 100%, 0 50%);
+        background: radial-gradient(circle at 50% 36%, color-mix(in srgb, var(--fam) 24%, var(--mb-coque-claire)), var(--mb-coque-noire) 80%);
+      }
+      .mb-pli .crt-ico > i { filter: drop-shadow(0 0 7px color-mix(in srgb, var(--fam) 45%, transparent)); }
+      .mb-pli .crt-titres { flex: none; align-items: center; }
+      .mb-pli .crt-nom {
+        font-family: var(--font-display); font-weight: 400; font-size: calc(12px * var(--ui));
+        line-height: 1.35; letter-spacing: 0.12em; text-transform: uppercase; color: var(--mb-encre);
+      }
+      .mb-pli .crt-effets { align-self: stretch; text-align: left; }
+      .mb-pli .crt-ctr { align-self: stretch; font-size: calc(10px * var(--ui)); letter-spacing: 0.24em; }
+      .mb-pli .crt-perso { font-size: calc(10px * var(--ui)); }
+      .mb-pli .crt-pied {
+        align-self: stretch; justify-content: center; padding-top: 8px;
+        border-top: 1px solid color-mix(in srgb, var(--fam) 16%, transparent);
+      }
+      .mb-pli .crt-prix {
+        font-family: var(--font-display); font-size: calc(13px * var(--ui)); letter-spacing: 0.12em;
+        text-transform: uppercase;
       }
       /* l'ÉCLAT qui balaie la carte à la pose : la carte se révèle */
       .mb-pli .crt-draft::after {
@@ -8697,30 +8746,51 @@
         0% { transform: translateX(-120%); }
         100% { transform: translateX(120%); }
       }
+      /* LE DOS : une vraie face, peinte à 180° et cachée de face — la tôle
+         striée de la station, deux bandes de danger, l'icône du tirage */
+      .mb-pli-dos {
+        --c: calc(var(--mb-chanfrein) * 1.1);
+        position: absolute; inset: 0;
+        display: grid; place-items: center;
+        font-size: calc(84px * var(--ui));
+        clip-path: polygon(0 0, calc(100% - var(--c)) 0, 100% var(--c), 100% 100%, var(--c) 100%, 0 calc(100% - var(--c)));
+        background:
+          linear-gradient(225deg, transparent 50%, rgba(143, 216, 200, 0.45) 50% calc(50% + 1.2px), transparent calc(50% + 1.2px)) right top / var(--c) var(--c) no-repeat,
+          linear-gradient(45deg, transparent 50%, rgba(143, 216, 200, 0.45) 50% calc(50% + 1.2px), transparent calc(50% + 1.2px)) left bottom / var(--c) var(--c) no-repeat,
+          repeating-linear-gradient(-45deg, var(--mb-ocre) 0 8px, var(--mb-coque-noire) 8px 16px) center 14px / calc(100% - 28px) 10px no-repeat,
+          repeating-linear-gradient(-45deg, var(--mb-ocre) 0 8px, var(--mb-coque-noire) 8px 16px) center calc(100% - 14px) / calc(100% - 28px) 10px no-repeat,
+          repeating-linear-gradient(45deg, rgba(143, 216, 200, 0.06) 0 6px, transparent 6px 14px),
+          radial-gradient(circle at 50% 50%, #14283a, var(--mb-coque) 70%);
+        box-shadow: inset 0 0 0 1px rgba(143, 216, 200, 0.35);
+        transform: rotateY(180deg); backface-visibility: hidden;
+        animation: mb-pli-parait 0.24s ease-out backwards;
+        animation-delay: calc(0.15s + var(--i, 0) * 0.2s);
+      }
+      /* (écrit « > i » : les gardes des planches lisent la DERNIÈRE règle
+         de la classe de l'icône, celle qui porte l'image) */
+      .mb-pli-dos > i { opacity: 0.85; filter: drop-shadow(0 0 14px rgba(143, 216, 200, 0.4)); }
       /* L'ISOLEMENT sous le pointeur ou le focus : celle qu'on regarde
-         s'incline, s'allume et grandit ; les autres s'effacent */
-      .mb-cartes.mb-isole .mb-pli:not(.mb-vise) { opacity: 0.3; }
+         s'incline, s'allume et grandit ; les autres s'effacent — leur
+         FACE, pas leur pli (voir plus haut) */
+      .mb-cartes.mb-isole .mb-pli:not(.mb-vise) .crt-draft { opacity: 0.3; }
       .mb-pli.mb-vise { z-index: 2; transform: rotateX(var(--rx, 0deg)) rotateY(var(--ry, 0deg)) translateY(-8px) scale(1.04); }
-      .mb-pli.mb-vise .crt-draft {
-        border-color: color-mix(in srgb, var(--fam) 90%, transparent);
-        box-shadow: 0 22px 44px rgba(0, 0, 0, 0.55), 0 0 30px color-mix(in srgb, var(--fam) 28%, transparent);
+      .mb-pli.mb-vise .crt-draft, .mb-pli .crt-draft:focus-visible, .mb-pli .crt-draft.pad-focus {
+        outline: none;
+        box-shadow: inset 0 0 0 2px var(--fam), inset 0 0 36px color-mix(in srgb, var(--fam) 22%, transparent);
       }
       .mb-pli.mb-vise .crt-halo {
         opacity: 1;
-        box-shadow:
-          inset 0 0 34px color-mix(in srgb, var(--fam) 26%, transparent),
-          0 0 26px color-mix(in srgb, var(--fam) 24%, transparent);
+        box-shadow: inset 0 0 34px color-mix(in srgb, var(--fam) 26%, transparent);
       }
-      .mb-pli .crt-draft:focus-visible { outline: 2px solid var(--fam); outline-offset: 3px; }
       .mb-pli .crt-draft.mb-pauvre { opacity: 0.4; cursor: not-allowed; }
-      /* LE CHOIX : l'élue s'embrase et grandit, les autres tombent */
+      /* LE CHOIX : l'élue s'embrase et grandit, les autres tombent (le pli
+         peut alors s'aplatir : chacun est sur sa face) */
       .mb-cartes.mb-elu .mb-pli:not(.mb-elu-c) {
         animation: crt-refus 0.32s ease-in forwards; pointer-events: none;
       }
       .mb-pli.mb-elu-c { z-index: 3; animation: crt-elue 0.4s cubic-bezier(0.22, 1, 0.36, 1) forwards; }
       .mb-pli.mb-elu-c .crt-draft {
-        border-color: var(--fam);
-        box-shadow: 0 0 40px color-mix(in srgb, var(--fam) 45%, transparent);
+        box-shadow: inset 0 0 0 2px var(--fam), inset 0 0 52px color-mix(in srgb, var(--fam) 42%, transparent);
       }
       @keyframes crt-elue {
         0% { transform: translateY(-8px) scale(1.04); }
@@ -9405,6 +9475,19 @@
         .mb-cartes, .mb-cartes.mb-draft, .mb-cartes.mb-trio,
         .mb-cartes:has(.mb-porte) { grid-template-columns: 1fr; }
         .mb-pli, .mb-pli .crt-draft { min-height: 0; }
+        /* le tirage en une colonne : la cartouche se COUCHE — l'icône à
+           gauche, le nom, les effets et le prix à droite. Debout, trois
+           cartes empilées passaient le bas d'un écran de 844 px (875 px
+           de scène pour 834 visibles, banc à 390 × 844) */
+        .mb-pli .crt-draft {
+          display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center;
+          gap: 4px 12px; padding: 10px 14px 10px 12px; text-align: left;
+        }
+        .mb-pli .crt-tete { display: contents; }
+        .mb-pli .crt-ico { grid-column: 1; grid-row: 1 / span 4; font-size: calc(34px * var(--ui)); }
+        .mb-pli .crt-titres, .mb-pli .crt-ctr, .mb-pli .crt-effets, .mb-pli .crt-pied { grid-column: 2; }
+        .mb-pli .crt-titres { align-items: flex-start; }
+        .mb-pli .crt-pied { justify-content: flex-start; padding-top: 4px; }
         .mb-carte { min-height: 0; padding: 14px 12px; }
         /* les deux cuves restent côte à côte (le choix se lit d'un regard),
            l'orbe passe au-dessus d'elles */
@@ -9440,6 +9523,11 @@
       @media (max-height: 480px) and (min-width: 761px) {
         .mb-etal { --mb-etal-h: calc(100vh - 262px); }
         .mb-etal-xp b, .mb-etal-palier b { font-size: calc(28px * var(--ui)); }
+        /* le tirage couché : l'icône et la carte se resserrent (403 px de
+           scène pour 400 visibles à 844 × 390, sans cela) */
+        .mb-pli, .mb-pli .crt-draft { min-height: 0; }
+        .mb-pli .crt-draft { gap: 5px; padding: 10px 12px 8px; }
+        .mb-pli .crt-ico { font-size: calc(32px * var(--ui)); }
       }
       /* ---- MOINS D'ANIMATIONS : le jeu reste le même, sans le spectacle.
          Chaque mise en scène retombe sur son état final. ---- */
@@ -9454,7 +9542,7 @@
         .mb-prime, .mb-record, .mb-etal, .mb-etal-palier.saute,
         .mb-module-tete, .mb-module-sceau, .mb-module-salles li,
         .mb-etal-tampon, .mb-anneau.mb-anneau-casse,
-        .mb-palier-eclair, .mb-choix, .mb-pli, .mb-pli .crt-draft::after,
+        .mb-palier-eclair, .mb-choix, .mb-pli, .mb-pli .crt-draft, .mb-pli-dos, .mb-pli .crt-draft::after,
         .mb-cartes.mb-elu .mb-pli:not(.mb-elu-c), .mb-pli.mb-elu-c, .mb-carte, .mb-ico,
         .mb-goutte, .mb-goutte-corps, .mb-flux, .mb-dest, .mb-dest.mb-dest-palier, .mb-anneau-franchit,
         .mb-continuer, .mb-continuer::after, .mb-porte,

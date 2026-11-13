@@ -683,3 +683,97 @@ describe('la cérémonie — le palier', () => {
     }
   })
 })
+
+// LE TIRAGE « EMPORTEZ UN INSTRUMENT » (étape 4). La colonne de maîtrise et
+// son tampon restaient au-dessus des cartes ; les cartes portaient un émoji,
+// un paragraphe et une étiquette de 7,5 px ; et le retournement montrait,
+// au banc, la FACE EN MIROIR au lieu du dos. Aucun focus n'était posé et
+// aucune garde ne tenait : le A martelé d'une rafale, arrivé après la garde
+// du palier, tombait sur une carte et la CHOISISSAIT (relecture de F4).
+describe('la cérémonie — le tirage', () => {
+  const css = HTML.slice(HTML.indexOf('/* ==== LA CÉRÉMONIE DE FIN DE SALLE'), HTML.indexOf('/* ---- Le panneau du GÉNÉRATEUR'))
+  it('le tirage n’est pas surplombé par la jauge et son tampon', () => {
+    expect(corps('mbMontreDraft')).toContain(`mbEl('mb-etal').hidden = true`)
+  })
+  it('les cartes du tirage dessinent leur icône, sans émoji', () => {
+    expect(corps('carteHTML')).toContain('iconeInstrumentHTML(')
+    expect(corps('carteHTML')).not.toMatch(/\$\{d\.icone\}/)
+  })
+  it('n’obéit pas au geste qui vient de l’ouvrir', () => {
+    const f = corps('mbMontreDraft')
+    expect(f).toMatch(/mbDraftOuvertA = performance\.now\(\)/)
+    // le clic d'une carte (souris, Entrée, Espace, A) passe par la garde
+    const clic = f.slice(f.indexOf("btn.addEventListener('click'"))
+    expect(clic.slice(0, 400)).toContain('if (gesteTropTot(performance.now(), mbDraftOuvertA)) return')
+  })
+  it('pose le focus sur la première carte offerte, sans l’isoler ni l’incliner', () => {
+    const f = corps('mbMontreDraft')
+    expect(f).toMatch(/mbFocusOuverture = true;?\s*\n\s*[^\n]*button:not\(:disabled\)[^\n]*\.focus\(\{ preventScroll: true \}\);?\s*\n\s*mbFocusOuverture = false/)
+    // le focusin isole la carte (visée), sauf celui que le tirage pose lui-même
+    expect(f).toMatch(/'focusin'[^\n]*mbFocusOuverture/)
+  })
+  it('se vise aux flèches du clavier, comme à la croix de la manette', () => {
+    const f = corps('mbMontreDraft')
+    expect(f).toContain("'ArrowLeft'")
+    expect(f).toContain("'ArrowRight'")
+  })
+  it('dit le texte complet en infobulle, pas en paragraphe', () => {
+    const c = corps('carteHTML')
+    expect(c).toMatch(/title="\$\{htmlSafe\(/)
+    expect(c).toContain('descriptionInstrument(d)')
+    // la carte du tirage n'écrit ni la phrase ni l'étiquette de calibre
+    expect(c).toMatch(/const condensee = o\.variante === 'draft'/)
+    expect(c).toMatch(/condensee \? '' : `<span class="crt-txt">/)
+  })
+  it('sonne la carte élue de sa voix, et chaque carte posée de la sienne', () => {
+    const f = corps('mbMontreDraft')
+    expect(f).toContain("sonCeremonie('elu'")
+    expect(f).toContain("sonCeremonie('cartouche'")
+    expect(f).not.toContain('sting-collecte') // les stings restent au rang, au record, au palier
+    expect(f).toContain("bande.ponctuation('sting-record'")
+  })
+  it('taille ses cartes au chanfrein, et le dos aussi', () => {
+    expect(regle('.mb-pli .crt-draft')).toMatch(/clip-path:\s*polygon\(/)
+    expect(regle('.mb-pli-dos')).toMatch(/clip-path:\s*polygon\(/)
+    expect(corps('mbMontreDraft')).toContain('class="mb-pli-dos"')
+  })
+  // LE DOS. Une opacité sous 1, un filtre, un clip-path… posés sur l'élément
+  // qui porte la 3D l'APLATISSENT (CSS Transforms 2, « grouping
+  // properties ») : ses faces sont peintes à plat, puis l'ensemble tourne —
+  // le dos se cache, et l'on voit la face EN MIROIR. Le pli s'effaçait en
+  // tournant (opacité de 0 à 1 dans mb-retourne) et les cartes non visées
+  // passaient à 0,3 : vu au banc à 550 ms, reproduit sur une page nue à
+  // opacité 0,9 (SwiftShader et llvmpipe). L'opacité passe aux faces.
+  it('montre un vrai dos au retournement : rien n’aplatit le pli pendant qu’il tourne', () => {
+    expect(regle('.mb-pli')).toMatch(/transform-style:\s*preserve-3d/)
+    expect(regle('.mb-pli .crt-draft')).toMatch(/backface-visibility:\s*hidden/)
+    expect(regle('.mb-pli-dos')).toMatch(/backface-visibility:\s*hidden/)
+    expect(regle('.mb-pli-dos')).toMatch(/transform:\s*rotateY\(180deg\)/)
+    const debut = css.indexOf('@keyframes mb-retourne {')
+    expect(debut).toBeGreaterThan(-1)
+    let prof = 0
+    let fin = debut
+    for (let i = css.indexOf('{', debut); i < css.length; i++) {
+      if (css[i] === '{') prof++
+      else if (css[i] === '}' && --prof === 0) { fin = i; break }
+    }
+    const aplatit = /(?:^|[;{\s])(?:opacity|filter|clip-path|overflow|isolation|mask|mix-blend-mode):/
+    expect(css.slice(debut, fin)).not.toMatch(aplatit)
+    // les règles qui visent le pli lui-même tant qu'il peut tourner (le
+    // choix fait, l'élue et les refusées sont sur leur face : elles peuvent)
+    const visent = reglesCSS(css).filter((r) =>
+      r.selecteurs.some((s) => {
+        const dernier = s.split(/[\s>+~]+/).pop() ?? ''
+        return /\.mb-pli(?![-\w])/.test(dernier) && !dernier.includes('::') && !s.includes('mb-elu')
+      }))
+    expect(visent.length).toBeGreaterThan(2) // la garde regarde bien quelque chose
+    for (const r of visent) expect(r.corps, r.selecteurs.join(', ')).not.toMatch(aplatit)
+  })
+  it('n’écrit plus d’étiquette sous 10 px', () => {
+    for (const s of ['.mb-pli .crt-nom', '.mb-pli .crt-ctr', '.mb-pli .crt-perso', '.mb-pli .crt-prix']) {
+      const t = /font-size:\s*calc\((\d+(?:\.\d+)?)px/.exec(regle(s))
+      expect(t, s).not.toBeNull()
+      expect(Number(t![1]), s).toBeGreaterThanOrEqual(10)
+    }
+  })
+})

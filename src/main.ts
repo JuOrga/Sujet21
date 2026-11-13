@@ -472,7 +472,7 @@ import {
 import { cartoucheHTML } from './game/cartouches'
 import { cuveHTML, sceauHTML } from './game/ceremonieObjets'
 import { anneauxHTML, colonneMaitrise, couleeColonne, niveauColonne, type Colonne } from './game/colonneMaitrise'
-import { iconeCeremonieHTML } from './game/iconesStation'
+import { iconeCeremonieHTML, iconeInstrumentHTML } from './game/iconesStation'
 import {
   condensatDuSas,
   gainsDeModule,
@@ -12811,8 +12811,11 @@ function sansAnimation(): boolean {
 // ---- LA CARTE DE RÉCOMPENSE : un seul dessin, trois emplois ----
 // L'atelier (vignette), le tirage de fin de salle (draft) et l'aperçu
 // vivant de la forge passent tous par `carteHTML`. Ce que le concepteur
-// fabrique a donc EXACTEMENT la tête de ce que le joueur tire — c'est ce
-// qui fait de l'atelier autre chose qu'une maquette.
+// fabrique a donc EXACTEMENT les mots, l'icône et les effets de ce que le
+// joueur tire — c'est ce qui fait de l'atelier autre chose qu'une maquette.
+// Le tirage en montre MOINS : une cartouche de la station (icône, nom,
+// effets, prix) ; la phrase et le calibre passent dans l'infobulle, que
+// toutes les variantes portent.
 // Contenu en phrasing pur (span/b/em/i) : la carte du tirage est un
 // <button>, qui n'admet ni <p> ni <ul>.
 
@@ -12904,13 +12907,22 @@ function carteHTML(d: InstrumentDef, o: CarteOpts): string {
     (ctr ? ' a-contrepartie' : '') +
     (d.perso ? ' crt-perso-c' : '')
   const balise = o.bouton ? 'button' : 'div'
+  const phrase = descriptionInstrument(d)
+  // LE TIRAGE EST UNE CARTOUCHE, pas une fiche : on y choisit d'un coup
+  // d'œil (l'icône, le nom, ce que la carte donne et coûte, son prix).
+  // La phrase et l'étiquette du calibre (7,5 px) n'y sont plus écrites —
+  // elles restent dans l'infobulle ; l'atelier, lui, garde tout à plat
+  const condensee = o.variante === 'draft'
   return (
-    `<${balise} class="${cls}" style="--fam:${t1};--fam2:${t2}"${o.bouton ? ' type="button"' : ''}${o.attrs ?? ''}>` +
+    `<${balise} class="${cls}" style="--fam:${t1};--fam2:${t2}" title="${htmlSafe(`${d.nom} — ${phrase} (${rang})`)}"${o.bouton ? ' type="button"' : ''}${o.attrs ?? ''}>` +
     `<span class="crt-halo"></span>` +
-    `<span class="crt-tete"><i class="crt-ico">${htmlSafe(d.icone)}</i>` +
+    // l'icône rendue dans Blender ; une carte sans case (fabriquée à
+    // l'atelier) rend son émoji, jamais un carré vide (iconesStation.ts)
+    `<span class="crt-tete"><i class="crt-ico">${iconeInstrumentHTML(d)}</i>` +
     `<span class="crt-titres"><b class="crt-nom">${htmlSafe(d.nom)}</b>` +
-    `<i class="crt-rang">${htmlSafe(rang)}</i></span></span>` +
-    `<span class="crt-txt">${htmlSafe(descriptionInstrument(d))}</span>` +
+    (condensee ? '' : `<i class="crt-rang">${htmlSafe(rang)}</i>`) +
+    `</span></span>` +
+    (condensee ? '' : `<span class="crt-txt">${htmlSafe(phrase)}</span>`) +
     (ctr ? `<span class="crt-ctr">CONTREPARTIE</span>` : '') +
     `<span class="crt-effets">${effets}</span>` +
     (pied.length ? `<span class="crt-pied">${pied.join('')}</span>` : '') +
@@ -15118,10 +15130,11 @@ function mbPoseCuve(hote: HTMLElement, html: string): HTMLElement | null {
  *  d'ouverture, sur l'horloge du jeu. */
 let mbVersementOuvertA = -Infinity
 
-/** Le focus que le versement pose LUI-MÊME à l'ouverture (pour qu'Entrée,
- *  Espace et A trouvent une cible) n'est pas une visée : son focusin
- *  faisait pencher l'orbe vers la réserve, même pour un joueur à la souris
- *  qui n'avait rien visé. Levé le temps de cet appel. */
+/** Le focus que le versement ou le tirage pose LUI-MÊME à l'ouverture (pour
+ *  qu'Entrée, Espace et A trouvent une cible) n'est pas une visée : son
+ *  focusin faisait pencher l'orbe vers la réserve, même pour un joueur à la
+ *  souris qui n'avait rien visé — et aurait isolé la première carte du
+ *  tirage. Levé le temps de cet appel. */
 let mbFocusOuverture = false
 /** Le temps de voir le liquide monter et d'entendre l'orbe s'y déverser,
  *  avant que la maîtrise ne prenne la scène. Le liquide monte en 1,3 s sur
@@ -15732,10 +15745,25 @@ function mbCartes(): HTMLElement {
   return h
 }
 
+/** LE GESTE QUI OUVRE LE TIRAGE N'EST PAS CELUI QUI CHOISIT. Le palier
+ *  sauté tient sa garde, puis le tirage s'ouvre : un A martelé, un double
+ *  clic qui durait au-delà tombaient sur une carte et la CHOISISSAIENT. Le
+ *  tirage ignore à son tour les gestes de ses premières 400 ms (la règle et
+ *  ses bornes : ceremonie.ts, gesteTropTot). L'heure d'ouverture, sur
+ *  l'horloge du jeu. */
+let mbDraftOuvertA = -Infinity
+
 /** Un TIRAGE d'instruments (palier franchi) : trois cartes, on en emporte
  * une — certaines payantes en condensat, jamais toutes. */
 function mbMontreDraft(): void {
   mbEtape = 'draft'
+  mbDraftOuvertA = performance.now()
+  // LA COLONNE ET SON TAMPON S'EN VONT : en grand au-dessus des cartes, ils
+  // poussaient le tirage sous le bas d'un écran de 720 px, sous un tampon
+  // « TIRAGE OUVERT » qui n'apprenait plus rien. Le palier les retire déjà
+  // en partant (part) ; le tirage ne compte pas sur lui pour ça
+  mbEl('mb-etal').hidden = true
+  mbEl('mb-passer').hidden = true
   // le titre dit d'où vient le tirage (ceremonie.ts, titreDuTirage) ; et la
   // BOURSE se lit là où l'on paie : le bandeau ne porte plus de solde (il
   // rappelle la salle), une carte payante se juge sur ce qu'on a
@@ -15769,14 +15797,29 @@ function mbMontreDraft(): void {
   host.style.setProperty('--n', String(Math.min(4, cartes.length)))
   // LE TIRAGE SE RETOURNE : chaque carte arrive dos visible et pivote sur
   // sa face, l'une après l'autre — c'est le pli (`.mb-pli`) qui tourne,
-  // la carte `.crt` reste le composant partagé avec l'atelier. Le survol
-  // isole et INCLINE celle qu'on regarde ; au clavier ou à la manette, le
-  // focus fait le même office que la souris.
+  // portant deux faces : la carte `.crt` (le composant partagé avec
+  // l'atelier) et son dos (`.mb-pli-dos`). Le survol isole et INCLINE
+  // celle qu'on regarde ; au clavier ou à la manette, le focus fait le
+  // même office que la souris — sauf le focus posé par le tirage lui-même.
   const isole = (pli: HTMLElement | null): void => {
     host.classList.toggle('mb-isole', pli !== null)
     for (const c of host.children) c.classList.toggle('mb-vise', c === pli)
   }
   let elu = false
+  // les FLÈCHES passent d'une carte à l'autre (la manette a sa croix ; Tab
+  // est mort dans la cérémonie, la table des commandes en fait le dossier) ;
+  // une carte trop chère reste hors d'atteinte. Écoutées sur chaque carte,
+  // neuves à chaque tirage : le porte-cartes, lui, sert à toutes les étapes
+  const fleches = (e: KeyboardEvent): void => {
+    const pas = e.key === 'ArrowLeft' ? -1 : e.key === 'ArrowRight' ? 1 : 0
+    if (!pas || elu) return
+    const offertes = [...host.querySelectorAll<HTMLButtonElement>('.crt-draft:not(:disabled)')]
+    const ici = offertes.indexOf(e.currentTarget as HTMLButtonElement)
+    const vers = offertes[Math.max(0, Math.min(offertes.length - 1, ici + pas))]
+    if (!vers) return
+    e.preventDefault()
+    vers.focus({ preventScroll: true })
+  }
   cartes.forEach((carte, i) => {
     const def = carteDef(carte.id)
     if (!def) return
@@ -15784,28 +15827,40 @@ function mbMontreDraft(): void {
     const pli = document.createElement('div')
     pli.className = 'mb-pli'
     pli.style.setProperty('--i', String(i))
-    pli.innerHTML = carteHTML(def, {
-      variante: 'draft',
-      bouton: true,
-      prix: carte.prix,
-    })
+    pli.innerHTML =
+      carteHTML(def, {
+        variante: 'draft',
+        bouton: true,
+        prix: carte.prix,
+      }) +
+      // LE DOS, une vraie face peinte à 180° : la tôle de la station et
+      // l'icône du tirage
+      `<span class="mb-pli-dos" aria-hidden="true">${iconeCeremonieHTML('tirage')}</span>`
     const btn = pli.firstElementChild as HTMLButtonElement
     btn.style.setProperty('--i', String(i))
     if (!payable) {
+      // trop chère : grisée, et hors d'atteinte du clic comme du focus
       btn.classList.add('mb-pauvre')
       btn.disabled = true
     }
-    for (const ev of ['pointerenter', 'focusin', 'pad-vise'] as const)
+    for (const ev of ['pointerenter', 'pad-vise'] as const)
       btn.addEventListener(ev, () => { if (!elu) isole(pli) })
+    btn.addEventListener('focusin', () => { if (!elu && !mbFocusOuverture) isole(pli) })
     for (const ev of ['pointerleave', 'focusout', 'pad-quitte'] as const)
       btn.addEventListener(ev, () => { if (!elu) isole(null) })
+    btn.addEventListener('keydown', fleches)
     mbIncline(btn, pli)
-    // la carte tombée sur sa face fait son petit bruit : une par une
+    // la carte tombée sur sa face claque, une par une : la voix d'une
+    // cartouche qui se pose (le sting reste au choix)
     mbTimers.push(window.setTimeout(() => {
-      if (mbEtape === 'draft') bande.ponctuation('sting-collecte', 0.18)
+      if (mbEtape === 'draft' && !elu) sonCeremonie('cartouche', 0.6)
     }, sansAnimation() ? 0 : 500 + i * 200))
     btn.addEventListener('click', () => {
       if (elu) return
+      // le geste qui a ouvert (le palier sauté, le choix du tirage
+      // précédent) ne choisit pas : le second clic d'un double clic, le A
+      // suivant d'une rafale tombent ici
+      if (gesteTropTot(performance.now(), mbDraftOuvertA)) return
       if (!depenseCondensat(carte.prix)) return
       elu = true
       // LA CARTE ÉLUE s'embrase, les autres se retirent — puis la suite
@@ -15829,6 +15884,7 @@ function mbMontreDraft(): void {
       if ((def?.effets ?? []).some((e) => e.levier !== 'vies'))
         run.instruments.push(carte.id)
       majInstrumentsUI()
+      sonCeremonie('elu')
       bande.ponctuation('sting-record', 0.6)
       // l'embrasement dure 400 ms ; sans animation (réglage système), la
       // suite s'enchaîne quand même — le tirage reste jouable. Une
@@ -15839,6 +15895,13 @@ function mbMontreDraft(): void {
     })
     host.appendChild(pli)
   })
+  // le levier du palier, qui avait le focus, vient de disparaître : le
+  // focus passe à la première carte offerte — Entrée, Espace et la manette
+  // trouvent une cible, sans que le geste qui a ouvert ne la presse, et
+  // sans l'isoler : rien n'a été visé
+  mbFocusOuverture = true
+  host.querySelector<HTMLButtonElement>('button:not(:disabled)')?.focus({ preventScroll: true })
+  mbFocusOuverture = false
 }
 
 // ---- Le POOL de salles : le choix de la prochaine, après la récompense --

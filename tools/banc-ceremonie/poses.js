@@ -343,12 +343,14 @@
     tampon.textContent = `PALIER ${paliers(arrivee)} — TIRAGE OUVERT`
   }
 
-  // ---- LE TIRAGE (main.ts:15502 mbMontreDraft) ----
+  // ---- LE TIRAGE (main.ts:15758 mbMontreDraft) ----
   function draft(etat) {
     etalonnage('fin')
-    // la coulée partie, la colonne et le levier du palier se retirent (mbAnimeEtalonnage)
-    $('mb-passer').hidden = true
+    // la coulée partie, la colonne, son levier et la poutre se retirent
+    // (mbAnimeEtalonnage, part) ; le tirage les retire aussi à l'ouverture
+    $('mb-palier-eclair').hidden = true
     $('mb-etal').hidden = true
+    $('mb-passer').hidden = true
     const xpF = RUN.xp + RUN.surplus
     $('mb-choix-titre').textContent = `${F.titreDuTirage(paliers(xpF), 2, true)} · EN BOURSE : ${RUN.condensat} cL`
     const host = cartes()
@@ -357,13 +359,16 @@
     host.style.setProperty('--n', String(Math.min(4, tir.length)))
     tir.forEach((c, i) => {
       const def = F.INSTRUMENTS.find((d) => d.id === c.id)
+      const payable = c.prix === 0 || RUN.condensat >= c.prix
       const pli = document.createElement('div')
       pli.className = 'mb-pli'
       pli.style.setProperty('--i', String(i))
-      pli.innerHTML = F.carteHTML(def, { variante: 'draft', bouton: true, prix: c.prix })
+      pli.innerHTML =
+        F.carteHTML(def, { variante: 'draft', bouton: true, prix: c.prix }) +
+        `<span class="mb-pli-dos" aria-hidden="true">${F.iconeCeremonieHTML('tirage')}</span>`
       const btn = pli.firstElementChild
       btn.style.setProperty('--i', String(i))
-      if (!(c.prix === 0 || RUN.condensat >= c.prix)) { btn.classList.add('mb-pauvre'); btn.disabled = true }
+      if (!payable) { btn.classList.add('mb-pauvre'); btn.disabled = true }
       host.appendChild(pli)
     })
     if (etat === 'elue') {
