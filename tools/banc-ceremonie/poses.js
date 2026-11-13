@@ -250,14 +250,19 @@
       borne(b.bonbonne / Math.max(0.01, cap)), borne((b.bonbonne + verse) / Math.max(0.01, cap)),
       pleine ? 'PLEINE' : `${fmt(b.bonbonne + verse)} L`,
       !pleine && spill > 0.01 ? `<em class="mb-dest-plus">+${fmt(spill)} L → MAÎTRISE</em>` : '',
-      `Réserve : ${fmt(b.bonbonne)} → ${fmt(b.bonbonne + verse)} L sur ${cap} L — à reverser dans le corps, en pleine salle`)
+      pleine
+        ? `Réserve pleine (${cap} / ${cap} L) — tout le surplus ira à la maîtrise`
+        : `Réserve : ${fmt(b.bonbonne)} → ${fmt(b.bonbonne + verse)} L sur ${cap} L — à reverser dans le corps, en pleine salle` +
+          (spill > 0.01 ? ` ; ${fmt(spill)} L d’excédent vers la maîtrise` : ''))
     if (pleine) { res.btn.classList.add('mb-pauvre'); res.btn.disabled = true }
     const col = F.colonneMaitrise(b.xp)
     const mai = cuve('maitrise', F.cuveHTML('maitrise', 'mb-v-mai'), 1,
       F.niveauColonne(col, b.xp), F.niveauColonne(col, b.xp + b.surplus),
       `${virgule(b.xp + b.surplus, 1)} L`,
       franchit ? `<em class="mb-dest-plus mb-dest-ouvre">UN PALIER SE FRANCHIT — TIRAGE OUVERT</em>` : '',
-      `Maîtrise : ${virgule(b.xp, 1)} → ${virgule(b.xp + b.surplus, 1)} L, palier à ${prochain} L — chaque palier ouvre un tirage d’instrument`)
+      `Maîtrise : ${virgule(b.xp, 1)} → ${virgule(b.xp + b.surplus, 1)} L` +
+        (prochain !== null ? `, palier à ${prochain} L` : ', table complète') +
+        ' — chaque palier ouvre un tirage d’instrument')
     if (franchit) mai.btn.classList.add('mb-dest-palier')
     mai.btn.querySelector('.mb-cuve').insertAdjacentHTML('beforeend', F.anneauxHTML(col, b.xp, b.xp + b.surplus))
     sc.append(res.btn, goutte, mai.btn)

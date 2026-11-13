@@ -458,7 +458,7 @@ import {
 } from './game/soundtrack'
 import { Jukebox, PISTES_ECOUTE } from './game/jukebox'
 import { auteurAvis, avisDe, ligneAvis, ligneBilan, lisAvisEcoute, poseAvis, type Avis, type DocumentAvis } from './game/ecouteAvis'
-import { compteur, douce, gesteTropTot, motDeNote, rangDeSalle, TEMPS_BILAN, titreDuTirage } from './game/ceremonie'
+import { compteur, douce, gesteAuVersement, motDeNote, rangDeSalle, TEMPS_BILAN, titreDuTirage } from './game/ceremonie'
 import { cartoucheHTML } from './game/cartouches'
 import { cuveHTML, sceauHTML } from './game/ceremonieObjets'
 import { anneauxHTML, colonneMaitrise, niveauColonne } from './game/colonneMaitrise'
@@ -15103,12 +15103,10 @@ function mbPoseCuve(hote: HTMLElement, html: string): HTMLElement | null {
 }
 
 /** LE GESTE QUI OUVRE N'EST PAS CELUI QUI CHOISIT : le versement ignore les
- *  gestes de ses premières 400 ms (la règle et ses bornes : ceremonie.ts,
- *  gesteTropTot). Ici, l'horloge du jeu. */
+ *  gestes de ses premières 400 ms, puis ceux des 400 ms qui suivent le choix
+ *  (la règle et ses bornes : ceremonie.ts, gesteAuVersement). L'heure
+ *  d'ouverture, sur l'horloge du jeu. */
 let mbVersementOuvertA = -Infinity
-function mbGesteTropTot(): boolean {
-  return gesteTropTot(performance.now(), mbVersementOuvertA)
-}
 
 /** Le focus que le versement pose LUI-MÊME à l'ouverture (pour qu'Entrée,
  *  Espace et A trouvent une cible) n'est pas une visée : son focusin
@@ -15116,8 +15114,10 @@ function mbGesteTropTot(): boolean {
  *  qui n'avait rien visé. Levé le temps de cet appel. */
 let mbFocusOuverture = false
 /** Le temps de voir le liquide monter et d'entendre l'orbe s'y déverser,
- *  avant que la maîtrise ne prenne la scène (le liquide met 1,3 s à
- *  monter : à 800 ms, il est presque arrivé). */
+ *  avant que la maîtrise ne prenne la scène. Le liquide monte en 1,3 s sur
+ *  la courbe cubic-bezier(0.2, 0.7, 0.3, 1) de .mb-cuve-liquide : à 800 ms
+ *  il a fait 95 % du chemin (calculé sur la courbe, pas mesuré à l'écran).
+ *  Un geste pendant ce temps enchaîne sans attendre. */
 const MB_DEVERSE_MS = 800
 
 /** LE VERSEMENT : le surplus choisit sa destination — la RÉSERVE (bonbonne,
@@ -15246,41 +15246,55 @@ function mbMontreVersement(): void {
     v.hidden = false
   }
   // LE DÉVERSEMENT : l'orbe part vers la cuve, son liquide monte, la voix
-  // s'écoule — puis la maîtrise prend la scène. Un seul choix : les gestes
-  // qui suivent (double clic, A martelé) ne choisissent plus rien.
-  let choisi = false
-  const deverse = (cote: 'g' | 'd', c: { btn: HTMLButtonElement; liquide: HTMLElement | null }, teintes: string[], suite: () => void): void => {
+  // s'écoule — puis la maîtrise prend la scène, d'elle-même ou au geste
+  // suivant. Un seul choix, une seule suite.
+  let choixA: number | null = null
+  let suite: (() => void) | null = null
+  let suivi = false
+  const enchaine = (): void => {
+    if (suivi || !miseEnBonbonne || mbEtape !== 'versement') return // déjà fait, ou cérémonie fermée
+    suivi = true
+    suite?.()
+  }
+  const deverse = (cote: 'g' | 'd', c: { btn: HTMLButtonElement; liquide: HTMLElement | null }, teintes: string[], apres: () => void): void => {
+    choixA = performance.now()
+    suite = apres
     scene.dataset.verse = cote
     scene.dataset.vers = cote
     c.liquide?.style.setProperty('--mb-niveau', c.liquide.style.getPropertyValue('--mb-apres'))
     sonCeremonie('deversement')
     mbEclate(c.btn.querySelector('.mb-dest-cuve'), { n: 36, teintes, vitesse: 320, gravite: 700 })
-    mbTimers.push(
-      window.setTimeout(() => {
-        if (!miseEnBonbonne || mbEtape !== 'versement') return // cérémonie fermée
-        suite()
-      }, sansAnimation() ? 250 : MB_DEVERSE_MS),
-    )
+    mbTimers.push(window.setTimeout(enchaine, sansAnimation() ? 250 : MB_DEVERSE_MS))
   }
-  cb.addEventListener('click', () => {
-    if (choisi || cb.disabled || mbGesteTropTot()) return
-    choisi = true
-    run.bonbonneLiters = Math.min(cap, run.bonbonneLiters + verse)
-    noteVersement(spill > 0.01 ? `→ réserve, ${fmt(spill)} L à la maîtrise` : '→ versé à la réserve')
-    deverse('g', res, MB_EAU, () => mbVerseXp(spill))
-  })
-  cx.addEventListener('click', () => {
-    if (choisi || mbGesteTropTot()) return
-    choisi = true
-    noteVersement('→ versé à la maîtrise')
-    deverse('d', mai, MB_MENTHE, () => mbVerseXp(b.surplus))
+  // UN SEUL ÉCOUTEUR pour tout geste dans la scène : le clic, Entrée et
+  // Espace sur une cuve (le bouton en fait un clic), A à la manette (qui
+  // clique la cuve visée). Avant le choix, il choisit ; pendant le
+  // déversement, il enchaîne — sauf sous le geste qui vient d'ouvrir ou de
+  // choisir (ceremonie.ts, gesteAuVersement)
+  scene.addEventListener('click', (e) => {
+    const geste = gesteAuVersement(performance.now(), mbVersementOuvertA, choixA)
+    if (geste === 'ignore') return
+    if (geste === 'enchaine') {
+      enchaine()
+      return
+    }
+    const btn = (e.target as Element).closest('button')
+    if (btn === cb && !cb.disabled) {
+      run.bonbonneLiters = Math.min(cap, run.bonbonneLiters + verse)
+      noteVersement(spill > 0.01 ? `→ réserve, ${fmt(spill)} L à la maîtrise` : '→ versé à la réserve')
+      deverse('g', res, MB_EAU, () => mbVerseXp(spill))
+    } else if (btn === cx) {
+      noteVersement('→ versé à la maîtrise')
+      deverse('d', mai, MB_MENTHE, () => mbVerseXp(b.surplus))
+    }
   })
 
   // LA VISÉE fait pencher l'orbe et couler son flux vers la cuve : le
-  // survol, la manette (pad-vise), la flèche ou la tabulation — pas le
-  // focus que la scène pose elle-même à l'ouverture
+  // survol, la manette (pad-vise) ou les flèches du clavier (Tab est mort
+  // dans la cérémonie : la table des commandes en fait le dossier) — pas
+  // le focus que la scène pose elle-même à l'ouverture
   const vise = (cote: 'g' | 'd' | ''): void => {
-    if (choisi) return // l'orbe déversée ne se redresse ni ne se retourne
+    if (choixA !== null) return // l'orbe déversée ne se redresse ni ne se retourne
     if (cote) scene.dataset.vers = cote
     else delete scene.dataset.vers
   }

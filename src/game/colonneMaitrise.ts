@@ -22,11 +22,9 @@ export const NIVEAUX_SIEGES: readonly number[] = ANNEAUX_MAITRISE.map((b) => {
 })
 
 /** Ce que la colonne montre : le fond (`base`, le dernier palier atteint, ou
- *  0), les paliers posés sur ses sièges, du bas vers le haut, et le numéro
- *  du premier (pour le dire au joueur). */
+ *  0) et les paliers posés sur ses sièges, du bas vers le haut. */
 export interface Colonne {
   base: number
-  premier: number
   paliers: readonly number[]
 }
 
@@ -38,7 +36,7 @@ export function colonneMaitrise(xp: number, table: readonly number[] = PALIERS_X
   let suivant = table.findIndex((p) => xp < p)
   if (suivant < 0) suivant = table.length
   const debut = Math.max(0, Math.min(suivant, table.length - n))
-  return { base: debut > 0 ? table[debut - 1] : 0, premier: debut + 1, paliers: table.slice(debut, debut + n) }
+  return { base: debut > 0 ? table[debut - 1] : 0, paliers: table.slice(debut, debut + n) }
 }
 
 /** Le niveau du liquide (0..1) pour `xp` : en ligne droite d'un siège à

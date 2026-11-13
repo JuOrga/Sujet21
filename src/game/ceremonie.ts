@@ -98,6 +98,22 @@ export function gesteTropTot(maintenant: number, ouvertA: number): boolean {
   return ecart >= 0 && ecart < GARDE_GESTE_MS
 }
 
+/** CE QUE FAIT UN GESTE PENDANT LE VERSEMENT (clic, Entrée, Espace, A).
+ *  Avant le choix (`choixA` null) : il choisit, sauf sous le geste qui a
+ *  ouvert. Après : le liquide monte et l'orbe se déverse avant que la
+ *  maîtrise ne prenne la scène — chaque étape se passe d'un geste, celle-ci
+ *  aussi : il enchaîne tout de suite. Sauf sous le geste qui vient de
+ *  choisir (le second clic d'un double clic, le A suivant) : une rafale
+ *  saute une étape, pas deux. */
+export function gesteAuVersement(
+  maintenant: number,
+  ouvertA: number,
+  choixA: number | null,
+): 'ignore' | 'choisit' | 'enchaine' {
+  if (choixA === null) return gesteTropTot(maintenant, ouvertA) ? 'ignore' : 'choisit'
+  return gesteTropTot(maintenant, choixA) ? 'ignore' : 'enchaine'
+}
+
 /** Sortie douce : un compteur qui file vite puis se pose. */
 export function sortieDouce(t: number): number {
   const x = Math.max(0, Math.min(1, t))

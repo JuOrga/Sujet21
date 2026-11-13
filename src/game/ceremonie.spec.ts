@@ -4,6 +4,7 @@ import {
   compteur,
   douce,
   GARDE_GESTE_MS,
+  gesteAuVersement,
   gesteTropTot,
   motDeNote,
   PAS_LIGNE_MS,
@@ -117,6 +118,29 @@ describe('la garde du geste qui ouvre le versement', () => {
     // performance.now() ne recule pas, mais une horloge fournie peut : un
     // écart négatif n'est pas « trop tôt », il est faux — on obéit
     expect(gesteTropTot(900, 1000)).toBe(false)
+  })
+})
+
+// CHAQUE ÉTAPE SE PASSE D'UN GESTE, le déversement compris : le liquide
+// monte 800 ms avant que la maîtrise ne prenne la scène, et un geste
+// pendant ce temps (clic, Entrée, Espace, A) ne faisait rien — le choix
+// absorbait tout. Il enchaîne désormais, mais une seule étape : le second
+// clic d'un double clic qui vient de choisir ne saute pas le déversement.
+describe('un geste pendant le versement', () => {
+  const ouvert = 1000
+  it('ne choisit rien sous le geste qui a ouvert, puis choisit', () => {
+    expect(gesteAuVersement(ouvert + 100, ouvert, null)).toBe('ignore')
+    expect(gesteAuVersement(ouvert + GARDE_GESTE_MS, ouvert, null)).toBe('choisit')
+  })
+  it('n’enchaîne pas sous le geste qui vient de choisir (une rafale saute une étape, pas deux)', () => {
+    const choix = ouvert + 600
+    expect(gesteAuVersement(choix, ouvert, choix)).toBe('ignore')
+    expect(gesteAuVersement(choix + GARDE_GESTE_MS - 1, ouvert, choix)).toBe('ignore')
+  })
+  it('enchaîne tout de suite sur un geste pendant le déversement', () => {
+    const choix = ouvert + 600
+    expect(gesteAuVersement(choix + GARDE_GESTE_MS, ouvert, choix)).toBe('enchaine')
+    expect(gesteAuVersement(choix + 700, ouvert, choix)).toBe('enchaine')
   })
 })
 
@@ -240,10 +264,10 @@ describe('la cérémonie — le versement', () => {
     expect(v).toContain("sonCeremonie('deversement'")
     expect(v).not.toContain('sting-collecte') // les stings restent au rang, au record, au palier
     expect(v).toMatch(/--mb-niveau/) // le liquide de la cible monte
-    // un seul choix, même sous les gestes en rafale pendant le déversement ;
-    // la suite n'arrive que si la cérémonie en est encore là
-    expect(v.match(/if \(choisi \|\|/g) ?? []).toHaveLength(2)
-    expect(v).toMatch(/if \(!miseEnBonbonne \|\| mbEtape !== 'versement'\) return/)
+    // un geste pendant le déversement enchaîne (gesteAuVersement), une
+    // seule fois ; la suite n'arrive que si la cérémonie en est encore là
+    expect(v).toMatch(/=== 'enchaine'\) \{?\s*enchaine\(\)/)
+    expect(v).toMatch(/if \(suivi \|\| !miseEnBonbonne \|\| mbEtape !== 'versement'\) return/)
   })
   it('garde la visée, la manette, le bocal plein grisé et le tampon du palier', () => {
     const v = corps('mbMontreVersement')
@@ -526,7 +550,7 @@ describe('la cérémonie — le bilan « SALLE FRANCHIE »', () => {
   // première cuve, que le versement venait de poser sous le doigt
   it('le versement n’obéit pas au geste qui vient de l’ouvrir', () => {
     const v = corps('mbMontreVersement')
-    expect(v).toMatch(/mbGesteTropTot\(\)/)
+    expect(v).toMatch(/gesteAuVersement\(performance\.now\(\), mbVersementOuvertA, /)
     expect(v).toMatch(/\.focus\(\{ preventScroll: true \}\)/)
   })
 

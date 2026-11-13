@@ -19,15 +19,15 @@ describe('la colonne de maîtrise', () => {
   })
 
   it('montre les trois paliers à venir, depuis le dernier atteint', () => {
-    expect(colonneMaitrise(0)).toEqual({ base: 0, premier: 1, paliers: [3, 6, 10] })
-    expect(colonneMaitrise(4.6)).toEqual({ base: 3, premier: 2, paliers: [6, 10, 15] })
+    expect(colonneMaitrise(0)).toEqual({ base: 0, paliers: [3, 6, 10] })
+    expect(colonneMaitrise(4.6)).toEqual({ base: 3, paliers: [6, 10, 15] })
     // un palier atteint pile n'est plus « à venir »
-    expect(colonneMaitrise(6)).toEqual({ base: 6, premier: 3, paliers: [10, 15, 21] })
+    expect(colonneMaitrise(6)).toEqual({ base: 6, paliers: [10, 15, 21] })
   })
 
   it('garde trois sièges occupés au bout de la table : les derniers paliers, franchis ou non', () => {
-    expect(colonneMaitrise(25)).toEqual({ base: 15, premier: 5, paliers: [21, 28, 36] })
-    expect(colonneMaitrise(400)).toEqual({ base: 15, premier: 5, paliers: [21, 28, 36] })
+    expect(colonneMaitrise(25)).toEqual({ base: 15, paliers: [21, 28, 36] })
+    expect(colonneMaitrise(400)).toEqual({ base: 15, paliers: [21, 28, 36] })
   })
 
   it('pose le liquide exactement sur le siège quand l’XP vaut le palier', () => {
@@ -53,8 +53,8 @@ describe('la colonne de maîtrise', () => {
   })
 
   it('se remplit quand la table n’a plus aucun palier', () => {
-    expect(niveauColonne({ base: 0, premier: 1, paliers: [] }, 5)).toBe(1)
-    expect(colonneMaitrise(2, [])).toEqual({ base: 0, premier: 1, paliers: [] })
+    expect(niveauColonne({ base: 0, paliers: [] }, 5)).toBe(1)
+    expect(colonneMaitrise(2, [])).toEqual({ base: 0, paliers: [] })
   })
 
   it('pose un anneau par palier, intact s’il reste à franchir, brisé sinon', () => {
