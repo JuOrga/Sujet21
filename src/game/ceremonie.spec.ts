@@ -12,6 +12,24 @@ import {
   titreDuTirage,
 } from './ceremonie'
 
+// LES AIDES DES GARDES DE LA CÉRÉMONIE. Vitest tourne sans navigateur : les
+// gardes lisent main.ts et index.html en TEXTE. `corps` rend le corps d'une
+// fonction de main.ts, `regle` le bloc d'une règle de la feuille (la
+// première à ce sélecteur, indentée comme la feuille l'écrit). Partagées
+// par tous les blocs qui gardent un écran.
+const HTML = readFileSync(new URL('../../index.html', import.meta.url), 'utf-8')
+const MAIN = readFileSync(new URL('../main.ts', import.meta.url), 'utf-8')
+const corps = (nom: string): string => {
+  const debut = MAIN.indexOf(`\nfunction ${nom}(`)
+  expect(debut, `la fonction ${nom} manque`).toBeGreaterThan(-1)
+  return MAIN.slice(debut, MAIN.indexOf('\n}\n', debut))
+}
+const regle = (selecteur: string): string => {
+  const debut = HTML.indexOf(`\n      ${selecteur} {`)
+  expect(debut, `la règle « ${selecteur} » manque`).toBeGreaterThan(-1)
+  return HTML.slice(debut, HTML.indexOf('}', debut))
+}
+
 describe('le rang d’une salle', () => {
   it('donne S à qui livre 90 % et plus — la prime peut porter au-delà du départ', () => {
     expect(rangDeSalle(0.9).rang).toBe('S')
@@ -143,9 +161,6 @@ describe('le titre d’un tirage', () => {
 // bien dans la coque — un id renommé d'un côté donne, sans ce filet, un
 // écran qui s'ouvre sur du vide, sans erreur.
 describe('la cérémonie — la coque et ses poignées', () => {
-  const HTML = readFileSync(new URL('../../index.html', import.meta.url), 'utf-8')
-  const MAIN = readFileSync(new URL('../main.ts', import.meta.url), 'utf-8')
-
   it('porte tous les identifiants « mb-… » que main.ts va chercher', () => {
     const ids = new Set<string>()
     for (const m of MAIN.matchAll(/mbEl\('([a-z0-9-]+)'\)/g)) ids.add(m[1])
@@ -178,13 +193,6 @@ describe('la cérémonie — la coque et ses poignées', () => {
 // changement de porte, 17/09). Vitest tourne sans navigateur : on garde
 // les lignes qui tiennent la mise en page, pas les pixels.
 describe('la cérémonie — la carte ne bouge pas sous le survol', () => {
-  const HTML = readFileSync(new URL('../../index.html', import.meta.url), 'utf-8')
-  const regle = (selecteur: string): string => {
-    const debut = HTML.indexOf(`\n      ${selecteur} {`)
-    expect(debut, `la règle « ${selecteur} » manque`).toBeGreaterThan(-1)
-    return HTML.slice(debut, HTML.indexOf('}', debut))
-  }
-
   it('la fiche réserve ses trois lignes : elle ne pousse pas la carte', () => {
     expect(regle('.mb-station-fiche')).toMatch(/min-height:\s*calc\(3 \* 1\.55em\)/)
     expect(regle('.mb-station-fiche span')).toMatch(/white-space:\s*nowrap/)
@@ -209,19 +217,6 @@ describe('la cérémonie — la carte ne bouge pas sous le survol', () => {
 // sous le bas de l'écran. L'étape a été épurée ; ces gardes tiennent
 // l'épure, faute de navigateur pour mesurer les pixels sous Vitest.
 describe('la cérémonie — le choix de la salle tient dans l’écran', () => {
-  const HTML = readFileSync(new URL('../../index.html', import.meta.url), 'utf-8')
-  const MAIN = readFileSync(new URL('../main.ts', import.meta.url), 'utf-8')
-  const corps = (nom: string): string => {
-    const debut = MAIN.indexOf(`\nfunction ${nom}(`)
-    expect(debut, `la fonction ${nom} manque`).toBeGreaterThan(-1)
-    return MAIN.slice(debut, MAIN.indexOf('\n}\n', debut))
-  }
-  const regle = (selecteur: string): string => {
-    const debut = HTML.indexOf(`\n      ${selecteur} {`)
-    expect(debut, `la règle « ${selecteur} » manque`).toBeGreaterThan(-1)
-    return HTML.slice(debut, HTML.indexOf('}', debut))
-  }
-
   it('ni relevé, ni jauge de maîtrise, ni jauges, ni consigne au-dessus des portes', () => {
     for (const nom of ['mbMontreSallesVoie', 'mbMontreSalles']) {
       const f = corps(nom)
@@ -255,7 +250,6 @@ describe('la cérémonie — le choix de la salle tient dans l’écran', () => 
 // l'arrondi, et que chaque mise en scène qu'elles apportent a son repli
 // « moins d'animations ».
 describe('la cérémonie — le vocabulaire de la station', () => {
-  const HTML = readFileSync(new URL('../../index.html', import.meta.url), 'utf-8')
   const css = HTML.slice(HTML.indexOf('/* ==== LA CÉRÉMONIE DE FIN DE SALLE'), HTML.indexOf('/* ---- Le panneau du GÉNÉRATEUR'))
   const regle = (s: string): string => { const d = css.indexOf(`\n      ${s} {`); expect(d, s).toBeGreaterThan(-1); return css.slice(d, css.indexOf('}', d)) }
   it('taille ses cadres au chanfrein, pas à l’arrondi', () => {
@@ -272,5 +266,103 @@ describe('la cérémonie — le vocabulaire de la station', () => {
   // 46 px à 1280 × 720 (mesuré au banc : 1270 px de contenu pour 1224)
   it('compte le rembourrage de la poutre dans sa largeur : elle ne déborde pas', () => {
     expect(regle('.mb-poutre')).toMatch(/box-sizing:\s*border-box/)
+  })
+})
+
+// LE BILAN « SALLE FRANCHIE ». Il se lisait comme un tableau de bord : une
+// médaille ronde, un flacon en rectangle, trois lignes à barre de 6 px, des
+// tuiles qui répétaient à chaque salle un paragraphe sur l'usage de la
+// monnaie, des émojis (💧 ⏱ ❖ 🧊) ; et il ne se passait qu'au pointeur —
+// ni Entrée, ni Espace, ni A n'y faisaient rien (inventaire, étape 1). Il
+// devient une scène à UN héros, la bonbonne, et un levier qu'on presse.
+describe('la cérémonie — le bilan « SALLE FRANCHIE »', () => {
+  it('ne s’allonge pas : le versement arrive au plus tard à 4,9 s', () => {
+    expect(TEMPS_BILAN.versement).toBeLessThanOrEqual(4900)
+  })
+  it('se passe d’un geste : le levier est un bouton focalisé à l’ouverture', () => {
+    expect(HTML).toMatch(/<button[^>]*id="mb-passer"/)
+    expect(corps('montreMiseEnBonbonne')).toMatch(/mbEl\('mb-passer'\)\.focus\(/)
+  })
+  it('saute une étape et une seule, même sous les gestes en rafale', () => {
+    expect(corps('mbSauteBilan')).toMatch(/if \(mbEtape !== 'bilan'\) return/)
+  })
+  it('n’a plus aucun émoji dans le bilan', () => {
+    const coque = HTML.slice(HTML.indexOf('id="mb-releve"'), HTML.indexOf('id="mb-etal"'))
+    expect(coque).not.toMatch(/\p{Extended_Pictographic}/u)
+  })
+
+  // le levier, la touche et le clic qui le pressent mènent tous au même saut
+  it('le clic du levier et le toucher de la scène appellent le même saut', () => {
+    expect(MAIN).toMatch(/mbEl\('mb-passer'\)\.addEventListener\('click', mbSauteBilan\)/)
+    const toucher = MAIN.slice(MAIN.indexOf("mbVeil?.addEventListener('pointerdown'"))
+    expect(toucher.slice(0, 400)).toContain('mbSauteBilan()')
+  })
+  // ESPACE ÉTAIT AU JEU : la table des commandes en fait la PAUSE, et
+  // input.ts l'annule (preventDefault) sur window — un bouton ne s'actionne
+  // pas sur une touche annulée. La cérémonie garde ses touches pour elle,
+  // et une touche TENUE (répétition) n'actionne pas la cible suivante.
+  it('garde Entrée et Espace pour ses boutons, et ignore une touche tenue', () => {
+    const touches = MAIN.slice(MAIN.indexOf("mbVeil?.addEventListener('keydown'"))
+    expect(touches.length).toBeLessThan(MAIN.length)
+    const h = touches.slice(0, touches.indexOf('\n})\n'))
+    expect(h).toContain('stopPropagation()')
+    expect(h).toMatch(/e\.repeat\)? e\.preventDefault\(\)/)
+  })
+  // le second geste d'une rafale (double clic, A martelé) tombait sur la
+  // première cuve, que le versement venait de poser sous le doigt
+  it('le versement n’obéit pas au geste qui vient de l’ouvrir', () => {
+    const v = corps('mbMontreVersement')
+    expect(v).toMatch(/mbGesteTropTot\(\)/)
+    expect(v).toMatch(/\.focus\(\{ preventScroll: true \}\)/)
+  })
+
+  it('met en scène la bonbonne, son manomètre, le sceau du rang et les cartouches', () => {
+    const f = corps('montreMiseEnBonbonne')
+    expect(f).toContain("cuveHTML('bonbonne', 'mb-eau')")
+    expect(f).toContain('sceauHTML(verdict.rang)')
+    expect(f).toContain('cartoucheHTML')
+    expect(HTML).toMatch(/<header class="mb-banniere mb-poutre"/)
+    expect(HTML).toMatch(/<svg class="mb-mano" id="mb-mano"/)
+    expect(HTML).toMatch(/class="mb-rang mb-sceau" id="mb-rang"/)
+    expect(MAIN).not.toContain('function mbGainHTML')
+  })
+  // LA BONBONNE AVANT SES IMAGES (point de vigilance n° 1) : les rendus de
+  // l'atelier n'étaient pas livrés, et Chrome dessinait à leur place l'icône
+  // d'image cassée, cadre compris, au cœur du héros (vu au banc, 13/11). Une
+  // image en échec se cache, la silhouette CSS tient la place jusqu'au dos.
+  it('pose ses cuves sans jamais montrer une image cassée', () => {
+    expect(corps('montreMiseEnBonbonne')).toContain("mbPoseCuve(mbEl('mb-bonbonne'), cuveHTML('bonbonne', 'mb-eau'))")
+    const pose = corps('mbPoseCuve')
+    expect(pose).toMatch(/'error'/)
+    expect(pose).toMatch(/\.hidden = true/)
+    expect(pose).toContain('mb-cuve-rendue')
+    expect(HTML).toMatch(/\.mb-cuve::before,\s*\.mb-cuve::after \{[^}]*clip-path:\s*polygon\(/)
+    expect(HTML).toMatch(/\.mb-cuve\.mb-cuve-rendue::before[^{]*\{[^}]*display: none/)
+  })
+  it('n’a plus ni lignes à barre ni titre de récolte', () => {
+    expect(HTML).not.toContain('id="mb-lignes"')
+    expect(HTML).not.toContain('id="mb-recolte-titre"')
+    expect(MAIN).not.toContain("mbEl('mb-lignes')")
+  })
+  it('fait sonner chaque geste de sa voix', () => {
+    const f = corps('montreMiseEnBonbonne')
+    for (const v of ['sceau', 'compteur', 'cartouche']) expect(f, v).toContain(`sonCeremonie('${v}'`)
+    expect(corps('mbSauteBilan')).toContain("sonCeremonie('levier'")
+    // la sonde de la console n'a plus de raison d'être : la voix sert
+    expect(MAIN).not.toContain('__sonCeremonie')
+  })
+  it('donne leur repli « moins d’animations » aux nouvelles mises en scène', () => {
+    const css = HTML.slice(HTML.indexOf('/* ==== LA CÉRÉMONIE DE FIN DE SALLE'), HTML.indexOf('/* ---- Le panneau du GÉNÉRATEUR'))
+    const moins = css.slice(css.lastIndexOf('prefers-reduced-motion: reduce'))
+    for (const s of ['.mb-cuve-liquide', '.mb-etoiles i.mb-on', '.mb-record', '.mb-ligne'])
+      expect(moins, s).toContain(s)
+  })
+  // les constats de la relecture du vocabulaire : un nom de rang trop long
+  // descendait sous 10 px, et la poutre gardait 143 px de bande par côté
+  // sur un écran de téléphone
+  it('borne le mot du sceau à 10 px et resserre les bandes de la poutre sur petit écran', () => {
+    expect(regle('.mb-sceau-mot')).toMatch(/font-size:\s*max\(calc\(10px \* var\(--ui\)\)/)
+    const petit = HTML.slice(HTML.indexOf('@media (max-width: 760px) {', HTML.indexOf('/* ==== LA CÉRÉMONIE DE FIN DE SALLE')))
+    expect(petit.slice(0, petit.indexOf('\n      }\n'))).toMatch(/\.mb-poutre \{ --mb-bande:/)
   })
 })

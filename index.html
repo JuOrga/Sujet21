@@ -7895,6 +7895,12 @@
         /* les bandes de danger : l'ocre TERNI du mat_rayures de l'atelier
            Blender — pas l'ambre, réservé à ce qui luit */
         --mb-ocre: #806220;
+        /* les teintes du relevé, nommées une fois : l'étoile éteinte, la
+           prime de glace, et les deux monnaies qui ne sont ni menthe ni or */
+        --mb-eteint: #24364a;
+        --mb-glace: #a8d8f0;
+        --mb-memoire: #b9a4ff;
+        --mb-orbe: #e58bff;
         position: fixed; inset: 0; z-index: 50; overflow: hidden;
         display: grid; place-items: center;
         font-family: var(--font-mono); color: var(--mb-texte);
@@ -8042,7 +8048,9 @@
       .mb-sceau-mot {
         position: relative; z-index: 2; font-style: normal;
         font-family: var(--font-display); font-weight: 600; letter-spacing: 0.04em; white-space: nowrap;
-        font-size: min(calc(22px * var(--ui)), calc(var(--mb-sceau-l) * 0.78 / var(--mb-nom-n, 6)));
+        /* plancher à 10 px : un nom long (SUPERFLUIDE) dans un petit sceau
+           descendait sous la taille lisible d'une étiquette */
+        font-size: max(calc(10px * var(--ui)), min(calc(22px * var(--ui)), calc(var(--mb-sceau-l) * 0.78 / var(--mb-nom-n, 6))));
         color: var(--mb-encre);
         text-shadow: 0 0 12px color-mix(in srgb, var(--mb-rang) 80%, transparent), 0 1px 2px rgba(0, 0, 0, 0.8);
       }
@@ -8188,18 +8196,22 @@
         60% { transform: translate(3px, -2px); }
         100% { transform: translate(0, 0); }
       }
-      /* ---- LA BANNIÈRE : le titre claque, le filet s'étire ---- */
-      .mb-banniere { position: relative; text-align: center; padding: 4px 0 6px; }
+      /* ---- LA BANNIÈRE : une POUTRE de la station. Le titre géant (50 px)
+         claquait sur toute la largeur au-dessus d'un filet lumineux : il
+         disputait l'écran au héros. Il claque toujours, mais dans sa poutre,
+         à la taille d'un titre d'étape. ---- */
+      .mb-banniere.mb-poutre { width: min(100%, 940px); margin: 0 auto; flex: none; }
       .mb-sur {
-        display: block; font-family: var(--font-display);
-        font-size: calc(9px * var(--ui)); letter-spacing: 0.5em; color: var(--mb-teal);
+        display: block; max-width: 100%; font-family: var(--font-display);
+        font-size: calc(10px * var(--ui)); letter-spacing: 0.36em; color: var(--mb-teal);
+        white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
         animation: mb-monte 0.5s 0.2s ease-out backwards;
       }
       .mb-titre {
-        margin: 6px 0 0; font-family: var(--font-display); font-weight: 600;
-        font-size: calc(clamp(24px, 4.6vw, 50px) * var(--ui)); line-height: 1.05;
+        margin: 4px 0 0; font-family: var(--font-display); font-weight: 600;
+        font-size: calc(clamp(20px, 2.7vw, 34px) * var(--ui)); line-height: 1.05;
         letter-spacing: 0.22em; color: var(--mb-encre);
-        text-shadow: 0 0 22px rgba(143, 216, 200, 0.5), 0 0 64px rgba(99, 183, 230, 0.3);
+        text-shadow: 0 0 22px rgba(143, 216, 200, 0.5);
         animation: mb-claque 0.6s cubic-bezier(0.16, 1.3, 0.3, 1) both;
       }
       @keyframes mb-claque {
@@ -8207,168 +8219,150 @@
         55% { transform: scale(0.97); opacity: 1; filter: blur(0); letter-spacing: 0.22em; }
         100% { transform: scale(1); }
       }
-      .mb-filet {
-        display: block; height: 2px; margin: 10px auto 0; width: 0;
-        background: linear-gradient(90deg, transparent, var(--mb-teal), var(--mb-menthe), var(--mb-teal), transparent);
-        box-shadow: 0 0 14px rgba(109, 255, 184, 0.6);
-        animation: mb-filet 0.7s 0.35s ease-out forwards;
-      }
-      @keyframes mb-filet { to { width: min(560px, 82%); } }
       @keyframes mb-monte {
         from { opacity: 0; transform: translateY(10px); }
         to { opacity: 1; transform: none; }
       }
-      /* ---- LE RELEVÉ : UNE PLAQUE. La médaille du rang, le flacon et les
-         lignes, puis la récolte dessous. Sans cadre, la médaille pendait
-         seule dans la marge gauche et les trois lignes flottaient à droite :
-         rien ne disait que tout cela était UN relevé. La plaque prend la
-         teinte du rang dans son angle — un superfluide dore son coin. ---- */
+      /* ---- LE RELEVÉ : une scène à trois places autour d'UN héros. C'était
+         une plaque de tableau de bord — médaille ronde, flacon en rectangle,
+         trois lignes à barre de 6 px, des tuiles à paragraphe. Plus de
+         plaque : au centre la bonbonne, cerclée de son manomètre ; le sceau
+         du rang à gauche ; le volume en très grand à droite ; les cartouches
+         de ce que la salle rapporte dessous. ---- */
       .mb-releve {
+        --mb-coeur-l: 290px;
         position: relative;
-        display: grid; grid-template-columns: auto 1fr; gap: 16px 30px; align-items: center;
-        padding: 18px 24px 20px; border-radius: 14px;
-        background:
-          radial-gradient(70% 130% at 0% 0%, color-mix(in srgb, var(--mb-rang) 10%, transparent), transparent 60%),
-          linear-gradient(180deg, rgba(14, 24, 38, 0.84), rgba(8, 14, 24, 0.72));
-        border: 1px solid rgba(150, 200, 235, 0.14);
-        box-shadow: 0 24px 60px rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.05);
+        display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+        grid-template-areas: 'rang coeur litres' 'gains gains gains';
+        align-items: center; gap: 12px 44px;
       }
       .mb-releve[hidden] { display: none; }
-      /* LA MÉDAILLE : un anneau qui tourne, un disque qui luit, la lettre
-         qui TOMBE dessus — l'instant que le joueur attend */
-      .mb-rang {
-        position: relative; width: 172px; height: 172px; flex: none;
-        display: flex; flex-direction: column; align-items: center; justify-content: center;
+      /* LE SCEAU DU RANG (la primitive .mb-sceau) : le médaillon rendu, le
+         nom du régime, les étoiles. Il ATTEND sa place sans la lâcher :
+         caché, il garde son volume — rien ne glisse quand il tombe. Et sa
+         chute ne part qu'à l'instant où il paraît : posée d'emblée, elle se
+         jouait, invisible, pendant qu'il attendait (la médaille d'avant
+         tombait ainsi dans le vide, une demi-seconde avant de se montrer). */
+      .mb-rang { grid-area: rang; justify-self: end; }
+      .mb-rang[hidden] { display: grid; visibility: hidden; animation: none; }
+      .mb-rang-img { display: grid; place-items: center; width: 100%; height: 100%; }
+      .mb-etoiles {
+        position: relative; z-index: 2; align-self: end; margin-bottom: 17%;
+        display: flex; gap: 2px;
       }
-      /* la médaille ATTEND sa place sans la lâcher : cachée, elle garde son
-         volume — sinon le flacon sauterait à gauche quand elle tombe */
-      .mb-rang[hidden] { display: flex; visibility: hidden; }
-      .mb-rang::before {
-        content: ''; position: absolute; inset: 12px; border-radius: 50%;
-        background: radial-gradient(circle at 50% 38%, color-mix(in srgb, var(--mb-rang) 30%, var(--mb-coque)), #070d15 72%);
-        border: 1px solid color-mix(in srgb, var(--mb-rang) 50%, transparent);
-        box-shadow:
-          inset 0 0 34px color-mix(in srgb, var(--mb-rang) 20%, transparent),
-          0 0 44px color-mix(in srgb, var(--mb-rang) 26%, transparent);
-        animation: mb-monte 0.4s ease-out backwards;
-      }
-      .mb-rang-anneau {
-        position: absolute; inset: 0; border-radius: 50%;
-        background: conic-gradient(from 0deg, var(--mb-rang), transparent 28%, var(--mb-rang) 50%, transparent 78%, var(--mb-rang));
-        -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 5px), #000 calc(100% - 4px));
-        mask: radial-gradient(farthest-side, transparent calc(100% - 5px), #000 calc(100% - 4px));
-        filter: drop-shadow(0 0 8px color-mix(in srgb, var(--mb-rang) 70%, transparent));
-        animation: mb-tourne 5s linear infinite;
-      }
-      @keyframes mb-tourne { to { transform: rotate(360deg); } }
-      /* le NOM du rang (SUPERFLUIDE… FIGÉ) : un mot, plus une lettre. Michroma
-         est large (~1 em par lettre, espacement compris) : la taille se
-         règle sur le nombre de lettres (--mb-nom-n, posé par main.ts) pour
-         que le mot tienne dans la largeur utile du disque (--mb-nom-l) —
-         FIGÉ s'affiche en grand, SUPERFLUIDE sans déborder de l'anneau */
-      .mb-rang-lettre {
-        position: relative; font-family: var(--font-display); font-weight: 600;
-        font-size: min(calc(26px * var(--ui)), calc(var(--mb-nom-l, 136px) / var(--mb-nom-n, 6)));
-        line-height: 1; color: var(--mb-rang);
-        letter-spacing: 0.04em; white-space: nowrap;
-        text-shadow:
-          0 0 16px color-mix(in srgb, var(--mb-rang) 75%, transparent),
-          0 0 46px color-mix(in srgb, var(--mb-rang) 40%, transparent);
-        animation: mb-tombe 0.62s cubic-bezier(0.2, 1.5, 0.3, 1) both;
-      }
-      @keyframes mb-tombe {
-        0% { transform: scale(3.6) rotate(-16deg); opacity: 0; filter: blur(8px); }
-        55% { transform: scale(0.92) rotate(2deg); opacity: 1; filter: blur(0); }
-        100% { transform: none; }
-      }
-      .mb-rang-mot {
-        position: relative; font-style: normal; font-family: var(--font-display);
-        font-size: calc(7.5px * var(--ui)); letter-spacing: 0.32em; color: var(--mb-encre);
-        margin-top: 8px; white-space: nowrap;
-        animation: mb-monte 0.4s 0.4s ease-out backwards;
-      }
-      .mb-etoiles { position: relative; display: flex; gap: 3px; margin-top: 6px; }
       .mb-etoiles i {
-        font-style: normal; font-size: calc(13px * var(--ui)); color: #24364a;
+        font-style: normal; font-size: calc(12px * var(--ui)); line-height: 1; color: var(--mb-eteint);
         transition: color 0.2s ease;
       }
       .mb-etoiles i.mb-on {
-        color: var(--mb-rang); text-shadow: 0 0 10px var(--mb-rang);
+        color: var(--mb-encre); text-shadow: 0 0 8px var(--mb-rang), 0 1px 2px rgba(0, 0, 0, 0.8);
         animation: mb-etoile 0.38s cubic-bezier(0.2, 2.2, 0.4, 1);
       }
       @keyframes mb-etoile {
         0% { transform: scale(0) rotate(-90deg); }
         100% { transform: scale(1) rotate(0); }
       }
-      /* le corps du relevé : le flacon et le grand chiffre à gauche, les
-         lignes à droite */
-      .mb-corps {
-        display: grid; grid-template-columns: auto 1fr; gap: 12px 30px; align-items: center;
-        min-width: 0; opacity: 0; transition: opacity 0.4s ease;
+      @keyframes mb-tombe {
+        0% { transform: scale(3.6) rotate(-16deg); opacity: 0; filter: blur(8px); }
+        55% { transform: scale(0.92) rotate(2deg); opacity: 1; filter: blur(0); }
+        100% { transform: none; }
       }
-      .mb-corps.mb-on, .mb-scene.mb-compact .mb-corps { opacity: 1; }
-      .mb-haut { display: flex; align-items: center; gap: 18px; }
-      .mb-flacon {
-        position: relative; width: 66px; height: 118px; flex: 0 0 66px;
-        border: 2px solid #3d5a78; border-top-width: 9px; border-radius: 12px 12px 18px 18px;
-        background: rgba(18, 28, 42, 0.6); overflow: hidden;
-        box-shadow: inset 0 0 18px rgba(0, 0, 0, 0.5), 0 0 24px rgba(99, 183, 230, 0.12);
+      /* LE CŒUR : la bonbonne, cerclée du manomètre de la part livrée — son
+         arc de 270° s'ouvre en bas, où s'écrit le pourcentage */
+      .mb-coeur {
+        grid-area: coeur; position: relative;
+        width: var(--mb-coeur-l); height: var(--mb-coeur-l);
+        display: grid; place-items: center;
       }
-      /* les graduations du flacon : on lit le niveau, on ne le devine pas */
-      .mb-flacon::after {
-        content: ''; position: absolute; top: 0; bottom: 0; right: 4px; width: 8px;
-        background: repeating-linear-gradient(180deg, rgba(200, 230, 255, 0.35) 0 1px, transparent 1px 12px);
-        pointer-events: none;
+      .mb-coeur > .mb-mano { position: absolute; inset: 0; width: 100%; height: 100%; }
+      .mb-bonbonne { position: relative; height: calc(var(--mb-coeur-l) * 0.7); display: grid; place-items: center; }
+      .mb-part {
+        position: absolute; left: 50%; bottom: 2%; transform: translateX(-50%);
+        font-family: var(--font-display); font-weight: 400; font-size: calc(15px * var(--ui));
+        letter-spacing: 0.12em; color: var(--mb-texte); font-variant-numeric: tabular-nums; white-space: nowrap;
       }
-      .mb-eau {
-        position: absolute; left: 0; right: 0; bottom: 0; height: 0%;
-        background: linear-gradient(180deg, #6fc8f0, #2b7fb4 40%, #1d5f8c);
+      /* ---- LES CUVES (cuveHTML : la bonbonne ici, la réserve et la maîtrise
+         au versement et au palier). Trois calques : le DOS rendu, le LIQUIDE
+         (un bloc, dans la fenêtre que ceremonieObjets.ts donne en fractions
+         de l'image), le VERRE rendu devant. Le niveau se règle par
+         --mb-niveau (0..1) sur le liquide : la fenêtre reste fixe, l'eau y
+         monte (::before), sa surface ondule (::after). --mb-liquide le
+         teinte. Images absentes ou lentes : la fenêtre garde un contour de
+         verre, et l'eau se lit. ---- */
+      .mb-cuve { position: relative; isolation: isolate; height: 100%; max-width: 100%; }
+      /* LA SILHOUETTE D'ATTENTE : une bonbonne de verre en CSS — goulot,
+         épaules, fond chanfreiné — derrière la fenêtre du liquide. Elle tient
+         la place tant que le dos rendu n'est pas là, et s'efface quand il
+         l'est (main.ts, mbPoseCuve) : deux contours ne se superposent pas.
+         ::before est l'arête, ::after le verre, 2 px en dedans ; le ::after
+         venant après le liquide dans l'ordre du document, les plans sont
+         dits : silhouette et dos à 0, liquide à 1, verre à 2. */
+      .mb-cuve::before,
+      .mb-cuve::after {
+        content: ''; position: absolute; z-index: 0; pointer-events: none;
+        clip-path: polygon(38% 0, 62% 0, 62% 11%, 80% 19%, 80% 94%, 74% 100%, 26% 100%, 20% 94%, 20% 19%, 38% 11%);
+      }
+      .mb-cuve::before { inset: 0; background: var(--mb-arete); }
+      .mb-cuve::after {
+        inset: 2px 3px;
+        background: linear-gradient(90deg, color-mix(in srgb, var(--mb-coque) 70%, transparent), color-mix(in srgb, var(--mb-tole-haut) 55%, transparent) 45%, color-mix(in srgb, var(--mb-coque) 80%, transparent));
+      }
+      .mb-cuve.mb-cuve-rendue::before,
+      .mb-cuve.mb-cuve-rendue::after { display: none; }
+      .mb-cuve-dos, .mb-cuve-verre {
+        position: absolute; inset: 0; z-index: 0; width: 100%; height: 100%; object-fit: contain;
+        pointer-events: none; user-select: none;
+      }
+      .mb-cuve-verre { z-index: 2; }
+      .mb-cuve-liquide {
+        --mb-niveau: 0;
+        --mb-liquide: var(--mb-bleu);
+        position: absolute; z-index: 1; overflow: hidden;
+        background: color-mix(in srgb, var(--mb-texte) 5%, transparent);
+        box-shadow: inset 0 0 0 1px var(--mb-arete), inset 0 -10px 18px rgba(0, 0, 0, 0.35);
+      }
+      .mb-cuve-liquide::before {
+        content: ''; position: absolute; left: 0; right: 0; bottom: 0;
+        height: calc(var(--mb-niveau) * 100%);
+        background:
+          linear-gradient(90deg, transparent 12%, rgba(255, 255, 255, 0.18) 28%, transparent 44%),
+          linear-gradient(180deg, color-mix(in srgb, var(--mb-liquide) 55%, #ffffff), var(--mb-liquide) 30%, color-mix(in srgb, var(--mb-liquide) 50%, #000000));
+        box-shadow: 0 0 18px color-mix(in srgb, var(--mb-liquide) 60%, transparent);
         transition: height 1.3s cubic-bezier(0.2, 0.7, 0.3, 1);
       }
-      /* la surface qui ondule et les bulles qui montent : le liquide vit */
-      .mb-eau::before {
-        content: ''; position: absolute; left: -20%; right: -20%; top: -5px; height: 10px;
-        background: radial-gradient(ellipse at 50% 50%, rgba(220, 245, 255, 0.55), transparent 70%);
+      .mb-cuve-liquide::after {
+        content: ''; position: absolute; left: -10%; right: -10%; height: 8px;
+        bottom: calc(var(--mb-niveau) * 100% - 4px);
+        background: radial-gradient(ellipse at 50% 50%, rgba(220, 245, 255, 0.6), transparent 70%);
+        transition: bottom 1.3s cubic-bezier(0.2, 0.7, 0.3, 1);
         animation: mb-ondule 1.6s ease-in-out infinite;
       }
       @keyframes mb-ondule {
         0%, 100% { transform: translateX(-4px) scaleY(1); }
         50% { transform: translateX(4px) scaleY(0.6); }
       }
-      .mb-eau::after {
-        content: ''; position: absolute; inset: 0;
-        background:
-          radial-gradient(circle, rgba(255, 255, 255, 0.5) 0 1.5px, transparent 2px) 30% 80% / 100% 100% no-repeat,
-          radial-gradient(circle, rgba(255, 255, 255, 0.4) 0 1px, transparent 1.5px) 65% 60% / 100% 100% no-repeat,
-          radial-gradient(circle, rgba(255, 255, 255, 0.45) 0 1.2px, transparent 1.8px) 50% 95% / 100% 100% no-repeat;
-        animation: mb-bulles 2.4s linear infinite;
+      /* LE VOLUME, en très grand : le chiffre qu'on vient de livrer */
+      .mb-litres {
+        grid-area: litres; justify-self: start; min-width: 0;
+        display: flex; flex-direction: column; align-items: flex-start; gap: 4px;
       }
-      @keyframes mb-bulles {
-        from { background-position: 30% 100%, 65% 100%, 50% 100%; opacity: 0.9; }
-        to { background-position: 34% 0%, 62% 10%, 52% 5%; opacity: 0; }
+      .mb-litres small {
+        font-family: var(--font-display); font-size: calc(10px * var(--ui));
+        letter-spacing: 0.3em; color: var(--mb-teal);
       }
-      .mb-glace {
-        position: absolute; left: 0; right: 0; top: 4px; text-align: center;
-        font-size: calc(16px * var(--ui)); filter: drop-shadow(0 2px 3px rgba(0,0,0,0.5));
-        animation: mb-plonge 0.5s ease-out;
+      .mb-litres b {
+        font-family: var(--font-display); font-weight: 400;
+        font-size: calc(clamp(36px, 4.4vw, 58px) * var(--ui)); line-height: 1;
+        color: var(--mb-encre); font-variant-numeric: tabular-nums; white-space: nowrap;
+        text-shadow: 0 0 22px rgba(109, 255, 184, 0.35);
+      }
+      .mb-prime {
+        display: block; font-size: calc(12px * var(--ui)); color: var(--mb-glace);
+        letter-spacing: 0.06em; animation: mb-plonge 0.4s ease-out;
       }
       @keyframes mb-plonge {
         from { transform: translateY(-26px); opacity: 0; }
         to { transform: translateY(0); opacity: 1; }
-      }
-      .mb-litres { display: flex; flex-direction: column; gap: 2px; }
-      .mb-litres small {
-        font-family: var(--font-display); font-size: calc(7.5px * var(--ui));
-        letter-spacing: 0.3em; color: var(--mb-teal);
-      }
-      .mb-litres b {
-        font-family: var(--font-display); font-size: calc(40px * var(--ui)); line-height: 1;
-        color: var(--mb-encre); font-variant-numeric: tabular-nums;
-        text-shadow: 0 0 22px rgba(109, 255, 184, 0.35);
-      }
-      .mb-prime {
-        display: block; margin-top: 6px; font-size: calc(12px * var(--ui)); color: #a8d8f0;
-        letter-spacing: 0.06em; animation: mb-plonge 0.4s ease-out;
       }
       /* OÙ LE SURPLUS EST PARTI : le bandeau replié le disait encore
          « livré », sans dire qu'il était versé, ni où */
@@ -8377,228 +8371,114 @@
         letter-spacing: 0.06em; white-space: nowrap;
       }
       .mb-scene.mb-compact .mb-verse:not([hidden]) { display: inline; }
-      /* LES LIGNES : chacune glisse en place, avec sa barre, son chiffre et,
-         s'il y a lieu, le tampon du record. TROIS COLONNES PARTAGÉES (le nom,
-         la barre, le chiffre) : chaque ligne calculait les siennes, et les
-         barres commençaient à 610, 563 et 542 px selon la longueur du mot —
-         un escalier. La sous-grille les aligne toutes sur les mêmes rails. */
-      .mb-lignes {
-        display: grid; grid-template-columns: auto minmax(60px, 1fr) auto;
-        gap: 7px 14px; min-width: 0; align-items: center;
-      }
+      /* CHRONO ET NOTE : une ligne courte sous le volume, icône et chiffre —
+         le mot de la note et le record à battre passent dans l'infobulle.
+         Un record la remplace par son TAMPON. */
       .mb-ligne {
-        display: grid; grid-template-columns: subgrid; grid-column: 1 / -1;
-        align-items: center; row-gap: 3px;
-        padding: 9px 14px; border-radius: 8px; min-width: 0;
-        background: rgba(6, 12, 20, 0.5); border: 1px solid rgba(150, 200, 235, 0.1);
-        opacity: 0; transform: translateX(-28px);
+        display: flex; align-items: center; gap: 20px; margin-top: 10px; min-height: calc(28px * var(--ui));
+        opacity: 0; transform: translateX(-16px);
         transition: opacity 0.34s ease, transform 0.34s cubic-bezier(0.2, 1, 0.3, 1);
       }
-      /* sans sous-grille (vieux moteur) : trois colonnes fixes, mêmes rails */
-      @supports not (grid-template-columns: subgrid) {
-        .mb-lignes { grid-template-columns: 1fr; }
-        .mb-ligne {
-          grid-template-columns: calc(128px * var(--ui)) minmax(60px, 1fr) calc(92px * var(--ui));
-          column-gap: 14px;
-        }
-      }
       .mb-ligne.mb-on { opacity: 1; transform: none; }
-      .mb-ligne.mb-neuf { border-color: color-mix(in srgb, var(--mb-or) 45%, transparent); }
-      .mb-ligne-nom {
-        display: flex; align-items: center; gap: 9px; white-space: nowrap;
-        font-family: var(--font-display); font-size: calc(7.5px * var(--ui));
-        letter-spacing: 0.22em; color: var(--mb-texte-second);
+      .mb-ligne-it { display: inline-flex; align-items: center; gap: 8px; white-space: nowrap; }
+      .mb-ligne-it > i { font-size: calc(24px * var(--ui)); }
+      .mb-ligne-it b, .mb-record b {
+        font-family: var(--font-display); font-weight: 400; font-size: calc(16px * var(--ui));
+        color: var(--mb-texte); font-variant-numeric: tabular-nums; letter-spacing: 0.04em;
       }
-      .mb-ligne-nom i {
-        font-style: normal; font-size: calc(15px * var(--ui)); width: 1.3em; text-align: center;
-        color: var(--mb-teal);
-      }
-      .mb-ligne-barre {
-        position: relative; height: 6px; border-radius: 3px; min-width: 40px;
-        background: rgba(255, 255, 255, 0.08); overflow: hidden;
-      }
-      .mb-ligne-barre::after {
-        content: ''; position: absolute; inset: 0 auto 0 0; width: 0;
-        border-radius: 3px; background: linear-gradient(90deg, var(--mb-bleu), var(--mb-menthe));
-        box-shadow: 0 0 10px rgba(109, 255, 184, 0.5);
-        transition: width 0.9s 0.15s cubic-bezier(0.2, 0.8, 0.2, 1);
-      }
-      .mb-ligne.mb-on .mb-ligne-barre::after { width: calc(var(--f, 0) * 100%); }
-      .mb-ligne-val { white-space: nowrap; justify-self: end; }
-      .mb-ligne-val b {
-        font-family: var(--font-display); font-size: calc(18px * var(--ui));
-        color: var(--mb-encre); font-variant-numeric: tabular-nums;
-      }
-      /* sous la barre : ce que le chiffre veut dire, et le record à battre */
-      .mb-ligne-sous {
-        grid-column: 2 / -1; grid-row: 2; min-width: 0;
-        color: var(--mb-legende-sourde); font-size: calc(10.5px * var(--ui)); letter-spacing: 0.02em;
-        overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-      }
-      .mb-ligne-sous em { font-style: normal; color: #5f7890; }
       .mb-record {
-        grid-column: 2 / -1; grid-row: 2; justify-self: end;
-        font-style: normal; font-family: var(--font-display); font-size: calc(9px * var(--ui));
-        letter-spacing: 0.2em; color: var(--mb-or); white-space: nowrap;
-        border: 2px solid var(--mb-or); border-radius: 4px; padding: 3px 9px;
-        background: rgba(8, 14, 24, 0.9);
+        display: inline-flex; align-items: center; gap: 10px;
+        font-style: normal; font-family: var(--font-display); font-size: calc(13px * var(--ui));
+        letter-spacing: 0.24em; color: var(--mb-or); white-space: nowrap;
+        border: 2px solid var(--mb-or); padding: 4px 12px;
+        background: color-mix(in srgb, var(--mb-coque) 92%, transparent);
         transform: rotate(-3deg); text-shadow: 0 0 14px rgba(255, 217, 119, 0.6);
-        box-shadow: 0 0 18px rgba(255, 217, 119, 0.25);
-        animation: mb-tampon 0.4s cubic-bezier(0.2, 2.2, 0.4, 1) backwards;
-        animation-delay: 0.35s;
+        animation: mb-tampon 0.4s 0.35s cubic-bezier(0.2, 2.2, 0.4, 1) backwards;
       }
+      .mb-record > i { font-size: calc(20px * var(--ui)); }
+      /* le tampon claque quand sa ligne paraît (main.ts sonne 360 ms après),
+         pas à l'ouverture, où il frappait dans une ligne encore invisible */
+      .mb-ligne:not(.mb-on) .mb-record { animation: none; }
       @keyframes mb-tampon {
         from { transform: rotate(-3deg) scale(2.6); opacity: 0; }
         to { transform: rotate(-3deg) scale(1); opacity: 1; }
       }
-      /* ---- LA RÉCOLTE : une TUILE par chose gagnée. Le pied du relevé ne
-         montrait que le condensat — un total, et un « +450 cL » exilé au
-         bord droit. La mémoire gravée au sas n'y était pas, l'orbe d'une
-         cache passait en toast pendant que la médaille tombait, et rien ne
-         disait à quoi sert l'une ou l'autre monnaie. Chaque tuile porte le
-         gain en grand, son rôle, sa provenance et le solde (game/recolte.ts
-         dit quoi ; ici, seulement comment). La teinte nomme la monnaie :
-         menthe le condensat (la bourse, qui se purge), violet la mémoire
-         (ce qui reste), or l'exceptionnel. ---- */
-      .mb-recolte {
-        grid-column: 1 / -1; min-width: 0;
-        opacity: 0; transform: translateY(8px); transition: opacity 0.35s ease, transform 0.35s ease;
+      /* ---- LES GAINS : une CARTOUCHE par chose gagnée (cartouches.ts) — un
+         chiffre, un nom, l'icône rendue ; le rôle et la provenance en
+         infobulle. Elles claquent une à une : chacune attend son tour
+         cachée, À SA PLACE (la rangée ne grandit pas quand elle paraît), et
+         son claquement part quand elle paraît. La teinte du liseré nomme la
+         monnaie : menthe la bourse, violet la mémoire, or l'exceptionnel. */
+      .mb-gains { display: grid; gap: 10px; min-width: 0; }
+      .mb-releve .mb-gains {
+        grid-area: gains; display: flex; flex-wrap: wrap; justify-content: center; gap: 12px 16px;
       }
-      .mb-recolte.mb-on, .mb-scene.mb-compact .mb-recolte { opacity: 1; transform: none; }
-      .mb-recolte-titre {
-        margin: 0 0 10px; display: flex; align-items: center; gap: 14px;
-        font-family: var(--font-display); font-size: calc(8.5px * var(--ui));
-        letter-spacing: 0.32em; color: var(--mb-teal); white-space: nowrap;
+      .mb-releve .mb-gains .mb-cartouche { flex: 0 1 calc(236px * var(--ui)); }
+      .mb-releve .mb-cartouche:not(.mb-on) { visibility: hidden; animation: none; }
+      .mb-cartouche-condensat { --mb-liseret: var(--mb-menthe); }
+      .mb-cartouche-memoire { --mb-liseret: var(--mb-memoire); }
+      .mb-cartouche-livre { --mb-liseret: var(--mb-bleu); }
+      .mb-cartouche-tirage { --mb-liseret: var(--mb-or); }
+      .mb-cartouche-orbe { --mb-liseret: var(--mb-orbe); }
+      .mb-cartouche-solde {
+        grid-column: 3; grid-row: 1 / span 2; align-self: center; justify-self: end;
+        font-family: var(--font-display); font-size: calc(12px * var(--ui));
+        color: var(--mb-texte-second); font-variant-numeric: tabular-nums; white-space: nowrap;
       }
-      .mb-recolte-titre::after {
-        content: ''; height: 1px; flex: 1;
-        background: linear-gradient(90deg, rgba(143, 216, 200, 0.4), transparent);
+      /* LE LEVIER DU BILAN : il passe au versement. Il se tenait en 8 px
+         clignotants (« toucher pour passer ») et ne répondait qu'au
+         pointeur ; c'est un bouton (la primitive .mb-levier), qui a le focus
+         dès l'ouverture. Sourd, couleur acier : il ne vole pas la vedette à
+         la bonbonne. */
+      .mb-passer {
+        --mb-levier-teinte: var(--mb-legende);
+        align-self: center; flex: none; min-height: 38px; font-size: calc(11px * var(--ui));
       }
-      .mb-gains {
-        display: grid; gap: 10px;
-        /* 250 px : quatre tuiles (bourse, mémoire, tirage garanti, orbe)
-           tiennent sur un rang à 1180 px — à 290, la quatrième passait seule
-           à la ligne et poussait le versement hors d'un écran de 800 px */
-        grid-template-columns: repeat(auto-fit, minmax(min(100%, calc(250px * var(--ui))), 1fr));
-      }
-      .mb-gain {
-        --t: var(--mb-menthe);
-        position: relative; min-width: 0;
-        display: grid; grid-template-columns: auto 1fr; column-gap: 13px; row-gap: 4px;
-        align-items: start; padding: 11px 14px 11px 16px; border-radius: 10px;
-        background: linear-gradient(100deg, color-mix(in srgb, var(--t) 12%, transparent), rgba(10, 18, 30, 0.55) 60%);
-        border: 1px solid color-mix(in srgb, var(--t) 26%, transparent);
-        opacity: 0; transform: translateY(12px) scale(0.98);
-        transition: opacity 0.3s ease, transform 0.36s cubic-bezier(0.2, 1.2, 0.3, 1);
-      }
-      .mb-gain.mb-on, .mb-scene.mb-compact .mb-releve .mb-gain { opacity: 1; transform: none; }
-      /* le liseré : la teinte de la monnaie, au bord gauche */
-      .mb-gain::before {
-        content: ''; position: absolute; left: 0; top: 10px; bottom: 10px; width: 3px;
-        border-radius: 0 2px 2px 0; background: var(--t); box-shadow: 0 0 12px var(--t);
-      }
-      .mb-gain-memoire { --t: #b9a4ff; }
-      .mb-gain-livre { --t: var(--mb-bleu); }
-      .mb-gain-instruments { --t: var(--mb-teal); }
-      .mb-gain-tirage { --t: var(--mb-or); }
-      .mb-gain-orbe { --t: #e58bff; }
-      .mb-gain-ico {
-        grid-row: 1 / span 3; width: calc(38px * var(--ui)); height: calc(38px * var(--ui));
-        display: grid; place-items: center; border-radius: 9px;
-        font-style: normal; font-size: calc(19px * var(--ui)); line-height: 1; color: var(--t);
-        background: color-mix(in srgb, var(--t) 12%, var(--mb-coque));
-        border: 1px solid color-mix(in srgb, var(--t) 34%, transparent);
-      }
-      .mb-gain-ico i { font-style: normal; }
-      .mb-gain-ico .ico-meta { width: 1.5em; height: 1.5em; vertical-align: 0; }
-      .mb-gain-haut {
-        display: flex; flex-wrap: wrap; justify-content: space-between; align-items: flex-start;
-        gap: 4px 14px; min-width: 0;
-      }
-      .mb-gain-tete { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
-      .mb-gain-nom {
-        font-family: var(--font-display); font-size: calc(7.5px * var(--ui));
-        letter-spacing: 0.26em; color: color-mix(in srgb, var(--t) 72%, var(--mb-texte));
-      }
-      .mb-gain-val {
-        font-family: var(--font-display); font-size: calc(22px * var(--ui)); line-height: 1.1;
-        color: var(--mb-encre); font-variant-numeric: tabular-nums;
-        text-shadow: 0 0 18px color-mix(in srgb, var(--t) 42%, transparent);
-        white-space: nowrap;
-      }
-      .mb-gain-solde { display: flex; flex-direction: column; align-items: flex-end; gap: 3px; margin-left: auto; }
-      .mb-gain-solde small {
-        font-family: var(--font-display); font-size: calc(7px * var(--ui));
-        letter-spacing: 0.22em; color: var(--mb-etiquette);
-      }
-      .mb-gain-solde b {
-        font-family: var(--font-display); font-size: calc(13px * var(--ui));
-        color: var(--mb-texte); font-variant-numeric: tabular-nums; white-space: nowrap;
-      }
-      .mb-gain-role {
-        grid-column: 2; font-size: calc(11.5px * var(--ui)); line-height: 1.4; color: #a9bfd0;
-      }
-      .mb-gain-detail {
-        grid-column: 2; font-size: calc(10.5px * var(--ui)); line-height: 1.4;
-        color: var(--mb-etiquette); letter-spacing: 0.02em;
-      }
+      .mb-passer[hidden] { display: none; }
       /* ---- LE COMPACT : le relevé lu se replie en BANDEAU — le rang, le
          volume (et où il a été versé), puis chaque gain en une puce — et la
          scène revient aux cartes. C'est un RAPPEL de la salle, pas un solde :
          il affichait la bourse du moment du sas, fausse dès la première
-         carte payée. ---- */
+         carte payée. La poutre s'amincit. ---- */
       .mb-scene.mb-compact { gap: 10px; }
-      .mb-scene.mb-compact .mb-banniere { padding: 0; }
-      .mb-scene.mb-compact .mb-sur,
-      .mb-scene.mb-compact .mb-filet { display: none; }
+      .mb-scene.mb-compact .mb-banniere.mb-poutre {
+        --mb-bande: 56px; width: min(100%, 760px); min-height: 38px; padding-top: 4px; padding-bottom: 4px;
+      }
+      .mb-scene.mb-compact .mb-sur { display: none; }
       .mb-scene.mb-compact .mb-titre {
-        font-size: calc(15px * var(--ui)); letter-spacing: 0.3em; animation: none;
+        margin: 0; font-size: calc(15px * var(--ui)); letter-spacing: 0.3em; animation: none;
         color: var(--mb-teal); text-shadow: none;
       }
       .mb-scene.mb-compact .mb-releve {
-        display: flex; align-items: center; flex-wrap: wrap; gap: 4px 22px; padding: 6px 14px;
-        border: 1px solid rgba(150, 200, 235, 0.12); border-radius: 10px;
-        background: rgba(10, 18, 30, 0.72); box-shadow: none;
+        display: flex; align-items: center; justify-content: center; flex-wrap: wrap; gap: 6px 22px;
       }
       .mb-scene.mb-compact .mb-releve[hidden] { display: none; }
-      /* repliée, la médaille s'allonge en pastille : un mot ne tient pas
-         dans un disque de 56 px */
-      .mb-scene.mb-compact .mb-rang { width: 120px; height: 40px; }
-      .mb-scene.mb-compact .mb-rang::before { inset: 4px; border-radius: 999px; }
-      /* l'anneau suit la pastille, et cesse de TOURNER : dessiné pour un
-         disque, il devenait sur 120 × 40 une ellipse en rotation qui
-         balayait ~40 px au-dessus et au-dessous, sur le titre et les litres */
-      .mb-scene.mb-compact .mb-rang-anneau {
-        animation: none; border-radius: 999px; background: none;
-        -webkit-mask: none; mask: none;
-        border: 2px solid color-mix(in srgb, var(--mb-rang) 80%, transparent);
+      /* replié, le sceau devient une plaque biseautée qui porte le nom du
+         régime — immobile : un sceau qui retomberait ou pencherait à chaque
+         repli balaierait le titre */
+      .mb-scene.mb-compact .mb-rang {
+        --mb-sceau-incl: 0deg;
+        width: auto; height: 32px; padding: 0 18px;
+        clip-path: polygon(10px 0, calc(100% - 10px) 0, 100% 50%, calc(100% - 10px) 100%, 10px 100%, 0 50%);
+        animation: none;
       }
-      .mb-scene.mb-compact .mb-rang-lettre { --mb-nom-l: 100px; animation: none; }
-      .mb-scene.mb-compact .mb-rang-mot,
+      .mb-scene.mb-compact .mb-sceau-mot { font-size: calc(13px * var(--ui)); }
+      .mb-scene.mb-compact .mb-rang-img,
       .mb-scene.mb-compact .mb-etoiles,
-      .mb-scene.mb-compact .mb-flacon,
-      .mb-scene.mb-compact .mb-lignes,
+      .mb-scene.mb-compact .mb-coeur,
+      .mb-scene.mb-compact .mb-litres small,
       .mb-scene.mb-compact .mb-prime,
-      .mb-scene.mb-compact .mb-recolte-titre,
-      .mb-scene.mb-compact .mb-releve .mb-gain::before,
-      .mb-scene.mb-compact .mb-releve .mb-gain-role,
-      .mb-scene.mb-compact .mb-releve .mb-gain-detail,
-      .mb-scene.mb-compact .mb-releve .mb-gain-solde { display: none; }
-      .mb-scene.mb-compact .mb-corps { display: flex; align-items: center; gap: 22px; }
-      .mb-scene.mb-compact .mb-haut { gap: 0; }
+      .mb-scene.mb-compact .mb-ligne,
+      .mb-scene.mb-compact .mb-cartouche-solde { display: none; }
       .mb-scene.mb-compact .mb-litres { flex-direction: row; align-items: baseline; gap: 10px; flex-wrap: wrap; }
       .mb-scene.mb-compact .mb-litres b { font-size: calc(20px * var(--ui)); text-shadow: none; }
-      .mb-scene.mb-compact .mb-releve .mb-gains { display: flex; flex-wrap: wrap; gap: 4px 22px; }
-      .mb-scene.mb-compact .mb-releve .mb-gain {
-        display: flex; align-items: baseline; gap: 8px; padding: 0; border: 0; background: none;
+      .mb-scene.mb-compact .mb-releve .mb-gains { display: flex; flex-wrap: wrap; gap: 4px 20px; }
+      .mb-scene.mb-compact .mb-releve .mb-cartouche {
+        flex: none; display: flex; align-items: center; gap: 8px; padding: 0;
+        clip-path: none; background: none; box-shadow: none; visibility: visible; animation: none;
       }
-      .mb-scene.mb-compact .mb-releve .mb-gain-ico {
-        width: auto; height: auto; border: 0; background: none; align-self: center;
-        font-size: calc(14px * var(--ui));
-      }
-      .mb-scene.mb-compact .mb-releve .mb-gain-haut { display: contents; }
-      .mb-scene.mb-compact .mb-releve .mb-gain-tete { flex-direction: row; align-items: baseline; gap: 8px; }
-      .mb-scene.mb-compact .mb-releve .mb-gain-val { font-size: calc(16px * var(--ui)); text-shadow: none; }
+      .mb-scene.mb-compact .mb-releve .mb-cartouche-alv { width: 24px; height: 21px; font-size: 16px; }
+      .mb-scene.mb-compact .mb-releve .mb-cartouche-val { font-size: calc(16px * var(--ui)); }
       .mb-scene.mb-compact .mb-etal { margin-top: 0; padding-top: 0; border-top: 0; }
       /* ---- La JAUGE D'ÉTALONNAGE : l'XP se VOIT couler ---- */
       .mb-etal {
@@ -9191,11 +9071,8 @@
       /* deux colonnes, pas quatre : à quatre, « +1235 cL » se tronquait en
          « +1235… » et le rôle s'empilait sur quatre lignes */
       .mb-module .mb-gains { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-      .mb-module .mb-gain {
-        opacity: 1; transform: none;
-        animation: mb-carte-monte 0.42s cubic-bezier(0.2, 1, 0.3, 1) backwards;
-        animation-delay: calc(0.45s + var(--i, 0) * 0.08s);
-      }
+      /* les cartouches du module claquent en cascade, après la plaque */
+      .mb-module .mb-cartouche { animation-delay: calc(0.45s + var(--i, 0) * 0.08s); }
       /* LE BOUTON DE SUITE : une pastille qui respire et qu'on presse */
       .mb-continuer {
         grid-column: 1 / -1; justify-self: center; min-width: min(360px, 100%);
@@ -9472,39 +9349,31 @@
         display: block; line-height: 1.55em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
       }
       .mb-station-fiche span:first-child { color: var(--mb-texte); }
-      .mb-passer {
-        margin: 4px 0 0; text-align: center; font-family: var(--font-display);
-        font-size: calc(8px * var(--ui)); letter-spacing: 0.3em; color: var(--mb-acier);
-        animation: mb-clignote 1.8s ease-in-out infinite;
-      }
-      .mb-passer[hidden] { display: none; }
-      @keyframes mb-clignote {
-        0%, 100% { opacity: 0.45; }
-        50% { opacity: 1; }
-      }
-      /* ---- LES ÉCRANS MOYENS (téléphone couché, 844 px) : la médaille, le
-         flacon et les lignes ne tiennent plus de front — les lignes
-         débordaient de la plaque, leurs chiffres coupés au bord de l'écran.
-         Le flacon passe au-dessus des lignes. ---- */
+      /* ---- LES ÉCRANS MOYENS (téléphone couché, 844 px) : le sceau, la
+         bonbonne et le volume tiennent de front en se resserrant ; la poutre
+         rentre ses bandes (143 px par côté écrasaient le titre). ---- */
       @media (max-width: 1000px) and (min-width: 761px) {
-        .mb-scene:not(.mb-compact) .mb-corps { grid-template-columns: minmax(0, 1fr); }
+        .mb-releve { --mb-coeur-l: 230px; column-gap: 24px; }
+        .mb-rang { --mb-sceau-l: 124px; }
+        .mb-poutre { --mb-bande: 60px; }
       }
       /* ---- LES PETITS ÉCRANS : une colonne, la médaille en tête ---- */
       @media (max-width: 760px) {
         .mb-scene { padding: 10px 12px 14px; gap: 10px; }
-        .mb-releve { grid-template-columns: 1fr; justify-items: center; gap: 8px; }
-        .mb-rang { width: 136px; height: 136px; }
-        .mb-rang-lettre { --mb-nom-l: 104px; }
-        .mb-corps { grid-template-columns: 1fr; width: 100%; }
-        .mb-haut { grid-row: auto; justify-content: center; }
-        .mb-litres b { font-size: calc(32px * var(--ui)); }
-        .mb-releve { padding: 14px 12px 16px; }
-        .mb-lignes { column-gap: 10px; }
-        .mb-ligne { padding: 8px 10px; }
-        .mb-gain-ico { grid-row: 1; }
-        .mb-gain-role, .mb-gain-detail { grid-column: 1 / -1; }
-        .mb-ligne-sous { white-space: normal; }
+        /* une colonne : le héros en tête, le sceau et le volume côte à côte */
+        .mb-releve {
+          --mb-coeur-l: 210px;
+          grid-template-columns: auto auto; justify-content: center;
+          grid-template-areas: 'coeur coeur' 'rang litres' 'gains gains'; gap: 10px 18px;
+        }
+        .mb-coeur { justify-self: center; }
+        .mb-rang { --mb-sceau-l: 104px; }
+        .mb-litres b { font-size: calc(30px * var(--ui)); }
+        .mb-ligne { flex-wrap: wrap; gap: 6px 14px; }
+        .mb-ligne-it > i { font-size: calc(18px * var(--ui)); }
+        .mb-ligne-it b { font-size: calc(13px * var(--ui)); }
         .mb-prime { white-space: normal; }
+        .mb-poutre { --mb-bande: 36px; }
         .mb-module .mb-gains { grid-template-columns: 1fr; }
         .mb-module-tete { padding: 12px 14px; gap: 12px; grid-template-columns: auto 1fr; }
         .mb-module-total { grid-column: 1 / -1; align-items: flex-start; }
@@ -9523,19 +9392,13 @@
         .mb-flux { display: none; }
         .mb-versement[data-vers] .mb-goutte-corps { transform: none; }
         .mb-scene.mb-compact .mb-releve { gap: 4px 14px; }
-        .mb-scene.mb-compact .mb-corps { gap: 12px; width: auto; }
         .mb-scene.mb-compact .mb-releve .mb-gains { gap: 4px 14px; }
       }
       /* ---- LE STEAM DECK (1280 × 800) : tout doit tenir sans ascenseur ---- */
       @media (max-height: 820px) and (min-width: 761px) {
         .mb-scene { gap: 10px; padding-top: 8px; }
-        .mb-rang { width: 140px; height: 140px; }
-        .mb-rang-lettre { --mb-nom-l: 108px; }
-        .mb-releve { padding: 12px 22px 14px; gap: 12px 26px; }
-        .mb-ligne { padding: 7px 14px; }
-        .mb-gain { padding-top: 9px; padding-bottom: 9px; }
-        .mb-flacon { width: 56px; height: 100px; flex-basis: 56px; }
-        .mb-litres b { font-size: calc(32px * var(--ui)); }
+        .mb-releve { --mb-coeur-l: 260px; }
+        .mb-rang { --mb-sceau-l: 136px; }
         .mb-pli, .mb-pli .crt-draft { min-height: 160px; }
         .mb-porte-vue canvas { max-height: 132px; object-fit: contain; }
         .mb-ev-vue { aspect-ratio: auto; height: 132px; }
@@ -9550,19 +9413,17 @@
         .mb-poutre, .mb-sceau, .mb-cartouche, .mb-levier, .mb-levier::after { animation: none; }
         .mb-levier, .mb-mano-arc { transition: none; }
         .mb-fond::before, .mb-fond::after, .mb-flash.mb-on, .mb-scene.mb-secousse,
-        .mb-sur, .mb-titre, .mb-rang::before, .mb-rang-anneau, .mb-rang-lettre,
-        .mb-rang-mot, .mb-etoiles i.mb-on, .mb-eau::before, .mb-eau::after, .mb-glace,
+        .mb-sur, .mb-titre, .mb-etoiles i.mb-on, .mb-cuve-liquide::after,
         .mb-prime, .mb-record, .mb-etal, .mb-etal-palier.saute,
-        .mb-module-tete, .mb-module-sceau, .mb-module-salles li, .mb-module .mb-gain,
+        .mb-module-tete, .mb-module-sceau, .mb-module-salles li,
         .mb-etal-fluide, .mb-etal-fluide::after, .mb-etal-tube.eclair, .mb-etal-tampon,
         .mb-palier-eclair, .mb-choix, .mb-pli, .mb-pli .crt-draft::after,
         .mb-cartes.mb-elu .mb-pli:not(.mb-elu-c), .mb-pli.mb-elu-c, .mb-carte, .mb-ico,
         .mb-dest-jauge::after, .mb-goutte, .mb-goutte-corps, .mb-flux, .mb-bocal-gain, .mb-anneau-gain,
         .mb-carte.mb-dest-palier, .mb-continuer, .mb-continuer::after, .mb-porte,
         .mb-porte-vue::after, .mb-cartes.mb-elu .mb-porte:not(.mb-elue), .mb-porte.mb-elue,
-        .mb-station-carte, .mb-passer { animation: none; }
-        .mb-filet { animation: none; width: min(560px, 82%); }
-        .mb-eau, .mb-ligne, .mb-ligne-barre::after, .mb-recolte, .mb-gain, .mb-pli, .mb-carte, .mb-porte,
+        .mb-station-carte { animation: none; }
+        .mb-cuve-liquide::before, .mb-cuve-liquide::after, .mb-ligne, .mb-pli, .mb-carte, .mb-porte,
         .mb-station-carte { transition: none; }
         .mb-pli { transform: none; }
         .mb-pli.mb-vise { transform: translateY(-4px); }
@@ -11327,33 +11188,43 @@
       <canvas class="mb-feu" id="mb-feu" aria-hidden="true"></canvas>
       <div class="mb-flash" id="mb-flash" aria-hidden="true"></div>
       <div class="mb-scene" id="mb-scene">
-        <header class="mb-banniere" id="mb-banniere">
+        <!-- LA BANNIÈRE est une POUTRE de la station : profil effilé,
+             rivets, deux bandes de danger autour du titre -->
+        <header class="mb-banniere mb-poutre" id="mb-banniere">
           <span class="mb-sur" id="mb-sur">MISE EN BONBONNE</span>
           <h3 class="mb-titre" id="mb-titre">SALLE FRANCHIE</h3>
-          <span class="mb-filet" aria-hidden="true"></span>
         </header>
-        <!-- LE RELEVÉ : le rang à gauche, le flacon et les lignes à droite ;
-             dessous, LA RÉCOLTE — une tuile par chose gagnée (condensat,
-             mémoire, tirage garanti, orbe), avec son rôle et son solde.
-             Lu, il se replie en bandeau pour laisser la scène aux cartes. -->
+        <!-- LE RELEVÉ : UN héros, la bonbonne, au centre — cerclée du
+             manomètre de la part livrée ; à gauche le SCEAU du rang qui
+             tombe, à droite le volume en très grand et, dessous, chrono et
+             note sur une ligne (ou le tampon RECORD). Puis les CARTOUCHES de
+             ce que la salle rapporte claquent une à une. Plus de phrase : le
+             rôle d'une monnaie passe dans l'infobulle. La bonbonne (cuveHTML)
+             et le sceau (sceauHTML) sont posés par main.ts dans leur alvéole.
+             Lu, le relevé se replie en bandeau pour laisser la scène. -->
         <section class="mb-releve" id="mb-releve">
-          <div class="mb-rang" id="mb-rang" hidden>
-            <span class="mb-rang-anneau" aria-hidden="true"></span>
-            <b class="mb-rang-lettre" id="mb-rang-lettre">SUPERFLUIDE</b>
-            <i class="mb-rang-mot" id="mb-rang-mot">IMPECCABLE</i>
+          <div class="mb-rang mb-sceau" id="mb-rang" hidden>
+            <span class="mb-rang-img" id="mb-rang-img"></span>
+            <b class="mb-sceau-mot" id="mb-rang-lettre">SUPERFLUIDE</b>
             <span class="mb-etoiles" id="mb-etoiles" aria-hidden="true"></span>
           </div>
-          <div class="mb-corps" id="mb-corps">
-            <div class="mb-haut">
-              <div class="mb-flacon"><div class="mb-eau" id="mb-eau"></div><div class="mb-glace" id="mb-glace" hidden>🧊</div></div>
-              <div class="mb-litres"><small>VOLUME LIVRÉ</small><b id="mb-l">0,00 L</b><span class="mb-prime" id="mb-prime" hidden></span><span class="mb-verse" id="mb-verse" hidden></span></div>
-            </div>
-            <div class="mb-lignes" id="mb-lignes"></div>
+          <div class="mb-coeur">
+            <svg class="mb-mano" id="mb-mano" viewBox="0 0 100 100" aria-hidden="true">
+              <path class="mb-mano-piste" pathLength="1" d="M18.89 81.11A44 44 0 1 1 81.11 81.11"/>
+              <path class="mb-mano-grad" pathLength="1" d="M24.54 75.46A36 36 0 1 1 75.46 75.46"/>
+              <path class="mb-mano-arc" pathLength="1" d="M18.89 81.11A44 44 0 1 1 81.11 81.11"/>
+            </svg>
+            <div class="mb-bonbonne" id="mb-bonbonne"></div>
+            <b class="mb-part" id="mb-part" title="part du volume de départ livrée">0 %</b>
           </div>
-          <div class="mb-recolte" id="mb-recolte">
-            <p class="mb-recolte-titre" id="mb-recolte-titre">CE QUE LA SALLE RAPPORTE</p>
-            <div class="mb-gains" id="mb-gains"></div>
+          <div class="mb-litres">
+            <small>VOLUME LIVRÉ</small>
+            <b id="mb-l">0,00 L</b>
+            <span class="mb-prime" id="mb-prime" hidden></span>
+            <span class="mb-verse" id="mb-verse" hidden></span>
+            <span class="mb-ligne" id="mb-ligne"></span>
           </div>
+          <div class="mb-gains" id="mb-gains"></div>
         </section>
         <!-- La JAUGE D'ÉTALONNAGE : l'XP se voit couler, palier par palier -->
         <div class="mb-etal" id="mb-etal" hidden>
@@ -11377,7 +11248,9 @@
           <p class="mb-choix-titre" id="mb-choix-titre">OÙ VERSER LE SURPLUS ?</p>
           <div class="mb-cartes" id="mb-cartes"></div>
         </div>
-        <p class="mb-passer" id="mb-passer">toucher pour passer</p>
+        <!-- LE LEVIER : il passe le bilan — au clic, au toucher, à Entrée,
+             à Espace et à A (il a le focus dès l'ouverture) -->
+        <button type="button" class="mb-levier mb-passer" id="mb-passer">PASSER ▸</button>
       </div>
       <!-- LE PALIER FRANCHI traverse l'écran : une bande, pas une ligne -->
       <div class="mb-palier-eclair" id="mb-palier-eclair" hidden><b id="mb-palier-eclair-no">PALIER 1</b><i>TIRAGE OUVERT</i></div>

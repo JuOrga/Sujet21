@@ -115,7 +115,7 @@ function mesure() {
   const s = document.getElementById('mb-scene')
   const veil = document.getElementById('mb-veil')
   if (veil.hidden) return { veil: 'caché' }
-  const vis = [...s.querySelectorAll('button, .mb-gain, .mb-ligne')].filter((e) => e.offsetParent)
+  const vis = [...s.querySelectorAll('button, .mb-cartouche, .mb-ligne, .mb-coeur')].filter((e) => e.offsetParent)
   const bas = vis.length ? Math.round(Math.max(...vis.map((e) => e.getBoundingClientRect().bottom))) : 0
   return {
     scene: `${s.scrollHeight}/${s.clientHeight}${s.scrollHeight > s.clientHeight + 1 ? ' DÉBORDE (défile)' : ''}`,

@@ -458,7 +458,10 @@ import {
 } from './game/soundtrack'
 import { Jukebox, PISTES_ECOUTE } from './game/jukebox'
 import { auteurAvis, avisDe, ligneAvis, ligneBilan, lisAvisEcoute, poseAvis, type Avis, type DocumentAvis } from './game/ecouteAvis'
-import { compteur, douce, motDeNote, PAS_LIGNE_MS, rangDeSalle, TEMPS_BILAN, titreDuTirage } from './game/ceremonie'
+import { compteur, douce, motDeNote, rangDeSalle, TEMPS_BILAN, titreDuTirage } from './game/ceremonie'
+import { cartoucheHTML } from './game/cartouches'
+import { cuveHTML, sceauHTML } from './game/ceremonieObjets'
+import { iconeCeremonieHTML } from './game/iconesStation'
 import {
   condensatDuSas,
   gainsDeModule,
@@ -788,11 +791,9 @@ const audio = new AudioFx(loadAudioPrefs())
 // et ne télécharge rien tant que le son est coupé.
 const bande = new Soundtrack(audio)
 // La voix de la cérémonie : un seul point d'entrée, pour que les écrans de
-// récompense n'aient pas à connaître l'AudioFx. Exposée en sonde (comme
-// __rejeu) tant que les écrans ne l'appellent pas — sans cela `noUnusedLocals`
-// refuserait la ligne, et on pourrait écouter une voix depuis la console.
+// récompense n'aient pas à connaître l'AudioFx — chaque geste (compteur,
+// sceau, cartouche, levier…) appelle la sienne.
 const sonCeremonie = (voix: VoixCeremonie, force = 1): void => audio.ceremonie(voix, force)
-;(window as unknown as { __sonCeremonie: unknown }).__sonCeremonie = sonCeremonie
 function eveilAudio(): void {
   audio.resume()
   if (audio.enabled) {
@@ -15031,39 +15032,85 @@ function fermeMiseEnBonbonne(): void {
   mbBilanCourant = null
 }
 
-/** Fige les temps 1-3 à leur état final (saut ou passage naturel). */
+/** La part livrée, bornée à la bonbonne pleine : la prime peut porter
+ *  au-delà du départ, l'eau ne déborde pas du verre ni l'arc du cadran. */
+function mbPartPleine(b: BilanSalle): number {
+  return Math.max(0, Math.min(1, Number.isFinite(b.pct) ? b.pct : 0))
+}
+
+/** Fige les temps 1-3 à leur état final (saut ou passage naturel). Les
+ *  minuteurs tombent tous ici : un temps du bilan qui arriverait après le
+ *  saut ne réécrit rien (les compteurs qui roulent vérifient l'étape). */
 function mbFigeBilan(): void {
   for (const t of mbTimers) clearTimeout(t)
   mbTimers.length = 0
   const b = mbBilanCourant
   if (b) {
     mbEl('mb-rang').hidden = false
-    mbEl('mb-corps').classList.add('mb-on')
     // les étoiles du rang, pas les cinq : un D sauté reste un D
     const etoiles = rangDeSalle(b.pct).etoiles
     Array.from(mbEl('mb-etoiles').children).forEach((e, i) => {
       if (i < etoiles) e.classList.add('mb-on')
     })
-    mbEl('mb-eau').style.height = `${Math.min(100, b.pct * 100).toFixed(0)}%`
+    const part = mbPartPleine(b)
+    mbEl('mb-bonbonne').querySelector<HTMLElement>('.mb-cuve-liquide')?.style.setProperty('--mb-niveau', part.toFixed(3))
+    mbEl('mb-mano').style.setProperty('--mb-mano-p', part.toFixed(3))
+    mbEl('mb-part').textContent = `${Math.round(b.pct * 100)} %`
     mbEl('mb-l').textContent = fmtL(b.surplus)
     if (b.prime >= 0.01) {
       const pr = mbEl('mb-prime')
       pr.hidden = false
       pr.textContent = `dont +${fmtL(b.prime)} de PRIME DE GLACE`
-      mbEl('mb-glace').hidden = false
     }
-    for (const l of Array.from(mbVeil.querySelectorAll('.mb-ligne'))) {
-      l.classList.add('mb-on')
-    }
-    // la récolte, à son état final : chaque tuile posée, son chiffre exact
-    mbEl('mb-recolte').classList.add('mb-on')
-    Array.from(mbEl('mb-gains').children).forEach((tuile, i) => {
-      tuile.classList.add('mb-on')
-      const val = tuile.querySelector('.mb-gain-val')
+    mbEl('mb-ligne').classList.add('mb-on')
+    // les cartouches, à leur état final : chacune posée, son chiffre exact
+    Array.from(mbEl('mb-gains').children).forEach((c, i) => {
+      c.classList.add('mb-on')
+      const val = c.querySelector('.mb-cartouche-val')
       if (val && b.gains[i]) val.textContent = b.gains[i].valeur
     })
   }
   mbEl('mb-passer').hidden = true
+}
+
+/** POSE UNE CUVE (cuveHTML) dans son hôte, et rend son liquide. Ses deux
+ *  images viennent de l'atelier Blender : tant qu'elles manquent (pas
+ *  encore livrées, réseau lent, nom faux), Chrome dessinait à leur place
+ *  l'icône d'image cassée, cadre compris, au cœur du héros. Une image en
+ *  échec se cache ; le dos chargé, la silhouette CSS qui tenait la place
+ *  s'efface (.mb-cuve-rendue). Une image déjà en cache a pu conclure avant
+ *  qu'on l'écoute : on lit aussi son état présent. */
+function mbPoseCuve(hote: HTMLElement, html: string): HTMLElement | null {
+  hote.innerHTML = html
+  const cuve = hote.querySelector<HTMLElement>('.mb-cuve')
+  for (const img of Array.from(hote.querySelectorAll('img'))) {
+    const echoue = (): void => {
+      img.hidden = true
+    }
+    const charge = (): void => {
+      if (img.classList.contains('mb-cuve-dos')) cuve?.classList.add('mb-cuve-rendue')
+    }
+    if (img.complete) {
+      if (img.naturalWidth === 0) echoue()
+      else charge()
+    } else {
+      img.addEventListener('error', echoue, { once: true })
+      img.addEventListener('load', charge, { once: true })
+    }
+  }
+  return hote.querySelector<HTMLElement>('.mb-cuve-liquide')
+}
+
+/** LE GESTE QUI OUVRE N'EST PAS CELUI QUI CHOISIT. Le bilan se passe d'un
+ *  geste, et le versement s'ouvre SOUS ce geste : le second clic d'un double
+ *  clic, ou A martelé, tombait sur la première cuve — le surplus partait
+ *  dans la réserve sans qu'on l'ait choisi. Le versement n'obéit qu'après
+ *  ce délai : il absorbe le second clic d'un double clic, le A suivant
+ *  d'une rafale. */
+const MB_GARDE_GESTE_MS = 400
+let mbVersementOuvertA = -Infinity
+function mbGesteTropTot(): boolean {
+  return performance.now() - mbVersementOuvertA < MB_GARDE_GESTE_MS
 }
 
 /** LE VERSEMENT : le surplus choisit sa destination — la RÉSERVE (bonbonne,
@@ -15072,6 +15119,7 @@ function mbFigeBilan(): void {
 function mbMontreVersement(): void {
   if (mbEtape !== 'bilan') return
   mbEtape = 'versement'
+  mbVersementOuvertA = performance.now()
   mbFigeBilan()
   const b = mbBilanCourant
   if (!b) return
@@ -15140,6 +15188,7 @@ function mbMontreVersement(): void {
     v.hidden = false
   }
   cb.addEventListener('click', () => {
+    if (mbGesteTropTot()) return
     run.bonbonneLiters = Math.min(cap, run.bonbonneLiters + verse)
     noteVersement(spill > 0.01 ? `→ réserve, ${fmt(spill)} L à la maîtrise` : '→ versé à la réserve')
     bande.ponctuation('sting-collecte', 0.55)
@@ -15167,6 +15216,7 @@ function mbMontreVersement(): void {
     `<small class="mb-dest-mot">chaque palier ouvre un tirage d’instrument</small>` +
     (franchit ? `<em class="mb-dest-plus mb-dest-ouvre">UN PALIER SE FRANCHIT — TIRAGE OUVERT</em>` : '')
   cx.addEventListener('click', () => {
+    if (mbGesteTropTot()) return
     noteVersement('→ versé à la maîtrise')
     bande.ponctuation('sting-collecte', 0.55)
     mbEclate(cx, { n: 36, teintes: MB_MENTHE, vitesse: 320, gravite: 700 })
@@ -15186,6 +15236,10 @@ function mbMontreVersement(): void {
   }
   scene.append(cb, goutte, cx)
   host.appendChild(scene)
+  // le levier du bilan, qui avait le focus, vient de disparaître : le focus
+  // passe à la première cuve offerte — Entrée, Espace et la manette
+  // trouvent une cible, sans que le geste qui a ouvert ne la presse
+  scene.querySelector<HTMLButtonElement>('button:not(:disabled)')?.focus({ preventScroll: true })
 }
 
 // ---- LA JAUGE D'ÉTALONNAGE : l'XP se VOIT couler, palier par palier ----
@@ -15245,31 +15299,6 @@ function mbJaugeMince(): void {
  *  d'un Semblable endormi, puis d'un module qu'on venait de finir. */
 function mbReleveHors(): void {
   mbEl('mb-releve').hidden = true
-}
-
-/** UNE TUILE DE RÉCOLTE (game/recolte.ts dit ce qu'elle contient) : le
- *  gain en grand, le solde à droite, le rôle et la provenance dessous. */
-function mbGainHTML(g: Gain, i: number): string {
-  const esc = (t: string): string => t.replace(/&/g, '&amp;').replace(/</g, '&lt;')
-  return (
-    `<div class="mb-gain mb-gain-${g.cle}" style="--i:${i}">` +
-    // le condensat et la mémoire ont leur icône DESSINÉE (la planche du
-    // dossier et de l'ATH) : la même partout, le glyphe n'est que le repli
-    `<i class="mb-gain-ico" aria-hidden="true">${
-      g.cle === 'condensat' || g.cle === 'memoire' ? iconeMetaHTML(g.cle, g.icone) : g.icone
-    }</i>` +
-    // le gain et son solde partagent un rang QUI SE PLIE : à l'étroit, le
-    // solde passe dessous plutôt que de tronquer le gain (« +450 … »)
-    `<span class="mb-gain-haut"><span class="mb-gain-tete"><span class="mb-gain-nom">${esc(g.nom)}</span>` +
-    `<b class="mb-gain-val">${esc(g.valeur)}</b></span>` +
-    (g.solde
-      ? `<span class="mb-gain-solde"><small>${esc(g.solde.nom)}</small><b>${esc(g.solde.valeur)}</b></span>`
-      : '') +
-    `</span>` +
-    `<small class="mb-gain-role">${esc(g.role)}</small>` +
-    (g.detail ? `<small class="mb-gain-detail">${esc(g.detail)}</small>` : '') +
-    `</div>`
-  )
 }
 
 /** LE BILAN DU MODULE. Le module épuisé, le plan se rouvrait d'office : rien
@@ -15339,7 +15368,7 @@ function mbMontreBilanModule(): void {
     `<div class="mb-gains">` +
     gains
       .filter((g) => g !== livre)
-      .map(mbGainHTML)
+      .map(cartoucheHTML)
       .join('') +
     `</div>`
   host.appendChild(bloc)
@@ -17203,49 +17232,73 @@ function montreMiseEnBonbonne(b: BilanSalle): void {
   mbCartes() // la disposition du choix repart à neuf
   mbScene.classList.remove('mb-compact', 'mb-large', 'mb-question')
   mbScene.scrollTop = 0
-  // état de départ : tout est replié, la bannière claque seule
+  // état de départ : la poutre claque seule, la bonbonne attend, vide
   const verdict = rangDeSalle(b.pct)
+  const part = mbPartPleine(b)
   mbVeil.style.setProperty('--mb-rang', verdict.teinte)
   mbEl('mb-releve').hidden = false
   mbEl('mb-titre').textContent = 'SALLE FRANCHIE'
   mbEl('mb-sur').textContent =
     `MISE EN BONBONNE · ${level.code}` + (run.primeSalle ? ` · PRIME : ${NOMS_PRIME[run.primeSalle].toUpperCase()}` : '')
-  mbEl('mb-rang').hidden = true
-  mbEl('mb-corps').classList.remove('mb-on')
+  // LE SCEAU DU RANG : le médaillon rendu (un seul, teinté par --mb-rang),
+  // le nom du régime ; le mot (« IMPECCABLE ») passe dans l'infobulle
+  const rang = mbEl('mb-rang')
+  rang.hidden = true
+  rang.title = `${verdict.nom} — ${verdict.mot}`
+  mbEl('mb-rang-img').innerHTML = sceauHTML(verdict.rang)
   mbEl('mb-rang-lettre').textContent = verdict.nom
-  // la taille du mot suit sa longueur (index.html, .mb-rang-lettre)
+  // la taille du mot suit sa longueur (index.html, .mb-sceau-mot)
   mbEl('mb-rang-lettre').style.setProperty('--mb-nom-n', String(verdict.nom.length))
-  mbEl('mb-rang-mot').textContent = verdict.mot
   mbEl('mb-etoiles').innerHTML = '<i>★</i>'.repeat(5)
-  mbEl('mb-eau').style.height = '0%'
+  // LA BONBONNE : posée à neuf (le liquide repart de zéro, sans transition),
+  // cerclée du manomètre de la part livrée, vide lui aussi
+  const eau = mbPoseCuve(mbEl('mb-bonbonne'), cuveHTML('bonbonne', 'mb-eau'))
+  const mano = mbEl('mb-mano')
+  mano.style.setProperty('--mb-mano-p', '0')
+  mbEl('mb-part').textContent = '0 %'
   mbEl('mb-l').textContent = '0,00 L'
   mbEl('mb-prime').hidden = true
   mbEl('mb-verse').hidden = true
-  mbEl('mb-glace').hidden = true
   mbEl('mb-choix').hidden = true
-  // LA RÉCOLTE : les tuiles sont posées d'emblée, invisibles — elles
-  // tiennent leur place, le relevé ne grandit pas quand elles paraissent
-  mbEl('mb-recolte').classList.remove('mb-on')
-  mbEl('mb-gains').innerHTML = b.gains.map(mbGainHTML).join('')
+  // CHRONO ET NOTE, en une ligne : l'icône et le chiffre ; le mot de la
+  // note et le record à battre vont dans l'infobulle. Un record la remplace
+  // par son tampon — celui du chrono garde son temps, celui du volume
+  // renvoie au grand chiffre juste au-dessus.
+  const record = b.newVolume || b.newChrono
+  const quoi = [b.newVolume ? 'volume' : '', b.newChrono ? 'chrono' : ''].filter((x) => x).join(' et ')
+  const recordChrono = b.recChr && b.recChr !== '—' ? ` — record ${b.recChr}` : ''
+  const ligne = mbEl('mb-ligne')
+  ligne.classList.remove('mb-on')
+  ligne.innerHTML = record
+    ? `<em class="mb-record" title="${htmlSafe(`record du protocole : ${quoi}`)}">RECORD` +
+      (b.newChrono ? `${iconeCeremonieHTML('chrono')}<b>${fmtTime(b.temps)}</b>` : '') +
+      `</em>`
+    : `<span class="mb-ligne-it" title="${htmlSafe(`chrono${recordChrono}`)}">${iconeCeremonieHTML('chrono')}<b>${fmtTime(b.temps)}</b></span>` +
+      `<span class="mb-ligne-it" title="${htmlSafe(`note — ${motDeNote(b.note)}, le volume pesé par la vitesse`)}">${iconeCeremonieHTML('note')}<b>${b.note}</b></span>`
+  // LES CARTOUCHES : posées d'emblée, cachées à leur place — la rangée ne
+  // grandit pas quand elles claquent
+  mbEl('mb-gains').innerHTML = b.gains.map(cartoucheHTML).join('')
   mbEl('mb-etal').hidden = true
   mbEl('mb-etal').classList.remove('coule', 'mb-mince')
   mbEl('mb-etal-tampon').hidden = true
   mbEl('mb-etal-gain').hidden = true
   mbEl('mb-palier-eclair').hidden = true
-  mbEl('mb-lignes').innerHTML = ''
+  // LE LEVIER a le focus dès l'ouverture : Entrée, Espace et A le pressent
+  // (la manette vise le seul bouton de l'écran), le clic aussi
   mbEl('mb-passer').hidden = false
+  mbEl('mb-passer').focus({ preventScroll: true })
   const apres = (ms: number, fn: () => void): void => {
     mbTimers.push(window.setTimeout(fn, ms))
   }
-  // Temps 1 — LE RANG TOMBE : la médaille claque sur la scène, l'écran
-  // flashe, la manette tremble, le feu jaillit — puis les étoiles
-  // s'allument une à une. Un superfluide ou un laminaire sonne comme un record.
+  // Temps 1 — LE SCEAU TOMBE : il claque sur la scène, l'écran flashe, la
+  // manette tremble, le feu jaillit — puis les étoiles s'allument une à
+  // une. Un superfluide ou un laminaire garde le sting du record.
   apres(TEMPS_BILAN.rang, () => {
-    const rang = mbEl('mb-rang')
     rang.hidden = false
     mbFlash()
     mbSecousse(verdict.etoiles >= 4 ? 0.9 : 0.5)
-    bande.ponctuation(verdict.etoiles >= 4 ? 'sting-record' : 'sting-collecte', 0.7)
+    sonCeremonie('sceau', verdict.etoiles >= 4 ? 1 : 0.7)
+    if (verdict.etoiles >= 4) bande.ponctuation('sting-record', 0.7)
     mbEclate(rang, {
       n: 40 + verdict.etoiles * 16,
       teintes: [verdict.teinte, '#eaf6ff', ...MB_MENTHE],
@@ -17256,17 +17309,15 @@ function montreMiseEnBonbonne(b: BilanSalle): void {
       taille: 4,
     })
     Array.from(mbEl('mb-etoiles').children).forEach((e, i) => {
-      if (i < verdict.etoiles)
-        apres(240 + i * 110, () => {
-          e.classList.add('mb-on')
-          bande.ponctuation('sting-collecte', 0.12 + i * 0.04)
-        })
+      if (i < verdict.etoiles) apres(240 + i * 110, () => e.classList.add('mb-on'))
     })
   })
-  // Temps 2 — la COMPRESSION : le niveau monte, le compteur ROULE
+  // Temps 2 — LA BONBONNE SE REMPLIT : le liquide monte, l'arc du
+  // manomètre tourne, le volume et la part ROULENT
   apres(TEMPS_BILAN.litres, () => {
-    mbEl('mb-corps').classList.add('mb-on')
-    mbEl('mb-eau').style.height = `${Math.min(100, b.pct * 100).toFixed(0)}%`
+    eau?.style.setProperty('--mb-niveau', part.toFixed(3))
+    mano.style.setProperty('--mb-mano-p', part.toFixed(3))
+    sonCeremonie('compteur')
     const t0 = performance.now()
     const litres = (): void => {
       // l'image déjà demandée quand on SAUTE ne doit pas repasser derrière
@@ -17274,6 +17325,7 @@ function montreMiseEnBonbonne(b: BilanSalle): void {
       if (mbEtape !== 'bilan') return
       const t = Math.min(1, (performance.now() - t0) / 1300)
       mbEl('mb-l').textContent = fmtL(compteur(0, b.surplus, t))
+      mbEl('mb-part').textContent = `${Math.round(compteur(0, b.pct * 100, t))} %`
       if (t < 1) requestAnimationFrame(litres)
     }
     requestAnimationFrame(litres)
@@ -17284,88 +17336,78 @@ function montreMiseEnBonbonne(b: BilanSalle): void {
       pr.hidden = false
       // « dont » : la prime est DANS le volume affiché, elle ne s'y ajoute pas
       pr.textContent = `dont +${fmtL(b.prime)} de PRIME DE GLACE`
-      mbEl('mb-glace').hidden = false
       audio.iceImpact(1)
-      mbEclate(mbVeil.querySelector('.mb-flacon'), { n: 24, teintes: MB_EAU, vitesse: 240, gravite: 500 })
+      mbEclate(mbEl('mb-bonbonne'), { n: 24, teintes: MB_EAU, vitesse: 240, gravite: 500 })
     })
   }
-  // Temps 3 — la LECTURE DU PROTOCOLE : les lignes glissent une à une,
-  // chacune avec sa barre ; un record se TAMPONNE, en or, avec son feu
-  // Trois lignes, trois chiffres DIFFÉRENTS : la première redisait le volume
-  // du grand compteur voisin (« 4.50 L » deux fois à trente pixels d'écart) —
-  // elle dit maintenant la PART livrée, celle dont le rang se déduit. Sous la
-  // barre, ce que le chiffre veut dire et le record à battre ; un record
-  // absent ne s'écrit plus (« record : — » sous deux lignes sur trois).
-  const tampon = (neuf: boolean): string =>
-    neuf ? `<em class="mb-record">RECORD DU PROTOCOLE</em>` : ''
-  const ligne = (ico: string, nom: string, f: number, val: string, sous: string, neuf: boolean, record: string): string =>
-    `<div class="mb-ligne${neuf ? ' mb-neuf' : ''}">` +
-    `<span class="mb-ligne-nom"><i>${ico}</i>${nom}</span>` +
-    `<span class="mb-ligne-barre" style="--f:${Math.max(0, Math.min(1, f)).toFixed(3)}"></span>` +
-    `<span class="mb-ligne-val"><b>${val}</b></span>` +
-    `<small class="mb-ligne-sous">${sous}${!neuf && record && record !== '—' ? `${sous ? ' · ' : ''}<em>record ${record}</em>` : ''}</small>` +
-    tampon(neuf) +
-    `</div>`
-  const lignes = [
-    ligne('💧', 'PART LIVRÉE', b.pct, `${Math.round(b.pct * 100)} %`, 'du volume de départ', b.newVolume, b.recVol),
-    // la barre du chrono se remplit d'autant que la salle est vite passée :
-    // une minute la remplit à moitié, dix secondes presque en entier
-    ligne('⏱', 'CHRONO', 60 / (60 + Math.max(0, b.temps)), fmtTime(b.temps), '', b.newChrono, b.recChr),
-    // la note se disait sans dire d'où elle sort : le volume, pesé par la vitesse
-    ligne('❖', 'NOTE', b.note / 300, String(b.note), `${motDeNote(b.note)} — le volume, pesé par la vitesse`, false, ''),
-  ]
-  const hostLignes = mbEl('mb-lignes')
-  hostLignes.innerHTML = lignes.join('')
-  Array.from(hostLignes.children).forEach((el2, i) => {
-    apres(TEMPS_BILAN.lignes + i * PAS_LIGNE_MS, () => {
-      el2.classList.add('mb-on')
-      if (el2.classList.contains('mb-neuf')) {
-        // le tampon claque 350 ms après la ligne (voir le retard CSS)
-        apres(360, () => {
-          bande.ponctuation('sting-record', 0.55)
-          mbSecousse(0.4)
-          mbEclate(el2.querySelector('.mb-record'), { n: 46, teintes: MB_OR, vitesse: 360, gravite: 520, forme: 'confetti', duree: 1.3, taille: 5 })
-        })
-      }
-    })
-  })
-  // Temps 4 — LA RÉCOLTE : chaque tuile se pose à son tour, son chiffre
-  // ROULE jusqu'au gain — condensat, mémoire, puis l'exceptionnel
-  apres(TEMPS_BILAN.condensat, () => {
-    mbEl('mb-recolte').classList.add('mb-on')
-    Array.from(mbEl('mb-gains').children).forEach((tuile, i) => {
-      const g = b.gains[i]
-      if (!g) return
-      apres(i * 170, () => {
-        tuile.classList.add('mb-on')
-        const teinte = getComputedStyle(tuile).getPropertyValue('--t').trim() || '#6dffb8'
-        mbEclate(tuile.querySelector('.mb-gain-ico'), { n: 22, teintes: [teinte, '#eaf6ff'], vitesse: 220, gravite: 420, duree: 0.8, taille: 3 })
-        if (g.cle === 'orbe' || g.cle === 'tirage') bande.ponctuation('sting-record', 0.5)
-        const val = tuile.querySelector('.mb-gain-val')
-        if (!val || g.n <= 0) return
-        const c0 = performance.now()
-        const roule = (): void => {
-          if (mbEtape !== 'bilan') return // sauté : mbFigeBilan a écrit la valeur finale
-          const t = Math.min(1, (performance.now() - c0) / 1000)
-          // arrivé, le chiffre est celui du module de règles, à la lettre
-          val.textContent = t >= 1 ? g.valeur : `${g.prefixe}${Math.round(compteur(0, g.n, t))}${g.suffixe}`
-          if (t < 1) requestAnimationFrame(roule)
-        }
-        requestAnimationFrame(roule)
+  // Temps 3 — CHRONO ET NOTE glissent sous le volume ; un record se
+  // TAMPONNE, en or, avec son feu (le tampon claque 350 ms après la ligne,
+  // voir le retard CSS de .mb-record)
+  apres(TEMPS_BILAN.lignes, () => {
+    ligne.classList.add('mb-on')
+    if (record)
+      apres(360, () => {
+        sonCeremonie('sceau', 0.8)
+        bande.ponctuation('sting-record', 0.55)
+        mbSecousse(0.4)
+        mbEclate(ligne.querySelector('.mb-record'), { n: 46, teintes: MB_OR, vitesse: 360, gravite: 520, forme: 'confetti', duree: 1.3, taille: 5 })
       })
+  })
+  // Temps 4 — LES CARTOUCHES CLAQUENT une à une, à 170 ms d'écart ; leur
+  // chiffre ROULE jusqu'au gain — la bourse, la mémoire, puis l'exceptionnel
+  Array.from(mbEl('mb-gains').children).forEach((c, i) => {
+    const g = b.gains[i]
+    if (!g) return
+    apres(TEMPS_BILAN.condensat + 170 * i, () => {
+      c.classList.add('mb-on')
+      const teinte = getComputedStyle(c).getPropertyValue('--mb-liseret').trim() || '#6dffb8'
+      mbEclate(c.querySelector('.mb-cartouche-alv'), { n: 22, teintes: [teinte, '#eaf6ff'], vitesse: 220, gravite: 420, duree: 0.8, taille: 3 })
+      sonCeremonie('cartouche', g.cle === 'orbe' || g.cle === 'tirage' ? 1 : 0.7)
+      const val = c.querySelector('.mb-cartouche-val')
+      if (!val || g.n <= 0) return
+      sonCeremonie('compteur', 0.4)
+      const c0 = performance.now()
+      const roule = (): void => {
+        if (mbEtape !== 'bilan') return // sauté : mbFigeBilan a écrit la valeur finale
+        const t = Math.min(1, (performance.now() - c0) / 1000)
+        // arrivé, le chiffre est celui du module de règles, à la lettre
+        val.textContent = t >= 1 ? g.valeur : `${g.prefixe}${Math.round(compteur(0, g.n, t))}${g.suffixe}`
+        if (t < 1) requestAnimationFrame(roule)
+      }
+      requestAnimationFrame(roule)
     })
   })
   // Temps 5 — LE VERSEMENT
   apres(TEMPS_BILAN.versement, mbMontreVersement)
 }
+/** LE SAUT AU GESTE. Le bilan ne se passait qu'au pointeur : ni Entrée, ni
+ *  Espace, ni A n'y faisaient rien. Le levier (qui a le focus) et le toucher
+ *  de la scène mènent ici. Une fois : le premier geste fige le bilan et
+ *  ouvre le versement ; les suivants d'une rafale (Entrée tenue, double
+ *  clic, A martelé) trouvent l'étape passée et ne font rien — le versement,
+ *  lui, ignore le geste qui vient de l'ouvrir (mbGesteTropTot). */
+function mbSauteBilan(): void {
+  if (mbEtape !== 'bilan') return
+  sonCeremonie('levier')
+  mbMontreVersement()
+}
+mbEl('mb-passer').addEventListener('click', mbSauteBilan)
 // un toucher pendant les temps 1-3 saute au versement ; jamais l'inverse
 mbVeil?.addEventListener('pointerdown', (e) => {
-  if (
-    mbEtape === 'bilan' &&
-    (e.target as HTMLElement).closest('button') === null
-  ) {
-    mbMontreVersement()
-  }
+  if ((e.target as HTMLElement).closest('button') === null) mbSauteBilan()
+})
+// LES TOUCHES DE LA CÉRÉMONIE SONT À ELLE. Espace était au jeu : la table
+// des commandes en fait la PAUSE, et input.ts l'annule sur window
+// (preventDefault) — or un bouton ne s'actionne pas sur une touche annulée :
+// Espace ne pressait ni le levier ni aucun choix, et mettait la salle de
+// derrière en pause. Une touche qui vise un bouton du voile ne remonte donc
+// plus au jeu. Et une touche TENUE (répétition) n'actionne rien : Entrée
+// gardée enfoncée sur le levier presserait sinon la cuve qui prend le focus.
+mbVeil?.addEventListener('keydown', (e) => {
+  if (e.key !== 'Enter' && e.key !== ' ') return
+  if ((e.target as HTMLElement).closest('button') === null) return
+  e.stopPropagation()
+  if (e.repeat) e.preventDefault()
 })
 // le canvas du feu suit la fenêtre : un écran tourné en pleine cérémonie
 // (téléphone) ne laisse pas les éclats hors champ

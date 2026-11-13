@@ -76,26 +76,57 @@
     $('mb-choix-titre').classList.remove('mb-grande')
   }
 
-  // ---- LE BILAN (main.ts:17188 montreMiseEnBonbonne, 17027 mbFigeBilan) ----
+  // main.ts mbPoseCuve : une image en échec se cache (jamais l'icône d'image
+  // cassée), le dos chargé efface la silhouette d'attente
+  function poseCuve(hote, html) {
+    hote.innerHTML = html
+    const cuve = hote.querySelector('.mb-cuve')
+    for (const img of hote.querySelectorAll('img')) {
+      const echoue = () => { img.hidden = true }
+      const charge = () => { if (img.classList.contains('mb-cuve-dos')) cuve.classList.add('mb-cuve-rendue') }
+      if (img.complete) { if (img.naturalWidth === 0) echoue(); else charge() }
+      else { img.addEventListener('error', echoue, { once: true }); img.addEventListener('load', charge, { once: true }) }
+    }
+    return hote.querySelector('.mb-cuve-liquide')
+  }
+
+  // ---- LE BILAN (main.ts montreMiseEnBonbonne, mbFigeBilan) ----
+  // la scène « station » : la poutre, le sceau du rang, la bonbonne cerclée
+  // de son manomètre, le volume, la ligne chrono · note (ou le tampon
+  // RECORD), les cartouches, le levier
   function bilan(etat) {
     ouvre()
     scene.scrollTop = 0
     const v = F.rangDeSalle(RUN.pct)
+    const part = Math.max(0, Math.min(1, RUN.pct))
     veil.style.setProperty('--mb-rang', v.teinte)
     $('mb-releve').hidden = false
     $('mb-titre').textContent = 'SALLE FRANCHIE'
     $('mb-sur').textContent = `MISE EN BONBONNE · ${RUN.code} · PRIME : TIRAGE GARANTI`
-    $('mb-rang').hidden = true
-    $('mb-corps').classList.remove('mb-on')
+    const rang = $('mb-rang')
+    rang.hidden = true
+    rang.title = `${v.nom} — ${v.mot}`
+    $('mb-rang-img').innerHTML = F.sceauHTML(v.rang)
     $('mb-rang-lettre').textContent = v.nom
     $('mb-rang-lettre').style.setProperty('--mb-nom-n', String(v.nom.length))
-    $('mb-rang-mot').textContent = v.mot
     $('mb-etoiles').innerHTML = '<i>★</i>'.repeat(5)
-    $('mb-eau').style.height = '0%'
+    const eau = poseCuve($('mb-bonbonne'), F.cuveHTML('bonbonne', 'mb-eau'))
+    $('mb-mano').style.setProperty('--mb-mano-p', '0')
+    $('mb-part').textContent = '0 %'
     $('mb-l').textContent = '0,00 L'
-    $('mb-prime').hidden = true; $('mb-verse').hidden = true; $('mb-glace').hidden = true
+    $('mb-prime').hidden = true; $('mb-verse').hidden = true
     $('mb-choix').hidden = true
-    $('mb-recolte').classList.remove('mb-on')
+    // main.ts : la ligne chrono · note, ou le tampon d'un record
+    const note = Math.round((RUN.surplus * 100 * 60) / (60 + RUN.temps))
+    const record = RUN.newVolume || RUN.newChrono
+    const quoi = [RUN.newVolume ? 'volume' : '', RUN.newChrono ? 'chrono' : ''].filter((x) => x).join(' et ')
+    const ligne = $('mb-ligne')
+    ligne.classList.remove('mb-on')
+    ligne.innerHTML = record
+      ? `<em class="mb-record" title="${esc(`record du protocole : ${quoi}`)}">RECORD` +
+        (RUN.newChrono ? `${F.iconeCeremonieHTML('chrono')}<b>${fmtTime(RUN.temps)}</b>` : '') + `</em>`
+      : `<span class="mb-ligne-it" title="${esc(`chrono — record ${RUN.recChr}`)}">${F.iconeCeremonieHTML('chrono')}<b>${fmtTime(RUN.temps)}</b></span>` +
+        `<span class="mb-ligne-it" title="${esc(`note — ${F.motDeNote(note)}, le volume pesé par la vitesse`)}">${F.iconeCeremonieHTML('note')}<b>${note}</b></span>`
     const cond = F.condensatDuSas({ surplusL: RUN.surplus, rendement: 1, primeDouble: false, pastillesCl: 35 })
     const mem = F.memoireDuSas({ premiereFois: true, newVolume: true, newChrono: false, primeMur: 0, facteurModule: 1, primeDouble: false })
     const gains = F.gainsDeSalle({
@@ -103,45 +134,32 @@
       memoireSolde: RUN.memoireSolde, tirageGaranti: true, orbe: null,
     })
     RUN.gains = gains
-    $('mb-gains').innerHTML = gains.map(F.mbGainHTML).join('')
+    $('mb-gains').innerHTML = gains.map(F.cartoucheHTML).join('')
     $('mb-etal').hidden = true
     $('mb-etal').classList.remove('coule', 'mb-mince')
     $('mb-etal-tampon').hidden = true
     $('mb-etal-gain').hidden = true
-    // main.ts:17292 les trois lignes
-    const ligne = (ico, nom, f, val, sous, neuf, record) =>
-      `<div class="mb-ligne${neuf ? ' mb-neuf' : ''}">` +
-      `<span class="mb-ligne-nom"><i>${ico}</i>${nom}</span>` +
-      `<span class="mb-ligne-barre" style="--f:${Math.max(0, Math.min(1, f)).toFixed(3)}"></span>` +
-      `<span class="mb-ligne-val"><b>${val}</b></span>` +
-      `<small class="mb-ligne-sous">${sous}${!neuf && record && record !== '—' ? `${sous ? ' · ' : ''}<em>record ${record}</em>` : ''}</small>` +
-      (neuf ? `<em class="mb-record">RECORD DU PROTOCOLE</em>` : '') + `</div>`
-    const note = Math.round((RUN.surplus * 100 * 60) / (60 + RUN.temps))
-    $('mb-lignes').innerHTML = [
-      ligne('💧', 'PART LIVRÉE', RUN.pct, `${Math.round(RUN.pct * 100)} %`, 'du volume de départ', RUN.newVolume, ''),
-      ligne('⏱', 'CHRONO', 60 / (60 + RUN.temps), fmtTime(RUN.temps), '', RUN.newChrono, RUN.recChr),
-      ligne('❖', 'NOTE', note / 300, String(note), `${F.motDeNote(note)} — le volume, pesé par la vitesse`, false, ''),
-    ].join('')
     $('mb-passer').hidden = false
+    $('mb-passer').focus({ preventScroll: true })
     if (etat === 'chute') {
-      // t ≈ 850 ms : la médaille vient de tomber (TEMPS_BILAN.rang = 650)
-      $('mb-rang').hidden = false
+      // t ≈ 850 ms : le sceau vient de tomber (TEMPS_BILAN.rang = 650), la
+      // bonbonne attend encore, vide
+      rang.hidden = false
       $('mb-flash').classList.add('mb-on')
       scene.classList.add('mb-secousse')
       return v
     }
     // état final (≈ 4,6 s) : ce que mbFigeBilan écrit
-    $('mb-rang').hidden = false
-    $('mb-corps').classList.add('mb-on')
+    rang.hidden = false
     Array.from($('mb-etoiles').children).forEach((e, i) => { if (i < v.etoiles) e.classList.add('mb-on') })
-    $('mb-eau').style.height = `${Math.min(100, RUN.pct * 100).toFixed(0)}%`
+    eau.style.setProperty('--mb-niveau', part.toFixed(3))
+    $('mb-mano').style.setProperty('--mb-mano-p', part.toFixed(3))
+    $('mb-part').textContent = `${Math.round(RUN.pct * 100)} %`
     $('mb-l').textContent = fmtL(RUN.surplus)
     $('mb-prime').hidden = false
     $('mb-prime').textContent = `dont +${fmtL(RUN.prime)} de PRIME DE GLACE`
-    $('mb-glace').hidden = false
-    for (const l of document.querySelectorAll('.mb-ligne')) l.classList.add('mb-on')
-    $('mb-recolte').classList.add('mb-on')
-    for (const t of $('mb-gains').children) t.classList.add('mb-on')
+    ligne.classList.add('mb-on')
+    for (const c of $('mb-gains').children) c.classList.add('mb-on')
     return v
   }
 
@@ -386,7 +404,7 @@
       `<div class="mb-module-total"><small>${esc(livre.nom)}</small><b>${esc(livre.valeur)}</b></div>` +
       `<ol class="mb-module-salles" aria-label="Les salles franchies">` +
       F.pastillesDeSalles(r).map((p, i) => `<li style="--t:${p.teinte};--i:${i}"><span>${esc(p.code)}</span><b>${p.nom}</b><i aria-hidden="true">${'★'.repeat(p.etoiles)}</i><small>${p.litres}</small></li>`).join('') +
-      `</ol></div><div class="mb-gains">${gains.filter((g) => g !== livre).map(F.mbGainHTML).join('')}</div>`
+      `</ol></div><div class="mb-gains">${gains.filter((g) => g !== livre).map(F.cartoucheHTML).join('')}</div>`
     host.appendChild(bloc)
     const btn = document.createElement('button')
     btn.type = 'button'; btn.className = 'mb-continuer'; btn.textContent = 'CHOISIR LA COURSIVE SUIVANTE ▸'

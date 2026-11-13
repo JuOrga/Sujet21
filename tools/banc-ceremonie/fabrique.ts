@@ -1,6 +1,6 @@
 // FABRIQUE DU BANC DE LA CÉRÉMONIE — les vrais modules du jeu, rien de recopié
-// sauf ce qui vit DANS main.ts (carteHTML, mbGainHTML : copiés à la lettre,
-// voir les références). Empaqueté en IIFE par esbuild, injecté dans la page
+// sauf ce qui vit DANS main.ts (carteHTML : copié à la lettre, voir la
+// référence). Empaqueté en IIFE par esbuild, injecté dans la page
 // construite (scripts du jeu bloqués) : window.FAB.
 const W = '../../src/game/'
 // (esbuild résout les chemins absolus tels quels)
@@ -18,7 +18,8 @@ import { gainsDeSalle, gainsDeModule, pastillesDeSalles, condensatDuSas, memoire
 import { rangDeSalle, motDeNote, titreDuTirage } from '../../src/game/ceremonie'
 import { iconeMetaHTML } from '../../src/game/metaAssets'
 import { iconeCeremonieHTML } from '../../src/game/iconesStation'
-import { sceauHTML } from '../../src/game/ceremonieObjets'
+import { cuveHTML, sceauHTML } from '../../src/game/ceremonieObjets'
+import { cartoucheHTML } from '../../src/game/cartouches'
 import { offresRepos, offreDon } from '../../src/game/descenteCarte'
 import { tireEvenement, offresDe, detailOffre, resoutChoix, ditEffet } from '../../src/game/evenements'
 void W
@@ -72,21 +73,6 @@ function carteHTML(d: any, o: { variante: string; prix?: number; bouton?: boolea
     `</${balise}>`
 }
 
-// ---- main.ts:15245 mbGainHTML ----
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function mbGainHTML(g: any, i: number): string {
-  const esc = (t: string): string => t.replace(/&/g, '&amp;').replace(/</g, '&lt;')
-  return `<div class="mb-gain mb-gain-${g.cle}" style="--i:${i}">` +
-    `<i class="mb-gain-ico" aria-hidden="true">${g.cle === 'condensat' || g.cle === 'memoire' ? iconeMetaHTML(g.cle, g.icone) : g.icone}</i>` +
-    `<span class="mb-gain-haut"><span class="mb-gain-tete"><span class="mb-gain-nom">${esc(g.nom)}</span>` +
-    `<b class="mb-gain-val">${esc(g.valeur)}</b></span>` +
-    (g.solde ? `<span class="mb-gain-solde"><small>${esc(g.solde.nom)}</small><b>${esc(g.solde.valeur)}</b></span>` : '') +
-    `</span>` +
-    `<small class="mb-gain-role">${esc(g.role)}</small>` +
-    (g.detail ? `<small class="mb-gain-detail">${esc(g.detail)}</small>` : '') +
-    `</div>`
-}
-
 // un aléa figé : les mêmes images à chaque passage
 function graine(s: number): () => number {
   let g = s
@@ -119,11 +105,11 @@ function station(): { svg: string; legende: string; cadre: string; choix: string
 }
 
 const FAB = {
-  carteHTML, mbGainHTML, miniCarte, station, rangDeSalle, motDeNote, iconeMetaHTML,
+  carteHTML, cartoucheHTML, miniCarte, station, rangDeSalle, motDeNote, iconeMetaHTML,
   INSTRUMENTS, gainsDeSalle, gainsDeModule, pastillesDeSalles, condensatDuSas,
   offresRepos, offreDon, tireEvenement, offresDe, detailOffre, ICONES_MINI_CARTE,
   graine, Feu, memoireDuSas, resoutChoix, ditEffet, titreDuTirage, tirageInstruments,
-  iconeCeremonieHTML, sceauHTML,
+  iconeCeremonieHTML, sceauHTML, cuveHTML,
   /** dessine le plan d'une salle générée dans un canvas de porte */
   plan(canvas: HTMLCanvasElement, mecanique: 0 | 1 | 2 | 3, diff: number, variante: string): string {
     const lv = genereNiveauAtelier({ moment: 2, mecanique, difficulte: diff } as never, variante)
