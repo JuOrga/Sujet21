@@ -246,3 +246,25 @@ describe('la cérémonie — le choix de la salle tient dans l’écran', () => 
     expect(corps('mbMontreSallesVoie')).not.toContain('visez une porte')
   })
 })
+
+// LE VOCABULAIRE DE LA STATION. « Tout est rectangulaire, carré… ça ne fait
+// pas encore assez jeu vidéo » (le concepteur, 13/11) : la cérémonie était
+// faite de rectangles arrondis et de pilules. Ses primitives (chanfreins,
+// poutre, cartouche, sceau, manomètre, levier) posent les coins coupés une
+// fois pour toutes ; ces gardes tiennent qu'aucune ne retombe dans
+// l'arrondi, et que chaque mise en scène qu'elles apportent a son repli
+// « moins d'animations ».
+describe('la cérémonie — le vocabulaire de la station', () => {
+  const HTML = readFileSync(new URL('../../index.html', import.meta.url), 'utf-8')
+  const css = HTML.slice(HTML.indexOf('/* ==== LA CÉRÉMONIE DE FIN DE SALLE'), HTML.indexOf('/* ---- Le panneau du GÉNÉRATEUR'))
+  const regle = (s: string): string => { const d = css.indexOf(`\n      ${s} {`); expect(d, s).toBeGreaterThan(-1); return css.slice(d, css.indexOf('}', d)) }
+  it('taille ses cadres au chanfrein, pas à l’arrondi', () => {
+    for (const s of ['.mb-coupe', '.mb-coupe-diag', '.mb-cartouche', '.mb-levier', '.mb-sceau', '.mb-poutre'])
+      expect(regle(s), s).toMatch(/clip-path:\s*polygon\(/)
+    expect(regle('.mb-levier')).not.toMatch(/border-radius:\s*999/)
+  })
+  it('donne un repli « moins d’animations » à chaque primitive animée', () => {
+    const moins = css.slice(css.lastIndexOf('prefers-reduced-motion: reduce'))
+    for (const s of ['.mb-sceau', '.mb-cartouche', '.mb-poutre', '.mb-levier', '.mb-mano']) expect(moins, s).toContain(s)
+  })
+})
