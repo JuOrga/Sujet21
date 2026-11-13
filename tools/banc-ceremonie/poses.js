@@ -1,0 +1,504 @@
+// LES POSES DE LA CÉRÉMONIE — le DOM que main.ts bâtit à chaque étape,
+// recopié de ses gabarits (références main.ts:ligne en tête de chaque pose),
+// rempli de valeurs plausibles. S'appuie sur window.FAB (fabrique.js).
+;(() => {
+  const F = window.FAB
+  const $ = (id) => document.getElementById(id)
+  const veil = $('mb-veil')
+  const scene = $('mb-scene')
+  const esc = (t) => String(t).replace(/&/g, '&amp;').replace(/</g, '&lt;')
+  const fmtL = (l) => `${l.toFixed(2).replace('.', ',')} L`
+  const fmtTime = (s) => `${s.toFixed(1).replace('.', ',')} s`
+  const virgule = (n, d = 2) => n.toFixed(d).replace('.', ',')
+  const MB_OR = ['#ffd977', '#ffe9a8', '#fff4d6', '#f2c98e']
+  const MB_MENTHE = ['#6dffb8', '#a9ffd6', '#8fd8c8', '#eaf6ff']
+  const MB_EAU = ['#63b7e6', '#a7ddf5', '#eaf6ff', '#4fa8d8']
+  const PALIERS = [3, 6, 10, 15, 21, 28, 36]
+  const paliers = (xp) => PALIERS.filter((p) => xp >= p).length
+  const segment = (xp) => { let base = 0; for (const p of PALIERS) { if (xp >= p) base = p; else return { base, cible: p } } return { base, cible: null } }
+
+  // ---- LA RUN DU BANC (valeurs plausibles, pas mesurées) ----
+  const RUN = {
+    code: 'G-203-K3F9', pct: 0.93, surplus: 4.18, prime: 0.32, temps: 48.3,
+    newVolume: true, newChrono: false, recChr: '41,6 s · OPÉRATEUR',
+    bonbonne: 3.2, cap: 8, xp: 4.6, condensat: 655, memoireSolde: 148,
+    module: 'TRANSFO GLACE', rang: 3, longueur: 18,
+  }
+
+  // ---- le feu : la vraie simulation (ceremonieFx.Feu), avancée à la main ----
+  function feu(rafales) {
+    const c = $('mb-feu')
+    c.width = veil.clientWidth; c.height = veil.clientHeight
+    const ctx = c.getContext('2d')
+    ctx.clearRect(0, 0, c.width, c.height)
+    const v = veil.getBoundingClientRect()
+    rafales.forEach(({ el, r, age }, k) => {
+      if (!el) return
+      const b = el.getBoundingClientRect()
+      const f = new F.Feu()
+      f.eclate(b.left + b.width / 2 - v.left, b.top + b.height / 2 - v.top, r, F.graine(31 + k * 7))
+      for (let t = 0; t < age; t += 1 / 60) f.pas(1 / 60)
+      f.dessine(ctx)
+    })
+  }
+
+  // ---- figer les animations CSS à un instant donné (ms depuis leur départ) ----
+  function fige(regles, defaut) {
+    for (const a of document.getAnimations()) {
+      const cible = a.effect && a.effect.target
+      let ms = defaut
+      for (const [sel, t] of regles) if (cible && cible.matches && cible.matches(sel)) { ms = t; break }
+      a.pause()
+      if (ms !== null) a.currentTime = ms
+    }
+  }
+
+  function ouvre() {
+    veil.hidden = false
+    veil.style.zIndex = '2147483647'
+    scene.classList.remove('mb-compact', 'mb-large', 'mb-secousse', 'mb-question')
+    $('mb-palier-eclair').hidden = true
+    $('mb-flash').classList.remove('mb-on')
+    const c = $('mb-feu'); c.width = veil.clientWidth; c.height = veil.clientHeight
+  }
+  function cartes() { // main.ts:15489 mbCartes
+    const h = $('mb-cartes')
+    h.className = 'mb-cartes'
+    h.style.removeProperty('--n')
+    h.innerHTML = ''
+    $('mb-choix-titre').classList.remove('mb-grande')
+    scene.classList.remove('mb-question')
+    return h
+  }
+  function question(t) { // main.ts:16613 mbQuestion
+    $('mb-titre').textContent = t
+    scene.classList.add('mb-question')
+    $('mb-choix-titre').classList.remove('mb-grande')
+  }
+
+  // ---- LE BILAN (main.ts:17188 montreMiseEnBonbonne, 17027 mbFigeBilan) ----
+  function bilan(etat) {
+    ouvre()
+    scene.scrollTop = 0
+    const v = F.rangDeSalle(RUN.pct)
+    veil.style.setProperty('--mb-rang', v.teinte)
+    $('mb-releve').hidden = false
+    $('mb-titre').textContent = 'SALLE FRANCHIE'
+    $('mb-sur').textContent = `MISE EN BONBONNE · ${RUN.code} · PRIME : TIRAGE GARANTI`
+    $('mb-rang').hidden = true
+    $('mb-corps').classList.remove('mb-on')
+    $('mb-rang-lettre').textContent = v.nom
+    $('mb-rang-lettre').style.setProperty('--mb-nom-n', String(v.nom.length))
+    $('mb-rang-mot').textContent = v.mot
+    $('mb-etoiles').innerHTML = '<i>★</i>'.repeat(5)
+    $('mb-eau').style.height = '0%'
+    $('mb-l').textContent = '0,00 L'
+    $('mb-prime').hidden = true; $('mb-verse').hidden = true; $('mb-glace').hidden = true
+    $('mb-choix').hidden = true
+    $('mb-recolte').classList.remove('mb-on')
+    const cond = F.condensatDuSas({ surplusL: RUN.surplus, rendement: 1, primeDouble: false, pastillesCl: 35 })
+    const mem = F.memoireDuSas({ premiereFois: true, newVolume: true, newChrono: false, primeMur: 0, facteurModule: 1, primeDouble: false })
+    const gains = F.gainsDeSalle({
+      condensat: cond, bourseCl: RUN.condensat, memoire: mem.brut, memoireDetail: mem.detail,
+      memoireSolde: RUN.memoireSolde, tirageGaranti: true, orbe: null,
+    })
+    RUN.gains = gains
+    $('mb-gains').innerHTML = gains.map(F.mbGainHTML).join('')
+    $('mb-etal').hidden = true
+    $('mb-etal').classList.remove('coule', 'mb-mince')
+    $('mb-etal-tampon').hidden = true
+    $('mb-etal-gain').hidden = true
+    // main.ts:17292 les trois lignes
+    const ligne = (ico, nom, f, val, sous, neuf, record) =>
+      `<div class="mb-ligne${neuf ? ' mb-neuf' : ''}">` +
+      `<span class="mb-ligne-nom"><i>${ico}</i>${nom}</span>` +
+      `<span class="mb-ligne-barre" style="--f:${Math.max(0, Math.min(1, f)).toFixed(3)}"></span>` +
+      `<span class="mb-ligne-val"><b>${val}</b></span>` +
+      `<small class="mb-ligne-sous">${sous}${!neuf && record && record !== '—' ? `${sous ? ' · ' : ''}<em>record ${record}</em>` : ''}</small>` +
+      (neuf ? `<em class="mb-record">RECORD DU PROTOCOLE</em>` : '') + `</div>`
+    const note = Math.round((RUN.surplus * 100 * 60) / (60 + RUN.temps))
+    $('mb-lignes').innerHTML = [
+      ligne('💧', 'PART LIVRÉE', RUN.pct, `${Math.round(RUN.pct * 100)} %`, 'du volume de départ', RUN.newVolume, ''),
+      ligne('⏱', 'CHRONO', 60 / (60 + RUN.temps), fmtTime(RUN.temps), '', RUN.newChrono, RUN.recChr),
+      ligne('❖', 'NOTE', note / 300, String(note), `${F.motDeNote(note)} — le volume, pesé par la vitesse`, false, ''),
+    ].join('')
+    $('mb-passer').hidden = false
+    if (etat === 'chute') {
+      // t ≈ 850 ms : la médaille vient de tomber (TEMPS_BILAN.rang = 650)
+      $('mb-rang').hidden = false
+      $('mb-flash').classList.add('mb-on')
+      scene.classList.add('mb-secousse')
+      return v
+    }
+    // état final (≈ 4,6 s) : ce que mbFigeBilan écrit
+    $('mb-rang').hidden = false
+    $('mb-corps').classList.add('mb-on')
+    Array.from($('mb-etoiles').children).forEach((e, i) => { if (i < v.etoiles) e.classList.add('mb-on') })
+    $('mb-eau').style.height = `${Math.min(100, RUN.pct * 100).toFixed(0)}%`
+    $('mb-l').textContent = fmtL(RUN.surplus)
+    $('mb-prime').hidden = false
+    $('mb-prime').textContent = `dont +${fmtL(RUN.prime)} de PRIME DE GLACE`
+    $('mb-glace').hidden = false
+    for (const l of document.querySelectorAll('.mb-ligne')) l.classList.add('mb-on')
+    $('mb-recolte').classList.add('mb-on')
+    for (const t of $('mb-gains').children) t.classList.add('mb-on')
+    return v
+  }
+
+  // ---- LE VERSEMENT (main.ts:15065) ----
+  function versement() {
+    bilan('final')
+    $('mb-passer').hidden = true
+    $('mb-choix').hidden = false
+    const titre = $('mb-choix-titre')
+    titre.textContent = 'OÙ VERSER LE SURPLUS ?'
+    const host = cartes()
+    titre.classList.add('mb-grande')
+    const b = RUN, cap = RUN.cap
+    const espace = Math.max(0, cap - b.bonbonne), verse = Math.min(b.surplus, espace), spill = b.surplus - verse
+    const pleine = espace < 0.01
+    const seg = segment(b.xp), prochain = seg.cible
+    const largeur = seg.cible === null ? 1 : seg.cible - seg.base
+    const acquis = seg.cible === null ? 1 : (b.xp - seg.base) / largeur
+    const gain = seg.cible === null ? 0 : Math.min(1, b.surplus / largeur)
+    const franchit = prochain !== null && b.xp + b.surplus >= prochain
+    const fmt = (l) => l.toFixed(2).replace('.', ',')
+    const sc = document.createElement('div'); sc.className = 'mb-versement'
+    const goutte = document.createElement('div'); goutte.className = 'mb-goutte'
+    goutte.innerHTML = `<span class="mb-flux mb-flux-g" aria-hidden="true"></span><span class="mb-flux mb-flux-d" aria-hidden="true"></span><span class="mb-goutte-corps"><b>${fmt(b.surplus)} L</b><i>SURPLUS</i></span>`
+    const nAv = b.bonbonne / cap, nAp = Math.min(1, (b.bonbonne + verse) / cap)
+    const cb = document.createElement('button'); cb.type = 'button'
+    cb.className = 'mb-carte mb-dest mb-dest-reserve' + (pleine ? ' mb-pauvre' : ''); cb.style.setProperty('--i', '0')
+    cb.innerHTML = `<span class="mb-dest-tete"><svg class="mb-bocal" viewBox="0 0 48 64" aria-hidden="true">` +
+      `<rect x="12" y="2" width="24" height="7" rx="2" class="mb-bocal-bouchon"/>` +
+      `<rect x="4" y="9" width="40" height="53" rx="9" class="mb-bocal-verre"/>` +
+      `<rect x="6" y="${(11 + 49 * (1 - nAp)).toFixed(1)}" width="36" height="${(49 * nAp).toFixed(1)}" rx="6" class="mb-bocal-gain"/>` +
+      `<rect x="6" y="${(11 + 49 * (1 - nAv)).toFixed(1)}" width="36" height="${(49 * nAv).toFixed(1)}" rx="6" class="mb-bocal-eau"/>` +
+      `</svg><b>RÉSERVE</b></span>` +
+      `<span class="mb-dest-chiffres"><i>${fmt(b.bonbonne)}</i><em>→</em><b>${fmt(b.bonbonne + verse)} L</b><small>/ ${cap} L</small></span>` +
+      `<span class="mb-dest-jauge" style="--a:${nAv.toFixed(3)};--g:${(nAp - nAv).toFixed(3)}"></span>` +
+      `<small class="mb-dest-mot">à reverser dans le corps, en pleine salle</small>` +
+      (spill > 0.01 ? `<em class="mb-dest-plus">+ ${fmt(spill)} L d’excédent vers la maîtrise</em>` : '')
+    const C = (2 * Math.PI * 27).toFixed(2)
+    const cx = document.createElement('button'); cx.type = 'button'
+    cx.className = 'mb-carte mb-dest mb-dest-maitrise' + (franchit ? ' mb-dest-palier' : ''); cx.style.setProperty('--i', '1')
+    cx.innerHTML = `<span class="mb-dest-tete"><svg class="mb-anneau" viewBox="0 0 64 64" aria-hidden="true">` +
+      `<circle cx="32" cy="32" r="27" class="mb-anneau-fond"/>` +
+      `<circle cx="32" cy="32" r="27" class="mb-anneau-gain" style="stroke-dasharray:${C};stroke-dashoffset:${(Number(C) * (1 - Math.min(1, acquis + gain))).toFixed(2)}"/>` +
+      `<circle cx="32" cy="32" r="27" class="mb-anneau-fait" style="stroke-dasharray:${C};stroke-dashoffset:${(Number(C) * (1 - acquis)).toFixed(2)}"/>` +
+      `<text x="32" y="37" class="mb-anneau-no">${paliers(b.xp)}</text></svg><b>MAÎTRISE</b></span>` +
+      `<span class="mb-dest-chiffres"><i>${virgule(b.xp, 1)}</i><em>→</em><b>${virgule(b.xp + b.surplus, 1)} L</b>` +
+      `<small>${prochain !== null ? `palier à ${prochain} L` : 'table complète'}</small></span>` +
+      `<span class="mb-dest-jauge" style="--a:${acquis.toFixed(3)};--g:${gain.toFixed(3)}"></span>` +
+      `<small class="mb-dest-mot">chaque palier ouvre un tirage d’instrument</small>` +
+      (franchit ? `<em class="mb-dest-plus mb-dest-ouvre">UN PALIER SE FRANCHIT — TIRAGE OUVERT</em>` : '')
+    sc.append(cb, goutte, cx)
+    host.appendChild(sc)
+  }
+
+  // ---- la jauge (main.ts:15201 mbPeintEtal) ----
+  function peintEtal(xp) {
+    const seg = segment(xp)
+    const part = seg.cible === null ? 1 : Math.max(0, Math.min(1, (xp - seg.base) / (seg.cible - seg.base)))
+    const pct = `${(part * 100).toFixed(2)}%`
+    $('mb-etal-fluide').style.width = pct
+    $('mb-etal-lueur').style.left = pct
+    $('mb-etal-l').textContent = virgule(xp, 1)
+    $('mb-etal-pg').querySelector('b').textContent = String(paliers(xp))
+    $('mb-etal-pd').querySelector('b').textContent = seg.cible === null ? '★' : `${seg.cible} L`
+    $('mb-etal-pd').querySelector('small').textContent = seg.cible === null ? 'complet' : 'prochain'
+  }
+  // le bandeau replié : versé à la maîtrise (main.ts:15462 mbVerseXp)
+  function bandeau() {
+    bilan('final')
+    $('mb-passer').hidden = true
+    $('mb-choix').hidden = false
+    const v = $('mb-verse'); v.textContent = '→ versé à la maîtrise'; v.hidden = false
+    scene.classList.add('mb-compact')
+  }
+
+  // ---- L'ÉTALONNAGE, au palier franchi (main.ts:15359 mbAnimeEtalonnage) ----
+  function etalonnage(etat) {
+    bandeau()
+    $('mb-choix-titre').textContent = 'LA MAÎTRISE MONTE'
+    cartes()
+    const etal = $('mb-etal')
+    etal.hidden = false
+    etal.classList.remove('mb-mince')
+    $('mb-etal-gain').hidden = false
+    $('mb-etal-gain').textContent = `+${virgule(RUN.surplus, 2)} L`
+    const no = paliers(6)
+    if (etat === 'palier') {
+      etal.classList.add('coule')
+      $('mb-etal-tube').classList.add('eclair')
+      $('mb-etal-pg').classList.add('saute')
+      const t = $('mb-etal-tampon'); t.hidden = false; t.textContent = `PALIER ${no} — TIRAGE OUVERT`
+      $('mb-palier-eclair-no').textContent = `PALIER ${no}`
+      $('mb-palier-eclair').hidden = false
+      $('mb-flash').classList.add('mb-on')
+      scene.classList.add('mb-secousse')
+      peintEtal(6)
+      return
+    }
+    // la coulée finie : le second segment rempli
+    const t = $('mb-etal-tampon'); t.hidden = false; t.textContent = `PALIER ${no} — TIRAGE OUVERT`
+    peintEtal(RUN.xp + RUN.surplus)
+  }
+
+  // ---- LE TIRAGE (main.ts:15502 mbMontreDraft) ----
+  function draft(etat) {
+    etalonnage('fin')
+    const xpF = RUN.xp + RUN.surplus
+    $('mb-choix-titre').textContent = `${F.titreDuTirage(paliers(xpF), 2, true)} · EN BOURSE : ${RUN.condensat} cL`
+    const host = cartes()
+    const tir = F.tirageInstruments(F.graine(5), [], 2, 3, 3, F.INSTRUMENTS)
+    host.classList.add('mb-draft')
+    host.style.setProperty('--n', String(Math.min(4, tir.length)))
+    tir.forEach((c, i) => {
+      const def = F.INSTRUMENTS.find((d) => d.id === c.id)
+      const pli = document.createElement('div')
+      pli.className = 'mb-pli'
+      pli.style.setProperty('--i', String(i))
+      pli.innerHTML = F.carteHTML(def, { variante: 'draft', bouton: true, prix: c.prix })
+      const btn = pli.firstElementChild
+      btn.style.setProperty('--i', String(i))
+      if (!(c.prix === 0 || RUN.condensat >= c.prix)) { btn.classList.add('mb-pauvre'); btn.disabled = true }
+      host.appendChild(pli)
+    })
+    if (etat === 'elue') {
+      host.classList.add('mb-elu')
+      host.children[1].classList.add('mb-elu-c')
+      scene.classList.add('mb-secousse')
+    }
+  }
+
+  // ---- LE CHOIX DE LA SALLE (main.ts:16413 mbMontreSallesVoie, 16642 mbPorte, 16766 mbPorteNoeud) ----
+  function salles(variante) {
+    ouvre()
+    $('mb-releve').hidden = true
+    $('mb-etal').hidden = true
+    $('mb-passer').hidden = true
+    $('mb-choix').hidden = false
+    question('CHOISISSEZ LA SALLE SUIVANTE')
+    $('mb-choix-titre').textContent = `${RUN.module} · SALLE 3/6 · DESCENTE ${RUN.rang + 1}/${RUN.longueur}`
+    scene.classList.add('mb-compact')
+    const host = cartes()
+    host.classList.add('mb-trio')
+    host.innerHTML = `<div class="mb-voies">${F.miniCarte()}<p class="mv-fiche" hidden></p></div>`
+    const REP = [['▲', 'HAUT'], ['●', 'MILIEU'], ['▼', 'BAS']]
+    const portes = [
+      { mec: 0, diff: 3, v: 'K3F9', figure: 'le serpentin' },
+      { mec: 1, diff: 4, v: 'PQ2Z', prime: 'CONDENSAT ×2' },
+      variante === 'noeud' ? { noeud: true } : { mec: 2, diff: 3, v: 'AB12' },
+    ]
+    portes.forEach((p, i) => {
+      const no = `<span class="mb-porte-no mb-porte-repere"><i>${REP[i][0]}</i> VOIE DU ${REP[i][1]}</span>`
+      const btn = document.createElement('button')
+      btn.type = 'button'
+      btn.style.setProperty('--i', String(i))
+      if (p.noeud) {
+        btn.className = 'mb-porte mb-porte-ev mb-porte-evenement'
+        btn.innerHTML = `<span class="mb-porte-vue mb-ev-vue">${no}<svg class="mb-ev-icone" viewBox="0 0 24 24" aria-hidden="true">${F.ICONES_MINI_CARTE}<use href="#mv-i-rencontre" width="24" height="24"/></svg></span>` +
+          `<b>SIGNAL</b><small>Quelque chose vit encore derrière.</small><span class="mb-porte-ligne mb-porte-ligne-ev"><i>RENCONTRE</i></span><span class="mb-porte-entrer">ENTRER ▸</span>`
+      } else {
+        btn.className = 'mb-porte'
+        btn.innerHTML = `<span class="mb-porte-vue">${no}<canvas width="440" height="252"></canvas></span><b></b><small></small><span class="mb-porte-ligne"></span><span class="mb-porte-entrer">ENTRER ▸</span>`
+        const [code, nom] = F.plan(btn.querySelector('canvas'), p.mec, p.diff, p.v).split('|')
+        btn.querySelector('b').textContent = code
+        btn.querySelector('small').textContent = nom
+        btn.querySelector('.mb-porte-ligne').innerHTML = [`<i>DIFF ${p.diff}</i>`, p.prime ? `<i class="mb-porte-prime">PRIME ${p.prime}</i>` : '', p.figure ? `<i>FIGURE ${p.figure.toUpperCase()}</i>` : ''].join('')
+      }
+      host.appendChild(btn)
+    })
+  }
+
+  // ---- LE BILAN DU MODULE (main.ts:15274 mbMontreBilanModule) ----
+  function module(etat) {
+    ouvre()
+    scene.classList.add('mb-compact')
+    $('mb-releve').hidden = true
+    question('MODULE TRAVERSÉ')
+    $('mb-choix-titre').textContent = `DESCENTE 6 / ${RUN.longueur} · CE QUE LE MODULE A RENDU`
+    $('mb-etal').hidden = true; $('mb-passer').hidden = true; $('mb-choix').hidden = false
+    const host = cartes()
+    const r = {
+      module: 'T1', haltes: 1, condensatCl: 1235, memoire: 22, orbes: [], instrumentsEntree: [], paliersEntree: 1,
+      salles: [
+        { code: 'G-102-AB12', pct: 0.93, litres: 4.18 }, { code: '21B7-031', pct: 0.78, litres: 3.4 },
+        { code: 'G-213-K3F9', pct: 0.55, litres: 2.31 }, { code: 'G-221-PQ2Z', pct: 0.95, litres: 4.6 },
+        { code: 'G-232-ZZ01', pct: 0.34, litres: 1.42 },
+      ],
+    }
+    const gains = F.gainsDeModule({
+      recolte: r, bourseCl: 1890, memoireSolde: 164, instruments: ['aimant-rosee', 'croc-du-sas'],
+      nomInstrument: (id) => { const d = F.INSTRUMENTS.find((x) => x.id === id); return d ? { icone: d.icone, nom: d.nom } : null },
+      paliers: 2,
+    })
+    const livre = gains.find((g) => g.cle === 'livre')
+    const sous = ['énigme', '5 salles franchies', '1 rencontre ou halte']
+    const bloc = document.createElement('div')
+    bloc.className = 'mb-module'
+    bloc.innerHTML = `<div class="mb-module-tete"><i class="mb-module-sceau" aria-hidden="true">✓</i>` +
+      `<div class="mb-module-nom"><b>${esc(RUN.module)}</b><small>${esc(sous.join(' · '))}</small></div>` +
+      `<div class="mb-module-total"><small>${esc(livre.nom)}</small><b>${esc(livre.valeur)}</b></div>` +
+      `<ol class="mb-module-salles" aria-label="Les salles franchies">` +
+      F.pastillesDeSalles(r).map((p, i) => `<li style="--t:${p.teinte};--i:${i}"><span>${esc(p.code)}</span><b>${p.nom}</b><i aria-hidden="true">${'★'.repeat(p.etoiles)}</i><small>${p.litres}</small></li>`).join('') +
+      `</ol></div><div class="mb-gains">${gains.filter((g) => g !== livre).map(F.mbGainHTML).join('')}</div>`
+    host.appendChild(bloc)
+    const btn = document.createElement('button')
+    btn.type = 'button'; btn.className = 'mb-continuer'; btn.textContent = 'CHOISIR LA COURSIVE SUIVANTE ▸'
+    host.appendChild(btn)
+  }
+
+  // ---- LA CARTE DE LA STATION (main.ts:15691 mbMontreCarte) ----
+  function carte() {
+    ouvre()
+    scene.classList.add('mb-compact')
+    $('mb-releve').hidden = true; $('mb-etal').hidden = true; $('mb-passer').hidden = true; $('mb-choix').hidden = false
+    question('CHOISISSEZ LA COURSIVE')
+    scene.classList.add('mb-large')
+    const st = F.station()
+    $('mb-choix-titre').textContent = `${st.nomCourant} TRAVERSÉ — CHOISISSEZ LA COURSIVE SUIVANTE`
+    const host = cartes()
+    host.classList.add('mb-station')
+    const sc = document.createElement('div')
+    sc.className = 'mb-station-carte'
+    sc.style.setProperty('--cadre', st.cadre)
+    sc.innerHTML = st.svg
+    host.appendChild(sc)
+    const lg = document.createElement('ul'); lg.className = 'mb-station-legende'; lg.innerHTML = st.legende
+    host.appendChild(lg)
+    const fiche = document.createElement('p'); fiche.className = 'mb-station-fiche'
+    fiche.innerHTML = [`${st.choix.length} coursives ouvertes · descente 6 / ${RUN.longueur} salles`,
+      'visez un module allumé : ce qu’on y trouve, et la route la plus courte jusqu’à l’objectif se trace en blanc sur le plan',
+      'ce qui s’éteint alors ne sera plus joignable par là — c’est ce que ce choix ferme'].map((t) => `<span>${esc(t)}</span>`).join('')
+    host.appendChild(fiche)
+  }
+
+  // ---- HALTES (main.ts:15995 mbMontreRepos, 16043 mbMontreDon, 16918 mbMontreCache) ----
+  function halteBase(q, titre) {
+    ouvre(); scene.classList.add('mb-compact')
+    $('mb-releve').hidden = true; $('mb-etal').hidden = true; $('mb-passer').hidden = true; $('mb-choix').hidden = false
+    question(q)
+    $('mb-choix-titre').textContent = titre
+    return cartes()
+  }
+  function repos() {
+    const host = halteBase('UNE HALTE — UNE SEULE OFFRE', `${RUN.module} — ÉNIGME : PRENEZ UNE OFFRE, PUIS LA CARTE SE ROUVRE`)
+    host.classList.add('mb-trio')
+    F.offresRepos({ vies: 2, viesMax: 3, bonbonne: RUN.bonbonne, cap: RUN.cap }).forEach((o, i) => {
+      const b = document.createElement('button'); b.type = 'button'
+      b.className = 'mb-carte mb-repos' + (o.possible ? '' : ' mb-pauvre'); b.disabled = !o.possible
+      b.style.setProperty('--i', String(i))
+      b.innerHTML = `<i class="mb-repos-icone">${o.icone}</i><b>${esc(o.nom)}</b><small>${esc(o.detail)}</small>`
+      host.appendChild(b)
+    })
+  }
+  function don() {
+    const host = halteBase('UNE HALTE — PRENEZ', `${RUN.module} — ÉNIGME : QUELQU’UN A LAISSÉ ÇA LÀ`)
+    host.classList.add('mb-trio')
+    const o = F.offreDon({ bonbonne: RUN.bonbonne, cap: RUN.cap })
+    const b = document.createElement('button'); b.type = 'button'; b.className = 'mb-carte mb-repos'; b.style.gridColumn = '2'
+    b.innerHTML = `<i class="mb-repos-icone">${o.icone}</i><b>${esc(o.nom)}</b><small>${esc(o.detail)}</small>`
+    host.appendChild(b)
+  }
+  function cache() {
+    const host = halteBase('LA CACHE', 'SOUTES — UNE CHAMBRE CLOSE')
+    const nom = F.ORBES[0].nom
+    const bl = document.createElement('div'); bl.className = 'mb-ev-recit mb-ev-issue'
+    bl.innerHTML = `<em>SOUTES</em><p>${esc(`L’orbe d’essence de conscience — ${nom}. Il vous suit.`)}</p><ul class="mb-ev-gains"><li>🔮 orbe d’essence — ${esc(nom)}</li></ul>`
+    host.appendChild(bl)
+    const btn = document.createElement('button'); btn.type = 'button'; btn.className = 'mb-continuer'; btn.textContent = 'REPRENDRE LA DESCENTE ▸'
+    host.appendChild(btn)
+  }
+
+  // ---- LA RENCONTRE (main.ts:17086 mbPeintEvenement, 17129 mbTranche) ----
+  function ligneEffet(e) { // main.ts:16982 appliqueEffets, au format affiché
+    switch (e.quoi) {
+      case 'bonbonne': return `🫙 réserve ${e.litres >= 0 ? '+' : ''}${virgule(e.litres, 1)} L`
+      case 'condensat': return `💧 condensat ${e.cl >= 0 ? '+' : ''}${Math.round(e.cl)} cL`
+      case 'memoire': return `🧠 mémoire +${Math.round(e.n)}`
+      case 'vies': return `💠 ${e.n > 0 ? '+' : ''}${e.n} échantillon de secours`
+      case 'essence': return `🜄 essence maximale ${Math.round(e.part * 100)} % — le corps naîtra à ${Math.round((1 + e.part) * 100)} % du plein`
+      case 'confinement': return `⚠️ confinement +${e.crans} à la prochaine salle`
+      default: return F.ditEffet(e)
+    }
+  }
+  function evenement(etat) {
+    const ev = F.tireEvenement([], F.graine(11))
+    const host = halteBase(ev.titre, `${RUN.module} — RENCONTRE · DESCENTE ${RUN.rang + 1} / ${RUN.longueur}`)
+    if (etat === 'issue') {
+      const choix = ev.choix[0]
+      const issue = F.resoutChoix(choix, F.graine(3))
+      const lignes = issue.effets.map(ligneEffet).filter(Boolean)
+      const bl = document.createElement('div'); bl.className = 'mb-ev-recit mb-ev-issue'
+      bl.innerHTML = `<em>${esc(choix.libelle)} — ${esc(choix.detail)}</em><p>${esc(issue.texte)}</p><ul class="mb-ev-gains">${(lignes.length ? lignes : ['rien']).map((l) => `<li>${esc(l)}</li>`).join('')}</ul>`
+      host.appendChild(bl)
+      const btn = document.createElement('button'); btn.type = 'button'; btn.className = 'mb-continuer'; btn.textContent = 'REPRENDRE LA DESCENTE ▸'
+      host.appendChild(btn)
+      return
+    }
+    host.classList.add('mb-trio')
+    const rc = document.createElement('div'); rc.className = 'mb-ev-recit'
+    rc.innerHTML = `<em>${esc(ev.lieu)}</em><p>${esc(ev.texte)}</p>`
+    host.appendChild(rc)
+    const etatJ = { bonbonne: RUN.bonbonne, cap: RUN.cap, vies: 2, viesMax: 3, essence: 1, plancher: 0.5, orbeAPrendre: true, inconnuALire: true }
+    F.offresDe(ev, etatJ).forEach(({ choix, possible }, i) => {
+      const b = document.createElement('button'); b.type = 'button'
+      b.className = 'mb-carte mb-ev-offre' + (possible ? '' : ' mb-pauvre'); b.disabled = !possible
+      b.style.setProperty('--i', String(i))
+      const d = F.detailOffre(choix, i === 0, possible)
+      b.innerHTML = `<b>${esc(choix.libelle)}</b><small${d.voilee ? ' class="mb-ev-voile"' : ''}>${esc(d.texte)}</small>` +
+        (choix.issues.length > 1 ? `<em class="mb-ev-pari">⚄ ${choix.issues.length} issues possibles</em>` : `<em class="mb-ev-sur">▸ sans risque</em>`)
+      host.appendChild(b)
+    })
+  }
+
+  // ---- LE RÉSULTAT D'UN MINI-JEU (main.ts:16854) ----
+  function minijeu() {
+    const host = halteBase('LES RAFALES', '3,62 L À L\'ARRIVÉE SUR 4,50 L AU DÉPART — 80 % GARDÉS, EN 21,4 S')
+    host.classList.add('mb-trio')
+    const b = document.createElement('button'); b.type = 'button'; b.className = 'mb-carte mb-repos'; b.style.gridColumn = '2'
+    b.innerHTML = `<i class="mb-repos-icone">🌬️</i><b>ÉCORNÉ</b><small>+6 mémoire · continuer</small>`
+    host.appendChild(b)
+  }
+
+  // ---- LA FIN ORDINAIRE (main.ts:17160 mbMontreFin) ----
+  function fin() {
+    bandeau()
+    $('mb-titre').textContent = 'SALLE FRANCHIE'
+    $('mb-choix-titre').textContent = 'PAROI DU SAS OUVERTE'
+    const etal = $('mb-etal'); etal.hidden = false; etal.classList.remove('coule'); etal.classList.add('mb-mince')
+    $('mb-etal-tampon').hidden = true; $('mb-etal-gain').hidden = true
+    peintEtal(RUN.xp + RUN.surplus)
+    const host = cartes()
+    const j = document.createElement('div'); j.className = 'mb-jauges'
+    j.innerHTML = `<span>🫙 réserve <b>${virgule(RUN.bonbonne)} / ${RUN.cap} L</b></span><span>◈ bourse <b>${RUN.condensat} cL</b></span><span>💠 vies <b>×2</b></span><span>⇣ profondeur <b>${RUN.rang} / ${RUN.longueur}</b></span>`
+    host.appendChild(j)
+    const btn = document.createElement('button'); btn.type = 'button'; btn.className = 'mb-continuer'; btn.textContent = 'SALLE SUIVANTE ▸'
+    host.appendChild(btn)
+  }
+
+  // ---- HORS CÉRÉMONIE : #overlay (main.ts:18911 showOverlay ; 20404 fin de run, 17873 défaite) ----
+  function overlay(quoi) {
+    veil.hidden = true
+    const o = $('overlay')
+    o.style.zIndex = '2147483647'
+    o.classList.remove('success', 'danger', 'end')
+    if (quoi === 'bouclee') {
+      $('overlay-title').textContent = 'LA DESCENTE EST BOUCLÉE'
+      $('overlay-sub').innerHTML = `<span class="bilan"><span class="bilan-l">18/18 salles · 💧 61,40 L · ⏱ 24:12 — <em class="bilan-neuf">MEILLEURE DESCENTE ✦</em></span></span>` +
+        `Descente de 18 salles, du premier sas au dernier.<br>Butin de la descente : ${['aimant-rosee', 'croc-du-sas', 'ration-de-survie'].map((id) => F.INSTRUMENTS.find((d) => d.id === id)?.icone ?? '').join(' ')} 3 instrument(s) · palier de maîtrise 4 · +86 MÉMOIRE gravée — la purge confisque le condensat restant (1890 cL).<br>` +
+        `Palmarès du poste : 2 bouclée(s) · profondeur record 18 · meilleur livré 61,40 L.`
+      o.classList.add('visible', 'success', 'end')
+      $('overlay-btn').textContent = 'RETOUR AU LABO'
+    } else {
+      $('overlay-title').textContent = 'ÉCHANTILLON PERDU — FIN DE LA RUN'
+      $('overlay-sub').textContent = 'La dispersion a eu raison du dernier échantillon. Le laboratoire vous rappelle.'
+      o.classList.add('visible', 'danger', 'end')
+      $('overlay-btn').textContent = 'RETOUR AU LABO'
+    }
+  }
+
+  window.POSE = { bilan, versement, etalonnage, draft, salles, module, carte, repos, don, cache, evenement, minijeu, fin, overlay, feu, fige, MB_OR, MB_MENTHE, MB_EAU, RUN }
+})()

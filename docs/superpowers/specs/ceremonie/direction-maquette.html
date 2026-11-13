@@ -1,0 +1,80 @@
+<h2>La direction : une cérémonie « station », un moment à la fois</h2>
+<p class="subtitle">Maquette de principe (CSS) — les formes grises marquées « BLENDER » seront des rendus faits dans l'atelier, comme le fond de cuve.</p>
+
+<style>
+  :root{--ac:#5af0e0;--or:#e8b84a;}
+  .scene{position:relative;background:radial-gradient(ellipse at 50% 40%,#10202a 0%,#05090d 70%);border-radius:6px;padding:26px 22px 30px;margin:14px 0 30px;overflow:hidden;font-family:'Segoe UI',sans-serif;color:#d8e6ee;min-height:430px}
+  .poutre{position:relative;margin:0 auto 22px;width:72%;height:54px;background:linear-gradient(#22313d,#121b23);clip-path:polygon(4% 0,96% 0,100% 50%,96% 100%,4% 100%,0 50%);display:flex;align-items:center;justify-content:center;letter-spacing:.32em;font-weight:700;font-size:22px;color:#e9f6fb}
+  .poutre::before,.poutre::after{content:'';position:absolute;top:0;bottom:0;width:13%;background:repeating-linear-gradient(-45deg,#c9a23a 0 8px,#141a20 8px 16px);opacity:.75}
+  .poutre::before{left:4%}.poutre::after{right:4%}
+  .rivets{position:absolute;inset:6px 10%;pointer-events:none;background:radial-gradient(circle,#6b7f8c 1.6px,transparent 2.2px) 0 0/28px 42px}
+  .coeur{display:grid;grid-template-columns:1fr 260px 1fr;align-items:center;gap:10px}
+  .sceau{justify-self:end;width:150px;height:150px;clip-path:polygon(29% 0,71% 0,100% 29%,100% 71%,71% 100%,29% 100%,0 71%,0 29%);background:linear-gradient(145deg,#d8b45a,#6e5420);display:grid;place-items:center;text-align:center;color:#20170a;font-weight:800;letter-spacing:.12em;font-size:13px;transform:rotate(-8deg);box-shadow:0 0 30px rgba(232,184,74,.35)}
+  .sceau small{display:block;font-size:10px;letter-spacing:.2em;opacity:.8}
+  .bonbonne{position:relative;width:260px;height:300px;display:grid;place-items:center}
+  .bonbonne svg{position:absolute;inset:0}
+  .flacon{width:120px;height:200px;border-radius:34px 34px 22px 22px;background:linear-gradient(90deg,#2a3a46,#495e6c 40%,#253440);position:relative;overflow:hidden}
+  .flacon i{position:absolute;left:8px;right:8px;bottom:8px;height:70%;border-radius:12px;background:linear-gradient(#7af7ea,#1b8f99);box-shadow:0 0 24px #5af0e0}
+  .flacon b{position:absolute;top:8px;left:0;right:0;text-align:center;color:#9bb;font-size:9px;letter-spacing:.2em}
+  .litres{font-size:64px;font-weight:200;line-height:1;color:#effcff;text-shadow:0 0 18px rgba(90,240,224,.5)}
+  .litres small{display:block;font-size:13px;letter-spacing:.25em;color:#8fb6c4;margin-top:6px}
+  .cartouches{display:flex;gap:16px;justify-content:center;margin-top:20px}
+  .cartouche{width:200px;padding:12px 14px 12px 64px;position:relative;background:linear-gradient(#1f2e3a,#121c25);clip-path:polygon(0 0,88% 0,100% 30%,100% 100%,12% 100%,0 70%);border-left:3px solid var(--ac)}
+  .cartouche .ico{position:absolute;left:12px;top:50%;transform:translateY(-50%);width:42px;height:42px;background:#2c3c48;clip-path:polygon(25% 0,75% 0,100% 50%,75% 100%,25% 100%,0 50%);display:grid;place-items:center;font-size:8px;color:#8ab}
+  .cartouche .v{font-size:26px;font-weight:600}
+  .cartouche .n{font-size:10px;letter-spacing:.24em;color:#8fb0bd}
+  .cartouche.or{border-left-color:var(--or)} .cartouche.vi{border-left-color:#b08cff}
+  .note{position:absolute;right:14px;bottom:10px;font-size:11px;color:#6d8796}
+  .verse{display:grid;grid-template-columns:1fr 120px 1fr;align-items:end;gap:16px;padding:10px 40px}
+  .cuve{height:230px;position:relative;clip-path:polygon(10% 0,90% 0,100% 8%,100% 100%,0 100%,0 8%);background:linear-gradient(#1c2a35,#0f171e);display:flex;flex-direction:column;justify-content:flex-end;align-items:center;padding-bottom:14px}
+  .cuve .liq{position:absolute;left:14%;right:14%;bottom:46px;border-radius:6px 6px 0 0;background:linear-gradient(#5af0e0,#127b86);opacity:.85}
+  .cuve .anneaux{position:absolute;left:10%;right:10%;bottom:46px;top:30px;background:repeating-linear-gradient(transparent 0 38px,rgba(232,184,74,.7) 38px 40px)}
+  .cuve h4{margin:0;letter-spacing:.3em;font-size:14px;position:relative}
+  .cuve p{margin:2px 0 0;font-size:12px;color:#8fb0bd;position:relative}
+  .orbe{width:110px;height:110px;border-radius:50%;margin:0 auto 70px;background:radial-gradient(circle at 35% 30%,#d8fffb,#5af0e0 35%,#0b5d66 75%);box-shadow:0 0 40px #5af0e0;display:grid;place-items:center;color:#032;font-weight:800}
+  .fl{font-size:28px;color:#5af0e0;text-align:center}
+  .tags{display:flex;gap:10px;flex-wrap:wrap;margin-top:8px}
+  .tags span{font-size:12px;padding:4px 10px;background:#18252f;border-left:2px solid var(--ac)}
+</style>
+
+<div class="label">1 · « Salle franchie » — après</div>
+<div class="scene">
+  <div class="poutre"><div class="rivets"></div>SALLE FRANCHIE</div>
+  <div class="coeur">
+    <div class="sceau">SUPERFLUIDE<small>★★★★★</small></div>
+    <div class="bonbonne">
+      <svg viewBox="0 0 260 300"><circle cx="130" cy="150" r="122" fill="none" stroke="#1d2c38" stroke-width="10"/><circle cx="130" cy="150" r="122" fill="none" stroke="#5af0e0" stroke-width="10" stroke-dasharray="713 767" transform="rotate(-90 130 150)"/><g stroke="#3a4e5c" stroke-width="2">
+        <line x1="130" y1="20" x2="130" y2="34"/><line x1="260" y1="150" x2="246" y2="150"/><line x1="130" y1="280" x2="130" y2="266"/><line x1="0" y1="150" x2="14" y2="150"/></g>
+        <text x="130" y="296" text-anchor="middle" fill="#8fb6c4" font-size="11" letter-spacing="3">93 % LIVRÉ</text></svg>
+      <div class="flacon"><b>BLENDER</b><i></i></div>
+    </div>
+    <div class="litres">4,18 L<small>VERSÉS À LA STATION</small></div>
+  </div>
+  <div class="cartouches">
+    <div class="cartouche"><div class="ico">BLENDER</div><div class="v">+453 cL</div><div class="n">CONDENSAT</div></div>
+    <div class="cartouche vi"><div class="ico">BLENDER</div><div class="v">+12</div><div class="n">MÉMOIRE</div></div>
+    <div class="cartouche or"><div class="ico">BLENDER</div><div class="v">+1</div><div class="n">TIRAGE</div></div>
+  </div>
+  <div class="note">l'ordre : la bonbonne se remplit → le manomètre tourne → le sceau tombe → les cartouches claquent une à une</div>
+</div>
+
+<div class="label">2 · « Où verser ? » — le bilan s'en va, il ne reste que le geste</div>
+<div class="scene" style="min-height:330px">
+  <div class="poutre" style="width:56%;font-size:18px"><div class="rivets"></div>OÙ VERSER LE SURPLUS ?</div>
+  <div class="verse">
+    <div class="cuve"><div class="liq" style="height:42%"></div><h4>RÉSERVE</h4><p>3,20 → 7,38 L</p></div>
+    <div><div class="orbe">4,18 L</div><div class="fl">◀ ▶</div></div>
+    <div class="cuve"><div class="anneaux"></div><div class="liq" style="height:58%;background:linear-gradient(#ffe9a8,#b98a2a);box-shadow:0 0 20px #e8b84a"></div><h4>MAÎTRISE</h4><p>palier 2 dans 1,4 L</p></div>
+  </div>
+  <div class="note">deux cuves rendues dans Blender ; l'orbe part à gauche ou à droite et s'y déverse</div>
+</div>
+
+<div class="label">Ce qui change partout</div>
+<div class="tags">
+  <span>coins coupés, biseaux, poutres rivetées, bandes de danger</span>
+  <span>un seul moment à l'écran — l'étape précédente s'en va</span>
+  <span>des chiffres et des formes, plus de paragraphes (l'explication passe dans l'infobulle et le codex)</span>
+  <span>icônes et objets rendus dans Blender, plus d'émojis</span>
+  <span>des sons pour chaque geste : compteur, tampon, déversement, palier, cartouche</span>
+  <span>tout se passe d'un bouton (A / Entrée / clic)</span>
+</div>
