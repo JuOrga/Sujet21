@@ -17,10 +17,10 @@ import { levierDef, sensEffet, forceEffet } from '../../src/game/leviers'
 import { gainsDeSalle, gainsDeModule, pastillesDeSalles, condensatDuSas, memoireDuSas } from '../../src/game/recolte'
 import { rangDeSalle, motDeNote, titreDuTirage } from '../../src/game/ceremonie'
 import { iconeMetaHTML } from '../../src/game/metaAssets'
-import { iconeCeremonieHTML } from '../../src/game/iconesStation'
+import { iconeCeremonieHTML, iconeInstrumentHTML } from '../../src/game/iconesStation'
 import { cuveHTML, sceauHTML } from '../../src/game/ceremonieObjets'
 import { anneauxHTML, colonneMaitrise, niveauColonne } from '../../src/game/colonneMaitrise'
-import { cartoucheHTML } from '../../src/game/cartouches'
+import { cartoucheHTML, iconeDuGlyphe, offreHTML, plaqueHTML, puceHTML } from '../../src/game/cartouches'
 import { offresRepos, offreDon } from '../../src/game/descenteCarte'
 import { tireEvenement, offresDe, detailOffre, resoutChoix, ditEffet } from '../../src/game/evenements'
 void W
@@ -111,6 +111,7 @@ const FAB = {
   offresRepos, offreDon, tireEvenement, offresDe, detailOffre, ICONES_MINI_CARTE,
   graine, Feu, memoireDuSas, resoutChoix, ditEffet, titreDuTirage, tirageInstruments,
   iconeCeremonieHTML, sceauHTML, cuveHTML, colonneMaitrise, niveauColonne, anneauxHTML,
+  iconeDuGlyphe, offreHTML, plaqueHTML, puceHTML, iconeInstrumentHTML,
   /** dessine le plan d'une salle générée dans un canvas de porte */
   plan(canvas: HTMLCanvasElement, mecanique: 0 | 1 | 2 | 3, diff: number, variante: string): string {
     const lv = genereNiveauAtelier({ moment: 2, mecanique, difficulte: diff } as never, variante)

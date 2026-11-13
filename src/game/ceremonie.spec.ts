@@ -666,3 +666,92 @@ describe('la cérémonie — « MODULE TRAVERSÉ »', () => {
     expect(regle('.mb-module-salles')).toMatch(/flex-wrap:\s*wrap/)
   })
 })
+
+// LES HALTES, RENCONTRES, CACHE ET MINI-JEU (étape 6). Des cartes arrondies
+// à émoji (💠 🫙 💧, 🥌 🌬️ 🪐 🎯 🔪), des puces de texte (🫙 💧 🧠 💠 🜄 🗺️
+// ⚠️ 🔮), une pilule ; un choix ne faisait qu'un sting, ni feu ni flash ; et
+// l'alcôve s'appelait du type de son module, « ÉNIGME » (inventaire,
+// étapes 9–12). Chaque halte prend son objet rendu en héros, ses offres et
+// ses issues en cartouches, un levier ; un choix claque comme les autres.
+describe('la cérémonie — les haltes', () => {
+  it('l’alcôve s’appelle REPOS, quel que soit le module', () => {
+    expect(corps('mbMontreRepos')).toMatch(/'REPOS/)
+  })
+  it('un choix de halte claque comme les autres choix', () => {
+    for (const f of ['mbMontreRepos', 'mbMontreDon', 'mbTranche', 'mbMontreCache'])
+      expect(corps(f), f).toMatch(/mbFlash\(\)/)
+  })
+  it('aucun émoji ne reste dans les haltes', () => {
+    for (const f of ['mbMontreRepos', 'mbMontreDon', 'mbPeintEvenement', 'mbTranche', 'mbMontreCache', 'mbMontreResultatMiniJeu', 'mbMontreChoixPalet'])
+      expect(corps(f), f).not.toMatch(/\p{Extended_Pictographic}/u)
+  })
+
+  // « ÉNIGME » venait du type du module où l'alcôve se tient (une halte
+  // tirée en voie vit dans un module d'énigmes) : ce n'est pas son nom
+  it('ne nomme plus l’alcôve ni le don du type de leur module', () => {
+    for (const f of ['mbMontreRepos', 'mbMontreDon']) expect(corps(f), f).not.toContain('carte.types[m.type]')
+  })
+  it('pose l’objet de chaque halte en héros', () => {
+    expect(corps('mbMontreRepos')).toContain("iconeCeremonieHTML('repos')")
+    expect(corps('mbMontreDon')).toContain("iconeCeremonieHTML('don')")
+    expect(corps('mbPeintEvenement')).toContain("iconeCeremonieHTML('rencontre')")
+    expect(corps('mbTranche')).toContain("iconeCeremonieHTML('rencontre')")
+    expect(corps('mbMontreCache')).toContain("iconeCeremonieHTML('cache')")
+    expect(corps('mbMontreChoixPalet')).toContain("iconeCeremonieHTML('palet')")
+    // le mini-jeu par son identifiant : couperet, palet, rafales, orbites, cibles
+    expect(corps('mbMontreResultatMiniJeu')).toMatch(/iconeCeremonieHTML\(level\.minijeu\?\.type \?\? 'couperet'\)/)
+    for (const f of ['mbMontreRepos', 'mbMontreDon', 'mbPeintEvenement', 'mbTranche', 'mbMontreCache', 'mbMontreChoixPalet', 'mbMontreResultatMiniJeu'])
+      expect(corps(f), f).toContain('mb-halte-heros')
+  })
+  it('met les offres et les issues en cartouches', () => {
+    for (const f of ['mbMontreRepos', 'mbMontreDon', 'mbPeintEvenement', 'mbMontreChoixPalet'])
+      expect(corps(f), f).toContain('offreHTML(')
+    // le glyphe des données passe par la table, jamais tel quel dans le gabarit
+    for (const f of ['mbMontreRepos', 'mbMontreDon']) expect(corps(f), f).toContain('glyphe: o.icone')
+    expect(corps('mbTranche')).toContain('puceHTML(')
+    expect(corps('mbMontreCache')).toMatch(/plaqueHTML\(|puceHTML\(/)
+    for (const f of ['mbMontreRepos', 'mbMontreDon', 'mbPeintEvenement', 'mbMontreChoixPalet', 'mbTranche', 'mbMontreCache', 'mbMontreResultatMiniJeu'])
+      expect(corps(f), f).not.toContain("'mb-carte ")
+  })
+  it('garde le récit d’une rencontre, dans un cadre de la station', () => {
+    expect(corps('mbPeintEvenement')).toContain('esc(ev.texte)')
+    expect(corps('mbPeintEvenement')).toMatch(/className = 'mb-ev-recit mb-coupe/)
+    expect(corps('mbTranche')).toContain('esc(issue.texte)')
+  })
+  it('fait sonner chaque choix et chaque levier de sa voix', () => {
+    for (const f of ['mbMontreRepos', 'mbMontreDon', 'mbPeintEvenement', 'mbTranche', 'mbMontreCache', 'mbMontreResultatMiniJeu', 'mbMontreChoixPalet', 'mbMontreFin'])
+      expect(corps(f), f).toContain("sonCeremonie('levier'")
+  })
+  it('se passe d’un geste : un levier ou une offre focalisés, sous une garde de rafale', () => {
+    for (const f of ['mbMontreRepos', 'mbMontreDon', 'mbPeintEvenement', 'mbTranche', 'mbMontreCache', 'mbMontreResultatMiniJeu', 'mbMontreChoixPalet', 'mbMontreFin']) {
+      expect(corps(f), f).toMatch(/\.focus\(\{ preventScroll: true \}\)/)
+      expect(corps(f), f).toMatch(/gesteTropTot\(performance\.now\(\), ouvertA\)/)
+    }
+    for (const f of ['mbTranche', 'mbMontreCache', 'mbMontreResultatMiniJeu', 'mbMontreFin']) {
+      expect(corps(f), f).toContain('mb-levier')
+      expect(corps(f), f).not.toContain("'mb-continuer'")
+    }
+  })
+  it('n’écrit plus d’étiquette sous 10 px', () => {
+    for (const s of ['.mb-ev-recit em', '.mb-ev-pari, .mb-ev-sur', '.mb-offre-detail', '.mb-puce-texte']) {
+      const t = /font-size:\s*calc\((\d+(?:\.\d+)?)px/.exec(regle(s))
+      expect(t, s).not.toBeNull()
+      expect(Number(t![1]), s).toBeGreaterThanOrEqual(10)
+    }
+  })
+  // le bouton d'une offre est taillé : le clip-path rogne l'outline, le
+  // focus (clavier et manette) se dessine DANS la forme
+  it('dessine la visée d’une offre dans sa forme', () => {
+    expect(corps('mbMontreRepos')).toContain('mb-cartouche mb-offre')
+    expect(HTML).toMatch(/\.mb-offre:focus-visible, \.mb-offre\.pad-focus \{[^}]*outline: none;[^}]*box-shadow: inset/)
+  })
+})
+
+// LA FIN ORDINAIRE (étape 13, hors voie) : une rangée de jauges en texte à
+// émojis (🫙 ◈ 💠 ⇣) et une pilule. Le même traitement que les haltes.
+describe('la cérémonie — la fin ordinaire', () => {
+  it('dit ses jauges en cartouches, sans émoji', () => {
+    expect(corps('mbJauges')).toContain('plaqueHTML(')
+    for (const f of ['mbJauges', 'mbMontreFin']) expect(corps(f), f).not.toMatch(/\p{Extended_Pictographic}/u)
+  })
+})

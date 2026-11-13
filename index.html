@@ -8743,55 +8743,11 @@
         0% { opacity: 0.3; transform: translateY(0); }
         100% { opacity: 0; transform: translateY(18px) scale(0.94); }
       }
-      /* ---- LES CARTES DE DESTINATION (versement) et de FIN ---- */
-      .mb-carte {
-        position: relative; overflow: hidden;
-        display: flex; flex-direction: column; align-items: center; gap: 6px;
-        padding: 18px 14px 14px; min-height: 150px;
-        background:
-          radial-gradient(120% 70% at 50% -10%, rgba(255, 255, 255, 0.06), transparent 60%),
-          linear-gradient(180deg, #14202f, var(--mb-coque-claire));
-        border: 1px solid #2d4258; border-radius: 12px; color: var(--mb-texte);
-        font: inherit; font-size: calc(12px * var(--ui)); cursor: pointer; text-align: center;
-        animation: mb-carte-monte 0.45s cubic-bezier(0.2, 1, 0.3, 1) backwards;
-        animation-delay: calc(var(--i, 0) * 0.1s);
-        transition: transform 0.16s ease, border-color 0.16s ease, box-shadow 0.16s ease;
-      }
+      /* la montée des plaques (portes, plan, tirage) */
       @keyframes mb-carte-monte {
         from { opacity: 0; transform: translateY(28px) scale(0.96); }
         to { opacity: 1; transform: none; }
       }
-      /* les ÉQUERRES d'angle : le cadre d'une cible de jeu */
-      .mb-carte::before {
-        content: ''; position: absolute; inset: 6px; pointer-events: none; border-radius: 6px;
-        background:
-          linear-gradient(90deg, var(--mb-teal), var(--mb-teal)) 0 0 / 14px 1px no-repeat,
-          linear-gradient(90deg, var(--mb-teal), var(--mb-teal)) 0 0 / 1px 14px no-repeat,
-          linear-gradient(90deg, var(--mb-teal), var(--mb-teal)) 100% 0 / 14px 1px no-repeat,
-          linear-gradient(90deg, var(--mb-teal), var(--mb-teal)) 100% 0 / 1px 14px no-repeat,
-          linear-gradient(90deg, var(--mb-teal), var(--mb-teal)) 0 100% / 14px 1px no-repeat,
-          linear-gradient(90deg, var(--mb-teal), var(--mb-teal)) 0 100% / 1px 14px no-repeat,
-          linear-gradient(90deg, var(--mb-teal), var(--mb-teal)) 100% 100% / 14px 1px no-repeat,
-          linear-gradient(90deg, var(--mb-teal), var(--mb-teal)) 100% 100% / 1px 14px no-repeat;
-        opacity: 0.35; transition: opacity 0.16s ease, inset 0.16s ease;
-      }
-      .mb-carte:hover:not(:disabled), .mb-carte:focus-visible {
-        transform: translateY(-6px) scale(1.02); border-color: var(--mb-menthe);
-        box-shadow: 0 18px 40px rgba(0, 0, 0, 0.5), 0 0 30px rgba(109, 255, 184, 0.22);
-        outline: none;
-      }
-      .mb-carte:hover:not(:disabled)::before, .mb-carte:focus-visible::before { opacity: 1; inset: 3px; }
-      .mb-carte b {
-        font-family: var(--font-display); font-size: calc(11px * var(--ui));
-        letter-spacing: 0.24em; line-height: 1.3; color: var(--mb-encre);
-      }
-      .mb-carte small { color: var(--mb-legende); font-size: calc(12px * var(--ui)); line-height: 1.4; }
-      .mb-prix {
-        margin-top: auto; font-style: normal; font-size: calc(11.5px * var(--ui));
-        color: var(--mb-or); letter-spacing: 0.08em;
-      }
-      .mb-prix.mb-offert { color: var(--mb-menthe); }
-      .mb-carte.mb-pauvre { opacity: 0.45; cursor: not-allowed; }
       /* ---- LES SALLES ÉVÉNEMENT (game/evenements.ts) ---- */
       /* la porte d'une rencontre : pas de plan, un point d'interrogation */
       .mb-ev-vue { display: grid; place-items: center; background: linear-gradient(180deg, #16233a, #0b1220); aspect-ratio: 440 / 252; }
@@ -8809,47 +8765,121 @@
         border-color: var(--mb-or, #ffd977);
         box-shadow: 0 22px 44px rgba(0, 0, 0, 0.55), 0 0 30px rgba(255, 217, 119, 0.25);
       }
-      /* le récit : le lieu en italique, le lore dessous — la seule prose du jeu */
-      .mb-ev-recit {
-        grid-column: 1 / -1; max-width: 62ch; margin: 0 auto; text-align: left;
-        border-left: 2px solid rgba(255, 217, 119, 0.5); padding: 2px 0 2px 16px;
+      /* ---- LES HALTES, LES RENCONTRES, LA CACHE, LE MINI-JEU (étape 6) ----
+         C'étaient des cartes arrondies à émoji (💠 🫙 💧, 🥌 🌬️ 🪐 🎯 🔪),
+         des puces de texte, une pilule qui respirait. Chaque halte devient
+         une scène de station : son objet rendu en HÉROS (l'alcôve, la
+         bonbonne oubliée, le signal, le coffre, l'objet du mini-jeu), les
+         offres en cartouches qu'on presse, ce qu'une issue donne en
+         cartouches, un levier. Le récit d'une rencontre garde sa prose, dans
+         un cadre taillé. Une colonne centrée ; avec un récit, le héros passe
+         à sa gauche (.mb-halte-a-recit). ---- */
+      .mb-halte {
+        grid-column: 1 / -1; min-width: 0;
+        display: flex; flex-direction: column; align-items: center; gap: 16px;
       }
-      .mb-ev-recit em {
-        display: block; font-style: normal; font-family: var(--font-display);
-        font-size: calc(9.5px * var(--ui)); letter-spacing: 0.22em; color: var(--mb-or, #ffd977);
+      /* le héros et le récit, centrés ensemble entre deux marges souples ;
+         les offres et les puces enjambent toute la largeur. La colonne du
+         héros a SA largeur : en « auto », elle s'élargissait à la rangée
+         qui l'enjambe, et le récit partait au bord droit (vu au banc) ; et
+         les offres, serrées sous le seul récit, passaient à la ligne. */
+      .mb-halte-a-recit {
+        display: grid; grid-template-columns: 1fr 150px minmax(0, 62ch) 1fr;
+        align-items: center; row-gap: 16px;
       }
-      .mb-ev-recit p {
-        margin: 8px 0 0; font-size: calc(13px * var(--ui)); line-height: 1.65; color: var(--mb-texte);
+      .mb-halte-a-recit > * { grid-column: 1 / -1; justify-self: center; }
+      .mb-halte-a-recit > .mb-halte-heros { grid-column: 2; justify-self: start; }
+      .mb-halte-a-recit > .mb-ev-recit { grid-column: 3; justify-self: stretch; }
+      /* L'OBJET EN HÉROS : la case de la planche en grand (l'icône mesure
+         1em), sur un halo. Pas de cadre taillé : son ombre serait rognée. */
+      .mb-halte-heros {
+        --mb-heros-l: 150px;
+        display: grid; place-items: center;
+        width: var(--mb-heros-l); height: var(--mb-heros-l); font-size: var(--mb-heros-l); line-height: 1;
+        background: radial-gradient(closest-side, rgba(99, 183, 230, 0.2), transparent);
+        filter: drop-shadow(0 10px 18px rgba(0, 0, 0, 0.55));
+        animation: mb-heros-pose 0.5s cubic-bezier(0.2, 1.3, 0.3, 1) backwards;
       }
-      /* CE QUE L'ISSUE DONNE, en puces : c'était une ligne de texte de 12 px
-         sous le récit — la seule chose à retenir de l'écran, et la moins
-         visible */
-      .mb-ev-gains {
-        margin: 14px 0 0; padding: 0; list-style: none; display: flex; flex-wrap: wrap; gap: 8px;
+      .mb-halte-a-recit .mb-halte-heros { --mb-heros-l: 120px; }
+      @keyframes mb-heros-pose {
+        from { opacity: 0; transform: translateY(14px) scale(1.25); }
       }
-      .mb-ev-gains li {
-        padding: 8px 13px; border-radius: 8px;
-        font-size: calc(13.5px * var(--ui)); color: var(--mb-encre); letter-spacing: 0.03em;
-        background: rgba(109, 255, 184, 0.08); border: 1px solid rgba(109, 255, 184, 0.34);
-        box-shadow: 0 0 18px rgba(109, 255, 184, 0.08);
+      /* LES OFFRES : des cartouches qu'on presse. Le clip-path rogne
+         l'outline et les ombres : la visée (clavier, survol, manette) se
+         dessine DANS la forme — l'arête s'allume en menthe. */
+      .mb-halte-offres { width: 100%; display: flex; flex-wrap: wrap; justify-content: center; gap: 14px 18px; }
+      .mb-offre {
+        flex: 0 1 calc(320px * var(--ui)); min-height: 74px;
+        align-content: center; row-gap: 3px;
+        font: inherit; color: inherit; text-align: left; border: 0; border-radius: 0; cursor: pointer;
+        animation-delay: calc(0.2s + var(--i, 0) * 0.1s);
+        transition: transform 0.14s ease, filter 0.14s ease;
       }
-      .mb-ev-issue { border-left-color: var(--mb-menthe); }
-      .mb-ev-issue em { color: var(--mb-menthe); }
-      .mb-carte.mb-ev-offre {
-        min-height: 128px; justify-content: center; gap: 7px; text-align: center;
+      .mb-offre .mb-cartouche-alv { grid-row: 1 / span 3; }
+      .mb-offre:not(:has(.mb-cartouche-alv)) { grid-template-columns: minmax(0, 1fr); padding-left: 18px; }
+      .mb-offre:hover:not(:disabled), .mb-offre:focus-visible, .mb-offre.pad-focus {
+        outline: none; transform: translateY(-3px); filter: brightness(1.12);
+        box-shadow: inset 3px 0 0 var(--mb-liseret), inset 0 0 0 2px var(--mb-menthe);
       }
-      .mb-ev-offre b { font-family: var(--font-display); letter-spacing: 0.14em; }
+      .mb-offre:active:not(:disabled) { transform: translateY(1px) scale(0.98); }
+      .mb-offre.mb-pauvre { cursor: not-allowed; filter: grayscale(0.85) brightness(0.6); }
+      .mb-offre-nom {
+        font-family: var(--font-display); font-weight: 400; font-size: calc(14px * var(--ui));
+        letter-spacing: 0.16em; line-height: 1.25; color: var(--mb-encre);
+      }
+      .mb-offre-detail { font-size: calc(12px * var(--ui)); line-height: 1.4; color: var(--mb-legende); }
+      /* le détail d'une offre de rencontre jamais prise : voilé, il se
+         devine sans se lire (les deux classes : le détail ordinaire, à
+         spécificité égale, gardait sinon sa couleur) */
+      .mb-offre-detail.mb-ev-voile { font-style: italic; color: var(--mb-etiquette); letter-spacing: 0.04em; }
       .mb-ev-pari, .mb-ev-sur {
         font-style: normal; font-size: calc(10px * var(--ui)); letter-spacing: 0.14em; color: var(--dim);
       }
       .mb-ev-pari { color: var(--mb-or, #ffd977); }
-      /* le détail d'une offre jamais prise : voilé, il se devine sans se lire */
-      /* .mb-carte devant : « .mb-carte small » (déclarée plus haut) était plus
-         spécifique, et le voile gardait la couleur d'un détail connu */
-      .mb-carte .mb-ev-voile { font-style: italic; color: #6f8799; letter-spacing: 0.04em; }
-      /* l'alcôve de repos : trois offres, l'icône en tête */
-      .mb-carte.mb-repos { min-height: 170px; justify-content: center; gap: 8px; }
-      .mb-repos-icone { font-style: normal; font-size: calc(30px * var(--ui)); line-height: 1; }
+      /* LE RÉCIT d'une rencontre (et ce que la cache dit) : la seule prose
+         du jeu, gardée — dans un cadre taillé (.mb-coupe-diag), le lieu en
+         capitales, un liseré à gauche, menthe pour ce qui vient d'arriver */
+      .mb-ev-recit {
+        --mb-liseret: var(--mb-teal);
+        min-width: 0; max-width: 62ch; margin: 0; padding: 14px 22px 16px 20px; text-align: left;
+        box-shadow: inset 3px 0 0 var(--mb-liseret), inset 0 0 0 1px var(--mb-arete);
+      }
+      .mb-ev-recit em {
+        display: block; font-style: normal; font-family: var(--font-display);
+        font-size: calc(10px * var(--ui)); letter-spacing: 0.22em; color: var(--mb-liseret);
+      }
+      .mb-ev-recit p {
+        margin: 8px 0 0; font-size: calc(13px * var(--ui)); line-height: 1.65; color: var(--mb-texte);
+      }
+      .mb-ev-issue { --mb-liseret: var(--mb-menthe); }
+      /* CE QU'UNE ISSUE DONNE : une cartouche par ligne, qui claque. C'était
+         une rangée de puces de texte sous le récit — la seule chose à
+         retenir de l'écran. Un glyphe que la table ne connaît pas reste
+         écrit dans l'alvéole (.mb-glyphe) : jamais une case vide. */
+      .mb-halte-puces {
+        margin: 0; padding: 0; list-style: none; width: 100%;
+        display: flex; flex-wrap: wrap; justify-content: center; gap: 10px 14px;
+      }
+      .mb-halte-puces .mb-cartouche {
+        flex: 0 1 auto; max-width: min(100%, calc(460px * var(--ui)));
+        animation-delay: calc(0.25s + var(--i, 0) * 0.12s);
+      }
+      .mb-puce { --mb-liseret: var(--mb-menthe); min-height: 52px; }
+      .mb-puce .mb-cartouche-alv { grid-row: auto; }
+      .mb-puce-nue { grid-template-columns: minmax(0, 1fr); padding-left: 18px; }
+      .mb-puce-texte { font-size: calc(13px * var(--ui)); line-height: 1.4; color: var(--mb-encre); }
+      .mb-cartouche-alv .mb-glyphe { font-style: normal; font-size: 26px; }
+      /* le verdict d'un mini-jeu, et ce qu'il ne rend pas */
+      .mb-halte-verdict {
+        font-family: var(--font-display); font-weight: 400; font-size: calc(24px * var(--ui));
+        letter-spacing: 0.24em; color: var(--mb-encre); text-shadow: 0 0 22px rgba(109, 255, 184, 0.35);
+      }
+      .mb-halte-rien { margin: 0; font-size: calc(12px * var(--ui)); color: var(--mb-legende); }
+      .mb-halte-levier { grid-column: 1 / -1; justify-self: center; margin-top: 4px; }
+      /* les liserés des jauges et des offres qui ne sont pas des gains */
+      .mb-cartouche-reserve { --mb-liseret: var(--mb-bleu); }
+      .mb-cartouche-secours { --mb-liseret: var(--mb-teal); }
+      .mb-cartouche-profondeur { --mb-liseret: var(--mb-etiquette); }
       /* ---- LE VERSEMENT : l'orbe du surplus au centre, une cuve rendue de
          chaque côté (la RÉSERVE, la colonne de MAÎTRISE et ses anneaux). Le
          bilan s'en est allé : les deux plaques d'avant (bocal et anneau en
@@ -9108,28 +9138,6 @@
         animation-delay: calc(0.95s + var(--i, 0) * 0.08s);
       }
       .mb-module-levier { grid-column: 1 / -1; justify-self: center; margin-top: 4px; }
-      /* LE BOUTON DE SUITE : une pastille qui respire et qu'on presse */
-      .mb-continuer {
-        grid-column: 1 / -1; justify-self: center; min-width: min(360px, 100%);
-        padding: 16px 34px; font-family: var(--font-display); font-size: calc(12px * var(--ui));
-        letter-spacing: 0.32em; color: var(--mb-coque-noire); cursor: pointer; position: relative; overflow: hidden;
-        background: linear-gradient(180deg, #8fffcf, var(--mb-menthe) 55%, #3fd69b);
-        border: 0; border-radius: 999px;
-        box-shadow: 0 0 0 2px rgba(109, 255, 184, 0.35), 0 10px 30px rgba(109, 255, 184, 0.25);
-        animation: mb-carte-monte 0.45s cubic-bezier(0.2, 1, 0.3, 1) backwards, mb-respire 2.2s 0.5s ease-in-out infinite;
-        transition: transform 0.12s ease;
-      }
-      .mb-continuer::after {
-        content: ''; position: absolute; inset: 0;
-        background: linear-gradient(105deg, transparent 35%, rgba(255, 255, 255, 0.5) 50%, transparent 65%);
-        background-size: 250% 100%; animation: mb-etal-reflet 2.4s linear infinite;
-      }
-      @keyframes mb-respire {
-        0%, 100% { box-shadow: 0 0 0 2px rgba(109, 255, 184, 0.35), 0 10px 30px rgba(109, 255, 184, 0.25); }
-        50% { box-shadow: 0 0 0 6px rgba(109, 255, 184, 0.18), 0 10px 44px rgba(109, 255, 184, 0.45); }
-      }
-      .mb-continuer:hover, .mb-continuer:focus-visible { transform: translateY(-3px) scale(1.03); outline: none; }
-      .mb-continuer:active { transform: scale(0.97); }
       /* ---- LES PORTES : le choix de la prochaine salle. Chaque salle est
          une porte — le plan dedans, balayé d'une ligne de lecture ; sous
          le pointeur elle s'avance et s'allume ; élue, elle S'OUVRE (elle
@@ -9312,16 +9320,12 @@
       /* au doigt : la porte armée attend un second toucher */
       .mb-porte.mb-armee { outline: 2px solid #eaf6ff; outline-offset: 2px; }
       @media (prefers-reduced-motion: reduce) { .mv-noeud.mv-porte .mv-halo { animation: none; } }
-      /* les jauges de la fin ordinaire (le choix de salle ne les montre plus) */
-      .mb-jauges {
-        grid-column: 1 / -1; display: flex; justify-content: center; align-items: center;
-        gap: 22px; flex-wrap: wrap; font-size: calc(12px * var(--ui)); color: var(--mb-texte-second);
-        letter-spacing: 0.06em; padding: 0 2px 2px;
-      }
-      .mb-jauges span { display: flex; align-items: baseline; gap: 6px; }
-      .mb-jauges b {
-        font-family: var(--font-display); color: #d5f3e8; font-size: calc(13px * var(--ui));
-        font-variant-numeric: tabular-nums;
+      /* les jauges de la fin ordinaire (le choix de salle ne les montre
+         plus) : une plaque chacune, sur une rangée */
+      .mb-jauges { grid-column: 1 / -1; display: flex; flex-wrap: wrap; justify-content: center; gap: 12px 16px; }
+      .mb-jauges .mb-cartouche {
+        flex: 0 1 calc(220px * var(--ui));
+        animation-delay: calc(0.15s + var(--i, 0) * 0.08s);
       }
       /* ---- LA CARTE DANS LA CÉRÉMONIE : le module épuisé, le plan se
          déploie ; la scène s'élargit le temps du choix, le module élu
@@ -9427,7 +9431,12 @@
         .mb-cartes, .mb-cartes.mb-draft, .mb-cartes.mb-trio,
         .mb-cartes:has(.mb-porte) { grid-template-columns: 1fr; }
         .mb-pli, .mb-pli .crt-draft { min-height: 0; }
-        .mb-carte { min-height: 0; padding: 14px 12px; }
+        /* les haltes : le héros au-dessus du récit, une offre par ligne */
+        .mb-halte-heros { --mb-heros-l: 110px; }
+        .mb-halte-a-recit { grid-template-columns: minmax(0, 1fr); }
+        .mb-halte-a-recit > .mb-halte-heros, .mb-halte-a-recit > .mb-ev-recit { grid-column: 1 / -1; justify-self: center; }
+        .mb-halte-a-recit .mb-halte-heros { --mb-heros-l: 84px; justify-self: center; }
+        .mb-offre { flex-basis: 100%; }
         /* les deux cuves restent côte à côte (le choix se lit d'un regard),
            l'orbe passe au-dessus d'elles */
         .mb-versement { --mb-v-h: min(30vh, 40vw); grid-template-columns: 1fr 1fr; gap: 10px; }
@@ -9469,12 +9478,12 @@
         .mb-prime, .mb-record, .mb-etal, .mb-etal-palier.saute,
         .mb-etal-fluide, .mb-etal-fluide::after, .mb-etal-tube.eclair, .mb-etal-tampon,
         .mb-palier-eclair, .mb-choix, .mb-salle, .mb-pli, .mb-pli .crt-draft::after,
-        .mb-cartes.mb-elu .mb-pli:not(.mb-elu-c), .mb-pli.mb-elu-c, .mb-carte, .mb-ico,
+        .mb-cartes.mb-elu .mb-pli:not(.mb-elu-c), .mb-pli.mb-elu-c, .mb-halte-heros, .mb-ico,
         .mb-goutte, .mb-goutte-corps, .mb-flux, .mb-dest, .mb-dest.mb-dest-palier, .mb-anneau-franchit,
-        .mb-continuer, .mb-continuer::after, .mb-porte,
+        .mb-porte,
         .mb-porte-vue::after, .mb-cartes.mb-elu .mb-porte:not(.mb-elue), .mb-porte.mb-elue,
         .mb-station-carte { animation: none; }
-        .mb-cuve-liquide::before, .mb-cuve-liquide::after, .mb-ligne, .mb-pli, .mb-carte, .mb-porte,
+        .mb-cuve-liquide::before, .mb-cuve-liquide::after, .mb-ligne, .mb-pli, .mb-offre, .mb-porte,
         .mb-station-carte, .mb-goutte-corps, .mb-dest { transition: none; }
         /* l'anneau qu'un versement franchirait luit, sans battre ; la
            colonne qui franchit garde son arête allumée */
@@ -9496,8 +9505,8 @@
         .mb-etal-xp i, .mb-ev-vue i, .mb-flux-g, .mb-flux-d,
         .mb-dest.mb-dest-palier:hover:not(:disabled), .mb-dest.mb-dest-palier:focus-visible,
         .mb-dest.mb-dest-palier.pad-focus { animation: none; }
-        .mb-etoiles i, .mb-pli .crt-draft, .mb-carte::before, .mb-versement[data-verse] .mb-goutte-corps,
-        .mb-flux, .mb-continuer, .mb-porte-entrer, .mv-halo, .mv-tuile, .mv-lien, .mv-noeud { transition: none; }
+        .mb-etoiles i, .mb-pli .crt-draft, .mb-versement[data-verse] .mb-goutte-corps,
+        .mb-flux, .mb-porte-entrer, .mv-halo, .mv-tuile, .mv-lien, .mv-noeud { transition: none; }
       }
       /* ---- Le panneau du GÉNÉRATEUR (⚄) : les réglages qui voyagent ---- */
       #edg-voile {

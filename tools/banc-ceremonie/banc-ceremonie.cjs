@@ -64,6 +64,7 @@ const PRISES = [
   ['14-rencontre-issue', 'evenement', 'issue', null, 1500],
   ['15-cache', 'cache', null, null, 1500],
   ['16-minijeu', 'minijeu', null, null, 1500],
+  ['16b-palet-choix', 'palet', null, null, 1500],
   ['17-fin-ordinaire', 'fin', null, null, 1500],
   ['18-overlay-descente-bouclee', 'overlay', 'bouclee', null, 1200],
   ['19-overlay-defaite', 'overlay', 'defaite', null, 1200],

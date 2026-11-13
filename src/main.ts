@@ -459,10 +459,10 @@ import {
 import { Jukebox, PISTES_ECOUTE } from './game/jukebox'
 import { auteurAvis, avisDe, ligneAvis, ligneBilan, lisAvisEcoute, poseAvis, type Avis, type DocumentAvis } from './game/ecouteAvis'
 import { compteur, douce, gesteAuVersement, gesteTropTot, motDeNote, rangDeSalle, TEMPS_BILAN, titreDuTirage } from './game/ceremonie'
-import { cartoucheHTML } from './game/cartouches'
+import { cartoucheHTML, iconeDuGlyphe, offreHTML, plaqueHTML, puceHTML } from './game/cartouches'
 import { cuveHTML, sceauHTML } from './game/ceremonieObjets'
 import { anneauxHTML, colonneMaitrise, niveauColonne } from './game/colonneMaitrise'
-import { iconeCeremonieHTML } from './game/iconesStation'
+import { iconeCeremonieHTML, iconeInstrumentHTML } from './game/iconesStation'
 import {
   condensatDuSas,
   gainsDeModule,
@@ -14410,9 +14410,11 @@ function relancePalet(): void {
   paletLancersVus = garde.lancers.length
 }
 
-/** LE CHOIX APRÈS UN LANCER : deux cartes — relancer, ou valider le
+/** LE CHOIX APRÈS UN LANCER : deux offres — relancer, ou valider le
  *  meilleur. Le bouton CONTINUER du sas ne convient pas ici (« en plein
- *  milieu alors qu'on doit repartir ») : la remise en place est le geste. */
+ *  milieu alors qu'on doit repartir ») : la remise en place est le geste.
+ *  Le palet rendu en héros ; une offre claque (flash, éclat, levier) et la
+ *  cérémonie se ferme d'un coup — le jeu reprend sous le doigt. */
 function mbMontreChoixPalet(dernier: Lancer): void {
   const mj = level.minijeu
   if (!mj || mj.type !== 'palet') return
@@ -14432,25 +14434,36 @@ function mbMontreChoixPalet(dernier: Lancer): void {
   mbEl('mb-choix-titre').textContent = `LANCER ${num} / ${mj.regles.lancers} — ${Math.round(dernier.distance)} u DU CENTRE · ${VERDICTS_PALET[dernier.verdict]}`
   const host = mbCartes()
   host.innerHTML = ''
-  host.classList.add('mb-trio')
+  const halte = document.createElement('div')
+  halte.className = 'mb-halte'
+  halte.innerHTML = `<div class="mb-halte-heros">${iconeCeremonieHTML('palet')}</div><div class="mb-halte-offres"></div>`
+  const offres = halte.querySelector('.mb-halte-offres')!
+  host.appendChild(halte)
+  // le lancer qui vient de finir s'est peut-être joué au bouton que l'offre
+  // va recevoir : ce geste-là ne choisit rien (game/ceremonie.ts)
+  const ouvertA = performance.now()
   let elu = false
-  const carte = (col: number, icone: string, titre: string, sous: string, action: () => void): void => {
+  const offre = (i: number, icone: 'palet' | 'note', nom: string, detail: string, action: () => void): HTMLButtonElement => {
     const btn = document.createElement('button')
     btn.type = 'button'
-    btn.className = 'mb-carte mb-repos'
-    btn.style.gridColumn = String(col)
-    btn.innerHTML = `<i class="mb-repos-icone">${icone}</i><b>${titre}</b><small>${sous}</small>`
+    btn.className = 'mb-cartouche mb-offre'
+    btn.style.setProperty('--i', String(i))
+    btn.innerHTML = offreHTML({ icone, nom, detail })
     btn.addEventListener('click', () => {
-      if (elu) return
+      if (elu || gesteTropTot(performance.now(), ouvertA)) return
       elu = true
-      bande.ponctuation('sting-collecte', 0.6)
+      mbFlash()
+      mbEclate(btn, { n: 50, teintes: MB_MENTHE, vitesse: 420, gravite: 400, forme: 'etincelle', duree: 0.8, taille: 4 })
+      sonCeremonie('levier')
       fermeMiseEnBonbonne()
       action()
     })
-    host.appendChild(btn)
+    offres.appendChild(btn)
+    return btn
   }
-  carte(1, '🥌', `LANCER ${num + 1} / ${mj.regles.lancers}`, 'remise en place au départ, même volume de base', relancePalet)
-  carte(3, '✓', 'VALIDER', `garder le meilleur : ${Math.round(best.distance)} u · ${VERDICTS_PALET[best.verdict]}`, validePalet)
+  offre(0, 'palet', `LANCER ${num + 1} / ${mj.regles.lancers}`, 'remise en place au départ, même volume de base', relancePalet)
+    .focus({ preventScroll: true })
+  offre(1, 'note', 'VALIDER', `garder le meilleur : ${Math.round(best.distance)} u · ${VERDICTS_PALET[best.verdict]}`, validePalet)
 }
 
 /** LA POSE : chaque porte prend l'état de son canal d'un coup, sans jouer
@@ -16142,19 +16155,21 @@ function entreModuleRun(id: string): void {
 /** L'ALCÔVE DE REPOS : trois offres, une seule se prend — un second
  *  souffle (une vie), de la réserve (la bonbonne), du condensat (la
  *  bourse). Le choix se juge sur ce qu'on possède : une offre qui ne
- *  donnerait rien reste visible mais grisée. Puis la carte se rouvre. */
+ *  donnerait rien reste visible mais grisée. Puis la carte se rouvre.
+ *  L'alcôve rendue en héros, les offres en cartouches (le glyphe de la
+ *  donnée traduit par ICONE_DE_GLYPHE) ; prendre claque comme tout choix. */
 function mbMontreRepos(m: ModuleCarte, suite: () => void = () => mbMontreCarte('suite')): void {
   mbEtape = 'repos'
   mbReleveHors()
   mbScene.classList.remove('mb-large')
-  mbQuestion('UNE HALTE — UNE SEULE OFFRE')
-  mbEl('mb-choix-titre').textContent = `${m.nom} — ${carte.types[m.type]} : PRENEZ UNE OFFRE, PUIS LA CARTE SE ROUVRE`
+  // l'alcôve s'appelle REPOS : elle disait le type du module où elle se
+  // tient — « ÉNIGME » pour une halte tirée en voie dans un module d'énigmes
+  mbQuestion('REPOS')
+  mbEl('mb-choix-titre').textContent = `${m.nom} — UNE SEULE OFFRE, PUIS LA CARTE SE ROUVRE`
   mbEl('mb-etal').hidden = true
   mbEl('mb-passer').hidden = true
   const host = mbCartes()
   host.innerHTML = ''
-  host.classList.add('mb-trio')
-  const esc = (t: string): string => t.replace(/&/g, '&amp;').replace(/</g, '&lt;')
   const offres = offresRepos(
     {
       vies: run.vies,
@@ -16164,16 +16179,22 @@ function mbMontreRepos(m: ModuleCarte, suite: () => void = () => mbMontreCarte('
     },
     donsHalte(),
   )
+  const halte = document.createElement('div')
+  halte.className = 'mb-halte'
+  halte.innerHTML = `<div class="mb-halte-heros">${iconeCeremonieHTML('repos')}</div><div class="mb-halte-offres"></div>`
+  const rangee = halte.querySelector('.mb-halte-offres')!
+  host.appendChild(halte)
+  const ouvertA = performance.now()
   let elu = false
   offres.forEach((o, i) => {
     const btn = document.createElement('button')
     btn.type = 'button'
-    btn.className = 'mb-carte mb-repos' + (o.possible ? '' : ' mb-pauvre')
+    btn.className = `mb-cartouche mb-offre mb-cartouche-${iconeDuGlyphe(o.icone) ?? 'offre'}` + (o.possible ? '' : ' mb-pauvre')
     btn.disabled = !o.possible
     btn.style.setProperty('--i', String(i))
-    btn.innerHTML = `<i class="mb-repos-icone">${o.icone}</i><b>${esc(o.nom)}</b><small>${esc(o.detail)}</small>`
+    btn.innerHTML = offreHTML({ glyphe: o.icone, nom: o.nom, detail: o.detail })
     btn.addEventListener('click', () => {
-      if (elu) return
+      if (elu || gesteTropTot(performance.now(), ouvertA)) return
       elu = true
       if (o.id === 'souffle') run.vies = Math.min(VIES_MAX, run.vies + 1)
       else if (o.id === 'reserve')
@@ -16181,47 +16202,56 @@ function mbMontreRepos(m: ModuleCarte, suite: () => void = () => mbMontreCarte('
       else gagneCondensat(donsHalte().condensatCl)
       majBoutonsRun()
       sauveRun() // la halte prise s'écrit : une reprise ne la rejoue pas
-      bande.ponctuation('sting-record', 0.6)
+      mbFlash()
+      mbEclate(btn, { n: 50, teintes: MB_MENTHE, vitesse: 420, gravite: 400, forme: 'etincelle', duree: 0.8, taille: 4 })
+      sonCeremonie('levier')
       suite()
     })
-    host.appendChild(btn)
+    rangee.appendChild(btn)
   })
+  // Entrée, Espace et A trouvent la première offre qu'on peut prendre
+  rangee.querySelector<HTMLButtonElement>('button:not(:disabled)')?.focus({ preventScroll: true })
 }
 
 /** LE DON — une bonbonne oubliée dans une halte : une seule offre, on la
  *  prend, la carte se rouvre. De la réserve, ou du condensat si la
- *  bonbonne est pleine. */
+ *  bonbonne est pleine. L'objet rendu en héros, l'offre en cartouche. */
 function mbMontreDon(m: ModuleCarte, suite: () => void = () => mbMontreCarte('suite')): void {
   mbEtape = 'repos'
   mbReleveHors()
   mbScene.classList.remove('mb-large')
   mbQuestion('UNE HALTE — PRENEZ')
-  mbEl('mb-choix-titre').textContent = `${m.nom} — ${carte.types[m.type]} : QUELQU’UN A LAISSÉ ÇA LÀ`
+  mbEl('mb-choix-titre').textContent = `${m.nom} — QUELQU’UN A LAISSÉ ÇA LÀ`
   mbEl('mb-etal').hidden = true
   mbEl('mb-passer').hidden = true
   const host = mbCartes()
   host.innerHTML = ''
-  host.classList.add('mb-trio')
-  const esc = (t: string): string => t.replace(/&/g, '&amp;').replace(/</g, '&lt;')
   const o = offreDon({ bonbonne: run.bonbonneLiters, cap: capBonbonne() }, donsHalte())
+  const halte = document.createElement('div')
+  halte.className = 'mb-halte'
+  halte.innerHTML = `<div class="mb-halte-heros">${iconeCeremonieHTML('don')}</div><div class="mb-halte-offres"></div>`
+  host.appendChild(halte)
   const btn = document.createElement('button')
   btn.type = 'button'
-  btn.className = 'mb-carte mb-repos'
-  btn.style.gridColumn = '2'
-  btn.innerHTML = `<i class="mb-repos-icone">${o.icone}</i><b>${esc(o.nom)}</b><small>${esc(o.detail)}</small>`
+  btn.className = `mb-cartouche mb-offre mb-cartouche-${iconeDuGlyphe(o.icone) ?? 'offre'}`
+  btn.innerHTML = offreHTML({ glyphe: o.icone, nom: o.nom, detail: o.detail })
+  const ouvertA = performance.now()
   let elu = false
   btn.addEventListener('click', () => {
-    if (elu) return
+    if (elu || gesteTropTot(performance.now(), ouvertA)) return
     elu = true
     if (o.id === 'reserve')
       run.bonbonneLiters = Math.min(capBonbonne(), run.bonbonneLiters + donsHalte().reserveL)
     else gagneCondensat(donsHalte().condensatCl)
     majBoutonsRun()
     sauveRun()
-    bande.ponctuation('sting-record', 0.6)
+    mbFlash()
+    mbEclate(btn, { n: 50, teintes: MB_MENTHE, vitesse: 420, gravite: 400, forme: 'etincelle', duree: 0.8, taille: 4 })
+    sonCeremonie('levier')
     suite()
   })
-  host.appendChild(btn)
+  halte.querySelector('.mb-halte-offres')!.appendChild(btn)
+  btn.focus({ preventScroll: true })
 }
 
 /** Une carte du choix de la voie. */
@@ -16767,16 +16797,18 @@ function mbQuestion(texte: string): void {
   mbEl('mb-choix-titre').classList.remove('mb-grande')
 }
 
-/** Les jauges de la fin ordinaire : la réserve, les vies, la profondeur.
+/** Les jauges de la fin ordinaire : la réserve, la bourse, les vies, la
+ *  profondeur — une plaque chacune (un chiffre, un nom, l'icône rendue).
  *  Le choix de salle ne les montre plus (l'épure du 13/11). */
 function mbJauges(): HTMLElement {
   const jauges = document.createElement('div')
   jauges.className = 'mb-jauges'
-  jauges.innerHTML =
-    `<span>🫙 réserve <b>${virgule(run.bonbonneLiters)} / ${capBonbonne()} L</b></span>` +
-    `<span>◈ bourse <b>${condensat} cL</b></span>` +
-    `<span>💠 vies <b>×${run.vies}</b></span>` +
-    `<span>⇣ profondeur <b>${voieRang} / ${longueurRun()}</b></span>`
+  jauges.innerHTML = [
+    plaqueHTML({ cle: 'reserve', icone: 'reserve', valeur: `${virgule(run.bonbonneLiters)} / ${capBonbonne()} L`, nom: 'RÉSERVE' }, 0),
+    plaqueHTML({ cle: 'condensat', icone: 'condensat', valeur: `${condensat} cL`, nom: 'BOURSE' }, 1),
+    plaqueHTML({ cle: 'secours', icone: 'secours', valeur: `×${run.vies}`, nom: 'ÉCHANTILLONS' }, 2),
+    plaqueHTML({ cle: 'profondeur', icone: 'profondeur', valeur: `${voieRang} / ${longueurRun()}`, nom: 'PROFONDEUR' }, 3),
+  ].join('')
   return jauges
 }
 
@@ -17000,8 +17032,9 @@ function ouvreNoeud(nature: Exclude<NatureNoeud, 'salle'>): void {
   }
 }
 
-/** LE RÉSULTAT D'UN MINI-JEU : une carte, le détail de la mesure, le
- *  verdict et la mémoire gagnée — puis le module reprend (mbApresHalte). */
+/** LE RÉSULTAT D'UN MINI-JEU : l'objet du mini-jeu rendu en héros (le
+ *  couperet, le palet, les rafales, les orbites, les cibles), le verdict,
+ *  la mémoire gagnée en plaque — puis le module reprend (mbApresHalte). */
 function mbMontreResultatMiniJeu(r: NonNullable<typeof minijeuResultat>, suite: () => void): void {
   const res = r.note
   miseEnBonbonne = true
@@ -17018,22 +17051,33 @@ function mbMontreResultatMiniJeu(r: NonNullable<typeof minijeuResultat>, suite: 
   mbEl('mb-choix-titre').textContent = r.detail.toUpperCase()
   const host = mbCartes()
   host.innerHTML = ''
-  host.classList.add('mb-trio')
+  const esc = (t: string): string => t.replace(/&/g, '&amp;').replace(/</g, '&lt;')
+  const halte = document.createElement('div')
+  halte.className = 'mb-halte'
+  halte.innerHTML =
+    `<div class="mb-halte-heros">${iconeCeremonieHTML(level.minijeu?.type ?? 'couperet')}</div>` +
+    `<b class="mb-halte-verdict">${esc(r.titre.split(' — ')[1] ?? '')}</b>` +
+    (res.memoire > 0
+      ? `<div class="mb-halte-puces">${plaqueHTML({ cle: 'memoire', icone: 'memoire', valeur: `+${res.memoire}`, nom: 'MÉMOIRE' }, 0)}</div>`
+      : `<p class="mb-halte-rien">rien — le trait est loin</p>`)
+  host.appendChild(halte)
+  const ouvertA = performance.now()
   const btn = document.createElement('button')
   btn.type = 'button'
-  btn.className = 'mb-carte mb-repos'
-  btn.style.gridColumn = '2'
-  btn.innerHTML =
-    `<i class="mb-repos-icone">${level.minijeu?.type === 'palet' ? '🥌' : level.minijeu?.type === 'rafales' ? '🌬️' : level.minijeu?.type === 'orbites' ? '🪐' : level.minijeu?.type === 'cibles' ? '🎯' : '🔪'}</i><b>${r.titre.split(' — ')[1] ?? ''}</b>` +
-    `<small>${res.memoire > 0 ? `+${res.memoire} mémoire` : 'rien — le trait est loin'} · continuer</small>`
-  let elu = false
+  btn.className = 'mb-levier mb-halte-levier'
+  btn.textContent = 'REPRENDRE LA DESCENTE ▸'
   btn.addEventListener('click', () => {
-    if (elu) return
-    elu = true
-    bande.ponctuation(res.verdict === 'juste' ? 'sting-record' : 'sting-collecte', 0.6)
+    if (btn.disabled || gesteTropTot(performance.now(), ouvertA)) return
+    btn.disabled = true
+    mbFlash()
+    mbEclate(btn, { n: 50, teintes: MB_MENTHE, vitesse: 420, gravite: 400, forme: 'etincelle', duree: 0.8, taille: 4 })
+    sonCeremonie('levier')
+    // le sting reste au verdict juste : c'est un record du trait
+    if (res.verdict === 'juste') bande.ponctuation('sting-record', 0.6)
     suite()
   })
-  host.appendChild(btn)
+  halte.appendChild(btn)
+  btn.focus({ preventScroll: true })
 }
 
 /** APRÈS UNE HALTE OU UNE RENCONTRE : le nœud est un nœud comme un autre,
@@ -17065,7 +17109,9 @@ function montreSuiteRun(): void {
 }
 
 /** LA CACHE : l'orbe que le module recèle se prend ici, une fois par
- *  poste — la cache s'ouvre, dit ce qu'elle rend, et le module reprend. */
+ *  poste — la cache s'ouvre, dit ce qu'elle rend, et le module reprend.
+ *  Le coffre rendu en héros, le récit dans un cadre de la station, l'orbe
+ *  pris en plaque ; le levier claque comme un choix. */
 function mbMontreCache(m: ModuleCarte): void {
   mbEtape = 'repos'
   const esc = (t: string): string => t.replace(/&/g, '&amp;').replace(/</g, '&lt;')
@@ -17091,22 +17137,35 @@ function mbMontreCache(m: ModuleCarte): void {
         ? `L’orbe ${nomOrbe} y dormait — vous l’aviez déjà. La chambre est vide désormais.`
         : `L’orbe d’essence de conscience — ${nomOrbe}. Il vous suit.`
       : 'Vous avez déjà ouvert cette cache sur ce poste : elle est vide.'
-  const bilan = document.createElement('div')
-  bilan.className = 'mb-ev-recit mb-ev-issue'
-  bilan.innerHTML = `<em>${esc(m.nom)}</em><p>${esc(texte)}</p>` + (prise && !dejaTenu ? `<ul class="mb-ev-gains"><li>🔮 orbe d’essence — ${esc(nomOrbe)}</li></ul>` : '')
-  host.appendChild(bilan)
+  const halte = document.createElement('div')
+  halte.className = 'mb-halte mb-halte-a-recit'
+  halte.innerHTML =
+    `<div class="mb-halte-heros">${iconeCeremonieHTML('cache')}</div>` +
+    `<div class="mb-ev-recit mb-ev-issue mb-coupe-diag"><em>${esc(m.nom)}</em><p>${esc(texte)}</p></div>` +
+    (prise && !dejaTenu
+      ? `<div class="mb-halte-puces">${plaqueHTML({ cle: 'orbe', icone: 'orbe', valeur: nomOrbe, nom: 'ORBE D’ESSENCE' }, 0)}</div>`
+      : '')
+  host.appendChild(halte)
+  // un orbe trouvé claque à l'ouverture, comme la cartouche d'un gain
+  if (prise && !dejaTenu) {
+    sonCeremonie('cartouche', 1)
+    mbEclate(halte.querySelector('.mb-halte-puces .mb-cartouche'), { n: 40, teintes: ['#e58bff', '#eaf6ff', ...MB_MENTHE], vitesse: 300, gravite: 420, duree: 1, taille: 4 })
+  }
+  const ouvertA = performance.now()
   const btn = document.createElement('button')
   btn.type = 'button'
-  btn.className = 'mb-continuer'
+  btn.className = 'mb-levier mb-halte-levier'
   btn.textContent = 'REPRENDRE LA DESCENTE ▸'
   btn.addEventListener('click', () => {
-    if (btn.disabled) return
+    if (btn.disabled || gesteTropTot(performance.now(), ouvertA)) return
     btn.disabled = true
-    bande.ponctuation('sting-record', 0.6)
+    mbFlash()
+    mbEclate(btn, { n: 50, teintes: MB_MENTHE, vitesse: 420, gravite: 400, forme: 'etincelle', duree: 0.8, taille: 4 })
+    sonCeremonie('levier')
     mbApresHalte()
   })
-  host.appendChild(btn)
-  btn.focus()
+  halte.appendChild(btn)
+  btn.focus({ preventScroll: true })
 }
 
 /** L'ÉTAT DE LA RUN que les offres d'un événement consultent — juste assez
@@ -17234,6 +17293,9 @@ function mbMontreEvenement(): void {
   mbPeintEvenement(ev, alea)
 }
 
+/** LA RENCONTRE PEINTE : le signal rendu en héros, le récit — la seule
+ *  prose du jeu, gardée telle quelle — dans un cadre de la station, et les
+ *  offres en cartouches. */
 function mbPeintEvenement(ev: EvenementDef, alea: () => number): void {
   const esc = (t: string): string => t.replace(/&/g, '&amp;').replace(/</g, '&lt;')
   mbReleveHors()
@@ -17246,68 +17308,94 @@ function mbPeintEvenement(ev: EvenementDef, alea: () => number): void {
   mbEl('mb-passer').hidden = true
   const host = mbCartes()
   host.innerHTML = ''
-  host.classList.add('mb-trio')
+  const halte = document.createElement('div')
+  halte.className = 'mb-halte mb-halte-a-recit'
+  halte.innerHTML = `<div class="mb-halte-heros">${iconeCeremonieHTML('rencontre')}</div>`
   const recit = document.createElement('div')
-  recit.className = 'mb-ev-recit'
+  recit.className = 'mb-ev-recit mb-coupe-diag'
   recit.innerHTML = `<em>${esc(ev.lieu)}</em><p>${esc(ev.texte)}</p>`
-  host.appendChild(recit)
+  halte.appendChild(recit)
+  const rangee = document.createElement('div')
+  rangee.className = 'mb-halte-offres'
+  halte.appendChild(rangee)
+  host.appendChild(halte)
+  const ouvertA = performance.now()
   let elu = false
   offresDe(ev, etatJoueurEvenement()).forEach(({ choix, possible }, i) => {
     const btn = document.createElement('button')
     btn.type = 'button'
-    btn.className = 'mb-carte mb-ev-offre' + (possible ? '' : ' mb-pauvre')
+    btn.className = 'mb-cartouche mb-offre' + (possible ? '' : ' mb-pauvre')
     btn.disabled = !possible
     btn.style.setProperty('--i', String(i))
     // le détail ne se lit que d'une offre déjà prise ; une offre hors de
     // portée le dit (evenements, règle 4)
     const detail = detailOffre(choix, records.offreEssayee(cleOffre(ev, choix)), possible)
-    btn.innerHTML =
-      `<b>${esc(choix.libelle)}</b><small${detail.voilee ? ' class="mb-ev-voile"' : ''}>${esc(detail.texte)}</small>` +
-      (choix.issues.length > 1
-        ? `<em class="mb-ev-pari">⚄ ${choix.issues.length} issues possibles</em>`
-        : `<em class="mb-ev-sur">▸ sans risque</em>`)
-    btn.addEventListener('click', () => {
-      if (elu) return
-      elu = true
-      mbTranche(ev, choix, alea)
+    btn.innerHTML = offreHTML({
+      nom: choix.libelle,
+      detail: detail.texte,
+      voile: detail.voilee,
+      mention:
+        choix.issues.length > 1
+          ? `<em class="mb-ev-pari">⚄ ${choix.issues.length} issues possibles</em>`
+          : `<em class="mb-ev-sur">▸ sans risque</em>`,
     })
-    host.appendChild(btn)
+    btn.addEventListener('click', () => {
+      if (elu || gesteTropTot(performance.now(), ouvertA)) return
+      elu = true
+      mbEclate(btn, { n: 50, teintes: MB_MENTHE, vitesse: 420, gravite: 400, forme: 'etincelle', duree: 0.8, taille: 4 })
+      sonCeremonie('levier')
+      mbTranche(ev, choix, alea) // le flash part avec l'issue
+    })
+    rangee.appendChild(btn)
   })
+  rangee.querySelector<HTMLButtonElement>('button:not(:disabled)')?.focus({ preventScroll: true })
 }
 
 /** LE CHOIX EST PRIS : l'issue se tire, les effets s'appliquent, et l'écran
- *  dit ce qui vient d'arriver avant de rendre la main. */
+ *  dit ce qui vient d'arriver avant de rendre la main. Les lignes de
+ *  l'issue (appliqueEffets, en émojis) deviennent des cartouches : leur
+ *  glyphe passe par ICONE_DE_GLYPHE ; celui d'un instrument, par sa case. */
 function mbTranche(ev: EvenementDef, choix: ChoixEvenement, alea: () => number): void {
   const esc = (t: string): string => t.replace(/&/g, '&amp;').replace(/</g, '&lt;')
   const issue = resoutChoix(choix, alea)
   // l'offre prise se dévoile — elle, pas ses voisines écartées
   records.noteOffreEssayee(cleOffre(ev, choix))
   const lignes = appliqueEffets(issue.effets)
-  bande.ponctuation('sting-record', 0.6)
+  mbFlash()
   mbQuestion(ev.titre)
   const host = mbCartes()
   host.innerHTML = ''
-  const bilan = document.createElement('div')
-  bilan.className = 'mb-ev-recit mb-ev-issue'
   const dites = lignes.length > 0 ? lignes : [issue.effets.map(ditEffet).join(' · ') || 'rien']
-  bilan.innerHTML =
-    `<em>${esc(choix.libelle)} — ${esc(choix.detail)}</em><p>${esc(issue.texte)}</p>` +
-    `<ul class="mb-ev-gains">${dites.map((l) => `<li>${esc(l)}</li>`).join('')}</ul>`
-  host.appendChild(bilan)
+  // l'émoji d'un instrument n'est pas dans la table : la ligne porte son
+  // nom, qui désigne sa case rendue (deux instruments peuvent partager un
+  // émoji, pas un nom)
+  const instrument = (glyphe: string, texte: string): string | null => {
+    const d = catalogueRecompenses().find((x) => x.icone === glyphe && texte.includes(x.nom))
+    return d ? iconeInstrumentHTML(d) : null
+  }
+  const halte = document.createElement('div')
+  halte.className = 'mb-halte mb-halte-a-recit'
+  halte.innerHTML =
+    `<div class="mb-halte-heros">${iconeCeremonieHTML('rencontre')}</div>` +
+    `<div class="mb-ev-recit mb-ev-issue mb-coupe-diag"><em>${esc(choix.libelle)} — ${esc(choix.detail)}</em><p>${esc(issue.texte)}</p></div>` +
+    `<ul class="mb-halte-puces">${dites.map((l, i) => puceHTML(l, i, instrument)).join('')}</ul>`
+  host.appendChild(halte)
+  const ouvertA = performance.now()
   const btn = document.createElement('button')
   btn.type = 'button'
-  btn.className = 'mb-continuer'
+  btn.className = 'mb-levier mb-halte-levier'
   btn.textContent = 'REPRENDRE LA DESCENTE ▸'
   btn.addEventListener('click', () => {
-    if (btn.disabled) return
+    if (btn.disabled || gesteTropTot(performance.now(), ouvertA)) return
     btn.disabled = true
+    sonCeremonie('levier')
     mbApresHalte()
   })
-  host.appendChild(btn)
-  btn.focus()
+  halte.appendChild(btn)
+  btn.focus({ preventScroll: true })
 }
 
-/** La FIN : l'état des jauges, et CONTINUER mène à la salle suivante. */
+/** La FIN : l'état des jauges, et le levier mène à la salle suivante. */
 function mbMontreFin(): void {
   mbEtape = 'fin'
   mbEl('mb-choix-titre').textContent = 'PAROI DU SAS OUVERTE'
@@ -17317,14 +17405,15 @@ function mbMontreFin(): void {
   const host = mbCartes()
   host.innerHTML = ''
   host.appendChild(mbJauges())
+  const ouvertA = performance.now()
   const btn = document.createElement('button')
   btn.type = 'button'
-  btn.className = 'mb-continuer'
+  btn.className = 'mb-levier mb-halte-levier'
   btn.textContent = 'SALLE SUIVANTE ▸'
   btn.addEventListener('click', () => {
-    if (btn.disabled) return
+    if (btn.disabled || gesteTropTot(performance.now(), ouvertA)) return
     btn.disabled = true
-    bande.ponctuation('sting-collecte', 0.6)
+    sonCeremonie('levier')
     mbFlash()
     mbEclate(btn, { n: 50, teintes: MB_MENTHE, vitesse: 420, gravite: 400, forme: 'etincelle', duree: 0.8, taille: 4 })
     window.setTimeout(() => {
@@ -17334,6 +17423,7 @@ function mbMontreFin(): void {
     }, sansAnimation() ? 0 : 260)
   })
   host.appendChild(btn)
+  btn.focus({ preventScroll: true })
 }
 
 function montreMiseEnBonbonne(b: BilanSalle): void {

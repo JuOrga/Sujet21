@@ -16,8 +16,11 @@ describe('la médaille repliée et le voile des offres (index.html)', () => {
     expect(html).toMatch(/\.mb-scene\.mb-compact \.mb-rang \{[^}]*--mb-sceau-incl: 0deg/)
   })
 
-  it('le voile d’une offre bat « .mb-carte small » en spécificité', () => {
-    expect(html).toMatch(/\.mb-carte \.mb-ev-voile \{/)
+  // l'offre de rencontre est devenue une cartouche (cérémonie « station ») :
+  // le voile porte toujours deux classes, sinon le détail ordinaire, à
+  // spécificité égale, lui reprenait sa couleur
+  it('le voile d’une offre bat le détail ordinaire en spécificité', () => {
+    expect(html).toMatch(/\.mb-offre-detail\.mb-ev-voile \{/)
     expect(html).not.toMatch(/^\s*\.mb-ev-voile \{/m)
   })
 })
