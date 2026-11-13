@@ -156,7 +156,9 @@ describe('la récolte d’un module', () => {
     expect(g[2].valeur).toBe('+24')
     expect(g[3].valeur).toBe('+2 paliers')
     expect(g[4].valeur).toBe('+2')
-    expect(g[4].detail).toBe('• FILTRE · • TAMIS')
+    // le détail finit en infobulle (texte brut) : l'émoji d'un instrument y
+    // disparaît au profit de son nom — il n'y a pas d'icône rendue en title
+    expect(g[4].detail).toBe('FILTRE · TAMIS')
     expect(g[5].valeur).toBe('Vaporisation')
   })
 

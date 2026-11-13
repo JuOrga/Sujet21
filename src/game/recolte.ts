@@ -385,7 +385,9 @@ export function gainsDeModule(e: EntreeGainsModule): Gain[] {
       prefixe: '',
       suffixe: '',
       role: 'des avantages pour le reste de la descente — perdus à la purge',
-      detail: gagnes.map((g) => `${g.icone} ${g.nom}`).join(' · '),
+      // le détail finit en infobulle, du texte brut : l'émoji d'un instrument
+      // s'y dessinerait autrement selon la machine — son nom suffit
+      detail: gagnes.map((g) => g.nom).join(' · '),
       solde: { nom: 'EMBARQUÉS', valeur: String(e.instruments.length) },
     },
   ]
