@@ -16069,6 +16069,8 @@ interface CarteVoie {
   nature?: Exclude<NatureNoeud, 'salle'>
   /** la salle est SCELLÉE : plus dure d'un cran, elle paie plus au sas */
   prime?: PrimeNoeud
+  /** la FAMILLE de la figure, pour une générée en figure : la porte la nomme */
+  figure?: string
   /** le pool manquait pour cette porte : à noter au relevé quand le choix se
    *  prend (pas à chaque rendu des portes — une reprise les rebâtit) */
   manqueNote?: Omit<Manque, 'fois' | 'dernier'>
@@ -16264,6 +16266,12 @@ function propositionsVoie(seq: LevelDef[]): CarteVoie[] | null {
       ? `SALLE GÉNÉRÉE — FIGURE : ${FIGURE_NOMS[fam].toUpperCase()}`
       : etiquettesGen[Math.min(i, etiquettesGen.length - 1)]
   }
+  // la famille seule, pour la ligne courte de la porte (l'étiquette entière
+  // passe dans l'infobulle)
+  const figureDe = (figure: number): { figure?: string } => {
+    const fam = FIGURE_FAMILLES[figure - 2]
+    return fam ? { figure: FIGURE_NOMS[fam] } : {}
+  }
   // LES PORTES DE LA MINI-CARTE : une carte par nœud joignable. Le nœud du
   // pool pioche à l'instant ; pool vide (tout vu, rien de jouable), il se
   // génère avec sa mécanique — la voie ne meurt jamais sur un pool sec
@@ -16325,6 +16333,7 @@ function propositionsVoie(seq: LevelDef[]): CarteVoie[] | null {
             (manque
               ? `GÉNÉRÉE — LE POOL MANQUE (${MECANIQUE_NOMS[p.mecanique]})`
               : etiquetteGeneree(g.figure, p.voie)) + suffixePrime,
+          ...figureDe(g.figure),
           voie: p.voie,
           ...(p.prime ? { prime: p.prime } : {}),
           ...(manqueNote ? { manqueNote } : {}),
@@ -16355,6 +16364,7 @@ function propositionsVoie(seq: LevelDef[]): CarteVoie[] | null {
         cahier: g.cahier,
         generee: true,
         etiquette: etiquetteGeneree(g.figure, i),
+        ...figureDe(g.figure),
       })
   })
   // le FILET : si un tirage a échoué (graine ingrate), on balaie les
@@ -16371,6 +16381,7 @@ function propositionsVoie(seq: LevelDef[]): CarteVoie[] | null {
           cahier: gx.cahier,
           generee: true,
           etiquette: etiquetteGeneree(gx.figure, 0),
+          ...figureDe(gx.figure),
         })
     }
   }
@@ -16399,26 +16410,30 @@ function mbMontreSallesVoie(cartes: CarteVoie[]): void {
   // et il faut que ça se lise avant tout — le module et le rang de la
   // descente passent en ligne de contexte sous elle
   mbQuestion('CHOISISSEZ LA SALLE SUIVANTE')
+  const m = moduleEnCours()
   mbEl('mb-choix-titre').textContent =
-    // le MODULE se nomme en tête : c'est son biome qu'on traverse, et la
-    // salle se compte dans le module avant de se compter dans la descente
-    `${moduleEnCours()?.nom ?? 'LA VOIE SE SÉPARE'} — SALLE ${Math.min(moduleEnCours()?.niveaux ?? 1, carteRun.niveau + 1)} / ${moduleEnCours()?.niveaux ?? '?'}` +
-    ` · DESCENTE ${rangSuivant} / ${longueurRun()}` +
+    // UNE LIGNE DE CONTEXTE, pas une phrase : le module (c'est son biome
+    // qu'on traverse), la salle dans le module, le rang dans la descente.
+    // Les mentions rares mais décisives restent, en quelques mots
+    `${m?.nom ?? 'LA VOIE SE SÉPARE'} · SALLE ${Math.min(m?.niveaux ?? 1, carteRun.niveau + 1)}/${m?.niveaux ?? '?'}` +
+    ` · DESCENTE ${rangSuivant}/${longueurRun()}` +
     // le CONFINEMENT SUPÉRIEUR s'annonce : plus dur, plus généreux
-    ((moduleEnCours()?.cran ?? 0) > 0 ? ` · CONFINEMENT +${moduleEnCours()!.cran} · MÉMOIRE ×${primeMemoireDu(moduleEnCours())}` : '') +
-    (run.confinementDu > 0 ? ` · LA STATION EST RÉVEILLÉE +${run.confinementDu}` : '') +
+    ((m?.cran ?? 0) > 0 ? ` · CONFINEMENT +${m!.cran} · MÉMOIRE ×${primeMemoireDu(m)}` : '') +
+    (run.confinementDu > 0 ? ` · STATION RÉVEILLÉE +${run.confinementDu}` : '') +
     (descenteDuJour() ? ' · DESCENTE DU JOUR' : '') +
     stadeNeuf
-  // les JAUGES restent en scène, comme à la fin ordinaire : le choix se
-  // prend en voyant ce qu'on possède — maîtrise et réserve, chacune en ligne
-  mbJaugeMince()
-  // le COMPACT : le bilan déjà lu se replie, les portes prennent la scène
+  // L'ÉTAPE ÉPURÉE : ni le relevé de la salle jouée, ni la jauge de
+  // maîtrise, ni le rang des jauges, ni la consigne. Le joueur les a lus à
+  // l'étape d'avant ; ici, ils empilaient ~180 px au-dessus des portes, qui
+  // passaient sous le bas d'un écran de 720 ou 800 px (« la page déborde,
+  // il y a trop d'informations », le joueur, 13/11)
+  mbReleveHors()
+  mbEl('mb-etal').hidden = true
   mbScene.classList.add('mb-compact')
   const host = mbCartes()
   host.innerHTML = ''
   // trois portes : trois colonnes ; quatre (l'écrite en plus) : en rang
   host.classList.toggle('mb-trio', cartes.length === 3)
-  host.appendChild(mbJauges())
   // LA MINI-CARTE À VOIES du module, au-dessus des portes : le chemin déjà
   // ouvert, les portes de ce rang allumées, et ce qu'elles ouvrent ensuite
   // — on choisit une porte en voyant où elle mène
@@ -16431,15 +16446,18 @@ function mbMontreSallesVoie(cartes: CarteVoie[]): void {
       trace: carteRun.trace,
       portes: cartes.map((c) => c.voie).filter((v): v is number => v !== undefined),
     })
-    // LA FICHE DE LA MINI-CARTE : ce qu'est la case ou la porte visée, en
-    // une ligne fixe — l'infobulle native ne paraissait ni à la manette ni
-    // au doigt, et la hauteur ne bouge pas (la carte ne « saute » pas)
+    // LA FICHE DE LA MINI-CARTE : ce qu'est la case ou la porte visée —
+    // l'infobulle native ne paraissait ni à la manette ni au doigt. Elle ne
+    // paraît QUE visée, posée en surimpression au pied de la carte : elle ne
+    // prend aucune hauteur (la carte ne « saute » pas), et la consigne par
+    // défaut qui l'occupait au repos est partie avec l'épure
     const fiche = document.createElement('p')
     fiche.className = 'mv-fiche'
     voies.appendChild(fiche)
     host.appendChild(voies)
     ficheVoies = (t: string | null): void => {
-      fiche.textContent = t ?? '▸ visez une porte : ce qu’elle fermerait s’éteint sur la carte'
+      fiche.textContent = t ?? ''
+      fiche.hidden = !t
     }
     ficheVoies(null)
     // survoler une case de la grille la décrit aussi
@@ -16458,7 +16476,6 @@ function mbMontreSallesVoie(cartes: CarteVoie[]): void {
       else ficheVoies(null)
     })
   } else ficheVoies = () => {}
-  host.appendChild(mbConsignePortes(cartes.length))
   // LES MANQUES DU POOL se notent quand le choix se prend, une fois : ce
   // sont les trous que ce choix a réellement présentés au joueur
   let manquesNotes = false
@@ -16485,9 +16502,10 @@ function mbMontreSallesVoie(cartes: CarteVoie[]): void {
           i,
           {
             etiquette: c.etiquette,
-            classe: c.generee ? 'mb-voie-gen' : 'mb-voie-pool',
             cahier: c.cahier,
             voie: c.voie,
+            ...(c.prime ? { prime: c.prime } : {}),
+            ...(c.figure ? { figure: c.figure } : {}),
           },
           () => {
             noteLesManques()
@@ -16556,11 +16574,12 @@ function mbMontreSalles(props: LevelDef[]): void {
   mbEtape = 'salles'
   mbQuestion('CHOISISSEZ LA SALLE SUIVANTE')
   mbEl('mb-choix-titre').textContent = 'PAROI DU SAS OUVERTE — DEUX SALLES SE PROPOSENT'
-  mbJaugeMince()
+  // la même épure que la voie : relevé et jauge ont été lus avant
+  mbReleveHors()
+  mbEl('mb-etal').hidden = true
   mbScene.classList.add('mb-compact')
   const host = mbCartes()
   host.innerHTML = ''
-  host.appendChild(mbConsignePortes(props.length))
   props.forEach((lv, i) => {
     const c21 = decodeCode21(lv.code)
     host.appendChild(
@@ -16580,20 +16599,8 @@ function mbQuestion(texte: string): void {
   mbEl('mb-choix-titre').classList.remove('mb-grande')
 }
 
-/** LA CONSIGNE des portes : une ligne qui dit ce que sont ces vignettes —
- *  des salles, une par porte, et qu'on va jouer celle qu'on ouvre. Sans
- *  elle, le choix se lisait comme une galerie. */
-function mbConsignePortes(n: number): HTMLElement {
-  const p = document.createElement('p')
-  p.className = 'mb-portes-consigne'
-  p.innerHTML =
-    `<i>▸</i> ${n > 1 ? `${n} portes, ${n} salles différentes` : 'une seule porte'} — ` +
-    `ouvrez celle que vous voulez jouer ensuite`
-  return p
-}
-
-/** Les jauges en tête du choix de salle : la réserve, les vies, la
- *  profondeur — on décide en voyant ce qu'on possède. */
+/** Les jauges de la fin ordinaire : la réserve, les vies, la profondeur.
+ *  Le choix de salle ne les montre plus (l'épure du 13/11). */
 function mbJauges(): HTMLElement {
   const jauges = document.createElement('div')
   jauges.className = 'mb-jauges'
@@ -16605,8 +16612,12 @@ function mbJauges(): HTMLElement {
   return jauges
 }
 
-/** UNE PORTE : la salle proposée, plan en vitrine, numéro dans l'angle,
- *  étiquette, code, nom, chips — et la mention ENTRER à la visée. Élue,
+/** UNE PORTE : la salle proposée, plan en vitrine, repère dans l'angle,
+ *  code, nom, UNE ligne courte — la difficulté, et la prime ou la figure
+ *  quand il y en a — puis la mention ENTRER à la visée. L'étiquette longue
+ *  (« SALLE GÉNÉRÉE — FIGURE : … », « TABLEAU DU POOL ») et la mécanique
+ *  passent dans l'infobulle : en ligne, elles faisaient trois rangs de plus
+ *  par porte, et la mécanique se lit déjà à l'icône de la mini-carte. Élue,
  *  elle S'OUVRE (elle grandit, blanchit, le feu jaillit, l'écran flashe)
  *  pendant que les autres se referment, puis `choisit` retient la salle et
  *  le sas mène à la suivante. Un second clic pendant l'ouverture ne compte
@@ -16614,7 +16625,13 @@ function mbJauges(): HTMLElement {
 function mbPorte(
   lv: LevelDef,
   i: number,
-  o: { etiquette?: string; classe?: string; cahier: CodeAtelier | null; voie?: number },
+  o: {
+    etiquette?: string
+    cahier: CodeAtelier | null
+    voie?: number
+    prime?: PrimeNoeud
+    figure?: string
+  },
   choisit: () => void,
 ): HTMLButtonElement {
   const esc = (t: string): string =>
@@ -16623,15 +16640,23 @@ function mbPorte(
   btn.type = 'button'
   btn.className = 'mb-porte'
   btn.style.setProperty('--i', String(i))
+  // l'infobulle garde tout ce que la porte ne dit plus en ligne : le
+  // concepteur y lit encore « GÉNÉRÉE — LE POOL MANQUE (…) »
+  btn.title = [
+    o.etiquette,
+    o.cahier ? `${MOMENT_COURT[o.cahier.moment]} · ${MECANIQUE_NOMS[o.cahier.mecanique]}` : '',
+  ]
+    .filter(Boolean)
+    .join(' — ')
+  const ligne = [
+    o.cahier ? `<i>DIFF ${o.cahier.difficulte}</i>` : '',
+    o.prime ? `<i class="mb-porte-prime">PRIME ${esc(NOMS_PRIME[o.prime].toUpperCase())}</i>` : '',
+    o.figure ? `<i>FIGURE ${esc(o.figure.toUpperCase())}</i>` : '',
+  ].join('')
   btn.innerHTML =
     `<span class="mb-porte-vue">${mbNumeroPorte(i, o.voie)}<canvas width="440" height="252"></canvas></span>` +
-    (o.etiquette ? `<em class="mb-porte-tag ${o.classe ?? ''}">${esc(o.etiquette)}</em>` : '') +
     `<b>${esc(lv.code)}</b><small>${esc(lv.name)}</small>` +
-    (o.cahier
-      ? `<span class="salle-chips"><i>${MOMENT_COURT[o.cahier.moment]}</i>` +
-        `<i class="sc-m${o.cahier.mecanique}">${MECANIQUE_NOMS[o.cahier.mecanique].toUpperCase()}</i>` +
-        `<i>DIFF ${o.cahier.difficulte}</i></span>`
-      : '') +
+    (ligne ? `<span class="mb-porte-ligne">${ligne}</span>` : '') +
     `<span class="mb-porte-entrer">ENTRER ▸</span>`
   dessineMiniCarte(btn.querySelector('canvas') as HTMLCanvasElement, lv)
   const ouvre = armeAuToucher(btn, o.voie !== undefined)
@@ -16657,41 +16682,51 @@ function mbPorte(
 }
 
 /** CE QUE DIT LA PORTE d'un nœud qui n'est pas une salle : l'étiquette de
- *  la voie, le titre, la phrase, et l'icône de la mini-carte en grand. */
-const NOMS_NOEUD: Record<Exclude<NatureNoeud, 'salle'>, { etiquette: string; titre: string; texte: string; icone: string }> = {
+ *  la voie, le titre, une phrase COURTE (une ligne sur la porte), le texte
+ *  entier (l'infobulle), et l'icône de la mini-carte en grand. */
+const NOMS_NOEUD: Record<
+  Exclude<NatureNoeud, 'salle'>,
+  { etiquette: string; titre: string; court: string; texte: string; icone: string }
+> = {
   evenement: {
     etiquette: 'RENCONTRE',
     titre: 'SIGNAL',
+    court: 'Quelque chose vit encore derrière.',
     texte: 'Quelque chose vit encore derrière cette porte. Le plan du module ne dit pas quoi.',
     icone: 'rencontre',
   },
   economat: {
     etiquette: 'ÉCONOMAT',
     titre: 'LE SEMBLABLE',
+    court: 'Il troque contre du condensat.',
     texte: 'Le comptoir du Sujet 12, derrière sa grille. Il troque contre du condensat.',
     icone: 'economat',
   },
   repos: {
     etiquette: 'ALCÔVE',
     titre: 'REPOS',
+    court: 'Un souffle, de la réserve ou du condensat.',
     texte: 'Une alcôve tiède. Un second souffle, de la réserve ou du condensat — un seul des trois.',
     icone: 'repos',
   },
   don: {
     etiquette: 'BONBONNE',
     titre: 'UNE RÉSERVE OUBLIÉE',
+    court: 'Une bonbonne laissée là.',
     texte: 'Quelqu’un a laissé sa bonbonne là et n’est jamais revenu la chercher.',
     icone: 'don',
   },
   coffre: {
     etiquette: 'CACHE',
     titre: 'LA CACHE',
+    court: 'Un orbe d’essence y dort.',
     texte: 'Une chambre close. Un orbe d’essence y dort depuis onze ans.',
     icone: 'coffre',
   },
   minijeu: {
     etiquette: 'MINI-JEU',
     titre: 'LA PESÉE',
+    court: 'La précision paie en mémoire.',
     texte: 'Une cuve graduée. Versez-y exactement ce qu’elle demande — ni plus, ni moins. La précision paie en mémoire.',
     icone: 'minijeu',
   },
@@ -16724,11 +16759,14 @@ function mbPorteNoeud(
   btn.type = 'button'
   btn.className = `mb-porte mb-porte-ev mb-porte-${nature}`
   btn.style.setProperty('--i', String(i))
+  // la même épure que la porte d'une salle : titre, phrase courte, une
+  // ligne (l'étiquette) — le texte entier reste à l'infobulle
+  btn.title = d.texte
   btn.innerHTML =
     `<span class="mb-porte-vue mb-ev-vue">${mbNumeroPorte(i, voie)}` +
     `<svg class="mb-ev-icone" viewBox="0 0 24 24" aria-hidden="true">${ICONES_MINI_CARTE}<use href="#mv-i-${d.icone}" width="24" height="24"/></svg></span>` +
-    `<em class="mb-porte-tag mb-voie-ev">${esc(etiquette)}</em>` +
-    `<b>${esc(d.titre)}</b><small>${esc(d.texte)}</small>` +
+    `<b>${esc(d.titre)}</b><small>${esc(d.court)}</small>` +
+    `<span class="mb-porte-ligne mb-porte-ligne-ev"><i>${esc(etiquette)}</i></span>` +
     `<span class="mb-porte-entrer">ENTRER ▸</span>`
   const arme = armeAuToucher(btn, voie !== undefined)
   btn.addEventListener('click', () => {
