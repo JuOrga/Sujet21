@@ -210,6 +210,48 @@ describe('la cérémonie — la coque et ses poignées', () => {
   })
 })
 
+// LES CONSTATS DE LA RELECTURE DU BILAN (F2) : trois règles que la cascade
+// rendait muettes — une taille du Steam Deck qui écrasait celle des
+// téléphones couchés, une bande de poutre trop large sur écran étroit, deux
+// monnaies sans leur teinte. Le navigateur ne dit rien d'une règle perdue :
+// on garde ce qui la fait gagner.
+describe('la cérémonie — les règles que la cascade perdait', () => {
+  const css = HTML.slice(HTML.indexOf('/* ==== LA CÉRÉMONIE DE FIN DE SALLE'), HTML.indexOf('/* ---- Le panneau du GÉNÉRATEUR'))
+  /** la condition du @media qui enveloppe la première occurrence de `bout` */
+  const media = (bout: string): string => {
+    const i = css.indexOf(bout)
+    expect(i, bout).toBeGreaterThan(-1)
+    const m = css.lastIndexOf('@media (', i)
+    return css.slice(m, css.indexOf('{', m))
+  }
+  /** le bloc d'un @media de la section, jusqu'à sa fermeture */
+  const blocMedia = (condition: string): string => {
+    const d = css.indexOf(`@media ${condition} {`)
+    expect(d, condition).toBeGreaterThan(-1)
+    return css.slice(d, css.indexOf('\n      }\n', d))
+  }
+  it('ne laisse pas la taille du Steam Deck écraser celle d’un téléphone couché', () => {
+    // 844 × 390 : la règle des 761–1000 px ET celle des 820 px de haut
+    // s'appliquent ; la seconde, écrite après, regrossissait le cœur
+    // (260 au lieu de 230) et le sceau (136 au lieu de 124)
+    expect(media('--mb-coeur-l: 260px')).toContain('min-width: 1001px')
+    expect(media('--mb-sceau-l: 136px')).toContain('min-width: 1001px')
+  })
+  it('resserre la poutre repliée sur écran étroit aussi', () => {
+    // la bannière repliée (56 px de bande, 4 classes) l'emportait sur la
+    // réduction à 36 px (1 classe) : la poutre débordait sur un téléphone
+    expect(blocMedia('(max-width: 760px)')).toMatch(/\.mb-scene\.mb-compact \.mb-banniere\.mb-poutre[^{]*\{[^}]*--mb-bande: 36px/)
+  })
+  it('donne sa teinte de liseré à chaque gain de la récolte', () => {
+    const RECOLTE = readFileSync(new URL('./recolte.ts', import.meta.url), 'utf-8')
+    const union = /cle: ((?:'[a-z]+'(?: \| )?)+)/.exec(RECOLTE)
+    expect(union, 'le type des clés de Gain').not.toBeNull()
+    const cles = [...union![1].matchAll(/'([a-z]+)'/g)].map((m) => m[1])
+    expect(cles).toContain('instruments')
+    for (const cle of cles) expect(regle(`.mb-cartouche-${cle}`), cle).toContain('--mb-liseret:')
+  })
+})
+
 // LA CARTE DANS LA CÉRÉMONIE : le plan ne bouge pas sous le survol. Deux
 // pannes vécues, deux garde-fous — la fiche qui passait d'une à trois
 // lignes poussait la carte vers le bas (16/09) ; une ligne en nowrap plus

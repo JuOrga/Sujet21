@@ -8418,6 +8418,11 @@
       .mb-cartouche-condensat { --mb-liseret: var(--mb-menthe); }
       .mb-cartouche-memoire { --mb-liseret: var(--mb-memoire); }
       .mb-cartouche-livre { --mb-liseret: var(--mb-bleu); }
+      /* la maîtrise a la menthe de sa colonne ; les instruments, le teal
+         qu'ils avaient avant les cartouches (ils le tenaient du défaut, et
+         la maîtrise perdait sa menthe en passant à la cartouche) */
+      .mb-cartouche-maitrise { --mb-liseret: var(--mb-menthe); }
+      .mb-cartouche-instruments { --mb-liseret: var(--mb-teal); }
       .mb-cartouche-tirage { --mb-liseret: var(--mb-or); }
       .mb-cartouche-orbe { --mb-liseret: var(--mb-orbe); }
       .mb-cartouche-solde {
@@ -9373,7 +9378,9 @@
         .mb-ligne-it > i { font-size: calc(18px * var(--ui)); }
         .mb-ligne-it b { font-size: calc(13px * var(--ui)); }
         .mb-prime { white-space: normal; }
-        .mb-poutre { --mb-bande: 36px; }
+        /* la poutre repliée aussi : sa règle (4 classes) l'emportait sur
+           celle-ci, et gardait 56 px de bande par côté sur un téléphone */
+        .mb-poutre, .mb-scene.mb-compact .mb-banniere.mb-poutre { --mb-bande: 36px; }
         .mb-module .mb-gains { grid-template-columns: 1fr; }
         .mb-module-tete { padding: 12px 14px; gap: 12px; grid-template-columns: auto 1fr; }
         .mb-module-total { grid-column: 1 / -1; align-items: flex-start; }
@@ -9397,12 +9404,18 @@
       /* ---- LE STEAM DECK (1280 × 800) : tout doit tenir sans ascenseur ---- */
       @media (max-height: 820px) and (min-width: 761px) {
         .mb-scene { gap: 10px; padding-top: 8px; }
-        .mb-releve { --mb-coeur-l: 260px; }
-        .mb-rang { --mb-sceau-l: 136px; }
         .mb-pli, .mb-pli .crt-draft { min-height: 160px; }
         .mb-porte-vue canvas { max-height: 132px; object-fit: contain; }
         .mb-ev-vue { aspect-ratio: auto; height: 132px; }
         .mb-station-carte { max-height: 58vh; }
+      }
+      /* le cœur et le sceau resserrés du Steam Deck ne valent qu'au-delà des
+         écrans moyens : sur un téléphone couché (844 × 390), les deux
+         règles s'appliquaient et celle-ci, écrite après, regrossissait ce
+         que la règle des 761–1000 px venait de resserrer */
+      @media (max-height: 820px) and (min-width: 1001px) {
+        .mb-releve { --mb-coeur-l: 260px; }
+        .mb-rang { --mb-sceau-l: 136px; }
       }
       /* ---- MOINS D'ANIMATIONS : le jeu reste le même, sans le spectacle.
          Chaque mise en scène retombe sur son état final. ---- */
