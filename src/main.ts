@@ -15090,6 +15090,9 @@ function fermeMiseEnBonbonne(): void {
   mbVeil.classList.remove('mb-fin-descente')
   delete mbVeil.dataset.issue
   mbEl('mb-fin-vue').hidden = true
+  // mbFlash pose « mb-on » et ne l'ôte pas : laissée là, l'animation
+  // rejouait à la réouverture du voile — la défaite s'ouvrait sur un éclair
+  mbEl('mb-flash').classList.remove('mb-on')
   mbFeu.vide()
   miseEnBonbonne = false
   mbBilanCourant = null

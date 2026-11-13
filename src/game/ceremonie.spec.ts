@@ -682,6 +682,13 @@ describe('la cérémonie — les fins de partie', () => {
     expect(f).toContain("mbVeil.classList.remove('mb-fin-descente')")
     expect(f).toContain("mbEl('mb-fin-vue').hidden = true")
   })
+  // une animation CSS portée par une classe laissée en place REJOUE quand
+  // le voile repasse de hidden à visible : « ÉCHANTILLON PERDU », chaque
+  // bilan, le plan de départ s'ouvraient sur un éclair blanc que personne
+  // n'avait demandé (vérifié dans Chromium 151)
+  it('éteint le flash en fermant : il ne rejoue pas à la réouverture du voile', () => {
+    expect(corps('fermeMiseEnBonbonne')).toContain("mbEl('mb-flash').classList.remove('mb-on')")
+  })
   it('laisse les fins d’essai, d’éditeur et de mini-jeu en test sur l’overlay', () => {
     expect(MAIN).toMatch(/showOverlay\(\s*r\.titre,/)
     expect(MAIN).toMatch(/showOverlay\(\s*fromEditor \? 'TABLEAU FRANCHI'/)
