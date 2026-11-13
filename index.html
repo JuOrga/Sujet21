@@ -7323,6 +7323,15 @@
       #ed-cartes label.inconnue {
         color: var(--warn, #e8b04a);
       }
+      /* la case rendue d'un instrument, dessin d'acier sombre, ne se lisait
+         pas à la taille du texte (12 px) : 1,4 em. [class^='ico-'] plutôt que
+         la classe : iconesStation.spec prend la DERNIÈRE règle écrite à ce
+         nom de classe pour la règle de base */
+      #ed-cartes [class^='ico-'],
+      #ed-cartes-compte [class^='ico-'] {
+        width: 1.4em;
+        height: 1.4em;
+      }
       .ed-f input,
       .ed-f select,
       #editor textarea {
