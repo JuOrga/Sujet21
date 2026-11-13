@@ -1439,7 +1439,7 @@ if DANS_BLENDER:
             at.dome('clair', x, z, 0.012, -0.02)
 
     def i_detendeur(at):
-        """le détendeur : un corps de régulateur, son molette, l'entrée et la
+        """le détendeur : un corps de régulateur, sa molette, l'entrée et la
         sortie, et son petit cadran"""
         at.tour('acier', [(0, -0.07), (0.085, -0.07), (0.09, -0.06), (0.09, 0.06), (0.085, 0.07), (0, 0.07)], var=0.2)
         at.tour('clair', [(0, 0.068), (0.05, 0.068), (0.055, 0.08), (0.055, 0.15), (0.045, 0.165), (0, 0.168)], seg=16)
@@ -1549,7 +1549,7 @@ if DANS_BLENDER:
                 t = 2 * math.pi * k / 28
                 # une semelle : large à l'avant, cintrée, le talon rond
                 x = 0.065 * math.cos(t) * (1.0 if math.sin(t) > 0 else 0.85)
-                z = 0.17 * math.sin(t) + (0.0 if abs(math.sin(t)) > 0.3 else 0.0)
+                z = 0.17 * math.sin(t)
                 x *= 1.0 - 0.25 * math.exp(-((math.sin(t) + 0.15) ** 2) / 0.05)
                 pts.append((x, z))
             pts = tourne(pts, ang)
@@ -1735,9 +1735,9 @@ PLANCHES = {
 
 
 def assemble(planche_nom, dossier, sortie, controle=None):
-    """les rendus détourés (alpha/<préfixe><nom>.png, 1024²) en une planche
-    de cases de 512² (256² pour les instruments) ; et, si demandé, une planche de contrôle : chaque case
-    à 32 et à 64 px sur le fond du voile, pour juger la lisibilité"""
+    """les rendus détourés (alpha/<préfixe><nom>.png) réduits à la case de
+    la planche et assemblés ; et, si demandé, une planche de contrôle à 32 et
+    64 px sur le fond du voile, pour juger la lisibilité"""
     from PIL import Image
     noms, colonnes, rangees, prefixe, case = PLANCHES[planche_nom]
     planche = Image.new('RGBA', (colonnes * case, rangees * case), (0, 0, 0, 0))

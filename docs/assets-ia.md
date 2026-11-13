@@ -2541,3 +2541,59 @@ python3 tools/images/prepare.py instruments-icones
 vide, **167 Ko** (qualité 82) ; au moins 14 px transparents autour de chaque
 objet dans sa case de 256.
 
+### 36e. Les deux scènes de fin — `fin-capsule.webp`, `fin-fiole-brisee.webp` ✅ LIVRÉ (13/11)
+
+**1600×900 · opaques**, l'écran qui suit la cinématique quand la descente
+se termine (`SCENES_FIN`, `src/game/ceremonieObjets.ts`). Atelier :
+`tools/images/blender/fins.py`, qui charge `ceremonie.py`. Aucune image
+générée : les étoiles (un Voronoï sur le ciel, vu seulement par la caméra),
+la planète et son anneau sont procéduraux, le reste est modélisé.
+
+- **La descente bouclée** (`fin-capsule`). La bonbonne de la cérémonie
+  (`cuve_bonbonne`, B3 : même objet, même acier), la jauge PLEINE, montée en
+  capsule : un berceau de deux cerclages et quatre rails, un sceau octogonal
+  cerclé de cyan sur le robinet, quatre tuyères, deux veilleuses ambre. Elle
+  part en haut à gauche ; sa poussée, froide, s'efface vers la station. La
+  station suit le canon (§26), de gauche à droite : le croissant de coque et
+  le module Méduse, trois modules octogonaux empilés, le nœud et ses petits
+  modules, l'observatoire à dôme et son télescope, le mât aux quatre
+  panneaux et sa parabole. Derrière, la géante gazeuse froide du canon, à
+  bandes, ceinte d'un anneau fin, éclairée EN CROISSANT en haut à gauche : son
+  jour est calculé dans le shader (éclairée par le soleil de la scène, qui
+  vient de face pour sculpter la capsule, elle sortait pleine lune).
+- **L'échantillon perdu** (`fin-fiole-brisee`). Une fiole couchée sur le
+  caillebotis, son bord cassé en dents, un fond de fluide au creux du verre ;
+  le col et son bouchon plus loin ; des éclats ; une flaque qui ne garde
+  qu'un souffle de sarcelle. Une seule lumière froide d'en haut, un liseré
+  bleu derrière. Pas d'or.
+
+**Le bas du cadre reste sombre** : le relevé de la descente s'y pose. La
+mesure (`python -I tools/images/blender/fins.py <images>`) donne la
+luminance de l'image et celle du TIERS BAS (30 %), et échoue au-delà de
+0,06. Ce qu'elle a changé : la poussée de la capsule, d'abord un trapèze
+opaque qui descendait dans cette bande, est devenue une lueur additive,
+fondue vers son bout et vers son bord ; le contre-jour de la fiole, qui se
+mirait sur le caillebotis jusqu'au bas du cadre (0,08), a été resserré.
+
+**Rendu** : la capsule à 3200×1800, 384 échantillons, sans débruiteur, comme
+l'atelier, et `prepare.py` la réduit ; la fiole à 1600×900, 192
+échantillons, débruitée — le verre éclaté sur un caillebotis brillant
+demande des milliers d'échantillons sans débruiteur, et une scène dans le
+noir n'a pas de grain d'acier à perdre. Les caustiques sont coupées
+(elles semaient des étincelles parasites).
+
+**Refaire** — dans Blender, en un seul appel :
+`exec(compile(open(DOSSIER + r'\fins.py', …).read(), DOSSIER + r'\fins.py', 'exec'))`
+puis `lance_fins(MASTERS, 384)` (MASTERS : `masters\images`). Chaque
+scène a sa scène Blender, et la fenêtre y bascule : on revient à la main à
+la scène d'origine. Puis :
+
+```bash
+python -I tools/images/blender/fins.py masters/images/fin-capsule.png masters/images/fin-fiole-brisee.png
+python3 tools/images/prepare.py fin-capsule fin-fiole-brisee
+```
+
+**Mesuré à la livraison** : la capsule, luminance 0,06, tiers bas 0,03,
+**39 Ko** ; la fiole, 0,04, tiers bas 0,03, **15 Ko** ; aucun pixel chaud.
+Le test `LIVREES` vérifie qu'elles sont là, en 1600×900.
+

@@ -1,6 +1,16 @@
 import { existsSync, readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
-import { ANNEAU_URL, ANNEAUX_MAITRISE, OBJETS, ORDRE_SCEAUX, SCEAUX_COLONNES, SCEAUX_URL, cuveHTML, sceauHTML } from './ceremonieObjets'
+import {
+  ANNEAU_URL,
+  ANNEAUX_MAITRISE,
+  OBJETS,
+  ORDRE_SCEAUX,
+  SCEAUX_COLONNES,
+  SCEAUX_URL,
+  SCENES_FIN,
+  cuveHTML,
+  sceauHTML,
+} from './ceremonieObjets'
 import {
   ICONES_CEREMONIE,
   ICONES_CEREMONIE_COLONNES,
@@ -22,6 +32,7 @@ const LIVREES: string[] = [
   ...Object.values(OBJETS).flatMap((o) => [o.dos, o.verre]),
   ANNEAU_URL,
   ICONES_INSTRUMENTS_URL,
+  ...Object.values(SCENES_FIN),
 ]
 
 /** Une liste de l'atelier Python (`NOM = ['a', 'b', …]`), lue en texte : les
@@ -34,13 +45,18 @@ function listeAtelier(nom: string): string[] {
   return [...m![1].matchAll(/'([^']+)'/g)].map((x) => x[1])
 }
 
-/** La taille d'un WebP, lue dans son en-tête : une planche transparente porte
- *  un bloc VP8X (largeur − 1 et hauteur − 1 sur 24 bits, petit-boutiste). */
+/** La taille d'un WebP, lue dans son en-tête : une image transparente porte
+ *  un bloc VP8X (largeur − 1 et hauteur − 1 sur 24 bits, petit-boutiste) ;
+ *  une image opaque (les scènes de fin) un bloc « VP8 », dont l'image clé
+ *  donne largeur et hauteur sur 14 bits, après sa signature 9d 01 2a. */
 function tailleWebp(chemin: string): [number, number] {
   const b = readFileSync(chemin)
   expect(b.toString('ascii', 0, 4) + b.toString('ascii', 8, 12)).toBe('RIFFWEBP')
-  expect(b.toString('ascii', 12, 16)).toBe('VP8X')
-  return [b.readUIntLE(24, 3) + 1, b.readUIntLE(27, 3) + 1]
+  const bloc = b.toString('ascii', 12, 16)
+  if (bloc === 'VP8X') return [b.readUIntLE(24, 3) + 1, b.readUIntLE(27, 3) + 1]
+  expect(bloc).toBe('VP8 ')
+  expect([b[23], b[24], b[25]]).toEqual([0x9d, 0x01, 0x2a])
+  return [b.readUInt16LE(26) & 0x3fff, b.readUInt16LE(28) & 0x3fff]
 }
 
 describe('les images livrées par l’atelier', () => {
@@ -60,6 +76,9 @@ describe('les images livrées par l’atelier', () => {
   })
   it('découpe la planche des instruments en cases de 256², à la grille du contrat', () => {
     expect(tailleWebp('public' + ICONES_INSTRUMENTS_URL)).toEqual([ICONES_INSTRUMENTS_COLONNES * 256, ICONES_INSTRUMENTS_RANGEES * 256])
+  })
+  it('livre les deux scènes de fin en 1600×900', () => {
+    for (const u of Object.values(SCENES_FIN)) expect(tailleWebp('public' + u), u).toEqual([1600, 900])
   })
   it('livre l’anneau en deux cases de 512² : intact, brisé', () => {
     expect(tailleWebp('public' + ANNEAU_URL)).toEqual([1024, 512])
