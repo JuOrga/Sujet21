@@ -482,7 +482,7 @@
     return btn
   }
   function repos() {
-    const host = halteBase('REPOS', `${RUN.module} — UNE SEULE OFFRE, PUIS LA CARTE SE ROUVRE`)
+    const host = halteBase('REPOS', `${RUN.module} — UNE SEULE OFFRE`)
     const r = rangee(halte(host, 'repos'))
     F.offresRepos({ vies: 2, viesMax: 3, bonbonne: RUN.bonbonne, cap: RUN.cap }).forEach((o, i) => {
       const b = document.createElement('button'); b.type = 'button'

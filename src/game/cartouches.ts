@@ -63,20 +63,25 @@ export function iconeDuGlyphe(glyphe: string): IconeCeremonie | null {
   return PAR_GLYPHE.get(sansVariante(glyphe)) ?? null
 }
 
-/** L'ALVÉOLE d'un glyphe : son icône rendue, ou — glyphe inconnu (l'émoji
- *  d'un instrument, un glyphe ajouté plus tard) — le glyphe lui-même, écrit.
- *  Jamais une alvéole vide. `autre` laisse l'appelant dessiner ce que la
- *  table ignore (l'icône rendue d'un instrument). */
+/** L'ALVÉOLE d'un glyphe. `autre`, ce que l'appelant a reconnu (l'icône
+ *  rendue d'un instrument), passe AVANT la table : trois instruments
+ *  partagent un glyphe avec elle (Filtre à condensat et Fuite lente 💧,
+ *  Bonbonne percée 🫙), et une contrepartie prenait l'icône du condensat —
+ *  une pénalité habillée en gain. Puis l'icône de la table ; à défaut, le
+ *  glyphe lui-même, écrit. Jamais une alvéole vide. */
 function alveoleDuGlyphe(glyphe: string, autre?: string | null): string {
   const icone = iconeDuGlyphe(glyphe)
-  const dedans = icone ? iconeCeremonieHTML(icone) : (autre ?? `<i class="mb-glyphe">${echappe(glyphe)}</i>`)
+  const dedans = autre ?? (icone ? iconeCeremonieHTML(icone) : `<i class="mb-glyphe">${echappe(glyphe)}</i>`)
   return `<span class="mb-cartouche-alv">${dedans}</span>`
 }
 
 /** LA PUCE D'UNE ISSUE : une ligne de ce qu'une rencontre a donné
  *  (« 🫙 réserve +1,5 L »). Le glyphe de tête passe dans l'alvéole, la
  *  phrase reste. Une ligne qui ne commence pas par un glyphe (une lettre, un
- *  chiffre : « +1 échantillon ») se pose sans alvéole. */
+ *  chiffre : « +1 échantillon ») se pose sans alvéole. Une ligne
+ *  d'instrument (« Aimant à rosée : La rosée recondensée… ») ne garde à
+ *  l'écran que ce qui précède « : » ; l'explication passe dans l'infobulle.
+ *  `autre` reçoit la ligne entière, nom compris. */
 export function puceHTML(
   ligne: string,
   i: number,
@@ -85,10 +90,13 @@ export function puceHTML(
   const m = /^(\S+)\s+([\s\S]*)$/u.exec(ligne)
   const glyphe = m && !/[\p{L}\p{N}]/u.test(m[1]) ? m[1] : null
   const texte = glyphe ? m![2] : ligne
+  const coupe = /\s:\s/.exec(texte)
+  const dit = coupe ? texte.slice(0, coupe.index) : texte
+  const explique = coupe ? texte.slice(coupe.index + coupe[0].length) : ''
   return (
-    `<li class="mb-cartouche mb-puce${glyphe ? '' : ' mb-puce-nue'}" style="--i:${i}">` +
+    `<li class="mb-cartouche mb-puce${glyphe ? '' : ' mb-puce-nue'}" style="--i:${i}"${explique ? ` title="${echappe(explique)}"` : ''}>` +
     (glyphe ? alveoleDuGlyphe(glyphe, autre?.(glyphe, texte)) : '') +
-    `<span class="mb-puce-texte">${echappe(texte)}</span></li>`
+    `<span class="mb-puce-texte">${echappe(dit)}</span></li>`
   )
 }
 

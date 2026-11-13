@@ -14455,8 +14455,14 @@ function mbMontreChoixPalet(dernier: Lancer): void {
       mbFlash()
       mbEclate(btn, { n: 50, teintes: MB_MENTHE, vitesse: 420, gravite: 400, forme: 'etincelle', duree: 0.8, taille: 4 })
       sonCeremonie('levier')
-      fermeMiseEnBonbonne()
-      action()
+      // le flash et le feu vivent dans le voile : le fermer dans le même
+      // tour les cachait avant leur première image. On ferme 260 ms plus
+      // tard (comme la fin ordinaire), si la cérémonie est encore ouverte.
+      window.setTimeout(() => {
+        if (!miseEnBonbonne) return
+        fermeMiseEnBonbonne()
+        action()
+      }, sansAnimation() ? 0 : 260)
     })
     offres.appendChild(btn)
     return btn
@@ -15418,7 +15424,6 @@ function mbMontreBilanModule(): void {
     return
   }
   mbEtape = 'module'
-  const esc = (t: string): string => t.replace(/&/g, '&amp;').replace(/</g, '&lt;')
   mbScene.classList.remove('mb-large')
   mbScene.classList.add('mb-compact')
   mbReleveHors()
@@ -15456,9 +15461,9 @@ function mbMontreBilanModule(): void {
     // le sceau rendu (acier neutre) prend sa teinte dans la feuille : celle
     // de la dernière salle reste sur le voile (--mb-rang)
     `<div class="mb-module-sceau mb-sceau">${sceauHTML('module')}</div>` +
-    `<div class="mb-module-nom"><b>${esc(m.nom)}</b><small>${esc(sous.join(' · '))}</small></div>` +
+    `<div class="mb-module-nom"><b>${htmlSafe(m.nom)}</b><small>${htmlSafe(sous.join(' · '))}</small></div>` +
     (livre
-      ? `<div class="mb-module-total"><small>${esc(livre.nom)}</small><b>${esc(livre.valeur)}</b></div>`
+      ? `<div class="mb-module-total"><small>${htmlSafe(livre.nom)}</small><b>${htmlSafe(livre.valeur)}</b></div>`
       : '') +
     // une salle = un petit sceau de son rang, à la teinte de son régime ; le
     // nom du régime (SUPERFLUIDE…) passe dans l'infobulle et la lecture
@@ -15469,7 +15474,7 @@ function mbMontreBilanModule(): void {
         (p, i) =>
           `<li class="mb-salle" style="--mb-rang:${p.teinte};--i:${i}" title="${htmlSafe(p.nom)}">` +
           `<span class="mb-salle-sceau mb-sceau" role="img" aria-label="${htmlSafe(p.nom)}">${sceauHTML(p.rang)}</span>` +
-          `<span class="mb-salle-code">${esc(p.code)}</span><b class="mb-salle-l">${p.litres}</b></li>`,
+          `<span class="mb-salle-code">${htmlSafe(p.code)}</span><b class="mb-salle-l">${p.litres}</b></li>`,
       )
       .join('') +
     `</ol>` +
@@ -16165,7 +16170,7 @@ function mbMontreRepos(m: ModuleCarte, suite: () => void = () => mbMontreCarte('
   // l'alcôve s'appelle REPOS : elle disait le type du module où elle se
   // tient — « ÉNIGME » pour une halte tirée en voie dans un module d'énigmes
   mbQuestion('REPOS')
-  mbEl('mb-choix-titre').textContent = `${m.nom} — UNE SEULE OFFRE, PUIS LA CARTE SE ROUVRE`
+  mbEl('mb-choix-titre').textContent = `${m.nom} — UNE SEULE OFFRE`
   mbEl('mb-etal').hidden = true
   mbEl('mb-passer').hidden = true
   const host = mbCartes()
@@ -17051,12 +17056,11 @@ function mbMontreResultatMiniJeu(r: NonNullable<typeof minijeuResultat>, suite: 
   mbEl('mb-choix-titre').textContent = r.detail.toUpperCase()
   const host = mbCartes()
   host.innerHTML = ''
-  const esc = (t: string): string => t.replace(/&/g, '&amp;').replace(/</g, '&lt;')
   const halte = document.createElement('div')
   halte.className = 'mb-halte'
   halte.innerHTML =
     `<div class="mb-halte-heros">${iconeCeremonieHTML(level.minijeu?.type ?? 'couperet')}</div>` +
-    `<b class="mb-halte-verdict">${esc(r.titre.split(' — ')[1] ?? '')}</b>` +
+    `<b class="mb-halte-verdict">${htmlSafe(r.titre.split(' — ')[1] ?? '')}</b>` +
     (res.memoire > 0
       ? `<div class="mb-halte-puces">${plaqueHTML({ cle: 'memoire', icone: 'memoire', valeur: `+${res.memoire}`, nom: 'MÉMOIRE' }, 0)}</div>`
       : `<p class="mb-halte-rien">rien — le trait est loin</p>`)
@@ -17114,7 +17118,6 @@ function montreSuiteRun(): void {
  *  pris en plaque ; le levier claque comme un choix. */
 function mbMontreCache(m: ModuleCarte): void {
   mbEtape = 'repos'
-  const esc = (t: string): string => t.replace(/&/g, '&amp;').replace(/</g, '&lt;')
   mbReleveHors()
   mbScene.classList.remove('mb-large')
   mbQuestion('LA CACHE')
@@ -17141,7 +17144,7 @@ function mbMontreCache(m: ModuleCarte): void {
   halte.className = 'mb-halte mb-halte-a-recit'
   halte.innerHTML =
     `<div class="mb-halte-heros">${iconeCeremonieHTML('cache')}</div>` +
-    `<div class="mb-ev-recit mb-ev-issue mb-coupe-diag"><em>${esc(m.nom)}</em><p>${esc(texte)}</p></div>` +
+    `<div class="mb-ev-recit mb-ev-issue mb-coupe-diag"><em>${htmlSafe(m.nom)}</em><p>${htmlSafe(texte)}</p></div>` +
     (prise && !dejaTenu
       ? `<div class="mb-halte-puces">${plaqueHTML({ cle: 'orbe', icone: 'orbe', valeur: nomOrbe, nom: 'ORBE D’ESSENCE' }, 0)}</div>`
       : '')
@@ -17297,7 +17300,6 @@ function mbMontreEvenement(): void {
  *  prose du jeu, gardée telle quelle — dans un cadre de la station, et les
  *  offres en cartouches. */
 function mbPeintEvenement(ev: EvenementDef, alea: () => number): void {
-  const esc = (t: string): string => t.replace(/&/g, '&amp;').replace(/</g, '&lt;')
   mbReleveHors()
   mbScene.classList.remove('mb-large')
   mbScene.classList.add('mb-compact')
@@ -17313,7 +17315,7 @@ function mbPeintEvenement(ev: EvenementDef, alea: () => number): void {
   halte.innerHTML = `<div class="mb-halte-heros">${iconeCeremonieHTML('rencontre')}</div>`
   const recit = document.createElement('div')
   recit.className = 'mb-ev-recit mb-coupe-diag'
-  recit.innerHTML = `<em>${esc(ev.lieu)}</em><p>${esc(ev.texte)}</p>`
+  recit.innerHTML = `<em>${htmlSafe(ev.lieu)}</em><p>${htmlSafe(ev.texte)}</p>`
   halte.appendChild(recit)
   const rangee = document.createElement('div')
   rangee.className = 'mb-halte-offres'
@@ -17356,7 +17358,6 @@ function mbPeintEvenement(ev: EvenementDef, alea: () => number): void {
  *  l'issue (appliqueEffets, en émojis) deviennent des cartouches : leur
  *  glyphe passe par ICONE_DE_GLYPHE ; celui d'un instrument, par sa case. */
 function mbTranche(ev: EvenementDef, choix: ChoixEvenement, alea: () => number): void {
-  const esc = (t: string): string => t.replace(/&/g, '&amp;').replace(/</g, '&lt;')
   const issue = resoutChoix(choix, alea)
   // l'offre prise se dévoile — elle, pas ses voisines écartées
   records.noteOffreEssayee(cleOffre(ev, choix))
@@ -17377,7 +17378,7 @@ function mbTranche(ev: EvenementDef, choix: ChoixEvenement, alea: () => number):
   halte.className = 'mb-halte mb-halte-a-recit'
   halte.innerHTML =
     `<div class="mb-halte-heros">${iconeCeremonieHTML('rencontre')}</div>` +
-    `<div class="mb-ev-recit mb-ev-issue mb-coupe-diag"><em>${esc(choix.libelle)} — ${esc(choix.detail)}</em><p>${esc(issue.texte)}</p></div>` +
+    `<div class="mb-ev-recit mb-ev-issue mb-coupe-diag"><em>${htmlSafe(choix.libelle)} — ${htmlSafe(choix.detail)}</em><p>${htmlSafe(issue.texte)}</p></div>` +
     `<ul class="mb-halte-puces">${dites.map((l, i) => puceHTML(l, i, instrument)).join('')}</ul>`
   host.appendChild(halte)
   const ouvertA = performance.now()

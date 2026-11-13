@@ -114,9 +114,27 @@ describe('la puce d’une issue', () => {
     expect(html).toMatch(/^<li class="mb-cartouche mb-puce"/)
   })
   it('garde un glyphe inconnu, écrit, dans l’alvéole — jamais une case vide', () => {
-    const html = puceHTML('🧲 Aimant à rosée : la rosée vient à vous', 0)
+    const html = puceHTML('🧲 Aimant à rosée', 0)
     expect(html).toContain('>🧲<')
-    expect(html).toContain('>Aimant à rosée : la rosée vient à vous<')
+    expect(html).toContain('>Aimant à rosée<')
+  })
+  // une ligne d'instrument portait toute sa description à l'écran (« Aimant
+  // à rosée : La rosée recondensée rend nettement plus de volume. ») : la
+  // cartouche dit le nom, l'explication passe dans l'infobulle
+  it('dit le nom d’un instrument et range sa description dans l’infobulle', () => {
+    const html = puceHTML('🧲 Aimant à rosée : la rosée « vient » à vous', 0)
+    expect(html).toContain('>Aimant à rosée<')
+    expect(html).toContain('title="la rosée « vient » à vous"')
+    expect(puceHTML('🫙 réserve +1,5 L', 0)).not.toContain('title=')
+  })
+  // trois instruments partagent un glyphe avec la table (Filtre à
+  // condensat 💧, Fuite lente 💧, Bonbonne percée 🫙) : la table passait
+  // avant l'appelant, et une CONTREPARTIE prenait l'icône du condensat — une
+  // pénalité habillée en gain
+  it('laisse l’appelant reconnaître un instrument avant la table', () => {
+    const html = puceHTML('💧 CONTREPARTIE — Fuite lente : x', 0, () => '<i class="ico-instrument"></i>')
+    expect(html).toContain('ico-instrument')
+    expect(html).not.toContain('ico-ceremonie')
   })
   it('laisse une ligne sans glyphe telle quelle, sans alvéole', () => {
     // « +1 échantillon » commence par un chiffre : ce n'est pas un glyphe

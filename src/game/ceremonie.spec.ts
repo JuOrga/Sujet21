@@ -714,9 +714,9 @@ describe('la cérémonie — les haltes', () => {
       expect(corps(f), f).not.toContain("'mb-carte ")
   })
   it('garde le récit d’une rencontre, dans un cadre de la station', () => {
-    expect(corps('mbPeintEvenement')).toContain('esc(ev.texte)')
+    expect(corps('mbPeintEvenement')).toContain('htmlSafe(ev.texte)')
     expect(corps('mbPeintEvenement')).toMatch(/className = 'mb-ev-recit mb-coupe/)
-    expect(corps('mbTranche')).toContain('esc(issue.texte)')
+    expect(corps('mbTranche')).toContain('htmlSafe(issue.texte)')
   })
   it('fait sonner chaque choix et chaque levier de sa voix', () => {
     for (const f of ['mbMontreRepos', 'mbMontreDon', 'mbPeintEvenement', 'mbTranche', 'mbMontreCache', 'mbMontreResultatMiniJeu', 'mbMontreChoixPalet', 'mbMontreFin'])
@@ -744,6 +744,32 @@ describe('la cérémonie — les haltes', () => {
   it('dessine la visée d’une offre dans sa forme', () => {
     expect(corps('mbMontreRepos')).toContain('mb-cartouche mb-offre')
     expect(HTML).toMatch(/\.mb-offre:focus-visible, \.mb-offre\.pad-focus \{[^}]*outline: none;[^}]*box-shadow: inset/)
+  })
+})
+
+// LA RELECTURE DES HALTES (tour 1)
+describe('la cérémonie — les haltes, relues', () => {
+  // le flash et le feu vivent dans #mb-veil : fermer la cérémonie dans le
+  // même tour les cachait avant leur première image — le palet ne claquait
+  // pas. Le motif de la fin ordinaire : on ferme 260 ms plus tard, si la
+  // cérémonie est encore ouverte.
+  it('laisse claquer le choix du palet avant de fermer la cérémonie', () => {
+    const f = corps('mbMontreChoixPalet')
+    expect(f).toMatch(/mbEclate\(btn[\s\S]*?window\.setTimeout\(\(\) => \{\s*if \(!miseEnBonbonne\) return\s*fermeMiseEnBonbonne\(\)\s*action\(\)/)
+    expect(f).toMatch(/sansAnimation\(\) \? 0 : 260/)
+  })
+  it('pose le héros en grand, et la colonne du récit suit sa taille', () => {
+    const l = (s: string): number => Number(/--mb-heros-l:\s*(\d+)px/.exec(regle(s))?.[1] ?? 0)
+    expect(l('.mb-halte')).toBeGreaterThanOrEqual(200)
+    expect(l('.mb-halte-a-recit')).toBeGreaterThanOrEqual(160)
+    expect(regle('.mb-halte-a-recit')).toMatch(/grid-template-columns:[^;]*var\(--mb-heros-l\)/)
+  })
+  it('ne laisse pas d’explication à l’écran du repos', () => {
+    expect(corps('mbMontreRepos')).not.toContain('PUIS LA CARTE SE ROUVRE')
+  })
+  // un risque ne luit pas : l'or est réservé à ce qui luit
+  it('ne met pas en or la mention d’un pari', () => {
+    expect(regle('.mb-ev-pari')).not.toMatch(/--mb-or|#ffd977/i)
   })
 })
 
