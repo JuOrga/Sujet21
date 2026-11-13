@@ -125,7 +125,23 @@ function mesure() {
   if (veil.hidden) return { veil: 'caché' }
   const vis = [...s.querySelectorAll('button, .mb-cartouche, .mb-ligne, .mb-coeur')].filter((e) => e.offsetParent)
   const bas = vis.length ? Math.round(Math.max(...vis.map((e) => e.getBoundingClientRect().bottom))) : 0
+  // L'EMPRISE D'UNE SCÈNE DE FIN : l'image est la scène, le relevé (et sa
+  // ligne de contexte) doit tenir dans le tiers bas — son haut à 66 % de
+  // l'écran ou plus bas (relecture du lot E), quand il y a une image
+  const fin = s.querySelector('.mb-fin')
+  let emprise
+  if (fin) {
+    const ctx = document.getElementById('mb-choix-titre')
+    const hauts = [fin.getBoundingClientRect().top]
+    if (ctx.offsetParent && ctx.textContent) hauts.push(ctx.getBoundingClientRect().top)
+    const haut = Math.min(...hauts)
+    // la reprise n'a pas d'image : son relevé se tient au milieu, exprès
+    const image = !document.getElementById('mb-fin-vue').hidden
+    emprise = `${Math.round(haut)}/${innerHeight} = ${(100 * haut / innerHeight).toFixed(1)} %` +
+      (!image ? ' (sans image : centré)' : haut < 0.66 * innerHeight ? ' TROP HAUT' : '')
+  }
   return {
+    ...(emprise ? { hautDuReleve: emprise } : {}),
     scene: `${s.scrollHeight}/${s.clientHeight}${s.scrollHeight > s.clientHeight + 1 ? ' DÉBORDE (défile)' : ''}`,
     basDuDernierBouton: bas,
     ecran: innerHeight,

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { finDescenteHTML, levierFin, releveDescente, titresFin } from './finDescente'
+import { GARDE_GESTE_MS } from './ceremonie'
+import { finDescenteHTML, LEVIER_FIN_MS, levierFin, levierFinPret, releveDescente, titresFin } from './finDescente'
 
 // LE RELEVÉ DE LA DESCENTE : ce que la scène de fin (bouclée, perdue,
 // reprise) écrit en chiffres. Les attendus sont ceux que fmtL et fmtDuree
@@ -51,7 +52,7 @@ describe('le relevé de la descente', () => {
     }
   })
 
-  it('ne compte jamais plus de salles franchies que la descente n’en a', () => {
+  it('porte la longueur à la profondeur quand la carte la donne plus courte (« 19/19 », jamais « 19/18 »)', () => {
     // la longueur se recalcule sur la carte : elle ne descend pas sous la
     // profondeur atteinte, mais un relevé ne doit pas dire « 19/18 »
     expect(releveDescente({ ...bouclee, salles: 19 }).salles).toBe('19/19')
@@ -79,6 +80,31 @@ describe('la scène de fin de descente', () => {
     expect(h.match(/class="mb-cartouche /g)?.length).toBe(5)
   })
 
+  it('tient en UNE rangée : le sceau, les cartouches, le butin', () => {
+    // la scène est l'image : le relevé se pose dans son tiers bas, sur une
+    // seule rangée (constat de relecture : il en couvrait la moitié)
+    const h = finDescenteHTML({ issue: 'bouclee', releve: r, butin, tampons: ['MEILLEURE DESCENTE'] })
+    // la rangée est le seul enfant de la scène : on suit ses <div> jusqu'à
+    // sa fermeture, qui doit être celle d'avant la dernière
+    const debut = h.indexOf('<div class="mb-fin-releve">')
+    expect(debut).toBeGreaterThan(-1)
+    let prof = 0
+    let fin = -1
+    for (const m of h.slice(debut).matchAll(/<(\/?)div\b/g)) {
+      prof += m[1] ? -1 : 1
+      if (prof === 0) {
+        fin = debut + m.index!
+        break
+      }
+    }
+    expect(fin).toBe(h.length - '</div></div>'.length)
+    const rangee = h.slice(debut, fin)
+    expect(h.slice(0, debut)).toBe('<div class="mb-fin mb-fin-bouclee">')
+    for (const c of ['mb-fin-salles', 'mb-fin-butin', 'mb-fin-tampon']) expect(rangee, c).toContain(c)
+    expect(h).not.toContain('mb-fin-palmares')
+    expect(h).not.toContain('mb-fin-legende')
+  })
+
   it('montre le butin en icônes rendues, sans un émoji', () => {
     const h = finDescenteHTML({ issue: 'bouclee', releve: r, butin, tampons: ['MEILLEURE DESCENTE'] })
     expect(h.match(/class="ico-instrument"/g)?.length).toBe(3)
@@ -91,7 +117,7 @@ describe('la scène de fin de descente', () => {
     expect(h).toContain('Clef « maison »')
   })
 
-  it('tamponne les records et dit le palmarès du poste en cartouches', () => {
+  it('tamponne les records sur le sceau ; le palmarès et la purge passent en infobulle', () => {
     const h = finDescenteHTML({
       issue: 'bouclee',
       releve: r,
@@ -100,17 +126,19 @@ describe('la scène de fin de descente', () => {
       palmares: { bouclees: 2, profondeurRecord: 18, meilleurLivre: '61,40 L' },
       purgeCl: 1890,
     })
-    expect(h.match(/class="mb-fin-tampon"/g)?.length).toBe(2)
-    expect(h).toContain('MEILLEURE EXPÉDITION')
-    expect(h).toMatch(/class="mb-fin-palmares"[\s\S]*61,40 L/)
-    expect(h).toContain('<b class="mb-cartouche-val">1890 cL</b>')
-    expect(h.match(/class="mb-cartouche /g)?.length).toBe(9)
+    // UN tampon, posé dans la figure du sceau ; les records nommés en infobulle
+    expect(h.match(/class="mb-fin-tampon"/g)?.length).toBe(1)
+    expect(h).toMatch(/<figure class="mb-fin-salles"[^>]*>[\s\S]*<em class="mb-fin-tampon" title="MEILLEURE DESCENTE · MEILLEURE EXPÉDITION">RECORD<\/em>[\s\S]*<\/figure>/)
+    // le palmarès du poste dans l'infobulle du sceau, la purge dans celle de la mémoire
+    expect(h).toMatch(/<figure class="mb-fin-salles" title="[^"]*palmarès du poste : 2 bouclées · profondeur record 18 · meilleur livré 61,40 L"/)
+    expect(h).toMatch(/class="mb-cartouche mb-cartouche-memoire" style="--i:\d" title="[^"]*1890 cL[^"]*"/)
+    expect(h.match(/class="mb-cartouche /g)?.length).toBe(5)
   })
 
   it('ne tamponne rien et ne dit aucun palmarès quand il n’y en a pas', () => {
     const h = finDescenteHTML({ issue: 'perdue', releve: r, butin: [] })
     expect(h).not.toContain('mb-fin-tampon')
-    expect(h).not.toContain('mb-fin-palmares')
+    expect(h).not.toContain('palmarès')
     expect(h).not.toContain('mb-fin-butin')
     expect(h).toContain('mb-fin-perdue')
   })
@@ -141,5 +169,37 @@ describe('les mots de la fin', () => {
     expect(titresFin('reprise', true).titre).toBe('ÉCHANTILLON ASPIRÉ PAR LE VIDE')
     expect(titresFin('reprise', false).titre).toBe('ÉCHANTILLON DISPERSÉ')
     expect(titresFin('bouclee', false).titre).toBe('LA DESCENTE EST BOUCLÉE')
+  })
+})
+
+// UN GESTE EN RAFALE NE SAUTE PAS LA SCÈNE (constat de relecture) : Entrée
+// et Espace font avancer les planches de la cinématique ; la dernière la
+// ferme, la scène s'ouvre, le levier prend le focus — et la pression
+// suivante pressait RETOUR AU LABO, levier encore invisible. Il ne
+// s'actionne qu'une fois paru ; sans animation il paraît tout de suite, et
+// seule la garde du dépôt (GARDE_GESTE_MS) reste.
+describe('le levier de la fin', () => {
+  const t0 = 10_000
+  it('ignore tout geste tant qu’il n’a pas paru', () => {
+    expect(levierFinPret(t0, t0, false)).toBe(false)
+    expect(levierFinPret(t0 + GARDE_GESTE_MS, t0, false)).toBe(false)
+    expect(levierFinPret(t0 + LEVIER_FIN_MS - 1, t0, false)).toBe(false)
+    expect(levierFinPret(t0 + LEVIER_FIN_MS, t0, false)).toBe(true)
+  })
+  it('sans animation, il paraît tout de suite : seule la garde du dépôt tient', () => {
+    expect(levierFinPret(t0 + GARDE_GESTE_MS - 1, t0, true)).toBe(false)
+    expect(levierFinPret(t0 + GARDE_GESTE_MS, t0, true)).toBe(true)
+  })
+  it('obéit plutôt que de bloquer si l’horloge recule', () => {
+    expect(levierFinPret(t0 - 5, t0, false)).toBe(true)
+  })
+})
+
+describe('les lignes de contexte', () => {
+  it('disent quelques mots, pas une phrase', () => {
+    for (const issue of ['bouclee', 'perdue', 'reprise'] as const)
+      for (const vide of [false, true]) expect(titresFin(issue, vide).contexte.length, `${issue} ${vide}`).toBeLessThanOrEqual(32)
+    // la bouclée n'en a pas : l'image et le titre suffisent
+    expect(titresFin('bouclee', false).contexte).toBe('')
   })
 })

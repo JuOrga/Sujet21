@@ -465,6 +465,7 @@ import { cuveHTML, sceauHTML, SCENES_FIN } from './game/ceremonieObjets'
 import {
   finDescenteHTML,
   levierFin,
+  levierFinPret,
   releveDescente,
   titresFin,
   type IssueDescente,
@@ -8093,6 +8094,7 @@ async function openEditor(): Promise<LevelEditor | null> {
   const ed = await chargeEditeur()
   if (!ed) return null
   overlay.classList.remove('visible')
+  if (mbFinOuverte()) fermeMiseEnBonbonne() // la scène de fin remplace l'overlay
   document.body.classList.remove('playing')
   // l'éditeur a la main : le jeu se met en PAUSE derrière lui — la physique
   // ne tourne plus dans son dos (« Essayer » relance, quitter rend la fiche)
@@ -8142,6 +8144,7 @@ async function openEditeurCarte(): Promise<EditeurCarte | null> {
   const ec = await chargeEditeurCarte()
   if (!ec) return null
   overlay.classList.remove('visible')
+  if (mbFinOuverte()) fermeMiseEnBonbonne() // la scène de fin remplace l'overlay
   document.body.classList.remove('playing')
   input.paused = true
   ec.open()
@@ -14910,6 +14913,7 @@ let mbBilanCourant: BilanSalle | null = null
 /** Le sas mène à la salle suivante (raccourci éventuel compris). */
 function avanceSalle(): void {
   overlay.classList.remove('visible')
+  if (mbFinOuverte()) fermeMiseEnBonbonne() // la scène de fin remplace l'overlay
   const premiere = premiereSalleDeLaRun
   premiereSalleDeLaRun = false
   // la salle GÉNÉRÉE élue s'INTERCALE : elle prend la place du rang suivant
@@ -17305,8 +17309,9 @@ function mbMontreFin(): void {
   host.appendChild(btn)
 }
 
-/** La scène de fin est-elle à l'écran ? Le levier, R et « quitter la
- *  descente » la ferment comme ils fermaient l'overlay qu'elle remplace. */
+/** La scène de fin est-elle à l'écran ? Son levier, et tout ce qui retirait
+ *  l'overlay qu'elle remplace (relancer une salle, ouvrir un éditeur, quitter
+ *  la descente), la ferment. */
 function mbFinOuverte(): boolean {
   return miseEnBonbonne && mbVeil.classList.contains('mb-fin-descente')
 }
@@ -17337,6 +17342,8 @@ function releveDeLaRun(): ReleveDescente {
  *  avant : l'appelant attend qu'elle finisse. `tampons` : les records que
  *  la descente vient de battre. */
 function mbMontreFinDescente(issue: IssueDescente, r: ReleveDescente, suite: () => void, tampons: readonly string[] = []): void {
+  // l'heure d'ouverture : le levier ne répond qu'une fois paru (levierFinPret)
+  const ouvertA = performance.now()
   // un minuteur d'une étape précédente ne tombe pas sur la scène de fin
   for (const t of mbTimers) clearTimeout(t)
   mbTimers.length = 0
@@ -17393,6 +17400,10 @@ function mbMontreFinDescente(issue: IssueDescente, r: ReleveDescente, suite: () 
   btn.textContent = levierFin(issue, levelIndex + 1)
   btn.addEventListener('click', () => {
     if (btn.disabled) return
+    // UN GESTE EN RAFALE NE SAUTE PAS LA SCÈNE : Entrée ou Espace, qui
+    // faisaient avancer la cinématique, pressaient le levier encore
+    // invisible. Il ne répond qu'une fois paru (finDescente.ts).
+    if (!levierFinPret(performance.now(), ouvertA, sansAnimation())) return
     btn.disabled = true
     sonCeremonie('levier')
     suite()
@@ -17401,8 +17412,9 @@ function mbMontreFinDescente(issue: IssueDescente, r: ReleveDescente, suite: () 
   btn.focus({ preventScroll: true })
   // LA CHORÉGRAPHIE, calée sur la feuille (index.html, « LES FINS DE
   // PARTIE ») : le sceau tombe à 0,5 s et touche vers 0,84 s (55 % de ses
-  // 0,62 s), les cartouches claquent à 1 s puis toutes les 120 ms, les
-  // tampons à 1,9 s. Sans animation, tout est posé d'emblée : un seul choc.
+  // 0,62 s), les cartouches claquent à 1 s puis toutes les 120 ms, le
+  // tampon RECORD sur le sceau à 1,6 s (il touche vers 1,85 s), le levier
+  // paraît à 1,2 s. Sans animation, tout est posé d'emblée : un seul choc.
   const apres = (ms: number, fn: () => void): void => {
     mbTimers.push(window.setTimeout(() => {
       if (mbFinOuverte()) fn()
@@ -17426,7 +17438,7 @@ function mbMontreFinDescente(issue: IssueDescente, r: ReleveDescente, suite: () 
   for (let i = 0; i < nCartouches; i++) apres((sceau ? 1200 : 600) + 120 * i, () => sonCeremonie('cartouche', 0.5))
   const premierTampon = host.querySelector('.mb-fin-tampon')
   if (premierTampon)
-    apres(2200, () => {
+    apres(1850, () => {
       sonCeremonie('sceau', 0.8)
       bande.ponctuation('sting-record', 0.55)
       mbEclate(premierTampon, { n: 46, teintes: MB_OR, vitesse: 360, gravite: 520, forme: 'confetti', duree: 1.3, taille: 5 })
@@ -17814,6 +17826,9 @@ function restart(): void {
   resetLasers()
   loop.reset()
   overlay.classList.remove('visible')
+  // la scène de fin remplace l'overlay : une salle relancée depuis la fiche
+  // (Échap pendant la scène) la laissait par-dessus, le jeu figé sous le voile
+  if (mbFinOuverte()) fermeMiseEnBonbonne()
   // les déclencheurs (cinématiques, séquences) se réarment à chaque essai
   cinesVues.clear()
   // la mise en scène repart de zéro : lampes rendues, brèches refermées
@@ -18184,9 +18199,10 @@ function quitteAuMenu(): void {
 // En mode prototype (21-A bis) : l'essai conclu ramène au protocole, la
 // dispersion remet l'échantillon en cuve pour un nouvel essai du bis.
 function resetAction(): void {
-  // LA SCÈNE DE FIN tient le voile (la cérémonie se tait) : son levier — et
-  // R, comme sur l'overlay qu'elle remplace — la ferment d'abord, puis font
-  // ce que le bouton annonçait
+  // LA SCÈNE DE FIN tient le voile (la cérémonie se tait) : son levier la
+  // ferme d'abord, puis fait ce que le bouton annonçait. R aussi, mais
+  // seulement si le focus a quitté le voile : input.ts laisse au voile les
+  // touches qui le visent (cibleHorsJeu), et le levier y a le focus
   if (mbFinOuverte()) fermeMiseEnBonbonne()
   if (miseEnBonbonne) return // la mise en bonbonne se conclut par une carte
   if (testLevel) {

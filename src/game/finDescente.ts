@@ -5,6 +5,7 @@
 // voile de la cérémonie. Ce module dit ce que leur relevé écrit ; main.ts
 // (mbMontreFinDescente) les met en scène.
 
+import { GARDE_GESTE_MS, gesteTropTot } from './ceremonie'
 import { sceauHTML } from './ceremonieObjets'
 import { fmtDuree, fmtL } from './formats'
 import { iconeCeremonieHTML, iconeInstrumentHTML, type IconeCeremonie } from './iconesStation'
@@ -57,28 +58,41 @@ export function releveDescente(e: {
 }
 
 /** Ce que la poutre et la ligne de contexte disent : le surtitre, le titre,
- *  la phrase (les mots de l'overlay d'avant, en capitales de la station).
+ *  et quelques mots sous la poutre (vides à la bouclée : l'image et le titre
+ *  suffisent). Les phrases de l'overlay d'avant dépassaient 80 caractères ;
+ *  la cause de la perte (le vide ou la dispersion) tient en quatre mots.
  *  `vide` : l'échantillon a été aspiré par le vide plutôt que dispersé. */
 export function titresFin(issue: IssueDescente, vide: boolean): { sur: string; titre: string; contexte: string } {
-  if (issue === 'bouclee') return { sur: 'FIN DE LA DESCENTE', titre: 'LA DESCENTE EST BOUCLÉE', contexte: 'DU PREMIER SAS AU DERNIER' }
+  if (issue === 'bouclee') return { sur: 'FIN DE LA DESCENTE', titre: 'LA DESCENTE EST BOUCLÉE', contexte: '' }
   if (issue === 'perdue')
-    return {
-      sur: 'FIN DE LA RUN',
-      titre: 'ÉCHANTILLON PERDU',
-      contexte: vide
-        ? 'LE VIDE A EMPORTÉ LE DERNIER ÉCHANTILLON — LE LABORATOIRE VOUS RAPPELLE'
-        : 'LA DISPERSION A EU RAISON DU DERNIER ÉCHANTILLON — LE LABORATOIRE VOUS RAPPELLE',
-    }
+    return { sur: 'FIN DE LA RUN', titre: 'ÉCHANTILLON PERDU', contexte: vide ? 'EMPORTÉ PAR LE VIDE' : 'DÉFAIT PAR LA DISPERSION' }
   return {
-    sur: 'REPRISE',
+    sur: 'ÉCHANTILLON DE SECOURS',
     titre: vide ? 'ÉCHANTILLON ASPIRÉ PAR LE VIDE' : 'ÉCHANTILLON DISPERSÉ',
-    contexte: 'LE LABORATOIRE ENGAGE UN ÉCHANTILLON DE SECOURS — REPRISE À LA PREMIÈRE GOUTTE DE LA SALLE',
+    contexte: 'REPRISE À LA PREMIÈRE GOUTTE',
   }
 }
 
 /** Le libellé du levier : celui du bouton de l'overlay, à la lettre. */
 export function levierFin(issue: IssueDescente, salle: number): string {
   return issue === 'reprise' ? `REPRENDRE — SALLE ${salle}` : 'RETOUR AU LABO'
+}
+
+/** Quand le levier paraît : son animation-delay dans la feuille
+ *  (.mb-fin-levier, index.html — ceremonie.spec.ts garde l'accord). */
+export const LEVIER_FIN_MS = 1200
+
+/** Le levier répond-il ? Entrée et Espace font avancer les planches de la
+ *  cinématique qui précède : la dernière pression la ferme, la scène s'ouvre,
+ *  le levier prend le focus — et la pression suivante pressait RETOUR AU LABO
+ *  avant que le levier ne soit seulement visible. Il ne répond qu'une fois
+ *  paru. Sans animation, il paraît tout de suite : reste la garde du dépôt
+ *  (gesteTropTot, GARDE_GESTE_MS) contre le geste qui vient d'ouvrir. Une
+ *  horloge qui recule n'est pas « trop tôt » : on obéit. */
+export function levierFinPret(maintenant: number, ouvertA: number, moinsAnimations: boolean): boolean {
+  if (gesteTropTot(maintenant, ouvertA)) return false
+  const ecart = maintenant - ouvertA
+  return moinsAnimations || ecart < 0 || ecart >= Math.max(GARDE_GESTE_MS, LEVIER_FIN_MS)
 }
 
 /** Ce que la scène de fin montre sous la poutre. Tout sauf le relevé est
@@ -119,17 +133,20 @@ function cartouche(cle: IconeCeremonie, valeur: string, nom: string, titre: stri
   )
 }
 
-/** LE GABARIT DE LA SCÈNE : le relevé (le sceau du module porte les salles,
- *  les cartouches le reste), le butin en icônes rendues, les tampons des
- *  records, le palmarès du poste. Le levier n'y est pas : main.ts le crée
- *  pour l'écouter. Sorti de main.ts pour être testé, et posé tel quel par
- *  le banc de la cérémonie. */
+/** LE GABARIT DE LA SCÈNE. L'image est la scène : le relevé se pose dans son
+ *  tiers bas, en UNE rangée — le sceau du module (les salles, et le tampon
+ *  RECORD posé dessus), les cinq cartouches, le butin en icônes rendues.
+ *  Le palmarès du poste passe dans l'infobulle du sceau, la purge dans celle
+ *  de la mémoire : en cartouches, ils doublaient la hauteur du relevé et
+ *  couvraient la moitié de l'image (relecture du lot E). Le levier n'y est
+ *  pas : main.ts le crée pour l'écouter. Sorti de main.ts pour être testé,
+ *  et posé tel quel par le banc de la cérémonie. */
 export function finDescenteHTML(s: SceneFin): string {
   const r = s.releve
   if (s.issue === 'reprise') {
     const n = compte(s.secours ?? 0)
     return (
-      `<div class="mb-fin mb-fin-reprise"><div class="mb-fin-chiffres">` +
+      `<div class="mb-fin mb-fin-reprise"><div class="mb-fin-releve">` +
       cartouche('secours', `×${n}`, 'SECOURS RESTANTS', 'les échantillons de secours qui resteront après celui-ci', 0) +
       cartouche('profondeur', r.salles, 'PROFONDEUR', 'salles franchies sur la longueur de la descente', 1) +
       `</div></div>`
@@ -137,41 +154,39 @@ export function finDescenteHTML(s: SceneFin): string {
   }
   const butin = s.butin ?? []
   const tampons = s.tampons ?? []
+  const p = s.palmares
+  const titreSalles =
+    'salles franchies sur la longueur de la descente' +
+    (p
+      ? ` — palmarès du poste : ${compte(p.bouclees)} bouclées · profondeur record ${compte(p.profondeurRecord)} · meilleur livré ${p.meilleurLivre}`
+      : '')
+  const titreMemoire =
+    'la mémoire gravée cette descente — pour de bon : elle survit à la purge' +
+    (s.purgeCl != null ? ` ; la purge du retour confisque ${compte(s.purgeCl)} cL de condensat` : '')
   let i = 0
-  let h =
-    `<div class="mb-fin mb-fin-${s.issue}">` +
-    `<div class="mb-fin-releve">` +
+  return (
+    `<div class="mb-fin mb-fin-${s.issue}"><div class="mb-fin-releve">` +
     // LES SALLES sur le sceau du module : le chiffre de la descente, celui
-    // qui tombe ; teinté par --mb-rang (l'or de la bouclée, le rouge du figé)
-    `<figure class="mb-fin-salles" title="salles franchies sur la longueur de la descente">` +
+    // qui tombe ; teinté par --mb-rang (l'or de la bouclée, le rouge du
+    // figé). Un record battu s'y tamponne.
+    `<figure class="mb-fin-salles" title="${echappe(titreSalles)}">` +
     `<div class="mb-sceau mb-fin-sceau"><span class="mb-fin-sceau-img">${sceauHTML('module')}</span>` +
     `<b class="mb-sceau-mot" style="--mb-nom-n:${r.salles.length}">${echappe(r.salles)}</b></div>` +
-    `<figcaption>SALLES</figcaption></figure>` +
+    `<figcaption>SALLES</figcaption>` +
+    (tampons.length > 0 ? `<em class="mb-fin-tampon" title="${echappe(tampons.join(' · '))}">RECORD</em>` : '') +
+    `</figure>` +
     `<div class="mb-fin-chiffres">` +
     cartouche('livre', r.litres, 'VOLUME', 'le volume livré : ce que les sas ont bu, de la première salle à la dernière', i++) +
     cartouche('chrono', r.duree, 'DURÉE', 'le temps de la descente, du premier sas au dernier', i++) +
     cartouche('instruments', String(r.instruments), 'INSTRUMENTS', 'les instruments emportés', i++) +
-    cartouche('memoire', r.memoire, 'MÉMOIRE', 'la mémoire gravée cette descente — pour de bon : elle survit à la purge', i++) +
+    cartouche('memoire', r.memoire, 'MÉMOIRE', titreMemoire, i++) +
     cartouche('maitrise', String(r.palier), 'PALIER', 'le palier de maîtrise atteint', i++) +
+    `</div>` +
+    // LE BUTIN : les instruments emportés, leurs icônes rendues (un
+    // instrument sans case rend son emoji, ou son nom)
+    (butin.length > 0
+      ? `<div class="mb-fin-butin" title="le butin de la descente">${butin.map((d) => iconeInstrumentHTML(d)).join('')}</div>`
+      : '') +
     `</div></div>`
-  // LE BUTIN : les instruments emportés, leurs icônes rendues (un
-  // instrument sans case rend son emoji, ou son nom)
-  if (butin.length > 0)
-    h += `<div class="mb-fin-butin" title="le butin de la descente">${butin.map((d) => iconeInstrumentHTML(d)).join('')}</div>`
-  if (tampons.length > 0)
-    h += `<div class="mb-fin-tampons">${tampons.map((t) => `<em class="mb-fin-tampon">${echappe(t)}</em>`).join('')}</div>`
-  // LE PALMARÈS DU POSTE, et ce que la purge confisque au retour
-  if (s.palmares) {
-    const p = s.palmares
-    h +=
-      `<p class="mb-fin-legende">PALMARÈS DU POSTE</p><div class="mb-fin-palmares">` +
-      cartouche('carte', String(compte(p.bouclees)), 'BOUCLÉES', 'les descentes bouclées sur ce poste', i++) +
-      cartouche('profondeur', String(compte(p.profondeurRecord)), 'PROFONDEUR RECORD', 'la salle la plus profonde jamais atteinte sur ce poste', i++) +
-      cartouche('livre', p.meilleurLivre, 'MEILLEUR LIVRÉ', 'le plus grand volume livré en une descente sur ce poste', i++) +
-      (s.purgeCl != null
-        ? cartouche('condensat', `${compte(s.purgeCl)} cL`, 'PURGÉ AU RETOUR', 'la purge confisque le condensat restant ; la mémoire, elle, reste', i++)
-        : '') +
-      `</div>`
-  }
-  return h + `</div>`
+  )
 }

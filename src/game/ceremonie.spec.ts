@@ -14,6 +14,7 @@ import {
   TEMPS_BILAN,
   titreDuTirage,
 } from './ceremonie'
+import { LEVIER_FIN_MS } from './finDescente'
 
 // LES AIDES DES GARDES DE LA CÉRÉMONIE. Vitest tourne sans navigateur : les
 // gardes lisent main.ts et index.html en TEXTE. `corps` rend le corps d'une
@@ -668,9 +669,43 @@ describe('la cérémonie — les fins de partie', () => {
     // l'animation est coupée : la règle de base ne le cache pas
     expect(regle('.mb-fin-vue')).not.toMatch(/opacity:\s*0[;\s]/)
     expect(regle('.mb-fin-tampon')).not.toMatch(/opacity:\s*0[;\s]/)
+    // à 16:10 (Steam Deck), « cover » rognait 71 px de chaque côté et coupait
+    // le nez de la capsule : l'image entière, sur le noir
+    expect(regle('.mb-fin-vue img')).toMatch(/object-fit:\s*contain/)
+  })
+  it('ne laisse pas un geste en rafale presser le levier avant qu’il ait paru', () => {
+    const f = corps('mbMontreFinDescente')
+    expect(f).toMatch(/const ouvertA = performance\.now\(\)/)
+    expect(f).toMatch(/if \(!levierFinPret\(performance\.now\(\), ouvertA, sansAnimation\(\)\)\) return/)
+    // le délai du levier dans la feuille est celui que la règle attend
+    const d = /animation-delay:\s*([\d.]+)s/.exec(regle('.mb-fin-levier'))
+    expect(d, 'animation-delay de .mb-fin-levier').not.toBeNull()
+    expect(Math.round(Number(d![1]) * 1000)).toBe(LEVIER_FIN_MS)
+  })
+  it('se ferme partout où l’overlay qu’elle remplace se retirait', () => {
+    // Échap ouvre la fiche pendant la scène ; lancer une salle ou l'éditeur
+    // depuis la fiche laissait le voile par-dessus, le jeu figé
+    const fonctions: string[] = []
+    let i = MAIN.indexOf("overlay.classList.remove('visible')")
+    while (i > -1) {
+      const f = /\n(?:async )?function (\w+)\(/g
+      let nom = ''
+      for (const m of MAIN.slice(0, i).matchAll(f)) nom = m[1]
+      fonctions.push(nom)
+      i = MAIN.indexOf("overlay.classList.remove('visible')", i + 1)
+    }
+    // la boucle de jeu retire l'overlay quand aucune fin n'est à l'écran :
+    // elle ne doit pas fermer une scène de fin
+    const ouvreurs = [...new Set(fonctions)].filter((n) => n !== 'corpsImage')
+    for (const n of ['restart', 'openEditor', 'openEditeurCarte', 'avanceSalle', 'quitteAuMenu', 'resetAction'])
+      expect(ouvreurs, n).toContain(n)
+    for (const n of ouvreurs) {
+      const debut = MAIN.search(new RegExp(`\\n(?:async )?function ${n}\\(`))
+      expect(MAIN.slice(debut, MAIN.indexOf('\n}\n', debut)), n).toContain('mbFinOuverte()')
+    }
   })
   it('n’écrit pas d’étiquette sous 10 px', () => {
-    for (const s of ['.mb-fin-salles figcaption', '.mb-fin-legende', '.mb-fin-tampon']) {
+    for (const s of ['.mb-fin-salles figcaption', '.mb-fin-tampon']) {
       const t = /font-size:\s*calc\((\d+(?:\.\d+)?)px/.exec(regle(s))
       expect(t, s).not.toBeNull()
       expect(Number(t![1]), s).toBeGreaterThanOrEqual(10)
