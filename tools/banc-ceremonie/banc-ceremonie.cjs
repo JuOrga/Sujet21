@@ -65,8 +65,10 @@ const PRISES = [
   ['15-cache', 'cache', null, null, 1500],
   ['16-minijeu', 'minijeu', null, null, 1500],
   ['17-fin-ordinaire', 'fin', null, null, 1500],
-  ['18-overlay-descente-bouclee', 'overlay', 'bouclee', null, 1200],
-  ['19-overlay-defaite', 'overlay', 'defaite', null, 1200],
+  ['18-fin-bouclee', 'finDescente', 'bouclee', null, 3000],
+  ['18b-fin-bouclee-sceau-t900ms', 'finDescente', 'bouclee', 'finSceau', 0],
+  ['19-fin-perdue', 'finDescente', 'perdue', null, 3000],
+  ['20-fin-reprise', 'finDescente', 'reprise', null, 2000],
 ]
 
 // les instants figés : chaque règle donne l'âge (ms) des animations ciblées,
@@ -106,6 +108,12 @@ function prepare(quoi, M, O) {
   } else if (quoi === 'sceau') {
     P.fige([['.mb-module, .mb-module *', 350], ['.mb-continuer', 350], ['.mb-choix', 350]], 900)
     P.feu([{ el: $('.mb-module-sceau'), age: 0.35, r: { n: 70, teintes: [...M, ...O], vitesse: 420, gravite: 480, forme: 'confetti', duree: 1.4, taille: 6 } }])
+  } else if (quoi === 'finSceau') {
+    // le sceau du module touche (0,5 s de retard + 55 % de ses 0,62 s) : le
+    // feu d'or que main.ts y jette, et le flash
+    document.getElementById('mb-flash').classList.add('mb-on')
+    P.fige([['.mb-flash', 60]], 900)
+    P.feu([{ el: $('.mb-fin-sceau'), age: 0.06, r: { n: 110, teintes: [...O, '#eaf6ff'], vitesse: 520, gravite: 460, forme: 'confetti', duree: 1.6, taille: 6 } }])
   } else if (quoi === 'defile') {
     const s = document.getElementById('mb-scene'); s.scrollTop = s.scrollHeight
   }

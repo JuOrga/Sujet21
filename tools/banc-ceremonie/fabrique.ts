@@ -18,7 +18,9 @@ import { gainsDeSalle, gainsDeModule, pastillesDeSalles, condensatDuSas, memoire
 import { rangDeSalle, motDeNote, titreDuTirage } from '../../src/game/ceremonie'
 import { iconeMetaHTML } from '../../src/game/metaAssets'
 import { iconeCeremonieHTML } from '../../src/game/iconesStation'
-import { cuveHTML, sceauHTML } from '../../src/game/ceremonieObjets'
+import { cuveHTML, sceauHTML, SCENES_FIN } from '../../src/game/ceremonieObjets'
+import { finDescenteHTML, levierFin, releveDescente, titresFin } from '../../src/game/finDescente'
+import { fmtL } from '../../src/game/formats'
 import { anneauxHTML, colonneMaitrise, niveauColonne } from '../../src/game/colonneMaitrise'
 import { cartoucheHTML } from '../../src/game/cartouches'
 import { offresRepos, offreDon } from '../../src/game/descenteCarte'
@@ -111,6 +113,7 @@ const FAB = {
   offresRepos, offreDon, tireEvenement, offresDe, detailOffre, ICONES_MINI_CARTE,
   graine, Feu, memoireDuSas, resoutChoix, ditEffet, titreDuTirage, tirageInstruments,
   iconeCeremonieHTML, sceauHTML, cuveHTML, colonneMaitrise, niveauColonne, anneauxHTML,
+  SCENES_FIN, finDescenteHTML, levierFin, releveDescente, titresFin, fmtL,
   /** dessine le plan d'une salle générée dans un canvas de porte */
   plan(canvas: HTMLCanvasElement, mecanique: 0 | 1 | 2 | 3, diff: number, variante: string): string {
     const lv = genereNiveauAtelier({ moment: 2, mecanique, difficulte: diff } as never, variante)

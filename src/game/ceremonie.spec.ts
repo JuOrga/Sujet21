@@ -598,3 +598,82 @@ describe('la cérémonie — le bilan « SALLE FRANCHIE »', () => {
     expect(petit.slice(0, petit.indexOf('\n      }\n'))).toMatch(/\.mb-poutre \{ --mb-bande:/)
   })
 })
+
+// LES FINS DE PARTIE (lot E). La descente bouclée — le plus grand moment
+// du jeu —, la défaite définitive et « échantillon dispersé — reprise »
+// s'affichaient dans #overlay : un rectangle, un paragraphe gris, un
+// bouton. Elles deviennent des scènes du voile. Ce qui ne doit pas casser :
+// la cinématique joue AVANT, la sauvegarde s'efface à la défaite, le levier
+// fait ce que faisait le bouton de l'overlay (resetAction), et le voile est
+// rendu propre à la cérémonie suivante.
+describe('la cérémonie — les fins de partie', () => {
+  it('la descente bouclée, la défaite et la reprise ne passent plus par l’overlay brut', () => {
+    expect(corps('afficheDispersion')).not.toContain('showOverlay(')
+    expect(corps('afficheDispersion')).toContain('mbMontreFinDescente(')
+    expect(MAIN).not.toMatch(/showOverlay\(\s*'LA DESCENTE EST BOUCLÉE'/)
+  })
+  it('la scène de fin se quitte d’un geste', () => {
+    expect(corps('mbMontreFinDescente')).toMatch(/\.focus\(/)
+  })
+  it('ouvre le voile à l’étape de fin : l’image rendue, la poutre, le relevé, un levier', () => {
+    const f = corps('mbMontreFinDescente')
+    expect(f).toContain("mbEtape = 'fin'")
+    expect(f).toContain('mbVeil.hidden = false')
+    expect(f).toContain('SCENES_FIN[issue]')
+    expect(f).toContain('finDescenteHTML(')
+    expect(f).toMatch(/className = 'mb-levier/)
+    expect(f).toContain("sonCeremonie('levier')")
+    expect(f).toContain("sonCeremonie('sceau'")
+    // la poutre de la bannière porte le titre
+    expect(HTML).toMatch(/<header class="mb-banniere mb-poutre" id="mb-banniere">/)
+  })
+  it('joue toujours la cinématique, et n’ouvre la scène qu’après elle', () => {
+    // la scène s'ouvre quand la promesse de la cinématique se règle (tenue
+    // ou rompue : une cinématique en panne ne doit pas laisser l'écran vide)
+    const d = corps('afficheDispersion')
+    expect(d).toMatch(/const ouvre = \(\): void => \{[^}]*mbMontreFinDescente\('perdue'/)
+    expect(d).toContain("void joueMoment('run-perdue').then(ouvre, ouvre)")
+    expect(MAIN).toMatch(/const ouvreFin = \(\): void => \{[^}]*mbMontreFinDescente\('bouclee'/)
+    expect(MAIN).toContain("void joueMoment('expedition-achevee').then(ouvreFin, ouvreFin)")
+  })
+  it('efface toujours la sauvegarde à la défaite définitive', () => {
+    const d = corps('afficheDispersion')
+    expect(d.indexOf('effaceRun()')).toBeGreaterThan(-1)
+    expect(d.indexOf('effaceRun()')).toBeLessThan(d.indexOf("mbMontreFinDescente('perdue'"))
+  })
+  it('suit le chemin du bouton de l’overlay, aux trois endroits', () => {
+    const appels = MAIN.match(/mbMontreFinDescente\('(?:bouclee|perdue|reprise)'[^\n]*/g) ?? []
+    expect(appels.length).toBe(3)
+    for (const a of appels) expect(a).toContain('resetAction')
+    // resetAction ferme la scène AVANT de se taire sous la cérémonie : sans
+    // cela, le levier (et R) ne feraient plus rien
+    const ra = corps('resetAction')
+    expect(ra.indexOf('mbFinOuverte()')).toBeGreaterThan(-1)
+    expect(ra.indexOf('mbFinOuverte()')).toBeLessThan(ra.indexOf('if (miseEnBonbonne) return'))
+    // quitter la descente ferme la scène comme il fermait l'overlay
+    expect(corps('quitteAuMenu')).toContain('mbFinOuverte()')
+  })
+  it('rend le voile propre à la cérémonie suivante', () => {
+    const f = corps('fermeMiseEnBonbonne')
+    expect(f).toContain("mbVeil.classList.remove('mb-fin-descente')")
+    expect(f).toContain("mbEl('mb-fin-vue').hidden = true")
+  })
+  it('laisse les fins d’essai, d’éditeur et de mini-jeu en test sur l’overlay', () => {
+    expect(MAIN).toMatch(/showOverlay\(\s*r\.titre,/)
+    expect(MAIN).toMatch(/showOverlay\(\s*fromEditor \? 'TABLEAU FRANCHI'/)
+  })
+  it('pose l’image de fin derrière la scène, visible même sans animation', () => {
+    expect(HTML).toMatch(/<div class="mb-fin-vue" id="mb-fin-vue" hidden aria-hidden="true"><img alt="" draggable="false"><\/div>/)
+    // un élément qui ne paraît que par son animation doit être là quand
+    // l'animation est coupée : la règle de base ne le cache pas
+    expect(regle('.mb-fin-vue')).not.toMatch(/opacity:\s*0[;\s]/)
+    expect(regle('.mb-fin-tampon')).not.toMatch(/opacity:\s*0[;\s]/)
+  })
+  it('n’écrit pas d’étiquette sous 10 px', () => {
+    for (const s of ['.mb-fin-salles figcaption', '.mb-fin-legende', '.mb-fin-tampon']) {
+      const t = /font-size:\s*calc\((\d+(?:\.\d+)?)px/.exec(regle(s))
+      expect(t, s).not.toBeNull()
+      expect(Number(t![1]), s).toBeGreaterThanOrEqual(10)
+    }
+  })
+})
