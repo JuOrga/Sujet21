@@ -12407,11 +12407,13 @@ function majInstrumentsUI(): void {
     .filter((id) => !run.instruments.includes(id))
     .map((id) => carteDef(id))
     .filter((d): d is NonNullable<typeof d> => d !== null)
-  hudInstr.textContent =
-    defs.length + imposees.length > 0 ? [...defs, ...imposees].map((d) => d.icone).join('') : '—'
+  // les cases rendues de la planche des instruments (une carte perso garde
+  // son émoji : iconeInstrumentHTML le rend)
+  hudInstr.innerHTML =
+    defs.length + imposees.length > 0 ? [...defs, ...imposees].map((d) => iconeInstrumentHTML(d)).join('') : '—'
   if (instrPanel) {
     const ligne = (d: InstrumentDef, note = ''): string =>
-      `<div class="ip-row"><span class="ip-ico">${d.icone}</span><div><b>${d.nom}</b>${note}<small>${d.desc}</small></div></div>`
+      `<div class="ip-row"><span class="ip-ico">${iconeInstrumentHTML(d)}</span><div><b>${d.nom}</b>${note}<small>${d.desc}</small></div></div>`
     instrPanel.innerHTML =
       `<h4>INSTRUMENTS EMBARQUÉS</h4>` +
       (defs.length === 0 && imposees.length === 0

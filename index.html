@@ -5093,7 +5093,12 @@
         background-repeat: no-repeat;
         background-position: calc(var(--ic-x) * 33.3333%) calc(var(--ic-y) * 100%);
       }
-      .hud-chip .ico-meta { width: 1.5em; height: 1.5em; opacity: 0.9; }
+      /* la vie et le condensat (planche de la cérémonie : une monnaie, un seul
+         dessin) et les instruments embarqués : à la taille de la pastille,
+         comme l'était la planche du méta qu'ils quittent — à 1 em, ils se
+         perdaient */
+      .hud-chip .ico-ceremonie,
+      .hud-chip .ico-instrument { width: 1.5em; height: 1.5em; }
       /* LES PLANCHES DE LA STATION (cérémonie, instruments, sceaux) : même
          principe que .ico-meta — une pastille qui découpe la planche en fond,
          placée par --ic-x / --ic-y (0-based, colonne et rangée). Sous
@@ -10183,8 +10188,8 @@
         </div>
         <button type="button" class="hud-chip ath-salle" data-nom="progression de l'expédition"><span class="v" id="hud-tableau">SALLE 1/1</span></button>
         <div class="hud-chips">
-          <button type="button" class="hud-chip" data-nom="échantillons de secours — le dernier perdu, la run s'arrête" id="hud-vies-chip"><i class="ico-meta" style="--ic-x:3;--ic-y:1"></i><span class="v" id="hud-vies">×1</span></button>
-          <button type="button" class="hud-chip" data-nom="condensat de la run — la matière ramassée, purgée en fin de run" id="hud-cond-chip"><i class="ico-meta" style="--ic-x:2;--ic-y:1"></i><span class="v" id="hud-cond">0 cL</span></button>
+          <button type="button" class="hud-chip" data-nom="échantillons de secours — le dernier perdu, la run s'arrête" id="hud-vies-chip"><i class="ico-ceremonie" style="--ic-x:3;--ic-y:1" aria-hidden="true"></i><span class="v" id="hud-vies">×1</span></button>
+          <button type="button" class="hud-chip" data-nom="condensat de la run — la matière ramassée, purgée en fin de run" id="hud-cond-chip"><i class="ico-ceremonie" style="--ic-x:0;--ic-y:0" aria-hidden="true"></i><span class="v" id="hud-cond">0 cL</span></button>
           <button type="button" class="hud-chip" data-nom="coque du vaisseau — elle refroidit : la pression du temps" id="hud-coque-chip"><i class="voyant"></i><svg class="picto" data-picto="coque" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 4a2 2 0 0 1 2 2v7.5a3.5 3.5 0 1 1-4 0V6a2 2 0 0 1 2-2z"/></svg><span class="v" id="hud-coque">+21°</span></button>
           <button type="button" class="hud-chip" data-nom="instruments embarqués — toucher pour le détail" id="hud-instr-chip" hidden><svg class="picto" data-picto="instruments" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 20a8 8 0 1 1 0-16 8 8 0 0 1 0 16zM12 12l4-3"/></svg><span class="v" id="hud-instr">—</span></button>
           <!-- LA CAPTURE POUR LE CODEX (mode concepteur) : quatre secondes de
