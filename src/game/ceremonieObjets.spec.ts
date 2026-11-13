@@ -1,7 +1,16 @@
 import { existsSync, readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import { ANNEAU_URL, ANNEAUX_MAITRISE, OBJETS, ORDRE_SCEAUX, SCEAUX_COLONNES, SCEAUX_URL, cuveHTML, sceauHTML } from './ceremonieObjets'
-import { ICONES_CEREMONIE, ICONES_CEREMONIE_COLONNES, ICONES_CEREMONIE_RANGEES, ICONES_CEREMONIE_URL } from './iconesStation'
+import {
+  ICONES_CEREMONIE,
+  ICONES_CEREMONIE_COLONNES,
+  ICONES_CEREMONIE_RANGEES,
+  ICONES_CEREMONIE_URL,
+  ICONES_INSTRUMENTS_COLONNES,
+  ICONES_INSTRUMENTS_RANGEES,
+  ICONES_INSTRUMENTS_URL,
+  ORDRE_INSTRUMENTS,
+} from './iconesStation'
 
 /** Les images que l'atelier Blender (tools/images/blender/ceremonie.py) a
  *  LIVRÉES dans public/ : chaque planche s'y ajoute le jour où elle arrive.
@@ -12,6 +21,7 @@ const LIVREES: string[] = [
   SCEAUX_URL,
   ...Object.values(OBJETS).flatMap((o) => [o.dos, o.verre]),
   ANNEAU_URL,
+  ICONES_INSTRUMENTS_URL,
 ]
 
 /** Une liste de l'atelier Python (`NOM = ['a', 'b', …]`), lue en texte : les
@@ -48,6 +58,9 @@ describe('les images livrées par l’atelier', () => {
       expect(tailleWebp('public' + o.verre), nom).toEqual([o.largeur, o.hauteur])
     }
   })
+  it('découpe la planche des instruments en cases de 256², à la grille du contrat', () => {
+    expect(tailleWebp('public' + ICONES_INSTRUMENTS_URL)).toEqual([ICONES_INSTRUMENTS_COLONNES * 256, ICONES_INSTRUMENTS_RANGEES * 256])
+  })
   it('livre l’anneau en deux cases de 512² : intact, brisé', () => {
     expect(tailleWebp('public' + ANNEAU_URL)).toEqual([1024, 512])
   })
@@ -70,6 +83,7 @@ describe('les images livrées par l’atelier', () => {
   it('rend les cases dans l’ordre où le jeu les découpe', () => {
     expect(listeAtelier('ICONES')).toEqual([...ICONES_CEREMONIE])
     expect(listeAtelier('SCEAUX')).toEqual([...ORDRE_SCEAUX])
+    expect(listeAtelier('INSTRUMENTS')).toEqual([...ORDRE_INSTRUMENTS])
   })
 })
 

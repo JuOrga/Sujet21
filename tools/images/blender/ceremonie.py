@@ -26,12 +26,14 @@ le rendu ne bloque pas : lance() passe par un minuteur) :
     atelier() ; lance(ICONES, SORTIE, 192)       # la planche d'icônes
     sceaux() ; lance(SCEAUX, SORTIE, 192)        # la planche des sceaux
     cuves() ; lance_cuves(SORTIE, 192)           # les cuves (dos, verre, sonde) et l'anneau
-atelier(), sceaux() et cuves() rendent dans une scène À EUX, `ceremonie`, et y
+    instruments() ; lance(INSTRUMENTS, SORTIE, 160)  # la planche des instruments
+atelier(), sceaux(), cuves() et instruments() rendent dans une scène À EUX, `ceremonie`, et y
 basculent la fenêtre : la scène d'origine reste intacte, on y revient à la
 main. Puis, hors de Blender, l'assemblage (et une planche de contrôle
 réduite à 32 et 64 px, pour juger la lisibilité) :
     python -I tools/images/blender/ceremonie.py icones <rendus> masters/images/ceremonie-icones.png [contrôle.png]
     python -I tools/images/blender/ceremonie.py sceaux <rendus> masters/images/ceremonie-sceaux.png [contrôle.png]
+    python -I tools/images/blender/ceremonie.py instruments <rendus> masters/images/instruments-icones.png [contrôle.png]
     python -I tools/images/blender/ceremonie.py cuves <rendus> masters/images [contrôle.png]
 (la dernière écrit les sept masters des cuves et de l'anneau, et IMPRIME les
 fenêtres de liquide et les boîtes des sièges à recopier dans
@@ -56,6 +58,19 @@ COLONNES_SCEAUX, RANGEES_SCEAUX = 3, 2
 # et l'anneau de palier, intact puis brisé (ceremonieObjets.ts)
 CUVES = ['bonbonne', 'reserve', 'maitrise']
 ANNEAUX = ['intact', 'brise']
+# l'ORDRE des instruments : recopié de ORDRE_INSTRUMENTS (iconesStation.ts),
+# 8 × 4 cases de 256² — 24 instruments, 7 contreparties, la case 32 vide
+INSTRUMENTS = [
+    'echantillon-secours', 'gaine-isolante', 'buse-calibree', 'aimant-rosee',
+    'chambre-froide', 'peau-tendue', 'vanne-de-secours', 'plastron',
+    'detendeur', 'patins-de-givre', 'lentille-de-visee', 'gueule-ouverte',
+    'filtre-a-condensat', 'ballast', 'bascule-rapide', 'chambre-etanche',
+    'tamis-fin', 'semelles-polies', 'eclateur', 'croc-du-sas',
+    'sur-regime', 'ration-de-survie', 'oeilleres', 'carnet-du-semblable',
+    'fuite-lente', 'residu-collant', 'gaine-fendue', 'buse-encrassee',
+    'bonbonne-percee', 'fuite-prioritaire', 'vapeur-eventee',
+]
+COLONNES_INSTR, RANGEES_INSTR, CASE_INSTR = 8, 4, 256
 
 if DANS_BLENDER:
     import bpy, bmesh
@@ -655,35 +670,38 @@ if DANS_BLENDER:
         fen.scene = sc
         return sc
 
-    def atelier(noms=None):
-        global PREFIXE
-        PREFIXE = 'ico-'
-        sc = scene_neuve()
-        mats = matieres_ceremonie()
-        for i, nom in enumerate(ICONES):
-            if noms and nom not in noms:
-                continue
-            fab, incl, roulis = FABRIQUES[nom]
+    def monte_cases(sc, mats, noms, fabriques, colonnes, prefixe, echelle):
+        """une case par objet : bâti autour de l'origine, posé (inclinaison
+        vers la caméra, roulis dans le plan), RECENTRÉ sur sa boîte et mis à
+        l'échelle `echelle(nom, demi)` — incliné, un fût descend dans sa case
+        (le bocal finissait à 14 px du bord bas, premier essai des icônes) ;
+        et un objet plat (le palet) y flottait petit"""
+        for i, nom in enumerate(noms):
+            fab, incl, roulis = fabriques[nom]
             P = parent(sc, nom)
             at = Atelier()
             fab(at)
-            cx = (i % COLONNES) * 0.6
-            cz = -(i // COLONNES) * 0.6
+            cx = (i % colonnes) * 0.6
+            cz = -(i // colonnes) * 0.6
             pose = RX(incl) @ RY(roulis)
             for bm in at.bm.values():
                 bmesh.ops.transform(bm, matrix=pose, verts=bm.verts[:])
-            # RECENTRÉ sur sa boîte, et borné : incliné vers la caméra, un fût
-            # descend dans sa case (le bocal finissait à 14 px du bord bas,
-            # premier essai) ; et un objet plat (le palet) y flottait petit
             xs = [v.co.x for bm in at.bm.values() for v in bm.verts]
             zs = [v.co.z for bm in at.bm.values() for v in bm.verts]
             demi = max(max(xs) - min(xs), max(zs) - min(zs)) / 2
-            k = min(ECHELLE.get(nom, 1.0), DEMI_MAX / demi)
+            k = echelle(nom, demi)
             cadre = T(cx, 0, cz) @ Matrix.Diagonal((k, k, k, 1)) @ T(-(max(xs) + min(xs)) / 2, 0, -(max(zs) + min(zs)) / 2)
             for bm in at.bm.values():
                 bmesh.ops.transform(bm, matrix=cadre, verts=bm.verts[:])
-            at.objets(P, mats, BISEAU_ICO, lisse=True, prefixe='ico-' + nom)
+            at.objets(P, mats, BISEAU_ICO, lisse=True, prefixe=prefixe + nom)
             declare(nom, P, cx - DEMI, cx + DEMI, cz - DEMI, cz + DEMI, alpha=True)
+
+    def atelier():
+        global PREFIXE
+        PREFIXE = 'ico-'
+        sc = scene_neuve()
+        monte_cases(sc, matieres_ceremonie(), ICONES, FABRIQUES, COLONNES, 'ico-',
+                    lambda nom, demi: min(ECHELLE.get(nom, 1.0), DEMI_MAX / demi))
         lumiere_camera(sc)
         sc.cycles.device = 'GPU'
         return sc
@@ -920,7 +938,8 @@ if DANS_BLENDER:
     #     cache, la vitre ôtée. Ce qui en reste visible est la fenêtre du
     #     liquide : elle ne se devine pas, elle se MESURE (assemble_cuves,
     #     hors de Blender), qui vérifie aussi que chaque pixel de la fenêtre
-    #     où le liquide ne se voit pas est sous un opaque du verre.
+    #     où le liquide ne se voit pas est couvert par le calque verre (à plus
+    #     de moitié opaque, vitre comprise : voir VOILE_MAX).
     #
     # Vue de face, inclinée de INCL_CUVE vers la caméra comme les icônes (on
     # voit le dessus des fûts) : une cuve fait une unité de haut, rendue à
@@ -1280,28 +1299,455 @@ if DANS_BLENDER:
         bpy.app.timers.register(pas, first_interval=0.5)
 
 
+    # -------------------------------------------------------- les instruments
+    # UNE CASE PAR INSTRUMENT (instruments.ts), et l'objet dit son EFFET : la
+    # buse calibrée souffle, l'aimant à rosée attire des gouttes, le ballast
+    # pèse, la lentille de visée vise… Les CONTREPARTIES sont du même acier,
+    # mais ABÎMÉ — encrassé, fendu, percé, qui fuit : le prix se voit sur
+    # l'objet. Ces icônes s'affichent PETIT (cartes de tirage, ATH, journal,
+    # canvas du module, 24 à 32 px) : peu de pièces, une silhouette franche,
+    # et chaque objet agrandi jusqu'à REMPLIR sa case (DEMI_INSTR), quand les
+    # icônes de cérémonie, vues en grand, gardaient leurs proportions.
+    DEMI_INSTR = 0.222
+
+    def matieres_instruments():
+        mats = matieres_ceremonie()
+        # l'acier ENCRASSÉ des contreparties : plus sombre, un voile de crasse
+        # grise (une rouille franche aurait fait chaud, et la charte le refuse)
+        # (au premier essai, 2e3234 / 52585a : la gourde, la buse, l'antenne
+        # et la bonbonne de gaz se perdaient dans le fond à 24 px — abîmé ne
+        # veut pas dire noir)
+        mats['crasse'] = mat_brosse('instr-crasse', (0x46, 0x4a, 0x4a), (0x74, 0x7a, 0x78), 95, brosse=0.04, rouille=(0x34, 0x32, 0x2c))
+        next(n for n in mats['crasse'].node_tree.nodes if n.type == 'BSDF_PRINCIPLED').inputs['Metallic'].default_value = 0.15
+        mats['gras'] = mat_simple('instr-gras', (0x0c, 0x0e, 0x10), rug=0.1)
+        mats['vapeur'] = mat_simple('instr-vapeur', (0x8a, 0xa0, 0xac), rug=0.9, emission=(0x6a, 0x84, 0x90), force=0.25)
+        mats['membrane'] = mat_simple('instr-membrane', (0x9c, 0xa8, 0xae), rug=0.5)
+        mats['eteint'] = mat_simple('instr-eteint', (0x0c, 0x18, 0x1a), rug=0.3)
+        # le matelas de la gaine : la toile aluminisée de l'atelier (4a4f55)
+        # sortait en boudin noir à 24 px
+        mats['isolant'] = mat_simple('instr-isolant', (0x74, 0x7a, 0x80), rug=0.7, metal=0.2)
+        return mats
+
+    def i_echantillon(at):
+        """l'échantillon de secours : une éprouvette pleine, bouchée, dans sa pince"""
+        at.tour('verre', [(0, -0.19), (0.03, -0.185), (0.045, -0.165), (0.048, -0.14), (0.048, 0.15), (0, 0.15)])
+        at.tour('eau', [(0, -0.182), (0.028, -0.178), (0.04, -0.16), (0.041, -0.14), (0.041, 0.06), (0, 0.06)])
+        at.tour('acier', [(0, 0.145), (0.056, 0.145), (0.058, 0.17), (0.05, 0.2), (0, 0.205)])
+        at.tore('clair', 0.053, 0.011, T(0, 0, -0.03))
+        at.boite('clair', 0.05, 0.13, -0.045, -0.015, -0.012, 0.012)
+        at.tube('sombre', (0.13, 0, -0.2), (0.13, 0, 0.03), 0.013)
+        at.tour('acier', [(0, -0.21), (0.06, -0.21), (0.06, -0.19), (0, -0.19)], M=T(0.13, 0, 0))
+
+    def gaine(at, fendue=False):
+        """la gaine isolante : une conduite sous un matelas cousu — fendue, un
+        coussin éclaté, le tuyau à nu, et le givre qui sort"""
+        M = RY(90)
+        at.tour('crasse' if fendue else 'acier', [(0, -0.21), (0.048, -0.21), (0.048, 0.21), (0, 0.21)], M=M)
+        for k in range(5):
+            z = -0.14 + 0.07 * k
+            prof = [(0.048, z - 0.033), (0.082, z - 0.03), (0.094, z), (0.082, z + 0.03), (0.048, z + 0.033)]
+            if fendue and k == 2:
+                at.secteur('isolant', prof, math.radians(-40), math.radians(200), M=M, seg=32)
+                # le givre sort de la fente, en aiguilles vers la caméra
+                for a, dz, long in ((-90, 0.0, 0.11), (-60, -0.02, 0.08), (-120, 0.02, 0.085), (-75, 0.025, 0.06), (-105, -0.025, 0.065)):
+                    d = M @ Vector((math.cos(math.radians(a)), math.sin(math.radians(a)), 0.0)) - M @ Vector((0, 0, 0))
+                    c = M @ Vector((0.0, 0.0, z + dz)) + d * 0.045
+                    at.tube('cristal', tuple(c), tuple(c + d * long), 0.016, seg=6, r2=0.002)
+            else:
+                at.tour('isolant', prof, M=M, ferme=True)
+        for z in (-0.19, 0.19):
+            at.tour('clair', [(0.04, z - 0.012), (0.075, z - 0.012), (0.075, z + 0.012), (0.04, z + 0.012)], M=M, ferme=True)
+        if fendue:
+            at.tore('cristal', 0.098, 0.006, M @ T(0, 0, 0.105), segr=6)
+
+    def i_gaine(at):
+        gaine(at)
+
+    def buse(at, encrassee=False):
+        """la buse calibrée : un cône à bague graduée, et son jet — encrassée,
+        bouchée d'un bouchon de crasse qui coule"""
+        M = T(-0.04, 0, 0) @ RY(90)
+        at.tour('crasse' if encrassee else 'acier', [(0, -0.17), (0.062, -0.17), (0.062, -0.09), (0.078, -0.09), (0.078, -0.06),
+                                                    (0.058, -0.05), (0.03, 0.07), (0.022, 0.08), (0, 0.08)], M=M)
+        at.tore('sombre' if encrassee else 'cyan', 0.064, 0.008, T(-0.12, 0, 0) @ RY(90), segr=8)
+        if encrassee:
+            at.sphere('gras', (0.045, 0, 0), 0.035)
+            at.tube('gras', (0.045, -0.005, -0.02), (0.05, -0.01, -0.12), 0.018, r2=0.006)
+            at.sphere('gras', (0.05, -0.01, -0.13), 0.014)
+        else:
+            for k in range(3):
+                at.tore('cyan', 0.03 + 0.022 * k, 0.008, T(0.07 + 0.045 * k, 0, 0) @ RX(90), seg=24, segr=8,
+                        a0=math.radians(-55), a1=math.radians(55))
+
+    def i_buse(at):
+        buse(at)
+
+    def i_aimant(at):
+        """l'aimant à rosée : un fer à cheval aux pôles qui luisent, et les
+        gouttes qu'il attire"""
+        at.tore('acier', 0.1, 0.042, T(0, 0, 0.06) @ RX(90), a0=0, a1=math.pi, segr=16)
+        for x in (-0.1, 0.1):
+            at.tube('acier', (x, 0, 0.06), (x, 0, -0.07), 0.042, seg=32)
+            at.tube('cyan', (x, 0, -0.07), (x, 0, -0.115), 0.043, seg=32)
+        for (x, z, r) in ((0.0, -0.15, 0.03), (-0.04, -0.2, 0.02), (0.045, -0.19, 0.017)):
+            at.sphere('eau', (x, -0.01, z), r)
+
+    def i_chambre_froide(at):
+        """la chambre froide : un cube de glace dans sa cage d'acier"""
+        a = 0.14
+        at.boite('acier', -a - 0.01, a + 0.01, -a - 0.03, -a, -a - 0.01, a + 0.01, var=0.2)
+        at.boite('acier', -a - 0.01, a + 0.01, a, a + 0.03, -a - 0.01, a + 0.01, var=-0.2)
+        for x in (-a, a):
+            for y in (-a, a):
+                at.tube('clair', (x, y, -a), (x, y, a), 0.012)
+        at.boite('cristal', -0.09, 0.09, -0.09, 0.09, -0.09, 0.09, rot=RZ(28) @ RX(14))
+        at.boite('voyant', -0.03, 0.03, -a - 0.024, -a - 0.006, -a - 0.016, -a - 0.009)
+
+    def i_peau(at):
+        """la peau tendue : une membrane sur son cadre, ses tirants, une goutte
+        qui y perle"""
+        at.tour('acier', [(0.165, -0.07), (0.185, -0.07), (0.185, 0.03), (0.165, 0.03)], seg=64, ferme=True, var=0.2)
+        at.tour('membrane', [(0, 0.026), (0.17, 0.026), (0.17, 0.034), (0, 0.034)], seg=64)
+        at.tore('clair', 0.178, 0.009, T(0, 0, 0.034), segr=8)
+        for k in range(8):
+            th = 2 * math.pi * (k + 0.5) / 8
+            c, s_ = 0.19 * math.cos(th), 0.19 * math.sin(th)
+            at.tube('clair', (c, s_, -0.06), (c, s_, 0.03), 0.008)
+        at.sphere('eau', (0.03, -0.02, 0.06), 0.038)
+
+    def i_vanne(at):
+        """la vanne de secours : un corps de vanne sur sa conduite, et son
+        volant à bandes de danger"""
+        at.tube('acier', (-0.2, 0, -0.12), (0.2, 0, -0.12), 0.045, seg=40)
+        for x in (-0.16, 0.16):
+            at.tube('clair', (x - 0.012, 0, -0.12), (x + 0.012, 0, -0.12), 0.06, seg=40)
+        at.sphere('acier', (0, 0, -0.11), 0.072)
+        at.tube('clair', (0, 0, -0.06), (0, 0, 0.07), 0.016)
+        at.tore('rayures', 0.13, 0.02, T(0, 0, 0.08), segr=10)
+        for a in (0, 60, 120):
+            c, s_ = math.cos(math.radians(a)), math.sin(math.radians(a))
+            at.tube('sombre', (-0.13 * c, -0.13 * s_, 0.08), (0.13 * c, 0.13 * s_, 0.08), 0.008)
+        at.sphere('clair', (0, 0, 0.085), 0.025)
+
+    def i_plastron(at):
+        """le plastron : un bouclier riveté, sa bande et sa plaque claire"""
+        ecu = [(-0.17, 0.12), (-0.12, 0.17), (0.12, 0.17), (0.17, 0.12), (0.17, -0.03), (0.0, -0.2), (-0.17, -0.03)]
+        at.prisme('acier', ecu, -0.02, 0.02, var=0.2)
+        at.prisme('clair', mise_a_l_echelle(ecu, 0.72, 0, 0.0), -0.028, -0.02)
+        at.prisme('sombre', [(-0.17, 0.035), (0.17, 0.035), (0.17, 0.0), (-0.17, 0.0)], -0.034, -0.02)
+        for (x, z) in ((-0.145, 0.13), (0.145, 0.13), (-0.145, -0.02), (0.145, -0.02), (0.0, -0.165)):
+            at.dome('clair', x, z, 0.012, -0.02)
+
+    def i_detendeur(at):
+        """le détendeur : un corps de régulateur, son molette, l'entrée et la
+        sortie, et son petit cadran"""
+        at.tour('acier', [(0, -0.07), (0.085, -0.07), (0.09, -0.06), (0.09, 0.06), (0.085, 0.07), (0, 0.07)], var=0.2)
+        at.tour('clair', [(0, 0.068), (0.05, 0.068), (0.055, 0.08), (0.055, 0.15), (0.045, 0.165), (0, 0.168)], seg=16)
+        for x0, x1 in ((-0.21, -0.08), (0.08, 0.21)):
+            at.tube('acier', (x0, 0, -0.02), (x1, 0, -0.02), 0.03, seg=32)
+        at.tube('clair', (-0.2, 0, -0.02), (-0.18, 0, -0.02), 0.04, seg=32)
+        at.tube('clair', (0.18, 0, -0.02), (0.2, 0, -0.02), 0.04, seg=32)
+        M = T(0, -0.085, -0.01) @ FACE
+        at.tour('clair', [(0, 0.0), (0.05, 0.0), (0.05, 0.012), (0, 0.012)], M=M)
+        at.tour('cadran', [(0, 0.012), (0.04, 0.012), (0.04, 0.015), (0, 0.015)], M=M)
+        at.boite('aiguille', -0.003, 0.003, -0.01, 0.025, -0.102, -0.099, rot=RY(-40))
+
+    def i_patins(at):
+        """les patins de givre : une lame polie sur sa monture, sa trace de glace"""
+        lame = [(-0.21, -0.11), (0.14, -0.11), (0.19, -0.08), (0.205, -0.04), (0.19, -0.03), (0.15, -0.085), (-0.21, -0.085)]
+        at.prisme('clair', lame, -0.008, 0.008)
+        for x in (-0.15, 0.08):
+            at.boite('acier', x - 0.02, x + 0.02, -0.088, 0.0, -0.025, 0.025)
+        at.prisme('acier', chanfrein(-0.19, 0.13, 0.0, 0.06, (0.02, 0.0, 0.03, 0.02)), -0.05, 0.05, var=0.2)
+        at.boite('cyan', -0.21, 0.1, -0.135, -0.124, -0.01, 0.01)
+
+    def i_lentille(at):
+        """la lentille de visée : une lunette, sa lentille qui luit vers vous"""
+        M = RZ(-35) @ RY(90)
+        at.tour('acier', [(0, -0.2), (0.032, -0.2), (0.032, -0.15), (0.042, -0.14), (0.042, 0.08), (0.06, 0.1), (0.06, 0.19), (0, 0.19)], M=M, var=0.2)
+        at.tour('voyant', [(0, 0.19), (0.05, 0.19), (0.05, 0.196), (0, 0.2)], M=M)
+        at.tore('clair', 0.06, 0.008, M @ T(0, 0, 0.188), segr=8)
+        for z in (-0.06, 0.03):
+            at.tore('sombre', 0.046, 0.01, M @ T(0, 0, z), segr=8)
+        at.tube('sombre', tuple(M @ Vector((0, 0, -0.015))), tuple(M @ Vector((0, 0, -0.015)) + Vector((0, 0, -0.12))), 0.012)
+        at.tour('acier', [(0, -0.01), (0.06, -0.01), (0.06, 0.01), (0, 0.01)], M=T(*(M @ Vector((0, 0, -0.015)) + Vector((0, 0, -0.13)))))
+
+    def i_gueule(at):
+        """la gueule ouverte : une bouche d'aspiration en entonnoir, ses
+        aubes en spirale qui luisent, le noir du conduit au fond"""
+        at.tour('acier', [(0.06, -0.06), (0.085, -0.06), (0.205, 0.035), (0.205, 0.055), (0.185, 0.055), (0.06, -0.035)], M=FACE, seg=64, ferme=True, var=0.2)
+        at.tour('fond', [(0, -0.07), (0.065, -0.07), (0.065, -0.04), (0, -0.04)], M=FACE)
+        at.tore('clair', 0.197, 0.012, T(0, -0.055, 0) @ RX(90), segr=8)
+        for k in range(6):
+            th = 60 * k
+            r = 0.125
+            x, z = r * math.cos(math.radians(th)), r * math.sin(math.radians(th))
+            at.boite('cyan', x - 0.055, x + 0.055, z - 0.008, z + 0.008, -0.02, -0.01, rot=RY(-(th + 62)))
+
+    def i_filtre(at):
+        """le filtre à condensat : une cartouche à plis, et la goutte qu'il rend"""
+        at.tour('clair', [(0, 0.12), (0.112, 0.12), (0.112, 0.16), (0.09, 0.175), (0, 0.178)], var=0.2)
+        at.tour('acier', [(0, -0.16), (0.1, -0.16), (0.1, 0.12), (0, 0.12)], var=0.1)
+        for k in range(14):
+            a = math.radians(180 + 180 * (k + 0.5) / 14)
+            x, y = 0.102 * math.cos(a), 0.102 * math.sin(a)
+            at.boite('sombre', x - 0.006, x + 0.006, -0.13, 0.09, y - 0.006, y + 0.006, rot=RZ(math.degrees(a)))
+        at.tour('clair', [(0, -0.19), (0.112, -0.19), (0.112, -0.155), (0, -0.155)])
+        at.tore('cyan', 0.104, 0.007, T(0, 0, 0.0), segr=8)
+        at.tube('acier', (0, 0, -0.19), (0, 0, -0.215), 0.02)
+        at.tour('eau', [(0, -0.29), (0.02, -0.285), (0.027, -0.27), (0.02, -0.255), (0.007, -0.24), (0, -0.23)])
+
+    def i_ballast(at):
+        """le ballast : un lest d'acier massif, sa bande de danger, son anneau"""
+        at.prisme('acier', [(-0.18, -0.17), (0.18, -0.17), (0.13, 0.07), (-0.13, 0.07)], -0.08, 0.08, var=0.2)
+        at.prisme('rayures', [(-0.17, -0.13), (0.17, -0.13), (0.16, -0.08), (-0.16, -0.08)], -0.084, -0.079)
+        at.tore('clair', 0.065, 0.018, T(0, 0, 0.12) @ RX(90), segr=10)
+        at.boite('sombre', -0.03, 0.03, 0.06, 0.085, -0.02, 0.02)
+
+    def i_bascule(at):
+        """la bascule rapide : un interrupteur à levier sur son socle, un voyant
+        allumé, l'autre éteint"""
+        at.prisme('acier', chanfrein(-0.18, 0.18, -0.2, -0.06, (0, 0, 0.03, 0.03)), -0.1, 0.1, var=0.2)
+        at.tour('clair', [(0, -0.06), (0.045, -0.06), (0.035, -0.035), (0, -0.03)], M=T(0, 0, 0))
+        at.boite('clair', -0.018, 0.018, -0.04, 0.13, -0.025, 0.025, rot=RY(28))
+        at.sphere('clair', (0.07, 0, 0.115), 0.032)
+        at.sphere('voyant', (-0.12, -0.1, -0.13), 0.022)
+        at.sphere('eteint', (0.12, -0.1, -0.13), 0.022)
+
+    def i_chambre_etanche(at):
+        """la chambre étanche : une porte ronde, ses six crabots, et son
+        hublot où dort une vapeur"""
+        at.tour('acier', [(0, 0.0), (0.18, 0.0), (0.185, 0.01), (0.185, 0.03), (0, 0.03)], M=FACE, seg=64, var=0.2)
+        at.tour('clair', [(0.15, 0.03), (0.185, 0.03), (0.185, 0.045), (0.15, 0.045)], M=FACE, seg=64, ferme=True)
+        for k in range(6):
+            th = 60 * k + 30
+            x, z = 0.19 * math.cos(math.radians(th)), 0.19 * math.sin(math.radians(th))
+            at.boite('sombre', x - 0.028, x + 0.028, z - 0.016, z + 0.016, -0.05, 0.0, rot=RY(-th))
+        at.tour('clair', [(0.06, 0.03), (0.085, 0.03), (0.085, 0.05), (0.06, 0.05)], M=FACE, ferme=True)
+        at.tour('veille', [(0, 0.03), (0.062, 0.03), (0.062, 0.036), (0, 0.036)], M=FACE)
+        for (x, z, r) in ((-0.015, 0.0, 0.026), (0.02, 0.012, 0.02), (0.01, -0.025, 0.018)):
+            at.sphere('vapeur', (x, -0.036, z), r)
+
+    def i_tamis(at):
+        """le tamis fin : un cadre rond tendu d'une maille, sa poignée"""
+        at.tour('acier', [(0.16, -0.035), (0.19, -0.035), (0.19, 0.03), (0.16, 0.03)], seg=64, ferme=True, var=0.2)
+        # (treize fils de 0,006 : une grisaille à 24 px ; neuf, plus épais)
+        n = 9
+        for k in range(n):
+            c = -0.16 + 0.32 * (k + 0.5) / n
+            L = math.sqrt(max(0.161 ** 2 - c * c, 0))
+            at.boite('clair', -L, L, -0.005, 0.005, c - 0.006, c + 0.006)
+            at.boite('clair', c - 0.006, c + 0.006, -0.005, 0.005, -L, L)
+        at.tube('sombre', (0.19, 0, 0.0), (0.27, 0, 0.0), 0.016)
+        at.sphere('sombre', (0.27, 0, 0), 0.02)
+
+    def i_semelles(at):
+        """les semelles polies : une paire de semelles, lisses à briller"""
+        def semelle(dx, dz, ang):
+            pts = []
+            for k in range(28):
+                t = 2 * math.pi * k / 28
+                # une semelle : large à l'avant, cintrée, le talon rond
+                x = 0.065 * math.cos(t) * (1.0 if math.sin(t) > 0 else 0.85)
+                z = 0.17 * math.sin(t) + (0.0 if abs(math.sin(t)) > 0.3 else 0.0)
+                x *= 1.0 - 0.25 * math.exp(-((math.sin(t) + 0.15) ** 2) / 0.05)
+                pts.append((x, z))
+            pts = tourne(pts, ang)
+            pts = [(x + dx, z + dz) for x, z in pts]
+            at.prisme('acier', pts, -0.012, 0.012, var=0.2)
+            at.prisme('clair', mise_a_l_echelle(pts, 0.82, dx, dz), -0.018, -0.012)
+            for k in range(3):
+                z = dz - 0.06 + 0.06 * k
+                at.boite('cyan', dx - 0.03, dx + 0.03, z - 0.004, z + 0.004, -0.02, -0.017, rot=RY(-25 - ang))
+        semelle(-0.075, 0.0, 8)
+        semelle(0.075, -0.015, -8)
+
+    def i_eclateur(at):
+        """l'éclateur : une charge cerclée de danger, son détonateur qui luit,
+        les éclats qu'il détache"""
+        at.tour('sombre', [(0, -0.2), (0.075, -0.2), (0.08, -0.19), (0.08, 0.07), (0, 0.07)], var=0.2)
+        at.tour('rayures', [(0.0805, -0.08), (0.083, -0.08), (0.083, -0.03), (0.0805, -0.03)], ferme=True)
+        at.tour('acier', [(0, 0.065), (0.085, 0.065), (0.085, 0.09), (0.03, 0.11), (0, 0.112)])
+        at.tube('clair', (0, 0, 0.11), (0, 0, 0.15), 0.012)
+        at.sphere('voyant', (0, 0, 0.165), 0.03)
+        for (x, z, r, a) in ((0.075, 0.2, 0.02, 20), (-0.07, 0.19, 0.016, -30), (0.11, 0.13, 0.014, 50)):
+            at.boite('cristal', x - r, x + r, z - r * 1.6, z + r * 1.6, -r, r, rot=RY(a))
+
+    def i_croc(at):
+        """le croc du sas : un crochet forgé au bout de sa tige, son œil"""
+        at.tube('acier', (0.1, 0, -0.04), (0.1, 0, 0.17), 0.022, seg=24)
+        at.tore('clair', 0.04, 0.014, T(0.1, 0, 0.205) @ RX(90), segr=10)
+        at.tore('acier', 0.1, 0.022, T(0, 0, -0.04) @ RX(90), seg=48, segr=12, a0=math.radians(160), a1=math.radians(360))
+        tip = (0.1 * math.cos(math.radians(160)), 0, -0.04 + 0.1 * math.sin(math.radians(160)))
+        at.tube('clair', tip, (tip[0] + 0.02, 0, tip[2] + 0.07), 0.024, r2=0.003)
+
+    def i_sur_regime(at):
+        """le sur-régime : un compte-tours en demi-lune, l'aiguille collée dans
+        la zone qui luit"""
+        # (un contour à 27 sommets, premier essai, se triangulait de travers :
+        # des triangles noirs au pied — la demi-lune est un secteur de tour)
+        M = T(0, 0, -0.06) @ FACE
+        at.secteur('acier', [(0.001, -0.02), (0.19, -0.02), (0.19, 0.01), (0.001, 0.01)], 0, math.pi, M=M, seg=32, var=0.2)
+        at.secteur('cadran', [(0.001, 0.01), (0.165, 0.01), (0.165, 0.016), (0.001, 0.016)], 0, math.pi, M=M, seg=32)
+        at.boite('acier', -0.2, 0.2, -0.11, -0.055, -0.03, 0.02, var=-0.2)
+        at.tore('ambre', 0.14, 0.009, T(0, -0.017, -0.06) @ RX(90), seg=16, segr=8, a0=0, a1=math.radians(42))
+        for k in range(9):
+            th = math.radians(180 - 22.5 * k)
+            at.boite('trait', 0.12 * math.cos(th) - 0.014, 0.12 * math.cos(th) + 0.014, -0.06 + 0.12 * math.sin(th) - 0.004,
+                     -0.06 + 0.12 * math.sin(th) + 0.004, -0.019, -0.015, rot=RY(-math.degrees(th)))
+        aig = tourne([(-0.02, -0.008), (0.14, -0.002), (0.15, 0.0), (0.14, 0.002), (-0.02, 0.008)], 14)
+        at.prisme('aiguille', [(x, z - 0.06) for x, z in aig], -0.024, -0.018)
+        at.tour('clair', [(0, 0.018), (0.02, 0.018), (0.02, 0.028), (0, 0.03)], M=T(0, 0, -0.06) @ FACE)
+
+    def i_ration(at):
+        """la ration de survie : une boîte de conserve, son étiquette, sa
+        languette à tirer"""
+        at.tour('acier', [(0, -0.16), (0.115, -0.16), (0.12, -0.15), (0.12, 0.12), (0.115, 0.13), (0, 0.13)], var=0.2)
+        for z in (-0.155, 0.125):
+            at.tore('clair', 0.118, 0.01, T(0, 0, z), segr=8)
+        at.tour('etiquette', [(0.1205, -0.1), (0.1225, -0.1), (0.1225, 0.07), (0.1205, 0.07)], ferme=True)
+        at.tore('cyan', 0.1235, 0.006, T(0, 0, -0.015), segr=8)
+        at.tore('clair', 0.03, 0.008, T(0.05, 0, 0.138), segr=8)
+        at.sphere('clair', (0.02, 0, 0.134), 0.012)
+
+    def i_oeilleres(at):
+        """les œillères : deux verres de visée qui luisent, et les volets qui
+        ferment le côté"""
+        for s_ in (-1, 1):
+            x = s_ * 0.085
+            at.tour('clair', [(0.05, 0.0), (0.072, 0.0), (0.072, 0.03), (0.05, 0.03)], M=T(x, 0, 0.0) @ FACE, ferme=True)
+            at.tour('voyant', [(0, 0.004), (0.052, 0.004), (0.052, 0.012), (0, 0.014)], M=T(x, 0, 0.0) @ FACE)
+            volet = [(s_ * 0.155, 0.08), (s_ * 0.215, 0.11), (s_ * 0.215, -0.11), (s_ * 0.155, -0.08)]
+            at.prisme('acier', volet, -0.02, 0.0, var=0.3)
+            at.boite('sombre', min(s_ * 0.155, s_ * 0.17), max(s_ * 0.155, s_ * 0.17), -0.075, 0.075, -0.025, 0.0)
+        at.boite('acier', -0.02, 0.02, -0.01, 0.025, -0.02, 0.0)
+        at.boite('sombre', -0.215, 0.215, 0.07, 0.09, 0.0, 0.015)
+
+    def i_carnet(at):
+        """le carnet du Semblable : un carnet relié, ses coins, sa sangle et
+        l'octogone du Semblable"""
+        at.prisme('sombre', chanfrein(-0.145, 0.145, -0.195, 0.195, (0.0,) * 4), -0.022, 0.022, var=0.2)
+        at.boite('etiquette', 0.13, 0.15, -0.185, 0.185, -0.016, 0.016)
+        for (sx, sz) in ((-1, -1), (1, -1), (1, 1), (-1, 1)):
+            x, z = sx * 0.145, sz * 0.195
+            at.prisme('clair', [(x, z), (x - sx * 0.05, z), (x, z - sz * 0.05)], -0.026, 0.026)
+        at.boite('acier', 0.07, 0.1, -0.2, 0.2, -0.027, 0.027)
+        at.prisme('cyan', polygone(-0.03, 0.03, 0.06, 8), -0.028, -0.022)
+        at.prisme('sombre', polygone(-0.03, 0.03, 0.04, 8), -0.031, -0.026)
+
+    # ---- les contreparties : le même acier, abîmé
+    def c_fuite_lente(at):
+        """la fuite lente : une gourde encrassée, percée au fond, qui goutte"""
+        at.tour('crasse', [(0, -0.12), (0.09, -0.12), (0.11, -0.09), (0.115, -0.03), (0.11, 0.05), (0.08, 0.1), (0.035, 0.12),
+                           (0.035, 0.16), (0, 0.16)], var=0.3)
+        at.tour('sombre', [(0, 0.155), (0.045, 0.155), (0.045, 0.19), (0, 0.19)])
+        at.tore('sombre', 0.114, 0.008, T(0, 0, -0.04), segr=8)
+        at.prisme('fond', [(-0.012, -0.1), (0.01, -0.095), (0.004, -0.115), (-0.008, -0.118)], -0.12, -0.08)
+        for (x, z, r) in ((0.0, -0.15, 0.016), (0.0, -0.19, 0.012)):
+            at.sphere('eau', (x, -0.06, z), r)
+        at.tour('eau', [(0, -0.215), (0.08, -0.215), (0.07, -0.205), (0, -0.2)], M=T(0, -0.04, 0))
+
+    def c_residu(at):
+        """le résidu collant : une plaque prise dans un gras noir qui coule"""
+        at.prisme('crasse', chanfrein(-0.18, 0.18, -0.18, 0.18, (0.04,) * 4), 0.0, 0.025, var=0.3)
+        for (x, z, r, l) in ((-0.08, 0.1, 0.06, 0.18), (0.06, 0.06, 0.05, 0.12), (0.1, 0.13, 0.035, 0.07), (-0.02, -0.02, 0.045, 0.14)):
+            at.sphere('gras', (x, -0.005, z), r)
+            at.tube('gras', (x, -0.01, z), (x + 0.004, -0.01, z - l), r * 0.55, r2=r * 0.25)
+            at.sphere('gras', (x + 0.004, -0.012, z - l), r * 0.32)
+
+    def c_gaine_fendue(at):
+        gaine(at, fendue=True)
+
+    def c_buse_encrassee(at):
+        buse(at, encrassee=True)
+
+    def c_bonbonne_percee(at):
+        """la bonbonne percée : la bonbonne de livraison, presque vide, et son
+        jet qui fuit par le trou"""
+        bonbonne(at, Matrix.Identity(4), liquide=0.22)
+        at.prisme('fond', [(0.045, -0.03), (0.07, -0.02), (0.075, -0.045), (0.055, -0.055)], -0.1, -0.07)
+        for k, (x, z, r) in enumerate(((0.1, -0.05, 0.016), (0.135, -0.075, 0.014), (0.165, -0.11, 0.012), (0.18, -0.15, 0.01))):
+            at.sphere('eau', (x, -0.09, z), r)
+
+    def c_fuite_prioritaire(at):
+        """classé fuite prioritaire : une antenne encrassée qui vous traque,
+        et son signal haché"""
+        # (tournée de -55°, premier essai, elle montrait son dos : la coupe
+        # vers la caméra, son cornet et son signal devant)
+        M = T(-0.04, 0, 0.02) @ RY(-35) @ RX(55)
+        at.tour('crasse', [(0, -0.01), (0.08, 0.004), (0.14, 0.035), (0.155, 0.05), (0.14, 0.055), (0.08, 0.026), (0, 0.012)], M=M, seg=48, var=0.3)
+        at.tube('clair', tuple(M @ Vector((0, 0, 0.01))), tuple(M @ Vector((0, 0, 0.11))), 0.01)
+        at.sphere('voyant', tuple(M @ Vector((0, 0, 0.115))), 0.018)
+        at.tube('sombre', tuple(M @ Vector((0, 0, -0.01))), (-0.04, 0, -0.19), 0.016)
+        at.tour('sombre', [(0, -0.21), (0.07, -0.21), (0.07, -0.19), (0, -0.19)], M=T(-0.04, 0, 0), seg=8, phase=0.5)
+        c = M @ Vector((0, 0, 0.115))
+        for k, (a0, a1) in enumerate(((10, 40), (55, 80), (5, 25), (45, 85))):
+            R = 0.05 if k < 2 else 0.09
+            at.tore('cyan', R, 0.009, T(c.x, c.y - 0.02, c.z) @ RX(90), seg=12, segr=6, a0=math.radians(a0), a1=math.radians(a1))
+
+    def c_vapeur_eventee(at):
+        """la vapeur éventée : une bonbonne de gaz encrassée, sa vanne cassée,
+        et le gaz qui s'en va en bouffées"""
+        at.tour('crasse', [(0, -0.2), (0.08, -0.2), (0.09, -0.19), (0.09, 0.02), (0.075, 0.06), (0.04, 0.075), (0, 0.078)], var=0.3)
+        at.tore('sombre', 0.091, 0.008, T(0, 0, -0.08), segr=8)
+        at.tube('sombre', (0, 0, 0.07), (0.02, 0, 0.11), 0.015)
+        at.tube('sombre', (0.025, 0, 0.11), (0.06, 0, 0.12), 0.012)
+        for (x, z, r) in ((0.06, 0.13, 0.022), (0.09, 0.16, 0.03), (0.13, 0.19, 0.038), (0.03, 0.18, 0.02)):
+            at.sphere('vapeur', (x, -0.02, z), r)
+
+    FABRIQUES_INSTR = {
+        'echantillon-secours': (i_echantillon, 8, 18), 'gaine-isolante': (i_gaine, 14, -22),
+        'buse-calibree': (i_buse, 0, -12), 'aimant-rosee': (i_aimant, 6, 12),
+        'chambre-froide': (i_chambre_froide, 18, 0), 'peau-tendue': (i_peau, 34, 0),
+        'vanne-de-secours': (i_vanne, 26, 0), 'plastron': (i_plastron, 0, 0),
+        'detendeur': (i_detendeur, 14, 0), 'patins-de-givre': (i_patins, 14, -8),
+        'lentille-de-visee': (i_lentille, 4, -22), 'gueule-ouverte': (i_gueule, 0, 0),
+        'filtre-a-condensat': (i_filtre, 12, 0), 'ballast': (i_ballast, 16, 0),
+        'bascule-rapide': (i_bascule, 20, 0), 'chambre-etanche': (i_chambre_etanche, 0, 0),
+        'tamis-fin': (i_tamis, 38, 0), 'semelles-polies': (i_semelles, 0, 0),
+        'eclateur': (i_eclateur, 10, 18), 'croc-du-sas': (i_croc, 0, 0),
+        'sur-regime': (i_sur_regime, 0, 0), 'ration-de-survie': (i_ration, 22, 0),
+        'oeilleres': (i_oeilleres, 6, 0), 'carnet-du-semblable': (i_carnet, 0, 8),
+        'fuite-lente': (c_fuite_lente, 10, 0), 'residu-collant': (c_residu, 0, 0),
+        'gaine-fendue': (c_gaine_fendue, 14, -22), 'buse-encrassee': (c_buse_encrassee, 0, -12),
+        'bonbonne-percee': (c_bonbonne_percee, 10, 0), 'fuite-prioritaire': (c_fuite_prioritaire, 0, 0),
+        'vapeur-eventee': (c_vapeur_eventee, 10, 0),
+    }
+
+    def instruments():
+        global PREFIXE
+        PREFIXE = 'instr-'
+        sc = scene_neuve()
+        monte_cases(sc, matieres_instruments(), INSTRUMENTS, FABRIQUES_INSTR, COLONNES_INSTR, 'instr-',
+                    lambda nom, demi: DEMI_INSTR / demi)
+        lumiere_camera(sc)
+        sc.cycles.device = 'GPU'
+        return sc
+
+
 # ------------------------------------------------- l'assemblage, hors de Blender
 PLANCHES = {
-    # planche : (les cases dans l'ordre, colonnes, rangées, préfixe des rendus)
-    'icones': (ICONES, COLONNES, RANGEES, 'ico-'),
-    'sceaux': (SCEAUX, COLONNES_SCEAUX, RANGEES_SCEAUX, 'sceau-'),
+    # planche : (les cases dans l'ordre, colonnes, rangées, préfixe des rendus, côté d'une case)
+    'icones': (ICONES, COLONNES, RANGEES, 'ico-', CASE),
+    'sceaux': (SCEAUX, COLONNES_SCEAUX, RANGEES_SCEAUX, 'sceau-', CASE),
+    'instruments': (INSTRUMENTS, COLONNES_INSTR, RANGEES_INSTR, 'instr-', CASE_INSTR),
 }
 
 
 def assemble(planche_nom, dossier, sortie, controle=None):
     """les rendus détourés (alpha/<préfixe><nom>.png, 1024²) en une planche
-    de cases de 512² ; et, si demandé, une planche de contrôle : chaque case
+    de cases de 512² (256² pour les instruments) ; et, si demandé, une planche de contrôle : chaque case
     à 32 et à 64 px sur le fond du voile, pour juger la lisibilité"""
     from PIL import Image
-    noms, colonnes, rangees, prefixe = PLANCHES[planche_nom]
-    planche = Image.new('RGBA', (colonnes * CASE, rangees * CASE), (0, 0, 0, 0))
+    noms, colonnes, rangees, prefixe, case = PLANCHES[planche_nom]
+    planche = Image.new('RGBA', (colonnes * case, rangees * case), (0, 0, 0, 0))
     cases = []
     for i, nom in enumerate(noms):
         im = Image.open(os.path.join(dossier, 'alpha', prefixe + nom + '.png')).convert('RGBA')
         # prémultiplié pendant la réduction : sinon le noir du vide (alpha
         # nul) bave en liseré sombre autour de l'objet
-        im = im.convert('RGBa').resize((CASE, CASE), Image.LANCZOS).convert('RGBA')
-        planche.paste(im, ((i % colonnes) * CASE, (i // colonnes) * CASE))
+        im = im.convert('RGBa').resize((case, case), Image.LANCZOS).convert('RGBA')
+        planche.paste(im, ((i % colonnes) * case, (i // colonnes) * case))
         cases.append(im)
     planche.save(sortie)
     if controle:
@@ -1316,12 +1762,12 @@ def assemble(planche_nom, dossier, sortie, controle=None):
         ctl.save(controle)
 
 
-# la part du liquide visible que le verre peut voiler à plus de moitié : ses
-# bords seulement, là où le tube fuit vers le rasant. Mesuré le 13/11 : la
-# jauge plate de la bonbonne 0,01, le bocal 0,13, la colonne 0,21 (un tube
-# étroit : ses deux bords rasants pèsent plus) ; un verre qui éteint le
-# liquide, le premier essai, mesurait 1,0
-VOILE_MAX = 0.25
+# la part du liquide visible que le calque verre peut voiler à plus de moitié.
+# Mesuré sur les cuves livrées le 13/11 : bonbonne 0,0006, bocal 0,0036,
+# colonne 0,0015 — la vitre, claire de face, ne passe presque jamais 0,5. Un
+# verre qui éteint le liquide (premier essai) mesurait 1,0. Le plafond reste
+# à quelques fois la mesure : une régression modérée de la vitre se voit
+VOILE_MAX = 0.02
 
 
 def _reduit(chemin, taille):
@@ -1334,9 +1780,13 @@ def assemble_cuves(dossier, masters, controle=None):
     """les cuves : chaque calque réduit de moitié (2048 → 1024 de haut) en
     master ; la fenêtre du liquide MESURÉE sur la sonde ; l'anneau (deux
     cases de 512²) ; et ce qu'il faut recopier dans OBJETS / ANNEAUX_MAITRISE
-    (ceremonieObjets.ts). Renvoie les mesures, et lève une erreur si un
-    pixel de la fenêtre où le liquide ne se voit pas n'est pas sous un opaque
-    du verre — le liquide y déborderait."""
+    (ceremonieObjets.ts). Renvoie les mesures : `pixels_nus` compte les pixels
+    de la fenêtre où le liquide ne se voit pas et qui ne sont pas couverts —
+    le liquide y déborderait ; l'appel en ligne de commande échoue s'il y en
+    a, ou si le voile dépasse VOILE_MAX. « Couvert » : sous le calque VERRE à
+    plus de moitié opaque — l'alpha du calque entier, vitre comprise ; le
+    voile mesuré montre que la vitre seule n'y atteint presque jamais, si bien
+    que ce qui couvre, ce sont les opaques."""
     import numpy as np
     from PIL import Image
     geo = json.load(open(os.path.join(dossier, 'cuves.json')))
@@ -1354,7 +1804,8 @@ def assemble_cuves(dossier, masters, controle=None):
         verre = np.asarray(calques['verre'])[..., 3] / 255.0
         ys, xs = np.nonzero(sonde > 0.5)
         x0, x1, y0, y1 = xs.min(), xs.max() + 1, ys.min(), ys.max() + 1
-        # un pixel de plus d'un côté s'il tombe SOUS un opaque du verre : la
+        # un pixel de plus d'un côté s'il tombe sous le calque verre à plus de
+        # moitié opaque (vitre comprise : voir VOILE_MAX) : la
         # lisière anticrénelée ne laisse pas voir le fond entre liquide et
         # cadre. Contre une paroi de verre clair, non : le liquide s'y
         # verrait dans l'épaisseur du verre (premier essai, partout élargie,

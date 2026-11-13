@@ -93,6 +93,7 @@ const NOMS: Record<string, string> = {
   'ceremonie-maitrise-dos.webp': 'Cérémonie — colonne de maîtrise (dos)',
   'ceremonie-maitrise-verre.webp': 'Cérémonie — colonne de maîtrise (verre)',
   'ceremonie-anneau.webp': 'Cérémonie — anneau de palier (intact, brisé)',
+  'instruments-icones.webp': 'Cérémonie — planche des instruments et contreparties (8×4)',
   // les illustrations du tableau des avaries (public/assets/avaries/<id>.webp),
   // une par station de reparations.ts — la même image éteinte ou allumée
   'eclairage.webp': 'Avarie — réseau d’éclairage',

@@ -167,8 +167,10 @@ FAMILLES: list[Famille] = [
         note='deux cases de 512² : intact, brisé (ceremonieObjets.ts, ANNEAU_URL)',
     ),
     Famille(
+        # mesuré le 13/11 (qualité 82) : 167 Ko, luminance 0,29, 1 % de chauds
+        # (le volant de la vanne de secours, la zone du sur-régime)
         'planche des instruments', ('instruments-icones',), alpha=True, cote_max=4096,
-        poids_max_ko=600,
+        poids_max_ko=250,
         note='8×4 cases de 256² — l’ordre est ORDRE_INSTRUMENTS (src/game/iconesStation.ts)',
     ),
     Famille(
