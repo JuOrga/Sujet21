@@ -25,6 +25,7 @@ import {
   etatCourt,
   filtre,
   filtreSuivant,
+  iconeArticleHTML,
   libelleBouton,
   libellePrix,
   rayonMarchand,
@@ -34,6 +35,7 @@ import {
   type FiltreMarchand,
   type RayonMarchandId,
 } from './marchandVue'
+import { iconeCeremonieHTML } from './iconesStation'
 import {
   PiloteEcran,
   colonnesDe,
@@ -149,7 +151,7 @@ export class EcranMarchand {
         const b = badge(a)
         return (
           `<button type="button" class="mr-article${on ? ' on' : ''}${tenu(a) ? ' mr-tenu' : ''}${a.etat === 'trop-cher' ? ' mr-cher' : ''}" data-article="${esc(a.id)}">` +
-          `<span class="mr-article-tete"><i>${a.icone}</i><span><b>${esc(a.nom)}</b><small>${esc(r.nom)}</small></span></span>` +
+          `<span class="mr-article-tete">${iconeArticleHTML(a)}<span><b>${esc(a.nom)}</b><small>${esc(r.nom)}</small></span></span>` +
           `<span class="mr-article-txt">${esc(a.detail)}</span>` +
           `<span class="mr-badge${b ? '' : ' mr-badge--vide'}">${esc(b)}</span>` +
           `<span class="mr-article-pied"><u class="${a.etat === 'trop-cher' ? 'mr-rouge' : ''}">${tenu(a) ? '—' : libellePrix(a.prix)}</u><em class="${a.etat === 'trop-cher' ? 'mr-rouge' : tenu(a) ? 'mr-vert' : ''}">${esc(etatCourt(a))}</em></span>` +
@@ -169,7 +171,7 @@ export class EcranMarchand {
     const b = badge(a)
     const ok = achetable(a)
     panneau.innerHTML =
-      `<div class="mr-apercu" style="--t:${r.teinte}"><i>${a.icone}</i><small>${esc(r.nom)}</small></div>` +
+      `<div class="mr-apercu" style="--t:${r.teinte}">${iconeArticleHTML(a)}<small>${esc(r.nom)}</small></div>` +
       `<div class="mr-fiche-titres"><span class="mr-etiquette" style="color:${r.teinte}">${esc(r.nom)}${b ? ` · ${esc(b)}` : ''}</span><h3>${esc(a.nom)}</h3></div>` +
       `<p class="mr-texte">${esc(a.detail)}</p>` +
       `<div class="mr-stats"><div><span>TENUE</span><b class="mr-vert">${esc(r.tenue)}</b></div>` +
@@ -302,7 +304,7 @@ function gabarit(): string {
     `<div class="mr-titres"><div class="mr-titre-ligne"><h2>LE MARCHAND</h2><span>LE SEMBLABLE DU COMPTOIR</span></div>` +
     `<p>« Le condensat ne survit pas à la run. Ce qui dure se paie en mémoire. »</p></div></div>` +
     `<div class="mr-bourses">` +
-    `<div class="mr-bourse mr-bourse--memoire"><i>◈</i><div><span>MÉMOIRE</span><b id="mr-memoire">0</b></div></div>` +
+    `<div class="mr-bourse mr-bourse--memoire">${iconeCeremonieHTML('memoire')}<div><span>MÉMOIRE</span><b id="mr-memoire">0</b></div></div>` +
     `<div class="mr-bourse mr-bourse--orbes"><i>🔮</i><div><span>ORBES EN POCHE</span><b id="mr-orbes">0</b></div></div>` +
     `</div>` +
     `<button type="button" id="marchand-fermer" aria-label="Fermer le marchand">✕</button>` +

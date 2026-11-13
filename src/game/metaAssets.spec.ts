@@ -11,7 +11,10 @@ import {
   RAPPORT_MARCHAND,
   RAPPORT_SAS,
   caseIcone,
+  ceremonieDeMonnaie,
   decalsDuMeta,
+  iconeMetaHTML,
+  iconeMonnaieHTML,
   vuesEclat,
 } from './metaAssets'
 import { jonctionsDesStructures } from './structures'
@@ -122,8 +125,9 @@ describe('les décalques du méta', () => {
 })
 
 describe('la planche d’icônes du méta', () => {
-  it('chaque article vendable a sa case, dans la grille', () => {
+  it('chaque article vendable a son dessin : la monnaie à la cérémonie, le reste sa case dans la grille', () => {
     for (const id of [...ARTICLES_ETAL_IDS, ...ARTICLES_COMPTOIR_IDS]) {
+      if (ceremonieDeMonnaie(id)) continue
       const c = caseIcone(id)
       expect(c, id).not.toBeNull()
       expect(c!).toBeGreaterThanOrEqual(0)
@@ -137,6 +141,38 @@ describe('la planche d’icônes du méta', () => {
 
   it('le viatique et la fiole de gouttes partagent leur case (même objet)', () => {
     expect(caseIcone('viatique')).toBe(caseIcone('gouttes'))
+  })
+})
+
+// UNE MONNAIE, UN SEUL DESSIN : le condensat, la mémoire et la vie (et
+// l'échantillon de secours, qui DONNE une vie) prennent l'icône de la
+// cérémonie partout où l'interface les montre — un toast d'éclat ne doit pas
+// dessiner la mémoire autrement que le bilan de la salle.
+describe('les monnaies du méta prennent le dessin de la cérémonie', () => {
+  it('condensat, mémoire, vie et secours sortent par la planche de la cérémonie', () => {
+    expect(iconeMetaHTML('condensat', '💠')).toContain('ico-ceremonie')
+    expect(iconeMetaHTML('memoire', '🧠')).toContain('ico-ceremonie')
+    expect(iconeMetaHTML('vie', '💠')).toBe(iconeMetaHTML('secours', '💠'))
+    expect(iconeMetaHTML('secours', '💠')).toContain('ico-ceremonie')
+    for (const id of ['condensat', 'memoire', 'vie', 'secours']) expect(iconeMetaHTML(id, '?'), id).not.toContain('ico-meta')
+  })
+
+  it('les autres articles du commerce restent sur leur planche', () => {
+    for (const id of ['gouttes', 'viatique', 'dashs', 'clef', 'sac']) expect(iconeMetaHTML(id, '?'), id).toContain('ico-meta')
+  })
+
+  it('la planche générée ne leur garde plus de case : le canvas de l’Économat ne peut plus la lire pour elles', () => {
+    for (const id of ['condensat', 'memoire', 'vie', 'secours']) expect(caseIcone(id), id).toBeNull()
+    expect(ceremonieDeMonnaie('vie')).toBe('secours')
+    expect(ceremonieDeMonnaie('secours')).toBe('secours')
+    expect(ceremonieDeMonnaie('gouttes')).toBeNull()
+  })
+
+  it('iconeMonnaieHTML ne répond que pour une monnaie — jamais pour un nom hérité d’Object', () => {
+    expect(iconeMonnaieHTML('memoire')).toContain('ico-ceremonie')
+    expect(iconeMonnaieHTML('gouttes')).toBeNull()
+    expect(iconeMonnaieHTML('toString')).toBeNull()
+    expect(iconeMonnaieHTML('constructor')).toBeNull()
   })
 })
 

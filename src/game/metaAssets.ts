@@ -15,6 +15,7 @@
 // Tant que l'image manque, le renderer ne dessine rien et le tracé vectoriel
 // du fx-canvas tient seul la place — on peut livrer les fichiers un par un.
 
+import { iconeCeremonieHTML, type IconeCeremonie } from './iconesStation'
 import type { DecalDef, LevelDef } from './level'
 import { jonctionsDesStructures } from './structures'
 
@@ -171,12 +172,10 @@ export const ICONE_CASE: Record<string, number> = {
   viatique: 0,
   dashs: 1,
   clef: 2,
-  secours: 3,
   sac: 4,
-  // les monnaies et marques du méta, pour les écrans qui suivront
-  memoire: 5,
-  condensat: 6,
-  vie: 7,
+  // les cases 3, 5, 6 et 7 (échantillon de secours, mémoire, condensat,
+  // vie) restent dans l'image mais ne se lisent plus : ces monnaies ont pris
+  // le dessin de la cérémonie (MONNAIES_CEREMONIE, plus bas)
 }
 
 /** La case d'un article, ou null s'il n'en a pas (on retombe sur l'emoji). */
@@ -185,10 +184,41 @@ export function caseIcone(id: string): number | null {
   return c === undefined ? null : c
 }
 
-/** L'icône d'un article POUR L'INTERFACE : une pastille qui découpe la
- *  planche en fond, à la taille du texte autour. L'emoji reste le repli —
- *  pour un id sans case, et pour les écrans qu'on n'a pas encore repris. */
+// ---- LES MONNAIES : UNE MONNAIE, UN SEUL DESSIN -----------------------------
+// Le condensat, la mémoire et la vie avaient leur case ici ET leur icône à la
+// cérémonie (planche Blender) : le toast d'un éclat dessinait la mémoire
+// autrement que le bilan de la salle. Elles prennent toutes le dessin de la
+// cérémonie. L'ÉCHANTILLON DE SECOURS, l'article qui donne une vie, est la
+// même marque : il suit la vie.
+
+const MONNAIES_CEREMONIE: ReadonlyMap<string, IconeCeremonie> = new Map([
+  ['condensat', 'condensat'],
+  ['memoire', 'memoire'],
+  ['vie', 'secours'],
+  ['secours', 'secours'],
+])
+
+/** L'icône de la cérémonie d'une monnaie du méta, ou null si l'id n'en est
+ *  pas une — pour le canvas de l'Économat, qui la dessine lui-même. Une
+ *  Map, pas un objet : un id venu d'un toast ne doit pas tomber sur
+ *  `toString`. */
+export function ceremonieDeMonnaie(id: string): IconeCeremonie | null {
+  return MONNAIES_CEREMONIE.get(id) ?? null
+}
+
+/** La même, en HTML : null si l'id n'est pas une monnaie. */
+export function iconeMonnaieHTML(id: string): string | null {
+  const m = ceremonieDeMonnaie(id)
+  return m ? iconeCeremonieHTML(m) : null
+}
+
+/** L'icône d'un article POUR L'INTERFACE : une monnaie prend le dessin de la
+ *  cérémonie ; un article du commerce, une pastille qui découpe la planche en
+ *  fond, à la taille du texte autour. L'emoji reste le repli — pour un id
+ *  sans case, et pour les écrans qu'on n'a pas encore repris. */
 export function iconeMetaHTML(id: string, secours: string): string {
+  const monnaie = iconeMonnaieHTML(id)
+  if (monnaie) return monnaie
   const c = caseIcone(id)
   if (c === null) return `<i>${secours}</i>`
   const col = c % ICONES_COLONNES

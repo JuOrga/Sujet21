@@ -8,6 +8,7 @@ import {
   ICONES_INSTRUMENTS_RANGEES,
   ORDRE_INSTRUMENTS,
   caseInstrument,
+  dessineIconeCeremonie,
   dessineIconeInstrument,
   iconeCeremonieHTML,
   iconeInstrumentHTML,
@@ -68,13 +69,32 @@ describe('iconesStation', () => {
     expect(dessineIconeInstrument(ctx, img, INSTRUMENTS[9].id, 5, 6, 32)).toBe(true)
     expect(ctx.drawImage).toHaveBeenCalledWith(img, 256, 256, 256, 256, 5, 6, 32, 32)
   })
+  // le canvas de l'Économat dessine l'échantillon de secours (la vie) par la
+  // planche de la cérémonie : une monnaie, un seul dessin, au canvas aussi
+  it('dessine une icône de cérémonie au canvas quand la planche est prête, et seulement alors', () => {
+    const ctx = { drawImage: vi.fn() } as unknown as CanvasRenderingContext2D
+    expect(dessineIconeCeremonie(ctx, null, 'secours', 0, 0, 26)).toBe(false)
+    const enRoute = { complete: false, naturalWidth: 0, naturalHeight: 0 } as HTMLImageElement
+    expect(dessineIconeCeremonie(ctx, enRoute, 'secours', 0, 0, 26)).toBe(false)
+    expect(ctx.drawImage).not.toHaveBeenCalled()
+    const img = { complete: true, naturalWidth: 3584, naturalHeight: 2048 } as HTMLImageElement
+    // « secours » : case 10, colonne 3, rangée 1 — des cases de 512²
+    expect(dessineIconeCeremonie(ctx, img, 'secours', 4, 7, 26)).toBe(true)
+    expect(ctx.drawImage).toHaveBeenCalledWith(img, 1536, 512, 512, 512, 4, 7, 26, 26)
+  })
 })
 
 describe('les planches de la station dans index.html', () => {
   const css = readFileSync(resolve(__dirname, '../../index.html'), 'utf8')
   const regle = (sel: string): string => {
-    const i = css.lastIndexOf(`${sel} {`) // la dernière : la première est la fin du groupe de sélecteurs
-    expect(i, sel).toBeGreaterThan(-1)
+    // la règle PROPRE à la classe : le sélecteur seul en tête de ligne. Ni la
+    // fin du groupe « .ico-ceremonie, .ico-instrument, .ico-sceau { », ni une
+    // règle contextuelle posée plus bas (« .hud-chip .ico-ceremonie { »), ni
+    // un commentaire qui cite la classe ne doivent passer pour elle
+    const echappe = sel.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+    const trouvees = [...css.matchAll(new RegExp(`^[ \\t]*${echappe} \\{`, 'gm'))]
+    expect(trouvees.length, sel).toBeGreaterThan(0)
+    const i = trouvees[trouvees.length - 1].index!
     return css.slice(i, css.indexOf('}', i))
   }
   it('peint la planche AU-DESSUS de l’alvéole, jamais l’inverse', () => {

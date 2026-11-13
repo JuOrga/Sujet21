@@ -481,7 +481,13 @@ import {
   type ReleveDescente,
 } from './game/finDescente'
 import { anneauxHTML, colonneMaitrise, couleeColonne, niveauColonne, type Colonne } from './game/colonneMaitrise'
-import { iconeCeremonieHTML, iconeInstrumentHTML, type IconeCeremonie } from './game/iconesStation'
+import {
+  ICONES_CEREMONIE_URL,
+  dessineIconeCeremonie,
+  iconeCeremonieHTML,
+  iconeInstrumentHTML,
+  type IconeCeremonie,
+} from './game/iconesStation'
 import {
   condensatDuSas,
   gainsDeModule,
@@ -573,6 +579,7 @@ import {
   ICONES_URL,
   cadreAlcove,
   caseIcone,
+  ceremonieDeMonnaie,
   decalsDuMeta,
   iconeMetaHTML,
   vuesEclat,
@@ -3101,10 +3108,12 @@ function majToast(): void {
   tropheeToast.style.setProperty('--tt', TOAST_TEINTE[genre])
   tropheeToast.style.setProperty('--dur', `${duree}s`)
   tropheeToast.dataset.genre = genre
+  // un article passe par sa planche (la mémoire d'un éclat, l'échantillon de
+  // secours : le dessin de la cérémonie) ; un trophée, une fiche ou une
+  // fiole n'ont pas de dessin rendu et gardent leur glyphe
+  const glyphe = t.article ? iconeMetaHTML(t.article, t.icone) : `<i>${t.icone}</i>`
   tropheeToast.innerHTML =
-    `<span class="tt-cartouche">${
-      t.article ? iconeMetaHTML(t.article, t.icone) : `<i>${t.icone}</i>`
-    }</span>` +
+    `<span class="tt-cartouche">${glyphe}</span>` +
     `<span class="tt-corps"><b>${t.sur ?? 'TROPHÉE DÉBLOQUÉ'}</b>` +
     `<span class="tt-nom">${htmlSafe(t.nom)}</span>${voir}</span>` +
     `<span class="tt-vie"></span>`
@@ -9094,9 +9103,11 @@ function decorAffiche(): DecalDef[] {
 // ici et pas en décalque. Chacune prend son image si elle est livrée, et
 // retombe sur le tracé vectoriel sinon — le jeu ne dépend jamais d'un fichier.
 
-/** L'icône d'un article : la case de la planche du méta, ou l'emoji du
- *  catalogue tant que la planche n'est pas déposée. Le centre est donné ;
- *  l'appelant a posé textAlign/textBaseline au centre. */
+/** L'icône d'un article : une MONNAIE du méta (l'échantillon de secours)
+ *  prend le dessin de la cérémonie, comme dans l'ATH et les toasts ; le
+ *  reste, la case de la planche du méta ; l'emoji du catalogue tant que la
+ *  planche n'est pas prête. Le centre est donné ; l'appelant a posé
+ *  textAlign/textBaseline au centre. */
 function dessineIconeArticle(
   g: CanvasRenderingContext2D,
   article: string,
@@ -9105,6 +9116,12 @@ function dessineIconeArticle(
   cy: number,
   taille: number,
 ): void {
+  const monnaie = ceremonieDeMonnaie(article)
+  if (
+    monnaie &&
+    dessineIconeCeremonie(g, sprite(ICONES_CEREMONIE_URL), monnaie, cx - taille / 2, cy - taille / 2, taille)
+  )
+    return
   const planche = sprite(ICONES_URL)
   const c = caseIcone(article)
   if (planche && c !== null) {
@@ -12405,11 +12422,13 @@ function majInstrumentsUI(): void {
     .filter((id) => !run.instruments.includes(id))
     .map((id) => carteDef(id))
     .filter((d): d is NonNullable<typeof d> => d !== null)
-  hudInstr.textContent =
-    defs.length + imposees.length > 0 ? [...defs, ...imposees].map((d) => d.icone).join('') : '—'
+  // les cases rendues de la planche des instruments (une carte perso garde
+  // son émoji : iconeInstrumentHTML le rend)
+  hudInstr.innerHTML =
+    defs.length + imposees.length > 0 ? [...defs, ...imposees].map((d) => iconeInstrumentHTML(d)).join('') : '—'
   if (instrPanel) {
     const ligne = (d: InstrumentDef, note = ''): string =>
-      `<div class="ip-row"><span class="ip-ico">${d.icone}</span><div><b>${d.nom}</b>${note}<small>${d.desc}</small></div></div>`
+      `<div class="ip-row"><span class="ip-ico">${iconeInstrumentHTML(d)}</span><div><b>${d.nom}</b>${note}<small>${d.desc}</small></div></div>`
     instrPanel.innerHTML =
       `<h4>INSTRUMENTS EMBARQUÉS</h4>` +
       (defs.length === 0 && imposees.length === 0
@@ -15485,7 +15504,7 @@ function mbMontreBilanModule(): void {
     instruments: run.instruments,
     nomInstrument: (id) => {
       const d = carteDef(id)
-      return d ? { icone: d.icone, nom: d.nom } : null
+      return d ? { nom: d.nom } : null
     },
     paliers: paliersAtteints(run.xp),
   })
@@ -19190,8 +19209,8 @@ function majDossier(): void {
   const butin = enRun
     ? '<section class="do-sec do-butin">' +
       `<span title="Bonbonne : ${run.bonbonneLiters.toFixed(2).replace('.', ',')} L sur ${capBonbonne()}">🫙<b>${run.bonbonneLiters.toFixed(1).replace('.', ',')} L</b></span>` +
-      `<span title="Condensat">${iconeMetaHTML('condensat', '💠')}<b>${condensat} cL</b></span>` +
-      `<span class="vert" title="Mémoire gagnée pendant la descente">${iconeMetaHTML('memoire', '🧠')}<b>+${run.memoireGagnee}</b></span>` +
+      `<span title="Condensat">${iconeCeremonieHTML('condensat')}<b>${condensat} cL</b></span>` +
+      `<span class="vert" title="Mémoire gagnée pendant la descente">${iconeCeremonieHTML('memoire')}<b>+${run.memoireGagnee}</b></span>` +
       '</section>'
     : ''
 
@@ -19204,9 +19223,11 @@ function majDossier(): void {
     .fiolesEquipees()
     .map((f) => fioleDef(f))
     .filter((d): d is NonNullable<typeof d> => d !== null)
+  // l'icône est déjà du HTML : la case rendue d'un instrument (ou l'émoji
+  // d'une carte perso), le glyphe d'une fiole, qui n'a pas de dessin rendu
   const objets = [
-    ...instrs.map((d) => ({ icone: d.icone, nom: d.nom, desc: d.desc })),
-    ...fioles.map((d) => ({ icone: '⚗', nom: d.nom, desc: d.desc })),
+    ...instrs.map((d) => ({ ico: iconeInstrumentHTML(d), nom: d.nom, desc: d.desc })),
+    ...fioles.map((d) => ({ ico: '<i>⚗</i>', nom: d.nom, desc: d.desc })),
   ]
   const equip =
     objets.length === 0
@@ -19215,7 +19236,7 @@ function majDossier(): void {
         objets
           .map(
             (o) =>
-              `<span title="${o.desc.replace(/"/g, '&quot;')}"><i>${o.icone}</i>${o.nom}</span>`,
+              `<span title="${o.desc.replace(/"/g, '&quot;')}">${o.ico}${o.nom}</span>`,
           )
           .join('') +
         '</section>'

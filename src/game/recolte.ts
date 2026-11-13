@@ -312,7 +312,7 @@ export interface EntreeGainsModule {
   memoireSolde: number
   /** les instruments tenus maintenant (ids), et de quoi les nommer */
   instruments: readonly string[]
-  nomInstrument: (id: string) => { icone: string; nom: string } | null
+  nomInstrument: (id: string) => { nom: string } | null
   paliers: number
 }
 
@@ -325,7 +325,7 @@ export function gainsDeModule(e: EntreeGainsModule): Gain[] {
   const n = r.salles.length
   const gagnes = instrumentsGagnes(r.instrumentsEntree, e.instruments)
     .map((id) => e.nomInstrument(id))
-    .filter((x): x is { icone: string; nom: string } => x !== null)
+    .filter((x): x is { nom: string } => x !== null)
   const paliers = Math.max(0, e.paliers - r.paliersEntree)
   const gains: Gain[] = [
     {
@@ -385,7 +385,9 @@ export function gainsDeModule(e: EntreeGainsModule): Gain[] {
       prefixe: '',
       suffixe: '',
       role: 'des avantages pour le reste de la descente — perdus à la purge',
-      detail: gagnes.map((g) => `${g.icone} ${g.nom}`).join(' · '),
+      // le détail finit en infobulle, du texte brut : l'émoji d'un instrument
+      // s'y dessinerait autrement selon la machine — son nom suffit
+      detail: gagnes.map((g) => g.nom).join(' · '),
       solde: { nom: 'EMBARQUÉS', valeur: String(e.instruments.length) },
     },
   ]

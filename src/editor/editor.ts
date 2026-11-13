@@ -67,6 +67,7 @@ import { periodeCoeur } from '../game/puits'
 import { tableauCibles, tableauCouperet, tableauOrbites, tableauPalet, tableauRafales } from '../game/minijeux'
 import { tableauRonde } from '../game/ronde'
 import { builtinPresets, loadStoredPresets, type Preset } from '../bench/presets'
+import { iconeInstrumentHTML } from '../game/iconesStation'
 import { catalogueRecompenses } from '../game/recompenses'
 import { descriptionInstrument } from '../game/instruments'
 import { grainsPuits, rayonNoyau } from '../game/puitsDessin'
@@ -5504,8 +5505,10 @@ export class LevelEditor {
     const tenues = this.level.cartes ?? []
     const cat = catalogueRecompenses()
     const echappe = (t: string): string => t.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;')
-    const case_ = (id: string, icone: string, nom: string, desc: string, inconnue = false): string =>
-      `<label class="${inconnue ? 'inconnue' : ''}" title="${echappe(desc)}"><input type="checkbox" data-carte="${echappe(id)}" ${tenues.includes(id) ? 'checked' : ''} /> ${icone} ${echappe(nom)}</label>`
+    // `ico` est déjà du HTML : la case rendue de l'instrument (ou l'émoji
+    // d'une carte perso), comme le jeu la montrera
+    const case_ = (id: string, ico: string, nom: string, desc: string, inconnue = false): string =>
+      `<label class="${inconnue ? 'inconnue' : ''}" title="${echappe(desc)}"><input type="checkbox" data-carte="${echappe(id)}" ${tenues.includes(id) ? 'checked' : ''} /> ${ico} ${echappe(nom)}</label>`
     const groupes: [string, (typeof cat)[number][]][] = [
       ['Livrées', cat.filter((d) => !d.contrepartie && !d.perso)],
       ['Contreparties', cat.filter((d) => d.contrepartie)],
@@ -5514,14 +5517,22 @@ export class LevelEditor {
     host.innerHTML =
       groupes
         .filter(([, l]) => l.length > 0)
-        .map(([titre, l]) => `<span class="k">${titre}</span>` + l.map((d) => case_(d.id, d.icone, d.nom, descriptionInstrument(d))).join(''))
+        .map(([titre, l]) => `<span class="k">${titre}</span>` + l.map((d) => case_(d.id, iconeInstrumentHTML(d), d.nom, descriptionInstrument(d))).join(''))
         .join('') +
       tenues
         .filter((id) => !cat.some((d) => d.id === id))
         .map((id) => case_(id, '?', `${id} (inconnue du catalogue)`, 'Aucune carte de ce nom ici : elle ne fera rien sur ce poste.', true))
         .join('')
     const compte = this.el('ed-cartes-compte')
-    compte.textContent = tenues.length === 0 ? 'aucune' : tenues.map((id) => cat.find((d) => d.id === id)?.icone ?? '?').join(' ') + ` ${tenues.length}`
+    compte.innerHTML =
+      tenues.length === 0
+        ? 'aucune'
+        : tenues
+            .map((id) => {
+              const d = cat.find((x) => x.id === id)
+              return d ? iconeInstrumentHTML(d) : '?'
+            })
+            .join(' ') + ` ${tenues.length}`
   }
 
   /** Le panneau du mini-jeu : visible sur un tableau de cibles, et à jour. */

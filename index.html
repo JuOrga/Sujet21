@@ -889,12 +889,18 @@
       .do-butin > span { display: inline-flex; align-items: center; gap: 6px; font-size: calc(13px * var(--ui)); }
       .do-butin b { font-weight: normal; color: #f2c98e; }
       .do-butin .vert b { color: #6dffb8; }
+      /* le condensat et la mémoire (planche de la cérémonie) gardent la taille
+         de la pastille du méta qu'ils remplacent */
+      .do-butin .ico-ceremonie { width: 1.35em; height: 1.35em; }
       .do-equip > span {
         display: inline-flex; align-items: center; gap: 7px; cursor: help;
         font-family: var(--font-display); font-size: calc(9px * var(--ui));
         letter-spacing: 0.12em; color: var(--ink);
       }
       .do-equip > span i { font-style: normal; font-size: calc(14px * var(--ui)); line-height: 1; }
+      /* la case rendue d'un instrument est un dessin d'acier, sombre : à la
+         taille de l'ancien émoji (14 px), elle ne se lisait plus */
+      .do-equip .ico-instrument { width: 1.3em; height: 1.3em; }
       /* au doigt et sur petit écran, le carnet prend toute la largeur */
       @media (max-width: 760px) {
         #dossier { width: 100%; }
@@ -3176,6 +3182,9 @@
         font-style: normal; font-size: calc(20px * var(--ui)); line-height: 1;
         filter: drop-shadow(0 0 7px color-mix(in srgb, var(--tt) 55%, transparent));
       }
+      /* la monnaie d'un toast (la mémoire d'un éclat, l'échantillon de
+         secours) garde la taille qu'avait sa pastille de l'ancienne planche */
+      .tt-cartouche .ico-ceremonie { width: 1.35em; height: 1.35em; }
       .tt-corps { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
       .tt-nom {
         font-family: var(--font-mono); font-size: calc(12.5px * var(--ui));
@@ -5090,7 +5099,12 @@
         background-repeat: no-repeat;
         background-position: calc(var(--ic-x) * 33.3333%) calc(var(--ic-y) * 100%);
       }
-      .hud-chip .ico-meta { width: 1.5em; height: 1.5em; opacity: 0.9; }
+      /* la vie et le condensat (planche de la cérémonie : une monnaie, un seul
+         dessin) et les instruments embarqués : à la taille de la pastille,
+         comme l'était la planche du méta qu'ils quittent — à 1 em, ils se
+         perdaient */
+      .hud-chip .ico-ceremonie,
+      .hud-chip .ico-instrument { width: 1.5em; height: 1.5em; }
       /* LES PLANCHES DE LA STATION (cérémonie, instruments, sceaux) : même
          principe que .ico-meta — une pastille qui découpe la planche en fond,
          placée par --ic-x / --ic-y (0-based, colonne et rangée). Sous
@@ -6625,6 +6639,9 @@
       #marchand .mr-article.on.mr-tenu, #marchand .mr-article.on.mr-cher { opacity: 0.85; }
       .mr-article-tete { display: flex; gap: 10px; align-items: flex-start; }
       .mr-article-tete > i { font-style: normal; font-size: 26px; line-height: 1; filter: drop-shadow(0 0 8px color-mix(in srgb, var(--t) 55%, transparent)); }
+      /* une icône rendue est un fond découpé : la tête de carte, en flex, la
+         rétrécissait (21 × 26 px mesurés) et le dessin s'écrasait */
+      .mr-article-tete > .ico-ceremonie { flex: none; }
       .mr-article-tete > span { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
       .mr-article-tete b { font-size: calc(12.5px * var(--ui)); line-height: 1.25; color: #e6f3ff; font-weight: 600; }
       .mr-tenu .mr-article-tete b { color: var(--dim); }
@@ -7305,6 +7322,13 @@
       }
       #ed-cartes label.inconnue {
         color: var(--warn, #e8b04a);
+      }
+      /* la case rendue d'un instrument, dessin d'acier sombre, ne se lisait
+         pas à la taille du texte (12 px) : 1,4 em */
+      #ed-cartes .ico-instrument,
+      #ed-cartes-compte .ico-instrument {
+        width: 1.4em;
+        height: 1.4em;
       }
       .ed-f input,
       .ed-f select,
@@ -10180,8 +10204,8 @@
         </div>
         <button type="button" class="hud-chip ath-salle" data-nom="progression de l'expédition"><span class="v" id="hud-tableau">SALLE 1/1</span></button>
         <div class="hud-chips">
-          <button type="button" class="hud-chip" data-nom="échantillons de secours — le dernier perdu, la run s'arrête" id="hud-vies-chip"><i class="ico-meta" style="--ic-x:3;--ic-y:1"></i><span class="v" id="hud-vies">×1</span></button>
-          <button type="button" class="hud-chip" data-nom="condensat de la run — la matière ramassée, purgée en fin de run" id="hud-cond-chip"><i class="ico-meta" style="--ic-x:2;--ic-y:1"></i><span class="v" id="hud-cond">0 cL</span></button>
+          <button type="button" class="hud-chip" data-nom="échantillons de secours — le dernier perdu, la run s'arrête" id="hud-vies-chip"><i class="ico-ceremonie" style="--ic-x:3;--ic-y:1" aria-hidden="true"></i><span class="v" id="hud-vies">×1</span></button>
+          <button type="button" class="hud-chip" data-nom="condensat de la run — la matière ramassée, purgée en fin de run" id="hud-cond-chip"><i class="ico-ceremonie" style="--ic-x:0;--ic-y:0" aria-hidden="true"></i><span class="v" id="hud-cond">0 cL</span></button>
           <button type="button" class="hud-chip" data-nom="coque du vaisseau — elle refroidit : la pression du temps" id="hud-coque-chip"><i class="voyant"></i><svg class="picto" data-picto="coque" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 4a2 2 0 0 1 2 2v7.5a3.5 3.5 0 1 1-4 0V6a2 2 0 0 1 2-2z"/></svg><span class="v" id="hud-coque">+21°</span></button>
           <button type="button" class="hud-chip" data-nom="instruments embarqués — toucher pour le détail" id="hud-instr-chip" hidden><svg class="picto" data-picto="instruments" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 20a8 8 0 1 1 0-16 8 8 0 0 1 0 16zM12 12l4-3"/></svg><span class="v" id="hud-instr">—</span></button>
           <!-- LA CAPTURE POUR LE CODEX (mode concepteur) : quatre secondes de
