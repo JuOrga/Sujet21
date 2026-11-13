@@ -18,3 +18,9 @@ masters/images/*
 
 # le cache de Python (tools/images importe conduite_atlas)
 __pycache__/
+
+# les sorties du banc de la cérémonie (tools/banc-ceremonie) : fabrique.js
+# s'empaquette à chaque passe depuis fabrique.ts (654 Ko), les captures et
+# leurs mesures se refont — ni l'un ni l'autre ne se commitent
+tools/banc-ceremonie/fabrique.js
+tools/banc-ceremonie/captures/
