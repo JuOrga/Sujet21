@@ -470,7 +470,17 @@ import {
   titreDuTirage,
 } from './game/ceremonie'
 import { cartoucheHTML } from './game/cartouches'
-import { cuveHTML, sceauHTML } from './game/ceremonieObjets'
+import { fmtDuree, fmtL, fmtTime } from './game/formats'
+import { cuveHTML, sceauHTML, SCENES_FIN } from './game/ceremonieObjets'
+import {
+  finDescenteHTML,
+  levierFin,
+  levierFinPret,
+  releveDescente,
+  titresFin,
+  type IssueDescente,
+  type ReleveDescente,
+} from './game/finDescente'
 import { anneauxHTML, colonneMaitrise, couleeColonne, niveauColonne, type Colonne } from './game/colonneMaitrise'
 import { iconeCeremonieHTML, iconeInstrumentHTML } from './game/iconesStation'
 import {
@@ -891,22 +901,7 @@ try {
 }
 majMemoireUI()
 
-function fmtTime(s: number): string {
-  return `${s.toFixed(1).replace('.', ',')} s`
-}
-
-// Les litres à la française : la virgule, pas le point
-function fmtL(l: number): string {
-  return `${l.toFixed(2).replace('.', ',')} L`
-}
-
-// Les durées d'expédition se lisent en minutes : « 13:32 » plutôt que 812 s
-function fmtDuree(s: number): string {
-  if (s < 120) return fmtTime(s)
-  const mn = Math.floor(s / 60)
-  const sec = Math.round(s % 60)
-  return `${mn}:${String(sec).padStart(2, '0')}`
-}
+// fmtTime, fmtL, fmtDuree : game/formats.ts (le relevé de la descente les partage)
 
 // ---- Moteur physique : les noyaux WASM (public/noyaux.wasm), chargés en
 // arrière-plan. Choix mémorisé (sujet21-moteur) : WASM par défaut quand le
@@ -8109,6 +8104,7 @@ async function openEditor(): Promise<LevelEditor | null> {
   const ed = await chargeEditeur()
   if (!ed) return null
   overlay.classList.remove('visible')
+  if (mbFinOuverte()) fermeMiseEnBonbonne() // la scène de fin remplace l'overlay
   document.body.classList.remove('playing')
   // l'éditeur a la main : le jeu se met en PAUSE derrière lui — la physique
   // ne tourne plus dans son dos (« Essayer » relance, quitter rend la fiche)
@@ -8158,6 +8154,7 @@ async function openEditeurCarte(): Promise<EditeurCarte | null> {
   const ec = await chargeEditeurCarte()
   if (!ec) return null
   overlay.classList.remove('visible')
+  if (mbFinOuverte()) fermeMiseEnBonbonne() // la scène de fin remplace l'overlay
   document.body.classList.remove('playing')
   input.paused = true
   ec.open()
@@ -14938,6 +14935,7 @@ let mbBilanCourant: BilanSalle | null = null
 /** Le sas mène à la salle suivante (raccourci éventuel compris). */
 function avanceSalle(): void {
   overlay.classList.remove('visible')
+  if (mbFinOuverte()) fermeMiseEnBonbonne() // la scène de fin remplace l'overlay
   const premiere = premiereSalleDeLaRun
   premiereSalleDeLaRun = false
   // la salle GÉNÉRÉE élue s'INTERCALE : elle prend la place du rang suivant
@@ -15050,6 +15048,11 @@ function fermeMiseEnBonbonne(): void {
   mbVeil.hidden = true
   mbScene.classList.remove('mb-large', 'mb-compact', 'mb-secousse', 'mb-question')
   mbEl('mb-palier-eclair').hidden = true
+  // la scène de fin rend le voile tel qu'elle l'a trouvé : ni image, ni
+  // mise en page pleine hauteur pour la cérémonie suivante
+  mbVeil.classList.remove('mb-fin-descente')
+  delete mbVeil.dataset.issue
+  mbEl('mb-fin-vue').hidden = true
   mbFeu.vide()
   miseEnBonbonne = false
   mbBilanCourant = null
@@ -17483,6 +17486,142 @@ function mbMontreFin(): void {
   host.appendChild(btn)
 }
 
+/** La scène de fin est-elle à l'écran ? Son levier, et tout ce qui retirait
+ *  l'overlay qu'elle remplace (relancer une salle, ouvrir un éditeur, quitter
+ *  la descente), la ferment. */
+function mbFinOuverte(): boolean {
+  return miseEnBonbonne && mbVeil.classList.contains('mb-fin-descente')
+}
+
+/** LE RELEVÉ DE LA RUN EN COURS, tel que la scène de fin l'écrit — rien que
+ *  des chiffres que la run tient déjà (game/finDescente.ts). La longueur est
+ *  celle du rail et du bilan de module, pas la taille de la bibliothèque. */
+function releveDeLaRun(): ReleveDescente {
+  return releveDescente({
+    salles: voieRang,
+    total: longueurRun(),
+    livreL: run.livreTotal,
+    dureeS: run.runTime,
+    instruments: run.instruments.length,
+    memoireGagnee: run.memoireGagnee,
+    palier: paliersAtteints(run.xp),
+  })
+}
+
+/** LES FINS DE PARTIE : la descente bouclée, la défaite définitive, la
+ *  reprise sur un échantillon de secours. Elles étaient un #overlay brut —
+ *  un titre, un paragraphe gris, un bouton, le même pour avoir tout gagné et
+ *  pour avoir tout perdu. Ce sont des scènes du voile : l'image rendue en
+ *  fond (la capsule qui part, la fiole brisée ; la reprise n'en a pas, ce
+ *  n'est pas une fin), la poutre, le relevé en sceau et en cartouches, puis
+ *  UN levier qui a le focus — clic, toucher, Entrée, Espace, A. `suite` est
+ *  ce que faisait le bouton de l'overlay (resetAction). La cinématique joue
+ *  avant : l'appelant attend qu'elle finisse. `tampons` : les records que
+ *  la descente vient de battre. */
+function mbMontreFinDescente(issue: IssueDescente, r: ReleveDescente, suite: () => void, tampons: readonly string[] = []): void {
+  // l'heure d'ouverture : le levier ne répond qu'une fois paru (levierFinPret)
+  const ouvertA = performance.now()
+  // un minuteur d'une étape précédente ne tombe pas sur la scène de fin
+  for (const t of mbTimers) clearTimeout(t)
+  mbTimers.length = 0
+  miseEnBonbonne = true
+  mbEtape = 'fin'
+  mbBilanCourant = null
+  mbDraftsRestants = 0
+  mbVeil.hidden = false
+  mbVeil.classList.add('mb-fin-descente')
+  mbVeil.dataset.issue = issue
+  mbFeuDimensionne()
+  mbScene.classList.remove('mb-compact', 'mb-large', 'mb-secousse', 'mb-question')
+  mbScene.scrollTop = 0
+  mbReleveHors()
+  mbEl('mb-etal').hidden = true
+  mbEl('mb-passer').hidden = true
+  mbEl('mb-palier-eclair').hidden = true
+  mbEl('mb-choix').hidden = false
+  // le sceau du module se teinte : l'or de la bouclée, le rouge du figé
+  mbVeil.style.setProperty('--mb-rang', rangDeSalle(issue === 'bouclee' ? 1 : 0).teinte)
+  // L'IMAGE RENDUE : une image absente ou en échec se cache — reste le fond
+  // du voile, la scène se lit pareil
+  const vue = mbEl('mb-fin-vue')
+  const img = vue.querySelector('img') as HTMLImageElement
+  if (issue === 'reprise') vue.hidden = true
+  else {
+    img.hidden = false
+    img.onerror = () => {
+      img.hidden = true
+    }
+    img.src = SCENES_FIN[issue]
+    vue.hidden = false
+  }
+  const { sur, titre, contexte } = titresFin(issue, vide.prise)
+  mbEl('mb-sur').textContent = sur
+  mbEl('mb-titre').textContent = titre
+  const host = mbCartes()
+  mbEl('mb-choix-titre').textContent = contexte
+  // le palmarès est celui du poste, cette descente comprise ; le butin, les
+  // instruments emportés (un instrument retiré du catalogue ne s'affiche pas)
+  const palm = issue === 'bouclee' ? chargePalmaresVoie() : null
+  host.innerHTML = finDescenteHTML({
+    issue,
+    releve: r,
+    butin: run.instruments.map((i) => carteDef(i)).filter((d): d is InstrumentDef => d !== null),
+    tampons,
+    palmares: palm ? { bouclees: palm.bouclees, profondeurRecord: palm.profondeurRecord, meilleurLivre: fmtL(palm.meilleurLivre) } : null,
+    purgeCl: issue === 'bouclee' ? condensat : null,
+    secours: run.vies - 1,
+  })
+  const btn = document.createElement('button')
+  btn.type = 'button'
+  btn.className = 'mb-levier mb-fin-levier'
+  btn.textContent = levierFin(issue, levelIndex + 1)
+  btn.addEventListener('click', () => {
+    if (btn.disabled) return
+    // UN GESTE EN RAFALE NE SAUTE PAS LA SCÈNE : Entrée ou Espace, qui
+    // faisaient avancer la cinématique, pressaient le levier encore
+    // invisible. Il ne répond qu'une fois paru (finDescente.ts).
+    if (!levierFinPret(performance.now(), ouvertA, sansAnimation())) return
+    btn.disabled = true
+    sonCeremonie('levier')
+    suite()
+  })
+  host.appendChild(btn)
+  btn.focus({ preventScroll: true })
+  // LA CHORÉGRAPHIE, calée sur la feuille (index.html, « LES FINS DE
+  // PARTIE ») : le sceau tombe à 0,5 s et touche vers 0,84 s (55 % de ses
+  // 0,62 s), les cartouches claquent à 1 s puis toutes les 120 ms, le
+  // tampon RECORD sur le sceau à 1,6 s (il touche vers 1,85 s), le levier
+  // paraît à 1,2 s. Sans animation, tout est posé d'emblée : un seul choc.
+  const apres = (ms: number, fn: () => void): void => {
+    mbTimers.push(window.setTimeout(() => {
+      if (mbFinOuverte()) fn()
+    }, ms))
+  }
+  const sceau = host.querySelector('.mb-fin-sceau')
+  if (sansAnimation()) {
+    sonCeremonie(sceau ? 'sceau' : 'cartouche', 0.8)
+    return
+  }
+  if (sceau)
+    apres(840, () => {
+      sonCeremonie('sceau', issue === 'bouclee' ? 1 : 0.7)
+      mbSecousse(issue === 'bouclee' ? 0.9 : 0.5)
+      if (issue === 'bouclee') {
+        mbFlash()
+        mbEclate(sceau, { n: 110, teintes: [...MB_OR, '#eaf6ff'], vitesse: 520, gravite: 460, forme: 'confetti', duree: 1.6, taille: 6 })
+      }
+    })
+  const nCartouches = host.querySelectorAll('.mb-cartouche').length
+  for (let i = 0; i < nCartouches; i++) apres((sceau ? 1200 : 600) + 120 * i, () => sonCeremonie('cartouche', 0.5))
+  const premierTampon = host.querySelector('.mb-fin-tampon')
+  if (premierTampon)
+    apres(1850, () => {
+      sonCeremonie('sceau', 0.8)
+      bande.ponctuation('sting-record', 0.55)
+      mbEclate(premierTampon, { n: 46, teintes: MB_OR, vitesse: 360, gravite: 520, forme: 'confetti', duree: 1.3, taille: 5 })
+    })
+}
+
 function montreMiseEnBonbonne(b: BilanSalle): void {
   miseEnBonbonne = true
   mbEtape = 'bilan'
@@ -17870,6 +18009,9 @@ function restart(): void {
   resetLasers()
   loop.reset()
   overlay.classList.remove('visible')
+  // la scène de fin remplace l'overlay : une salle relancée depuis la fiche
+  // (Échap pendant la scène) la laissait par-dessus, le jeu figé sous le voile
+  if (mbFinOuverte()) fermeMiseEnBonbonne()
   // les déclencheurs (cinématiques, séquences) se réarment à chaque essai
   cinesVues.clear()
   // la mise en scène repart de zéro : lampes rendues, brèches refermées
@@ -18174,28 +18316,24 @@ function afficheDispersion(): void {
   dispersionDelai = 0
   if (run.vies > 1) {
     ecranDispersion = 'relance'
-    showOverlay(
-      vide.prise ? 'ÉCHANTILLON ASPIRÉ PAR LE VIDE' : 'ÉCHANTILLON DISPERSÉ',
-      `Le laboratoire engage un échantillon de secours — il en restera ${run.vies - 1}. Reprise à la première goutte de la salle.`,
-      'danger',
-      `REPRENDRE — SALLE ${levelIndex + 1}`,
-    )
+    // la reprise n'est pas une fin : une scène du voile, sans image, qui
+    // dit les secours qui restent ; le levier fait ce que faisait le bouton
+    mbMontreFinDescente('reprise', releveDeLaRun(), resetAction)
     return
   }
   // dernier échantillon : GAME OVER — la sauvegarde de la principale
   // s'efface (la run est perdue), la secondaire n'y touche pas
   ecranDispersion = 'fin'
   effaceRun()
-  // LE SCÉNARIO : la cinématique de défaite, par-dessus l'écran de fin
-  void joueMoment('run-perdue')
-  showOverlay(
-    'ÉCHANTILLON PERDU — FIN DE LA RUN',
-    vide.prise
-      ? `Le vide a emporté le dernier échantillon. Le laboratoire vous rappelle.`
-      : `La dispersion a eu raison du dernier échantillon. Le laboratoire vous rappelle.`,
-    'danger',
-    'RETOUR AU LABO',
-  )
+  // LE SCÉNARIO : la cinématique de défaite joue d'abord ; la scène de fin
+  // vient APRÈS elle (sans cinématique, tout de suite). Le relevé se lit
+  // maintenant : la run n'est purgée qu'au retour au labo. Si l'écran a
+  // changé pendant la cinématique (quitter la descente), la scène ne vient pas.
+  const r = releveDeLaRun()
+  const ouvre = (): void => {
+    if (ecranDispersion === 'fin' && !mbFinOuverte()) mbMontreFinDescente('perdue', r, resetAction)
+  }
+  void joueMoment('run-perdue').then(ouvre, ouvre)
 }
 
 /** QUITTER LA DESCENTE : la partie s'arrête et l'on revient au MENU (pas au
@@ -18207,6 +18345,7 @@ function quitteAuMenu(): void {
   effaceRun()
   ecranDispersion = 'aucun'
   overlay.classList.remove('visible')
+  if (mbFinOuverte()) fermeMiseEnBonbonne() // la scène de fin remplace l'overlay
   // l'état de descente se remet à zéro sans passer par le module
   voieIntercalaire = null
   voieGenereeChoisie = null
@@ -18243,6 +18382,11 @@ function quitteAuMenu(): void {
 // En mode prototype (21-A bis) : l'essai conclu ramène au protocole, la
 // dispersion remet l'échantillon en cuve pour un nouvel essai du bis.
 function resetAction(): void {
+  // LA SCÈNE DE FIN tient le voile (la cérémonie se tait) : son levier la
+  // ferme d'abord, puis fait ce que le bouton annonçait. R aussi, mais
+  // seulement si le focus a quitté le voile : input.ts laisse au voile les
+  // touches qui le visent (cibleHorsJeu), et le levier y a le focus
+  if (mbFinOuverte()) fermeMiseEnBonbonne()
   if (miseEnBonbonne) return // la mise en bonbonne se conclut par une carte
   if (testLevel) {
     if (run.ended) {
@@ -19240,11 +19384,6 @@ function showOverlay(
     overlay.classList.add('end')
     overlayBtn.textContent = btn
   }
-}
-
-// Bilan d'expédition : la phrase que le tampon raconte au protocole
-function expeditionSummary(tableauxDone: number): string {
-  return `${tableauxDone}/${playedLevels().length} salles · 💧 ${fmtL(run.livreTotal)} · ⏱ ${fmtDuree(run.runTime)}`
 }
 
 let lastTime = performance.now()
@@ -20691,46 +20830,30 @@ function corpsImage(now: number): boolean {
           }
         })
       // le palmarès de la voie : la descente est BOUCLÉE
-      let voieNeuf = ''
+      let voieNeuf = false
       if (!sasOutil) {
         const p = chargePalmaresVoie()
         p.bouclees += 1
         if (run.livreTotal > p.meilleurLivre) {
           p.meilleurLivre = run.livreTotal
-          voieNeuf = ' — <em class="bilan-neuf">MEILLEURE DESCENTE ✦</em>'
+          voieNeuf = true
         }
         sauvePalmaresVoie(p)
       }
       renderRegistres()
       // l'expédition principale conclue n'a plus rien à reprendre
       if (!testLevel) effaceRun()
-      // LE SCÉNARIO : la cinématique de fin d'expédition, sur le bilan
-      void joueMoment('expedition-achevee')
-      const palm = chargePalmaresVoie()
-      // le BUTIN de la descente : ce que la run a réellement rapporté — les
-      // instruments emportés (leurs glyphes), les paliers d'étalonnage, le
-      // condensat nourri (chaque centilitre livré en a versé un)
-      const glyphes = run.instruments
-        .map((i) => carteDef(i)?.icone ?? '')
-        .filter(Boolean)
-        .join(' ')
-      const butinVoie =
-        `<br>Butin de la descente : ` +
-        `${run.instruments.length > 0 ? `${glyphes} ${run.instruments.length} instrument(s)` : 'aucun instrument'} · ` +
-        `palier de maîtrise ${paliersAtteints(run.xp)} · ` +
-        `+${run.memoireGagnee} MÉMOIRE gravée — la purge confisque le condensat restant (${condensat} cL).`
-      showOverlay(
-        'LA DESCENTE EST BOUCLÉE',
-        `<span class="bilan"><span class="bilan-l">${expeditionSummary(sallesFranchies)}${voieNeuf}${
-          exp.newRecord
-            ? ' — <em class="bilan-neuf">MEILLEURE EXPÉDITION ✦</em>'
-            : ''
-        }</span></span>` +
-          `Descente de ${sallesFranchies} salles, du premier sas au dernier.${butinVoie}<br>` +
-          `Palmarès du poste : ${palm.bouclees} bouclée(s) · profondeur record ${palm.profondeurRecord} · meilleur livré ${fmtL(palm.meilleurLivre)}.`,
-        'success',
-        'RETOUR AU LABO',
-      )
+      // LE SCÉNARIO : la cinématique de fin d'expédition joue d'abord ; la
+      // scène de fin vient APRÈS elle — le relevé (salles, litres, durée,
+      // instruments, mémoire, palier), le butin en icônes, les records
+      // tamponnés, le palmarès du poste et la purge. Le relevé se lit
+      // maintenant : la run n'est purgée qu'au retour au labo.
+      const releve = releveDeLaRun()
+      const tampons = [voieNeuf ? 'MEILLEURE DESCENTE' : '', exp.newRecord ? 'MEILLEURE EXPÉDITION' : ''].filter(Boolean)
+      const ouvreFin = (): void => {
+        if (run.ended && !mbFinOuverte()) mbMontreFinDescente('bouclee', releve, resetAction, tampons)
+      }
+      void joueMoment('expedition-achevee').then(ouvreFin, ouvreFin)
     } else {
       renderRegistres()
       run.conclues += 1

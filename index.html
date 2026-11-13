@@ -9529,6 +9529,128 @@
         .mb-pli .crt-draft { gap: 5px; padding: 10px 12px 8px; }
         .mb-pli .crt-ico { font-size: calc(32px * var(--ui)); }
       }
+      /* ---- LES FINS DE PARTIE : la descente bouclée — le plus grand moment
+         du jeu —, la défaite définitive et la reprise. Elles s'affichaient
+         dans #overlay : un rectangle, un paragraphe gris, un bouton, le même
+         pour avoir tout gagné et pour avoir tout perdu. Ce sont des scènes du
+         voile, et L'IMAGE EST LA SCÈNE (16:9, son tiers bas laissé sombre
+         exprès) : la poutre porte le titre en haut, le relevé tient en UNE
+         rangée dans le tiers bas — le sceau du module (les salles, le tampon
+         RECORD posé dessus), cinq cartouches, le butin en icônes — puis le
+         levier. Le palmarès du poste est dans l'infobulle du sceau. Première
+         version : relevé, tampons et palmarès sur trois rangs couvraient la
+         moitié basse de l'image (y 330 → 689 sur 720, relecture du lot E). ---- */
+      .mb-fin-vue {
+        position: absolute; inset: 0; z-index: 1; overflow: hidden; pointer-events: none;
+        background: #000;
+        animation: mb-fin-vue 2.4s cubic-bezier(0.2, 0.7, 0.3, 1) backwards;
+      }
+      .mb-fin-vue[hidden], .mb-fin-vue img[hidden] { display: none; }
+      /* l'image ENTIÈRE, sur le noir de l'espace qui la borde : à 16:10
+         (Steam Deck), « cover » rognait 71 px de chaque côté et coupait le
+         nez de la capsule */
+      .mb-fin-vue img { display: block; width: 100%; height: 100%; object-fit: contain; }
+      /* le haut garde l'image, le bas s'assombrit encore sous le relevé */
+      .mb-fin-vue::after {
+        content: ''; position: absolute; inset: 0;
+        background: linear-gradient(180deg, rgba(2, 5, 10, 0.4) 0%, transparent 16%, transparent 58%, rgba(2, 5, 10, 0.7) 76%, rgba(2, 5, 10, 0.88) 100%);
+      }
+      @keyframes mb-fin-vue {
+        from { opacity: 0; transform: scale(1.06); }
+      }
+      /* la scène prend toute la hauteur : la poutre en haut, le relevé en bas */
+      #mb-veil.mb-fin-descente .mb-scene {
+        align-self: stretch; box-sizing: border-box; height: 100%; max-height: 100vh; margin-top: 0;
+        padding-top: clamp(10px, 4vh, 36px); padding-bottom: clamp(12px, 4vh, 32px);
+      }
+      /* le titre tient sur UNE ligne de la poutre : à 34 px entre deux bandes
+         de 96 px, « LA DESCENTE EST BOUCLÉE » se cassait en deux (banc, 1280) */
+      #mb-veil.mb-fin-descente .mb-banniere.mb-poutre { --mb-bande: 56px; width: min(100%, 1040px); }
+      #mb-veil.mb-fin-descente .mb-titre { font-size: calc(clamp(18px, 2.3vw, 30px) * var(--ui)); }
+      #mb-veil.mb-fin-descente .mb-choix { margin-top: auto; }
+      /* la reprise n'a pas d'image : son relevé se tient au milieu */
+      #mb-veil[data-issue='reprise'] .mb-choix { margin-bottom: auto; }
+      #mb-veil.mb-fin-descente .mb-choix-titre { margin-bottom: 8px; color: var(--mb-texte); }
+      /* la bouclée n'a pas de ligne de contexte : l'image et le titre suffisent */
+      #mb-veil.mb-fin-descente .mb-choix-titre:empty { display: none; }
+      #mb-veil[data-issue='bouclee'] .mb-titre { text-shadow: 0 0 26px rgba(255, 217, 119, 0.55); }
+      #mb-veil[data-issue='perdue'] .mb-titre,
+      #mb-veil[data-issue='reprise'] .mb-titre { text-shadow: 0 0 26px rgba(224, 104, 92, 0.55); }
+      .mb-fin { grid-column: 1 / -1; min-width: 0; }
+      /* LA RANGÉE : le sceau, les cartouches, le butin */
+      .mb-fin-releve { display: flex; align-items: center; justify-content: center; gap: 14px; width: 100%; }
+      .mb-fin-salles {
+        position: relative; margin: 0; flex: none;
+        display: flex; flex-direction: column; align-items: center; gap: 6px;
+      }
+      /* le sceau tombe le premier, quand l'image s'est posée */
+      .mb-fin-sceau { --mb-sceau-l: 88px; animation-delay: 0.5s; }
+      .mb-fin-sceau-img { display: grid; place-items: center; width: 100%; height: 100%; }
+      .mb-fin-salles figcaption {
+        font-family: var(--font-display); font-size: calc(10px * var(--ui)); letter-spacing: 0.36em;
+        color: var(--mb-texte-second);
+      }
+      .mb-fin-chiffres {
+        flex: 1 1 auto; min-width: 0;
+        display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 8px;
+      }
+      /* des cartouches de rangée : l'alvéole et le chiffre resserrés, pour
+         que cinq tiennent de front avec le sceau et le butin */
+      .mb-fin .mb-cartouche { padding: 8px 14px 8px 9px; column-gap: 9px; animation-delay: calc(1s + var(--i, 0) * 0.12s); }
+      .mb-fin .mb-cartouche-alv { width: 40px; height: 35px; font-size: 26px; }
+      .mb-fin .mb-cartouche-val { font-size: calc(18px * var(--ui)); }
+      .mb-fin-reprise .mb-fin-releve > .mb-cartouche { flex: 0 1 260px; }
+      .mb-fin-reprise .mb-cartouche { animation-delay: calc(0.4s + var(--i, 0) * 0.12s); }
+      /* LE BUTIN : les instruments emportés, en icônes rendues, sur deux rangs */
+      .mb-fin-butin {
+        flex: none; display: grid; grid-auto-flow: column; grid-template-rows: repeat(2, auto); gap: 4px;
+        font-size: calc(26px * var(--ui)); line-height: 1;
+        animation: mb-monte 0.5s 1.6s ease-out backwards;
+      }
+      /* LE TAMPON : un record battu se tamponne en or (ce qui luit), posé
+         de biais sur le HAUT du sceau — au milieu, il cachait les salles
+         (vu au banc) ; les records nommés sont dans son infobulle */
+      .mb-fin-tampon {
+        position: absolute; z-index: 3; left: 50%; top: 9%;
+        padding: 3px 9px; border: 2px solid var(--mb-or); transform: translate(-50%, -50%) rotate(-14deg);
+        font-style: normal; font-family: var(--font-display); font-size: calc(11px * var(--ui)); letter-spacing: 0.3em;
+        color: var(--mb-or); background: rgba(7, 16, 24, 0.72); text-shadow: 0 0 14px rgba(255, 217, 119, 0.6);
+        box-shadow: 0 0 18px rgba(255, 217, 119, 0.22), inset 0 0 12px rgba(255, 217, 119, 0.14);
+        animation: mb-fin-tampon 0.5s 1.6s cubic-bezier(0.2, 1.5, 0.3, 1) backwards;
+      }
+      @keyframes mb-fin-tampon {
+        from { opacity: 0; transform: translate(-50%, -50%) scale(2.2) rotate(-28deg); }
+      }
+      /* le levier paraît à 1,2 s (LEVIER_FIN_MS, finDescente.ts), pendant que
+         les cartouches claquent ; il a le focus dès l'ouverture mais ne
+         répond qu'une fois paru (levierFinPret) */
+      .mb-fin-levier { grid-column: 1 / -1; justify-self: center; min-width: min(360px, 100%); animation-delay: 1.2s; }
+      @media (max-width: 760px) {
+        /* un téléphone debout : la bande 16:9 remonte au-dessus du relevé,
+           qui s'empile sur trois rangs */
+        .mb-fin-vue img { object-position: 50% 25%; }
+        .mb-fin-releve { flex-wrap: wrap; gap: 10px; }
+        .mb-fin-chiffres { flex-basis: 100%; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+        #mb-veil.mb-fin-descente .mb-banniere.mb-poutre { --mb-bande: 36px; }
+      }
+      /* LE TÉLÉPHONE COUCHÉ (844 × 390) : tout se resserre — le surtitre
+         s'efface, le sceau et les cartouches rapetissent */
+      @media (max-height: 560px) and (min-width: 761px) {
+        #mb-veil.mb-fin-descente .mb-scene { gap: 6px; padding-top: 6px; padding-bottom: 8px; }
+        #mb-veil.mb-fin-descente .mb-banniere.mb-poutre { min-height: 0; padding-top: 4px; padding-bottom: 4px; }
+        #mb-veil.mb-fin-descente .mb-sur { display: none; }
+        .mb-fin-releve { gap: 8px; }
+        .mb-fin-sceau { --mb-sceau-l: 64px; }
+        .mb-fin-chiffres { gap: 5px; }
+        .mb-fin .mb-cartouche { padding: 5px 10px 5px 6px; column-gap: 6px; }
+        .mb-fin .mb-cartouche-alv { width: 28px; height: 24px; font-size: 18px; }
+        .mb-fin .mb-cartouche-val { font-size: calc(14px * var(--ui)); }
+        .mb-fin-butin { font-size: 20px; }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        /* l'image, le butin et le tampon sont d'emblée posés */
+        .mb-fin-vue, .mb-fin-butin, .mb-fin-tampon { animation: none; }
+      }
       /* ---- MOINS D'ANIMATIONS : le jeu reste le même, sans le spectacle.
          Chaque mise en scène retombe sur son état final. ---- */
       @media (prefers-reduced-motion: reduce) {
@@ -11327,6 +11449,10 @@
          instant aux grands moments. main.ts remplit et enchaîne. -->
     <div id="mb-veil" hidden aria-label="Mise en bonbonne">
       <div class="mb-fond" aria-hidden="true"></div>
+      <!-- LA SCÈNE DE FIN : l'image rendue dans Blender (la capsule qui part,
+           la fiole brisée) couvre l'écran derrière le relevé — main.ts y
+           pose SCENES_FIN[issue] ; fermeMiseEnBonbonne la recache -->
+      <div class="mb-fin-vue" id="mb-fin-vue" hidden aria-hidden="true"><img alt="" draggable="false"></div>
       <canvas class="mb-feu" id="mb-feu" aria-hidden="true"></canvas>
       <div class="mb-flash" id="mb-flash" aria-hidden="true"></div>
       <div class="mb-scene" id="mb-scene">

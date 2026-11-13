@@ -585,26 +585,61 @@
     host.appendChild(btn)
   }
 
-  // ---- HORS CÉRÉMONIE : #overlay (main.ts:18911 showOverlay ; 20404 fin de run, 17873 défaite) ----
-  function overlay(quoi) {
-    veil.hidden = true
-    const o = $('overlay')
-    o.style.zIndex = '2147483647'
-    o.classList.remove('success', 'danger', 'end')
-    if (quoi === 'bouclee') {
-      $('overlay-title').textContent = 'LA DESCENTE EST BOUCLÉE'
-      $('overlay-sub').innerHTML = `<span class="bilan"><span class="bilan-l">18/18 salles · 💧 61,40 L · ⏱ 24:12 — <em class="bilan-neuf">MEILLEURE DESCENTE ✦</em></span></span>` +
-        `Descente de 18 salles, du premier sas au dernier.<br>Butin de la descente : ${['aimant-rosee', 'croc-du-sas', 'ration-de-survie'].map((id) => F.INSTRUMENTS.find((d) => d.id === id)?.icone ?? '').join(' ')} 3 instrument(s) · palier de maîtrise 4 · +86 MÉMOIRE gravée — la purge confisque le condensat restant (1890 cL).<br>` +
-        `Palmarès du poste : 2 bouclée(s) · profondeur record 18 · meilleur livré 61,40 L.`
-      o.classList.add('visible', 'success', 'end')
-      $('overlay-btn').textContent = 'RETOUR AU LABO'
-    } else {
-      $('overlay-title').textContent = 'ÉCHANTILLON PERDU — FIN DE LA RUN'
-      $('overlay-sub').textContent = 'La dispersion a eu raison du dernier échantillon. Le laboratoire vous rappelle.'
-      o.classList.add('visible', 'danger', 'end')
-      $('overlay-btn').textContent = 'RETOUR AU LABO'
+  // ---- LES FINS DE PARTIE (main.ts mbMontreFinDescente ; ses appels :
+  // afficheDispersion pour la reprise et la défaite, la fin de descente
+  // bouclée) — les gabarits sont ceux de game/finDescente.ts, tels quels ----
+  const FINS = {
+    bouclee: { salles: 18, total: 18, livreL: 61.4, dureeS: 1452, butin: ['aimant-rosee', 'croc-du-sas', 'ration-de-survie', 'filtre-a-condensat'], memoire: 86, palier: 4, vies: 1, salle: 18 },
+    perdue: { salles: 7, total: 18, livreL: 14.2, dureeS: 581, butin: ['buse-calibree', 'oeilleres'], memoire: 38, palier: 2, vies: 1, salle: 8 },
+    reprise: { salles: 5, total: 18, livreL: 9.6, dureeS: 402, butin: ['ballast'], memoire: 24, palier: 1, vies: 3, salle: 6 },
+  }
+  function finDescente(issue) {
+    const d = FINS[issue]
+    const butin = d.butin.map((id) => F.INSTRUMENTS.find((x) => x.id === id)).filter(Boolean)
+    const r = F.releveDescente({ salles: d.salles, total: d.total, livreL: d.livreL, dureeS: d.dureeS, instruments: butin.length, memoireGagnee: d.memoire, palier: d.palier })
+    const tampons = issue === 'bouclee' ? ['MEILLEURE DESCENTE'] : []
+    // main.ts mbMontreFinDescente
+    ouvre()
+    veil.classList.add('mb-fin-descente')
+    veil.dataset.issue = issue
+    scene.scrollTop = 0
+    $('mb-releve').hidden = true
+    $('mb-etal').hidden = true
+    $('mb-passer').hidden = true
+    $('mb-palier-eclair').hidden = true
+    $('mb-choix').hidden = false
+    veil.style.setProperty('--mb-rang', F.rangDeSalle(issue === 'bouclee' ? 1 : 0).teinte)
+    const vue = $('mb-fin-vue')
+    const img = vue.querySelector('img')
+    if (issue === 'reprise') vue.hidden = true
+    else {
+      img.hidden = false
+      img.onerror = () => { img.hidden = true }
+      img.src = F.SCENES_FIN[issue]
+      vue.hidden = false
     }
+    const { sur, titre, contexte } = F.titresFin(issue, false)
+    $('mb-sur').textContent = sur
+    $('mb-titre').textContent = titre
+    const host = cartes()
+    $('mb-choix-titre').textContent = contexte
+    const palm = issue === 'bouclee' ? { bouclees: 2, profondeurRecord: 18, meilleurLivre: 61.4 } : null
+    host.innerHTML = F.finDescenteHTML({
+      issue,
+      releve: r,
+      butin,
+      tampons,
+      palmares: palm ? { bouclees: palm.bouclees, profondeurRecord: palm.profondeurRecord, meilleurLivre: F.fmtL(palm.meilleurLivre) } : null,
+      purgeCl: issue === 'bouclee' ? 1890 : null,
+      secours: d.vies - 1,
+    })
+    const btn = document.createElement('button')
+    btn.type = 'button'
+    btn.className = 'mb-levier mb-fin-levier'
+    btn.textContent = F.levierFin(issue, d.salle)
+    host.appendChild(btn)
+    btn.focus({ preventScroll: true })
   }
 
-  window.POSE = { vocabulaire, bilan, versement, etalonnage, draft, salles, module, carte, repos, don, cache, evenement, minijeu, fin, overlay, feu, fige, MB_OR, MB_MENTHE, MB_EAU, RUN }
+  window.POSE = { vocabulaire, bilan, versement, etalonnage, draft, salles, module, carte, repos, don, cache, evenement, minijeu, fin, finDescente, feu, fige, MB_OR, MB_MENTHE, MB_EAU, RUN }
 })()

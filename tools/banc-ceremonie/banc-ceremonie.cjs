@@ -66,8 +66,10 @@ const PRISES = [
   ['15-cache', 'cache', null, null, 1500],
   ['16-minijeu', 'minijeu', null, null, 1500],
   ['17-fin-ordinaire', 'fin', null, null, 1500],
-  ['18-overlay-descente-bouclee', 'overlay', 'bouclee', null, 1200],
-  ['19-overlay-defaite', 'overlay', 'defaite', null, 1200],
+  ['18-fin-bouclee', 'finDescente', 'bouclee', null, 3000],
+  ['18b-fin-bouclee-sceau-t900ms', 'finDescente', 'bouclee', 'finSceau', 0],
+  ['19-fin-perdue', 'finDescente', 'perdue', null, 3000],
+  ['20-fin-reprise', 'finDescente', 'reprise', null, 2000],
 ]
 
 // les instants figés : chaque règle donne l'âge (ms) des animations ciblées,
@@ -111,6 +113,12 @@ function prepare(quoi, M, O) {
   } else if (quoi === 'sceau') {
     P.fige([['.mb-module, .mb-module *', 350], ['.mb-continuer', 350], ['.mb-choix', 350]], 900)
     P.feu([{ el: $('.mb-module-sceau'), age: 0.35, r: { n: 70, teintes: [...M, ...O], vitesse: 420, gravite: 480, forme: 'confetti', duree: 1.4, taille: 6 } }])
+  } else if (quoi === 'finSceau') {
+    // le sceau du module touche (0,5 s de retard + 55 % de ses 0,62 s) : le
+    // feu d'or que main.ts y jette, et le flash
+    document.getElementById('mb-flash').classList.add('mb-on')
+    P.fige([['.mb-flash', 60]], 900)
+    P.feu([{ el: $('.mb-fin-sceau'), age: 0.06, r: { n: 110, teintes: [...O, '#eaf6ff'], vitesse: 520, gravite: 460, forme: 'confetti', duree: 1.6, taille: 6 } }])
   } else if (quoi === 'defile') {
     const s = document.getElementById('mb-scene'); s.scrollTop = s.scrollHeight
   }
@@ -122,7 +130,23 @@ function mesure() {
   if (veil.hidden) return { veil: 'caché' }
   const vis = [...s.querySelectorAll('button, .mb-cartouche, .mb-ligne, .mb-coeur')].filter((e) => e.offsetParent)
   const bas = vis.length ? Math.round(Math.max(...vis.map((e) => e.getBoundingClientRect().bottom))) : 0
+  // L'EMPRISE D'UNE SCÈNE DE FIN : l'image est la scène, le relevé (et sa
+  // ligne de contexte) doit tenir dans le tiers bas — son haut à 66 % de
+  // l'écran ou plus bas (relecture du lot E), quand il y a une image
+  const fin = s.querySelector('.mb-fin')
+  let emprise
+  if (fin) {
+    const ctx = document.getElementById('mb-choix-titre')
+    const hauts = [fin.getBoundingClientRect().top]
+    if (ctx.offsetParent && ctx.textContent) hauts.push(ctx.getBoundingClientRect().top)
+    const haut = Math.min(...hauts)
+    // la reprise n'a pas d'image : son relevé se tient au milieu, exprès
+    const image = !document.getElementById('mb-fin-vue').hidden
+    emprise = `${Math.round(haut)}/${innerHeight} = ${(100 * haut / innerHeight).toFixed(1)} %` +
+      (!image ? ' (sans image : centré)' : haut < 0.66 * innerHeight ? ' TROP HAUT' : '')
+  }
   return {
+    ...(emprise ? { hautDuReleve: emprise } : {}),
     scene: `${s.scrollHeight}/${s.clientHeight}${s.scrollHeight > s.clientHeight + 1 ? ' DÉBORDE (défile)' : ''}`,
     basDuDernierBouton: bas,
     ecran: innerHeight,
