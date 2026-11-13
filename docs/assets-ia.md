@@ -755,7 +755,16 @@ matte finish, low contrast, uniform grain
 Négatif : négatif commun + `rust, hexagonal mesh, warped grid, uneven holes,
 large holes, bright reflections, panel border`
 
-### 18b. Le fond de cuve — `tank-bg.webp` ✗ À REFAIRE
+### 18b. Le fond de cuve — `tank-bg.webp` ✅ REDESSINÉ DANS BLENDER (13/11)
+
+> Plus de prompt à envoyer : le fond se dessine dans l'atelier
+> (`tools/images/blender/surfaces.py`, `cuve()`) — une ossature de cuve
+> d'essai : deux montants en I et une traverse par carreau, une baie au
+> hublot (lueur sarcelle de l'eau voisine) et à réglette graduée, une baie
+> à évent et boîtier de mesure, deux conduites qui traversent, le marquage
+> « CUVE 21 ». Mesuré à la livraison : luminance 0,11, raccord 0,5 / 1,0,
+> aucun chaud, 15 Ko. Le texte ci-dessous reste pour mémoire.
+
 **1024×1024 · tileable · pas de transparence · luminance visée 0,10 à 0,15**
 
 Le fond est ce qu'on voit sous l'eau : il doit rester **plus sombre que les
