@@ -636,7 +636,10 @@ if DANS_BLENDER:
     def lance_fins(sortie, echantillons=384, pourcent=100, noms=SCENES):
         """bâtit et rend les scènes une à une, par un minuteur (un rendu long
         coupait la liaison avec l'appelant, chaud_biome.py) ; écrit
-        <sortie>/<nom>.png, puis fini-fins.txt"""
+        <sortie>/<nom>.png, puis fini-fins.txt. Les réglages propres à une
+        scène (REGLAGES : la fiole débruitée, à 192 échantillons, à la taille
+        livrée) ne s'appliquent qu'à `pourcent=100` : un aperçu à un autre
+        pourcentage rend la fiole sans débruiteur, donc grêlée"""
         import time
         file = list(noms)
         fini = os.path.join(sortie, 'fini-fins.txt')

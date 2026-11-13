@@ -181,7 +181,7 @@ FAMILLES: list[Famille] = [
         note='le dos et le verre d’une cuve, le liquide passe entre les deux (ceremonieObjets.ts)',
     ),
     Famille(
-        # mesuré le 13/11 (qualité 84) : la capsule 39 Ko, luminance 0,06 ; la
+        # mesuré le 13/11 (qualité 84) : la capsule 29 Ko, luminance 0,06 ; la
         # fiole brisée 15 Ko, 0,04 ; aucune des deux n'a de pixel chaud (les
         # veilleuses ambre de la capsule sont des points) — le plafond de
         # chauds reprend celui de la charte, l'alerte rouge des cinématiques
