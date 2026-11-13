@@ -598,3 +598,71 @@ describe('la cérémonie — le bilan « SALLE FRANCHIE »', () => {
     expect(petit.slice(0, petit.indexOf('\n      }\n'))).toMatch(/\.mb-poutre \{ --mb-bande:/)
   })
 })
+
+// « MODULE TRAVERSÉ » (étape 5). La fin de module était une plaque arrondie
+// de tableau de bord : une coche dans un octogone menthe, des pastilles de
+// salle en rectangles à étoiles, des tuiles en deux colonnes et une pilule
+// qui respirait (inventaire, étape 7). Elle devient une scène de station :
+// le sceau du module en héros, une rangée de petits sceaux de rang (un par
+// salle, teinté de son régime), les gains en cartouches, un levier.
+describe('la cérémonie — « MODULE TRAVERSÉ »', () => {
+  it('pose le sceau du module en héros, et les gains en cartouches', () => {
+    expect(corps('mbMontreBilanModule')).toContain('cartoucheHTML(')
+    expect(corps('mbMontreBilanModule')).toContain("sceauHTML('module')")
+    expect(corps('mbMontreBilanModule')).not.toContain('mbGainHTML(')
+  })
+  it('range les salles en petits sceaux de rang teintés, avec le code et les litres', () => {
+    const f = corps('mbMontreBilanModule')
+    expect(f).toContain('sceauHTML(p.rang)')
+    expect(f).toMatch(/--mb-rang:\$\{p\.teinte\}/)
+    expect(f).toContain('p.code')
+    expect(f).toContain('p.litres')
+    // le régime se lit au sceau (et dans l'infobulle) : plus d'étoiles en texte
+    expect(f).not.toContain("'★'.repeat")
+  })
+  it('n’a plus ni émoji ni coche dans son gabarit', () => {
+    expect(corps('mbMontreBilanModule')).not.toMatch(/\p{Extended_Pictographic}|✓/u)
+  })
+  // le sceau rendu de cinq rangs est un acier neutre que --mb-rang teinte :
+  // sans teinte à lui, le sceau du module prendrait celle de la dernière
+  // salle, restée sur le voile
+  it('donne au sceau du module sa propre teinte', () => {
+    expect(regle('.mb-module-sceau')).toMatch(/--mb-rang:/)
+  })
+  it('se passe d’un geste : un levier focalisé, à sa voix', () => {
+    const f = corps('mbMontreBilanModule')
+    expect(f).toContain('mb-levier')
+    expect(f).not.toContain("'mb-continuer'")
+    expect(f).toMatch(/\.focus\(\{ preventScroll: true \}\)/)
+    expect(f).toContain("sonCeremonie('levier'")
+  })
+  // le geste qui ferme l'étape d'avant (A martelé, double clic, Entrée)
+  // trouverait le levier sous lui, focalisé : il sauterait le bilan du
+  // module sans qu'on l'ait vu. Une rafale saute une étape, pas deux.
+  it('ignore le geste qui vient de l’ouvrir', () => {
+    const f = corps('mbMontreBilanModule')
+    expect(f).toMatch(/const ouvertA = performance\.now\(\)/)
+    expect(f).toMatch(/gesteTropTot\(performance\.now\(\), ouvertA\)\) return/)
+  })
+  // le choc part à l'impact du sceau ; si le joueur a déjà passé, le
+  // minuteur ne fait plus rien (pas de flash ni de choc sur le plan)
+  it('fait sonner le sceau qui tombe, tant que l’étape est là', () => {
+    const f = corps('mbMontreBilanModule')
+    expect(f).toContain("sonCeremonie('sceau'")
+    expect(f).toMatch(/if \(mbEtape !== 'module'\) return/)
+  })
+  it('n’écrit plus d’étiquette sous 10 px', () => {
+    for (const s of ['.mb-module-total small', '.mb-module-nom small', '.mb-salle-code']) {
+      const t = /font-size:\s*calc\((\d+(?:\.\d+)?)px/.exec(regle(s))
+      expect(t, s).not.toBeNull()
+      expect(Number(t![1]), s).toBeGreaterThanOrEqual(10)
+    }
+  })
+  // six salles (le plus grand module de la station) tiennent sur une rangée
+  // à 1280 px — mesuré au banc ; un module plus long (l'éditeur n'a pas de
+  // plafond) passe à la ligne au lieu de pousser la scène de côté
+  it('garde ses petits sceaux à taille fixe, et passe à la ligne au-delà', () => {
+    expect(regle('.mb-salle-sceau')).toMatch(/--mb-sceau-l:\s*\d+px/)
+    expect(regle('.mb-module-salles')).toMatch(/flex-wrap:\s*wrap/)
+  })
+})

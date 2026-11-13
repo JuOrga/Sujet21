@@ -13,7 +13,7 @@
 // Une seule règle : l'écran ne dit que ce qui a été réellement crédité — le
 // même calcul sert au crédit et à l'affichage, ils ne peuvent plus diverger.
 
-import { rangDeSalle } from './ceremonie'
+import { rangDeSalle, type Rang } from './ceremonie'
 
 /** Un nombre à la française : la virgule, pas le point. */
 export function virgule(n: number, decimales = 2): string {
@@ -406,12 +406,13 @@ export function gainsDeModule(e: EntreeGainsModule): Gain[] {
 }
 
 /** La ligne des salles d'un module : une pastille par salle, à la teinte et
- *  au nom de son régime — le parcours se relit d'un regard. */
+ *  au nom de son régime — le parcours se relit d'un regard. La lettre du
+ *  rang choisit le petit sceau de la salle (la case de la planche). */
 export function pastillesDeSalles(
   r: RecolteModule,
-): { code: string; nom: string; teinte: string; etoiles: number; litres: string }[] {
+): { code: string; rang: Rang; nom: string; teinte: string; etoiles: number; litres: string }[] {
   return r.salles.map((s) => {
     const v = rangDeSalle(s.pct)
-    return { code: s.code, nom: v.nom, teinte: v.teinte, etoiles: v.etoiles, litres: `${virgule(s.litres)} L` }
+    return { code: s.code, rang: v.rang, nom: v.nom, teinte: v.teinte, etoiles: v.etoiles, litres: `${virgule(s.litres)} L` }
   })
 }

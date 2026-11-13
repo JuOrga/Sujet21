@@ -174,6 +174,12 @@ describe('la récolte d’un module', () => {
     ])
   })
 
+  // la fin de module pose un petit sceau par salle : il lui faut la lettre du
+  // rang (la case de la planche), pas seulement le nom et la teinte
+  it('donne à chaque salle la lettre de son sceau', () => {
+    expect(pastillesDeSalles(pleine()).map((p) => p.rang)).toEqual(['S', 'B'])
+  })
+
   it('se relit d’une sauvegarde, et repart à neuf si elle parle d’un autre module', () => {
     const r = pleine()
     expect(litRecolte(JSON.parse(JSON.stringify(r)), 'M1', ['x'], 9)).toEqual(r)

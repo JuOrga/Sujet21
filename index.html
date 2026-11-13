@@ -8262,11 +8262,6 @@
         0% { transform: scale(0) rotate(-90deg); }
         100% { transform: scale(1) rotate(0); }
       }
-      @keyframes mb-tombe {
-        0% { transform: scale(3.6) rotate(-16deg); opacity: 0; filter: blur(8px); }
-        55% { transform: scale(0.92) rotate(2deg); opacity: 1; filter: blur(0); }
-        100% { transform: none; }
-      }
       /* LE CŒUR : la bonbonne, cerclée du manomètre de la part livrée — son
          arc de 270° s'ouvre en bas, où s'écrit le pourcentage */
       .mb-coeur {
@@ -9029,76 +9024,90 @@
         text-shadow: 0 0 18px rgba(99, 183, 230, 0.45);
       }
       /* ---- LE BILAN DU MODULE : le module traversé dit ce qu'il a rendu
-         AVANT que le plan ne se rouvre. Le plan arrivait d'office, sous le
-         bandeau de la dernière salle : rien ne marquait qu'un module venait
-         de se finir, ni ce qu'on en rapportait. Un sceau à huit pans (la
-         forme d'un module sur le plan), une pastille par salle à la teinte
-         de son régime, et les mêmes tuiles que la fin de salle. ---- */
-      .mb-module { grid-column: 1 / -1; display: grid; gap: 14px; min-width: 0; }
-      .mb-module-tete {
-        display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 14px 18px;
-        padding: 16px 20px; border-radius: 14px;
-        background:
-          radial-gradient(60% 140% at 0% 50%, rgba(109, 255, 184, 0.1), transparent 65%),
-          linear-gradient(180deg, rgba(14, 24, 38, 0.84), rgba(8, 14, 24, 0.72));
-        border: 1px solid rgba(150, 200, 235, 0.14);
-        box-shadow: 0 24px 60px rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.05);
-        animation: mb-carte-monte 0.45s cubic-bezier(0.2, 1, 0.3, 1) backwards;
+         AVANT que le plan ne se rouvre. C'était une plaque arrondie de
+         tableau de bord : une coche dans un octogone menthe, des pastilles de
+         salle en rectangles à étoiles, des tuiles en deux colonnes et une
+         pilule qui respirait. C'est la scène du bilan de salle à l'échelle du
+         module : le SCEAU du module en héros (la primitive .mb-sceau, il
+         tombe), le nom à sa gauche, le volume à sa droite ; une rangée de
+         petits sceaux de rang, un par salle, teintés de leur régime ; les
+         cartouches ; un levier. Pas de plaque : la scène est le cadre. ---- */
+      .mb-module {
+        grid-column: 1 / -1; min-width: 0;
+        display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+        grid-template-areas: 'nom sceau total' 'salles salles salles' 'gains gains gains';
+        align-items: center; gap: 16px 40px; padding-top: 6px;
       }
+      /* menthe, comme l'octogone d'avant (l'or reste au rang S, à ce qui
+         luit) ; une teinte à lui, sinon il prendrait celle de la dernière
+         salle, restée sur le voile */
       .mb-module-sceau {
-        flex: none; width: calc(66px * var(--ui)); height: calc(66px * var(--ui));
-        display: grid; place-items: center;
-        clip-path: polygon(30% 0, 70% 0, 100% 30%, 100% 70%, 70% 100%, 30% 100%, 0 70%, 0 30%);
-        background: linear-gradient(160deg, #a9ffd6, var(--mb-menthe) 45%, #2fb884);
-        color: #06131a; font-style: normal; font-size: calc(30px * var(--ui)); font-weight: 700;
-        animation: mb-tombe 0.62s 0.1s cubic-bezier(0.2, 1.5, 0.3, 1) both;
+        --mb-sceau-l: 168px;
+        --mb-rang: var(--mb-menthe);
+        grid-area: sceau;
+        animation-delay: 0.1s;
       }
-      .mb-module-nom { display: flex; flex-direction: column; gap: 5px; min-width: 0; }
+      .mb-module-nom {
+        grid-area: nom; justify-self: end; min-width: 0;
+        display: flex; flex-direction: column; align-items: flex-end; gap: 6px; text-align: right;
+      }
       .mb-module-nom b {
-        font-family: var(--font-display); font-size: calc(19px * var(--ui)); letter-spacing: 0.2em;
+        font-family: var(--font-display); font-weight: 400; font-size: calc(22px * var(--ui)); letter-spacing: 0.2em;
         color: var(--mb-encre); text-shadow: 0 0 22px rgba(109, 255, 184, 0.35);
       }
       .mb-module-nom small { font-size: calc(12px * var(--ui)); color: var(--mb-texte-second); letter-spacing: 0.04em; }
-      /* le volume du module : LE grand chiffre de la plaque, à droite */
-      .mb-module-total { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; }
+      /* le volume du module : LE grand chiffre de la scène, comme celui
+         d'une salle */
+      .mb-module-total {
+        grid-area: total; justify-self: start; min-width: 0;
+        display: flex; flex-direction: column; align-items: flex-start; gap: 4px;
+      }
       .mb-module-total small {
-        font-family: var(--font-display); font-size: calc(7.5px * var(--ui));
+        font-family: var(--font-display); font-size: calc(10px * var(--ui));
         letter-spacing: 0.3em; color: var(--mb-teal);
       }
       .mb-module-total b {
-        font-family: var(--font-display); font-size: calc(34px * var(--ui)); line-height: 1;
+        font-family: var(--font-display); font-weight: 400;
+        font-size: calc(clamp(34px, 4vw, 52px) * var(--ui)); line-height: 1;
         color: var(--mb-encre); font-variant-numeric: tabular-nums; white-space: nowrap;
         text-shadow: 0 0 22px rgba(99, 183, 230, 0.45);
       }
-      /* les salles, sur leur propre rang : deux ou six, la plaque garde sa forme */
+      /* LES SALLES : un petit sceau de rang par salle, à taille fixe — six
+         (le plus long module de la station) tiennent sur une rangée ; un
+         module plus long passe à la ligne. Ils se posent l'un après l'autre,
+         après le sceau du module (la chute de la primitive, décalée par --i). */
       .mb-module-salles {
-        grid-column: 1 / -1; margin: 0; padding: 0; list-style: none;
-        display: flex; gap: 8px; flex-wrap: wrap;
+        grid-area: salles; margin: 0; padding: 0; list-style: none; min-width: 0;
+        display: flex; flex-wrap: wrap; justify-content: center; gap: 12px 26px;
       }
-      .mb-module-salles li {
-        --t: var(--mb-teal);
-        display: grid; gap: 2px; padding: 7px 11px; border-radius: 8px;
-        flex: 1 1 calc(120px * var(--ui)); min-width: 0; max-width: calc(220px * var(--ui));
-        border: 1px solid color-mix(in srgb, var(--t) 42%, transparent);
-        background: color-mix(in srgb, var(--t) 9%, var(--mb-coque));
-        animation: mb-carte-monte 0.4s cubic-bezier(0.2, 1, 0.3, 1) backwards;
-        animation-delay: calc(0.25s + var(--i, 0) * 0.09s);
+      /* le code et les litres paraissent avec leur sceau, pas avant lui */
+      .mb-salle {
+        --mb-salle-t: calc(0.55s + var(--i, 0) * 0.09s);
+        display: grid; justify-items: center; gap: 4px; min-width: 0;
+        animation: mb-monte 0.3s var(--mb-salle-t) ease-out backwards;
       }
-      .mb-module-salles span {
-        font-size: calc(10.5px * var(--ui)); color: var(--mb-texte-second);
-        overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+      .mb-salle-sceau {
+        --mb-sceau-l: 60px;
+        --mb-sceau-incl: 0deg;
+        animation-delay: var(--mb-salle-t);
       }
-      .mb-module-salles b {
-        font-family: var(--font-display); font-size: calc(8px * var(--ui)); letter-spacing: 0.16em;
-        color: var(--t);
+      .mb-salle-code {
+        margin-top: 2px; font-size: calc(10px * var(--ui)); color: var(--mb-texte-second);
+        white-space: nowrap;
       }
-      .mb-module-salles i { font-style: normal; font-size: calc(9px * var(--ui)); letter-spacing: 1px; color: var(--t); }
-      .mb-module-salles small { font-size: calc(10.5px * var(--ui)); color: var(--mb-texte); font-variant-numeric: tabular-nums; }
-      /* deux colonnes, pas quatre : à quatre, « +1235 cL » se tronquait en
-         « +1235… » et le rôle s'empilait sur quatre lignes */
-      .mb-module .mb-gains { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-      /* les cartouches du module claquent en cascade, après la plaque */
-      .mb-module .mb-cartouche { animation-delay: calc(0.45s + var(--i, 0) * 0.08s); }
+      .mb-salle-l {
+        font-family: var(--font-display); font-weight: 400; font-size: calc(13px * var(--ui));
+        color: var(--mb-encre); font-variant-numeric: tabular-nums; white-space: nowrap;
+      }
+      /* les cartouches claquent après les salles, sur une rangée centrée */
+      .mb-module .mb-gains {
+        grid-area: gains; display: flex; flex-wrap: wrap; justify-content: center; gap: 12px 16px;
+      }
+      .mb-module .mb-cartouche {
+        flex: 0 1 calc(236px * var(--ui));
+        animation-delay: calc(0.95s + var(--i, 0) * 0.08s);
+      }
+      .mb-module-levier { grid-column: 1 / -1; justify-self: center; margin-top: 4px; }
       /* LE BOUTON DE SUITE : une pastille qui respire et qu'on presse */
       .mb-continuer {
         grid-column: 1 / -1; justify-self: center; min-width: min(360px, 100%);
@@ -9402,11 +9411,16 @@
         /* la poutre repliée aussi : sa règle (4 classes) l'emportait sur
            celle-ci, et gardait 56 px de bande par côté sur un téléphone */
         .mb-poutre, .mb-scene.mb-compact .mb-banniere.mb-poutre { --mb-bande: 36px; }
-        .mb-module .mb-gains { grid-template-columns: 1fr; }
-        .mb-module-tete { padding: 12px 14px; gap: 12px; grid-template-columns: auto 1fr; }
-        .mb-module-total { grid-column: 1 / -1; align-items: flex-start; }
+        /* le module : le sceau en tête, le nom et le volume côte à côte */
+        .mb-module {
+          grid-template-columns: auto auto; justify-content: center;
+          grid-template-areas: 'sceau sceau' 'nom total' 'salles salles' 'gains gains'; gap: 10px 18px;
+        }
+        .mb-module-sceau { --mb-sceau-l: 112px; justify-self: center; }
+        .mb-module-nom b { font-size: calc(16px * var(--ui)); }
         .mb-module-total b { font-size: calc(28px * var(--ui)); }
-        .mb-module-salles li { flex-basis: calc(96px * var(--ui)); }
+        .mb-module-salles { gap: 8px 14px; }
+        .mb-salle-sceau { --mb-sceau-l: 48px; }
         .mb-etal-nom small { display: block; margin: 4px 0 0; }
         .mb-etal.mb-mince { flex-wrap: wrap; gap: 6px 12px; }
         .mb-etal.mb-mince .mb-etal-jauge { flex-basis: 100%; }
@@ -9453,9 +9467,8 @@
         .mb-fond::before, .mb-fond::after, .mb-flash.mb-on, .mb-scene.mb-secousse,
         .mb-sur, .mb-titre, .mb-etoiles i.mb-on, .mb-cuve-liquide::after,
         .mb-prime, .mb-record, .mb-etal, .mb-etal-palier.saute,
-        .mb-module-tete, .mb-module-sceau, .mb-module-salles li,
         .mb-etal-fluide, .mb-etal-fluide::after, .mb-etal-tube.eclair, .mb-etal-tampon,
-        .mb-palier-eclair, .mb-choix, .mb-pli, .mb-pli .crt-draft::after,
+        .mb-palier-eclair, .mb-choix, .mb-salle, .mb-pli, .mb-pli .crt-draft::after,
         .mb-cartes.mb-elu .mb-pli:not(.mb-elu-c), .mb-pli.mb-elu-c, .mb-carte, .mb-ico,
         .mb-goutte, .mb-goutte-corps, .mb-flux, .mb-dest, .mb-dest.mb-dest-palier, .mb-anneau-franchit,
         .mb-continuer, .mb-continuer::after, .mb-porte,

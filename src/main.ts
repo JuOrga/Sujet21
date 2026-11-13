@@ -458,7 +458,7 @@ import {
 } from './game/soundtrack'
 import { Jukebox, PISTES_ECOUTE } from './game/jukebox'
 import { auteurAvis, avisDe, ligneAvis, ligneBilan, lisAvisEcoute, poseAvis, type Avis, type DocumentAvis } from './game/ecouteAvis'
-import { compteur, douce, gesteAuVersement, motDeNote, rangDeSalle, TEMPS_BILAN, titreDuTirage } from './game/ceremonie'
+import { compteur, douce, gesteAuVersement, gesteTropTot, motDeNote, rangDeSalle, TEMPS_BILAN, titreDuTirage } from './game/ceremonie'
 import { cartoucheHTML } from './game/cartouches'
 import { cuveHTML, sceauHTML } from './game/ceremonieObjets'
 import { anneauxHTML, colonneMaitrise, niveauColonne } from './game/colonneMaitrise'
@@ -15382,12 +15382,21 @@ function mbReleveHors(): void {
   mbEl('mb-releve').hidden = true
 }
 
+/** L'instant où le sceau du module touche la scène : 0,1 s de retard, puis
+ *  55 % des 0,62 s de mb-sceau-tombe (l'image où il se plaque) — 441 ms,
+ *  calculé sur la feuille (index.html, .mb-module-sceau), pas mesuré à
+ *  l'écran. Le choc et le feu partent là. */
+const MB_SCEAU_MODULE_MS = 440
 /** LE BILAN DU MODULE. Le module épuisé, le plan se rouvrait d'office : rien
  *  ne marquait qu'un module venait de se finir, ni ce qu'on en rapportait.
  *  Ce temps-là le dit — les salles franchies et leur régime, le volume, la
  *  bourse, la mémoire, la maîtrise, les instruments, l'orbe — puis rend la
  *  main au plan. Un module sans salle (cache, halte) n'a rien traversé : le
- *  plan revient tout de suite, comme avant. */
+ *  plan revient tout de suite, comme avant.
+ *  La scène est celle du bilan de salle, à l'échelle du module : le SCEAU
+ *  du module en héros (il tombe, comme celui du rang), le nom à sa gauche,
+ *  le volume à sa droite ; dessous, une rangée de petits sceaux de rang, un
+ *  par salle, teintés de leur régime ; puis les cartouches ; un levier. */
 function mbMontreBilanModule(): void {
   const m = moduleEnCours()
   const r = run.recolte
@@ -15425,50 +15434,71 @@ function mbMontreBilanModule(): void {
     },
     paliers: paliersAtteints(run.xp),
   })
-  // le VOLUME est le grand chiffre de la plaque, au-dessus de ses salles —
-  // les autres gains suivent en tuiles
+  // le VOLUME est le grand chiffre de la scène, à droite du sceau — les
+  // autres gains suivent en cartouches
   const livre = gains.find((g) => g.cle === 'livre')
   const bloc = document.createElement('div')
   bloc.className = 'mb-module'
   bloc.innerHTML =
-    `<div class="mb-module-tete">` +
-    `<i class="mb-module-sceau" aria-hidden="true">✓</i>` +
+    // le sceau rendu (acier neutre) prend sa teinte dans la feuille : celle
+    // de la dernière salle reste sur le voile (--mb-rang)
+    `<div class="mb-module-sceau mb-sceau">${sceauHTML('module')}</div>` +
     `<div class="mb-module-nom"><b>${esc(m.nom)}</b><small>${esc(sous.join(' · '))}</small></div>` +
     (livre
       ? `<div class="mb-module-total"><small>${esc(livre.nom)}</small><b>${esc(livre.valeur)}</b></div>`
       : '') +
+    // une salle = un petit sceau de son rang, à la teinte de son régime ; le
+    // nom du régime (SUPERFLUIDE…) passe dans l'infobulle et la lecture
+    // d'écran, le code et les litres restent écrits
     `<ol class="mb-module-salles" aria-label="Les salles franchies">` +
     pastillesDeSalles(r)
       .map(
         (p, i) =>
-          `<li style="--t:${p.teinte};--i:${i}"><span>${esc(p.code)}</span><b>${p.nom}</b>` +
-          `<i aria-hidden="true">${'★'.repeat(p.etoiles)}</i><small>${p.litres}</small></li>`,
+          `<li class="mb-salle" style="--mb-rang:${p.teinte};--i:${i}" title="${htmlSafe(p.nom)}">` +
+          `<span class="mb-salle-sceau mb-sceau" role="img" aria-label="${htmlSafe(p.nom)}">${sceauHTML(p.rang)}</span>` +
+          `<span class="mb-salle-code">${esc(p.code)}</span><b class="mb-salle-l">${p.litres}</b></li>`,
       )
       .join('') +
-    `</ol></div>` +
+    `</ol>` +
     `<div class="mb-gains">` +
     gains
       .filter((g) => g !== livre)
-      .map(cartoucheHTML)
+      .map((g, i) => cartoucheHTML(g, i))
       .join('') +
     `</div>`
   host.appendChild(bloc)
-  bande.ponctuation('sting-record', 0.6)
-  mbEclate(bloc.querySelector('.mb-module-sceau'), {
-    n: 70, teintes: [...MB_MENTHE, ...MB_OR], vitesse: 420, gravite: 480, forme: 'confetti', duree: 1.4, taille: 6,
-  })
+  // LE SCEAU TOMBE : le choc, le flash et le feu partent à son impact
+  // (MB_SCEAU_MODULE_MS), pas à l'ouverture. Passé avant, le minuteur ne
+  // fait plus rien.
+  const sceau = bloc.querySelector('.mb-module-sceau')
+  mbTimers.push(
+    window.setTimeout(() => {
+      if (mbEtape !== 'module') return
+      mbFlash()
+      mbSecousse(0.7)
+      sonCeremonie('sceau', 1)
+      bande.ponctuation('sting-record', 0.6)
+      mbEclate(sceau, {
+        n: 70, teintes: [...MB_MENTHE, ...MB_OR], vitesse: 420, gravite: 480, forme: 'confetti', duree: 1.4, taille: 6,
+      })
+    }, sansAnimation() ? 0 : MB_SCEAU_MODULE_MS),
+  )
+  // LE LEVIER a le focus dès l'ouverture : Entrée, Espace et A le pressent,
+  // le clic aussi. Le geste qui a fermé l'étape d'avant (A martelé, double
+  // clic) le trouverait sous lui : il ne compte pas (game/ceremonie.ts).
+  const ouvertA = performance.now()
   const btn = document.createElement('button')
   btn.type = 'button'
-  btn.className = 'mb-continuer'
+  btn.className = 'mb-levier mb-module-levier'
   btn.textContent = 'CHOISIR LA COURSIVE SUIVANTE ▸'
   btn.addEventListener('click', () => {
-    if (btn.disabled) return
+    if (btn.disabled || gesteTropTot(performance.now(), ouvertA)) return
     btn.disabled = true
-    bande.ponctuation('sting-collecte', 0.6)
+    sonCeremonie('levier')
     mbMontreCarte('suite')
   })
   host.appendChild(btn)
-  btn.focus()
+  btn.focus({ preventScroll: true })
 }
 
 /** Fait COULER la jauge de `depart` à `arrivee` : le fluide monte, chaque

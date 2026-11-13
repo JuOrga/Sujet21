@@ -385,7 +385,10 @@
     })
   }
 
-  // ---- LE BILAN DU MODULE (main.ts:15274 mbMontreBilanModule) ----
+  // ---- LE BILAN DU MODULE (main.ts:15400 mbMontreBilanModule) ----
+  // la scène « station » : le sceau du module en héros, le nom, le volume ;
+  // la rangée des petits sceaux de rang (SIX salles : le plus long module de
+  // carteStation.json, le pire cas de la rangée) ; les cartouches ; le levier
   function module(etat) {
     ouvre()
     scene.classList.add('mb-compact')
@@ -399,7 +402,7 @@
       salles: [
         { code: 'G-102-AB12', pct: 0.93, litres: 4.18 }, { code: '21B7-031', pct: 0.78, litres: 3.4 },
         { code: 'G-213-K3F9', pct: 0.55, litres: 2.31 }, { code: 'G-221-PQ2Z', pct: 0.95, litres: 4.6 },
-        { code: 'G-232-ZZ01', pct: 0.34, litres: 1.42 },
+        { code: 'G-232-ZZ01', pct: 0.34, litres: 1.42 }, { code: 'G-240-QX7M', pct: 0.12, litres: 0.48 },
       ],
     }
     const gains = F.gainsDeModule({
@@ -408,18 +411,23 @@
       paliers: 2,
     })
     const livre = gains.find((g) => g.cle === 'livre')
-    const sous = ['énigme', '5 salles franchies', '1 rencontre ou halte']
+    const sous = ['énigme', '6 salles franchies', '1 rencontre ou halte']
     const bloc = document.createElement('div')
     bloc.className = 'mb-module'
-    bloc.innerHTML = `<div class="mb-module-tete"><i class="mb-module-sceau" aria-hidden="true">✓</i>` +
+    bloc.innerHTML =
+      `<div class="mb-module-sceau mb-sceau">${F.sceauHTML('module')}</div>` +
       `<div class="mb-module-nom"><b>${esc(RUN.module)}</b><small>${esc(sous.join(' · '))}</small></div>` +
       `<div class="mb-module-total"><small>${esc(livre.nom)}</small><b>${esc(livre.valeur)}</b></div>` +
       `<ol class="mb-module-salles" aria-label="Les salles franchies">` +
-      F.pastillesDeSalles(r).map((p, i) => `<li style="--t:${p.teinte};--i:${i}"><span>${esc(p.code)}</span><b>${p.nom}</b><i aria-hidden="true">${'★'.repeat(p.etoiles)}</i><small>${p.litres}</small></li>`).join('') +
-      `</ol></div><div class="mb-gains">${gains.filter((g) => g !== livre).map(F.cartoucheHTML).join('')}</div>`
+      F.pastillesDeSalles(r).map((p, i) =>
+        `<li class="mb-salle" style="--mb-rang:${p.teinte};--i:${i}" title="${esc(p.nom)}">` +
+        `<span class="mb-salle-sceau mb-sceau" role="img" aria-label="${esc(p.nom)}">${F.sceauHTML(p.rang)}</span>` +
+        `<span class="mb-salle-code">${esc(p.code)}</span><b class="mb-salle-l">${p.litres}</b></li>`).join('') +
+      `</ol>` +
+      `<div class="mb-gains">${gains.filter((g) => g !== livre).map((g, i) => F.cartoucheHTML(g, i)).join('')}</div>`
     host.appendChild(bloc)
     const btn = document.createElement('button')
-    btn.type = 'button'; btn.className = 'mb-continuer'; btn.textContent = 'CHOISIR LA COURSIVE SUIVANTE ▸'
+    btn.type = 'button'; btn.className = 'mb-levier mb-module-levier'; btn.textContent = 'CHOISIR LA COURSIVE SUIVANTE ▸'
     host.appendChild(btn)
   }
 
