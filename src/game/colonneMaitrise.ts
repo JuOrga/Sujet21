@@ -78,3 +78,54 @@ export function anneauxHTML(c: Colonne, xp: number, apres = xp): string {
     })
     .join('')
 }
+
+/** Un tronçon de la coulée : le liquide monte de `de` à `a` (XP) dans la
+ *  fenêtre `colonne`, qui ne bouge pas pendant le tronçon. `palier` est le
+ *  palier franchi au bout (alors `a === palier`), `siege` l'anneau qui s'y
+ *  brise ; `rearme` dit que la colonne vient d'avancer d'une fenêtre (le
+ *  liquide repart de son nouveau niveau, les anneaux se reposent). */
+export interface TronconColonne {
+  colonne: Colonne
+  de: number
+  a: number
+  palier: number | null
+  siege: number | null
+  rearme: boolean
+}
+
+/** LA COULÉE, de `depart` à `arrivee`, découpée aux paliers. La fenêtre est
+ *  FIGÉE au départ : relue à chaque image, elle glissait d'un cran au
+ *  premier palier franchi, et l'anneau qu'on brisait quittait son siège sous
+ *  le liquide. Quand le dernier siège est brisé et qu'il reste à couler vers
+ *  des paliers que la fenêtre ne montre pas, la colonne SE RÉARME : la
+ *  fenêtre avance (colonneMaitrise du point atteint), le liquide repart de
+ *  son fond — sans quoi il plafonnait au troisième siège et taisait les
+ *  paliers suivants. Au bout de la table, plus rien à montrer : le liquide
+ *  monte au-delà du dernier siège, jusqu'au plein. Un palier est franchi
+ *  quand l'XP l'ATTEINT, comme paliersAtteints. */
+export function couleeColonne(depart: number, arrivee: number, table: readonly number[] = PALIERS_XP): TronconColonne[] {
+  const troncons: TronconColonne[] = []
+  let colonne = colonneMaitrise(depart, table)
+  let xp = depart
+  let rearme = false
+  while (xp < arrivee) {
+    const k = colonne.paliers.findIndex((p) => p > xp)
+    if (k < 0) {
+      const suivante = colonneMaitrise(xp, table)
+      if (suivante.paliers.some((p) => p > xp)) {
+        colonne = suivante
+        rearme = true
+        continue
+      }
+      troncons.push({ colonne, de: xp, a: arrivee, palier: null, siege: null, rearme })
+      break
+    }
+    const p = colonne.paliers[k]
+    const franchi = arrivee >= p
+    const a = franchi ? p : arrivee
+    troncons.push({ colonne, de: xp, a, palier: franchi ? p : null, siege: franchi ? k : null, rearme })
+    rearme = false
+    xp = a
+  }
+  return troncons
+}
