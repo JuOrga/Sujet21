@@ -267,4 +267,10 @@ describe('la cérémonie — le vocabulaire de la station', () => {
     const moins = css.slice(css.lastIndexOf('prefers-reduced-motion: reduce'))
     for (const s of ['.mb-sceau', '.mb-cartouche', '.mb-poutre', '.mb-levier', '.mb-mano']) expect(moins, s).toContain(s)
   })
+  // posée à une largeur (min(100 %, 940 px) en bannière), la poutre ajoutait
+  // ses 2 × 143 px de rembourrage PAR-DESSUS : elle débordait la scène de
+  // 46 px à 1280 × 720 (mesuré au banc : 1270 px de contenu pour 1224)
+  it('compte le rembourrage de la poutre dans sa largeur : elle ne déborde pas', () => {
+    expect(regle('.mb-poutre')).toMatch(/box-sizing:\s*border-box/)
+  })
 })
