@@ -269,13 +269,14 @@
     host.appendChild(sc)
   }
 
-  // ---- la jauge (main.ts:15201 mbPeintEtal) ----
-  function peintEtal(xp) {
+  // ---- la maîtrise (main.ts mbPeintEtal) : le liquide dans la fenêtre
+  // figée, les litres, le compte des paliers et le prochain, la barre mince ----
+  function peintEtal(xp, col = F.colonneMaitrise(xp)) {
+    const liq = $('mb-etal-colonne').querySelector('.mb-cuve-liquide')
+    if (liq) liq.style.setProperty('--mb-niveau', F.niveauColonne(col, xp).toFixed(4))
     const seg = segment(xp)
     const part = seg.cible === null ? 1 : Math.max(0, Math.min(1, (xp - seg.base) / (seg.cible - seg.base)))
-    const pct = `${(part * 100).toFixed(2)}%`
-    $('mb-etal-fluide').style.width = pct
-    $('mb-etal-lueur').style.left = pct
+    $('mb-etal-barre').style.setProperty('--p', part.toFixed(4))
     $('mb-etal-l').textContent = virgule(xp, 1)
     $('mb-etal-pg').querySelector('b').textContent = String(paliers(xp))
     $('mb-etal-pd').querySelector('b').textContent = seg.cible === null ? '★' : `${seg.cible} L`
@@ -290,7 +291,10 @@
     scene.classList.add('mb-compact')
   }
 
-  // ---- L'ÉTALONNAGE, au palier franchi (main.ts:15359 mbAnimeEtalonnage) ----
+  // ---- LE PALIER (main.ts mbAnimeEtalonnage) : la colonne du versement en
+  // grand, la fenêtre figée au départ de la coulée (couleeColonne) ; 'palier'
+  // = l'instant où l'anneau du premier palier franchi se brise, sinon la
+  // coulée finie ----
   function etalonnage(etat) {
     bandeau()
     $('mb-choix-titre').textContent = 'LA MAÎTRISE MONTE'
@@ -298,29 +302,53 @@
     const etal = $('mb-etal')
     etal.hidden = false
     etal.classList.remove('mb-mince')
+    const tampon = $('mb-etal-tampon')
+    tampon.hidden = true
+    $('mb-etal-pg').classList.remove('saute')
     $('mb-etal-gain').hidden = false
     $('mb-etal-gain').textContent = `+${virgule(RUN.surplus, 2)} L`
-    const no = paliers(6)
+    const depart = RUN.xp, arrivee = RUN.xp + RUN.surplus
+    const troncons = F.couleeColonne(depart, arrivee)
+    const hote = $('mb-etal-colonne')
+    poseCuve(hote, F.cuveHTML('maitrise', 'mb-etal-fluide'))
+    const anneaux = (col, xp) => {
+      const cuve = hote.querySelector('.mb-cuve')
+      cuve.querySelectorAll('.mb-anneau').forEach((a) => a.remove())
+      cuve.insertAdjacentHTML('beforeend', F.anneauxHTML(col, xp, arrivee))
+    }
+    anneaux(troncons[0].colonne, depart)
+    peintEtal(depart, troncons[0].colonne)
+    $('mb-passer').hidden = false
     if (etat === 'palier') {
-      etal.classList.add('coule')
-      $('mb-etal-tube').classList.add('eclair')
+      const t = troncons.find((x) => x.palier !== null)
+      peintEtal(t.a, t.colonne)
+      const anneau = hote.querySelectorAll('.mb-anneau')[t.siege]
+      anneau.classList.remove('mb-anneau-franchit')
+      anneau.classList.add('mb-anneau-brise', 'mb-anneau-casse')
+      const no = paliers(t.palier)
       $('mb-etal-pg').classList.add('saute')
-      const t = $('mb-etal-tampon'); t.hidden = false; t.textContent = `PALIER ${no} — TIRAGE OUVERT`
+      tampon.hidden = false
+      tampon.textContent = `PALIER ${no} — TIRAGE OUVERT`
       $('mb-palier-eclair-no').textContent = `PALIER ${no}`
       $('mb-palier-eclair').hidden = false
       $('mb-flash').classList.add('mb-on')
       scene.classList.add('mb-secousse')
-      peintEtal(6)
       return
     }
-    // la coulée finie : le second segment rempli
-    const t = $('mb-etal-tampon'); t.hidden = false; t.textContent = `PALIER ${no} — TIRAGE OUVERT`
-    peintEtal(RUN.xp + RUN.surplus)
+    // la coulée finie : les anneaux franchis brisés, le liquide à l'arrivée
+    const fin = troncons[troncons.length - 1].colonne
+    anneaux(fin, arrivee)
+    peintEtal(arrivee, fin)
+    tampon.hidden = false
+    tampon.textContent = `PALIER ${paliers(arrivee)} — TIRAGE OUVERT`
   }
 
   // ---- LE TIRAGE (main.ts:15502 mbMontreDraft) ----
   function draft(etat) {
     etalonnage('fin')
+    // la coulée partie, la colonne et le levier du palier se retirent (mbAnimeEtalonnage)
+    $('mb-passer').hidden = true
+    $('mb-etal').hidden = true
     const xpF = RUN.xp + RUN.surplus
     $('mb-choix-titre').textContent = `${F.titreDuTirage(paliers(xpF), 2, true)} · EN BOURSE : ${RUN.condensat} cL`
     const host = cartes()
@@ -541,7 +569,7 @@
     bandeau()
     $('mb-titre').textContent = 'SALLE FRANCHIE'
     $('mb-choix-titre').textContent = 'PAROI DU SAS OUVERTE'
-    const etal = $('mb-etal'); etal.hidden = false; etal.classList.remove('coule'); etal.classList.add('mb-mince')
+    const etal = $('mb-etal'); etal.hidden = false; etal.classList.add('mb-mince')
     $('mb-etal-tampon').hidden = true; $('mb-etal-gain').hidden = true
     peintEtal(RUN.xp + RUN.surplus)
     const host = cartes()

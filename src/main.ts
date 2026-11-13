@@ -458,10 +458,20 @@ import {
 } from './game/soundtrack'
 import { Jukebox, PISTES_ECOUTE } from './game/jukebox'
 import { auteurAvis, avisDe, ligneAvis, ligneBilan, lisAvisEcoute, poseAvis, type Avis, type DocumentAvis } from './game/ecouteAvis'
-import { compteur, douce, gesteAuVersement, motDeNote, rangDeSalle, TEMPS_BILAN, titreDuTirage } from './game/ceremonie'
+import {
+  compteur,
+  douce,
+  GARDE_GESTE_MS,
+  gesteAuVersement,
+  gesteTropTot,
+  motDeNote,
+  rangDeSalle,
+  TEMPS_BILAN,
+  titreDuTirage,
+} from './game/ceremonie'
 import { cartoucheHTML } from './game/cartouches'
 import { cuveHTML, sceauHTML } from './game/ceremonieObjets'
-import { anneauxHTML, colonneMaitrise, niveauColonne } from './game/colonneMaitrise'
+import { anneauxHTML, colonneMaitrise, couleeColonne, niveauColonne, type Colonne } from './game/colonneMaitrise'
 import { iconeCeremonieHTML } from './game/iconesStation'
 import {
   condensatDuSas,
@@ -15323,13 +15333,15 @@ function mbMontreVersement(): void {
   mbFocusOuverture = false
 }
 
-// ---- LA JAUGE D'ÉTALONNAGE : l'XP se VOIT couler, palier par palier ----
-// La barre couvre le segment « palier atteint → palier suivant » (façon
-// barre de niveau) : un franchissement l'emplit, l'embrase, fait sauter le
-// compteur de paliers, tamponne « PALIER n — TIRAGE OUVERT » — puis elle
-// repart de zéro sur le segment suivant. Table épuisée : elle reste pleine.
+// ---- LE PALIER : la COLONNE DE MAÎTRISE coule, palier par palier ----
+// La colonne du versement, en grand. Le liquide monte dans la fenêtre de
+// paliers que la coulée a figée à son départ (colonneMaitrise.ts,
+// couleeColonne) ; chaque palier franchi brise son anneau, fait sauter le
+// compte et tamponne « PALIER n — TIRAGE OUVERT ». Plus de trois paliers
+// d'une coulée : la colonne se vide et se réarme sur les suivants.
+// Repliée (fin de salle), une barre mince dit où l'on en est du segment.
 
-/** Le segment courant de la jauge : dernier palier atteint → prochain. */
+/** Le segment de la barre mince : dernier palier atteint → prochain. */
 function mbSegmentXp(xp: number): { base: number; cible: number | null } {
   let base = 0
   for (const p of PALIERS_XP) {
@@ -15339,16 +15351,23 @@ function mbSegmentXp(xp: number): { base: number; cible: number | null } {
   return { base, cible: null }
 }
 
-/** Peint la jauge pour une valeur d'XP donnée (remplissage, bornes, litres). */
-function mbPeintEtal(xp: number): void {
+/** Le liquide de la colonne du palier : il vient de cuveHTML, la coque ne
+ *  le porte pas — on le cherche dans son alvéole. */
+function mbEtalLiquide(): HTMLElement | null {
+  return mbEl('mb-etal-colonne').querySelector<HTMLElement>('.mb-cuve-liquide')
+}
+
+/** Peint la maîtrise pour une valeur d'XP : le liquide dans la fenêtre
+ *  `col` (celle que la coulée a figée), les litres, le compte des paliers
+ *  et le prochain, la barre mince de la maîtrise repliée. */
+function mbPeintEtal(xp: number, col: Colonne = colonneMaitrise(xp)): void {
+  mbEtalLiquide()?.style.setProperty('--mb-niveau', niveauColonne(col, xp).toFixed(4))
   const seg = mbSegmentXp(xp)
   const part =
     seg.cible === null
       ? 1
       : Math.max(0, Math.min(1, (xp - seg.base) / (seg.cible - seg.base)))
-  const pct = `${(part * 100).toFixed(2)}%`
-  mbEl('mb-etal-fluide').style.width = pct
-  mbEl('mb-etal-lueur').style.left = pct
+  mbEl('mb-etal-barre').style.setProperty('--p', part.toFixed(4))
   mbEl('mb-etal-l').textContent = virgule(xp, 1)
   mbEl('mb-etal-pg').querySelector('b')!.textContent = String(
     paliersAtteints(xp),
@@ -15360,14 +15379,13 @@ function mbPeintEtal(xp: number): void {
     seg.cible === null ? 'complet' : 'prochain'
 }
 
-/** LA JAUGE REPLIÉE : la coulée finie, elle tient sur une ligne. En grand,
- *  tampon « TIRAGE OUVERT » compris, elle restait en scène après le tirage —
- *  160 px qui poussaient les portes sous le bas d'un écran de 800 px, sous
- *  un tampon qui annonçait un tirage déjà pris. */
+/** LA MAÎTRISE REPLIÉE : la coulée finie, elle tient sur une ligne. En
+ *  grand, tampon « TIRAGE OUVERT » compris, elle restait en scène après le
+ *  tirage — 160 px qui poussaient les portes sous le bas d'un écran de
+ *  800 px, sous un tampon qui annonçait un tirage déjà pris. */
 function mbJaugeMince(): void {
   const etal = mbEl('mb-etal')
   etal.hidden = false
-  etal.classList.remove('coule')
   etal.classList.add('mb-mince')
   mbEl('mb-etal-tampon').hidden = true
   mbEl('mb-etal-gain').hidden = true
@@ -15471,8 +15489,17 @@ function mbMontreBilanModule(): void {
   btn.focus()
 }
 
-/** Fait COULER la jauge de `depart` à `arrivee` : le fluide monte, chaque
- * palier franchi s'embrase et se tamponne, puis `onDone` enchaîne. */
+/** L'heure d'ouverture du palier : le geste qui vient de finir le versement
+ *  (le second clic d'un double clic, le A suivant d'une rafale) ne le passe
+ *  pas — la garde des 400 ms du versement (ceremonie.ts, gesteTropTot). */
+let mbEtalOuvertA = -Infinity
+/** Ce que le levier fait au palier : finir la coulée d'un coup. Posé par
+ *  mbAnimeEtalonnage, repris par le premier geste qui le passe. */
+let mbEtalSaute: (() => void) | null = null
+
+/** LA COLONNE COULE de `depart` à `arrivee` : le liquide monte, les litres
+ * roulent, chaque palier franchi brise son anneau et se tamponne, puis
+ * `onDone` enchaîne — d'elle-même, ou au premier geste (mbSauteEtalonnage). */
 function mbAnimeEtalonnage(
   depart: number,
   arrivee: number,
@@ -15481,7 +15508,10 @@ function mbAnimeEtalonnage(
   const etal = mbEl('mb-etal')
   etal.hidden = false
   etal.classList.remove('mb-mince') // la coulée se regarde en grand
-  mbEl('mb-etal-tampon').hidden = true
+  const tampon = mbEl('mb-etal-tampon')
+  tampon.hidden = true
+  const pg = mbEl('mb-etal-pg')
+  pg.classList.remove('saute')
   const gainEl = mbEl('mb-etal-gain')
   const gain = arrivee - depart
   if (gain > 0.005) {
@@ -15491,91 +15521,167 @@ function mbAnimeEtalonnage(
   } else {
     gainEl.hidden = true
   }
-  mbPeintEtal(depart)
-  if (gain <= 0.005) {
+  // LA COLONNE DU VERSEMENT, en grand : la même cuve rendue, ses anneaux
+  // sur les sièges. La fenêtre de paliers est figée au départ de la coulée
+  // (couleeColonne) : l'anneau qu'on brise ne quitte pas son siège
+  const troncons = couleeColonne(depart, arrivee)
+  const hote = mbEl('mb-etal-colonne')
+  mbPoseCuve(hote, cuveHTML('maitrise', 'mb-etal-fluide'))
+  const anneaux = (col: Colonne, xp: number): void => {
+    const cuve = hote.querySelector('.mb-cuve')
+    cuve?.querySelectorAll('.mb-anneau').forEach((a) => a.remove())
+    // ceux que la coulée va franchir luisent déjà
+    cuve?.insertAdjacentHTML('beforeend', anneauxHTML(col, xp, arrivee))
+  }
+  anneaux(troncons[0]?.colonne ?? colonneMaitrise(depart), depart)
+  mbPeintEtal(depart, troncons[0]?.colonne)
+  // un filet sans palier ne se regarde pas couler ; un filet qui atteint un
+  // palier, si : sinon le tirage s'ouvrait sur un palier jamais montré
+  // (la colonne ne reste pas en grand au-dessus de ce qui suit)
+  if (gain <= 0.005 && !troncons.some((t) => t.palier !== null)) {
+    etal.hidden = true
     onDone()
     return
   }
-  etal.classList.add('coule')
-  // le fluide coule segment par segment — la durée suit la part du gain,
-  // bornée pour que ni un filet ni un torrent ne cassent le rythme
-  const etape = (xp: number): void => {
-    const seg = mbSegmentXp(xp)
-    const cible = seg.cible !== null ? Math.min(arrivee, seg.cible) : arrivee
-    const duree = Math.max(
-      450,
-      Math.min(1400, ((cible - xp) / Math.max(0.001, gain)) * 1800),
-    )
+  // LE LEVIER a le focus : Entrée, Espace et A le pressent, le clic aussi
+  // — il finit la coulée d'un coup (mbSauteEtalonnage)
+  const levier = mbEl('mb-passer')
+  levier.hidden = false
+  levier.focus({ preventScroll: true })
+  mbEtalOuvertA = performance.now()
+  let fini = false // la coulée est à son état final
+  let parti = false // la suite est partie
+  // LA SUITE : la colonne et son levier se retirent. En grand, la colonne
+  // restait au-dessus du tirage et le poussait sous le bas d'un écran de
+  // 720 px (730 px de scène pour 717 visibles, mesuré au banc) ; la fin
+  // de salle la rappelle repliée (mbJaugeMince)
+  const part = (): void => {
+    if (parti || !miseEnBonbonne || mbEtape !== 'etalonnage') return // déjà fait, ou cérémonie fermée
+    parti = true
+    mbEtalSaute = null
+    levier.hidden = true
+    etal.hidden = true
+    onDone()
+  }
+  const finit = (attente: number): void => {
+    fini = true
+    mbTimers.push(window.setTimeout(part, attente))
+  }
+  // SAUTÉE, la coulée se pose à son état final (les anneaux franchis
+  // brisés, le compte et le tampon à jour) et s'y tient le temps d'une
+  // garde avant le tirage : le second geste d'une rafale tombe sur le
+  // levier, qui ne fait plus rien — pas sur une carte du tirage
+  mbEtalSaute = () => {
+    if (!fini) {
+      const fin = troncons[troncons.length - 1]?.colonne ?? colonneMaitrise(arrivee)
+      anneaux(fin, arrivee)
+      mbPeintEtal(arrivee, fin)
+      if (paliersAtteints(arrivee) > paliersAtteints(depart)) {
+        tampon.hidden = false
+        tampon.textContent = `PALIER ${paliersAtteints(arrivee)} — TIRAGE OUVERT`
+      }
+    }
+    finit(GARDE_GESTE_MS)
+  }
+  const liquide = mbEtalLiquide()
+  // un tronçon : le liquide monte de t.de à t.a, la durée suit la part du
+  // gain, bornée pour que ni un filet ni un torrent ne cassent le rythme
+  const avance = (i: number): void => {
+    if (fini) return
+    const t = troncons[i]
+    const duree = Math.max(450, Math.min(1400, ((t.a - t.de) / Math.max(0.001, gain)) * 1800))
+    sonCeremonie('compteur', i === 0 ? 1 : 0.6)
     const t0 = performance.now()
     const anime = (): void => {
-      if (!miseEnBonbonne || mbEtape !== 'etalonnage') return // cérémonie fermée
-      const t = Math.min(1, (performance.now() - t0) / duree)
-      mbPeintEtal(xp + (cible - xp) * douce(t))
-      if (t < 1) {
+      if (fini || !miseEnBonbonne || mbEtape !== 'etalonnage') return // sautée, ou cérémonie fermée
+      const u = Math.min(1, (performance.now() - t0) / duree)
+      mbPeintEtal(t.de + (t.a - t.de) * douce(u), t.colonne)
+      if (u < 1) {
         requestAnimationFrame(anime)
         return
       }
-      const franchit = seg.cible !== null && cible >= seg.cible - 1e-9
-      if (franchit) {
-        // PALIER FRANCHI : l'embrasement du tube, le pop du compteur, le
-        // tampon doré, la ponctuation des records
-        const no = paliersAtteints(cible)
-        const tube = mbEl('mb-etal-tube')
-        tube.classList.remove('eclair')
-        void tube.offsetWidth // relance l'animation CSS
-        tube.classList.add('eclair')
-        const pg = mbEl('mb-etal-pg')
-        pg.classList.remove('saute')
-        void pg.offsetWidth
-        pg.classList.add('saute')
-        const tampon = mbEl('mb-etal-tampon')
-        tampon.hidden = false
-        tampon.textContent = `PALIER ${no} — TIRAGE OUVERT`
-        bande.ponctuation('sting-record', 0.75)
-        // LE « LEVEL UP » : la bande traverse l'écran, le feu jaillit du
-        // compteur de paliers, l'écran blanchit, la manette tremble
-        mbPalierEclair(no)
-        mbFlash()
-        mbSecousse(0.8)
-        mbEclate(pg, { n: 90, teintes: MB_MENTHE, vitesse: 520, gravite: 380, forme: 'etincelle', duree: 1.1, taille: 4 })
-        mbEclate(tube, { n: 60, teintes: [...MB_MENTHE, ...MB_OR], vitesse: 260, gravite: 600, forme: 'confetti', duree: 1.6, taille: 6 })
-        mbPeintEtal(cible) // la jauge repart de zéro sur le segment suivant
-        mbTimers.push(
-          window.setTimeout(
-            () => {
-              if (cible < arrivee - 1e-9) etape(cible)
-              else {
-                etal.classList.remove('coule')
-                onDone()
-              }
-            },
-            cible < arrivee - 1e-9 ? 850 : 1000,
-          ),
-        )
+      const suite = i + 1 < troncons.length
+      if (t.palier === null || t.siege === null) {
+        finit(450)
         return
       }
-      etal.classList.remove('coule')
-      mbTimers.push(window.setTimeout(onDone, 450))
+      // PALIER FRANCHI : l'anneau de son siège se brise (la case brisée de
+      // la planche, qui s'écarte), le compte saute, le tampon doré, la
+      // ponctuation des records
+      const no = paliersAtteints(t.palier)
+      const anneau = hote.querySelectorAll<HTMLElement>('.mb-anneau')[t.siege] ?? null
+      anneau?.classList.remove('mb-anneau-franchit')
+      anneau?.classList.add('mb-anneau-brise', 'mb-anneau-casse')
+      pg.classList.remove('saute')
+      void pg.offsetWidth // relance l'animation CSS
+      pg.classList.add('saute')
+      tampon.hidden = false
+      tampon.textContent = `PALIER ${no} — TIRAGE OUVERT`
+      sonCeremonie('palier')
+      bande.ponctuation('sting-record', 0.75)
+      // LE « LEVEL UP » : la poutre traverse l'écran, le feu jaillit de
+      // l'anneau et du compte, l'écran blanchit, la manette tremble
+      mbPalierEclair(no)
+      mbFlash()
+      mbSecousse(0.8)
+      mbEclate(anneau ?? hote, { n: 60, teintes: [...MB_MENTHE, ...MB_OR], vitesse: 300, gravite: 600, forme: 'confetti', duree: 1.6, taille: 6 })
+      mbEclate(pg, { n: 90, teintes: MB_OR, vitesse: 520, gravite: 380, forme: 'etincelle', duree: 1.1, taille: 4 })
+      if (suite) mbTimers.push(window.setTimeout(() => coule(i + 1), 850))
+      else finit(1000)
     }
     requestAnimationFrame(anime)
   }
-  etape(depart)
+  // LA COLONNE SE RÉARME (plus de trois paliers d'une coulée) : la
+  // fenêtre avance, les anneaux se reposent, le liquide se vide d'un trait
+  // jusqu'à son nouveau niveau — puis il remonte
+  const coule = (i: number): void => {
+    if (fini) return
+    const t = troncons[i]
+    if (!t.rearme) {
+      avance(i)
+      return
+    }
+    anneaux(t.colonne, t.de)
+    liquide?.classList.add('mb-vidange')
+    mbPeintEtal(t.de, t.colonne)
+    mbTimers.push(
+      window.setTimeout(() => {
+        liquide?.classList.remove('mb-vidange')
+        avance(i)
+      }, sansAnimation() ? 0 : 420),
+    )
+  }
+  coule(0)
 }
 
-/** LA BANDE DU PALIER : « PALIER n — TIRAGE OUVERT » traverse l'écran de
- *  gauche à droite, par-dessus tout. Elle se retire d'elle-même ; un
- *  second palier dans la même coulée la relance. */
+/** LE SAUT AU PALIER : le levier (qui a le focus), Entrée, Espace, A ou un
+ *  toucher de la scène finissent la coulée d'un coup. Une fois : les gestes
+ *  suivants d'une rafale ne trouvent plus rien à sauter ; et pas sous le
+ *  geste qui vient de finir le versement. */
+function mbSauteEtalonnage(): void {
+  if (mbEtape !== 'etalonnage' || !mbEtalSaute) return
+  if (gesteTropTot(performance.now(), mbEtalOuvertA)) return
+  const saute = mbEtalSaute
+  mbEtalSaute = null
+  sonCeremonie('levier')
+  saute()
+}
+
+/** LE PALIER TRAVERSE L'ÉCRAN : une poutre « PALIER n — TIRAGE OUVERT »
+ *  entre par la gauche, tient au milieu, ressort à droite, par-dessus tout.
+ *  Elle se retire d'elle-même ; un second palier dans la même coulée la
+ *  relance. */
 function mbPalierEclair(no: number): void {
-  const ruban = mbEl('mb-palier-eclair')
+  const poutre = mbEl('mb-palier-eclair')
   mbEl('mb-palier-eclair-no').textContent = `PALIER ${no}`
-  ruban.hidden = true
-  void ruban.offsetWidth // relance l'animation CSS si un palier suit l'autre
-  ruban.hidden = false
-  mbTimers.push(window.setTimeout(() => { ruban.hidden = true }, sansAnimation() ? 900 : 1650))
+  poutre.hidden = true
+  void poutre.offsetWidth // relance l'animation CSS si un palier suit l'autre
+  poutre.hidden = false
+  mbTimers.push(window.setTimeout(() => { poutre.hidden = true }, sansAnimation() ? 900 : 1650))
 }
 
-/** Crédite l'XP et fait COULER la jauge — puis un tirage par palier
- * franchi, sinon la suite de la cérémonie. */
+/** Crédite l'XP et fait COULER la colonne de maîtrise — puis un tirage
+ * par palier franchi, sinon la suite de la cérémonie. */
 function mbVerseXp(litres: number): void {
   const avantXp = run.xp
   const avant = paliersAtteints(run.xp)
@@ -15587,14 +15693,14 @@ function mbVerseXp(litres: number): void {
   mbDraftsRestants = paliersAtteints(run.xp) - avant + (mbTirageGaranti ? 1 : 0)
   run.primeSalle = null
   mbEtape = 'etalonnage'
-  // le bilan est lu : il se replie en bandeau, la jauge prend la scène —
+  // le bilan est lu : il se replie en bandeau, la colonne prend la scène —
   // et le tirage qui suit tient dans l'écran du Deck sans ascenseur. Le
   // versement l'avait caché et avait posé sa question dans la poutre : le
   // bandeau revient rappeler la salle (et où le surplus est parti)
   mbScene.classList.add('mb-compact')
   mbEl('mb-releve').hidden = false
   mbEl('mb-titre').textContent = 'SALLE FRANCHIE'
-  // les cartes du versement s'effacent : la jauge prend la scène
+  // les cuves du versement s'effacent : la colonne prend la scène
   mbEl('mb-choix-titre').textContent =
     litres > 0.005 ? 'LA MAÎTRISE MONTE' : 'MAÎTRISE'
   mbCartes().innerHTML = ''
@@ -17364,7 +17470,8 @@ function montreMiseEnBonbonne(b: BilanSalle): void {
   // grandit pas quand elles claquent
   mbEl('mb-gains').innerHTML = b.gains.map(cartoucheHTML).join('')
   mbEl('mb-etal').hidden = true
-  mbEl('mb-etal').classList.remove('coule', 'mb-mince')
+  mbEl('mb-etal').classList.remove('mb-mince')
+  mbEtalSaute = null
   mbEl('mb-etal-tampon').hidden = true
   mbEl('mb-etal-gain').hidden = true
   mbEl('mb-palier-eclair').hidden = true
@@ -17477,9 +17584,14 @@ function mbSauteBilan(): void {
   mbMontreVersement()
 }
 mbEl('mb-passer').addEventListener('click', mbSauteBilan)
-// un toucher pendant les temps 1-3 saute au versement ; jamais l'inverse
+// le même levier passe le palier (chacun ne répond qu'à son étape)
+mbEl('mb-passer').addEventListener('click', mbSauteEtalonnage)
+// un toucher pendant les temps 1-3 saute au versement (jamais l'inverse) ;
+// au palier, il finit la coulée
 mbVeil?.addEventListener('pointerdown', (e) => {
-  if ((e.target as HTMLElement).closest('button') === null) mbSauteBilan()
+  if ((e.target as HTMLElement).closest('button') !== null) return
+  mbSauteBilan()
+  mbSauteEtalonnage()
 })
 // LES TOUCHES DE LA CÉRÉMONIE SONT À ELLE. Espace était au jeu : la table
 // des commandes en fait la PAUSE, et input.ts l'annulait sur window

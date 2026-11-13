@@ -598,3 +598,77 @@ describe('la cérémonie — le bilan « SALLE FRANCHIE »', () => {
     expect(petit.slice(0, petit.indexOf('\n      }\n'))).toMatch(/\.mb-poutre \{ --mb-bande:/)
   })
 })
+
+// LE PALIER « LA MAÎTRISE MONTE » (étape 3). Une jauge horizontale en
+// rectangle arrondi, deux cercles de bornes, un paragraphe qui expliquait
+// la maîtrise à chaque salle ; la bande du palier, un ruban flou ; et
+// l'étape ne se passait d'aucun geste (inventaire, étape 3). Le héros
+// devient la colonne de maîtrise du versement, en grand : le liquide monte,
+// l'anneau du palier franchi se brise, une poutre traverse l'écran.
+describe('la cérémonie — le palier', () => {
+  it('n’explique plus la maîtrise en paragraphe : la phrase passe dans l’infobulle', () => {
+    const phrase = 'les litres qu’on y verse'
+    let n = 0
+    for (let i = HTML.indexOf(phrase); i >= 0; i = HTML.indexOf(phrase, i + 1)) {
+      n++
+      const avant = HTML.slice(HTML.lastIndexOf('<', i), i)
+      expect(avant, 'la phrase hors d’un attribut title').toMatch(/\btitle="[^"]*$/)
+    }
+    expect(n).toBeGreaterThan(0)
+  })
+  it('fait de la colonne de maîtrise le héros : la même cuve que le versement, en grand', () => {
+    const f = corps('mbAnimeEtalonnage')
+    expect(f).toContain("cuveHTML('maitrise', 'mb-etal-fluide')")
+    expect(f).toContain('mbPoseCuve(') // jamais une image cassée
+    expect(f).toContain('couleeColonne(') // la fenêtre figée, le réarmement
+    expect(f).toContain('anneauxHTML(')
+    expect(HTML).toContain('id="mb-etal-colonne"')
+    // la jauge horizontale et ses bornes rondes sont parties
+    expect(HTML).not.toContain('id="mb-etal-tube"')
+    expect(HTML).not.toContain('.mb-etal-tube')
+    expect(regle('.mb-etal-palier')).not.toMatch(/border-radius:\s*50%/)
+  })
+  it('brise l’anneau du palier franchi, à sa voix', () => {
+    const f = corps('mbAnimeEtalonnage')
+    expect(f).toContain('mb-anneau-casse')
+    expect(f).toContain("sonCeremonie('palier'")
+    expect(f).toContain("sonCeremonie('compteur'")
+    expect(f).toContain("bande.ponctuation('sting-record'") // le sting reste au palier
+    expect(regle('.mb-anneau.mb-anneau-casse')).toMatch(/animation:/)
+  })
+  it('fait traverser l’écran à une poutre, plus à un ruban', () => {
+    expect(HTML).toMatch(/<div class="mb-palier-eclair mb-poutre" id="mb-palier-eclair"/)
+    expect(regle('.mb-palier-eclair')).toMatch(/translate\(/)
+  })
+  it('se passe d’un geste, une étape et une seule', () => {
+    const s = corps('mbSauteEtalonnage')
+    expect(s).toMatch(/if \(mbEtape !== 'etalonnage'/)
+    // le geste qui a fini le versement n'est pas celui qui passe le palier
+    expect(s).toContain('gesteTropTot(performance.now(), mbEtalOuvertA)')
+    expect(s).toContain("sonCeremonie('levier'")
+    const f = corps('mbAnimeEtalonnage')
+    expect(f).toMatch(/mbEl\('mb-passer'\)/)
+    expect(f).toMatch(/\.focus\(\{ preventScroll: true \}\)/)
+    // sauté, l'état final se tient le temps d'une garde avant le tirage :
+    // le second geste d'une rafale ne tombe pas sur une carte
+    expect(f).toMatch(/GARDE_GESTE_MS/)
+    expect(MAIN).toMatch(/mbEl\('mb-passer'\)\.addEventListener\('click', mbSauteEtalonnage\)/)
+    const toucher = MAIN.slice(MAIN.indexOf("mbVeil?.addEventListener('pointerdown'"))
+    expect(toucher.slice(0, 400)).toContain('mbSauteEtalonnage()')
+  })
+  // en grand, la colonne restait au-dessus du tirage : 730 px de scène
+  // pour 717 visibles à 1280 × 720 (banc, 13/11)
+  it('se retire, colonne et levier, quand la suite part', () => {
+    const f = corps('mbAnimeEtalonnage')
+    const part = f.slice(f.indexOf('const part = '), f.indexOf('onDone()', f.indexOf('const part = ')))
+    expect(part).toContain('levier.hidden = true')
+    expect(part).toContain('etal.hidden = true')
+  })
+  it('n’écrit plus d’étiquette sous 10 px', () => {
+    for (const s of ['.mb-etal-nom', '.mb-etal-palier small']) {
+      const t = /font-size:\s*calc\((\d+(?:\.\d+)?)px/.exec(regle(s))
+      expect(t, s).not.toBeNull()
+      expect(Number(t![1]), s).toBeGreaterThanOrEqual(10)
+    }
+  })
+})

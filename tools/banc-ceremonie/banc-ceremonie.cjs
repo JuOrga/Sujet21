@@ -49,6 +49,7 @@ const PRISES = [
   ['03-versement', 'versement', null, null, 2200, '.mb-dest-maitrise'],
   ['03b-versement-defile', 'versement', null, 'defile', 2200, '.mb-dest-maitrise'],
   ['04-etalonnage-palier-t350ms', 'etalonnage', 'palier', 'palier', 0],
+  ['04b-etalonnage-fin', 'etalonnage', 'fin', null, 2200],
   ['05-tirage-retournement-t550ms', 'draft', null, 'retourne', 0],
   ['06-tirage', 'draft', null, 'vise', 2600, '.mb-pli:first-child .crt-draft'],
   ['06b-tirage-elue-t250ms', 'draft', 'elue', 'elue', 0],
@@ -78,10 +79,10 @@ function prepare(quoi, M, O) {
     P.fige([['.mb-rang, .mb-rang *', 200], ['.mb-flash', 200], ['.mb-scene', 200]], 900)
     P.feu([{ el: $('#mb-rang'), age: 0.2, r: { n: 120, teintes: ['#ffd977', '#eaf6ff', ...M], vitesse: 480, gravite: 420, forme: 'etincelle', duree: 1, taille: 4 } }])
   } else if (quoi === 'palier') {
-    P.fige([['.mb-palier-eclair, .mb-palier-eclair *', 350], ['.mb-flash', 350], ['.mb-etal-tube', 350], ['.mb-etal-palier', 350], ['.mb-scene', 350]], 1500)
+    P.fige([['.mb-palier-eclair, .mb-palier-eclair *', 350], ['.mb-flash', 350], ['.mb-anneau-casse', 350], ['.mb-etal-palier', 350], ['.mb-scene', 350]], 1500)
     P.feu([
-      { el: $('#mb-etal-pg'), age: 0.35, r: { n: 90, teintes: M, vitesse: 520, gravite: 380, forme: 'etincelle', duree: 1.1, taille: 4 } },
-      { el: $('#mb-etal-tube'), age: 0.35, r: { n: 60, teintes: [...M, ...O], vitesse: 260, gravite: 600, forme: 'confetti', duree: 1.6, taille: 6 } },
+      { el: $('.mb-anneau-casse'), age: 0.35, r: { n: 60, teintes: [...M, ...O], vitesse: 300, gravite: 600, forme: 'confetti', duree: 1.6, taille: 6 } },
+      { el: $('#mb-etal-pg'), age: 0.35, r: { n: 90, teintes: O, vitesse: 520, gravite: 380, forme: 'etincelle', duree: 1.1, taille: 4 } },
     ])
   } else if (quoi === 'retourne') {
     P.fige([['.mb-pli, .mb-pli *', 550]], 1500)

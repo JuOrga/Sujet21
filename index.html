@@ -8485,173 +8485,156 @@
       .mb-scene.mb-compact .mb-releve .mb-cartouche-alv { width: 24px; height: 21px; font-size: 16px; }
       .mb-scene.mb-compact .mb-releve .mb-cartouche-val { font-size: calc(16px * var(--ui)); }
       .mb-scene.mb-compact .mb-etal { margin-top: 0; padding-top: 0; border-top: 0; }
-      /* ---- La JAUGE D'ÉTALONNAGE : l'XP se VOIT couler ---- */
+      /* ---- LE PALIER : la COLONNE DE MAÎTRISE, en grand ----
+         La maîtrise se lisait dans un tube horizontal en rectangle arrondi,
+         entre deux cercles, sous un paragraphe qui l'expliquait à chaque
+         salle. Au versement, elle est une colonne rendue, cerclée de ses
+         anneaux de palier : le palier en est la suite — la même colonne, au
+         centre et en grand. Les litres roulent à sa gauche, le compte des
+         paliers et le prochain se tiennent à sa droite ; la phrase passe dans
+         l'infobulle du nom. */
       .mb-etal {
-        padding: 12px 14px; border-radius: 10px;
-        background: rgba(10, 18, 30, 0.72); border: 1px solid rgba(150, 200, 235, 0.12);
+        --mb-etal-h: min(54vh, calc(100vh - 300px), 440px);
+        display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+        align-items: center; column-gap: clamp(18px, 4vw, 56px);
         animation: mb-monte 0.4s ease-out;
       }
       .mb-etal[hidden] { display: none; }
-      .mb-etal-tete {
-        display: flex; justify-content: space-between; align-items: baseline;
-        margin-bottom: 8px;
-      }
+      .mb-etal-gauche { display: flex; flex-direction: column; align-items: flex-end; gap: 6px; text-align: right; }
       .mb-etal-nom {
         font-family: var(--font-display);
-        font-size: calc(9px * var(--ui)); letter-spacing: 0.3em; color: var(--mb-teal);
+        font-size: calc(11px * var(--ui)); letter-spacing: 0.3em; color: var(--mb-teal);
       }
-      /* ce que la jauge mesure : « MAÎTRISE » seul, suivi de litres, ne disait
-         ni d'où ils venaient ni ce qu'un palier ouvrait */
-      .mb-etal-nom small {
-        margin-left: 12px; font-family: var(--font-mono); font-size: calc(11px * var(--ui));
-        letter-spacing: 0.02em; color: var(--mb-etiquette); text-transform: none;
-      }
-      .mb-etal-xp { font-size: calc(13px * var(--ui)); color: var(--mb-texte-second); white-space: nowrap; }
+      .mb-etal-xp { font-size: calc(16px * var(--ui)); color: var(--mb-texte-second); white-space: nowrap; }
       .mb-etal-xp b {
-        font-family: var(--font-display); font-size: calc(24px * var(--ui)); color: var(--mb-encre);
-        font-variant-numeric: tabular-nums;
+        font-family: var(--font-display); font-weight: 400; font-size: calc(46px * var(--ui)); line-height: 1.05;
+        color: var(--mb-encre); font-variant-numeric: tabular-nums; text-shadow: 0 0 22px rgba(109, 255, 184, 0.3);
       }
+      /* le gain, sous les litres qu'il fait monter */
       .mb-etal-xp i {
-        font-style: normal; margin-left: 8px; font-size: calc(14px * var(--ui)); color: var(--mb-menthe);
+        display: block; margin-top: 2px; font-style: normal; font-size: calc(16px * var(--ui)); color: var(--mb-menthe);
         font-weight: 600; animation: mb-plonge 0.4s ease-out;
       }
-      .mb-etal-jauge { display: flex; align-items: center; gap: 12px; }
-      /* les deux bornes : le palier ATTEINT (gros chiffre) et le PROCHAIN */
-      .mb-etal-palier {
-        flex: 0 0 58px; width: 58px; height: 58px; border-radius: 50%;
-        border: 2px solid #2d4a63; background: radial-gradient(circle at 50% 40%, #16283a, var(--mb-coque));
-        display: flex; flex-direction: column; align-items: center; justify-content: center;
-        box-shadow: 0 0 0 4px rgba(45, 74, 99, 0.25);
+      .mb-etal-xp i[hidden] { display: none; }
+      /* la colonne : sa hauteur fixe sa largeur (les proportions du rendu) */
+      .mb-etal-colonne { height: var(--mb-etal-h); aspect-ratio: 512 / 1024; display: grid; place-items: center; }
+      /* la maîtrise en menthe, comme au versement. Le liquide suit la coulée
+         image par image (main.ts) : une transition le ferait traîner */
+      .mb-etal .mb-cuve-liquide { --mb-liquide: var(--mb-menthe); }
+      .mb-etal .mb-cuve-liquide::before,
+      .mb-etal .mb-cuve-liquide::after { transition: none; }
+      /* RÉARMÉE (plus de trois paliers d'une coulée) : la fenêtre avance, et
+         la colonne se vide d'un trait avant de remonter */
+      .mb-etal .mb-vidange::before { transition: height 0.35s ease-in; }
+      .mb-etal .mb-vidange::after { transition: bottom 0.35s ease-in; }
+      .mb-etal-droite { display: flex; flex-direction: column; align-items: flex-start; gap: 10px; }
+      .mb-etal-palier { display: flex; flex-direction: column; align-items: flex-start; }
+      .mb-etal-palier small {
+        font-family: var(--font-display); font-size: calc(10px * var(--ui)); letter-spacing: 0.3em; color: var(--mb-etiquette);
       }
       .mb-etal-palier b {
-        font-size: calc(21px * var(--ui)); line-height: 1; color: #d5f3e8;
-        font-family: var(--font-display);
+        font-family: var(--font-display); font-weight: 400; font-size: calc(46px * var(--ui)); line-height: 1.05;
+        color: var(--mb-encre); font-variant-numeric: tabular-nums;
       }
-      .mb-etal-palier small {
-        font-size: calc(9px * var(--ui)); letter-spacing: 0.14em; color: var(--mb-etiquette); margin-top: 3px;
-      }
-      .mb-etal-palier.d b { color: var(--mb-teal); font-size: calc(15px * var(--ui)); }
+      .mb-etal-palier.d b { font-size: calc(20px * var(--ui)); color: var(--mb-teal); }
+      /* un palier franchi : le compte saute et prend l'or des paliers */
       .mb-etal-palier.saute {
+        transform-origin: 0 60%;
         animation: mb-palier-pop 0.6s cubic-bezier(0.2, 2.4, 0.4, 1);
-        border-color: var(--mb-menthe);
       }
+      .mb-etal-palier.saute b { color: var(--mb-or); text-shadow: 0 0 26px rgba(255, 217, 119, 0.55); }
       @keyframes mb-palier-pop {
         0% { transform: scale(1); }
-        35% { transform: scale(1.45); box-shadow: 0 0 40px rgba(109, 255, 184, 0.8); }
+        35% { transform: scale(1.35); }
         100% { transform: scale(1); }
       }
-      /* le tube gradué : le fluide y monte, les crans marquent le chemin,
-         la lueur marque le ménisque */
-      .mb-etal-tube {
-        position: relative; flex: 1; height: 34px; border-radius: 17px;
-        border: 1px solid #2d4a63; background: rgba(6, 12, 20, 0.95);
-        overflow: hidden;
-        box-shadow: inset 0 3px 10px rgba(0, 0, 0, 0.6);
-      }
-      .mb-etal-crans {
-        position: absolute; inset: 0; pointer-events: none;
-        background: repeating-linear-gradient(90deg, transparent 0 calc(10% - 1px), rgba(200, 230, 255, 0.14) calc(10% - 1px) 10%);
-      }
-      .mb-etal-fluide {
-        position: absolute; top: 0; bottom: 0; left: 0; width: 0%;
-        background:
-          repeating-linear-gradient(-60deg, rgba(255, 255, 255, 0.08) 0 8px, transparent 8px 18px),
-          linear-gradient(180deg, #6dffcf, #1d8c74 60%, #14705e);
-        background-size: 60px 100%, 100% 100%;
-        border-radius: 0 8px 8px 0;
-        animation: mb-etal-rayures 1.2s linear infinite;
-      }
-      @keyframes mb-etal-rayures {
-        from { background-position: 0 0, 0 0; }
-        to { background-position: 60px 0, 0 0; }
-      }
-      /* la vaguelette qui court sur le fluide : la jauge VIT même immobile */
-      .mb-etal-fluide::after {
-        content: ''; position: absolute; inset: 0;
-        background: linear-gradient(105deg, transparent 30%, rgba(255, 255, 255, 0.28) 46%, transparent 62%);
-        background-size: 220% 100%;
-        animation: mb-etal-reflet 2.6s linear infinite;
-      }
-      @keyframes mb-etal-reflet {
-        from { background-position: 130% 0; }
-        to { background-position: -90% 0; }
-      }
-      .mb-etal-lueur {
-        position: absolute; top: -4px; bottom: -4px; left: 0%; width: 12px;
-        margin-left: -6px; border-radius: 6px;
-        background: rgba(160, 255, 225, 0.95);
-        filter: blur(5px); opacity: 0;
-      }
-      .mb-etal.coule .mb-etal-lueur { opacity: 1; }
-      /* palier franchi : le tube entier s'embrase un instant */
-      .mb-etal-tube.eclair { animation: mb-etal-eclair 0.7s ease-out; }
-      @keyframes mb-etal-eclair {
-        0% { box-shadow: inset 0 3px 10px rgba(0, 0, 0, 0.6), 0 0 0 rgba(109, 255, 184, 0); }
-        30% { box-shadow: inset 0 0 22px rgba(160, 255, 225, 0.9), 0 0 44px rgba(109, 255, 184, 0.9); border-color: var(--mb-menthe); }
-        100% { box-shadow: inset 0 3px 10px rgba(0, 0, 0, 0.6), 0 0 0 rgba(109, 255, 184, 0); }
-      }
       .mb-etal-tampon {
-        margin: 12px auto 0; width: fit-content;
+        margin: 6px 0 0; width: fit-content;
         font-family: var(--font-display);
         font-size: calc(12px * var(--ui)); letter-spacing: 0.22em; color: var(--mb-or);
-        border: 2px solid var(--mb-or); border-radius: 5px; padding: 7px 14px;
+        border: 2px solid var(--mb-or); padding: 7px 14px;
         transform: rotate(-2deg);
         animation: mb-tampon 0.4s cubic-bezier(0.2, 2.2, 0.4, 1);
         text-shadow: 0 0 18px rgba(255, 217, 119, 0.5);
       }
       .mb-etal-tampon[hidden] { display: none; }
-      /* LA JAUGE MINCE : la coulée finie, elle se replie sur UNE ligne. En
+      /* la barre mince ne sert que repliée */
+      .mb-etal-barre { display: none; }
+      .mb-etal-barre i {
+        display: block; height: 100%; width: calc(var(--p, 0) * 100%);
+        background: linear-gradient(180deg, #6dffcf, #1d8c74 60%, #14705e);
+      }
+      /* L'ANNEAU SE BRISE : le palier franchi, la case brisée de la planche
+         remplace l'intacte ; elle éclate d'or, et ses morceaux s'écartent.
+         Au palier, tout anneau brisé est écarté — celui qu'on vient de
+         casser comme ceux qu'un saut ou un réarmement repose d'emblée ;
+         sans animation, c'est cet état qu'on voit. */
+      .mb-etal .mb-anneau-brise { transform: scale(1.12, 1.05); }
+      .mb-anneau.mb-anneau-casse {
+        animation: mb-anneau-casse 0.7s cubic-bezier(0.2, 1.4, 0.4, 1) backwards;
+      }
+      @keyframes mb-anneau-casse {
+        0% { transform: scale(0.96); filter: brightness(2.2) drop-shadow(0 0 14px rgba(255, 217, 119, 1)); }
+        100% { transform: scale(1.12, 1.05); filter: none; }
+      }
+      /* LA MAÎTRISE REPLIÉE : la coulée finie, elle tient sur UNE ligne. En
          grand, tampon « TIRAGE OUVERT » compris, elle restait en scène après
          le tirage — 160 px qui poussaient les portes sous le bas d'un écran
-         de 800 px, sous un tampon qui annonçait un tirage déjà pris. */
+         de 800 px, sous un tampon qui annonçait un tirage déjà pris. La
+         colonne s'efface ; une barre mince dit où l'on en est du segment. */
       .mb-etal.mb-mince {
-        display: flex; align-items: center; gap: 16px; padding: 6px 14px; animation: none;
+        --mb-c: 10px;
+        display: flex; align-items: center; gap: 14px; padding: 6px 16px; animation: none;
+        clip-path: polygon(var(--mb-c) 0, calc(100% - var(--mb-c)) 0, 100% var(--mb-c), 100% calc(100% - var(--mb-c)), calc(100% - var(--mb-c)) 100%, var(--mb-c) 100%, 0 calc(100% - var(--mb-c)), 0 var(--mb-c));
+        background: linear-gradient(180deg, var(--mb-tole-haut), var(--mb-tole-bas));
+        box-shadow: inset 0 0 0 1px var(--mb-arete);
       }
       .mb-etal.mb-mince[hidden] { display: none; }
-      .mb-etal.mb-mince .mb-etal-tete { margin: 0; gap: 12px; flex: none; }
-      .mb-etal.mb-mince .mb-etal-nom small,
-      .mb-etal.mb-mince .mb-etal-xp i,
+      .mb-etal.mb-mince .mb-etal-colonne,
       .mb-etal.mb-mince .mb-etal-tampon,
+      .mb-etal.mb-mince .mb-etal-xp i,
       .mb-etal.mb-mince .mb-etal-palier small { display: none; }
-      .mb-etal.mb-mince .mb-etal-xp b { font-size: calc(15px * var(--ui)); }
-      .mb-etal.mb-mince .mb-etal-jauge { flex: 1; gap: 10px; }
-      .mb-etal.mb-mince .mb-etal-palier {
-        flex-basis: 30px; width: 30px; height: 30px; box-shadow: none; border-width: 1px;
+      .mb-etal.mb-mince .mb-etal-gauche { flex: none; flex-direction: row; align-items: baseline; gap: 12px; }
+      .mb-etal.mb-mince .mb-etal-xp b { font-size: calc(15px * var(--ui)); text-shadow: none; }
+      .mb-etal.mb-mince .mb-etal-droite { display: contents; }
+      .mb-etal.mb-mince .mb-etal-palier { order: 1; }
+      .mb-etal.mb-mince .mb-etal-palier b { font-size: calc(13px * var(--ui)); }
+      .mb-etal.mb-mince .mb-etal-palier:not(.d) {
+        padding: 3px 10px; background: var(--mb-coque-claire); box-shadow: inset 0 0 0 1px var(--mb-arete);
+        clip-path: polygon(6px 0, calc(100% - 6px) 0, 100% 50%, calc(100% - 6px) 100%, 6px 100%, 0 50%);
       }
-      .mb-etal.mb-mince .mb-etal-palier b { font-size: calc(12px * var(--ui)); }
-      .mb-etal.mb-mince .mb-etal-palier.d {
-        flex-basis: auto; width: auto; height: auto; border: 0; background: none; border-radius: 0;
+      .mb-etal.mb-mince .mb-etal-barre {
+        display: block; order: 2; flex: 1; height: 10px;
+        background: rgba(6, 12, 20, 0.95); box-shadow: inset 0 0 0 1px var(--mb-arete);
       }
+      .mb-etal.mb-mince .mb-etal-palier.d { order: 3; }
       .mb-etal.mb-mince .mb-etal-palier.d b { font-size: calc(11px * var(--ui)); }
-      .mb-etal.mb-mince .mb-etal-tube { height: 10px; border-radius: 5px; box-shadow: none; }
-      .mb-etal.mb-mince .mb-etal-lueur { display: none; }
-      /* LE PALIER TRAVERSE L'ÉCRAN : une bande menthe qui s'ouvre de la
-         gauche, tient une seconde et se referme à droite — le « level up » */
+      /* LE PALIER TRAVERSE L'ÉCRAN : une POUTRE de la station (la primitive
+         .mb-poutre : profil effilé, rivets, bandes de danger) entre par la
+         gauche, tient une seconde au milieu et ressort à droite — le « level
+         up ». Son halo est dans le texte : le clip-path de la poutre
+         rognerait une ombre portée. */
       .mb-palier-eclair {
-        position: absolute; left: 0; right: 0; top: 50%; z-index: 5; pointer-events: none;
-        transform: translateY(-50%) skewY(-3deg); text-align: center; padding: 22px 0 18px;
-        background: linear-gradient(90deg, transparent, rgba(109, 255, 184, 0.16) 18%, rgba(109, 255, 184, 0.3) 50%, rgba(109, 255, 184, 0.16) 82%, transparent);
-        border-top: 1px solid rgba(109, 255, 184, 0.55);
-        border-bottom: 1px solid rgba(109, 255, 184, 0.55);
-        backdrop-filter: blur(2px);
+        position: absolute; left: 8%; right: 8%; top: 50%; z-index: 5; pointer-events: none;
+        min-height: 0; padding-top: 14px; padding-bottom: 12px;
+        transform: translate(0, -50%) rotate(-3deg);
         animation: mb-eclair-passe 1.6s cubic-bezier(0.2, 1, 0.3, 1) both;
       }
       .mb-palier-eclair[hidden] { display: none; }
       .mb-palier-eclair b {
-        display: block; font-family: var(--font-display); font-weight: 600;
-        font-size: calc(clamp(28px, 5vw, 52px) * var(--ui)); letter-spacing: 0.34em;
-        color: var(--mb-encre); text-shadow: 0 0 34px var(--mb-menthe), 0 0 70px rgba(109, 255, 184, 0.5);
+        display: block; font-family: var(--font-display); font-weight: 400; line-height: 1.1;
+        font-size: calc(clamp(26px, 4.4vw, 48px) * var(--ui)); letter-spacing: 0.34em;
+        color: var(--mb-encre); text-shadow: 0 0 26px rgba(255, 217, 119, 0.75), 0 0 60px rgba(255, 217, 119, 0.35);
       }
       .mb-palier-eclair i {
         display: block; font-style: normal; font-family: var(--font-display);
-        font-size: calc(10px * var(--ui)); letter-spacing: 0.5em; color: var(--mb-menthe);
-        margin-top: 6px;
+        font-size: calc(11px * var(--ui)); letter-spacing: 0.5em; color: var(--mb-or);
+        margin-top: 4px;
       }
       @keyframes mb-eclair-passe {
-        0% { clip-path: inset(0 100% 0 0); }
-        22% { clip-path: inset(0 0 0 0); }
-        78% { clip-path: inset(0 0 0 0); }
-        100% { clip-path: inset(0 0 0 100%); }
+        0% { transform: translate(-110vw, -50%) rotate(-3deg); }
+        24%, 76% { transform: translate(0, -50%) rotate(-3deg); }
+        100% { transform: translate(110vw, -50%) rotate(-3deg); }
       }
       /* ---- LA SCÈNE DU CHOIX ---- */
       .mb-choix { animation: mb-monte 0.4s ease-out; }
@@ -9115,6 +9098,12 @@
         background: linear-gradient(105deg, transparent 35%, rgba(255, 255, 255, 0.5) 50%, transparent 65%);
         background-size: 250% 100%; animation: mb-etal-reflet 2.4s linear infinite;
       }
+      /* le reflet qui court (né sur l'ancienne jauge de maîtrise, gardé pour
+         le bouton : la jauge est devenue une colonne) */
+      @keyframes mb-etal-reflet {
+        from { background-position: 130% 0; }
+        to { background-position: -90% 0; }
+      }
       @keyframes mb-respire {
         0%, 100% { box-shadow: 0 0 0 2px rgba(109, 255, 184, 0.35), 0 10px 30px rgba(109, 255, 184, 0.25); }
         50% { box-shadow: 0 0 0 6px rgba(109, 255, 184, 0.18), 0 10px 44px rgba(109, 255, 184, 0.45); }
@@ -9407,9 +9396,12 @@
         .mb-module-total { grid-column: 1 / -1; align-items: flex-start; }
         .mb-module-total b { font-size: calc(28px * var(--ui)); }
         .mb-module-salles li { flex-basis: calc(96px * var(--ui)); }
-        .mb-etal-nom small { display: block; margin: 4px 0 0; }
+        /* le palier : la colonne plus courte, les chiffres resserrés */
+        .mb-etal { --mb-etal-h: min(34vh, 290px); column-gap: 14px; }
+        .mb-etal-xp b, .mb-etal-palier b { font-size: calc(28px * var(--ui)); }
+        .mb-etal-tampon { padding: 5px 8px; letter-spacing: 0.12em; }
         .mb-etal.mb-mince { flex-wrap: wrap; gap: 6px 12px; }
-        .mb-etal.mb-mince .mb-etal-jauge { flex-basis: 100%; }
+        .mb-etal.mb-mince .mb-etal-barre { flex-basis: 100%; order: 4; }
         .mb-cartes, .mb-cartes.mb-draft, .mb-cartes.mb-trio,
         .mb-cartes:has(.mb-porte) { grid-template-columns: 1fr; }
         .mb-pli, .mb-pli .crt-draft { min-height: 0; }
@@ -9442,6 +9434,13 @@
         .mb-releve { --mb-coeur-l: 260px; }
         .mb-rang { --mb-sceau-l: 136px; }
       }
+      /* le téléphone couché (844 × 390) : la colonne tombait à 90 px sous
+         des chiffres de 46 px — le héros n'était plus qu'une vignette. Les
+         chiffres rapetissent, la colonne prend la hauteur qu'ils rendent */
+      @media (max-height: 480px) and (min-width: 761px) {
+        .mb-etal { --mb-etal-h: calc(100vh - 262px); }
+        .mb-etal-xp b, .mb-etal-palier b { font-size: calc(28px * var(--ui)); }
+      }
       /* ---- MOINS D'ANIMATIONS : le jeu reste le même, sans le spectacle.
          Chaque mise en scène retombe sur son état final. ---- */
       @media (prefers-reduced-motion: reduce) {
@@ -9454,7 +9453,7 @@
         .mb-sur, .mb-titre, .mb-etoiles i.mb-on, .mb-cuve-liquide::after,
         .mb-prime, .mb-record, .mb-etal, .mb-etal-palier.saute,
         .mb-module-tete, .mb-module-sceau, .mb-module-salles li,
-        .mb-etal-fluide, .mb-etal-fluide::after, .mb-etal-tube.eclair, .mb-etal-tampon,
+        .mb-etal-tampon, .mb-anneau.mb-anneau-casse,
         .mb-palier-eclair, .mb-choix, .mb-pli, .mb-pli .crt-draft::after,
         .mb-cartes.mb-elu .mb-pli:not(.mb-elu-c), .mb-pli.mb-elu-c, .mb-carte, .mb-ico,
         .mb-goutte, .mb-goutte-corps, .mb-flux, .mb-dest, .mb-dest.mb-dest-palier, .mb-anneau-franchit,
@@ -9462,7 +9461,8 @@
         .mb-porte-vue::after, .mb-cartes.mb-elu .mb-porte:not(.mb-elue), .mb-porte.mb-elue,
         .mb-station-carte { animation: none; }
         .mb-cuve-liquide::before, .mb-cuve-liquide::after, .mb-ligne, .mb-pli, .mb-carte, .mb-porte,
-        .mb-station-carte, .mb-goutte-corps, .mb-dest { transition: none; }
+        .mb-station-carte, .mb-goutte-corps, .mb-dest,
+        .mb-etal .mb-vidange::before, .mb-etal .mb-vidange::after { transition: none; }
         /* l'anneau qu'un versement franchirait luit, sans battre ; la
            colonne qui franchit garde son arête allumée */
         .mb-anneau-franchit { filter: drop-shadow(0 0 8px rgba(255, 217, 119, 0.85)); }
@@ -11280,22 +11280,24 @@
           </div>
           <div class="mb-gains" id="mb-gains"></div>
         </section>
-        <!-- La JAUGE D'ÉTALONNAGE : l'XP se voit couler, palier par palier -->
+        <!-- LE PALIER : la COLONNE DE MAÎTRISE du versement, en grand (cuveHTML
+             et ses anneaux, posés par main.ts dans #mb-etal-colonne) ; à
+             gauche les litres qui roulent, à droite le compte des paliers et
+             le prochain. Le liquide monte, l'anneau du palier franchi se
+             brise. La coulée finie (fin de salle), elle se replie sur une
+             ligne : la colonne s'efface, une barre mince la remplace. -->
         <div class="mb-etal" id="mb-etal" hidden>
-          <div class="mb-etal-tete">
-            <span class="mb-etal-nom">MAÎTRISE<small>les litres qu’on y verse — chaque palier ouvre un tirage d’instrument</small></span>
+          <div class="mb-etal-gauche">
+            <span class="mb-etal-nom" title="Maîtrise : les litres qu’on y verse — chaque palier ouvre un tirage d’instrument">MAÎTRISE</span>
             <span class="mb-etal-xp"><b id="mb-etal-l">0,0</b> L<i id="mb-etal-gain" hidden></i></span>
           </div>
-          <div class="mb-etal-jauge">
-            <div class="mb-etal-palier" id="mb-etal-pg"><b>0</b><small>palier</small></div>
-            <div class="mb-etal-tube" id="mb-etal-tube">
-              <div class="mb-etal-fluide" id="mb-etal-fluide"></div>
-              <div class="mb-etal-lueur" id="mb-etal-lueur"></div>
-              <div class="mb-etal-crans" aria-hidden="true"></div>
-            </div>
-            <div class="mb-etal-palier d" id="mb-etal-pd"><b>3 L</b><small>prochain</small></div>
+          <div class="mb-etal-colonne" id="mb-etal-colonne"></div>
+          <div class="mb-etal-droite">
+            <div class="mb-etal-palier" id="mb-etal-pg"><small>PALIER</small><b>0</b></div>
+            <div class="mb-etal-palier d" id="mb-etal-pd"><small>prochain</small><b>3 L</b></div>
+            <div class="mb-etal-tampon" id="mb-etal-tampon" hidden>PALIER 1 — TIRAGE OUVERT</div>
           </div>
-          <div class="mb-etal-tampon" id="mb-etal-tampon" hidden>PALIER 1 — TIRAGE OUVERT</div>
+          <div class="mb-etal-barre" aria-hidden="true"><i id="mb-etal-barre"></i></div>
         </div>
         <!-- LA SCÈNE DU CHOIX : versement, tirage, portes, plan -->
         <div class="mb-choix" id="mb-choix" hidden>
@@ -11306,8 +11308,9 @@
              à Espace et à A (il a le focus dès l'ouverture) -->
         <button type="button" class="mb-levier mb-passer" id="mb-passer">PASSER ▸</button>
       </div>
-      <!-- LE PALIER FRANCHI traverse l'écran : une bande, pas une ligne -->
-      <div class="mb-palier-eclair" id="mb-palier-eclair" hidden><b id="mb-palier-eclair-no">PALIER 1</b><i>TIRAGE OUVERT</i></div>
+      <!-- LE PALIER FRANCHI traverse l'écran : une POUTRE de la station,
+           pas une ligne -->
+      <div class="mb-palier-eclair mb-poutre" id="mb-palier-eclair" hidden><b id="mb-palier-eclair-no">PALIER 1</b><i>TIRAGE OUVERT</i></div>
     </div>
     <!-- LE MARCHAND DU HUB : le Semblable du comptoir vend ce qui dure — la maquette « Marchand v2 » (game/ecranMarchand.ts) -->
     <div id="marchand" hidden aria-label="Le marchand"></div>
