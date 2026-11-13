@@ -15385,6 +15385,10 @@ function mbPeintEtal(xp: number, col: Colonne = colonneMaitrise(xp)): void {
  *  800 px, sous un tampon qui annonçait un tirage déjà pris. */
 function mbJaugeMince(): void {
   const etal = mbEl('mb-etal')
+  // le compte des paliers garde sa classe « saute » du dernier palier : la
+  // colonne réaffichée, l'animation repartait — un PALIER doré qui
+  // sautait encore en fin de salle, pour un palier franchi bien avant
+  mbEl('mb-etal-pg').classList.remove('saute')
   etal.hidden = false
   etal.classList.add('mb-mince')
   mbEl('mb-etal-tampon').hidden = true
@@ -15555,12 +15559,16 @@ function mbAnimeEtalonnage(
   // restait au-dessus du tirage et le poussait sous le bas d'un écran de
   // 720 px (730 px de scène pour 717 visibles, mesuré au banc) ; la fin
   // de salle la rappelle repliée (mbJaugeMince)
+  // La POUTRE du palier part avec elle : son minuteur la gardait 1,65 s,
+  // et un palier franchi en fin de coulée la faisait courir au-dessus des
+  // cartes du tirage
   const part = (): void => {
     if (parti || !miseEnBonbonne || mbEtape !== 'etalonnage') return // déjà fait, ou cérémonie fermée
     parti = true
     mbEtalSaute = null
     levier.hidden = true
     etal.hidden = true
+    mbEl('mb-palier-eclair').hidden = true
     onDone()
   }
   const finit = (attente: number): void => {

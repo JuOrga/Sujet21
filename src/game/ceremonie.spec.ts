@@ -664,6 +664,17 @@ describe('la cérémonie — le palier', () => {
     expect(part).toContain('levier.hidden = true')
     expect(part).toContain('etal.hidden = true')
   })
+  // la poutre restait 1,65 s : un palier franchi en fin de coulée la
+  // faisait courir au-dessus des cartes du tirage ; et le compte réaffiché
+  // en fin de salle rejouait son saut doré (relecture de F4)
+  it('ne laisse pas la poutre du palier courir au-dessus des cartes', () => {
+    const f = corps('mbAnimeEtalonnage')
+    const part = f.slice(f.indexOf('const part = '), f.indexOf('onDone()', f.indexOf('const part = ')))
+    expect(part).toContain("mbEl('mb-palier-eclair').hidden = true")
+  })
+  it('replie la maîtrise sans rejouer le saut doré du compte des paliers', () => {
+    expect(corps('mbJaugeMince')).toContain("mbEl('mb-etal-pg').classList.remove('saute')")
+  })
   it('n’écrit plus d’étiquette sous 10 px', () => {
     for (const s of ['.mb-etal-nom', '.mb-etal-palier small']) {
       const t = /font-size:\s*calc\((\d+(?:\.\d+)?)px/.exec(regle(s))
