@@ -108,7 +108,7 @@ def carreau(sc, mats, nom, bati, extra=None):
     C = sous(P, nom + '-carreau')
     at = Atelier()
     bati(at, random.Random(len(nom) * 97))
-    at.objets(C, mats, {'panneau': 0.0022, 'rail': 0.0016, 'lame': 0.0006, 'plat': 0.0012}, prefixe=nom)
+    at.objets(C, mats, {'panneau': 0.0022, 'peinture': 0.0022, 'rail': 0.0016, 'lame': 0.0006, 'plat': 0.0012}, prefixe=nom)
     if extra:
         extra(C, mats)
     fond(P, mats)
@@ -460,6 +460,63 @@ def bati_phobe(at, rng):
         at.dome('goutte', x, z, r, 0.0, 0, aplati=0.75)
 
 
+# ------------------------------------------------------- la seconde paroi
+# wall-a : la paroi qui alterne avec le mur sur les longs murs (le shader
+# fond l'une dans l'autre selon un bruit très lent, à l'échelle 520 contre
+# 230). Elle doit donc être PLUS FOUILLÉE que le mur, dans le même acier
+# froid — c'est le relief qui rompt la répétition, pas la couleur. La mise
+# en page et les panneaux sont ceux de la tôle de la chaufferie (dispose,
+# plaque, nervures, trappe), sans ce qui y dit la chaleur : ni matelas, ni
+# suie, ni veilleuse ambre.
+
+def bati_wall_a(at, rng):
+    g = JEU / 2
+    for (x0, x1, z0, z1, sorte) in dispose(rng, [0.2, 0.26, 0.18, 0.36], [0.16, 0.22, 0.3, 0.4]):
+        w, h = x1 - x0, z1 - z0
+        a = (x0 + g, x1 - g, z0 + g, z1 - g)
+        yf = rng.choice((0.0, 0.0, -0.003, -0.006))
+        var = rng.uniform(-1, 1)
+        t = rng.random()
+        if sorte is None and t < 0.2 and w >= 0.16:
+            nervures(at, *a, yf, var)
+        elif sorte is None and t < 0.34 and w >= 0.14 and h >= 0.14:
+            trappe(at, *a, yf, var)
+        elif sorte is None and t < 0.48 and w >= 0.2 and h >= 0.16:
+            plaque(at, *a, yf, var)
+            grille(at, a[0] + 0.03, a[1] - 0.03, a[2] + 0.03, a[3] - 0.03, var)
+        else:
+            plaque(at, *a, yf, var)
+            # une plaque nue sur deux porte un petit équipement : sans eux, la
+            # paroi sortait plus propre et plus sage que le mur (essai 1)
+            if w >= 0.1 and h >= 0.1 and rng.random() < 0.55:
+                petit_equipement(at, *a, yf, var, rng)
+    # deux faisceaux de conduites verticales, qui font le tour du carreau
+    for xc in (rng.uniform(0.05, 0.4), rng.uniform(0.55, 0.9)):
+        for k, dx in enumerate((-0.011, 0.011)):
+            at.tube('tuyau', (xc + dx, -0.016, -0.02), (xc + dx, -0.016, 1.02), 0.0075, seg=16)
+        for i in range(4):
+            z = (i + 0.5) / 4 + rng.uniform(-0.04, 0.04)
+            at.boite('lame', xc - 0.024, xc + 0.024, z - 0.007, z + 0.007, -0.026, -0.006, 0)
+
+
+def petit_equipement(at, x0, x1, z0, z1, yf, var, rng):
+    """un boîtier de raccordement, ou des fentes d'aération, dans un coin de
+    la plaque"""
+    if rng.random() < 0.5:
+        bw, bh = min(0.08, (x1 - x0) * 0.5), min(0.06, (z1 - z0) * 0.5)
+        bx = x0 + 0.02 if rng.random() < 0.5 else x1 - 0.02 - bw
+        bz = z0 + 0.02 if rng.random() < 0.5 else z1 - 0.02 - bh
+        at.boite('peinture', bx, bx + bw, bz, bz + bh, yf - 0.01, yf, var)
+        at.boite('fond', bx + 0.008, bx + bw - 0.008, bz + bh - 0.016, bz + bh - 0.01, yf - 0.0105, yf - 0.009, 0)
+    else:
+        n = rng.randint(3, 5)
+        sx = x0 + 0.025
+        sz = z1 - 0.03
+        for i in range(n):
+            z = sz - i * 0.012
+            at.boite('fond', sx, sx + min(0.07, (x1 - x0) * 0.45), z - 0.0025, z + 0.0025, yf - 0.0005, yf + 0.002, 0)
+
+
 def gouttes_lisses(C, mats):
     """les gouttes en facettes de dix sur six se lisaient comme des clous :
     lissées, elles prennent un reflet rond"""
@@ -506,5 +563,12 @@ def surfaces():
     # son reflet qui la dessine
     mats['goutte'] = mat_simple('goutte', (0x3c, 0x2c, 0x52), rug=0.04)
     carreau(sc, mats, 'phobe', bati_phobe, extra=gouttes_lisses)
+    # la seconde paroi : l'acier du mur, un rien plus vert et plus usé
+    # (l'ancienne mesurait 0,17 de luminance ; à 223032 / 46585a, 0,137 :
+    # plus sombre que le mur, elle s'y lisait en tache)
+    mats_a = dict(mats)
+    mats_a['peinture'] = mat_brosse('paroi-a', (0x27, 0x36, 0x38), (0x50, 0x63, 0x65), 43, brosse=0.08, rouille=(0x2c, 0x32, 0x2c))
+    mats_a['rivet'] = mats_a['panneau'] = mats_a['peinture']
+    carreau(sc, mats_a, 'wall-a', bati_wall_a)
     lumiere_camera(sc)
     sc.cycles.device = 'GPU'

@@ -93,6 +93,13 @@ Négatif : négatif commun + `green, emerald, brown background, perspective,
 tilt, off-center, motion blur`
 
 ## 5. Texture mur neutre — `wall.webp` ✗ À REFAIRE
+
+> ✅ **Le mur et la seconde paroi sont dessinés dans Blender** (`tools/images/blender/surfaces.py`) : `wall` le 12/11, `wall-a` le 13/11 —
+> la mise en page de la tôle de la chaufferie dans l'acier froid du mur,
+> nervures, trappes, évents, petits boîtiers, deux faisceaux de conduites
+> verticales ; luminance 0,15 (0,17 avant), raccord 0,5 / 0,3 (1,0 / 1,7),
+> 19 Ko (207), livrée à 1024² comme le reste de la famille. Ce qui suit
+> reste pour mémoire.
 **1024×1024 · PNG · tileable sur les deux axes**
 
 Le mur par défaut montre sa couture : raccord vertical **4,7** (seuil 3,0),
