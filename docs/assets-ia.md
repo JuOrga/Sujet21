@@ -2353,11 +2353,14 @@ atelier() ; lance(ICONES, SORTIE, 192)   # SORTIE : masters\images\ceremonie (av
 ```
 
 (l'`exec` et `lance` dans le même appel : le MCP ne garde rien d'un appel à
-l'autre). Chaque case est rendue à 1024² (2048 px par unité), 192
+l'autre ; la même forme d'`exec` qu'en tête de `ceremonie.py`). **`atelier()`
+bascule la fenêtre de Blender sur la scène `ceremonie`** (le rendu prend la
+scène de la fenêtre) : la scène d'origine reste intacte, mais il faut y
+revenir à la main, dans le sélecteur de scènes. Chaque case est rendue à 1024² (2048 px par unité), 192
 échantillons sans débruiteur, ~2 s par case. Puis, hors de Blender :
 
 ```bash
-python -I tools/images/blender/ceremonie.py masters/images/ceremonie masters/images/ceremonie-icones.png controle.png
+python -I tools/images/blender/ceremonie.py icones masters/images/ceremonie masters/images/ceremonie-icones.png controle.png
 python3 tools/images/prepare.py ceremonie-icones
 ```
 
@@ -2367,4 +2370,52 @@ le fond du voile — c'est elle qu'on regarde pour juger la lisibilité.
 
 **Mesuré à la livraison** : luminance 0,30, 1 % de pixels chauds, bord vide,
 **301 Ko** (qualité 82). Le test `LIVREES` de `src/game/ceremonieObjets.spec.ts`
-vérifie que la planche est là et qu'elle mesure 7 × 512 sur 4 × 512.
+vérifie que la planche est là et qu'elle mesure 7 × 512 sur 4 × 512 ; un
+autre y compare la liste `ICONES` de `ceremonie.py` (lue en texte) à
+`ICONES_CEREMONIE` : l'ordre est écrit deux fois, en Python et en TS.
+
+### 36b. Les sceaux — `ceremonie-sceaux.webp` ✅ LIVRÉ (13/11)
+
+**1536×1024 · transparente · 3 × 2 cases de 512²**, dans l'ordre de
+`ORDRE_SCEAUX` (`src/game/ceremonieObjets.ts`) : S, A, B, C, D, module —
+recopié dans la liste `SCEAUX` de `ceremonie.py`, et comparé par le même test.
+
+Six médaillons octogonaux en **acier neutre, sans teinte** : le CSS
+(`.mb-sceau`) les découpe par un `clip-path` octogonal régulier qui touche
+les quatre bords du cadre, puis les teinte par `--mb-rang` en mélange
+« color » à 0,85 — la teinte de l'image disparaît, seule sa luminance reste.
+Le médaillon est donc ce même octogone (côtés plats sur les axes), de 504
+px sur 512 (4 px de marge : le bord de la planche reste vide), une couronne
+rivetée, une marche, un champ gris moyen où s'écrit le mot du rang, et une
+gravure EN RELIEF — l'arête claire et l'ombre qu'elle porte sous les soleils
+de l'atelier font tout le dessin une fois teinté.
+
+La gravure dit le **régime d'écoulement** (`ceremonie.ts`), du lisse au
+strié figé : S superfluide, un champ poli et une lentille sans une ride ;
+A laminaire, des filets droits et parallèles ; B turbulent, des filets qui
+ondulent et deux tourbillons ; C visqueux, six bourrelets épais qui enflent
+et maigrissent ; D figé, les filets droits du laminaire pris dans la masse,
+en arête vive, cassés par trois failles en biais (chaque bloc a glissé d'un
+cran) et traversés d'une fêlure. Le sceau de module porte le plan octogonal
+d'un module : la coque, les coursives en croix, quatre salles, le nœud
+central et ses quatre sas. (Un premier D en zigzag se lisait en
+vaguelettes : de l'eau qui coule encore.)
+
+**Refaire** — même atelier, même appel unique :
+`sceaux() ; lance(SCEAUX, SORTIE, 192)` (SORTIE : `masters\images\sceaux`,
+avec `brut\` et `alpha\`), qui bascule aussi la fenêtre sur la scène
+`ceremonie`. Puis :
+
+```bash
+python -I tools/images/blender/ceremonie.py sceaux masters/images/sceaux masters/images/ceremonie-sceaux.png controle.png
+python3 tools/images/prepare.py ceremonie-sceaux
+```
+
+On juge le rendu TEINT : une simulation du calque CSS (mélange « color » à
+0,85 aux cinq teintes de rang) a été regardée avant livraison ; chaque
+gravure s'y lit.
+
+**Mesuré à la livraison** : luminance 0,27, aucun pixel chaud, bord vide,
+**70 Ko** (qualité 82) ; chaque octogone occupe 4 à 507 px de sa case, et
+remplit 80,2 % du carré — l'aire de l'octogone régulier à cette taille. La
+planche est dans `LIVREES`, et sa taille (3 × 512 sur 2 × 512) est vérifiée.

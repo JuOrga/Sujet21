@@ -148,10 +148,11 @@ FAMILLES: list[Famille] = [
     # générique ne les mesurerait comme il faut. Plafonds de chauds : ceux
     # par défaut ; le lot Blender ajuste les poids quand il les a MESURÉS.
     Famille(
-        # mesuré le 13/11 : la planche des icônes (3584×2048, 26 cases
-        # pleines) pèse 301 Ko à la qualité 82, luminance 0,30, 1 % de
-        # chauds (les bandes ocre du danger, la prime du tirage). Les sceaux
-        # (1536×1024) et l'anneau (1024×512), plus petits, tiennent dessous
+        # le plafond, d'après ce qui est MESURÉ (13/11, qualité 82) : les
+        # icônes (3584×2048, 26 cases pleines) 301 Ko, luminance 0,30, 1 % de
+        # chauds (les bandes ocre du danger, la prime du tirage) ; les sceaux
+        # (1536×1024, acier neutre) 70 Ko, luminance 0,27, aucun chaud.
+        # L'anneau n'est pas encore rendu : sa livraison dira s'il tient
         'planche de cérémonie', ('ceremonie-icones', 'ceremonie-sceaux', 'ceremonie-anneau'),
         alpha=True, cote_max=4096, poids_max_ko=400,
         note='grille de cases carrées de 512² (icônes 7×4, sceaux 3×2, anneau 2×1) — l’ordre des cases est un contrat avec src/game/iconesStation.ts et ceremonieObjets.ts',

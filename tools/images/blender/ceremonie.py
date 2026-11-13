@@ -1,4 +1,4 @@
-"""L'ATELIER DE LA CÉRÉMONIE « STATION » (13/11) — les pictogrammes rendus qui
+r"""L'ATELIER DE LA CÉRÉMONIE « STATION » (13/11) — les pictogrammes rendus qui
 remplacent les émojis des écrans de récompense, puis du jeu entier.
 
 Pourquoi des objets et pas des pictos plats : la cérémonie se passe DANS la
@@ -19,13 +19,18 @@ rangée i // 7 ; les deux dernières restent vides. C'est un CONTRAT : changer
 l'ordre ici sans le changer là-bas, c'est montrer un manomètre à la place
 d'une bonbonne.
 
-Dans Blender (le rendu ne bloque pas l'appel : lance() passe par un minuteur) :
-    DOSSIER = r'\\\\wsl.localhost\\Ubuntu\\...\\tools\\images\\blender'
-    exec(open(DOSSIER + r'\\ceremonie.py', encoding='utf-8').read())
-    atelier() ; lance(ICONES, SORTIE, 192)
-puis, hors de Blender, l'assemblage de la planche (et une planche de contrôle
+Dans Blender, en UN SEUL appel (le MCP ne garde rien d'un appel à l'autre ;
+le rendu ne bloque pas : lance() passe par un minuteur) :
+    DOSSIER = r'\\wsl.localhost\Ubuntu\home\julian\projets\sujet21\tools\images\blender'
+    exec(compile(open(DOSSIER + r'\ceremonie.py', encoding='utf-8').read(), DOSSIER + r'\ceremonie.py', 'exec'))
+    atelier() ; lance(ICONES, SORTIE, 192)       # la planche d'icônes
+    sceaux() ; lance(SCEAUX, SORTIE, 192)        # la planche des sceaux
+atelier() et sceaux() rendent dans une scène À EUX, `ceremonie`, et y
+basculent la fenêtre : la scène d'origine reste intacte, on y revient à la
+main. Puis, hors de Blender, l'assemblage (et une planche de contrôle
 réduite à 32 et 64 px, pour juger la lisibilité) :
-    python -I tools/images/blender/ceremonie.py <dossier des rendus> masters/images/ceremonie-icones.png [contrôle.png]
+    python -I tools/images/blender/ceremonie.py icones <rendus> masters/images/ceremonie-icones.png [contrôle.png]
+    python -I tools/images/blender/ceremonie.py sceaux <rendus> masters/images/ceremonie-sceaux.png [contrôle.png]
 """
 import math, os, random, sys
 
@@ -39,6 +44,9 @@ ICONES = [
     'orbites', 'cibles', 'minijeu', 'contrepartie',
 ]
 COLONNES, RANGEES, CASE = 7, 4, 512
+# l'ORDRE des sceaux : recopié de ORDRE_SCEAUX (ceremonieObjets.ts), 3 × 2
+SCEAUX = ['S', 'A', 'B', 'C', 'D', 'module']
+COLONNES_SCEAUX, RANGEES_SCEAUX = 3, 2
 
 if DANS_BLENDER:
     import bpy, bmesh
@@ -238,7 +246,7 @@ if DANS_BLENDER:
         return mats
 
     # ------------------------------------------------------- les pictogrammes
-    # Chaque fonction bâtit son objet autour de l'origine, dans |x|, |z| < 0,21
+    # Chaque fonction bâtit son objet autour de l'origine, dans |x|, |z| < 0,215
     # (la case fait ±0,25 : le bord doit rester transparent, prepare.py le
     # mesure). x à droite, z en haut, y vers le fond (la caméra est en -y).
 
@@ -605,8 +613,9 @@ if DANS_BLENDER:
     }
 
     # un agrandissement pour les objets plats ou fins, borné par DEMI_MAX : la
-    # demi-taille d'un objet dans sa case (0,25), qui laisse au moins ~20 px
-    # transparents au bord d'une case de 512 (prepare.py mesure le bord)
+    # demi-taille d'un objet dans sa case (0,25) — mesuré à la livraison du
+    # 13/11, au moins 35 px transparents au bord d'une case de 512 (le bord
+    # est ce que prepare.py contrôle)
     ECHELLE = {'palet': 1.2, 'secours': 1.1, 'couperet': 1.12, 'orbites': 1.1, 'repos': 1.08, 'note': 1.05}
     DEMI_MAX = 0.215
 
@@ -626,12 +635,21 @@ if DANS_BLENDER:
                 if d.users == 0:
                     coll.remove(d)
 
-    def atelier(noms=None):
+    def scene_neuve():
+        """la scène `ceremonie`, neuve, et la fenêtre de Blender basculée
+        dessus (rend() rend la scène de la fenêtre) : revenir à la scène
+        d'origine se fait à la main, dans le sélecteur de scènes"""
         efface()
         PIECES.clear()
         sc = bpy.data.scenes.new('ceremonie')
         fen = bpy.context.window or bpy.context.window_manager.windows[0]
         fen.scene = sc
+        return sc
+
+    def atelier(noms=None):
+        global PREFIXE
+        PREFIXE = 'ico-'
+        sc = scene_neuve()
         mats = matieres_ceremonie()
         for i, nom in enumerate(ICONES):
             if noms and nom not in noms:
@@ -661,29 +679,251 @@ if DANS_BLENDER:
         sc.cycles.device = 'GPU'
         return sc
 
+    # ------------------------------------------------------------ les sceaux
+    # Un MÉDAILLON OCTOGONAL par rang, et celui du module. Le CSS (.mb-sceau,
+    # lot F) le découpe par un clip-path octogonal RÉGULIER qui touche les
+    # quatre bords de son cadre (sommets à 29,3 %, côtés plats en haut, en
+    # bas et sur les flancs) puis le teinte par --mb-rang en mélange
+    # « color » : la teinte remplace celle de l'image, seule sa LUMINANCE
+    # reste. D'où un acier NEUTRE (aucune teinte à laisser traîner, rien de
+    # chaud pour prepare.py) et une gravure en relief, dont l'arête claire
+    # et l'ombre portée portent tout le dessin une fois teinté. Le mot du
+    # rang s'écrit au centre, par-dessus : le champ reste dans les gris moyens.
+    #
+    # La gravure dit le RÉGIME D'ÉCOULEMENT (ceremonie.ts) : du lisse au strié
+    # figé — S superfluide, un champ poli sans une ride ; A laminaire, des
+    # filets droits et parallèles ; B turbulent, des filets qui ondulent et
+    # deux tourbillons ; C visqueux, des bourrelets épais et lents ; D figé,
+    # des stries anguleuses, cassées et décalées, et une fêlure.
+
+    APOTHEME = 0.246     # demi-largeur de plat à plat (la case : 0,25) — 4 px de marge à 512
+    CHAMP = 0.2          # le plat du champ, sous la couronne
+    DISQUE = 0.172       # le rayon de la gravure
+    Y_CHAMP = -0.024     # la face du champ (la caméra est en -y)
+
+    def octo(a):
+        """l'octogone régulier d'apothème a, côtés plats sur les axes (comme
+        le clip-path de .mb-sceau)"""
+        return polygone(0, 0, a / math.cos(math.pi / 8), 8, 0.5)
+
+    def couronne_octo(at, mat, ae, ai, yf, yb, var=0.0):
+        """une couronne octogonale, en huit trapèzes"""
+        E, I = octo(ae), octo(ai)
+        for k in range(8):
+            j = (k + 1) % 8
+            at.prisme(mat, [E[k], E[j], I[j], I[k]], yf, yb, var=var)
+
+    def _trace(self, mat, pts, r, segr=10, var=0.0, y=None):
+        """un filet en relief le long d'une ligne du plan de la caméra :
+        un tube à demi noyé dans le champ. r est un rayon, ou un rayon par
+        point (un bourrelet qui enfle) ; segr=4 : une arête vive"""
+        bm = self._bm(mat)
+        y = Y_CHAMP if y is None else y
+        rs = r if isinstance(r, (list, tuple)) else [r] * len(pts)
+        anneaux = []
+        for i, (x, z) in enumerate(pts):
+            a, b = pts[max(i - 1, 0)], pts[min(i + 1, len(pts) - 1)]
+            tx, tz = b[0] - a[0], b[1] - a[1]
+            n = math.hypot(tx, tz) or 1.0
+            nx, nz = -tz / n, tx / n
+            anneaux.append([bm.verts.new((x + rs[i] * math.cos(2 * math.pi * j / segr + math.pi / segr) * nx,
+                                          y + rs[i] * math.sin(2 * math.pi * j / segr + math.pi / segr),
+                                          z + rs[i] * math.cos(2 * math.pi * j / segr + math.pi / segr) * nz))
+                            for j in range(segr)])
+        faces = []
+        for A, B in zip(anneaux, anneaux[1:]):
+            for j in range(segr):
+                k = (j + 1) % segr
+                faces.append(bm.faces.new((A[j], A[k], B[k], B[j])))
+        faces += [bm.faces.new(anneaux[0]), bm.faces.new(list(reversed(anneaux[-1])))]
+        bmesh.ops.recalc_face_normals(bm, faces=faces)
+        self._marque(mat, [v for a in anneaux for v in a], var)
+
+    Atelier.trace = _trace
+
+    def dans_disque(pts, R=DISQUE):
+        """coupe une ligne en tronçons qui restent dans le disque gravé"""
+        tron, cour = [], []
+        for p in pts:
+            if math.hypot(*p) < R:
+                cour.append(p)
+            elif cour:
+                tron.append(cour)
+                cour = []
+        if cour:
+            tron.append(cour)
+        return [t for t in tron if len(t) > 2]
+
+    def filets(at, mat, lignes, r, segr=10):
+        for ligne in lignes:
+            for t in dans_disque(ligne):
+                at.trace(mat, t, r if not callable(r) else [r(x, z) for x, z in t], segr=segr)
+
+    def medaillon(at, champ='champ'):
+        """le médaillon commun : la plaque, la couronne rivetée, la marche
+        intérieure, le champ et le cercle de la gravure"""
+        at.prisme('acier', octo(APOTHEME), -0.02, 0.0, var=0.2)
+        couronne_octo(at, 'acier', APOTHEME, CHAMP, -0.04, -0.02, var=-0.1)
+        couronne_octo(at, 'sombre', CHAMP, CHAMP - 0.01, -0.032, -0.02)
+        at.prisme(champ, octo(CHAMP), Y_CHAMP, -0.02)
+        for k in range(8):
+            a = 2 * math.pi * (k + 0.5) / 8
+            r = (APOTHEME + CHAMP) / 2 / math.cos(math.pi / 8)
+            at.dome('clair', r * math.cos(a), r * math.sin(a), 0.0085, -0.04)
+        at.tore('clair', DISQUE + 0.006, 0.0045, T(0, Y_CHAMP, 0) @ RX(90), seg=96, segr=8)
+
+    def xs(pas=0.004):
+        n = int(0.4 / pas)
+        return [-0.2 + pas * i for i in range(n + 1)]
+
+    def sceau_S(at):
+        # SUPERFLUIDE : un champ poli, une lentille sans une ride
+        medaillon(at, champ='poli')
+        at.tour('poli', [(0, 0.0), (0.15, 0.0), (0.13, 0.006), (0.08, 0.011), (0, 0.013)], M=T(0, Y_CHAMP, 0) @ FACE, seg=96)
+
+    def sceau_A(at):
+        # LAMINAIRE : des filets droits, parallèles, réguliers
+        medaillon(at)
+        filets(at, 'clair', [[(x, z0) for x in xs()] for z0 in [-0.156 + 0.026 * i for i in range(13)]], 0.004)
+
+    def sceau_B(at):
+        # TURBULENT : les filets ondulent, deux tourbillons les déchirent
+        medaillon(at)
+        tourb = [(-0.06, 0.045, 0.06), (0.07, -0.055, 0.055)]
+        lignes = []
+        for i in range(10):
+            z0 = -0.15 + 0.033 * i
+            ligne = []
+            for x in xs():
+                z = z0 + 0.011 * math.sin(x * 26 + i * 1.7)
+                if all(math.hypot(x - cx, z - cz) > r + 0.012 for cx, cz, r in tourb):
+                    ligne.append((x, z))
+                elif ligne:
+                    lignes.append(ligne)
+                    ligne = []
+            lignes.append(ligne)
+        for cx, cz, r in tourb:
+            lignes.append([(cx + (0.008 + r * t / 12.6) * math.cos(t), cz + (0.008 + r * t / 12.6) * math.sin(t))
+                           for t in [0.1 * k for k in range(127)]])
+        filets(at, 'clair', [l for l in lignes if len(l) > 2], 0.004)
+
+    def sceau_C(at):
+        # VISQUEUX : peu de bourrelets, épais, lents, qui enflent et maigrissent
+        medaillon(at)
+        lignes = [[(x, z0 + 0.016 * math.sin(x * 11 + i)) for x in xs(0.005)] for i, z0 in enumerate([-0.135 + 0.054 * k for k in range(6)])]
+        filets(at, 'clair', lignes, lambda x, z: 0.0075 + 0.0035 * math.sin(x * 23 + z * 40))
+
+    def sceau_D(at):
+        # FIGÉ : des stries anguleuses, cassées par des failles et décalées,
+        # en arête vive ; une fêlure les traverse
+        medaillon(at)
+        # (premier essai : des stries en zigzag — elles se lisaient en
+        # vaguelettes, de l'eau qui coule encore. Ici, les filets droits du
+        # laminaire, PRIS dans la masse : trois failles en biais, et chaque
+        # bloc entre deux failles a glissé d'un cran, toutes stries ensemble)
+        failles = [-0.085, 0.0, 0.08]       # x de chaque faille à z = 0
+        biais = 0.45                         # la faille penche : x = f + biais·z
+        rejets = [0.0, 0.011, -0.007, 0.014]  # le glissement de chaque bloc
+        lignes = []
+        for i in range(12):
+            z0 = -0.152 + 0.0285 * i
+            for k in range(4):
+                a = -0.2 if k == 0 else failles[k - 1] + biais * z0
+                b = 0.2 if k == 3 else failles[k] + biais * z0
+                lignes.append([(x, z0 + rejets[k]) for x in xs(0.004) if a + 0.007 < x < b - 0.007])
+        filets(at, 'clair', lignes, 0.005, segr=4)
+        felure = [(-0.14, 0.11), (-0.07, 0.04), (-0.085, 0.01), (-0.01, -0.03), (0.02, -0.075), (0.005, -0.1), (0.07, -0.15)]
+        for (a, b) in zip(felure, felure[1:]):
+            L = math.hypot(b[0] - a[0], b[1] - a[1])
+            ang = math.degrees(math.atan2(b[1] - a[1], b[0] - a[0]))
+            at.boite('fond', (a[0] + b[0]) / 2 - L / 2 - 0.003, (a[0] + b[0]) / 2 + L / 2 + 0.003,
+                     (a[1] + b[1]) / 2 - 0.004, (a[1] + b[1]) / 2 + 0.004, Y_CHAMP - 0.0065, Y_CHAMP + 0.002, rot=RY(-ang))
+
+    def sceau_module(at):
+        # LE MODULE : son plan octogonal — la coque, les coursives en croix,
+        # quatre salles, le nœud central et ses quatre sas
+        medaillon(at)
+        couronne_octo(at, 'clair', 0.135, 0.12, Y_CHAMP - 0.008, Y_CHAMP + 0.002)
+        for rot in (RY(0), RY(90)):
+            at.boite('clair', -0.12, 0.12, -0.009, 0.009, Y_CHAMP - 0.005, Y_CHAMP + 0.002, rot=rot)
+        for sx in (-1, 1):
+            for sz in (-1, 1):
+                at.prisme('clair', chanfrein(sx * 0.062 - 0.03, sx * 0.062 + 0.03, sz * 0.062 - 0.03, sz * 0.062 + 0.03, (0.008,) * 4),
+                          Y_CHAMP - 0.006, Y_CHAMP + 0.002)
+        at.prisme('clair', octo(0.026), Y_CHAMP - 0.009, Y_CHAMP + 0.002)
+        # (boite() tourne autour de son PROPRE centre : chaque sas se place
+        # donc à la main, sur son côté)
+        for (dx, dz) in ((1, 0), (0, 1), (-1, 0), (0, -1)):
+            x0, x1 = sorted((0.135 * dx, 0.162 * dx)) if dx else (-0.016, 0.016)
+            z0, z1 = sorted((0.135 * dz, 0.162 * dz)) if dz else (-0.016, 0.016)
+            at.boite('clair', x0, x1, z0, z1, Y_CHAMP - 0.007, Y_CHAMP + 0.002)
+
+    GRAVURES = {'S': sceau_S, 'A': sceau_A, 'B': sceau_B, 'C': sceau_C, 'D': sceau_D, 'module': sceau_module}
+
+    def matieres_sceaux():
+        mats = matieres_ceremonie()
+        # NEUTRE : la teinte viendra du CSS ; brossé comme l'acier de
+        # l'atelier, mais gris pur
+        mats['acier'] = mat_brosse('sceau-acier', (0x5e, 0x5e, 0x5e), (0xa4, 0xa4, 0xa4), 91, brosse=0.10)
+        mats['champ'] = mat_brosse('sceau-champ', (0x36, 0x36, 0x36), (0x5c, 0x5c, 0x5c), 93, brosse=0.05)
+        mats['sombre'] = mat_simple('sceau-sombre', (0x22, 0x22, 0x22), rug=0.6)
+        mats['clair'] = mat_simple('sceau-clair', (0xb8, 0xb8, 0xb8), rug=0.34, metal=0.2)
+        mats['poli'] = mat_simple('sceau-poli', (0x6c, 0x6c, 0x6c), rug=0.2, metal=0.3)
+        mats['fond'] = mat_simple('sceau-fond', (0x08, 0x08, 0x08), rug=0.9)
+        mats['rivet'] = mats['clair']
+        for m in (mats['acier'], mats['champ']):
+            next(n for n in m.node_tree.nodes if n.type == 'BSDF_PRINCIPLED').inputs['Metallic'].default_value = 0.2
+        return mats
+
+    def sceaux():
+        global PREFIXE
+        PREFIXE = 'sceau-'
+        sc = scene_neuve()
+        mats = matieres_sceaux()
+        for i, nom in enumerate(SCEAUX):
+            P = parent(sc, nom)
+            at = Atelier()
+            GRAVURES[nom](at)
+            cx, cz = (i % COLONNES_SCEAUX) * 0.6, -(i // COLONNES_SCEAUX) * 0.6
+            for bm in at.bm.values():
+                bmesh.ops.transform(bm, matrix=T(cx, 0, cz), verts=bm.verts[:])
+            at.objets(P, mats, {'acier': 0.004, 'sombre': 0.002, 'clair': 0.0015}, lisse=True, prefixe='sceau-' + nom)
+            declare(nom, P, cx - DEMI, cx + DEMI, cz - DEMI, cz + DEMI, alpha=True)
+        lumiere_camera(sc)
+        sc.cycles.device = 'GPU'
+        return sc
+
 
 # ------------------------------------------------- l'assemblage, hors de Blender
-def assemble(dossier, sortie, controle=None):
-    """les rendus détourés (alpha/ico-<nom>.png, 1024²) en une planche 7×4 de
-    cases de 512² ; et, si demandé, une planche de contrôle : chaque icône à
-    32 et à 64 px sur le fond du voile, pour juger la lisibilité"""
+PLANCHES = {
+    # planche : (les cases dans l'ordre, colonnes, rangées, préfixe des rendus)
+    'icones': (ICONES, COLONNES, RANGEES, 'ico-'),
+    'sceaux': (SCEAUX, COLONNES_SCEAUX, RANGEES_SCEAUX, 'sceau-'),
+}
+
+
+def assemble(planche_nom, dossier, sortie, controle=None):
+    """les rendus détourés (alpha/<préfixe><nom>.png, 1024²) en une planche
+    de cases de 512² ; et, si demandé, une planche de contrôle : chaque case
+    à 32 et à 64 px sur le fond du voile, pour juger la lisibilité"""
     from PIL import Image
-    planche = Image.new('RGBA', (COLONNES * CASE, RANGEES * CASE), (0, 0, 0, 0))
+    noms, colonnes, rangees, prefixe = PLANCHES[planche_nom]
+    planche = Image.new('RGBA', (colonnes * CASE, rangees * CASE), (0, 0, 0, 0))
     cases = []
-    for i, nom in enumerate(ICONES):
-        im = Image.open(os.path.join(dossier, 'alpha', 'ico-' + nom + '.png')).convert('RGBA')
+    for i, nom in enumerate(noms):
+        im = Image.open(os.path.join(dossier, 'alpha', prefixe + nom + '.png')).convert('RGBA')
         # prémultiplié pendant la réduction : sinon le noir du vide (alpha
         # nul) bave en liseré sombre autour de l'objet
         im = im.convert('RGBa').resize((CASE, CASE), Image.LANCZOS).convert('RGBA')
-        planche.paste(im, ((i % COLONNES) * CASE, (i // COLONNES) * CASE))
+        planche.paste(im, ((i % colonnes) * CASE, (i // colonnes) * CASE))
         cases.append(im)
     planche.save(sortie)
     if controle:
         fond = (0x0b, 0x12, 0x18, 255)
         pas = 80
-        ctl = Image.new('RGBA', (COLONNES * pas * 2, RANGEES * pas), fond)
+        ctl = Image.new('RGBA', (colonnes * pas * 2, rangees * pas), fond)
         for i, im in enumerate(cases):
-            x, y = (i % COLONNES) * pas * 2, (i // COLONNES) * pas
+            x, y = (i % colonnes) * pas * 2, (i // colonnes) * pas
             for k, cote in enumerate((32, 64)):
                 petit = im.convert('RGBa').resize((cote, cote), Image.LANCZOS).convert('RGBA')
                 ctl.alpha_composite(petit, (x + 8 + k * 44, y + (pas - cote) // 2))
@@ -691,6 +931,4 @@ def assemble(dossier, sortie, controle=None):
 
 
 if __name__ == '__main__' and not DANS_BLENDER:
-    d = sys.argv[1]
-    assemble(d, sys.argv[2] if len(sys.argv) > 2 else os.path.join(d, 'ceremonie-icones.png'),
-             sys.argv[3] if len(sys.argv) > 3 else None)
+    assemble(sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4] if len(sys.argv) > 4 else None)

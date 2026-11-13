@@ -85,6 +85,7 @@ const NOMS: Record<string, string> = {
   'meta-icones.webp': 'Méta — planche d’icônes (4×2)',
   // LA CÉRÉMONIE STATION — rendue dans Blender (docs/assets-ia.md § 36)
   'ceremonie-icones.webp': 'Cérémonie — planche d’icônes (7×4)',
+  'ceremonie-sceaux.webp': 'Cérémonie — sceaux de rang et de module (3×2)',
   // les illustrations du tableau des avaries (public/assets/avaries/<id>.webp),
   // une par station de reparations.ts — la même image éteinte ou allumée
   'eclairage.webp': 'Avarie — réseau d’éclairage',
