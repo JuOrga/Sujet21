@@ -7874,11 +7874,259 @@
         --mb-bleu: #63b7e6;
         --mb-encre: #eaf6ff;
         --mb-rang: #ffd977;
+        /* LA STATION, en variables : la taille du chanfrein, et les
+           gris-bleus qui étaient recopiés en dur d'une règle à l'autre —
+           nommés une fois, du plus clair au plus sombre */
+        --mb-chanfrein: 14px;
+        --mb-texte: #cfe2ef;          /* le texte courant */
+        --mb-texte-second: #9fb6c8;   /* ce qui accompagne un chiffre */
+        --mb-legende: #8ba3b8;        /* les phrases et légendes */
+        --mb-legende-sourde: #7b93a8;
+        --mb-etiquette: #6d8aa5;      /* les petites capitales */
+        --mb-acier: #55708c;          /* les séparateurs, les rivets */
+        --mb-coque-claire: #0e1724;
+        --mb-coque: #0a1420;          /* le fond des plaques */
+        --mb-coque-noire: #071018;    /* l'encre sur un bouton clair */
+        /* la tôle des primitives (le dégradé de la maquette de direction)
+           et l'arête biseautée qui accroche la lumière */
+        --mb-tole-haut: #1f2e3a;
+        --mb-tole-bas: #121c25;
+        --mb-arete: rgba(150, 200, 235, 0.24);
+        /* les bandes de danger : l'ocre TERNI du mat_rayures de l'atelier
+           Blender — pas l'ambre, réservé à ce qui luit */
+        --mb-ocre: #806220;
+        /* les teintes du relevé, nommées une fois : l'étoile éteinte, la
+           prime de glace, et les deux monnaies qui ne sont ni menthe ni or */
+        --mb-eteint: #24364a;
+        --mb-glace: #a8d8f0;
+        --mb-memoire: #b9a4ff;
+        --mb-orbe: #e58bff;
         position: fixed; inset: 0; z-index: 50; overflow: hidden;
         display: grid; place-items: center;
-        font-family: var(--font-mono); color: #cfe2ef;
+        font-family: var(--font-mono); color: var(--mb-texte);
       }
       #mb-veil[hidden] { display: none; }
+      /* ==== LE VOCABULAIRE DE LA STATION (13/11) ====
+         La cérémonie était faite de rectangles arrondis (r 8–14) et de
+         pilules : « tout est rectangulaire, carré… ça ne fait pas encore
+         assez jeu vidéo » (le concepteur). On est dans une station : les
+         cadres se taillent au CHANFREIN, comme les octogones du plan des
+         modules et les montants de l'atelier Blender. Ces primitives servent
+         toutes les étapes. Chacune a son FOND PROPRE, peint en CSS ; l'image
+         rendue (icône, sceau) se pose par-dessus — une planche absente ou
+         lente laisse un cadre lisible, jamais un trou. Les coins coupés sont
+         des clip-path : ils rognent aussi l'outline et les ombres portées,
+         d'où les arêtes peintes en dégradé et le focus dessiné DANS la
+         forme. */
+      /* LES COINS COUPÉS : le chanfrein symétrique des modules (.mb-coupe)
+         et sa variante à deux coins opposés (.mb-coupe-diag). L'arête : les
+         côtés droits en ombre intérieure, et un trait sur chaque biais, peint
+         en dégradé dans son coin (une bordure suivrait le rectangle, pas la
+         coupe). Le fond se change par --mb-fond, sans perdre l'arête. */
+      .mb-coupe {
+        --mb-c: var(--mb-chanfrein);
+        clip-path: polygon(var(--mb-c) 0, calc(100% - var(--mb-c)) 0, 100% var(--mb-c), 100% calc(100% - var(--mb-c)), calc(100% - var(--mb-c)) 100%, var(--mb-c) 100%, 0 calc(100% - var(--mb-c)), 0 var(--mb-c));
+        background:
+          linear-gradient(135deg, transparent 50%, var(--mb-arete) 50% calc(50% + 1.2px), transparent calc(50% + 1.2px)) left top / var(--mb-c) var(--mb-c) no-repeat,
+          linear-gradient(225deg, transparent 50%, var(--mb-arete) 50% calc(50% + 1.2px), transparent calc(50% + 1.2px)) right top / var(--mb-c) var(--mb-c) no-repeat,
+          linear-gradient(315deg, transparent 50%, var(--mb-arete) 50% calc(50% + 1.2px), transparent calc(50% + 1.2px)) right bottom / var(--mb-c) var(--mb-c) no-repeat,
+          linear-gradient(45deg, transparent 50%, var(--mb-arete) 50% calc(50% + 1.2px), transparent calc(50% + 1.2px)) left bottom / var(--mb-c) var(--mb-c) no-repeat,
+          var(--mb-fond, linear-gradient(180deg, var(--mb-tole-haut), var(--mb-tole-bas)));
+        box-shadow: inset 0 0 0 1px var(--mb-arete);
+      }
+      .mb-coupe-diag {
+        --mb-c: var(--mb-chanfrein);
+        clip-path: polygon(0 0, calc(100% - var(--mb-c)) 0, 100% var(--mb-c), 100% 100%, var(--mb-c) 100%, 0 calc(100% - var(--mb-c)));
+        background:
+          linear-gradient(225deg, transparent 50%, var(--mb-arete) 50% calc(50% + 1.2px), transparent calc(50% + 1.2px)) right top / var(--mb-c) var(--mb-c) no-repeat,
+          linear-gradient(45deg, transparent 50%, var(--mb-arete) 50% calc(50% + 1.2px), transparent calc(50% + 1.2px)) left bottom / var(--mb-c) var(--mb-c) no-repeat,
+          var(--mb-fond, linear-gradient(180deg, var(--mb-tole-haut), var(--mb-tole-bas)));
+        box-shadow: inset 0 0 0 1px var(--mb-arete);
+      }
+      /* LA POUTRE : le titre d'une étape est une poutre de la station — un
+         profil effilé aux deux bouts, une rangée de rivets dessus et dessous,
+         deux bandes de danger qui encadrent le mot. Elle se pose en
+         s'ouvrant depuis son milieu : le clip-path part d'un polygone écrasé
+         au centre, aux mêmes six sommets, ce qui le rend interpolable.
+         --mb-bande est en px : un pourcentage de padding se lirait sur la
+         largeur du PARENT, celui de la bande sur celle de la poutre. */
+      .mb-poutre {
+        --mb-pointe: calc(var(--mb-chanfrein) * 2.2);
+        --mb-bande: 96px;
+        position: relative; isolation: isolate; box-sizing: border-box;
+        display: flex; flex-direction: column; align-items: center; justify-content: center;
+        min-height: 54px; padding: 10px calc(var(--mb-pointe) + var(--mb-bande) + 16px);
+        font-family: var(--font-display); color: var(--mb-encre); text-align: center;
+        clip-path: polygon(var(--mb-pointe) 0, calc(100% - var(--mb-pointe)) 0, 100% 50%, calc(100% - var(--mb-pointe)) 100%, var(--mb-pointe) 100%, 0 50%);
+        background:
+          radial-gradient(circle, var(--mb-acier) 1.6px, transparent 2.3px) center 4px / 26px 8px repeat-x,
+          radial-gradient(circle, var(--mb-acier) 1.6px, transparent 2.3px) center calc(100% - 4px) / 26px 8px repeat-x,
+          linear-gradient(180deg, rgba(255, 255, 255, 0.07), transparent 24%, transparent 76%, rgba(0, 0, 0, 0.35)),
+          linear-gradient(180deg, var(--mb-tole-haut), var(--mb-tole-bas));
+        animation: mb-poutre-pose 0.55s cubic-bezier(0.2, 1, 0.3, 1) both;
+      }
+      .mb-poutre::before,
+      .mb-poutre::after {
+        content: ''; position: absolute; z-index: -1; top: 0; bottom: 0; width: var(--mb-bande);
+        background: repeating-linear-gradient(-45deg, var(--mb-ocre) 0 8px, var(--mb-coque-noire) 8px 16px);
+        box-shadow: inset 0 3px 4px rgba(0, 0, 0, 0.55), inset 0 -3px 4px rgba(0, 0, 0, 0.55);
+        opacity: 0.85;
+      }
+      .mb-poutre::before { left: var(--mb-pointe); }
+      .mb-poutre::after { right: var(--mb-pointe); }
+      @keyframes mb-poutre-pose {
+        from { clip-path: polygon(50% 0, 50% 0, 50% 50%, 50% 100%, 50% 100%, 50% 50%); }
+      }
+      /* LA CARTOUCHE : un gain, un instrument, une offre. Deux coins coupés
+         en diagonale, un liseré à gauche dans la teinte de ce qu'elle porte
+         (--mb-liseret), une alvéole hexagonale où se pose l'icône rendue —
+         l'alvéole a son fond, l'icône s'y ajoute. Dedans : le gros chiffre
+         (.mb-cartouche-val), le nom (.mb-cartouche-nom). Elle CLAQUE :
+         elle arrive un peu grande et décalée, puis se plaque. */
+      .mb-cartouche {
+        --mb-c: calc(var(--mb-chanfrein) * 0.8);
+        --mb-liseret: var(--mb-teal);
+        position: relative; min-width: 0;
+        display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; column-gap: 12px;
+        padding: 9px 20px 9px 12px;
+        clip-path: polygon(0 0, calc(100% - var(--mb-c)) 0, 100% var(--mb-c), 100% 100%, var(--mb-c) 100%, 0 calc(100% - var(--mb-c)));
+        background:
+          linear-gradient(225deg, transparent 50%, var(--mb-arete) 50% calc(50% + 1.2px), transparent calc(50% + 1.2px)) right top / var(--mb-c) var(--mb-c) no-repeat,
+          linear-gradient(45deg, transparent 50%, var(--mb-arete) 50% calc(50% + 1.2px), transparent calc(50% + 1.2px)) left bottom / var(--mb-c) var(--mb-c) no-repeat,
+          radial-gradient(120% 160% at 0% 50%, color-mix(in srgb, var(--mb-liseret) 12%, transparent), transparent 60%),
+          linear-gradient(180deg, var(--mb-tole-haut), var(--mb-tole-bas));
+        box-shadow: inset 3px 0 0 var(--mb-liseret), inset 0 0 0 1px var(--mb-arete);
+        animation: mb-cartouche-claque 0.34s cubic-bezier(0.2, 1.5, 0.35, 1) backwards;
+      }
+      .mb-cartouche-alv {
+        grid-row: 1 / span 2;
+        display: grid; place-items: center;
+        width: 50px; height: 44px; font-size: 32px; line-height: 1;
+        clip-path: polygon(25% 0, 75% 0, 100% 50%, 75% 100%, 25% 100%, 0 50%);
+        background: radial-gradient(circle at 50% 36%, color-mix(in srgb, var(--mb-liseret) 22%, var(--mb-coque-claire)), var(--mb-coque-noire) 80%);
+      }
+      .mb-cartouche-val {
+        font-family: var(--font-display); font-size: calc(20px * var(--ui)); line-height: 1.1;
+        color: var(--mb-encre); font-variant-numeric: tabular-nums; white-space: nowrap;
+      }
+      .mb-cartouche-nom {
+        font-size: calc(10px * var(--ui)); letter-spacing: 0.24em; text-transform: uppercase;
+        color: var(--mb-texte-second); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+      }
+      @keyframes mb-cartouche-claque {
+        0% { opacity: 0; transform: translateX(-14px) scale(1.12); filter: brightness(1.8); }
+        60% { opacity: 1; transform: translateX(2px) scale(0.98); }
+        100% { transform: none; filter: none; }
+      }
+      /* LE SCEAU : un octogone, celui du rang ou du module. L'image
+         (sceauHTML : le médaillon rendu UNE fois, en acier neutre) remplit
+         le cadre ; le ::after, teinté par --mb-rang en mélange « color »,
+         la colore — un seul rendu pour cinq rangs, et la planche reste sous
+         le plafond de chauds de prepare.py. Le fond propre (un octogone
+         dégradé à la teinte du rang) tient la place tant que l'image manque.
+         Ce qui s'écrit dessus (.mb-sceau-mot) passe au-dessus du calque. Il
+         TOMBE, et reste penché (--mb-sceau-incl). */
+      .mb-sceau {
+        --mb-sceau-l: 150px;
+        --mb-sceau-incl: -6deg;
+        position: relative; isolation: isolate;
+        display: grid; place-items: center;
+        width: var(--mb-sceau-l); height: var(--mb-sceau-l); flex: none;
+        /* l'image (.ico-sceau) mesure 1em : le cadre entier */
+        font-size: var(--mb-sceau-l); line-height: 1;
+        clip-path: polygon(29.3% 0, 70.7% 0, 100% 29.3%, 100% 70.7%, 70.7% 100%, 29.3% 100%, 0 70.7%, 0 29.3%);
+        background: radial-gradient(circle at 50% 36%, color-mix(in srgb, var(--mb-rang) 38%, var(--mb-tole-haut)), var(--mb-coque) 78%);
+        box-shadow: inset 0 0 0 3px color-mix(in srgb, var(--mb-rang) 45%, transparent);
+        transform: rotate(var(--mb-sceau-incl));
+        animation: mb-sceau-tombe 0.62s cubic-bezier(0.2, 1.5, 0.3, 1) both;
+      }
+      .mb-sceau > * { grid-area: 1 / 1; }
+      .mb-sceau::after {
+        content: ''; position: absolute; inset: 0; z-index: 1; pointer-events: none;
+        background: var(--mb-rang); mix-blend-mode: color; opacity: 0.85;
+      }
+      .mb-sceau-mot {
+        position: relative; z-index: 2; font-style: normal;
+        font-family: var(--font-display); font-weight: 600; letter-spacing: 0.04em; white-space: nowrap;
+        /* plancher à 10 px : un nom long (SUPERFLUIDE) dans un petit sceau
+           descendait sous la taille lisible d'une étiquette */
+        font-size: max(calc(10px * var(--ui)), min(calc(22px * var(--ui)), calc(var(--mb-sceau-l) * 0.78 / var(--mb-nom-n, 6))));
+        color: var(--mb-encre);
+        text-shadow: 0 0 12px color-mix(in srgb, var(--mb-rang) 80%, transparent), 0 1px 2px rgba(0, 0, 0, 0.8);
+      }
+      @keyframes mb-sceau-tombe {
+        0% { transform: scale(2.6) rotate(-22deg); opacity: 0; filter: blur(6px); }
+        55% { transform: scale(0.94) rotate(calc(var(--mb-sceau-incl) + 3deg)); opacity: 1; filter: blur(0); }
+        100% { transform: rotate(var(--mb-sceau-incl)); }
+      }
+      /* LE MANOMÈTRE : un arc de 270°, gradué, rempli de 0 à 1 par
+         --mb-mano-p. Trois tracés, tous en pathLength="1" : la longueur de
+         l'arc vaut 1, si bien qu'un pointillé « p 1 » remplit exactement la
+         part p, sans calcul de circonférence (et les graduations, un
+         pointillé fin, tombent tous les dixièmes). Le gabarit :
+           <svg class="mb-mano" viewBox="0 0 100 100" aria-hidden="true">
+             <path class="mb-mano-piste" pathLength="1" d="M18.89 81.11A44 44 0 1 1 81.11 81.11"/>
+             <path class="mb-mano-grad" pathLength="1" d="M24.54 75.46A36 36 0 1 1 75.46 75.46"/>
+             <path class="mb-mano-arc" pathLength="1" d="M18.89 81.11A44 44 0 1 1 81.11 81.11"/>
+           </svg>
+         Le passage d'une valeur à l'autre est une transition : main.ts n'a
+         qu'à poser --mb-mano-p. */
+      .mb-mano { --mb-mano-p: 0; --mb-mano-teinte: var(--mb-teal); display: block; overflow: visible; }
+      .mb-mano path { fill: none; }
+      .mb-mano-piste { stroke: var(--mb-tole-haut); stroke-width: 8; }
+      .mb-mano-grad { stroke: var(--mb-acier); stroke-width: 4; stroke-dasharray: 0.006 0.094; stroke-dashoffset: 0.003; }
+      .mb-mano-arc {
+        stroke: var(--mb-mano-teinte); stroke-width: 8;
+        stroke-dasharray: var(--mb-mano-p) 1;
+        filter: drop-shadow(0 0 3px color-mix(in srgb, var(--mb-mano-teinte) 70%, transparent));
+        transition: stroke-dasharray 1.1s cubic-bezier(0.2, 0.8, 0.2, 1);
+      }
+      /* LE LEVIER : le bouton qui fait passer, biseauté aux deux bouts —
+         plus de pilule. Le clip-path rognant outline et ombres, l'arête est
+         le FOND du bouton, la face un ::before posé 2 px en dedans ; le
+         focus (clavier, et .pad-focus de la manette, dont le liseré serait
+         rogné) éclaire l'arête et la face, dans la forme. Un reflet le
+         balaie : il attend qu'on le presse. --mb-levier-teinte le recolore. */
+      .mb-levier {
+        --mb-c: calc(var(--mb-chanfrein) * 0.9);
+        --mb-levier-teinte: var(--mb-menthe);
+        position: relative; isolation: isolate;
+        display: inline-flex; align-items: center; justify-content: center; gap: 10px;
+        min-height: 44px; padding: 12px calc(var(--mb-c) + 22px);
+        font-family: var(--font-display); font-size: calc(12px * var(--ui)); letter-spacing: 0.3em;
+        color: var(--mb-coque-noire); cursor: pointer;
+        border: 0; border-radius: 0;
+        background: color-mix(in srgb, var(--mb-levier-teinte) 45%, var(--mb-encre));
+        clip-path: polygon(var(--mb-c) 0, calc(100% - var(--mb-c)) 0, 100% 50%, calc(100% - var(--mb-c)) 100%, var(--mb-c) 100%, 0 50%);
+        transition: transform 0.12s ease, filter 0.12s ease, background-color 0.12s ease;
+        animation: mb-levier-arme 0.42s cubic-bezier(0.2, 1, 0.3, 1) backwards;
+      }
+      .mb-levier::before,
+      .mb-levier::after {
+        content: ''; position: absolute; z-index: -1;
+        clip-path: polygon(var(--mb-c) 0, calc(100% - var(--mb-c)) 0, 100% 50%, calc(100% - var(--mb-c)) 100%, var(--mb-c) 100%, 0 50%);
+      }
+      .mb-levier::before {
+        inset: 2px;
+        background: linear-gradient(180deg, color-mix(in srgb, var(--mb-levier-teinte) 62%, #ffffff), var(--mb-levier-teinte) 52%, color-mix(in srgb, var(--mb-levier-teinte) 72%, #000000));
+      }
+      .mb-levier::after {
+        inset: 0;
+        background: linear-gradient(105deg, transparent 38%, rgba(255, 255, 255, 0.45) 50%, transparent 62%) 0 0 / 250% 100% no-repeat;
+        animation: mb-levier-reflet 2.6s 0.6s linear infinite;
+      }
+      .mb-levier:hover, .mb-levier:focus-visible, .mb-levier.pad-focus {
+        background-color: var(--mb-encre); filter: brightness(1.12); transform: translateY(-2px); outline: none;
+      }
+      .mb-levier:active { transform: translateY(1px) scale(0.98); }
+      .mb-levier:disabled { cursor: default; filter: grayscale(1) brightness(0.6); }
+      @keyframes mb-levier-arme {
+        from { opacity: 0; transform: translateY(10px); }
+      }
+      @keyframes mb-levier-reflet {
+        from { background-position: 130% 0; }
+        to { background-position: -90% 0; }
+      }
       /* LE FOND : un dégradé profond, une grille qui dérive lentement et
          un balayage de lumière — l'écran vit avant même que le titre
          n'arrive. Le vignettage ramène l'œil au centre. */
@@ -7948,18 +8196,22 @@
         60% { transform: translate(3px, -2px); }
         100% { transform: translate(0, 0); }
       }
-      /* ---- LA BANNIÈRE : le titre claque, le filet s'étire ---- */
-      .mb-banniere { position: relative; text-align: center; padding: 4px 0 6px; }
+      /* ---- LA BANNIÈRE : une POUTRE de la station. Le titre géant (50 px)
+         claquait sur toute la largeur au-dessus d'un filet lumineux : il
+         disputait l'écran au héros. Il claque toujours, mais dans sa poutre,
+         à la taille d'un titre d'étape. ---- */
+      .mb-banniere.mb-poutre { width: min(100%, 940px); margin: 0 auto; flex: none; }
       .mb-sur {
-        display: block; font-family: var(--font-display);
-        font-size: calc(9px * var(--ui)); letter-spacing: 0.5em; color: var(--mb-teal);
+        display: block; max-width: 100%; font-family: var(--font-display);
+        font-size: calc(10px * var(--ui)); letter-spacing: 0.36em; color: var(--mb-teal);
+        white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
         animation: mb-monte 0.5s 0.2s ease-out backwards;
       }
       .mb-titre {
-        margin: 6px 0 0; font-family: var(--font-display); font-weight: 600;
-        font-size: calc(clamp(24px, 4.6vw, 50px) * var(--ui)); line-height: 1.05;
+        margin: 4px 0 0; font-family: var(--font-display); font-weight: 600;
+        font-size: calc(clamp(20px, 2.7vw, 34px) * var(--ui)); line-height: 1.05;
         letter-spacing: 0.22em; color: var(--mb-encre);
-        text-shadow: 0 0 22px rgba(143, 216, 200, 0.5), 0 0 64px rgba(99, 183, 230, 0.3);
+        text-shadow: 0 0 22px rgba(143, 216, 200, 0.5);
         animation: mb-claque 0.6s cubic-bezier(0.16, 1.3, 0.3, 1) both;
       }
       @keyframes mb-claque {
@@ -7967,168 +8219,150 @@
         55% { transform: scale(0.97); opacity: 1; filter: blur(0); letter-spacing: 0.22em; }
         100% { transform: scale(1); }
       }
-      .mb-filet {
-        display: block; height: 2px; margin: 10px auto 0; width: 0;
-        background: linear-gradient(90deg, transparent, var(--mb-teal), var(--mb-menthe), var(--mb-teal), transparent);
-        box-shadow: 0 0 14px rgba(109, 255, 184, 0.6);
-        animation: mb-filet 0.7s 0.35s ease-out forwards;
-      }
-      @keyframes mb-filet { to { width: min(560px, 82%); } }
       @keyframes mb-monte {
         from { opacity: 0; transform: translateY(10px); }
         to { opacity: 1; transform: none; }
       }
-      /* ---- LE RELEVÉ : UNE PLAQUE. La médaille du rang, le flacon et les
-         lignes, puis la récolte dessous. Sans cadre, la médaille pendait
-         seule dans la marge gauche et les trois lignes flottaient à droite :
-         rien ne disait que tout cela était UN relevé. La plaque prend la
-         teinte du rang dans son angle — un superfluide dore son coin. ---- */
+      /* ---- LE RELEVÉ : une scène à trois places autour d'UN héros. C'était
+         une plaque de tableau de bord — médaille ronde, flacon en rectangle,
+         trois lignes à barre de 6 px, des tuiles à paragraphe. Plus de
+         plaque : au centre la bonbonne, cerclée de son manomètre ; le sceau
+         du rang à gauche ; le volume en très grand à droite ; les cartouches
+         de ce que la salle rapporte dessous. ---- */
       .mb-releve {
+        --mb-coeur-l: 290px;
         position: relative;
-        display: grid; grid-template-columns: auto 1fr; gap: 16px 30px; align-items: center;
-        padding: 18px 24px 20px; border-radius: 14px;
-        background:
-          radial-gradient(70% 130% at 0% 0%, color-mix(in srgb, var(--mb-rang) 10%, transparent), transparent 60%),
-          linear-gradient(180deg, rgba(14, 24, 38, 0.84), rgba(8, 14, 24, 0.72));
-        border: 1px solid rgba(150, 200, 235, 0.14);
-        box-shadow: 0 24px 60px rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.05);
+        display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+        grid-template-areas: 'rang coeur litres' 'gains gains gains';
+        align-items: center; gap: 12px 44px;
       }
       .mb-releve[hidden] { display: none; }
-      /* LA MÉDAILLE : un anneau qui tourne, un disque qui luit, la lettre
-         qui TOMBE dessus — l'instant que le joueur attend */
-      .mb-rang {
-        position: relative; width: 172px; height: 172px; flex: none;
-        display: flex; flex-direction: column; align-items: center; justify-content: center;
+      /* LE SCEAU DU RANG (la primitive .mb-sceau) : le médaillon rendu, le
+         nom du régime, les étoiles. Il ATTEND sa place sans la lâcher :
+         caché, il garde son volume — rien ne glisse quand il tombe. Et sa
+         chute ne part qu'à l'instant où il paraît : posée d'emblée, elle se
+         jouait, invisible, pendant qu'il attendait (la médaille d'avant
+         tombait ainsi dans le vide, une demi-seconde avant de se montrer). */
+      .mb-rang { grid-area: rang; justify-self: end; }
+      .mb-rang[hidden] { display: grid; visibility: hidden; animation: none; }
+      .mb-rang-img { display: grid; place-items: center; width: 100%; height: 100%; }
+      .mb-etoiles {
+        position: relative; z-index: 2; align-self: end; margin-bottom: 17%;
+        display: flex; gap: 2px;
       }
-      /* la médaille ATTEND sa place sans la lâcher : cachée, elle garde son
-         volume — sinon le flacon sauterait à gauche quand elle tombe */
-      .mb-rang[hidden] { display: flex; visibility: hidden; }
-      .mb-rang::before {
-        content: ''; position: absolute; inset: 12px; border-radius: 50%;
-        background: radial-gradient(circle at 50% 38%, color-mix(in srgb, var(--mb-rang) 30%, #0a1420), #070d15 72%);
-        border: 1px solid color-mix(in srgb, var(--mb-rang) 50%, transparent);
-        box-shadow:
-          inset 0 0 34px color-mix(in srgb, var(--mb-rang) 20%, transparent),
-          0 0 44px color-mix(in srgb, var(--mb-rang) 26%, transparent);
-        animation: mb-monte 0.4s ease-out backwards;
-      }
-      .mb-rang-anneau {
-        position: absolute; inset: 0; border-radius: 50%;
-        background: conic-gradient(from 0deg, var(--mb-rang), transparent 28%, var(--mb-rang) 50%, transparent 78%, var(--mb-rang));
-        -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 5px), #000 calc(100% - 4px));
-        mask: radial-gradient(farthest-side, transparent calc(100% - 5px), #000 calc(100% - 4px));
-        filter: drop-shadow(0 0 8px color-mix(in srgb, var(--mb-rang) 70%, transparent));
-        animation: mb-tourne 5s linear infinite;
-      }
-      @keyframes mb-tourne { to { transform: rotate(360deg); } }
-      /* le NOM du rang (SUPERFLUIDE… FIGÉ) : un mot, plus une lettre. Michroma
-         est large (~1 em par lettre, espacement compris) : la taille se
-         règle sur le nombre de lettres (--mb-nom-n, posé par main.ts) pour
-         que le mot tienne dans la largeur utile du disque (--mb-nom-l) —
-         FIGÉ s'affiche en grand, SUPERFLUIDE sans déborder de l'anneau */
-      .mb-rang-lettre {
-        position: relative; font-family: var(--font-display); font-weight: 600;
-        font-size: min(calc(26px * var(--ui)), calc(var(--mb-nom-l, 136px) / var(--mb-nom-n, 6)));
-        line-height: 1; color: var(--mb-rang);
-        letter-spacing: 0.04em; white-space: nowrap;
-        text-shadow:
-          0 0 16px color-mix(in srgb, var(--mb-rang) 75%, transparent),
-          0 0 46px color-mix(in srgb, var(--mb-rang) 40%, transparent);
-        animation: mb-tombe 0.62s cubic-bezier(0.2, 1.5, 0.3, 1) both;
-      }
-      @keyframes mb-tombe {
-        0% { transform: scale(3.6) rotate(-16deg); opacity: 0; filter: blur(8px); }
-        55% { transform: scale(0.92) rotate(2deg); opacity: 1; filter: blur(0); }
-        100% { transform: none; }
-      }
-      .mb-rang-mot {
-        position: relative; font-style: normal; font-family: var(--font-display);
-        font-size: calc(7.5px * var(--ui)); letter-spacing: 0.32em; color: var(--mb-encre);
-        margin-top: 8px; white-space: nowrap;
-        animation: mb-monte 0.4s 0.4s ease-out backwards;
-      }
-      .mb-etoiles { position: relative; display: flex; gap: 3px; margin-top: 6px; }
       .mb-etoiles i {
-        font-style: normal; font-size: calc(13px * var(--ui)); color: #24364a;
+        font-style: normal; font-size: calc(12px * var(--ui)); line-height: 1; color: var(--mb-eteint);
         transition: color 0.2s ease;
       }
       .mb-etoiles i.mb-on {
-        color: var(--mb-rang); text-shadow: 0 0 10px var(--mb-rang);
+        color: var(--mb-encre); text-shadow: 0 0 8px var(--mb-rang), 0 1px 2px rgba(0, 0, 0, 0.8);
         animation: mb-etoile 0.38s cubic-bezier(0.2, 2.2, 0.4, 1);
       }
       @keyframes mb-etoile {
         0% { transform: scale(0) rotate(-90deg); }
         100% { transform: scale(1) rotate(0); }
       }
-      /* le corps du relevé : le flacon et le grand chiffre à gauche, les
-         lignes à droite */
-      .mb-corps {
-        display: grid; grid-template-columns: auto 1fr; gap: 12px 30px; align-items: center;
-        min-width: 0; opacity: 0; transition: opacity 0.4s ease;
+      @keyframes mb-tombe {
+        0% { transform: scale(3.6) rotate(-16deg); opacity: 0; filter: blur(8px); }
+        55% { transform: scale(0.92) rotate(2deg); opacity: 1; filter: blur(0); }
+        100% { transform: none; }
       }
-      .mb-corps.mb-on, .mb-scene.mb-compact .mb-corps { opacity: 1; }
-      .mb-haut { display: flex; align-items: center; gap: 18px; }
-      .mb-flacon {
-        position: relative; width: 66px; height: 118px; flex: 0 0 66px;
-        border: 2px solid #3d5a78; border-top-width: 9px; border-radius: 12px 12px 18px 18px;
-        background: rgba(18, 28, 42, 0.6); overflow: hidden;
-        box-shadow: inset 0 0 18px rgba(0, 0, 0, 0.5), 0 0 24px rgba(99, 183, 230, 0.12);
+      /* LE CŒUR : la bonbonne, cerclée du manomètre de la part livrée — son
+         arc de 270° s'ouvre en bas, où s'écrit le pourcentage */
+      .mb-coeur {
+        grid-area: coeur; position: relative;
+        width: var(--mb-coeur-l); height: var(--mb-coeur-l);
+        display: grid; place-items: center;
       }
-      /* les graduations du flacon : on lit le niveau, on ne le devine pas */
-      .mb-flacon::after {
-        content: ''; position: absolute; top: 0; bottom: 0; right: 4px; width: 8px;
-        background: repeating-linear-gradient(180deg, rgba(200, 230, 255, 0.35) 0 1px, transparent 1px 12px);
-        pointer-events: none;
+      .mb-coeur > .mb-mano { position: absolute; inset: 0; width: 100%; height: 100%; }
+      .mb-bonbonne { position: relative; height: calc(var(--mb-coeur-l) * 0.7); display: grid; place-items: center; }
+      .mb-part {
+        position: absolute; left: 50%; bottom: 2%; transform: translateX(-50%);
+        font-family: var(--font-display); font-weight: 400; font-size: calc(15px * var(--ui));
+        letter-spacing: 0.12em; color: var(--mb-texte); font-variant-numeric: tabular-nums; white-space: nowrap;
       }
-      .mb-eau {
-        position: absolute; left: 0; right: 0; bottom: 0; height: 0%;
-        background: linear-gradient(180deg, #6fc8f0, #2b7fb4 40%, #1d5f8c);
+      /* ---- LES CUVES (cuveHTML : la bonbonne ici, la réserve et la maîtrise
+         au versement et au palier). Trois calques : le DOS rendu, le LIQUIDE
+         (un bloc, dans la fenêtre que ceremonieObjets.ts donne en fractions
+         de l'image), le VERRE rendu devant. Le niveau se règle par
+         --mb-niveau (0..1) sur le liquide : la fenêtre reste fixe, l'eau y
+         monte (::before), sa surface ondule (::after). --mb-liquide le
+         teinte. Images absentes ou lentes : la fenêtre garde un contour de
+         verre, et l'eau se lit. ---- */
+      .mb-cuve { position: relative; isolation: isolate; height: 100%; max-width: 100%; }
+      /* LA SILHOUETTE D'ATTENTE : une bonbonne de verre en CSS — goulot,
+         épaules, fond chanfreiné — derrière la fenêtre du liquide. Elle tient
+         la place tant que le dos rendu n'est pas là, et s'efface quand il
+         l'est (main.ts, mbPoseCuve) : deux contours ne se superposent pas.
+         ::before est l'arête, ::after le verre, 2 px en dedans ; le ::after
+         venant après le liquide dans l'ordre du document, les plans sont
+         dits : silhouette et dos à 0, liquide à 1, verre à 2. */
+      .mb-cuve::before,
+      .mb-cuve::after {
+        content: ''; position: absolute; z-index: 0; pointer-events: none;
+        clip-path: polygon(38% 0, 62% 0, 62% 11%, 80% 19%, 80% 94%, 74% 100%, 26% 100%, 20% 94%, 20% 19%, 38% 11%);
+      }
+      .mb-cuve::before { inset: 0; background: var(--mb-arete); }
+      .mb-cuve::after {
+        inset: 2px 3px;
+        background: linear-gradient(90deg, color-mix(in srgb, var(--mb-coque) 70%, transparent), color-mix(in srgb, var(--mb-tole-haut) 55%, transparent) 45%, color-mix(in srgb, var(--mb-coque) 80%, transparent));
+      }
+      .mb-cuve.mb-cuve-rendue::before,
+      .mb-cuve.mb-cuve-rendue::after { display: none; }
+      .mb-cuve-dos, .mb-cuve-verre {
+        position: absolute; inset: 0; z-index: 0; width: 100%; height: 100%; object-fit: contain;
+        pointer-events: none; user-select: none;
+      }
+      .mb-cuve-verre { z-index: 2; }
+      .mb-cuve-liquide {
+        --mb-niveau: 0;
+        --mb-liquide: var(--mb-bleu);
+        position: absolute; z-index: 1; overflow: hidden;
+        background: color-mix(in srgb, var(--mb-texte) 5%, transparent);
+        box-shadow: inset 0 0 0 1px var(--mb-arete), inset 0 -10px 18px rgba(0, 0, 0, 0.35);
+      }
+      .mb-cuve-liquide::before {
+        content: ''; position: absolute; left: 0; right: 0; bottom: 0;
+        height: calc(var(--mb-niveau) * 100%);
+        background:
+          linear-gradient(90deg, transparent 12%, rgba(255, 255, 255, 0.18) 28%, transparent 44%),
+          linear-gradient(180deg, color-mix(in srgb, var(--mb-liquide) 55%, #ffffff), var(--mb-liquide) 30%, color-mix(in srgb, var(--mb-liquide) 50%, #000000));
+        box-shadow: 0 0 18px color-mix(in srgb, var(--mb-liquide) 60%, transparent);
         transition: height 1.3s cubic-bezier(0.2, 0.7, 0.3, 1);
       }
-      /* la surface qui ondule et les bulles qui montent : le liquide vit */
-      .mb-eau::before {
-        content: ''; position: absolute; left: -20%; right: -20%; top: -5px; height: 10px;
-        background: radial-gradient(ellipse at 50% 50%, rgba(220, 245, 255, 0.55), transparent 70%);
+      .mb-cuve-liquide::after {
+        content: ''; position: absolute; left: -10%; right: -10%; height: 8px;
+        bottom: calc(var(--mb-niveau) * 100% - 4px);
+        background: radial-gradient(ellipse at 50% 50%, rgba(220, 245, 255, 0.6), transparent 70%);
+        transition: bottom 1.3s cubic-bezier(0.2, 0.7, 0.3, 1);
         animation: mb-ondule 1.6s ease-in-out infinite;
       }
       @keyframes mb-ondule {
         0%, 100% { transform: translateX(-4px) scaleY(1); }
         50% { transform: translateX(4px) scaleY(0.6); }
       }
-      .mb-eau::after {
-        content: ''; position: absolute; inset: 0;
-        background:
-          radial-gradient(circle, rgba(255, 255, 255, 0.5) 0 1.5px, transparent 2px) 30% 80% / 100% 100% no-repeat,
-          radial-gradient(circle, rgba(255, 255, 255, 0.4) 0 1px, transparent 1.5px) 65% 60% / 100% 100% no-repeat,
-          radial-gradient(circle, rgba(255, 255, 255, 0.45) 0 1.2px, transparent 1.8px) 50% 95% / 100% 100% no-repeat;
-        animation: mb-bulles 2.4s linear infinite;
+      /* LE VOLUME, en très grand : le chiffre qu'on vient de livrer */
+      .mb-litres {
+        grid-area: litres; justify-self: start; min-width: 0;
+        display: flex; flex-direction: column; align-items: flex-start; gap: 4px;
       }
-      @keyframes mb-bulles {
-        from { background-position: 30% 100%, 65% 100%, 50% 100%; opacity: 0.9; }
-        to { background-position: 34% 0%, 62% 10%, 52% 5%; opacity: 0; }
+      .mb-litres small {
+        font-family: var(--font-display); font-size: calc(10px * var(--ui));
+        letter-spacing: 0.3em; color: var(--mb-teal);
       }
-      .mb-glace {
-        position: absolute; left: 0; right: 0; top: 4px; text-align: center;
-        font-size: calc(16px * var(--ui)); filter: drop-shadow(0 2px 3px rgba(0,0,0,0.5));
-        animation: mb-plonge 0.5s ease-out;
+      .mb-litres b {
+        font-family: var(--font-display); font-weight: 400;
+        font-size: calc(clamp(36px, 4.4vw, 58px) * var(--ui)); line-height: 1;
+        color: var(--mb-encre); font-variant-numeric: tabular-nums; white-space: nowrap;
+        text-shadow: 0 0 22px rgba(109, 255, 184, 0.35);
+      }
+      .mb-prime {
+        display: block; font-size: calc(12px * var(--ui)); color: var(--mb-glace);
+        letter-spacing: 0.06em; animation: mb-plonge 0.4s ease-out;
       }
       @keyframes mb-plonge {
         from { transform: translateY(-26px); opacity: 0; }
         to { transform: translateY(0); opacity: 1; }
-      }
-      .mb-litres { display: flex; flex-direction: column; gap: 2px; }
-      .mb-litres small {
-        font-family: var(--font-display); font-size: calc(7.5px * var(--ui));
-        letter-spacing: 0.3em; color: var(--mb-teal);
-      }
-      .mb-litres b {
-        font-family: var(--font-display); font-size: calc(40px * var(--ui)); line-height: 1;
-        color: var(--mb-encre); font-variant-numeric: tabular-nums;
-        text-shadow: 0 0 22px rgba(109, 255, 184, 0.35);
-      }
-      .mb-prime {
-        display: block; margin-top: 6px; font-size: calc(12px * var(--ui)); color: #a8d8f0;
-        letter-spacing: 0.06em; animation: mb-plonge 0.4s ease-out;
       }
       /* OÙ LE SURPLUS EST PARTI : le bandeau replié le disait encore
          « livré », sans dire qu'il était versé, ni où */
@@ -8137,396 +8371,270 @@
         letter-spacing: 0.06em; white-space: nowrap;
       }
       .mb-scene.mb-compact .mb-verse:not([hidden]) { display: inline; }
-      /* LES LIGNES : chacune glisse en place, avec sa barre, son chiffre et,
-         s'il y a lieu, le tampon du record. TROIS COLONNES PARTAGÉES (le nom,
-         la barre, le chiffre) : chaque ligne calculait les siennes, et les
-         barres commençaient à 610, 563 et 542 px selon la longueur du mot —
-         un escalier. La sous-grille les aligne toutes sur les mêmes rails. */
-      .mb-lignes {
-        display: grid; grid-template-columns: auto minmax(60px, 1fr) auto;
-        gap: 7px 14px; min-width: 0; align-items: center;
-      }
+      /* CHRONO ET NOTE : une ligne courte sous le volume, icône et chiffre —
+         le mot de la note et le record à battre passent dans l'infobulle.
+         Un record la remplace par son TAMPON. */
       .mb-ligne {
-        display: grid; grid-template-columns: subgrid; grid-column: 1 / -1;
-        align-items: center; row-gap: 3px;
-        padding: 9px 14px; border-radius: 8px; min-width: 0;
-        background: rgba(6, 12, 20, 0.5); border: 1px solid rgba(150, 200, 235, 0.1);
-        opacity: 0; transform: translateX(-28px);
+        display: flex; align-items: center; gap: 20px; margin-top: 10px; min-height: calc(28px * var(--ui));
+        opacity: 0; transform: translateX(-16px);
         transition: opacity 0.34s ease, transform 0.34s cubic-bezier(0.2, 1, 0.3, 1);
       }
-      /* sans sous-grille (vieux moteur) : trois colonnes fixes, mêmes rails */
-      @supports not (grid-template-columns: subgrid) {
-        .mb-lignes { grid-template-columns: 1fr; }
-        .mb-ligne {
-          grid-template-columns: calc(128px * var(--ui)) minmax(60px, 1fr) calc(92px * var(--ui));
-          column-gap: 14px;
-        }
-      }
       .mb-ligne.mb-on { opacity: 1; transform: none; }
-      .mb-ligne.mb-neuf { border-color: color-mix(in srgb, var(--mb-or) 45%, transparent); }
-      .mb-ligne-nom {
-        display: flex; align-items: center; gap: 9px; white-space: nowrap;
-        font-family: var(--font-display); font-size: calc(7.5px * var(--ui));
-        letter-spacing: 0.22em; color: #9fb6c8;
+      .mb-ligne-it { display: inline-flex; align-items: center; gap: 8px; white-space: nowrap; }
+      .mb-ligne-it > i { font-size: calc(24px * var(--ui)); }
+      .mb-ligne-it b, .mb-record b {
+        font-family: var(--font-display); font-weight: 400; font-size: calc(16px * var(--ui));
+        color: var(--mb-texte); font-variant-numeric: tabular-nums; letter-spacing: 0.04em;
       }
-      .mb-ligne-nom i {
-        font-style: normal; font-size: calc(15px * var(--ui)); width: 1.3em; text-align: center;
-        color: var(--mb-teal);
-      }
-      .mb-ligne-barre {
-        position: relative; height: 6px; border-radius: 3px; min-width: 40px;
-        background: rgba(255, 255, 255, 0.08); overflow: hidden;
-      }
-      .mb-ligne-barre::after {
-        content: ''; position: absolute; inset: 0 auto 0 0; width: 0;
-        border-radius: 3px; background: linear-gradient(90deg, var(--mb-bleu), var(--mb-menthe));
-        box-shadow: 0 0 10px rgba(109, 255, 184, 0.5);
-        transition: width 0.9s 0.15s cubic-bezier(0.2, 0.8, 0.2, 1);
-      }
-      .mb-ligne.mb-on .mb-ligne-barre::after { width: calc(var(--f, 0) * 100%); }
-      .mb-ligne-val { white-space: nowrap; justify-self: end; }
-      .mb-ligne-val b {
-        font-family: var(--font-display); font-size: calc(18px * var(--ui));
-        color: var(--mb-encre); font-variant-numeric: tabular-nums;
-      }
-      /* sous la barre : ce que le chiffre veut dire, et le record à battre */
-      .mb-ligne-sous {
-        grid-column: 2 / -1; grid-row: 2; min-width: 0;
-        color: #7b93a8; font-size: calc(10.5px * var(--ui)); letter-spacing: 0.02em;
-        overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-      }
-      .mb-ligne-sous em { font-style: normal; color: #5f7890; }
       .mb-record {
-        grid-column: 2 / -1; grid-row: 2; justify-self: end;
-        font-style: normal; font-family: var(--font-display); font-size: calc(9px * var(--ui));
-        letter-spacing: 0.2em; color: var(--mb-or); white-space: nowrap;
-        border: 2px solid var(--mb-or); border-radius: 4px; padding: 3px 9px;
-        background: rgba(8, 14, 24, 0.9);
+        display: inline-flex; align-items: center; gap: 10px;
+        font-style: normal; font-family: var(--font-display); font-size: calc(13px * var(--ui));
+        letter-spacing: 0.24em; color: var(--mb-or); white-space: nowrap;
+        border: 2px solid var(--mb-or); padding: 4px 12px;
+        background: color-mix(in srgb, var(--mb-coque) 92%, transparent);
         transform: rotate(-3deg); text-shadow: 0 0 14px rgba(255, 217, 119, 0.6);
-        box-shadow: 0 0 18px rgba(255, 217, 119, 0.25);
-        animation: mb-tampon 0.4s cubic-bezier(0.2, 2.2, 0.4, 1) backwards;
-        animation-delay: 0.35s;
+        animation: mb-tampon 0.4s 0.35s cubic-bezier(0.2, 2.2, 0.4, 1) backwards;
       }
+      .mb-record > i { font-size: calc(20px * var(--ui)); }
+      /* le tampon claque quand sa ligne paraît (main.ts sonne 360 ms après),
+         pas à l'ouverture, où il frappait dans une ligne encore invisible */
+      .mb-ligne:not(.mb-on) .mb-record { animation: none; }
       @keyframes mb-tampon {
         from { transform: rotate(-3deg) scale(2.6); opacity: 0; }
         to { transform: rotate(-3deg) scale(1); opacity: 1; }
       }
-      /* ---- LA RÉCOLTE : une TUILE par chose gagnée. Le pied du relevé ne
-         montrait que le condensat — un total, et un « +450 cL » exilé au
-         bord droit. La mémoire gravée au sas n'y était pas, l'orbe d'une
-         cache passait en toast pendant que la médaille tombait, et rien ne
-         disait à quoi sert l'une ou l'autre monnaie. Chaque tuile porte le
-         gain en grand, son rôle, sa provenance et le solde (game/recolte.ts
-         dit quoi ; ici, seulement comment). La teinte nomme la monnaie :
-         menthe le condensat (la bourse, qui se purge), violet la mémoire
-         (ce qui reste), or l'exceptionnel. ---- */
-      .mb-recolte {
-        grid-column: 1 / -1; min-width: 0;
-        opacity: 0; transform: translateY(8px); transition: opacity 0.35s ease, transform 0.35s ease;
+      /* ---- LES GAINS : une CARTOUCHE par chose gagnée (cartouches.ts) — un
+         chiffre, un nom, l'icône rendue ; le rôle et la provenance en
+         infobulle. Elles claquent une à une : chacune attend son tour
+         cachée, À SA PLACE (la rangée ne grandit pas quand elle paraît), et
+         son claquement part quand elle paraît. La teinte du liseré nomme la
+         monnaie : menthe la bourse, violet la mémoire, or l'exceptionnel. */
+      .mb-gains { display: grid; gap: 10px; min-width: 0; }
+      .mb-releve .mb-gains {
+        grid-area: gains; display: flex; flex-wrap: wrap; justify-content: center; gap: 12px 16px;
       }
-      .mb-recolte.mb-on, .mb-scene.mb-compact .mb-recolte { opacity: 1; transform: none; }
-      .mb-recolte-titre {
-        margin: 0 0 10px; display: flex; align-items: center; gap: 14px;
-        font-family: var(--font-display); font-size: calc(8.5px * var(--ui));
-        letter-spacing: 0.32em; color: var(--mb-teal); white-space: nowrap;
+      .mb-releve .mb-gains .mb-cartouche { flex: 0 1 calc(236px * var(--ui)); }
+      .mb-releve .mb-cartouche:not(.mb-on) { visibility: hidden; animation: none; }
+      .mb-cartouche-condensat { --mb-liseret: var(--mb-menthe); }
+      .mb-cartouche-memoire { --mb-liseret: var(--mb-memoire); }
+      .mb-cartouche-livre { --mb-liseret: var(--mb-bleu); }
+      /* la maîtrise a la menthe de sa colonne ; les instruments, le teal
+         qu'ils avaient avant les cartouches (ils le tenaient du défaut, et
+         la maîtrise perdait sa menthe en passant à la cartouche) */
+      .mb-cartouche-maitrise { --mb-liseret: var(--mb-menthe); }
+      .mb-cartouche-instruments { --mb-liseret: var(--mb-teal); }
+      .mb-cartouche-tirage { --mb-liseret: var(--mb-or); }
+      .mb-cartouche-orbe { --mb-liseret: var(--mb-orbe); }
+      .mb-cartouche-solde {
+        grid-column: 3; grid-row: 1 / span 2; align-self: center; justify-self: end;
+        font-family: var(--font-display); font-size: calc(12px * var(--ui));
+        color: var(--mb-texte-second); font-variant-numeric: tabular-nums; white-space: nowrap;
       }
-      .mb-recolte-titre::after {
-        content: ''; height: 1px; flex: 1;
-        background: linear-gradient(90deg, rgba(143, 216, 200, 0.4), transparent);
+      /* LE LEVIER DU BILAN : il passe au versement. Il se tenait en 8 px
+         clignotants (« toucher pour passer ») et ne répondait qu'au
+         pointeur ; c'est un bouton (la primitive .mb-levier), qui a le focus
+         dès l'ouverture. Sourd, couleur acier : il ne vole pas la vedette à
+         la bonbonne. */
+      .mb-passer {
+        --mb-levier-teinte: var(--mb-legende);
+        align-self: center; flex: none; min-height: 38px; font-size: calc(11px * var(--ui));
       }
-      .mb-gains {
-        display: grid; gap: 10px;
-        /* 250 px : quatre tuiles (bourse, mémoire, tirage garanti, orbe)
-           tiennent sur un rang à 1180 px — à 290, la quatrième passait seule
-           à la ligne et poussait le versement hors d'un écran de 800 px */
-        grid-template-columns: repeat(auto-fit, minmax(min(100%, calc(250px * var(--ui))), 1fr));
-      }
-      .mb-gain {
-        --t: var(--mb-menthe);
-        position: relative; min-width: 0;
-        display: grid; grid-template-columns: auto 1fr; column-gap: 13px; row-gap: 4px;
-        align-items: start; padding: 11px 14px 11px 16px; border-radius: 10px;
-        background: linear-gradient(100deg, color-mix(in srgb, var(--t) 12%, transparent), rgba(10, 18, 30, 0.55) 60%);
-        border: 1px solid color-mix(in srgb, var(--t) 26%, transparent);
-        opacity: 0; transform: translateY(12px) scale(0.98);
-        transition: opacity 0.3s ease, transform 0.36s cubic-bezier(0.2, 1.2, 0.3, 1);
-      }
-      .mb-gain.mb-on, .mb-scene.mb-compact .mb-releve .mb-gain { opacity: 1; transform: none; }
-      /* le liseré : la teinte de la monnaie, au bord gauche */
-      .mb-gain::before {
-        content: ''; position: absolute; left: 0; top: 10px; bottom: 10px; width: 3px;
-        border-radius: 0 2px 2px 0; background: var(--t); box-shadow: 0 0 12px var(--t);
-      }
-      .mb-gain-memoire { --t: #b9a4ff; }
-      .mb-gain-livre { --t: var(--mb-bleu); }
-      .mb-gain-instruments { --t: var(--mb-teal); }
-      .mb-gain-tirage { --t: var(--mb-or); }
-      .mb-gain-orbe { --t: #e58bff; }
-      .mb-gain-ico {
-        grid-row: 1 / span 3; width: calc(38px * var(--ui)); height: calc(38px * var(--ui));
-        display: grid; place-items: center; border-radius: 9px;
-        font-style: normal; font-size: calc(19px * var(--ui)); line-height: 1; color: var(--t);
-        background: color-mix(in srgb, var(--t) 12%, #0a1420);
-        border: 1px solid color-mix(in srgb, var(--t) 34%, transparent);
-      }
-      .mb-gain-ico i { font-style: normal; }
-      .mb-gain-ico .ico-meta { width: 1.5em; height: 1.5em; vertical-align: 0; }
-      .mb-gain-haut {
-        display: flex; flex-wrap: wrap; justify-content: space-between; align-items: flex-start;
-        gap: 4px 14px; min-width: 0;
-      }
-      .mb-gain-tete { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
-      .mb-gain-nom {
-        font-family: var(--font-display); font-size: calc(7.5px * var(--ui));
-        letter-spacing: 0.26em; color: color-mix(in srgb, var(--t) 72%, #cfe2ef);
-      }
-      .mb-gain-val {
-        font-family: var(--font-display); font-size: calc(22px * var(--ui)); line-height: 1.1;
-        color: var(--mb-encre); font-variant-numeric: tabular-nums;
-        text-shadow: 0 0 18px color-mix(in srgb, var(--t) 42%, transparent);
-        white-space: nowrap;
-      }
-      .mb-gain-solde { display: flex; flex-direction: column; align-items: flex-end; gap: 3px; margin-left: auto; }
-      .mb-gain-solde small {
-        font-family: var(--font-display); font-size: calc(7px * var(--ui));
-        letter-spacing: 0.22em; color: #6d8aa5;
-      }
-      .mb-gain-solde b {
-        font-family: var(--font-display); font-size: calc(13px * var(--ui));
-        color: #cfe2ef; font-variant-numeric: tabular-nums; white-space: nowrap;
-      }
-      .mb-gain-role {
-        grid-column: 2; font-size: calc(11.5px * var(--ui)); line-height: 1.4; color: #a9bfd0;
-      }
-      .mb-gain-detail {
-        grid-column: 2; font-size: calc(10.5px * var(--ui)); line-height: 1.4;
-        color: #6d8aa5; letter-spacing: 0.02em;
-      }
+      .mb-passer[hidden] { display: none; }
       /* ---- LE COMPACT : le relevé lu se replie en BANDEAU — le rang, le
          volume (et où il a été versé), puis chaque gain en une puce — et la
          scène revient aux cartes. C'est un RAPPEL de la salle, pas un solde :
          il affichait la bourse du moment du sas, fausse dès la première
-         carte payée. ---- */
+         carte payée. La poutre s'amincit. ---- */
       .mb-scene.mb-compact { gap: 10px; }
-      .mb-scene.mb-compact .mb-banniere { padding: 0; }
-      .mb-scene.mb-compact .mb-sur,
-      .mb-scene.mb-compact .mb-filet { display: none; }
+      .mb-scene.mb-compact .mb-banniere.mb-poutre {
+        --mb-bande: 56px; width: min(100%, 760px); min-height: 38px; padding-top: 4px; padding-bottom: 4px;
+      }
+      .mb-scene.mb-compact .mb-sur { display: none; }
       .mb-scene.mb-compact .mb-titre {
-        font-size: calc(15px * var(--ui)); letter-spacing: 0.3em; animation: none;
+        margin: 0; font-size: calc(15px * var(--ui)); letter-spacing: 0.3em; animation: none;
         color: var(--mb-teal); text-shadow: none;
       }
       .mb-scene.mb-compact .mb-releve {
-        display: flex; align-items: center; flex-wrap: wrap; gap: 4px 22px; padding: 6px 14px;
-        border: 1px solid rgba(150, 200, 235, 0.12); border-radius: 10px;
-        background: rgba(10, 18, 30, 0.72); box-shadow: none;
+        display: flex; align-items: center; justify-content: center; flex-wrap: wrap; gap: 6px 22px;
       }
       .mb-scene.mb-compact .mb-releve[hidden] { display: none; }
-      /* repliée, la médaille s'allonge en pastille : un mot ne tient pas
-         dans un disque de 56 px */
-      .mb-scene.mb-compact .mb-rang { width: 120px; height: 40px; }
-      .mb-scene.mb-compact .mb-rang::before { inset: 4px; border-radius: 999px; }
-      /* l'anneau suit la pastille, et cesse de TOURNER : dessiné pour un
-         disque, il devenait sur 120 × 40 une ellipse en rotation qui
-         balayait ~40 px au-dessus et au-dessous, sur le titre et les litres */
-      .mb-scene.mb-compact .mb-rang-anneau {
-        animation: none; border-radius: 999px; background: none;
-        -webkit-mask: none; mask: none;
-        border: 2px solid color-mix(in srgb, var(--mb-rang) 80%, transparent);
+      /* replié, le sceau devient une plaque biseautée qui porte le nom du
+         régime — immobile : un sceau qui retomberait ou pencherait à chaque
+         repli balaierait le titre */
+      .mb-scene.mb-compact .mb-rang {
+        --mb-sceau-incl: 0deg;
+        width: auto; height: 32px; padding: 0 18px;
+        clip-path: polygon(10px 0, calc(100% - 10px) 0, 100% 50%, calc(100% - 10px) 100%, 10px 100%, 0 50%);
+        animation: none;
       }
-      .mb-scene.mb-compact .mb-rang-lettre { --mb-nom-l: 100px; animation: none; }
-      .mb-scene.mb-compact .mb-rang-mot,
+      .mb-scene.mb-compact .mb-sceau-mot { font-size: calc(13px * var(--ui)); }
+      .mb-scene.mb-compact .mb-rang-img,
       .mb-scene.mb-compact .mb-etoiles,
-      .mb-scene.mb-compact .mb-flacon,
-      .mb-scene.mb-compact .mb-lignes,
+      .mb-scene.mb-compact .mb-coeur,
+      .mb-scene.mb-compact .mb-litres small,
       .mb-scene.mb-compact .mb-prime,
-      .mb-scene.mb-compact .mb-recolte-titre,
-      .mb-scene.mb-compact .mb-releve .mb-gain::before,
-      .mb-scene.mb-compact .mb-releve .mb-gain-role,
-      .mb-scene.mb-compact .mb-releve .mb-gain-detail,
-      .mb-scene.mb-compact .mb-releve .mb-gain-solde { display: none; }
-      .mb-scene.mb-compact .mb-corps { display: flex; align-items: center; gap: 22px; }
-      .mb-scene.mb-compact .mb-haut { gap: 0; }
+      .mb-scene.mb-compact .mb-ligne,
+      .mb-scene.mb-compact .mb-cartouche-solde { display: none; }
       .mb-scene.mb-compact .mb-litres { flex-direction: row; align-items: baseline; gap: 10px; flex-wrap: wrap; }
       .mb-scene.mb-compact .mb-litres b { font-size: calc(20px * var(--ui)); text-shadow: none; }
-      .mb-scene.mb-compact .mb-releve .mb-gains { display: flex; flex-wrap: wrap; gap: 4px 22px; }
-      .mb-scene.mb-compact .mb-releve .mb-gain {
-        display: flex; align-items: baseline; gap: 8px; padding: 0; border: 0; background: none;
+      .mb-scene.mb-compact .mb-releve .mb-gains { display: flex; flex-wrap: wrap; gap: 4px 20px; }
+      .mb-scene.mb-compact .mb-releve .mb-cartouche {
+        flex: none; display: flex; align-items: center; gap: 8px; padding: 0;
+        clip-path: none; background: none; box-shadow: none; visibility: visible; animation: none;
       }
-      .mb-scene.mb-compact .mb-releve .mb-gain-ico {
-        width: auto; height: auto; border: 0; background: none; align-self: center;
-        font-size: calc(14px * var(--ui));
-      }
-      .mb-scene.mb-compact .mb-releve .mb-gain-haut { display: contents; }
-      .mb-scene.mb-compact .mb-releve .mb-gain-tete { flex-direction: row; align-items: baseline; gap: 8px; }
-      .mb-scene.mb-compact .mb-releve .mb-gain-val { font-size: calc(16px * var(--ui)); text-shadow: none; }
+      .mb-scene.mb-compact .mb-releve .mb-cartouche-alv { width: 24px; height: 21px; font-size: 16px; }
+      .mb-scene.mb-compact .mb-releve .mb-cartouche-val { font-size: calc(16px * var(--ui)); }
       .mb-scene.mb-compact .mb-etal { margin-top: 0; padding-top: 0; border-top: 0; }
-      /* ---- La JAUGE D'ÉTALONNAGE : l'XP se VOIT couler ---- */
+      /* ---- LE PALIER : la COLONNE DE MAÎTRISE, en grand ----
+         La maîtrise se lisait dans un tube horizontal en rectangle arrondi,
+         entre deux cercles, sous un paragraphe qui l'expliquait à chaque
+         salle. Au versement, elle est une colonne rendue, cerclée de ses
+         anneaux de palier : le palier en est la suite — la même colonne, au
+         centre et en grand. Les litres roulent à sa gauche, le compte des
+         paliers et le prochain se tiennent à sa droite ; la phrase passe dans
+         l'infobulle du nom. */
       .mb-etal {
-        padding: 12px 14px; border-radius: 10px;
-        background: rgba(10, 18, 30, 0.72); border: 1px solid rgba(150, 200, 235, 0.12);
+        --mb-etal-h: min(54vh, calc(100vh - 300px), 440px);
+        display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+        align-items: center; column-gap: clamp(18px, 4vw, 56px);
         animation: mb-monte 0.4s ease-out;
       }
       .mb-etal[hidden] { display: none; }
-      .mb-etal-tete {
-        display: flex; justify-content: space-between; align-items: baseline;
-        margin-bottom: 8px;
-      }
+      .mb-etal-gauche { display: flex; flex-direction: column; align-items: flex-end; gap: 6px; text-align: right; }
       .mb-etal-nom {
         font-family: var(--font-display);
-        font-size: calc(9px * var(--ui)); letter-spacing: 0.3em; color: var(--mb-teal);
+        font-size: calc(11px * var(--ui)); letter-spacing: 0.3em; color: var(--mb-teal);
       }
-      /* ce que la jauge mesure : « MAÎTRISE » seul, suivi de litres, ne disait
-         ni d'où ils venaient ni ce qu'un palier ouvrait */
-      .mb-etal-nom small {
-        margin-left: 12px; font-family: var(--font-mono); font-size: calc(11px * var(--ui));
-        letter-spacing: 0.02em; color: #6d8aa5; text-transform: none;
-      }
-      .mb-etal-xp { font-size: calc(13px * var(--ui)); color: #9fb6c8; white-space: nowrap; }
+      .mb-etal-xp { font-size: calc(16px * var(--ui)); color: var(--mb-texte-second); white-space: nowrap; }
       .mb-etal-xp b {
-        font-family: var(--font-display); font-size: calc(24px * var(--ui)); color: var(--mb-encre);
-        font-variant-numeric: tabular-nums;
+        font-family: var(--font-display); font-weight: 400; font-size: calc(46px * var(--ui)); line-height: 1.05;
+        color: var(--mb-encre); font-variant-numeric: tabular-nums; text-shadow: 0 0 22px rgba(109, 255, 184, 0.3);
       }
+      /* le gain, sous les litres qu'il fait monter */
       .mb-etal-xp i {
-        font-style: normal; margin-left: 8px; font-size: calc(14px * var(--ui)); color: var(--mb-menthe);
+        display: block; margin-top: 2px; font-style: normal; font-size: calc(16px * var(--ui)); color: var(--mb-menthe);
         font-weight: 600; animation: mb-plonge 0.4s ease-out;
       }
-      .mb-etal-jauge { display: flex; align-items: center; gap: 12px; }
-      /* les deux bornes : le palier ATTEINT (gros chiffre) et le PROCHAIN */
-      .mb-etal-palier {
-        flex: 0 0 58px; width: 58px; height: 58px; border-radius: 50%;
-        border: 2px solid #2d4a63; background: radial-gradient(circle at 50% 40%, #16283a, #0a1420);
-        display: flex; flex-direction: column; align-items: center; justify-content: center;
-        box-shadow: 0 0 0 4px rgba(45, 74, 99, 0.25);
+      .mb-etal-xp i[hidden] { display: none; }
+      /* la colonne : sa hauteur fixe sa largeur (les proportions du rendu) */
+      .mb-etal-colonne { height: var(--mb-etal-h); aspect-ratio: 512 / 1024; display: grid; place-items: center; }
+      /* la maîtrise en menthe, comme au versement. Le liquide suit la coulée
+         image par image (main.ts) : une transition le ferait traîner */
+      .mb-etal .mb-cuve-liquide { --mb-liquide: var(--mb-menthe); }
+      .mb-etal .mb-cuve-liquide::before,
+      .mb-etal .mb-cuve-liquide::after { transition: none; }
+      /* RÉARMÉE (plus de trois paliers d'une coulée) : la fenêtre avance, et
+         la colonne se vide d'un trait avant de remonter */
+      .mb-etal .mb-vidange::before { transition: height 0.35s ease-in; }
+      .mb-etal .mb-vidange::after { transition: bottom 0.35s ease-in; }
+      .mb-etal-droite { display: flex; flex-direction: column; align-items: flex-start; gap: 10px; }
+      .mb-etal-palier { display: flex; flex-direction: column; align-items: flex-start; }
+      .mb-etal-palier small {
+        font-family: var(--font-display); font-size: calc(10px * var(--ui)); letter-spacing: 0.3em; color: var(--mb-etiquette);
       }
       .mb-etal-palier b {
-        font-size: calc(21px * var(--ui)); line-height: 1; color: #d5f3e8;
-        font-family: var(--font-display);
+        font-family: var(--font-display); font-weight: 400; font-size: calc(46px * var(--ui)); line-height: 1.05;
+        color: var(--mb-encre); font-variant-numeric: tabular-nums;
       }
-      .mb-etal-palier small {
-        font-size: calc(9px * var(--ui)); letter-spacing: 0.14em; color: #6d8aa5; margin-top: 3px;
-      }
-      .mb-etal-palier.d b { color: var(--mb-teal); font-size: calc(15px * var(--ui)); }
+      .mb-etal-palier.d b { font-size: calc(20px * var(--ui)); color: var(--mb-teal); }
+      /* un palier franchi : le compte saute et prend l'or des paliers */
       .mb-etal-palier.saute {
+        transform-origin: 0 60%;
         animation: mb-palier-pop 0.6s cubic-bezier(0.2, 2.4, 0.4, 1);
-        border-color: var(--mb-menthe);
       }
+      .mb-etal-palier.saute b { color: var(--mb-or); text-shadow: 0 0 26px rgba(255, 217, 119, 0.55); }
       @keyframes mb-palier-pop {
         0% { transform: scale(1); }
-        35% { transform: scale(1.45); box-shadow: 0 0 40px rgba(109, 255, 184, 0.8); }
+        35% { transform: scale(1.35); }
         100% { transform: scale(1); }
       }
-      /* le tube gradué : le fluide y monte, les crans marquent le chemin,
-         la lueur marque le ménisque */
-      .mb-etal-tube {
-        position: relative; flex: 1; height: 34px; border-radius: 17px;
-        border: 1px solid #2d4a63; background: rgba(6, 12, 20, 0.95);
-        overflow: hidden;
-        box-shadow: inset 0 3px 10px rgba(0, 0, 0, 0.6);
-      }
-      .mb-etal-crans {
-        position: absolute; inset: 0; pointer-events: none;
-        background: repeating-linear-gradient(90deg, transparent 0 calc(10% - 1px), rgba(200, 230, 255, 0.14) calc(10% - 1px) 10%);
-      }
-      .mb-etal-fluide {
-        position: absolute; top: 0; bottom: 0; left: 0; width: 0%;
-        background:
-          repeating-linear-gradient(-60deg, rgba(255, 255, 255, 0.08) 0 8px, transparent 8px 18px),
-          linear-gradient(180deg, #6dffcf, #1d8c74 60%, #14705e);
-        background-size: 60px 100%, 100% 100%;
-        border-radius: 0 8px 8px 0;
-        animation: mb-etal-rayures 1.2s linear infinite;
-      }
-      @keyframes mb-etal-rayures {
-        from { background-position: 0 0, 0 0; }
-        to { background-position: 60px 0, 0 0; }
-      }
-      /* la vaguelette qui court sur le fluide : la jauge VIT même immobile */
-      .mb-etal-fluide::after {
-        content: ''; position: absolute; inset: 0;
-        background: linear-gradient(105deg, transparent 30%, rgba(255, 255, 255, 0.28) 46%, transparent 62%);
-        background-size: 220% 100%;
-        animation: mb-etal-reflet 2.6s linear infinite;
-      }
-      @keyframes mb-etal-reflet {
-        from { background-position: 130% 0; }
-        to { background-position: -90% 0; }
-      }
-      .mb-etal-lueur {
-        position: absolute; top: -4px; bottom: -4px; left: 0%; width: 12px;
-        margin-left: -6px; border-radius: 6px;
-        background: rgba(160, 255, 225, 0.95);
-        filter: blur(5px); opacity: 0;
-      }
-      .mb-etal.coule .mb-etal-lueur { opacity: 1; }
-      /* palier franchi : le tube entier s'embrase un instant */
-      .mb-etal-tube.eclair { animation: mb-etal-eclair 0.7s ease-out; }
-      @keyframes mb-etal-eclair {
-        0% { box-shadow: inset 0 3px 10px rgba(0, 0, 0, 0.6), 0 0 0 rgba(109, 255, 184, 0); }
-        30% { box-shadow: inset 0 0 22px rgba(160, 255, 225, 0.9), 0 0 44px rgba(109, 255, 184, 0.9); border-color: var(--mb-menthe); }
-        100% { box-shadow: inset 0 3px 10px rgba(0, 0, 0, 0.6), 0 0 0 rgba(109, 255, 184, 0); }
-      }
       .mb-etal-tampon {
-        margin: 12px auto 0; width: fit-content;
+        margin: 6px 0 0; width: fit-content;
         font-family: var(--font-display);
         font-size: calc(12px * var(--ui)); letter-spacing: 0.22em; color: var(--mb-or);
-        border: 2px solid var(--mb-or); border-radius: 5px; padding: 7px 14px;
+        border: 2px solid var(--mb-or); padding: 7px 14px;
         transform: rotate(-2deg);
         animation: mb-tampon 0.4s cubic-bezier(0.2, 2.2, 0.4, 1);
         text-shadow: 0 0 18px rgba(255, 217, 119, 0.5);
       }
       .mb-etal-tampon[hidden] { display: none; }
-      /* LA JAUGE MINCE : la coulée finie, elle se replie sur UNE ligne. En
+      /* la barre mince ne sert que repliée */
+      .mb-etal-barre { display: none; }
+      .mb-etal-barre i {
+        display: block; height: 100%; width: calc(var(--p, 0) * 100%);
+        background: linear-gradient(180deg, #6dffcf, #1d8c74 60%, #14705e);
+      }
+      /* L'ANNEAU SE BRISE : le palier franchi, la case brisée de la planche
+         remplace l'intacte ; elle éclate d'or, et ses morceaux s'écartent.
+         Au palier, tout anneau brisé est écarté — celui qu'on vient de
+         casser comme ceux qu'un saut ou un réarmement repose d'emblée ;
+         sans animation, c'est cet état qu'on voit. */
+      .mb-etal .mb-anneau-brise { transform: scale(1.12, 1.05); }
+      .mb-anneau.mb-anneau-casse {
+        animation: mb-anneau-casse 0.7s cubic-bezier(0.2, 1.4, 0.4, 1) backwards;
+      }
+      @keyframes mb-anneau-casse {
+        0% { transform: scale(0.96); filter: brightness(2.2) drop-shadow(0 0 14px rgba(255, 217, 119, 1)); }
+        100% { transform: scale(1.12, 1.05); filter: none; }
+      }
+      /* LA MAÎTRISE REPLIÉE : la coulée finie, elle tient sur UNE ligne. En
          grand, tampon « TIRAGE OUVERT » compris, elle restait en scène après
          le tirage — 160 px qui poussaient les portes sous le bas d'un écran
-         de 800 px, sous un tampon qui annonçait un tirage déjà pris. */
+         de 800 px, sous un tampon qui annonçait un tirage déjà pris. La
+         colonne s'efface ; une barre mince dit où l'on en est du segment. */
       .mb-etal.mb-mince {
-        display: flex; align-items: center; gap: 16px; padding: 6px 14px; animation: none;
+        --mb-c: 10px;
+        display: flex; align-items: center; gap: 14px; padding: 6px 16px; animation: none;
+        clip-path: polygon(var(--mb-c) 0, calc(100% - var(--mb-c)) 0, 100% var(--mb-c), 100% calc(100% - var(--mb-c)), calc(100% - var(--mb-c)) 100%, var(--mb-c) 100%, 0 calc(100% - var(--mb-c)), 0 var(--mb-c));
+        background: linear-gradient(180deg, var(--mb-tole-haut), var(--mb-tole-bas));
+        box-shadow: inset 0 0 0 1px var(--mb-arete);
       }
       .mb-etal.mb-mince[hidden] { display: none; }
-      .mb-etal.mb-mince .mb-etal-tete { margin: 0; gap: 12px; flex: none; }
-      .mb-etal.mb-mince .mb-etal-nom small,
-      .mb-etal.mb-mince .mb-etal-xp i,
+      .mb-etal.mb-mince .mb-etal-colonne,
       .mb-etal.mb-mince .mb-etal-tampon,
+      .mb-etal.mb-mince .mb-etal-xp i,
       .mb-etal.mb-mince .mb-etal-palier small { display: none; }
-      .mb-etal.mb-mince .mb-etal-xp b { font-size: calc(15px * var(--ui)); }
-      .mb-etal.mb-mince .mb-etal-jauge { flex: 1; gap: 10px; }
-      .mb-etal.mb-mince .mb-etal-palier {
-        flex-basis: 30px; width: 30px; height: 30px; box-shadow: none; border-width: 1px;
+      .mb-etal.mb-mince .mb-etal-gauche { flex: none; flex-direction: row; align-items: baseline; gap: 12px; }
+      .mb-etal.mb-mince .mb-etal-xp b { font-size: calc(15px * var(--ui)); text-shadow: none; }
+      .mb-etal.mb-mince .mb-etal-droite { display: contents; }
+      .mb-etal.mb-mince .mb-etal-palier { order: 1; }
+      .mb-etal.mb-mince .mb-etal-palier b { font-size: calc(13px * var(--ui)); }
+      .mb-etal.mb-mince .mb-etal-palier:not(.d) {
+        padding: 3px 10px; background: var(--mb-coque-claire); box-shadow: inset 0 0 0 1px var(--mb-arete);
+        clip-path: polygon(6px 0, calc(100% - 6px) 0, 100% 50%, calc(100% - 6px) 100%, 6px 100%, 0 50%);
       }
-      .mb-etal.mb-mince .mb-etal-palier b { font-size: calc(12px * var(--ui)); }
-      .mb-etal.mb-mince .mb-etal-palier.d {
-        flex-basis: auto; width: auto; height: auto; border: 0; background: none; border-radius: 0;
+      .mb-etal.mb-mince .mb-etal-barre {
+        display: block; order: 2; flex: 1; height: 10px;
+        background: rgba(6, 12, 20, 0.95); box-shadow: inset 0 0 0 1px var(--mb-arete);
       }
+      .mb-etal.mb-mince .mb-etal-palier.d { order: 3; }
       .mb-etal.mb-mince .mb-etal-palier.d b { font-size: calc(11px * var(--ui)); }
-      .mb-etal.mb-mince .mb-etal-tube { height: 10px; border-radius: 5px; box-shadow: none; }
-      .mb-etal.mb-mince .mb-etal-lueur { display: none; }
-      /* LE PALIER TRAVERSE L'ÉCRAN : une bande menthe qui s'ouvre de la
-         gauche, tient une seconde et se referme à droite — le « level up » */
+      /* LE PALIER TRAVERSE L'ÉCRAN : une POUTRE de la station (la primitive
+         .mb-poutre : profil effilé, rivets, bandes de danger) entre par la
+         gauche, tient une seconde au milieu et ressort à droite — le « level
+         up ». Son halo est dans le texte : le clip-path de la poutre
+         rognerait une ombre portée. */
       .mb-palier-eclair {
-        position: absolute; left: 0; right: 0; top: 50%; z-index: 5; pointer-events: none;
-        transform: translateY(-50%) skewY(-3deg); text-align: center; padding: 22px 0 18px;
-        background: linear-gradient(90deg, transparent, rgba(109, 255, 184, 0.16) 18%, rgba(109, 255, 184, 0.3) 50%, rgba(109, 255, 184, 0.16) 82%, transparent);
-        border-top: 1px solid rgba(109, 255, 184, 0.55);
-        border-bottom: 1px solid rgba(109, 255, 184, 0.55);
-        backdrop-filter: blur(2px);
+        position: absolute; left: 8%; right: 8%; top: 50%; z-index: 5; pointer-events: none;
+        min-height: 0; padding-top: 14px; padding-bottom: 12px;
+        transform: translate(0, -50%) rotate(-3deg);
         animation: mb-eclair-passe 1.6s cubic-bezier(0.2, 1, 0.3, 1) both;
       }
       .mb-palier-eclair[hidden] { display: none; }
       .mb-palier-eclair b {
-        display: block; font-family: var(--font-display); font-weight: 600;
-        font-size: calc(clamp(28px, 5vw, 52px) * var(--ui)); letter-spacing: 0.34em;
-        color: var(--mb-encre); text-shadow: 0 0 34px var(--mb-menthe), 0 0 70px rgba(109, 255, 184, 0.5);
+        display: block; font-family: var(--font-display); font-weight: 400; line-height: 1.1;
+        font-size: calc(clamp(26px, 4.4vw, 48px) * var(--ui)); letter-spacing: 0.34em;
+        color: var(--mb-encre); text-shadow: 0 0 26px rgba(255, 217, 119, 0.75), 0 0 60px rgba(255, 217, 119, 0.35);
       }
       .mb-palier-eclair i {
         display: block; font-style: normal; font-family: var(--font-display);
-        font-size: calc(10px * var(--ui)); letter-spacing: 0.5em; color: var(--mb-menthe);
-        margin-top: 6px;
+        font-size: calc(11px * var(--ui)); letter-spacing: 0.5em; color: var(--mb-or);
+        margin-top: 4px;
       }
       @keyframes mb-eclair-passe {
-        0% { clip-path: inset(0 100% 0 0); }
-        22% { clip-path: inset(0 0 0 0); }
-        78% { clip-path: inset(0 0 0 0); }
-        100% { clip-path: inset(0 0 0 100%); }
+        0% { transform: translate(-110vw, -50%) rotate(-3deg); }
+        24%, 76% { transform: translate(0, -50%) rotate(-3deg); }
+        100% { transform: translate(110vw, -50%) rotate(-3deg); }
       }
       /* ---- LA SCÈNE DU CHOIX ---- */
       .mb-choix { animation: mb-monte 0.4s ease-out; }
@@ -8542,40 +8650,89 @@
       }
       .mb-choix-titre::after { background: linear-gradient(90deg, rgba(150, 200, 235, 0.3), transparent); }
       .mb-cartes { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
-      /* ---- LE TIRAGE : les cartes arrivent DOS VISIBLE et se retournent
+      /* ---- LE TIRAGE : trois CARTOUCHES D'INSTRUMENT (quatre avec le
+         Carnet du Semblable). Elles arrivent DOS VISIBLE et se retournent
          une à une ; sous le pointeur, elles s'inclinent (--rx/--ry posés
          par main.ts) ; l'élue s'embrase et grandit, les autres tombent.
-         La face est le composant `.crt` partagé avec l'atelier : ce que le
-         concepteur fabrique a exactement la tête de ce que le joueur tire. */
-      .mb-cartes.mb-draft { grid-template-columns: repeat(var(--n, 3), 1fr); perspective: 1400px; }
+         La face est le composant `.crt` partagé avec l'atelier, taillé ici
+         au chanfrein de la station : l'icône rendue dans son alvéole, le
+         nom, les effets, le prix ; la phrase et le calibre passent dans
+         l'infobulle (carteHTML). */
+      .mb-cartes.mb-draft {
+        grid-template-columns: repeat(var(--n, 3), minmax(0, 1fr)); gap: 16px;
+        max-width: 1000px; width: 100%; margin: 0 auto; perspective: 1400px;
+      }
+      /* LE PLI porte la 3D et ses deux faces, la carte et son dos. Rien de
+         ce qui l'APLATIT ne se pose sur lui tant qu'il peut tourner — ni
+         opacité sous 1, ni filtre, ni clip-path (CSS Transforms 2, les
+         « grouping properties ») : aplati, il peint ses faces à plat puis
+         tourne le tout, et c'est la face EN MIROIR qu'on voyait au lieu du
+         dos (banc, 13/11). L'apparition et l'effacement passent aux faces. */
       .mb-pli {
-        position: relative; transform-style: preserve-3d; min-height: 176px;
+        position: relative; transform-style: preserve-3d; min-height: 210px;
         transform: rotateX(var(--rx, 0deg)) rotateY(var(--ry, 0deg));
-        transition: transform 0.16s ease, opacity 0.2s ease;
+        transition: transform 0.16s ease;
         animation: mb-retourne 0.8s cubic-bezier(0.3, 1, 0.3, 1) backwards;
         animation-delay: calc(0.15s + var(--i, 0) * 0.2s);
       }
       @keyframes mb-retourne {
-        0% { transform: translateY(-48px) rotateY(180deg); opacity: 0; }
-        30% { opacity: 1; transform: translateY(-10px) rotateY(180deg); }
-        100% { transform: translateY(0) rotateY(0); opacity: 1; }
+        0% { transform: translateY(-48px) rotateY(180deg); }
+        30% { transform: translateY(-10px) rotateY(180deg); }
+        100% { transform: translateY(0) rotateY(0); }
       }
-      /* le DOS de la carte : un motif de stries et l'emblème du protocole */
-      .mb-pli::before {
-        content: '◈'; position: absolute; inset: 0; border-radius: 10px;
-        display: flex; align-items: center; justify-content: center;
-        font-size: calc(44px * var(--ui)); color: rgba(143, 216, 200, 0.55);
-        background:
-          repeating-linear-gradient(45deg, rgba(143, 216, 200, 0.07) 0 6px, transparent 6px 14px),
-          radial-gradient(circle at 50% 50%, #14283a, #0a1420 70%);
-        border: 1px solid rgba(143, 216, 200, 0.35);
-        box-shadow: inset 0 0 0 5px #0a1420, inset 0 0 0 6px rgba(143, 216, 200, 0.25);
-        transform: rotateY(180deg); backface-visibility: hidden;
+      /* les deux faces apparaissent ensemble, au départ du retournement */
+      @keyframes mb-pli-parait {
+        from { opacity: 0; }
       }
+      /* LA FACE : une cartouche à deux coins coupés (le chanfrein de
+         .mb-coupe-diag), l'arête et la lueur à la teinte de la famille ;
+         le calibre se voit à l'arête qui s'avive (le halo, lui, est celui
+         de l'atelier). Le clip-path rogne outline et ombres portées : la
+         visée et le focus s'éclairent DANS la forme. */
       .mb-pli .crt-draft {
-        position: relative; width: 100%; height: 100%; min-height: 176px;
-        cursor: pointer; align-items: stretch; backface-visibility: hidden;
-        transition: border-color 0.16s ease, box-shadow 0.16s ease;
+        --c: calc(var(--mb-chanfrein) * 1.1);
+        --crt-arete: color-mix(in srgb, var(--fam) 30%, transparent);
+        position: relative; width: 100%; height: 100%; min-height: 210px; box-sizing: border-box;
+        align-items: center; gap: 8px; padding: 16px 14px 12px; text-align: center;
+        border: 0; border-radius: 0; cursor: pointer; backface-visibility: hidden;
+        clip-path: polygon(0 0, calc(100% - var(--c)) 0, 100% var(--c), 100% 100%, var(--c) 100%, 0 calc(100% - var(--c)));
+        background:
+          linear-gradient(225deg, transparent 50%, var(--crt-arete) 50% calc(50% + 1.2px), transparent calc(50% + 1.2px)) right top / var(--c) var(--c) no-repeat,
+          linear-gradient(45deg, transparent 50%, var(--crt-arete) 50% calc(50% + 1.2px), transparent calc(50% + 1.2px)) left bottom / var(--c) var(--c) no-repeat,
+          radial-gradient(90% 55% at 50% 20%, color-mix(in srgb, var(--fam) 13%, transparent), transparent 72%),
+          linear-gradient(180deg, var(--mb-tole-haut), var(--mb-tole-bas));
+        box-shadow: inset 0 0 0 1px var(--crt-arete);
+        animation: mb-pli-parait 0.24s ease-out backwards;
+        animation-delay: calc(0.15s + var(--i, 0) * 0.2s);
+        transition: opacity 0.2s ease, box-shadow 0.16s ease;
+      }
+      .mb-pli .crt-draft.cal-notable { --crt-arete: color-mix(in srgb, var(--fam) 50%, transparent); }
+      .mb-pli .crt-draft.cal-majeur { --crt-arete: color-mix(in srgb, var(--fam) 72%, transparent); }
+      /* l'icône rendue, dans son alvéole hexagonale ; une carte d'atelier
+         y pose son émoji */
+      .mb-pli .crt-tete { flex-direction: column; align-items: center; gap: 8px; }
+      .mb-pli .crt-ico {
+        display: grid; place-items: center; width: 1.5em; height: 1.3em;
+        font-size: calc(46px * var(--ui)); filter: none;
+        clip-path: polygon(25% 0, 75% 0, 100% 50%, 75% 100%, 25% 100%, 0 50%);
+        background: radial-gradient(circle at 50% 36%, color-mix(in srgb, var(--fam) 24%, var(--mb-coque-claire)), var(--mb-coque-noire) 80%);
+      }
+      .mb-pli .crt-ico > i { filter: drop-shadow(0 0 7px color-mix(in srgb, var(--fam) 45%, transparent)); }
+      .mb-pli .crt-titres { flex: none; align-items: center; }
+      .mb-pli .crt-nom {
+        font-family: var(--font-display); font-weight: 400; font-size: calc(12px * var(--ui));
+        line-height: 1.35; letter-spacing: 0.12em; text-transform: uppercase; color: var(--mb-encre);
+      }
+      .mb-pli .crt-effets { align-self: stretch; text-align: left; }
+      .mb-pli .crt-ctr { align-self: stretch; font-size: calc(10px * var(--ui)); letter-spacing: 0.24em; }
+      .mb-pli .crt-perso { font-size: calc(10px * var(--ui)); }
+      .mb-pli .crt-pied {
+        align-self: stretch; justify-content: center; padding-top: 8px;
+        border-top: 1px solid color-mix(in srgb, var(--fam) 16%, transparent);
+      }
+      .mb-pli .crt-prix {
+        font-family: var(--font-display); font-size: calc(13px * var(--ui)); letter-spacing: 0.12em;
+        text-transform: uppercase;
       }
       /* l'ÉCLAT qui balaie la carte à la pose : la carte se révèle */
       .mb-pli .crt-draft::after {
@@ -8589,30 +8746,51 @@
         0% { transform: translateX(-120%); }
         100% { transform: translateX(120%); }
       }
+      /* LE DOS : une vraie face, peinte à 180° et cachée de face — la tôle
+         striée de la station, deux bandes de danger, l'icône du tirage */
+      .mb-pli-dos {
+        --c: calc(var(--mb-chanfrein) * 1.1);
+        position: absolute; inset: 0;
+        display: grid; place-items: center;
+        font-size: calc(84px * var(--ui));
+        clip-path: polygon(0 0, calc(100% - var(--c)) 0, 100% var(--c), 100% 100%, var(--c) 100%, 0 calc(100% - var(--c)));
+        background:
+          linear-gradient(225deg, transparent 50%, rgba(143, 216, 200, 0.45) 50% calc(50% + 1.2px), transparent calc(50% + 1.2px)) right top / var(--c) var(--c) no-repeat,
+          linear-gradient(45deg, transparent 50%, rgba(143, 216, 200, 0.45) 50% calc(50% + 1.2px), transparent calc(50% + 1.2px)) left bottom / var(--c) var(--c) no-repeat,
+          repeating-linear-gradient(-45deg, var(--mb-ocre) 0 8px, var(--mb-coque-noire) 8px 16px) center 14px / calc(100% - 28px) 10px no-repeat,
+          repeating-linear-gradient(-45deg, var(--mb-ocre) 0 8px, var(--mb-coque-noire) 8px 16px) center calc(100% - 14px) / calc(100% - 28px) 10px no-repeat,
+          repeating-linear-gradient(45deg, rgba(143, 216, 200, 0.06) 0 6px, transparent 6px 14px),
+          radial-gradient(circle at 50% 50%, #14283a, var(--mb-coque) 70%);
+        box-shadow: inset 0 0 0 1px rgba(143, 216, 200, 0.35);
+        transform: rotateY(180deg); backface-visibility: hidden;
+        animation: mb-pli-parait 0.24s ease-out backwards;
+        animation-delay: calc(0.15s + var(--i, 0) * 0.2s);
+      }
+      /* (écrit « > i » : les gardes des planches lisent la DERNIÈRE règle
+         de la classe de l'icône, celle qui porte l'image) */
+      .mb-pli-dos > i { opacity: 0.85; filter: drop-shadow(0 0 14px rgba(143, 216, 200, 0.4)); }
       /* L'ISOLEMENT sous le pointeur ou le focus : celle qu'on regarde
-         s'incline, s'allume et grandit ; les autres s'effacent */
-      .mb-cartes.mb-isole .mb-pli:not(.mb-vise) { opacity: 0.3; }
+         s'incline, s'allume et grandit ; les autres s'effacent — leur
+         FACE, pas leur pli (voir plus haut) */
+      .mb-cartes.mb-isole .mb-pli:not(.mb-vise) .crt-draft { opacity: 0.3; }
       .mb-pli.mb-vise { z-index: 2; transform: rotateX(var(--rx, 0deg)) rotateY(var(--ry, 0deg)) translateY(-8px) scale(1.04); }
-      .mb-pli.mb-vise .crt-draft {
-        border-color: color-mix(in srgb, var(--fam) 90%, transparent);
-        box-shadow: 0 22px 44px rgba(0, 0, 0, 0.55), 0 0 30px color-mix(in srgb, var(--fam) 28%, transparent);
+      .mb-pli.mb-vise .crt-draft, .mb-pli .crt-draft:focus-visible, .mb-pli .crt-draft.pad-focus {
+        outline: none;
+        box-shadow: inset 0 0 0 2px var(--fam), inset 0 0 36px color-mix(in srgb, var(--fam) 22%, transparent);
       }
       .mb-pli.mb-vise .crt-halo {
         opacity: 1;
-        box-shadow:
-          inset 0 0 34px color-mix(in srgb, var(--fam) 26%, transparent),
-          0 0 26px color-mix(in srgb, var(--fam) 24%, transparent);
+        box-shadow: inset 0 0 34px color-mix(in srgb, var(--fam) 26%, transparent);
       }
-      .mb-pli .crt-draft:focus-visible { outline: 2px solid var(--fam); outline-offset: 3px; }
       .mb-pli .crt-draft.mb-pauvre { opacity: 0.4; cursor: not-allowed; }
-      /* LE CHOIX : l'élue s'embrase et grandit, les autres tombent */
+      /* LE CHOIX : l'élue s'embrase et grandit, les autres tombent (le pli
+         peut alors s'aplatir : chacun est sur sa face) */
       .mb-cartes.mb-elu .mb-pli:not(.mb-elu-c) {
         animation: crt-refus 0.32s ease-in forwards; pointer-events: none;
       }
       .mb-pli.mb-elu-c { z-index: 3; animation: crt-elue 0.4s cubic-bezier(0.22, 1, 0.36, 1) forwards; }
       .mb-pli.mb-elu-c .crt-draft {
-        border-color: var(--fam);
-        box-shadow: 0 0 40px color-mix(in srgb, var(--fam) 45%, transparent);
+        box-shadow: inset 0 0 0 2px var(--fam), inset 0 0 52px color-mix(in srgb, var(--fam) 42%, transparent);
       }
       @keyframes crt-elue {
         0% { transform: translateY(-8px) scale(1.04); }
@@ -8630,8 +8808,8 @@
         padding: 18px 14px 14px; min-height: 150px;
         background:
           radial-gradient(120% 70% at 50% -10%, rgba(255, 255, 255, 0.06), transparent 60%),
-          linear-gradient(180deg, #14202f, #0e1724);
-        border: 1px solid #2d4258; border-radius: 12px; color: #cfe2ef;
+          linear-gradient(180deg, #14202f, var(--mb-coque-claire));
+        border: 1px solid #2d4258; border-radius: 12px; color: var(--mb-texte);
         font: inherit; font-size: calc(12px * var(--ui)); cursor: pointer; text-align: center;
         animation: mb-carte-monte 0.45s cubic-bezier(0.2, 1, 0.3, 1) backwards;
         animation-delay: calc(var(--i, 0) * 0.1s);
@@ -8665,7 +8843,7 @@
         font-family: var(--font-display); font-size: calc(11px * var(--ui));
         letter-spacing: 0.24em; line-height: 1.3; color: var(--mb-encre);
       }
-      .mb-carte small { color: #8ba3b8; font-size: calc(12px * var(--ui)); line-height: 1.4; }
+      .mb-carte small { color: var(--mb-legende); font-size: calc(12px * var(--ui)); line-height: 1.4; }
       .mb-prix {
         margin-top: auto; font-style: normal; font-size: calc(11.5px * var(--ui));
         color: var(--mb-or); letter-spacing: 0.08em;
@@ -8699,7 +8877,7 @@
         font-size: calc(9.5px * var(--ui)); letter-spacing: 0.22em; color: var(--mb-or, #ffd977);
       }
       .mb-ev-recit p {
-        margin: 8px 0 0; font-size: calc(13px * var(--ui)); line-height: 1.65; color: #cfe2ef;
+        margin: 8px 0 0; font-size: calc(13px * var(--ui)); line-height: 1.65; color: var(--mb-texte);
       }
       /* CE QUE L'ISSUE DONNE, en puces : c'était une ligne de texte de 12 px
          sous le récit — la seule chose à retenir de l'écran, et la moins
@@ -8720,7 +8898,7 @@
       }
       .mb-ev-offre b { font-family: var(--font-display); letter-spacing: 0.14em; }
       .mb-ev-pari, .mb-ev-sur {
-        font-style: normal; font-size: calc(10px * var(--ui)); letter-spacing: 0.14em; color: #7f9cb0;
+        font-style: normal; font-size: calc(10px * var(--ui)); letter-spacing: 0.14em; color: var(--dim);
       }
       .mb-ev-pari { color: var(--mb-or, #ffd977); }
       /* le détail d'une offre jamais prise : voilé, il se devine sans se lire */
@@ -8730,11 +8908,20 @@
       /* l'alcôve de repos : trois offres, l'icône en tête */
       .mb-carte.mb-repos { min-height: 170px; justify-content: center; gap: 8px; }
       .mb-repos-icone { font-style: normal; font-size: calc(30px * var(--ui)); line-height: 1; }
-      /* ---- LE VERSEMENT : la goutte du surplus au centre, une plaque de
-         chaque côté (la RÉSERVE et son bocal, la MAÎTRISE et son anneau).
-         Viser une plaque fait COULER le flux de la goutte vers elle ; la
-         plaque dit en chiffres « avant → après » et le montre en jauge. ---- */
+      /* ---- LE VERSEMENT : l'orbe du surplus au centre, une cuve rendue de
+         chaque côté (la RÉSERVE, la colonne de MAÎTRISE et ses anneaux). Le
+         bilan s'en est allé : les deux plaques d'avant (bocal et anneau en
+         SVG, « avant → après », jauge de 8 px) tombaient sous le bas d'un
+         écran de 720 px. Viser une cuve fait pencher l'orbe et COULER son
+         flux vers elle ; la choisir l'y déverse, et son liquide monte.
+         --mb-v-h, la hauteur des cuves, suit l'écran : la hauteur pour qu'elles
+         tiennent sous la poutre (46vh ; et sur un écran très bas, ce que
+         laissent la poutre, la ligne de contexte, les noms et les chiffres,
+         ~250 px — un téléphone couché défilait de 11 px), la largeur pour
+         que la réserve (880 × 1024) ne soit jamais plus large que sa
+         plaque. ---- */
       .mb-versement {
+        --mb-v-h: min(46vh, calc(100vh - 250px), 30vw, 380px);
         grid-column: 1 / -1; width: 100%; max-width: 980px; margin: 0 auto;
         display: grid; grid-template-columns: 1fr auto 1fr; gap: 18px; align-items: center;
       }
@@ -8750,7 +8937,7 @@
         border: 2px solid rgba(167, 221, 245, 0.7);
         box-shadow: 0 0 0 8px rgba(99, 183, 230, 0.12), 0 0 44px rgba(99, 183, 230, 0.45), inset 0 -10px 24px rgba(0, 0, 0, 0.35);
         animation: mb-goutte-bat 2.4s ease-in-out infinite;
-        transition: transform 0.25s ease;
+        transition: transform 0.25s ease, opacity 0.25s ease;
       }
       @keyframes mb-goutte-bat {
         0%, 100% { box-shadow: 0 0 0 8px rgba(99, 183, 230, 0.12), 0 0 44px rgba(99, 183, 230, 0.45), inset 0 -10px 24px rgba(0, 0, 0, 0.35); }
@@ -8760,14 +8947,22 @@
         font-family: var(--font-display); font-size: calc(17px * var(--ui)); color: var(--mb-encre);
         font-variant-numeric: tabular-nums; text-shadow: 0 0 12px rgba(234, 246, 255, 0.6);
       }
+      /* « SURPLUS » : 7 px, sous le plancher des étiquettes */
       .mb-goutte-corps i {
-        font-style: normal; font-family: var(--font-display); font-size: calc(7px * var(--ui));
-        letter-spacing: 0.3em; color: rgba(234, 246, 255, 0.8);
+        font-style: normal; font-family: var(--font-display); font-size: calc(10px * var(--ui));
+        letter-spacing: 0.22em; color: rgba(234, 246, 255, 0.85);
       }
-      /* la goutte penche vers la plaque visée */
+      /* l'orbe penche vers la cuve visée */
       .mb-versement[data-vers='g'] .mb-goutte-corps { transform: translateX(-10px) scale(0.96); }
       .mb-versement[data-vers='d'] .mb-goutte-corps { transform: translateX(10px) scale(0.96); }
-      /* LE FLUX : des gouttes qui filent de la goutte vers la plaque visée */
+      /* choisie, elle part s'y déverser : elle file vers la cuve en fondant */
+      .mb-versement[data-verse] .mb-goutte-corps {
+        opacity: 0; animation: none;
+        transition: transform 0.6s cubic-bezier(0.5, 0, 0.8, 0.4), opacity 0.5s 0.15s ease-in;
+      }
+      .mb-versement[data-verse='g'] .mb-goutte-corps { transform: translateX(-90px) translateY(30px) scale(0.25); }
+      .mb-versement[data-verse='d'] .mb-goutte-corps { transform: translateX(90px) translateY(30px) scale(0.25); }
+      /* LE FLUX : des gouttes qui filent de l'orbe vers la cuve visée */
       .mb-flux {
         position: absolute; top: 50%; height: 8px; width: 90px; margin-top: -4px;
         background: radial-gradient(circle, rgba(167, 221, 245, 0.95) 0 2.5px, transparent 3px);
@@ -8787,89 +8982,93 @@
         from { background-position: 0 0; }
         to { background-position: 18px 0; }
       }
-      /* LES PLAQUES : chacune a sa teinte (l'eau pour la réserve, la menthe
-         pour la maîtrise) qui prend le bord, le halo et la jauge */
-      .mb-carte.mb-dest {
+      /* LES CUVES À CHOISIR : une plaque à deux coins coupés (la primitive
+         .mb-coupe-diag, le fond par --mb-fond), le nom, la cuve rendue, un
+         chiffre. Chacune a sa teinte (--t : l'eau pour la réserve, la menthe
+         pour la maîtrise), qui prend la lueur du fond, l'arête visée et le
+         liquide. Le clip-path rognant outline et ombres portées, la visée
+         (survol, clavier, .pad-focus de la manette) s'éclaire DANS la forme. */
+      .mb-dest {
         --t: var(--mb-bleu);
-        min-height: 210px; padding: 18px 18px 16px; gap: 10px; align-items: stretch; text-align: left;
+        --mb-fond:
+          radial-gradient(80% 55% at 50% 52%, color-mix(in srgb, var(--t) 12%, transparent), transparent 72%),
+          linear-gradient(180deg, var(--mb-tole-haut), var(--mb-tole-bas));
+        position: relative; min-width: 0; align-self: stretch;
+        display: flex; flex-direction: column; align-items: center; gap: 6px;
+        padding: 12px 14px 14px; border: 0; border-radius: 0;
+        font: inherit; color: var(--mb-texte); cursor: pointer; text-align: center;
+        animation: mb-carte-monte 0.45s cubic-bezier(0.2, 1, 0.3, 1) backwards;
+        animation-delay: calc(var(--i, 0) * 0.1s);
+        transition: transform 0.16s ease, box-shadow 0.16s ease, opacity 0.3s ease, filter 0.3s ease;
       }
-      .mb-carte.mb-dest-maitrise { --t: var(--mb-menthe); }
-      .mb-carte.mb-dest::before { --mb-teal: var(--t); }
-      .mb-carte.mb-dest:hover:not(:disabled), .mb-carte.mb-dest:focus-visible {
-        border-color: var(--t);
-        box-shadow: 0 18px 40px rgba(0, 0, 0, 0.5), 0 0 34px color-mix(in srgb, var(--t) 30%, transparent);
+      .mb-dest-maitrise { --t: var(--mb-menthe); }
+      .mb-dest:hover:not(:disabled), .mb-dest:focus-visible, .mb-dest.pad-focus {
+        transform: translateY(-4px); outline: none;
+        box-shadow: inset 0 0 0 2px var(--t), inset 0 0 38px color-mix(in srgb, var(--t) 22%, transparent);
       }
-      .mb-dest-tete { display: flex; align-items: center; gap: 14px; }
-      .mb-dest-tete b {
-        font-family: var(--font-display); font-size: calc(13px * var(--ui)); letter-spacing: 0.3em;
-        color: var(--mb-encre);
+      .mb-dest-nom {
+        font-family: var(--font-display); font-weight: 400; font-size: calc(13px * var(--ui));
+        letter-spacing: 0.3em; color: var(--mb-encre);
       }
-      /* le BOCAL de la réserve : le niveau d'avant en plein, la part qui
-         s'ajoute en clair par-dessus */
-      .mb-bocal { width: 44px; height: 58px; flex: none; filter: drop-shadow(0 0 10px rgba(99, 183, 230, 0.35)); }
-      .mb-bocal-bouchon { fill: #3d5a78; }
-      .mb-bocal-verre { fill: rgba(18, 28, 42, 0.7); stroke: #4a7096; stroke-width: 2; }
-      .mb-bocal-eau { fill: #3f98cf; }
-      .mb-bocal-gain { fill: rgba(167, 221, 245, 0.55); animation: mb-dest-pulse 1.4s ease-in-out infinite; }
-      /* l'ANNEAU de la maîtrise : le chemin fait en plein, celui qui
-         s'ajoute en clair, le numéro du palier au centre */
-      .mb-anneau { width: 58px; height: 58px; flex: none; transform: rotate(-90deg); filter: drop-shadow(0 0 10px rgba(109, 255, 184, 0.35)); }
-      .mb-anneau circle { fill: none; stroke-width: 6; stroke-linecap: round; }
-      .mb-anneau-fond { stroke: #223447; }
-      .mb-anneau-fait { stroke: var(--mb-menthe); }
-      .mb-anneau-gain { stroke: rgba(169, 255, 214, 0.45); animation: mb-dest-pulse 1.4s ease-in-out infinite; }
-      .mb-anneau-no {
-        fill: var(--mb-encre); font-family: var(--font-display); font-size: 19px; text-anchor: middle;
-        transform: rotate(90deg); transform-origin: 32px 32px;
+      .mb-dest-cuve { display: grid; place-items: center; height: var(--mb-v-h); max-width: 100%; }
+      /* le liquide : sa teinte, et le FANTÔME de ce que le versement y
+         ajoutera — de --mb-avant à --mb-apres, peint dans le fond de la
+         fenêtre, sous l'eau (::before) qui le recouvre en montant */
+      .mb-dest .mb-cuve-liquide {
+        background: linear-gradient(0deg,
+          transparent calc(var(--mb-avant, 0) * 100%),
+          color-mix(in srgb, var(--mb-liquide) var(--mb-fantome, 26%), transparent) calc(var(--mb-avant, 0) * 100%) calc(var(--mb-apres, 0) * 100%),
+          color-mix(in srgb, var(--mb-texte) 5%, transparent) calc(var(--mb-apres, 0) * 100%));
       }
-      /* AVANT → APRÈS, en chiffres */
-      .mb-dest-chiffres {
-        display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap;
-        font-variant-numeric: tabular-nums;
+      .mb-dest-maitrise .mb-cuve-liquide { --mb-liquide: var(--mb-menthe); }
+      .mb-versement[data-vers='g'] .mb-dest-reserve .mb-cuve-liquide,
+      .mb-versement[data-vers='d'] .mb-dest-maitrise .mb-cuve-liquide { --mb-fantome: 52%; }
+      /* LES ANNEAUX DE PALIER (colonneMaitrise.ts, anneauxHTML) : la planche
+         2 × 1 de l'atelier — intact, puis brisé — posée dans la boîte
+         mesurée de chaque siège, par-dessus le verre. Celui qu'un versement
+         franchirait luit. */
+      .mb-anneau {
+        position: absolute; z-index: 3; pointer-events: none;
+        background: 0 0 / 200% 100% no-repeat;
       }
-      .mb-dest-chiffres i { font-style: normal; font-size: calc(15px * var(--ui)); color: #7b93a8; }
-      .mb-dest-chiffres em { font-style: normal; color: var(--t); font-size: calc(15px * var(--ui)); }
-      .mb-dest-chiffres b {
-        font-family: var(--font-display); font-size: calc(22px * var(--ui)); color: var(--mb-encre);
+      .mb-anneau-brise { background-position: 100% 0; }
+      .mb-anneau-franchit {
+        filter: drop-shadow(0 0 6px rgba(255, 217, 119, 0.75));
+        animation: mb-anneau-luit 1.4s ease-in-out infinite;
+      }
+      @keyframes mb-anneau-luit {
+        0%, 100% { filter: drop-shadow(0 0 3px rgba(255, 217, 119, 0.5)); }
+        50% { filter: drop-shadow(0 0 12px rgba(255, 217, 119, 0.95)) brightness(1.2); }
+      }
+      /* UN CHIFFRE : ce que la cuve contiendra. L'avant et le palier suivant
+         passent dans l'infobulle. */
+      .mb-dest-val {
+        font-family: var(--font-display); font-weight: 400; font-size: calc(26px * var(--ui)); line-height: 1.1;
+        color: var(--mb-encre); font-variant-numeric: tabular-nums; white-space: nowrap;
         text-shadow: 0 0 14px color-mix(in srgb, var(--t) 40%, transparent);
       }
-      .mb-dest-chiffres small { color: #7b93a8; font-size: calc(11px * var(--ui)); }
-      /* la jauge : l'acquis en plein, le gain en clair qui pulse */
-      .mb-dest-jauge {
-        width: 100%; height: 8px; border-radius: 4px;
-        background: rgba(255, 255, 255, 0.08); overflow: hidden; position: relative;
-      }
-      .mb-dest-jauge::before {
-        content: ''; position: absolute; inset: 0 auto 0 0; width: calc(var(--a, 0) * 100%);
-        background: color-mix(in srgb, var(--t) 70%, #ffffff 10%);
-      }
-      .mb-dest-jauge::after {
-        content: ''; position: absolute; inset: 0 auto 0 calc(var(--a, 0) * 100%);
-        width: calc(var(--g, 0) * 100%);
-        background: color-mix(in srgb, var(--t) 60%, #ffffff);
-        box-shadow: 0 0 10px color-mix(in srgb, var(--t) 70%, transparent);
-        animation: mb-dest-pulse 1.4s ease-in-out infinite;
-      }
-      @keyframes mb-dest-pulse {
-        0%, 100% { opacity: 0.6; }
-        50% { opacity: 1; }
-      }
-      .mb-dest-mot { color: #8ba3b8; font-size: calc(11.5px * var(--ui)); line-height: 1.4; }
       .mb-dest-plus {
-        margin-top: auto; font-style: normal; font-size: calc(11px * var(--ui)); letter-spacing: 0.06em;
-        color: var(--t);
+        font-style: normal; font-size: calc(11px * var(--ui)); letter-spacing: 0.06em; color: var(--t);
       }
-      /* la plaque qui FRANCHIT un palier le dit en tampon, et son bord respire */
+      /* la colonne qui FRANCHIT un palier le dit en tampon, et respire */
       .mb-dest-plus.mb-dest-ouvre {
-        font-family: var(--font-display); font-size: calc(8px * var(--ui)); letter-spacing: 0.2em;
-        color: var(--mb-or); border: 1px solid rgba(255, 217, 119, 0.6); border-radius: 4px;
-        padding: 5px 9px; width: fit-content; text-shadow: 0 0 12px rgba(255, 217, 119, 0.5);
+        font-family: var(--font-display); font-size: calc(10px * var(--ui)); letter-spacing: 0.16em;
+        color: var(--mb-or); border: 1px solid rgba(255, 217, 119, 0.6);
+        padding: 4px 8px; text-shadow: 0 0 12px rgba(255, 217, 119, 0.5);
       }
-      .mb-carte.mb-dest-palier { animation: mb-carte-monte 0.45s cubic-bezier(0.2, 1, 0.3, 1) backwards, mb-dest-respire 2s 0.6s ease-in-out infinite; }
+      .mb-dest.mb-dest-palier { animation: mb-carte-monte 0.45s cubic-bezier(0.2, 1, 0.3, 1) backwards, mb-dest-respire 2s 0.6s ease-in-out infinite; }
       @keyframes mb-dest-respire {
-        0%, 100% { border-color: #2d4258; }
-        50% { border-color: rgba(109, 255, 184, 0.7); box-shadow: 0 0 26px rgba(109, 255, 184, 0.2); }
+        0%, 100% { box-shadow: inset 0 0 0 1px var(--mb-arete); }
+        50% { box-shadow: inset 0 0 0 1px rgba(109, 255, 184, 0.7), inset 0 0 30px rgba(109, 255, 184, 0.16); }
       }
+      .mb-dest.mb-dest-palier:hover:not(:disabled), .mb-dest.mb-dest-palier:focus-visible, .mb-dest.mb-dest-palier.pad-focus {
+        animation: mb-carte-monte 0.45s cubic-bezier(0.2, 1, 0.3, 1) backwards;
+      }
+      /* le BOCAL PLEIN, grisé : on le voit, on ne le choisit pas */
+      .mb-dest.mb-pauvre { cursor: not-allowed; filter: grayscale(0.85) brightness(0.6); }
+      /* le choix fait, l'autre cuve s'efface */
+      .mb-versement[data-verse='g'] .mb-dest-maitrise,
+      .mb-versement[data-verse='d'] .mb-dest-reserve { opacity: 0.3; }
       /* LA QUESTION : le titre de scène qui demande quelque chose au joueur
          se lit en grand et en clair, même en compact */
       .mb-scene.mb-question .mb-titre,
@@ -8877,7 +9076,7 @@
         font-size: calc(clamp(18px, 2.6vw, 26px) * var(--ui)); letter-spacing: 0.3em;
         color: var(--mb-encre); text-shadow: 0 0 22px rgba(109, 255, 184, 0.45);
       }
-      .mb-scene.mb-question .mb-choix-titre { color: #7f9cb0; }
+      .mb-scene.mb-question .mb-choix-titre { color: var(--dim); }
       .mb-choix-titre.mb-grande {
         font-size: calc(14px * var(--ui)); letter-spacing: 0.34em; color: var(--mb-encre);
         text-shadow: 0 0 18px rgba(99, 183, 230, 0.45);
@@ -8912,7 +9111,7 @@
         font-family: var(--font-display); font-size: calc(19px * var(--ui)); letter-spacing: 0.2em;
         color: var(--mb-encre); text-shadow: 0 0 22px rgba(109, 255, 184, 0.35);
       }
-      .mb-module-nom small { font-size: calc(12px * var(--ui)); color: #9fb6c8; letter-spacing: 0.04em; }
+      .mb-module-nom small { font-size: calc(12px * var(--ui)); color: var(--mb-texte-second); letter-spacing: 0.04em; }
       /* le volume du module : LE grand chiffre de la plaque, à droite */
       .mb-module-total { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; }
       .mb-module-total small {
@@ -8934,12 +9133,12 @@
         display: grid; gap: 2px; padding: 7px 11px; border-radius: 8px;
         flex: 1 1 calc(120px * var(--ui)); min-width: 0; max-width: calc(220px * var(--ui));
         border: 1px solid color-mix(in srgb, var(--t) 42%, transparent);
-        background: color-mix(in srgb, var(--t) 9%, #0a1420);
+        background: color-mix(in srgb, var(--t) 9%, var(--mb-coque));
         animation: mb-carte-monte 0.4s cubic-bezier(0.2, 1, 0.3, 1) backwards;
         animation-delay: calc(0.25s + var(--i, 0) * 0.09s);
       }
       .mb-module-salles span {
-        font-size: calc(10.5px * var(--ui)); color: #9fb6c8;
+        font-size: calc(10.5px * var(--ui)); color: var(--mb-texte-second);
         overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
       }
       .mb-module-salles b {
@@ -8947,20 +9146,17 @@
         color: var(--t);
       }
       .mb-module-salles i { font-style: normal; font-size: calc(9px * var(--ui)); letter-spacing: 1px; color: var(--t); }
-      .mb-module-salles small { font-size: calc(10.5px * var(--ui)); color: #cfe2ef; font-variant-numeric: tabular-nums; }
+      .mb-module-salles small { font-size: calc(10.5px * var(--ui)); color: var(--mb-texte); font-variant-numeric: tabular-nums; }
       /* deux colonnes, pas quatre : à quatre, « +1235 cL » se tronquait en
          « +1235… » et le rôle s'empilait sur quatre lignes */
       .mb-module .mb-gains { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-      .mb-module .mb-gain {
-        opacity: 1; transform: none;
-        animation: mb-carte-monte 0.42s cubic-bezier(0.2, 1, 0.3, 1) backwards;
-        animation-delay: calc(0.45s + var(--i, 0) * 0.08s);
-      }
+      /* les cartouches du module claquent en cascade, après la plaque */
+      .mb-module .mb-cartouche { animation-delay: calc(0.45s + var(--i, 0) * 0.08s); }
       /* LE BOUTON DE SUITE : une pastille qui respire et qu'on presse */
       .mb-continuer {
         grid-column: 1 / -1; justify-self: center; min-width: min(360px, 100%);
         padding: 16px 34px; font-family: var(--font-display); font-size: calc(12px * var(--ui));
-        letter-spacing: 0.32em; color: #071018; cursor: pointer; position: relative; overflow: hidden;
+        letter-spacing: 0.32em; color: var(--mb-coque-noire); cursor: pointer; position: relative; overflow: hidden;
         background: linear-gradient(180deg, #8fffcf, var(--mb-menthe) 55%, #3fd69b);
         border: 0; border-radius: 999px;
         box-shadow: 0 0 0 2px rgba(109, 255, 184, 0.35), 0 10px 30px rgba(109, 255, 184, 0.25);
@@ -8971,6 +9167,12 @@
         content: ''; position: absolute; inset: 0;
         background: linear-gradient(105deg, transparent 35%, rgba(255, 255, 255, 0.5) 50%, transparent 65%);
         background-size: 250% 100%; animation: mb-etal-reflet 2.4s linear infinite;
+      }
+      /* le reflet qui court (né sur l'ancienne jauge de maîtrise, gardé pour
+         le bouton : la jauge est devenue une colonne) */
+      @keyframes mb-etal-reflet {
+        from { background-position: 130% 0; }
+        to { background-position: -90% 0; }
       }
       @keyframes mb-respire {
         0%, 100% { box-shadow: 0 0 0 2px rgba(109, 255, 184, 0.35), 0 10px 30px rgba(109, 255, 184, 0.25); }
@@ -8990,7 +9192,7 @@
         padding: 10px 10px 12px; text-align: left;
         background: linear-gradient(180deg, #101b2a, #0a1220);
         border: 1px solid rgba(150, 200, 235, 0.18); border-radius: 12px;
-        color: #cfe2ef; font: inherit; cursor: pointer;
+        color: var(--mb-texte); font: inherit; cursor: pointer;
         animation: mb-porte-monte 0.5s cubic-bezier(0.2, 1, 0.3, 1) backwards;
         animation-delay: calc(0.05s + var(--i) * 0.12s);
         transition: transform 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease;
@@ -9031,7 +9233,7 @@
         overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
       }
       .mb-porte small {
-        color: #8ba3b8; font-size: calc(11.5px * var(--ui)); line-height: 1.35;
+        color: var(--mb-legende); font-size: calc(11.5px * var(--ui)); line-height: 1.35;
         display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
       }
       /* LA LIGNE COURTE de la porte : DIFF, et la prime ou la figure quand
@@ -9040,17 +9242,17 @@
       .mb-porte-ligne {
         margin-top: auto; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
         font-family: var(--font-display); font-size: calc(8.5px * var(--ui));
-        letter-spacing: 0.12em; color: #9fb6c8;
+        letter-spacing: 0.12em; color: var(--mb-texte-second);
       }
       .mb-porte-ligne i { font-style: normal; }
-      .mb-porte-ligne i + i::before { content: ' · '; color: #55708c; }
+      .mb-porte-ligne i + i::before { content: ' · '; color: var(--mb-acier); }
       .mb-porte-ligne .mb-porte-prime { color: var(--mb-or); }
       .mb-porte-ligne-ev { color: var(--mb-or, #ffd977); }
       /* la mention ENTRER, qui n'apparaît qu'à la visée */
       .mb-porte-entrer {
         position: absolute; right: 16px; top: 16px; z-index: 1;
         font-family: var(--font-display); font-size: calc(8px * var(--ui)); letter-spacing: 0.26em;
-        color: #071018; background: var(--mb-menthe); border-radius: 999px; padding: 5px 11px;
+        color: var(--mb-coque-noire); background: var(--mb-menthe); border-radius: 999px; padding: 5px 11px;
         opacity: 0.6; transform: scale(0.94); transition: opacity 0.16s ease, transform 0.16s ease;
         box-shadow: 0 0 16px rgba(109, 255, 184, 0.5);
       }
@@ -9092,7 +9294,7 @@
          disputaient l'œil, revue du 25/09) */
       .mv-lien.mv-ouvre { stroke: #b8cddd; stroke-width: 3; }
       /* la teinte d'un nœud : sa nature (currentColor nourrit l'icône) */
-      .mv-noeud { color: #7f9cb0; }
+      .mv-noeud { color: var(--dim); }
       .mv-noeud.mv-m0 { color: #63b7e6; }
       .mv-noeud.mv-m1 { color: #a7ddf5; }
       .mv-noeud.mv-m2 { color: #f2c98e; }
@@ -9101,7 +9303,7 @@
       .mv-noeud.mv-evenement { color: var(--mb-or, #ffd977); }
       .mv-noeud.mv-minijeu { color: #ff9ad5; } /* le mini-jeu : la physique est le jeu */
       .mv-halo { fill: none; stroke: transparent; stroke-width: 6; transition: stroke 0.16s ease; }
-      .mv-tuile { fill: #0e1724; stroke: currentColor; stroke-width: 1.5; stroke-opacity: 0.55; transition: fill 0.16s ease, stroke-opacity 0.16s ease; }
+      .mv-tuile { fill: var(--mb-coque-claire); stroke: currentColor; stroke-width: 1.5; stroke-opacity: 0.55; transition: fill 0.16s ease, stroke-opacity 0.16s ease; }
       .mv-noeud use { opacity: 0.9; }
       /* TROIS ÉTATS : joué (menthe), joignable (plein), hors d'atteinte — un
          seul gris pour le passé non joué, le futur interdit par le choix, et
@@ -9111,9 +9313,9 @@
       .mv-lien.mv-interdit, .mv-noeud.mv-interdit, .mv-lien.mv-perdu, .mv-noeud.mv-perdu { opacity: 0.3; }
       .mv-noeud.mv-joue .mv-tuile { fill: rgba(109, 255, 184, 0.14); stroke: var(--mb-menthe); stroke-opacity: 1; }
       .mv-noeud.mv-joue use { opacity: 1; }
-      .mv-coche { fill: var(--mb-menthe); stroke: #071018; stroke-width: 1.5; }
+      .mv-coche { fill: var(--mb-menthe); stroke: var(--mb-coque-noire); stroke-width: 1.5; }
       /* la PRIME d'un nœud : un losange au coin, teinté par ce qu'elle paie */
-      .mv-prime { stroke: #071018; stroke-width: 1; }
+      .mv-prime { stroke: var(--mb-coque-noire); stroke-width: 1; }
       .mv-prime-memoire { fill: #6dffb8; }
       .mv-prime-condensat { fill: #63b7e6; }
       .mv-prime-tirage { fill: #ffd977; }
@@ -9121,13 +9323,13 @@
       .mv-noeud.mv-porte .mv-halo { stroke: currentColor; stroke-opacity: 0.35; animation: mv-bat 1.8s ease-in-out infinite; }
       .mv-noeud.mv-porte use { opacity: 1; filter: drop-shadow(0 0 4px currentColor); }
       .mv-noeud.mv-vise .mv-tuile { fill: currentColor; }
-      .mv-noeud.mv-vise use { color: #071018; filter: none; }
+      .mv-noeud.mv-vise use { color: var(--mb-coque-noire); filter: none; }
       .mv-noeud.mv-evenement.mv-porte .mv-tuile { fill: rgba(255, 217, 119, 0.12); }
       /* la coursive qui mène à la porte survolée : blanc plein, pour dire
          laquelle des cases de la grille est cette porte */
       .mv-lien.mv-entree { stroke: #ffffff; stroke-width: 4.5; stroke-dasharray: none; animation: none; filter: drop-shadow(0 0 6px rgba(234, 246, 255, 0.9)); }
       /* LE REPÈRE DES VOIES (▲ ● ▼) : le même signe que sur la porte */
-      .mv-repere { fill: #55708c; font-size: 13px; text-anchor: middle; dominant-baseline: central; }
+      .mv-repere { fill: var(--mb-acier); font-size: 13px; text-anchor: middle; dominant-baseline: central; }
       .mv-repere.mv-repere-porte { fill: #d5f3e8; }
       .mv-repere.mv-vise { fill: #ffffff; filter: drop-shadow(0 0 4px rgba(234, 246, 255, 0.9)); }
       @keyframes mv-bat { 0%, 100% { stroke-width: 6; stroke-opacity: 0.35; } 50% { stroke-width: 10; stroke-opacity: 0.12; } }
@@ -9143,7 +9345,7 @@
       .mv-prime-anneau.mv-prime-condensat { stroke: #63b7e6; }
       .mv-prime-anneau.mv-prime-tirage { stroke: #ffd977; }
       /* LE SAS : la sortie du module */
-      .mv-sas rect { fill: #0e1724; stroke: #8aa6bc; stroke-width: 1.5; }
+      .mv-sas rect { fill: var(--mb-coque-claire); stroke: #8aa6bc; stroke-width: 1.5; }
       .mv-sas path { fill: none; stroke: #d5f3e8; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
       /* LA FICHE de la mini-carte : une ligne, EN SURIMPRESSION au pied de
          la carte (sur les titres « SALLE n »), et seulement à la visée. Une
@@ -9163,7 +9365,7 @@
       /* les jauges de la fin ordinaire (le choix de salle ne les montre plus) */
       .mb-jauges {
         grid-column: 1 / -1; display: flex; justify-content: center; align-items: center;
-        gap: 22px; flex-wrap: wrap; font-size: calc(12px * var(--ui)); color: #9fb6c8;
+        gap: 22px; flex-wrap: wrap; font-size: calc(12px * var(--ui)); color: var(--mb-texte-second);
         letter-spacing: 0.06em; padding: 0 2px 2px;
       }
       .mb-jauges span { display: flex; align-items: baseline; gap: 6px; }
@@ -9226,105 +9428,151 @@
          travail. */
       .mb-station-fiche {
         margin: 6px 0 0; min-width: 0; overflow: hidden; min-height: calc(3 * 1.55em); text-align: center;
-        font-size: calc(12px * var(--ui)); letter-spacing: 0.06em; color: #8ba3b8;
+        font-size: calc(12px * var(--ui)); letter-spacing: 0.06em; color: var(--mb-legende);
       }
       .mb-station-fiche span {
         display: block; line-height: 1.55em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
       }
-      .mb-station-fiche span:first-child { color: #cfe2ef; }
-      .mb-passer {
-        margin: 4px 0 0; text-align: center; font-family: var(--font-display);
-        font-size: calc(8px * var(--ui)); letter-spacing: 0.3em; color: #55708c;
-        animation: mb-clignote 1.8s ease-in-out infinite;
-      }
-      .mb-passer[hidden] { display: none; }
-      @keyframes mb-clignote {
-        0%, 100% { opacity: 0.45; }
-        50% { opacity: 1; }
-      }
-      /* ---- LES ÉCRANS MOYENS (téléphone couché, 844 px) : la médaille, le
-         flacon et les lignes ne tiennent plus de front — les lignes
-         débordaient de la plaque, leurs chiffres coupés au bord de l'écran.
-         Le flacon passe au-dessus des lignes. ---- */
+      .mb-station-fiche span:first-child { color: var(--mb-texte); }
+      /* ---- LES ÉCRANS MOYENS (téléphone couché, 844 px) : le sceau, la
+         bonbonne et le volume tiennent de front en se resserrant ; la poutre
+         rentre ses bandes (143 px par côté écrasaient le titre). ---- */
       @media (max-width: 1000px) and (min-width: 761px) {
-        .mb-scene:not(.mb-compact) .mb-corps { grid-template-columns: minmax(0, 1fr); }
+        .mb-releve { --mb-coeur-l: 230px; column-gap: 24px; }
+        .mb-rang { --mb-sceau-l: 124px; }
+        .mb-poutre { --mb-bande: 60px; }
       }
       /* ---- LES PETITS ÉCRANS : une colonne, la médaille en tête ---- */
       @media (max-width: 760px) {
         .mb-scene { padding: 10px 12px 14px; gap: 10px; }
-        .mb-releve { grid-template-columns: 1fr; justify-items: center; gap: 8px; }
-        .mb-rang { width: 136px; height: 136px; }
-        .mb-rang-lettre { --mb-nom-l: 104px; }
-        .mb-corps { grid-template-columns: 1fr; width: 100%; }
-        .mb-haut { grid-row: auto; justify-content: center; }
-        .mb-litres b { font-size: calc(32px * var(--ui)); }
-        .mb-releve { padding: 14px 12px 16px; }
-        .mb-lignes { column-gap: 10px; }
-        .mb-ligne { padding: 8px 10px; }
-        .mb-gain-ico { grid-row: 1; }
-        .mb-gain-role, .mb-gain-detail { grid-column: 1 / -1; }
-        .mb-ligne-sous { white-space: normal; }
+        /* une colonne : le héros en tête, le sceau et le volume côte à côte */
+        .mb-releve {
+          --mb-coeur-l: 210px;
+          grid-template-columns: auto auto; justify-content: center;
+          grid-template-areas: 'coeur coeur' 'rang litres' 'gains gains'; gap: 10px 18px;
+        }
+        .mb-coeur { justify-self: center; }
+        .mb-rang { --mb-sceau-l: 104px; }
+        .mb-litres b { font-size: calc(30px * var(--ui)); }
+        .mb-ligne { flex-wrap: wrap; gap: 6px 14px; }
+        .mb-ligne-it > i { font-size: calc(18px * var(--ui)); }
+        .mb-ligne-it b { font-size: calc(13px * var(--ui)); }
         .mb-prime { white-space: normal; }
+        /* la poutre repliée aussi : sa règle (4 classes) l'emportait sur
+           celle-ci, et gardait 56 px de bande par côté sur un téléphone */
+        .mb-poutre, .mb-scene.mb-compact .mb-banniere.mb-poutre { --mb-bande: 36px; }
         .mb-module .mb-gains { grid-template-columns: 1fr; }
         .mb-module-tete { padding: 12px 14px; gap: 12px; grid-template-columns: auto 1fr; }
         .mb-module-total { grid-column: 1 / -1; align-items: flex-start; }
         .mb-module-total b { font-size: calc(28px * var(--ui)); }
         .mb-module-salles li { flex-basis: calc(96px * var(--ui)); }
-        .mb-etal-nom small { display: block; margin: 4px 0 0; }
+        /* le palier : la colonne plus courte, les chiffres resserrés */
+        .mb-etal { --mb-etal-h: min(34vh, 290px); column-gap: 14px; }
+        .mb-etal-xp b, .mb-etal-palier b { font-size: calc(28px * var(--ui)); }
+        .mb-etal-tampon { padding: 5px 8px; letter-spacing: 0.12em; }
         .mb-etal.mb-mince { flex-wrap: wrap; gap: 6px 12px; }
-        .mb-etal.mb-mince .mb-etal-jauge { flex-basis: 100%; }
+        .mb-etal.mb-mince .mb-etal-barre { flex-basis: 100%; order: 4; }
         .mb-cartes, .mb-cartes.mb-draft, .mb-cartes.mb-trio,
         .mb-cartes:has(.mb-porte) { grid-template-columns: 1fr; }
         .mb-pli, .mb-pli .crt-draft { min-height: 0; }
+        /* le tirage en une colonne : la cartouche se COUCHE — l'icône à
+           gauche, le nom, les effets et le prix à droite. Debout, trois
+           cartes empilées passaient le bas d'un écran de 844 px (875 px
+           de scène pour 834 visibles, banc à 390 × 844) */
+        .mb-pli .crt-draft {
+          display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center;
+          gap: 4px 12px; padding: 10px 14px 10px 12px; text-align: left;
+        }
+        .mb-pli .crt-tete { display: contents; }
+        .mb-pli .crt-ico { grid-column: 1; grid-row: 1 / span 4; font-size: calc(34px * var(--ui)); }
+        .mb-pli .crt-titres, .mb-pli .crt-ctr, .mb-pli .crt-effets, .mb-pli .crt-pied { grid-column: 2; }
+        .mb-pli .crt-titres { align-items: flex-start; }
+        .mb-pli .crt-pied { justify-content: flex-start; padding-top: 4px; }
         .mb-carte { min-height: 0; padding: 14px 12px; }
-        .mb-versement { grid-template-columns: 1fr; gap: 12px; }
-        .mb-goutte { order: -1; width: 100px; height: 100px; margin: 0 auto; }
+        /* les deux cuves restent côte à côte (le choix se lit d'un regard),
+           l'orbe passe au-dessus d'elles */
+        .mb-versement { --mb-v-h: min(30vh, 40vw); grid-template-columns: 1fr 1fr; gap: 10px; }
+        .mb-goutte { grid-column: 1 / -1; order: -1; width: 100px; height: 100px; margin: 0 auto; }
         .mb-goutte-corps { width: 92px; height: 92px; }
         .mb-flux { display: none; }
         .mb-versement[data-vers] .mb-goutte-corps { transform: none; }
+        .mb-versement[data-verse] .mb-goutte-corps { transform: translateY(40px) scale(0.25); }
+        .mb-dest-val { font-size: calc(20px * var(--ui)); }
         .mb-scene.mb-compact .mb-releve { gap: 4px 14px; }
-        .mb-scene.mb-compact .mb-corps { gap: 12px; width: auto; }
         .mb-scene.mb-compact .mb-releve .mb-gains { gap: 4px 14px; }
       }
       /* ---- LE STEAM DECK (1280 × 800) : tout doit tenir sans ascenseur ---- */
       @media (max-height: 820px) and (min-width: 761px) {
         .mb-scene { gap: 10px; padding-top: 8px; }
-        .mb-rang { width: 140px; height: 140px; }
-        .mb-rang-lettre { --mb-nom-l: 108px; }
-        .mb-releve { padding: 12px 22px 14px; gap: 12px 26px; }
-        .mb-ligne { padding: 7px 14px; }
-        .mb-gain { padding-top: 9px; padding-bottom: 9px; }
-        .mb-flacon { width: 56px; height: 100px; flex-basis: 56px; }
-        .mb-litres b { font-size: calc(32px * var(--ui)); }
         .mb-pli, .mb-pli .crt-draft { min-height: 160px; }
         .mb-porte-vue canvas { max-height: 132px; object-fit: contain; }
         .mb-ev-vue { aspect-ratio: auto; height: 132px; }
         .mb-station-carte { max-height: 58vh; }
       }
+      /* le cœur et le sceau resserrés du Steam Deck ne valent qu'au-delà des
+         écrans moyens : sur un téléphone couché (844 × 390), les deux
+         règles s'appliquaient et celle-ci, écrite après, regrossissait ce
+         que la règle des 761–1000 px venait de resserrer */
+      @media (max-height: 820px) and (min-width: 1001px) {
+        .mb-releve { --mb-coeur-l: 260px; }
+        .mb-rang { --mb-sceau-l: 136px; }
+      }
+      /* le téléphone couché (844 × 390) : la colonne tombait à 90 px sous
+         des chiffres de 46 px — le héros n'était plus qu'une vignette. Les
+         chiffres rapetissent, la colonne prend la hauteur qu'ils rendent */
+      @media (max-height: 480px) and (min-width: 761px) {
+        .mb-etal { --mb-etal-h: calc(100vh - 262px); }
+        .mb-etal-xp b, .mb-etal-palier b { font-size: calc(28px * var(--ui)); }
+        /* le tirage couché : l'icône et la carte se resserrent (403 px de
+           scène pour 400 visibles à 844 × 390, sans cela) */
+        .mb-pli, .mb-pli .crt-draft { min-height: 0; }
+        .mb-pli .crt-draft { gap: 5px; padding: 10px 12px 8px; }
+        .mb-pli .crt-ico { font-size: calc(32px * var(--ui)); }
+      }
       /* ---- MOINS D'ANIMATIONS : le jeu reste le même, sans le spectacle.
          Chaque mise en scène retombe sur son état final. ---- */
       @media (prefers-reduced-motion: reduce) {
+        /* le vocabulaire : chaque primitive est d'emblée à sa place —
+           la poutre ouverte, le sceau posé (penché), la cartouche plaquée,
+           le levier sans reflet, l'arc du manomètre rempli d'un coup */
+        .mb-poutre, .mb-sceau, .mb-cartouche, .mb-levier, .mb-levier::after { animation: none; }
+        .mb-levier, .mb-mano-arc { transition: none; }
         .mb-fond::before, .mb-fond::after, .mb-flash.mb-on, .mb-scene.mb-secousse,
-        .mb-sur, .mb-titre, .mb-rang::before, .mb-rang-anneau, .mb-rang-lettre,
-        .mb-rang-mot, .mb-etoiles i.mb-on, .mb-eau::before, .mb-eau::after, .mb-glace,
+        .mb-sur, .mb-titre, .mb-etoiles i.mb-on, .mb-cuve-liquide::after,
         .mb-prime, .mb-record, .mb-etal, .mb-etal-palier.saute,
-        .mb-module-tete, .mb-module-sceau, .mb-module-salles li, .mb-module .mb-gain,
-        .mb-etal-fluide, .mb-etal-fluide::after, .mb-etal-tube.eclair, .mb-etal-tampon,
-        .mb-palier-eclair, .mb-choix, .mb-pli, .mb-pli .crt-draft::after,
+        .mb-module-tete, .mb-module-sceau, .mb-module-salles li,
+        .mb-etal-tampon, .mb-anneau.mb-anneau-casse,
+        .mb-palier-eclair, .mb-choix, .mb-pli, .mb-pli .crt-draft, .mb-pli-dos, .mb-pli .crt-draft::after,
         .mb-cartes.mb-elu .mb-pli:not(.mb-elu-c), .mb-pli.mb-elu-c, .mb-carte, .mb-ico,
-        .mb-dest-jauge::after, .mb-goutte, .mb-goutte-corps, .mb-flux, .mb-bocal-gain, .mb-anneau-gain,
-        .mb-carte.mb-dest-palier, .mb-continuer, .mb-continuer::after, .mb-porte,
+        .mb-goutte, .mb-goutte-corps, .mb-flux, .mb-dest, .mb-dest.mb-dest-palier, .mb-anneau-franchit,
+        .mb-continuer, .mb-continuer::after, .mb-porte,
         .mb-porte-vue::after, .mb-cartes.mb-elu .mb-porte:not(.mb-elue), .mb-porte.mb-elue,
-        .mb-station-carte, .mb-passer { animation: none; }
-        .mb-filet { animation: none; width: min(560px, 82%); }
-        .mb-eau, .mb-ligne, .mb-ligne-barre::after, .mb-recolte, .mb-gain, .mb-pli, .mb-carte, .mb-porte,
-        .mb-station-carte { transition: none; }
+        .mb-station-carte { animation: none; }
+        .mb-cuve-liquide::before, .mb-cuve-liquide::after, .mb-ligne, .mb-pli, .mb-carte, .mb-porte,
+        .mb-station-carte, .mb-goutte-corps, .mb-dest,
+        .mb-etal .mb-vidange::before, .mb-etal .mb-vidange::after { transition: none; }
+        /* l'anneau qu'un versement franchirait luit, sans battre ; la
+           colonne qui franchit garde son arête allumée */
+        .mb-anneau-franchit { filter: drop-shadow(0 0 8px rgba(255, 217, 119, 0.85)); }
+        .mb-dest.mb-dest-palier { box-shadow: inset 0 0 0 1px rgba(109, 255, 184, 0.7); }
         .mb-pli { transform: none; }
         .mb-pli.mb-vise { transform: translateY(-4px); }
         .mb-cartes.mb-elu .mb-pli:not(.mb-elu-c), .mb-cartes.mb-elu .mb-porte:not(.mb-elue) { opacity: 0; }
         .mb-porte.mb-elue { opacity: 0; }
         .mb-palier-eclair[hidden] { display: none; }
         .mb-station-carte.mb-station-refus { animation: none; }
+        /* LES RÈGLES QUE LE REPLI PAR CLASSE NE COUVRAIT PAS. Un @media
+           n'ajoute aucune spécificité : une règle plus précise qui redéfinit
+           son animation (la colonne visée qui rejouait son entrée) ou sa
+           transition (l'orbe déversée qui filait encore) l'emportait sur le
+           « none » d'une classe seule. Chaque sélecteur animé de la
+           cérémonie est neutralisé tel qu'il est écrit (ceremonie.spec.ts,
+           « règle par règle »). */
+        .mb-etal-xp i, .mb-ev-vue i, .mb-flux-g, .mb-flux-d,
+        .mb-dest.mb-dest-palier:hover:not(:disabled), .mb-dest.mb-dest-palier:focus-visible,
+        .mb-dest.mb-dest-palier.pad-focus { animation: none; }
+        .mb-etoiles i, .mb-pli .crt-draft, .mb-carte::before, .mb-versement[data-verse] .mb-goutte-corps,
+        .mb-flux, .mb-continuer, .mb-porte-entrer, .mv-halo, .mv-tuile, .mv-lien, .mv-noeud { transition: none; }
       }
       /* ---- Le panneau du GÉNÉRATEUR (⚄) : les réglages qui voyagent ---- */
       #edg-voile {
@@ -11082,60 +11330,75 @@
       <canvas class="mb-feu" id="mb-feu" aria-hidden="true"></canvas>
       <div class="mb-flash" id="mb-flash" aria-hidden="true"></div>
       <div class="mb-scene" id="mb-scene">
-        <header class="mb-banniere" id="mb-banniere">
+        <!-- LA BANNIÈRE est une POUTRE de la station : profil effilé,
+             rivets, deux bandes de danger autour du titre -->
+        <header class="mb-banniere mb-poutre" id="mb-banniere">
           <span class="mb-sur" id="mb-sur">MISE EN BONBONNE</span>
           <h3 class="mb-titre" id="mb-titre">SALLE FRANCHIE</h3>
-          <span class="mb-filet" aria-hidden="true"></span>
         </header>
-        <!-- LE RELEVÉ : le rang à gauche, le flacon et les lignes à droite ;
-             dessous, LA RÉCOLTE — une tuile par chose gagnée (condensat,
-             mémoire, tirage garanti, orbe), avec son rôle et son solde.
-             Lu, il se replie en bandeau pour laisser la scène aux cartes. -->
+        <!-- LE RELEVÉ : UN héros, la bonbonne, au centre — cerclée du
+             manomètre de la part livrée ; à gauche le SCEAU du rang qui
+             tombe, à droite le volume en très grand et, dessous, chrono et
+             note sur une ligne (ou le tampon RECORD). Puis les CARTOUCHES de
+             ce que la salle rapporte claquent une à une. Plus de phrase : le
+             rôle d'une monnaie passe dans l'infobulle. La bonbonne (cuveHTML)
+             et le sceau (sceauHTML) sont posés par main.ts dans leur alvéole.
+             Lu, le relevé se replie en bandeau pour laisser la scène. -->
         <section class="mb-releve" id="mb-releve">
-          <div class="mb-rang" id="mb-rang" hidden>
-            <span class="mb-rang-anneau" aria-hidden="true"></span>
-            <b class="mb-rang-lettre" id="mb-rang-lettre">SUPERFLUIDE</b>
-            <i class="mb-rang-mot" id="mb-rang-mot">IMPECCABLE</i>
+          <div class="mb-rang mb-sceau" id="mb-rang" hidden>
+            <span class="mb-rang-img" id="mb-rang-img"></span>
+            <b class="mb-sceau-mot" id="mb-rang-lettre">SUPERFLUIDE</b>
             <span class="mb-etoiles" id="mb-etoiles" aria-hidden="true"></span>
           </div>
-          <div class="mb-corps" id="mb-corps">
-            <div class="mb-haut">
-              <div class="mb-flacon"><div class="mb-eau" id="mb-eau"></div><div class="mb-glace" id="mb-glace" hidden>🧊</div></div>
-              <div class="mb-litres"><small>VOLUME LIVRÉ</small><b id="mb-l">0,00 L</b><span class="mb-prime" id="mb-prime" hidden></span><span class="mb-verse" id="mb-verse" hidden></span></div>
-            </div>
-            <div class="mb-lignes" id="mb-lignes"></div>
+          <div class="mb-coeur">
+            <svg class="mb-mano" id="mb-mano" viewBox="0 0 100 100" aria-hidden="true">
+              <path class="mb-mano-piste" pathLength="1" d="M18.89 81.11A44 44 0 1 1 81.11 81.11"/>
+              <path class="mb-mano-grad" pathLength="1" d="M24.54 75.46A36 36 0 1 1 75.46 75.46"/>
+              <path class="mb-mano-arc" pathLength="1" d="M18.89 81.11A44 44 0 1 1 81.11 81.11"/>
+            </svg>
+            <div class="mb-bonbonne" id="mb-bonbonne"></div>
+            <b class="mb-part" id="mb-part" title="part du volume de départ livrée">0 %</b>
           </div>
-          <div class="mb-recolte" id="mb-recolte">
-            <p class="mb-recolte-titre" id="mb-recolte-titre">CE QUE LA SALLE RAPPORTE</p>
-            <div class="mb-gains" id="mb-gains"></div>
+          <div class="mb-litres">
+            <small>VOLUME LIVRÉ</small>
+            <b id="mb-l">0,00 L</b>
+            <span class="mb-prime" id="mb-prime" hidden></span>
+            <span class="mb-verse" id="mb-verse" hidden></span>
+            <span class="mb-ligne" id="mb-ligne"></span>
           </div>
+          <div class="mb-gains" id="mb-gains"></div>
         </section>
-        <!-- La JAUGE D'ÉTALONNAGE : l'XP se voit couler, palier par palier -->
+        <!-- LE PALIER : la COLONNE DE MAÎTRISE du versement, en grand (cuveHTML
+             et ses anneaux, posés par main.ts dans #mb-etal-colonne) ; à
+             gauche les litres qui roulent, à droite le compte des paliers et
+             le prochain. Le liquide monte, l'anneau du palier franchi se
+             brise. La coulée finie (fin de salle), elle se replie sur une
+             ligne : la colonne s'efface, une barre mince la remplace. -->
         <div class="mb-etal" id="mb-etal" hidden>
-          <div class="mb-etal-tete">
-            <span class="mb-etal-nom">MAÎTRISE<small>les litres qu’on y verse — chaque palier ouvre un tirage d’instrument</small></span>
+          <div class="mb-etal-gauche">
+            <span class="mb-etal-nom" title="Maîtrise : les litres qu’on y verse — chaque palier ouvre un tirage d’instrument">MAÎTRISE</span>
             <span class="mb-etal-xp"><b id="mb-etal-l">0,0</b> L<i id="mb-etal-gain" hidden></i></span>
           </div>
-          <div class="mb-etal-jauge">
-            <div class="mb-etal-palier" id="mb-etal-pg"><b>0</b><small>palier</small></div>
-            <div class="mb-etal-tube" id="mb-etal-tube">
-              <div class="mb-etal-fluide" id="mb-etal-fluide"></div>
-              <div class="mb-etal-lueur" id="mb-etal-lueur"></div>
-              <div class="mb-etal-crans" aria-hidden="true"></div>
-            </div>
-            <div class="mb-etal-palier d" id="mb-etal-pd"><b>3 L</b><small>prochain</small></div>
+          <div class="mb-etal-colonne" id="mb-etal-colonne"></div>
+          <div class="mb-etal-droite">
+            <div class="mb-etal-palier" id="mb-etal-pg"><small>PALIER</small><b>0</b></div>
+            <div class="mb-etal-palier d" id="mb-etal-pd"><small>prochain</small><b>3 L</b></div>
+            <div class="mb-etal-tampon" id="mb-etal-tampon" hidden>PALIER 1 — TIRAGE OUVERT</div>
           </div>
-          <div class="mb-etal-tampon" id="mb-etal-tampon" hidden>PALIER 1 — TIRAGE OUVERT</div>
+          <div class="mb-etal-barre" aria-hidden="true"><i id="mb-etal-barre"></i></div>
         </div>
         <!-- LA SCÈNE DU CHOIX : versement, tirage, portes, plan -->
         <div class="mb-choix" id="mb-choix" hidden>
           <p class="mb-choix-titre" id="mb-choix-titre">OÙ VERSER LE SURPLUS ?</p>
           <div class="mb-cartes" id="mb-cartes"></div>
         </div>
-        <p class="mb-passer" id="mb-passer">toucher pour passer</p>
+        <!-- LE LEVIER : il passe le bilan — au clic, au toucher, à Entrée,
+             à Espace et à A (il a le focus dès l'ouverture) -->
+        <button type="button" class="mb-levier mb-passer" id="mb-passer">PASSER ▸</button>
       </div>
-      <!-- LE PALIER FRANCHI traverse l'écran : une bande, pas une ligne -->
-      <div class="mb-palier-eclair" id="mb-palier-eclair" hidden><b id="mb-palier-eclair-no">PALIER 1</b><i>TIRAGE OUVERT</i></div>
+      <!-- LE PALIER FRANCHI traverse l'écran : une POUTRE de la station,
+           pas une ligne -->
+      <div class="mb-palier-eclair mb-poutre" id="mb-palier-eclair" hidden><b id="mb-palier-eclair-no">PALIER 1</b><i>TIRAGE OUVERT</i></div>
     </div>
     <!-- LE MARCHAND DU HUB : le Semblable du comptoir vend ce qui dure — la maquette « Marchand v2 » (game/ecranMarchand.ts) -->
     <div id="marchand" hidden aria-label="Le marchand"></div>

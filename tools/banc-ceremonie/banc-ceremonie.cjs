@@ -1,4 +1,4 @@
-// BANC DE LA CÉRÉMONIE — chaque étape de #mb-veil, à 1280 × 720.
+// BANC DE LA CÉRÉMONIE — chaque étape de #mb-veil, à 1280 × 720 ou 1280 × 800.
 // La page CONSTRUITE (vite build → dist/) est servie, ses scripts BLOQUÉS
 // (WebGL2 indisponible en headless : le jeu ne démarrerait pas) ; la vraie
 // feuille de style reste. On injecte fabrique.js (les vrais modules du jeu :
@@ -6,6 +6,13 @@
 // d'instruments, tuiles de récolte, rencontres, feu de particules) puis
 // poses.js (le DOM que main.ts bâtit à chaque étape).
 // node banc-ceremonie.cjs <port>
+//   BANC_TAILLE=1280x800  la taille de l'écran (1280x720 par défaut) : le
+//                         Steam Deck a 80 px de plus, et une étape qui tient
+//                         à l'une peut déborder à l'autre ;
+//   BANC_MOINS=1          « moins d'animations » (reducedMotion: 'reduce') :
+//                         chaque mise en scène doit retomber sur son état final.
+// Les captures et mesures.json vont dans captures/<taille>[-moins]/ : trois
+// passes (720, 800, moins) ne s'écrasent pas l'une l'autre.
 // Avant : ./node_modules/.bin/vite build, servir dist/ (vite preview), et
 // empaqueter fabrique.ts en fabrique.js (esbuild --bundle --format=iife,
 // ./node_modules/.bin/esbuild si présent). Le dépôt n'a pas Playwright :
@@ -14,9 +21,21 @@ const { chromium } = require('/home/julian/projets/PasMoi/node_modules/playwrigh
 const fs = require('fs')
 const path = require('path')
 const port = process.argv[2] || '5291'
-const OUT = path.join(__dirname, 'captures')
+const TAILLE = process.env.BANC_TAILLE || '1280x720'
+const dims = /^(\d+)x(\d+)$/.exec(TAILLE)
+if (!dims) { console.log(`BANC_TAILLE « ${TAILLE} » : attendu LARGEURxHAUTEUR, par exemple 1280x800`); process.exit(1) }
+const VUE = { width: Number(dims[1]), height: Number(dims[2]) }
+const MOINS = process.env.BANC_MOINS === '1'
+const OUT = path.join(__dirname, 'captures', `${TAILLE}${MOINS ? '-moins' : ''}`)
 fs.mkdirSync(OUT, { recursive: true })
+// import.meta.glob est une macro de VITE (planche.ts : les planches livrées,
+// tirées par voiesModule → voie → … → renderer) ; esbuild la laisse telle
+// quelle sur un import.meta vide, et fabrique.js mourait au chargement
+// (« import_meta.glob is not a function ») — window.FAB n'existait plus,
+// aucune pose ne se dressait. Hors de Vite, aucune planche n'est livrée :
+// le glob rend un catalogue vide.
 const FAB = fs.readFileSync(path.join(__dirname, 'fabrique.js'), 'utf-8')
+  .replace(/\bimport_meta(\d*)\.glob\(/g, '(() => ({}))(')
 const POSES = fs.readFileSync(path.join(__dirname, 'poses.js'), 'utf-8')
 
 const MENTHE = ['#6dffb8', '#a9ffd6', '#8fd8c8', '#eaf6ff']
@@ -24,11 +43,13 @@ const OR = ['#ffd977', '#ffe9a8', '#fff4d6', '#f2c98e']
 
 // [fichier, pose, argument, préparation figée (dans la page), attente ms, survol]
 const PRISES = [
+  ['00-vocabulaire', 'vocabulaire', null, null, 1500],
   ['01-bilan-chute-t850ms', 'bilan', 'chute', 'chute', 0],
   ['02-bilan-final', 'bilan', 'final', null, 2200],
   ['03-versement', 'versement', null, null, 2200, '.mb-dest-maitrise'],
   ['03b-versement-defile', 'versement', null, 'defile', 2200, '.mb-dest-maitrise'],
   ['04-etalonnage-palier-t350ms', 'etalonnage', 'palier', 'palier', 0],
+  ['04b-etalonnage-fin', 'etalonnage', 'fin', null, 2200],
   ['05-tirage-retournement-t550ms', 'draft', null, 'retourne', 0],
   ['06-tirage', 'draft', null, 'vise', 2600, '.mb-pli:first-child .crt-draft'],
   ['06b-tirage-elue-t250ms', 'draft', 'elue', 'elue', 0],
@@ -58,10 +79,10 @@ function prepare(quoi, M, O) {
     P.fige([['.mb-rang, .mb-rang *', 200], ['.mb-flash', 200], ['.mb-scene', 200]], 900)
     P.feu([{ el: $('#mb-rang'), age: 0.2, r: { n: 120, teintes: ['#ffd977', '#eaf6ff', ...M], vitesse: 480, gravite: 420, forme: 'etincelle', duree: 1, taille: 4 } }])
   } else if (quoi === 'palier') {
-    P.fige([['.mb-palier-eclair, .mb-palier-eclair *', 350], ['.mb-flash', 350], ['.mb-etal-tube', 350], ['.mb-etal-palier', 350], ['.mb-scene', 350]], 1500)
+    P.fige([['.mb-palier-eclair, .mb-palier-eclair *', 350], ['.mb-flash', 350], ['.mb-anneau-casse', 350], ['.mb-etal-palier', 350], ['.mb-scene', 350]], 1500)
     P.feu([
-      { el: $('#mb-etal-pg'), age: 0.35, r: { n: 90, teintes: M, vitesse: 520, gravite: 380, forme: 'etincelle', duree: 1.1, taille: 4 } },
-      { el: $('#mb-etal-tube'), age: 0.35, r: { n: 60, teintes: [...M, ...O], vitesse: 260, gravite: 600, forme: 'confetti', duree: 1.6, taille: 6 } },
+      { el: $('.mb-anneau-casse'), age: 0.35, r: { n: 60, teintes: [...M, ...O], vitesse: 300, gravite: 600, forme: 'confetti', duree: 1.6, taille: 6 } },
+      { el: $('#mb-etal-pg'), age: 0.35, r: { n: 90, teintes: O, vitesse: 520, gravite: 380, forme: 'etincelle', duree: 1.1, taille: 4 } },
     ])
   } else if (quoi === 'retourne') {
     P.fige([['.mb-pli, .mb-pli *', 550]], 1500)
@@ -69,7 +90,11 @@ function prepare(quoi, M, O) {
     const h = $('#mb-cartes'); h.classList.add('mb-isole')
     const pli = h.children[0]; pli.classList.add('mb-vise'); pli.style.setProperty('--ry', '-5deg'); pli.style.setProperty('--rx', '3deg')
   } else if (quoi === 'elue') {
-    P.fige([['.mb-pli, .mb-pli *', 250], ['.mb-scene', 250]], 2600)
+    // le choix arrive cartes posées : seuls l'élan de l'élue, la chute des
+    // autres et la secousse ont 250 ms ; l'apparition des faces et l'éclat
+    // sont finis depuis longtemps (figés à 250 ms, la face, encore dans son
+    // délai, était invisible)
+    P.fige([['.mb-pli', 250], ['.mb-scene', 250]], 2600)
     const b = $('.mb-elu-c .crt-draft')
     const fam = getComputedStyle(b).getPropertyValue('--fam').trim() || '#6dffb8'
     P.feu([
@@ -95,7 +120,7 @@ function mesure() {
   const s = document.getElementById('mb-scene')
   const veil = document.getElementById('mb-veil')
   if (veil.hidden) return { veil: 'caché' }
-  const vis = [...s.querySelectorAll('button, .mb-gain, .mb-ligne')].filter((e) => e.offsetParent)
+  const vis = [...s.querySelectorAll('button, .mb-cartouche, .mb-ligne, .mb-coeur')].filter((e) => e.offsetParent)
   const bas = vis.length ? Math.round(Math.max(...vis.map((e) => e.getBoundingClientRect().bottom))) : 0
   return {
     scene: `${s.scrollHeight}/${s.clientHeight}${s.scrollHeight > s.clientHeight + 1 ? ' DÉBORDE (défile)' : ''}`,
@@ -109,7 +134,7 @@ function mesure() {
   const browser = await chromium.launch({ headless: true })
   const rapport = []
   for (const [nom, pose, arg, prep, attente, survol] of PRISES) {
-    const page = await browser.newPage({ viewport: { width: 1280, height: 720 } })
+    const page = await browser.newPage({ viewport: VUE, reducedMotion: MOINS ? 'reduce' : 'no-preference' })
     page.on('pageerror', (e) => console.log(nom, 'PAGEERR', String(e).slice(0, 200)))
     await page.route('**/*.js', (r) => r.abort())
     await page.goto(`http://127.0.0.1:${port}/`)
@@ -147,7 +172,8 @@ function mesure() {
     await page.screenshot({ path: path.join(OUT, `${nom}.png`) })
     await page.close()
   }
-  fs.writeFileSync(path.join(__dirname, 'mesures.json'), JSON.stringify(rapport, null, 1))
+  fs.writeFileSync(path.join(OUT, 'mesures.json'), JSON.stringify(rapport, null, 1))
+  console.log(`→ ${path.relative(process.cwd(), OUT)}/`)
   await browser.close()
   process.exit(0)
 })().catch((e) => { console.log('ERR', String(e).slice(0, 600)); process.exit(1) })
