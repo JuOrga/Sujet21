@@ -142,6 +142,31 @@ FAMILLES: list[Famille] = [
         qualite=84, poids_max_ko=260,
         note='1600×900 paysage, marge sur les bords (docs/assets-ia.md §11) ; l’alerte rouge y a droit',
     ),
+    # Les planches et objets de la cérémonie « station » (rendus Blender). Elles
+    # passent AVANT « planche de vues » et « décalque » : sans cela, `fin-*`
+    # et `ceremonie-*` tomberaient dans « (inconnue) » — et aucun motif
+    # générique ne les mesurerait comme il faut. Plafonds de chauds : ceux
+    # par défaut ; le lot Blender ajuste les poids quand il les a MESURÉS.
+    Famille(
+        'planche de cérémonie', ('ceremonie-icones', 'ceremonie-sceaux', 'ceremonie-anneau'),
+        alpha=True, cote_max=4096, poids_max_ko=600,
+        note='grille de cases carrées de 512² (icônes 7×4, sceaux 3×2, anneau 2×1) — l’ordre des cases est un contrat avec src/game/iconesStation.ts et ceremonieObjets.ts',
+    ),
+    Famille(
+        'planche des instruments', ('instruments-icones',), alpha=True, cote_max=4096,
+        poids_max_ko=600,
+        note='8×4 cases de 256² — l’ordre est ORDRE_INSTRUMENTS (src/game/iconesStation.ts)',
+    ),
+    Famille(
+        'objet de cérémonie', ('ceremonie-*-dos', 'ceremonie-*-verre'), alpha=True, cote_max=1600,
+        poids_max_ko=350,
+        note='le dos et le verre d’une cuve, le liquide passe entre les deux (ceremonieObjets.ts)',
+    ),
+    Famille(
+        'scène de fin', ('fin-*',), taille=(1600, 900), luma_max=0.50, chaud_max=1.0,
+        qualite=84, poids_max_ko=260,
+        note='1600×900 paysage : la capsule bouclée, la fiole brisée',
+    ),
     Famille(
         'planche de vues', ('*-anime', 'meta-eclat', 'meta-icones'), alpha=True, cote_max=4096,
         poids_max_ko=600,

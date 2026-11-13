@@ -449,6 +449,7 @@ import {
   renflouementEngage,
 } from './game/bonbonne'
 import { AudioFx, loadAudioPrefs } from './game/audio'
+import type { VoixCeremonie } from './game/sonsCeremonie'
 import {
   Soundtrack,
   type Bruitage,
@@ -786,6 +787,12 @@ const audio = new AudioFx(loadAudioPrefs())
 // Bande-son : mêmes réglages, même bus — elle ne s'éveille qu'au premier geste
 // et ne télécharge rien tant que le son est coupé.
 const bande = new Soundtrack(audio)
+// La voix de la cérémonie : un seul point d'entrée, pour que les écrans de
+// récompense n'aient pas à connaître l'AudioFx. Exposée en sonde (comme
+// __rejeu) tant que les écrans ne l'appellent pas — sans cela `noUnusedLocals`
+// refuserait la ligne, et on pourrait écouter une voix depuis la console.
+const sonCeremonie = (voix: VoixCeremonie, force = 1): void => audio.ceremonie(voix, force)
+;(window as unknown as { __sonCeremonie: unknown }).__sonCeremonie = sonCeremonie
 function eveilAudio(): void {
   audio.resume()
   if (audio.enabled) {

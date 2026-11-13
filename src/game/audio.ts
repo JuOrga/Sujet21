@@ -9,6 +9,7 @@
 // clic et reste sans effet ensuite.
 
 import { type Ouie, ouieDe } from './ouie'
+import type { VoixCeremonie } from './sonsCeremonie'
 
 export interface AudioPrefs {
   on: boolean
@@ -117,6 +118,12 @@ export class AudioFx {
       ? { ctx: this.ctx, bus: this.master, post: this.postMaster }
       : null
   }
+
+  /** Une voix de la cérémonie « station ». Muette pour l'instant : les recettes
+   *  (sonsCeremonie.ts) arrivent voix par voix. Le contrat est posé d'abord pour
+   *  que main.ts puisse appeler sans attendre, et sans jamais lever : le son
+   *  coupé ou absent ne doit pas faire trébucher un écran de récompense. */
+  ceremonie(_voix: VoixCeremonie, _force = 1): void {}
 
   private build(): void {
     const Ctor =

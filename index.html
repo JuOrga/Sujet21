@@ -5091,6 +5091,49 @@
         background-position: calc(var(--ic-x) * 33.3333%) calc(var(--ic-y) * 100%);
       }
       .hud-chip .ico-meta { width: 1.5em; height: 1.5em; opacity: 0.9; }
+      /* LES PLANCHES DE LA STATION (cérémonie, instruments, sceaux) : même
+         principe que .ico-meta — une pastille qui découpe la planche en fond,
+         placée par --ic-x / --ic-y (0-based, colonne et rangée). Sous
+         l'image, une ALVÉOLE hexagonale gris-bleu à 25 % : si la planche
+         manque ou tarde, la place reste visible et rien ne se décale. Le
+         background-position vaut x/(colonnes-1) et y/(rangées-1) en % : c'est
+         la règle de CSS pour une planche plus grande que sa case. */
+      .ico-ceremonie,
+      .ico-instrument,
+      .ico-sceau {
+        position: relative;
+        isolation: isolate;
+        display: inline-block;
+        width: 1em;
+        height: 1em;
+        vertical-align: -0.15em;
+        background-repeat: no-repeat;
+      }
+      .ico-ceremonie::before,
+      .ico-instrument::before,
+      .ico-sceau::before {
+        content: '';
+        position: absolute;
+        inset: 6%;
+        z-index: -1;
+        background: rgba(120, 150, 175, 0.25);
+        clip-path: polygon(50% 0, 93% 25%, 93% 75%, 50% 100%, 7% 75%, 7% 25%);
+      }
+      .ico-ceremonie {
+        background-image: url('/assets/ceremonie-icones.webp');
+        background-size: 700% 400%;
+        background-position: calc(var(--ic-x) * 16.6667%) calc(var(--ic-y) * 33.3333%);
+      }
+      .ico-instrument {
+        background-image: url('/assets/instruments-icones.webp');
+        background-size: 800% 400%;
+        background-position: calc(var(--ic-x) * 14.2857%) calc(var(--ic-y) * 33.3333%);
+      }
+      .ico-sceau {
+        background-image: url('/assets/ceremonie-sceaux.webp');
+        background-size: 300% 200%;
+        background-position: calc(var(--ic-x) * 50%) calc(var(--ic-y) * 100%);
+      }
       /* le toucher dit le nom : une étiquette éphémère sous la pastille */
       .hud-chip.ouvert::after {
         content: attr(data-nom);
