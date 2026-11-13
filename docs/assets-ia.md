@@ -110,6 +110,9 @@ join, in the exact style of the attached reference (wall-a.webp)
 Négatif : négatif commun + `rust, strong highlights, panel border, frame`
 
 ## 6. Texture paroi hydrophobe
+
+> ✅ **Redessinée dans Blender le 13/11** (`tools/images/blender/surfaces.py`, `mat_phobe`) :
+> une cire violette martelée où l'eau perle (260 gouttes semées en distance périodique) — luminance 0,15, raccord 0,8 / 1,0 (2,3 / 2,5 avant), 28 Ko. Le prompt ci-dessous reste pour mémoire.
 **512×512 · PNG · tileable**
 
 ```
@@ -121,6 +124,9 @@ perfect tiling, no text
 Négatif : `wet film, puddles, bright purple, glitter, text`
 
 ## 7. Texture paroi hydrophile
+
+> ✅ **Redessinée dans Blender le 13/11** (`tools/images/blender/surfaces.py`, `mat_phile`) :
+> un émail sarcelle sous un film d'eau, reflet teinté à demi métallique — luminance 0,18, raccord 0,6 / 0,9 (1,8 / 1,6 avant), 49 Ko. Le prompt ci-dessous reste pour mémoire.
 **512×512 · PNG · tileable**
 
 ```
