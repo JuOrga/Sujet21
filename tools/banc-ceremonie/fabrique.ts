@@ -17,6 +17,8 @@ import { levierDef, sensEffet, forceEffet } from '../../src/game/leviers'
 import { gainsDeSalle, gainsDeModule, pastillesDeSalles, condensatDuSas, memoireDuSas } from '../../src/game/recolte'
 import { rangDeSalle, motDeNote, titreDuTirage } from '../../src/game/ceremonie'
 import { iconeMetaHTML } from '../../src/game/metaAssets'
+import { iconeCeremonieHTML } from '../../src/game/iconesStation'
+import { sceauHTML } from '../../src/game/ceremonieObjets'
 import { offresRepos, offreDon } from '../../src/game/descenteCarte'
 import { tireEvenement, offresDe, detailOffre, resoutChoix, ditEffet } from '../../src/game/evenements'
 void W
@@ -121,6 +123,7 @@ const FAB = {
   INSTRUMENTS, gainsDeSalle, gainsDeModule, pastillesDeSalles, condensatDuSas,
   offresRepos, offreDon, tireEvenement, offresDe, detailOffre, ICONES_MINI_CARTE,
   graine, Feu, memoireDuSas, resoutChoix, ditEffet, titreDuTirage, tirageInstruments,
+  iconeCeremonieHTML, sceauHTML,
   /** dessine le plan d'une salle générée dans un canvas de porte */
   plan(canvas: HTMLCanvasElement, mecanique: 0 | 1 | 2 | 3, diff: number, variante: string): string {
     const lv = genereNiveauAtelier({ moment: 2, mecanique, difficulte: diff } as never, variante)

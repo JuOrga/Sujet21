@@ -1,4 +1,4 @@
-// BANC DE LA CÉRÉMONIE — chaque étape de #mb-veil, à 1280 × 720.
+// BANC DE LA CÉRÉMONIE — chaque étape de #mb-veil, à 1280 × 720 ou 1280 × 800.
 // La page CONSTRUITE (vite build → dist/) est servie, ses scripts BLOQUÉS
 // (WebGL2 indisponible en headless : le jeu ne démarrerait pas) ; la vraie
 // feuille de style reste. On injecte fabrique.js (les vrais modules du jeu :
@@ -6,6 +6,13 @@
 // d'instruments, tuiles de récolte, rencontres, feu de particules) puis
 // poses.js (le DOM que main.ts bâtit à chaque étape).
 // node banc-ceremonie.cjs <port>
+//   BANC_TAILLE=1280x800  la taille de l'écran (1280x720 par défaut) : le
+//                         Steam Deck a 80 px de plus, et une étape qui tient
+//                         à l'une peut déborder à l'autre ;
+//   BANC_MOINS=1          « moins d'animations » (reducedMotion: 'reduce') :
+//                         chaque mise en scène doit retomber sur son état final.
+// Les captures et mesures.json vont dans captures/<taille>[-moins]/ : trois
+// passes (720, 800, moins) ne s'écrasent pas l'une l'autre.
 // Avant : ./node_modules/.bin/vite build, servir dist/ (vite preview), et
 // empaqueter fabrique.ts en fabrique.js (esbuild --bundle --format=iife,
 // ./node_modules/.bin/esbuild si présent). Le dépôt n'a pas Playwright :
@@ -14,7 +21,12 @@ const { chromium } = require('/home/julian/projets/PasMoi/node_modules/playwrigh
 const fs = require('fs')
 const path = require('path')
 const port = process.argv[2] || '5291'
-const OUT = path.join(__dirname, 'captures')
+const TAILLE = process.env.BANC_TAILLE || '1280x720'
+const dims = /^(\d+)x(\d+)$/.exec(TAILLE)
+if (!dims) { console.log(`BANC_TAILLE « ${TAILLE} » : attendu LARGEURxHAUTEUR, par exemple 1280x800`); process.exit(1) }
+const VUE = { width: Number(dims[1]), height: Number(dims[2]) }
+const MOINS = process.env.BANC_MOINS === '1'
+const OUT = path.join(__dirname, 'captures', `${TAILLE}${MOINS ? '-moins' : ''}`)
 fs.mkdirSync(OUT, { recursive: true })
 // import.meta.glob est une macro de VITE (planche.ts : les planches livrées,
 // tirées par voiesModule → voie → … → renderer) ; esbuild la laisse telle
@@ -31,6 +43,7 @@ const OR = ['#ffd977', '#ffe9a8', '#fff4d6', '#f2c98e']
 
 // [fichier, pose, argument, préparation figée (dans la page), attente ms, survol]
 const PRISES = [
+  ['00-vocabulaire', 'vocabulaire', null, null, 1500],
   ['01-bilan-chute-t850ms', 'bilan', 'chute', 'chute', 0],
   ['02-bilan-final', 'bilan', 'final', null, 2200],
   ['03-versement', 'versement', null, null, 2200, '.mb-dest-maitrise'],
@@ -116,7 +129,7 @@ function mesure() {
   const browser = await chromium.launch({ headless: true })
   const rapport = []
   for (const [nom, pose, arg, prep, attente, survol] of PRISES) {
-    const page = await browser.newPage({ viewport: { width: 1280, height: 720 } })
+    const page = await browser.newPage({ viewport: VUE, reducedMotion: MOINS ? 'reduce' : 'no-preference' })
     page.on('pageerror', (e) => console.log(nom, 'PAGEERR', String(e).slice(0, 200)))
     await page.route('**/*.js', (r) => r.abort())
     await page.goto(`http://127.0.0.1:${port}/`)
@@ -154,7 +167,8 @@ function mesure() {
     await page.screenshot({ path: path.join(OUT, `${nom}.png`) })
     await page.close()
   }
-  fs.writeFileSync(path.join(__dirname, 'mesures.json'), JSON.stringify(rapport, null, 1))
+  fs.writeFileSync(path.join(OUT, 'mesures.json'), JSON.stringify(rapport, null, 1))
+  console.log(`→ ${path.relative(process.cwd(), OUT)}/`)
   await browser.close()
   process.exit(0)
 })().catch((e) => { console.log('ERR', String(e).slice(0, 600)); process.exit(1) })

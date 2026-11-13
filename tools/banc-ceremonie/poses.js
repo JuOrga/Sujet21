@@ -145,6 +145,49 @@
     return v
   }
 
+  // ---- LE VOCABULAIRE DE LA STATION : les primitives seules, sur la vraie
+  // feuille, avant qu'une étape ne les emploie. Ce n'est PAS un gabarit de
+  // main.ts mais un nuancier : chaque primitive, et l'état qu'il faut voir
+  // (rangs S A D, focus de la manette, manomètre plein et vide). Les images
+  // rendues manquent tant que le lot Blender n'a pas livré : on doit alors
+  // lire les fonds propres (alvéoles, octogones), jamais un trou. ----
+  function vocabulaire() {
+    ouvre()
+    for (const e of scene.children) e.style.display = 'none'
+    const mano = (p) =>
+      `<svg class="mb-mano" viewBox="0 0 100 100" aria-hidden="true" style="--mb-mano-p:${p};width:150px;height:150px">` +
+      `<path class="mb-mano-piste" pathLength="1" d="M18.89 81.11A44 44 0 1 1 81.11 81.11"/>` +
+      `<path class="mb-mano-grad" pathLength="1" d="M24.54 75.46A36 36 0 1 1 75.46 75.46"/>` +
+      `<path class="mb-mano-arc" pathLength="1" d="M18.89 81.11A44 44 0 1 1 81.11 81.11"/></svg>`
+    const sceau = (r, teinte, mot) =>
+      `<div class="mb-sceau" style="--mb-rang:${teinte};--mb-nom-n:${mot.length}">${F.sceauHTML(r)}<b class="mb-sceau-mot">${mot}</b></div>`
+    const cartouche = (cle, val, nom, teinte) =>
+      `<div class="mb-cartouche" style="--mb-liseret:${teinte}"><span class="mb-cartouche-alv">${F.iconeCeremonieHTML(cle)}</span>` +
+      `<b class="mb-cartouche-val">${val}</b><span class="mb-cartouche-nom">${nom}</span></div>`
+    const n = document.createElement('div')
+    n.style.cssText = 'display:flex;flex-direction:column;gap:18px;align-items:center'
+    n.innerHTML =
+      `<div class="mb-poutre" style="width:72%"><b style="font-size:24px;letter-spacing:.3em;font-weight:400">SALLE FRANCHIE</b></div>` +
+      `<div style="display:flex;gap:26px;align-items:center">` +
+        sceau('S', '#ffd977', 'SUPERFLUIDE') + sceau('B', '#63b7e6', 'TURBULENT') + sceau('D', '#e0685c', 'FIGÉ') +
+        mano(RUN.pct) + mano(0) +
+      `</div>` +
+      `<div style="display:grid;grid-template-columns:repeat(3,220px);gap:16px">` +
+        cartouche('condensat', '+453 cL', 'Condensat', 'var(--mb-teal)') +
+        cartouche('memoire', '+12', 'Mémoire', '#b9a4ff') +
+        cartouche('tirage', '+1', 'Tirage', 'var(--mb-or)') +
+      `</div>` +
+      `<div style="display:flex;gap:16px;align-items:stretch">` +
+        `<div class="mb-coupe" style="width:180px;height:90px;display:grid;place-items:center">.mb-coupe</div>` +
+        `<div class="mb-coupe-diag" style="width:180px;height:90px;display:grid;place-items:center">.mb-coupe-diag</div>` +
+        `<div style="display:flex;flex-direction:column;gap:10px;justify-content:center">` +
+          `<button type="button" class="mb-levier">PASSER ▸</button>` +
+          `<button type="button" class="mb-levier pad-focus">VISÉ (MANETTE)</button>` +
+        `</div>` +
+      `</div>`
+    scene.appendChild(n)
+  }
+
   // ---- LE VERSEMENT (main.ts:15065) ----
   function versement() {
     bilan('final')
@@ -500,5 +543,5 @@
     }
   }
 
-  window.POSE = { bilan, versement, etalonnage, draft, salles, module, carte, repos, don, cache, evenement, minijeu, fin, overlay, feu, fige, MB_OR, MB_MENTHE, MB_EAU, RUN }
+  window.POSE = { vocabulaire, bilan, versement, etalonnage, draft, salles, module, carte, repos, don, cache, evenement, minijeu, fin, overlay, feu, fige, MB_OR, MB_MENTHE, MB_EAU, RUN }
 })()
