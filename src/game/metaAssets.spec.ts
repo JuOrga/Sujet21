@@ -11,6 +11,7 @@ import {
   RAPPORT_MARCHAND,
   RAPPORT_SAS,
   caseIcone,
+  ceremonieDeMonnaie,
   decalsDuMeta,
   iconeMetaHTML,
   iconeMonnaieHTML,
@@ -124,8 +125,9 @@ describe('les décalques du méta', () => {
 })
 
 describe('la planche d’icônes du méta', () => {
-  it('chaque article vendable a sa case, dans la grille', () => {
+  it('chaque article vendable a son dessin : la monnaie à la cérémonie, le reste sa case dans la grille', () => {
     for (const id of [...ARTICLES_ETAL_IDS, ...ARTICLES_COMPTOIR_IDS]) {
+      if (ceremonieDeMonnaie(id)) continue
       const c = caseIcone(id)
       expect(c, id).not.toBeNull()
       expect(c!).toBeGreaterThanOrEqual(0)
@@ -157,6 +159,13 @@ describe('les monnaies du méta prennent le dessin de la cérémonie', () => {
 
   it('les autres articles du commerce restent sur leur planche', () => {
     for (const id of ['gouttes', 'viatique', 'dashs', 'clef', 'sac']) expect(iconeMetaHTML(id, '?'), id).toContain('ico-meta')
+  })
+
+  it('la planche générée ne leur garde plus de case : le canvas de l’Économat ne peut plus la lire pour elles', () => {
+    for (const id of ['condensat', 'memoire', 'vie', 'secours']) expect(caseIcone(id), id).toBeNull()
+    expect(ceremonieDeMonnaie('vie')).toBe('secours')
+    expect(ceremonieDeMonnaie('secours')).toBe('secours')
+    expect(ceremonieDeMonnaie('gouttes')).toBeNull()
   })
 
   it('iconeMonnaieHTML ne répond que pour une monnaie — jamais pour un nom hérité d’Object', () => {

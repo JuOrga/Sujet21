@@ -78,6 +78,26 @@ export function iconeInstrumentHTML(d: Pick<InstrumentDef, 'id' | 'icone' | 'nom
   return `<i class="ico-instrument" style="--ic-x:${col};--ic-y:${rang}" title="${echappe(d.nom)}" aria-hidden="true"></i>`
 }
 
+/** Au canvas : la case `c` d'une planche de `colonnes` × `rangees`, si la
+ *  planche est prête et la case existe ; sinon false, et l'appelant garde
+ *  son dessin d'attente. */
+function dessineCase(
+  ctx: CanvasRenderingContext2D,
+  planche: HTMLImageElement | null,
+  c: number | null,
+  colonnes: number,
+  rangees: number,
+  x: number,
+  y: number,
+  cote: number,
+): boolean {
+  if (!planche || c === null || !planche.complete || planche.naturalWidth === 0) return false
+  const sw = planche.naturalWidth / colonnes
+  const sh = planche.naturalHeight / rangees
+  ctx.drawImage(planche, (c % colonnes) * sw, Math.floor(c / colonnes) * sh, sw, sh, x, y, cote, cote)
+  return true
+}
+
 /** Au canvas : dessine la case si la planche est prête et l'instrument a la
  *  sienne ; sinon renvoie false, et l'appelant garde son dessin d'attente. */
 export function dessineIconeInstrument(
@@ -88,20 +108,20 @@ export function dessineIconeInstrument(
   y: number,
   cote: number,
 ): boolean {
-  const c = caseInstrument(id)
-  if (!planche || c === null || !planche.complete || planche.naturalWidth === 0) return false
-  const sw = planche.naturalWidth / ICONES_INSTRUMENTS_COLONNES
-  const sh = planche.naturalHeight / ICONES_INSTRUMENTS_RANGEES
-  ctx.drawImage(
-    planche,
-    (c % ICONES_INSTRUMENTS_COLONNES) * sw,
-    Math.floor(c / ICONES_INSTRUMENTS_COLONNES) * sh,
-    sw,
-    sh,
-    x,
-    y,
-    cote,
-    cote,
-  )
-  return true
+  return dessineCase(ctx, planche, caseInstrument(id), ICONES_INSTRUMENTS_COLONNES, ICONES_INSTRUMENTS_RANGEES, x, y, cote)
+}
+
+/** Au canvas : une icône de la cérémonie (une monnaie du méta sur le plot de
+ *  l'Économat, par exemple), aux mêmes conditions — false tant que la
+ *  planche n'est pas prête. */
+export function dessineIconeCeremonie(
+  ctx: CanvasRenderingContext2D,
+  planche: HTMLImageElement | null,
+  id: IconeCeremonie,
+  x: number,
+  y: number,
+  cote: number,
+): boolean {
+  const c = ICONES_CEREMONIE.indexOf(id)
+  return dessineCase(ctx, planche, c < 0 ? null : c, ICONES_CEREMONIE_COLONNES, ICONES_CEREMONIE_RANGEES, x, y, cote)
 }

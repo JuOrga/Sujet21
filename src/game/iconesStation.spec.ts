@@ -8,6 +8,7 @@ import {
   ICONES_INSTRUMENTS_RANGEES,
   ORDRE_INSTRUMENTS,
   caseInstrument,
+  dessineIconeCeremonie,
   dessineIconeInstrument,
   iconeCeremonieHTML,
   iconeInstrumentHTML,
@@ -67,6 +68,19 @@ describe('iconesStation', () => {
     expect(dessineIconeInstrument(ctx, img, 'perso-x', 0, 0, 32)).toBe(false)
     expect(dessineIconeInstrument(ctx, img, INSTRUMENTS[9].id, 5, 6, 32)).toBe(true)
     expect(ctx.drawImage).toHaveBeenCalledWith(img, 256, 256, 256, 256, 5, 6, 32, 32)
+  })
+  // le canvas de l'Économat dessine l'échantillon de secours (la vie) par la
+  // planche de la cérémonie : une monnaie, un seul dessin, au canvas aussi
+  it('dessine une icône de cérémonie au canvas quand la planche est prête, et seulement alors', () => {
+    const ctx = { drawImage: vi.fn() } as unknown as CanvasRenderingContext2D
+    expect(dessineIconeCeremonie(ctx, null, 'secours', 0, 0, 26)).toBe(false)
+    const enRoute = { complete: false, naturalWidth: 0, naturalHeight: 0 } as HTMLImageElement
+    expect(dessineIconeCeremonie(ctx, enRoute, 'secours', 0, 0, 26)).toBe(false)
+    expect(ctx.drawImage).not.toHaveBeenCalled()
+    const img = { complete: true, naturalWidth: 3584, naturalHeight: 2048 } as HTMLImageElement
+    // « secours » : case 10, colonne 3, rangée 1 — des cases de 512²
+    expect(dessineIconeCeremonie(ctx, img, 'secours', 4, 7, 26)).toBe(true)
+    expect(ctx.drawImage).toHaveBeenCalledWith(img, 1536, 512, 512, 512, 4, 7, 26, 26)
   })
 })
 

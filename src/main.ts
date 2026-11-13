@@ -481,7 +481,13 @@ import {
   type ReleveDescente,
 } from './game/finDescente'
 import { anneauxHTML, colonneMaitrise, couleeColonne, niveauColonne, type Colonne } from './game/colonneMaitrise'
-import { iconeCeremonieHTML, iconeInstrumentHTML, type IconeCeremonie } from './game/iconesStation'
+import {
+  ICONES_CEREMONIE_URL,
+  dessineIconeCeremonie,
+  iconeCeremonieHTML,
+  iconeInstrumentHTML,
+  type IconeCeremonie,
+} from './game/iconesStation'
 import {
   condensatDuSas,
   gainsDeModule,
@@ -573,6 +579,7 @@ import {
   ICONES_URL,
   cadreAlcove,
   caseIcone,
+  ceremonieDeMonnaie,
   decalsDuMeta,
   iconeMetaHTML,
   vuesEclat,
@@ -9096,9 +9103,11 @@ function decorAffiche(): DecalDef[] {
 // ici et pas en décalque. Chacune prend son image si elle est livrée, et
 // retombe sur le tracé vectoriel sinon — le jeu ne dépend jamais d'un fichier.
 
-/** L'icône d'un article : la case de la planche du méta, ou l'emoji du
- *  catalogue tant que la planche n'est pas déposée. Le centre est donné ;
- *  l'appelant a posé textAlign/textBaseline au centre. */
+/** L'icône d'un article : une MONNAIE du méta (l'échantillon de secours)
+ *  prend le dessin de la cérémonie, comme dans l'ATH et les toasts ; le
+ *  reste, la case de la planche du méta ; l'emoji du catalogue tant que la
+ *  planche n'est pas prête. Le centre est donné ; l'appelant a posé
+ *  textAlign/textBaseline au centre. */
 function dessineIconeArticle(
   g: CanvasRenderingContext2D,
   article: string,
@@ -9107,6 +9116,12 @@ function dessineIconeArticle(
   cy: number,
   taille: number,
 ): void {
+  const monnaie = ceremonieDeMonnaie(article)
+  if (
+    monnaie &&
+    dessineIconeCeremonie(g, sprite(ICONES_CEREMONIE_URL), monnaie, cx - taille / 2, cy - taille / 2, taille)
+  )
+    return
   const planche = sprite(ICONES_URL)
   const c = caseIcone(article)
   if (planche && c !== null) {

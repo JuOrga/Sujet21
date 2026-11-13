@@ -172,12 +172,10 @@ export const ICONE_CASE: Record<string, number> = {
   viatique: 0,
   dashs: 1,
   clef: 2,
-  secours: 3,
   sac: 4,
-  // les monnaies et marques du méta, pour les écrans qui suivront
-  memoire: 5,
-  condensat: 6,
-  vie: 7,
+  // les cases 3, 5, 6 et 7 (échantillon de secours, mémoire, condensat,
+  // vie) restent dans l'image mais ne se lisent plus : ces monnaies ont pris
+  // le dessin de la cérémonie (MONNAIES_CEREMONIE, plus bas)
 }
 
 /** La case d'un article, ou null s'il n'en a pas (on retombe sur l'emoji). */
@@ -201,10 +199,16 @@ const MONNAIES_CEREMONIE: ReadonlyMap<string, IconeCeremonie> = new Map([
 ])
 
 /** L'icône de la cérémonie d'une monnaie du méta, ou null si l'id n'en est
- *  pas une. Une Map, pas un objet : un id venu d'un toast ne doit pas
- *  tomber sur `toString`. */
+ *  pas une — pour le canvas de l'Économat, qui la dessine lui-même. Une
+ *  Map, pas un objet : un id venu d'un toast ne doit pas tomber sur
+ *  `toString`. */
+export function ceremonieDeMonnaie(id: string): IconeCeremonie | null {
+  return MONNAIES_CEREMONIE.get(id) ?? null
+}
+
+/** La même, en HTML : null si l'id n'est pas une monnaie. */
 export function iconeMonnaieHTML(id: string): string | null {
-  const m = MONNAIES_CEREMONIE.get(id)
+  const m = ceremonieDeMonnaie(id)
   return m ? iconeCeremonieHTML(m) : null
 }
 
