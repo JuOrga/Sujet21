@@ -93,3 +93,14 @@ describe('catalogue — LA SERRE accueille ses cultures avant même les fichiers
     )
   })
 })
+
+describe('catalogue — LA CÉRÉMONIE STATION range ses planches rendues', () => {
+  it('range les planches et objets de la cérémonie, et les scènes de fin, sous leur rubrique', () => {
+    // les noms fixés par le contrat (iconesStation.ts, ceremonieObjets.ts,
+    // prepare.py) : chaque planche du lot Blender doit y tomber dès sa livraison
+    for (const f of ['ceremonie-icones', 'ceremonie-sceaux', 'ceremonie-bonbonne-dos', 'ceremonie-anneau',
+      'instruments-icones', 'fin-capsule', 'fin-fiole-brisee'])
+      expect(rubriqueDe(`/assets/${f}.webp`), f).toBe('Cérémonie station')
+    expect(nomDe('/assets/ceremonie-icones.webp')).toBe('Cérémonie — planche d’icônes (7×4)')
+  })
+})
