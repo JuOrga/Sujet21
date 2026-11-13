@@ -460,6 +460,7 @@ import { Jukebox, PISTES_ECOUTE } from './game/jukebox'
 import { auteurAvis, avisDe, ligneAvis, ligneBilan, lisAvisEcoute, poseAvis, type Avis, type DocumentAvis } from './game/ecouteAvis'
 import { compteur, douce, gesteAuVersement, motDeNote, rangDeSalle, TEMPS_BILAN, titreDuTirage } from './game/ceremonie'
 import { cartoucheHTML } from './game/cartouches'
+import { fmtDuree, fmtL, fmtTime } from './game/formats'
 import { cuveHTML, sceauHTML } from './game/ceremonieObjets'
 import { anneauxHTML, colonneMaitrise, niveauColonne } from './game/colonneMaitrise'
 import { iconeCeremonieHTML } from './game/iconesStation'
@@ -881,22 +882,7 @@ try {
 }
 majMemoireUI()
 
-function fmtTime(s: number): string {
-  return `${s.toFixed(1).replace('.', ',')} s`
-}
-
-// Les litres à la française : la virgule, pas le point
-function fmtL(l: number): string {
-  return `${l.toFixed(2).replace('.', ',')} L`
-}
-
-// Les durées d'expédition se lisent en minutes : « 13:32 » plutôt que 812 s
-function fmtDuree(s: number): string {
-  if (s < 120) return fmtTime(s)
-  const mn = Math.floor(s / 60)
-  const sec = Math.round(s % 60)
-  return `${mn}:${String(sec).padStart(2, '0')}`
-}
+// fmtTime, fmtL, fmtDuree : game/formats.ts (le relevé de la descente les partage)
 
 // ---- Moteur physique : les noyaux WASM (public/noyaux.wasm), chargés en
 // arrière-plan. Choix mémorisé (sujet21-moteur) : WASM par défaut quand le
