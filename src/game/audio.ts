@@ -9,7 +9,7 @@
 // clic et reste sans effet ensuite.
 
 import { type Ouie, ouieDe } from './ouie'
-import type { VoixCeremonie } from './sonsCeremonie'
+import { VOIX, type VoixCeremonie } from './sonsCeremonie'
 
 export interface AudioPrefs {
   on: boolean
@@ -119,13 +119,23 @@ export class AudioFx {
       : null
   }
 
-  /** Une voix de la cérémonie « station ». Muette pour l'instant : les recettes
-   *  (sonsCeremonie.ts) arrivent voix par voix. Le contrat est posé d'abord pour
-   *  que main.ts puisse appeler sans attendre, et sans jamais lever : le son
-   *  coupé ou absent ne doit pas faire trébucher un écran de récompense. */
-  ceremonie(_voix: VoixCeremonie, _force = 1): void {}
+  /** Une voix de la cérémonie « station » (recettes dans sonsCeremonie.ts), jouée
+   *  sur le bus des effets : même coupure, même volume que le reste. Ne lève
+   *  jamais — le son coupé ou absent ne doit pas faire trébucher un écran de
+   *  récompense. Coupé, on ne bâtit même pas le contexte (graph() le ferait). */
+  ceremonie(voix: VoixCeremonie, force = 1): void {
+    if (!this.enabled) return
+    try {
+      const g = this.graph()
+      if (!g) return
+      VOIX[voix]?.jouer(g.ctx, g.bus, force, g.ctx.currentTime)
+    } catch {
+      // une voix ratée vaut mieux qu'une cérémonie qui plante
+    }
+  }
 
   private build(): void {
+    if (typeof window === 'undefined') return // Node (tests) : pas de contexte audio
     const Ctor =
       window.AudioContext ??
       (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext
