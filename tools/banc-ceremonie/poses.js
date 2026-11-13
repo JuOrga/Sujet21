@@ -345,17 +345,17 @@
     }
   }
 
-  // ---- LE CHOIX DE LA SALLE (main.ts:16413 mbMontreSallesVoie, 16642 mbPorte, 16766 mbPorteNoeud) ----
+  // ---- LE CHOIX DE LA SALLE (main.ts mbMontreSallesVoie, mbPorte, mbPorteNoeud) ----
   function salles(variante) {
     ouvre()
     $('mb-releve').hidden = true
     $('mb-etal').hidden = true
     $('mb-passer').hidden = true
     $('mb-choix').hidden = false
-    question('CHOISISSEZ LA SALLE SUIVANTE')
     $('mb-choix-titre').textContent = `${RUN.module} · SALLE 3/6 · DESCENTE ${RUN.rang + 1}/${RUN.longueur}`
     scene.classList.add('mb-compact')
     const host = cartes()
+    question('CHOISISSEZ LA SALLE SUIVANTE') // après le porte-cartes, comme main.ts
     host.classList.add('mb-trio')
     host.innerHTML = `<div class="mb-voies">${F.miniCarte()}<p class="mv-fiche" hidden></p></div>`
     const REP = [['▲', 'HAUT'], ['●', 'MILIEU'], ['▼', 'BAS']]
@@ -370,12 +370,12 @@
       btn.type = 'button'
       btn.style.setProperty('--i', String(i))
       if (p.noeud) {
-        btn.className = 'mb-porte mb-porte-ev mb-porte-evenement'
-        btn.innerHTML = `<span class="mb-porte-vue mb-ev-vue">${no}<svg class="mb-ev-icone" viewBox="0 0 24 24" aria-hidden="true">${F.ICONES_MINI_CARTE}<use href="#mv-i-rencontre" width="24" height="24"/></svg></span>` +
-          `<b>SIGNAL</b><small>Quelque chose vit encore derrière.</small><span class="mb-porte-ligne mb-porte-ligne-ev"><i>RENCONTRE</i></span><span class="mb-porte-entrer">ENTRER ▸</span>`
+        btn.className = 'mb-porte mb-coupe mb-porte-ev mb-porte-evenement'
+        btn.innerHTML = `<span class="mb-porte-vue mb-ev-vue">${no}<span class="mb-ev-objet">${F.iconeCeremonieHTML('rencontre')}</span><span class="mb-porte-entrer mb-levier">ENTRER ▸</span></span>` +
+          `<b>SIGNAL</b><small>Quelque chose vit encore derrière.</small><span class="mb-porte-ligne mb-porte-ligne-ev"><i>RENCONTRE</i></span>`
       } else {
-        btn.className = 'mb-porte'
-        btn.innerHTML = `<span class="mb-porte-vue">${no}<canvas width="440" height="252"></canvas></span><b></b><small></small><span class="mb-porte-ligne"></span><span class="mb-porte-entrer">ENTRER ▸</span>`
+        btn.className = 'mb-porte mb-coupe'
+        btn.innerHTML = `<span class="mb-porte-vue">${no}<canvas width="440" height="252"></canvas><span class="mb-porte-entrer mb-levier">ENTRER ▸</span></span><b></b><small></small><span class="mb-porte-ligne"></span>`
         const [code, nom] = F.plan(btn.querySelector('canvas'), p.mec, p.diff, p.v).split('|')
         btn.querySelector('b').textContent = code
         btn.querySelector('small').textContent = nom
@@ -393,10 +393,10 @@
     ouvre()
     scene.classList.add('mb-compact')
     $('mb-releve').hidden = true
-    question('MODULE TRAVERSÉ')
     $('mb-choix-titre').textContent = `DESCENTE 6 / ${RUN.longueur} · CE QUE LE MODULE A RENDU`
     $('mb-etal').hidden = true; $('mb-passer').hidden = true; $('mb-choix').hidden = false
     const host = cartes()
+    question('MODULE TRAVERSÉ')
     const r = {
       module: 'T1', haltes: 1, condensatCl: 1235, memoire: 22, orbes: [], instrumentsEntree: [], paliersEntree: 1,
       salles: [
@@ -431,19 +431,19 @@
     host.appendChild(btn)
   }
 
-  // ---- LA CARTE DE LA STATION (main.ts:15691 mbMontreCarte) ----
+  // ---- LA CARTE DE LA STATION (main.ts mbMontreCarte) ----
   function carte() {
     ouvre()
     scene.classList.add('mb-compact')
     $('mb-releve').hidden = true; $('mb-etal').hidden = true; $('mb-passer').hidden = true; $('mb-choix').hidden = false
-    question('CHOISISSEZ LA COURSIVE')
     scene.classList.add('mb-large')
     const st = F.station()
     $('mb-choix-titre').textContent = `${st.nomCourant} TRAVERSÉ — CHOISISSEZ LA COURSIVE SUIVANTE`
     const host = cartes()
+    question('CHOISISSEZ LA COURSIVE') // après le porte-cartes, comme main.ts
     host.classList.add('mb-station')
     const sc = document.createElement('div')
-    sc.className = 'mb-station-carte'
+    sc.className = 'mb-station-carte mb-coupe'
     sc.style.setProperty('--cadre', st.cadre)
     sc.innerHTML = st.svg
     host.appendChild(sc)
@@ -462,9 +462,10 @@
   function halteBase(q, titre) {
     ouvre(); scene.classList.add('mb-compact')
     $('mb-releve').hidden = true; $('mb-etal').hidden = true; $('mb-passer').hidden = true; $('mb-choix').hidden = false
-    question(q)
     $('mb-choix-titre').textContent = titre
-    return cartes()
+    const host = cartes()
+    question(q) // après le porte-cartes, comme main.ts
+    return host
   }
   function halte(host, icone, recit) {
     const h = document.createElement('div')

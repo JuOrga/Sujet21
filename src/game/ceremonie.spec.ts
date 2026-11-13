@@ -781,3 +781,85 @@ describe('la cérémonie — la fin ordinaire', () => {
     for (const f of ['mbJauges', 'mbMontreFin']) expect(corps(f), f).not.toMatch(/\p{Extended_Pictographic}/u)
   })
 })
+
+// LE CHOIX DE LA SALLE ET LA CARTE DE LA STATION, HABILLÉS (M3) : la
+// disposition, l'épure du 13/11 et le plan ne bougent pas — les portes
+// prennent le chanfrein, ENTRER devient un levier, l'icône d'un nœud vient
+// de la planche rendue, le plan se taille comme un module.
+describe('la cérémonie — les portes et le plan, habillés', () => {
+  it('les portes sont taillées au chanfrein, ENTRER est un levier', () => {
+    expect(regle('.mb-porte')).toMatch(/clip-path:\s*polygon\(/)
+    expect(corps('mbPorte')).toContain('mb-levier')
+  })
+  it('la porte d’un nœud aussi, et son icône vient de la planche de cérémonie', () => {
+    const f = corps('mbPorteNoeud')
+    expect(f).toContain('mb-coupe')
+    expect(f).toContain('mb-levier')
+    expect(f).toContain('iconeCeremonieHTML(d.ceremonie)')
+    expect(f).not.toContain('mb-ev-icone')
+    expect(corps('mbPorte')).toContain('mb-coupe')
+  })
+  // le clip-path rogne l'outline : la porte armée au doigt et la visée de
+  // la manette se dessinaient DEHORS, et auraient disparu
+  it('dessine la porte armée et la visée de la manette dans sa forme', () => {
+    expect(regle('.mb-porte.mb-armee')).not.toMatch(/outline:\s*2px/)
+    expect(regle('.mb-porte.mb-armee')).toMatch(/box-shadow:\s*inset/)
+    expect(HTML).toMatch(/\.mb-porte\.pad-focus[^{]*\{[^}]*box-shadow:\s*inset/)
+  })
+  it('taille le plan de la station comme un module', () => {
+    expect(corps('mbMontreCarte')).toContain("'mb-station-carte mb-coupe'")
+  })
+  // la manette vise les portes et le plan par « pad-vise » : l'habillage ne
+  // doit pas l'avoir débranché
+  it('garde la visée de la manette sur les portes et sur le plan', () => {
+    expect(corps('mbMontreSallesVoie')).toContain("'pad-vise'")
+    expect(corps('mbMontreCarte')).toContain("'pad-vise'")
+  })
+  it('échappe les portes comme le reste : guillemets compris', () => {
+    for (const f of ['mbPorte', 'mbPorteNoeud']) {
+      expect(corps(f), f).not.toContain('const esc')
+      expect(corps(f), f).toContain('htmlSafe(')
+    }
+  })
+  it('n’écrit plus d’étiquette sous 10 px sur une porte', () => {
+    for (const s of ['.mb-porte-no', '.mb-porte-ligne', '.mb-porte-entrer']) {
+      const t = /font-size:\s*calc\((\d+(?:\.\d+)?)px/.exec(regle(s))
+      expect(t, s).not.toBeNull()
+      expect(Number(t![1]), s).toBeGreaterThanOrEqual(10)
+    }
+  })
+})
+
+// LA QUESTION RESTAIT REPLIÉE. mbQuestion() pose « mb-question » (le titre
+// en grand), mbCartes() la retire (le porte-cartes repart à neuf pour une
+// étape sans question) : appelées dans cet ordre, la question s'effaçait
+// aussitôt — les salles, la carte, le module et les haltes s'affichaient
+// dans le style replié. Le commentaire de mbCartes le dit : « l'étape qui
+// pose une QUESTION le regrossit elle-même », donc APRÈS.
+describe('la cérémonie — la question se pose après le porte-cartes', () => {
+  it('chaque étape qui pose une question la pose après mbCartes()', () => {
+    const fonctions = [...MAIN.matchAll(/\nfunction (\w+)\(/g)].map((m) => m[1])
+    const fautives: string[] = []
+    let vues = 0
+    for (const nom of fonctions) {
+      const f = corps(nom)
+      const q = f.lastIndexOf('mbQuestion(')
+      const c = f.indexOf('mbCartes()')
+      if (q < 0 || c < 0 || nom === 'mbQuestion' || nom === 'mbCartes') continue
+      vues++
+      if (q < c) fautives.push(nom)
+    }
+    expect(vues).toBeGreaterThan(8) // la garde regarde bien quelque chose
+    expect(fautives).toEqual([])
+  })
+  // en grand, la question cassait sur deux lignes dans la poutre repliée
+  // (F3, « CHOISISSEZ LA SALLE SUIVANTE ») : la poutre s'élargit, le titre
+  // tient sur une ligne ; sur téléphone il retourne à la ligne et la
+  // bande reste resserrée
+  it('tient la question sur une ligne dans la poutre repliée', () => {
+    expect(regle('.mb-scene.mb-compact.mb-question .mb-banniere.mb-poutre')).toMatch(/width:\s*min\(100%,/)
+    expect(HTML).toMatch(/\.mb-scene\.mb-compact\.mb-question \.mb-titre \{[^}]*white-space:\s*nowrap/)
+    const petit = HTML.slice(HTML.indexOf('@media (max-width: 760px) {', HTML.indexOf('/* ==== LA CÉRÉMONIE DE FIN DE SALLE')))
+    expect(petit.slice(0, petit.indexOf('\n      }\n'))).toMatch(/\.mb-scene\.mb-compact\.mb-question \.mb-banniere\.mb-poutre \{[^}]*--mb-bande: 36px/)
+  })
+})

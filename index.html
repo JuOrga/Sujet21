@@ -8751,19 +8751,13 @@
       /* ---- LES SALLES ÉVÉNEMENT (game/evenements.ts) ---- */
       /* la porte d'une rencontre : pas de plan, un point d'interrogation */
       .mb-ev-vue { display: grid; place-items: center; background: linear-gradient(180deg, #16233a, #0b1220); aspect-ratio: 440 / 252; }
-      /* l'icône a SA taille : sans elle, le SVG prenait les 300 × 150 par
-         défaut du navigateur, et une rencontre parmi trois portes grandissait
-         tout le rang de 148 px (221 → 369, mesuré à 1280 × 720 le 13/11) */
-      .mb-ev-icone { width: calc(56px * var(--ui)); height: calc(56px * var(--ui)); }
-      .mb-ev-vue i {
-        font-style: normal; font-family: var(--font-display);
-        font-size: calc(46px * var(--ui)); color: var(--mb-or, #ffd977);
-        text-shadow: 0 0 18px rgba(255, 217, 119, 0.45); animation: mb-ev-bat 2.6s ease-in-out infinite;
-      }
-      @keyframes mb-ev-bat { 0%, 100% { opacity: 0.75; } 50% { opacity: 1; } }
-      .mb-porte-ev:hover, .mb-porte-ev:focus-visible {
-        border-color: var(--mb-or, #ffd977);
-        box-shadow: 0 22px 44px rgba(0, 0, 0, 0.55), 0 0 30px rgba(255, 217, 119, 0.25);
+      /* l'objet du nœud, rendu (la planche de cérémonie) : il a SA taille,
+         la vitrine garde sa proportion — une rencontre parmi trois portes
+         grandissait tout le rang de 148 px quand l'icône n'en avait pas
+         (221 → 369, mesuré à 1280 × 720 le 13/11) */
+      .mb-ev-objet { display: grid; place-items: center; font-size: calc(88px * var(--ui)); line-height: 1; }
+      .mb-porte-ev:hover, .mb-porte-ev:focus-visible, .mb-porte-ev.pad-focus {
+        box-shadow: inset 0 0 0 2px var(--mb-or, #ffd977), inset 0 0 28px rgba(255, 217, 119, 0.14);
       }
       /* ---- LES HALTES, LES RENCONTRES, LA CACHE, LE MINI-JEU (étape 6) ----
          C'étaient des cartes arrondies à émoji (💠 🫙 💧, 🥌 🌬️ 🪐 🎯 🔪),
@@ -9055,6 +9049,13 @@
         color: var(--mb-encre); text-shadow: 0 0 22px rgba(109, 255, 184, 0.45);
       }
       .mb-scene.mb-question .mb-choix-titre { color: var(--dim); }
+      /* dans la poutre repliée, la question tient sur UNE ligne : elle s'y
+         cassait en deux (« CHOISISSEZ LA SALLE SUIVANTE », vu en F3) — la
+         poutre s'élargit, le titre se resserre un peu */
+      .mb-scene.mb-compact.mb-question .mb-banniere.mb-poutre { width: min(100%, 940px); --mb-bande: 64px; min-height: 46px; }
+      .mb-scene.mb-compact.mb-question .mb-titre {
+        font-size: calc(clamp(15px, 1.6vw, 20px) * var(--ui)); letter-spacing: 0.2em; white-space: nowrap;
+      }
       .mb-choix-titre.mb-grande {
         font-size: calc(14px * var(--ui)); letter-spacing: 0.34em; color: var(--mb-encre);
         text-shadow: 0 0 18px rgba(99, 183, 230, 0.45);
@@ -9149,13 +9150,21 @@
          le pointeur elle s'avance et s'allume ; élue, elle S'OUVRE (elle
          grandit, blanchit, et l'on passe) pendant que les autres se
          referment ---- */
+      /* HABILLÉE EN STATION (M3) : la porte se taille au chanfrein (.mb-coupe
+         dans main.ts — le même polygone, redit ici pour que la porte garde
+         sa forme par sa propre règle) ; son fond passe par --mb-fond, qui
+         garde les arêtes peintes de la primitive. Le clip-path rogne
+         l'outline et les ombres : la visée (survol, clavier, manette) et la
+         porte armée au doigt s'éclairent DANS la forme. */
       .mb-porte {
         --i: 0;
+        --mb-c: 12px;
+        --mb-fond: linear-gradient(180deg, #101b2a, #0a1220);
         position: relative; overflow: hidden;
         display: flex; flex-direction: column; gap: 7px; min-width: 0;
         padding: 10px 10px 12px; text-align: left;
-        background: linear-gradient(180deg, #101b2a, #0a1220);
-        border: 1px solid rgba(150, 200, 235, 0.18); border-radius: 12px;
+        clip-path: polygon(var(--mb-c) 0, calc(100% - var(--mb-c)) 0, 100% var(--mb-c), 100% calc(100% - var(--mb-c)), calc(100% - var(--mb-c)) 100%, var(--mb-c) 100%, 0 calc(100% - var(--mb-c)), 0 var(--mb-c));
+        border: 0; border-radius: 0;
         color: var(--mb-texte); font: inherit; cursor: pointer;
         animation: mb-porte-monte 0.5s cubic-bezier(0.2, 1, 0.3, 1) backwards;
         animation-delay: calc(0.05s + var(--i) * 0.12s);
@@ -9166,7 +9175,7 @@
         to { opacity: 1; transform: none; }
       }
       .mb-porte-vue {
-        position: relative; border-radius: 8px; overflow: hidden;
+        position: relative; overflow: hidden;
         border: 1px solid #223447; background: #0c141d;
       }
       .mb-porte-vue canvas { width: 100%; display: block; }
@@ -9185,8 +9194,8 @@
       /* le numéro de porte dans l'angle du plan */
       .mb-porte-no {
         position: absolute; top: 6px; left: 6px; z-index: 1;
-        font-family: var(--font-display); font-size: calc(8px * var(--ui)); letter-spacing: 0.16em;
-        padding: 3px 7px; border-radius: 4px; color: var(--mb-encre);
+        font-family: var(--font-display); font-size: calc(10px * var(--ui)); letter-spacing: 0.14em;
+        padding: 3px 7px; color: var(--mb-encre);
         background: rgba(4, 10, 18, 0.75); border: 1px solid rgba(150, 200, 235, 0.25);
       }
       /* le repère de voie : le signe se lit d'abord, comme au bord de la mini-carte */
@@ -9205,26 +9214,30 @@
          est à l'infobulle (l'épure du 13/11) */
       .mb-porte-ligne {
         margin-top: auto; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-        font-family: var(--font-display); font-size: calc(8.5px * var(--ui));
-        letter-spacing: 0.12em; color: var(--mb-texte-second);
+        font-family: var(--font-display); font-size: calc(10px * var(--ui));
+        letter-spacing: 0.1em; color: var(--mb-texte-second);
       }
       .mb-porte-ligne i { font-style: normal; }
       .mb-porte-ligne i + i::before { content: ' · '; color: var(--mb-acier); }
       .mb-porte-ligne .mb-porte-prime { color: var(--mb-or); }
       .mb-porte-ligne-ev { color: var(--mb-or, #ffd977); }
-      /* la mention ENTRER, qui n'apparaît qu'à la visée */
+      /* ENTRER, un LEVIER en petit (la primitive .mb-levier : biseau, arête,
+         face, reflet) — plus de pilule ; à demi éteint au repos, il s'arme à
+         la visée. Au pied de la vitrine, à droite : dans l'angle du haut, à
+         10 px, il couvrait le repère de la voie (vu au banc) */
       .mb-porte-entrer {
-        position: absolute; right: 16px; top: 16px; z-index: 1;
-        font-family: var(--font-display); font-size: calc(8px * var(--ui)); letter-spacing: 0.26em;
-        color: var(--mb-coque-noire); background: var(--mb-menthe); border-radius: 999px; padding: 5px 11px;
+        --mb-c: 7px;
+        position: absolute; right: 6px; bottom: 6px; z-index: 1;
+        min-height: 0; padding: 5px calc(var(--mb-c) + 9px);
+        font-family: var(--font-display); font-size: calc(10px * var(--ui)); letter-spacing: 0.22em;
         opacity: 0.6; transform: scale(0.94); transition: opacity 0.16s ease, transform 0.16s ease;
-        box-shadow: 0 0 16px rgba(109, 255, 184, 0.5);
       }
-      .mb-porte:hover, .mb-porte:focus-visible {
-        transform: translateY(-7px) scale(1.02); border-color: var(--mb-menthe); outline: none;
-        box-shadow: 0 22px 44px rgba(0, 0, 0, 0.55), 0 0 30px rgba(109, 255, 184, 0.25);
+      .mb-porte:hover, .mb-porte:focus-visible, .mb-porte.pad-focus {
+        transform: translateY(-7px) scale(1.02); outline: none;
+        box-shadow: inset 0 0 0 2px var(--mb-menthe), inset 0 0 28px rgba(109, 255, 184, 0.16);
       }
-      .mb-porte:hover .mb-porte-entrer, .mb-porte:focus-visible .mb-porte-entrer { opacity: 1; transform: none; }
+      .mb-porte:hover .mb-porte-entrer, .mb-porte:focus-visible .mb-porte-entrer,
+      .mb-porte.pad-focus .mb-porte-entrer { opacity: 1; transform: none; }
       .mb-cartes.mb-elu .mb-porte:not(.mb-elue) {
         animation: mb-porte-ferme 0.38s ease-in forwards; pointer-events: none;
       }
@@ -9324,7 +9337,7 @@
       }
       .mv-fiche[hidden] { display: none; }
       /* au doigt : la porte armée attend un second toucher */
-      .mb-porte.mb-armee { outline: 2px solid #eaf6ff; outline-offset: 2px; }
+      .mb-porte.mb-armee { box-shadow: inset 0 0 0 3px var(--mb-encre), inset 0 0 28px rgba(234, 246, 255, 0.18); }
       @media (prefers-reduced-motion: reduce) { .mv-noeud.mv-porte .mv-halo { animation: none; } }
       /* les jauges de la fin ordinaire (le choix de salle ne les montre
          plus) : une plaque chacune, sur une rangée */
@@ -9346,8 +9359,11 @@
            depuis cadreCarte) : la feuille les tenait à 1600 / 804, la taille
            d'une scène qui en fait 2100 depuis le 16/09 */
         aspect-ratio: var(--cadre, 1616 / 616); max-height: 64vh; width: 100%; margin: 0 auto;
-        border: 1px solid #27405a; border-radius: 10px; overflow: hidden; background: #020509;
-        box-shadow: 0 0 0 1px rgba(99, 183, 230, 0.1), 0 20px 60px rgba(0, 0, 0, 0.6), inset 0 0 60px rgba(99, 183, 230, 0.06);
+        /* taillé au chanfrein (.mb-coupe dans main.ts) : le fond par
+           --mb-fond, l'arête et la lueur en ombre intérieure — une ombre
+           portée serait rognée par la coupe */
+        --mb-c: 18px; --mb-fond: #020509; overflow: hidden;
+        box-shadow: inset 0 0 0 1px var(--mb-arete), inset 0 0 60px rgba(99, 183, 230, 0.06);
         transition: transform 0.42s cubic-bezier(0.2, 0.7, 0.2, 1), opacity 0.42s ease;
         animation: mb-carte-monte 0.5s cubic-bezier(0.2, 1, 0.3, 1) backwards;
       }
@@ -9421,6 +9437,9 @@
         /* la poutre repliée aussi : sa règle (4 classes) l'emportait sur
            celle-ci, et gardait 56 px de bande par côté sur un téléphone */
         .mb-poutre, .mb-scene.mb-compact .mb-banniere.mb-poutre { --mb-bande: 36px; }
+        /* la question aussi : elle retourne à la ligne plutôt que de sortir */
+        .mb-scene.mb-compact.mb-question .mb-banniere.mb-poutre { --mb-bande: 36px; }
+        .mb-scene.mb-compact.mb-question .mb-titre { white-space: normal; }
         /* le module : le sceau en tête, le nom et le volume côte à côte */
         .mb-module {
           grid-template-columns: auto auto; justify-content: center;
@@ -9507,7 +9526,7 @@
            « none » d'une classe seule. Chaque sélecteur animé de la
            cérémonie est neutralisé tel qu'il est écrit (ceremonie.spec.ts,
            « règle par règle »). */
-        .mb-etal-xp i, .mb-ev-vue i, .mb-flux-g, .mb-flux-d,
+        .mb-etal-xp i, .mb-flux-g, .mb-flux-d,
         .mb-dest.mb-dest-palier:hover:not(:disabled), .mb-dest.mb-dest-palier:focus-visible,
         .mb-dest.mb-dest-palier.pad-focus { animation: none; }
         .mb-etoiles i, .mb-pli .crt-draft, .mb-versement[data-verse] .mb-goutte-corps,
