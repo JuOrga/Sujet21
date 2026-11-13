@@ -5,7 +5,10 @@
 // ne doit rien charger) et BRÈVE — elle ponctue un geste, elle ne l'habille
 // pas. Les gains restent sous celui des stings existants d'audio.ts
 // (coupFinal 0,26 ; vanne 0,18 ; collect 0,16) : une cérémonie qui couvrirait
-// la musique serait pire qu'une cérémonie muette.
+// la musique serait pire qu'une cérémonie muette. Ces chiffres sont des gains
+// de nœuds ; ce qui compte est la crête de la SOMME, mesurée hors ligne par
+// tools/banc-ceremonie/crete-voix.cjs : chaque voix y reste sous 0,132, la plus
+// basse des références (iceImpact).
 
 export type VoixCeremonie =
   | 'compteur'
@@ -108,9 +111,9 @@ export const VOIX: Record<VoixCeremonie, VoixDef> = {
   // Le sceau : le choc sourd d'un tampon sur du métal — coup grave, claque
   // de contact, et deux résonances inharmoniques qui traînent un instant.
   sceau: {
-    duree: 0.8, gain: 0.2,
+    duree: 0.8, gain: 0.1,
     jouer(ctx, bus, force, t0) {
-      const k = dose(force)
+      const k = dose(force) * 0.45 // crête mesurée 0,25 → sous 0,132 (iceImpact)
       note(ctx, bus, t0, 'sine', 115, 42, 0.42, 0.2 * k)
       note(ctx, bus, t0, 'square', 92, 40, 0.12, 0.1 * k)
       souffle(ctx, bus, t0, 'lowpass', 900, 500, 1.2, 0.09, 0.07 * k)
@@ -151,9 +154,9 @@ export const VOIX: Record<VoixCeremonie, VoixDef> = {
   // la hauteur de l'anneau s'effondre d'un demi-ton sous lui-même et un
   // éclat de bruit l'achève.
   palier: {
-    duree: 1.5, gain: 0.14,
+    duree: 1.5, gain: 0.1,
     jouer(ctx, bus, force, t0) {
-      const k = dose(force)
+      const k = dose(force) * 0.6 // crête mesurée 0,19 → sous 0,132
       note(ctx, bus, t0, 'triangle', 220, 880, 0.6, 0.08 * k)
       note(ctx, bus, t0, 'sine', 110, 440, 0.6, 0.06 * k)
       const t1 = t0 + 0.6
@@ -161,7 +164,7 @@ export const VOIX: Record<VoixCeremonie, VoixDef> = {
       note(ctx, bus, t1, 'sine', 1318 * 2.76, 1318 * 2.76, 0.35, 0.025 * k)
       // la cassure : l'anneau glisse vers le bas en se tordant
       note(ctx, bus, t1 + 0.5, 'sine', 1318, 620, 0.3, 0.05 * k)
-      souffle(ctx, bus, t1 + 0.5, 'highpass', 3000, 3000, 0.7, 0.18, 0.06 * k)
+      souffle(ctx, bus, t1 + 0.5, 'bandpass', 4000, 4000, 0.9, 0.18, 0.06 * k)
       note(ctx, bus, t1 + 0.5, 'square', 130, 52, 0.35, 0.14 * k)
     },
   },
@@ -180,9 +183,9 @@ export const VOIX: Record<VoixCeremonie, VoixDef> = {
 
   // Le levier : le clac lourd d'un contacteur qu'on rabat, et sa résonance basse.
   levier: {
-    duree: 0.55, gain: 0.16,
+    duree: 0.55, gain: 0.15,
     jouer(ctx, bus, force, t0) {
-      const k = dose(force)
+      const k = dose(force) * 0.8 // crête mesurée 0,142 → sous 0,132
       note(ctx, bus, t0, 'square', 150, 58, 0.12, 0.16 * k)
       souffle(ctx, bus, t0, 'lowpass', 1500, 700, 1, 0.06, 0.06 * k)
       note(ctx, bus, t0 + 0.05, 'sine', 72, 50, 0.4, 0.1 * k)
