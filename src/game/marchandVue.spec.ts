@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import { ARTICLES_COMPTOIR } from './hub'
 import { AMELIORATIONS, orbesEnVente } from './marchand'
@@ -11,6 +12,7 @@ import {
   etatCourt,
   filtre,
   filtreSuivant,
+  iconeArticleHTML,
   libelleBouton,
   tenu,
   type EtatRegistres,
@@ -91,5 +93,31 @@ describe('les filtres et les mots', () => {
     expect(apresAchat(sac, 4)).toBe('déjà à vous')
     expect(compteRayon(liste)).toBe('1 acquis · 4')
     expect(compteRayon(filtre(liste, 'ok'))).toBe('2 articles')
+  })
+})
+
+// UNE MONNAIE, UN SEUL DESSIN : l'échantillon de secours (la vie) et la
+// mémoire, seule monnaie du marchand, prennent l'icône de la cérémonie ;
+// orbes et améliorations n'ont pas de dessin rendu et gardent leur glyphe.
+describe('les icônes du marchand', () => {
+  const s: EtatRegistres = { ...vide, memoire: 99 }
+  const provision = (id: string) => articlesDuRayon('provisions', s).find((a) => a.id === id)!
+
+  it('l’échantillon de secours prend l’icône « secours » de la cérémonie', () => {
+    const h = iconeArticleHTML(provision('secours'))
+    expect(h).toContain('ico-ceremonie')
+    expect(h).not.toContain(provision('secours').icone)
+  })
+
+  it('les autres articles gardent leur glyphe', () => {
+    for (const a of [provision('clef'), ...articlesDuRayon('ameliorations', s), ...articlesDuRayon('orbes', s)]) {
+      expect(iconeArticleHTML(a), a.id).toBe(`<i>${a.icone}</i>`)
+    }
+  })
+
+  it('la bourse de mémoire porte l’icône « mémoire » de la cérémonie', () => {
+    const ecran = readFileSync(new URL('./ecranMarchand.ts', import.meta.url), 'utf-8')
+    expect(ecran).toMatch(/mr-bourse--memoire">\$\{iconeCeremonieHTML\('memoire'\)\}/)
+    expect(ecran).not.toContain('<i>${a.icone}</i>')
   })
 })

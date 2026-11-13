@@ -17,6 +17,7 @@
 import { transfoTenue } from './cycle'
 import { ARTICLES_COMPTOIR } from './hub'
 import { AMELIORATIONS, orbesEnVente } from './marchand'
+import { iconeMonnaieHTML } from './metaAssets'
 
 export type RayonMarchandId = 'orbes' | 'ameliorations' | 'provisions'
 
@@ -138,6 +139,14 @@ export function articlesDuRayon(rayon: RayonMarchandId, s: EtatRegistres): Artic
         etat: s.servies.includes(a.id) ? 'servie' : paye(a.prix, s.memoire),
       }))
   }
+}
+
+/** L'icône d'un article à l'étal et sur sa fiche. Une PROVISION qui est une
+ *  monnaie du méta (l'échantillon de secours : la vie) prend le dessin de la
+ *  cérémonie — une monnaie, un seul dessin ; les orbes et les améliorations
+ *  n'ont pas de dessin rendu et gardent leur glyphe. */
+export function iconeArticleHTML(a: ArticleMarchand): string {
+  return (a.rayon === 'provisions' && iconeMonnaieHTML(a.id)) || `<i>${a.icone}</i>`
 }
 
 /** Tenu : l'article est déjà à soi, d'une façon ou d'une autre. */

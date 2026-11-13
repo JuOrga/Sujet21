@@ -6639,6 +6639,9 @@
       #marchand .mr-article.on.mr-tenu, #marchand .mr-article.on.mr-cher { opacity: 0.85; }
       .mr-article-tete { display: flex; gap: 10px; align-items: flex-start; }
       .mr-article-tete > i { font-style: normal; font-size: 26px; line-height: 1; filter: drop-shadow(0 0 8px color-mix(in srgb, var(--t) 55%, transparent)); }
+      /* une icône rendue est un fond découpé : la tête de carte, en flex, la
+         rétrécissait (21 × 26 px mesurés) et le dessin s'écrasait */
+      .mr-article-tete > [class^='ico-'] { flex: none; }
       .mr-article-tete > span { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
       .mr-article-tete b { font-size: calc(12.5px * var(--ui)); line-height: 1.25; color: #e6f3ff; font-weight: 600; }
       .mr-tenu .mr-article-tete b { color: var(--dim); }
