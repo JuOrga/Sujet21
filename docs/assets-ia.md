@@ -2299,3 +2299,72 @@ contre la salle : 0,35 cran. Poids : chaufferie 532 Ko, serre 1,4 Mo.
 pièces propres du cryo, de l'antichambre et de
 l'observatoire (ils prennent les pièces tempérées en attendant) ; une
 deuxième variante de baie et de trappe.
+
+---
+
+## 36. LA CÉRÉMONIE STATION — les planches rendues dans Blender (13/11)
+
+Les écrans de récompense (`#mb-veil`) et, à terme, le jeu entier quittent
+les émojis pour des objets de la station rendus dans l'atelier Blender
+(conception : `docs/superpowers/specs/2026-11-13-ceremonie-station-design.md`).
+Aucune image générée ici. L'atelier est `tools/images/blender/ceremonie.py`,
+qui charge `surfaces.py` (donc les matières, la lumière et la caméra de la
+chaufferie) et rend dans une scène À LUI, `ceremonie` : la scène ouverte dans
+Blender n'est pas effacée.
+
+### 36a. Les icônes de cérémonie — `ceremonie-icones.webp` ✅ LIVRÉ (13/11)
+
+**3584×2048 · transparente · 7 × 4 cases de 512²**, dans l'ordre de
+`ICONES_CEREMONIE` (`src/game/iconesStation.ts`) : la case i est en colonne
+i % 7, rangée i // 7 ; les deux dernières restent vides.
+
+Vingt-six objets d'acier, modélisés par script : condensat (une goutte sous
+cloche), mémoire (un cristal taillé sur socle octogonal), tirage (trois
+cartouches en éventail, la prime ambre qui luit), orbe (une sphère dans une
+cage), livré (la bonbonne à jauge), réserve (un bocal), maîtrise (une colonne
+cerclée de trois anneaux), instruments (une caisse à coins coupés), chrono (un
+manomètre à aiguille), note (une réglette et son curseur), secours (une
+ampoule de vie menthe), profondeur (une sonde au bout de son câble), repos
+(une capsule de sommeil), don (la petite bonbonne et son étiquette), rencontre
+(une balise et ses ondes), cache (un coffre à cadran), économat (une balance),
+carte (une plaque où les modules octogonaux sont reliés), danger (un triangle
+à bandes ocre), et les cinq mini-jeux par leur objet : couperet, palet,
+rafales (un ventilateur), orbites, cibles ; puis le mini-jeu (un pupitre à
+manche) et la contrepartie (une conduite fendue qui fuit).
+
+**Ce qui les tient avec le reste** : les trois soleils froids de l'atelier,
+le bruit pris sur le tore, l'acier brossé de `surfaces.py` — remonté de deux
+crans (`5a6878 / a2b0be`, métal 0,2 au lieu de 0,45) : au premier essai, à
+l'acier des murs, la bonbonne, la colonne, la caisse et le couperet se
+perdaient dans le voile à 32 px. Le fluide luit sarcelle (`5af0e0`, celui de
+la maquette), la vie menthe (`6dffb8`, le rang A), le cyan de la charte
+(`63b7e6`) dit les traits et les ondes ; l'ambre n'est que sur la prime du
+tirage, l'ocre terni que sur le danger. Les objets sont inclinés de 0 à 24°
+vers la caméra (on voit le dessus d'un fût), recentrés sur leur boîte et
+bornés à une demi-taille de 0,215 case : au moins 35 px transparents autour
+de chaque objet (mesuré).
+
+**Refaire** — dans Blender :
+
+```python
+DOSSIER = r'\\wsl.localhost\Ubuntu\home\julian\projets\sujet21\tools\images\blender'
+exec(compile(open(DOSSIER + r'\ceremonie.py', encoding='utf-8').read(), DOSSIER + r'\ceremonie.py', 'exec'))
+atelier() ; lance(ICONES, SORTIE, 192)   # SORTIE : masters\images\ceremonie (avec brut\ et alpha\)
+```
+
+(l'`exec` et `lance` dans le même appel : le MCP ne garde rien d'un appel à
+l'autre). Chaque case est rendue à 1024² (2048 px par unité), 192
+échantillons sans débruiteur, ~2 s par case. Puis, hors de Blender :
+
+```bash
+python -I tools/images/blender/ceremonie.py masters/images/ceremonie masters/images/ceremonie-icones.png controle.png
+python3 tools/images/prepare.py ceremonie-icones
+```
+
+L'assemblage réduit chaque case à 512² (en alpha prémultiplié : sans cela le
+vide noir bave en liseré) et écrit une planche de contrôle à 32 et 64 px sur
+le fond du voile — c'est elle qu'on regarde pour juger la lisibilité.
+
+**Mesuré à la livraison** : luminance 0,30, 1 % de pixels chauds, bord vide,
+**301 Ko** (qualité 82). Le test `LIVREES` de `src/game/ceremonieObjets.spec.ts`
+vérifie que la planche est là et qu'elle mesure 7 × 512 sur 4 × 512.
