@@ -141,9 +141,16 @@ export interface MiniCarte {
  *  · `figures` — combien des trois voies sont des figures, au début et
  *    ensuite (le réglage du plan) ;
  *  · `ecrites` — une voie par rang porte un tableau du pool.
- *  Chaque nœud mène au moins à sa propre voie au rang suivant, et à une
- *  voisine une fois sur deux environ : tout nœud a un successeur, tout nœud
- *  d'un rang suivant a un prédécesseur — aucune voie morte. */
+ *  Chaque nœud mène au moins à sa propre voie au rang suivant, et parfois
+ *  à une voisine : tout nœud a un successeur, tout nœud d'un rang suivant
+ *  a un prédécesseur — aucune voie morte.
+ *  LES VOIES DU BORD NE SONT PAS DES PIÈGES (le joueur, 13/11 : « si je
+ *  choisis la voie du haut au début je me retrouve avec une seule ligne
+ *  tout en haut et aucun moyen de descendre »). Le haut et le bas n'ont
+ *  qu'une voisine : leur unique branche vers le milieu se tire sur leurs
+ *  deux tirages (~56 % par transition, le milieu ~28 % de chaque côté), et
+ *  le module en garantit au moins une à chacun dès qu'il a deux salles et
+ *  que la bifurcation n'est pas à zéro. */
 export function tisseMiniCarte(
   niveaux: number,
   alea: () => number,
@@ -160,6 +167,10 @@ export function tisseMiniCarte(
   const favori = reglages.favori !== null && permises.includes(reglages.favori) ? reglages.favori : null
   const partFavori = Math.max(0, Math.min(1, reglages.partFavori))
   const rangs: NoeudVoie[][] = []
+  // le tirage de la branche intérieure des deux voies du bord, transition
+  // par transition : c'est lui qui désigne où la garantie la force
+  const tirsHaut: number[] = []
+  const tirsBas: number[] = []
   for (let r = 0; r < n; r++) {
     const mecaniques = [...mecaniquesDuChoix(null, alea, null, permises)]
     // LE BIOME PÈSE : chaque voie tire (TOUJOURS, pour que la graine reste
@@ -190,8 +201,8 @@ export function tisseMiniCarte(
     if (reglages.dernierRangSalles && r === n - 1) evs[0] = evs[1] = evs[2] = false
     const voiesSalle = [0, 1, 2].filter((v) => !evs[v])
     const voieEcrite = ecrites ? voiesSalle[Math.min(voiesSalle.length - 1, Math.floor(tEcrite * voiesSalle.length))] : -1
-    // la voie continue tout droit, et bifurque vers une voisine une fois
-    // sur deux environ — les tirages se font TOUJOURS, même au bord, dans
+    // la voie continue tout droit, et bifurque parfois vers une voisine —
+    // les tirages se font TOUJOURS, même au bord, dans
     // l'ordre d'avant (gauche puis droite, voie par voie ; aucun au dernier
     // rang), pour que la graine reste alignée quel que soit le tracé
     const tG: number[] = []
@@ -201,8 +212,25 @@ export function tisseMiniCarte(
         tG.push(alea())
         tD.push(alea())
       }
+    // LA VOIE DU BORD TIRE DE SES DEUX TIRAGES. Un nœud du milieu a deux
+    // sorties de côté (~35 % chacune, le X défait), un nœud du bord n'en a
+    // qu'une — et son autre tirage, celui qui pointait hors de la grille,
+    // ne servait à rien. Le haut ne descendait qu'une transition sur trois :
+    // 12 % des modules de six salles (28 % de quatre) n'offraient AUCUNE
+    // descente depuis le haut, et qui y entrait y restait (le joueur,
+    // 13/11 : « je me retrouve avec une seule ligne tout en haut et aucun
+    // moyen de descendre »). Sa seule branche prend désormais le plus bas
+    // de ses deux tirages : déjà tirés, la graine reste alignée.
+    const tirage = (v: number, cote: 'g' | 'd'): number =>
+      cote === 'g'
+        ? v === VOIES - 1 ? Math.min(tG[v], tD[v]) : tG[v]
+        : v === 0 ? Math.min(tG[v], tD[v]) : tD[v]
     const va = (v: number, cote: 'g' | 'd'): boolean =>
-      r < n - 1 && (cote === 'g' ? v > 0 && tG[v] < bif : v < VOIES - 1 && tD[v] < bif)
+      r < n - 1 && (cote === 'g' ? v > 0 && tirage(v, 'g') < bif : v < VOIES - 1 && tirage(v, 'd') < bif)
+    if (r < n - 1) {
+      tirsHaut.push(tirage(0, 'd'))
+      tirsBas.push(tirage(VOIES - 1, 'g'))
+    }
     // PAS DE CROISEMENT. Deux voisines qui bifurquent l'une vers l'autre
     // dessinent un X : à 45 % de bifurcation, il y en avait deux par module
     // de six salles, et la mini-carte se lisait comme un tressage où l'on
@@ -213,9 +241,10 @@ export function tisseMiniCarte(
     const coupe = { g: new Set<number>(), d: new Set<number>() }
     for (let v = 0; v < VOIES - 1; v++) {
       if (!va(v, 'd') || !va(v + 1, 'g')) continue
+      // le tirage du bord est celui qui décide sa branche : le même ici
       const seuil = bif * PART_CROISEMENT
-      if (tD[v] < seuil && tG[v + 1] < seuil) continue
-      if (tD[v] >= tG[v + 1]) coupe.d.add(v)
+      if (tirage(v, 'd') < seuil && tirage(v + 1, 'g') < seuil) continue
+      if (tirage(v, 'd') >= tirage(v + 1, 'g')) coupe.d.add(v)
       else coupe.g.add(v + 1)
     }
     const rang: NoeudVoie[] = []
@@ -253,6 +282,26 @@ export function tisseMiniCarte(
     }
     rangs.push(rang)
   }
+  // AUCUNE VOIE DU BORD SANS ISSUE. Même à deux tirages, un bord peut
+  // traverser tout un module sans branche vers le milieu — le X défait
+  // peut aussi la lui prendre (mesuré sur 5000 graines : 1,7 % des modules
+  // de six salles, 8,9 % de quatre, plus encore sur deux) : on y entre et
+  // on n'en sort plus. Le module lui en DOIT une — posée à la transition
+  // où son tirage était le plus bas, la moins arbitraire. Le X qu'elle
+  // dessinerait se défait du côté du milieu : il
+  // garde sa voie tout droit, donc ni nœud sans suite, ni nœud sans
+  // prédécesseur. À bifurcation zéro, le concepteur a demandé trois
+  // couloirs : rien n'est forcé. Aucun tirage : la graine reste alignée.
+  if (bif > 0 && n >= 2)
+    for (const [bord, interieur, tirs] of [
+      [0, 1, tirsHaut],
+      [VOIES - 1, VOIES - 2, tirsBas],
+    ] as const) {
+      if (rangs.slice(0, -1).some((rg) => rg[bord].suivants.includes(interieur))) continue
+      const rg = rangs[tirs.indexOf(Math.min(...tirs))]
+      rg[bord].suivants = [...rg[bord].suivants, interieur].sort((a, b) => a - b)
+      rg[interieur].suivants = rg[interieur].suivants.filter((s) => s !== bord)
+    }
   // LES HALTES SE POSENT APRÈS : sur des nœuds « salle » des rangs
   // éligibles, jamais deux sur le même nœud, et jamais au prix de la
   // dernière salle d'un rang — il reste toujours une voie qui se joue. Le
