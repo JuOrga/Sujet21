@@ -9473,6 +9473,18 @@
         .mb-porte.mb-elue { opacity: 0; }
         .mb-palier-eclair[hidden] { display: none; }
         .mb-station-carte.mb-station-refus { animation: none; }
+        /* LES RÈGLES QUE LE REPLI PAR CLASSE NE COUVRAIT PAS. Un @media
+           n'ajoute aucune spécificité : une règle plus précise qui redéfinit
+           son animation (la colonne visée qui rejouait son entrée) ou sa
+           transition (l'orbe déversée qui filait encore) l'emportait sur le
+           « none » d'une classe seule. Chaque sélecteur animé de la
+           cérémonie est neutralisé tel qu'il est écrit (ceremonie.spec.ts,
+           « règle par règle »). */
+        .mb-etal-xp i, .mb-ev-vue i, .mb-flux-g, .mb-flux-d,
+        .mb-dest.mb-dest-palier:hover:not(:disabled), .mb-dest.mb-dest-palier:focus-visible,
+        .mb-dest.mb-dest-palier.pad-focus { animation: none; }
+        .mb-etoiles i, .mb-pli .crt-draft, .mb-carte::before, .mb-versement[data-verse] .mb-goutte-corps,
+        .mb-flux, .mb-continuer, .mb-porte-entrer, .mv-halo, .mv-tuile, .mv-lien, .mv-noeud { transition: none; }
       }
       /* ---- Le panneau du GÉNÉRATEUR (⚄) : les réglages qui voyagent ---- */
       #edg-voile {

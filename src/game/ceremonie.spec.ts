@@ -270,17 +270,83 @@ describe('la cérémonie — le versement', () => {
     expect(x).toContain("mbEl('mb-releve').hidden = false")
     expect(x).toContain("mbEl('mb-titre').textContent = 'SALLE FRANCHIE'")
   })
-  it('donne leur repli « moins d’animations » aux cuves, aux anneaux et à l’orbe', () => {
-    const css = HTML.slice(HTML.indexOf('/* ==== LA CÉRÉMONIE DE FIN DE SALLE'), HTML.indexOf('/* ---- Le panneau du GÉNÉRATEUR'))
-    const moins = css.slice(css.lastIndexOf('prefers-reduced-motion: reduce'))
-    for (const s of ['.mb-dest', '.mb-anneau-franchit', '.mb-goutte-corps', '.mb-dest-palier']) expect(moins, s).toContain(s)
-  })
   it('n’écrit plus d’étiquette sous 10 px', () => {
     for (const s of ['.mb-goutte-corps i', '.mb-dest-plus.mb-dest-ouvre']) {
       const t = /font-size:\s*calc\((\d+(?:\.\d+)?)px/.exec(regle(s))
       expect(t, s).not.toBeNull()
       expect(Number(t![1]), s).toBeGreaterThanOrEqual(10)
     }
+  })
+})
+
+// « MOINS D'ANIMATIONS », RÈGLE PAR RÈGLE. Les gardes d'avant cherchaient
+// un nom de classe dans le dernier bloc de repli : elles passaient alors
+// que l'orbe déversée filait encore (sa règle, plus spécifique, redéfinissait
+// sa transition après le « transition: none » d'une classe seule) et que la
+// colonne visée rejouait son entrée à chaque survol. Un @media n'ajoute
+// aucune spécificité : un repli ne gagne que s'il vise le MÊME sélecteur,
+// plus loin dans la feuille. Cette garde relève chaque règle de la
+// cérémonie qui anime ou fait transiter quelque chose, et exige pour chacun
+// de ses sélecteurs ce repli-là — ou que la règle vive sous
+// « prefers-reduced-motion: no-preference ».
+interface RegleCSS { selecteurs: string[]; corps: string; medias: string[]; pos: number }
+function reglesCSS(source: string): RegleCSS[] {
+  const css = source.replace(/\/\*[\s\S]*?\*\//g, (m) => ' '.repeat(m.length))
+  const regles: RegleCSS[] = []
+  const pile: Array<{ prelude: string; pos: number }> = []
+  let debut = 0
+  for (let i = 0; i < css.length; i++) {
+    const c = css[i]
+    if (c === '{') {
+      pile.push({ prelude: css.slice(debut, i).trim(), pos: i })
+      debut = i + 1
+    } else if (c === '}') {
+      const b = pile.pop()
+      const medias = pile.map((p) => p.prelude)
+      // les images d'une @keyframes ne sont pas des règles
+      if (b && !b.prelude.startsWith('@') && !medias.some((m) => m.startsWith('@keyframes')))
+        regles.push({ selecteurs: b.prelude.split(',').map((x) => x.trim().replace(/\s+/g, ' ')), corps: css.slice(b.pos + 1, i), medias, pos: b.pos })
+      debut = i + 1
+    } else if (c === ';' && pile.length === 0) debut = i + 1
+  }
+  return regles
+}
+function trousDuRepli(source: string): string[] {
+  const regles = reglesCSS(source)
+  const reduit = (r: RegleCSS): boolean => r.medias.some((m) => m.includes('prefers-reduced-motion: reduce'))
+  const tolere = (r: RegleCSS): boolean => r.medias.some((m) => m.includes('prefers-reduced-motion: no-preference'))
+  const declare = (corps: string, prop: string): string | null => new RegExp(`(?:^|;|\\s)${prop}:\\s*([^;]+)`).exec(corps)?.[1].trim() ?? null
+  const trous: string[] = []
+  for (const r of regles) {
+    if (reduit(r) || tolere(r)) continue
+    for (const prop of ['animation', 'transition']) {
+      const v = declare(r.corps, prop)
+      if (v === null || /^none\b/.test(v)) continue
+      for (const s of r.selecteurs) {
+        const neutralise = regles.some((q) => reduit(q) && q.pos > r.pos && q.selecteurs.includes(s) && /^none\b/.test(declare(q.corps, prop) ?? ''))
+        if (!neutralise) trous.push(`${prop} — ${s}`)
+      }
+    }
+  }
+  return trous
+}
+describe('la cérémonie — « moins d’animations », règle par règle', () => {
+  it('voit le trou qu’un sélecteur plus spécifique creuse dans le repli', () => {
+    // le cas de l'orbe déversée : la classe seule est neutralisée, la règle
+    // plus spécifique ne l'est pas
+    const piege =
+      '.a { transition: opacity 1s; }\n.b .a { transition: transform 1s; }\n' +
+      '@media (prefers-reduced-motion: no-preference) { .c { animation: x 1s; } }\n' +
+      '@media (prefers-reduced-motion: reduce) { .a { transition: none; } }\n'
+    expect(trousDuRepli(piege)).toEqual(['transition — .b .a'])
+    // un repli écrit AVANT la règle perd à spécificité égale
+    expect(trousDuRepli('@media (prefers-reduced-motion: reduce) { .a { animation: none; } }\n.a { animation: x 1s; }')).toEqual(['animation — .a'])
+  })
+  it('neutralise chaque animation et chaque transition de la cérémonie', () => {
+    const css = HTML.slice(HTML.indexOf('/* ==== LA CÉRÉMONIE DE FIN DE SALLE'), HTML.indexOf('/* ---- Le panneau du GÉNÉRATEUR'))
+    const animees = reglesCSS(css).filter((r) => /(?:^|;|\s)(?:animation|transition):\s*(?!none)/.test(r.corps))
+    expect(animees.length).toBeGreaterThan(40) // la garde regarde bien quelque chose
+    expect(trousDuRepli(css)).toEqual([])
   })
 })
 
@@ -498,12 +564,6 @@ describe('la cérémonie — le bilan « SALLE FRANCHIE »', () => {
     expect(corps('mbSauteBilan')).toContain("sonCeremonie('levier'")
     // la sonde de la console n'a plus de raison d'être : la voix sert
     expect(MAIN).not.toContain('__sonCeremonie')
-  })
-  it('donne leur repli « moins d’animations » aux nouvelles mises en scène', () => {
-    const css = HTML.slice(HTML.indexOf('/* ==== LA CÉRÉMONIE DE FIN DE SALLE'), HTML.indexOf('/* ---- Le panneau du GÉNÉRATEUR'))
-    const moins = css.slice(css.lastIndexOf('prefers-reduced-motion: reduce'))
-    for (const s of ['.mb-cuve-liquide', '.mb-etoiles i.mb-on', '.mb-record', '.mb-ligne'])
-      expect(moins, s).toContain(s)
   })
   // les constats de la relecture du vocabulaire : un nom de rang trop long
   // descendait sous 10 px, et la poutre gardait 143 px de bande par côté
