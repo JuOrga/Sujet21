@@ -461,6 +461,7 @@ import { auteurAvis, avisDe, ligneAvis, ligneBilan, lisAvisEcoute, poseAvis, typ
 import { compteur, douce, gesteTropTot, motDeNote, rangDeSalle, TEMPS_BILAN, titreDuTirage } from './game/ceremonie'
 import { cartoucheHTML } from './game/cartouches'
 import { cuveHTML, sceauHTML } from './game/ceremonieObjets'
+import { anneauxHTML, colonneMaitrise, niveauColonne } from './game/colonneMaitrise'
 import { iconeCeremonieHTML } from './game/iconesStation'
 import {
   condensatDuSas,
@@ -15109,9 +15110,25 @@ function mbGesteTropTot(): boolean {
   return gesteTropTot(performance.now(), mbVersementOuvertA)
 }
 
+/** Le focus que le versement pose LUI-MÊME à l'ouverture (pour qu'Entrée,
+ *  Espace et A trouvent une cible) n'est pas une visée : son focusin
+ *  faisait pencher l'orbe vers la réserve, même pour un joueur à la souris
+ *  qui n'avait rien visé. Levé le temps de cet appel. */
+let mbFocusOuverture = false
+/** Le temps de voir le liquide monter et d'entendre l'orbe s'y déverser,
+ *  avant que la maîtrise ne prenne la scène (le liquide met 1,3 s à
+ *  monter : à 800 ms, il est presque arrivé). */
+const MB_DEVERSE_MS = 800
+
 /** LE VERSEMENT : le surplus choisit sa destination — la RÉSERVE (bonbonne,
- * reversable dans le corps en route) ou l'ÉTALONNAGE (l'XP des
- * instruments). Bonbonne pleine : l'XP est le seul chemin. */
+ * reversable dans le corps en route) ou la MAÎTRISE (l'XP des
+ * instruments). Bonbonne pleine : la maîtrise est le seul chemin.
+ * La scène : le bilan s'en va (il restait en grand au-dessus, et le bas
+ * des plaques tombait sous l'écran : 789 px de scène pour 717 visibles à
+ * 1280 × 720), la poutre pose la question ; deux cuves rendues de part et
+ * d'autre de l'orbe du surplus, chacune un seul chiffre — ce qu'elle
+ * contiendra. Viser une cuve fait pencher l'orbe et couler son flux vers
+ * elle ; la choisir l'y déverse, et son liquide monte. */
 function mbMontreVersement(): void {
   if (mbEtape !== 'bilan') return
   mbEtape = 'versement'
@@ -15119,31 +15136,27 @@ function mbMontreVersement(): void {
   mbFigeBilan()
   const b = mbBilanCourant
   if (!b) return
-  const bloc = mbEl('mb-choix')
-  bloc.hidden = false
-  const titre = mbEl('mb-choix-titre')
-  titre.textContent = 'OÙ VERSER LE SURPLUS ?'
-  titre.classList.add('mb-grande')
   const host = mbCartes()
   host.innerHTML = ''
+  // le bilan est lu : la poutre se replie et pose la question, une ligne
+  // rappelle la salle — rien d'autre au-dessus des cuves. La question
+  // garde le titre replié, comme celle des salles : grossie (mb-question),
+  // elle se cassait sur deux lignes dans la poutre
+  mbScene.classList.add('mb-compact')
+  mbEl('mb-releve').hidden = true
+  mbEl('mb-titre').textContent = 'OÙ VERSER LE SURPLUS ?'
+  mbEl('mb-choix').hidden = false
+  mbEl('mb-choix-titre').textContent = `SALLE FRANCHIE · ${level.code} · ${rangDeSalle(b.pct).nom}`
   const cap = capBonbonne()
   const espace = Math.max(0, cap - run.bonbonneLiters)
   const verse = Math.min(b.surplus, espace)
   const spill = b.surplus - verse
   const pleine = espace < 0.01
   const prochain = prochainPalier(run.xp)
-  const seg = mbSegmentXp(run.xp)
-  // table des paliers épuisée : la jauge est pleine et le reste (comme
-  // mbPeintEtal la peint) — rien ne s'ajoute à l'aperçu
-  const largeur = seg.cible === null ? 1 : seg.cible - seg.base
-  const acquis = seg.cible === null ? 1 : (run.xp - seg.base) / largeur
-  const gain = seg.cible === null ? 0 : Math.min(1, b.surplus / largeur)
   const franchit = prochain !== null && run.xp + b.surplus >= prochain
   const fmt = (l: number): string => l.toFixed(2).replace('.', ',')
+  const borne = (v: number): number => Math.max(0, Math.min(1, v))
 
-  // LA SCÈNE DU VERSEMENT : la goutte du surplus au centre, une plaque de
-  // chaque côté. Viser une plaque fait COULER le flux de la goutte vers
-  // elle et montre, en chiffres et en jauge, ce que le versement fera.
   const scene = document.createElement('div')
   scene.className = 'mb-versement'
   const goutte = document.createElement('div')
@@ -15153,29 +15166,78 @@ function mbMontreVersement(): void {
     `<span class="mb-flux mb-flux-d" aria-hidden="true"></span>` +
     `<span class="mb-goutte-corps"><b>${fmt(b.surplus)} L</b><i>SURPLUS</i></span>`
 
-  // la RÉSERVE : le bocal, son niveau d'avant et la part qui s'ajoute
-  const niveauAvant = run.bonbonneLiters / Math.max(0.01, cap)
-  const niveauApres = Math.min(1, (run.bonbonneLiters + verse) / Math.max(0.01, cap))
-  const cb = document.createElement('button')
-  cb.type = 'button'
-  cb.className = 'mb-carte mb-dest mb-dest-reserve' + (pleine ? ' mb-pauvre' : '')
-  cb.style.setProperty('--i', '0')
-  cb.disabled = pleine
-  cb.innerHTML =
-    `<span class="mb-dest-tete">` +
-    `<svg class="mb-bocal" viewBox="0 0 48 64" aria-hidden="true">` +
-    `<rect x="12" y="2" width="24" height="7" rx="2" class="mb-bocal-bouchon"/>` +
-    `<rect x="4" y="9" width="40" height="53" rx="9" class="mb-bocal-verre"/>` +
-    `<rect x="6" y="${(11 + 49 * (1 - niveauApres)).toFixed(1)}" width="36" height="${(49 * niveauApres).toFixed(1)}" rx="6" class="mb-bocal-gain"/>` +
-    `<rect x="6" y="${(11 + 49 * (1 - niveauAvant)).toFixed(1)}" width="36" height="${(49 * niveauAvant).toFixed(1)}" rx="6" class="mb-bocal-eau"/>` +
-    `</svg><b>RÉSERVE</b></span>` +
-    (pleine
-      ? `<span class="mb-dest-chiffres"><b>PLEINE</b><small>${cap} / ${cap} L</small></span>` +
-        `<small class="mb-dest-mot">tout le surplus ira à la maîtrise</small>`
-      : `<span class="mb-dest-chiffres"><i>${fmt(run.bonbonneLiters)}</i><em>→</em><b>${fmt(run.bonbonneLiters + verse)} L</b><small>/ ${cap} L</small></span>` +
-        `<span class="mb-dest-jauge" style="--a:${niveauAvant.toFixed(3)};--g:${(niveauApres - niveauAvant).toFixed(3)}"></span>` +
-        `<small class="mb-dest-mot">à reverser dans le corps, en pleine salle</small>` +
-        (spill > 0.01 ? `<em class="mb-dest-plus">+ ${fmt(spill)} L d’excédent vers la maîtrise</em>` : ''))
+  // UNE CUVE À CHOISIR : son nom, la cuve rendue (dos, liquide, verre), un
+  // chiffre. Le liquide se tient à son niveau d'avant ; un fantôme montre
+  // jusqu'où le versement le portera (--mb-avant → --mb-apres). Les
+  // phrases d'avant (à quoi sert la réserve, le palier suivant) passent
+  // dans l'infobulle.
+  const cuve = (
+    o: 'reserve' | 'maitrise',
+    html: string,
+    i: number,
+    niveau: number,
+    apres: number,
+    chiffre: string,
+    pied: string,
+    titre: string,
+  ): { btn: HTMLButtonElement; liquide: HTMLElement | null } => {
+    const btn = document.createElement('button')
+    btn.type = 'button'
+    btn.className = `mb-dest mb-coupe-diag mb-dest-${o}`
+    btn.style.setProperty('--i', String(i))
+    btn.title = titre
+    btn.innerHTML =
+      `<b class="mb-dest-nom">${o === 'reserve' ? 'RÉSERVE' : 'MAÎTRISE'}</b>` +
+      `<span class="mb-dest-cuve"></span>` +
+      `<b class="mb-dest-val">${chiffre}</b>` +
+      pied
+    const liquide = mbPoseCuve(btn.querySelector<HTMLElement>('.mb-dest-cuve')!, html)
+    liquide?.style.setProperty('--mb-niveau', niveau.toFixed(3))
+    liquide?.style.setProperty('--mb-avant', niveau.toFixed(3))
+    liquide?.style.setProperty('--mb-apres', apres.toFixed(3))
+    return { btn, liquide }
+  }
+
+  // la RÉSERVE : la bonbonne de route, et ce que le surplus y ajoute
+  const res = cuve(
+    'reserve',
+    cuveHTML('reserve', 'mb-v-res'),
+    0,
+    borne(run.bonbonneLiters / Math.max(0.01, cap)),
+    borne((run.bonbonneLiters + verse) / Math.max(0.01, cap)),
+    pleine ? 'PLEINE' : `${fmt(run.bonbonneLiters + verse)} L`,
+    !pleine && spill > 0.01 ? `<em class="mb-dest-plus">+${fmt(spill)} L → MAÎTRISE</em>` : '',
+    pleine
+      ? `Réserve pleine (${cap} / ${cap} L) — tout le surplus ira à la maîtrise`
+      : `Réserve : ${fmt(run.bonbonneLiters)} → ${fmt(run.bonbonneLiters + verse)} L sur ${cap} L — à reverser dans le corps, en pleine salle` +
+        (spill > 0.01 ? ` ; ${fmt(spill)} L d’excédent vers la maîtrise` : ''),
+  )
+  const cb = res.btn
+  if (pleine) {
+    // le bocal plein grisé : on le voit, on ne le choisit pas
+    cb.classList.add('mb-pauvre')
+    cb.disabled = true
+  }
+
+  // la MAÎTRISE : la colonne et ses anneaux — un siège par palier à venir ;
+  // celui que le surplus franchirait luit
+  const col = colonneMaitrise(run.xp)
+  const mai = cuve(
+    'maitrise',
+    cuveHTML('maitrise', 'mb-v-mai'),
+    1,
+    niveauColonne(col, run.xp),
+    niveauColonne(col, run.xp + b.surplus),
+    `${virgule(run.xp + b.surplus, 1)} L`,
+    franchit ? `<em class="mb-dest-plus mb-dest-ouvre">UN PALIER SE FRANCHIT — TIRAGE OUVERT</em>` : '',
+    `Maîtrise : ${virgule(run.xp, 1)} → ${virgule(run.xp + b.surplus, 1)} L` +
+      (prochain !== null ? `, palier à ${prochain} L` : ', table complète') +
+      ' — chaque palier ouvre un tirage d’instrument',
+  )
+  const cx = mai.btn
+  if (franchit) cx.classList.add('mb-dest-palier')
+  cx.querySelector('.mb-cuve')?.insertAdjacentHTML('beforeend', anneauxHTML(col, run.xp, run.xp + b.surplus))
+
   // le bandeau replié dira où le surplus est parti (il le disait « livré »,
   // sans dire qu'il était versé, ni où)
   const noteVersement = (texte: string): void => {
@@ -15183,59 +15245,68 @@ function mbMontreVersement(): void {
     v.textContent = texte
     v.hidden = false
   }
+  // LE DÉVERSEMENT : l'orbe part vers la cuve, son liquide monte, la voix
+  // s'écoule — puis la maîtrise prend la scène. Un seul choix : les gestes
+  // qui suivent (double clic, A martelé) ne choisissent plus rien.
+  let choisi = false
+  const deverse = (cote: 'g' | 'd', c: { btn: HTMLButtonElement; liquide: HTMLElement | null }, teintes: string[], suite: () => void): void => {
+    scene.dataset.verse = cote
+    scene.dataset.vers = cote
+    c.liquide?.style.setProperty('--mb-niveau', c.liquide.style.getPropertyValue('--mb-apres'))
+    sonCeremonie('deversement')
+    mbEclate(c.btn.querySelector('.mb-dest-cuve'), { n: 36, teintes, vitesse: 320, gravite: 700 })
+    mbTimers.push(
+      window.setTimeout(() => {
+        if (!miseEnBonbonne || mbEtape !== 'versement') return // cérémonie fermée
+        suite()
+      }, sansAnimation() ? 250 : MB_DEVERSE_MS),
+    )
+  }
   cb.addEventListener('click', () => {
-    if (mbGesteTropTot()) return
+    if (choisi || cb.disabled || mbGesteTropTot()) return
+    choisi = true
     run.bonbonneLiters = Math.min(cap, run.bonbonneLiters + verse)
     noteVersement(spill > 0.01 ? `→ réserve, ${fmt(spill)} L à la maîtrise` : '→ versé à la réserve')
-    bande.ponctuation('sting-collecte', 0.55)
-    mbEclate(cb, { n: 36, teintes: MB_EAU, vitesse: 320, gravite: 700 })
-    mbVerseXp(spill)
+    deverse('g', res, MB_EAU, () => mbVerseXp(spill))
   })
-
-  // la MAÎTRISE : l'anneau du palier, le chemin fait et celui qui s'ajoute
-  const C = (2 * Math.PI * 27).toFixed(2)
-  const cx = document.createElement('button')
-  cx.type = 'button'
-  cx.className = 'mb-carte mb-dest mb-dest-maitrise' + (franchit ? ' mb-dest-palier' : '')
-  cx.style.setProperty('--i', '1')
-  cx.innerHTML =
-    `<span class="mb-dest-tete">` +
-    `<svg class="mb-anneau" viewBox="0 0 64 64" aria-hidden="true">` +
-    `<circle cx="32" cy="32" r="27" class="mb-anneau-fond"/>` +
-    `<circle cx="32" cy="32" r="27" class="mb-anneau-gain" style="stroke-dasharray:${C};stroke-dashoffset:${(Number(C) * (1 - Math.min(1, acquis + gain))).toFixed(2)}"/>` +
-    `<circle cx="32" cy="32" r="27" class="mb-anneau-fait" style="stroke-dasharray:${C};stroke-dashoffset:${(Number(C) * (1 - acquis)).toFixed(2)}"/>` +
-    `<text x="32" y="37" class="mb-anneau-no">${paliersAtteints(run.xp)}</text>` +
-    `</svg><b>MAÎTRISE</b></span>` +
-    `<span class="mb-dest-chiffres"><i>${run.xp.toFixed(1).replace('.', ',')}</i><em>→</em><b>${(run.xp + b.surplus).toFixed(1).replace('.', ',')} L</b>` +
-    `<small>${prochain !== null ? `palier à ${prochain} L` : 'table complète'}</small></span>` +
-    `<span class="mb-dest-jauge" style="--a:${acquis.toFixed(3)};--g:${gain.toFixed(3)}"></span>` +
-    `<small class="mb-dest-mot">chaque palier ouvre un tirage d’instrument</small>` +
-    (franchit ? `<em class="mb-dest-plus mb-dest-ouvre">UN PALIER SE FRANCHIT — TIRAGE OUVERT</em>` : '')
   cx.addEventListener('click', () => {
-    if (mbGesteTropTot()) return
+    if (choisi || mbGesteTropTot()) return
+    choisi = true
     noteVersement('→ versé à la maîtrise')
-    bande.ponctuation('sting-collecte', 0.55)
-    mbEclate(cx, { n: 36, teintes: MB_MENTHE, vitesse: 320, gravite: 700 })
-    mbVerseXp(b.surplus)
+    deverse('d', mai, MB_MENTHE, () => mbVerseXp(b.surplus))
   })
 
-  // la visée fait couler le flux vers la plaque (souris, clavier, manette)
+  // LA VISÉE fait pencher l'orbe et couler son flux vers la cuve : le
+  // survol, la manette (pad-vise), la flèche ou la tabulation — pas le
+  // focus que la scène pose elle-même à l'ouverture
   const vise = (cote: 'g' | 'd' | ''): void => {
+    if (choisi) return // l'orbe déversée ne se redresse ni ne se retourne
     if (cote) scene.dataset.vers = cote
     else delete scene.dataset.vers
   }
   for (const [btn, cote] of [[cb, 'g'], [cx, 'd']] as const) {
-    for (const ev of ['pointerenter', 'focusin', 'pad-vise'] as const)
+    for (const ev of ['pointerenter', 'pad-vise'] as const)
       btn.addEventListener(ev, () => { if (!btn.disabled) vise(cote) })
+    btn.addEventListener('focusin', () => { if (!btn.disabled && !mbFocusOuverture) vise(cote) })
     for (const ev of ['pointerleave', 'focusout', 'pad-quitte'] as const)
       btn.addEventListener(ev, () => vise(''))
   }
+  // les FLÈCHES passent d'une cuve à l'autre (la manette a sa croix) ; la
+  // réserve pleine reste hors d'atteinte
+  scene.addEventListener('keydown', (e) => {
+    const vers = e.key === 'ArrowLeft' ? cb : e.key === 'ArrowRight' ? cx : null
+    if (!vers || vers.disabled) return
+    e.preventDefault()
+    vers.focus({ preventScroll: true })
+  })
   scene.append(cb, goutte, cx)
   host.appendChild(scene)
   // le levier du bilan, qui avait le focus, vient de disparaître : le focus
   // passe à la première cuve offerte — Entrée, Espace et la manette
   // trouvent une cible, sans que le geste qui a ouvert ne la presse
+  mbFocusOuverture = true
   scene.querySelector<HTMLButtonElement>('button:not(:disabled)')?.focus({ preventScroll: true })
+  mbFocusOuverture = false
 }
 
 // ---- LA JAUGE D'ÉTALONNAGE : l'XP se VOIT couler, palier par palier ----
@@ -15503,8 +15574,12 @@ function mbVerseXp(litres: number): void {
   run.primeSalle = null
   mbEtape = 'etalonnage'
   // le bilan est lu : il se replie en bandeau, la jauge prend la scène —
-  // et le tirage qui suit tient dans l'écran du Deck sans ascenseur
+  // et le tirage qui suit tient dans l'écran du Deck sans ascenseur. Le
+  // versement l'avait caché et avait posé sa question dans la poutre : le
+  // bandeau revient rappeler la salle (et où le surplus est parti)
   mbScene.classList.add('mb-compact')
+  mbEl('mb-releve').hidden = false
+  mbEl('mb-titre').textContent = 'SALLE FRANCHIE'
   // les cartes du versement s'effacent : la jauge prend la scène
   mbEl('mb-choix-titre').textContent =
     litres > 0.005 ? 'LA MAÎTRISE MONTE' : 'MAÎTRISE'

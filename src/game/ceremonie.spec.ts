@@ -210,6 +210,80 @@ describe('la cérémonie — la coque et ses poignées', () => {
   })
 })
 
+// LE VERSEMENT « OÙ VERSER LE SURPLUS ? » (étape 2). Il se posait SOUS le
+// bilan resté en grand : deux plaques à bocal et anneau SVG, des chiffres
+// « avant → après », une jauge de 8 px — 789 px de scène pour 717 visibles
+// à 1280 × 720, le bas des plaques coupé (inventaire). Le bilan s'en va ;
+// restent deux cuves rendues et l'orbe du surplus qu'on y verse.
+describe('la cérémonie — le versement', () => {
+  it('le versement ne garde pas le bilan au-dessus de lui', () => {
+    expect(corps('mbMontreVersement')).toMatch(/mbEl\('mb-releve'\)\.hidden = true|mbScene\.classList\.add\('mb-compact'\)/)
+  })
+  it('pose deux cuves rendues, la colonne cerclée de ses anneaux', () => {
+    const v = corps('mbMontreVersement')
+    expect(v).toContain("cuveHTML('reserve', 'mb-v-res')")
+    expect(v).toContain("cuveHTML('maitrise', 'mb-v-mai')")
+    expect(v).toContain('mbPoseCuve(') // jamais une image cassée
+    expect(v).toContain('anneauxHTML(')
+    expect(v).toContain('colonneMaitrise(')
+  })
+  it('dit un chiffre par cuve : plus de jauge de 8 px, plus de bocal ni d’anneau dessinés', () => {
+    const v = corps('mbMontreVersement')
+    expect(v).not.toContain('mb-dest-jauge')
+    expect(v).not.toContain('<em>→</em>')
+    expect(v).not.toContain('mb-bocal')
+    expect(HTML).not.toContain('.mb-dest-jauge')
+    expect(HTML).not.toContain('.mb-bocal')
+  })
+  it('déverse l’orbe dans la cuve choisie, à sa voix', () => {
+    const v = corps('mbMontreVersement')
+    expect(v).toContain("sonCeremonie('deversement'")
+    expect(v).not.toContain('sting-collecte') // les stings restent au rang, au record, au palier
+    expect(v).toMatch(/--mb-niveau/) // le liquide de la cible monte
+    // un seul choix, même sous les gestes en rafale pendant le déversement ;
+    // la suite n'arrive que si la cérémonie en est encore là
+    expect(v.match(/if \(choisi \|\|/g) ?? []).toHaveLength(2)
+    expect(v).toMatch(/if \(!miseEnBonbonne \|\| mbEtape !== 'versement'\) return/)
+  })
+  it('garde la visée, la manette, le bocal plein grisé et le tampon du palier', () => {
+    const v = corps('mbMontreVersement')
+    for (const ev of ['pointerenter', 'pad-vise', 'focusin', 'pad-quitte']) expect(v, ev).toContain(`'${ev}'`)
+    expect(v).toContain('mb-pauvre')
+    expect(v).toContain('UN PALIER SE FRANCHIT')
+  })
+  // le focus posé d'office sur la réserve (pour qu'Entrée, Espace et A
+  // trouvent une cible) déclenchait son focusin : l'orbe penchait vers la
+  // réserve à l'ouverture, même pour un joueur à la souris qui n'avait rien
+  // visé. Une vraie visée : le survol, la manette, la flèche, la tabulation.
+  it('ne penche pas vers la cuve que le focus d’ouverture désigne', () => {
+    const v = corps('mbMontreVersement')
+    expect(v).toMatch(/mbFocusOuverture = true;?\s*\n\s*[^\n]*\.focus\(\{ preventScroll: true \}\);?\s*\n\s*mbFocusOuverture = false/)
+    expect(v).toMatch(/'focusin'[^\n]*\n?[^\n]*mbFocusOuverture/)
+  })
+  it('se vise aux flèches du clavier, comme à la croix de la manette', () => {
+    const v = corps('mbMontreVersement')
+    expect(v).toContain("'ArrowLeft'")
+    expect(v).toContain("'ArrowRight'")
+  })
+  it('rend la bannière et le bandeau au palier qui suit', () => {
+    const x = corps('mbVerseXp')
+    expect(x).toContain("mbEl('mb-releve').hidden = false")
+    expect(x).toContain("mbEl('mb-titre').textContent = 'SALLE FRANCHIE'")
+  })
+  it('donne leur repli « moins d’animations » aux cuves, aux anneaux et à l’orbe', () => {
+    const css = HTML.slice(HTML.indexOf('/* ==== LA CÉRÉMONIE DE FIN DE SALLE'), HTML.indexOf('/* ---- Le panneau du GÉNÉRATEUR'))
+    const moins = css.slice(css.lastIndexOf('prefers-reduced-motion: reduce'))
+    for (const s of ['.mb-dest', '.mb-anneau-franchit', '.mb-goutte-corps', '.mb-dest-palier']) expect(moins, s).toContain(s)
+  })
+  it('n’écrit plus d’étiquette sous 10 px', () => {
+    for (const s of ['.mb-goutte-corps i', '.mb-dest-plus.mb-dest-ouvre']) {
+      const t = /font-size:\s*calc\((\d+(?:\.\d+)?)px/.exec(regle(s))
+      expect(t, s).not.toBeNull()
+      expect(Number(t![1]), s).toBeGreaterThanOrEqual(10)
+    }
+  })
+})
+
 // LES CONSTATS DE LA RELECTURE DU BILAN (F2) : trois règles que la cascade
 // rendait muettes — une taille du Steam Deck qui écrasait celle des
 // téléphones couchés, une bande de poutre trop large sur écran étroit, deux

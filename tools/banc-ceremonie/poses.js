@@ -206,54 +206,61 @@
     scene.appendChild(n)
   }
 
-  // ---- LE VERSEMENT (main.ts:15065) ----
+  // ---- LE VERSEMENT (main.ts:15132 mbMontreVersement) ----
+  // le bilan s'en va, la poutre pose la question ; deux cuves rendues de
+  // part et d'autre de l'orbe, un chiffre chacune, les anneaux sur la colonne
   function versement() {
     bilan('final')
-    $('mb-passer').hidden = true
-    $('mb-choix').hidden = false
-    const titre = $('mb-choix-titre')
-    titre.textContent = 'OÙ VERSER LE SURPLUS ?'
+    $('mb-passer').hidden = true // mbFigeBilan
     const host = cartes()
-    titre.classList.add('mb-grande')
+    host.innerHTML = ''
+    scene.classList.add('mb-compact')
+    $('mb-releve').hidden = true
+    $('mb-titre').textContent = 'OÙ VERSER LE SURPLUS ?'
+    $('mb-choix').hidden = false
+    $('mb-choix-titre').textContent = `SALLE FRANCHIE · ${RUN.code} · ${F.rangDeSalle(RUN.pct).nom}`
     const b = RUN, cap = RUN.cap
     const espace = Math.max(0, cap - b.bonbonne), verse = Math.min(b.surplus, espace), spill = b.surplus - verse
     const pleine = espace < 0.01
-    const seg = segment(b.xp), prochain = seg.cible
-    const largeur = seg.cible === null ? 1 : seg.cible - seg.base
-    const acquis = seg.cible === null ? 1 : (b.xp - seg.base) / largeur
-    const gain = seg.cible === null ? 0 : Math.min(1, b.surplus / largeur)
+    const prochain = segment(b.xp).cible
     const franchit = prochain !== null && b.xp + b.surplus >= prochain
     const fmt = (l) => l.toFixed(2).replace('.', ',')
+    const borne = (v) => Math.max(0, Math.min(1, v))
     const sc = document.createElement('div'); sc.className = 'mb-versement'
     const goutte = document.createElement('div'); goutte.className = 'mb-goutte'
-    goutte.innerHTML = `<span class="mb-flux mb-flux-g" aria-hidden="true"></span><span class="mb-flux mb-flux-d" aria-hidden="true"></span><span class="mb-goutte-corps"><b>${fmt(b.surplus)} L</b><i>SURPLUS</i></span>`
-    const nAv = b.bonbonne / cap, nAp = Math.min(1, (b.bonbonne + verse) / cap)
-    const cb = document.createElement('button'); cb.type = 'button'
-    cb.className = 'mb-carte mb-dest mb-dest-reserve' + (pleine ? ' mb-pauvre' : ''); cb.style.setProperty('--i', '0')
-    cb.innerHTML = `<span class="mb-dest-tete"><svg class="mb-bocal" viewBox="0 0 48 64" aria-hidden="true">` +
-      `<rect x="12" y="2" width="24" height="7" rx="2" class="mb-bocal-bouchon"/>` +
-      `<rect x="4" y="9" width="40" height="53" rx="9" class="mb-bocal-verre"/>` +
-      `<rect x="6" y="${(11 + 49 * (1 - nAp)).toFixed(1)}" width="36" height="${(49 * nAp).toFixed(1)}" rx="6" class="mb-bocal-gain"/>` +
-      `<rect x="6" y="${(11 + 49 * (1 - nAv)).toFixed(1)}" width="36" height="${(49 * nAv).toFixed(1)}" rx="6" class="mb-bocal-eau"/>` +
-      `</svg><b>RÉSERVE</b></span>` +
-      `<span class="mb-dest-chiffres"><i>${fmt(b.bonbonne)}</i><em>→</em><b>${fmt(b.bonbonne + verse)} L</b><small>/ ${cap} L</small></span>` +
-      `<span class="mb-dest-jauge" style="--a:${nAv.toFixed(3)};--g:${(nAp - nAv).toFixed(3)}"></span>` +
-      `<small class="mb-dest-mot">à reverser dans le corps, en pleine salle</small>` +
-      (spill > 0.01 ? `<em class="mb-dest-plus">+ ${fmt(spill)} L d’excédent vers la maîtrise</em>` : '')
-    const C = (2 * Math.PI * 27).toFixed(2)
-    const cx = document.createElement('button'); cx.type = 'button'
-    cx.className = 'mb-carte mb-dest mb-dest-maitrise' + (franchit ? ' mb-dest-palier' : ''); cx.style.setProperty('--i', '1')
-    cx.innerHTML = `<span class="mb-dest-tete"><svg class="mb-anneau" viewBox="0 0 64 64" aria-hidden="true">` +
-      `<circle cx="32" cy="32" r="27" class="mb-anneau-fond"/>` +
-      `<circle cx="32" cy="32" r="27" class="mb-anneau-gain" style="stroke-dasharray:${C};stroke-dashoffset:${(Number(C) * (1 - Math.min(1, acquis + gain))).toFixed(2)}"/>` +
-      `<circle cx="32" cy="32" r="27" class="mb-anneau-fait" style="stroke-dasharray:${C};stroke-dashoffset:${(Number(C) * (1 - acquis)).toFixed(2)}"/>` +
-      `<text x="32" y="37" class="mb-anneau-no">${paliers(b.xp)}</text></svg><b>MAÎTRISE</b></span>` +
-      `<span class="mb-dest-chiffres"><i>${virgule(b.xp, 1)}</i><em>→</em><b>${virgule(b.xp + b.surplus, 1)} L</b>` +
-      `<small>${prochain !== null ? `palier à ${prochain} L` : 'table complète'}</small></span>` +
-      `<span class="mb-dest-jauge" style="--a:${acquis.toFixed(3)};--g:${gain.toFixed(3)}"></span>` +
-      `<small class="mb-dest-mot">chaque palier ouvre un tirage d’instrument</small>` +
-      (franchit ? `<em class="mb-dest-plus mb-dest-ouvre">UN PALIER SE FRANCHIT — TIRAGE OUVERT</em>` : '')
-    sc.append(cb, goutte, cx)
+    goutte.innerHTML = `<span class="mb-flux mb-flux-g" aria-hidden="true"></span>` +
+      `<span class="mb-flux mb-flux-d" aria-hidden="true"></span>` +
+      `<span class="mb-goutte-corps"><b>${fmt(b.surplus)} L</b><i>SURPLUS</i></span>`
+    const cuve = (o, html, i, niveau, apres, chiffre, pied, titre) => {
+      const btn = document.createElement('button')
+      btn.type = 'button'
+      btn.className = `mb-dest mb-coupe-diag mb-dest-${o}`
+      btn.style.setProperty('--i', String(i))
+      btn.title = titre
+      btn.innerHTML = `<b class="mb-dest-nom">${o === 'reserve' ? 'RÉSERVE' : 'MAÎTRISE'}</b>` +
+        `<span class="mb-dest-cuve"></span>` +
+        `<b class="mb-dest-val">${chiffre}</b>` + pied
+      const liquide = poseCuve(btn.querySelector('.mb-dest-cuve'), html)
+      liquide.style.setProperty('--mb-niveau', niveau.toFixed(3))
+      liquide.style.setProperty('--mb-avant', niveau.toFixed(3))
+      liquide.style.setProperty('--mb-apres', apres.toFixed(3))
+      return { btn, liquide }
+    }
+    const res = cuve('reserve', F.cuveHTML('reserve', 'mb-v-res'), 0,
+      borne(b.bonbonne / Math.max(0.01, cap)), borne((b.bonbonne + verse) / Math.max(0.01, cap)),
+      pleine ? 'PLEINE' : `${fmt(b.bonbonne + verse)} L`,
+      !pleine && spill > 0.01 ? `<em class="mb-dest-plus">+${fmt(spill)} L → MAÎTRISE</em>` : '',
+      `Réserve : ${fmt(b.bonbonne)} → ${fmt(b.bonbonne + verse)} L sur ${cap} L — à reverser dans le corps, en pleine salle`)
+    if (pleine) { res.btn.classList.add('mb-pauvre'); res.btn.disabled = true }
+    const col = F.colonneMaitrise(b.xp)
+    const mai = cuve('maitrise', F.cuveHTML('maitrise', 'mb-v-mai'), 1,
+      F.niveauColonne(col, b.xp), F.niveauColonne(col, b.xp + b.surplus),
+      `${virgule(b.xp + b.surplus, 1)} L`,
+      franchit ? `<em class="mb-dest-plus mb-dest-ouvre">UN PALIER SE FRANCHIT — TIRAGE OUVERT</em>` : '',
+      `Maîtrise : ${virgule(b.xp, 1)} → ${virgule(b.xp + b.surplus, 1)} L, palier à ${prochain} L — chaque palier ouvre un tirage d’instrument`)
+    if (franchit) mai.btn.classList.add('mb-dest-palier')
+    mai.btn.querySelector('.mb-cuve').insertAdjacentHTML('beforeend', F.anneauxHTML(col, b.xp, b.xp + b.surplus))
+    sc.append(res.btn, goutte, mai.btn)
     host.appendChild(sc)
   }
 
