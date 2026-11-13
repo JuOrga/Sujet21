@@ -19194,8 +19194,8 @@ function majDossier(): void {
   const butin = enRun
     ? '<section class="do-sec do-butin">' +
       `<span title="Bonbonne : ${run.bonbonneLiters.toFixed(2).replace('.', ',')} L sur ${capBonbonne()}">🫙<b>${run.bonbonneLiters.toFixed(1).replace('.', ',')} L</b></span>` +
-      `<span title="Condensat">${iconeMetaHTML('condensat', '💠')}<b>${condensat} cL</b></span>` +
-      `<span class="vert" title="Mémoire gagnée pendant la descente">${iconeMetaHTML('memoire', '🧠')}<b>+${run.memoireGagnee}</b></span>` +
+      `<span title="Condensat">${iconeCeremonieHTML('condensat')}<b>${condensat} cL</b></span>` +
+      `<span class="vert" title="Mémoire gagnée pendant la descente">${iconeCeremonieHTML('memoire')}<b>+${run.memoireGagnee}</b></span>` +
       '</section>'
     : ''
 
@@ -19208,9 +19208,11 @@ function majDossier(): void {
     .fiolesEquipees()
     .map((f) => fioleDef(f))
     .filter((d): d is NonNullable<typeof d> => d !== null)
+  // l'icône est déjà du HTML : la case rendue d'un instrument (ou l'émoji
+  // d'une carte perso), le glyphe d'une fiole, qui n'a pas de dessin rendu
   const objets = [
-    ...instrs.map((d) => ({ icone: d.icone, nom: d.nom, desc: d.desc })),
-    ...fioles.map((d) => ({ icone: '⚗', nom: d.nom, desc: d.desc })),
+    ...instrs.map((d) => ({ ico: iconeInstrumentHTML(d), nom: d.nom, desc: d.desc })),
+    ...fioles.map((d) => ({ ico: '<i>⚗</i>', nom: d.nom, desc: d.desc })),
   ]
   const equip =
     objets.length === 0
@@ -19219,7 +19221,7 @@ function majDossier(): void {
         objets
           .map(
             (o) =>
-              `<span title="${o.desc.replace(/"/g, '&quot;')}"><i>${o.icone}</i>${o.nom}</span>`,
+              `<span title="${o.desc.replace(/"/g, '&quot;')}">${o.ico}${o.nom}</span>`,
           )
           .join('') +
         '</section>'

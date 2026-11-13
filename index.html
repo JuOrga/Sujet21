@@ -889,12 +889,18 @@
       .do-butin > span { display: inline-flex; align-items: center; gap: 6px; font-size: calc(13px * var(--ui)); }
       .do-butin b { font-weight: normal; color: #f2c98e; }
       .do-butin .vert b { color: #6dffb8; }
+      /* le condensat et la mémoire (planche de la cérémonie) gardent la taille
+         de la pastille du méta qu'ils remplacent */
+      .do-butin .ico-ceremonie { width: 1.35em; height: 1.35em; }
       .do-equip > span {
         display: inline-flex; align-items: center; gap: 7px; cursor: help;
         font-family: var(--font-display); font-size: calc(9px * var(--ui));
         letter-spacing: 0.12em; color: var(--ink);
       }
       .do-equip > span i { font-style: normal; font-size: calc(14px * var(--ui)); line-height: 1; }
+      /* la case rendue d'un instrument est un dessin d'acier, sombre : à la
+         taille de l'ancien émoji (14 px), elle ne se lisait plus */
+      .do-equip .ico-instrument { width: 1.3em; height: 1.3em; }
       /* au doigt et sur petit écran, le carnet prend toute la largeur */
       @media (max-width: 760px) {
         #dossier { width: 100%; }
