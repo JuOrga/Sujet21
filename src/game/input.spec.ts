@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { Input } from './input'
+import { cibleHorsJeu, Input } from './input'
 
 // La DEMANDE de transformation (bouton, clavier, manette) passe par le
 // garde du cycle ; les toggles restent la voie du décor, sans garde.
@@ -52,3 +52,36 @@ describe('Input — le garde du cycle des états', () => {
     expect(i.etatManuel()).toBe('eau')
   })
 })
+
+// LES TOUCHES D'UN ÉCRAN NE SONT PAS AU JEU. Espace est la PAUSE : sur une
+// touche visant un bouton de la cérémonie (#mb-veil), input.ts annulait la
+// touche (preventDefault) — le bouton ne s'actionnait pas et la salle de
+// derrière se mettait en pause. Le voile coupait alors la remontée
+// (stopPropagation), ce qui masquait aussi la touche au réveil du son et à
+// l'aide clavier du dossier. C'est input.ts qui laisse la touche à l'écran,
+// comme il le fait déjà pour un champ de texte.
+describe('Input — les touches qui ne sont pas au jeu', () => {
+  // un élément du DOM, réduit à ce que la règle lit
+  const el = (tagName: string, dans: string[] = []): { tagName: string; closest: (s: string) => unknown } => ({
+    tagName,
+    closest: (s: string) => (dans.includes(s) ? {} : null),
+  })
+  it('laisse la touche à un champ de texte', () => {
+    expect(cibleHorsJeu(el('INPUT'))).toBe(true)
+    expect(cibleHorsJeu(el('TEXTAREA'))).toBe(true)
+  })
+  it('laisse Espace et Entrée aux boutons de la cérémonie', () => {
+    expect(cibleHorsJeu(el('BUTTON', ['#mb-veil']))).toBe(true)
+    expect(cibleHorsJeu(el('DIV', ['#mb-veil']))).toBe(true)
+  })
+  it('garde la touche au jeu hors de la cérémonie : la pause reste intacte', () => {
+    expect(cibleHorsJeu(el('BODY'))).toBe(false)
+    expect(cibleHorsJeu(el('BUTTON'))).toBe(false)
+    expect(cibleHorsJeu(null)).toBe(false)
+    expect(cibleHorsJeu(cibleSansClosest())).toBe(false)
+  })
+})
+// la cible d'une touche peut être la fenêtre elle-même, sans closest()
+function cibleSansClosest(): { tagName?: string } {
+  return {}
+}

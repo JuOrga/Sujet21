@@ -325,14 +325,20 @@ describe('la cérémonie — le bilan « SALLE FRANCHIE »', () => {
   })
   // ESPACE ÉTAIT AU JEU : la table des commandes en fait la PAUSE, et
   // input.ts l'annule (preventDefault) sur window — un bouton ne s'actionne
-  // pas sur une touche annulée. La cérémonie garde ses touches pour elle,
-  // et une touche TENUE (répétition) n'actionne pas la cible suivante.
-  it('garde Entrée et Espace pour ses boutons, et ignore une touche tenue', () => {
+  // pas sur une touche annulée. C'est input.ts qui laisse les touches du
+  // voile à la cérémonie (cibleHorsJeu, input.spec.ts) ; le voile ne coupe
+  // plus leur remontée, qui les cachait au réveil du son (eveilAudio) et à
+  // l'aide clavier du dossier. Une touche TENUE (répétition) n'actionne
+  // toujours pas la cible suivante.
+  it('laisse Entrée et Espace à ses boutons sans les cacher au reste, et ignore une touche tenue', () => {
     const touches = MAIN.slice(MAIN.indexOf("mbVeil?.addEventListener('keydown'"))
     expect(touches.length).toBeLessThan(MAIN.length)
     const h = touches.slice(0, touches.indexOf('\n})\n'))
-    expect(h).toContain('stopPropagation()')
+    expect(h).not.toContain('stopPropagation()')
     expect(h).toMatch(/e\.repeat\)? e\.preventDefault\(\)/)
+    const INPUT = readFileSync(new URL('./input.ts', import.meta.url), 'utf-8')
+    const clavier = INPUT.slice(INPUT.indexOf("window.addEventListener('keydown'"))
+    expect(clavier.slice(0, 400)).toContain('if (cibleHorsJeu(e.target')
   })
   // le second geste d'une rafale (double clic, A martelé) tombait sur la
   // première cuve, que le versement venait de poser sous le doigt

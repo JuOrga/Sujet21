@@ -17393,16 +17393,17 @@ mbVeil?.addEventListener('pointerdown', (e) => {
   if ((e.target as HTMLElement).closest('button') === null) mbSauteBilan()
 })
 // LES TOUCHES DE LA CÉRÉMONIE SONT À ELLE. Espace était au jeu : la table
-// des commandes en fait la PAUSE, et input.ts l'annule sur window
-// (preventDefault) — or un bouton ne s'actionne pas sur une touche annulée :
-// Espace ne pressait ni le levier ni aucun choix, et mettait la salle de
-// derrière en pause. Une touche qui vise un bouton du voile ne remonte donc
-// plus au jeu. Et une touche TENUE (répétition) n'actionne rien : Entrée
-// gardée enfoncée sur le levier presserait sinon la cuve qui prend le focus.
+// des commandes en fait la PAUSE, et input.ts l'annulait sur window
+// (preventDefault) — or un bouton ne s'actionne pas sur une touche annulée.
+// input.ts laisse désormais toute touche visant le voile à la cérémonie
+// (cibleHorsJeu) ; elle remonte quand même, et le réveil du son comme
+// l'aide clavier du dossier la voient (couper sa remontée, comme on le
+// faisait ici, les rendait aveugles). Reste une règle à la cérémonie : une
+// touche TENUE (répétition) n'actionne rien — Entrée gardée enfoncée sur le
+// levier presserait sinon la cuve qui prend le focus.
 mbVeil?.addEventListener('keydown', (e) => {
   if (e.key !== 'Enter' && e.key !== ' ') return
   if ((e.target as HTMLElement).closest('button') === null) return
-  e.stopPropagation()
   if (e.repeat) e.preventDefault()
 })
 // le canvas du feu suit la fenêtre : un écran tourné en pleine cérémonie

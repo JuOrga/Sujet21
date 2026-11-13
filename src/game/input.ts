@@ -13,6 +13,22 @@ import { actionDeTouche, sourisInverse } from './commandes'
 
 export const TIME_WARP_STEPS = [0.25, 0.5, 1, 2, 4]
 
+/** UNE TOUCHE QUI N'EST PAS AU JEU : celle d'un champ de texte (présets du
+ *  banc), ou celle qui vise la cérémonie de fin de salle (#mb-veil). Espace y
+ *  presse le bouton visé ; le jeu, lui, en faisait la PAUSE et l'annulait
+ *  (preventDefault) — le bouton ne s'actionnait pas, la salle de derrière se
+ *  figeait. Le voile coupait alors la remontée de la touche, et le réveil du
+ *  son et l'aide clavier du dossier ne la voyaient plus : c'est ici qu'on la
+ *  laisse à l'écran, sans la cacher au reste. La cible peut être la fenêtre
+ *  elle-même (sans closest). */
+export function cibleHorsJeu(
+  t: { tagName?: string; closest?: (selecteur: string) => unknown } | null,
+): boolean {
+  if (!t) return false
+  if (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA') return true
+  return typeof t.closest === 'function' && t.closest('#mb-veil') !== null
+}
+
 /** Les trois états qu'une COMMANDE peut viser (le plasma n'a pas de bouton). */
 export type EtatManuel = 'eau' | 'glace' | 'vapeur'
 
@@ -309,10 +325,10 @@ export class Input {
     )
 
     window.addEventListener('keydown', (e) => {
-      // Ne pas voler les touches des champs de texte (présets du banc),
-      // ni agir quand la partie n'est pas au premier plan (fiche ouverte)
-      const t = e.target as HTMLElement | null
-      if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA')) return
+      // Ne pas voler les touches des champs de texte ni de la cérémonie
+      // (cibleHorsJeu), ni agir quand la partie n'est pas au premier plan
+      // (fiche ouverte)
+      if (cibleHorsJeu(e.target as HTMLElement | null)) return
       if (!enJeu()) return
       // commandes gelées (prise en main à l'écran) : aucune touche de jeu
       // ne passe — le voile bloque les pointeurs, ceci bloque le clavier
