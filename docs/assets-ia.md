@@ -2549,31 +2549,52 @@ se termine (`SCENES_FIN`, `src/game/ceremonieObjets.ts`). Atelier :
 générée : les étoiles (un Voronoï sur le ciel, vu seulement par la caméra),
 la planète et son anneau sont procéduraux, le reste est modélisé.
 
-- **La descente bouclée** (`fin-capsule`). La bonbonne de la cérémonie
-  (`cuve_bonbonne`, B3 : même objet, même acier), la jauge PLEINE, montée en
-  capsule : un berceau de deux cerclages et quatre rails, un sceau octogonal
-  cerclé de cyan sur le robinet, quatre tuyères, deux veilleuses ambre. Elle
-  part en haut à gauche ; sa poussée, froide, s'efface vers la station. La
-  station suit le canon (§26), de gauche à droite : le croissant de coque et
-  le module Méduse, trois modules octogonaux empilés, le nœud et ses petits
-  modules, l'observatoire à dôme et son télescope, le mât aux quatre
-  panneaux et sa parabole. Derrière, la géante gazeuse froide du canon, à
-  bandes, ceinte d'un anneau fin, éclairée EN CROISSANT en haut à gauche : son
-  jour est calculé dans le shader (éclairée par le soleil de la scène, qui
-  vient de face pour sculpter la capsule, elle sortait pleine lune).
+- **La descente bouclée** (`fin-capsule`), en trois plans. Au PREMIER, dans
+  le tiers gauche, le héros : la bonbonne de la cérémonie (`cuve_bonbonne`,
+  B3 : même objet, même acier), la jauge PLEINE, montée en capsule — un
+  berceau de deux cerclages et quatre rails, un sceau octogonal cerclé d'un
+  cyan qui luit, quatre tuyères, deux veilleuses ambre ; elle part en haut à
+  gauche, sa poussée froide file vers la station, un léger flou de mouvement
+  dit qu'elle bouge. Au SECOND, loin, en entier : la station du canon (§26),
+  de gauche à droite — le croissant de coque et le module Méduse, trois
+  modules octogonaux empilés, le nœud et ses petits modules, l'observatoire
+  à dôme, ses radiateurs et son télescope, le mât aux quatre panneaux et sa
+  parabole —, cerclée, ses hublots froids et quelques veilleuses ambre
+  allumés, inclinée pour montrer ses dessus au soleil. Au FOND : la géante
+  gazeuse froide du canon, à bandes, ceinte d'un anneau qui a de la matière
+  (sillons, une division) et porte son ombre, la station devant sa nuit.
+- **Une seule lumière**, `SOLEIL`, hors champ, en haut à gauche et DERRIÈRE
+  la scène : calculé pour un angle de phase d'environ 127° vu de la caméra,
+  il dessine le croissant de la planète (un cinquième du disque, ses bandes
+  lisibles dans le jour, un limbe doux côté jour seulement) et pose le
+  contre-jour sur les arêtes de la capsule et de la station. Un reflet
+  froid et faible, de face, lit leurs faces — il est EXCLU de la planète
+  (light linking) : il la remplissait en entier.
 - **L'échantillon perdu** (`fin-fiole-brisee`). Une fiole couchée sur le
   caillebotis, son bord cassé en dents, un fond de fluide au creux du verre ;
-  le col et son bouchon plus loin ; des éclats ; une flaque qui ne garde
-  qu'un souffle de sarcelle. Une seule lumière froide d'en haut, un liseré
-  bleu derrière. Pas d'or.
+  le col et son bouchon plus loin ; des éclats ; une flaque sombre et
+  miroitante dont la lueur sarcelle s'éteint de son cœur vers ses bords. Une
+  seule lumière froide d'en haut, un liseré bleu derrière. Pas d'or.
 
 **Le bas du cadre reste sombre** : le relevé de la descente s'y pose. La
 mesure (`python -I tools/images/blender/fins.py <images>`) donne la
 luminance de l'image et celle du TIERS BAS (30 %), et échoue au-delà de
 0,06. Ce qu'elle a changé : la poussée de la capsule, d'abord un trapèze
 opaque qui descendait dans cette bande, est devenue une lueur additive,
-fondue vers son bout et vers son bord ; le contre-jour de la fiole, qui se
-mirait sur le caillebotis jusqu'au bas du cadre (0,08), a été resserré.
+fondue vers son bout et vers son bord, plus courte, sur une route plus
+couchée ; le contre-jour de la fiole, qui se mirait sur le caillebotis
+jusqu'au bas du cadre (0,08), a été resserré.
+
+**La reprise de la capsule** (jugement de l'orchestrateur, 13/11 : « ne
+porte pas le plus grand moment ») : une première version livrée avait un
+soleil de face et un jour de planète calculé à part — un disque noir cerclé
+de bleu, une station plate de boîtes grises, une composition éparpillée.
+Cinq essais regardés : capsule trop proche et coupée (A) ; planète presque
+pleine, le soleil pas assez derrière (B) ; le reflet de face qui remplissait
+la planète (C) ; le liseré qui faisait le tour, la face arrière de la
+coquille d'atmosphère regardant le soleil (D, retenu une fois corrigé) ; une
+traînée de route vers la station, vue de bout, qui faisait une tache ronde
+sur elle (E, retirée).
 
 **Rendu** : la capsule à 3200×1800, 384 échantillons, sans débruiteur, comme
 l'atelier, et `prepare.py` la réduit ; la fiole à 1600×900, 192
@@ -2593,7 +2614,7 @@ python -I tools/images/blender/fins.py masters/images/fin-capsule.png masters/im
 python3 tools/images/prepare.py fin-capsule fin-fiole-brisee
 ```
 
-**Mesuré à la livraison** : la capsule, luminance 0,06, tiers bas 0,03,
-**39 Ko** ; la fiole, 0,04, tiers bas 0,03, **15 Ko** ; aucun pixel chaud.
+**Mesuré à la livraison** : la capsule, luminance 0,056, tiers bas 0,008,
+**29 Ko** ; la fiole, 0,039, tiers bas 0,027, **15 Ko** ; aucun pixel chaud.
 Le test `LIVREES` vérifie qu'elles sont là, en 1600×900.
 
