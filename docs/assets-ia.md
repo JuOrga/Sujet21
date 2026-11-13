@@ -1141,6 +1141,16 @@ bright neon`
 
 ## 24. L'ATLAS DES PAROIS N° 2 — les biomes (phase 2)
 
+> ✅ **L'atlas n° 1 est redessiné dans Blender le 13/11**
+> (`tools/images/blender/habillages.py`). Ce sont les mêmes huit sujets, dans l'acier
+> et la lumière du mur et du fond de cuve. Chaque case est un carreau raccordable,
+> rendu seul ; le script assemble ensuite l'atlas hors de Blender
+> (`python -I tools/images/blender/habillages.py <rendus> masters/images/paroi-atlas.png`).
+> Mesures : luminance 0,13 (0,14 avant), 1 % de pixels chauds (les chevrons, les câbles ocre
+> et sang), 107 Ko (1 056 avant). Les cases mesurent 0,2 à 1,1 au raccord, sauf les
+> caissons (4,2 en x) : le bord tombe sur le biseau continu d'une caisse, et à l'œil
+> en 2×2 rien ne se voit. L'atlas n° 2 ci-dessous se fera dans le même atelier.
+
 L'atlas livré (`paroi-atlas.webp`, huit habillages : caissons, conduites,
 poutrelle, blindage, aération, hublot, écrans, câbles) est **neutre** : la
 même paroi de la chambre froide à la cuve thermique. La carte de la station
