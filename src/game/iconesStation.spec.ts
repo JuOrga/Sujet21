@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
 import { describe, expect, it, vi } from 'vitest'
 import { CONTREPARTIES, INSTRUMENTS } from './instruments'
 import {
@@ -65,5 +67,24 @@ describe('iconesStation', () => {
     expect(dessineIconeInstrument(ctx, img, 'perso-x', 0, 0, 32)).toBe(false)
     expect(dessineIconeInstrument(ctx, img, INSTRUMENTS[9].id, 5, 6, 32)).toBe(true)
     expect(ctx.drawImage).toHaveBeenCalledWith(img, 256, 256, 256, 256, 5, 6, 32, 32)
+  })
+})
+
+describe('les planches de la station dans index.html', () => {
+  const css = readFileSync(resolve(__dirname, '../../index.html'), 'utf8')
+  const regle = (sel: string): string => {
+    const i = css.lastIndexOf(`${sel} {`) // la dernière : la première est la fin du groupe de sélecteurs
+    expect(i, sel).toBeGreaterThan(-1)
+    return css.slice(i, css.indexOf('}', i))
+  }
+  it('peint la planche AU-DESSUS de l’alvéole, jamais l’inverse', () => {
+    for (const sel of ['.ico-ceremonie', '.ico-instrument', '.ico-sceau']) {
+      const bg = /background-image:\s*([^;]*);/.exec(regle(sel))?.[1] ?? ''
+      // la première couche d'un background est la plus haute
+      expect(bg.startsWith("url('/assets/"), sel).toBe(true)
+      expect(bg.indexOf('data:image/svg'), sel).toBeGreaterThan(bg.indexOf('.webp'))
+      // une alvéole en pseudo-élément à z-index négatif voilerait l'image
+      expect(css, sel).not.toContain(`${sel}::before`)
+    }
   })
 })
