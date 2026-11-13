@@ -2453,10 +2453,12 @@ voilait le liquide à 63 %.
 **La fenêtre du liquide se mesure.** Une troisième passe, la SONDE, rend le
 liquide plein seul, en blanc, tous les opaques en cache : la boîte de ce qui
 s'en voit est la fenêtre. L'assemblage vérifie que chaque pixel de la
-fenêtre où le liquide ne se voit pas est sous un opaque du verre (sinon le
-rectangle déborderait : il échoue), et que la vitre ne voile pas plus de 25 %
+fenêtre où le liquide ne se voit pas est couvert par le calque verre à plus
+de moitié opaque (l'alpha du calque entier, vitre comprise ; sinon le
+rectangle déborderait : il échoue), et que le verre ne voile pas plus de 2 %
 du liquide visible. Mesuré : aucun pixel nu ; voile 0,06 % (bonbonne),
-0,36 % (bocal), 0,15 % (colonne).
+0,36 % (bocal), 0,15 % (colonne) — la vitre seule ne dépasse presque jamais
+la moitié d'opacité : ce qui couvre la fenêtre, ce sont les opaques.
 
 **L'anneau se pose sur la colonne.** Il est rendu dans la vue de la colonne,
 autour d'un cache de la taille de son tube (sa moitié arrière passe
@@ -2485,4 +2487,134 @@ colonne avec un anneau intact et un brisé posés.
 **33 % de chauds** — son or est voulu : il a sa famille dans `prepare.py`
 (« anneau de palier », plafond de chauds 40 %), pour ne pas relever celui
 des icônes.
+
+### 36d. Les instruments — `instruments-icones.webp` ✅ LIVRÉ (13/11)
+
+**2048×1024 · transparente · 8 × 4 cases de 256²**, dans l'ordre de
+`ORDRE_INSTRUMENTS` (`src/game/iconesStation.ts`) : 24 instruments, puis les
+7 contreparties, la case 32 vide. L'ordre est recopié dans la liste
+`INSTRUMENTS` de `ceremonie.py`, et le test d'ordre la compare au TS.
+
+**Chaque instrument est un objet de l'atelier qui dit son effet** (le nom et
+la description de `instruments.ts`) : l'échantillon de secours, une
+éprouvette pleine dans sa pince ; la gaine isolante, une conduite sous un
+matelas cousu ; la buse calibrée, un cône à bague graduée et son jet ;
+l'aimant à rosée, un fer à cheval qui attire des gouttes ; la chambre froide,
+un cube de glace en cage ; la peau tendue, une membrane où perle une goutte ;
+la vanne de secours, un volant à bandes de danger ; le plastron, un bouclier
+riveté ; le détendeur, un régulateur à cadran ; les patins de givre, une
+lame polie et sa trace ; la lentille de visée, une lunette dont la lentille
+luit vers vous ; la gueule ouverte, une bouche d'aspiration à aubes en
+spirale ; le filtre à condensat, une cartouche à plis et sa goutte ; le
+ballast, un lest à anneau ; la bascule rapide, un interrupteur à levier ; la
+chambre étanche, une porte ronde à crabots, sa vapeur au hublot ; le tamis
+fin ; les semelles polies ; l'éclateur, une charge et ses éclats ; le croc
+du sas ; le sur-régime, un compte-tours collé dans sa zone qui luit ; la
+ration de survie, une conserve ; les œillères, deux verres et leurs volets ;
+le carnet du Semblable, un carnet relié à l'octogone. **Les contreparties
+sont du même acier, abîmé** : une gourde percée qui goutte, une plaque prise
+dans un gras noir, la gaine fendue d'où sort le givre, la buse encrassée, la
+bonbonne percée qui fuit, une antenne encrassée qui vous traque, une
+bonbonne de gaz à la vanne cassée.
+
+**Pour l'affichage PETIT** (cartes de tirage, ATH, journal, canvas du module)
+: peu de pièces, une silhouette franche, et chaque objet agrandi jusqu'à
+remplir sa case (`DEMI_INSTR`). Jugé sur une planche réduite à 24 et 32 px.
+Ce que ce jugement a changé : l'acier encrassé des contreparties (premier
+essai à `2e3234`) et le matelas de la gaine sortaient noirs à 24 px —
+éclaircis ; l'antenne montrait son dos ; la maille du tamis, trop fine, se
+lisait en grisaille. Même acier, même lumière, mêmes accents (sarcelle et
+cyan pour ce qui luit, l'or seulement pour la zone du sur-régime) que la
+planche de cérémonie.
+
+**Refaire** — même atelier, même appel unique : `instruments() ;
+lance(INSTRUMENTS, SORTIE, 160)` (SORTIE : `masters\images\instruments`,
+avec `brut\` et `alpha\` ; la fenêtre bascule sur la scène `ceremonie`).
+Puis :
+
+```bash
+python -I tools/images/blender/ceremonie.py instruments masters/images/instruments masters/images/instruments-icones.png controle.png
+python3 tools/images/prepare.py instruments-icones
+```
+
+**Mesuré à la livraison** : luminance 0,29, 1 % de pixels chauds, bord
+vide, **167 Ko** (qualité 82) ; au moins 14 px transparents autour de chaque
+objet dans sa case de 256.
+
+### 36e. Les deux scènes de fin — `fin-capsule.webp`, `fin-fiole-brisee.webp` ✅ LIVRÉ (13/11)
+
+**1600×900 · opaques**, l'écran qui suit la cinématique quand la descente
+se termine (`SCENES_FIN`, `src/game/ceremonieObjets.ts`). Atelier :
+`tools/images/blender/fins.py`, qui charge `ceremonie.py`. Aucune image
+générée : les étoiles (un Voronoï sur le ciel, vu seulement par la caméra),
+la planète et son anneau sont procéduraux, le reste est modélisé.
+
+- **La descente bouclée** (`fin-capsule`), en trois plans. Au PREMIER, dans
+  le tiers gauche, le héros : la bonbonne de la cérémonie (`cuve_bonbonne`,
+  B3 : même objet, même acier), la jauge PLEINE, montée en capsule — un
+  berceau de deux cerclages et quatre rails, un sceau octogonal cerclé d'un
+  cyan qui luit, quatre tuyères, deux veilleuses ambre ; elle part en haut à
+  gauche, sa poussée froide file vers la station, un léger flou de mouvement
+  dit qu'elle bouge. Au SECOND, loin, en entier : la station du canon (§26),
+  de gauche à droite — le croissant de coque et le module Méduse, trois
+  modules octogonaux empilés, le nœud et ses petits modules, l'observatoire
+  à dôme, ses radiateurs et son télescope, le mât aux quatre panneaux et sa
+  parabole —, cerclée, ses hublots froids et quelques veilleuses ambre
+  allumés, inclinée pour montrer ses dessus au soleil. Au FOND : la géante
+  gazeuse froide du canon, à bandes, ceinte d'un anneau qui a de la matière
+  (sillons, une division) et porte son ombre, la station devant sa nuit.
+- **Une seule lumière**, `SOLEIL`, hors champ, en haut à gauche et DERRIÈRE
+  la scène : calculé pour un angle de phase d'environ 127° vu de la caméra,
+  il dessine le croissant de la planète (un cinquième du disque, ses bandes
+  lisibles dans le jour, un limbe doux côté jour seulement) et pose le
+  contre-jour sur les arêtes de la capsule et de la station. Un reflet
+  froid et faible, de face, lit leurs faces — il est EXCLU de la planète
+  (light linking) : il la remplissait en entier.
+- **L'échantillon perdu** (`fin-fiole-brisee`). Une fiole couchée sur le
+  caillebotis, son bord cassé en dents, un fond de fluide au creux du verre ;
+  le col et son bouchon plus loin ; des éclats ; une flaque sombre et
+  miroitante dont la lueur sarcelle s'éteint de son cœur vers ses bords. Une
+  seule lumière froide d'en haut, un liseré bleu derrière. Pas d'or.
+
+**Le bas du cadre reste sombre** : le relevé de la descente s'y pose. La
+mesure (`python -I tools/images/blender/fins.py <images>`) donne la
+luminance de l'image et celle du TIERS BAS (30 %), et échoue au-delà de
+0,06. Ce qu'elle a changé : la poussée de la capsule, d'abord un trapèze
+opaque qui descendait dans cette bande, est devenue une lueur additive,
+fondue vers son bout et vers son bord, plus courte, sur une route plus
+couchée ; le contre-jour de la fiole, qui se mirait sur le caillebotis
+jusqu'au bas du cadre (0,08), a été resserré.
+
+**La reprise de la capsule** (jugement de l'orchestrateur, 13/11 : « ne
+porte pas le plus grand moment ») : une première version livrée avait un
+soleil de face et un jour de planète calculé à part — un disque noir cerclé
+de bleu, une station plate de boîtes grises, une composition éparpillée.
+Cinq essais regardés : capsule trop proche et coupée (A) ; planète presque
+pleine, le soleil pas assez derrière (B) ; le reflet de face qui remplissait
+la planète (C) ; le liseré qui faisait le tour, la face arrière de la
+coquille d'atmosphère regardant le soleil (D, retenu une fois corrigé) ; une
+traînée de route vers la station, vue de bout, qui faisait une tache ronde
+sur elle (E, retirée).
+
+**Rendu** : la capsule à 3200×1800, 384 échantillons, sans débruiteur, comme
+l'atelier, et `prepare.py` la réduit ; la fiole à 1600×900, 192
+échantillons, débruitée — le verre éclaté sur un caillebotis brillant
+demande des milliers d'échantillons sans débruiteur, et une scène dans le
+noir n'a pas de grain d'acier à perdre. Les caustiques sont coupées
+(elles semaient des étincelles parasites).
+
+**Refaire** — dans Blender, en un seul appel :
+`exec(compile(open(DOSSIER + r'\fins.py', …).read(), DOSSIER + r'\fins.py', 'exec'))`
+puis `lance_fins(MASTERS, 384)` (MASTERS : `masters\images`). Chaque
+scène a sa scène Blender, et la fenêtre y bascule : on revient à la main à
+la scène d'origine. Puis :
+
+```bash
+python -I tools/images/blender/fins.py masters/images/fin-capsule.png masters/images/fin-fiole-brisee.png
+python3 tools/images/prepare.py fin-capsule fin-fiole-brisee
+```
+
+**Mesuré à la livraison** : la capsule, luminance 0,056, tiers bas 0,008,
+**29 Ko** ; la fiole, 0,039, tiers bas 0,027, **15 Ko** ; aucun pixel chaud.
+Le test `LIVREES` vérifie qu'elles sont là, en 1600×900.
 

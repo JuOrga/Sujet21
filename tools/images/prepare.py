@@ -167,8 +167,10 @@ FAMILLES: list[Famille] = [
         note='deux cases de 512² : intact, brisé (ceremonieObjets.ts, ANNEAU_URL)',
     ),
     Famille(
+        # mesuré le 13/11 (qualité 82) : 167 Ko, luminance 0,29, 1 % de chauds
+        # (le volant de la vanne de secours, la zone du sur-régime)
         'planche des instruments', ('instruments-icones',), alpha=True, cote_max=4096,
-        poids_max_ko=600,
+        poids_max_ko=250,
         note='8×4 cases de 256² — l’ordre est ORDRE_INSTRUMENTS (src/game/iconesStation.ts)',
     ),
     Famille(
@@ -179,8 +181,13 @@ FAMILLES: list[Famille] = [
         note='le dos et le verre d’une cuve, le liquide passe entre les deux (ceremonieObjets.ts)',
     ),
     Famille(
-        'scène de fin', ('fin-*',), taille=(1600, 900), luma_max=0.50, chaud_max=1.0,
-        qualite=84, poids_max_ko=260,
+        # mesuré le 13/11 (qualité 84) : la capsule 29 Ko, luminance 0,06 ; la
+        # fiole brisée 15 Ko, 0,04 ; aucune des deux n'a de pixel chaud (les
+        # veilleuses ambre de la capsule sont des points) — le plafond de
+        # chauds reprend celui de la charte, l'alerte rouge des cinématiques
+        # n'a rien à faire ici
+        'scène de fin', ('fin-*',), taille=(1600, 900), luma_max=0.50,
+        qualite=84, poids_max_ko=120,
         note='1600×900 paysage : la capsule bouclée, la fiole brisée',
     ),
     Famille(
