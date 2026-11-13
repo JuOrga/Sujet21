@@ -15345,13 +15345,19 @@ function mbMontreVersement(): void {
       return
     }
     const btn = (e.target as Element).closest('button')
+    // LES DEUX CRÉDITS TOMBENT AU CLIC, seule la mise en scène attend :
+    // la maîtrise créditée à l'enchaînement (≤ 800 ms) se perdait si la
+    // cérémonie se fermait entre-temps (un essai du pupitre), la réserve non
+    const avantXp = run.xp
     if (btn === cb && !cb.disabled) {
       run.bonbonneLiters = Math.min(cap, run.bonbonneLiters + verse)
+      run.xp += spill
       noteVersement(spill > 0.01 ? `→ réserve, ${fmt(spill)} L à la maîtrise` : '→ versé à la réserve')
-      deverse('g', res, MB_EAU, () => mbVerseXp(spill))
+      deverse('g', res, MB_EAU, () => mbVerseXp(avantXp))
     } else if (btn === cx) {
+      run.xp += b.surplus
       noteVersement('→ versé à la maîtrise')
-      deverse('d', mai, MB_MENTHE, () => mbVerseXp(b.surplus))
+      deverse('d', mai, MB_MENTHE, () => mbVerseXp(avantXp))
     }
   })
 
@@ -15773,12 +15779,13 @@ function mbPalierEclair(no: number): void {
   mbTimers.push(window.setTimeout(() => { poutre.hidden = true }, sansAnimation() ? 900 : 1650))
 }
 
-/** Crédite l'XP et fait COULER la colonne de maîtrise — puis un tirage
- * par palier franchi, sinon la suite de la cérémonie. */
-function mbVerseXp(litres: number): void {
-  const avantXp = run.xp
-  const avant = paliersAtteints(run.xp)
-  run.xp += litres
+/** Fait COULER la colonne de maîtrise depuis l'XP d'avant le versement —
+ * puis un tirage par palier franchi, sinon la suite de la cérémonie. L'XP
+ * est déjà créditée au clic (mbMontreVersement) : la scène ne la touche
+ * plus, une cérémonie fermée avant elle ne la perd plus. */
+function mbVerseXp(avantXp: number): void {
+  const litres = run.xp - avantXp
+  const avant = paliersAtteints(avantXp)
   // LE TIRAGE GARANTI de la salle scellée s'ajoute aux paliers franchis ;
   // la prime est servie, elle s'éteint ici (les portes suivantes en posent
   // une autre ou aucune)

@@ -290,6 +290,19 @@ describe('la cérémonie — le versement', () => {
     expect(v).toContain("'ArrowLeft'")
     expect(v).toContain("'ArrowRight'")
   })
+  // la réserve était créditée au clic, la maîtrise seulement à
+  // l'enchaînement (≤ 800 ms plus tard) — et l'enchaînement se tait si la
+  // cérémonie s'est fermée entre-temps (un essai du pupitre) : le surplus
+  // vers la maîtrise était perdu. Les deux crédits tombent au clic ; seule
+  // la mise en scène attend
+  it('crédite la maîtrise au clic, comme la réserve : seule la mise en scène attend', () => {
+    const v = corps('mbMontreVersement')
+    const clic = v.slice(v.indexOf("scene.addEventListener('click'"))
+    expect(clic).toMatch(/run\.xp \+= spill[\s\S]*deverse\('g'/)
+    expect(clic).toMatch(/run\.xp \+= b\.surplus[\s\S]*deverse\('d'/)
+    // la mise en scène ne crédite plus : elle part de l'XP d'avant le clic
+    expect(corps('mbVerseXp')).not.toMatch(/run\.xp \+=/)
+  })
   it('rend la bannière et le bandeau au palier qui suit', () => {
     const x = corps('mbVerseXp')
     expect(x).toContain("mbEl('mb-releve').hidden = false")
