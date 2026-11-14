@@ -288,17 +288,39 @@ def habillages():
     sc = bpy.context.scene
     mats = matieres_habillages()
     for nom, bati in zip(NOMS, BATIS):
-        carreau(sc, mats, nom, bati, extra=lisses)
-    lumiere_camera(sc)
+        carreau(sc, mats, nom, bati, extra=lisses, relief=True)
+    # (14/11) la lumière neutre : ce sont les lampes du jeu qui sculptent
+    # les habillages, par le relief rangé dans l'alpha (relief.py)
+    lumiere_neutre(sc)
     sc.cycles.device = 'GPU'
 
 
 def assemble(dossier, sortie):
-    """les huit rendus en un atlas 4×2 (hors de Blender, avec pillow)"""
+    """les huit rendus en un atlas 4×2 (hors de Blender, avec pillow). Rendus
+    avec leur relief (14/11, relief/<nom>.npy), il va dans l'alpha CASE PAR
+    CASE : chacune a sa fenêtre (les conduites dépassent de 15 cm, l'aération
+    de 1) — la profondeur de chaque case est imprimée, et le raccord de sa
+    couleur et de son relief, que prepare.py ne mesure pas dans un atlas"""
+    import numpy as np
     from PIL import Image
-    atlas = Image.new('RGB', (4096, 2048))
+    ici = os.path.dirname(os.path.abspath(__file__))
+    sys.path[:0] = [ici, os.path.dirname(ici)]
+    import relief
+    from prepare import raccord
+    avec = all(os.path.exists(os.path.join(dossier, 'relief', n + '.npy')) for n in NOMS)
+    atlas = Image.new('RGBA' if avec else 'RGB', (4096, 2048))
     for i, nom in enumerate(NOMS):
-        im = Image.open(os.path.join(dossier, nom + '.png')).convert('RGB').resize((1024, 1024), Image.LANCZOS)
+        if avec:
+            im, prof = relief.monte(dossier, nom)
+        else:
+            im, prof = Image.open(os.path.join(dossier, nom + '.png')).convert('RGB'), None
+        if im.size != (1024, 1024):
+            im = im.resize((1024, 1024), Image.LANCZOS)
+        a = np.asarray(im, dtype=np.float32) / 255
+        mes = [raccord(a[..., :3], 'x'), raccord(a[..., :3], 'y')]
+        if prof is not None:
+            mes += [raccord(a[..., 3:], 'x'), raccord(a[..., 3:], 'y')]
+            print(f'{nom:<16} profondeur {prof:.4f} salle   raccord {mes[0]:.1f} / {mes[1]:.1f}   relief {mes[2]:.1f} / {mes[3]:.1f}')
         atlas.paste(im, ((i % 4) * 1024, (i // 4) * 1024))
     atlas.save(sortie)
 

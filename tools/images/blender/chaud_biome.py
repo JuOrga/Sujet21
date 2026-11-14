@@ -193,8 +193,100 @@ def copies(P, motif, decalages):
         P.objects.link(e)
 
 
-def declare(nom, P, x0, x1, z0, z1, mx=0, mz=0, alpha=True, ancres=None):
-    PIECES[nom] = dict(nom=nom, coll=P, x0=x0, x1=x1, z0=z0, z1=z1, mx=mx, mz=mz, alpha=alpha, ancres=ancres or {})
+def declare(nom, P, x0, x1, z0, z1, mx=0, mz=0, alpha=True, ancres=None, relief=False):
+    PIECES[nom] = dict(nom=nom, coll=P, x0=x0, x1=x1, z0=z0, z1=z1, mx=mx, mz=mz, alpha=alpha, ancres=ancres or {}, relief=relief)
+
+
+# LE RELIEF (14/11, chantier « volume des parois ») : pour que les lampes du
+# jeu sculptent une surface, le shader doit connaître sa forme. Une seconde
+# passe, dans la MÊME scène, la même caméra, les mêmes copies autour du
+# carreau (le raccord vient donc comme celui de la couleur) : chaque matière
+# y est remplacée par une jumelle qui émet, au lieu de sa couleur,
+# l'élévation du point vers la caméra (−y, en largeurs de salle), plus celle
+# de son relief de matière (le bump : hauteur × distance × force — les rides
+# de l'émail, le martelé de la cire n'ont pas de géométrie). Une émission vue
+# en face n'a ni lumière ni bruit : le filtre de pixel de Cycles l'adoucit
+# comme il adoucit la couleur. Écrite en EXR flottant (linéaire, sans
+# transformée de vue), relue, rognée et rangée en .npy ; la mise à l'échelle
+# dans l'alpha se fait hors de Blender (relief.py).
+ECHELLE_RELIEF = 0.4   # E = 0,5 + élévation / 0,4 : de −0,2 à +0,2 salle
+ECHANTILLONS_RELIEF = 64
+# un bump plus fin que ça (le brossé de l'acier : 0,15 mm) reste sous un
+# niveau de l'alpha : il n'y mettait qu'un grésil d'un niveau — le mur pesait
+# 67 Ko au lieu de 23, mesuré le 14/11 —, et sa lumière est déjà dans la couleur
+BUMP_MIN = 0.0005
+
+
+def _jumelle_hauteur(mat):
+    j = mat.copy()
+    j.name = mat.name + '-hauteur'
+    nt = j.node_tree
+    N, L = nt.nodes, nt.links
+    geo = N.new('ShaderNodeNewGeometry')
+    sep = N.new('ShaderNodeSeparateXYZ')
+    L.new(geo.outputs['Position'], sep.inputs[0])
+    h = op(nt, 'MULTIPLY', sep.outputs['Y'], -1.0)
+    for b in [n for n in N if n.type == 'BUMP']:
+        lien = b.inputs['Height'].links
+        if lien:
+            k = b.inputs['Distance'].default_value * b.inputs['Strength'].default_value
+            if k >= BUMP_MIN:
+                h = op(nt, 'ADD', h, op(nt, 'MULTIPLY', lien[0].from_socket, -k if b.invert else k))
+    em = N.new('ShaderNodeEmission')
+    L.new(op(nt, 'MULTIPLY_ADD', h, 1 / ECHELLE_RELIEF, 0.5), em.inputs['Color'])
+    em.inputs['Strength'].default_value = 1.0
+    sortie = next(n for n in N if n.type == 'OUTPUT_MATERIAL')
+    for e in sortie.inputs:
+        for l in list(e.links):
+            L.remove(l)
+    L.new(em.outputs[0], sortie.inputs['Surface'])
+    return j
+
+
+def rend_relief(p, chemin, mx, mz, echantillons=ECHANTILLONS_RELIEF):
+    """la passe de relief de la pièce `p` (déjà cadrée par rend) : rend les
+    jumelles, rogne la même marge, écrit l'élévation en .npy (largeurs de
+    salle) et rend son étendue"""
+    import numpy as np
+    sc = bpy.context.scene
+    r = sc.render
+    meshes = {o.data for c in [p['coll']] + list(p['coll'].children_recursive) for o in c.objects if o.type == 'MESH'}
+    jumelles, avant = {}, []
+    for me in meshes:
+        for i, m in enumerate(me.materials):
+            if m is None:
+                continue
+            if m not in jumelles:
+                jumelles[m] = _jumelle_hauteur(m)
+            avant.append((me, i, m))
+            me.materials[i] = jumelles[m]
+    monde = sc.world
+    sc.world = None
+    fmt = (r.image_settings.file_format, r.image_settings.color_mode, r.image_settings.color_depth, sc.cycles.samples, r.filepath)
+    try:
+        r.image_settings.file_format = 'OPEN_EXR'
+        r.image_settings.color_mode = 'RGB'
+        r.image_settings.color_depth = '32'
+        sc.cycles.samples = echantillons
+        brut = chemin.replace('.npy', '-brut.exr')
+        r.filepath = brut
+        bpy.ops.render.render(write_still=True)
+    finally:
+        for me, i, m in avant:
+            me.materials[i] = m
+        for j in jumelles.values():
+            bpy.data.materials.remove(j)
+        sc.world = monde
+        (r.image_settings.file_format, r.image_settings.color_mode, r.image_settings.color_depth,
+         sc.cycles.samples, r.filepath) = fmt
+    im = bpy.data.images.load(brut, check_existing=False)
+    W, H = im.size
+    a = np.array(im.pixels[:], dtype=np.float32).reshape(H, W, 4)
+    bpy.data.images.remove(im)
+    e = (a[mz:H - mz, mx:W - mx, 0] - 0.5) * ECHELLE_RELIEF
+    # (les pixels de Blender montent du bas : retournés, ils suivent le PNG)
+    np.save(chemin, np.ascontiguousarray(e[::-1]))
+    return [round(float(e.min()), 4), round(float(e.max()), 4)]
 
 
 # ------------------------------------------------------------------ les tôles
@@ -599,6 +691,11 @@ def rend(nom, sortie, echantillons=ECHANTILLONS, pourcent=100):
     brut = os.path.join(sortie, 'brut', f'{PREFIXE}{nom}.png')
     r.filepath = brut
     bpy.ops.render.render(write_still=True)
+    etendue = None
+    if p.get('relief'):
+        k = pourcent / 100
+        os.makedirs(os.path.join(sortie, 'relief'), exist_ok=True)
+        etendue = rend_relief(p, os.path.join(sortie, 'relief', f'{PREFIXE}{nom}.npy'), round(p['mx'] * k), round(p['mz'] * k))
     r.resolution_percentage = 100
     im = bpy.data.images.load(brut, check_existing=False)
     W, H = im.size
@@ -638,6 +735,8 @@ def rend(nom, sortie, echantillons=ECHANTILLONS, pourcent=100):
         m['raccord_x'] = raccord(noir[..., :3])
     if p['mz']:
         m['raccord_y'] = raccord(noir[..., :3].transpose(1, 0, 2))
+    if etendue:
+        m['relief'] = etendue
     return m
 
 
