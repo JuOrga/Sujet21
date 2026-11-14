@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest'
 import { FORME_COQUE, FORME_DISQUE, FORME_RECT, coquePack } from '../game/formes'
 import {
   MAT_BAIE,
+  MAT_CHAUD,
+  MAT_FROID,
   MAT_EXIT,
   MAT_HYDROPHILE,
   MAT_HYDROPHOBE,
@@ -181,6 +183,15 @@ describe('le contrat des hauteurs', () => {
     // à rebours du soleil de l'atelier peint dans les surfaces
     expect(LUMIERE_PAR_DEFAUT[0]).toBe(0)
     expect(LUMIERE_PAR_DEFAUT[1]).toBe(1)
+  })
+
+  it('la conduite et la chaudière à pièces (rectangulaires) sont hautes ; à forme, elles gardent leur rang', () => {
+    // leur rendu (aPieces) ne change pas : leur ombre cuite reste celle
+    // d'avant la table, qu'elles touchent un mur ou non
+    expect(hauteurPropre(MAT_FROID, FORME_RECT)).toBe(HAUTEUR_DE_RANG.haut)
+    expect(hauteurPropre(MAT_CHAUD, FORME_RECT)).toBe(HAUTEUR_DE_RANG.haut)
+    expect(hauteurPropre(MAT_FROID, FORME_DISQUE)).toBe(HAUTEUR_DE_RANG.bas)
+    expect(hauteurPropre(MAT_CHAUD, FORME_DISQUE)).toBe(HAUTEUR_DE_RANG.moyen)
   })
 
   it("un toit moyen voisin d'un haut reçoit son ombre ; l'inverse non", () => {

@@ -9,6 +9,7 @@
 import { HAUTEUR_BLOCS } from './hauteurs'
 import {
   FORME_COQUE,
+  FORME_RECT,
   formeContact,
   formeOutline,
   type Coupe,
@@ -82,6 +83,12 @@ export function hauteurPropre(mat: number, forme: number, skin = 0): number {
   // la VITRE est un mur d'habillage 9 (level.ts) : la conception la veut
   // basse, elle arrête le fluide sans se dresser comme une cloison
   if (mat === MAT_WALL && skin === SKIN_VITRE) return HAUTEUR_DE_RANG.bas
+  // la CONDUITE (plaque froide rectangulaire) et la CHAUDIÈRE rectangulaire
+  // sont composées par pièces (aPieces, renderer.ts) : leur rendu ne change
+  // pas, leur ombre cuite non plus — celle d'avant la table, à la hauteur
+  // d'un mur, qu'elles touchent un mur ou non (décision de l'orchestrateur,
+  // relecture R2). À forme, ce sont des solides comme les autres.
+  if ((mat === MAT_FROID || mat === MAT_CHAUD) && forme === FORME_RECT) return HAUTEUR_DE_RANG.haut
   const h = HAUTEUR_DE_RANG[rang]
   return forme === FORME_COQUE ? Math.min(h, HAUTEUR_DE_RANG.haut) : h
 }
