@@ -8,7 +8,9 @@
 // AVANT / APRÈS, construire chaque version dans son dossier (--outDir) et
 // servir les deux sur deux ports : les captures se comparent nom à nom.
 // Chaque prise coûte ~40 s (chargement et compilation des shaders en rendu
-// logiciel) : quelques tableaux, pas toute la liste.
+// logiciel) : quelques tableaux, pas toute la liste. Lancer les bancs L'UN
+// APRÈS L'AUTRE : deux à la fois se disputent le processeur, et la moitié
+// des prises échouaient (le jeu ne se montait pas dans le délai).
 //
 // Pour chaque tableau (?tableau=N, la navigation directe de main.ts, sans le
 // hub), deux captures : lumière allumée (`-lum`) et éteinte (`-nolum`). Les
@@ -23,6 +25,7 @@
 //   BANC_GL=angle         Chromium rend par ANGLE + SwiftShader au lieu du
 //                         choix par défaut ;
 //   BANC_RELIEF=fort      allume le relief 2.5D (off par défaut, comme le jeu) ;
+//   BANC_LUMIERE=on|off   une seule des deux prises (les deux par défaut) ;
 //   BANC_ZOOM=2.5         rapproche la caméra (la molette du joueur : manualZoom)
 //                         — au cadrage d'entrée, une paroi fait 10-20 pixels et
 //                         un chanfrein n'en fait que deux ou trois.
@@ -52,6 +55,7 @@ const VUE = { width: Number(dims[1]), height: Number(dims[2]) }
 const ATTENTE = Number(process.env.BANC_ATTENTE || 6000)
 const RELIEF = process.env.BANC_RELIEF || 'off'
 const ZOOM = Number(process.env.BANC_ZOOM || 1)
+const LUMIERES = process.env.BANC_LUMIERE === 'on' ? [true] : process.env.BANC_LUMIERE === 'off' ? [false] : [true, false]
 const ARGS = process.env.BANC_GL === 'angle'
   ? ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader']
   : ['--enable-unsafe-swiftshader']
@@ -89,7 +93,7 @@ function recopie() {
 ;(async () => {
   const b = await chromium.launch({ args: ARGS })
   for (const n of liste.split(',').map(Number)) {
-    for (const lumiere of [true, false]) {
+    for (const lumiere of LUMIERES) {
       const nom = `t${String(n).padStart(2, '0')}-${lumiere ? 'lum' : 'nolum'}`
       const ctx = await b.newContext({ viewport: VUE })
       await ctx.addInitScript(prepare, { lumiere, relief: RELIEF })
@@ -119,10 +123,12 @@ function recopie() {
         }, ZOOM)
       }
       await p.waitForTimeout(ATTENTE)
+      // la sonde lit la MÊME toile que la recopie (la plus grande) : la
+      // première du document peut être une toile 2D de l'interface
       const gl = await p.evaluate(() => {
-        const c = document.querySelector('canvas')
-        const g = c && (c.getContext('webgl2'))
-        return g ? g.getParameter(g.RENDERER) : 'aucun contexte'
+        const c = [...document.querySelectorAll('canvas')].sort((a, b) => b.width * b.height - a.width * a.height)[0]
+        const g = c && c.getContext('webgl2')
+        return g ? g.getParameter(g.RENDERER) : 'pas une toile WebGL2'
       })
       const url = await p.evaluate(recopie)
       if (url) fs.writeFileSync(path.join(sortie, `${nom}.png`), Buffer.from(url.split(',')[1], 'base64'))

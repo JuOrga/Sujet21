@@ -15,6 +15,7 @@ import {
   RANG_DE_MATIERE,
   hauteurPropre,
   hauteursPartagees,
+  directionLumiereMoyenne,
   longueurOmbreCourte,
 } from './volume'
 
@@ -185,5 +186,16 @@ describe('le contrat des hauteurs', () => {
     expect(longueurOmbreCourte(2 * HAUTEUR_DE_RANG.bas)).toBeCloseTo(2 * longueurOmbreCourte(HAUTEUR_DE_RANG.bas), 6)
     expect(longueurOmbreCourte(HAUTEUR_DE_RANG.bas)).toBeLessThan(longueurOmbreCourte(HAUTEUR_DE_RANG.moyen))
     expect(longueurOmbreCourte(HAUTEUR_DE_RANG.moyen)).toBeLessThan(longueurOmbreCourte(HAUTEUR_BLOCS))
+  })
+
+  it('la coque prend la lumière moyenne des lampes, pondérée, vue du centre', () => {
+    // une lampe forte à droite, une faible en haut : la droite l'emporte
+    const d = directionLumiereMoyenne(0, 0, [100, 0, 300, 500, 0, 100, 300, 500], [3, 1], 2)
+    expect(d[0]).toBeGreaterThan(d[1])
+    expect(d[1]).toBeGreaterThan(0)
+    expect(Math.hypot(d[0], d[1])).toBeCloseTo(1, 6)
+    // sans lampe, ou deux lampes opposées égales : la direction par défaut
+    expect(directionLumiereMoyenne(0, 0, [], [], 0)).toEqual(LUMIERE_PAR_DEFAUT)
+    expect(directionLumiereMoyenne(0, 0, [100, 0, 1, 1, -100, 0, 1, 1], [1, 1], 2)).toEqual(LUMIERE_PAR_DEFAUT)
   })
 })

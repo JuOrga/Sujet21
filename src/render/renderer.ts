@@ -99,7 +99,7 @@ export const MAX_LUMIERES = 4
 // lampe lui passe dessus ; une COQUE (une chambre, un couloir) monte au
 // plafond et n'est jamais enjambée.
 import { HAUTEUR_BLOCS, HAUTEUR_COQUE } from './hauteurs'
-import { LUMIERE_PAR_DEFAUT } from './volume'
+import { LUMIERE_PAR_DEFAUT, directionLumiereMoyenne } from './volume'
 export { HAUTEUR_BLOCS, HAUTEUR_COQUE }
 
 const SPLAT_VS = `#version 300 es
@@ -2170,7 +2170,7 @@ float sdfBoiteLocal(int bi, vec2 wb, vec4 dec) {
 
 // L'OMBRE COURTE de lisibilité (volume.ts : longueurOmbreCourte(HAUTEUR_BLOCS)
 // et FLOU_OMBRE_COURTE — epaisseur.spec.ts vérifie qu'ils ne dérivent pas)
-#define OMBRE_COURTE 35.0
+#define OMBRE_COURTE 56.0
 #define OMBRE_COURTE_FLOU 12.0
 
 // le gradient du SDF de base d'une boîte, au point wb de son repère local
@@ -2739,7 +2739,8 @@ void main() {
     // son grand rayon d'aspiration : jamais coupé. Le rejet se fait sur la
     // BOÎTE englobante : toute forme y est inscrite, il reste conservateur.
     if (solide) {
-      float reachMax = 56.0;
+      // l'ombre courte et son flou doivent tenir dans le rayon de rejet
+      float reachMax = max(56.0, OMBRE_COURTE + OMBRE_COURTE_FLOU);
       if (mat > 0.5 && mat < 2.5) reachMax = max(reachMax, uHydroBand);
       else if (mat > 5.5 && mat < 6.5) reachMax = max(reachMax, uHeatBand * uBoxAux[bi].w);
       else if (mat > 3.5 && mat < 4.5) reachMax = max(reachMax, uColdBand);
@@ -2821,20 +2822,29 @@ void main() {
     // Rien de tout cela là où un AUTRE solide couvre le pixel (libre) : un
     // pied posé sur le dessus d'un voisin y tracerait une couture sombre.
     if (solide && !aPieces) {
-      // depuis ce point du sol, on remonte VERS la lumière : si le chemin
-      // croise la boîte, le point est dans son ombre. Deux échantillons
-      // (mi-chemin, bout) suffisent à une ombre si courte.
-      vec2 versLum = lampeDir * OMBRE_COURTE;
-      // (le monde pivote dans le repère de la boîte, comme wb)
-      vec2 lLoc = vec2(bca * versLum.x + bsa * versLum.y, -bsa * versLum.x + bca * versLum.y);
-      float dO = min(sdfBoiteLocal(bi, wb + lLoc * 0.5, dec), sdfBoiteLocal(bi, wb + lLoc, dec));
       float sol = step(0.0, d) * libre;
-      float ombreCourte = (1.0 - smoothstep(0.0, OMBRE_COURTE_FLOU, dO)) * sol;
-      // dense au pied, elle s'éclaircit en s'éloignant
-      ombreCourte *= 1.0 - 0.5 * smoothstep(0.0, OMBRE_COURTE + OMBRE_COURTE_FLOU, d);
-      ombreCourte *= mix(0.4, 1.0, solEclaire);
+      float ombreCourte = 0.0;
+      // ses SDF ne se paient que sur le sol libre (dedans, ou sous un voisin,
+      // rien ne se peindrait)
+      if (d > 0.0 && libre > 0.0) {
+        // depuis ce point du sol, on remonte VERS la lumière : si le chemin
+        // croise la boîte, le point est dans son ombre. Trois échantillons
+        // (le quart, la moitié, le bout) : une paroi plus mince que le pas
+        // passerait entre deux.
+        vec2 versLum = lampeDir * OMBRE_COURTE;
+        // (le monde pivote dans le repère de la boîte, comme wb)
+        vec2 lLoc = vec2(bca * versLum.x + bsa * versLum.y, -bsa * versLum.x + bca * versLum.y);
+        float dO = min(sdfBoiteLocal(bi, wb + lLoc * 0.25, dec),
+                       min(sdfBoiteLocal(bi, wb + lLoc * 0.5, dec), sdfBoiteLocal(bi, wb + lLoc, dec)));
+        ombreCourte = (1.0 - smoothstep(0.0, OMBRE_COURTE_FLOU, dO)) * sol;
+        // dense au pied, elle s'éclaircit en s'éloignant
+        ombreCourte *= 1.0 - 0.5 * smoothstep(0.0, OMBRE_COURTE + OMBRE_COURTE_FLOU, d);
+        // dans l'ombre cuite, elle s'efface un peu — jamais sous les trois
+        // quarts : à 0,4, le sol ombré sortait PLUS CLAIR qu'avec l'ancien halo
+        ombreCourte *= mix(0.75, 1.0, solEclaire);
+      }
       float contact = (1.0 - smoothstep(0.0, max(6.0, 2.0 * pxMonde), d)) * sol;
-      col = mix(col, col * vec3(0.50, 0.56, 0.70), ombreCourte * 0.45);
+      col = mix(col, col * vec3(0.50, 0.56, 0.70), ombreCourte * 0.65);
       col *= 1.0 - 0.45 * contact;
     }
     // ——— LE FLANC : la tranche du solide, PLEINE et teintée matériau ————
@@ -3436,21 +3446,28 @@ void main() {
     // plaques et leur tuyau (composition).
     if (solide && !aPieces) {
       float dT = -dV; // la profondeur dans le dessus, depuis son bord
-      if (dT > -edgeW && dT < 12.0) {
+      // La bande commence APRÈS le trait clair du bord (edgeW, peint avec le
+      // remplissage) : posée dessus, il en mangeait la moitié. 14 u, au moins
+      // 5 pixels pour se lire au recul, au plus 0,35 de la demi-épaisseur (une
+      // paroi mince garde un plat), au moins 2 pixels.
+      vec4 bxC = uBoxes[bi];
+      float d0 = edgeW;
+      float wC = max(min(max(14.0, 5.0 * pxMonde), 0.35 * 0.5 * min(bxC.z - bxC.x, bxC.w - bxC.y)), 2.0 * pxMonde);
+      float aaC = max(pxMonde, 0.35);
+      // le gradient ne se paie que dans la bande, et pas sous un voisin
+      if (libre > 0.0 && dT > -aaC && dT < d0 + wC + 2.0 * aaC) {
         vec2 gd = gradSdfBoite(bi, wbV, dV, dec, bca, bsa);
         float gn = length(gd);
         if (gn > 1e-6) {
           float facing = dot(gd / gn, lampeDir);
-          // large de 9 u, jamais plus du tiers de la demi-épaisseur (une
-          // paroi mince garde un plat), jamais moins de deux pixels
-          vec4 bxC = uBoxes[bi];
-          float wC = max(min(9.0, 0.3 * 0.5 * min(bxC.z - bxC.x, bxC.w - bxC.y)), 2.0 * pxMonde);
-          float aaC = max(pxMonde, 0.35);
-          float chanfrein = (1.0 - smoothstep(wC - aaC, wC + aaC, dT)) * smoothstep(-aaC, aaC, dT) * libre;
-          col *= 1.0 + facing * 0.34 * chanfrein;
+          float chanfrein = smoothstep(d0 - aaC, d0 + aaC, dT)
+                          * (1.0 - smoothstep(d0 + wC - aaC, d0 + wC + aaC, dT)) * libre;
+          // plus franc à l'ombre (−55 %) qu'à la lumière (+45 %) : c'est le
+          // côté sombre qui dit l'épaisseur
+          col *= 1.0 + facing * (facing > 0.0 ? 0.45 : 0.55) * chanfrein;
           // l'arête qui sépare le chanfrein du plat
-          float pli = (1.0 - smoothstep(0.0, 1.5 * aaC, abs(dT - wC))) * libre;
-          col *= 1.0 - 0.18 * pli;
+          float pli = (1.0 - smoothstep(0.0, 1.5 * aaC, abs(dT - d0 - wC))) * libre;
+          col *= 1.0 - 0.28 * pli;
           // le liseré : l'arête vive, côté lumière, accroche un fil froid
           float lisere = (1.0 - smoothstep(0.0, max(1.5 * pxMonde, 0.8), dT)) * smoothstep(-aaC, 0.0, dT);
           col += vec3(0.55, 0.68, 0.80) * (0.30 * max(facing, 0.0) * lisere * libre) * eclSolide;
@@ -4569,9 +4586,10 @@ uniform vec2 uCenter;
 uniform float uZoom;
 uniform float uTime;
 uniform float uEpais;
-// la direction VERS la lumière par défaut (volume.ts) : le chanfrein du bord
-// intérieur de la coque, sans lampes à lire ici
-uniform vec2 uLumiereDefaut;
+// la direction VERS la lumière pour toute la coque (volume.ts :
+// directionLumiereMoyenne, la direction par défaut lumière éteinte) — son
+// chanfrein n'a pas de lampes à lire une à une ici
+uniform vec2 uLumiereCoque;
 uniform float uRep;
 uniform int uVideCount;
 uniform vec4 uVides[MAX_VIDES];   // minX, minY, maxX, maxY
@@ -5006,11 +5024,11 @@ void main() {
     // Même lecture que celui des solides de la composition : une bande
     // nette (la face regarde la cuve, −dO), claire côté lumière, une arête
     // fine qui la sépare du plat, un liseré sur l'arête vive éclairée.
-    float wCh = max(9.0, 2.0 * px);
-    float faceCh = dot(-dO, uLumiereDefaut);
+    float wCh = max(14.0, 5.0 * px);
+    float faceCh = dot(-dO, uLumiereCoque);
     float chanfrein = 1.0 - smoothstep(wCh - px, wCh + px, a);
-    c *= 1.0 + faceCh * 0.34 * chanfrein;
-    c *= 1.0 - 0.18 * (1.0 - smoothstep(0.0, 1.5 * px, abs(a - wCh)));
+    c *= 1.0 + faceCh * (faceCh > 0.0 ? 0.45 : 0.55) * chanfrein;
+    c *= 1.0 - 0.28 * (1.0 - smoothstep(0.0, 1.5 * px, abs(a - wCh)));
     c += vec3(0.55, 0.68, 0.80) * 0.30 * max(faceCh, 0.0) * (1.0 - smoothstep(0.0, max(1.5 * px, 0.8), a));
     c = mix(c, vec3(0.030, 0.040, 0.055), (1.0 - smoothstep(0.0, 12.0, dv)) * 0.85);
     c = mix(c, vec3(0.30, 0.38, 0.48), (1.0 - smoothstep(px, 2.5 * px, dv)) * 0.65);
@@ -5342,6 +5360,9 @@ export class Renderer {
   // image, et le rendu ne commence qu'à son premier oui.
   private readonly programmes: Programmes
   private programmesPrets = false
+  // la direction VERS la lumière du chanfrein de la coque (posée par la
+  // composition, lue par drawHull dans la même image)
+  private lumiereCoque: readonly [number, number] = LUMIERE_PAR_DEFAUT
 
   constructor(canvas: HTMLCanvasElement, capacity: number) {
     this.canvas = canvas
@@ -6766,6 +6787,11 @@ export class Renderer {
     gl.uniform4fv(cu['uLampes[0]'], this.lampScratch)
     gl.uniform1fv(cu['uLampesInt[0]'], this.lampIntScratch)
     gl.uniform3fv(cu['uLampesCol[0]'], this.lampColScratch)
+    // la coque (drawHull, plus loin dans l'image) n'a qu'une direction pour
+    // toute la salle : celle des lampes vue du centre, comme lampeDir
+    this.lumiereCoque = lumiere > 0.5 && this.lightTex
+      ? directionLumiereMoyenne((b.minX + b.maxX) * 0.5, (b.minY + b.maxY) * 0.5, this.lampScratch, this.lampIntScratch, lampes.length)
+      : LUMIERE_PAR_DEFAUT
     // le luminaire par lampe : taille (0 : aucun corps — c'est le cas de la
     // lampe par défaut), forme bandeau, demi-longueur, angle
     gl.uniform4fv(cu['uLampesFix[0]'], this.lampFixScratch)
@@ -7028,7 +7054,7 @@ export class Renderer {
     gl.uniform1f(hu['uZoom'], camera.zoom)
     gl.uniform1f(hu['uTime'], timeSec)
     gl.uniform1f(hu['uEpais'], COQUE_EPAISSEUR)
-    gl.uniform2f(hu['uLumiereDefaut'], LUMIERE_PAR_DEFAUT[0], LUMIERE_PAR_DEFAUT[1])
+    gl.uniform2f(hu['uLumiereCoque'], this.lumiereCoque[0], this.lumiereCoque[1])
     gl.uniform1f(hu['uRep'], this.hullRep)
     gl.uniform1i(hu['uVideCount'], nVides)
     if (nVides > 0) {

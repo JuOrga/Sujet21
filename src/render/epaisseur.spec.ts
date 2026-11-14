@@ -45,9 +45,14 @@ describe("l'épaisseur des solides dans la composition", () => {
   it("l'ombre courte s'allonge à l'opposé de la lumière, et tient dans le rayon de rejet", () => {
     expect(define('OMBRE_COURTE')).toBeCloseTo(longueurOmbreCourte(HAUTEUR_BLOCS), 3)
     expect(define('OMBRE_COURTE_FLOU')).toBeCloseTo(FLOU_OMBRE_COURTE, 3)
-    // le rejet grossier d'un mur saute tout pixel au-delà de 56 u : une ombre
-    // plus longue serait coupée net au bord de ce rayon
-    expect(longueurOmbreCourte(HAUTEUR_BLOCS) + FLOU_OMBRE_COURTE).toBeLessThanOrEqual(56)
+    // le rejet grossier d'un solide saute tout pixel au-delà de son rayon :
+    // il couvre l'ombre courte et son flou, sinon elle serait coupée net
+    expect(source).toContain('float reachMax = max(56.0, OMBRE_COURTE + OMBRE_COURTE_FLOU);')
+    // seulement sur le sol libre : ailleurs, ses SDF ne se paient pas
+    expect(bloc).toMatch(/if \(d > 0\.0 && libre > 0\.0\) \{[^}]*sdfBoiteLocal/)
+    // une paroi plus mince que la moitié de l'ombre passerait entre deux
+    // échantillons : un troisième, au quart
+    expect(bloc).toContain('lLoc * 0.25')
     // on remonte VERS la lumière depuis le sol : c'est là qu'est le bloc
     expect(bloc).toMatch(/lampeDir \* OMBRE_COURTE/)
   })
@@ -59,19 +64,28 @@ describe("l'épaisseur des solides dans la composition", () => {
     // la lumière éteinte ne coupe plus le chanfrein : il ne dépend que de solide
     const ch = source.indexOf('// LE CHANFREIN')
     expect(source.slice(ch, source.indexOf('{', ch))).not.toContain('uLumiere > 0.5')
+    // la bande suit sa largeur (au zoom de carte, 5 px valent bien plus de
+    // 12 u) : le gradient ne se paie que là où elle se peint
+    const chanfrein = source.slice(ch, source.indexOf('gradSdfBoite(', ch))
+    expect(chanfrein).toContain('dT < d0 + wC + 2.0 * aaC')
+    expect(chanfrein).not.toContain('dT < 12.0')
   })
 
   it("l'ombre courte ne double pas la carte cuite", () => {
     // là où la carte a déjà assombri le sol, l'ombre courte s'efface d'autant
-    expect(bloc).toContain('solEclaire')
+    // …mais jamais sous les trois quarts : dans l'ombre cuite, le sol ne doit
+    // pas s'éclaircir par rapport à l'ancien halo
+    expect(bloc).toContain('mix(0.75, 1.0, solEclaire)')
   })
 })
 
 describe('la paroi de la cuve (drawHull)', () => {
   it('le shader de la coque peint le chanfrein de son bord intérieur', () => {
-    expect(hullFs).toContain('uniform vec2 uLumiereDefaut;')
+    expect(hullFs).toContain('uniform vec2 uLumiereCoque;')
     expect(hullFs).toContain('chanfrein')
-    expect(drawHull).toContain("gl.uniform2f(hu['uLumiereDefaut'], LUMIERE_PAR_DEFAUT[0], LUMIERE_PAR_DEFAUT[1])")
+    // lumière allumée, la moyenne des lampes vue du centre de la cuve
+    expect(drawHull).toContain("gl.uniform2f(hu['uLumiereCoque'], this.lumiereCoque[0], this.lumiereCoque[1])")
+    expect(source).toMatch(/this\.lumiereCoque = [^;]*directionLumiereMoyenne\(/)
   })
 
   it("l'ombre de contact court au pied de la paroi, côté cuve", () => {

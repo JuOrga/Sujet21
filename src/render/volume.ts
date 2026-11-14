@@ -257,12 +257,12 @@ export function hauteursPartagees(boites: ReadonlyArray<BoiteVolume>): Float32Ar
 export const LUMIERE_PAR_DEFAUT: readonly [number, number] = [0, 1]
 
 /** L'ombre courte de lisibilité : la longueur au sol par unité de hauteur.
- *  Courte à dessein — la carte cuite porte déjà l'ombre LONGUE des lampes ;
- *  celle-ci dit seulement « ceci se dresse, de tant ». Un mur haut (140)
- *  jette 35 u : avec le flou, elle tient dans les 56 u du rejet grossier de
- *  la composition (au-delà, un mur ne peint plus rien, elle serait coupée
- *  net). */
-export const OMBRE_COURTE_PAR_HAUTEUR = 0.25
+ *  Courte devant l'ombre LONGUE des lampes (la carte cuite), mais assez pour
+ *  se lire au cadrage normal : à 0,25 (35 u pour un mur haut), la relecture
+ *  du 14/11 ne distinguait plus l'avant de l'après en 1280 × 720. Un mur
+ *  haut (140) jette 56 u ; le rejet grossier de la composition est élargi à
+ *  OMBRE_COURTE + OMBRE_COURTE_FLOU, sinon elle serait coupée net. */
+export const OMBRE_COURTE_PAR_HAUTEUR = 0.4
 
 /** Le fondu du bout de l'ombre courte, en unités monde. */
 export const FLOU_OMBRE_COURTE = 12
@@ -270,4 +270,31 @@ export const FLOU_OMBRE_COURTE = 12
 /** La longueur de l'ombre courte d'un solide de hauteur `h`. */
 export function longueurOmbreCourte(h: number): number {
   return Math.max(0, h) * OMBRE_COURTE_PAR_HAUTEUR
+}
+
+/** La direction VERS la lumière vue du centre de la cuve : la moyenne des
+ *  lampes (x, y, z, rayon par lampe dans `lampes`), pondérée par leur
+ *  intensité. Le shader de la coque ne lit pas les lampes une à une : sa
+ *  paroi entoure toute la salle, une direction pour toute la salle suffit
+ *  à mettre son chanfrein clair du côté où la lumière est. Sans lampe (ou
+ *  des lampes qui s'annulent), la direction par défaut. Unitaire. */
+export function directionLumiereMoyenne(
+  cx: number,
+  cy: number,
+  lampes: ArrayLike<number>,
+  intensites: ArrayLike<number>,
+  n: number,
+): readonly [number, number] {
+  let ax = 0
+  let ay = 0
+  for (let i = 0; i < n; i++) {
+    const dx = lampes[i * 4] - cx
+    const dy = lampes[i * 4 + 1] - cy
+    const l = Math.hypot(dx, dy)
+    if (l < 1e-3) continue // une lampe au centre n'a pas de côté
+    ax += (dx / l) * intensites[i]
+    ay += (dy / l) * intensites[i]
+  }
+  const a = Math.hypot(ax, ay)
+  return a > 1e-5 ? [ax / a, ay / a] : LUMIERE_PAR_DEFAUT
 }
