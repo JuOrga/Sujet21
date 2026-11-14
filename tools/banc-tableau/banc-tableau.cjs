@@ -13,7 +13,8 @@
 // des prises échouaient (le jeu ne se montait pas dans le délai).
 //
 // Pour chaque tableau (?tableau=N, la navigation directe de main.ts, sans le
-// hub), deux captures : lumière allumée (`-lum`) et éteinte (`-nolum`). Les
+// hub ; `hub` dans la liste ouvre le hub, seul tableau bâti en modules — des
+// coques), deux captures : lumière allumée (`-lum`) et éteinte (`-nolum`). Les
 // réglages passent par le localStorage AVANT le chargement, comme un joueur
 // qui les aurait posés.
 //
@@ -92,16 +93,16 @@ function recopie() {
 
 ;(async () => {
   const b = await chromium.launch({ args: ARGS })
-  for (const n of liste.split(',').map(Number)) {
+  for (const n of liste.split(',')) {
     for (const lumiere of LUMIERES) {
-      const nom = `t${String(n).padStart(2, '0')}-${lumiere ? 'lum' : 'nolum'}`
+      const nom = `${n === 'hub' ? 'hub' : 't' + n.padStart(2, '0')}-${lumiere ? 'lum' : 'nolum'}`
       const ctx = await b.newContext({ viewport: VUE })
       await ctx.addInitScript(prepare, { lumiere, relief: RELIEF })
       const p = await ctx.newPage()
       const erreurs = []
       p.on('pageerror', (e) => erreurs.push((e.stack || e.message).slice(0, 400)))
       p.on('console', (m) => m.type() === 'error' && erreurs.push(m.text().slice(0, 300)))
-      await p.goto(`${base}/?tableau=${n}&dev=0`, { waitUntil: 'domcontentloaded' })
+      await p.goto(`${base}/?${n === 'hub' ? '' : `tableau=${n}&`}dev=0`, { waitUntil: 'domcontentloaded' })
       try {
         await p.waitForFunction(() => typeof window.__cam === 'object' && window.__sim, null, {
           timeout: 120000,

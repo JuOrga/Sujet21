@@ -69,8 +69,10 @@ for (let i = 0; i < lignes.length; i++) {
 }
 
 describe('Les boucles sur les boîtes des shaders — ce que fxc ne déroule pas', () => {
-  it('il y a bien six boucles sur les boîtes (trois par shader)', () => {
-    expect(boucles.map((b) => b.ligne)).toHaveLength(6)
+  it('il y a bien sept boucles sur les boîtes (trois dans la composition, quatre au cuiseur)', () => {
+    // la quatrième du cuiseur : hauteurToit, la hauteur du toit sous un
+    // texel (les toits bas reçoivent l'ombre des voisins plus hauts)
+    expect(boucles.map((b) => b.ligne)).toHaveLength(7)
   })
 
   it('leur borne est uBoxCount, jamais la constante MAX_BOXES seule', () => {

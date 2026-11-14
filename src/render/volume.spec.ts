@@ -3,6 +3,7 @@ import { FORME_COQUE, FORME_DISQUE, FORME_RECT, coquePack } from '../game/formes
 import {
   MAT_BAIE,
   MAT_EXIT,
+  MAT_HYDROPHILE,
   MAT_HYDROPHOBE,
   MAT_RIDEAU,
   MAT_VIDE,
@@ -17,6 +18,7 @@ import {
   hauteursPartagees,
   directionLumiereMoyenne,
   longueurOmbreCourte,
+  longueurOmbreSur,
 } from './volume'
 
 const boite = (x0: number, y0: number, x1: number, y1: number, mat: number, forme = FORME_RECT, angle = 0) => ({
@@ -179,6 +181,25 @@ describe('le contrat des hauteurs', () => {
     // à rebours du soleil de l'atelier peint dans les surfaces
     expect(LUMIERE_PAR_DEFAUT[0]).toBe(0)
     expect(LUMIERE_PAR_DEFAUT[1]).toBe(1)
+  })
+
+  it("un toit moyen voisin d'un haut reçoit son ombre ; l'inverse non", () => {
+    // un mur et un hydrophile séparés d'un jour de 10 u : chacun sa hauteur
+    const h = hauteursPartagees([
+      boite(0, 0, 100, 20, MAT_WALL),
+      boite(110, 0, 200, 20, MAT_HYDROPHILE),
+    ])
+    expect(Array.from(h)).toEqual([HAUTEUR_DE_RANG.haut, HAUTEUR_DE_RANG.moyen])
+    // l'ombre du mur franchit le jour et monte sur le toit de l'hydrophile :
+    // elle s'y couche sur ce qui dépasse le toit, pas sur toute la hauteur
+    const surToit = longueurOmbreSur(h[0], h[1])
+    expect(surToit).toBeGreaterThan(10)
+    expect(surToit).toBeCloseTo(longueurOmbreCourte(HAUTEUR_DE_RANG.haut - HAUTEUR_DE_RANG.moyen), 6)
+    expect(surToit).toBeLessThan(longueurOmbreSur(h[0], 0))
+    // le toit du mur, plus haut, ne reçoit rien de l'hydrophile ; deux toits
+    // à la même hauteur ne s'ombrent pas
+    expect(longueurOmbreSur(h[1], h[0])).toBe(0)
+    expect(longueurOmbreSur(h[0], h[0])).toBe(0)
   })
 
   it("l'ombre courte suit la hauteur : un bas en jette moins qu'un haut", () => {

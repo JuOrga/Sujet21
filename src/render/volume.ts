@@ -290,6 +290,18 @@ export function longueurOmbreCourte(h: number): number {
   return Math.max(0, h) * OMBRE_COURTE_PAR_HAUTEUR
 }
 
+/** L'ombre courte d'un solide de hauteur `hSource` sur la surface qui la
+ *  reçoit, à la hauteur `hRecoit` : le sol (0), ou le TOIT d'un voisin plus
+ *  bas. Le rayon rasant qui frôle l'arête du haut touche ce toit plus tôt
+ *  que le sol : l'ombre ne s'y couche que sur ce qui le dépasse. Elle ne
+ *  monte pas : un toit aussi haut ou plus haut que la source n'en reçoit
+ *  rien. C'est la règle que la composition suit, boîte par boîte, pour
+ *  qu'un dessus bas reçoive l'ombre d'un voisin plus haut — lumière
+ *  éteinte comme allumée. */
+export function longueurOmbreSur(hSource: number, hRecoit: number): number {
+  return longueurOmbreCourte(hSource - hRecoit)
+}
+
 /** La direction VERS la lumière vue du centre de la cuve : la moyenne des
  *  lampes (x, y, z, rayon par lampe dans `lampes`), pondérée par leur
  *  intensité. Le shader de la coque ne lit pas les lampes une à une : sa

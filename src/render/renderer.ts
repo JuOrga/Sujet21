@@ -81,9 +81,10 @@ import { MODULE2D_FS, MODULE2D_VS } from './module2dShader'
 // (chambres, couloirs, cachettes voilées, portes) atteignait déjà 112 blocs
 // posés pour 95 dessinés. Ce que coûte le plafond, ce n'est pas la boucle —
 // elle s'arrête à uBoxCount — mais les CASES D'UNIFORMES du fragment shader
-// (uBoxes + uBoxAux : deux vec4 par boîte) : comptées sur la source, la
-// composition en occupe 460 à 160 boîtes (332 à 96) et le cuiseur de lumière
-// 359 (231 à 96). WebGL2 n'en garantit que 224 — le shader les dépassait
+// (uBoxes + uBoxAux : deux vec4 par boîte ; uBoxH, la table des hauteurs :
+// un quart) : comptées sur la source, la composition en occupe 460 à 160
+// boîtes (332 à 96) et le cuiseur de lumière 359 (231 à 96) — 40 de plus
+// chacun avec la table des hauteurs (14/11/2026), soit 500 et 399. WebGL2 n'en garantit que 224 — le shader les dépassait
 // déjà à 96, on ne s'appuie donc pas sur une limite nouvelle ; les GPU
 // courants en annoncent 1024. Un tableau qui n'en pose pas plus qu'avant ne
 // paie rien de plus par pixel. Le même chiffre est écrit dans les deux
@@ -99,7 +100,12 @@ export const MAX_LUMIERES = 4
 // lampe lui passe dessus ; une COQUE (une chambre, un couloir) monte au
 // plafond et n'est jamais enjambée.
 import { HAUTEUR_BLOCS, HAUTEUR_COQUE } from './hauteurs'
-import { LUMIERE_PAR_DEFAUT, directionLumiereMoyenne } from './volume'
+import {
+  LUMIERE_PAR_DEFAUT,
+  directionLumiereMoyenne,
+  hauteursPartagees,
+  type BoiteVolume,
+} from './volume'
 export { HAUTEUR_BLOCS, HAUTEUR_COQUE }
 
 const SPLAT_VS = `#version 300 es
@@ -875,6 +881,16 @@ uniform vec4 uBoxes[MAX_BOXES];   // minX, minY, maxX, maxY
 // 1 plein, 0 déchargé) ; w : portée d'aura propre (chaudière, 1 = banc).
 // Empaquetés par boîte pour tenir dans le budget des GPU mobiles.
 uniform vec4 uBoxAux[MAX_BOXES];
+// LA HAUTEUR DE CHAQUE BOÎTE (volume.ts, hauteursPartagees : la matière
+// donne le rang, des solides qui se touchent partagent le plus haut), dans
+// l'ordre des cases. Quatre par vec4 : un vec4 par boîte coûterait 160 cases
+// d'uniformes de plus, quatre par case n'en coûtent que 40. La composante se
+// choisit par un masque, sans indice dynamique dans un vecteur.
+uniform vec4 uBoxH[MAX_BOXES / 4];
+float hauteurBoite(int bi) {
+  int r = bi - 4 * (bi / 4);
+  return dot(uBoxH[bi / 4], vec4(equal(ivec4(r), ivec4(0, 1, 2, 3))));
+}
 uniform float uTime;
 uniform float uExitRadius; // portée de l'aspiration du sas (halo de courant)
 uniform float uColdBand;   // portée de l'aura de gel des plaques froides
@@ -2168,8 +2184,13 @@ float sdfBoiteLocal(int bi, vec2 wb, vec4 dec) {
   return dec.y > 0.5 ? formeSdf(wb, uBoxes[bi], dec.y, dec.z, dec.w) : boxSdf(wb, uBoxes[bi]);
 }
 
-// L'OMBRE COURTE de lisibilité (volume.ts : longueurOmbreCourte(HAUTEUR_BLOCS)
-// et FLOU_OMBRE_COURTE — epaisseur.spec.ts vérifie qu'ils ne dérivent pas)
+// L'OMBRE COURTE de lisibilité (volume.ts : OMBRE_COURTE_PAR_HAUTEUR,
+// longueurOmbreCourte et FLOU_OMBRE_COURTE — epaisseur.spec.ts et
+// hauteursBoites.spec.ts vérifient qu'ils ne dérivent pas). Chaque boîte la
+// jette à SA hauteur ; OMBRE_COURTE est la plus longue, celle d'un mur haut
+// (la hauteur d'une coque est bornée à la sienne) : c'est elle qui borne le
+// rayon de rejet.
+#define OMBRE_COURTE_PAR_HAUTEUR 0.4
 #define OMBRE_COURTE 56.0
 #define OMBRE_COURTE_FLOU 12.0
 
@@ -2499,7 +2520,6 @@ void main() {
   // Lumière éteinte, ou aucune lampe : la direction par défaut, en uniforme
   // (volume.ts) — le chanfrein et l'ombre courte en ont toujours une.
   vec2 lampeDir = uLumiereDefaut;
-  vec3 lumHaut = vec3(0.0);   // lumière reçue par le sommet des solides
   vec3 eclSolide = vec3(1.0); // multiplicateur des matières inertes
   vec3 eclActif = vec3(1.0);  // idem, atténué, pour les surfaces actives
   if (uLumiere > 0.5) {
@@ -2510,43 +2530,23 @@ void main() {
       float dn = max(length(dl), 1.0);
       float w = uLampesInt[li] * (1.0 - 0.55 * smoothstep(0.0, uLampes[li].w, dn));
       acc += (dl / dn) * w;
-      // LA LUMIÈRE SUR LE DESSUS DES SOLIDES. Le sommet d'un bloc est à
-      // HAUTEUR_BLOCS, et tous les blocs ont la même hauteur : aucun n'ombre
-      // le toit d'un autre. Il n'y a donc pas d'occlusion à lire — la carte
-      // cuite, elle, ne vaut QUE pour le sol (à l'intérieur d'un bloc elle
-      // rend l'ombre du bloc lui-même). Même formule que la carte, mesurée
-      // depuis le sommet : la flaque d'une lampe basse ne monte pas sur les
-      // toits, une lampe haute les baigne.
-      float hRel = max(uLampes[li].z - HAUTEUR_BLOCS, 0.0);
-      // Retombée PLUS FRANCHE que celle du sol (0,72 contre 0,55) : le sol,
-      // lui, garde un plateau large parce que l'occlusion cuite y creuse
-      // déjà les ombres. Sur les toits, rien ne creuse — sans cette pente,
-      // un sommet à l'autre bout de la salle rendait comme un sommet sous
-      // la lampe, et c'est précisément ce qu'on corrige.
-      float fall = 1.0 - 0.72 * smoothstep(0.0, uLampes[li].w, dn);
-      fall += 0.85 * pow(max(0.0, 1.0 - dn / (hRel * 0.55 + 60.0)), 1.6);
-      lumHaut += uLampesCol[li] * (fall * uLampesInt[li]);
     }
     float an = length(acc);
     if (an > 1e-5) lampeDir = acc / an;
-    // Même contrat que le fond de cuve (ambiante + carte), BORNÉ À 1 : la
-    // lumière ne peut qu'assombrir un solide, jamais le surexposer — les
-    // tableaux déjà réglés gardent exactement leur clair d'aujourd'hui, et
-    // seuls les recoins que rien n'éclaire tombent vers le plancher.
-    eclSolide = clamp(vec3(uAmbiante) + 0.95 * lumHaut,
-                      vec3(PLANCHER_SOLIDE), vec3(1.0));
-    // Les surfaces ACTIVES gardent leur signal : une chaudière se lit
-    // brûlante même dans le noir. Elles n'obéissent qu'à moitié.
-    eclActif = mix(vec3(1.0), eclSolide, 0.45);
   }
   // ce que la carte cuite laisse de lumière au sol ici (1 : rien d'ombré) —
   // l'ombre courte des solides s'y efface d'autant, pour ne pas DOUBLER
   // l'ombre longue que la carte porte déjà
   float solEclaire = 1.0;
+  // ce que les lampes laissent de lumière au TOIT ici (1 : aucun voisin plus
+  // haut ne l'ombre) — la carte le porte dans son alpha (voir LIGHT_FS)
+  float toitVis = 1.0;
   if (uLumiere > 0.5) {
     vec2 luv = (world - uLightMapMin) * uLightMapInvSize;
     // la carte est COLORÉE : chaque lampe y a versé sa teinte × visibilité
-    vec3 lm = texture(uLightMap, clamp(luv, 0.0, 1.0)).rgb;
+    vec4 lm4 = texture(uLightMap, clamp(luv, 0.0, 1.0));
+    vec3 lm = lm4.rgb;
+    toitVis = lm4.a;
     solEclaire = clamp(max(lm.r, max(lm.g, lm.b)), 0.0, 1.0);
     tank *= uAmbiante + 0.95 * lm;
     // un léger surcroît dans les pleins feux — la teinte suit les lampes
@@ -2705,6 +2705,49 @@ void main() {
       iCouv = bi;
     }
   }
+  // LA LUMIÈRE SUR LE DESSUS DES SOLIDES, à la hauteur du toit qu'on
+  // regarde : la table des hauteurs, et hors de tout solide celle du plus
+  // proche (son liseré et son flanc se peignent ici). Même formule que la
+  // carte, mesurée depuis le sommet : la flaque d'une lampe basse ne monte
+  // pas sur les toits, une lampe haute les baigne — et elle atteint un toit
+  // bas plus tôt qu'un mur haut. La carte, elle, ne vaut que pour le sol (à
+  // l'intérieur d'un bloc elle rend l'ombre du bloc lui-même) ; ce qu'un
+  // voisin PLUS HAUT ôte à un toit, elle le porte dans son alpha (toitVis).
+  // Tant que tous les blocs avaient la même hauteur, aucun n'ombrait le toit
+  // d'un autre : ce n'est plus vrai.
+  if (uLumiere > 0.5) {
+    float hToit = iCouv >= 0 ? hauteurBoite(iCouv) : HAUTEUR_BLOCS;
+    vec3 lumHaut = vec3(0.0);   // lumière reçue par le sommet des solides
+    for (int li = 0; li < MAX_LUMIERES; li++) {
+      if (li >= uLampeCount) break;
+      float dn = max(length(pointLampe(li, world) - world), 1.0);
+      float hRel = max(uLampes[li].z - hToit, 0.0);
+      // Retombée PLUS FRANCHE que celle du sol (0,72 contre 0,55) : le sol,
+      // lui, garde un plateau large parce que l'occlusion cuite y creuse
+      // déjà les ombres. Sur les toits, seul un voisin plus haut creuse —
+      // sans cette pente, un sommet à l'autre bout de la salle rendait comme
+      // un sommet sous la lampe.
+      float fall = 1.0 - 0.72 * smoothstep(0.0, uLampes[li].w, dn);
+      fall += 0.85 * pow(max(0.0, 1.0 - dn / (hRel * 0.55 + 60.0)), 1.6);
+      lumHaut += uLampesCol[li] * (fall * uLampesInt[li]);
+    }
+    // l'ombre des voisins plus hauts, sur le dessus seulement : au sol, le
+    // fond a déjà la sienne (la carte)
+    lumHaut *= mix(1.0, toitVis, step(dCouv, 0.0));
+    // Même contrat que le fond de cuve (ambiante + carte), BORNÉ À 1 : la
+    // lumière ne peut qu'assombrir un solide, jamais le surexposer — les
+    // tableaux déjà réglés gardent exactement leur clair d'aujourd'hui, et
+    // seuls les recoins que rien n'éclaire tombent vers le plancher.
+    eclSolide = clamp(vec3(uAmbiante) + 0.95 * lumHaut,
+                      vec3(PLANCHER_SOLIDE), vec3(1.0));
+    // Les surfaces ACTIVES gardent leur signal : une chaudière se lit
+    // brûlante même dans le noir. Elles n'obéissent qu'à moitié.
+    eclActif = mix(vec3(1.0), eclSolide, 0.45);
+  }
+  // l'ombre courte d'un solide sur le TOIT d'un voisin plus bas : retenue
+  // dans la boucle, peinte après elle (le toit se peint peut-être après la
+  // source, et l'aurait recouverte)
+  float ombreToit = 0.0;
   for (int bi = 0; bi < min(uBoxCount, MAX_BOXES); bi++) {
     // boîte oblique : le monde pivote dans le repère local de la boîte —
     // la distance signée (remplissage, arête, aura) suit la rotation
@@ -2816,34 +2859,46 @@ void main() {
     //  - l'ombre de CONTACT, serrée et sombre au pied : le solide est posé,
     //    et c'est là — au pied, nulle part ailleurs — que le fluide le touche ;
     //  - l'ombre COURTE, à l'opposé de la lumière (lampeDir, la direction par
-    //    défaut lumière éteinte), longue de OMBRE_COURTE : la hauteur d'un mur
-    //    haut en attendant la table des hauteurs par boîte. Un sol que la
-    //    carte cuite a déjà ombré la reçoit moins (solEclaire).
-    // Rien de tout cela là où un AUTRE solide couvre le pixel (libre) : un
+    //    défaut lumière éteinte), longue de OMBRE_COURTE_PAR_HAUTEUR × la
+    //    hauteur de la boîte (la table) : un mur haut la jette plus loin
+    //    qu'un rideau. Un sol que la carte cuite a déjà ombré la reçoit moins
+    //    (solEclaire).
+    // Le contact, rien là où un AUTRE solide couvre le pixel (libre) : un
     // pied posé sur le dessus d'un voisin y tracerait une couture sombre.
+    // L'ombre courte, elle, tombe aussi sur le TOIT d'un voisin plus bas.
+    // (déclarées hors du bloc : l'aura des hydro, plus bas, les lit)
+    float ombreCourte = 0.0;
+    float contact = 0.0;
     if (solide && !aPieces) {
       float sol = step(0.0, d) * libre;
-      float ombreCourte = 0.0;
-      // ses SDF ne se paient que sur le sol libre (dedans, ou sous un voisin,
-      // rien ne se peindrait)
-      if (d > 0.0 && libre > 0.0) {
+      // CE QUI REÇOIT l'ombre : le sol (0), ou le toit du voisin qui couvre
+      // ce pixel — elle ne s'y couche que sur ce que cette boîte le dépasse
+      // (volume.ts : longueurOmbreSur). Sous un voisin aussi haut ou plus
+      // haut, lO s'annule et ses SDF ne se paient pas ; dedans non plus.
+      float hRecoit = (iCouv >= 0 && iCouv != bi && dCouv < 0.0) ? hauteurBoite(iCouv) : 0.0;
+      float lO = OMBRE_COURTE_PAR_HAUTEUR * max(hauteurBoite(bi) - hRecoit, 0.0);
+      if (d > 0.0 && lO > 0.0) {
         // depuis ce point du sol, on remonte VERS la lumière : si le chemin
         // croise la boîte, le point est dans son ombre. Trois échantillons
         // (le quart, la moitié, le bout) : une paroi plus mince que le pas
         // passerait entre deux.
-        vec2 versLum = lampeDir * OMBRE_COURTE;
+        vec2 versLum = lampeDir * lO;
         // (le monde pivote dans le repère de la boîte, comme wb)
         vec2 lLoc = vec2(bca * versLum.x + bsa * versLum.y, -bsa * versLum.x + bca * versLum.y);
         float dO = min(sdfBoiteLocal(bi, wb + lLoc * 0.25, dec),
                        min(sdfBoiteLocal(bi, wb + lLoc * 0.5, dec), sdfBoiteLocal(bi, wb + lLoc, dec)));
-        ombreCourte = (1.0 - smoothstep(0.0, OMBRE_COURTE_FLOU, dO)) * sol;
+        float o = 1.0 - smoothstep(0.0, OMBRE_COURTE_FLOU, dO);
         // dense au pied, elle s'éclaircit en s'éloignant
-        ombreCourte *= 1.0 - 0.5 * smoothstep(0.0, OMBRE_COURTE + OMBRE_COURTE_FLOU, d);
-        // dans l'ombre cuite, elle s'efface un peu — jamais sous les trois
-        // quarts : à 0,4, le sol ombré sortait PLUS CLAIR qu'avec l'ancien halo
-        ombreCourte *= mix(0.75, 1.0, solEclaire);
+        o *= 1.0 - 0.5 * smoothstep(0.0, lO + OMBRE_COURTE_FLOU, d);
+        // au sol : dans l'ombre cuite, elle s'efface un peu — jamais sous les
+        // trois quarts : à 0,4, le sol ombré sortait PLUS CLAIR qu'avec
+        // l'ancien halo
+        ombreCourte = o * sol * mix(0.75, 1.0, solEclaire);
+        // sur un toit : la carte n'y dit rien (elle vaut pour le sol), c'est
+        // toitVis qui porte l'ombre longue des voisins plus hauts
+        ombreToit = max(ombreToit, o * (1.0 - libre) * mix(0.75, 1.0, toitVis));
       }
-      float contact = (1.0 - smoothstep(0.0, max(6.0, 2.0 * pxMonde), d)) * sol;
+      contact = (1.0 - smoothstep(0.0, max(6.0, 2.0 * pxMonde), d)) * sol;
       col = mix(col, col * vec3(0.50, 0.56, 0.70), ombreCourte * 0.65);
       col *= 1.0 - 0.45 * contact;
     }
@@ -3034,6 +3089,11 @@ void main() {
         // Atténuation LINÉAIRE : la brume emplit toute la bande au lieu de
         // s'écraser contre le mur — à n'importe quel zoom, le champ se voit
         float aura = (1.0 - smoothstep(0.0, uHydroBand, max(d, 0.0))) * step(0.0, d);
+        // Elle part AU-DELÀ du contact, et s'éclaircit à peine dans l'ombre
+        // courte du bloc : additive, elle les effaçait (vu au banc le 14/11 :
+        // le bloc hydro restait plat dans sa brume). Elle reste lisible tout
+        // autour — c'est une information de jeu, elle garde la priorité.
+        aura *= (1.0 - contact) * (1.0 - 0.4 * ombreCourte);
         float mist = 0.5 + 0.5 * dnoise(world * 0.045 + vec2(uTime * 0.10, -uTime * 0.07));
         vec3 auraCol = mat < 1.5 ? vec3(0.12, 0.42, 0.45) : vec3(0.38, 0.20, 0.52);
         col += auraCol * aura * (0.45 + 0.55 * mist);
@@ -3475,6 +3535,12 @@ void main() {
       }
     }
   }
+
+  // L'OMBRE COURTE SUR LES TOITS : celle qu'un solide jette sur le dessus
+  // d'un voisin plus bas (retenue dans la boucle, voir l'épaisseur). Peinte
+  // ici, une fois tous les remplissages posés : un toit peint APRÈS la
+  // boîte qui l'ombre l'aurait recouverte. Même teinte que l'ombre au sol.
+  col = mix(col, col * vec3(0.50, 0.56, 0.70), ombreToit * 0.65);
 
   // L'ombre du CORPS se couche sur tout ce qui est déjà peint — fond de
   // cuve, zones, parois : le volume existe dans la lumière, il l'intercepte.
@@ -4122,6 +4188,13 @@ precision highp float;
 uniform int uBoxCount;
 uniform vec4 uBoxes[MAX_BOXES];
 uniform vec4 uBoxAux[MAX_BOXES];
+// la hauteur de chaque boîte : la même table que la composition (voir
+// COMPOSE_FS), quatre par vec4
+uniform vec4 uBoxH[MAX_BOXES / 4];
+float hauteurBoite(int bi) {
+  int r = bi - 4 * (bi / 4);
+  return dot(uBoxH[bi / 4], vec4(equal(ivec4(r), ivec4(0, 1, 2, 3))));
+}
 uniform vec2 uMapMin;   // coin bas-gauche de la carte (monde)
 uniform vec2 uMapSize;  // taille de la carte (monde)
 uniform vec2 uMapPx;    // résolution de la carte (texels)
@@ -4217,7 +4290,11 @@ float sceneSdf(vec2 p, float alt) {
     if (dec.x > 10.5) continue;              // vide, baie : un trou dans le plancher, pas un mur
     if (dec.x > 4.5 && dec.x < 5.5) continue; // évent : tamisé à part (grilleTrans)
     if (dec.x < 0.5 && uBoxAux[i].z > 8.5) continue; // vitre : tamisée (vitreTrans)
-    if (alt > (dec.y > 4.5 ? HAUTEUR_COQUE : HAUTEUR_BLOCS)) continue;
+    // chaque boîte à SA hauteur (la table : un rideau bas est enjambé plus
+    // tôt qu'un mur haut) ; la coque monte au plafond. À hauteur ÉGALE, elle
+    // est enjambée aussi : un toit ne s'ombre pas lui-même, ni ses voisins
+    // du même groupe (la marche des toits part de leur hauteur, voir main)
+    if (alt >= (dec.y > 4.5 ? HAUTEUR_COQUE : hauteurBoite(i))) continue;
     vec2 wb = p;
     float ang = uBoxAux[i].y;
     if (abs(ang) > 0.0005) {
@@ -4270,7 +4347,7 @@ float sceneSdf(vec2 p, float alt) {
 // sol). Loin derrière, le motif se fond en tamis uniforme — la pénombre
 // d'une source réelle. Les formes d'évent ne projettent que là où le rayon
 // traverse vraiment leur silhouette (SDF au point de passage).
-float grilleTrans(vec2 p, vec2 dir, float tMax) {
+float grilleTrans(vec2 p, vec2 dir, float tMax, float hL, float distL) {
   float trans = 1.0;
   for (int i = 0; i < min(uBoxCount, MAX_BOXES); i++) {
     vec4 dec = decodeAux(uBoxAux[i].x);
@@ -4292,6 +4369,10 @@ float grilleTrans(vec2 p, vec2 dir, float tMax) {
     vec2 tb = (uBoxes[i].zw - lp) / safe;
     float t0 = max(max(min(ta.x, tb.x), min(ta.y, tb.y)), 0.0);
     float t1 = min(min(max(ta.x, tb.x), max(ta.y, tb.y)), tMax);
+    // passé SA hauteur, le rayon ne traverse plus le panneau : un évent
+    // moyen ne tamise pas aussi loin qu'un mur haut ombrerait
+    float hG = hauteurBoite(i);
+    t1 = min(t1, distL * hG / max(hL, hG + 1.0));
     if (t1 <= t0) continue;
     float tmid = 0.5 * (t0 + t1);
     // évent en FORME : hors de la silhouette, pas d'ombre
@@ -4315,7 +4396,7 @@ float grilleTrans(vec2 p, vec2 dir, float tMax) {
 // laisse la salle voisine éclairée. C'est ce qui distingue une vitre d'un
 // mur À DISTANCE, avant même d'aller la toucher : derrière un mur, le noir ;
 // derrière une vitre, la lumière de l'autre côté.
-float vitreTrans(vec2 p, vec2 dir, float tMax) {
+float vitreTrans(vec2 p, vec2 dir, float tMax, float hL, float distL) {
   float trans = 1.0;
   for (int i = 0; i < min(uBoxCount, MAX_BOXES); i++) {
     vec4 dec = decodeAux(uBoxAux[i].x);
@@ -4337,16 +4418,54 @@ float vitreTrans(vec2 p, vec2 dir, float tMax) {
     vec2 tb = (uBoxes[i].zw - lp) / safe;
     float t0 = max(max(min(ta.x, tb.x), min(ta.y, tb.y)), 0.0);
     float t1 = min(min(max(ta.x, tb.x), max(ta.y, tb.y)), tMax);
+    // la vitre est basse : le rayon la passe tôt (même règle que l'évent)
+    float hV = hauteurBoite(i);
+    t1 = min(t1, distL * hV / max(hL, hV + 1.0));
     if (t1 <= t0) continue;
     trans *= 0.62; // le verre boit un tiers de ce qui le traverse
   }
   return trans;
 }
 
+// LA HAUTEUR DU TOIT sous ce texel : la plus haute boîte qui le contient,
+// 0 au sol. Le sas, le vide et la baie n'ont pas de dessus. Une coque
+// compte à HAUTEUR_COQUE, comme dans la marche : rien ne la dépasse.
+float hauteurToit(vec2 p) {
+  float h = 0.0;
+  for (int i = 0; i < min(uBoxCount, MAX_BOXES); i++) {
+    vec4 dec = decodeAux(uBoxAux[i].x);
+    if (dec.x > 2.5 && dec.x < 3.5) continue;
+    if (dec.x > 10.5) continue;
+    float hB = dec.y > 4.5 ? HAUTEUR_COQUE : hauteurBoite(i);
+    if (hB <= h) continue;
+    vec2 wb = p;
+    float ang = uBoxAux[i].y;
+    if (abs(ang) > 0.0005) {
+      vec2 bc = 0.5 * (uBoxes[i].xy + uBoxes[i].zw);
+      vec2 rel = p - bc;
+      float ca = cos(ang);
+      float sa = sin(ang);
+      wb = bc + vec2(ca * rel.x + sa * rel.y, -sa * rel.x + ca * rel.y);
+    }
+    if (formeSdf(wb, uBoxes[i], dec.y, dec.z, dec.w) < 0.0) h = hB;
+  }
+  return h;
+}
+
 void main() {
   vec2 p = uMapMin + (gl_FragCoord.xy / uMapPx) * uMapSize;
   vec3 total = vec3(0.0);
   vec4 vis = vec4(0.0);
+  // UN DESSUS BAS REÇOIT L'OMBRE D'UN VOISIN PLUS HAUT. La carte vaut pour
+  // le sol ; sous un toit, elle rendait l'ombre du bloc lui-même, et la
+  // composition éclairait les toits sans occlusion — juste tant que tous les
+  // blocs avaient la même hauteur. Une seconde marche part donc du TOIT, à
+  // sa hauteur, et sa visibilité (pondérée par l'intensité des lampes) va
+  // dans l'ALPHA de la carte, que rien ne lisait : aucune unité de texture
+  // de plus (la composition les a toutes prises), une fois par décor.
+  float hT = hauteurToit(p);
+  float toitAcc = 0.0;
+  float toitPoids = 0.0;
   for (int li = 0; li < MAX_LUMIERES; li++) {
     if (li >= uLampeCount) break;
     vec2 toL = pointLampe(li, p) - p;
@@ -4378,13 +4497,33 @@ void main() {
     // éponge et une vitre sont du mobilier, pas des cloisons — les border à
     // tLim les ferait tamiser tout le trajet, et l'ombre des barreaux
     // s'étendrait à toute la salle.
-    float tamis = grilleTrans(p, dir, min(distL, tBloc))
+    float tamis = grilleTrans(p, dir, min(distL, tBloc), hL, distL)
       * epongeTrans(p, dir, min(distL, tBloc))
-      * vitreTrans(p, dir, min(distL, tBloc));
+      * vitreTrans(p, dir, min(distL, tBloc), hL, distL);
     // la VISIBILITÉ de cette lampe depuis ce texel, SANS le rebond : c'est
     // elle qui dit si la lampe éclaire vraiment ici — l'ombre dynamique du
     // corps s'y pèse, pour ne pas projeter l'ombre d'une lampe murée
     vis[li] = clamp(res * tamis, 0.0, 1.0);
+    // LA MARCHE DES TOITS : le rayon part du dessus, à hT, et grimpe vers la
+    // lampe ; sceneSdf enjambe tout ce qui est sous son altitude, le toit
+    // lui-même compris — seuls les voisins plus hauts l'arrêtent. Un toit que
+    // rien ne dépasse (hT ≥ uHautMax : un mur haut sans coque, une coque) ne
+    // marche pas, il voit la lampe.
+    if (hT > 0.0 && hT < uHautMax) {
+      float monte = max(hL - hT, 0.0) / distL;
+      float tLimT = monte > 0.0 ? min(distL, (uHautMax - hT) / monte) : distL;
+      float resT = 1.0;
+      float tT = 4.0;
+      for (int k = 0; k < 40; k++) {
+        if (tT >= tLimT || resT < 0.004) break;
+        float hS = sceneSdf(p + dir * tT, hT + tT * monte);
+        resT = min(resT, pen * hS / tT);
+        tT += clamp(hS, 8.0, 200.0);
+      }
+      // le même rebond qu'au sol : une ombre portée n'est jamais noire
+      toitAcc += uLampesInt[li] * (0.14 + 0.86 * clamp(resT, 0.0, 1.0));
+      toitPoids += uLampesInt[li];
+    }
     // la lumière REBONDIT : une ombre portée n'est jamais noire dans une
     // pièce claire — 14 % de la lampe y parviennent par les parois. Depuis
     // la flaque (le cône au sol), le contraste ombre/lumière avait doublé :
@@ -4403,7 +4542,8 @@ void main() {
     fall += 0.85 * pow(max(0.0, 1.0 - distL / (hL * 0.55 + 60.0)), 1.6);
     total += uLampesCol[li] * (res * fall * uLampesInt[li]);
   }
-  outColor = vec4(clamp(total, 0.0, 1.0), 1.0);
+  float toitVis = toitPoids > 0.0 ? toitAcc / toitPoids : 1.0;
+  outColor = vec4(clamp(total, 0.0, 1.0), toitVis);
   outVis = vis;
 }`
 
@@ -5325,6 +5465,11 @@ export class Renderer {
   private readonly scratch: Float32Array
   private readonly boxScratch = new Float32Array(MAX_BOXES * 4)
   private readonly auxScratch = new Float32Array(MAX_BOXES * 4) // matériau, angle, charge, aura
+  // LA HAUTEUR DE CHAQUE BOÎTE, case par case (uBoxH : quatre par vec4) —
+  // tirée de hauteursBoites, calculée une fois par décor (hauteursCle)
+  private readonly hauteurScratch = new Float32Array(MAX_BOXES)
+  private hauteursBoites: Float32Array = new Float32Array(0)
+  private hauteursCle = ''
   private readonly rangsScratch: number[] = [] // l'ordre de peinture des boîtes (fonds d'abord)
   private readonly floatField: boolean
   private fieldScale: number
@@ -6357,9 +6502,11 @@ export class Renderer {
     const h = Math.max(48, Math.min(480, Math.round((w * sizeY) / sizeX)))
     this.ensureLightTarget(w, h)
     // Le plus haut obstacle posé : une seule coque suffit à faire monter la
-    // borne de marche au plafond ; sans coque, elle reste à la hauteur des
-    // blocs et le cuiseur rend exactement ce qu'il rendait avant elles.
-    let hautMax = HAUTEUR_BLOCS
+    // borne de marche au plafond ; sans coque, c'est la plus haute hauteur
+    // de la table (celle d'un mur haut, HAUTEUR_BLOCS, dès qu'il y en a un —
+    // un tableau de rideaux bas s'arrête à la leur).
+    let hautMax = 0
+    for (let k = 0; k < boxCount; k++) hautMax = Math.max(hautMax, this.hauteurScratch[k])
     for (let i = 0; i < boxCount; i++)
       if ((boxes[i].forme ?? 0) === FORME_COQUE) {
         hautMax = HAUTEUR_COQUE
@@ -6376,6 +6523,9 @@ export class Renderer {
         `;L${l.x},${l.y},${l.h},${l.portee},${l.intensite},${l.rvb.join('/')}` +
         `,${l.bandeau ? 1 : 0},${l.demiLong},${l.angleRad}`
     key += this.cleBoitesImage(boxes, boxCount)
+    // les hauteurs entrent dans la clé : un habillage changé en vitre (basse)
+    // ne bouge aucune coordonnée, mais change les ombres
+    key += '|' + this.hauteurScratch.subarray(0, boxCount).join(',')
     if (key === this.lightKey) return
     this.lightKey = key
     this.lightMapMinX = minX
@@ -6389,6 +6539,7 @@ export class Renderer {
     gl.uniform1i(lu['uBoxCount'], boxCount)
     gl.uniform4fv(lu['uBoxes[0]'], this.boxScratch)
     gl.uniform4fv(lu['uBoxAux[0]'], this.auxScratch)
+    gl.uniform4fv(lu['uBoxH[0]'], this.hauteurScratch)
     gl.uniform2f(lu['uMapMin'], minX, minY)
     gl.uniform2f(lu['uMapSize'], sizeX, sizeY)
     gl.uniform2f(lu['uMapPx'], w, h)
@@ -6415,6 +6566,9 @@ export class Renderer {
     gl.uniform1i(lu['uSpongeCount'], nSp)
     gl.uniform4fv(lu['uSponges[0]'], spRect)
     gl.uniform1fv(lu['uSpongeCell[0]'], spCell)
+    // l'alpha de la carte porte la lumière des toits (LIGHT_FS) : un mélange
+    // resté allumé la multiplierait dans la couleur
+    gl.disable(gl.BLEND)
     gl.drawArrays(gl.TRIANGLES, 0, 3)
     gl.bindFramebuffer(gl.FRAMEBUFFER, null)
   }
@@ -6540,9 +6694,39 @@ export class Renderer {
     const rangs = rangsDePeinture(boxes, boxCount, this.rangsScratch)
     this.boutsCleFaite = false
     this.cleImage = null
+    // LES HAUTEURS (volume.ts) : la matière donne le rang, des solides qui se
+    // touchent partagent le plus haut. Calculées une fois par décor, comme la
+    // carte cuite : la clé des boîtes, plus leurs habillages (la vitre est
+    // basse, et cleBoite ne porte pas l'habillage). Dans l'éditeur, chaque
+    // boîte déplacée les refait — quelques ms sur le hub (volume.ts).
+    let cleH = this.cleBoitesImage(boxes, boxCount)
+    for (let i = 0; i < boxCount; i++) cleH += `,${boxes[i].skin ?? 0}`
+    if (cleH !== this.hauteursCle) {
+      this.hauteursCle = cleH
+      const vol: BoiteVolume[] = []
+      for (let i = 0; i < boxCount; i++) {
+        const bx = boxes[i]
+        vol.push({
+          x0: bx.minX,
+          y0: bx.minY,
+          x1: bx.maxX,
+          y1: bx.maxY,
+          mat: bx.material,
+          forme: bx.forme ?? FORME_RECT,
+          angle: bx.angle ?? 0,
+          skin: bx.skin,
+          coupe: (bx as { coupe?: BoiteVolume['coupe'] }).coupe,
+          p0: bx.p0,
+          p1: bx.p1,
+          p2: bx.p2,
+        })
+      }
+      this.hauteursBoites = hauteursPartagees(vol)
+    }
     for (let k = 0; k < boxCount; k++) {
       const i = rangs[k]
       const bx = boxes[i]
+      this.hauteurScratch[k] = this.hauteursBoites[i]
       this.boxScratch[k * 4] = bx.minX
       this.boxScratch[k * 4 + 1] = bx.minY
       this.boxScratch[k * 4 + 2] = bx.maxX
@@ -6707,6 +6891,7 @@ export class Renderer {
     gl.uniform1i(cu['uBoxCount'], boxCount)
     gl.uniform4fv(cu['uBoxes[0]'], this.boxScratch)
     gl.uniform4fv(cu['uBoxAux[0]'], this.auxScratch)
+    gl.uniform4fv(cu['uBoxH[0]'], this.hauteurScratch)
     gl.uniform1f(cu['uTime'], timeSec)
     gl.uniform1f(cu['uExitRadius'], params.exitRadius)
     // les auras dessinées suivent la physique refroidie (mêmes formules que

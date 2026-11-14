@@ -48,13 +48,15 @@ describe("l'épaisseur des solides dans la composition", () => {
     // le rejet grossier d'un solide saute tout pixel au-delà de son rayon :
     // il couvre l'ombre courte et son flou, sinon elle serait coupée net
     expect(source).toContain('float reachMax = max(56.0, OMBRE_COURTE + OMBRE_COURTE_FLOU);')
-    // seulement sur le sol libre : ailleurs, ses SDF ne se paient pas
-    expect(bloc).toMatch(/if \(d > 0\.0 && libre > 0\.0\) \{[^}]*sdfBoiteLocal/)
+    // seulement hors de la boîte, et là où elle a une longueur (sous un
+    // voisin aussi haut, rien) : ailleurs, ses SDF ne se paient pas
+    expect(bloc).toMatch(/if \(d > 0\.0 && lO > 0\.0\) \{[^}]*sdfBoiteLocal/)
     // une paroi plus mince que la moitié de l'ombre passerait entre deux
     // échantillons : un troisième, au quart
     expect(bloc).toContain('lLoc * 0.25')
-    // on remonte VERS la lumière depuis le sol : c'est là qu'est le bloc
-    expect(bloc).toMatch(/lampeDir \* OMBRE_COURTE/)
+    // on remonte VERS la lumière depuis le sol : c'est là qu'est le bloc —
+    // sur la longueur de SA hauteur (hauteursBoites.spec.ts)
+    expect(bloc).toMatch(/lampeDir \* lO/)
   })
 
   it('lumière éteinte, la direction est la direction par défaut, en uniforme', () => {

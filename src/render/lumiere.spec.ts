@@ -64,9 +64,12 @@ describe('Éclairage des volumes — la hauteur des coques', () => {
     )
     expect(source).toMatch(/hautMax\s*=\s*HAUTEUR_COQUE/)
     expect(source).toContain("gl.uniform1f(lu['uHautMax'], hautMax)")
-    // et chaque boîte est écartée à SA hauteur, pas à celle de la scène
+    // et chaque boîte est écartée à SA hauteur, pas à celle de la scène :
+    // la coque au plafond, les autres à leur hauteur de la table (volume.ts,
+    // hauteursBoites.spec.ts) — à hauteur égale, enjambée (un toit ne
+    // s'ombre pas lui-même)
     expect(source).toMatch(
-      /if\s*\(alt\s*>\s*\(dec\.y\s*>\s*4\.5\s*\?\s*HAUTEUR_COQUE\s*:\s*HAUTEUR_BLOCS\)\)\s*continue;/,
+      /if\s*\(alt\s*>=\s*\(dec\.y\s*>\s*4\.5\s*\?\s*HAUTEUR_COQUE\s*:\s*hauteurBoite\(i\)\)\)\s*continue;/,
     )
     // l'altitude passée au SDF : t·hLampe/distL, la montée réelle du rayon
     expect(source).toMatch(/sceneSdf\(p\s*\+\s*dir\s*\*\s*t,\s*t\s*\*\s*hL\s*\/\s*distL\)/)
@@ -82,8 +85,11 @@ describe('Éclairage des volumes — la hauteur des coques', () => {
   it('ne déborde PAS sur les tamis : évent, éponge et vitre restent du mobilier', () => {
     // un évent tamisé sur tout le trajet coucherait ses barreaux dans toute
     // la salle — les trois tamis se bornent à la hauteur des BLOCS
-    for (const tamis of ['grilleTrans', 'epongeTrans', 'vitreTrans'])
-      expect(source).toContain(`${tamis}(p, dir, min(distL, tBloc))`)
+    // (l'évent et la vitre se bornent en plus à la hauteur de LEUR boîte,
+    // d'où la lampe et la distance qu'ils reçoivent — hauteursBoites.spec.ts)
+    expect(source).toContain('grilleTrans(p, dir, min(distL, tBloc), hL, distL)')
+    expect(source).toContain('epongeTrans(p, dir, min(distL, tBloc))')
+    expect(source).toContain('vitreTrans(p, dir, min(distL, tBloc), hL, distL)')
     expect(source).toMatch(
       /float\s+tBloc\s*=\s*min\(distL,\s*distL\s*\*\s*HAUTEUR_BLOCS\s*\/\s*max\(hL,\s*HAUTEUR_BLOCS\s*\+\s*1\.0\)\);/,
     )
