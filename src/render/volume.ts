@@ -166,7 +166,12 @@ const scratch: FormeContact = { dist: 0, nx: 0, ny: 1 }
 // unité. Pour une forme coupée, on ne garde que ce qui reste de la forme.
 const PAS_CONTOUR = 2 * TOLERANCE
 
+// Calculé une fois par boîte (et non par paire) : c'est lui qui coûtait cher.
+const contours = new WeakMap<FormeBox, { x: number; y: number }[]>()
+
 function contourDense(a: FormeBox): { x: number; y: number }[] {
+  const connu = contours.get(a)
+  if (connu) return connu
   const perim = 2 * ((a.maxX - a.minX) + (a.maxY - a.minY))
   const brut = formeOutline(a, Math.min(8192, Math.max(48, Math.ceil(perim / PAS_CONTOUR))))
   const out: { x: number; y: number }[] = []
@@ -178,6 +183,7 @@ function contourDense(a: FormeBox): { x: number; y: number }[] {
       out.push({ x: p.x + ((q.x - p.x) * k) / n, y: p.y + ((q.y - p.y) * k) / n })
     }
   }
+  contours.set(a, out)
   return out
 }
 

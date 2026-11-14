@@ -98,6 +98,38 @@ describe('le contrat des hauteurs', () => {
     expect(h[0]).toBe(HAUTEUR_DE_RANG.bas)
   })
 
+  // Ces deux cas échouaient avec l'ancien échantillonnage (64 sommets de
+  // formeOutline) DANS LES DEUX SENS : les points tombent entre deux
+  // sommets, et les sommets de l'autre solide ne sont pas dans la forme.
+  it('une barre qui entame le bord d\'une très grande ellipse s\'y joint', () => {
+    // tournée d'un demi-pas d'échantillon : les points du contour tombent à
+    // droite et à gauche de la barre, jamais dessous
+    const grande = boite(-2000, -2000, 2000, 2000, MAT_WALL, FORME_DISQUE, 2.8125)
+    // aucun de ses coins n'est dans l'ellipse (à plus d'une unité), mais sa
+    // base y mord au milieu
+    const barre = boite(-90, -2004, 90, -1999.4, MAT_RIDEAU)
+    const h = hauteursPartagees([grande, barre])
+    expect(h[1]).toBe(HAUTEUR_DE_RANG.haut)
+  })
+
+  it('un grand disque posé contre la face intérieure d\'une coque s\'y joint', () => {
+    const coque = { ...boite(0, 0, 5000, 5000, MAT_WALL, FORME_COQUE), ...coquePack({ cotes: 15, chanfrein: 0, ep: 64, porte: 0 }) }
+    // tangent à la face (y = 64) ; tourné d'un demi-pas d'échantillon pour
+    // que le point de contact tombe entre deux points du contour
+    const disque = boite(500, 64, 4500, 4064, MAT_RIDEAU, FORME_DISQUE, 2.8125)
+    expect(hauteursPartagees([coque, disque])[1]).toBe(HAUTEUR_DE_RANG.haut)
+  })
+
+  it('une forme coupée ne se joint pas par sa partie retranchée', () => {
+    const coupe = { x: 50, y: 0, nx: 1, ny: 0 } // retranche x > 50
+    const coupee = { ...boite(0, 0, 100, 100, MAT_WALL), coupe }
+    // (le bord retranché, x = 100, est entièrement couvert par cette boîte)
+    const dansRetranche = boite(80, -10, 120, 110, MAT_RIDEAU)
+    const dansReste = boite(30, 10, 70, 90, MAT_RIDEAU)
+    expect(hauteursPartagees([coupee, dansRetranche])[1]).toBe(HAUTEUR_DE_RANG.bas)
+    expect(hauteursPartagees([coupee, dansReste])[1]).toBe(HAUTEUR_DE_RANG.haut)
+  })
+
   it("la vitre (mur, habillage 9) est basse, et partage la hauteur d'un mur voisin", () => {
     expect(hauteurPropre(MAT_WALL, 0, 9)).toBe(HAUTEUR_DE_RANG.bas)
     expect(hauteurPropre(MAT_WALL, 0, 3)).toBe(HAUTEUR_DE_RANG.haut)
