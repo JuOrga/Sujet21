@@ -1438,18 +1438,128 @@ export class FluidSim {
   }
 
   // L'impulsion SANS direction (stick au neutre, doigt posé sur le corps)
-  // se retourne vers l'intérieur : le corps se RASSEMBLE autour de son
-  // centre au lieu d'éjecter. Rien ne part, rien ne se paie — chaque
-  // particule du corps est rappelée vers le centre, sa fuite radiale est
-  // amortie, et les gouttes LIBRES du voisinage immédiat (hors délai de
-  // réabsorption) sont ramenées avec lui : le volume se REFORME, fragments
-  // compris. Le rappel est interne : la quantité de mouvement d'ensemble est
-  // préservée exactement (la dérive du corps reste une trajectoire).
-  rassemble(dt: number): void {
+  // se retourne vers l'intérieur : le corps se RASSEMBLE au lieu d'éjecter.
+  // Rien ne part, rien ne se paie — chaque particule du corps est rappelée
+  // vers le point de rassemblement, sa fuite radiale est amortie, et les
+  // gouttes LIBRES du voisinage immédiat (hors délai de réabsorption) sont
+  // ramenées avec lui : le volume se REFORME, fragments compris. Le rappel
+  // est interne : la quantité de mouvement d'ensemble est préservée.
+  //
+  // LE POINT DE RASSEMBLEMENT (retour joueur : « peu importe où on clique,
+  // ça regroupe au centre ; je voudrais que ça se regroupe là où l'on
+  // clique »). Sans point (stick au neutre), c'est le centre, comme avant.
+  // Avec un point (le doigt posé sur le corps), le corps se reforme LÀ : un
+  // corps tout étiré qu'on touche à son bout se ramasse vers ce bout.
+  //
+  // Déplacer le centre de masse sans rien éjecter, c'est créer de l'élan à
+  // partir de rien — la physique l'interdit, l'économie du jeu aussi. D'où
+  // trois garde-fous :
+  //  - le glissement est un ALLER SANS RETOUR D'ÉLAN : une vitesse de
+  //    translation commune s'ajoute au corps le temps du trajet, puis se
+  //    retire exactement — à l'arrivée ou au relâchement. La dérive d'avant
+  //    le geste est celle d'après : se rassembler ne freine ni ne lance.
+  //  - le point est pris dans le REPÈRE DU CORPS (fixé au premier toucher,
+  //    puis emporté avec sa dérive) : tenir le doigt ne cloue pas le corps
+  //    dans le monde, sinon le geste deviendrait un frein gratuit.
+  //  - le trajet est raccourci du RAYON DU CORPS COMPACT : le corps reformé
+  //    ENGLOBE le point touché au lieu de s'y centrer. Un corps déjà ramassé
+  //    touché à son bord ne bouge donc pas — sans cela, toucher le bord en
+  //    boucle ferait ramper le corps d'un rayon par toucher, gratuitement.
+  //    Un corps étiré touché à son bout, lui, s'y ramasse : c'est le geste.
+  private rass = {
+    actif: false, // un rassemblement est en cours (au moins un pas)
+    vu: false, // rassemble() a été appelé depuis le dernier pas
+    resteX: 0, // trajet du centre de masse qu'il reste à faire (repère du corps)
+    resteY: 0,
+    uX: 0, // vitesse de translation commune actuellement prêtée au corps
+    uY: 0,
+  }
+
+  /** Le rayon du corps ramassé en disque compact (pavage hexagonal). */
+  private rayonCompact(): number {
+    const s = this.params.particleSpacing
+    return Math.sqrt((this.stats.count * s * s * Math.sqrt(3) * 0.5) / Math.PI)
+  }
+
+  /** Le point (monde) vers lequel le corps se rassemble en ce moment, ou
+   *  null hors rassemblement. Sert au rendu (l'onde part de là). */
+  pointDeRassemblement(): { x: number; y: number } | null {
+    if (!this.rass.actif) return null
+    return {
+      x: this.stats.centroidX + this.rass.resteX,
+      y: this.stats.centroidY + this.rass.resteY,
+    }
+  }
+
+  /** Le geste est relâché (ou interrompu) : la vitesse de translation prêtée
+   *  au corps lui est reprise — il garde la dérive qu'il avait avant. */
+  private finRassemble(): void {
+    const r = this.rass
+    if (r.uX !== 0 || r.uY !== 0) {
+      for (let i = 0; i < this.count; i++) {
+        if (this.kind[i] !== KIND_PLAYER || this.frozen[i] === 1 || this.gaseous[i] === 1) continue
+        this.velX[i] -= r.uX
+        this.velY[i] -= r.uY
+      }
+    }
+    r.actif = false
+    r.resteX = r.resteY = r.uX = r.uY = 0
+  }
+
+  rassemble(dt: number, versX?: number, versY?: number): void {
     if (this.dispersed) return
     const p = this.params
-    const cx = this.stats.centroidX
-    const cy = this.stats.centroidY
+    const r = this.rass
+    r.vu = true
+    if (!r.actif) {
+      r.actif = true
+      r.resteX = r.resteY = r.uX = r.uY = 0
+      if (versX !== undefined && versY !== undefined) {
+        const dx = versX - this.stats.centroidX
+        const dy = versY - this.stats.centroidY
+        const d = Math.hypot(dx, dy)
+        const rc = this.rayonCompact()
+        if (d > rc) {
+          r.resteX = (dx * (d - rc)) / d
+          r.resteY = (dy * (d - rc)) / d
+        }
+      }
+    }
+    // La translation : la vitesse visée décroît avec le trajet restant —
+    // freinage à accélération bornée (v² = a·d) au loin, approche
+    // exponentielle (taux regroupDamp) à la fin — et ne change jamais de
+    // plus de regroupAccel·dt d'un pas à l'autre : pas d'à-coup au toucher.
+    const reste = Math.hypot(r.resteX, r.resteY)
+    let wX = 0
+    let wY = 0
+    if (reste > 1e-6) {
+      const v = Math.min(Math.sqrt(p.regroupAccel * reste), p.regroupDamp * reste)
+      wX = (r.resteX / reste) * v
+      wY = (r.resteY / reste) * v
+    }
+    let duX = wX - r.uX
+    let duY = wY - r.uY
+    const du = Math.hypot(duX, duY)
+    const duMax = p.regroupAccel * dt
+    if (du > duMax) {
+      duX *= duMax / du
+      duY *= duMax / du
+    }
+    r.uX += duX
+    r.uY += duY
+    r.resteX -= r.uX * dt
+    r.resteY -= r.uY * dt
+    if (duX !== 0 || duY !== 0) {
+      for (let i = 0; i < this.count; i++) {
+        if (this.kind[i] !== KIND_PLAYER || this.frozen[i] === 1 || this.gaseous[i] === 1) continue
+        this.velX[i] += duX
+        this.velY[i] += duY
+      }
+    }
+    // le rappel vise le point de rassemblement : le centre de masse plus le
+    // trajet qu'il lui reste (sans point, le centre lui-même)
+    const cx = this.stats.centroidX + r.resteX
+    const cy = this.stats.centroidY + r.resteY
     const rappel = p.regroupAccel * dt
     const keep = Math.exp(-p.regroupDamp * dt)
     // Rayon de capture des gouttes LIBRES : le voisinage immédiat du corps.
@@ -2244,6 +2354,9 @@ export class FluidSim {
     const p = this.params
     const n = this.count
     if (n === 0) return
+    // le geste de rassemblement relâché : la translation prêtée est reprise
+    if (this.rass.actif && !this.rass.vu) this.finRassemble()
+    this.rass.vu = false
     // Le re-tri ne concerne que les vraies scènes (les rigs de test suivent
     // des particules par indice) ; cadence 0,25 s — coût ~0,05 ms.
     if (n >= 128 && this.stepIndex % 30 === 0) this.reorderByCell()
