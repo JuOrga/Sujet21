@@ -98,8 +98,8 @@ export const MAX_LUMIERES = 4
 // Un obstacle ordinaire monte à HAUTEUR_BLOCS et le rayon qui grimpe vers la
 // lampe lui passe dessus ; une COQUE (une chambre, un couloir) monte au
 // plafond et n'est jamais enjambée.
-export const HAUTEUR_BLOCS = 140
-export const HAUTEUR_COQUE = 2400
+import { HAUTEUR_BLOCS, HAUTEUR_COQUE } from './hauteurs'
+export { HAUTEUR_BLOCS, HAUTEUR_COQUE }
 
 const SPLAT_VS = `#version 300 es
 layout(location = 0) in vec2 aPos;

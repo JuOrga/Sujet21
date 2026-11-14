@@ -6,10 +6,12 @@
 // pas et l'éditeur n'a rien de plus à demander. La matière dit ce qu'est
 // l'élément (un mur se dresse, un rideau arrête le fluide sans se dresser),
 // et la hauteur suit.
+import { HAUTEUR_BLOCS } from './hauteurs'
 import {
   FORME_COQUE,
   formeContact,
   formeOutline,
+  type Coupe,
   type FormeBox,
   type FormeContact,
 } from '../game/formes'
@@ -61,10 +63,12 @@ export const RANG_DE_MATIERE: Record<number, RangHauteur> = {
 // deux sous le haut pour que l'ombre d'un voisin plus haut tombe sur eux ;
 // le bas reste franchement non nul (flanc lisible à l'écran).
 export const HAUTEUR_DE_RANG: Record<RangHauteur, number> = {
-  haut: 140,
+  haut: HAUTEUR_BLOCS,
   moyen: 90,
   bas: 40,
 }
+
+const SKIN_VITRE = 9
 
 const solide = (mat: number): boolean => RANG_DE_MATIERE[mat] !== undefined
 
@@ -72,9 +76,12 @@ const solide = (mat: number): boolean => RANG_DE_MATIERE[mat] !== undefined
  *  baie). Une coque est bornée à celle d'un mur haut : elle garde sa
  *  `HAUTEUR_COQUE` pour la lumière cuite, mais pour l'image son ombre
  *  noierait la salle. */
-export function hauteurPropre(mat: number, forme: number): number {
+export function hauteurPropre(mat: number, forme: number, skin = 0): number {
   const rang = RANG_DE_MATIERE[mat]
   if (rang === undefined) return 0
+  // la VITRE est un mur d'habillage 9 (level.ts) : la conception la veut
+  // basse, elle arrête le fluide sans se dresser comme une cloison
+  if (mat === MAT_WALL && skin === SKIN_VITRE) return HAUTEUR_DE_RANG.bas
   const h = HAUTEUR_DE_RANG[rang]
   return forme === FORME_COQUE ? Math.min(h, HAUTEUR_DE_RANG.haut) : h
 }
@@ -87,6 +94,8 @@ export interface BoiteVolume {
   mat: number
   forme: number
   angle: number
+  skin?: number // habillage d'une paroi neutre : 9 = vitre
+  coupe?: Coupe // un demi-plan qui tronque la forme (formes.ts)
   // réglages de forme (coin, arc, coque) : sans eux, on lit la forme par
   // défaut — le contrat minimal reste celui de la fiche
   p0?: number
@@ -108,6 +117,7 @@ const enForme = (b: BoiteVolume): FormeBox => ({
   p0: b.p0,
   p1: b.p1,
   p2: b.p2,
+  coupe: b.coupe,
 })
 
 // Le rectangle orienté, en quatre sommets monde : sert au tri rapide (SAT).
@@ -149,10 +159,36 @@ function rectanglesSeTouchent(a: number[], b: number[]): boolean {
 
 const scratch: FormeContact = { dist: 0, nx: 0, ny: 1 }
 
+// Le contour de `a`, rendu dense : un point tous les 2 unités au plus (le
+// double de la tolérance), arêtes comprises. Les sommets seuls manquaient une
+// barre qui traverse la paroi d'une coque (sommets dans le creux d'un côté,
+// dehors de l'autre) ; et une grande ellipse à 64 points flèche de près d'une
+// unité. Pour une forme coupée, on ne garde que ce qui reste de la forme.
+const PAS_CONTOUR = 2 * TOLERANCE
+
+function contourDense(a: FormeBox): { x: number; y: number }[] {
+  const perim = 2 * ((a.maxX - a.minX) + (a.maxY - a.minY))
+  const brut = formeOutline(a, Math.min(8192, Math.max(48, Math.ceil(perim / PAS_CONTOUR))))
+  const out: { x: number; y: number }[] = []
+  for (let i = 0; i < brut.length; i++) {
+    const p = brut[i]
+    const q = brut[(i + 1) % brut.length]
+    const n = Math.max(1, Math.ceil(Math.hypot(q.x - p.x, q.y - p.y) / PAS_CONTOUR))
+    for (let k = 0; k < n; k++) {
+      out.push({ x: p.x + ((q.x - p.x) * k) / n, y: p.y + ((q.y - p.y) * k) / n })
+    }
+  }
+  return out
+}
+
 // Un point du contour de `a` est-il à moins de la tolérance de `b` ? (dedans,
 // ou au bord) — la distance signée de formes.ts, pas une recodée.
 function contourProche(a: FormeBox, b: FormeBox): boolean {
-  for (const p of formeOutline(a, 64)) {
+  for (const p of contourDense(a)) {
+    if (a.coupe) {
+      formeContact(p.x, p.y, a, scratch)
+      if (scratch.dist > TOLERANCE) continue
+    }
     formeContact(p.x, p.y, b, scratch)
     if (scratch.dist <= TOLERANCE) return true
   }
@@ -162,7 +198,7 @@ function contourProche(a: FormeBox, b: FormeBox): boolean {
 function seTouchent(a: BoiteVolume, fa: FormeBox, b: BoiteVolume, fb: FormeBox): boolean {
   if (!rectanglesSeTouchent(sommets(a), sommets(b))) return false
   // deux rectangles (même tournés) : le tri rapide est exact
-  if (!a.forme && !b.forme) return true
+  if (!a.forme && !b.forme && !fa.coupe && !fb.coupe) return true
   // Une forme courbe ou une coque creuse : le rectangle englobant mentirait
   // (un bloc DANS une chambre n'est pas collé à sa coque). Le contour d'une
   // forme contre la distance signée de l'autre, dans les deux sens.
@@ -197,7 +233,7 @@ export function hauteursPartagees(boites: ReadonlyArray<BoiteVolume>): Float32Ar
   const maxi = new Float32Array(n)
   for (let i = 0; i < n; i++) {
     const r = racine(i)
-    maxi[r] = Math.max(maxi[r], hauteurPropre(boites[i].mat, boites[i].forme))
+    maxi[r] = Math.max(maxi[r], hauteurPropre(boites[i].mat, boites[i].forme, boites[i].skin))
   }
   const out = new Float32Array(n)
   for (let i = 0; i < n; i++) out[i] = solide(boites[i].mat) ? maxi[racine(i)] : 0

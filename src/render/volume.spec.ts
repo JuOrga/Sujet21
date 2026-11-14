@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { FORME_COQUE, FORME_DISQUE, FORME_RECT } from '../game/formes'
+import { FORME_COQUE, FORME_DISQUE, FORME_RECT, coquePack } from '../game/formes'
 import {
   MAT_BAIE,
   MAT_EXIT,
@@ -8,7 +8,7 @@ import {
   MAT_VIDE,
   MAT_WALL,
 } from '../game/level'
-import { HAUTEUR_BLOCS } from './renderer'
+import { HAUTEUR_BLOCS } from './hauteurs'
 import {
   HAUTEUR_DE_RANG,
   LUMIERE_PAR_DEFAUT,
@@ -83,7 +83,7 @@ describe('le contrat des hauteurs', () => {
       expect(hauteurPropre(mat, FORME_COQUE)).toBeLessThanOrEqual(HAUTEUR_DE_RANG.haut)
     }
     const h = hauteursPartagees([
-      { ...boite(0, 0, 1000, 1000, MAT_WALL, FORME_COQUE), p0: 64, p1: 0 },
+      { ...boite(0, 0, 1000, 1000, MAT_WALL, FORME_COQUE), ...coquePack({ cotes: 15, chanfrein: 0, ep: 64, porte: 0 }) },
       boite(400, 400, 500, 500, MAT_RIDEAU),
     ])
     expect(h[0]).toBeLessThanOrEqual(HAUTEUR_DE_RANG.haut)
@@ -96,6 +96,31 @@ describe('le contrat des hauteurs', () => {
       boite(95, 95, 200, 200, MAT_WALL),
     ])
     expect(h[0]).toBe(HAUTEUR_DE_RANG.bas)
+  })
+
+  it("la vitre (mur, habillage 9) est basse, et partage la hauteur d'un mur voisin", () => {
+    expect(hauteurPropre(MAT_WALL, 0, 9)).toBe(HAUTEUR_DE_RANG.bas)
+    expect(hauteurPropre(MAT_WALL, 0, 3)).toBe(HAUTEUR_DE_RANG.haut)
+    const seule = hauteursPartagees([{ ...boite(0, 0, 100, 20, MAT_WALL), skin: 9 }])
+    expect(seule[0]).toBe(HAUTEUR_DE_RANG.bas)
+    const collee = hauteursPartagees([
+      { ...boite(0, 0, 100, 20, MAT_WALL), skin: 9 },
+      boite(100, 0, 200, 20, MAT_WALL),
+    ])
+    expect(Array.from(collee)).toEqual([140, 140])
+  })
+
+  it("une barre à cheval sur la paroi d'une coque s'y joint, un bloc collé aussi", () => {
+    // coque de 1000 × 1000, paroi de 64 : la barre a un bout dans le creux,
+    // l'autre dehors, et aucun de ses SOMMETS n'est dans la paroi
+    const coque = { ...boite(0, 0, 1000, 1000, MAT_WALL, FORME_COQUE), ...coquePack({ cotes: 15, chanfrein: 0, ep: 64, porte: 0 }) }
+    const barre = boite(480, -100, 520, 150, MAT_RIDEAU)
+    const collee = boite(500, 64, 560, 120, MAT_RIDEAU)
+    const loin = boite(400, 400, 500, 500, MAT_RIDEAU)
+    const h = hauteursPartagees([coque, barre, collee, loin])
+    expect(h[1]).toBe(HAUTEUR_DE_RANG.haut)
+    expect(h[3]).toBe(HAUTEUR_DE_RANG.bas)
+    expect(hauteursPartagees([coque, collee])[1]).toBe(HAUTEUR_DE_RANG.haut)
   })
 
   it('le sas, le vide et la baie valent 0 et ne joignent rien', () => {
