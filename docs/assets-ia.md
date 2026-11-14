@@ -2299,3 +2299,83 @@ contre la salle : 0,35 cran. Poids : chaufferie 532 Ko, serre 1,4 Mo.
 pièces propres du cryo, de l'antichambre et de
 l'observatoire (ils prennent les pièces tempérées en attendant) ; une
 deuxième variante de baie et de trappe.
+
+---
+
+## 37. LES SURFACES SOUS LUMIÈRE NEUTRE ET LEUR RELIEF ✅ LIVRÉ (14/11)
+
+Le chantier « volume des parois » (`docs/superpowers/specs/2026-11-14-volume-parois-design.md`,
+volet 3) : les surfaces de l'atelier avaient leur lumière PEINTE — le soleil du
+haut de la charte, à 50°, donnait à chaque rivet, chaque biseau, chaque tuyau un
+côté clair et un côté sombre fixes, et les lampes du jeu ne pouvaient plus les
+sculpter. Le mur, la seconde paroi, les deux matières et les huit habillages
+sont re-rendus avec **le même dessin, le même acier, le même cadrage**, sous une
+lumière neutre, et leur **relief voyage dans la couche alpha** de la même image
+(aucune unité de texture n'était libre).
+
+**La lumière neutre** (`chaud_tole.py`, `lumiere_neutre`) : un ciel couvert de
+la teinte froide des soleils (0,62), qui n'éclaire que par l'avant (la tôle de
+fond cache l'arrière) et que les reflets nets voient noir — vu dans les gouttes
+polies de la cire, il les changeait en anneaux pâles ; plus le soleil de face
+d'avant (0,13), qui vient de l'axe de la caméra et ne favorise aucun côté : c'est
+lui qui allume les crêtes du film d'eau de l'émail (sans lui, l'émail tombait
+de 0,18 à 0,075 de luminance, en sarcelle uni). Les autres pièces de l'atelier
+gardent `lumiere_camera`.
+
+**Le relief** (`chaud_biome.py`, `rend_relief`) : une seconde passe dans la même
+scène et la même caméra, les mêmes copies autour du carreau — le raccord vient
+comme celui de la couleur. Chaque matière y émet l'élévation du point vers la
+caméra, plus son bump quand il dépasse 0,5 mm (les rides de l'émail, le martelé
+de la cire ; le brossé de l'acier, 0,15 mm, restait sous un niveau de l'alpha :
+un grésil d'un niveau, et le mur pesait 67 Ko au lieu de 23). `relief.py` la range dans l'alpha : **blanc = le
+plus haut** ; la fenêtre va du point le plus haut à **6 mm sous la face
+dominante** (la médiane) — plus bas, c'est plat : le fond des joints, noir sous
+toute lampe, mangeait l'échelle (un rivet n'avait que 25 niveaux). Une image
+opaque (alpha 1 partout) est un dessus plat.
+
+**Pour le shader** : l'élévation vaut `alpha × profondeur` (+ une constante), en
+largeurs de carreau — le carreau est rendu à 1024 px pour une largeur. La pente
+vraie entre deux texels voisins est donc `Δalpha × profondeur × 1024` ; libre
+au shader de l'exagérer, mais d'une surface à l'autre, c'est la profondeur qui
+les accorde :
+
+| surface | profondeur (carreau) | luminance avant → après | raccord couleur x / y | raccord relief x / y | poids avant → après |
+| --- | --- | --- | --- | --- | --- |
+| `wall` | 0,0084 | 0,15 → 0,15 | 0,5 / 0,5 | 0,0 / 0,0 | 8 → 23 Ko |
+| `wall-a` | 0,0290 | 0,15 → 0,14 | 0,5 / 0,5 | 0,0 / 0,0 | 19 → 63 Ko |
+| `phile` | 0,0051 | 0,18 → 0,18 | 0,5 / 1,0 | 0,8 / 1,0 | 49 → 204 Ko |
+| `phobe` | 0,0157 | 0,15 → 0,16 | 0,6 / 0,6 | 1,0 / 1,1 | 28 → 238 Ko |
+| `paroi-atlas` | par case, ci-dessous | 0,13 → 0,12 (chauds 1 → 2 %) | — | — | 107 → 342 Ko |
+
+Les cases de l'atlas (`skin` 1 à 8), chacune sa fenêtre — les conduites
+dépassent de 15 cm, l'aération d'un : caissons 0,0248, conduites 0,1005,
+poutrelle 0,0391, blindage 0,0140, aération 0,0153, hublots 0,0410, écrans
+0,0340, câbles 0,0361. Raccords mesurés case par case (`habillages.py`) : tous
+sous 1,1, sauf les caissons — couleur 2,8 en x (4,2 le 13/11 : le bord tombe
+sur le biseau continu d'une caisse), relief 1,5.
+
+Le poids est celui d'un alpha **sans perte** : `prepare.py` encode en
+`exact` (libwebp remplaçait la couleur sous un alpha nul, et le fond des
+joints est à 0) ; un alpha avec perte (`alpha_quality` 85 à 95) pesait autant
+ou plus sur l'émail et la cire, par son tramage (mesuré le 14/11). Les
+familles `surface en relief` et `atlas des habillages` de `prepare.py`
+exigent l'alpha, ne le comptent pas dans la luminance et mesurent son raccord
+comme celui de la couleur ; `src/render/surfacesRelief.spec.ts` lit l'en-tête
+de chaque fichier livré.
+
+**Le fond de cuve n'est PAS re-rendu** : il est sous l'eau, derrière tout, et
+le shader n'éclaire que le dessus des solides — sa lumière peinte, venue du
+haut comme la lumière par défaut du jeu, ne contredit rien
+(`surfaces(neutre=False)` le refait tel quel).
+
+**La légende** (`index.html`, `.lg-sw`) montrait ces surfaces en fond CSS, où
+l'alpha se lirait en transparence (la cire est presque à 0 sous ses gouttes) :
+elle a sa planche opaque, `legende-surfaces.webp` (3 cases de 72 px, 2 Ko).
+
+Refaire : dans Blender, `DOSSIER = r'…/tools/images/blender'`, exécuter
+`surfaces.py`, puis `surfaces()` et `lance(['wall', 'wall-a', 'phile',
+'phobe'], SORTIE, 384)` ; hors de Blender, `python -I
+tools/images/blender/relief.py SORTIE masters/images wall wall-a phile phobe`.
+Les habillages : `habillages.py`, `habillages()`, `lance(NOMS, SORTIE, 384)`,
+puis `python -I tools/images/blender/habillages.py SORTIE
+masters/images/paroi-atlas.png`. Enfin `prepare.py`.
