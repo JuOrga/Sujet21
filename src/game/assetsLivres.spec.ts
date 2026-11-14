@@ -3,7 +3,7 @@
 import { describe, expect, it } from 'vitest'
 import { readdirSync, statSync } from 'node:fs'
 import { join } from 'node:path'
-import { assetsLivres, nomDe, rubriqueDe, RUBRIQUES } from './assetsLivres'
+import { assetsLivres, nomDe, reliefDansAlpha, rubriqueDe, RUBRIQUES } from './assetsLivres'
 
 function fichiersDisque(dir: string, base = ''): string[] {
   const out: string[] = []
@@ -90,6 +90,27 @@ describe('catalogue — LA SERRE accueille ses cultures avant même les fichiers
     )
     expect(RUBRIQUES.indexOf('Serre & cultures')).toBeLessThan(
       RUBRIQUES.indexOf('Autres'),
+    )
+  })
+})
+
+describe('catalogue — les surfaces dont l’alpha est un RELIEF (assets-ia §37)', () => {
+  it('le mur, la seconde paroi, les deux matières et l’atlas des habillages, et rien d’autre', () => {
+    for (const f of ['wall.webp', 'wall-a.webp', 'phile.webp', 'phobe.webp', 'paroi-atlas.webp']) {
+      expect(reliefDansAlpha(`/assets/${f}`), f).toBe(true)
+    }
+    // la légende a sa planche opaque ; le fond de cuve et l'atlas des
+    // conduites ont un alpha de détourage, ou pas d'alpha
+    for (const f of ['legende-surfaces.webp', 'tank-bg.webp', 'conduite-atlas.webp', 'wall-b.webp']) {
+      expect(reliefDansAlpha(`/assets/${f}`), f).toBe(false)
+    }
+  })
+
+  it('le catalogue le dit de chaque image : la galerie les montre SANS leur alpha', () => {
+    const cat = assetsLivres()
+    const enRelief = cat.filter((a) => a.relief).map((a) => a.url).sort()
+    expect(enRelief).toEqual(
+      ['/assets/paroi-atlas.webp', '/assets/phile.webp', '/assets/phobe.webp', '/assets/wall-a.webp', '/assets/wall.webp'],
     )
   })
 })

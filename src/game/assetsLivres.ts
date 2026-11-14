@@ -14,6 +14,18 @@ export interface AssetLivre {
   url: string
   nom: string
   rubrique: string
+  /** son alpha est un RELIEF, pas une transparence (reliefDansAlpha) */
+  relief: boolean
+}
+
+/** Les surfaces dont la couche alpha porte le RELIEF (docs/assets-ia.md §37 :
+ *  le mur, la seconde paroi, les deux matières, l'atlas des habillages) — le
+ *  shader l'y lit comme une hauteur. Montrées telles quelles, elles
+ *  paraîtraient trouées : la cire est presque à zéro sous ses perles, le fond
+ *  des joints à zéro. La galerie les montre donc SANS leur alpha. */
+export function reliefDansAlpha(url: string): boolean {
+  const f = url.slice(url.lastIndexOf('/') + 1)
+  return /^(wall|wall-a|phile|phobe|paroi-atlas)\.webp$/.test(f)
 }
 
 /** L'ordre des rubriques : celui du regard d'un concepteur — d'abord ce
@@ -143,7 +155,7 @@ export function assetsLivres(): AssetLivre[] {
   for (const chemin of Object.keys(FICHIERS)) {
     const i = chemin.indexOf('/public/')
     const url = i >= 0 ? chemin.slice(i + '/public'.length) : chemin
-    out.push({ url, nom: nomDe(url), rubrique: rubriqueDe(url) })
+    out.push({ url, nom: nomDe(url), rubrique: rubriqueDe(url), relief: reliefDansAlpha(url) })
   }
   const rang = (r: string): number => {
     const i = (RUBRIQUES as readonly string[]).indexOf(r)
