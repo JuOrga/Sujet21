@@ -99,6 +99,7 @@ export const MAX_LUMIERES = 4
 // lampe lui passe dessus ; une COQUE (une chambre, un couloir) monte au
 // plafond et n'est jamais enjambée.
 import { HAUTEUR_BLOCS, HAUTEUR_COQUE } from './hauteurs'
+import { LUMIERE_PAR_DEFAUT } from './volume'
 export { HAUTEUR_BLOCS, HAUTEUR_COQUE }
 
 const SPLAT_VS = `#version 300 es
@@ -978,6 +979,10 @@ uniform float uHasPlafond; // calque 3 du tableau de zones : le plafond du refle
 // le coût par image se réduit à une lecture de texture. uLumiere la
 // débranche entièrement (bouton PARAMÈTRES, comme uDecor/uEau).
 uniform float uLumiere;
+// La direction VERS la lumière quand uLumiere est éteint (volume.ts :
+// LUMIERE_PAR_DEFAUT, le haut de l'écran) : le chanfrein et l'ombre courte
+// gardent un côté clair et un côté sombre, le volume ne s'éteint pas.
+uniform vec2 uLumiereDefaut;
 // Lumière GÉNÉRALE du tableau (réglée à l'éditeur) : la part d'éclat que la
 // pièce garde là où aucune lampe ne porte. 0,52 = niveau historique ;
 // 0 = noir total hors des lampes.
@@ -2157,6 +2162,17 @@ float sdfVisible(int bi, vec2 p) {
 // dFdx lisait la valeur du pixel voisin, indéfinie quand ce voisin avait
 // sauté la boîte d'un continue.
 
+// la distance signée d'une boîte en un point QUELCONQUE de son repère local
+// (l'ombre courte la lit hors du pixel) : la forme si elle en a une
+float sdfBoiteLocal(int bi, vec2 wb, vec4 dec) {
+  return dec.y > 0.5 ? formeSdf(wb, uBoxes[bi], dec.y, dec.z, dec.w) : boxSdf(wb, uBoxes[bi]);
+}
+
+// L'OMBRE COURTE de lisibilité (volume.ts : longueurOmbreCourte(HAUTEUR_BLOCS)
+// et FLOU_OMBRE_COURTE — epaisseur.spec.ts vérifie qu'ils ne dérivent pas)
+#define OMBRE_COURTE 35.0
+#define OMBRE_COURTE_FLOU 12.0
+
 // le gradient du SDF de base d'une boîte, au point wb de son repère local
 // (dépivoté), par différences finies : d est la distance déjà calculée en
 // wb, (bca, bsa) le cosinus et le sinus de l'angle de la boîte — les axes du
@@ -2464,6 +2480,15 @@ void main() {
   tank += vec3(0.07, 0.12, 0.17) * gridLine(world, 500.0, lw * 1.6) * 0.45 * gridDim;
   // halo le long des parois : la cuve est éclairée par sa coque
   tank += vec3(0.020, 0.045, 0.060) * exp(min(0.0, roomD) * 0.02);
+  // L'OMBRE DE CONTACT au pied de la paroi de la cuve (volume des parois,
+  // volet 2) : la paroi est POSÉE, le fond ne passe pas dessous. Serrée
+  // (quelques unités, deux pixels au moins au recul). La salle en modules
+  // n'en a pas besoin ici : ses coques sont des solides, la boucle des
+  // boîtes leur donne déjà la leur.
+  if (uSolModules < 0.5) {
+    float contactCoque = (1.0 - smoothstep(0.0, max(6.0, 2.0 * pxMonde), -roomD)) * step(roomD, 0.0);
+    tank *= 1.0 - 0.45 * contactCoque;
+  }
   // Éclairage de la pièce : la carte précalculée (visibilité × retombée)
   // module le FOND — les ombres portées se couchent sur la cuve, les blocs
   // eux-mêmes restent éclairés (leur relief vient du biseau directionnel).
@@ -2471,7 +2496,9 @@ void main() {
   // elles n'ont pas à subir l'ombre de la lampe principale.
   // La direction de lumière dominante ICI (pour le biseau des arêtes) : la
   // somme des lampes, pondérée par intensité et retombée.
-  vec2 lampeDir = vec2(0.0, 1.0);
+  // Lumière éteinte, ou aucune lampe : la direction par défaut, en uniforme
+  // (volume.ts) — le chanfrein et l'ombre courte en ont toujours une.
+  vec2 lampeDir = uLumiereDefaut;
   vec3 lumHaut = vec3(0.0);   // lumière reçue par le sommet des solides
   vec3 eclSolide = vec3(1.0); // multiplicateur des matières inertes
   vec3 eclActif = vec3(1.0);  // idem, atténué, pour les surfaces actives
@@ -2512,10 +2539,15 @@ void main() {
     // brûlante même dans le noir. Elles n'obéissent qu'à moitié.
     eclActif = mix(vec3(1.0), eclSolide, 0.45);
   }
+  // ce que la carte cuite laisse de lumière au sol ici (1 : rien d'ombré) —
+  // l'ombre courte des solides s'y efface d'autant, pour ne pas DOUBLER
+  // l'ombre longue que la carte porte déjà
+  float solEclaire = 1.0;
   if (uLumiere > 0.5) {
     vec2 luv = (world - uLightMapMin) * uLightMapInvSize;
     // la carte est COLORÉE : chaque lampe y a versé sa teinte × visibilité
     vec3 lm = texture(uLightMap, clamp(luv, 0.0, 1.0)).rgb;
+    solEclaire = clamp(max(lm.r, max(lm.g, lm.b)), 0.0, 1.0);
     tank *= uAmbiante + 0.95 * lm;
     // un léger surcroît dans les pleins feux — la teinte suit les lampes
     tank += lm * lm * 0.06;
@@ -2770,16 +2802,40 @@ void main() {
         }
       }
     }
-    // Ombre portée douce autour de chaque solide (sauf le sas) : les blocs
-    // se détachent du fond au lieu de flotter — la cuve prend de la
-    // profondeur, les rectangles cessent d'être des aplats.
-    // (sauf la conduite d'ammoniac : son ombre suit ses tubes, pas la boîte
-    // — une plaque froide À FORME, elle, est un solide comme un autre)
-    // (ni la chaudière rectangulaire : même règle, mêmes pièces)
+    // (la conduite d'ammoniac a son ombre qui suit ses tubes, pas la boîte
+    // — une plaque froide À FORME, elle, est un solide comme un autre — et
+    // la chaudière rectangulaire de même : mêmes pièces, même règle)
     bool aPieces = ((mat > 3.5 && mat < 4.5) || (mat > 5.5 && mat < 6.5) || (mat > 8.5 && mat < 9.5)) && dec.y < 0.5;
+    // ——— L'ÉPAISSEUR, AU SOL (volume des parois, volet 2) ————————————
+    // Vu de dessus, caméra immobile et relief éteint, un solide ne dit sa
+    // hauteur que par ce qu'il fait au sol autour de lui. Le halo SYMÉTRIQUE
+    // d'avant (56 u, le même de tous côtés) le détachait du fond sans dire
+    // de quel côté il se dresse, ni de combien. Deux lectures le remplacent,
+    // sur le sol seulement (d > 0) :
+    //  - l'ombre de CONTACT, serrée et sombre au pied : le solide est posé,
+    //    et c'est là — au pied, nulle part ailleurs — que le fluide le touche ;
+    //  - l'ombre COURTE, à l'opposé de la lumière (lampeDir, la direction par
+    //    défaut lumière éteinte), longue de OMBRE_COURTE : la hauteur d'un mur
+    //    haut en attendant la table des hauteurs par boîte. Un sol que la
+    //    carte cuite a déjà ombré la reçoit moins (solEclaire).
+    // Rien de tout cela là où un AUTRE solide couvre le pixel (libre) : un
+    // pied posé sur le dessus d'un voisin y tracerait une couture sombre.
     if (solide && !aPieces) {
-      float shade = 1.0 - smoothstep(0.0, 56.0, max(d, 0.0));
-      col = mix(col, col * vec3(0.50, 0.56, 0.70), shade * shade * 0.5);
+      // depuis ce point du sol, on remonte VERS la lumière : si le chemin
+      // croise la boîte, le point est dans son ombre. Deux échantillons
+      // (mi-chemin, bout) suffisent à une ombre si courte.
+      vec2 versLum = lampeDir * OMBRE_COURTE;
+      // (le monde pivote dans le repère de la boîte, comme wb)
+      vec2 lLoc = vec2(bca * versLum.x + bsa * versLum.y, -bsa * versLum.x + bca * versLum.y);
+      float dO = min(sdfBoiteLocal(bi, wb + lLoc * 0.5, dec), sdfBoiteLocal(bi, wb + lLoc, dec));
+      float sol = step(0.0, d) * libre;
+      float ombreCourte = (1.0 - smoothstep(0.0, OMBRE_COURTE_FLOU, dO)) * sol;
+      // dense au pied, elle s'éclaircit en s'éloignant
+      ombreCourte *= 1.0 - 0.5 * smoothstep(0.0, OMBRE_COURTE + OMBRE_COURTE_FLOU, d);
+      ombreCourte *= mix(0.4, 1.0, solEclaire);
+      float contact = (1.0 - smoothstep(0.0, max(6.0, 2.0 * pxMonde), d)) * sol;
+      col = mix(col, col * vec3(0.50, 0.56, 0.70), ombreCourte * 0.45);
+      col *= 1.0 - 0.45 * contact;
     }
     // ——— LE FLANC : la tranche du solide, PLEINE et teintée matériau ————
     // Opaque (fini le voile fantôme), sombre au pied, franche vers le
@@ -3365,22 +3421,40 @@ void main() {
         col += vec3(0.15, 0.75, 0.55) * ring * pulse * 0.8;
       }
     }
-    // Relief d'éclairage : un biseau directionnel sur l'arête de chaque
-    // solide — la face tournée vers la lampe s'éclaire, l'opposée plonge.
-    // Le gradient du SDF vient des dérivées d'écran : gratuit, et il suit
-    // n'importe quelle forme. (Le sas, une bouche, ne se biseaute pas.)
-    // La conduite d'ammoniac non plus : d y est la distance à sa BOÎTE, et
-    // le biseau dessinait le rectangle du bloc sur le sol — dedans comme
-    // dehors. Son relief suit ses plaques et son tuyau (composition). La
-    // chaudière rectangulaire est dans le même cas (aPieces) : son dessin ne
-    // remplit plus sa boîte non plus.
-    if (uLumiere > 0.5 && solide && !aPieces) {
-      vec2 gd = gradSdfBoite(bi, wb, d, dec, bca, bsa);
-      float gn = length(gd);
-      if (gn > 1e-6) {
-        float facing = dot(gd / gn, lampeDir);
-        float bevel = 1.0 - smoothstep(0.0, 30.0, abs(d));
-        col += col * (facing * bevel * 0.30);
+    // Relief d'éclairage : un biseau directionnel, devenu un chanfrein franc.
+    // LE CHANFREIN (volume des parois, volet 2) : l'arête du dessus coupée
+    // net, comme une plaque d'acier — une bande franche, claire côté
+    // lumière, sombre à l'opposé, séparée du plat par une arête fine ; et sur
+    // l'arête vive tournée vers la lumière, un liseré. Il remplace le biseau
+    // MOU d'avant (±30 % fondus sur 30 u, dedans ET dehors) : celui-ci
+    // bavait sur le sol, ne se voyait qu'en dégradé, et s'éteignait avec la
+    // lumière. Le chanfrein vit sur le DESSUS seulement (dV, le sommet,
+    // déplacé si le relief est allumé) et garde lumière éteinte la
+    // direction par défaut. Le sas (une bouche) n'en a pas ; la conduite et
+    // la chaudière (aPieces) non plus : d y est la distance à leur BOÎTE, et
+    // le chanfrein dessinerait le rectangle du bloc — leur relief suit leurs
+    // plaques et leur tuyau (composition).
+    if (solide && !aPieces) {
+      float dT = -dV; // la profondeur dans le dessus, depuis son bord
+      if (dT > -edgeW && dT < 12.0) {
+        vec2 gd = gradSdfBoite(bi, wbV, dV, dec, bca, bsa);
+        float gn = length(gd);
+        if (gn > 1e-6) {
+          float facing = dot(gd / gn, lampeDir);
+          // large de 9 u, jamais plus du tiers de la demi-épaisseur (une
+          // paroi mince garde un plat), jamais moins de deux pixels
+          vec4 bxC = uBoxes[bi];
+          float wC = max(min(9.0, 0.3 * 0.5 * min(bxC.z - bxC.x, bxC.w - bxC.y)), 2.0 * pxMonde);
+          float aaC = max(pxMonde, 0.35);
+          float chanfrein = (1.0 - smoothstep(wC - aaC, wC + aaC, dT)) * smoothstep(-aaC, aaC, dT) * libre;
+          col *= 1.0 + facing * 0.34 * chanfrein;
+          // l'arête qui sépare le chanfrein du plat
+          float pli = (1.0 - smoothstep(0.0, 1.5 * aaC, abs(dT - wC))) * libre;
+          col *= 1.0 - 0.18 * pli;
+          // le liseré : l'arête vive, côté lumière, accroche un fil froid
+          float lisere = (1.0 - smoothstep(0.0, max(1.5 * pxMonde, 0.8), dT)) * smoothstep(-aaC, 0.0, dT);
+          col += vec3(0.55, 0.68, 0.80) * (0.30 * max(facing, 0.0) * lisere * libre) * eclSolide;
+        }
       }
     }
   }
@@ -4495,6 +4569,9 @@ uniform vec2 uCenter;
 uniform float uZoom;
 uniform float uTime;
 uniform float uEpais;
+// la direction VERS la lumière par défaut (volume.ts) : le chanfrein du bord
+// intérieur de la coque, sans lampes à lire ici
+uniform vec2 uLumiereDefaut;
 uniform float uRep;
 uniform int uVideCount;
 uniform vec4 uVides[MAX_VIDES];   // minX, minY, maxX, maxY
@@ -4924,6 +5001,17 @@ void main() {
     // bleu de la Terre du côté où ils sont
     vec3 c = tex * lumiereFace();
     c += lumiereArete(dO) * exp(-(uEpais - a) / (3.0 * px + 2.0));
+    // LE CHANFREIN du bord intérieur (volume des parois, volet 2) : la
+    // paroi est un objet épais posé autour de la cuve, pas un cadre peint.
+    // Même lecture que celui des solides de la composition : une bande
+    // nette (la face regarde la cuve, −dO), claire côté lumière, une arête
+    // fine qui la sépare du plat, un liseré sur l'arête vive éclairée.
+    float wCh = max(9.0, 2.0 * px);
+    float faceCh = dot(-dO, uLumiereDefaut);
+    float chanfrein = 1.0 - smoothstep(wCh - px, wCh + px, a);
+    c *= 1.0 + faceCh * 0.34 * chanfrein;
+    c *= 1.0 - 0.18 * (1.0 - smoothstep(0.0, 1.5 * px, abs(a - wCh)));
+    c += vec3(0.55, 0.68, 0.80) * 0.30 * max(faceCh, 0.0) * (1.0 - smoothstep(0.0, max(1.5 * px, 0.8), a));
     c = mix(c, vec3(0.030, 0.040, 0.055), (1.0 - smoothstep(0.0, 12.0, dv)) * 0.85);
     c = mix(c, vec3(0.30, 0.38, 0.48), (1.0 - smoothstep(px, 2.5 * px, dv)) * 0.65);
     // les embases qui mordent dans la coque, par-dessus la tôle
@@ -6617,6 +6705,7 @@ export class Renderer {
     // Éclairage de la pièce : la carte cuite + les lampes (le biseau des
     // arêtes et les montures en ont besoin par pixel)
     gl.uniform1f(cu['uLumiere'], lumiere > 0.5 && this.lightTex ? 1 : 0)
+    gl.uniform2f(cu['uLumiereDefaut'], LUMIERE_PAR_DEFAUT[0], LUMIERE_PAR_DEFAUT[1])
     gl.uniform1f(cu['uAmbiante'], ambiante)
     gl.uniform1f(cu['uBrume'], brume)
     gl.uniform1f(cu['uMiroirEau'], miroirEau)
@@ -6939,6 +7028,7 @@ export class Renderer {
     gl.uniform1f(hu['uZoom'], camera.zoom)
     gl.uniform1f(hu['uTime'], timeSec)
     gl.uniform1f(hu['uEpais'], COQUE_EPAISSEUR)
+    gl.uniform2f(hu['uLumiereDefaut'], LUMIERE_PAR_DEFAUT[0], LUMIERE_PAR_DEFAUT[1])
     gl.uniform1f(hu['uRep'], this.hullRep)
     gl.uniform1i(hu['uVideCount'], nVides)
     if (nVides > 0) {
