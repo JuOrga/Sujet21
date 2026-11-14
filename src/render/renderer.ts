@@ -5267,10 +5267,6 @@ export function passeNetteRequise(dprNatif: number, dpr: number, decorNet: boole
   return decorNet && dprNatif > dpr * 1.02
 }
 
-/** La part de la clé de cuisson de la lumière qui vient des boîtes : TOUT
- *  ce que le cuiseur lit d'elles (sceneSdf) — le SENS d'une conduite
- *  compris : l'ombre suit le tuyau, et basculer seulement le sens à
- *  l'éditeur laissait une ombre debout sous un tuyau couché. */
 /** La clé des HAUTEURS (hauteursPartagees, volume.ts) : tout ce dont elles
  *  dépendent — chaque boîte (cleBoite : coordonnées, angle, matière, forme)
  *  et son habillage, que cleBoite ne porte pas (la vitre, un habillage de
@@ -5286,6 +5282,10 @@ export function cleHauteurs(
   return cle
 }
 
+/** La part de la clé de cuisson de la lumière qui vient des boîtes : TOUT
+ *  ce que le cuiseur lit d'elles (sceneSdf) — le SENS d'une conduite
+ *  compris : l'ombre suit le tuyau, et basculer seulement le sens à
+ *  l'éditeur laissait une ombre debout sous un tuyau couché. */
 export function cleBoitesLumiere(
   boxes: readonly ObstacleBox[],
   boxCount: number,
