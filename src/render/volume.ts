@@ -246,7 +246,28 @@ export function hauteursPartagees(boites: ReadonlyArray<BoiteVolume>): Float32Ar
   return out
 }
 
-/** La direction (monde, y vers le bas) d'où vient la lumière quand le réglage
- *  « Lumière » est éteint : du haut de l'écran. Sans elle le volume
- *  s'éteindrait en noir avec la lumière. Unitaire. */
-export const LUMIERE_PAR_DEFAUT: readonly [number, number] = [0, -1]
+/** La direction VERS la lumière quand le réglage « Lumière » est éteint
+ *  (`lampeDir` du shader de composition) : du haut de l'écran, comme le soleil
+ *  de l'atelier peint dans les surfaces. Sans elle le volume s'éteindrait en
+ *  noir avec la lumière. Unitaire.
+ *  Le repère est celui du SHADER, y vers le HAUT (`world` y est tiré de
+ *  gl_FragCoord) : [0, -1], écrit d'abord pour un repère y vers le bas,
+ *  faisait tomber la lumière du bas de l'écran — à rebours des rivets et des
+ *  tôles déjà éclairés d'en haut dans les images. */
+export const LUMIERE_PAR_DEFAUT: readonly [number, number] = [0, 1]
+
+/** L'ombre courte de lisibilité : la longueur au sol par unité de hauteur.
+ *  Courte à dessein — la carte cuite porte déjà l'ombre LONGUE des lampes ;
+ *  celle-ci dit seulement « ceci se dresse, de tant ». Un mur haut (140)
+ *  jette 35 u : avec le flou, elle tient dans les 56 u du rejet grossier de
+ *  la composition (au-delà, un mur ne peint plus rien, elle serait coupée
+ *  net). */
+export const OMBRE_COURTE_PAR_HAUTEUR = 0.25
+
+/** Le fondu du bout de l'ombre courte, en unités monde. */
+export const FLOU_OMBRE_COURTE = 12
+
+/** La longueur de l'ombre courte d'un solide de hauteur `h`. */
+export function longueurOmbreCourte(h: number): number {
+  return Math.max(0, h) * OMBRE_COURTE_PAR_HAUTEUR
+}

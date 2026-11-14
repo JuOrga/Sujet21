@@ -15,6 +15,7 @@ import {
   RANG_DE_MATIERE,
   hauteurPropre,
   hauteursPartagees,
+  longueurOmbreCourte,
 } from './volume'
 
 const boite = (x0: number, y0: number, x1: number, y1: number, mat: number, forme = FORME_RECT, angle = 0) => ({
@@ -169,5 +170,20 @@ describe('le contrat des hauteurs', () => {
 
   it('LUMIERE_PAR_DEFAUT est unitaire', () => {
     expect(Math.hypot(...LUMIERE_PAR_DEFAUT)).toBeCloseTo(1, 6)
+  })
+
+  it('LUMIERE_PAR_DEFAUT tombe du haut de l’écran, dans le repère du shader', () => {
+    // lampeDir pointe VERS la lampe, et la composition a y vers le HAUT
+    // (gl_FragCoord) : [0, -1] faisait venir la lumière du BAS de l'écran,
+    // à rebours du soleil de l'atelier peint dans les surfaces
+    expect(LUMIERE_PAR_DEFAUT[0]).toBe(0)
+    expect(LUMIERE_PAR_DEFAUT[1]).toBe(1)
+  })
+
+  it("l'ombre courte suit la hauteur : un bas en jette moins qu'un haut", () => {
+    expect(longueurOmbreCourte(0)).toBe(0)
+    expect(longueurOmbreCourte(2 * HAUTEUR_DE_RANG.bas)).toBeCloseTo(2 * longueurOmbreCourte(HAUTEUR_DE_RANG.bas), 6)
+    expect(longueurOmbreCourte(HAUTEUR_DE_RANG.bas)).toBeLessThan(longueurOmbreCourte(HAUTEUR_DE_RANG.moyen))
+    expect(longueurOmbreCourte(HAUTEUR_DE_RANG.moyen)).toBeLessThan(longueurOmbreCourte(HAUTEUR_BLOCS))
   })
 })
