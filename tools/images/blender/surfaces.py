@@ -15,7 +15,8 @@ la dernière plaque déborde à droite, et la copie de gauche la ramène au déb
 Dans Blender :
     DOSSIER = r'...\\tools\\images\\blender'
     exec(open(DOSSIER + r'\\surfaces.py', encoding='utf-8').read())
-    surfaces() ; lance(['wall', 'tank-bg'], SORTIE, 384)
+    surfaces() ; lance(['wall', 'wall-a', 'phile', 'phobe'], SORTIE, 384)
+    (sous lumière neutre, avec la passe de relief : relief.py les monte)
 """
 import bpy, bmesh, math, os, random
 from mathutils import Matrix, Vector
@@ -100,7 +101,7 @@ def fond(P, mats, nom='fond'):
     P.objects.link(bpy.data.objects.new(P.name + '-fond', me))
 
 
-def carreau(sc, mats, nom, bati, extra=None):
+def carreau(sc, mats, nom, bati, extra=None, relief=False):
     """un carreau : `bati(at, rng)` pose la géométrie dans [0,1]², les huit
     copies l'entourent, la caméra cadre le carreau et sa marge ; `extra(C,
     mats)` y ajoute ce que l'atelier ne sait pas faire (un texte)"""
@@ -113,7 +114,7 @@ def carreau(sc, mats, nom, bati, extra=None):
         extra(C, mats)
     fond(P, mats)
     copies(P, C, [(dx, dz) for dx in (-1, 0, 1) for dz in (-1, 0, 1) if dx or dz])
-    declare(nom, P, 0, 1, 0, 1, mx=MARGE, mz=MARGE, alpha=False)
+    declare(nom, P, 0, 1, 0, 1, mx=MARGE, mz=MARGE, alpha=False, relief=relief)
 
 
 def rangee(coutures):
@@ -525,7 +526,11 @@ def gouttes_lisses(C, mats):
             ob.data.polygons.foreach_set('use_smooth', [True] * len(ob.data.polygons))
 
 
-def surfaces():
+def surfaces(neutre=True):
+    """neutre (14/11) : la lumière neutre et la passe de relief, pour ce que
+    les lampes du jeu éclairent ; le fond de cuve, que le shader n'éclaire
+    pas (il est sous l'eau, derrière tout), garde son soleil peint et ne se
+    re-rend qu'avec surfaces(neutre=False)"""
     vide_scene()
     PIECES.clear()
     sc = bpy.context.scene
@@ -538,7 +543,7 @@ def surfaces():
     mats['rail'] = mat_brosse('rail', (0x18, 0x24, 0x2a), (0x30, 0x40, 0x48), 33, brosse=0.05)
     mats['plat'] = mats['rail']
     mats['voyant'] = mat_simple('voyant', (0x10, 0x40, 0x40), rug=0.3, emission=(0x5a, 0xf0, 0xe0), force=3.0)
-    carreau(sc, mats, 'wall', mur)
+    carreau(sc, mats, 'wall', mur, relief=neutre)
     # le fond de cuve : plus sombre, plus sarcelle (l'ancien : 0,11)
     mats_cuve = dict(mats)
     mats_cuve['panneau'] = mat_brosse('cuve', (0x10, 0x1a, 0x20), (0x24, 0x32, 0x3a), 37, brosse=0.04, rouille=(0x22, 0x2a, 0x2a))
@@ -557,18 +562,18 @@ def surfaces():
     mats_cuve['eteint'] = mat_simple('eteint', (0x0c, 0x18, 0x1a), rug=0.3)
     carreau(sc, mats_cuve, 'tank-bg', cuve, extra=marquage)
     mats['phile'] = mat_phile()
-    carreau(sc, mats, 'phile', bati_phile)
+    carreau(sc, mats, 'phile', bati_phile, relief=neutre)
     mats['phobe'] = mat_phobe()
     # la goutte : une eau claire teintée par la cire dessous, polie — c'est
     # son reflet qui la dessine
     mats['goutte'] = mat_simple('goutte', (0x3c, 0x2c, 0x52), rug=0.04)
-    carreau(sc, mats, 'phobe', bati_phobe, extra=gouttes_lisses)
+    carreau(sc, mats, 'phobe', bati_phobe, extra=gouttes_lisses, relief=neutre)
     # la seconde paroi : l'acier du mur, un rien plus vert et plus usé
     # (l'ancienne mesurait 0,17 de luminance ; à 223032 / 46585a, 0,137 :
     # plus sombre que le mur, elle s'y lisait en tache)
     mats_a = dict(mats)
     mats_a['peinture'] = mat_brosse('paroi-a', (0x27, 0x36, 0x38), (0x50, 0x63, 0x65), 43, brosse=0.08, rouille=(0x2c, 0x32, 0x2c))
     mats_a['rivet'] = mats_a['panneau'] = mats_a['peinture']
-    carreau(sc, mats_a, 'wall-a', bati_wall_a)
-    lumiere_camera(sc)
+    carreau(sc, mats_a, 'wall-a', bati_wall_a, relief=neutre)
+    (lumiere_neutre if neutre else lumiere_camera)(sc)
     sc.cycles.device = 'GPU'

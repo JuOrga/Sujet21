@@ -6119,15 +6119,24 @@
         background-size: cover;
         background-position: center;
       }
+      /* les trois surfaces portent leur RELIEF dans l'alpha (docs/assets-ia.md
+         §37) : en fond CSS, il se lirait en transparence — la légende a sa
+         planche opaque, une case de 72 px par surface */
+      .lg-sw.sw-mur,
+      .lg-sw.sw-phile,
+      .lg-sw.sw-phobe {
+        background-image: url('/assets/legende-surfaces.webp');
+        background-size: 300% 100%;
+      }
       .lg-sw.sw-mur {
-        background-image: url('/assets/wall.webp');
+        background-position: 0 0;
       }
       .lg-sw.sw-phile {
-        background-image: url('/assets/phile.webp');
+        background-position: 50% 0;
         border-color: rgba(51, 166, 179, 0.7);
       }
       .lg-sw.sw-phobe {
-        background-image: url('/assets/phobe.webp');
+        background-position: 100% 0;
         border-color: rgba(158, 107, 199, 0.7);
       }
       .lg-sw.sw-eponge {

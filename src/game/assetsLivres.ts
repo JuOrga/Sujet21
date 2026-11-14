@@ -39,6 +39,7 @@ const NOMS: Record<string, string> = {
   'paroi-atlas.webp': 'Atlas des habillages de paroi (4×2)',
   'phile.webp': 'Surface hydrophile',
   'phobe.webp': 'Surface hydrophobe',
+  'legende-surfaces.webp': 'Légende — pastilles du mur et des deux matières (opaques)',
   'conduite-atlas.webp': 'Conduite d’ammoniac (tronçon, bride, joint, givre du sol)',
   'chaudiere-atlas.webp': 'Chaleurs : la chaudière (rampe, bout, joint, brûleur, compacte, sol chauffé) et le surchauffeur (tube de verre, tête, dôme)',
   'filtres-atlas.webp': 'Filtres : la grille de l’évent et le rideau lamellaire (tronçon à lanières, montant)',
@@ -103,7 +104,7 @@ export function rubriqueDe(url: string): string {
   // le dossier fait foi, sinon elles tombaient dans « Autres »
   if (url.includes('/avaries/')) return 'Avaries — stations'
   if (url.includes('/codex/')) return 'Codex — aperçus'
-  if (/^(wall|paroi|phile|phobe|conduite|chaudiere|filtres|sponge)/.test(f))
+  if (/^(wall|paroi|phile|phobe|conduite|chaudiere|filtres|sponge|legende-surfaces)/.test(f))
     return 'Surfaces & matériaux'
   if (f.startsWith('zone-')) return 'Zones d’état'
   if (f.startsWith('serre-')) return 'Serre & cultures'
