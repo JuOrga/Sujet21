@@ -31,6 +31,7 @@ const SURFACES: Record<string, [number, number]> = {
   'wall-a.webp': [1024, 1024],
   'phile.webp': [1024, 1024],
   'phobe.webp': [1024, 1024],
+  'paroi-atlas.webp': [4096, 2048],
 }
 
 describe('surfaces en relief — le relief dans l’alpha', () => {

@@ -126,7 +126,8 @@ FAMILLES: list[Famille] = [
     ),
     Famille(
         'atlas des habillages', ('paroi-atlas',), taille=(4096, 2048), luma_max=0.30, qualite=80,
-        poids_max_ko=1200, note='grille 4×2 de cases 1024² — le raccord des cases n’est PAS mesuré ici (à l’œil, dans le jeu)',
+        poids_max_ko=1200, relief=True,
+        note='grille 4×2 de cases 1024² — le raccord des cases n’est PAS mesuré ici (habillages.py le mesure case par case)',
     ),
     Famille(
         # (14/11) ce que les lampes du jeu éclairent : rendu sous la lumière
