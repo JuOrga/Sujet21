@@ -107,6 +107,13 @@ import {
   hauteursPartagees,
   type BoiteVolume,
 } from './volume'
+import {
+  CARREAU_MONDE,
+  PROFONDEUR_RELIEF,
+  PROFONDEUR_RELIEF_ATLAS,
+  RELIEF_SURFACES_GLSL,
+  glslFloat,
+} from './surfacesSculptees'
 export { HAUTEUR_BLOCS, HAUTEUR_COQUE }
 
 const SPLAT_VS = `#version 300 es
@@ -907,6 +914,21 @@ float hauteurBoite(int bi) {
   return dot(uBoxH[bi / 4], vec4(equal(ivec4(r), ivec4(0, 1, 2, 3))));
 }
 ${RETOMBEE_TOIT_GLSL}
+// LES SURFACES SCULPTÉES PAR LES LAMPES (volume des parois, volet 3) : le
+// relief des surfaces voyage dans leur alpha (élévation = alpha × profondeur,
+// en largeurs de carreau) ; la règle et son jumeau testé vivent dans
+// surfacesSculptees.ts. Les profondeurs de l'atlas, case par case (skin 1 à 8).
+${RELIEF_SURFACES_GLSL}
+const float PROF_ATLAS[8] = float[8](${PROFONDEUR_RELIEF_ATLAS.map(glslFloat).join(', ')});
+// les UV d'un point de l'atlas des habillages, case \`tuile\`, motif calé sur
+// la boîte (origine, pas) — l'atlas est téléversé avec UNPACK_FLIP_Y : le V
+// se lit depuis le BAS (sans l'inversion, chaque habillage affichait la tuile
+// de l'AUTRE rangée). Une fonction : le relief relit l'atlas un pas plus loin.
+vec2 uvParoi(vec2 w, vec2 tuile, vec2 origine, vec2 pas) {
+  vec2 uv = (tuile + fract((w - origine) / pas)) * vec2(0.25, 0.5);
+  uv.y = 1.0 - uv.y;
+  return uv;
+}
 uniform float uTime;
 uniform float uExitRadius; // portée de l'aspiration du sas (halo de courant)
 uniform float uColdBand;   // portée de l'aura de gel des plaques froides
@@ -2678,14 +2700,27 @@ void main() {
   // uniforme requis par les mipmaps), utilisées dans la boucle d'obstacles.
   // Les deux parois alternent selon un bruit très basse fréquence : les longs
   // murs cessent de répéter le même motif d'un bout à l'autre du tableau.
-  vec3 texWallC = texture(uTexWall, world / 230.0).rgb;
+  // Leur ALPHA est leur relief (surfacesSculptees.ts) : gardé ici, il donne
+  // le point des différences finies ; le pas voisin se relit dans la boucle,
+  // sur le dessus seulement, au MÊME niveau de détail — textureGrad avec les
+  // gradients que texture() prend ici (le monde est affine à l'écran) : deux
+  // niveaux différents, et leur écart se lirait comme une pente.
+  vec2 dWx = dFdx(world);
+  vec2 dWy = dFdy(world);
+  vec4 texWall4 = texture(uTexWall, world / ${glslFloat(CARREAU_MONDE.wall)});
+  vec3 texWallC = texWall4.rgb;
+  vec4 texWallA4 = vec4(1.0);
+  float blendWallA = 0.0; // la part de la seconde paroi, en couleur comme en relief
   if (uHasWallA > 0.5) {
-    vec3 wallA = texture(uTexWallA, world / 520.0).rgb;
+    texWallA4 = texture(uTexWallA, world / ${glslFloat(CARREAU_MONDE.wallA)});
     float blend = uDecor > 0.5 ? smoothstep(0.35, 0.65, smoothField(world * 0.0023 + 5.3)) : 0.5;
-    texWallC = uHasWall > 0.5 ? mix(texWallC, wallA, blend) : wallA;
+    blendWallA = uHasWall > 0.5 ? blend : 1.0;
+    texWallC = mix(texWallC, texWallA4.rgb, blendWallA);
   }
-  vec3 texPhobeC = texture(uTexPhobe, world / 170.0).rgb;
-  vec3 texPhileC = texture(uTexPhile, world / 210.0).rgb;
+  vec4 texPhobe4 = texture(uTexPhobe, world / ${glslFloat(CARREAU_MONDE.phobe)});
+  vec3 texPhobeC = texPhobe4.rgb;
+  vec4 texPhile4 = texture(uTexPhile, world / ${glslFloat(CARREAU_MONDE.phile)});
+  vec3 texPhileC = texPhile4.rgb;
   // la grille est calée pour que ses perforations fassent ~24 u, comme le
   // motif procédural qu'elle remplace
 
@@ -3030,16 +3065,28 @@ void main() {
           vec2 grand = step(1.0, rep);
           vec2 pas = mix(vec2(420.0), bsize / max(rep, vec2(1.0)), grand);
           vec2 origine = mix(bmin + 0.5 * bsize - 210.0, bmin, grand);
-          vec2 uvp = (tuile + fract((wbV - origine) / pas)) * vec2(0.25, 0.5);
-          // l'atlas est téléversé avec UNPACK_FLIP_Y : le V se lit depuis le
-          // BAS — sans cette inversion, chaque habillage affichait la tuile
-          // de l'AUTRE rangée (caissons devenait aération, écrans poutrelle…)
-          uvp.y = 1.0 - uvp.y;
           // niveau de détail écrit explicitement (pas de gradient en boucle) :
           // une tuile de l'atlas fait 0,25 × 0,5 d'UV pour pas unités monde
-          fillCol = textureGrad(uTexParoi, uvp,
-                                vec2(0.25 / pas.x, 0.0) * pxMonde,
-                                vec2(0.0, 0.5 / pas.y) * pxMonde).rgb * 0.92;
+          vec2 gxP = vec2(0.25 / pas.x, 0.0) * pxMonde;
+          vec2 gyP = vec2(0.0, 0.5 / pas.y) * pxMonde;
+          vec4 paroi4 = textureGrad(uTexParoi, uvParoi(wbV, tuile, origine, pas), gxP, gyP);
+          // le RELIEF de la case (son alpha) : relu un pas plus loin en x et
+          // en y du repère de la boîte — la pente y est locale, la lumière y
+          // passe aussi (lumLoc), sinon une boîte pivotée serait éclairée de
+          // travers. Les conduites surtout : leur reflet peint est parti avec
+          // la lumière peinte, c'est ce relief qui leur rend leur rondeur.
+          float lumP = 1.0;
+          if (fill > 0.0) {
+            float carreauP = 0.5 * (pas.x + pas.y);
+            float pP = pasRelief(carreauP, pxMonde);
+            vec2 sP = penteRelief(paroi4.a,
+              textureGrad(uTexParoi, uvParoi(wbV + vec2(pP, 0.0), tuile, origine, pas), gxP, gyP).a,
+              textureGrad(uTexParoi, uvParoi(wbV + vec2(0.0, pP), tuile, origine, pas), gxP, gyP).a,
+              PROF_ATLAS[int(si + 0.5)], carreauP, pP);
+            vec2 lumLoc = vec2(bca * lampeDir.x + bsa * lampeDir.y, -bsa * lampeDir.x + bca * lampeDir.y);
+            lumP = lumiereRelief(sP, lumLoc);
+          }
+          fillCol = paroi4.rgb * 0.92 * lumP;
           edgeCol = vec3(0.32, 0.40, 0.48);
         } else if (skin > 3.5) {
           // BLINDAGE : plaque lourde mate, chevrons d'avertissement au bord
@@ -3072,21 +3119,61 @@ void main() {
           float teinte = 0.85 + 0.3 * hash21(cel + 7.7);
           fillCol = vec3(0.105, 0.125, 0.155) * teinte * (0.55 + 0.45 * bordC);
           edgeCol = vec3(0.32, 0.39, 0.46);
+        } else if (uHasWall > 0.5) {
+          // le RELIEF du mur (et de la seconde paroi, mêlés comme leur
+          // couleur : on mêle les pentes, pas les lumières)
+          vec2 sMur = vec2(0.0);
+          if (fill > 0.0) {
+            float cW = ${glslFloat(CARREAU_MONDE.wall)};
+            float pW = pasRelief(cW, pxMonde);
+            sMur = penteRelief(texWall4.a,
+              textureGrad(uTexWall, (world + vec2(pW, 0.0)) / cW, dWx / cW, dWy / cW).a,
+              textureGrad(uTexWall, (world + vec2(0.0, pW)) / cW, dWx / cW, dWy / cW).a,
+              ${glslFloat(PROFONDEUR_RELIEF.wall)}, cW, pW);
+            if (blendWallA > 0.0) {
+              float cA = ${glslFloat(CARREAU_MONDE.wallA)};
+              float pA = pasRelief(cA, pxMonde);
+              vec2 sA = penteRelief(texWallA4.a,
+                textureGrad(uTexWallA, (world + vec2(pA, 0.0)) / cA, dWx / cA, dWy / cA).a,
+                textureGrad(uTexWallA, (world + vec2(0.0, pA)) / cA, dWx / cA, dWy / cA).a,
+                ${glslFloat(PROFONDEUR_RELIEF.wallA)}, cA, pA);
+              sMur = mix(sMur, sA, blendWallA);
+            }
+          }
+          fillCol = texWallC * 0.95 * lumiereRelief(sMur, lampeDir);
         } else {
-          fillCol = uHasWall > 0.5
-            ? texWallC * 0.95
-            : vec3(0.10, 0.13, 0.17) * (0.88 + 0.24 * dnoise(world * vec2(0.03, 0.30)));
+          fillCol = vec3(0.10, 0.13, 0.17) * (0.88 + 0.24 * dnoise(world * vec2(0.03, 0.30)));
         }
       } else if (mat < 1.5) { // hydrophile : mouillé, brillant, reflet qui glisse
         float sheen = 0.5 + 0.5 * sin(world.x * 0.045 + world.y * 0.10 + uTime * 0.7);
+        // le relief de l'émail : les crêtes de son film d'eau
+        vec2 sPhile = vec2(0.0);
+        if (uHasPhile > 0.5 && fill > 0.0) {
+          float cH = ${glslFloat(CARREAU_MONDE.phile)};
+          float pH = pasRelief(cH, pxMonde);
+          sPhile = penteRelief(texPhile4.a,
+            textureGrad(uTexPhile, (world + vec2(pH, 0.0)) / cH, dWx / cH, dWy / cH).a,
+            textureGrad(uTexPhile, (world + vec2(0.0, pH)) / cH, dWx / cH, dWy / cH).a,
+            ${glslFloat(PROFONDEUR_RELIEF.phile)}, cH, pH);
+        }
         fillCol = uHasPhile > 0.5
-          ? texPhileC * (0.85 + 0.25 * sheen)
+          ? texPhileC * (0.85 + 0.25 * sheen) * lumiereRelief(sPhile, lampeDir)
           : vec3(0.05, 0.16, 0.20) + vec3(0.015, 0.055, 0.065) * sheen;
         edgeCol = vec3(0.20, 0.65, 0.70);
       } else {                // hydrophobe : cireux, grain perlé qui repousse
         float wax = smoothstep(0.72, 0.95, dnoise(world * 0.12));
+        // le relief de la cire : ses perles et son martelé
+        vec2 sPhobe = vec2(0.0);
+        if (uHasPhobe > 0.5 && fill > 0.0) {
+          float cB = ${glslFloat(CARREAU_MONDE.phobe)};
+          float pB = pasRelief(cB, pxMonde);
+          sPhobe = penteRelief(texPhobe4.a,
+            textureGrad(uTexPhobe, (world + vec2(pB, 0.0)) / cB, dWx / cB, dWy / cB).a,
+            textureGrad(uTexPhobe, (world + vec2(0.0, pB)) / cB, dWx / cB, dWy / cB).a,
+            ${glslFloat(PROFONDEUR_RELIEF.phobe)}, cB, pB);
+        }
         fillCol = uHasPhobe > 0.5
-          ? texPhobeC * 0.75
+          ? texPhobeC * 0.75 * lumiereRelief(sPhobe, lampeDir)
           : vec3(0.16, 0.11, 0.20) + vec3(0.07, 0.035, 0.10) * wax;
         edgeCol = vec3(0.62, 0.42, 0.78);
       }
