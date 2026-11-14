@@ -82,9 +82,10 @@ import { MODULE2D_FS, MODULE2D_VS } from './module2dShader'
 // posés pour 95 dessinés. Ce que coûte le plafond, ce n'est pas la boucle —
 // elle s'arrête à uBoxCount — mais les CASES D'UNIFORMES du fragment shader
 // (uBoxes + uBoxAux : deux vec4 par boîte ; uBoxH, la table des hauteurs :
-// un quart) : comptées sur la source, la composition en occupe 460 à 160
-// boîtes (332 à 96) et le cuiseur de lumière 359 (231 à 96) — 40 de plus
-// chacun avec la table des hauteurs (14/11/2026), soit 500 et 399. WebGL2 n'en garantit que 224 — le shader les dépassait
+// un quart) : comptées sur la source, morceaux interpolés compris
+// (budgets.spec.ts, qui tient un plafond de 512), la composition en occupe
+// 507 à 160 boîtes et le cuiseur de lumière 399 — 467 et 359 avant la table
+// des hauteurs (14/11/2026). WebGL2 n'en garantit que 224 — le shader les dépassait
 // déjà à 96, on ne s'appuie donc pas sur une limite nouvelle ; les GPU
 // courants en annoncent 1024. Un tableau qui n'en pose pas plus qu'avant ne
 // paie rien de plus par pixel. Le même chiffre est écrit dans les deux
@@ -854,6 +855,20 @@ vec3 lumiereArete(vec2 n) {
 }
 `
 
+// LA RETOMBÉE D'UNE LAMPE SUR UN TOIT, partagée par la composition (la
+// lumière du dessus, lumHaut) et le cuiseur (la visibilité des toits, qui
+// pèse chaque lampe par ce qu'elle apporte au toit) : la même formule des
+// deux côtés, par construction. Mesurée depuis le sommet (hRel : la hauteur
+// de la lampe au-dessus du toit) : la flaque d'une lampe basse ne monte pas
+// sur les toits, une lampe haute les baigne. Retombée PLUS FRANCHE que celle
+// du sol (0,72 contre 0,55) : au sol, l'occlusion cuite creuse déjà les
+// ombres ; sans cette pente, un sommet à l'autre bout de la salle rendait
+// comme un sommet sous la lampe.
+const RETOMBEE_TOIT_GLSL = `float retombeeToit(float dn, float portee, float hRel) {
+  float f = 1.0 - 0.72 * smoothstep(0.0, portee, dn);
+  return f + 0.85 * pow(max(0.0, 1.0 - dn / (hRel * 0.55 + 60.0)), 1.6);
+}`
+
 const COMPOSE_FS = `#version 300 es
 precision highp float;
 #define MAX_BOXES 160
@@ -891,6 +906,7 @@ float hauteurBoite(int bi) {
   int r = bi - 4 * (bi / 4);
   return dot(uBoxH[bi / 4], vec4(equal(ivec4(r), ivec4(0, 1, 2, 3))));
 }
+${RETOMBEE_TOIT_GLSL}
 uniform float uTime;
 uniform float uExitRadius; // portée de l'aspiration du sas (halo de courant)
 uniform float uColdBand;   // portée de l'aura de gel des plaques froides
@@ -2722,13 +2738,7 @@ void main() {
       if (li >= uLampeCount) break;
       float dn = max(length(pointLampe(li, world) - world), 1.0);
       float hRel = max(uLampes[li].z - hToit, 0.0);
-      // Retombée PLUS FRANCHE que celle du sol (0,72 contre 0,55) : le sol,
-      // lui, garde un plateau large parce que l'occlusion cuite y creuse
-      // déjà les ombres. Sur les toits, seul un voisin plus haut creuse —
-      // sans cette pente, un sommet à l'autre bout de la salle rendait comme
-      // un sommet sous la lampe.
-      float fall = 1.0 - 0.72 * smoothstep(0.0, uLampes[li].w, dn);
-      fall += 0.85 * pow(max(0.0, 1.0 - dn / (hRel * 0.55 + 60.0)), 1.6);
+      float fall = retombeeToit(dn, uLampes[li].w, hRel);
       lumHaut += uLampesCol[li] * (fall * uLampesInt[li]);
     }
     // l'ombre des voisins plus hauts, sur le dessus seulement : au sol, le
@@ -4195,6 +4205,7 @@ float hauteurBoite(int bi) {
   int r = bi - 4 * (bi / 4);
   return dot(uBoxH[bi / 4], vec4(equal(ivec4(r), ivec4(0, 1, 2, 3))));
 }
+${RETOMBEE_TOIT_GLSL}
 uniform vec2 uMapMin;   // coin bas-gauche de la carte (monde)
 uniform vec2 uMapSize;  // taille de la carte (monde)
 uniform vec2 uMapPx;    // résolution de la carte (texels)
@@ -4520,9 +4531,14 @@ void main() {
         resT = min(resT, pen * hS / tT);
         tT += clamp(hS, 8.0, 200.0);
       }
+      // chaque lampe pèse ce qu'elle APPORTE au toit (lumHaut, même formule) :
+      // pesée par sa seule intensité, une lampe lointaine masquée comptait
+      // autant que celle qui éclaire le toit, et l'assombrissait à tort
+      float hRelT = max(hL - hT, 0.0);
+      float wT = uLampesInt[li] * retombeeToit(max(distL, 1.0), uLampes[li].w, hRelT);
       // le même rebond qu'au sol : une ombre portée n'est jamais noire
-      toitAcc += uLampesInt[li] * (0.14 + 0.86 * clamp(resT, 0.0, 1.0));
-      toitPoids += uLampesInt[li];
+      toitAcc += wT * (0.14 + 0.86 * clamp(resT, 0.0, 1.0));
+      toitPoids += wT;
     }
     // la lumière REBONDIT : une ombre portée n'est jamais noire dans une
     // pièce claire — 14 % de la lampe y parviennent par les parois. Depuis
@@ -5255,6 +5271,21 @@ export function passeNetteRequise(dprNatif: number, dpr: number, decorNet: boole
  *  ce que le cuiseur lit d'elles (sceneSdf) — le SENS d'une conduite
  *  compris : l'ombre suit le tuyau, et basculer seulement le sens à
  *  l'éditeur laissait une ombre debout sous un tuyau couché. */
+/** La clé des HAUTEURS (hauteursPartagees, volume.ts) : tout ce dont elles
+ *  dépendent — chaque boîte (cleBoite : coordonnées, angle, matière, forme)
+ *  et son habillage, que cleBoite ne porte pas (la vitre, un habillage de
+ *  mur, est basse). Ce qui n'y entre pas laisse des hauteurs périmées.
+ *  `cleBoites` : la clé des boîtes, si elle est déjà bâtie (cleBoitesImage). */
+export function cleHauteurs(
+  boxes: readonly ObstacleBox[],
+  boxCount: number,
+  cleBoites = cleBoitesLumiere(boxes, boxCount),
+): string {
+  let cle = cleBoites
+  for (let i = 0; i < boxCount; i++) cle += `,${boxes[i].skin ?? 0}`
+  return cle
+}
+
 export function cleBoitesLumiere(
   boxes: readonly ObstacleBox[],
   boxCount: number,
@@ -6696,11 +6727,9 @@ export class Renderer {
     this.cleImage = null
     // LES HAUTEURS (volume.ts) : la matière donne le rang, des solides qui se
     // touchent partagent le plus haut. Calculées une fois par décor, comme la
-    // carte cuite : la clé des boîtes, plus leurs habillages (la vitre est
-    // basse, et cleBoite ne porte pas l'habillage). Dans l'éditeur, chaque
+    // carte cuite (cleHauteurs : les boîtes et leurs habillages). Dans l'éditeur, chaque
     // boîte déplacée les refait — quelques ms sur le hub (volume.ts).
-    let cleH = this.cleBoitesImage(boxes, boxCount)
-    for (let i = 0; i < boxCount; i++) cleH += `,${boxes[i].skin ?? 0}`
+    const cleH = cleHauteurs(boxes, boxCount, this.cleBoitesImage(boxes, boxCount))
     if (cleH !== this.hauteursCle) {
       this.hauteursCle = cleH
       const vol: BoiteVolume[] = []

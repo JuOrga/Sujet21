@@ -2,6 +2,8 @@ import { describe, it, expect } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { OMBRE_COURTE_PAR_HAUTEUR } from './volume'
+import { MAX_BOXES, cleHauteurs } from './renderer'
+import type { ObstacleBox } from '../game/level'
 
 // LES HAUTEURS PAR BOÎTE (volume des parois, volet 4). Chaque solide a la
 // hauteur que volume.ts lui donne (hauteursPartagees) : l'ombre courte, la
@@ -32,6 +34,22 @@ describe('la table des hauteurs arrive au shader', () => {
       expect(fs).toContain('uniform vec4 uBoxH[MAX_BOXES / 4];')
       expect(fs).toContain('float hauteurBoite(int bi)')
     }
+  })
+
+  it('MAX_BOXES se range en vec4 entiers : uBoxH[MAX_BOXES / 4] couvre toutes les boîtes', () => {
+    // une division entière tronquerait : les dernières boîtes liraient hors
+    // de la table
+    expect(MAX_BOXES % 4).toBe(0)
+  })
+
+  it('sa clé change avec la matière et avec l’habillage, pas sans eux', () => {
+    const mur: ObstacleBox = { minX: 0, minY: 0, maxX: 100, maxY: 20, material: 0 }
+    const cle = (b: ObstacleBox) => cleHauteurs([b], 1)
+    expect(cle({ ...mur })).toBe(cle(mur))
+    // un mur devenu rideau est bas
+    expect(cle({ ...mur, material: 8 })).not.toBe(cle(mur))
+    // un mur habillé en vitre (9) aussi, sans qu'aucune coordonnée bouge
+    expect(cle({ ...mur, skin: 9 })).not.toBe(cle(mur))
   })
 
   it('elle vient de hauteursPartagees, une fois par décor, et suit l’ordre de peinture', () => {
@@ -70,6 +88,19 @@ describe('la carte cuite lit la hauteur de chaque boîte', () => {
     // la composition la lit et l'applique à la lumière du dessus
     expect(composeFs).toMatch(/toitVis = lm4\.a;/)
     expect(composeFs).toMatch(/lumHaut \*= mix\(1\.0, toitVis, step\(dCouv, 0\.0\)\);/)
+  })
+
+  it('la visibilité des toits pèse chaque lampe par ce qu’elle apporte au toit, comme lumHaut', () => {
+    // une seule formule, interpolée dans les deux shaders
+    expect(source.match(/float retombeeToit\(/g)).toHaveLength(1)
+    for (const fs of [composeFs, lightFs]) expect(fs).toContain('${RETOMBEE_TOIT_GLSL}')
+    expect(composeFs).toContain('float fall = retombeeToit(dn, uLampes[li].w, hRel);')
+    // au cuiseur : la hauteur de la lampe au-dessus du TOIT, et la retombée
+    // en poids — l'intensité seule faisait compter une lampe lointaine masquée
+    expect(lightFs).toContain('float hRelT = max(hL - hT, 0.0);')
+    expect(lightFs).toContain('float wT = uLampesInt[li] * retombeeToit(max(distL, 1.0), uLampes[li].w, hRelT);')
+    expect(lightFs).toContain('toitPoids += wT;')
+    expect(lightFs).not.toContain('toitPoids += uLampesInt[li];')
   })
 })
 
