@@ -27,6 +27,9 @@
 //                         choix par défaut ;
 //   BANC_RELIEF=fort      allume le relief 2.5D (off par défaut, comme le jeu) ;
 //   BANC_LUMIERE=on|off   une seule des deux prises (les deux par défaut) ;
+//   BANC_MONTAGE=120000  ms laissées au jeu pour se monter (le hub, bâti en
+//                         coques, dépassait souvent 120 s en rendu logiciel :
+//                         420000 l'a monté le 14/11) ;
 //   BANC_ZOOM=2.5         rapproche la caméra (la molette du joueur : manualZoom)
 //                         — au cadrage d'entrée, une paroi fait 10-20 pixels et
 //                         un chanfrein n'en fait que deux ou trois.
@@ -56,6 +59,7 @@ const VUE = { width: Number(dims[1]), height: Number(dims[2]) }
 const ATTENTE = Number(process.env.BANC_ATTENTE || 6000)
 const RELIEF = process.env.BANC_RELIEF || 'off'
 const ZOOM = Number(process.env.BANC_ZOOM || 1)
+const MONTAGE = Number(process.env.BANC_MONTAGE || 120000)
 const LUMIERES = process.env.BANC_LUMIERE === 'on' ? [true] : process.env.BANC_LUMIERE === 'off' ? [false] : [true, false]
 const ARGS = process.env.BANC_GL === 'angle'
   ? ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader']
@@ -105,7 +109,7 @@ function recopie() {
       await p.goto(`${base}/?${n === 'hub' ? '' : `tableau=${n}&`}dev=0`, { waitUntil: 'domcontentloaded' })
       try {
         await p.waitForFunction(() => typeof window.__cam === 'object' && window.__sim, null, {
-          timeout: 120000,
+          timeout: MONTAGE,
           polling: 500,
         })
       } catch {
