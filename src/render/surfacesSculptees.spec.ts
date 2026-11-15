@@ -172,3 +172,37 @@ describe('le shader lit le relief dans l’alpha (composition)', () => {
     expect(garde.length).toBeGreaterThanOrEqual(1)
   })
 })
+
+describe("le joint de tuile de l'atlas des habillages", () => {
+  // au bord de sa case, le filtrage lisait la case VOISINE de l'atlas : son
+  // alpha (une autre matière, un autre relief) faisait une pente parasite —
+  // une arête sombre en travers des conduites à chaque joint (banc, R4)
+  const uvParoi = compose.slice(compose.indexOf('vec2 uvParoi('), compose.indexOf('\n}', compose.indexOf('vec2 uvParoi(')))
+
+  it('la coordonnée se tient loin du bord de la case, d’une empreinte de pixel au moins un demi-texel', () => {
+    expect(uvParoi).toContain('vec2 uvParoi(vec2 w, vec2 tuile, vec2 origine, vec2 pas, vec2 marge)')
+    expect(uvParoi).toContain('clamp(fract((w - origine) / pas), marge, 1.0 - marge)')
+    expect(compose).toContain('vec2 margeP = max(vec2(0.5 / 1024.0), pxMonde / pas);')
+  })
+
+  it('chaque lecture de l’atlas passe par cette marge : le point, ses deux voisins, la tranche', () => {
+    // les arguments de chaque appel, comptés au premier niveau de parenthèses
+    const nArgs = (depuis: number): number => {
+      let prof = 0
+      let n = 1
+      for (let i = depuis; i < compose.length; i++) {
+        const c = compose[i]
+        if (c === '(') prof++
+        else if (c === ')' && --prof === 0) return n
+        else if (c === ',' && prof === 1) n++
+      }
+      return -1
+    }
+    const appels = [...compose.matchAll(/uvParoi\(/g)]
+      .map((m) => m.index! + 'uvParoi'.length)
+      .filter((i) => !compose.startsWith('(vec2 w,', i))
+    // les trois lectures du dessus, celle de la tranche
+    expect(appels.length).toBeGreaterThanOrEqual(4)
+    for (const i of appels) expect(nArgs(i), compose.slice(i, i + 60)).toBe(5)
+  })
+})

@@ -930,8 +930,16 @@ const float PROF_ATLAS[8] = float[8](${PROFONDEUR_RELIEF_ATLAS.map(glslFloat).jo
 // la boîte (origine, pas) — l'atlas est téléversé avec UNPACK_FLIP_Y : le V
 // se lit depuis le BAS (sans l'inversion, chaque habillage affichait la tuile
 // de l'AUTRE rangée). Une fonction : le relief relit l'atlas un pas plus loin.
-vec2 uvParoi(vec2 w, vec2 tuile, vec2 origine, vec2 pas) {
-  vec2 uv = (tuile + fract((w - origine) / pas)) * vec2(0.25, 0.5);
+// LE JOINT DE TUILE : au bord de sa case, le filtrage mêlait la case VOISINE
+// de l'atlas — une autre matière, un autre relief : en colonne de bord,
+// l'alpha des conduites vaut 44 en moyenne, celui de la poutrelle d'à côté
+// 167. La normale par différences en tirait une pente parasite, une arête
+// sombre d'un pixel en travers des tuyaux à chaque joint (vue au banc, zoom
+// ×2,5). La coordonnée se tient à \`marge\` du bord de la case (une empreinte
+// de pixel, au moins un demi-texel) : les tuiles se raccordent sans couture,
+// le pas perdu ne se voit pas.
+vec2 uvParoi(vec2 w, vec2 tuile, vec2 origine, vec2 pas, vec2 marge) {
+  vec2 uv = (tuile + clamp(fract((w - origine) / pas), marge, 1.0 - marge)) * vec2(0.25, 0.5);
   uv.y = 1.0 - uv.y;
   return uv;
 }
@@ -2370,11 +2378,11 @@ vec3 matiereFlanc(int mi, float skin, float blendA, vec2 ft, float h, vec2 gx, v
       return mix(metal, vec3(0.05, 0.10, 0.11), filet * 0.8);
     }
     if (skin > 0.5 && uHasParoi > 0.5) {
-      // HABILLAGE : sa case de l'atlas, à l'échelle native (420 u)
+      // HABILLAGE : sa case de l'atlas, à l'échelle native (420 u), tenue
+      // loin de ses bords comme sur le dessus (uvParoi)
       float si = skin - 1.0;
       vec2 tuile = vec2(mod(si, 4.0), floor(si / 4.0 + 0.001));
-      vec2 uv = (tuile + fract(ft / 420.0)) * vec2(0.25, 0.5);
-      uv.y = 1.0 - uv.y;
+      vec2 uv = uvParoi(ft, tuile, vec2(0.0), vec2(420.0), vec2(max(0.5 / 1024.0, px / 420.0)));
       vec2 k = vec2(0.25, 0.5) / 420.0;
       return textureGrad(uTexParoi, uv, gx * k, gy * k).rgb * 0.92;
     }
@@ -3221,7 +3229,8 @@ void main() {
           // une tuile de l'atlas fait 0,25 × 0,5 d'UV pour pas unités monde
           vec2 gxP = vec2(0.25 / pas.x, 0.0) * pxMonde;
           vec2 gyP = vec2(0.0, 0.5 / pas.y) * pxMonde;
-          vec4 paroi4 = textureGrad(uTexParoi, uvParoi(wbV, tuile, origine, pas), gxP, gyP);
+          vec2 margeP = max(vec2(0.5 / 1024.0), pxMonde / pas);
+          vec4 paroi4 = textureGrad(uTexParoi, uvParoi(wbV, tuile, origine, pas, margeP), gxP, gyP);
           // le RELIEF de la case (son alpha) : relu un pas plus loin en x et
           // en y du repère de la boîte — la pente y est locale, la lumière y
           // passe aussi (lumLoc), sinon une boîte pivotée serait éclairée de
@@ -3232,8 +3241,8 @@ void main() {
             float carreauP = 0.5 * (pas.x + pas.y);
             float pP = pasRelief(carreauP, pxMonde);
             vec2 sP = penteRelief(paroi4.a,
-              textureGrad(uTexParoi, uvParoi(wbV + vec2(pP, 0.0), tuile, origine, pas), gxP, gyP).a,
-              textureGrad(uTexParoi, uvParoi(wbV + vec2(0.0, pP), tuile, origine, pas), gxP, gyP).a,
+              textureGrad(uTexParoi, uvParoi(wbV + vec2(pP, 0.0), tuile, origine, pas, margeP), gxP, gyP).a,
+              textureGrad(uTexParoi, uvParoi(wbV + vec2(0.0, pP), tuile, origine, pas, margeP), gxP, gyP).a,
               PROF_ATLAS[int(si + 0.5)], carreauP, pP);
             vec2 lumLoc = vec2(bca * lampeDir.x + bsa * lampeDir.y, -bsa * lampeDir.x + bca * lampeDir.y);
             lumP = lumiereRelief(sP, lumLoc);
