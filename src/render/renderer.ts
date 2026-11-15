@@ -3011,10 +3011,12 @@ void main() {
     vec2 relB = vec2(0.0);
     float flanc = 0.0;
     float htFlanc = 0.0; // la hauteur vue sur la tranche : 0 au pied, 1 au sommet
-    // LE SOL QUE CE SOMMET CACHE (reliefParois.ts : solCache) : du côté où il
-    // déborde le pied, le sol est dessous — et derrière une face latérale vue
-    // de biais aussi. L'aura, les ombres au sol de la boîte et le fluide ne
-    // s'y peignent pas. Relief éteint : 0.
+    // LE SOL QUE CE SOMMET CACHE (reliefParois.ts : solCache) : tout ce que
+    // le dessus couvre — au-delà du pied du côté où il déborde, et sur la base
+    // (un perméable y laisse passer le fluide : il entre sous le dessus et
+    // ressort au-delà du débord, sans couture) — et le sol derrière une face
+    // latérale vue de biais. L'aura, les ombres au sol de la boîte et le
+    // fluide ne s'y peignent pas. Relief éteint : 0.
     float solPropre = 0.0;
     if (uRelief > 0.0 && solide) {
       relB = relDisp * facteurRelief(hauteurBoite(bi));
@@ -3504,9 +3506,10 @@ void main() {
         emis = lueur * tube * 0.85 * couvS;
       }
       col = col * (1.0 - fill * ch.a) + ch.rgb * eclMat * fill + emis * fill;
-      // relief allumé : l'image déplacée cache le sol au-delà de ses pièces —
-      // mesuré sur leur silhouette (dG au pied, dGV au sommet), pas la boîte :
-      // l'eau passe entre les pièces, elle passe aussi sous leur image
+      // relief allumé : l'image déplacée cache le sol partout où elle couvre —
+      // mesuré sur la silhouette de ses pièces au sommet (dGV) et l'alpha de
+      // l'image, pas sur la boîte : l'eau passe entre les pièces, elle passe
+      // aussi sous leur image
       if (uRelief > 0.0 && serp && fill > 0.0) {
         float dGV = surchSdf(wbV, uBoxes[bi], zS);
         solSousSommets = max(solSousSommets, solCache(dG, dGV, 0.0, edgeW) * fill * ch.a);
@@ -3918,10 +3921,11 @@ void main() {
   // LE FLUIDE PASSE SOUS LES SOMMETS (relief allumé). La physique touche la
   // BASE ; le fluide se peint APRÈS les solides : du côté où le sommet
   // déplacé déborde le pied, le fluide qui touche le pied se peignait sur le
-  // dessus du mur. Là, il passe dessous — lui, ses reflets et ses ondes
-  // (elles gonflent le champ, avant) : tout l'habillage de l'eau suit body.
-  // Côté où le pied se voit, rien n'est caché : le fluide touche le bas du
-  // flanc. Relief éteint, solSousSommets vaut 0 : rien ne change.
+  // dessus du mur. Partout où un dessus couvre, il passe dessous — lui, ses
+  // reflets et ses ondes (elles gonflent le champ, avant) : tout l'habillage
+  // de l'eau suit body. Dans un perméable, il entre sous le dessus et
+  // ressort au-delà du débord. Côté où le pied se voit, rien n'est caché : le
+  // fluide touche le bas du flanc. Relief éteint, solSousSommets vaut 0.
   body *= 1.0 - solSousSommets;
   // La passe de vie (motes, lueur des gouttes perdues), peinte après, lit
   // ce masque dans la PROFONDEUR (voir drawVie) : 0 sous un sommet.

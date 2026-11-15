@@ -83,8 +83,42 @@ describe('les règles pures du relief', () => {
     expect(pointDuSommet(310, 20, 0, 0, 0)).toEqual([310, 20])
   })
 
-  it('relief éteint, aucun sol n’est caché : le rendu d’avant reste', () => {
-    for (const d of [-40, -3, 0, 0.5, 4, 60]) expect(solCache(d, d, 0, 2.5)).toBe(0)
+  it('relief éteint, la règle ne se calcule pas : le rendu d’avant reste', () => {
+    // le sol caché n'existe que sous le relief : relief éteint, solPropre
+    // garde sa valeur de départ (0) — ni l'aura, ni les ombres, ni le fluide
+    // ne changent
+    expect(boucle).toMatch(/float solPropre = 0\.0;[\s\S]*if \(uRelief > 0\.0 && solide\) \{[\s\S]*solPropre = solCache\(/)
+    // hors du dessus et hors de la tranche, rien n'est caché
+    for (const d of [0.5, 4, 60]) expect(solCache(d, d, 0, 2.5)).toBe(0)
+  })
+
+  it('un dessus opaque cache ce qui est dessous, partout où il couvre', () => {
+    // sous le dessus, base comprise : le fluide qui traverse un solide
+    // perméable (membrane, évent, rideau) entre sous le dessus et ressort
+    // au-delà du débord
+    expect(solCache(-3, -35, 0, 2.5)).toBe(1)
+    expect(solCache(-20, -5, 0, 2.5)).toBe(1)
+    expect(solCache(-12, -12, 0, 2.5)).toBe(1)
+  })
+
+  it('un solide mince, du fluide dans sa base : aucune transition sous le dessus', () => {
+    // une membrane de 40 u, relief fort à 480 u du centre : son sommet glisse
+    // de 21,6 u. Coupe en x : d la base, dV le sommet, la tranche côté centre.
+    const T = 40
+    const delta = 21.6
+    const w = 2.5
+    const valeurs: number[] = []
+    for (let x = -T / 2 + delta + w; x <= T / 2 + delta - w; x += 0.5) {
+      const d = Math.abs(x) - T / 2
+      const dV = Math.abs(x - delta) - T / 2
+      const flanc = d <= 0 && dV > 0 ? 1 : 0
+      valeurs.push(solCache(d, dV, flanc, w))
+    }
+    expect(valeurs.length).toBeGreaterThan(20)
+    // une seule valeur sous tout le dessus : pas de couture au milieu
+    for (const v of valeurs) expect(v).toBe(1)
+    // devant la tranche, côté centre, le fluide reste visible
+    expect(solCache(-T / 2 + 2, Math.abs(-T / 2 + 2 - delta) - T / 2, 1, w)).toBe(0)
   })
 
   it('le sol que le sommet recouvre au-delà du pied est caché ; le pied vu reste visible', () => {

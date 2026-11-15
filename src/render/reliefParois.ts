@@ -60,19 +60,24 @@ const smoothstep = (a: number, b: number, x: number): number => {
 
 /** Le SOL QUE LE SOLIDE CACHE, 0..1, en un pixel : `d` la distance signée à
  *  la base, `dV` au sommet déplacé, `flanc` la tranche peinte ici (0..1),
- *  `w` le fondu d'un pixel.
- *  - Le sommet couvre le pixel ET s'y est écarté du pied (d − dV > 0 : du
- *    côté où il déborde) : le sol est dessous. Le champ du fluide déborde de
- *    quelques unités sous le pied (le rayon des splats) ; de ce côté, cette
- *    lisière se peindrait en ligne liquide à travers le dessus — elle est
- *    cachée aussi.
+ *  `w` le fondu d'un pixel. UNE règle : un dessus opaque cache ce qui est
+ *  dessous.
+ *  - Partout où le dessus couvre le pixel, le sol est caché — au-delà du
+ *    pied du côté où il déborde (le fluide qui touche le pied passe dessous),
+ *    et sur la base aussi. Un solide étanche n'y contient rien (seule la
+ *    lisière des splats y déborde) ; un PERMÉABLE (membrane, évent, rideau)
+ *    y laisse passer le fluide, qui entre sous le dessus et ressort au-delà
+ *    du débord, sans couture. (La première règle ne cachait la base que du
+ *    côté du débord : le fluide qui traversait une membrane s'arrêtait net au
+ *    milieu de son dessus — vu au banc, tableau 9, relecture R4.)
  *  - Hors de la base, la tranche est peinte (une face latérale vue de
  *    biais) : le sol derrière elle est caché.
- *  - Côté où le pied se voit (la tranche sur la base, d ≤ 0), rien n'est
- *    caché : le fluide y touche le bas du flanc.
- *  Relief éteint (dV = d, flanc = 0) : 0 partout — rien ne change. */
+ *  - Côté où le pied se voit (la tranche sur la base, d ≤ 0, hors du dessus),
+ *    rien n'est caché : le fluide y touche le bas du flanc.
+ *  Ne se calcule que relief allumé (le shader la garde sous uRelief > 0) :
+ *  relief éteint, rien ne change. */
 export function solCache(d: number, dV: number, flanc: number, w: number): number {
-  const sommet = (1 - smoothstep(-w, 0, dV)) * Math.min(Math.max((d - dV) / w, 0), 1)
+  const sommet = 1 - smoothstep(-w, 0, dV)
   const tranche = d > 0 ? flanc : 0
   return Math.max(sommet, tranche)
 }
@@ -83,7 +88,7 @@ float facteurRelief(float h) {
   return clamp(h, 0.0, ${glslFloat(HAUTEUR_BLOCS)}) / ${glslFloat(HAUTEUR_BLOCS)};
 }
 float solCache(float d, float dV, float flanc, float w) {
-  float sommet = (1.0 - smoothstep(-w, 0.0, dV)) * clamp((d - dV) / w, 0.0, 1.0);
+  float sommet = 1.0 - smoothstep(-w, 0.0, dV);
   return max(sommet, d > 0.0 ? flanc : 0.0);
 }
 `
