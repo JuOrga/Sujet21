@@ -3022,6 +3022,7 @@ void main() {
     // sur le dehors (vide, baie — des trous dans le plancher). Sans corps,
     // ni court-circuit d'aura, ni relief, ni ombre portée, ni chanfrein.
     bool solide = (mat < 2.5 || mat > 3.5) && mat < 10.5;
+    bool hydro = mat > 0.5 && mat < 2.5;
     vec3 eclMat = matActif ? eclActif : eclSolide;
     // Court-circuit : au-delà de toute influence visuelle (l'ombre courte et
     // son flou, 56 + 12 = 68 u ; l'arête ; l'aura selon le matériau ; relief
@@ -3873,7 +3874,11 @@ void main() {
     // la chaudière (aPieces) non plus : d y est la distance à leur BOÎTE, et
     // le chanfrein dessinerait le rectangle du bloc — leur relief suit leurs
     // plaques et leur tuyau (composition).
-    if (solide && !aPieces) {
+    // Les deux matières HYDRO non plus (le concepteur, 15/11, aperçu
+    // d'ensemble : « leurs parois ne sont pas dingues ») : la bande sombre
+    // les encadrait comme une plaque d'acier ; une surface mouillée ou cirée
+    // garde le liseré coloré de son bord (edgeCol), comme en ligne.
+    if (solide && !aPieces && !hydro) {
       float dT = -dV; // la profondeur dans le dessus, depuis son bord
       // La bande commence APRÈS le trait clair du bord (edgeW, peint avec le
       // remplissage) : posée dessus, il en mangeait la moitié. 14 u, au moins

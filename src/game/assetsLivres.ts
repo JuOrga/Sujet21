@@ -25,7 +25,9 @@ export interface AssetLivre {
  *  des joints à zéro. La galerie les montre donc SANS leur alpha. */
 export function reliefDansAlpha(url: string): boolean {
   const f = url.slice(url.lastIndexOf('/') + 1)
-  return /^(wall|wall-a|phile|phobe|paroi-atlas)\.webp$/.test(f)
+  // les deux matières (phile, phobe) sont revenues aux images en ligne,
+  // opaques (le concepteur, 15/11)
+  return /^(wall|wall-a|paroi-atlas)\.webp$/.test(f)
 }
 
 /** L'ordre des rubriques : celui du regard d'un concepteur — d'abord ce

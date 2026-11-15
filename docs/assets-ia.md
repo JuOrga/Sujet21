@@ -2304,6 +2304,15 @@ deuxième variante de baie et de trappe.
 
 ## 37. LES SURFACES SOUS LUMIÈRE NEUTRE ET LEUR RELIEF ✅ LIVRÉ (14/11)
 
+> **Les deux matières en sont sorties (15/11).** Sur l'aperçu d'ensemble, le
+> concepteur a jugé les hydro « moins jolies » (le motif, le dessus) et leurs
+> parois « pas dingues ». Il a choisi, sur une planche côte à côte (en ligne /
+> #516 Blender / re-rendu neutre), les images EN LIGNE : `phile.webp` et
+> `phobe.webp` sont redevenues celles de `prod`, opaques — un dessus plat, que
+> `lumiereRelief` rend à 1 — et le chanfrein des solides les épargne. Les
+> rendus Blender restent dans l'historique (e1ba8dc, puis B1). Ne pas les
+> relivrer avec un alpha sans son accord : `surfacesRelief.spec.ts` le garde.
+
 Le chantier « volume des parois » (`docs/superpowers/specs/2026-11-14-volume-parois-design.md`,
 volet 3) : les surfaces de l'atelier avaient leur lumière PEINTE — le soleil du
 haut de la charte, à 50°, donnait à chaque rivet, chaque biseau, chaque tuyau un

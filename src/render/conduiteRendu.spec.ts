@@ -74,7 +74,8 @@ describe('le relief de la conduite suit son dessin, pas sa boîte', () => {
     expect(i).toBeGreaterThan(0)
     const garde = source.slice(i, source.indexOf('gradSdfBoite(', i))
     // aPieces : la conduite ET la chaudière sans forme (gardé par dec.y < 0.5)
-    expect(garde).toMatch(/!aPieces\)/)
+    // (les hydro en sont exemptées aussi depuis le 15/11 : epaisseur.spec.ts)
+    expect(garde).toMatch(/!aPieces( && !hydro)?\)/)
   })
 
   it('les plaques ont leur arête et le tuyau son pied, dans la branche de la conduite', () => {
