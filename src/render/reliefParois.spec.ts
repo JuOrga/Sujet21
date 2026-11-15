@@ -3,7 +3,10 @@ import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { HAUTEUR_BLOCS } from './hauteurs'
 import { HAUTEUR_DE_RANG } from './volume'
-import { facteurRelief } from './reliefParois'
+import {
+  facteurRelief,
+  solCache,
+} from './reliefParois'
 
 // LE RELIEF 2.5D RÉPARÉ (volume des parois, volet 1). Les règles pures sont
 // testées ici ; le shader ne tourne pas sous vitest : on lit sa SOURCE, comme
@@ -26,6 +29,7 @@ const debutCompo = source.indexOf('const COMPOSE_FS = `')
 const couverture = entre('// ——— LA COUVERTURE', '// LA LUMIÈRE SUR LE DESSUS', debutCompo)
 const lumiereToit = entre('// LA LUMIÈRE SUR LE DESSUS', '// ——— RELIEF 2.5D', debutCompo)
 const boucle = entre('// ——— RELIEF 2.5D', "// L'OMBRE COURTE SUR LES TOITS", debutCompo)
+const epaisseur = entre("// ——— L'ÉPAISSEUR", '// ——— LE FLANC', debutCompo)
 
 describe('les règles pures du relief', () => {
   it('le sommet s’écarte selon la hauteur : un mur haut garde son flanc, une plaque basse en a un court', () => {
@@ -37,6 +41,27 @@ describe('les règles pures du relief', () => {
     expect(facteurRelief(0)).toBe(0)
     expect(facteurRelief(-5)).toBe(0)
     expect(HAUTEUR_DE_RANG.haut).toBe(HAUTEUR_BLOCS)
+  })
+
+  it('relief éteint, aucun sol n’est caché : le rendu d’avant reste', () => {
+    for (const d of [-40, -3, 0, 0.5, 4, 60]) expect(solCache(d, d, 0, 2.5)).toBe(0)
+  })
+
+  it('le sol que le sommet recouvre au-delà du pied est caché ; le pied vu reste visible', () => {
+    // au-delà du pied (d > 0), sous le sommet (dV ≤ 0) : caché — le fluide
+    // qui touche le pied de ce côté passe dessous
+    expect(solCache(3, -25, 0, 2.5)).toBe(1)
+    expect(solCache(20, -6, 0, 2.5)).toBe(1)
+    // la lisière du fluide sous le pied, de ce même côté : cachée aussi
+    expect(solCache(-3, -35, 0, 2.5)).toBe(1)
+    // le sol libre : visible
+    expect(solCache(10, 15, 0, 2.5)).toBe(0)
+    // côté où le pied se voit : la tranche sur la base — le fluide y touche
+    // le bas du flanc, rien n'est caché
+    expect(solCache(-4, 12, 1, 2.5)).toBe(0)
+    expect(solCache(-1, 30, 1, 2.5)).toBe(0)
+    // une face latérale vue de biais, hors de la base : elle cache le sol
+    expect(solCache(6, 9, 1, 2.5)).toBe(1)
   })
 })
 
@@ -71,6 +96,25 @@ describe('le shader : le dessus suit son sommet', () => {
     // le relief des surfaces (R3) se lit au même sommet
     expect(boucle).toMatch(/\(wS \+ vec2\(pW, 0\.0\)\) \/ cW/)
     expect(boucle).not.toMatch(/\(world \+ vec2\(p[WAHB], 0\.0\)\)/)
+  })
+})
+
+describe('le shader : les flancs absents (hydro, miroir)', () => {
+  it('chaque solide mesure le sol que son sommet cache, à la règle solCache', () => {
+    expect(boucle).toMatch(/solPropre = solCache\(d, dV, flanc, edgeW\)/)
+  })
+
+  it('l’aura des hydro, l’ombre de contact et l’ombre courte ne se peignent plus sur le sommet de leur propre boîte', () => {
+    expect(epaisseur).toMatch(/float sol = step\(0\.0, d\) \* libre \* \(1\.0 - solPropre\);/)
+    expect(boucle).toMatch(/aura \*= 1\.0 - solPropre;/)
+  })
+
+  it('le dessus du miroir suit le sommet : il ne recouvre plus sa propre tranche', () => {
+    // il se peignait sur d (la base), le seul solide à le faire
+    const miroir = entre('// MIROIR FIXE', '} else if (mat > 8.5) {', debutCompo)
+    expect(miroir).toContain('smoothstep(-edgeW, 0.0, dV)')
+    expect(miroir).not.toMatch(/smoothstep\(-edgeW, 0\.0, d\)/)
+    expect(miroir).not.toMatch(/abs\(d\)\)/)
   })
 })
 

@@ -921,7 +921,7 @@ ${RETOMBEE_TOIT_GLSL}
 // surfacesSculptees.ts. Les profondeurs de l'atlas, case par case (skin 1 à 8).
 ${RELIEF_SURFACES_GLSL}
 // LE RELIEF 2.5D (volume des parois, volet 1) : la part du déplacement que
-// prend chaque sommet (sa hauteur).
+// prend chaque sommet (sa hauteur), et le sol qu'un sommet déplacé cache.
 ${RELIEF_PAROIS_GLSL}
 const float PROF_ATLAS[8] = float[8](${PROFONDEUR_RELIEF_ATLAS.map(glslFloat).join(', ')});
 // les UV d'un point de l'atlas des habillages, case \`tuile\`, motif calé sur
@@ -2869,6 +2869,10 @@ void main() {
       ? smoothstep(-edgeW, 0.0, dCouv)
       : 1.0;
 
+    // (la conduite d'ammoniac a son ombre qui suit ses tubes, pas la boîte
+    // — une plaque froide À FORME, elle, est un solide comme un autre — et
+    // la chaudière rectangulaire de même : mêmes pièces, même règle)
+    bool aPieces = ((mat > 3.5 && mat < 4.5) || (mat > 5.5 && mat < 6.5) || (mat > 8.5 && mat < 9.5)) && dec.y < 0.5;
     // ——— RELIEF 2.5D (tous les solides, sauf la bouche du sas) ————————
     // dV / wbV : la géométrie du SOMMET (déplacé) — le remplissage et les
     // habillages la suivent ; wS, le même point dans le monde (sans le pivot
@@ -2886,6 +2890,11 @@ void main() {
     vec2 wS = world;
     vec2 relB = vec2(0.0);
     float flanc = 0.0;
+    // LE SOL QUE CE SOMMET CACHE (reliefParois.ts : solCache) : du côté où il
+    // déborde le pied, le sol est dessous — et derrière une face latérale vue
+    // de biais aussi. L'aura et les ombres au sol de la boîte ne s'y
+    // peignent pas. Relief éteint : 0.
+    float solPropre = 0.0;
     if (uRelief > 0.0 && solide) {
       relB = relDisp * facteurRelief(hauteurBoite(bi));
       vec2 wT = world - relB;
@@ -2920,11 +2929,10 @@ void main() {
           }
         }
       }
+      // (les pièces n'en sont pas : leur dessus est leur IMAGE, pas leur
+      // boîte — et elles n'ont ni aura ni ombre courte de boîte)
+      if (!aPieces) solPropre = solCache(d, dV, flanc, edgeW);
     }
-    // (la conduite d'ammoniac a son ombre qui suit ses tubes, pas la boîte
-    // — une plaque froide À FORME, elle, est un solide comme un autre — et
-    // la chaudière rectangulaire de même : mêmes pièces, même règle)
-    bool aPieces = ((mat > 3.5 && mat < 4.5) || (mat > 5.5 && mat < 6.5) || (mat > 8.5 && mat < 9.5)) && dec.y < 0.5;
     // ——— L'ÉPAISSEUR, AU SOL (volume des parois, volet 2) ————————————
     // Vu de dessus, caméra immobile et relief éteint, un solide ne dit sa
     // hauteur que par ce qu'il fait au sol autour de lui. Le halo SYMÉTRIQUE
@@ -2939,13 +2947,15 @@ void main() {
     //    qu'un rideau. Un sol que la carte cuite a déjà ombré la reçoit moins
     //    (solEclaire).
     // Le contact, rien là où un AUTRE solide couvre le pixel (libre) : un
-    // pied posé sur le dessus d'un voisin y tracerait une couture sombre.
+    // pied posé sur le dessus d'un voisin y tracerait une couture sombre —
+    // ni sous son PROPRE sommet, relief allumé (solPropre) : de ce côté-là le
+    // pied est caché, l'ombre se peignait en travers du dessus.
     // L'ombre courte, elle, tombe aussi sur le TOIT d'un voisin plus bas.
     // (déclarées hors du bloc : l'aura des hydro, plus bas, les lit)
     float ombreCourte = 0.0;
     float contact = 0.0;
     if (solide && !aPieces) {
-      float sol = step(0.0, d) * libre;
+      float sol = step(0.0, d) * libre * (1.0 - solPropre);
       // CE QUI REÇOIT l'ombre : le sol (0), ou le toit du voisin qui couvre
       // ce pixel — elle ne s'y couche que sur ce que cette boîte le dépasse
       // (volume.ts : longueurOmbreSur). Sous un voisin aussi haut ou plus
@@ -3241,6 +3251,14 @@ void main() {
         // le bloc hydro restait plat dans sa brume). Elle reste lisible tout
         // autour — c'est une information de jeu, elle garde la priorité.
         aura *= (1.0 - contact) * (1.0 - 0.4 * ombreCourte);
+        // LE FLANC ABSENT DES HYDRO : relief allumé, la brume se peignait
+        // par-dessus la part du sommet qui déborde le pied (et sur la face
+        // latérale vue de biais) — du côté où le dessus fuit, il prenait la
+        // couleur de la brume ; seul le dessus posé sur la base restait
+        // sombre, et la tranche, du côté du centre, avait la teinte même de
+        // l'aura. On voyait le bloc à sa base, cerclé de brume : ni sommet
+        // déplacé, ni flanc. Sous son propre sommet, la brume s'arrête.
+        aura *= 1.0 - solPropre;
         float mist = 0.5 + 0.5 * dnoise(world * 0.045 + vec2(uTime * 0.10, -uTime * 0.07));
         vec3 auraCol = mat < 1.5 ? vec3(0.12, 0.42, 0.45) : vec3(0.38, 0.20, 0.52);
         col += auraCol * aura * (0.45 + 0.55 * mist);
@@ -3305,13 +3323,16 @@ void main() {
       // vraie optique — ici, le POLI se voit) : métal froid presque blanc,
       // balayage spéculaire en diagonale, micro-rayures de polissage, arête
       // claire comme un fil de lumière.
-      float fill = 1.0 - smoothstep(-edgeW, 0.0, d);
-      float edge = (1.0 - smoothstep(0.0, edgeW, abs(d))) * libre;
-      float grain = dnoise(world * 0.021);
-      float stries = 0.5 + 0.5 * sin((world.x - world.y) * 0.55);
-      float band = 0.5 + 0.5 * sin((world.x + world.y) * 0.030 - uTime * 0.45);
+      // Son dessus suit le SOMMET (dV, wS), comme tout solide : peint sur la
+      // base (d), il recouvrait sa propre tranche relief allumé — le miroir
+      // n'avait pas de flanc, et son chanfrein (sur dV) flottait à côté.
+      float fill = 1.0 - smoothstep(-edgeW, 0.0, dV);
+      float edge = (1.0 - smoothstep(0.0, edgeW, abs(dV))) * libre;
+      float grain = dnoise(wS * 0.021);
+      float stries = 0.5 + 0.5 * sin((wS.x - wS.y) * 0.55);
+      float band = 0.5 + 0.5 * sin((wS.x + wS.y) * 0.030 - uTime * 0.45);
       float sweep = smoothstep(0.70, 0.985, band);
-      float ciel = 0.5 + 0.5 * sin(world.y * 0.012 + world.x * 0.004);
+      float ciel = 0.5 + 0.5 * sin(wS.y * 0.012 + wS.x * 0.004);
       vec3 base = mix(vec3(0.34, 0.40, 0.48), vec3(0.58, 0.66, 0.76), ciel);
       base *= 0.86 + 0.14 * grain;
       base += vec3(0.05) * smoothstep(0.80, 1.0, stries);

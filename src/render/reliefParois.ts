@@ -5,10 +5,12 @@
 // Le relief allumé, le SOMMET de chaque solide fuit le centre de l'écran
 // (le dessus d'une paroi haute est plus près de l'œil que son pied) et la
 // tranche se révèle du côté qui regarde le centre. La physique, elle, reste
-// sur la BASE : c'est au pied que le fluide touche. Ce que le relief d'avant
-// ignorait :
+// sur la BASE : c'est au pied que le fluide touche. Ce que le relief
+// d'avant ignorait :
 //  - la longueur du flanc suit la hauteur de l'élément (volume.ts) : une
-//    plaque basse ne se dresse pas comme un mur.
+//    plaque basse ne se dresse pas comme un mur ;
+//  - là où le sommet déplacé recouvre le sol au-delà du pied, ce sol ne se
+//    voit plus — ni le fluide qui touche le pied, ni ce qui se pose au sol.
 import { HAUTEUR_BLOCS } from './hauteurs'
 import { glslFloat } from './surfacesSculptees'
 
@@ -22,9 +24,37 @@ export function facteurRelief(h: number): number {
   return Math.min(Math.max(h, 0), HAUTEUR_BLOCS) / HAUTEUR_BLOCS
 }
 
-/** La règle en GLSL, pour le shader de composition. */
-export const RELIEF_PAROIS_GLSL = `// (reliefParois.ts : la règle et son jumeau TypeScript)
+const smoothstep = (a: number, b: number, x: number): number => {
+  const t = Math.min(Math.max((x - a) / (b - a), 0), 1)
+  return t * t * (3 - 2 * t)
+}
+
+/** Le SOL QUE LE SOLIDE CACHE, 0..1, en un pixel : `d` la distance signée à
+ *  la base, `dV` au sommet déplacé, `flanc` la tranche peinte ici (0..1),
+ *  `w` le fondu d'un pixel.
+ *  - Le sommet couvre le pixel ET s'y est écarté du pied (d − dV > 0 : du
+ *    côté où il déborde) : le sol est dessous. Le champ du fluide déborde de
+ *    quelques unités sous le pied (le rayon des splats) ; de ce côté, cette
+ *    lisière se peindrait en ligne liquide à travers le dessus — elle est
+ *    cachée aussi.
+ *  - Hors de la base, la tranche est peinte (une face latérale vue de
+ *    biais) : le sol derrière elle est caché.
+ *  - Côté où le pied se voit (la tranche sur la base, d ≤ 0), rien n'est
+ *    caché : le fluide y touche le bas du flanc.
+ *  Relief éteint (dV = d, flanc = 0) : 0 partout — rien ne change. */
+export function solCache(d: number, dV: number, flanc: number, w: number): number {
+  const sommet = (1 - smoothstep(-w, 0, dV)) * Math.min(Math.max((d - dV) / w, 0), 1)
+  const tranche = d > 0 ? flanc : 0
+  return Math.max(sommet, tranche)
+}
+
+/** Les deux règles en GLSL, pour le shader de composition. */
+export const RELIEF_PAROIS_GLSL = `// (reliefParois.ts : les règles et leur jumeau TypeScript)
 float facteurRelief(float h) {
   return clamp(h, 0.0, ${glslFloat(HAUTEUR_BLOCS)}) / ${glslFloat(HAUTEUR_BLOCS)};
+}
+float solCache(float d, float dV, float flanc, float w) {
+  float sommet = (1.0 - smoothstep(-w, 0.0, dV)) * clamp((d - dV) / w, 0.0, 1.0);
+  return max(sommet, d > 0.0 ? flanc : 0.0);
 }
 `
