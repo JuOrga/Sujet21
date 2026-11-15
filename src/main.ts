@@ -19981,14 +19981,16 @@ function corpsImage(now: number): boolean {
 
   // ---- Impulsion SANS direction : le geste se retourne vers soi ----
   // Stick au neutre (manette), ou doigt/pointeur posé SUR le corps : au lieu
-  // d'éjecter au petit bonheur, le corps se RASSEMBLE autour de son centre —
-  // l'anti-dispersion, gratuite (rien ne part, rien ne se paie).
+  // d'éjecter au petit bonheur, le corps se RASSEMBLE — l'anti-dispersion,
+  // gratuite (rien ne part, rien ne se paie). Le stick n'a pas de point : il
+  // rassemble au centre. Le doigt, lui, en a un : le corps se reforme LÀ où
+  // on le touche (voir FluidSim.rassemble pour les garde-fous).
+  const rassembleAuCentre = manetteTenait && manette.force < 0.02
   const rassembler =
     input.aimActive &&
     !input.gasIntent &&
     !sim.dispersed &&
-    ((manetteTenait && manette.force < 0.02) ||
-      corpsSousLePointeur(aim.x, aim.y))
+    (rassembleAuCentre || corpsSousLePointeur(aim.x, aim.y))
   ;(window as unknown as { __rass: boolean }).__rass = rassembler // sonde de test
 
   if (rejeu) {
@@ -20062,7 +20064,10 @@ function corpsImage(now: number): boolean {
           // En eau, maintenir éjecte ; en vapeur, la visée fige le temps —
           // le dash part au relâchement (voir plus haut), rien ne se pilote.
           // Sans direction (stick neutre, doigt sur le corps) : on se reforme.
-          if (rassembler) sim.rassemble(params.dt)
+          if (rassembler) {
+            if (rassembleAuCentre) sim.rassemble(params.dt)
+            else sim.rassemble(params.dt, aim.x, aim.y)
+          }
           else {
             sim.eject(aim.x, aim.y, params.dt)
             prevision = null // une éjection change la trajectoire : la ligne exacte ne vaut plus
@@ -21082,14 +21087,15 @@ function corpsImage(now: number): boolean {
       const dy = aim.y - sim.stats.centroidY
       const len = Math.hypot(dx, dy) || 1
       const r = sim.stats.rmsRadius * 1.1
-      // en rassemblement, l'onde part du CENTRE : le battement d'un cœur qui
-      // se reforme, pas une salve qui sort
+      // en rassemblement, l'onde part du POINT où le corps se reforme : le
+      // battement d'un cœur qui se ramasse, pas une salve qui sort
+      const ici = rassembler ? sim.pointDeRassemblement() : null
       waves.push({
         x: rassembler
-          ? sim.stats.centroidX
+          ? (ici?.x ?? sim.stats.centroidX)
           : sim.stats.centroidX + (dx / len) * r,
         y: rassembler
-          ? sim.stats.centroidY
+          ? (ici?.y ?? sim.stats.centroidY)
           : sim.stats.centroidY + (dy / len) * r,
         t: elapsed,
       })
