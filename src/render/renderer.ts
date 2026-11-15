@@ -2350,6 +2350,9 @@ float ombreVolume(vec2 world, float dansEau) {
 }
 
 void main() {
+  // la profondeur dit à la passe de vie où le sol est caché par un sommet
+  // (relief allumé) : rien de caché par défaut, sorties anticipées comprises
+  gl_FragDepth = 1.0;
   vec2 uv = gl_FragCoord.xy / uCanvasSize;
   vec4 tex = texture(uField, uv);
   // La couche d'eau ne se calcule que là où il y a de l'eau : loin du seuil,
@@ -2813,6 +2816,9 @@ void main() {
   // dans la boucle, peinte après elle (le toit se peint peut-être après la
   // source, et l'aurait recouverte)
   float ombreToit = 0.0;
+  // LE SOL QUE LES SOMMETS CACHENT (relief allumé) : le plus grand sur toutes
+  // les boîtes — le fluide, peint après la boucle, ne s'y peint pas
+  float solSousSommets = 0.0;
   for (int bi = 0; bi < min(uBoxCount, MAX_BOXES); bi++) {
     // boîte oblique : le monde pivote dans le repère local de la boîte —
     // la distance signée (remplissage, arête, aura) suit la rotation
@@ -2892,8 +2898,8 @@ void main() {
     float flanc = 0.0;
     // LE SOL QUE CE SOMMET CACHE (reliefParois.ts : solCache) : du côté où il
     // déborde le pied, le sol est dessous — et derrière une face latérale vue
-    // de biais aussi. L'aura et les ombres au sol de la boîte ne s'y
-    // peignent pas. Relief éteint : 0.
+    // de biais aussi. L'aura, les ombres au sol de la boîte et le fluide ne
+    // s'y peignent pas. Relief éteint : 0.
     float solPropre = 0.0;
     if (uRelief > 0.0 && solide) {
       relB = relDisp * facteurRelief(hauteurBoite(bi));
@@ -2929,9 +2935,10 @@ void main() {
           }
         }
       }
-      // (les pièces n'en sont pas : leur dessus est leur IMAGE, pas leur
-      // boîte — et elles n'ont ni aura ni ombre courte de boîte)
+      // (les pièces n'en sont pas : leur dessus est leur IMAGE, le sol caché
+      // se mesure sur la silhouette de leurs pièces — voir leurs branches)
       if (!aPieces) solPropre = solCache(d, dV, flanc, edgeW);
+      solSousSommets = max(solSousSommets, solPropre);
     }
     // ——— L'ÉPAISSEUR, AU SOL (volume des parois, volet 2) ————————————
     // Vu de dessus, caméra immobile et relief éteint, un solide ne dit sa
@@ -3383,6 +3390,13 @@ void main() {
         emis = lueur * tube * 0.85 * couvS;
       }
       col = col * (1.0 - fill * ch.a) + ch.rgb * eclMat * fill + emis * fill;
+      // relief allumé : l'image déplacée cache le sol au-delà de ses pièces —
+      // mesuré sur leur silhouette (dG au pied, dGV au sommet), pas la boîte :
+      // l'eau passe entre les pièces, elle passe aussi sous leur image
+      if (uRelief > 0.0 && serp && fill > 0.0) {
+        float dGV = surchSdf(wbV, uBoxes[bi], zS);
+        solSousSommets = max(solSousSommets, solCache(dG, dGV, 0.0, edgeW) * fill * ch.a);
+      }
       float hors = (1.0 - fill * ch.a) * surSol;
       // le halo dit « approchez en vapeur » : il meurt avec la charge — et,
       // chargé, l'air tremble autour de la borne
@@ -3488,6 +3502,11 @@ void main() {
         ch = vec4(vec3(0.26, 0.11, 0.05) + vec3(0.42, 0.17, 0.04) * smoothstep(0.35, 0.85, stripe), 1.0) * couvS;
       }
       col = col * (1.0 - fill * ch.a) + ch.rgb * eclMat * fill;
+      // relief allumé : l'image déplacée cache le sol (voir le surchauffeur)
+      if (uRelief > 0.0 && rampe && fill > 0.0) {
+        float dGV = chaudiereSdf(wbV, uBoxes[bi], codeC);
+        solSousSommets = max(solSousSommets, solCache(dG, dGV, 0.0, edgeW) * fill * ch.a);
+      }
       float hors = (1.0 - fill * ch.a) * surSol;
       // l'air qui brûle autour, et — riche seulement — la lueur que les
       // barreaux jettent au sol, au rythme de leur onde, et les braises
@@ -3579,6 +3598,11 @@ void main() {
         cnh = vec4(vec3(0.15, 0.21, 0.29) + vec3(0.26, 0.34, 0.40) * eclat * 0.55, 1.0) * couvS;
       }
       col = col * (1.0 - fill * cnh.a) + cnh.rgb * eclMat * fill;
+      // relief allumé : l'image déplacée cache le sol (voir le surchauffeur)
+      if (uRelief > 0.0 && tuyau && fill > 0.0) {
+        float dGV = conduiteSdf(wbV, uBoxes[bi], sensC);
+        solSousSommets = max(solSousSommets, solCache(dG, dGV, 0.0, edgeW) * fill * cnh.a);
+      }
       // L'ARÊTE DES PLAQUES : l'image les peint à plat, sans épaisseur — un
       // biseau tourné vers la lampe (le haut à gauche de l'image sans
       // lampe) leur rend un chant, et une fine ligne sombre les découpe du
@@ -3715,6 +3739,10 @@ void main() {
   // Teintée vers le bleu d'ombre, comme celle des blocs.
   if (uLumiere > 0.5 && uLumiereEau > 0.5) {
     float dansEau = smoothstep(uThreshold * 0.8, uThreshold * 1.4, field);
+    // le corps ne s'ombre pas lui-même… sauf là où il passe sous un sommet
+    // (relief allumé) : le dessus du mur reçoit son ombre en entier — l'en
+    // exempter y découpait, en clair, la silhouette du fluide caché dessous
+    dansEau *= 1.0 - solSousSommets;
     float ombre = ombreVolume(world, dansEau);
     col = mix(col, col * vec3(0.44, 0.51, 0.66), ombre * 0.72);
   }
@@ -3773,6 +3801,17 @@ void main() {
   float body = smoothstep(th - s, th + s, field2);
   // La fumée est trouée et translucide par endroits
   body *= 1.0 - vap * (0.2 + 0.4 * smokeN);
+  // LE FLUIDE PASSE SOUS LES SOMMETS (relief allumé). La physique touche la
+  // BASE ; le fluide se peint APRÈS les solides : du côté où le sommet
+  // déplacé déborde le pied, le fluide qui touche le pied se peignait sur le
+  // dessus du mur. Là, il passe dessous — lui, ses reflets et ses ondes
+  // (elles gonflent le champ, avant) : tout l'habillage de l'eau suit body.
+  // Côté où le pied se voit, rien n'est caché : le fluide touche le bas du
+  // flanc. Relief éteint, solSousSommets vaut 0 : rien ne change.
+  body *= 1.0 - solSousSommets;
+  // La passe de vie (motes, lueur des gouttes perdues), peinte après, lit
+  // ce masque dans la PROFONDEUR (voir drawVie) : 0 sous un sommet.
+  gl_FragDepth = solSousSommets > 0.5 ? 0.0 : 1.0;
 
   // LE HALO DU SUJET : il éclaire le sol sous lui. Une gaussienne autour
   // du centroïde, large comme le corps et demi, au MÊME rythme que le
@@ -7254,11 +7293,22 @@ export class Renderer {
     bindTex(15, this.texParoi, 'uTexParoi', 'uHasParoi')
     gl.uniform1f(cu['uHasHull'], this.texHull ? 1 : 0)
     gl.activeTexture(gl.TEXTURE0)
+    // LE SOMMET CACHE AUSSI CE QUI SE PEINT APRÈS (relief allumé). La
+    // composition masque le fluide sous les sommets déplacés ; la vie du
+    // corps (motes, lueur des gouttes perdues) se peint après elle,
+    // par-dessus. Le masque lui parvient par la PROFONDEUR de la toile
+    // (gl_FragDepth : 0 sous un sommet, 1 ailleurs) — les 16 unités de
+    // texture de la composition sont prises, elle ne peut écrire aucune
+    // autre image. Relief éteint : le test reste fermé, la profondeur n'est
+    // ni écrite ni lue, rien ne coûte.
+    const sommetsCachent = relief > 0
+    if (sommetsCachent && !decorNet) this.ecritProfondeur(true)
     gl.drawArrays(gl.TRIANGLES, 0, 3)
-    if (decorNet) this.drawDecorNet(viewportW, natW, natH)
+    this.ecritProfondeur(false)
+    if (decorNet) this.drawDecorNet(viewportW, natW, natH, sommetsCachent)
 
     // Passe B vie — les motes dans le corps, la lueur des gouttes perdues
-    this.drawVie(camera, viewportW, viewportH, dprPasses, params)
+    this.drawVie(camera, viewportW, viewportH, dprPasses, params, sommetsCachent)
 
     // Passe B bis — coque texturée autour de la cuve. Un tableau bâti en
     // MODULES n'a pas de cuve : ses parois sont celles de ses coques, et
@@ -7289,7 +7339,7 @@ export class Renderer {
   // dans sceneFbo. Le décor se calcule EN NATIF sur la toile, sans l'eau,
   // puis la couche s'y pose. Les passes suivantes (vie, coque, décalques,
   // éponges) se dessinent ensuite en natif, sur la toile.
-  private drawDecorNet(viewportW: number, natW: number, natH: number): void {
+  private drawDecorNet(viewportW: number, natW: number, natH: number, sommetsCachent: boolean): void {
     const gl = this.gl
     const cu = this.uniforms['compose']
     gl.bindFramebuffer(gl.FRAMEBUFFER, null)
@@ -7297,7 +7347,11 @@ export class Renderer {
     gl.uniform1f(cu['uDpr'], natW / viewportW)
     gl.uniform2f(cu['uCanvasSize'], natW, natH)
     gl.uniform1f(cu['uPasse'], 3)
+    // le décor natif, sur la toile : c'est lui qui écrit le masque des
+    // sommets (la couche d'eau, dans sceneFbo, n'a pas de profondeur)
+    this.ecritProfondeur(sommetsCachent)
     gl.drawArrays(gl.TRIANGLES, 0, 3)
+    this.ecritProfondeur(false)
     gl.uniform1f(cu['uPasse'], 0)
 
     gl.useProgram(this.recopieProgram)
@@ -7347,12 +7401,41 @@ export class Renderer {
     this.vieCount = data ? count : 0
   }
 
+  /** La composition écrit-elle sa profondeur (le masque des sommets) ? Le
+   *  test de profondeur ouvert sur ALWAYS : chaque pixel l'écrit — fermé, la
+   *  profondeur n'est pas écrite du tout. */
+  private ecritProfondeur(oui: boolean): void {
+    const gl = this.gl
+    if (oui) {
+      gl.enable(gl.DEPTH_TEST)
+      gl.depthFunc(gl.ALWAYS)
+      gl.depthMask(true)
+    } else {
+      gl.disable(gl.DEPTH_TEST)
+    }
+  }
+
+  /** Ce qui se peint au SOL après la composition passe sous les sommets :
+   *  la profondeur des points (0,5) contre le masque (0 sous un sommet). */
+  private passeSousSommets(oui: boolean): void {
+    const gl = this.gl
+    if (oui) {
+      gl.enable(gl.DEPTH_TEST)
+      gl.depthFunc(gl.LESS)
+      gl.depthMask(false)
+    } else {
+      gl.disable(gl.DEPTH_TEST)
+      gl.depthMask(true)
+    }
+  }
+
   private drawVie(
     camera: Camera,
     viewportW: number,
     viewportH: number,
     dpr: number,
     params: SimParams,
+    sommetsCachent = false,
   ): void {
     const n = this.vieCount
     const data = this.vieData
@@ -7362,6 +7445,9 @@ export class Renderer {
     gl.bufferSubData(gl.ARRAY_BUFFER, 0, data, 0, n * VIE_STRIDE)
     gl.enable(gl.BLEND)
     gl.blendFunc(gl.ONE, gl.ONE)
+    // les motes et la lueur des gouttes sont DANS le fluide : là où il passe
+    // sous un sommet (relief allumé), elles passent dessous avec lui
+    if (sommetsCachent) this.passeSousSommets(true)
     gl.useProgram(this.vieProgram)
     const vu = this.uniforms['vie']
     gl.uniform2f(vu['uCenter'], camera.x, camera.y)
@@ -7378,6 +7464,7 @@ export class Renderer {
     gl.drawArrays(gl.POINTS, 0, n)
     gl.bindVertexArray(null)
     gl.disable(gl.BLEND)
+    if (sommetsCachent) this.passeSousSommets(false)
     // la passe consomme ses points : une image sans setVie ne redessine
     // pas ceux de la précédente
     this.vieCount = 0

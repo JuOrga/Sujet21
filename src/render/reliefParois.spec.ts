@@ -30,6 +30,11 @@ const couverture = entre('// ——— LA COUVERTURE', '// LA LUMIÈRE SUR LE DE
 const lumiereToit = entre('// LA LUMIÈRE SUR LE DESSUS', '// ——— RELIEF 2.5D', debutCompo)
 const boucle = entre('// ——— RELIEF 2.5D', "// L'OMBRE COURTE SUR LES TOITS", debutCompo)
 const epaisseur = entre("// ——— L'ÉPAISSEUR", '// ——— LE FLANC', debutCompo)
+const drawVie = entre('private drawVie(', '\n  }\n')
+const rendu = entre('// Passe B — composition', '// Passe C — cellules')
+const decorNet = entre('private drawDecorNet(', '\n  }\n')
+const passeSous = entre('private passeSousSommets(', '\n  }\n')
+const ecrit = entre('private ecritProfondeur(', '\n  }\n')
 
 describe('les règles pures du relief', () => {
   it('le sommet s’écarte selon la hauteur : un mur haut garde son flanc, une plaque basse en a un court', () => {
@@ -115,6 +120,50 @@ describe('le shader : les flancs absents (hydro, miroir)', () => {
     expect(miroir).toContain('smoothstep(-edgeW, 0.0, dV)')
     expect(miroir).not.toMatch(/smoothstep\(-edgeW, 0\.0, d\)/)
     expect(miroir).not.toMatch(/abs\(d\)\)/)
+  })
+})
+
+describe('le shader : le fluide passe sous les sommets', () => {
+  it('chaque solide verse le sol que son sommet cache dans le masque de l’image', () => {
+    expect(boucle).toMatch(/solSousSommets = max\(solSousSommets, solPropre\)/)
+  })
+
+  it('la conduite, la chaudière et le surchauffeur à pièces cachent le sol sous leur image déplacée', () => {
+    // leur dessus est l'image (alpha) posée sur la silhouette des pièces : le
+    // sol caché se mesure sur ELLE, pas sur la boîte
+    const n = [...boucle.matchAll(/solSousSommets = max\(solSousSommets, solCache\(dG, dGV, 0\.0, edgeW\) \* fill \* \w+\.a\)/g)]
+    expect(n.length).toBe(3)
+  })
+
+  it('le fluide (et ses ondes, reflets, éclaboussures : tout passe par body) est masqué avant d’être peint', () => {
+    const masque = composeFs.indexOf('body *= 1.0 - solSousSommets;')
+    expect(masque).toBeGreaterThan(0)
+    // avant la sortie de la couche d'eau seule, et avant le mélange de l'eau
+    expect(masque).toBeLessThan(composeFs.indexOf('if (uPasse > 1.5 && uPasse < 2.5 && body <= 0.001)'))
+    expect(masque).toBeLessThan(composeFs.indexOf('col = mix(col, water, body);'))
+    // l'ombre du corps ne s'exempte plus là où il est caché : sa silhouette
+    // se découpait en clair sur le dessus du mur
+    expect(composeFs).toContain('dansEau *= 1.0 - solSousSommets;')
+    // les ondes d'éjection gonflent le champ AVANT que body ne se calcule :
+    // elles passent par le masque
+    expect(composeFs.indexOf('waveGlow')).toBeLessThan(masque)
+  })
+
+  it('la passe de vie (motes, lueur des gouttes perdues) lit le masque dans la profondeur', () => {
+    // la composition écrit sa profondeur : 0 sous un sommet, 1 ailleurs
+    expect(composeFs).toMatch(/void main\(\) \{(\s*\/\/[^\n]*)*\s*gl_FragDepth = 1\.0;/)
+    expect(composeFs).toContain('gl_FragDepth = solSousSommets > 0.5 ? 0.0 : 1.0;')
+    // relief allumé : la composition écrit, la vie teste
+    expect(rendu).toMatch(/if \(sommetsCachent && !decorNet\) this\.ecritProfondeur\(true\)/)
+    expect(decorNet).toContain('this.ecritProfondeur(sommetsCachent)')
+    expect(drawVie).toContain('if (sommetsCachent) this.passeSousSommets(true)')
+    expect(drawVie).toContain('if (sommetsCachent) this.passeSousSommets(false)')
+    // passer sous : le point (profondeur 0,5) ne se peint que là où le masque vaut 1
+    expect(passeSous).toContain('gl.depthFunc(gl.LESS)')
+    expect(passeSous).toContain('gl.depthMask(false)')
+    expect(passeSous).toContain('gl.disable(gl.DEPTH_TEST)')
+    // écrire : chaque pixel de la composition pose sa profondeur
+    expect(ecrit).toContain('gl.depthFunc(gl.ALWAYS)')
   })
 })
 
