@@ -347,6 +347,8 @@ import {
 } from './render/module2d'
 import { chargePiecesModule2d, peintCelluleSeule, peintModule2d, type Pieces } from './render/module2dCanvas'
 import { MAX_BOXES, Renderer } from './render/renderer'
+import { HAUTEUR_BLOCS } from './render/hauteurs'
+import { fractionSommet, pointDuSommet } from './render/reliefParois'
 import { Motes, VIE_STRIDE, remplitVie, toucheLeCorps } from './render/vie'
 import { panDepuis } from './game/ouie'
 import { dangerDevant, directionDeMarche, saccade, type Saccade } from './game/regard'
@@ -9342,13 +9344,29 @@ function drawMecanismes(vw: number, vh: number, dpr: number): void {
   // portes : barrières d'énergie — pleines quand closes, un cadre quand
   // ouvertes, et entre les deux la PART MATÉRIALISÉE seule, bordée par son
   // front : ce que le solveur oppose au corps est exactement ce qu'on voit
+  //
+  // RELIEF ALLUMÉ, ELLES SONT POSÉES SUR LE SOMMET DES MURS. Le dessus des
+  // cloisons fuit le centre de l'écran (reliefParois.ts) ; dessinées au pied,
+  // les barres du hub restaient en arrière des murs qu'elles relient — « les
+  // portes ne sont plus placées correctement » (le concepteur, 15/11 ; relief
+  // éteint, elles l'étaient). Une porte ferme le passage entre deux murs
+  // hauts : elle prend leur sommet, comme un décalque prend celui de son mur.
+  // Le calcul se fait à l'écran — l'homothétie autour du centre y est la même
+  // que dans le monde (reliefParois.spec.ts). Relief éteint, f = 0 : S seul.
+  const fPortes = fractionSommet(RELIEF_K[reliefChoix], camera.zoom, HAUTEUR_BLOCS)
+  const auSommet = (x: number, y: number): { sx: number; sy: number } => {
+    const q = S(x, y)
+    if (fPortes <= 0) return q
+    const [sx, sy] = pointDuSommet(q.sx, q.sy, vw * 0.5, vh * 0.5, fPortes)
+    return { sx, sy }
+  }
   for (let i = 0; i < portes.length; i++) {
     const p = portes[i]
     // sous un voile de cachette : la porte se tait (elle flotterait
     // au-dessus d'une paroi factice et vendrait le secret)
     if (dansCacheVoilee((p.minX + p.maxX) / 2, (p.minY + p.maxY) / 2)) continue
-    const a = S(p.minX, p.maxY)
-    const b = S(p.maxX, p.minY)
+    const a = auSommet(p.minX, p.maxY)
+    const b = auSommet(p.maxX, p.minY)
     const avance =
       laserEtat.portesAvance[i] ?? (laserEtat.portesOuvertes[i] ? 0 : 1)
     if (avance < 1) {
@@ -9365,7 +9383,7 @@ function drawMecanismes(vw: number, vh: number, dpr: number): void {
       g.save()
       g.beginPath()
       for (let k = 0; k < contour.length; k++) {
-        const q = S(contour[k].x, contour[k].y)
+        const q = auSommet(contour[k].x, contour[k].y)
         if (k === 0) g.moveTo(q.sx, q.sy)
         else g.lineTo(q.sx, q.sy)
       }
@@ -9396,8 +9414,8 @@ function drawMecanismes(vw: number, vh: number, dpr: number): void {
       g.restore()
       // le FRONT : la ligne vive qui avance — c'est elle qui pousse
       if (front.length === 2) {
-        const f0 = S(front[0].x, front[0].y)
-        const f1 = S(front[1].x, front[1].y)
+        const f0 = auSommet(front[0].x, front[0].y)
+        const f1 = auSommet(front[1].x, front[1].y)
         g.strokeStyle = 'rgba(255,200,190,0.95)'
         g.lineWidth = 3
         g.beginPath()
