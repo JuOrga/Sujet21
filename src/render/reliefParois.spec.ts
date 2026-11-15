@@ -298,6 +298,16 @@ describe('les décalques plaqués sur un mur suivent son sommet', () => {
   it('un décalque posé au sol passe sous les sommets, comme le fluide', () => {
     expect(drawDecals).toContain('this.passeSousSommets(')
   })
+
+  it('relief éteint, ni recherche, ni appel GL, ni tableau de plus par décalque', () => {
+    // tout le travail du relief, par décalque, sous une seule garde
+    expect(drawDecals).toMatch(/if \(this\.reliefK > 0\) \{\s*const hSupport = this\.hauteurSousDecal\([^}]*this\.passeSousSommets\(hSupport < 0\)\s*gl\.uniform1f\(du\['uSommet'\], f\)\s*\}/)
+    // aucun tableau par coin quand le décalque ne bouge pas
+    expect(drawDecals).not.toMatch(/: \[x, y\]/)
+    expect(drawDecals).toMatch(/if \(f > 0\) \{\s*const p = pointDuSommet\(/)
+    // l'état rendu en fin de passe, relief allumé seulement
+    expect(drawDecals).toMatch(/if \(this\.reliefK > 0\) \{\s*this\.passeSousSommets\(false\)/)
+  })
 })
 
 describe('le relief reste éteint par défaut', () => {

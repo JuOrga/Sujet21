@@ -7774,19 +7774,28 @@ export class Renderer {
       // flanc. Ses quatre coins passent sur le sommet (pointDuSommet), et
       // l'eau qui l'efface se lit au pied (uSommet). Un décalque posé au SOL
       // ne bouge pas : il passe sous les sommets, comme le fluide (le masque
-      // de la composition, dans la profondeur).
-      const hSupport = this.reliefK > 0 ? this.hauteurSousDecal(d.x, d.y) : -1
-      const f = hSupport >= 0 ? fractionSommet(this.reliefK, this.zoomRelief, hSupport) : 0
-      const [cx, cy] = this.centreRelief
-      this.passeSousSommets(this.reliefK > 0 && hSupport < 0)
-      gl.uniform1f(du['uSommet'], f)
+      // de la composition, dans la profondeur). Relief éteint, rien de tout
+      // ça : ni recherche du support, ni appel GL, ni tableau par coin.
+      let f = 0
+      if (this.reliefK > 0) {
+        const hSupport = this.hauteurSousDecal(d.x, d.y)
+        f = hSupport >= 0 ? fractionSommet(this.reliefK, this.zoomRelief, hSupport) : 0
+        this.passeSousSommets(hSupport < 0)
+        gl.uniform1f(du['uSommet'], f)
+      }
+      const cx = this.centreRelief[0]
+      const cy = this.centreRelief[1]
       // v inversé : les textures sont chargées avec UNPACK_FLIP_Y
       const q = this.decalScratch
       let o = 0
       const put = (x: number, y: number, u: number, v: number): void => {
-        const [sx, sy] = f > 0 ? pointDuSommet(x, y, cx, cy, f) : [x, y]
-        q[o++] = sx
-        q[o++] = sy
+        if (f > 0) {
+          const p = pointDuSommet(x, y, cx, cy, f)
+          x = p[0]
+          y = p[1]
+        }
+        q[o++] = x
+        q[o++] = y
         q[o++] = u
         q[o++] = v
       }
@@ -7808,7 +7817,9 @@ export class Renderer {
     if (started) {
       gl.bindVertexArray(null)
       gl.disable(gl.BLEND)
-      this.passeSousSommets(false)
+      if (this.reliefK > 0) {
+        this.passeSousSommets(false)
+      }
     }
   }
 
