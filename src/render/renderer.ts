@@ -7819,6 +7819,10 @@ export class Renderer {
       gl.disable(gl.BLEND)
       if (this.reliefK > 0) {
         this.passeSousSommets(false)
+        // drawLampes reprend ce programme : il n'hérite pas du sommet du
+        // dernier décalque (sans effet tant que les lampes ne lisent pas
+        // l'eau, mais un jour elles le pourraient)
+        gl.uniform1f(du['uSommet'], 0)
       }
     }
   }

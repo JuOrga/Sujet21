@@ -308,6 +308,12 @@ describe('les décalques plaqués sur un mur suivent son sommet', () => {
     // l'état rendu en fin de passe, relief allumé seulement
     expect(drawDecals).toMatch(/if \(this\.reliefK > 0\) \{\s*this\.passeSousSommets\(false\)/)
   })
+
+  it('uSommet revient à 0 en fin de passe : les lampes, qui reprennent ce programme, n’en héritent pas', () => {
+    expect(drawDecals).toMatch(/this\.passeSousSommets\(false\)\s*\/\/[^\n]*\n(\s*\/\/[^\n]*\n)*\s*gl\.uniform1f\(du\['uSommet'\], 0\)/)
+    // et drawLampes passe bien après les décalques
+    expect(rendu.indexOf('this.drawDecals(')).toBeLessThan(rendu.indexOf('this.drawLampes('))
+  })
 })
 
 describe('le relief reste éteint par défaut', () => {
