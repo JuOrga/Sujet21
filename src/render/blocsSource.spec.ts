@@ -43,6 +43,21 @@ describe('les blocs d’une source', () => {
     expect(o[1].entetes).toEqual([])
   })
 
+  it('l’hôte, sans point-virgule, et une condition sur plusieurs lignes', () => {
+    const ts = `
+  draw(): void {
+    const cle = f(a, b)
+    if (cle !== this.cle) {
+      this.t = calcule(x)
+    }
+  }
+`
+    expect(entetesAutour(ts, ts.indexOf('calcule('))).toEqual(['if (cle !== this.cle)', 'draw(): void'])
+    const gl = 'void main() {\n  if (a > 0.0 &&\n      b < 1.0) {\n    c = 1.0;\n  } else {\n    c = 2.0;\n  }\n}'
+    expect(entetesAutour(gl, gl.indexOf('c = 1.0'))).toEqual(['if (a > 0.0 && b < 1.0)', 'void main()'])
+    expect(entetesAutour(gl, gl.indexOf('c = 2.0'))).toEqual(['else', 'void main()'])
+  })
+
   it('une adresse n’est pas un commentaire', () => {
     const s = "const u = 'http://x' ; if (k) { y = 1 }"
     expect(blocApres(s, 'if (k) {')).toBe('if (k) { y = 1 }')

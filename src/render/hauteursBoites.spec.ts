@@ -4,6 +4,7 @@ import { fileURLToPath } from 'node:url'
 import { OMBRE_COURTE_PAR_HAUTEUR } from './volume'
 import { MAX_BOXES, cleHauteurs } from './renderer'
 import type { ObstacleBox } from '../game/level'
+import { occurrencesDans } from './blocsSource'
 
 // LES HAUTEURS PAR BOÎTE (volume des parois, volet 4). Chaque solide a la
 // hauteur que volume.ts lui donne (hauteursPartagees) : l'ombre courte, la
@@ -53,7 +54,13 @@ describe('la table des hauteurs arrive au shader', () => {
   })
 
   it('elle vient de hauteursPartagees, une fois par décor, et suit l’ordre de peinture', () => {
-    expect(source).toMatch(/hauteursPartagees\(/)
+    // UN seul appel, et DANS le bloc qui compare la clé à celle du dernier
+    // calcul (this.hauteursCle) : sans ce cache, hauteursPartagees tournerait
+    // à chaque image — 3 à 11 ms sur le hub (R2) — sans que rien ne le dise.
+    // (appariement d'accolades : `if (true)` à la place du test passait vert)
+    const appels = occurrencesDans(source, 'hauteursPartagees(')
+    expect(appels).toHaveLength(1)
+    expect(appels[0].entetes[0]).toMatch(/^if \([^)]*this\.hauteursCle[^)]*\)$/)
     // case k du shader = boîte rangs[k] de la liste
     expect(source).toMatch(/this\.hauteurScratch\[k\]\s*=\s*this\.hauteursBoites\[i\]/)
     expect(source).toContain("gl.uniform4fv(cu['uBoxH[0]'], this.hauteurScratch)")

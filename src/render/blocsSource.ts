@@ -38,10 +38,27 @@ export function blocApres(source: string, entete: string, depuis = 0): string {
   return f < 0 ? '' : source.slice(a, f + 1)
 }
 
+/** L'en-tête de l'accolade ouvrante en `k` : si elle suit une parenthèse
+ *  (`if (…)`, `for (…)`, une fonction), la parenthèse appariée et ce qui la
+ *  précède sur sa ligne — la condition peut courir sur plusieurs lignes, et
+ *  l'hôte s'écrit sans point-virgule ; sinon (`else`, `=>`, une classe), la
+ *  ligne de l'accolade. */
+function enteteDe(propre: string, k: number): string {
+  let j = k - 1
+  while (j >= 0 && /\s/.test(propre[j])) j--
+  if (propre[j] === ')') {
+    for (let prof = 0; j >= 0; j--) {
+      if (propre[j] === ')') prof++
+      else if (propre[j] === '(' && --prof === 0) break
+    }
+  }
+  let debut = j - 1
+  while (debut >= 0 && propre[debut] !== '\n' && !';{}'.includes(propre[debut])) debut--
+  return propre.slice(debut + 1, k).replace(/\s+/g, ' ').trim()
+}
+
 /** Les EN-TÊTES de tous les blocs qui contiennent la position `i`, du plus
- *  proche au plus lointain : pour chaque accolade ouvrante non refermée
- *  avant `i`, le texte qui la précède depuis la dernière fin d'instruction
- *  (`;`, `{`, `}`). */
+ *  proche au plus lointain (enteteDe). */
 export function entetesAutour(source: string, i: number): string[] {
   const propre = sansCommentaires(source)
   const entetes: string[] = []
@@ -51,11 +68,7 @@ export function entetesAutour(source: string, i: number): string[] {
     if (c === '}') prof++
     else if (c === '{') {
       if (prof > 0) prof--
-      else {
-        let debut = k - 1
-        while (debut >= 0 && !';{}'.includes(propre[debut])) debut--
-        entetes.push(propre.slice(debut + 1, k).replace(/\s+/g, ' ').trim())
-      }
+      else entetes.push(enteteDe(propre, k))
     }
   }
   return entetes
