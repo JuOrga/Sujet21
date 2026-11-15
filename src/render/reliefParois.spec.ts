@@ -431,3 +431,53 @@ describe('le relief reste éteint par défaut', () => {
     expect(main).toMatch(/const RELIEF_K = \{ off: 0, /)
   })
 })
+
+// LES PORTES D'ÉNERGIE SUIVENT LE SOMMET DES MURS (retour du concepteur,
+// 15/11, aperçu d'ensemble) : relief allumé, les barres rouges du hub
+// restaient au PIED des cloisons quand leur dessus fuyait le centre de
+// l'écran — « les portes ne sont plus placées correctement » ; relief éteint,
+// elles l'étaient. Elles se dessinent à part, en 2D (la toile des effets de
+// main.ts) : elles passent donc elles-mêmes sur le sommet, comme les
+// décalques d'un mur (drawDecals).
+describe("les portes d'énergie suivent le sommet des murs", () => {
+  const a = main.indexOf("// portes : barrières d'énergie")
+  const portes = a < 0 ? '' : main.slice(a, main.indexOf('// LE COUPERET', a))
+
+  it("la boucle des portes ne pose plus aucun point au pied : tout passe par le sommet", () => {
+    // la boucle seule : auSommet, lui, part de S
+    const boucle = portes.slice(Math.max(0, portes.indexOf('for (let i = 0; i < portes.length')))
+    expect(boucle).toContain('portePolygone(')
+    expect(boucle).not.toMatch(/[^A-Za-z]S\(/)
+    expect(boucle.split('auSommet(').length - 1).toBeGreaterThanOrEqual(4)
+  })
+
+  it("le sommet est celui d'un mur haut, au relief choisi et au zoom de la caméra", () => {
+    expect(main).toMatch(
+      /fractionSommet\(\s*RELIEF_K\[reliefChoix\],\s*camera\.zoom,\s*HAUTEUR_BLOCS\s*\)/,
+    )
+    expect(main).toMatch(/pointDuSommet\([^)]*vw \* 0\.5, vh \* 0\.5, fPortes\)/)
+  })
+
+  it("à l'écran ou dans le monde, le sommet tombe au même pixel (la toile 2D le calcule à l'écran)", () => {
+    // S : le passage monde → écran de la toile (main.ts), caméra (cx, cy, z)
+    const vw = 1280
+    const vh = 720
+    const cx = -2311
+    const cy = -10
+    const z = 0.45
+    const S = (x: number, y: number): [number, number] => [
+      vw * 0.5 + (x - cx) * z,
+      vh * 0.5 - (y - cy) * z,
+    ]
+    const f = fractionSommet(0.035, z, HAUTEUR_BLOCS)
+    expect(f).toBeGreaterThan(0)
+    for (const [x, y] of [[-3000, 200], [-1700, -220], [cx, cy]] as const) {
+      const [wx, wy] = pointDuSommet(x, y, cx, cy, f)
+      const viaMonde = S(wx, wy)
+      const [ex, ey] = S(x, y)
+      const viaEcran = pointDuSommet(ex, ey, vw * 0.5, vh * 0.5, f)
+      expect(viaEcran[0]).toBeCloseTo(viaMonde[0], 6)
+      expect(viaEcran[1]).toBeCloseTo(viaMonde[1], 6)
+    }
+  })
+})
