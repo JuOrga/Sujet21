@@ -337,10 +337,34 @@ describe('le shader : chaque flanc porte sa matière', () => {
     expect(flanc).toContain('htFlanc * hB')
   })
 
-  it('chaque branche dit de quel dessus elle recopie la recette : un réglage du dessus ne se perd pas', () => {
+  it('chaque branche recopie une recette qui existe encore dans le dessus : un réglage du dessus fait tomber la garde', () => {
+    // les teintes (vec3) et les seuils (smoothstep) d'une tranche sont ceux
+    // de son dessus : changés sur le dessus seul, la tranche ne suivrait pas.
+    // On les cherche dans la composition HORS de matiereFlanc. Propre à la
+    // tranche, et dit ici : le filet sombre de la feuille de verre, vue sur
+    // le chant du dormant de la vitre.
+    const PROPRES_A_LA_TRANCHE = ['vec3(0.05, 0.10, 0.11)', 'smoothstep(0.10, 0.18,']
+    const dessus = composeFs.replace(matiereFlanc, '')
     const branches = matiereFlanc.split(/if \(mi == /).slice(1)
     expect(branches.length).toBeGreaterThanOrEqual(10)
-    for (const b of branches) expect(b, b.slice(0, 40)).toContain('à garder en phase avec')
+    let vus = 0
+    for (const b of branches) {
+      // et chaque branche dit, en clair, avec quoi la garder en phase
+      expect(b, b.slice(0, 40)).toContain('à garder en phase avec')
+      for (const m of b.matchAll(/vec3\([0-9., ]+\)|smoothstep\([0-9.]+, [0-9.]+,/g)) {
+        if (PROPRES_A_LA_TRANCHE.includes(m[0]) || m[0] === 'vec3(0.0)') continue
+        expect(dessus, `mi == ${b.slice(0, 2)} : ${m[0]}`).toContain(m[0])
+        vus++
+      }
+    }
+    expect(vus).toBeGreaterThanOrEqual(25)
+    // les textures recopiées, avec le même facteur que leur dessus
+    expect(matiereFlanc).toContain('return c * 0.95;')
+    expect(dessus).toContain('fillCol = texWallC * 0.95 *')
+    expect(matiereFlanc).toContain('gx * k, gy * k).rgb * 0.92;')
+    expect(dessus).toContain('fillCol = paroi4.rgb * 0.92 *')
+    expect(matiereFlanc).toContain('gy / cB).rgb * 0.75')
+    expect(dessus).toContain('texPhobeC * 0.75 *')
   })
 
   it('assombrie au pied, éclairée par la lumière (la direction par défaut lumière éteinte)', () => {

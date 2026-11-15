@@ -201,8 +201,14 @@ describe('le shader lit le relief dans l’alpha (composition)', () => {
   })
 
   it('le relief ne se paie que sur le dessus (fill > 0), pas sur tout pixel proche', () => {
-    const garde = remplissage.match(/if \(fill > 0\.0\)/g) ?? []
-    expect(garde.length).toBeGreaterThanOrEqual(1)
+    // CHAQUE pente (les deux lectures voisines de l'alpha) dans un bloc dont
+    // l'en-tête porte `fill > 0.0` : le mur et sa seconde paroi, l'atlas,
+    // l'émail, la cire — une garde sur quatre suffisait à l'ancienne version
+    const pentes = occurrencesDans(remplissage, 'penteRelief(')
+    expect(pentes.length).toBe(5)
+    for (const p of pentes) {
+      expect(p.entetes.some((e) => e.includes('fill > 0.0')), remplissage.slice(p.position - 60, p.position + 40)).toBe(true)
+    }
   })
 })
 

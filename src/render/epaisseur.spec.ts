@@ -22,7 +22,7 @@ import {
   type FormeBox,
   type FormeContact,
 } from '../game/formes'
-import { blocApres } from './blocsSource'
+import { blocApres, occurrencesDans } from './blocsSource'
 
 // L'ÉPAISSEUR (volet 2 du volume des parois) — chanfrein, liseré, ombre de
 // contact, ombre courte. Le shader ne tourne pas sous vitest : on lit la
@@ -188,7 +188,20 @@ describe('la paroi de la cuve (drawHull)', () => {
   })
 
   it("l'ombre de contact court au pied de la paroi, côté cuve", () => {
-    expect(source).toContain('contactCoque')
+    // dans la composition, au fond de la cuve (tank), avant qu'il ne soit
+    // posé dans l'image ; la salle en modules n'en a pas besoin (ses coques
+    // sont des solides, la boucle des boîtes leur donne la leur)
+    const compo = source.slice(source.indexOf('const COMPOSE_FS = `'), source.indexOf('\n}`', source.indexOf('const COMPOSE_FS = `')))
+    const decl = occurrencesDans(compo, 'float contactCoque =')
+    expect(decl).toHaveLength(1)
+    expect(decl[0].entetes[0]).toBe('if (uSolModules < 0.5)')
+    const garde = blocApres(compo, 'if (uSolModules < 0.5) {', compo.lastIndexOf('if (uSolModules < 0.5) {', decl[0].position))
+    // serrée (quelques unités, deux pixels au moins au recul), du côté de la
+    // cuve seulement (roomD < 0 : l'intérieur)
+    expect(garde).toContain('float contactCoque = (1.0 - smoothstep(0.0, max(6.0, 2.0 * pxMonde), -roomD)) * step(roomD, 0.0);')
+    // et elle assombrit le fond, avant que le fond ne soit peint
+    expect(garde).toContain('tank *= 1.0 - 0.45 * contactCoque;')
+    expect(decl[0].position).toBeLessThan(compo.indexOf('vec3 col = mix(voidCol, tank, inRoom);'))
   })
 
   it('la lumière par défaut tombe du haut de l’écran', () => {
