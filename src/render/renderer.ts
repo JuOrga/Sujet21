@@ -938,6 +938,36 @@ const float PROF_ATLAS[8] = float[8](${PROFONDEUR_RELIEF_ATLAS.map(glslFloat).jo
 // ×2,5). La coordonnée se tient à \`marge\` du bord de la case (une empreinte
 // de pixel, au moins un demi-texel) : les tuiles se raccordent sans couture,
 // le pas perdu ne se voit pas.
+// LA VITRE, au point wb de son dessus (repère local de la boîte b) : x le
+// REFLET, y le DUR (le dormant ou un meneau, opaques). Une fonction : le
+// remplissage s'en sert, et le relief aussi — sous le dessus d'une vitre on
+// voit le sol au travers, le fluide compris (opaciteVitre).
+vec2 vitreReflDur(vec4 b, vec2 wb) {
+  vec2 bmin = b.xy;
+  vec2 bsize = max(b.zw - bmin, vec2(1.0));
+  vec2 loc = clamp(wb - bmin, vec2(0.0), bsize);
+  // le DORMANT : le cadre qui tient le verre, tout le tour
+  float bord = min(min(loc.x, bsize.x - loc.x), min(loc.y, bsize.y - loc.y));
+  float cadre = 1.0 - smoothstep(6.0, 9.5, bord);
+  // les MENEAUX : un nombre ENTIER de travées, calées sur la boîte — les
+  // montants tombent donc juste aux deux bords, comme un vrai vitrage, quelle
+  // que soit la taille du panneau
+  vec2 rep = max(vec2(1.0), floor(bsize / 170.0 + 0.5));
+  vec2 pas = bsize / rep;
+  vec2 u = fract(loc / pas);
+  vec2 mdist = min(u, 1.0 - u) * pas;
+  float meneau = 1.0 - smoothstep(2.2, 4.2, min(mdist.x, mdist.y));
+  // le REFLET : deux nappes obliques et IMMOBILES. Une vitre ne scintille pas
+  // toute seule — elle renvoie la salle, qui ne bouge pas. C'est l'inverse
+  // exact des rayures animées du radiateur.
+  float nappe = 0.5 + 0.5 * sin((wb.x - wb.y) * 0.0125);
+  return vec2(smoothstep(0.60, 0.99, nappe), max(cadre, meneau));
+}
+// le verre laisse voir la cuve dessous, le dormant est opaque ; le reflet
+// épaissit un peu le verre là où il accroche la lumière
+float opaciteVitre(vec2 reflDur) {
+  return mix(0.32 + 0.30 * reflDur.x, 1.0, reflDur.y);
+}
 vec2 uvParoi(vec2 w, vec2 tuile, vec2 origine, vec2 pas, vec2 marge) {
   vec2 uv = (tuile + clamp(fract((w - origine) / pas), marge, 1.0 - marge)) * vec2(0.25, 0.5);
   uv.y = 1.0 - uv.y;
@@ -3018,6 +3048,9 @@ void main() {
     // latérale vue de biais. L'aura, les ombres au sol de la boîte et le
     // fluide ne s'y peignent pas. Relief éteint : 0.
     float solPropre = 0.0;
+    // l'opacité de ce dessus : 1, sauf la VITRE — sous son verre on voit le
+    // sol, et le fluide qui touche son pied, au travers
+    float opaciteDessus = 1.0;
     if (uRelief > 0.0 && solide) {
       relB = relDisp * facteurRelief(hauteurBoite(bi));
       vec2 wT = world - relB;
@@ -3066,7 +3099,8 @@ void main() {
       }
       // (les pièces n'en sont pas : leur dessus est leur IMAGE, le sol caché
       // se mesure sur la silhouette de leurs pièces — voir leurs branches)
-      if (!aPieces) solPropre = solCache(d, dV, flanc, edgeW);
+      if (mat < 0.5 && uBoxAux[bi].z > 8.5) opaciteDessus = opaciteVitre(vitreReflDur(uBoxes[bi], wbV));
+      if (!aPieces) solPropre = solCache(d, dV, flanc, edgeW, opaciteDessus);
       solSousSommets = max(solSousSommets, solPropre);
     }
     // ——— L'ÉPAISSEUR, AU SOL (volume des parois, volet 2) ————————————
@@ -3179,35 +3213,17 @@ void main() {
           // la lumière la traverse (cf. vitreTrans dans le cuiseur d'ombres).
           // Ce qui la fait lire comme du verre, ce n'est pas sa couleur —
           // c'est le dormant, les meneaux, et le reflet immobile de la salle.
-          vec2 bmin = uBoxes[bi].xy;
-          vec2 bsize = max(uBoxes[bi].zw - bmin, vec2(1.0));
-          vec2 loc = clamp(wbV - bmin, vec2(0.0), bsize);
-          // le DORMANT : le cadre qui tient le verre, tout le tour
-          float bord = min(min(loc.x, bsize.x - loc.x), min(loc.y, bsize.y - loc.y));
-          float cadre = 1.0 - smoothstep(6.0, 9.5, bord);
-          // les MENEAUX : un nombre ENTIER de travées, calées sur la boîte —
-          // les montants tombent donc juste aux deux bords, comme un vrai
-          // vitrage, quelle que soit la taille du panneau
-          vec2 rep = max(vec2(1.0), floor(bsize / 170.0 + 0.5));
-          vec2 pas = bsize / rep;
-          vec2 u = fract(loc / pas);
-          vec2 mdist = min(u, 1.0 - u) * pas;
-          float meneau = 1.0 - smoothstep(2.2, 4.2, min(mdist.x, mdist.y));
-          // le REFLET : deux nappes obliques et IMMOBILES. Une vitre ne
-          // scintille pas toute seule — elle renvoie la salle, qui ne bouge
-          // pas. C'est l'inverse exact des rayures animées du radiateur.
-          float nappe = 0.5 + 0.5 * sin((wbV.x - wbV.y) * 0.0125);
-          float refl = smoothstep(0.60, 0.99, nappe);
+          // (le reflet et le dormant : vitreReflDur, que le relief lit aussi)
+          vec2 rdV = vitreReflDur(uBoxes[bi], wbV);
+          float refl = rdV.x;
+          float dur = rdV.y;
           // poussière et micro-rayures : sans elles, le verre fait plastique
           float grain = dnoise(wbV * 0.09);
           vec3 verre = vec3(0.055, 0.085, 0.105) * (0.85 + 0.30 * grain)
                      + vec3(0.16, 0.22, 0.28) * refl * 0.55;
           vec3 metal = vec3(0.115, 0.140, 0.175) * (0.90 + 0.20 * grain);
-          float dur = max(cadre, meneau);
           fillCol = mix(verre, metal, dur);
-          // le verre laisse voir la cuve dessous, le dormant est opaque ;
-          // le reflet épaissit un peu le verre là où il accroche la lumière
-          fillA = mix(0.32 + 0.30 * refl, 1.0, dur);
+          fillA = opaciteVitre(rdV);
           edgeCol = vec3(0.40, 0.52, 0.64); // le chant du dormant, sobre
         } else if (skin > 0.5 && skin < 8.5 && uHasParoi > 0.5) {
           // habillage TEXTURÉ : tuile (skin-1) de l'atlas, répétée dans le

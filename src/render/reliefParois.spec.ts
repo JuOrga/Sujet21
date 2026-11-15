@@ -4,6 +4,7 @@ import { fileURLToPath } from 'node:url'
 import { HAUTEUR_BLOCS } from './hauteurs'
 import { HAUTEUR_DE_RANG, RANG_DE_MATIERE } from './volume'
 import {
+  RELIEF_PAROIS_GLSL,
   facteurRelief,
   fonduRelief,
   fractionSommet,
@@ -121,6 +122,13 @@ describe('les règles pures du relief', () => {
     expect(solCache(-T / 2 + 2, Math.abs(-T / 2 + 2 - delta) - T / 2, 1, w)).toBe(0)
   })
 
+  it('le dessus translucide de la vitre ne cache le sol qu’à son opacité', () => {
+    expect(solCache(5, -20, 0, 2.5, 0.4)).toBeCloseTo(0.4, 6)
+    expect(solCache(-5, -20, 0, 2.5, 1)).toBe(1)
+    // sa tranche (le dormant) reste opaque
+    expect(solCache(6, 9, 1, 2.5, 0.4)).toBe(1)
+  })
+
   it('le sol que le sommet recouvre au-delà du pied est caché ; le pied vu reste visible', () => {
     // au-delà du pied (d > 0), sous le sommet (dV ≤ 0) : caché — le fluide
     // qui touche le pied de ce côté passe dessous
@@ -175,7 +183,14 @@ describe('le shader : le dessus suit son sommet', () => {
 
 describe('le shader : les flancs absents (hydro, miroir)', () => {
   it('chaque solide mesure le sol que son sommet cache, à la règle solCache', () => {
-    expect(boucle).toMatch(/solPropre = solCache\(d, dV, flanc, edgeW\)/)
+    expect(boucle).toMatch(/solPropre = solCache\(d, dV, flanc, edgeW, opaciteDessus\)/)
+  })
+
+  it('le dessus de la vitre ne cache le sol qu’à son opacité, celle de son remplissage', () => {
+    // une seule recette pour les deux : le remplissage et le relief
+    expect(boucle).toMatch(/opaciteDessus = opaciteVitre\(vitreReflDur\(uBoxes\[bi\], wbV\)\)/)
+    expect(composeFs).toMatch(/fillA = opaciteVitre\(rdV\);/)
+    expect(RELIEF_PAROIS_GLSL).toContain('float solCache(float d, float dV, float flanc, float w, float opacite)')
   })
 
   it('l’aura des hydro, l’ombre de contact et l’ombre courte ne se peignent plus sur le sommet de leur propre boîte', () => {

@@ -74,10 +74,12 @@ const smoothstep = (a: number, b: number, x: number): number => {
  *    biais) : le sol derrière elle est caché.
  *  - Côté où le pied se voit (la tranche sur la base, d ≤ 0, hors du dessus),
  *    rien n'est caché : le fluide y touche le bas du flanc.
+ *  - `opacite` : celle du dessus (1 ; la vitre, 0,32 à 1) — sous un verre, on
+ *    voit le sol au travers. Sa tranche (le dormant) reste opaque.
  *  Ne se calcule que relief allumé (le shader la garde sous uRelief > 0) :
  *  relief éteint, rien ne change. */
-export function solCache(d: number, dV: number, flanc: number, w: number): number {
-  const sommet = 1 - smoothstep(-w, 0, dV)
+export function solCache(d: number, dV: number, flanc: number, w: number, opacite = 1): number {
+  const sommet = (1 - smoothstep(-w, 0, dV)) * opacite
   const tranche = d > 0 ? flanc : 0
   return Math.max(sommet, tranche)
 }
@@ -87,8 +89,11 @@ export const RELIEF_PAROIS_GLSL = `// (reliefParois.ts : les règles et leur jum
 float facteurRelief(float h) {
   return clamp(h, 0.0, ${glslFloat(HAUTEUR_BLOCS)}) / ${glslFloat(HAUTEUR_BLOCS)};
 }
-float solCache(float d, float dV, float flanc, float w) {
-  float sommet = 1.0 - smoothstep(-w, 0.0, dV);
+float solCache(float d, float dV, float flanc, float w, float opacite) {
+  float sommet = (1.0 - smoothstep(-w, 0.0, dV)) * opacite;
   return max(sommet, d > 0.0 ? flanc : 0.0);
+}
+float solCache(float d, float dV, float flanc, float w) {
+  return solCache(d, dV, flanc, w, 1.0);
 }
 `
