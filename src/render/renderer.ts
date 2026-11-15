@@ -107,6 +107,7 @@ import {
   hauteursPartagees,
   type BoiteVolume,
 } from './volume'
+import { RELIEF_PAROIS_GLSL } from './reliefParois'
 import {
   CARREAU_MONDE,
   PROFONDEUR_RELIEF,
@@ -919,6 +920,9 @@ ${RETOMBEE_TOIT_GLSL}
 // en largeurs de carreau) ; la règle et son jumeau testé vivent dans
 // surfacesSculptees.ts. Les profondeurs de l'atlas, case par case (skin 1 à 8).
 ${RELIEF_SURFACES_GLSL}
+// LE RELIEF 2.5D (volume des parois, volet 1) : la part du déplacement que
+// prend chaque sommet (sa hauteur).
+${RELIEF_PAROIS_GLSL}
 const float PROF_ATLAS[8] = float[8](${PROFONDEUR_RELIEF_ATLAS.map(glslFloat).join(', ')});
 // les UV d'un point de l'atlas des habillages, case \`tuile\`, motif calé sur
 // la boîte (origine, pas) — l'atlas est téléversé avec UNPACK_FLIP_Y : le V
@@ -2750,7 +2754,12 @@ void main() {
     float mc = decodeAux(uBoxAux[bi].x).x;
     if (mc > 2.5 && mc < 3.5) continue; // le sas est une bouche, il n'enterre rien
     if (mc > 10.5) continue;             // le vide et la baie sont des trous : rien à enterrer
-    float dc = sdfVisible(bi, world - relDisp);
+    // le sommet de CETTE boîte, déplacé de sa part (sa hauteur) : le même que
+    // celui que la boucle des boîtes peint (relief éteint, rien à payer : la
+    // boucle passe sur TOUTES les boîtes, sans rejet)
+    vec2 pV = world;
+    if (uRelief > 0.0) pV -= relDisp * facteurRelief(hauteurBoite(bi));
+    float dc = sdfVisible(bi, pV);
     if (dc < dCouv) {
       dCouv = dc;
       iCouv = bi;
@@ -2768,10 +2777,21 @@ void main() {
   // d'un autre : ce n'est plus vrai.
   if (uLumiere > 0.5) {
     float hToit = iCouv >= 0 ? hauteurBoite(iCouv) : HAUTEUR_BLOCS;
+    // Relief allumé, le toit qu'on regarde ici n'est pas au-dessus de CE
+    // point du sol : son sommet a glissé, c'est le point pToit de sa base
+    // qu'on voit. La carte (lumière et ombre des voisins plus hauts, toitVis)
+    // et la distance aux lampes se lisent donc là — lues au sol, l'ombre d'un
+    // voisin se décalait d'autant sur le toit. Relief éteint : pToit = world,
+    // et toitVis reste la lecture d'avant.
+    vec2 pToit = world;
+    if (uRelief > 0.0 && iCouv >= 0) {
+      pToit = world - relDisp * facteurRelief(hauteurBoite(iCouv));
+      toitVis = textureLod(uLightMap, clamp((pToit - uLightMapMin) * uLightMapInvSize, 0.0, 1.0), 0.0).a;
+    }
     vec3 lumHaut = vec3(0.0);   // lumière reçue par le sommet des solides
     for (int li = 0; li < MAX_LUMIERES; li++) {
       if (li >= uLampeCount) break;
-      float dn = max(length(pointLampe(li, world) - world), 1.0);
+      float dn = max(length(pointLampe(li, pToit) - pToit), 1.0);
       float hRel = max(uLampes[li].z - hToit, 0.0);
       float fall = retombeeToit(dn, uLampes[li].w, hRel);
       lumHaut += uLampesCol[li] * (fall * uLampesInt[li]);
@@ -2851,15 +2871,25 @@ void main() {
 
     // ——— RELIEF 2.5D (tous les solides, sauf la bouche du sas) ————————
     // dV / wbV : la géométrie du SOMMET (déplacé) — le remplissage et les
-    // habillages la suivent. d reste LA BASE : ombres portées, auras et
-    // physique y demeurent ancrées. Entre les deux : le FLANC, échantillonné
-    // à deux hauteurs intermédiaires (les parois minces ne laissent pas de
-    // trou quand le sommet glisse au-delà de leur épaisseur).
+    // habillages la suivent ; wS, le même point dans le monde (sans le pivot
+    // de la boîte), où se lisent les motifs et les textures du dessus. d
+    // reste LA BASE : ombres portées, auras et physique y demeurent ancrées.
+    // Entre les deux : le FLANC, échantillonné à trois hauteurs
+    // intermédiaires (les parois minces ne laissent pas de trou quand le
+    // sommet glisse au-delà de leur épaisseur).
+    // LA LONGUEUR DU FLANC SUIT LA HAUTEUR (volume.ts, reliefParois.ts) : le
+    // sommet ne prend que sa part du déplacement — un mur haut garde le flanc
+    // d'avant, un hydro moyen n'en a que 90/140, une plaque basse 40/140.
+    // Avant, tout solide se dressait comme un mur.
     float dV = d;
     vec2 wbV = wb;
+    vec2 wS = world;
+    vec2 relB = vec2(0.0);
     float flanc = 0.0;
     if (uRelief > 0.0 && solide) {
-      vec2 wT = world - relDisp;
+      relB = relDisp * facteurRelief(hauteurBoite(bi));
+      vec2 wT = world - relB;
+      wS = wT;
       vec2 wbT = wT;
       float bAngR = uBoxAux[bi].y;
       float caR = 1.0;
@@ -2879,7 +2909,7 @@ void main() {
           flanc = 1.0; // sur la base, sous le vide : pleine tranche
         } else {
           for (int fs = 1; fs <= 3; fs++) {
-            vec2 wM = world - relDisp * (float(fs) / 4.0);
+            vec2 wM = world - relB * (float(fs) / 4.0);
             vec2 wbM = wM;
             if (abs(bAngR) > 0.0005) {
               vec2 relM = wM - bcR;
@@ -3120,40 +3150,55 @@ void main() {
           fillCol = vec3(0.105, 0.125, 0.155) * teinte * (0.55 + 0.45 * bordC);
           edgeCol = vec3(0.32, 0.39, 0.46);
         } else if (uHasWall > 0.5) {
+          float cW = ${glslFloat(CARREAU_MONDE.wall)};
+          float cA = ${glslFloat(CARREAU_MONDE.wallA)};
+          // RELIEF ALLUMÉ, la texture se relit au SOMMET de cette boîte (wS) :
+          // lue au sol avant la boucle, elle restait en place pendant que le
+          // dessus glissait — le motif nageait sous son contour. Relue à
+          // chaque mur, avant tout usage : aucune boîte n'hérite de la
+          // lecture d'une autre. Relief éteint : les lectures d'avant la boucle.
+          if (uRelief > 0.0) {
+            texWall4 = textureGrad(uTexWall, wS / cW, dWx / cW, dWy / cW);
+            if (blendWallA > 0.0) texWallA4 = textureGrad(uTexWallA, wS / cA, dWx / cA, dWy / cA);
+            texWallC = mix(texWall4.rgb, texWallA4.rgb, blendWallA);
+          }
           // le RELIEF du mur (et de la seconde paroi, mêlés comme leur
           // couleur : on mêle les pentes, pas les lumières)
           vec2 sMur = vec2(0.0);
           if (fill > 0.0) {
-            float cW = ${glslFloat(CARREAU_MONDE.wall)};
             float pW = pasRelief(cW, pxMonde);
             sMur = penteRelief(texWall4.a,
-              textureGrad(uTexWall, (world + vec2(pW, 0.0)) / cW, dWx / cW, dWy / cW).a,
-              textureGrad(uTexWall, (world + vec2(0.0, pW)) / cW, dWx / cW, dWy / cW).a,
+              textureGrad(uTexWall, (wS + vec2(pW, 0.0)) / cW, dWx / cW, dWy / cW).a,
+              textureGrad(uTexWall, (wS + vec2(0.0, pW)) / cW, dWx / cW, dWy / cW).a,
               ${glslFloat(PROFONDEUR_RELIEF.wall)}, cW, pW);
             if (blendWallA > 0.0) {
-              float cA = ${glslFloat(CARREAU_MONDE.wallA)};
               float pA = pasRelief(cA, pxMonde);
               vec2 sA = penteRelief(texWallA4.a,
-                textureGrad(uTexWallA, (world + vec2(pA, 0.0)) / cA, dWx / cA, dWy / cA).a,
-                textureGrad(uTexWallA, (world + vec2(0.0, pA)) / cA, dWx / cA, dWy / cA).a,
+                textureGrad(uTexWallA, (wS + vec2(pA, 0.0)) / cA, dWx / cA, dWy / cA).a,
+                textureGrad(uTexWallA, (wS + vec2(0.0, pA)) / cA, dWx / cA, dWy / cA).a,
                 ${glslFloat(PROFONDEUR_RELIEF.wallA)}, cA, pA);
               sMur = mix(sMur, sA, blendWallA);
             }
           }
           fillCol = texWallC * 0.95 * lumiereRelief(sMur, lampeDir);
         } else {
-          fillCol = vec3(0.10, 0.13, 0.17) * (0.88 + 0.24 * dnoise(world * vec2(0.03, 0.30)));
+          fillCol = vec3(0.10, 0.13, 0.17) * (0.88 + 0.24 * dnoise(wS * vec2(0.03, 0.30)));
         }
       } else if (mat < 1.5) { // hydrophile : mouillé, brillant, reflet qui glisse
-        float sheen = 0.5 + 0.5 * sin(world.x * 0.045 + world.y * 0.10 + uTime * 0.7);
+        float sheen = 0.5 + 0.5 * sin(wS.x * 0.045 + wS.y * 0.10 + uTime * 0.7);
+        float cH = ${glslFloat(CARREAU_MONDE.phile)};
+        // relief allumé : relue au sommet, comme le mur
+        if (uRelief > 0.0 && uHasPhile > 0.5) {
+          texPhile4 = textureGrad(uTexPhile, wS / cH, dWx / cH, dWy / cH);
+          texPhileC = texPhile4.rgb;
+        }
         // le relief de l'émail : les crêtes de son film d'eau
         vec2 sPhile = vec2(0.0);
         if (uHasPhile > 0.5 && fill > 0.0) {
-          float cH = ${glslFloat(CARREAU_MONDE.phile)};
           float pH = pasRelief(cH, pxMonde);
           sPhile = penteRelief(texPhile4.a,
-            textureGrad(uTexPhile, (world + vec2(pH, 0.0)) / cH, dWx / cH, dWy / cH).a,
-            textureGrad(uTexPhile, (world + vec2(0.0, pH)) / cH, dWx / cH, dWy / cH).a,
+            textureGrad(uTexPhile, (wS + vec2(pH, 0.0)) / cH, dWx / cH, dWy / cH).a,
+            textureGrad(uTexPhile, (wS + vec2(0.0, pH)) / cH, dWx / cH, dWy / cH).a,
             ${glslFloat(PROFONDEUR_RELIEF.phile)}, cH, pH);
         }
         fillCol = uHasPhile > 0.5
@@ -3161,15 +3206,20 @@ void main() {
           : vec3(0.05, 0.16, 0.20) + vec3(0.015, 0.055, 0.065) * sheen;
         edgeCol = vec3(0.20, 0.65, 0.70);
       } else {                // hydrophobe : cireux, grain perlé qui repousse
-        float wax = smoothstep(0.72, 0.95, dnoise(world * 0.12));
+        float wax = smoothstep(0.72, 0.95, dnoise(wS * 0.12));
+        float cB = ${glslFloat(CARREAU_MONDE.phobe)};
+        // relief allumé : relue au sommet, comme le mur
+        if (uRelief > 0.0 && uHasPhobe > 0.5) {
+          texPhobe4 = textureGrad(uTexPhobe, wS / cB, dWx / cB, dWy / cB);
+          texPhobeC = texPhobe4.rgb;
+        }
         // le relief de la cire : ses perles et son martelé
         vec2 sPhobe = vec2(0.0);
         if (uHasPhobe > 0.5 && fill > 0.0) {
-          float cB = ${glslFloat(CARREAU_MONDE.phobe)};
           float pB = pasRelief(cB, pxMonde);
           sPhobe = penteRelief(texPhobe4.a,
-            textureGrad(uTexPhobe, (world + vec2(pB, 0.0)) / cB, dWx / cB, dWy / cB).a,
-            textureGrad(uTexPhobe, (world + vec2(0.0, pB)) / cB, dWx / cB, dWy / cB).a,
+            textureGrad(uTexPhobe, (wS + vec2(pB, 0.0)) / cB, dWx / cB, dWy / cB).a,
+            textureGrad(uTexPhobe, (wS + vec2(0.0, pB)) / cB, dWx / cB, dWy / cB).a,
             ${glslFloat(PROFONDEUR_RELIEF.phobe)}, cB, pB);
         }
         fillCol = uHasPhobe > 0.5
@@ -3303,10 +3353,10 @@ void main() {
         // tracé d'avant la borne, sur la silhouette des pièces — sa lueur
         // brille par elle-même (emis), la pièce sombre ne l'éteint pas
         float couvS = serp ? 1.0 - smoothstep(-edgeW, 0.0, surchSdf(wbV, uBoxes[bi], zS)) : 1.0;
-        float coil = 0.5 + 0.5 * sin(world.x * 0.30 + sin(world.y * 0.24) * 2.2);
+        float coil = 0.5 + 0.5 * sin(wS.x * 0.30 + sin(wS.y * 0.24) * 2.2);
         float tube = smoothstep(0.55, 0.9, coil);
-        float pulse = 0.7 + 0.3 * sin(uTime * 3.1 + world.y * 0.05);
-        vec3 metal = vec3(0.10, 0.13, 0.17) * (0.9 + 0.2 * dnoise(world * 0.14));
+        float pulse = 0.7 + 0.3 * sin(uTime * 3.1 + wS.y * 0.05);
+        vec3 metal = vec3(0.10, 0.13, 0.17) * (0.9 + 0.2 * dnoise(wS * 0.14));
         vec3 lueur = mix(vec3(0.24, 0.20, 0.14), vec3(1.00, 0.76, 0.38) * pulse, charge);
         ch = vec4(metal, 1.0) * couvS;
         emis = lueur * tube * 0.85 * couvS;
@@ -3351,8 +3401,8 @@ void main() {
         // l'atlas pas (encore) là, ou un rideau À FORME : les lamelles
         // tracées d'avant
         float edge = (1.0 - smoothstep(0.0, edgeW, abs(dV))) * libre;
-        float sway = sin(world.y * 0.30 + uTime * 1.1 + world.x * 0.02) * 1.8;
-        float lam = 0.5 + 0.5 * sin((world.y + sway) * 0.55);
+        float sway = sin(wS.y * 0.30 + uTime * 1.1 + wS.x * 0.02) * 1.8;
+        float lam = 0.5 + 0.5 * sin((wS.y + sway) * 0.55);
         float fente = smoothstep(0.86, 0.97, lam);
         vec3 lamCol = vec3(0.34, 0.46, 0.60) * (0.72 + 0.38 * lam);
         col = mix(col, lamCol * eclMat, fill * (1.0 - fente * 0.75));
@@ -3363,9 +3413,9 @@ void main() {
       // l'EAU la traverse. Des gouttes descendent le long de la trame.
       float fill = 1.0 - smoothstep(-edgeW, 0.0, dV);
       float edge = (1.0 - smoothstep(0.0, edgeW, abs(dV))) * libre;
-      float weave = 0.5 + 0.5 * sin(world.x * 0.42) * sin(world.y * 0.42);
+      float weave = 0.5 + 0.5 * sin(wS.x * 0.42) * sin(wS.y * 0.42);
       float drip = smoothstep(0.78, 1.0,
-        0.5 + 0.5 * sin(world.y * 0.10 - uTime * 1.6 + dnoise(world * 0.05) * 6.0));
+        0.5 + 0.5 * sin(wS.y * 0.10 - uTime * 1.6 + dnoise(wS * 0.05) * 6.0));
       vec3 memCol = vec3(0.05, 0.20, 0.17) + vec3(0.04, 0.15, 0.12) * weave;
       col = mix(col, (memCol + vec3(0.03, 0.11, 0.09) * drip) * eclMat, fill);
       col = mix(col, vec3(0.25, 0.78, 0.62) * eclMat, edge * 0.9);
@@ -3413,7 +3463,7 @@ void main() {
         // L'ATLAS PAS (ENCORE) LÀ, ou une chaudière à forme : les rayures
         // chaudes d'avant, sur la silhouette (celle des pièces, pas la boîte)
         float couvS = rampe ? 1.0 - smoothstep(-edgeW, 0.0, chaudiereSdf(wbV, uBoxes[bi], codeC)) : 1.0;
-        float stripe = 0.5 + 0.5 * sin((world.x + world.y - uTime * 46.0) * 0.14);
+        float stripe = 0.5 + 0.5 * sin((wS.x + wS.y - uTime * 46.0) * 0.14);
         ch = vec4(vec3(0.26, 0.11, 0.05) + vec3(0.42, 0.17, 0.04) * smoothstep(0.35, 0.85, stripe), 1.0) * couvS;
       }
       col = col * (1.0 - fill * ch.a) + ch.rgb * eclMat * fill;
@@ -3438,14 +3488,14 @@ void main() {
       float hole;
       vec3 barCol;
       if (uHasGrille > 0.5) {
-        vec3 texGrilleC = grilleEvent(world, pxMonde);
+        vec3 texGrilleC = grilleEvent(wS, pxMonde);
         float lum = dot(texGrilleC, vec3(0.299, 0.587, 0.114));
         hole = 1.0 - smoothstep(0.020, 0.075, lum);
         barCol = texGrilleC * 1.5;
       } else {
-        vec2 cellUv = fract(world / 24.0) - 0.5;
+        vec2 cellUv = fract(wS / 24.0) - 0.5;
         hole = 1.0 - smoothstep(0.26, 0.34, max(abs(cellUv.x), abs(cellUv.y)));
-        barCol = vec3(0.17, 0.21, 0.26) * (0.9 + 0.2 * dnoise(world * 0.15));
+        barCol = vec3(0.17, 0.21, 0.26) * (0.9 + 0.2 * dnoise(wS * 0.15));
       }
       col = mix(col, barCol * eclMat, fill * (1.0 - hole * 0.85));
       col = mix(col, vec3(0.45, 0.60, 0.70) * eclMat, edge * 0.8);
@@ -3504,7 +3554,7 @@ void main() {
         float couvS = tuyau
           ? 1.0 - smoothstep(-edgeW, 0.0, conduiteSdf(wbV, uBoxes[bi], sensC))
           : 1.0;
-        float eclat = smoothstep(0.72, 0.94, dnoise(world * 0.22));
+        float eclat = smoothstep(0.72, 0.94, dnoise(wS * 0.22));
         cnh = vec4(vec3(0.15, 0.21, 0.29) + vec3(0.26, 0.34, 0.40) * eclat * 0.55, 1.0) * couvS;
       }
       col = col * (1.0 - fill * cnh.a) + cnh.rgb * eclMat * fill;
