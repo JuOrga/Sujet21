@@ -2403,6 +2403,7 @@ vec3 matiereFlanc(int mi, float skin, float blendA, vec2 ft, float h, vec2 gx, v
     if (skin > 8.5) {
       // VITRE : la tranche du DORMANT, le cadre d'acier qui tient le verre,
       // et à mi-hauteur la feuille de verre feuilleté, un filet sombre
+      // (à garder en phase avec le métal du dormant, vitre du remplissage)
       float filet = 1.0 - smoothstep(0.10, 0.18, abs(ft.y / max(h, 1.0) - 0.5));
       vec3 metal = vec3(0.115, 0.140, 0.175) * (0.90 + 0.20 * dnoise(ft * 0.09));
       return mix(metal, vec3(0.05, 0.10, 0.11), filet * 0.8);
@@ -2418,10 +2419,13 @@ vec3 matiereFlanc(int mi, float skin, float blendA, vec2 ft, float h, vec2 gx, v
     }
     if (skin > 0.5) {
       // l'atlas pas (encore) là : la tôle des habillages tracés
+      // (à garder en phase avec les caissons tracés du remplissage)
       return vec3(0.105, 0.125, 0.155) * (0.85 + 0.30 * dnoise(ft * 0.05));
     }
     if (uHasWall > 0.5) {
       // le MUR : son acier, et la seconde paroi mêlée comme sur le dessus
+      // (à garder en phase avec le remplissage du mur ; le repli sans texture
+      // aussi, plus bas)
       float cW = ${glslFloat(CARREAU_MONDE.wall)};
       float cA = ${glslFloat(CARREAU_MONDE.wallA)};
       vec3 c = textureGrad(uTexWall, ft / cW, gx / cW, gy / cW).rgb;
@@ -2431,14 +2435,16 @@ vec3 matiereFlanc(int mi, float skin, float blendA, vec2 ft, float h, vec2 gx, v
     return vec3(0.10, 0.13, 0.17) * (0.88 + 0.24 * dnoise(ft * vec2(0.03, 0.30)));
   }
   if (mi == 1) {
-    // HYDROPHILE : l'émail mouillé
+    // HYDROPHILE : l'émail mouillé (à garder en phase avec son remplissage,
+    // le repli sans texture compris)
     float cH = ${glslFloat(CARREAU_MONDE.phile)};
     return uHasPhile > 0.5
       ? textureGrad(uTexPhile, ft / cH, gx / cH, gy / cH).rgb * 0.95
       : vec3(0.05, 0.16, 0.20);
   }
   if (mi == 2) {
-    // HYDROPHOBE : la cire et ses perles
+    // HYDROPHOBE : la cire et ses perles (à garder en phase avec son
+    // remplissage, le repli sans texture compris)
     float cB = ${glslFloat(CARREAU_MONDE.phobe)};
     return uHasPhobe > 0.5
       ? textureGrad(uTexPhobe, ft / cB, gx / cB, gy / cB).rgb * 0.75
@@ -2446,12 +2452,14 @@ vec3 matiereFlanc(int mi, float skin, float blendA, vec2 ft, float h, vec2 gx, v
   }
   if (mi == 4) {
     // PLAQUE FROIDE À FORME : la tôle givrée de son dessus
+    // (à garder en phase avec le givre de secours de la conduite)
     float eclat = smoothstep(0.72, 0.94, dnoise(ft * 0.22));
     return vec3(0.15, 0.21, 0.29) + vec3(0.26, 0.34, 0.40) * eclat * 0.55;
   }
   if (mi == 5) {
     // ÉVENT : le panneau perforé ; sur la tranche, ses trous s'ouvrent sur
-    // le noir du conduit
+    // le noir du conduit (à garder en phase avec la grille du remplissage,
+    // son seuil de trou et son repli tracé)
     if (uHasGrille > 0.5) {
       vec3 g = grilleEvent(ft, px);
       float trou = 1.0 - smoothstep(0.020, 0.075, dot(g, vec3(0.299, 0.587, 0.114)));
@@ -2463,28 +2471,33 @@ vec3 matiereFlanc(int mi, float skin, float blendA, vec2 ft, float h, vec2 gx, v
   }
   if (mi == 6) {
     // CHAUDIÈRE À FORME : ses rayures chaudes — elle LUIT, l'ambre y est permis
+    // (à garder en phase avec les rayures de secours de la chaudière)
     float stripe = 0.5 + 0.5 * sin((ft.x - uTime * 46.0) * 0.14);
     return vec3(0.26, 0.11, 0.05) + vec3(0.42, 0.17, 0.04) * smoothstep(0.35, 0.85, stripe);
   }
   if (mi == 7) {
     // MEMBRANE : la trame vert d'eau, et l'eau qui suinte vers le pied
+    // (à garder en phase avec la trame et les gouttes du remplissage)
     float weave = 0.5 + 0.5 * sin(ft.x * 0.42) * sin(ft.y * 0.42);
     float drip = smoothstep(0.78, 1.0, 0.5 + 0.5 * sin(ft.y * 0.10 + uTime * 1.6 + dnoise(ft * 0.05) * 6.0));
     return vec3(0.05, 0.20, 0.17) + vec3(0.04, 0.15, 0.12) * weave + vec3(0.03, 0.11, 0.09) * drip;
   }
   if (mi == 8) {
     // RIDEAU : les lanières de PVC givré, vues sur leur tranche
+    // (à garder en phase avec les lamelles tracées du remplissage)
     float lam = 0.5 + 0.5 * sin(ft.x * 0.55);
     float fente = smoothstep(0.86, 0.97, lam);
     return vec3(0.34, 0.46, 0.60) * (0.72 + 0.38 * lam) * (1.0 - 0.5 * fente);
   }
   if (mi == 9) {
-    // SURCHAUFFEUR À FORME : l'acier de la borne
+    // SURCHAUFFEUR À FORME : l'acier de la borne (à garder en phase avec le
+    // métal du serpentin de secours)
     return vec3(0.10, 0.13, 0.17) * (0.9 + 0.2 * dnoise(ft * 0.14));
   }
   if (mi == 10) {
     // MIROIR : la tranche de la plaque polie, froide, presque blanche, et
-    // ses stries de polissage (l'ambre d'avant était celui du surchauffeur)
+    // ses stries de polissage (l'ambre d'avant était celui du surchauffeur ;
+    // à garder en phase avec le poli du remplissage du miroir)
     float ciel = 0.5 + 0.5 * sin(ft.x * 0.012);
     vec3 base = mix(vec3(0.34, 0.40, 0.48), vec3(0.58, 0.66, 0.76), ciel);
     base *= 0.86 + 0.14 * dnoise(ft * 0.021);

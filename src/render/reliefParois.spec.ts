@@ -273,6 +273,12 @@ describe('le shader : chaque flanc porte sa matière', () => {
     expect(flanc).toContain('htFlanc * hB')
   })
 
+  it('chaque branche dit de quel dessus elle recopie la recette : un réglage du dessus ne se perd pas', () => {
+    const branches = matiereFlanc.split(/if \(mi == /).slice(1)
+    expect(branches.length).toBeGreaterThanOrEqual(10)
+    for (const b of branches) expect(b, b.slice(0, 40)).toContain('à garder en phase avec')
+  })
+
   it('assombrie au pied, éclairée par la lumière (la direction par défaut lumière éteinte)', () => {
     expect(flanc).toMatch(/dot\(nrm, lampeDir\)/)
     // la tranche regarde la lampe même lumière éteinte : lampeDir y vaut la
