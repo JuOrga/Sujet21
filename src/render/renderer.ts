@@ -5642,19 +5642,33 @@ export function passeNetteRequise(dprNatif: number, dpr: number, decorNet: boole
   return decorNet && dprNatif > dpr * 1.02
 }
 
-/** La clé des HAUTEURS (hauteursPartagees, volume.ts) : tout ce dont elles
- *  dépendent — chaque boîte (cleBoite : coordonnées, angle, matière, forme)
- *  et son habillage, que cleBoite ne porte pas (la vitre, un habillage de
- *  mur, est basse). Ce qui n'y entre pas laisse des hauteurs périmées.
- *  `cleBoites` : la clé des boîtes, si elle est déjà bâtie (cleBoitesImage). */
-export function cleHauteurs(
-  boxes: readonly ObstacleBox[],
-  boxCount: number,
-  cleBoites = cleBoitesLumiere(boxes, boxCount),
-): string {
-  let cle = cleBoites
-  for (let i = 0; i < boxCount; i++) cle += `,${boxes[i].skin ?? 0}`
-  return cle
+/** LE CACHE DES HAUTEURS (hauteursPartagees, volume.ts) : tout ce dont
+ *  elles dépendent — chaque boîte (cleBoite : coordonnées, angle, matière,
+ *  forme), dont la clé est déjà bâtie pour l'image (cleBoitesImage), et son
+ *  habillage, que cleBoite ne porte pas (la vitre, un habillage de mur, est
+ *  basse). Ce qui n'y entre pas laisse des hauteurs périmées.
+ *  Il compare sans rien fabriquer : la clé des boîtes par son égalité, les
+ *  habillages un à un. L'ancienne clé recollait une chaîne par boîte À CHAQUE
+ *  IMAGE (relecture finale, mineur 6), pour une table qui ne change qu'avec
+ *  le décor. */
+export class CleHauteurs {
+  private boites = ''
+  private readonly habillages: number[] = []
+  private faite = false
+
+  /** Les hauteurs de ces boîtes sont-elles à refaire ? Vrai à la première
+   *  image, et dès que la clé des boîtes ou un habillage change ; ce qui est
+   *  retenu suit. */
+  perimee(boxes: readonly ObstacleBox[], boxCount: number, cleBoites: string): boolean {
+    let change = !this.faite || cleBoites !== this.boites || this.habillages.length !== boxCount
+    for (let i = 0; !change && i < boxCount; i++) change = (boxes[i].skin ?? 0) !== this.habillages[i]
+    if (!change) return false
+    this.faite = true
+    this.boites = cleBoites
+    this.habillages.length = boxCount
+    for (let i = 0; i < boxCount; i++) this.habillages[i] = boxes[i].skin ?? 0
+    return true
+  }
 }
 
 /** La part de la clé de cuisson de la lumière qui vient des boîtes : TOUT
@@ -5875,7 +5889,11 @@ export class Renderer {
   // tirée de hauteursBoites, calculée une fois par décor (hauteursCle)
   private readonly hauteurScratch = new Float32Array(MAX_BOXES)
   private hauteursBoites: Float32Array = new Float32Array(0)
-  private hauteursCle = ''
+  private readonly hauteursCle = new CleHauteurs()
+  // la version de la table, une de plus à chaque calcul : la clé de cuisson
+  // la porte au lieu de la table jointe (les boîtes, et donc l'ordre des
+  // cases, y sont déjà)
+  private hauteursVersion = 0
   // LE RELIEF DE L'IMAGE EN COURS (render) : ce que drawDecals relit pour
   // poser un décalque plaqué sur le sommet de son mur
   private reliefK = 0
@@ -6937,8 +6955,11 @@ export class Renderer {
         `,${l.bandeau ? 1 : 0},${l.demiLong},${l.angleRad}`
     key += this.cleBoitesImage(boxes, boxCount)
     // les hauteurs entrent dans la clé : un habillage changé en vitre (basse)
-    // ne bouge aucune coordonnée, mais change les ombres
-    key += '|' + this.hauteurScratch.subarray(0, boxCount).join(',')
+    // ne bouge aucune coordonnée, mais change les ombres. Leur VERSION suffit
+    // (une de plus à chaque calcul de la table) : les boîtes, et l'ordre des
+    // cases qui en découle, sont déjà dans la clé — joindre la table recollait
+    // une longue chaîne à chaque image
+    key += '|H' + this.hauteursVersion
     if (key === this.lightKey) return
     this.lightKey = key
     this.lightMapMinX = minX
@@ -7111,11 +7132,11 @@ export class Renderer {
     this.cleImage = null
     // LES HAUTEURS (volume.ts) : la matière donne le rang, des solides qui se
     // touchent partagent le plus haut. Calculées une fois par décor, comme la
-    // carte cuite (cleHauteurs : les boîtes et leurs habillages). Dans l'éditeur, chaque
-    // boîte déplacée les refait — quelques ms sur le hub (volume.ts).
-    const cleH = cleHauteurs(boxes, boxCount, this.cleBoitesImage(boxes, boxCount))
-    if (cleH !== this.hauteursCle) {
-      this.hauteursCle = cleH
+    // carte cuite (CleHauteurs : les boîtes et leurs habillages). Dans
+    // l'éditeur, chaque boîte déplacée les refait — quelques ms sur le hub
+    // (volume.ts).
+    if (this.hauteursCle.perimee(boxes, boxCount, this.cleBoitesImage(boxes, boxCount))) {
+      this.hauteursVersion++
       const vol: BoiteVolume[] = []
       for (let i = 0; i < boxCount; i++) {
         const bx = boxes[i]

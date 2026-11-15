@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { OMBRE_COURTE_PAR_HAUTEUR } from './volume'
-import { MAX_BOXES, cleHauteurs } from './renderer'
+import { CleHauteurs, MAX_BOXES, cleBoitesLumiere } from './renderer'
 import type { ObstacleBox } from '../game/level'
 import { occurrencesDans } from './blocsSource'
 
@@ -43,14 +43,40 @@ describe('la table des hauteurs arrive au shader', () => {
     expect(MAX_BOXES % 4).toBe(0)
   })
 
-  it('sa clé change avec la matière et avec l’habillage, pas sans eux', () => {
+  it('son cache se périme avec la matière, l’habillage, la place — pas sans eux', () => {
     const mur: ObstacleBox = { minX: 0, minY: 0, maxX: 100, maxY: 20, material: 0 }
-    const cle = (b: ObstacleBox) => cleHauteurs([b], 1)
-    expect(cle({ ...mur })).toBe(cle(mur))
+    const cache = new CleHauteurs()
+    const perimee = (bs: ObstacleBox[]): boolean => cache.perimee(bs, bs.length, cleBoitesLumiere(bs, bs.length))
+    // la première image calcule
+    expect(perimee([mur])).toBe(true)
+    // la même scène, d'autres objets : rien à refaire — c'est tout le cache
+    expect(perimee([{ ...mur }])).toBe(false)
+    expect(perimee([{ ...mur }])).toBe(false)
     // un mur devenu rideau est bas
-    expect(cle({ ...mur, material: 8 })).not.toBe(cle(mur))
+    expect(perimee([{ ...mur, material: 8 }])).toBe(true)
+    expect(perimee([{ ...mur, material: 8 }])).toBe(false)
     // un mur habillé en vitre (9) aussi, sans qu'aucune coordonnée bouge
-    expect(cle({ ...mur, skin: 9 })).not.toBe(cle(mur))
+    expect(perimee([mur])).toBe(true)
+    expect(perimee([{ ...mur, skin: 9 }])).toBe(true)
+    expect(perimee([{ ...mur, skin: 9 }])).toBe(false)
+    // déplacé, ou une boîte de plus
+    expect(perimee([{ ...mur, skin: 9, maxX: 120 }])).toBe(true)
+    expect(perimee([{ ...mur, skin: 9, maxX: 120 }, mur])).toBe(true)
+    expect(perimee([{ ...mur, skin: 9, maxX: 120 }, mur])).toBe(false)
+  })
+
+  it('l’image ne colle aucune chaîne de plus quand rien ne change', () => {
+    // le cache compare la clé des boîtes (déjà bâtie pour l'image) et les
+    // habillages un à un : il ne recolle plus une chaîne par boîte
+    const corps = entre('perimee(boxes: readonly ObstacleBox[]', '\n  }\n')
+    expect(corps).not.toMatch(/\+= `|\.join\(/)
+    // la clé de cuisson porte la VERSION de la table, pas la table jointe
+    expect(source).not.toContain('this.hauteurScratch.subarray(0, boxCount).join(')
+    expect(source).toContain("key += '|H' + this.hauteursVersion")
+    // et la version change là où la table se refait, et nulle part ailleurs
+    const refaite = occurrencesDans(source, 'this.hauteursVersion++')
+    expect(refaite).toHaveLength(1)
+    expect(refaite[0].entetes[0]).toMatch(/^if \(.*this\.hauteursCle\.perimee\(.*\)$/)
   })
 
   it('elle vient de hauteursPartagees, une fois par décor, et suit l’ordre de peinture', () => {
@@ -60,7 +86,7 @@ describe('la table des hauteurs arrive au shader', () => {
     // (appariement d'accolades : `if (true)` à la place du test passait vert)
     const appels = occurrencesDans(source, 'hauteursPartagees(')
     expect(appels).toHaveLength(1)
-    expect(appels[0].entetes[0]).toMatch(/^if \([^)]*this\.hauteursCle[^)]*\)$/)
+    expect(appels[0].entetes[0]).toMatch(/^if \(.*this\.hauteursCle.*\)$/)
     // case k du shader = boîte rangs[k] de la liste
     expect(source).toMatch(/this\.hauteurScratch\[k\]\s*=\s*this\.hauteursBoites\[i\]/)
     expect(source).toContain("gl.uniform4fv(cu['uBoxH[0]'], this.hauteurScratch)")
