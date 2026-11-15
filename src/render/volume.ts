@@ -7,8 +7,11 @@
 // l'élément (un mur se dresse, un rideau arrête le fluide sans se dresser),
 // et la hauteur suit.
 import { HAUTEUR_BLOCS } from './hauteurs'
+import { glslFloat } from './surfacesSculptees'
 import {
+  FORME_ARC,
   FORME_COQUE,
+  FORME_DISQUE,
   FORME_RECT,
   formeContact,
   formeOutline,
@@ -291,6 +294,41 @@ export const OMBRE_COURTE_PAR_HAUTEUR = 0.4
 
 /** Le fondu du bout de l'ombre courte, en unités monde. */
 export const FLOU_OMBRE_COURTE = 12
+
+/** Les formes dont la distance du shader est APPROCHÉE (formes.ts, et
+ *  formeSdf à l'identique) : le disque, une ellipse (k0·(k0 − 1)/k1, exacte
+ *  pour un cercle seulement), et l'arc, une distance d'anneau rapportée par
+ *  son gradient. Elles ne sont pas 1-lipschitziennes (mesuré sur leurs jumelles,
+ *  formeContact) : au bout d'une ellipse de 1600 × 40, la distance passe de
+ *  28 à 7 u en 16 u de chemin ; sur un arc étiré (600 × 150), de 71 à −12 u
+ *  en 56 u. Les
+ *  autres (rectangle, capsule, coin, coque) sont des distances à des
+ *  segments et à des plans, et leurs min/max : 1-lipschitziennes. */
+export const FORMES_DISTANCE_APPROCHEE: readonly number[] = [FORME_DISQUE, FORME_ARC]
+
+/** L'ombre courte d'un solide PEUT-ELLE porter en ce point du sol, à la
+ *  distance `d` de sa base, pour une ombre longue de `lO` (forme : celle de
+ *  la boîte) ? Dedans, ou sans longueur, non. Au-delà de lO + le flou, non
+ *  plus : ses trois échantillons sont au plus à lO du point, et une distance
+ *  1-lipschitzienne les laisse tous à plus du flou de la forme — l'ombre y
+ *  vaut EXACTEMENT 0, ses trois distances ne serviraient à rien. Le rejet
+ *  grossier de la composition se fait sur le rectangle englobant : une coque
+ *  y gardait toute sa salle, et chaque pixel payait trois distances par
+ *  coque, même à 300 u de toute paroi (relecture finale, I2). Une forme à
+ *  distance approchée paie partout, comme avant : l'image ne change nulle
+ *  part. */
+export function ombreCourtePeutPorter(d: number, lO: number, forme: number): boolean {
+  return d > 0 && lO > 0 && (d < lO + FLOU_OMBRE_COURTE || FORMES_DISTANCE_APPROCHEE.includes(forme))
+}
+
+/** Le jumeau GLSL d'ombreCourtePeutPorter, pour la composition (`forme` :
+ *  dec.y, un entier en flottant). */
+export const OMBRE_PORTEE_GLSL = `// (volume.ts : ombreCourtePeutPorter, son jumeau TypeScript)
+bool ombreCourtePeutPorter(float d, float lO, float forme) {
+  bool approchee = ${FORMES_DISTANCE_APPROCHEE.map((f) => `abs(forme - ${glslFloat(f)}) < 0.5`).join(' || ')};
+  return d > 0.0 && lO > 0.0 && (d < lO + ${glslFloat(FLOU_OMBRE_COURTE)} || approchee);
+}
+`
 
 /** La longueur de l'ombre courte d'un solide de hauteur `h`. */
 export function longueurOmbreCourte(h: number): number {

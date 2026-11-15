@@ -104,6 +104,7 @@ export const MAX_LUMIERES = 4
 import { HAUTEUR_BLOCS, HAUTEUR_COQUE } from './hauteurs'
 import {
   LUMIERE_PAR_DEFAUT,
+  OMBRE_PORTEE_GLSL,
   RANG_DE_MATIERE,
   directionLumiereMoyenne,
   hauteursPartagees,
@@ -2280,7 +2281,9 @@ float sdfBoiteLocal(int bi, vec2 wb, vec4 dec) {
 #define OMBRE_COURTE_PAR_HAUTEUR 0.4
 #define OMBRE_COURTE 56.0
 #define OMBRE_COURTE_FLOU 12.0
-
+// sa PORTÉE : au-delà, elle vaut exactement 0 et ses trois distances ne se
+// paient pas — le creux d'une coque, toute une salle (volume.ts)
+${OMBRE_PORTEE_GLSL}
 // le gradient du SDF de base d'une boîte, au point wb de son repère local
 // (dépivoté), par différences finies : d est la distance déjà calculée en
 // wb, (bca, bsa) le cosinus et le sinus de l'angle de la boîte — les axes du
@@ -3150,7 +3153,7 @@ void main() {
       // haut, lO s'annule et ses SDF ne se paient pas ; dedans non plus.
       float hRecoit = (iCouv >= 0 && iCouv != bi && dCouv < 0.0) ? hauteurBoite(iCouv) : 0.0;
       float lO = OMBRE_COURTE_PAR_HAUTEUR * max(hauteurBoite(bi) - hRecoit, 0.0);
-      if (d > 0.0 && lO > 0.0) {
+      if (ombreCourtePeutPorter(d, lO, dec.y)) {
         // depuis ce point du sol, on remonte VERS la lumière : si le chemin
         // croise la boîte, le point est dans son ombre. Trois échantillons
         // (le quart, la moitié, le bout) : une paroi plus mince que le pas
