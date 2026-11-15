@@ -3065,8 +3065,9 @@ void main() {
     // LE SOL QUE CE SOMMET CACHE (reliefParois.ts : solCache) : tout ce que
     // le dessus couvre — au-delà du pied du côté où il déborde, et sur la base
     // (un perméable y laisse passer le fluide : il entre sous le dessus et
-    // ressort au-delà du débord, sans couture) — et le sol derrière une face
-    // latérale vue de biais. L'aura, les ombres au sol de la boîte et le
+    // ressort au-delà du débord, sans couture) — le sol derrière une face
+    // latérale vue de biais, et, d'un perméable, le fluide de sa base devant
+    // sa tranche (sauf au pied). L'aura, les ombres au sol de la boîte et le
     // fluide ne s'y peignent pas. Relief éteint : 0.
     float solPropre = 0.0;
     // l'opacité de ce dessus : 1, sauf la VITRE — sous son verre on voit le
@@ -3121,7 +3122,7 @@ void main() {
       // (les pièces n'en sont pas : leur dessus est leur IMAGE, le sol caché
       // se mesure sur la silhouette de leurs pièces — voir leurs branches)
       if (mat < 0.5 && uBoxAux[bi].z > 8.5) opaciteDessus = opaciteVitre(vitreReflDur(uBoxes[bi], wbV));
-      if (!aPieces) solPropre = solCache(uRelief, d, dV, flanc, edgeW, opaciteDessus);
+      if (!aPieces) solPropre = solCache(uRelief, d, dV, flanc, edgeW, opaciteDessus, matPermeable(mat) ? 1.0 : 0.0);
       solSousSommets = max(solSousSommets, solPropre);
     }
     // ——— L'ÉPAISSEUR, AU SOL (volume des parois, volet 2) ————————————

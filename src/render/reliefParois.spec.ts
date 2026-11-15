@@ -3,7 +3,9 @@ import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { HAUTEUR_BLOCS } from './hauteurs'
 import { HAUTEUR_DE_RANG, RANG_DE_MATIERE } from './volume'
+import { MAT_GRILLE, MAT_MEMBRANE, MAT_RIDEAU } from '../game/level'
 import {
+  MATIERES_PERMEABLES,
   RELIEF_PAROIS_GLSL,
   facteurRelief,
   fonduRelief,
@@ -113,7 +115,7 @@ describe('les règles pures du relief', () => {
     // appariement d'accolades (blocsSource.ts) : une regex « A[\s\S]*B » ne
     // vérifiait qu'un ordre, et la ligne sortie du bloc la satisfaisait encore
     const garde = blocApres(boucle, 'if (uRelief > 0.0 && solide) {')
-    expect(garde).toContain('solPropre = solCache(uRelief, d, dV, flanc, edgeW, opaciteDessus);')
+    expect(garde).toContain('solPropre = solCache(uRelief, d, dV, flanc, edgeW, opaciteDessus, matPermeable(mat) ? 1.0 : 0.0);')
     expect(garde).toContain('solSousSommets = max(solSousSommets, solPropre);')
     // le masque du fluide ne grandit que sous une garde uRelief — les solides
     // comme les trois branches à pièces (surchauffeur, chaudière, conduite)
@@ -143,18 +145,45 @@ describe('les règles pures du relief', () => {
     const T = 40
     const delta = 21.6
     const w = 2.5
-    const valeurs: number[] = []
-    for (let x = -T / 2 + delta + w; x <= T / 2 + delta - w; x += 0.5) {
+    const coupe = (x: number, permeable: number): number => {
       const d = Math.abs(x) - T / 2
       const dV = Math.abs(x - delta) - T / 2
       const flanc = d <= 0 && dV > 0 ? 1 : 0
-      valeurs.push(solCache(R, d, dV, flanc, w))
+      return solCache(R, d, dV, flanc, w, 1, permeable)
     }
+    const valeurs: number[] = []
+    for (let x = -T / 2 + delta + w; x <= T / 2 + delta - w; x += 0.5) valeurs.push(coupe(x, 1))
     expect(valeurs.length).toBeGreaterThan(20)
     // une seule valeur sous tout le dessus : pas de couture au milieu
     for (const v of valeurs) expect(v).toBe(1)
-    // devant la tranche, côté centre, le fluide reste visible
-    expect(solCache(R, -T / 2 + 2, Math.abs(-T / 2 + 2 - delta) - T / 2, 1, w)).toBe(0)
+    // DEVANT LA TRANCHE, côté centre : la face est opaque, le fluide que la
+    // base contient ne s'y peint pas (il se lisait devant le mur — relecture
+    // finale, mineur 1)… sauf une bande de pied d'environ un fondu, où il
+    // touche le bas du flanc
+    for (let x = -T / 2 + 1.5 * w; x < -T / 2 + delta; x += 0.5) expect(coupe(x, 1), `x ${x}`).toBe(1)
+    for (let x = -T / 2 + 0.05; x <= -T / 2 + 0.5 * w; x += 0.25) expect(coupe(x, 1), `x ${x}`).toBe(0)
+  })
+
+  it('un solide étanche : devant sa tranche, sur la base, rien n’est caché — le pied y est la lisière', () => {
+    // un étanche ne contient rien dans sa base que la lisière du fluide qui
+    // touche son pied : la tranche ne la cache pas
+    for (const d of [-0.5, -2, -10, -30]) expect(solCache(R, d, 12, 1, 2.5)).toBe(0)
+    expect(solCache(R, -10, 12, 1, 2.5, 1, 0)).toBe(0)
+    // un perméable, au-delà de la bande de pied : caché ; dans la bande : non
+    expect(solCache(R, -10, 12, 1, 2.5, 1, 1)).toBe(1)
+    expect(solCache(R, -0.5, 12, 1, 2.5, 1, 1)).toBe(0)
+    // relief éteint, rien, perméable ou pas
+    expect(solCache(0, -10, 12, 1, 2.5, 1, 1)).toBe(0)
+  })
+
+  it('les perméables sont les solides que le fluide traverse : évent, membrane, rideau', () => {
+    // la vapeur passe l'évent, l'eau la membrane, la glace le rideau (level.ts)
+    expect([...MATIERES_PERMEABLES].sort()).toEqual([MAT_GRILLE, MAT_MEMBRANE, MAT_RIDEAU].sort())
+    // le jumeau GLSL, généré de la même liste
+    for (const m of MATIERES_PERMEABLES) expect(RELIEF_PAROIS_GLSL).toContain(`abs(mat - ${m}.0) < 0.5`)
+    expect(RELIEF_PAROIS_GLSL).toContain('bool matPermeable(float mat)')
+    // et le shader le passe à la règle, boîte par boîte
+    expect(boucle).toContain('solPropre = solCache(uRelief, d, dV, flanc, edgeW, opaciteDessus, matPermeable(mat) ? 1.0 : 0.0);')
   })
 
   it('le dessus translucide de la vitre ne cache le sol qu’à son opacité', () => {
@@ -218,14 +247,14 @@ describe('le shader : le dessus suit son sommet', () => {
 
 describe('le shader : les flancs absents (hydro, miroir)', () => {
   it('chaque solide mesure le sol que son sommet cache, à la règle solCache', () => {
-    expect(boucle).toMatch(/solPropre = solCache\(uRelief, d, dV, flanc, edgeW, opaciteDessus\)/)
+    expect(boucle).toMatch(/solPropre = solCache\(uRelief, d, dV, flanc, edgeW, opaciteDessus, matPermeable\(mat\) \? 1\.0 : 0\.0\)/)
   })
 
   it('le dessus de la vitre ne cache le sol qu’à son opacité, celle de son remplissage', () => {
     // une seule recette pour les deux : le remplissage et le relief
     expect(boucle).toMatch(/opaciteDessus = opaciteVitre\(vitreReflDur\(uBoxes\[bi\], wbV\)\)/)
     expect(composeFs).toMatch(/fillA = opaciteVitre\(rdV\);/)
-    expect(RELIEF_PAROIS_GLSL).toContain('float solCache(float relief, float d, float dV, float flanc, float w, float opacite)')
+    expect(RELIEF_PAROIS_GLSL).toContain('float solCache(float relief, float d, float dV, float flanc, float w, float opacite, float permeable)')
   })
 
   it('l’aura des hydro, l’ombre de contact et l’ombre courte ne se peignent plus sur le sommet de leur propre boîte', () => {

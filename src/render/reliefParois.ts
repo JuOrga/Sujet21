@@ -14,6 +14,13 @@
 //  - ce qui est plaqué sur un dessus (les décalques d'un mur) suit son sommet.
 import { HAUTEUR_BLOCS } from './hauteurs'
 import { glslFloat } from './surfacesSculptees'
+import { MAT_GRILLE, MAT_MEMBRANE, MAT_RIDEAU } from '../game/level'
+
+/** Les solides que le fluide TRAVERSE, sous l'une de ses phases (level.ts) :
+ *  la vapeur passe l'évent, l'eau la membrane, la glace le rideau. Leur base
+ *  peut contenir du fluide ; celle d'un étanche, rien que la lisière qui
+ *  touche son pied. */
+export const MATIERES_PERMEABLES: readonly number[] = [MAT_GRILLE, MAT_MEMBRANE, MAT_RIDEAU]
 
 /** La part du déplacement que prend le sommet d'un solide de hauteur `h` :
  *  sa hauteur sur celle d'un mur haut. Le mur haut (HAUTEUR_BLOCS) garde le
@@ -78,30 +85,47 @@ const smoothstep = (a: number, b: number, x: number): number => {
  *    milieu de son dessus — vu au banc, tableau 9, relecture R4.)
  *  - Hors de la base, la tranche est peinte (une face latérale vue de
  *    biais) : le sol derrière elle est caché.
- *  - Côté où le pied se voit (la tranche sur la base, d ≤ 0, hors du dessus),
- *    rien n'est caché : le fluide y touche le bas du flanc.
+ *  - Côté où le pied se voit (la tranche sur la base, d ≤ 0, hors du dessus) :
+ *    sur un ÉTANCHE, rien n'est caché — la base n'y contient que la lisière
+ *    du fluide, qui touche le bas du flanc. Sur un PERMÉABLE (`permeable` 1),
+ *    la base contient le fluide qui le traverse : il se peignait sur toute la
+ *    face latérale, devant une face opaque — l'eau se lisait devant le mur
+ *    (relecture finale, mineur 1). Il y est caché, sauf une bande de pied
+ *    d'environ `w`, où il touche le bas du flanc comme ailleurs.
  *  - `opacite` : celle du dessus (1 ; la vitre, 0,32 à 1) — sous un verre, on
  *    voit le sol au travers. Sa tranche (le dormant) reste opaque.
  *  Le shader ne l'appelle que relief allumé (sous uRelief > 0) : relief
  *  éteint, ni calcul ni changement. */
-export function solCache(relief: number, d: number, dV: number, flanc: number, w: number, opacite = 1): number {
+export function solCache(
+  relief: number,
+  d: number,
+  dV: number,
+  flanc: number,
+  w: number,
+  opacite = 1,
+  permeable = 0,
+): number {
   if (!(relief > 0)) return 0
   const sommet = (1 - smoothstep(-w, 0, dV)) * opacite
-  const tranche = d > 0 ? flanc : 0
+  const tranche = d > 0 ? flanc : flanc * permeable * smoothstep(0.5 * w, 1.5 * w, -d)
   return Math.max(sommet, tranche)
 }
 
-/** Les deux règles en GLSL, pour le shader de composition. */
+/** Les règles en GLSL, pour le shader de composition. */
 export const RELIEF_PAROIS_GLSL = `// (reliefParois.ts : les règles et leur jumeau TypeScript)
 float facteurRelief(float h) {
   return clamp(h, 0.0, ${glslFloat(HAUTEUR_BLOCS)}) / ${glslFloat(HAUTEUR_BLOCS)};
 }
-float solCache(float relief, float d, float dV, float flanc, float w, float opacite) {
+bool matPermeable(float mat) {
+  return ${MATIERES_PERMEABLES.map((m) => `abs(mat - ${glslFloat(m)}) < 0.5`).join(' || ')};
+}
+float solCache(float relief, float d, float dV, float flanc, float w, float opacite, float permeable) {
   if (relief <= 0.0) return 0.0;
   float sommet = (1.0 - smoothstep(-w, 0.0, dV)) * opacite;
-  return max(sommet, d > 0.0 ? flanc : 0.0);
+  float tranche = d > 0.0 ? flanc : flanc * permeable * smoothstep(0.5 * w, 1.5 * w, -d);
+  return max(sommet, tranche);
 }
 float solCache(float relief, float d, float dV, float flanc, float w) {
-  return solCache(relief, d, dV, flanc, w, 1.0);
+  return solCache(relief, d, dV, flanc, w, 1.0, 0.0);
 }
 `
