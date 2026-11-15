@@ -58,6 +58,10 @@ describe("l'épaisseur des solides dans la composition", () => {
     expect(ch).toBeGreaterThan(0)
     const garde = source.slice(ch, source.indexOf('{', ch) + 1)
     expect(garde).toContain('solide && !aPieces')
+    // ni les deux matières hydro (le concepteur, 15/11 : « leurs parois ne
+    // sont pas dingues ») : leur bord reste le liseré coloré d'avant
+    expect(garde).toMatch(/solide && !aPieces && !hydro/)
+    expect(source).toMatch(/bool hydro = mat > 0\.5 && mat < 2\.5;/)
     // le biseau mou de 30 u qu'il remplace n'existe plus
     expect(source).not.toContain('smoothstep(0.0, 30.0, abs(d))')
   })

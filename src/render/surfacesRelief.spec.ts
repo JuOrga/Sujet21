@@ -29,10 +29,23 @@ function enteteWebp(fichier: string): { l: number; h: number; alpha: boolean } {
 const SURFACES: Record<string, [number, number]> = {
   'wall.webp': [1024, 1024],
   'wall-a.webp': [1024, 1024],
-  'phile.webp': [1024, 1024],
-  'phobe.webp': [1024, 1024],
   'paroi-atlas.webp': [4096, 2048],
 }
+
+// LES DEUX MATIÈRES REVIENNENT AUX IMAGES EN LIGNE (le concepteur, 15/11,
+// aperçu d'ensemble : « le design est moins joli », « le motif bof bof »).
+// Ni le rendu Blender (#516) ni son re-rendu neutre (B1) : l'eau sombre à
+// reflets et le cuir violet d'avant, OPAQUES — un dessus plat, que
+// lumiereRelief rend à 1 (surfacesSculptees.ts) : la couleur d'avant, au
+// facteur près. Relivrées avec un alpha, elles reprendraient un relief que
+// personne n'a choisi.
+describe('surfaces hydro — les images en ligne, opaques', () => {
+  for (const fichier of ['phile.webp', 'phobe.webp']) {
+    it(`${fichier} est opaque, en 1024×1024`, () => {
+      expect(enteteWebp(fichier)).toEqual({ l: 1024, h: 1024, alpha: false })
+    })
+  }
+})
 
 describe('surfaces en relief — le relief dans l’alpha', () => {
   for (const [fichier, [l, h]] of Object.entries(SURFACES)) {
