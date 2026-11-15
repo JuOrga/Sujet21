@@ -32,7 +32,17 @@
 //                         420000 l'a monté le 14/11) ;
 //   BANC_ZOOM=2.5         rapproche la caméra (la molette du joueur : manualZoom)
 //                         — au cadrage d'entrée, une paroi fait 10-20 pixels et
-//                         un chanfrein n'en fait que deux ou trois.
+//                         un chanfrein n'en fait que deux ou trois ;
+//   BANC_CAMERA=-300,0,1.2  pose la caméra sur ce point du monde et l'y tient
+//                         (le geste « attraper la carte » : manualPan), au
+//                         zoom donné s'il y en a un (absolu : BANC_ZOOM
+//                         multiplie le zoom du moment, qui peut ne pas être
+//                         encore celui du tableau — le plancher du recul le
+//                         reprenait alors). Le relief 2.5D suit l'écart au
+//                         CENTRE de l'écran : un mur sous la caméra ne montre
+//                         aucun flanc, il faut des parois loin du centre ;
+//   BANC_SPAWN=-250,300   fait naître le corps là (?spawn=x,y de main.ts) : du
+//                         fluide contre un mur dès le chargement.
 //
 // POURQUOI la recopie du canvas et pas `page.screenshot` : sur ce poste (WSL),
 // la composition GPU sans tête rendait des captures BLANCHES. Le tampon WebGL,
@@ -60,6 +70,18 @@ const ATTENTE = Number(process.env.BANC_ATTENTE || 6000)
 const RELIEF = process.env.BANC_RELIEF || 'off'
 const ZOOM = Number(process.env.BANC_ZOOM || 1)
 const MONTAGE = Number(process.env.BANC_MONTAGE || 120000)
+const point = (nom) => {
+  const v = process.env[nom]
+  if (!v) return null
+  const m = /^(-?[\d.]+),(-?[\d.]+)(?:,([\d.]+))?$/.exec(v)
+  if (!m) {
+    console.log(`${nom} : attendu x,y (ou x,y,zoom), par exemple -300,0`)
+    process.exit(1)
+  }
+  return m[3] ? [Number(m[1]), Number(m[2]), Number(m[3])] : [Number(m[1]), Number(m[2])]
+}
+const CAMERA = point('BANC_CAMERA')
+const SPAWN = point('BANC_SPAWN')
 const LUMIERES = process.env.BANC_LUMIERE === 'on' ? [true] : process.env.BANC_LUMIERE === 'off' ? [false] : [true, false]
 const ARGS = process.env.BANC_GL === 'angle'
   ? ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader']
@@ -106,7 +128,8 @@ function recopie() {
       const erreurs = []
       p.on('pageerror', (e) => erreurs.push((e.stack || e.message).slice(0, 400)))
       p.on('console', (m) => m.type() === 'error' && erreurs.push(m.text().slice(0, 300)))
-      await p.goto(`${base}/?${n === 'hub' ? '' : `tableau=${n}&`}dev=0`, { waitUntil: 'domcontentloaded' })
+      const spawn = SPAWN ? `spawn=${SPAWN[0]},${SPAWN[1]}&` : ''
+      await p.goto(`${base}/?${n === 'hub' ? '' : `tableau=${n}&`}${spawn}dev=0`, { waitUntil: 'domcontentloaded' })
       try {
         await p.waitForFunction(() => typeof window.__cam === 'object' && window.__sim, null, {
           timeout: MONTAGE,
@@ -126,6 +149,18 @@ function recopie() {
           window.__cam.cancelIntro()
           window.__cam.manualZoom = window.__cam.zoom * z
         }, ZOOM)
+      }
+      if (CAMERA) {
+        // panBy(0, 0) : la caméra cesse de suivre le corps (manualPan), puis
+        // on la pose — elle tient le point jusqu'à la capture
+        await p.evaluate(([x, y, z]) => {
+          window.__cam.panBy(0, 0)
+          window.__cam.x = x
+          window.__cam.y = y
+          // le zoom posé tout de suite : avant que le joueur ne prenne la main,
+          // la boucle ne fait pas glisser la caméra vers manualZoom
+          if (z) window.__cam.manualZoom = window.__cam.zoom = z
+        }, CAMERA)
       }
       await p.waitForTimeout(ATTENTE)
       // la sonde lit la MÊME toile que la recopie (la plus grande) : la
