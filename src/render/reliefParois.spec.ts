@@ -232,6 +232,21 @@ describe('le shader : la longueur du flanc suit la hauteur', () => {
     expect(lumiereToit).toMatch(/toitVis = textureLod\(uLightMap, [^;]*pToit/)
     expect(lumiereToit).toMatch(/pointLampe\(li, pToit\) - pToit/)
   })
+
+  it('relief éteint, la lumière du toit reprend les distances de la première boucle des lampes', () => {
+    // pToit = world relief éteint : la seconde boucle recalculait pointLampe
+    // et sa longueur pour chaque lampe et chaque pixel, pour le même nombre
+    // (relecture finale, mineur 7). La première boucle les retient.
+    const premiere = blocApres(composeFs, 'for (int li = 0; li < MAX_LUMIERES; li++) {', composeFs.indexOf('vec2 lampeDir = uLumiereDefaut;'))
+    expect(premiere).toContain('float dn = max(length(dl), 1.0);')
+    expect(premiere).toContain('dnSol[li] = dn;')
+    expect(composeFs).toContain('float dnSol[MAX_LUMIERES];')
+    expect(lumiereToit).toContain('float dn = dnSol[li];')
+    // le recalcul, relief allumé seulement — là où pToit a glissé
+    const recalculs = occurrencesDans(composeFs, 'pointLampe(li, pToit)')
+    expect(recalculs).toHaveLength(1)
+    expect(recalculs[0].entetes[0]).toBe('if (uRelief > 0.0 && iCouv >= 0)')
+  })
 })
 
 describe('le shader : le dessus suit son sommet', () => {

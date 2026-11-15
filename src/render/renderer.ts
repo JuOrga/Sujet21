@@ -2734,12 +2734,16 @@ void main() {
   vec2 lampeDir = uLumiereDefaut;
   vec3 eclSolide = vec3(1.0); // multiplicateur des matières inertes
   vec3 eclActif = vec3(1.0);  // idem, atténué, pour les surfaces actives
+  // la distance de chaque lampe à ce point du sol, retenue pour la lumière
+  // des toits : relief éteint, elle y est la même (pToit = world)
+  float dnSol[MAX_LUMIERES];
   if (uLumiere > 0.5) {
     vec2 acc = vec2(0.0);
     for (int li = 0; li < MAX_LUMIERES; li++) {
       if (li >= uLampeCount) break;
       vec2 dl = pointLampe(li, world) - world;
       float dn = max(length(dl), 1.0);
+      dnSol[li] = dn;
       float w = uLampesInt[li] * (1.0 - 0.55 * smoothstep(0.0, uLampes[li].w, dn));
       acc += (dl / dn) * w;
     }
@@ -2961,7 +2965,13 @@ void main() {
     vec3 lumHaut = vec3(0.0);   // lumière reçue par le sommet des solides
     for (int li = 0; li < MAX_LUMIERES; li++) {
       if (li >= uLampeCount) break;
-      float dn = max(length(pointLampe(li, pToit) - pToit), 1.0);
+      // relief éteint, pToit = world : la distance de la première boucle —
+      // la recalculer coûtait pointLampe et une longueur par lampe et par
+      // pixel, pour le même nombre
+      float dn = dnSol[li];
+      if (uRelief > 0.0 && iCouv >= 0) {
+        dn = max(length(pointLampe(li, pToit) - pToit), 1.0);
+      }
       float hRel = max(uLampes[li].z - hToit, 0.0);
       float fall = retombeeToit(dn, uLampes[li].w, hRel);
       lumHaut += uLampesCol[li] * (fall * uLampesInt[li]);
