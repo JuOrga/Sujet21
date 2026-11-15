@@ -3113,7 +3113,7 @@ void main() {
       // (les pièces n'en sont pas : leur dessus est leur IMAGE, le sol caché
       // se mesure sur la silhouette de leurs pièces — voir leurs branches)
       if (mat < 0.5 && uBoxAux[bi].z > 8.5) opaciteDessus = opaciteVitre(vitreReflDur(uBoxes[bi], wbV));
-      if (!aPieces) solPropre = solCache(d, dV, flanc, edgeW, opaciteDessus);
+      if (!aPieces) solPropre = solCache(uRelief, d, dV, flanc, edgeW, opaciteDessus);
       solSousSommets = max(solSousSommets, solPropre);
     }
     // ——— L'ÉPAISSEUR, AU SOL (volume des parois, volet 2) ————————————
@@ -3541,7 +3541,7 @@ void main() {
       // aussi sous leur image
       if (uRelief > 0.0 && serp && fill > 0.0) {
         float dGV = surchSdf(wbV, uBoxes[bi], zS);
-        solSousSommets = max(solSousSommets, solCache(dG, dGV, 0.0, edgeW) * fill * ch.a);
+        solSousSommets = max(solSousSommets, solCache(uRelief, dG, dGV, 0.0, edgeW) * fill * ch.a);
       }
       float hors = (1.0 - fill * ch.a) * surSol;
       // le halo dit « approchez en vapeur » : il meurt avec la charge — et,
@@ -3651,7 +3651,7 @@ void main() {
       // relief allumé : l'image déplacée cache le sol (voir le surchauffeur)
       if (uRelief > 0.0 && rampe && fill > 0.0) {
         float dGV = chaudiereSdf(wbV, uBoxes[bi], codeC);
-        solSousSommets = max(solSousSommets, solCache(dG, dGV, 0.0, edgeW) * fill * ch.a);
+        solSousSommets = max(solSousSommets, solCache(uRelief, dG, dGV, 0.0, edgeW) * fill * ch.a);
       }
       float hors = (1.0 - fill * ch.a) * surSol;
       // l'air qui brûle autour, et — riche seulement — la lueur que les
@@ -3747,7 +3747,7 @@ void main() {
       // relief allumé : l'image déplacée cache le sol (voir le surchauffeur)
       if (uRelief > 0.0 && tuyau && fill > 0.0) {
         float dGV = conduiteSdf(wbV, uBoxes[bi], sensC);
-        solSousSommets = max(solSousSommets, solCache(dG, dGV, 0.0, edgeW) * fill * cnh.a);
+        solSousSommets = max(solSousSommets, solCache(uRelief, dG, dGV, 0.0, edgeW) * fill * cnh.a);
       }
       // L'ARÊTE DES PLAQUES : l'image les peint à plat, sans épaisseur — un
       // biseau tourné vers la lampe (le haut à gauche de l'image sans

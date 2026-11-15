@@ -11,6 +11,7 @@ import {
   pointDuSommet,
   solCache,
 } from './reliefParois'
+import { blocApres, occurrencesDans } from './blocsSource'
 
 // LE RELIEF 2.5D RÉPARÉ (volume des parois, volet 1). Les règles pures sont
 // testées ici ; le shader ne tourne pas sous vitest : on lit sa SOURCE, comme
@@ -48,6 +49,8 @@ const ecrit = entre('private ecritProfondeur(', '\n  }\n')
 // les matières SOLIDES, d'après la table des hauteurs (volume.ts) : tout ce
 // qui a un rang a un corps
 const SOLIDES = Object.keys(RANG_DE_MATIERE).map(Number)
+// un relief allumé (RELIEF_K.fort, main.ts) pour les règles pures
+const R = 0.07
 
 describe('les règles pures du relief', () => {
   it('le sommet s’écarte selon la hauteur : un mur haut garde son flanc, une plaque basse en a un court', () => {
@@ -84,22 +87,54 @@ describe('les règles pures du relief', () => {
     expect(pointDuSommet(310, 20, 0, 0, 0)).toEqual([310, 20])
   })
 
-  it('relief éteint, la règle ne se calcule pas : le rendu d’avant reste', () => {
-    // le sol caché n'existe que sous le relief : relief éteint, solPropre
-    // garde sa valeur de départ (0) — ni l'aura, ni les ombres, ni le fluide
-    // ne changent
-    expect(boucle).toMatch(/float solPropre = 0\.0;[\s\S]*if \(uRelief > 0\.0 && solide\) \{[\s\S]*solPropre = solCache\(/)
-    // hors du dessus et hors de la tranche, rien n'est caché
-    for (const d of [0.5, 4, 60]) expect(solCache(d, d, 0, 2.5)).toBe(0)
+  it('relief éteint, la règle vaut 0 partout : le rendu d’avant reste, par construction', () => {
+    // relief éteint, le shader appelle la règle avec dV = d (le sommet ne
+    // bouge pas) et flanc = 0 — or, sur la base, 1 − smoothstep(−w, 0, d)
+    // vaut 1 : sans le facteur de relief, une ligne sortie de sa garde
+    // uRelief cachait le fluide dans tout solide (membrane, rideau, évent),
+    // par défaut. La règle prend le relief et vaut 0 sans lui, quoi qu'on
+    // lui passe d'autre.
+    for (let d = -60; d <= 60; d += 0.5) {
+      for (const dV of [d, d - 20, d + 20, -35, 12]) {
+        for (const flanc of [0, 0.5, 1]) {
+          for (const op of [0.4, 1]) {
+            expect(solCache(0, d, dV, flanc, 2.5, op), `d ${d} dV ${dV} flanc ${flanc}`).toBe(0)
+          }
+        }
+      }
+    }
+    // relief allumé, hors du dessus et hors de la tranche, rien n'est caché
+    for (const d of [0.5, 4, 60]) expect(solCache(R, d, d, 0, 2.5)).toBe(0)
+    // le jumeau GLSL porte la même porte d'entrée
+    expect(RELIEF_PAROIS_GLSL).toMatch(/float solCache\(float relief, [^)]*\) \{\s*if \(relief <= 0\.0\) return 0\.0;/)
+  })
+
+  it('relief éteint, le shader ne calcule pas la règle : chaque appel est DANS une garde uRelief', () => {
+    // appariement d'accolades (blocsSource.ts) : une regex « A[\s\S]*B » ne
+    // vérifiait qu'un ordre, et la ligne sortie du bloc la satisfaisait encore
+    const garde = blocApres(boucle, 'if (uRelief > 0.0 && solide) {')
+    expect(garde).toContain('solPropre = solCache(uRelief, d, dV, flanc, edgeW, opaciteDessus);')
+    expect(garde).toContain('solSousSommets = max(solSousSommets, solPropre);')
+    // le masque du fluide ne grandit que sous une garde uRelief — les solides
+    // comme les trois branches à pièces (surchauffeur, chaudière, conduite)
+    const versements = occurrencesDans(composeFs, 'solSousSommets = max(')
+    expect(versements.length).toBe(4)
+    for (const v of versements) {
+      expect(v.entetes.some((e) => e.includes('uRelief > 0.0')), composeFs.slice(v.position, v.position + 90)).toBe(true)
+    }
+    // et chaque appel de la règle lui passe le relief
+    const appels = occurrencesDans(composeFs, 'solCache(')
+    expect(appels.length).toBe(4)
+    for (const a of appels) expect(composeFs.startsWith('solCache(uRelief, ', a.position)).toBe(true)
   })
 
   it('un dessus opaque cache ce qui est dessous, partout où il couvre', () => {
     // sous le dessus, base comprise : le fluide qui traverse un solide
     // perméable (membrane, évent, rideau) entre sous le dessus et ressort
     // au-delà du débord
-    expect(solCache(-3, -35, 0, 2.5)).toBe(1)
-    expect(solCache(-20, -5, 0, 2.5)).toBe(1)
-    expect(solCache(-12, -12, 0, 2.5)).toBe(1)
+    expect(solCache(R, -3, -35, 0, 2.5)).toBe(1)
+    expect(solCache(R, -20, -5, 0, 2.5)).toBe(1)
+    expect(solCache(R, -12, -12, 0, 2.5)).toBe(1)
   })
 
   it('un solide mince, du fluide dans sa base : aucune transition sous le dessus', () => {
@@ -113,37 +148,37 @@ describe('les règles pures du relief', () => {
       const d = Math.abs(x) - T / 2
       const dV = Math.abs(x - delta) - T / 2
       const flanc = d <= 0 && dV > 0 ? 1 : 0
-      valeurs.push(solCache(d, dV, flanc, w))
+      valeurs.push(solCache(R, d, dV, flanc, w))
     }
     expect(valeurs.length).toBeGreaterThan(20)
     // une seule valeur sous tout le dessus : pas de couture au milieu
     for (const v of valeurs) expect(v).toBe(1)
     // devant la tranche, côté centre, le fluide reste visible
-    expect(solCache(-T / 2 + 2, Math.abs(-T / 2 + 2 - delta) - T / 2, 1, w)).toBe(0)
+    expect(solCache(R, -T / 2 + 2, Math.abs(-T / 2 + 2 - delta) - T / 2, 1, w)).toBe(0)
   })
 
   it('le dessus translucide de la vitre ne cache le sol qu’à son opacité', () => {
-    expect(solCache(5, -20, 0, 2.5, 0.4)).toBeCloseTo(0.4, 6)
-    expect(solCache(-5, -20, 0, 2.5, 1)).toBe(1)
+    expect(solCache(R, 5, -20, 0, 2.5, 0.4)).toBeCloseTo(0.4, 6)
+    expect(solCache(R, -5, -20, 0, 2.5, 1)).toBe(1)
     // sa tranche (le dormant) reste opaque
-    expect(solCache(6, 9, 1, 2.5, 0.4)).toBe(1)
+    expect(solCache(R, 6, 9, 1, 2.5, 0.4)).toBe(1)
   })
 
   it('le sol que le sommet recouvre au-delà du pied est caché ; le pied vu reste visible', () => {
     // au-delà du pied (d > 0), sous le sommet (dV ≤ 0) : caché — le fluide
     // qui touche le pied de ce côté passe dessous
-    expect(solCache(3, -25, 0, 2.5)).toBe(1)
-    expect(solCache(20, -6, 0, 2.5)).toBe(1)
+    expect(solCache(R, 3, -25, 0, 2.5)).toBe(1)
+    expect(solCache(R, 20, -6, 0, 2.5)).toBe(1)
     // la lisière du fluide sous le pied, de ce même côté : cachée aussi
-    expect(solCache(-3, -35, 0, 2.5)).toBe(1)
+    expect(solCache(R, -3, -35, 0, 2.5)).toBe(1)
     // le sol libre : visible
-    expect(solCache(10, 15, 0, 2.5)).toBe(0)
+    expect(solCache(R, 10, 15, 0, 2.5)).toBe(0)
     // côté où le pied se voit : la tranche sur la base — le fluide y touche
     // le bas du flanc, rien n'est caché
-    expect(solCache(-4, 12, 1, 2.5)).toBe(0)
-    expect(solCache(-1, 30, 1, 2.5)).toBe(0)
+    expect(solCache(R, -4, 12, 1, 2.5)).toBe(0)
+    expect(solCache(R, -1, 30, 1, 2.5)).toBe(0)
     // une face latérale vue de biais, hors de la base : elle cache le sol
-    expect(solCache(6, 9, 1, 2.5)).toBe(1)
+    expect(solCache(R, 6, 9, 1, 2.5)).toBe(1)
   })
 })
 
@@ -183,14 +218,14 @@ describe('le shader : le dessus suit son sommet', () => {
 
 describe('le shader : les flancs absents (hydro, miroir)', () => {
   it('chaque solide mesure le sol que son sommet cache, à la règle solCache', () => {
-    expect(boucle).toMatch(/solPropre = solCache\(d, dV, flanc, edgeW, opaciteDessus\)/)
+    expect(boucle).toMatch(/solPropre = solCache\(uRelief, d, dV, flanc, edgeW, opaciteDessus\)/)
   })
 
   it('le dessus de la vitre ne cache le sol qu’à son opacité, celle de son remplissage', () => {
     // une seule recette pour les deux : le remplissage et le relief
     expect(boucle).toMatch(/opaciteDessus = opaciteVitre\(vitreReflDur\(uBoxes\[bi\], wbV\)\)/)
     expect(composeFs).toMatch(/fillA = opaciteVitre\(rdV\);/)
-    expect(RELIEF_PAROIS_GLSL).toContain('float solCache(float d, float dV, float flanc, float w, float opacite)')
+    expect(RELIEF_PAROIS_GLSL).toContain('float solCache(float relief, float d, float dV, float flanc, float w, float opacite)')
   })
 
   it('l’aura des hydro, l’ombre de contact et l’ombre courte ne se peignent plus sur le sommet de leur propre boîte', () => {
@@ -215,7 +250,7 @@ describe('le shader : le fluide passe sous les sommets', () => {
   it('la conduite, la chaudière et le surchauffeur à pièces cachent le sol sous leur image déplacée', () => {
     // leur dessus est l'image (alpha) posée sur la silhouette des pièces : le
     // sol caché se mesure sur ELLE, pas sur la boîte
-    const n = [...boucle.matchAll(/solSousSommets = max\(solSousSommets, solCache\(dG, dGV, 0\.0, edgeW\) \* fill \* \w+\.a\)/g)]
+    const n = [...boucle.matchAll(/solSousSommets = max\(solSousSommets, solCache\(uRelief, dG, dGV, 0\.0, edgeW\) \* fill \* \w+\.a\)/g)]
     expect(n.length).toBe(3)
   })
 

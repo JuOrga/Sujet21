@@ -58,10 +58,16 @@ const smoothstep = (a: number, b: number, x: number): number => {
   return t * t * (3 - 2 * t)
 }
 
-/** Le SOL QUE LE SOLIDE CACHE, 0..1, en un pixel : `d` la distance signée à
- *  la base, `dV` au sommet déplacé, `flanc` la tranche peinte ici (0..1),
- *  `w` le fondu d'un pixel. UNE règle : un dessus opaque cache ce qui est
- *  dessous.
+/** Le SOL QUE LE SOLIDE CACHE, 0..1, en un pixel : `relief` le relief du
+ *  moment (uRelief : 0 éteint), `d` la distance signée à la base, `dV` au
+ *  sommet déplacé, `flanc` la tranche peinte ici (0..1), `w` le fondu d'un
+ *  pixel. UNE règle : un dessus opaque cache ce qui est dessous.
+ *  - RELIEF ÉTEINT, ELLE VAUT 0, quoi qu'on lui passe d'autre. Relief éteint,
+ *    le sommet ne bouge pas (dV = d) : sur la base, 1 − smoothstep(−w, 0, d)
+ *    vaut 1, et la règle seule cacherait le fluide dans tout solide —
+ *    membrane, rideau, évent : par défaut. La garde uRelief du shader ne
+ *    suffisait pas à le tenir (relecture finale : un appel sorti de sa garde,
+ *    toute la suite restait verte) ; la règle le tient elle-même.
  *  - Partout où le dessus couvre le pixel, le sol est caché — au-delà du
  *    pied du côté où il déborde (le fluide qui touche le pied passe dessous),
  *    et sur la base aussi. Un solide étanche n'y contient rien (seule la
@@ -76,9 +82,10 @@ const smoothstep = (a: number, b: number, x: number): number => {
  *    rien n'est caché : le fluide y touche le bas du flanc.
  *  - `opacite` : celle du dessus (1 ; la vitre, 0,32 à 1) — sous un verre, on
  *    voit le sol au travers. Sa tranche (le dormant) reste opaque.
- *  Ne se calcule que relief allumé (le shader la garde sous uRelief > 0) :
- *  relief éteint, rien ne change. */
-export function solCache(d: number, dV: number, flanc: number, w: number, opacite = 1): number {
+ *  Le shader ne l'appelle que relief allumé (sous uRelief > 0) : relief
+ *  éteint, ni calcul ni changement. */
+export function solCache(relief: number, d: number, dV: number, flanc: number, w: number, opacite = 1): number {
+  if (!(relief > 0)) return 0
   const sommet = (1 - smoothstep(-w, 0, dV)) * opacite
   const tranche = d > 0 ? flanc : 0
   return Math.max(sommet, tranche)
@@ -89,11 +96,12 @@ export const RELIEF_PAROIS_GLSL = `// (reliefParois.ts : les règles et leur jum
 float facteurRelief(float h) {
   return clamp(h, 0.0, ${glslFloat(HAUTEUR_BLOCS)}) / ${glslFloat(HAUTEUR_BLOCS)};
 }
-float solCache(float d, float dV, float flanc, float w, float opacite) {
+float solCache(float relief, float d, float dV, float flanc, float w, float opacite) {
+  if (relief <= 0.0) return 0.0;
   float sommet = (1.0 - smoothstep(-w, 0.0, dV)) * opacite;
   return max(sommet, d > 0.0 ? flanc : 0.0);
 }
-float solCache(float d, float dV, float flanc, float w) {
-  return solCache(d, dV, flanc, w, 1.0);
+float solCache(float relief, float d, float dV, float flanc, float w) {
+  return solCache(relief, d, dV, flanc, w, 1.0);
 }
 `
