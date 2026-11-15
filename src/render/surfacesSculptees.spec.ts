@@ -27,8 +27,13 @@ const source = lire('./renderer.ts')
 const doc = lire('../../docs/assets-ia.md')
 
 // le shader de composition, du début de COMPOSE_FS à la fin de son gabarit
+// (`\n}\``, l'accolade de main puis le guillemet) — vide si l'une ou l'autre
+// manque : les gardes « dans la composition » échouent alors, au lieu de lire
+// le reste du fichier (l'ancienne fin, `\n\``, n'existait pas dans le shader et
+// tombait 5 000 lignes plus loin : cuiseur, coque et hôte compris)
 const debutCompose = source.indexOf('const COMPOSE_FS = `')
-const compose = source.slice(debutCompose, source.indexOf('\n`', debutCompose))
+const finCompose = debutCompose < 0 ? -1 : source.indexOf('\n}`', debutCompose)
+const compose = finCompose < 0 ? '' : source.slice(debutCompose, finCompose + 2)
 // le remplissage des dessus dans la boucle des boîtes (mur, habillages, hydro)
 const debutRemplissage = compose.indexOf('if (mat < 2.5) {\n      float fill')
 const remplissage = compose.slice(debutRemplissage, compose.indexOf('col = mix(col, edgeCol * eclMat', debutRemplissage))
@@ -135,6 +140,14 @@ describe('la règle : une normale tirée de l’alpha, éclairée par la lumièr
 })
 
 describe('le shader lit le relief dans l’alpha (composition)', () => {
+  it('la tranche lue est la composition, et elle seule', () => {
+    expect(debutCompose).toBeGreaterThan(0)
+    expect(finCompose).toBeGreaterThan(debutCompose)
+    expect(compose).toContain('void main() {')
+    // ni le cuiseur, ni la coque, ni l'hôte
+    for (const autre of ['const LIGHT_FS = `', 'const HULL_FS', 'export class Renderer']) expect(compose).not.toContain(autre)
+  })
+
   it('la règle GLSL, générée du même module, est dans la composition', () => {
     expect(debutCompose).toBeGreaterThan(0)
     expect(compose).toContain('${RELIEF_SURFACES_GLSL}')
