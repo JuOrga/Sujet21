@@ -1151,7 +1151,7 @@ uniform float uLampesInt[MAX_LUMIERES]; // intensité
 uniform vec3 uLampesCol[MAX_LUMIERES]; // couleur
 uniform vec4 uLampesFix[MAX_LUMIERES]; // taille, bandeau, demi-longueur, angle
 // le point du bandeau le plus proche (une lampe ronde renvoie son centre) —
-// ombre du volume, biseau et halo de monture éclairent depuis LÀ
+// ombre du volume, chanfrein et halo de monture éclairent depuis LÀ
 vec2 pointLampe(int li, vec2 p) {
   vec2 c = uLampes[li].xy;
   if (uLampesFix[li].y < 0.5) return c;
@@ -2722,11 +2722,13 @@ void main() {
   }
   // Éclairage de la pièce : la carte précalculée (visibilité × retombée)
   // module le FOND — les ombres portées se couchent sur la cuve, les blocs
-  // eux-mêmes restent éclairés (leur relief vient du biseau directionnel).
+  // eux-mêmes restent éclairés (leur épaisseur vient du chanfrein et de la
+  // tranche, leur lumière de lumHaut, plus bas).
   // Appliqué AVANT la vie du vaisseau : les veilleuses sont des lumières,
   // elles n'ont pas à subir l'ombre de la lampe principale.
-  // La direction de lumière dominante ICI (pour le biseau des arêtes) : la
-  // somme des lampes, pondérée par intensité et retombée.
+  // La direction de lumière dominante ICI (le chanfrein, l'ombre courte, la
+  // tranche et le relief des surfaces la suivent) : la somme des lampes,
+  // pondérée par intensité et retombée.
   // Lumière éteinte, ou aucune lampe : la direction par défaut, en uniforme
   // (volume.ts) — le chanfrein et l'ombre courte en ont toujours une.
   vec2 lampeDir = uLumiereDefaut;
@@ -3008,11 +3010,12 @@ void main() {
                     (mat > 8.5 && mat < 9.5);
     // Ce qui a un CORPS : tout, sauf le sas (une bouche) et les ouvertures
     // sur le dehors (vide, baie — des trous dans le plancher). Sans corps,
-    // ni court-circuit d'aura, ni relief, ni ombre portée, ni biseau.
+    // ni court-circuit d'aura, ni relief, ni ombre portée, ni chanfrein.
     bool solide = (mat < 2.5 || mat > 3.5) && mat < 10.5;
     vec3 eclMat = matActif ? eclActif : eclSolide;
-    // Court-circuit : au-delà de toute influence visuelle (ombre 56 u, arête,
-    // aura selon le matériau), la boîte ne peut plus teinter ce pixel — on
+    // Court-circuit : au-delà de toute influence visuelle (l'ombre courte et
+    // son flou, 56 + 12 = 68 u ; l'arête ; l'aura selon le matériau ; relief
+    // allumé, le glissement du sommet), la boîte ne peut plus teinter ce pixel — on
     // saute remplissage, bruit et mélanges. Sur un tableau à 30-40 boîtes,
     // chaque pixel n'en paie plus que les 1-2 qui le concernent. Le SAS garde
     // son grand rayon d'aspiration : jamais coupé. Le rejet se fait sur la
@@ -7318,8 +7321,9 @@ export class Renderer {
     gl.uniform1f(cu['uChill'], chill)
     gl.uniform1f(cu['uDecor'], decor)
     gl.uniform1f(cu['uEau'], eau)
-    // Éclairage de la pièce : la carte cuite + les lampes (le biseau des
-    // arêtes et les montures en ont besoin par pixel)
+    // Éclairage de la pièce : la carte cuite + les lampes (la direction du
+    // chanfrein, la lumière des dessus et les montures en ont besoin par
+    // pixel) — coupé, la direction par défaut prend le relais (uLumiereDefaut)
     gl.uniform1f(cu['uLumiere'], lumiere > 0.5 && this.lightTex ? 1 : 0)
     gl.uniform2f(cu['uLumiereDefaut'], LUMIERE_PAR_DEFAUT[0], LUMIERE_PAR_DEFAUT[1])
     gl.uniform1f(cu['uAmbiante'], ambiante)
