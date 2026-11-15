@@ -5,6 +5,9 @@ import { HAUTEUR_BLOCS } from './hauteurs'
 import { HAUTEUR_DE_RANG, RANG_DE_MATIERE } from './volume'
 import {
   facteurRelief,
+  fonduRelief,
+  fractionSommet,
+  pointDuSommet,
   solCache,
 } from './reliefParois'
 
@@ -33,8 +36,11 @@ const epaisseur = entre("// ——— L'ÉPAISSEUR", '// ——— LE FLANC', de
 const flanc = entre('// ——— LE FLANC', 'if (mat < 2.5) {', debutCompo)
 const matiereFlanc = entre('vec3 matiereFlanc(', '\n}\n', debutCompo)
 const drawVie = entre('private drawVie(', '\n  }\n')
+const drawDecals = entre('private drawDecals(', '\n  }\n')
+const decalFs = entre('const DECAL_FS = `', '}`')
 const rendu = entre('// Passe B — composition', '// Passe C — cellules')
 const decorNet = entre('private drawDecorNet(', '\n  }\n')
+const sousDecal = entre('private hauteurSousDecal(', '\n  }\n')
 const passeSous = entre('private passeSousSommets(', '\n  }\n')
 const ecrit = entre('private ecritProfondeur(', '\n  }\n')
 
@@ -52,6 +58,29 @@ describe('les règles pures du relief', () => {
     expect(facteurRelief(0)).toBe(0)
     expect(facteurRelief(-5)).toBe(0)
     expect(HAUTEUR_DE_RANG.haut).toBe(HAUTEUR_BLOCS)
+  })
+
+  it('le relief se fond au zoom de carte, comme le shader', () => {
+    expect(fonduRelief(1)).toBe(1)
+    expect(fonduRelief(0.5)).toBeCloseTo(0.6, 6)
+    expect(fonduRelief(0)).toBe(0)
+    expect(fractionSommet(0.07, 1, HAUTEUR_BLOCS)).toBeCloseTo(0.07, 6)
+    expect(fractionSommet(0.07, 0.5, 90)).toBeCloseTo(0.07 * 0.6 * (90 / 140), 6)
+    expect(fractionSommet(0, 1, HAUTEUR_BLOCS)).toBe(0)
+  })
+
+  it('pointDuSommet est la réciproque de la règle du shader : un décalque tombe sur le sommet', () => {
+    // le shader montre, au point w de l'écran, le sommet du point c + (w − c)(1 − f)
+    const c: [number, number] = [120, -40]
+    for (const f of [0, 0.02, 0.07]) {
+      for (const q of [[0, 0], [500, 300], [-800, 120]] as const) {
+        const [wx, wy] = pointDuSommet(q[0], q[1], c[0], c[1], f)
+        expect(c[0] + (wx - c[0]) * (1 - f)).toBeCloseTo(q[0], 6)
+        expect(c[1] + (wy - c[1]) * (1 - f)).toBeCloseTo(q[1], 6)
+      }
+    }
+    // f = 0 : le décalque ne bouge pas
+    expect(pointDuSommet(310, 20, 0, 0, 0)).toEqual([310, 20])
   })
 
   it('relief éteint, aucun sol n’est caché : le rendu d’avant reste', () => {
@@ -201,6 +230,24 @@ describe('le shader : chaque flanc porte sa matière', () => {
     // direction par défaut — plus de garde uLumiere autour
     expect(flanc).not.toContain('if (uLumiere > 0.5)')
     expect(flanc).toMatch(/mix\([0-9.]+, 1\.0, sqrt\(htFlanc\)\)/)
+  })
+})
+
+describe('les décalques plaqués sur un mur suivent son sommet', () => {
+  it('drawDecals cherche le solide sous le décalque et pose ses sommets sur le dessus déplacé', () => {
+    expect(drawDecals).toContain('this.hauteurSousDecal(')
+    expect(sousDecal).toContain('dansForme(')
+    // seuls les solides portent un dessus (le sas, le vide, la baie : non)
+    expect(sousDecal).toContain('RANG_DE_MATIERE[bx.material] === undefined')
+    expect(drawDecals).toContain('fractionSommet(')
+    expect(drawDecals).toContain('pointDuSommet(')
+    // l'eau qui l'efface se lit au pied (le décalque est sur le dessus)
+    expect(decalFs).toContain('uniform float uSommet;')
+    expect(decalFs).toMatch(/\(gl_FragCoord\.xy - 0\.5 \* uCanvasSize\) \* \(1\.0 - uSommet\)/)
+  })
+
+  it('un décalque posé au sol passe sous les sommets, comme le fluide', () => {
+    expect(drawDecals).toContain('this.passeSousSommets(')
   })
 })
 

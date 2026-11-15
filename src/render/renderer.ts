@@ -38,6 +38,7 @@ import {
   FILTRES_ATLAS,
   CONDUITE,
   CONDUITE_ATLAS,
+  dansForme,
 } from '../game/formes'
 import type { Camera } from './camera'
 import { VIE_STRIDE } from './vie'
@@ -103,11 +104,12 @@ export const MAX_LUMIERES = 4
 import { HAUTEUR_BLOCS, HAUTEUR_COQUE } from './hauteurs'
 import {
   LUMIERE_PAR_DEFAUT,
+  RANG_DE_MATIERE,
   directionLumiereMoyenne,
   hauteursPartagees,
   type BoiteVolume,
 } from './volume'
-import { RELIEF_PAROIS_GLSL } from './reliefParois'
+import { RELIEF_PAROIS_GLSL, fractionSommet, pointDuSommet } from './reliefParois'
 import {
   CARREAU_MONDE,
   PROFONDEUR_RELIEF,
@@ -5544,11 +5546,16 @@ uniform vec2 uCanvasSize;
 uniform float uThreshold;
 uniform float uSoftness;
 uniform float uFieldScale;
+// relief allumé, un décalque plaqué sur un mur est posé sur son SOMMET : la
+// part dont ce sommet s'écarte du centre (reliefParois.ts : fractionSommet),
+// 0 au sol. L'eau qui l'efface se lit au PIED, sous le point du dessus.
+uniform float uSommet;
 out vec4 outColor;
 void main() {
   vec4 t = texture(uTexDecal, vUv);
   vec3 c = t.rgb * vec3(0.52, 0.62, 0.72); // refroidi, fondu dans la cuve
-  float field = texture(uField, gl_FragCoord.xy / uCanvasSize).r / uFieldScale;
+  vec2 auPied = 0.5 * uCanvasSize + (gl_FragCoord.xy - 0.5 * uCanvasSize) * (1.0 - uSommet);
+  float field = texture(uField, auPied / uCanvasSize).r / uFieldScale;
   float th = uThreshold;
   float sfn = max(th * uSoftness, 1e-4);
   float fluide = smoothstep(th - sfn, th + sfn, field) * uEfface;
@@ -5801,6 +5808,13 @@ export class Renderer {
   private readonly hauteurScratch = new Float32Array(MAX_BOXES)
   private hauteursBoites: Float32Array = new Float32Array(0)
   private hauteursCle = ''
+  // LE RELIEF DE L'IMAGE EN COURS (render) : ce que drawDecals relit pour
+  // poser un décalque plaqué sur le sommet de son mur
+  private reliefK = 0
+  private zoomRelief = 1
+  private readonly centreRelief: [number, number] = [0, 0]
+  private boitesImage: readonly ObstacleBox[] = []
+  private nBoitesImage = 0
   private readonly rangsScratch: number[] = [] // l'ordre de peinture des boîtes (fonds d'abord)
   private readonly floatField: boolean
   private fieldScale: number
@@ -7023,6 +7037,8 @@ export class Renderer {
     // (celui du solveur, pour la charge du surchauffeur) ; `k` est la case.
     const boxCount = Math.min(boxes.length, MAX_BOXES)
     const rangs = rangsDePeinture(boxes, boxCount, this.rangsScratch)
+    this.boitesImage = boxes
+    this.nBoitesImage = boxCount
     this.boutsCleFaite = false
     this.cleImage = null
     // LES HAUTEURS (volume.ts) : la matière donne le rang, des solides qui se
@@ -7398,13 +7414,17 @@ export class Renderer {
     gl.activeTexture(gl.TEXTURE0)
     // LE SOMMET CACHE AUSSI CE QUI SE PEINT APRÈS (relief allumé). La
     // composition masque le fluide sous les sommets déplacés ; la vie du
-    // corps (motes, lueur des gouttes perdues) se peint après elle,
-    // par-dessus. Le masque lui parvient par la PROFONDEUR de la toile
-    // (gl_FragDepth : 0 sous un sommet, 1 ailleurs) — les 16 unités de
-    // texture de la composition sont prises, elle ne peut écrire aucune
-    // autre image. Relief éteint : le test reste fermé, la profondeur n'est
-    // ni écrite ni lue, rien ne coûte.
+    // corps (motes, lueur des gouttes perdues) et les décalques posés au sol
+    // se peignent après elle, par-dessus. Le masque leur parvient par la
+    // PROFONDEUR de la toile (gl_FragDepth : 0 sous un sommet, 1 ailleurs) —
+    // les 16 unités de texture de la composition sont prises, elle ne peut
+    // écrire aucune autre image. Relief éteint : le test reste fermé, la
+    // profondeur n'est ni écrite ni lue, rien ne coûte.
     const sommetsCachent = relief > 0
+    this.reliefK = relief
+    this.zoomRelief = camera.zoom
+    this.centreRelief[0] = camera.x
+    this.centreRelief[1] = camera.y
     if (sommetsCachent && !decorNet) this.ecritProfondeur(true)
     gl.drawArrays(gl.TRIANGLES, 0, 3)
     this.ecritProfondeur(false)
@@ -7720,12 +7740,24 @@ export class Renderer {
       const hh = d.h * 0.5
       const u0 = d.flip ? uB : uA
       const u1 = d.flip ? uA : uB
+      // LE DÉCALQUE PLAQUÉ SUR UN MUR SUIT SON SOMMET (relief allumé) : posé
+      // sur le dessus, il glisse avec lui — resté au pied, il flottait sur le
+      // flanc. Ses quatre coins passent sur le sommet (pointDuSommet), et
+      // l'eau qui l'efface se lit au pied (uSommet). Un décalque posé au SOL
+      // ne bouge pas : il passe sous les sommets, comme le fluide (le masque
+      // de la composition, dans la profondeur).
+      const hSupport = this.reliefK > 0 ? this.hauteurSousDecal(d.x, d.y) : -1
+      const f = hSupport >= 0 ? fractionSommet(this.reliefK, this.zoomRelief, hSupport) : 0
+      const [cx, cy] = this.centreRelief
+      this.passeSousSommets(this.reliefK > 0 && hSupport < 0)
+      gl.uniform1f(du['uSommet'], f)
       // v inversé : les textures sont chargées avec UNPACK_FLIP_Y
       const q = this.decalScratch
       let o = 0
       const put = (x: number, y: number, u: number, v: number): void => {
-        q[o++] = x
-        q[o++] = y
+        const [sx, sy] = f > 0 ? pointDuSommet(x, y, cx, cy, f) : [x, y]
+        q[o++] = sx
+        q[o++] = sy
         q[o++] = u
         q[o++] = v
       }
@@ -7747,7 +7779,21 @@ export class Renderer {
     if (started) {
       gl.bindVertexArray(null)
       gl.disable(gl.BLEND)
+      this.passeSousSommets(false)
     }
+  }
+
+  /** La hauteur du solide sur lequel est posé le décalque centré en (x, y)
+   *  — le dernier peint, celui qu'on voit — ou −1 s'il est au sol. Seuls
+   *  les solides (ceux qui ont une hauteur, volume.ts) portent un dessus. */
+  private hauteurSousDecal(x: number, y: number): number {
+    for (let k = this.nBoitesImage - 1; k >= 0; k--) {
+      const i = this.rangsScratch[k]
+      const bx = this.boitesImage[i]
+      if (RANG_DE_MATIERE[bx.material] === undefined) continue
+      if (dansForme(bx, x, y)) return this.hauteursBoites[i] ?? 0
+    }
+    return -1
   }
 
   // Les SPRITES de luminaires : des assets générés, dessinés au-dessus de
