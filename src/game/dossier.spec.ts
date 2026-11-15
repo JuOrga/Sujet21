@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import {
   gesteEtat,
@@ -87,5 +88,28 @@ describe('le dossier : la coque en un mot', () => {
     expect(motCoque(-10)).toBe('froide')
     expect(motCoque(-40)).toBe('glaciale')
     expect(motCoque(-60)).toBe('glaciale')
+  })
+})
+
+// LE DOSSIER DE DESCENTE dessine le butin et l'équipement avec les planches
+// de la station : le condensat et la mémoire par l'icône de la cérémonie
+// (une monnaie, un seul dessin), les instruments par leur case rendue. Le
+// dossier vit dans main.ts : la garde le lit en texte (vitest n'a pas de
+// navigateur).
+describe('le dossier montre le butin et l’équipement en icônes rendues', () => {
+  const MAIN = readFileSync(new URL('../main.ts', import.meta.url), 'utf-8')
+  const debut = MAIN.indexOf('\nfunction majDossier(')
+  const corps = MAIN.slice(debut, MAIN.indexOf('\n}\n', debut))
+
+  it('le condensat et la mémoire du butin passent par iconeCeremonieHTML', () => {
+    expect(debut).toBeGreaterThan(-1)
+    expect(corps).toContain("iconeCeremonieHTML('condensat')")
+    expect(corps).toContain("iconeCeremonieHTML('memoire')")
+    expect(corps).not.toContain('iconeMetaHTML(')
+  })
+
+  it('un instrument équipé passe par iconeInstrumentHTML, jamais par son émoji', () => {
+    expect(corps).toContain('iconeInstrumentHTML(d)')
+    expect(corps).not.toMatch(/icone: d\.icone/)
   })
 })

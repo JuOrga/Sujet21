@@ -98,7 +98,7 @@ const { chromium } = require('playwright')
       const geste = await p.evaluate(() => {
         const hote = document.getElementById('mb-cartes')
         if (hote.classList.contains('mb-station')) return 'plan'
-        const suite = hote.querySelector('.mb-continuer')
+        const suite = hote.querySelector('.mb-levier')
         if (suite) return suite.click(), 'suite'
         const bouton = hote.querySelector('button:not([disabled])')
         if (bouton) return bouton.click(), 'choix'

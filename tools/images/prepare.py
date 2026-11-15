@@ -163,6 +163,54 @@ FAMILLES: list[Famille] = [
         qualite=84, poids_max_ko=260,
         note='1600×900 paysage, marge sur les bords (docs/assets-ia.md §11) ; l’alerte rouge y a droit',
     ),
+    # Les planches et objets de la cérémonie « station » (rendus Blender). Elles
+    # passent AVANT « planche de vues » et « décalque » : sans cela, `fin-*`
+    # et `ceremonie-*` tomberaient dans « (inconnue) » — et aucun motif
+    # générique ne les mesurerait comme il faut. Plafonds de chauds : ceux
+    # par défaut ; le lot Blender ajuste les poids quand il les a MESURÉS.
+    Famille(
+        # le plafond, d'après ce qui est MESURÉ (13/11, qualité 82) : les
+        # icônes (3584×2048, 26 cases pleines) 301 Ko, luminance 0,30, 1 % de
+        # chauds (les bandes ocre du danger, la prime du tirage) ; les sceaux
+        # (1536×1024, acier neutre) 70 Ko, luminance 0,27, aucun chaud.
+        'planche de cérémonie', ('ceremonie-icones', 'ceremonie-sceaux'),
+        alpha=True, cote_max=4096, poids_max_ko=400,
+        note='grille de cases carrées de 512² (icônes 7×4, sceaux 3×2) — l’ordre des cases est un contrat avec src/game/iconesStation.ts et ceremonieObjets.ts',
+    ),
+    Famille(
+        # l'anneau de PALIER s'allume quand on le franchit : son or est celui
+        # que la charte réserve aux paliers (§3). Mesuré le 13/11 : 33 % de
+        # pixels chauds (l'intact luit, le brisé garde une braise), 17 Ko.
+        # Dans la planche de cérémonie, il tombait sous le plafond de 15 % des
+        # icônes — qu'on ne relève pas pour elles
+        'anneau de palier', ('ceremonie-anneau',), alpha=True, cote_max=4096, chaud_max=0.40,
+        poids_max_ko=60,
+        note='deux cases de 512² : intact, brisé (ceremonieObjets.ts, ANNEAU_URL)',
+    ),
+    Famille(
+        # mesuré le 13/11 (qualité 82) : 167 Ko, luminance 0,29, 1 % de chauds
+        # (le volant de la vanne de secours, la zone du sur-régime)
+        'planche des instruments', ('instruments-icones',), alpha=True, cote_max=4096,
+        poids_max_ko=250,
+        note='8×4 cases de 256² — l’ordre est ORDRE_INSTRUMENTS (src/game/iconesStation.ts)',
+    ),
+    Famille(
+        # mesuré le 13/11 (qualité 82) : les dos 20 à 21 Ko, les verres 33 Ko
+        # (bonbonne), 61 Ko (colonne), 113 Ko (bocal, le plus large : 880 px)
+        'objet de cérémonie', ('ceremonie-*-dos', 'ceremonie-*-verre'), alpha=True, cote_max=1600,
+        poids_max_ko=160,
+        note='le dos et le verre d’une cuve, le liquide passe entre les deux (ceremonieObjets.ts)',
+    ),
+    Famille(
+        # mesuré le 13/11 (qualité 84) : la capsule 29 Ko, luminance 0,06 ; la
+        # fiole brisée 15 Ko, 0,04 ; aucune des deux n'a de pixel chaud (les
+        # veilleuses ambre de la capsule sont des points) — le plafond de
+        # chauds reprend celui de la charte, l'alerte rouge des cinématiques
+        # n'a rien à faire ici
+        'scène de fin', ('fin-*',), taille=(1600, 900), luma_max=0.50,
+        qualite=84, poids_max_ko=120,
+        note='1600×900 paysage : la capsule bouclée, la fiole brisée',
+    ),
     Famille(
         'planche de vues', ('*-anime', 'meta-eclat', 'meta-icones'), alpha=True, cote_max=4096,
         poids_max_ko=600,
