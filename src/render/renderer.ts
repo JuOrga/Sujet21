@@ -2349,6 +2349,110 @@ float ombreVolume(vec2 world, float dansEau) {
   return clamp(occ, 0.0, 1.0) * (1.0 - dansEau);
 }
 
+// LA MATIÈRE SUR LA TRANCHE (volume des parois, volet 1). Le flanc d'un
+// solide porte la texture de son élément, projetée sur sa face : ft.x le
+// long de l'arête, ft.y la hauteur depuis le pied, en unités monde ; h la
+// hauteur de la boîte ; gx, gy les dérivées d'écran de ft. Le niveau de
+// détail s'écrit à la main : on est dans la boucle des boîtes
+// (gradientBoucles.spec.ts). Une branche par matière solide — la table des
+// hauteurs (volume.ts) en fait la liste, reliefParois.spec.ts la tient. La
+// conduite et la chaudière à pièces n'ont pas de tranche de boîte.
+vec3 matiereFlanc(int mi, float skin, float blendA, vec2 ft, float h, vec2 gx, vec2 gy) {
+  float px = max(max(length(gx), length(gy)), 1e-3);
+  if (mi == 0) {
+    if (skin > 8.5) {
+      // VITRE : la tranche du DORMANT, le cadre d'acier qui tient le verre,
+      // et à mi-hauteur la feuille de verre feuilleté, un filet sombre
+      float filet = 1.0 - smoothstep(0.10, 0.18, abs(ft.y / max(h, 1.0) - 0.5));
+      vec3 metal = vec3(0.115, 0.140, 0.175) * (0.90 + 0.20 * dnoise(ft * 0.09));
+      return mix(metal, vec3(0.05, 0.10, 0.11), filet * 0.8);
+    }
+    if (skin > 0.5 && uHasParoi > 0.5) {
+      // HABILLAGE : sa case de l'atlas, à l'échelle native (420 u)
+      float si = skin - 1.0;
+      vec2 tuile = vec2(mod(si, 4.0), floor(si / 4.0 + 0.001));
+      vec2 uv = (tuile + fract(ft / 420.0)) * vec2(0.25, 0.5);
+      uv.y = 1.0 - uv.y;
+      vec2 k = vec2(0.25, 0.5) / 420.0;
+      return textureGrad(uTexParoi, uv, gx * k, gy * k).rgb * 0.92;
+    }
+    if (skin > 0.5) {
+      // l'atlas pas (encore) là : la tôle des habillages tracés
+      return vec3(0.105, 0.125, 0.155) * (0.85 + 0.30 * dnoise(ft * 0.05));
+    }
+    if (uHasWall > 0.5) {
+      // le MUR : son acier, et la seconde paroi mêlée comme sur le dessus
+      float cW = ${glslFloat(CARREAU_MONDE.wall)};
+      float cA = ${glslFloat(CARREAU_MONDE.wallA)};
+      vec3 c = textureGrad(uTexWall, ft / cW, gx / cW, gy / cW).rgb;
+      if (blendA > 0.0) c = mix(c, textureGrad(uTexWallA, ft / cA, gx / cA, gy / cA).rgb, blendA);
+      return c * 0.95;
+    }
+    return vec3(0.10, 0.13, 0.17) * (0.88 + 0.24 * dnoise(ft * vec2(0.03, 0.30)));
+  }
+  if (mi == 1) {
+    // HYDROPHILE : l'émail mouillé
+    float cH = ${glslFloat(CARREAU_MONDE.phile)};
+    return uHasPhile > 0.5
+      ? textureGrad(uTexPhile, ft / cH, gx / cH, gy / cH).rgb * 0.95
+      : vec3(0.05, 0.16, 0.20);
+  }
+  if (mi == 2) {
+    // HYDROPHOBE : la cire et ses perles
+    float cB = ${glslFloat(CARREAU_MONDE.phobe)};
+    return uHasPhobe > 0.5
+      ? textureGrad(uTexPhobe, ft / cB, gx / cB, gy / cB).rgb * 0.75
+      : vec3(0.16, 0.11, 0.20) + vec3(0.07, 0.035, 0.10) * smoothstep(0.72, 0.95, dnoise(ft * 0.12));
+  }
+  if (mi == 4) {
+    // PLAQUE FROIDE À FORME : la tôle givrée de son dessus
+    float eclat = smoothstep(0.72, 0.94, dnoise(ft * 0.22));
+    return vec3(0.15, 0.21, 0.29) + vec3(0.26, 0.34, 0.40) * eclat * 0.55;
+  }
+  if (mi == 5) {
+    // ÉVENT : le panneau perforé ; sur la tranche, ses trous s'ouvrent sur
+    // le noir du conduit
+    if (uHasGrille > 0.5) {
+      vec3 g = grilleEvent(ft, px);
+      float trou = 1.0 - smoothstep(0.020, 0.075, dot(g, vec3(0.299, 0.587, 0.114)));
+      return g * 1.5 * (1.0 - 0.7 * trou);
+    }
+    vec2 cellUv = fract(ft / 24.0) - 0.5;
+    float trou = 1.0 - smoothstep(0.26, 0.34, max(abs(cellUv.x), abs(cellUv.y)));
+    return vec3(0.17, 0.21, 0.26) * (0.9 + 0.2 * dnoise(ft * 0.15)) * (1.0 - 0.7 * trou);
+  }
+  if (mi == 6) {
+    // CHAUDIÈRE À FORME : ses rayures chaudes — elle LUIT, l'ambre y est permis
+    float stripe = 0.5 + 0.5 * sin((ft.x - uTime * 46.0) * 0.14);
+    return vec3(0.26, 0.11, 0.05) + vec3(0.42, 0.17, 0.04) * smoothstep(0.35, 0.85, stripe);
+  }
+  if (mi == 7) {
+    // MEMBRANE : la trame vert d'eau, et l'eau qui suinte vers le pied
+    float weave = 0.5 + 0.5 * sin(ft.x * 0.42) * sin(ft.y * 0.42);
+    float drip = smoothstep(0.78, 1.0, 0.5 + 0.5 * sin(ft.y * 0.10 + uTime * 1.6 + dnoise(ft * 0.05) * 6.0));
+    return vec3(0.05, 0.20, 0.17) + vec3(0.04, 0.15, 0.12) * weave + vec3(0.03, 0.11, 0.09) * drip;
+  }
+  if (mi == 8) {
+    // RIDEAU : les lanières de PVC givré, vues sur leur tranche
+    float lam = 0.5 + 0.5 * sin(ft.x * 0.55);
+    float fente = smoothstep(0.86, 0.97, lam);
+    return vec3(0.34, 0.46, 0.60) * (0.72 + 0.38 * lam) * (1.0 - 0.5 * fente);
+  }
+  if (mi == 9) {
+    // SURCHAUFFEUR À FORME : l'acier de la borne
+    return vec3(0.10, 0.13, 0.17) * (0.9 + 0.2 * dnoise(ft * 0.14));
+  }
+  if (mi == 10) {
+    // MIROIR : la tranche de la plaque polie, froide, presque blanche, et
+    // ses stries de polissage (l'ambre d'avant était celui du surchauffeur)
+    float ciel = 0.5 + 0.5 * sin(ft.x * 0.012);
+    vec3 base = mix(vec3(0.34, 0.40, 0.48), vec3(0.58, 0.66, 0.76), ciel);
+    base *= 0.86 + 0.14 * dnoise(ft * 0.021);
+    return base + vec3(0.05) * smoothstep(0.80, 1.0, 0.5 + 0.5 * sin(ft.x * 0.55));
+  }
+  return vec3(0.0);
+}
+
 void main() {
   // la profondeur dit à la passe de vie où le sol est caché par un sommet
   // (relief allumé) : rien de caché par défaut, sorties anticipées comprises
@@ -2896,6 +3000,7 @@ void main() {
     vec2 wS = world;
     vec2 relB = vec2(0.0);
     float flanc = 0.0;
+    float htFlanc = 0.0; // la hauteur vue sur la tranche : 0 au pied, 1 au sommet
     // LE SOL QUE CE SOMMET CACHE (reliefParois.ts : solCache) : du côté où il
     // déborde le pied, le sol est dessous — et derrière une face latérale vue
     // de biais aussi. L'aura, les ombres au sol de la boîte et le fluide ne
@@ -2922,7 +3027,16 @@ void main() {
       if (dV > 0.0) {
         if (d <= 0.0) {
           flanc = 1.0; // sur la base, sous le vide : pleine tranche
+          // le chemin du pied au sommet coupe la base ici et le sommet à son
+          // bord : la hauteur vue est la part du chemin, mesurée par les DEUX
+          // SDF — fiable sur toutes les faces, verticales comprises
+          htFlanc = clamp(-d / max(dV - d, 1e-3), 0.0, 1.0);
         } else {
+          // hors de la base (une face latérale vue de biais, une paroi plus
+          // mince que le déplacement) : la hauteur vue est le DERNIER passage
+          // du dedans au dehors le long du chemin pied → sommet (avant, elle
+          // restait à 0 : toute la tranche à la couleur du pied)
+          float dP = d;
           for (int fs = 1; fs <= 3; fs++) {
             vec2 wM = world - relB * (float(fs) / 4.0);
             vec2 wbM = wM;
@@ -2932,7 +3046,10 @@ void main() {
             }
             float dM = dec.y > 0.5 ? formeSdf(wbM, uBoxes[bi], dec.y, dec.z, dec.w) : boxSdf(wbM, uBoxes[bi]);
             flanc = max(flanc, 1.0 - smoothstep(-1.0, 1.5, dM));
+            if (dP <= 0.0 && dM > 0.0) htFlanc = (float(fs) - 1.0 + dP / (dP - dM)) / 4.0;
+            dP = dM;
           }
+          if (dP <= 0.0) htFlanc = (3.0 + dP / (dP - dV)) / 4.0;
         }
       }
       // (les pièces n'en sont pas : leur dessus est leur IMAGE, le sol caché
@@ -2994,55 +3111,41 @@ void main() {
       col = mix(col, col * vec3(0.50, 0.56, 0.70), ombreCourte * 0.65);
       col *= 1.0 - 0.45 * contact;
     }
-    // ——— LE FLANC : la tranche du solide, PLEINE et teintée matériau ————
-    // Opaque (fini le voile fantôme), sombre au pied, franche vers le
-    // sommet, strates et chant clair — chaque matériau garde son identité
-    // sur sa tranche : turquoise mouillé, violet cireux, vert de membrane,
-    // ambre de borne… Le sommet (déplacé) se peint ensuite par-dessus.
+    // ——— LE FLANC : la tranche du solide, PLEINE, dans SA matière ————————
+    // Opaque, sombre au pied, franche vers le sommet. La tranche porte la
+    // texture de son élément (matiereFlanc) : l'acier du mur, l'émail de
+    // l'hydrophile, la cire de l'hydrophobe, la case d'habillage, la trame de
+    // la membrane… Ce n'étaient que des teintes calculées par matière, avec
+    // des strates, des joints et des rivets peints : la tranche ne se lisait
+    // pas comme le même objet que son dessus. Le sommet (déplacé) se peint
+    // ensuite par-dessus.
     if (flanc > 0.003 && !aPieces) { // la conduite et la chaudière n'ont pas de tranche de boîte
       vec2 gB = gradSdfBoite(bi, wb, d, dec, bca, bsa);
       float gn2 = max(length(gB), 1e-5);
       vec2 nrm = gB / gn2;
-      // la hauteur RÉELLE le long de la tranche : 0 au pied (la silhouette
-      // de la base), 1 au sommet (le bord du dessus déplacé) — mesurée par
-      // les DEUX SDF, fiable sur toutes les faces, verticales comprises
-      // (l'ancienne formule laissait ht à zéro sur toute la tranche : le
-      // pied sombre partout, la couleur du matériau jamais atteinte)
-      float ht = clamp(-d / max(dV - d, 1e-3), 0.0, 1.0);
-      float u = dot(wbV, vec2(-nrm.y, nrm.x));
-      vec3 basC; vec3 hautC;
-      if (mat < 0.5)      { basC = vec3(0.055, 0.070, 0.090); hautC = vec3(0.17, 0.21, 0.26); }
-      else if (mat < 1.5) { basC = vec3(0.030, 0.095, 0.110); hautC = vec3(0.10, 0.40, 0.44); }
-      else if (mat < 2.5) { basC = vec3(0.090, 0.055, 0.120); hautC = vec3(0.34, 0.20, 0.48); }
-      else if (mat < 4.5) { basC = vec3(0.080, 0.115, 0.150); hautC = vec3(0.36, 0.50, 0.62); }
-      else if (mat < 5.5) { basC = vec3(0.075, 0.095, 0.120); hautC = vec3(0.24, 0.30, 0.36); }
-      else if (mat < 6.5) { basC = vec3(0.140, 0.070, 0.035); hautC = vec3(0.50, 0.22, 0.08); }
-      else if (mat < 7.5) { basC = vec3(0.030, 0.100, 0.080); hautC = vec3(0.10, 0.32, 0.26); }
-      else if (mat < 8.5) { basC = vec3(0.100, 0.130, 0.175); hautC = vec3(0.32, 0.42, 0.55); }
-      else                { basC = vec3(0.130, 0.105, 0.060); hautC = vec3(0.46, 0.36, 0.17); }
-      vec3 fc = mix(basC, hautC, sqrt(ht)); // la couleur monte vite : la tranche EST le matériau
-      // strates horizontales : la tranche a des couches, pas un aplat
-      fc *= 0.92 + 0.08 * sin(ht * 18.0);
-      // joints verticaux réguliers — et des rivets sur les parois neutres
-      float ju = fract(u / 96.0);
-      float joint = 1.0 - smoothstep(0.015, 0.05, min(ju, 1.0 - ju));
-      fc *= 1.0 - 0.30 * joint;
-      if (mat < 0.5) {
-        float riv = smoothstep(0.93, 0.99, cos(u * 0.196)) *
-                    smoothstep(0.10, 0.22, abs(ht - 0.5));
-        fc += vec3(0.05, 0.06, 0.07) * riv;
-      }
-      // chant clair sous le sommet : l'arête haute attrape la lumière
-      fc += hautC * 0.55 * smoothstep(0.82, 0.97, ht);
+      vec2 tng = vec2(-nrm.y, nrm.x);
+      // LA PROJECTION : l'abscisse le long de l'arête (au pied, pour que les
+      // verticales de la texture restent verticales sur la face), l'ordonnée
+      // la hauteur depuis le pied, en unités monde — la face est vue de biais,
+      // sa hauteur se tasse dans la largeur du flanc. Le niveau de détail
+      // suit ce tassement (textureGrad, à la main : on est dans la boucle).
+      float hB = hauteurBoite(bi);
+      vec2 ft = vec2(dot(world - relB * htFlanc, tng), htFlanc * hB);
+      float tasse = hB / max(abs(dot(relB, nrm)), pxMonde);
+      vec2 gxF = vec2(tng.x, nrm.x * tasse) * pxMonde;
+      vec2 gyF = vec2(tng.y, nrm.y * tasse) * pxMonde;
+      vec3 fc = matiereFlanc(int(mat + 0.5), uBoxAux[bi].z, blendWallA, ft, hB, gxF, gyF);
+      // sombre au pied (le sol et le voisin y renvoient peu), franche en haut,
+      // et le chant clair sous le sommet : l'arête haute attrape la lumière
+      fc *= mix(0.42, 1.0, sqrt(htFlanc));
+      fc += fc * 0.45 * smoothstep(0.82, 0.97, htFlanc);
       // LA TRANCHE REGARDE LA LAMPE. C'est une face verticale : celle qui
       // fait face à la source s'allume, celle qui lui tourne le dos plonge
-      // — chant compris. Sans ça, le flanc éclairé était toujours le même,
-      // quelle que soit la position des lampes, et le volume ne tournait
-      // pas avec la lumière.
-      if (uLumiere > 0.5) {
-        float face = dot(nrm, lampeDir);
-        fc *= mix(0.52, 1.15, 0.5 + 0.5 * face) * eclMat;
-      }
+      // — chant compris. Lumière éteinte, lampeDir est la direction par
+      // défaut (le haut de l'écran) : la tranche garde son modelé, comme le
+      // chanfrein du dessus.
+      float face = dot(nrm, lampeDir);
+      fc *= mix(0.52, 1.15, 0.5 + 0.5 * face) * eclMat;
       col = mix(col, fc, flanc);
     }
     if (mat < 2.5) {

@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { HAUTEUR_BLOCS } from './hauteurs'
-import { HAUTEUR_DE_RANG } from './volume'
+import { HAUTEUR_DE_RANG, RANG_DE_MATIERE } from './volume'
 import {
   facteurRelief,
   solCache,
@@ -30,11 +30,17 @@ const couverture = entre('// ——— LA COUVERTURE', '// LA LUMIÈRE SUR LE DE
 const lumiereToit = entre('// LA LUMIÈRE SUR LE DESSUS', '// ——— RELIEF 2.5D', debutCompo)
 const boucle = entre('// ——— RELIEF 2.5D', "// L'OMBRE COURTE SUR LES TOITS", debutCompo)
 const epaisseur = entre("// ——— L'ÉPAISSEUR", '// ——— LE FLANC', debutCompo)
+const flanc = entre('// ——— LE FLANC', 'if (mat < 2.5) {', debutCompo)
+const matiereFlanc = entre('vec3 matiereFlanc(', '\n}\n', debutCompo)
 const drawVie = entre('private drawVie(', '\n  }\n')
 const rendu = entre('// Passe B — composition', '// Passe C — cellules')
 const decorNet = entre('private drawDecorNet(', '\n  }\n')
 const passeSous = entre('private passeSousSommets(', '\n  }\n')
 const ecrit = entre('private ecritProfondeur(', '\n  }\n')
+
+// les matières SOLIDES, d'après la table des hauteurs (volume.ts) : tout ce
+// qui a un rang a un corps
+const SOLIDES = Object.keys(RANG_DE_MATIERE).map(Number)
 
 describe('les règles pures du relief', () => {
   it('le sommet s’écarte selon la hauteur : un mur haut garde son flanc, une plaque basse en a un court', () => {
@@ -164,6 +170,37 @@ describe('le shader : le fluide passe sous les sommets', () => {
     expect(passeSous).toContain('gl.disable(gl.DEPTH_TEST)')
     // écrire : chaque pixel de la composition pose sa profondeur
     expect(ecrit).toContain('gl.depthFunc(gl.ALWAYS)')
+  })
+})
+
+describe('le shader : chaque flanc porte sa matière', () => {
+  it('chaque matière solide hors pièces a sa branche de flanc', () => {
+    expect(SOLIDES.length).toBeGreaterThanOrEqual(10)
+    for (const m of SOLIDES) expect(matiereFlanc, `mat ${m}`).toMatch(new RegExp(`\\bmi == ${m}\\b`))
+    // le sas, le vide et la baie n'ont pas de corps
+    for (const m of [3, 11, 12]) expect(matiereFlanc).not.toMatch(new RegExp(`\\bmi == ${m}\\b`))
+  })
+
+  it('la tranche lit la texture de la matière, projetée sur l’arête et la hauteur', () => {
+    expect(flanc).toContain('matiereFlanc(')
+    // les teintes calculées d'avant (bas et haut de tranche par matière) sont parties
+    expect(flanc).not.toContain('basC')
+    expect(flanc).not.toContain('hautC')
+    for (const tex of ['uTexWall', 'uTexWallA', 'uTexPhile', 'uTexPhobe', 'uTexParoi']) {
+      expect(matiereFlanc).toMatch(new RegExp(`textureGrad\\(${tex},`))
+    }
+    // l'abscisse le long de l'arête, l'ordonnée la hauteur depuis le pied
+    expect(flanc).toMatch(/vec2 ft = vec2\(/)
+    expect(flanc).toContain('float hB = hauteurBoite(bi);')
+    expect(flanc).toContain('htFlanc * hB')
+  })
+
+  it('assombrie au pied, éclairée par la lumière (la direction par défaut lumière éteinte)', () => {
+    expect(flanc).toMatch(/dot\(nrm, lampeDir\)/)
+    // la tranche regarde la lampe même lumière éteinte : lampeDir y vaut la
+    // direction par défaut — plus de garde uLumiere autour
+    expect(flanc).not.toContain('if (uLumiere > 0.5)')
+    expect(flanc).toMatch(/mix\([0-9.]+, 1\.0, sqrt\(htFlanc\)\)/)
   })
 })
 
