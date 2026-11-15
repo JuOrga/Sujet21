@@ -193,8 +193,9 @@ se déplace.
   dépôt (`src/bench`, `ops/LISEZ-MOI.md`, gâchette `perf-sync-go`). La cible
   est un surcoût du rendu du tableau d'au plus 10 % sur la référence mesurée.
   Le concepteur juge le Deck sur l'aperçu. Aucun nouveau réglage n'est créé, sauf
-  si la mesure le rend nécessaire : les volets 2 et 4 sont toujours actifs, le
-  volet 3 suit le réglage « Lumière », le volet 1 suit « Relief ».
+  si la mesure le rend nécessaire : les volets 2, 3 et 4 sont toujours actifs
+  (le volet 3 ne suit pas « Lumière » : voir le choix de l'orchestrateur du
+  15/11), le volet 1 suit « Relief ».
 - **La vérification visuelle est le point dur.** Le jeu demande WebGL2 et les
   captures sans tête sortent blanches. Une piste notée sur ce poste : le
   renderer a `preserveDrawingBuffer: true`, et on peut recopier le canvas WebGL
@@ -217,6 +218,17 @@ se déplace.
   commits par volet.
 - Relief allumé : les décalques suivent le sommet, les étiquettes et les éponges
   ne bougent pas.
+- **Le volet 3 reste actif « Lumière » coupé** (15/11, relecture finale). La
+  première version de cette conception le faisait suivre le réglage ; le code
+  l'a gardé actif, éclairé par la direction par défaut, et ce choix est
+  maintenu. Raison : les surfaces sont re-rendues sous une lumière neutre ;
+  sans leur relief, elles redeviendraient plates et grises sur le chemin de
+  secours, celui des machines modestes (anti-objectif ci-dessus, et point de
+  vigilance 2 du plan : « le volume tient » lumière éteinte). Coupé, le
+  réglage éteint donc les lampes (carte, halos, lumière des dessus), pas le
+  volume, qui reste éclairé par le haut ; son texte au joueur le dit. Si la
+  mesure de cadence lumière coupée montre un surcoût, la décision se reprend :
+  le couper tient en `&& uLumiere > 0.5` dans les quatre gardes du relief.
 
 ## Ce qui reste au constructeur
 

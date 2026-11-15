@@ -16,6 +16,7 @@ import {
   pasRelief,
   penteRelief,
 } from './surfacesSculptees'
+import { occurrencesDans } from './blocsSource'
 
 // LES SURFACES SCULPTÉES PAR LES LAMPES (volet 3 du volume des parois) : le
 // relief rangé dans l'alpha des surfaces (assets-ia §37) éclaire leur dessus.
@@ -165,6 +166,25 @@ describe('le shader lit le relief dans l’alpha (composition)', () => {
     expect(remplissage).toMatch(/lumiereRelief\([^;]*lampeDir/)
     // l'atlas pivote avec sa boîte : la lumière passe dans son repère local
     expect(remplissage).toMatch(/lumiereRelief\([^;]*lumLoc/)
+  })
+
+  it('« Lumière » coupé, le relief des surfaces reste, éclairé par le haut (choix du 15/11)', () => {
+    // Le couper rendrait plates les surfaces re-rendues sous lumière neutre
+    // sur le chemin de secours (conception : anti-objectif « plates et
+    // grises », vigilance 2 « le volume tient »). Rien, dans le remplissage
+    // des dessus, ne lit uLumiere — ni une garde, ni un ternaire autour d'un
+    // appel — et aucun bloc qui contient un appel ne dépend de lui.
+    expect(remplissage).not.toContain('uLumiere')
+    const appels = occurrencesDans(compose, 'lumiereRelief(').filter(
+      (a) => a.position > debutRemplissage && a.position < debutRemplissage + remplissage.length,
+    )
+    expect(appels.length).toBeGreaterThanOrEqual(4)
+    for (const a of appels) expect(a.entetes.filter((e) => e.includes('uLumiere'))).toEqual([])
+    // et la direction par défaut sculpte : une pente vers le haut de l'écran
+    // prend la lumière, la pente opposée l'ombre
+    const versLeHaut = penteRelief(0.4, 0.4, 0.45, 0.0084, 230, 0.5)
+    const versLeBas = penteRelief(0.4, 0.4, 0.35, 0.0084, 230, 0.5)
+    expect(lumiereRelief(versLeHaut, LUMIERE_PAR_DEFAUT)).not.toBeCloseTo(lumiereRelief(versLeBas, LUMIERE_PAR_DEFAUT), 2)
   })
 
   it('le relief ne se paie que sur le dessus (fill > 0), pas sur tout pixel proche', () => {

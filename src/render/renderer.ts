@@ -1074,8 +1074,13 @@ uniform vec3 uHasZones; // x buses (eau), y hublot (glace), z conduite (vapeur)
 uniform float uHasPlafond; // calque 3 du tableau de zones : le plafond du reflet
 // Éclairage de la pièce : carte de lumière PRÉCALCULÉE en espace monde
 // (visibilité × retombée, recalculée au changement de décor seulement) —
-// le coût par image se réduit à une lecture de texture. uLumiere la
-// débranche entièrement (bouton PARAMÈTRES, comme uDecor/uEau).
+// le coût par image se réduit à une lecture de texture. uLumiere débranche
+// les LAMPES (bouton PARAMÈTRES, comme uDecor/uEau) : la carte, leur halo,
+// leur lumière sur les dessus et sur le fluide. Pas le volume : le chanfrein, l'ombre courte,
+// la tranche et le relief des surfaces restent, éclairés par la direction
+// par défaut (uLumiereDefaut) — coupé, c'est le réglage de secours, et des
+// surfaces re-rendues sous lumière neutre y deviendraient plates (choix de
+// l'orchestrateur du 15/11, conception du volume des parois).
 uniform float uLumiere;
 // La direction VERS la lumière quand uLumiere est éteint (volume.ts :
 // LUMIERE_PAR_DEFAUT, le haut de l'écran) : le chanfrein et l'ombre courte
