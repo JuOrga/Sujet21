@@ -19,6 +19,7 @@
 // qui les aurait posés.
 //
 // Variables :
+//   BANC_PLAYWRIGHT=…     le paquet Playwright à emprunter (voir plus bas) ;
 //   BANC_TAILLE=640x400   la taille de la page (le rendu logiciel paie au pixel :
 //                         320 × 200 tient ~2 images/s, 640 × 400 reste lisible) ;
 //   BANC_ATTENTE=6000     ms entre le chargement et la capture (la caméra pilote
@@ -54,8 +55,12 @@
 // comparer (`-ecran.png`).
 //
 // Le dépôt n'a pas Playwright : le banc emprunte celui d'un autre projet de la
-// machine (même chemin que les autres bancs).
-const { chromium } = require('/home/julian/projets/PasMoi/node_modules/playwright-core')
+// machine — BANC_PLAYWRIGHT s'il est posé (le chemin d'un paquet `playwright`
+// ou `playwright-core`), sinon celui du poste où le banc est né. Les autres
+// bancs (tools/banc-module2d, tools/ceremonie) font `require('playwright')` :
+// eux l'attendent résolu depuis le dépôt.
+const PLAYWRIGHT = process.env.BANC_PLAYWRIGHT || '/home/julian/projets/PasMoi/node_modules/playwright-core'
+const { chromium } = require(PLAYWRIGHT)
 const fs = require('fs')
 const path = require('path')
 
