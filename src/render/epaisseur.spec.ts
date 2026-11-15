@@ -71,7 +71,7 @@ describe("l'épaisseur des solides dans la composition", () => {
     // seulement hors de la boîte, là où elle a une longueur (sous un voisin
     // aussi haut, rien), et à sa portée (ombreCourtePeutPorter) : ailleurs,
     // ses SDF ne se paient pas
-    expect(bloc).toMatch(/if \(ombreCourtePeutPorter\(dR, lO, dec\.y\)\) \{[^}]*sdfBoiteLocal/)
+    expect(bloc).toMatch(/if \(ombreCourtePeutPorter\(d, lO, dec\.y\)\) \{[^}]*sdfBoiteLocal/)
     expect(source).toContain('${OMBRE_PORTEE_GLSL}')
     // une paroi plus mince que la moitié de l'ombre passerait entre deux
     // échantillons : un troisième, au quart
@@ -151,23 +151,14 @@ describe("l'épaisseur des solides dans la composition", () => {
     expect(OMBRE_PORTEE_GLSL).toContain('d < lO + 12.0')
   })
 
-  it("relief allumé, l'ombre sur le toit d'un voisin plus bas suit le sommet de ce toit", () => {
-    // le pixel montre le point de la BASE du toit que son sommet a fait
-    // glisser (sa part du déplacement) : l'ombre se lit là, comme toitVis
-    // (pToit) — lue au sol, elle se décalait d'autant sur le toit
-    const glisse = blocApres(bloc, 'if (uRelief > 0.0 && hRecoit > 0.0) {')
-    expect(glisse).toContain('vec2 dep = relDisp * facteurRelief(hRecoit);')
-    expect(glisse).toContain('wbO = wb - vec2(bca * dep.x + bsa * dep.y, -bsa * dep.x + bca * dep.y);')
-    expect(glisse).toContain('dR = sdfBoiteLocal(bi, wbO, dec);')
-    // relief éteint (ou au sol), le point est celui d'avant
-    expect(bloc).toContain('vec2 wbO = wb;')
-    expect(bloc).toContain('float dR = d;')
-    // la portée, les trois échantillons et le fondu se lisent à ce point
-    expect(bloc).toContain('if (ombreCourtePeutPorter(dR, lO, dec.y)) {')
-    for (const t of ['0.25', '0.5']) expect(bloc).toContain(`sdfBoiteLocal(bi, wbO + lLoc * ${t}, dec)`)
-    expect(bloc).toContain('sdfBoiteLocal(bi, wbO + lLoc, dec)')
-    expect(bloc).toContain('smoothstep(0.0, lO + OMBRE_COURTE_FLOU, dR)')
-    expect(bloc).not.toMatch(/sdfBoiteLocal\(bi, wb \+ lLoc/)
+  it("l'épaisseur ne porte aucune branche du relief : relief éteint, elle ne paie rien de lui", () => {
+    // Au banc logiciel, une branche relief jamais prise relief éteint se
+    // paie quand même (le code du relief retiré de la boucle : −20 % par
+    // image). Le recalage de l'ombre courte sur un toit bas, relief allumé
+    // (relecture finale, mineur 8), y a été essayé puis retiré : c'est une
+    // limite écrite, au-dessus de la portée de l'ombre.
+    expect(bloc).not.toContain('uRelief')
+    expect(bloc).toContain('LIMITE CONNUE (relief allumé, relecture finale, mineur 8)')
   })
 
   it("l'ombre courte ne double pas la carte cuite", () => {

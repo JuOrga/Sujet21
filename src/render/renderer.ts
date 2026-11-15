@@ -3167,21 +3167,16 @@ void main() {
       // haut, lO s'annule et ses SDF ne se paient pas ; dedans non plus.
       float hRecoit = (iCouv >= 0 && iCouv != bi && dCouv < 0.0) ? hauteurBoite(iCouv) : 0.0;
       float lO = OMBRE_COURTE_PAR_HAUTEUR * max(hauteurBoite(bi) - hRecoit, 0.0);
-      // LE POINT QUI REÇOIT l'ombre : le sol, ici. Relief allumé, sur le
+      // LIMITE CONNUE (relief allumé, relecture finale, mineur 8) : sur le
       // TOIT d'un voisin plus bas, ce pixel montre un point de la base de ce
-      // toit, que son sommet a fait glisser de sa part du déplacement :
-      // l'ombre se lit là (comme toitVis, à pToit) — lue au sol, son motif se
-      // décalait d'autant sur le toit (relecture finale, mineur 8). Dans la
-      // bande d'un pixel au bord du toit, l'ombre au sol suit ce même point.
-      // Relief éteint, c'est le point d'avant, et rien ne se paie.
-      vec2 wbO = wb;
-      float dR = d;
-      if (uRelief > 0.0 && hRecoit > 0.0) {
-        vec2 dep = relDisp * facteurRelief(hRecoit);
-        wbO = wb - vec2(bca * dep.x + bsa * dep.y, -bsa * dep.x + bca * dep.y);
-        dR = sdfBoiteLocal(bi, wbO, dec);
-      }
-      if (ombreCourtePeutPorter(dR, lO, dec.y)) {
+      // toit que son sommet a fait glisser ; l'ombre, elle, se lit ici, au
+      // sol — son motif est décalé sur le toit de la part du déplacement de
+      // ce toit. La relire à ce point (comme toitVis à pToit) coûte une
+      // branche relief de plus dans la boucle des boîtes ; au banc logiciel,
+      // même jamais prise, une telle branche se paie relief éteint (le code
+      // du relief retiré : −20 % ; ce bloc seul : +3 % ± 6 %, non établi).
+      // Gardé ici tant que la cadence par défaut prime.
+      if (ombreCourtePeutPorter(d, lO, dec.y)) {
         // depuis ce point du sol, on remonte VERS la lumière : si le chemin
         // croise la boîte, le point est dans son ombre. Trois échantillons
         // (le quart, la moitié, le bout) : une paroi plus mince que le pas
@@ -3189,11 +3184,11 @@ void main() {
         vec2 versLum = lampeDir * lO;
         // (le monde pivote dans le repère de la boîte, comme wb)
         vec2 lLoc = vec2(bca * versLum.x + bsa * versLum.y, -bsa * versLum.x + bca * versLum.y);
-        float dO = min(sdfBoiteLocal(bi, wbO + lLoc * 0.25, dec),
-                       min(sdfBoiteLocal(bi, wbO + lLoc * 0.5, dec), sdfBoiteLocal(bi, wbO + lLoc, dec)));
+        float dO = min(sdfBoiteLocal(bi, wb + lLoc * 0.25, dec),
+                       min(sdfBoiteLocal(bi, wb + lLoc * 0.5, dec), sdfBoiteLocal(bi, wb + lLoc, dec)));
         float o = 1.0 - smoothstep(0.0, OMBRE_COURTE_FLOU, dO);
         // dense au pied, elle s'éclaircit en s'éloignant
-        o *= 1.0 - 0.5 * smoothstep(0.0, lO + OMBRE_COURTE_FLOU, dR);
+        o *= 1.0 - 0.5 * smoothstep(0.0, lO + OMBRE_COURTE_FLOU, d);
         // au sol : dans l'ombre cuite, elle s'efface un peu — jamais sous les
         // trois quarts : à 0,4, le sol ombré sortait PLUS CLAIR qu'avec
         // l'ancien halo
