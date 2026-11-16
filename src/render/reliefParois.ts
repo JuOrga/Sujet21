@@ -184,6 +184,87 @@ export function flancBalaye(
   return [d, t]
 }
 
+/** LE FLANC D'UN TRIANGLE, BALAYÉ EXACTEMENT — le COIN, la moitié d'une
+ *  boîte (formes.ts). Le même contrat que flancBalaye : [distance signée au
+ *  balayage, hauteur vue], `tri` = ax, ay, bx, by, cx, cy dans le repère de
+ *  la boîte, dans un sens ou dans l'autre.
+ *  POURQUOI : les formes gardaient les cinq copies ; le sommet de la tranche
+ *  d'un triangle hydrophobe sortait en dents de scie (le concepteur, 16/11).
+ *  Un triangle est convexe : chaque arête borne l'intervalle des t d'un côté
+ *  (p − t·r reste de son côté intérieur), comme les tranches de la boîte.
+ *  Dehors, la distance d'un segment à un triangle qu'il ne coupe pas : ses
+ *  deux bouts aux trois arêtes, les trois sommets au segment. */
+export function flancBalayeTriangle(
+  px: number,
+  py: number,
+  tri: readonly number[],
+  rx: number,
+  ry: number,
+): [number, number] {
+  const V = [
+    [tri[0], tri[1]],
+    [tri[2], tri[3]],
+    [tri[4], tri[5]],
+  ]
+  const sens =
+    (V[1][0] - V[0][0]) * (V[2][1] - V[0][1]) - (V[1][1] - V[0][1]) * (V[2][0] - V[0][0]) < 0 ? -1 : 1
+  // la normale SORTANTE de l'arête i → i + 1
+  const normale = (i: number): [number, number] => {
+    const j = (i + 1) % 3
+    return [sens * (V[j][1] - V[i][1]), -sens * (V[j][0] - V[i][0])]
+  }
+  let t0 = 0
+  let t1 = 1
+  for (let i = 0; i < 3; i++) {
+    const [nx, ny] = normale(i)
+    const a = nx * (px - V[i][0]) + ny * (py - V[i][1])
+    const q = nx * rx + ny * ry
+    if (Math.abs(q) < 1e-6) {
+      if (a > 0) t0 = 2
+    } else if (q > 0) t0 = Math.max(t0, a / q)
+    else t1 = Math.min(t1, a / q)
+  }
+  if (t0 <= t1) {
+    const tm = 0.5 * (t0 + t1)
+    let fond = Infinity
+    for (let i = 0; i < 3; i++) {
+      const [nx, ny] = normale(i)
+      const l = Math.max(Math.hypot(nx, ny), 1e-6)
+      fond = Math.min(fond, -(nx * (px - tm * rx - V[i][0]) + ny * (py - tm * ry - V[i][1])) / l)
+    }
+    return [-Math.max(fond, 0), t1]
+  }
+  const segment = (x: number, y: number, i: number): number => {
+    const j = (i + 1) % 3
+    const ex = V[j][0] - V[i][0]
+    const ey = V[j][1] - V[i][1]
+    const u = Math.min(Math.max(((x - V[i][0]) * ex + (y - V[i][1]) * ey) / Math.max(ex * ex + ey * ey, 1e-6), 0), 1)
+    return Math.hypot(x - V[i][0] - u * ex, y - V[i][1] - u * ey)
+  }
+  let d = Infinity
+  let t = 0
+  const rr = Math.max(rx * rx + ry * ry, 1e-6)
+  for (let i = 0; i < 3; i++) {
+    const dA = segment(px, py, i)
+    if (dA < d) {
+      d = dA
+      t = 0
+    }
+    const dB = segment(px - rx, py - ry, i)
+    if (dB < d) {
+      d = dB
+      t = 1
+    }
+    const tc = Math.min(Math.max(((px - V[i][0]) * rx + (py - V[i][1]) * ry) / rr, 0), 1)
+    const dc = Math.hypot(px - tc * rx - V[i][0], py - tc * ry - V[i][1])
+    if (dc < d) {
+      d = dc
+      t = tc
+    }
+  }
+  return [d, t]
+}
+
 type PointMonde = { x: number; y: number }
 type RectMonde = { minX: number; minY: number; maxX: number; maxY: number }
 
@@ -276,6 +357,65 @@ vec2 flancBalaye(vec2 p, vec4 b, vec2 r) {
     if (dc < d) { d = dc; t = tc; }
   }
   return vec2(d, t);
+}
+// le flanc d'un triangle, balayé exactement (flancBalayeTriangle,
+// reliefParois.ts) — et celui du COIN d'une boîte (q0 : l'angle droit, les
+// mêmes sommets que formeSdf)
+float segmentFlanc(vec2 p, vec2 a, vec2 b) {
+  vec2 e = b - a;
+  return length(p - a - e * clamp(dot(p - a, e) / max(dot(e, e), 1e-6), 0.0, 1.0));
+}
+vec2 flancBalayeTriangle(vec2 p, vec2 A, vec2 B, vec2 C, vec2 r) {
+  float sens = (B.x - A.x) * (C.y - A.y) - (B.y - A.y) * (C.x - A.x) < 0.0 ? -1.0 : 1.0;
+  float t0 = 0.0;
+  float t1 = 1.0;
+  for (int i = 0; i < 3; i++) {
+    vec2 Vi = i == 0 ? A : (i == 1 ? B : C);
+    vec2 Vj = i == 0 ? B : (i == 1 ? C : A);
+    vec2 n = sens * vec2(Vj.y - Vi.y, Vi.x - Vj.x);
+    float a = dot(n, p - Vi);
+    float q = dot(n, r);
+    if (abs(q) < 1e-6) {
+      if (a > 0.0) t0 = 2.0;
+    } else if (q > 0.0) t0 = max(t0, a / q);
+    else t1 = min(t1, a / q);
+  }
+  if (t0 <= t1) {
+    vec2 m = p - 0.5 * (t0 + t1) * r;
+    float fond = 1.0e9;
+    for (int i = 0; i < 3; i++) {
+      vec2 Vi = i == 0 ? A : (i == 1 ? B : C);
+      vec2 Vj = i == 0 ? B : (i == 1 ? C : A);
+      vec2 n = sens * vec2(Vj.y - Vi.y, Vi.x - Vj.x);
+      fond = min(fond, -dot(n, m - Vi) / max(length(n), 1e-6));
+    }
+    return vec2(-max(fond, 0.0), t1);
+  }
+  float d = 1.0e9;
+  float t = 0.0;
+  float rr = max(dot(r, r), 1e-6);
+  for (int i = 0; i < 3; i++) {
+    vec2 Vi = i == 0 ? A : (i == 1 ? B : C);
+    vec2 Vj = i == 0 ? B : (i == 1 ? C : A);
+    float dA = segmentFlanc(p, Vi, Vj);
+    if (dA < d) { d = dA; t = 0.0; }
+    float dB = segmentFlanc(p - r, Vi, Vj);
+    if (dB < d) { d = dB; t = 1.0; }
+    float tc = clamp(dot(p - Vi, r) / rr, 0.0, 1.0);
+    float dc = length(p - tc * r - Vi);
+    if (dc < d) { d = dc; t = tc; }
+  }
+  return vec2(d, t);
+}
+vec2 flancBalayeCoin(vec2 p, vec4 b, float q0, vec2 r) {
+  vec2 c = (b.xy + b.zw) * 0.5;
+  vec2 h = (b.zw - b.xy) * 0.5;
+  vec2 A; vec2 B; vec2 C;
+  if (q0 < 0.5)      { A = vec2(-h.x, -h.y); B = vec2( h.x, -h.y); C = vec2(-h.x,  h.y); }
+  else if (q0 < 1.5) { A = vec2( h.x, -h.y); B = vec2( h.x,  h.y); C = vec2(-h.x, -h.y); }
+  else if (q0 < 2.5) { A = vec2( h.x,  h.y); B = vec2(-h.x,  h.y); C = vec2( h.x, -h.y); }
+  else               { A = vec2(-h.x,  h.y); B = vec2(-h.x, -h.y); C = vec2( h.x,  h.y); }
+  return flancBalayeTriangle(p, c + A, c + B, c + C, r);
 }
 float solCache(float relief, float d, float dV, float flanc, float w) {
   return solCache(relief, d, dV, flanc, w, 1.0, 0.0);
