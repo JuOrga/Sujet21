@@ -43,6 +43,16 @@ export const MANOEUVRES: Manoeuvre[] = [
     manette: 13, // croix ↓
   },
   {
+    // Le regroupement « là où l'on clique » n'existait qu'à la souris : le
+    // stick n'a pas de point. Ce bouton, TENU, lui en donne un.
+    id: 'curseur',
+    nom: 'Curseur de regroupement (maintenir)',
+    aide: 'Tant que le bouton est tenu, le stick gauche promène un curseur dans le corps ; A regroupe le volume là où il se trouve — le geste du clic sur le corps, à la manette.',
+    section: 'Le geste',
+    clavier: null,
+    manette: 4, // LB (L1)
+  },
+  {
     id: 'glace',
     nom: 'Se changer en GLACE',
     aide: 'Le bloc garde son élan et glisse ; il ne se rassemble plus.',
@@ -80,7 +90,9 @@ export const MANOEUVRES: Manoeuvre[] = [
     aide: 'Le temps de la cuve s’étire — la physique suit, rien ne se fige.',
     section: 'Le temps',
     clavier: ',',
-    manette: 4, // LB
+    // LB porte désormais le curseur de regroupement : ralentir tient à la
+    // croix ←, où il a toujours répondu aussi
+    manette: 14, // croix ←
   },
   {
     id: 'accelerer',
@@ -88,7 +100,8 @@ export const MANOEUVRES: Manoeuvre[] = [
     aide: 'Le temps de la cuve se presse.',
     section: 'Le temps',
     clavier: '.',
-    manette: 5, // RB
+    // RB est libéré avec LB : le temps tient tout entier sur la croix ↔
+    manette: 15, // croix →
   },
   {
     id: 'pause',
@@ -149,9 +162,9 @@ export const MANOEUVRES: Manoeuvre[] = [
   {
     id: 'recadrer',
     nom: 'Recadrer la caméra',
-    aide: 'La caméra revient au suivi automatique.',
+    aide: 'La caméra se recentre sur le corps et le suit de nouveau, zoom automatique compris. Zoomer ne lui fait pas perdre ce suivi ; seul un déplacement de la caméra le défait.',
     section: 'Les écrans',
-    clavier: null,
+    clavier: 'x',
     manette: 10, // L3
   },
   {
