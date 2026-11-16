@@ -110,6 +110,7 @@ import {
   hauteursPartagees,
   type BoiteVolume,
 } from './volume'
+import { OMBRE_POINTE_GLSL } from './ombrePointe'
 import { RELIEF_PAROIS_GLSL, fractionSommet, pointDuSommet } from './reliefParois'
 import {
   CARREAU_MONDE,
@@ -4741,11 +4742,11 @@ vec2 pointLampe(int li, vec2 p) {
   return c + axe * clamp(dot(p - c, axe), -uLampesFix[li].z, uLampesFix[li].z);
 }
 
-// alt : l'ALTITUDE du rayon à ce point, sur sa montée du sol vers la
+${OMBRE_POINTE_GLSL}// alt : l'ALTITUDE du rayon à ce point, sur sa montée du sol vers la
 // lampe. Un obstacle plus bas qu'elle est déjà sous le rayon — il n'ombre
 // plus rien. C'est ce qui sépare le mobilier (140 u, enjambé) de la coque
 // d'une salle (jusqu'au plafond, jamais enjambée).
-float sceneSdf(vec2 p, float alt) {
+float sceneSdf(vec2 p, float alt, float plein) {
   float d = 1e9;
   for (int i = 0; i < min(uBoxCount, MAX_BOXES); i++) {
     vec4 dec = decodeAux(uBoxAux[i].x);
@@ -4757,7 +4758,13 @@ float sceneSdf(vec2 p, float alt) {
     // tôt qu'un mur haut) ; la coque monte au plafond. À hauteur ÉGALE, elle
     // est enjambée aussi : un toit ne s'ombre pas lui-même, ni ses voisins
     // du même groupe (la marche des toits part de leur hauteur, voir main)
-    if (alt >= (dec.y > 4.5 ? HAUTEUR_COQUE : hauteurBoite(i))) continue;
+    float hObs = dec.y > 4.5 ? HAUTEUR_COQUE : hauteurBoite(i);
+    if (alt >= hObs) continue;
+    // LA POINTE DE L'OMBRE EST UN FONDU (ombrePointe.ts) : au seuil seul,
+    // l'ombre finissait sur une coupure nette — un arc au sol sous un
+    // bandeau (le concepteur, 16/11). Sur sa dernière tranche de hauteur,
+    // l'obstacle s'éloigne du rayon : il ombre de moins en moins.
+    float leve = leveePointe(alt, hObs, plein);
     vec2 wb = p;
     float ang = uBoxAux[i].y;
     if (abs(ang) > 0.0005) {
@@ -4777,7 +4784,7 @@ float sceneSdf(vec2 p, float alt) {
       bool hC = conduiteHoriz(szC, conduiteSens(uBoxAux[i].z));
       vec2 qC = wb - 0.5 * (uBoxes[i].xy + uBoxes[i].zw);
       d = min(d, conduiteOmbreSdf(hC ? qC.x : qC.y, hC ? qC.y : qC.x,
-                                  hC ? szC.x : szC.y, hC ? szC.y : szC.x));
+                                  hC ? szC.x : szC.y, hC ? szC.y : szC.x) + leve);
       continue;
     }
     // le SURCHAUFFEUR ombre comme son tube (ou son dôme)
@@ -4786,7 +4793,7 @@ float sceneSdf(vec2 p, float alt) {
       bool hC = conduiteHoriz(szC, conduiteSens(surchCode(uBoxAux[i].z)));
       vec2 qC = wb - 0.5 * (uBoxes[i].xy + uBoxes[i].zw);
       d = min(d, surchOmbreSdf(hC ? qC.x : qC.y, hC ? qC.y : qC.x,
-                               hC ? szC.x : szC.y, hC ? szC.y : szC.x));
+                               hC ? szC.x : szC.y, hC ? szC.y : szC.x) + leve);
       continue;
     }
     // la CHAUDIÈRE ombre comme son carter (ou sa compacte)
@@ -4795,10 +4802,10 @@ float sceneSdf(vec2 p, float alt) {
       bool hC = conduiteHoriz(szC, conduiteSens(uBoxAux[i].z));
       vec2 qC = wb - 0.5 * (uBoxes[i].xy + uBoxes[i].zw);
       d = min(d, chaudiereOmbreSdf(hC ? qC.x : qC.y, hC ? qC.y : qC.x,
-                                   hC ? szC.x : szC.y, hC ? szC.y : szC.x));
+                                   hC ? szC.x : szC.y, hC ? szC.y : szC.x) + leve);
       continue;
     }
-    d = min(d, formeSdf(wb, uBoxes[i], dec.y, dec.z, dec.w));
+    d = min(d, formeSdf(wb, uBoxes[i], dec.y, dec.z, dec.w) + leve);
   }
   return d;
 }
@@ -4951,7 +4958,7 @@ void main() {
     float t = 4.0;
     for (int k = 0; k < 40; k++) {
       if (t >= tLim || res < 0.004) break;
-      float h = sceneSdf(p + dir * t, t * hL / distL);
+      float h = sceneSdf(p + dir * t, t * hL / distL, t / pen);
       res = min(res, pen * h / t);
       t += clamp(h, 8.0, 200.0);
     }
@@ -4979,7 +4986,7 @@ void main() {
       float tT = 4.0;
       for (int k = 0; k < 40; k++) {
         if (tT >= tLimT || resT < 0.004) break;
-        float hS = sceneSdf(p + dir * tT, hT + tT * monte);
+        float hS = sceneSdf(p + dir * tT, hT + tT * monte, tT / pen);
         resT = min(resT, pen * hS / tT);
         tT += clamp(hS, 8.0, 200.0);
       }
