@@ -102,6 +102,42 @@ describe('caméra — le recul a un fond', () => {
     expect(cam.zoom).toBeCloseTo(Math.min(VW / 2400, VH / 1500) * 0.25, 6)
   })
 
+  it('zoomer ne décroche pas la caméra du corps — seul un déplacement le fait', () => {
+    // la molette, pointeur loin du corps : elle figeait le suivi
+    const cam = ouvre()
+    cam.snapTo(CORPS.x, CORPS.y, cam.zoom)
+    cam.zoomAt(1.3, 40, 40, VW, VH, DEFAULT_PARAMS)
+    cam.zoomAt(0.7, VW - 40, VH - 40, VW, VH, DEFAULT_PARAMS)
+    cam.zoomBy(1.2, DEFAULT_PARAMS)
+    expect(cam.manualPan).toBe(false)
+    expect(cam.x).toBeCloseTo(CORPS.x, 6) // le zoom se fait SUR le corps
+    expect(cam.y).toBeCloseTo(CORPS.y, 6)
+    // le corps s'en va : la caméra le suit toujours, au zoom choisi
+    for (let i = 0; i < 400; i++)
+      cam.update(1 / IPS, CORPS.x + 300, CORPS.y - 200, CORPS.r, VW, VH, DEFAULT_PARAMS)
+    expect(cam.x).toBeCloseTo(CORPS.x + 300, 1)
+    expect(cam.y).toBeCloseTo(CORPS.y - 200, 1)
+    expect(cam.manualZoom).not.toBeNull()
+  })
+
+  it('caméra déplacée : le zoom reste ancré sous le pointeur, puis X recentre', () => {
+    const cam = ouvre()
+    cam.snapTo(CORPS.x, CORPS.y, cam.zoom)
+    cam.panBy(120, 0)
+    expect(cam.manualPan).toBe(true)
+    const avant = cam.screenToWorld(40, 40, VW, VH)
+    cam.zoomAt(1.3, 40, 40, VW, VH, DEFAULT_PARAMS)
+    const apres = cam.screenToWorld(40, 40, VW, VH)
+    expect(apres.x).toBeCloseTo(avant.x, 6)
+    expect(apres.y).toBeCloseTo(avant.y, 6)
+    expect(cam.manualPan).toBe(true)
+    cam.resetAutoZoom() // le geste « recadrer »
+    for (let i = 0; i < 400; i++)
+      cam.update(1 / IPS, CORPS.x, CORPS.y, CORPS.r, VW, VH, DEFAULT_PARAMS)
+    expect(cam.x).toBeCloseTo(CORPS.x, 1)
+    expect(cam.manualZoom).toBeNull()
+  })
+
   it('le zoom avant garde son plafond', () => {
     const cam = ouvre()
     for (let i = 0; i < 200; i++) cam.zoomBy(1.25, DEFAULT_PARAMS)
