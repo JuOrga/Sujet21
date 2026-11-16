@@ -349,7 +349,7 @@ import {
 import { chargePiecesModule2d, peintCelluleSeule, peintModule2d, type Pieces } from './render/module2dCanvas'
 import { MAX_BOXES, Renderer } from './render/renderer'
 import { HAUTEUR_BLOCS } from './render/hauteurs'
-import { facesTranche, fractionSommet, pointDuSommet } from './render/reliefParois'
+import { facesTranche, fractionSommet, pointDuSommet, pointPose } from './render/reliefParois'
 import { remetReglagesParDefaut } from './game/remiseReglages'
 import { Motes, VIE_STRIDE, remplitVie, toucheLeCorps } from './render/vie'
 import { panDepuis } from './game/ouie'
@@ -9389,6 +9389,20 @@ function drawMecanismes(vw: number, vh: number, dpr: number): void {
   // le pied, nommé : seule la tranche d'une porte s'y pose (le reste du
   // dessin des portes et des chasses prend le sommet)
   const auPied = S
+  // CE QUI EST POSÉ SUR UN SOLIDE PREND SON SOMMET, à la hauteur de CE
+  // solide (pas d'office celle d'un mur haut, comme les portes) : c'est la
+  // règle des décalques, avec la même recherche du support — une coupelle
+  // et le logement plaqué derrière elle tombent donc au même pixel. Au sol,
+  // ou relief éteint : S seul, sans recherche.
+  const surSupport = (x: number, y: number): { sx: number; sy: number } => {
+    const q = S(x, y)
+    const kRelief = RELIEF_K[reliefChoix]
+    if (kRelief <= 0) return q
+    const [sx, sy] = pointPose(
+      q.sx, q.sy, vw * 0.5, vh * 0.5, kRelief, camera.zoom, renderer.hauteurSousDecal(x, y),
+    )
+    return { sx, sy }
+  }
   for (let i = 0; i < portes.length; i++) {
     const p = portes[i]
     // sous un voile de cachette : la porte se tait (elle flotterait
@@ -10886,7 +10900,11 @@ function drawMecanismes(vw: number, vh: number, dpr: number): void {
     for (let i = 0; i < defs.length && i < sim.coupelles.length; i++) {
       const k = sim.coupelles[i]
       if (dansCacheVoilee(k.x, k.y)) continue
-      const p = S(k.x, k.y)
+      // RELIEF ALLUMÉ, ELLE SUIT LE SOMMET DE SON MUR : dessinée au pied,
+      // elle quittait le centre de son logement dès qu'elle s'éloignait du
+      // milieu de l'écran (le logement, plaqué sur le mur, glisse avec son
+      // dessus). La physique reste au pied : c'est là que le fluide touche.
+      const p = surSupport(k.x, k.y)
       const R = Math.max(6, k.r * z)
       const part = Math.min(1, k.bu / k.capacite)
       // la gorgée récente fait frémir l'outre (elle retombe en ~0,4 s)

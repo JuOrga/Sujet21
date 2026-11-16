@@ -60,6 +60,30 @@ export function pointDuSommet(
   return [cx + (x - cx) * s, cy + (y - cy) * s]
 }
 
+/** CE QUI EST POSÉ SUR UN SOLIDE SUIT SON SOMMET — la règle des décalques
+ *  (renderer.ts : drawDecals), pour ce que la toile 2D dessine par-dessus.
+ *  Les coupelles se peignaient au PIED : relief allumé, le logement rond
+ *  plaqué sur le mur glissait avec son dessus, la coupelle restait en
+ *  arrière — centrées au milieu de l'écran, de plus en plus décalées vers
+ *  ses bords (le concepteur, 16/11 : « les coupelles ne sont plus au centre
+ *  des parois rondes derrière, quand elles sont sur le côté de l'écran »).
+ *  `hSupport` : la hauteur du solide sous le point (renderer.ts :
+ *  hauteurSousDecal), −1 au sol — au sol, rien ne bouge, comme un décalque
+ *  posé au sol. (sx, sy) et le centre (cx, cy) sont à l'ÉCRAN : l'homothétie
+ *  y est la même que dans le monde. */
+export function pointPose(
+  sx: number,
+  sy: number,
+  cx: number,
+  cy: number,
+  k: number,
+  zoom: number,
+  hSupport: number,
+): [number, number] {
+  if (hSupport < 0) return [sx, sy]
+  return pointDuSommet(sx, sy, cx, cy, fractionSommet(k, zoom, hSupport))
+}
+
 const smoothstep = (a: number, b: number, x: number): number => {
   const t = Math.min(Math.max((x - a) / (b - a), 0), 1)
   return t * t * (3 - 2 * t)
