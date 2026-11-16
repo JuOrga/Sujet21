@@ -124,7 +124,7 @@ describe('la récolte d’un module', () => {
     bourseCl: 550,
     memoireSolde: 300,
     instruments: ['vanne', 'filtre', 'tamis'],
-    nomInstrument: (id: string) => (id === 'inconnu' ? null : { icone: '•', nom: id.toUpperCase() }),
+    nomInstrument: (id: string) => (id === 'inconnu' ? null : { nom: id.toUpperCase() }),
     paliers: 3,
   })
 
@@ -156,7 +156,9 @@ describe('la récolte d’un module', () => {
     expect(g[2].valeur).toBe('+24')
     expect(g[3].valeur).toBe('+2 paliers')
     expect(g[4].valeur).toBe('+2')
-    expect(g[4].detail).toBe('• FILTRE · • TAMIS')
+    // le détail finit en infobulle (texte brut) : l'émoji d'un instrument y
+    // disparaît au profit de son nom — il n'y a pas d'icône rendue en title
+    expect(g[4].detail).toBe('FILTRE · TAMIS')
     expect(g[5].valeur).toBe('Vaporisation')
   })
 
@@ -172,6 +174,12 @@ describe('la récolte d’un module', () => {
       ['21-01', 'SUPERFLUIDE', '4,50 L'],
       ['21-02', 'TURBULENT', '2,25 L'],
     ])
+  })
+
+  // la fin de module pose un petit sceau par salle : il lui faut la lettre du
+  // rang (la case de la planche), pas seulement le nom et la teinte
+  it('donne à chaque salle la lettre de son sceau', () => {
+    expect(pastillesDeSalles(pleine()).map((p) => p.rang)).toEqual(['S', 'B'])
   })
 
   it('se relit d’une sauvegarde, et repart à neuf si elle parle d’un autre module', () => {

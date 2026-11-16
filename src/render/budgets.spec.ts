@@ -41,6 +41,49 @@ describe('Budgets de rendu — TypeScript et shaders disent la même chose', () 
   })
 })
 
+// LES CASES D'UNIFORMES, COMPTÉES SUR LA SOURCE. Un vec4 par scalaire ou
+// vecteur, autant que d'éléments pour un tableau, N par matN ; les
+// échantillonneurs n'en prennent pas. Les morceaux interpolés (\${X}) sont
+// dépliés depuis leur `const X = \``. C'est la règle de rangement que les
+// pilotes appliquent au pire (sans tassement) : WebGL2 n'en garantit que 224,
+// les GPU courants en annoncent 1024. Le plafond est la moitié de ces 1024 :
+// la marge des pilotes qui rangent moins bien, et un fil tendu — un tableau
+// de plus par boîte (160 cases) le ferait tomber.
+const PLAFOND_CASES = 512
+const corpsShader = (nom: string): string => {
+  const a = source.indexOf(`const ${nom} = \``)
+  if (a < 0) return ''
+  const b = source.indexOf('`', a + nom.length + 10)
+  return source.slice(a, b)
+}
+const casesUniformes = (nom: string): number => {
+  const fs = corpsShader(nom).replace(/\$\{(\w+)\}/g, (_, x: string) => corpsShader(x))
+  const defs: Record<string, number> = {}
+  for (const m of fs.matchAll(/#define\s+(\w+)\s+([0-9.]+)/g)) defs[m[1]] = Number(m[2])
+  let total = 0
+  for (const m of fs.matchAll(/^\s*uniform\s+(\w+)\s+\w+\s*(?:\[([^\]]+)\])?\s*;/gm)) {
+    if (/sampler/.test(m[1])) continue
+    const colonnes = /^mat(\d)/.exec(m[1])
+    const taille = m[2]
+      ? Number(Function(`return (${m[2].replace(/\w+/g, (w) => (w in defs ? String(defs[w]) : w))})`)())
+      : 1
+    total += (colonnes ? Number(colonnes[1]) : 1) * taille
+  }
+  return total
+}
+
+describe("Budget d'uniformes — les cases comptées sur la source", () => {
+  it('la composition et le cuiseur tiennent sous le plafond', () => {
+    const compo = casesUniformes('COMPOSE_FS')
+    const cuiseur = casesUniformes('LIGHT_FS')
+    // le compte lui-même : les deux tableaux de boîtes y sont (2 × 160)
+    expect(compo).toBeGreaterThan(2 * MAX_BOXES)
+    expect(cuiseur).toBeGreaterThan(2 * MAX_BOXES)
+    expect(compo).toBeLessThanOrEqual(PLAFOND_CASES)
+    expect(cuiseur).toBeLessThanOrEqual(PLAFOND_CASES)
+  })
+})
+
 describe('checkLevel — le refus suit le budget, il ne le devine pas', () => {
   const tableau = (n: number) => ({
     name: 'budget',

@@ -5,6 +5,7 @@
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import { BULLES, PICTOS, type NomPicto } from './athPictos'
+import { iconeCeremonieHTML } from './iconesStation'
 
 const HTML = readFileSync(new URL('../../index.html', import.meta.url), 'utf-8')
 const MAIN = readFileSync(new URL('../main.ts', import.meta.url), 'utf-8')
@@ -225,6 +226,38 @@ describe('ce qui se pose sous les coins suit leur bas mesuré', () => {
     expect(toast).toContain('var(--coins-bas')
     const panneau = (HTML.match(/#instr-panel \{[^}]*\}/g) ?? []).find((r) => r.includes('position: fixed')) ?? ''
     expect(panneau).toContain('var(--coins-bas')
+  })
+})
+
+// LES ICÔNES RENDUES DANS L'ATH : la vie et le condensat portent le dessin
+// de la cérémonie (une monnaie, un seul dessin), et les instruments
+// embarqués leur case de la planche — un émoji se dessine autrement sous
+// Windows, macOS et Steam Deck.
+describe('l’ATH dessine ses marques avec les planches de la station', () => {
+  const bouton = (id: string): string => {
+    const m = new RegExp(`<button[^>]*id="${id}"[^>]*>(.*?)</button>`).exec(HTML)
+    expect(m, id).not.toBeNull()
+    return m![1]
+  }
+
+  it('la pastille des vies porte l’icône « secours », celle du condensat l’icône « condensat »', () => {
+    expect(bouton('hud-vies-chip')).toContain(iconeCeremonieHTML('secours'))
+    expect(bouton('hud-cond-chip')).toContain(iconeCeremonieHTML('condensat'))
+    expect(bouton('hud-vies-chip') + bouton('hud-cond-chip')).not.toContain('ico-meta')
+  })
+
+  it('les instruments embarqués s’affichent par iconeInstrumentHTML, à la pastille comme au panneau', () => {
+    const debut = MAIN.indexOf('\nfunction majInstrumentsUI(')
+    expect(debut).toBeGreaterThan(-1)
+    const corps = MAIN.slice(debut, MAIN.indexOf('\n}\n', debut))
+    expect(corps).not.toMatch(/\.icone\b/)
+    expect(corps).toContain('hudInstr.innerHTML')
+    expect(corps.match(/iconeInstrumentHTML\(/g)?.length ?? 0).toBeGreaterThanOrEqual(2)
+  })
+
+  it('les icônes de l’ATH prennent la taille de la pastille, pas celle du texte', () => {
+    expect(CSS_ATH).toMatch(/\.hud-chip \.ico-ceremonie[^{]*\{[^}]*width: 1\.5em/)
+    expect(CSS_ATH).toMatch(/\.hud-chip \.ico-instrument[^{]*\{[^}]*width: 1\.5em/)
   })
 })
 

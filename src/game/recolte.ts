@@ -13,7 +13,7 @@
 // Une seule règle : l'écran ne dit que ce qui a été réellement crédité — le
 // même calcul sert au crédit et à l'affichage, ils ne peuvent plus diverger.
 
-import { rangDeSalle } from './ceremonie'
+import { rangDeSalle, type Rang } from './ceremonie'
 
 /** Un nombre à la française : la virgule, pas le point. */
 export function virgule(n: number, decimales = 2): string {
@@ -312,7 +312,7 @@ export interface EntreeGainsModule {
   memoireSolde: number
   /** les instruments tenus maintenant (ids), et de quoi les nommer */
   instruments: readonly string[]
-  nomInstrument: (id: string) => { icone: string; nom: string } | null
+  nomInstrument: (id: string) => { nom: string } | null
   paliers: number
 }
 
@@ -325,7 +325,7 @@ export function gainsDeModule(e: EntreeGainsModule): Gain[] {
   const n = r.salles.length
   const gagnes = instrumentsGagnes(r.instrumentsEntree, e.instruments)
     .map((id) => e.nomInstrument(id))
-    .filter((x): x is { icone: string; nom: string } => x !== null)
+    .filter((x): x is { nom: string } => x !== null)
   const paliers = Math.max(0, e.paliers - r.paliersEntree)
   const gains: Gain[] = [
     {
@@ -385,7 +385,9 @@ export function gainsDeModule(e: EntreeGainsModule): Gain[] {
       prefixe: '',
       suffixe: '',
       role: 'des avantages pour le reste de la descente — perdus à la purge',
-      detail: gagnes.map((g) => `${g.icone} ${g.nom}`).join(' · '),
+      // le détail finit en infobulle, du texte brut : l'émoji d'un instrument
+      // s'y dessinerait autrement selon la machine — son nom suffit
+      detail: gagnes.map((g) => g.nom).join(' · '),
       solde: { nom: 'EMBARQUÉS', valeur: String(e.instruments.length) },
     },
   ]
@@ -406,12 +408,13 @@ export function gainsDeModule(e: EntreeGainsModule): Gain[] {
 }
 
 /** La ligne des salles d'un module : une pastille par salle, à la teinte et
- *  au nom de son régime — le parcours se relit d'un regard. */
+ *  au nom de son régime — le parcours se relit d'un regard. La lettre du
+ *  rang choisit le petit sceau de la salle (la case de la planche). */
 export function pastillesDeSalles(
   r: RecolteModule,
-): { code: string; nom: string; teinte: string; etoiles: number; litres: string }[] {
+): { code: string; rang: Rang; nom: string; teinte: string; etoiles: number; litres: string }[] {
   return r.salles.map((s) => {
     const v = rangDeSalle(s.pct)
-    return { code: s.code, nom: v.nom, teinte: v.teinte, etoiles: v.etoiles, litres: `${virgule(s.litres)} L` }
+    return { code: s.code, rang: v.rang, nom: v.nom, teinte: v.teinte, etoiles: v.etoiles, litres: `${virgule(s.litres)} L` }
   })
 }
