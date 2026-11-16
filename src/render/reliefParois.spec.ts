@@ -5,8 +5,11 @@ import { HAUTEUR_BLOCS } from './hauteurs'
 import { HAUTEUR_DE_RANG, RANG_DE_MATIERE } from './volume'
 import { MAT_GRILLE, MAT_MEMBRANE, MAT_RIDEAU } from '../game/level'
 import {
+  DEVINE_FOND,
+  DEVINE_LISERE,
   MATIERES_PERMEABLES,
   RELIEF_PAROIS_GLSL,
+  corpsDevine,
   facteurRelief,
   fonduRelief,
   facesTranche,
@@ -289,6 +292,57 @@ describe('le shader : les flancs absents (hydro, miroir)', () => {
   })
 })
 
+describe('le corps deviné : sous un sommet, le fluide ne disparaît plus', () => {
+  it('rien de caché : le corps d’avant, exactement (relief éteint, tout l’écran)', () => {
+    for (const l of [0, 0.3, 1]) expect(corpsDevine(0, l)).toBe(1)
+  })
+
+  it('caché : un fond dans la masse, un contour franc au bord — jamais effacé, jamais plein', () => {
+    expect(corpsDevine(1, 0)).toBeCloseTo(DEVINE_FOND, 12)
+    expect(corpsDevine(1, 1)).toBeCloseTo(DEVINE_LISERE, 12)
+    // le défaut : 1 − cache valait 0 ici, le corps s'effaçait dans la membrane
+    expect(corpsDevine(1, 0)).toBeGreaterThan(0.2)
+    // la paroi reste devant : même au contour, on la voit au travers
+    expect(corpsDevine(1, 1)).toBeLessThan(1)
+    expect(DEVINE_LISERE).toBeGreaterThan(DEVINE_FOND + 0.3)
+  })
+
+  it('monotone : plus le sommet cache, moins il reste ; le contour en garde toujours plus', () => {
+    let avant = 1
+    for (let c = 0; c <= 1.0001; c += 0.1) {
+      const v = corpsDevine(c, 0.4)
+      expect(v).toBeLessThanOrEqual(avant + 1e-12)
+      expect(corpsDevine(c, 1)).toBeGreaterThanOrEqual(v)
+      avant = v
+    }
+    // sous un verre (cache partiel), le fondu est continu
+    expect(corpsDevine(0.5, 0)).toBeCloseTo(1 - 0.5 * (1 - DEVINE_FOND), 12)
+    // bornée : des entrées hors de 0..1 ne débordent pas
+    expect(corpsDevine(2, -1)).toBeCloseTo(DEVINE_FOND, 12)
+  })
+
+  it('le jumeau GLSL dit la même règle, avec les mêmes constantes', () => {
+    const g = blocApres(RELIEF_PAROIS_GLSL, 'float corpsDevine(float cache, float lisere) {')
+    expect(g).toContain(`mix(${String(DEVINE_FOND)}, ${String(DEVINE_LISERE)}, l)`)
+    expect(g).toContain('return 1.0 - c * (1.0 - mix(')
+  })
+
+  it('le shader : le masque passe par la règle, et le corps caché devient une lueur', () => {
+    // plus aucun effacement net du fluide
+    expect(composeFs).not.toContain('body *= 1.0 - solSousSommets;')
+    expect(occurrencesDans(composeFs, 'body *= corpsDevine(solSousSommets, lisereCorps);').length).toBe(1)
+    // le contour se lit sur le champ gonflé (ondes, respiration), comme body
+    expect(composeFs).toContain('float lisereCorps = 1.0 - smoothstep(th + s, th * 3.0, field2);')
+    // la lueur : dans le bloc de l'eau, APRÈS l'éclairage de la pièce (elle
+    // n'en dépend pas) et avant le mélange
+    const eau = blocApres(composeFs, 'if (body > 0.001 && uPasse < 2.5) {')
+    const lueur = eau.indexOf('water = mix(water, spectre, solSousSommets);')
+    expect(lueur).toBeGreaterThan(eau.indexOf('if (uLumiereEau > 0.5)\n      water *= clamp('))
+    expect(lueur).toBeGreaterThan(eau.lastIndexOf('lmEau'))
+    expect(lueur).toBeLessThan(eau.indexOf('col = mix(col, water, body);'))
+  })
+})
+
 describe('le shader : le fluide passe sous les sommets', () => {
   it('chaque solide verse le sol que son sommet cache dans le masque de l’image', () => {
     expect(boucle).toMatch(/solSousSommets = max\(solSousSommets, solPropre\)/)
@@ -302,7 +356,7 @@ describe('le shader : le fluide passe sous les sommets', () => {
   })
 
   it('le fluide (et ses ondes, reflets, éclaboussures : tout passe par body) est masqué avant d’être peint', () => {
-    const masque = composeFs.indexOf('body *= 1.0 - solSousSommets;')
+    const masque = composeFs.indexOf('body *= corpsDevine(solSousSommets, lisereCorps);')
     expect(masque).toBeGreaterThan(0)
     // avant la sortie de la couche d'eau seule, et avant le mélange de l'eau
     expect(masque).toBeLessThan(composeFs.indexOf('if (uPasse > 1.5 && uPasse < 2.5 && body <= 0.001)'))
