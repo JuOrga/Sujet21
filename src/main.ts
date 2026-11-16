@@ -11553,48 +11553,26 @@ function drawFantomes(vw: number, vh: number, dpr: number): void {
   }
 }
 
-// LE CURSEUR DE REGROUPEMENT : une mire posée DANS le corps, là où A le
-// reformera. Sombre sous clair : elle doit se lire sur l'eau comme sur le
-// fond de la cuve. Elle se resserre et s'allume quand A regroupe.
-function drawCurseurVolume(dpr: number): void {
-  if (
-    !curseurVol.actif ||
-    input.paused ||
-    !document.body.classList.contains('playing')
-  )
-    return
-  const dprC = Math.min(dpr, 2)
-  const g = fxCtx
-  g.setTransform(dprC, 0, 0, dprC, 0, 0)
-  const x = manetteCurseur.x
-  const y = manetteCurseur.y
-  const agit = regroupeAuCurseur
-  const r = agit ? 9 : 12 + 1.2 * Math.sin(elapsed * 5)
-  g.save()
-  g.lineCap = 'round'
-  for (const passe of [0, 1]) {
-    g.strokeStyle =
-      passe === 0
-        ? 'rgba(6,20,32,0.7)'
-        : agit
-          ? 'rgba(255,255,255,0.98)'
-          : 'rgba(215,240,255,0.92)'
-    g.lineWidth = passe === 0 ? 4.5 : 2
-    g.beginPath()
-    g.arc(x, y, r, 0, Math.PI * 2)
-    // quatre repères vers l'extérieur : le centre reste dégagé
-    for (let k = 0; k < 4; k++) {
-      const a = (k * Math.PI) / 2
-      g.moveTo(x + Math.cos(a) * (r + 3), y + Math.sin(a) * (r + 3))
-      g.lineTo(x + Math.cos(a) * (r + 9), y + Math.sin(a) * (r + 9))
-    }
-    g.stroke()
+// LE NOYAU DE REGROUPEMENT : le curseur de la manette n'est pas une mire
+// posée sur l'eau — c'est le CORPS qui montre où il va se ramasser (une
+// lueur sous sa peau, des rides qui convergent : uNoyau, render/renderer.ts).
+// Ici, seulement son état lissé : la lueur naît et s'éteint en douceur, et
+// garde sa place le temps de s'éteindre.
+const noyau = { x: 0, y: 0, presence: 0, prise: 0 }
+function majNoyau(dtReal: number): void {
+  const montre =
+    curseurVol.actif &&
+    !input.paused &&
+    !sim.dispersed &&
+    document.body.classList.contains('playing')
+  if (montre) {
+    noyau.x = sim.stats.centroidX + curseurVol.dx
+    noyau.y = sim.stats.centroidY + curseurVol.dy
   }
-  g.fillStyle = 'rgba(255,255,255,0.95)'
-  g.beginPath()
-  g.arc(x, y, 2, 0, Math.PI * 2)
-  g.fill()
-  g.restore()
+  noyau.presence +=
+    ((montre ? 1 : 0) - noyau.presence) * Math.min(1, dtReal * (montre ? 14 : 7))
+  const pris = montre && regroupeAuCurseur
+  noyau.prise += ((pris ? 1 : 0) - noyau.prise) * Math.min(1, dtReal * 10)
 }
 
 function drawFleche(dtReal: number, dpr: number): void {
@@ -12375,6 +12353,11 @@ function majPresence(dtReal: number, aimX: number, aimY: number): void {
       }
       vise = true
     }
+  } else if (!sim.dispersed && noyau.presence > 0.3) {
+    // LE NOYAU : il regarde l'endroit où il va se ramasser
+    tx = noyau.x
+    ty = noyau.y
+    vise = true
   } else if (!sim.dispersed && presence.caresse > 0.3 && !input.aimActive) {
     // LA CARESSE : le regard vient sous le doigt et y reste
     tx = presence.caresseX
@@ -21389,7 +21372,7 @@ function corpsImage(now: number): boolean {
   drawRecharges(vw, vh, dpr, performance.now() / 1000)
   drawFantomes(vw, vh, dpr)
   drawFleche(dtReal, dpr)
-  drawCurseurVolume(dpr)
+  majNoyau(dtReal)
   majIdle(dtReal)
   majPresence(dtReal, aim.x, aim.y)
   aimMonde.x = aim.x
@@ -21502,6 +21485,10 @@ function corpsImage(now: number): boolean {
       caresseY: presence.caresseY,
       caresse: presence.caresse,
       caresseT0: presence.caresseT0,
+      noyauX: noyau.x,
+      noyauY: noyau.y,
+      noyau: noyau.presence,
+      noyauPrise: noyau.prise,
       peau: presence.peau,
       vitalStress: presence.stress,
       vitalFatigue: presence.fatigue,

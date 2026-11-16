@@ -1115,6 +1115,12 @@ uniform float uHalo;
 // écartent. x, y le point (monde), z l'intensité 0..1, w l'instant du
 // début (uTime), pour que les rides partent du toucher.
 uniform vec4 uCaresse;
+// LE NOYAU : le point où le corps va se regrouper (le curseur de la manette,
+// LB tenu). Une mire dessinée PAR-DESSUS l'eau faisait viseur de tir sur un
+// être vivant ; c'est le corps qui montre où il se ramassera — une lueur
+// sous sa peau et des rides qui CONVERGENT vers elle. x, y le point (monde),
+// z la présence 0..1 (lissée), w la prise 0..1 (A tenu : il se ramasse).
+uniform vec4 uNoyau;
 // LA PEAU (G3) : la tension du liseré, -1 (relâché : fin, doux) à +1
 // (tendu : épais, vif). 0 : le liseré historique.
 uniform float uPeau;
@@ -4374,6 +4380,26 @@ void main() {
       water += vec3(0.24, 0.44, 0.54) * rides * 0.14 * masqueC * (1.0 - fossette * 0.6);
     }
 
+    // LE NOYAU : là où le corps va se regrouper. Une lueur douce, tenue SOUS
+    // la peau (masquée par le corps : elle ne déborde jamais sur la cuve), un
+    // cœur plus vif, et des rides qui viennent vers elle — l'inverse des
+    // rides de la caresse, qui s'en écartent. Prise (A tenu), la lueur se
+    // resserre et s'allume, les rides se pressent : le corps se ramasse là.
+    if (uNoyau.z > 0.003) {
+      float dN = length(world - uNoyau.xy);
+      float prise = uNoyau.w;
+      float masqueN = uNoyau.z * (1.0 - vap) * (1.0 - icy) * clamp(player, 0.0, 1.0);
+      float sigN = mix(30.0, 20.0, prise);
+      float lueurN = exp(-dN * dN / (2.0 * sigN * sigN));
+      float coeurN = exp(-dN * dN / (2.0 * 7.0 * 7.0));
+      float battN = 1.0 + 0.10 * sin(uTime * mix(3.2, 7.0, prise));
+      // la phase AVANCE avec le temps : les crêtes marchent vers le centre
+      float ridesN = sin(dN * 0.26 + uTime * mix(4.5, 9.0, prise)) * exp(-dN / mix(70.0, 95.0, prise));
+      water += vec3(0.34, 0.62, 0.70) * lueurN * (0.36 + 0.30 * prise) * battN * masqueN;
+      water += vec3(0.85, 0.97, 1.00) * coeurN * (0.50 + 0.35 * prise) * battN * masqueN;
+      water += vec3(0.26, 0.48, 0.58) * ridesN * (0.10 + 0.12 * prise) * masqueN * (1.0 - coeurN);
+    }
+
     // Gel (tableau 2) : la teinte pâlit vers la glace mate — le givre se lit
     // sur le corps avant même la prise, la partie gelée devient blême et fixe.
     // En MERCURE, le gel poli MIRE la salle : le reflet givré (désaturé,
@@ -7165,6 +7191,11 @@ export class Renderer {
       caresseY?: number
       caresse?: number
       caresseT0?: number
+      // le noyau de regroupement (point monde, présence, prise)
+      noyauX?: number
+      noyauY?: number
+      noyau?: number
+      noyauPrise?: number
       peau?: number // -1..1 : la tension du liseré (0 : historique)
       vitalStress?: number // la teinte vitale, 0 partout : historique
       vitalFatigue?: number
@@ -7456,6 +7487,13 @@ export class Renderer {
       presence?.caresseY ?? 0,
       presence?.caresse ?? 0,
       presence?.caresseT0 ?? 0,
+    )
+    gl.uniform4f(
+      cu['uNoyau'],
+      presence?.noyauX ?? 0,
+      presence?.noyauY ?? 0,
+      presence?.noyau ?? 0,
+      presence?.noyauPrise ?? 0,
     )
     gl.uniform1f(cu['uPeau'], presence?.peau ?? 0)
     gl.uniform3f(
