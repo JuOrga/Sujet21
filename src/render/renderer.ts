@@ -110,6 +110,7 @@ import {
   hauteursPartagees,
   type BoiteVolume,
 } from './volume'
+import { tranchesBandeau } from './lampes'
 import { RELIEF_PAROIS_GLSL, fractionSommet, pointDuSommet } from './reliefParois'
 import {
   CARREAU_MONDE,
@@ -8035,32 +8036,38 @@ export class Renderer {
       }
       // même rayon que le dessin procédural, marge des pattes comprise
       const R = Math.min(26, Math.max(11, 9 + l.h * 0.012)) * l.taille * 1.35
-      const hw = l.bandeau ? l.demiLong + R : R
       const hh = R
       const ca = Math.cos(l.angleRad)
       const sa = Math.sin(l.angleRad)
-      const q = this.decalScratch
-      let o = 0
-      const put = (dx: number, dy: number, u: number, v: number): void => {
-        q[o++] = l.x + dx * ca - dy * sa
-        q[o++] = l.y + dx * sa + dy * ca
-        q[o++] = u
-        q[o++] = v
-      }
-      put(-hw, -hh, 0, 0)
-      put(hw, -hh, 1, 0)
-      put(hw, hh, 1, 1)
-      put(-hw, -hh, 0, 0)
-      put(hw, hh, 1, 1)
-      put(-hw, hh, 0, 1)
-      gl.bindBuffer(gl.ARRAY_BUFFER, this.decalVbo)
-      gl.bufferSubData(gl.ARRAY_BUFFER, 0, q)
       gl.activeTexture(gl.TEXTURE0)
       gl.bindTexture(gl.TEXTURE_2D, tex)
       gl.uniform1i(du['uTexDecal'], 0)
       gl.uniform1f(du['uFade'], 0.92)
       gl.uniform1f(du['uEfface'], 0)
-      gl.drawArrays(gl.TRIANGLES, 0, 6)
+      gl.bindBuffer(gl.ARRAY_BUFFER, this.decalVbo)
+      // LE BANDEAU EN TROIS TRANCHES (lampes.ts) : deux embouts carrés, un
+      // milieu qui prend la longueur. D'un seul quad, l'image s'étirait
+      // avec la lampe — ses embouts ronds en pointes, ses boulons en ovales.
+      // Le plafonnier, lui, tient dans un quad.
+      const tranches = l.bandeau ? tranchesBandeau(l.demiLong, R) : [{ x0: -R, x1: R, u0: 0, u1: 1 }]
+      for (const t of tranches) {
+        const q = this.decalScratch
+        let o = 0
+        const put = (dx: number, dy: number, u: number, v: number): void => {
+          q[o++] = l.x + dx * ca - dy * sa
+          q[o++] = l.y + dx * sa + dy * ca
+          q[o++] = u
+          q[o++] = v
+        }
+        put(t.x0, -hh, t.u0, 0)
+        put(t.x1, -hh, t.u1, 0)
+        put(t.x1, hh, t.u1, 1)
+        put(t.x0, -hh, t.u0, 0)
+        put(t.x1, hh, t.u1, 1)
+        put(t.x0, hh, t.u0, 1)
+        gl.bufferSubData(gl.ARRAY_BUFFER, 0, q)
+        gl.drawArrays(gl.TRIANGLES, 0, 6)
+      }
     }
     if (started) {
       gl.bindVertexArray(null)
