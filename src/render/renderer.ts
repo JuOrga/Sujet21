@@ -110,6 +110,7 @@ import {
   hauteursPartagees,
   type BoiteVolume,
 } from './volume'
+import { FOND_DALLE } from './fondCuve'
 import { RELIEF_PAROIS_GLSL, fractionSommet, pointDuSommet } from './reliefParois'
 import {
   CARREAU_MONDE,
@@ -1035,6 +1036,8 @@ ${LUMIERE_SCENE_GLSL}
 uniform vec2 uParCiel;   // la station lointaine
 uniform vec2 uParSemis;  // le semis d'étoiles proches
 uniform vec2 uParCuve;   // la paroi de cuve, derrière l'eau
+// l'étendue de la dalle du fond de cuve, en unités monde (fondCuve.ts)
+#define FOND_DALLE vec2(${glslFloat(FOND_DALLE[0])}, ${glslFloat(FOND_DALLE[1])})
 uniform sampler2D uTexTank; // fond de cuve : panneaux, conduites, liserés
 uniform sampler2D uTexWall;
 uniform sampler2D uTexWallA; // seconde paroi : les murs alternent, sans répétition visible
@@ -2723,7 +2726,7 @@ void main() {
   // est DERRIÈRE l'eau, elle suit un peu la caméra et la profondeur se sent.
   vec2 nuv = uv * 2.0 - 1.0;
   float vign = 1.0 - 0.35 * dot(nuv, nuv);
-  vec3 tankTex = texture(uTexTank, coucheFond(world, uParCuve) / 900.0).rgb;
+  vec3 tankTex = texture(uTexTank, coucheFond(world, uParCuve) / FOND_DALLE).rgb;
   vec3 tank = uHasTank > 0.5
     ? tankTex * (0.55 * vign + 0.12)
     : vec3(0.012, 0.022, 0.040) * vign;
@@ -2732,10 +2735,9 @@ void main() {
     caus *= vnoise(world * 0.03 - vec2(uTime * 0.02, uTime * 0.04));
     tank += vec3(0.010, 0.028, 0.040) * caus;
   }
-  float lw = 1.2 / uZoom;
-  float gridDim = uHasTank > 0.5 ? 0.5 : 1.0; // la texture a ses propres lignes
-  tank += vec3(0.05, 0.09, 0.13) * gridLine(world, 100.0, lw) * 0.30 * gridDim;
-  tank += vec3(0.07, 0.12, 0.17) * gridLine(world, 500.0, lw * 1.6) * 0.45 * gridDim;
+  // (la trame de mesure — une ligne tous les 100, une tous les 500 — datait
+  // du fond en aplat ; par-dessus un fond dessiné, on n'y voyait qu'une
+  // grille posée sur le tableau : retirée, le concepteur, 16/11)
   // halo le long des parois : la cuve est éclairée par sa coque
   tank += vec3(0.020, 0.045, 0.060) * exp(min(0.0, roomD) * 0.02);
   // L'OMBRE DE CONTACT au pied de la paroi de la cuve (volume des parois,
@@ -4228,7 +4230,7 @@ void main() {
           envL += 1.35 * texture(uLightMap, luvR).rgb;
         }
         vec3 envT = uHasTank > 0.5
-          ? textureLod(uTexTank, coucheFond(reflPos, uParCuve) / 900.0, 2.0).rgb
+          ? textureLod(uTexTank, coucheFond(reflPos, uParCuve) / FOND_DALLE, 2.0).rgb
           : vec3(0.10, 0.16, 0.22);
         vec3 env = envT * envL * vec3(0.80, 1.00, 1.20) + envL * envL * vec3(0.30, 0.38, 0.46);
         // le plafond dans le cœur : là où la flaque regarde vers le haut
@@ -4300,7 +4302,7 @@ void main() {
           envL += 1.35 * texture(uLightMap, luvR).rgb;
         }
         vec3 envT = uHasTank > 0.5
-          ? textureLod(uTexTank, coucheFond(reflPos, uParCuve) / 900.0, 2.0).rgb
+          ? textureLod(uTexTank, coucheFond(reflPos, uParCuve) / FOND_DALLE, 2.0).rgb
           : vec3(0.10, 0.16, 0.22);
         // le punch du miroir : les hautes lumières réfléchies CLAQUENT
         vec3 env = envT * envL * vec3(0.80, 1.00, 1.20) + envL * envL * vec3(0.30, 0.38, 0.46);
@@ -6185,6 +6187,7 @@ export class Renderer {
     // raccordait pas (écart de bord ~5 contre 1,5 en interne) et se répétait
     // EN MIROIR — les bords coïncidaient, mais les caissons et les conduites
     // se répondaient en symétrie, ce qui trahissait la répétition.
+    // (16/11 : une dalle de 3072 × 2048, trois carreaux sur deux — fondCuve.ts)
     this.loadTexture('/assets/tank-bg.webp', true, true, (t) => (this.texTank = t))
     this.loadTexture('/assets/wall.webp', true, true, (t) => (this.texWall = t))
     this.loadTexture(

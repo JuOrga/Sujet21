@@ -770,6 +770,18 @@ large holes, bright reflections, panel border`
 
 ### 18b. Le fond de cuve — `tank-bg.webp` ✅ REDESSINÉ DANS BLENDER (13/11)
 
+> **Devenu une GRANDE DALLE le 16/11** (`tools/images/blender/fond_cuve.py`).
+> Vu en jeu, le carreau de 900 unités se lisait « très basique » : deux
+> baies, le même hublot quatre à six fois par tableau. La dalle fait trois
+> carreaux sur deux (3072 × 2048 px, 2700 × 1800 unités : `FOND_DALLE`,
+> `src/render/fondCuve.ts`) — un tableau standard n'en voit qu'une — et
+> porte douze baies, un équipement différent dans chacune. Même ossature,
+> mêmes matières, même luminance (0,109 mesurée). Le même jour : la trame de
+> mesure du shader est retirée, et la paroi est collée au monde (plus de
+> parallaxe). La scène se bâtit À PART (`fond-cuve`), sans `vide_scene()`.
+> Livraison : `prepare.py tank-bg --depuis masters/images/fond-cuve`.
+
+
 > Plus de prompt à envoyer : le fond se dessine dans l'atelier
 > (`tools/images/blender/surfaces.py`, `cuve()`) — une ossature de cuve
 > d'essai : deux montants en I et une traverse par carreau, une baie au
