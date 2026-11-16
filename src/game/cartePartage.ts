@@ -22,6 +22,21 @@ export function litCartePubliee(document: unknown): CarteStation | null {
   return carte
 }
 
+/** Le brouillon de l'éditeur de carte, retenu sur le poste d'une séance à
+ *  l'autre. La clé vit ici, hors du morceau de l'éditeur : le jeu lit le
+ *  brouillon (les biomes à proposer) sans charger l'outil. */
+export const CLE_CARTE_BROUILLON = 'projet21.carte-station.v1'
+
+/** Le brouillon tel qu'il est stocké — null s'il n'y en a pas, ou illisible. */
+export function litBrouillonCarte(brut: string | null): CarteStation | null {
+  if (!brut) return null
+  try {
+    return parseCarte(JSON.parse(brut)).carte ?? null
+  } catch {
+    return null
+  }
+}
+
 /** Ce qui empêche de publier — vide : rien. */
 export function refusPublication(c: CarteStation): string[] {
   return verifieCarte(c)

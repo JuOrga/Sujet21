@@ -19,6 +19,7 @@ import {
   couleurTemperature,
   orbeRequis,
   biomeDeSalle,
+  biomesAEtiqueter,
   biomeEffectif,
   biomesDeCarte,
   mecaniqueDuBiome,
@@ -222,6 +223,21 @@ describe('biomesDeCarte — la liste que la planche et l’éditeur proposent', 
     c.modules.find((m) => m.id === 'P1')!.biome = 'abysses'
     expect(biomesDeCarte(c).find((b) => b.code === 'abysses')!.nom).toBe('PUITS FROID')
     expect(verifieCarte(c).some((v) => v.niveau === 'attention' && v.module === 'P1' && v.message.includes('fiche'))).toBe(true)
+  })
+
+  it('biomesAEtiqueter : un biome que seule la carte de l’éditeur porte se propose aussi', () => {
+    // le concepteur pose « abysses » sur P1 dans son brouillon, sans publier :
+    // le menu Biome du tableau ne lisait que la carte jouée, et l'ignorait
+    const brouillon = JSON.parse(JSON.stringify(CARTE_LIVREE)) as typeof CARTE_LIVREE
+    brouillon.modules.find((m) => m.id === 'P1')!.biome = 'abysses'
+    const codes = biomesAEtiqueter(CARTE_LIVREE, brouillon)
+    expect(codes.map((b) => b.code)).toEqual(['cryo', 'tempere', 'chaud', 'antichambre', 'observatoire', 'abysses'])
+    expect(codes.find((b) => b.code === 'abysses')).toEqual({ code: 'abysses', nom: 'PUITS FROID', horsJeu: true })
+    // ceux de la carte jouée ne sont ni doublés ni marqués
+    expect(codes.filter((b) => b.horsJeu).length).toBe(1)
+    // sans carte d'éditeur, ou la même : la liste de la carte jouée
+    expect(biomesAEtiqueter(CARTE_LIVREE, null)).toEqual(biomesDeCarte(CARTE_LIVREE))
+    expect(biomesAEtiqueter(CARTE_LIVREE, CARTE_LIVREE)).toEqual(biomesDeCarte(CARTE_LIVREE))
   })
 
   it('biomeDeSalle : à l’essai, la salle prend le biome que le tableau porte', () => {
