@@ -650,3 +650,37 @@ describe("la tranche d'une porte d'énergie", () => {
     expect(tranche).toBeLessThan(portes.indexOf("g.fillStyle = `rgba(255,72,72,"))
   })
 })
+
+// CE QUI EST DEVANT SE VOIT (retour du concepteur, 16/11) : relief allumé,
+// deux blocs collés montraient la face verticale de l'un PAR-DESSUS le
+// dessus de l'autre — une paroi qui devrait être cachée — et, dans l'angle
+// d'un bloc horizontal et d'un bloc vertical, le vertical passait devant.
+// Les flancs se peignaient dans l'ordre du tableau, sans égard à la hauteur.
+// La couverture mesure maintenant LA HAUTEUR VUE en chaque pixel — le dessus
+// le plus haut qui le couvre franchement, ou le point de tranche que le
+// chemin pied → sommet y traverse — et une boîte ne peint ni sa tranche ni
+// son dessus sous une surface plus haute qu'eux.
+describe('relief allumé, la surface la plus haute cache les autres', () => {
+  const hauteurTranche = entre('float hauteurTranche(', '\n}\n')
+
+  it('la hauteur de la tranche se lit au balayage exact, dans le repère de la boîte', () => {
+    expect(hauteurTranche).toContain('flancBalaye(')
+    expect(hauteurTranche).toMatch(/fb\.y \* hb/)
+    // les formes (coques, arrondis) n'y entrent pas : leur balayage n'a pas de forme close
+    expect(hauteurTranche).toMatch(/dec\.y > 0\.5\) return -1\.0/)
+  })
+
+  it('la couverture retient la hauteur vue : un dessus franc, sinon une tranche ; relief éteint, rien', () => {
+    expect(couverture).toMatch(/float zVis = -1\.0;/)
+    expect(couverture).toMatch(/if \(uRelief > 0\.0\) \{[\s\S]*zVis = max\(zVis, dc < -edgeW \? hb : hauteurTranche\(/)
+  })
+
+  it('une tranche sous une surface plus haute ne se peint pas', () => {
+    expect(flanc).toMatch(/step\(zVis - 0\.5, htFlanc \* hB\)/)
+    expect(flanc).toMatch(/col = mix\(col, fc, flanc \* devant\)/)
+  })
+
+  it('un dessus sous une surface plus haute non plus — à hauteur égale, l’ordre du tableau reste', () => {
+    expect(source).toMatch(/if \(uRelief > 0\.0 && hauteurBoite\(bi\) < zVis - 0\.5\) dV = max\(dV, 1\.0e4\);/)
+  })
+})
