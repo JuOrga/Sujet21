@@ -349,6 +349,7 @@ import { chargePiecesModule2d, peintCelluleSeule, peintModule2d, type Pieces } f
 import { MAX_BOXES, Renderer } from './render/renderer'
 import { HAUTEUR_BLOCS } from './render/hauteurs'
 import { facesTranche, fractionSommet, pointDuSommet } from './render/reliefParois'
+import { remetReglagesParDefaut } from './game/remiseReglages'
 import { Motes, VIE_STRIDE, remplitVie, toucheLeCorps } from './render/vie'
 import { panDepuis } from './game/ouie'
 import { dangerDevant, directionDeMarche, saccade, type Saccade } from './game/regard'
@@ -4201,6 +4202,10 @@ const parallaxeReglages = {
 ;(
   window as unknown as { __parallaxe: typeof parallaxeReglages }
 ).__parallaxe = parallaxeReglages
+// Relief LÉGER, liquide RICHE, éclairages ACTIFS pour tout le monde : les
+// choix anciens de ces quatre réglages sont effacés UNE fois, ici, avant
+// qu'on ne les lise juste dessous (remiseReglages.ts).
+remetReglagesParDefaut(localStorage)
 // Graphismes du LIQUIDE, séparés du décor : SOBRE débranche l'éclairage de
 // l'eau (relief, spéculaire, miroir, scintillement) dans le shader — la
 // silhouette, les couleurs de vitesse et les états restent. C'est le second
@@ -4242,9 +4247,10 @@ let lumiereActive = localStorage.getItem('sujet21-lumiere') !== 'off'
 let lumiereEauActive = localStorage.getItem('sujet21-lumiere-eau') !== 'off'
 // RELIEF 2.5D des parois : leur sommet fuit le centre de la caméra, la face
 // latérale se révèle du côté qui regarde le centre — en se déplaçant, on
-// aperçoit les flancs des éléments qu'on aborde. EXPÉRIMENTAL : OFF par
-// défaut le temps de la validation à la manette ; LÉGER puis FORT à l'essai.
-let reliefChoix = (localStorage.getItem('sujet21-relief') ?? 'off') as
+// aperçoit les flancs des éléments qu'on aborde. LÉGER par défaut (demande
+// du concepteur, 16/11 : la validation à la manette est faite) ; les OFF
+// choisis pendant l'essai sont effacés une fois (remiseReglages.ts).
+let reliefChoix = (localStorage.getItem('sujet21-relief') ?? 'leger') as
   | 'off'
   | 'leger'
   | 'fort'

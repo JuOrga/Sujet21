@@ -428,10 +428,13 @@ describe('les décalques plaqués sur un mur suivent son sommet', () => {
   })
 })
 
-describe('le relief reste éteint par défaut', () => {
-  it('sans réglage posé, sujet21-relief vaut off, et off ne déplace rien', () => {
-    expect(main).toContain("localStorage.getItem('sujet21-relief') ?? 'off'")
-    expect(main).toMatch(/const RELIEF_K = \{ off: 0, /)
+// LÉGER PAR DÉFAUT (demande du concepteur, 16/11) : le relief était OFF le
+// temps de sa validation. Le défaut ne joint que l'appareil sans réglage
+// posé : les OFF de l'essai sont effacés à part (remiseReglages.spec.ts).
+describe('le relief est léger par défaut', () => {
+  it('sans réglage posé, sujet21-relief vaut leger ; off reste un choix qui ne déplace rien', () => {
+    expect(main).toContain("localStorage.getItem('sujet21-relief') ?? 'leger'")
+    expect(main).toMatch(/const RELIEF_K = \{ off: 0, leger: 0\.035, /)
   })
 })
 
