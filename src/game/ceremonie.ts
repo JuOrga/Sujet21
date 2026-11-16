@@ -62,9 +62,12 @@ export function rangDeSalle(pct: number): VerdictRang {
 
 /** LES TEMPS DE LA LECTURE, en millisecondes depuis l'ouverture. Chaque
  *  chose arrive à son heure : le titre claque, le rang tombe, les litres
- *  roulent, les lignes se posent, le condensat s'égrène, puis le versement
- *  se propose. Un toucher saute tout d'un coup au versement — jamais
- *  l'inverse. Tenus ici pour que le test garde l'ordre : un temps qui
+ *  roulent, les lignes se posent, le condensat s'égrène, puis la lecture
+ *  est finie (`lu`) : le levier passe de PASSER à CONTINUER, et le bilan
+ *  ATTEND. Il passait seul au versement à cet instant : le joueur n'avait
+ *  pas fini de lire son rang que l'écran était parti. Seul un geste ouvre
+ *  le versement — pendant la lecture (il saute tout d'un coup) comme
+ *  après. Tenus ici pour que le test garde l'ordre : un temps qui
  *  passerait avant le précédent ferait tomber une ligne sur un rang pas
  *  encore posé. */
 export const TEMPS_BILAN = {
@@ -74,7 +77,7 @@ export const TEMPS_BILAN = {
   prime: 2050,
   lignes: 2350,
   condensat: 3450,
-  versement: 4900,
+  lu: 4900,
 } as const
 
 /** L'écart entre deux lignes du relevé : chacune tombe après l'autre. */
