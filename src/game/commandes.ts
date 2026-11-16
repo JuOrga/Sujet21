@@ -40,7 +40,19 @@ export const MANOEUVRES: Manoeuvre[] = [
     aide: 'Quand le sas a assez bu, le bouton CONTINUER s’offre : ce geste le valide. Tant qu’on ne le fait pas, le corps restant se pilote comme avant.',
     section: 'Le geste',
     clavier: 'Enter',
-    manette: 13, // croix ↓
+    // la croix ↓ est passée au zoom arrière (avec la croix ↑) le jour où les
+    // gâchettes ont cessé de zoomer pour porter le curseur de regroupement
+    manette: 15, // croix →
+  },
+  {
+    // Le regroupement « là où l'on clique » n'existait qu'à la souris : le
+    // stick n'a pas de point. Ce bouton, TENU, lui en donne un.
+    id: 'curseur',
+    nom: 'Curseur de regroupement (maintenir)',
+    aide: 'Tant que le bouton est tenu, le stick gauche promène un curseur dans le corps ; A regroupe le volume là où il se trouve — le geste du clic sur le corps, à la manette.',
+    section: 'Le geste',
+    clavier: null,
+    manette: 6, // LT
   },
   {
     id: 'glace',

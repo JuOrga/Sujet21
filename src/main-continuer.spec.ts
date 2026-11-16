@@ -62,11 +62,29 @@ describe('la sortie offerte par CONTINUER', () => {
     const m = MANOEUVRES.find((x) => x.id === 'conclure')
     expect(m).toBeDefined()
     expect(m?.fixe).toBeFalsy() // redéfinissable
-    expect(boutonDe('conclure')).toBe(BOUTON.BAS)
+    // la croix → : la croix ↓ est passée au zoom arrière
+    expect(boutonDe('conclure')).toBe(BOUTON.DROITE)
     expect(boutonDe('conclure')).not.toBe(BOUTON.A)
     expect(SRC).toContain("if (manetteFait('conclure')) conclureSalle()")
     expect(SRC).toContain("else if (id === 'conclure') return conclureSalle()")
     // conclure ne fait rien tant que le bouton ne s'offre pas
     expect(corps('conclureSalle')).toMatch(/if \(!continuerOffert\(\)\) return false/)
+  })
+
+  it('le cran de croix qui conclut ne fait rien d’autre à ce moment-là', () => {
+    // la croix → accélère le temps, la croix ↓ dézoome : quand CONTINUER
+    // s'offre sur l'un de ces crans, conclure ne doit pas AUSSI accélérer
+    // la cuve ni reculer la caméra
+    expect(SRC).toContain(
+      "const cranConclure = continuerOffert() ? boutonDe('conclure') : null",
+    )
+    expect(SRC).toMatch(
+      /cranConclure !== BOUTON\.DROITE && manette\.edge\(BOUTON\.DROITE\)\)\s*input\.stepWarp\(1\)/,
+    )
+    expect(SRC).toMatch(/manette\.zoomArriere && cranConclure !== BOUTON\.BAS/)
+  })
+
+  it('le zoom est à la croix : les gâchettes ne zooment plus', () => {
+    expect(SRC).not.toMatch(/zoomBy\([^)]*manette\.(rtVal|ltVal)/)
   })
 })
