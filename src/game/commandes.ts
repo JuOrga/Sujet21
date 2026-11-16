@@ -25,7 +25,7 @@ export const MANOEUVRES: Manoeuvre[] = [
   {
     id: 'agir',
     nom: 'Agir — éjecter, viser, se rassembler',
-    aide: 'Maintenir : le corps éjecte vers le pointeur (il part à l’opposé). En vapeur : viser puis relâcher lance le dash. Sur le corps, sans viser : se rassembler, gratuitement.',
+    aide: 'Maintenir : le corps éjecte vers le pointeur (il part à l’opposé). En vapeur : viser puis relâcher lance le dash. Sur le corps, sans viser : se rassembler là où l’on touche, gratuitement.',
     section: 'Le geste',
     clavier: null,
     manette: 0, // A

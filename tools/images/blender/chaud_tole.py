@@ -584,6 +584,17 @@ FORCE_FACE = 0.13
 FORCE_BAS = 0.13
 
 
+def soleil(sc, nom, d, force, couleur, ombre, angle):
+    l = bpy.data.lights.new(nom, 'SUN')
+    l.energy = force
+    l.color = couleur
+    l.angle = math.radians(angle)
+    l.use_shadow = ombre
+    o = bpy.data.objects.new(nom, l)
+    o.rotation_euler = Vector(d).normalized().to_track_quat('-Z', 'Y').to_euler()
+    sc.collection.objects.link(o)
+
+
 def lumiere_camera(sc):
     w = bpy.data.worlds.get('noir') or bpy.data.worlds.new('noir')
     try:
@@ -599,23 +610,64 @@ def lumiere_camera(sc):
     # partout : rien ne marque un endroit du carreau plus qu'un autre),
     # incliné de 50° depuis la face vers le haut : les dessus des reliefs
     # s'allument, les ombres tombent courtes vers le bas
-    def soleil(nom, d, force, couleur, ombre, angle):
-        l = bpy.data.lights.new(nom, 'SUN')
-        l.energy = force
-        l.color = couleur
-        l.angle = math.radians(angle)
-        l.use_shadow = ombre
-        o = bpy.data.objects.new(nom, l)
-        o.rotation_euler = Vector(d).normalized().to_track_quat('-Z', 'Y').to_euler()
-        sc.collection.objects.link(o)
-
     a = math.radians(50)
-    soleil('haut', (0, math.cos(a), -math.sin(a)), FORCE_HAUT, (0.86, 0.93, 1.0), True, 4)
+    soleil(sc, 'haut', (0, math.cos(a), -math.sin(a)), FORCE_HAUT, (0.86, 0.93, 1.0), True, 4)
     # le débouché de face, faible et sans ombre : sans lui, ce que le haut
     # éclaire en rasant restait d'un noir de trou
-    soleil('face', (0, 1, 0), FORCE_FACE, (0.9, 0.95, 1.0), False, 10)
+    soleil(sc, 'face', (0, 1, 0), FORCE_FACE, (0.9, 0.95, 1.0), False, 10)
     b = math.radians(45)
-    soleil('bas', (0, math.cos(b), math.sin(b)), FORCE_BAS, (0.9, 0.95, 1.0), False, 10)
+    soleil(sc, 'bas', (0, math.cos(b), math.sin(b)), FORCE_BAS, (0.9, 0.95, 1.0), False, 10)
+    camera_face(sc)
+
+
+# LA LUMIÈRE NEUTRE (14/11, chantier « volume des parois ») : les surfaces
+# que le jeu éclaire lui-même (le mur, la seconde paroi, les deux matières,
+# les habillages) ne doivent plus porter le soleil du haut — peint dans
+# l'image, il donnait à chaque rivet un côté clair et un côté sombre FIXES,
+# et les lampes du jeu ne pouvaient plus les sculpter. Un ciel couvert à la
+# place : un fond de monde uniforme, de la teinte froide des soleils, qui
+# n'éclaire que par l'avant (la tôle de fond, 3 × 3 carreaux, cache
+# l'arrière). Aucun côté n'est favorisé ; les creux restent sombres (ils le
+# sont sous toute lampe) ; l'acier garde sa teinte, son brossé, ses reflets.
+# Le soleil de FACE reste : il vient de l'axe de la caméra, il n'éclaire
+# aucun côté plus qu'un autre — mais c'est lui qui allume les crêtes du film
+# d'eau de l'émail et le point de reflet de chaque goutte de la cire. Sous
+# le ciel seul, l'émail tombait de 0,18 à 0,075 de luminance, en sarcelle
+# uni : il avait perdu ce qui le dit mouillé (essai du 14/11).
+# Le ciel n'éclaire que la part DIFFUSE : un reflet net le voit noir, comme
+# le monde noir de la lumière de la charte. Vu dans les gouttes polies de la
+# cire, il les changeait en anneaux pâles, de la clarté de la cire autour —
+# elles ne perlaient plus (essai 2) ; noires, elles restent des perles.
+# réglée sur la luminance des surfaces du 13/11 (mur 0,15) : le ciel seul à
+# 0,38 la donnait (0,155) ; avec le soleil de face, 0,177 ; mais ciel ôté des
+# reflets, à 0,23, plus que 0,105 ; à 0,52, mur 0,137 et cire 0,151 — d'où
+# 0,62, l'acier sur son repère, les deux matières un rien au-dessus
+FORCE_NEUTRE = 0.62
+TEINTE_NEUTRE = (0.88, 0.94, 1.0)
+
+
+def lumiere_neutre(sc):
+    w = bpy.data.worlds.get('neutre') or bpy.data.worlds.new('neutre')
+    try:
+        w.use_nodes = True
+    except AttributeError:
+        pass
+    bg = next(n for n in w.node_tree.nodes if n.type == 'BACKGROUND')
+    bg.inputs['Color'].default_value = (*TEINTE_NEUTRE, 1)
+    nt = w.node_tree
+    for l in list(bg.inputs['Strength'].links):
+        nt.links.remove(l)
+    chemin = next((n for n in nt.nodes if n.type == 'LIGHT_PATH'), None) or nt.nodes.new('ShaderNodeLightPath')
+    terne = op(nt, 'MULTIPLY', op(nt, 'SUBTRACT', 1.0, chemin.outputs['Is Glossy Ray']), FORCE_NEUTRE)
+    nt.links.new(terne, bg.inputs['Strength'])
+    sc.world = w
+    soleil(sc, 'face', (0, 1, 0), FORCE_FACE, (0.9, 0.95, 1.0), False, 10)
+    camera_face(sc)
+
+
+def camera_face(sc):
+    """la caméra orthographique de face et les réglages de rendu, communs
+    aux deux lumières"""
     cam = bpy.data.cameras.new('face')
     cam.type = 'ORTHO'
     cam.ortho_scale = 1 + 2 * MARGE / PX

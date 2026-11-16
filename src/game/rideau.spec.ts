@@ -87,8 +87,10 @@ describe('rideau lamellaire — dans la composition', () => {
 
   it('la grille de l’évent vient de l’atlas, répétée à la main', () => {
     // dans la branche de l'évent seulement, au gradient explicite : pas une
-    // lecture par pixel de l'écran (revue, 29/09)
-    expect(renderer).toMatch(/if \(uHasGrille > 0\.5\) \{\s*vec3 texGrilleC = grilleEvent\(world, pxMonde\);/)
+    // lecture par pixel de l'écran (revue, 29/09). Lue au point du SOMMET
+    // (wS, qui vaut world relief éteint) : relief allumé, le motif suit le
+    // dessus déplacé (volume des parois, R4)
+    expect(renderer).toMatch(/if \(uHasGrille > 0\.5\) \{\s*vec3 texGrilleC = grilleEvent\(wS, pxMonde\);/)
     const g = renderer.slice(renderer.indexOf('vec3 grilleEvent('), renderer.indexOf('vec2 rdFluide('))
     expect(g).not.toMatch(/dFd[xy]/)
     expect(renderer).not.toMatch(/texture\(uTexGrille, world/)

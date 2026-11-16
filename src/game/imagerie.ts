@@ -6,6 +6,7 @@
 
 import { deleteImage, fetchImages, pushImage, type SharedImage } from './netImages'
 import { assetsLivres, RUBRIQUES, type AssetLivre } from './assetsLivres'
+import { vignetteSansAlpha } from './vignetteOpaque'
 
 export interface ImagerieOptions {
   auteur: () => string
@@ -100,7 +101,7 @@ export class Imagerie {
   }
 
   /** Une carte de vignette : livrée (indélébile) ou importée. */
-  private carte(nom: string, url: string, pied: string, livree: boolean): HTMLElement {
+  private carte(nom: string, url: string, pied: string, livree: boolean, relief = false): HTMLElement {
     const carte = document.createElement('div')
     carte.className = livree ? 'im-carte im-livree' : 'im-carte'
     carte.innerHTML = `
@@ -110,7 +111,18 @@ export class Imagerie {
         <button type="button" data-im="lien" title="Copier le lien de l'image">LIEN</button>
         ${livree ? '' : '<button type="button" data-im="retirer" title="Retirer de la bibliothèque">✕</button>'}
       </div>`
-    ;(carte.querySelector('.im-vue img') as HTMLImageElement).src = url
+    const vue = carte.querySelector('.im-vue img') as HTMLImageElement
+    vue.src = url
+    // une surface dont l'alpha est un RELIEF (assetsLivres : reliefDansAlpha)
+    // se montre sans lui, sinon elle paraît trouée (vignetteOpaque.ts)
+    if (relief) {
+      const source = new Image()
+      source.onload = () => {
+        const opaque = vignetteSansAlpha(source)
+        if (opaque) vue.src = opaque
+      }
+      source.src = url
+    }
     ;(carte.querySelector('.im-pied b') as HTMLElement).textContent = nom
     ;(carte.querySelector('.im-pied span') as HTMLElement).textContent = pied
     carte.querySelector('.im-vue')!.addEventListener('click', () => {
@@ -177,7 +189,7 @@ export class Imagerie {
       if (lot.length === 0) continue
       vus += lot.length
       this.grilleEl.appendChild(this.section(rubrique, lot.length))
-      for (const a of lot) this.grilleEl.appendChild(this.carte(a.nom, a.url, 'livrée', true))
+      for (const a of lot) this.grilleEl.appendChild(this.carte(a.nom, a.url, 'livrée', true, a.relief))
     }
     if (vus === 0) {
       const vide = document.createElement('p')

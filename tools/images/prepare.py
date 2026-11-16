@@ -30,7 +30,10 @@ LES MESURES, par famille (voir FAMILLES, et docs/charte-visuelle.md) :
     son bord, sinon elle est coupée par le cadre et se lit comme une
     vignette collée ;
   · le POIDS : au-delà du plafond de la famille, on baisse la qualité avant
-    de livrer — le jeu se joue sur téléphone.
+    de livrer — le jeu se joue sur téléphone ;
+  · le RELIEF des surfaces que les lampes éclairent (familles `relief`) :
+    l'alpha y porte la hauteur, pas une transparence — exigé, raccordé
+    comme la couleur, jamais compté dans la luminance (docs/assets-ia.md §37).
 
 Usage :
   python3 tools/images/prepare.py                 # tout masters/images/ → public/assets/
@@ -49,7 +52,7 @@ import os
 import re
 import sys
 from dataclasses import dataclass, field
-from typing import Iterable
+from typing import IO, Iterable
 
 import numpy as np
 from PIL import Image
@@ -83,6 +86,11 @@ class Famille:
     taille: tuple[int, int] | None = None
     cote_max: int = 1536
     alpha: bool = False  # pièce détourée : l'alpha est exigé, le bord doit être vide
+    # l'alpha porte la HAUTEUR de la surface (tools/images/blender/relief.py),
+    # pas une transparence : exigé, il ne pondère ni la luminance ni la part
+    # chaude, et son raccord se mesure comme celui de la couleur — le shader
+    # en tire la lumière des lampes, une couture du relief s'y verrait
+    relief: bool = False
     raccord_x: bool = False  # se répète horizontalement : couture gauche/droite mesurée
     raccord_y: bool = False  # se répète verticalement : couture haut/bas mesurée
     luma_max: float = 1.0  # luminance moyenne au-delà de laquelle l'image est refusée
@@ -118,11 +126,24 @@ FAMILLES: list[Famille] = [
     ),
     Famille(
         'atlas des habillages', ('paroi-atlas',), taille=(4096, 2048), luma_max=0.30, qualite=80,
-        poids_max_ko=1200, note='grille 4×2 de cases 1024² — le raccord des cases n’est PAS mesuré ici (à l’œil, dans le jeu)',
+        poids_max_ko=1200, relief=True,
+        note='grille 4×2 de cases 1024² — le raccord des cases n’est PAS mesuré ici (habillages.py le mesure case par case)',
+    ),
+    Famille(
+        # (14/11) ce que les lampes du jeu éclairent : rendu sous la lumière
+        # neutre de l'atelier, le relief dans l'alpha (docs/assets-ia.md §37)
+        'surface en relief',
+        ('wall', 'wall-*', 'phile', 'phobe'),
+        taille=(1024, 1024), raccord_x=True, raccord_y=True, luma_max=0.32, poids_max_ko=300, relief=True,
+    ),
+    Famille(
+        # les pastilles opaques de la légende (relief.py) : les surfaces
+        # elles-mêmes y seraient transparentes, leur alpha est un relief
+        'pastilles de légende', ('legende-surfaces',), taille=(216, 72), luma_max=0.32, poids_max_ko=20,
     ),
     Famille(
         'surface répétée',
-        ('wall', 'wall-*', 'phile', 'phobe', 'froid', 'tank-bg'),
+        ('froid', 'tank-bg'),
         taille=(1024, 1024), raccord_x=True, raccord_y=True, luma_max=0.32, poids_max_ko=300,
     ),
     Famille(
@@ -141,6 +162,54 @@ FAMILLES: list[Famille] = [
         'planche de cinématique', ('cine/*',), taille=(1600, 900), luma_max=0.50, chaud_max=1.0,
         qualite=84, poids_max_ko=260,
         note='1600×900 paysage, marge sur les bords (docs/assets-ia.md §11) ; l’alerte rouge y a droit',
+    ),
+    # Les planches et objets de la cérémonie « station » (rendus Blender). Elles
+    # passent AVANT « planche de vues » et « décalque » : sans cela, `fin-*`
+    # et `ceremonie-*` tomberaient dans « (inconnue) » — et aucun motif
+    # générique ne les mesurerait comme il faut. Plafonds de chauds : ceux
+    # par défaut ; le lot Blender ajuste les poids quand il les a MESURÉS.
+    Famille(
+        # le plafond, d'après ce qui est MESURÉ (13/11, qualité 82) : les
+        # icônes (3584×2048, 26 cases pleines) 301 Ko, luminance 0,30, 1 % de
+        # chauds (les bandes ocre du danger, la prime du tirage) ; les sceaux
+        # (1536×1024, acier neutre) 70 Ko, luminance 0,27, aucun chaud.
+        'planche de cérémonie', ('ceremonie-icones', 'ceremonie-sceaux'),
+        alpha=True, cote_max=4096, poids_max_ko=400,
+        note='grille de cases carrées de 512² (icônes 7×4, sceaux 3×2) — l’ordre des cases est un contrat avec src/game/iconesStation.ts et ceremonieObjets.ts',
+    ),
+    Famille(
+        # l'anneau de PALIER s'allume quand on le franchit : son or est celui
+        # que la charte réserve aux paliers (§3). Mesuré le 13/11 : 33 % de
+        # pixels chauds (l'intact luit, le brisé garde une braise), 17 Ko.
+        # Dans la planche de cérémonie, il tombait sous le plafond de 15 % des
+        # icônes — qu'on ne relève pas pour elles
+        'anneau de palier', ('ceremonie-anneau',), alpha=True, cote_max=4096, chaud_max=0.40,
+        poids_max_ko=60,
+        note='deux cases de 512² : intact, brisé (ceremonieObjets.ts, ANNEAU_URL)',
+    ),
+    Famille(
+        # mesuré le 13/11 (qualité 82) : 167 Ko, luminance 0,29, 1 % de chauds
+        # (le volant de la vanne de secours, la zone du sur-régime)
+        'planche des instruments', ('instruments-icones',), alpha=True, cote_max=4096,
+        poids_max_ko=250,
+        note='8×4 cases de 256² — l’ordre est ORDRE_INSTRUMENTS (src/game/iconesStation.ts)',
+    ),
+    Famille(
+        # mesuré le 13/11 (qualité 82) : les dos 20 à 21 Ko, les verres 33 Ko
+        # (bonbonne), 61 Ko (colonne), 113 Ko (bocal, le plus large : 880 px)
+        'objet de cérémonie', ('ceremonie-*-dos', 'ceremonie-*-verre'), alpha=True, cote_max=1600,
+        poids_max_ko=160,
+        note='le dos et le verre d’une cuve, le liquide passe entre les deux (ceremonieObjets.ts)',
+    ),
+    Famille(
+        # mesuré le 13/11 (qualité 84) : la capsule 29 Ko, luminance 0,06 ; la
+        # fiole brisée 15 Ko, 0,04 ; aucune des deux n'a de pixel chaud (les
+        # veilleuses ambre de la capsule sont des points) — le plafond de
+        # chauds reprend celui de la charte, l'alerte rouge des cinématiques
+        # n'a rien à faire ici
+        'scène de fin', ('fin-*',), taille=(1600, 900), luma_max=0.50,
+        qualite=84, poids_max_ko=120,
+        note='1600×900 paysage : la capsule bouclée, la fiole brisée',
     ),
     Famille(
         'planche de vues', ('*-anime', 'meta-eclat', 'meta-icones'), alpha=True, cote_max=4096,
@@ -265,6 +334,9 @@ class Mesure:
     bord: float | None
     poids_ko: int
     defauts: list[str] = field(default_factory=list)
+    # le raccord du relief rangé dans l'alpha (familles « relief »)
+    relief_x: float | None = None
+    relief_y: float | None = None
 
 
 def a_de_l_alpha(img: Image.Image) -> bool:
@@ -279,7 +351,8 @@ def mesure(nom: str, img: Image.Image, poids_octets: int, fam: Famille, alpha_so
     im = img.convert('RGBA')
     arr = np.asarray(im, dtype=np.float32) / 255.0
     rgb = arr[..., :3]
-    alpha = arr[..., 3] if a_alpha else None
+    # un alpha de relief n'est pas une transparence : rien ne se pondère
+    alpha = arr[..., 3] if (a_alpha and not fam.relief) else None
     m = Mesure(
         nom=nom, famille=fam, largeur=im.width, hauteur=im.height, alpha=a_alpha,
         luma=luminance(rgb, alpha), chaud=part_chaude(rgb, alpha),
@@ -290,6 +363,16 @@ def mesure(nom: str, img: Image.Image, poids_octets: int, fam: Famille, alpha_so
     )
     if fam.alpha and not a_alpha:
         m.defauts.append('pas de couche alpha : une pièce détourée en exige une')
+    if fam.relief:
+        if not a_alpha:
+            m.defauts.append('pas de relief dans l’alpha : les lampes ne la sculpteraient pas (relief.py)')
+        else:
+            hauteur = arr[..., 3:4]
+            m.relief_x = raccord(hauteur, 'x') if fam.raccord_x else None
+            m.relief_y = raccord(hauteur, 'y') if fam.raccord_y else None
+            for axe, v in (('horizontal', m.relief_x), ('vertical', m.relief_y)):
+                if v is not None and v > RACCORD_MAX:
+                    m.defauts.append(f'raccord {axe} du relief {v:.1f} > {RACCORD_MAX} : la couture se verrait à la lampe')
     if m.bord is not None and m.bord > 0.05:
         m.defauts.append(f'bord plein à {m.bord:.0%} : la pièce est coupée par le cadre')
     if m.luma > fam.luma_max:
@@ -332,11 +415,14 @@ def taille_de_sortie(img: Image.Image, fam: Famille) -> tuple[int, int]:
     return (max(1, round(w * k)), max(1, round(h * k)))
 
 
-def encode(img: Image.Image, chemin: str, qualite: int) -> int:
+def encode(img: Image.Image, chemin: str | IO[bytes], qualite: int, exact: bool = False) -> int:
     """Écrit le WebP et rend son poids. method=6 : le plus lent, le plus
-    petit — on ne fabrique pas soixante fois par seconde."""
-    img.save(chemin, 'WEBP', quality=qualite, method=6)
-    return os.path.getsize(chemin)
+    petit — on ne fabrique pas soixante fois par seconde. `exact` : libwebp
+    garde la couleur sous un alpha nul — sinon il la remplace (elle est
+    invisible sous une transparence), mais sous un alpha de RELIEF le fond
+    des joints est à 0, et sa couleur se voit."""
+    img.save(chemin, 'WEBP', quality=qualite, method=6, exact=exact)
+    return chemin.tell() if hasattr(chemin, 'tell') else os.path.getsize(chemin)
 
 
 def fabrique(nom: str, chemin_master: str, dst: str, fam: Famille, recadre: bool, ecrit: bool) -> Mesure:
@@ -363,15 +449,14 @@ def fabrique(nom: str, chemin_master: str, dst: str, fam: Famille, recadre: bool
         import io
 
         tampon = io.BytesIO()
-        img.save(tampon, 'WEBP', quality=fam.qualite, method=6)
-        return mesure(nom, img, tampon.tell(), fam, alpha_source)
+        return mesure(nom, img, encode(img, tampon, fam.qualite, fam.relief), fam, alpha_source)
     # au-dessus du plafond de poids, on descend la qualité par pas de 4 —
     # jamais sous 60, où le WebP se met à baver sur les aplats sombres
     qualite = fam.qualite
-    poids = encode(img, sortie, qualite)
+    poids = encode(img, sortie, qualite, fam.relief)
     while poids > fam.poids_max_ko * 1024 and qualite > 60:
         qualite -= 4
-        poids = encode(img, sortie, qualite)
+        poids = encode(img, sortie, qualite, fam.relief)
     m = mesure(nom, img, poids, fam, alpha_source)
     if qualite != fam.qualite:
         m.defauts = [d for d in m.defauts if 'trop lourd' not in d]
@@ -390,6 +475,7 @@ def ligne(m: Mesure) -> str:
     return (
         f'{m.nom:<28} {m.famille.nom:<22} {m.largeur:>5}×{m.hauteur:<5} '
         f'{m.luma:5.2f} {m.chaud:5.0%} {f(m.raccord_x)} {f(m.raccord_y)} {bord} {m.poids_ko:>5} Ko'
+        + (f'   relief {f(m.relief_x)} {f(m.relief_y)}' if (m.relief_x is not None or m.relief_y is not None) else '')
     )
 
 

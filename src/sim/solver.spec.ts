@@ -272,6 +272,104 @@ describe('FluidSim — invariants physiques', () => {
     expect(Math.abs(apres.py - avant.py)).toBeLessThan(5)
   })
 
+  // Le point de rassemblement : un corps ÉTIRÉ (lancé en éventail le long de
+  // x, avec une dérive verticale commune) que l'on touche à son bout. Le
+  // témoin est le même corps rassemblé au centre (stick au neutre).
+  function corpsEtire(): FluidSim {
+    const sim = makeSim()
+    sim.spawnDisc(0, 0, 300, KIND_PLAYER)
+    for (let i = 0; i < sim.count; i++) {
+      sim.velX[i] = sim.posX[i] * 5
+      sim.velY[i] = 30 // la dérive d'ensemble, que le geste doit respecter
+    }
+    for (let s = 0; s < 40; s++) sim.step(sim.params.dt)
+    sim.updatePlayerStats()
+    return sim
+  }
+  function boutDroit(sim: FluidSim): { x: number; y: number } {
+    let k = -1
+    for (let i = 0; i < sim.count; i++) {
+      if (sim.kind[i] !== KIND_PLAYER) continue
+      if (k < 0 || sim.posX[i] > sim.posX[k]) k = i
+    }
+    return { x: sim.posX[k], y: sim.posY[k] }
+  }
+
+  it('toucher le bout d’un corps étiré l’y rassemble, sans le lancer', () => {
+    const temoin = corpsEtire()
+    const sim = corpsEtire()
+    const bout = boutDroit(sim)
+    const trajet = bout.x - sim.stats.centroidX
+    expect(trajet).toBeGreaterThan(80) // le corps est bien étiré
+    // deux secondes de geste maintenu, puis relâché
+    for (let s = 0; s < 240; s++) {
+      temoin.rassemble(temoin.params.dt)
+      temoin.step(temoin.params.dt)
+      sim.rassemble(sim.params.dt, bout.x, bout.y)
+      sim.step(sim.params.dt)
+    }
+    for (let s = 0; s < 30; s++) {
+      temoin.step(temoin.params.dt)
+      sim.step(sim.params.dt)
+    }
+    temoin.updatePlayerStats()
+    sim.updatePlayerStats()
+    // le corps s'est ramassé VERS le bout touché, pas au centre : il l'englobe
+    // (le trajet est raccourci du rayon du corps compact, ~60 u ici)
+    const glisse = sim.stats.centroidX - temoin.stats.centroidX
+    expect(glisse).toBeGreaterThan((trajet - 60) * 0.7)
+    expect(glisse).toBeLessThan(trajet)
+    expect(Math.abs(sim.stats.centroidY - temoin.stats.centroidY)).toBeLessThan(10)
+    // …ramassé pour de bon…
+    expect(sim.stats.rmsRadius).toBeLessThan(temoin.stats.rmsRadius * 1.2)
+    // …et RELÂCHÉ sans élan : la dérive est celle du témoin
+    expect(Math.abs(sim.stats.velX - temoin.stats.velX)).toBeLessThan(3)
+    expect(Math.abs(sim.stats.velY - temoin.stats.velY)).toBeLessThan(3)
+  })
+
+  it('relâcher le geste en route ne lance pas le corps', () => {
+    const temoin = corpsEtire()
+    const sim = corpsEtire()
+    const bout = boutDroit(sim)
+    // un toucher bref : le corps est encore en plein glissement au relâché
+    for (let s = 0; s < 20; s++) {
+      temoin.rassemble(temoin.params.dt)
+      temoin.step(temoin.params.dt)
+      sim.rassemble(sim.params.dt, bout.x, bout.y)
+      sim.step(sim.params.dt)
+    }
+    for (let s = 0; s < 60; s++) {
+      temoin.step(temoin.params.dt)
+      sim.step(sim.params.dt)
+    }
+    temoin.updatePlayerStats()
+    sim.updatePlayerStats()
+    expect(Math.abs(sim.stats.velX - temoin.stats.velX)).toBeLessThan(3)
+    expect(Math.abs(sim.stats.velY - temoin.stats.velY)).toBeLessThan(3)
+  })
+
+  it('toucher le bord d’un corps déjà ramassé ne le fait pas ramper', () => {
+    // sans le rayon compact retranché, chaque toucher au bord avancerait le
+    // corps d'un rayon : une locomotion gratuite, sans une goutte payée
+    const sim = makeSim()
+    sim.spawnDisc(0, 0, 300, KIND_PLAYER)
+    for (let s = 0; s < 30; s++) sim.step(sim.params.dt)
+    sim.updatePlayerStats()
+    const x0 = sim.stats.centroidX
+    const y0 = sim.stats.centroidY
+    for (let toucher = 0; toucher < 3; toucher++) {
+      const bord = boutDroit(sim)
+      for (let s = 0; s < 120; s++) {
+        sim.rassemble(sim.params.dt, bord.x, bord.y)
+        sim.step(sim.params.dt)
+      }
+      sim.step(sim.params.dt) // relâché
+    }
+    sim.updatePlayerStats()
+    expect(Math.abs(sim.stats.centroidX - x0)).toBeLessThan(6)
+    expect(Math.abs(sim.stats.centroidY - y0)).toBeLessThan(6)
+  })
+
   it('une gouttelette éjectée respecte son délai de réabsorption', () => {
     const sim = makeSim({ reabsorbCooldown: 60 })
     sim.spawnDisc(0, 0, 200, KIND_PLAYER)

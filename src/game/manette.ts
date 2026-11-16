@@ -14,7 +14,8 @@
 //   LB / RB        ralentir / accélérer le temps
 //   RT / LT        zoomer / dézoomer (progressif, à la pression)
 //   stick droit    caméra                 croix ↕  zoom (aussi)
-//   L3 / R3        recadrer : caméra et zoom automatiques
+//   L3             recadrer : caméra et zoom automatiques
+//   R3             dossier de descente — B le referme, comme la légende
 //   croix ↔        ralenti / accéléré (aussi)
 //   Start          pause                  Select   recommencer
 //   A (menus)      valider le bouton principal visible

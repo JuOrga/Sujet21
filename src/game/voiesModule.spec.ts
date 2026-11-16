@@ -246,6 +246,45 @@ describe('les réglages du tissage — ce que le concepteur tourne au banc', () 
     expect(bifurcations / 400).toBeGreaterThan(3)
   })
 
+  // LE PIÈGE DE LA VOIE DU BORD (le joueur, 13/11 : « si je choisis la voie
+  // du haut au début je me retrouve avec une seule ligne tout en haut et
+  // aucun moyen de descendre »). Un nœud du milieu tirait deux sorties de
+  // côté, un nœud du bord une seule : le haut ne descendait qu'une
+  // transition sur trois, et 12 % des modules de six salles n'offraient
+  // aucune descente depuis le haut.
+  const versLInterieur = (mc: MiniCarte, v: 0 | 2): boolean[] =>
+    mc.rangs.slice(0, -1).map((r) => r[v].suivants.includes(1))
+
+  it('la voie du bord bifurque vers le milieu autant que le milieu de ses deux côtés réunis', () => {
+    let bord = 0
+    let milieu = 0
+    let transitions = 0
+    for (let g = 0; g < 1500; g++) {
+      const mc = tisseMiniCarte(6, aleaDeGraine(`bord${g}`), [0, 1, 2, 3], () => 2, { debut: 1, suite: 2 }, true, NU)
+      for (const r of mc.rangs.slice(0, -1)) {
+        transitions++
+        bord += (Number(r[0].suivants.includes(1)) + Number(r[2].suivants.includes(1))) / 2
+        milieu += r[1].suivants.length - 1
+      }
+    }
+    // avant : 35 % par transition au bord, autant que le milieu PAR CÔTÉ ;
+    // le bord tire désormais sa seule branche de ses deux tirages
+    expect(bord / transitions).toBeGreaterThan(0.5)
+    expect(bord / transitions).toBeGreaterThan((0.75 * milieu) / transitions)
+  })
+
+  it('aucune voie du bord sans issue : dans tout module d’au moins deux salles, le haut descend et le bas monte quelque part', () => {
+    for (const bifurcation of [0.05, 0.45, 1])
+      for (const n of [2, 3, 6])
+        for (let g = 0; g < 300; g++) {
+          const mc = tisseMiniCarte(n, aleaDeGraine(`issue${g}`), [0, 1, 2, 3], () => 2, { debut: 1, suite: 2 }, true, { ...NU, bifurcation })
+          expect(versLInterieur(mc, 0), `haut, n=${n}, bif=${bifurcation}, graine ${g}`).toContain(true)
+          expect(versLInterieur(mc, 2), `bas, n=${n}, bif=${bifurcation}, graine ${g}`).toContain(true)
+        }
+    // un module d'une salle n'a pas de transition : rien à garantir
+    expect(tisseMiniCarte(1, aleaDeGraine('seul'), [0], () => 2, { debut: 0, suite: 0 }, false, NU).rangs[0].every((n) => n.suivants.length === 0)).toBe(true)
+  })
+
   it('les réglages n’ajoutent aucun tirage : la même graine donne la même grille quel que soit le réglage des salles', () => {
     // la part change QUELS nœuds sont des rencontres, pas la géométrie ni les mécaniques
     const a = tisseMiniCarte(6, aleaDeGraine('g'), [0, 1, 2, 3], () => 2, { debut: 1, suite: 2 }, true, { ...NU, partEvenement: 0 })

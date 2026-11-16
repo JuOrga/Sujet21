@@ -14,6 +14,20 @@ export interface AssetLivre {
   url: string
   nom: string
   rubrique: string
+  /** son alpha est un RELIEF, pas une transparence (reliefDansAlpha) */
+  relief: boolean
+}
+
+/** Les surfaces dont la couche alpha porte le RELIEF (docs/assets-ia.md §37 :
+ *  le mur, la seconde paroi, les deux matières, l'atlas des habillages) — le
+ *  shader l'y lit comme une hauteur. Montrées telles quelles, elles
+ *  paraîtraient trouées : la cire est presque à zéro sous ses perles, le fond
+ *  des joints à zéro. La galerie les montre donc SANS leur alpha. */
+export function reliefDansAlpha(url: string): boolean {
+  const f = url.slice(url.lastIndexOf('/') + 1)
+  // les deux matières (phile, phobe) sont revenues aux images en ligne,
+  // opaques (le concepteur, 15/11)
+  return /^(wall|wall-a|paroi-atlas)\.webp$/.test(f)
 }
 
 /** L'ordre des rubriques : celui du regard d'un concepteur — d'abord ce
@@ -24,6 +38,7 @@ export const RUBRIQUES = [
   'Zones d’état',
   'Machinerie & décalques',
   'Méta & commerce',
+  'Cérémonie station',
   'Avaries — stations',
   'Codex — aperçus',
   'Serre & cultures',
@@ -39,6 +54,7 @@ const NOMS: Record<string, string> = {
   'paroi-atlas.webp': 'Atlas des habillages de paroi (4×2)',
   'phile.webp': 'Surface hydrophile',
   'phobe.webp': 'Surface hydrophobe',
+  'legende-surfaces.webp': 'Légende — pastilles du mur et des deux matières (opaques)',
   'conduite-atlas.webp': 'Conduite d’ammoniac (tronçon, bride, joint, givre du sol)',
   'chaudiere-atlas.webp': 'Chaleurs : la chaudière (rampe, bout, joint, brûleur, compacte, sol chauffé) et le surchauffeur (tube de verre, tête, dôme)',
   'filtres-atlas.webp': 'Filtres : la grille de l’évent et le rideau lamellaire (tronçon à lanières, montant)',
@@ -82,6 +98,19 @@ const NOMS: Record<string, string> = {
   'sas-raccord-v.webp': 'Sas de raccord (quart de tour)',
   'meta-eclat.webp': 'Méta — éclat de mémoire',
   'meta-icones.webp': 'Méta — planche d’icônes (4×2)',
+  // LA CÉRÉMONIE STATION — rendue dans Blender (docs/assets-ia.md § 36)
+  'ceremonie-icones.webp': 'Cérémonie — planche d’icônes (7×4)',
+  'ceremonie-sceaux.webp': 'Cérémonie — sceaux de rang et de module (3×2)',
+  'ceremonie-bonbonne-dos.webp': 'Cérémonie — bonbonne (dos)',
+  'ceremonie-bonbonne-verre.webp': 'Cérémonie — bonbonne (verre)',
+  'ceremonie-reserve-dos.webp': 'Cérémonie — bocal de réserve (dos)',
+  'ceremonie-reserve-verre.webp': 'Cérémonie — bocal de réserve (verre)',
+  'ceremonie-maitrise-dos.webp': 'Cérémonie — colonne de maîtrise (dos)',
+  'ceremonie-maitrise-verre.webp': 'Cérémonie — colonne de maîtrise (verre)',
+  'ceremonie-anneau.webp': 'Cérémonie — anneau de palier (intact, brisé)',
+  'instruments-icones.webp': 'Cérémonie — planche des instruments et contreparties (8×4)',
+  'fin-capsule.webp': 'Fin — la bonbonne scellée part en capsule',
+  'fin-fiole-brisee.webp': 'Fin — l’échantillon perdu, la fiole brisée',
   // les illustrations du tableau des avaries (public/assets/avaries/<id>.webp),
   // une par station de reparations.ts — la même image éteinte ou allumée
   'eclairage.webp': 'Avarie — réseau d’éclairage',
@@ -103,11 +132,15 @@ export function rubriqueDe(url: string): string {
   // le dossier fait foi, sinon elles tombaient dans « Autres »
   if (url.includes('/avaries/')) return 'Avaries — stations'
   if (url.includes('/codex/')) return 'Codex — aperçus'
-  if (/^(wall|paroi|phile|phobe|conduite|chaudiere|filtres|sponge)/.test(f))
+  if (/^(wall|paroi|phile|phobe|conduite|chaudiere|filtres|sponge|legende-surfaces)/.test(f))
     return 'Surfaces & matériaux'
   if (f.startsWith('zone-')) return 'Zones d’état'
   if (f.startsWith('serre-')) return 'Serre & cultures'
   if (f.startsWith('meta-')) return 'Méta & commerce'
+  // les planches, objets et scènes de fin rendus pour la cérémonie : leurs
+  // noms sont un contrat (iconesStation.ts, ceremonieObjets.ts) ; sans cette
+  // règle, chacune tombait dans « Autres » à sa livraison
+  if (/^(ceremonie-|instruments-icones|fin-)/.test(f)) return 'Cérémonie station'
   if (f.startsWith('sas-')) return 'Coque & fonds'
   if (
     f.startsWith('decal-') ||
@@ -142,7 +175,7 @@ export function assetsLivres(): AssetLivre[] {
   for (const chemin of Object.keys(FICHIERS)) {
     const i = chemin.indexOf('/public/')
     const url = i >= 0 ? chemin.slice(i + '/public'.length) : chemin
-    out.push({ url, nom: nomDe(url), rubrique: rubriqueDe(url) })
+    out.push({ url, nom: nomDe(url), rubrique: rubriqueDe(url), relief: reliefDansAlpha(url) })
   }
   const rang = (r: string): number => {
     const i = (RUBRIQUES as readonly string[]).indexOf(r)
