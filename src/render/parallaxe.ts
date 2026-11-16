@@ -46,7 +46,12 @@ export interface ReglagesParallaxe {
 export const PARALLAXE_DEFAUTS: ReglagesParallaxe = {
   ciel: { suivi: 0.38, zoom: 0.45 },
   semis: { suivi: 1, zoom: 0.75 },
-  cuve: { suivi: 0.9, zoom: 0.94 },
+  // LA PAROI DE CUVE EST COLLÉE AU MONDE (16/11). Elle suivait à 90 % et
+  // zoomait à 94 % : le fond glissait sous les murs et le fluide, et l'on
+  // croyait voir le jeu évoluer sur un verre posé par-dessus — « pas
+  // terrible » (le concepteur). C'est le fond du tableau, pas un lointain :
+  // il tient aux murs. Le banc garde ses deux curseurs.
+  cuve: { suivi: 1, zoom: 1 },
   // MESURÉ, pas estimé : le zoom d'une salle en début de partie tourne
   // autour de 0,13–0,15 sur 1280 × 800 (l'auto-zoom cadre le corps, et le
   // corps est alors au plus gros). C'est donc là qu'on étale : à l'entrée

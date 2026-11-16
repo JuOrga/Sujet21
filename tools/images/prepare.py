@@ -143,8 +143,17 @@ FAMILLES: list[Famille] = [
     ),
     Famille(
         'surface répétée',
-        ('froid', 'tank-bg'),
+        ('froid',),
         taille=(1024, 1024), raccord_x=True, raccord_y=True, luma_max=0.32, poids_max_ko=300,
+    ),
+    Famille(
+        # LA DALLE du fond de cuve (16/11, blender/fond_cuve.py) : trois
+        # carreaux sur deux, 2700 × 1800 unités — un tableau standard n'en
+        # voit qu'une. Même finesse que l'ancien carreau (1024 px pour 900
+        # unités), six fois sa surface : le plafond de poids suit.
+        'fond de cuve',
+        ('tank-bg',),
+        taille=(3072, 2048), raccord_x=True, raccord_y=True, luma_max=0.32, poids_max_ko=700,
     ),
     Famille(
         'éponge', ('sponge-*',), taille=(1024, 1024), raccord_x=True, raccord_y=True,

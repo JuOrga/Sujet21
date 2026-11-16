@@ -111,6 +111,9 @@ import {
   hauteursPartagees,
   type BoiteVolume,
 } from './volume'
+import { FOND_DALLE } from './fondCuve'
+import { OMBRE_POINTE_GLSL } from './ombrePointe'
+import { tranchesBandeau } from './lampes'
 import { RELIEF_PAROIS_GLSL, fractionSommet, pointDuSommet } from './reliefParois'
 import {
   CARREAU_MONDE,
@@ -1058,6 +1061,8 @@ ${LUMIERE_SCENE_GLSL}
 uniform vec2 uParCiel;   // la station lointaine
 uniform vec2 uParSemis;  // le semis d'étoiles proches
 uniform vec2 uParCuve;   // la paroi de cuve, derrière l'eau
+// l'étendue de la dalle du fond de cuve, en unités monde (fondCuve.ts)
+#define FOND_DALLE vec2(${glslFloat(FOND_DALLE[0])}, ${glslFloat(FOND_DALLE[1])})
 uniform sampler2D uTexTank; // fond de cuve : panneaux, conduites, liserés
 uniform sampler2D uTexWall;
 uniform sampler2D uTexWallA; // seconde paroi : les murs alternent, sans répétition visible
@@ -2754,7 +2759,7 @@ void main() {
   // est DERRIÈRE l'eau, elle suit un peu la caméra et la profondeur se sent.
   vec2 nuv = uv * 2.0 - 1.0;
   float vign = 1.0 - 0.35 * dot(nuv, nuv);
-  vec3 tankTex = texture(uTexTank, coucheFond(world, uParCuve) / 900.0).rgb;
+  vec3 tankTex = texture(uTexTank, coucheFond(world, uParCuve) / FOND_DALLE).rgb;
   vec3 tank = uHasTank > 0.5
     ? tankTex * (0.55 * vign + 0.12)
     : vec3(0.012, 0.022, 0.040) * vign;
@@ -2763,10 +2768,9 @@ void main() {
     caus *= vnoise(world * 0.03 - vec2(uTime * 0.02, uTime * 0.04));
     tank += vec3(0.010, 0.028, 0.040) * caus;
   }
-  float lw = 1.2 / uZoom;
-  float gridDim = uHasTank > 0.5 ? 0.5 : 1.0; // la texture a ses propres lignes
-  tank += vec3(0.05, 0.09, 0.13) * gridLine(world, 100.0, lw) * 0.30 * gridDim;
-  tank += vec3(0.07, 0.12, 0.17) * gridLine(world, 500.0, lw * 1.6) * 0.45 * gridDim;
+  // (la trame de mesure — une ligne tous les 100, une tous les 500 — datait
+  // du fond en aplat ; par-dessus un fond dessiné, on n'y voyait qu'une
+  // grille posée sur le tableau : retirée, le concepteur, 16/11)
   // halo le long des parois : la cuve est éclairée par sa coque
   tank += vec3(0.020, 0.045, 0.060) * exp(min(0.0, roomD) * 0.02);
   // L'OMBRE DE CONTACT au pied de la paroi de la cuve (volume des parois,
@@ -4265,7 +4269,7 @@ void main() {
           envL += 1.35 * texture(uLightMap, luvR).rgb;
         }
         vec3 envT = uHasTank > 0.5
-          ? textureLod(uTexTank, coucheFond(reflPos, uParCuve) / 900.0, 2.0).rgb
+          ? textureLod(uTexTank, coucheFond(reflPos, uParCuve) / FOND_DALLE, 2.0).rgb
           : vec3(0.10, 0.16, 0.22);
         vec3 env = envT * envL * vec3(0.80, 1.00, 1.20) + envL * envL * vec3(0.30, 0.38, 0.46);
         // le plafond dans le cœur : là où la flaque regarde vers le haut
@@ -4337,7 +4341,7 @@ void main() {
           envL += 1.35 * texture(uLightMap, luvR).rgb;
         }
         vec3 envT = uHasTank > 0.5
-          ? textureLod(uTexTank, coucheFond(reflPos, uParCuve) / 900.0, 2.0).rgb
+          ? textureLod(uTexTank, coucheFond(reflPos, uParCuve) / FOND_DALLE, 2.0).rgb
           : vec3(0.10, 0.16, 0.22);
         // le punch du miroir : les hautes lumières réfléchies CLAQUENT
         vec3 env = envT * envL * vec3(0.80, 1.00, 1.20) + envL * envL * vec3(0.30, 0.38, 0.46);
@@ -4798,11 +4802,11 @@ vec2 pointLampe(int li, vec2 p) {
   return c + axe * clamp(dot(p - c, axe), -uLampesFix[li].z, uLampesFix[li].z);
 }
 
-// alt : l'ALTITUDE du rayon à ce point, sur sa montée du sol vers la
+${OMBRE_POINTE_GLSL}// alt : l'ALTITUDE du rayon à ce point, sur sa montée du sol vers la
 // lampe. Un obstacle plus bas qu'elle est déjà sous le rayon — il n'ombre
 // plus rien. C'est ce qui sépare le mobilier (140 u, enjambé) de la coque
 // d'une salle (jusqu'au plafond, jamais enjambée).
-float sceneSdf(vec2 p, float alt) {
+float sceneSdf(vec2 p, float alt, float plein) {
   float d = 1e9;
   for (int i = 0; i < min(uBoxCount, MAX_BOXES); i++) {
     vec4 dec = decodeAux(uBoxAux[i].x);
@@ -4814,7 +4818,13 @@ float sceneSdf(vec2 p, float alt) {
     // tôt qu'un mur haut) ; la coque monte au plafond. À hauteur ÉGALE, elle
     // est enjambée aussi : un toit ne s'ombre pas lui-même, ni ses voisins
     // du même groupe (la marche des toits part de leur hauteur, voir main)
-    if (alt >= (dec.y > 4.5 ? HAUTEUR_COQUE : hauteurBoite(i))) continue;
+    float hObs = dec.y > 4.5 ? HAUTEUR_COQUE : hauteurBoite(i);
+    if (alt >= hObs) continue;
+    // LA POINTE DE L'OMBRE EST UN FONDU (ombrePointe.ts) : au seuil seul,
+    // l'ombre finissait sur une coupure nette — un arc au sol sous un
+    // bandeau (le concepteur, 16/11). Sur sa dernière tranche de hauteur,
+    // l'obstacle s'éloigne du rayon : il ombre de moins en moins.
+    float leve = leveePointe(alt, hObs, plein);
     vec2 wb = p;
     float ang = uBoxAux[i].y;
     if (abs(ang) > 0.0005) {
@@ -4834,7 +4844,7 @@ float sceneSdf(vec2 p, float alt) {
       bool hC = conduiteHoriz(szC, conduiteSens(uBoxAux[i].z));
       vec2 qC = wb - 0.5 * (uBoxes[i].xy + uBoxes[i].zw);
       d = min(d, conduiteOmbreSdf(hC ? qC.x : qC.y, hC ? qC.y : qC.x,
-                                  hC ? szC.x : szC.y, hC ? szC.y : szC.x));
+                                  hC ? szC.x : szC.y, hC ? szC.y : szC.x) + leve);
       continue;
     }
     // le SURCHAUFFEUR ombre comme son tube (ou son dôme)
@@ -4843,7 +4853,7 @@ float sceneSdf(vec2 p, float alt) {
       bool hC = conduiteHoriz(szC, conduiteSens(surchCode(uBoxAux[i].z)));
       vec2 qC = wb - 0.5 * (uBoxes[i].xy + uBoxes[i].zw);
       d = min(d, surchOmbreSdf(hC ? qC.x : qC.y, hC ? qC.y : qC.x,
-                               hC ? szC.x : szC.y, hC ? szC.y : szC.x));
+                               hC ? szC.x : szC.y, hC ? szC.y : szC.x) + leve);
       continue;
     }
     // la CHAUDIÈRE ombre comme son carter (ou sa compacte)
@@ -4852,10 +4862,10 @@ float sceneSdf(vec2 p, float alt) {
       bool hC = conduiteHoriz(szC, conduiteSens(uBoxAux[i].z));
       vec2 qC = wb - 0.5 * (uBoxes[i].xy + uBoxes[i].zw);
       d = min(d, chaudiereOmbreSdf(hC ? qC.x : qC.y, hC ? qC.y : qC.x,
-                                   hC ? szC.x : szC.y, hC ? szC.y : szC.x));
+                                   hC ? szC.x : szC.y, hC ? szC.y : szC.x) + leve);
       continue;
     }
-    d = min(d, formeSdf(wb, uBoxes[i], dec.y, dec.z, dec.w));
+    d = min(d, formeSdf(wb, uBoxes[i], dec.y, dec.z, dec.w) + leve);
   }
   return d;
 }
@@ -5008,7 +5018,7 @@ void main() {
     float t = 4.0;
     for (int k = 0; k < 40; k++) {
       if (t >= tLim || res < 0.004) break;
-      float h = sceneSdf(p + dir * t, t * hL / distL);
+      float h = sceneSdf(p + dir * t, t * hL / distL, t / pen);
       res = min(res, pen * h / t);
       t += clamp(h, 8.0, 200.0);
     }
@@ -5036,7 +5046,7 @@ void main() {
       float tT = 4.0;
       for (int k = 0; k < 40; k++) {
         if (tT >= tLimT || resT < 0.004) break;
-        float hS = sceneSdf(p + dir * tT, hT + tT * monte);
+        float hS = sceneSdf(p + dir * tT, hT + tT * monte, tT / pen);
         resT = min(resT, pen * hS / tT);
         tT += clamp(hS, 8.0, 200.0);
       }
@@ -6247,6 +6257,7 @@ export class Renderer {
     // raccordait pas (écart de bord ~5 contre 1,5 en interne) et se répétait
     // EN MIROIR — les bords coïncidaient, mais les caissons et les conduites
     // se répondaient en symétrie, ce qui trahissait la répétition.
+    // (16/11 : une dalle de 3072 × 2048, trois carreaux sur deux — fondCuve.ts)
     this.loadTexture('/assets/tank-bg.webp', true, true, (t) => (this.texTank = t))
     this.loadTexture('/assets/wall.webp', true, true, (t) => (this.texWall = t))
     this.loadTexture(
@@ -8131,32 +8142,38 @@ export class Renderer {
       }
       // même rayon que le dessin procédural, marge des pattes comprise
       const R = Math.min(26, Math.max(11, 9 + l.h * 0.012)) * l.taille * 1.35
-      const hw = l.bandeau ? l.demiLong + R : R
       const hh = R
       const ca = Math.cos(l.angleRad)
       const sa = Math.sin(l.angleRad)
-      const q = this.decalScratch
-      let o = 0
-      const put = (dx: number, dy: number, u: number, v: number): void => {
-        q[o++] = l.x + dx * ca - dy * sa
-        q[o++] = l.y + dx * sa + dy * ca
-        q[o++] = u
-        q[o++] = v
-      }
-      put(-hw, -hh, 0, 0)
-      put(hw, -hh, 1, 0)
-      put(hw, hh, 1, 1)
-      put(-hw, -hh, 0, 0)
-      put(hw, hh, 1, 1)
-      put(-hw, hh, 0, 1)
-      gl.bindBuffer(gl.ARRAY_BUFFER, this.decalVbo)
-      gl.bufferSubData(gl.ARRAY_BUFFER, 0, q)
       gl.activeTexture(gl.TEXTURE0)
       gl.bindTexture(gl.TEXTURE_2D, tex)
       gl.uniform1i(du['uTexDecal'], 0)
       gl.uniform1f(du['uFade'], 0.92)
       gl.uniform1f(du['uEfface'], 0)
-      gl.drawArrays(gl.TRIANGLES, 0, 6)
+      gl.bindBuffer(gl.ARRAY_BUFFER, this.decalVbo)
+      // LE BANDEAU EN TROIS TRANCHES (lampes.ts) : deux embouts carrés, un
+      // milieu qui prend la longueur. D'un seul quad, l'image s'étirait
+      // avec la lampe — ses embouts ronds en pointes, ses boulons en ovales.
+      // Le plafonnier, lui, tient dans un quad.
+      const tranches = l.bandeau ? tranchesBandeau(l.demiLong, R) : [{ x0: -R, x1: R, u0: 0, u1: 1 }]
+      for (const t of tranches) {
+        const q = this.decalScratch
+        let o = 0
+        const put = (dx: number, dy: number, u: number, v: number): void => {
+          q[o++] = l.x + dx * ca - dy * sa
+          q[o++] = l.y + dx * sa + dy * ca
+          q[o++] = u
+          q[o++] = v
+        }
+        put(t.x0, -hh, t.u0, 0)
+        put(t.x1, -hh, t.u1, 0)
+        put(t.x1, hh, t.u1, 1)
+        put(t.x0, -hh, t.u0, 0)
+        put(t.x1, hh, t.u1, 1)
+        put(t.x0, hh, t.u0, 1)
+        gl.bufferSubData(gl.ARRAY_BUFFER, 0, q)
+        gl.drawArrays(gl.TRIANGLES, 0, 6)
+      }
     }
     if (started) {
       gl.bindVertexArray(null)
