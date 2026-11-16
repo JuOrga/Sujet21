@@ -3207,50 +3207,53 @@ void main() {
       dV = dec.y > 0.5 ? formeSdf(wbT, uBoxes[bi], dec.y, dec.z, dec.w) : boxSdf(wbT, uBoxes[bi]);
       wbV = wbT;
       if (dV > 0.0) {
-        if (d <= 0.0) {
+        // la hauteur vue est le DERNIER passage du dedans au dehors le long
+        // du chemin pied → sommet.
+        // UNE BOÎTE : le balayage exact (flancBalaye, reliefParois.ts). Hors
+        // de la base (une face latérale vue de biais, une paroi plus mince
+        // que le déplacement), trois échantillons ne voyaient que cinq copies
+        // de la boîte : au coin libre d'une paroi, le bord en biais du flanc
+        // tombait en escalier (le concepteur, 16/11). SUR la base, la hauteur
+        // s'estimait par deux distances, celle de l'arête la plus proche du
+        // pixel : près d'un bout de la face, c'est l'arête d'à côté, et un
+        // triangle à 45° prenait une hauteur fausse (le concepteur, 16/11,
+        // « les faces verticales »). Le balayage vaut des deux côtés du pied.
+        // Les formes COURBES ou creuses gardent l'estime et l'échantillonnage :
+        // leur balayage n'a pas de forme close.
+        if (dec.y < 0.5) {
+          vec2 rL = vec2(caR * relB.x + saR * relB.y, -saR * relB.x + caR * relB.y);
+          vec2 fb = flancBalaye(wb, uBoxes[bi], rL);
+          // sur la base, sous le vide : pleine tranche
+          flanc = d <= 0.0 ? 1.0 : 1.0 - smoothstep(-1.0, 1.5, fb.x);
+          htFlanc = fb.y;
+        } else if (dec.y > 2.5 && dec.y < 3.5) {
+          // UN COIN (le triangle) : convexe, il a lui aussi son balayage
+          // exact — le sommet de sa tranche sortait en dents de scie
+          vec2 rL = vec2(caR * relB.x + saR * relB.y, -saR * relB.x + caR * relB.y);
+          vec2 fb = flancBalayeCoin(wb, uBoxes[bi], dec.z, rL);
+          flanc = d <= 0.0 ? 1.0 : 1.0 - smoothstep(-1.0, 1.5, fb.x);
+          htFlanc = fb.y;
+        } else if (d <= 0.0) {
           flanc = 1.0; // sur la base, sous le vide : pleine tranche
           // le chemin du pied au sommet coupe la base ici et le sommet à son
-          // bord : la hauteur vue est la part du chemin, mesurée par les DEUX
-          // SDF — fiable sur toutes les faces, verticales comprises
+          // bord : la hauteur vue est la part du chemin, estimée par les DEUX
+          // SDF
           htFlanc = clamp(-d / max(dV - d, 1e-3), 0.0, 1.0);
         } else {
-          // hors de la base (une face latérale vue de biais, une paroi plus
-          // mince que le déplacement) : la hauteur vue est le DERNIER passage
-          // du dedans au dehors le long du chemin pied → sommet (avant, elle
-          // restait à 0 : toute la tranche à la couleur du pied)
-          // UNE BOÎTE : le balayage exact (flancBalaye, reliefParois.ts). Les
-          // trois échantillons ne voyaient que cinq copies de la boîte : au
-          // coin libre d'une paroi, le bord en biais du flanc tombait en
-          // escalier (le concepteur, 16/11). Les formes COURBES ou creuses
-          // gardent l'échantillonnage : leur balayage n'a pas de forme close.
-          if (dec.y < 0.5) {
-            vec2 rL = vec2(caR * relB.x + saR * relB.y, -saR * relB.x + caR * relB.y);
-            vec2 fb = flancBalaye(wb, uBoxes[bi], rL);
-            flanc = 1.0 - smoothstep(-1.0, 1.5, fb.x);
-            htFlanc = fb.y;
-          } else if (dec.y > 2.5 && dec.y < 3.5) {
-            // UN COIN (le triangle) : convexe, il a lui aussi son balayage
-            // exact — le sommet de sa tranche sortait en dents de scie
-            vec2 rL = vec2(caR * relB.x + saR * relB.y, -saR * relB.x + caR * relB.y);
-            vec2 fb = flancBalayeCoin(wb, uBoxes[bi], dec.z, rL);
-            flanc = 1.0 - smoothstep(-1.0, 1.5, fb.x);
-            htFlanc = fb.y;
-          } else {
-            float dP = d;
-            for (int fs = 1; fs <= 3; fs++) {
-              vec2 wM = world - relB * (float(fs) / 4.0);
-              vec2 wbM = wM;
-              if (abs(bAngR) > 0.0005) {
-                vec2 relM = wM - bcR;
-                wbM = bcR + vec2(caR * relM.x + saR * relM.y, -saR * relM.x + caR * relM.y);
-              }
-              float dM = formeSdf(wbM, uBoxes[bi], dec.y, dec.z, dec.w);
-              flanc = max(flanc, 1.0 - smoothstep(-1.0, 1.5, dM));
-              if (dP <= 0.0 && dM > 0.0) htFlanc = (float(fs) - 1.0 + dP / (dP - dM)) / 4.0;
-              dP = dM;
+          float dP = d;
+          for (int fs = 1; fs <= 3; fs++) {
+            vec2 wM = world - relB * (float(fs) / 4.0);
+            vec2 wbM = wM;
+            if (abs(bAngR) > 0.0005) {
+              vec2 relM = wM - bcR;
+              wbM = bcR + vec2(caR * relM.x + saR * relM.y, -saR * relM.x + caR * relM.y);
             }
-            if (dP <= 0.0) htFlanc = (3.0 + dP / (dP - dV)) / 4.0;
+            float dM = formeSdf(wbM, uBoxes[bi], dec.y, dec.z, dec.w);
+            flanc = max(flanc, 1.0 - smoothstep(-1.0, 1.5, dM));
+            if (dP <= 0.0 && dM > 0.0) htFlanc = (float(fs) - 1.0 + dP / (dP - dM)) / 4.0;
+            dP = dM;
           }
+          if (dP <= 0.0) htFlanc = (3.0 + dP / (dP - dV)) / 4.0;
         }
       }
       // (les pièces n'en sont pas : leur dessus est leur IMAGE, le sol caché
@@ -3338,9 +3341,24 @@ void main() {
     // pas comme le même objet que son dessus. Le sommet (déplacé) se peint
     // ensuite par-dessus.
     if (flanc > 0.003 && !aPieces) { // la conduite et la chaudière n'ont pas de tranche de boîte
-      vec2 gB = gradSdfBoite(bi, wb, d, dec, bca, bsa);
-      float gn2 = max(length(gB), 1e-5);
-      vec2 nrm = gB / gn2;
+      // LA FACE QU'ON VOIT est celle où tombe le PIED de ce point — pas l'arête
+      // la plus proche du pixel. Près d'un bout de la face, la plus proche
+      // est l'arête d'à côté, cachée : un triangle à 45° y prenait sa lumière
+      // et tournait la texture d'un quart (le concepteur, 16/11, « les faces
+      // verticales » : sombre au bout d'un flanc, clair sous des blocs collés).
+      // Une boîte : la face de sortie du chemin pied → sommet (faceFlanc,
+      // reliefParois.ts), ramenée du repère de la boîte à celui du monde. Les
+      // formes : le gradient de leur distance, lu au pied.
+      vec2 rLF = vec2(bca * relB.x + bsa * relB.y, -bsa * relB.x + bca * relB.y);
+      vec2 nrm;
+      if (dec.y < 0.5) {
+        vec2 nL = faceFlanc(wb, uBoxes[bi], rLF);
+        nrm = vec2(bca * nL.x - bsa * nL.y, bsa * nL.x + bca * nL.y);
+      } else {
+        vec2 wbPied = wb - rLF * htFlanc;
+        vec2 gB = gradSdfBoite(bi, wbPied, sdfBoiteLocal(bi, wbPied, dec), dec, bca, bsa);
+        nrm = gB / max(length(gB), 1e-5);
+      }
       vec2 tng = vec2(-nrm.y, nrm.x);
       // LA PROJECTION : l'abscisse le long de l'arête (au pied, pour que les
       // verticales de la texture restent verticales sur la face), l'ordonnée

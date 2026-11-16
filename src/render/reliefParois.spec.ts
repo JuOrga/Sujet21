@@ -12,6 +12,7 @@ import {
   corpsDevine,
   facteurRelief,
   fonduRelief,
+  faceFlanc,
   facesTranche,
   flancBalaye,
   flancBalayeTriangle,
@@ -650,6 +651,62 @@ describe('le flanc d\'une boîte est le balayage exact du pied au sommet', () =>
     expect(RELIEF_PAROIS_GLSL).toContain('vec2 flancBalaye(vec2 p, vec4 b, vec2 r)')
     expect(boucle).toMatch(/flancBalaye\(wb, uBoxes\[bi\], rL\)/)
     expect(boucle).toMatch(/dec\.y > 0\.5/)
+  })
+})
+
+// LA FACE QU'ON VOIT (retour du concepteur, 16/11, « quelques bugs sur les
+// faces verticales ») : aux deux bouts d'une tranche, un triangle sombre, et
+// un autre mal éclairé sous une rangée de blocs collés. La tranche prenait sa
+// normale et sa hauteur à l'arête de la base LA PLUS PROCHE DU PIXEL ; près
+// d'un bout, c'est l'arête d'à côté — celle qu'on ne voit pas.
+describe('la face que montre un point de la tranche', () => {
+  const B = [0, 0, 100, 60] as const
+
+  it('près d’un bout, ce n’est pas l’arête la plus proche : le cas des captures', () => {
+    // le sommet glisse vers la gauche et un peu vers le haut : on voit la face
+    // DROITE. Le point de cette face à mi-hauteur, 3 u sous le coin du haut,
+    // s'affiche à 1 u de l'arête du HAUT et à 5 u de celle de droite
+    const [rx, ry] = [-10, 4]
+    const [x, y] = [100 + 0.5 * rx, 57 + 0.5 * ry]
+    expect(60 - y).toBeLessThan(100 - x)
+    expect(faceFlanc(x, y, B, rx, ry)).toEqual([1, 0])
+    expect(flancBalaye(x, y, B, rx, ry)[1]).toBeCloseTo(0.5, 9)
+  })
+
+  it('partout sur la tranche : le pied tombe sur la face rendue, et elle regarde l’œil', () => {
+    for (const [rx, ry] of [[-10, 4], [14, 9], [-6, -17], [20, 0], [0, -12]] as const) {
+      let vus = 0
+      for (let x = -25; x <= 125; x += 1.7) {
+        for (let y = -25; y <= 85; y += 1.3) {
+          const [d, t] = flancBalaye(x, y, B, rx, ry)
+          // sur la tranche seulement : dans le balayage, hors du dessus
+          if (d > -0.2 || t >= 1 - 1e-9) continue
+          const [nx, ny] = faceFlanc(x, y, B, rx, ry)
+          expect(Math.abs(nx) + Math.abs(ny)).toBe(1)
+          // le pied de ce point est SUR cette face de la base
+          const [fx, fy] = [x - t * rx, y - t * ry]
+          const ecart = nx !== 0 ? fx - (nx > 0 ? B[2] : B[0]) : fy - (ny > 0 ? B[3] : B[1])
+          expect(Math.abs(ecart)).toBeLessThan(1e-6)
+          // et la face est de celles qu'on voit : le sommet s'en éloigne
+          expect(nx * rx + ny * ry).toBeLessThan(0)
+          vus++
+        }
+      }
+      expect(vus).toBeGreaterThan(50)
+    }
+  })
+
+  it('le shader : la normale vient de la face vue, la hauteur du balayage — plus de l’arête la plus proche', () => {
+    expect(RELIEF_PAROIS_GLSL).toContain('vec2 faceFlanc(vec2 p, vec4 b, vec2 r)')
+    expect(flanc).toMatch(/faceFlanc\(wb, uBoxes\[bi\], /)
+    // les formes : le gradient se lit AU PIED du point, pas sous le pixel
+    expect(flanc).not.toMatch(/gradSdfBoite\(bi, wb, d,/)
+    expect(flanc).toMatch(/gradSdfBoite\(bi, wbPied, /)
+    // dans la base, une boîte ou un coin ne devinent plus leur hauteur par
+    // deux distances : seules les formes courbes gardent cette estime
+    const estime = boucle.indexOf('htFlanc = clamp(-d / max(dV - d')
+    expect(estime).toBeGreaterThan(0)
+    expect(boucle.slice(0, estime)).toMatch(/else if \(d <= 0\.0\) \{[^}]*$/)
   })
 })
 
