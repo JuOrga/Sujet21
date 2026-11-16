@@ -111,6 +111,33 @@ export function solCache(
   return Math.max(sommet, tranche)
 }
 
+/** L'OMBRE QUE LE CORPS POSE SUR LA TRANCHE, 0..1. `corps` : la présence du
+ *  fluide au pied de la face (0..1, lue juste devant le pied) ; `z` : la
+ *  hauteur du point de la tranche qu'on regarde, en unités monde (0 au
+ *  pied) ; `hCorps` : la hauteur du corps (HAUTEUR_CORPS, renderer.ts).
+ *  POURQUOI : collé à une paroi, le corps s'aplatissait contre… rien de
+ *  lisible. La tranche est une face VERTICALE vue de biais, mais à plat sur
+ *  l'écran elle se lisait comme une bande de sol entre le dessus et la cuve
+ *  (le concepteur, 16/11 : « quand il est en contact ça peut faire
+ *  étrange »). Un volume posé contre un mur l'assombrit à SA hauteur : c'est
+ *  cette ombre qui dit que la face se dresse. Deux lectures, comme au sol
+ *  (l'épaisseur, renderer.ts) :
+ *  - le PLI, serré et dense au pied : la ligne où le corps touche le mur ;
+ *  - la PORTÉE, qui monte et s'éteint à la hauteur du corps — sur un mur
+ *    haut elle s'arrête aux deux tiers de la face (95 sur 140), une plaque
+ *    basse est ombrée jusqu'à son arête.
+ *  Sans corps au pied, elle vaut 0 : la tranche garde son modelé d'avant. */
+export function ombreCorpsFlanc(corps: number, z: number, hCorps: number): number {
+  const h = Math.max(hCorps, 1e-3)
+  const pli = 1 - smoothstep(0, PLI_CORPS_FLANC * h, z)
+  const portee = 1 - smoothstep(0.45 * h, h, z)
+  return Math.min(Math.max(corps, 0), 1) * Math.max(pli, PORTEE_CORPS_FLANC * portee)
+}
+/** Le pli : la part de la hauteur du corps où l'ombre est à son plein. */
+export const PLI_CORPS_FLANC = 0.22
+/** La portée : sa densité, face au pli (1). */
+export const PORTEE_CORPS_FLANC = 0.8
+
 /** LE FLANC D'UNE BOÎTE, BALAYÉ EXACTEMENT. Le point `p` (dans le repère de
  *  la boîte `b` = minX, minY, maxX, maxY) est sur la tranche s'il existe un
  *  t de [0, 1] tel que `p − t·r` soit dans la boîte : t = 0 le pied, t = 1
@@ -316,6 +343,12 @@ float solCache(float relief, float d, float dV, float flanc, float w, float opac
   float sommet = (1.0 - smoothstep(-w, 0.0, dV)) * opacite;
   float tranche = d > 0.0 ? flanc : flanc * permeable * smoothstep(0.5 * w, 1.5 * w, -d);
   return max(sommet, tranche);
+}
+float ombreCorpsFlanc(float corps, float z, float hCorps) {
+  float h = max(hCorps, 1e-3);
+  float pli = 1.0 - smoothstep(0.0, ${glslFloat(PLI_CORPS_FLANC)} * h, z);
+  float portee = 1.0 - smoothstep(0.45 * h, h, z);
+  return clamp(corps, 0.0, 1.0) * max(pli, ${glslFloat(PORTEE_CORPS_FLANC)} * portee);
 }
 // le flanc d'une boîte, balayé exactement (flancBalaye, reliefParois.ts) :
 // (distance signée au balayage, hauteur vue). La boîte se mesure ici, à la

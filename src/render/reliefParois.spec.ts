@@ -13,6 +13,9 @@ import {
   flancBalaye,
   flancBalayeTriangle,
   fractionSommet,
+  ombreCorpsFlanc,
+  PLI_CORPS_FLANC,
+  PORTEE_CORPS_FLANC,
   pointDuSommet,
   solCache,
 } from './reliefParois'
@@ -781,5 +784,51 @@ describe('le halo des hydro ne se peint pas sur un autre solide', () => {
   })
   it('relief allumé : ni sur une tranche, ni sur un dessus déplacé (la hauteur vue)', () => {
     expect(aura).toMatch(/if \(uRelief > 0\.0\) aura \*= 1\.0 - step\(0\.0, zVis\);/)
+  })
+})
+
+// Le concepteur, 16/11 : le corps collé à une paroi s'aplatissait contre une
+// bande qui se lisait comme du sol — la tranche, face verticale vue de biais.
+describe('le corps adossé à une paroi ombre sa tranche', () => {
+  const H_CORPS = 95
+  it('sans corps au pied, la tranche garde son modelé : 0 à toute hauteur', () => {
+    for (let z = 0; z <= 140; z += 5) expect(ombreCorpsFlanc(0, z, H_CORPS)).toBe(0)
+  })
+  it('au pied, le pli est plein ; il se desserre sans jamais remonter', () => {
+    expect(ombreCorpsFlanc(1, 0, H_CORPS)).toBe(1)
+    let avant = 1
+    for (let z = 1; z <= 140; z += 1) {
+      const o = ombreCorpsFlanc(1, z, H_CORPS)
+      expect(o, `z ${z}`).toBeLessThanOrEqual(avant + 1e-9)
+      avant = o
+    }
+  })
+  it("la portée monte à la hauteur du corps et s'y éteint : au-dessus, le mur est franc", () => {
+    // passé le pli, c'est la portée qui tient l'ombre — à sa densité
+    expect(ombreCorpsFlanc(1, PLI_CORPS_FLANC * H_CORPS, H_CORPS)).toBeCloseTo(PORTEE_CORPS_FLANC, 2)
+    expect(ombreCorpsFlanc(1, 0.6 * H_CORPS, H_CORPS)).toBeGreaterThan(0.1)
+    for (const z of [H_CORPS, 110, 140]) expect(ombreCorpsFlanc(1, z, H_CORPS)).toBe(0)
+    // une plaque basse (40) est ombrée jusqu'à son arête
+    expect(ombreCorpsFlanc(1, 40, H_CORPS)).toBeGreaterThan(0.4)
+  })
+  it('elle suit la présence du corps, bornée à 0..1', () => {
+    expect(ombreCorpsFlanc(0.5, 0, H_CORPS)).toBeCloseTo(0.5, 6)
+    expect(ombreCorpsFlanc(3, 0, H_CORPS)).toBe(1)
+    expect(ombreCorpsFlanc(-1, 0, H_CORPS)).toBe(0)
+  })
+  it('le shader porte le jumeau, et le lit sur la tranche — au pied du point regardé', () => {
+    expect(RELIEF_PAROIS_GLSL).toContain('float ombreCorpsFlanc(float corps, float z, float hCorps)')
+    expect(RELIEF_PAROIS_GLSL).toContain(`${PLI_CORPS_FLANC} * h`)
+    expect(RELIEF_PAROIS_GLSL).toContain(`${PORTEE_CORPS_FLANC} * portee`)
+    const tranche = blocApres(flanc, 'if (flanc > 0.003 && !aPieces) {')
+    expect(tranche).toContain('vec2 pied = world - relB * htFlanc;')
+    expect(tranche).toContain('ombreCorpsFlanc(corps, htFlanc * hB, HAUTEUR_CORPS)')
+    // avant que la tranche ne se pose sur l'image
+    expect(tranche.indexOf('ombreCorpsFlanc(')).toBeLessThan(tranche.indexOf('col = mix(col, fc, flanc * devant);'))
+  })
+  it('la vapeur ne s’adosse pas, et le champ se lit sans gradient implicite (boucle des boîtes)', () => {
+    const lecture = blocApres(source, 'float corpsAuPied(vec2 pw) {')
+    expect(lecture).toContain('textureLod(uField, fuv, 0.0)')
+    expect(lecture).toContain('* (1.0 - vap)')
   })
 })

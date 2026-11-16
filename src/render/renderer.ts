@@ -1665,6 +1665,19 @@ vec2 rdFluide(vec2 pw) {
   return vec2(pres * icy, pres * (1.0 - icy));
 }
 
+// LE CORPS AU PIED D'UNE TRANCHE, 0..1 : ce qui, là, a une épaisseur à
+// dresser contre le mur — l'eau et la glace, pas la vapeur (un nuage ne
+// s'adosse pas : il n'a ni bord ni hauteur). Le seuil est celui du dessin du
+// corps, un peu élargi : la lisière des splats suffit à dire qu'il touche.
+// textureLod : appelée dans la boucle des boîtes (gradientBoucles.spec.ts).
+float corpsAuPied(vec2 pw) {
+  vec2 fuv = ((pw - uCenter) * uZoom + uViewport * 0.5) / uViewport;
+  if (fuv.x < 0.0 || fuv.x > 1.0 || fuv.y < 0.0 || fuv.y > 1.0) return 0.0;
+  vec4 t = textureLod(uField, fuv, 0.0);
+  float vap = clamp(-t.a / max(t.r, 1e-5), 0.0, 1.0);
+  return smoothstep(0.7 * uThreshold, 1.3 * uThreshold, t.r / uFieldScale) * (1.0 - vap);
+}
+
 // Un point du rideau (s le long, t en travers : 0 au rail, 1 au seuil) en
 // MONDE, rotation de la boîte comprise (l'inverse du dépivotage de la boucle)
 vec2 rdMonde(float s, float t, vec2 bmin, vec2 bsize, bool horiz, float ca, float sa) {
@@ -3307,6 +3320,20 @@ void main() {
       fc *= mix(0.52, 1.15, 0.5 + 0.5 * face) * eclMat;
       // DEVANT ? Sous une surface plus haute (un dessus voisin, une tranche
       // plus haute), cette tranche est cachée : elle ne se peint pas
+      // L'OMBRE DU CORPS SUR LA TRANCHE (reliefParois.ts : ombreCorpsFlanc).
+      // Le pied de ce point de la face est à world − relB × htFlanc ; le
+      // corps se lit juste DEVANT, le long de la normale — à 10 u, là où il
+      // s'appuie, et à 26 u, pour qu'une goutte de passage (26 u de large)
+      // ne pèse pas comme un corps adossé. Teinte : celle de l'ombre du
+      // corps au sol. Lumière éteinte aussi : c'est une lecture du volume,
+      // comme l'ombre de contact au pied, pas un effet de lampe.
+      vec2 pied = world - relB * htFlanc;
+      float corps = corpsAuPied(pied + nrm * 10.0);
+      if (corps > 0.003) {
+        corps *= 0.45 + 0.55 * corpsAuPied(pied + nrm * 26.0);
+        float oC = ombreCorpsFlanc(corps, htFlanc * hB, HAUTEUR_CORPS);
+        fc = mix(fc, fc * vec3(0.20, 0.26, 0.40), oC * 0.9);
+      }
       float devant = step(zVis - 0.5, htFlanc * hB);
       col = mix(col, fc, flanc * devant);
     }
