@@ -18,6 +18,7 @@ import {
   cloneCarte,
   couleurTemperature,
   orbeRequis,
+  biomeDeSalle,
   biomeEffectif,
   biomesDeCarte,
   mecaniqueDuBiome,
@@ -221,6 +222,21 @@ describe('biomesDeCarte — la liste que la planche et l’éditeur proposent', 
     c.modules.find((m) => m.id === 'P1')!.biome = 'abysses'
     expect(biomesDeCarte(c).find((b) => b.code === 'abysses')!.nom).toBe('PUITS FROID')
     expect(verifieCarte(c).some((v) => v.niveau === 'attention' && v.module === 'P1' && v.message.includes('fiche'))).toBe(true)
+  })
+
+  it('biomeDeSalle : à l’essai, la salle prend le biome que le tableau porte', () => {
+    // le menu Biome de l'éditeur restait sans effet à l'essai : tempéré sans
+    // run, ou le module de la run restée derrière
+    expect(biomeDeSalle(CARTE_LIVREE, undefined, 'chaud', true)).toBe('chaud')
+    expect(biomeDeSalle(CARTE_LIVREE, 'tempere', 'cryo', true)).toBe('cryo')
+    // un ancien code de module suit le biome de ce module
+    expect(biomeDeSalle(CARTE_LIVREE, undefined, 'C1', true)).toBe('cryo')
+    // un tableau universel n'a rien à dire : le module, sinon le tempéré
+    expect(biomeDeSalle(CARTE_LIVREE, 'chaud', undefined, true)).toBe('chaud')
+    expect(biomeDeSalle(CARTE_LIVREE, undefined, '', true)).toBe('tempere')
+    // en run, le module commande, quoi que porte le tableau
+    expect(biomeDeSalle(CARTE_LIVREE, 'cryo', 'chaud', false)).toBe('cryo')
+    expect(biomeDeSalle(CARTE_LIVREE, '', 'chaud', false)).toBe('')
   })
 
   it('biomeEffectif : un tableau marqué d’un code de module suit le biome de ce module', () => {

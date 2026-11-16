@@ -96,6 +96,7 @@ import {
   type CarteStation,
   ORBES,
   accessibles,
+  biomeDeSalle,
   biomeEffectif,
   biomesDeCarte,
   mecaniqueDuBiome,
@@ -1553,7 +1554,8 @@ function releveSalle2d(): void {
   const m = moduleEnCours()
   const { vue, reel } = vueModule2d()
   // le biome donne la forme du module ET sa teinte (module2dCanvas, THEMES)
-  const biome = m?.biome ?? 'tempere'
+  // — à l'essai, celui que le TABLEAU porte (carteStation.ts, biomeDeSalle)
+  const biome = biomeDeSalle(carte, m?.biome, level.biome, testLevel !== null)
   salle2d = { module: m?.id ?? '', niveau: carteRun.niveau, vue, reel, forme: formeDuBiome(biome), biome, num: ++salle2dNum }
 }
 // les pièces se chargent à la première salle ; un échec se retente au bout

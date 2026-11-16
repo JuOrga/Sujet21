@@ -701,6 +701,22 @@ export function biomeEffectif(c: CarteStation, code: string | undefined): string
   return mod ? mod.biome.trim() || k : k
 }
 
+/** LE BIOME D'UNE SALLE QU'ON CHARGE : en run, celui du module où l'on est
+ *  (la pioche n'y propose que ses tableaux) ; à l'ESSAI — depuis l'éditeur,
+ *  la planche, un rejeu —, celui que le tableau porte. Le menu Biome de
+ *  l'éditeur ne changeait rien à l'essai : la salle prenait la coque du
+ *  module de la run restée derrière, ou le tempéré sans run (16/11). Un
+ *  tableau universel n'a rien à dire : le module, ou le tempéré, comme avant. */
+export function biomeDeSalle(
+  c: CarteStation,
+  biomeModule: string | undefined,
+  biomeTableau: string | undefined,
+  essai: boolean,
+): string {
+  const porte = essai ? biomeEffectif(c, biomeTableau) : ''
+  return porte || (biomeModule ?? 'tempere')
+}
+
 /** LA MÉCANIQUE FAVORITE d'un biome, null sans fiche ou sans favorite. */
 export function mecaniqueDuBiome(c: CarteStation, code: string): 0 | 1 | 2 | 3 | null {
   return c.biomes[code.trim()]?.mecanique ?? null
