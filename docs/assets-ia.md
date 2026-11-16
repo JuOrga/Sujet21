@@ -239,6 +239,18 @@ existent, le jeu les dessine à la place du luminaire procédural, à la positio
 de chaque lampe posée (taille et rotation automatiques). Tant qu'ils n'existent
 pas, le dessin procédural reste en place — aucun risque.
 
+> **Refaits dans Blender le 16/11** (`tools/images/blender/lampes.py`). Les
+> deux images générées montraient un dos de lampe en métal clair, rien
+> d'allumé ; en jeu, des pastilles pâles et un bandeau étiré en pointes —
+> « c'est moche » (le concepteur). On regarde toujours le luminaire
+> par-dessus, mais la LUMIÈRE Y FUIT : un anneau clair autour du capot du
+> plafonnier, deux bandes de part et d'autre de l'épine du bandeau. À la
+> taille du jeu (une quinzaine de pixels), c'est la lumière qui doit
+> dominer : un simple liseré s'y réduisait à un fil. Le bandeau se dessine
+> en TROIS TRANCHES (`src/render/lampes.ts`) : deux embouts carrés jamais
+> étirés, un milieu uniforme qui prend la longueur. Les consignes de
+> génération ci-dessous sont gardées pour mémoire.
+
 ### 12a. `lampe-plafonnier.webp`
 **512×512 · WebP/PNG TRANSPARENT · parfaitement centré · vu du DESSUS**
 
