@@ -2237,11 +2237,13 @@ float sdfVisible(int bi, vec2 p) {
 // LA HAUTEUR DE LA TRANCHE d'une boîte vue en ce pixel, relief allumé : le
 // chemin pied → sommet (relB, le déplacement de SON sommet) la traverse ici
 // à la hauteur fb.y × hb (flancBalaye, le balayage exact) ; −1 s'il ne la
-// traverse pas franchement. Les formes (coques, arrondis) rendent −1 : leur
-// balayage n'a pas de forme close, elles ne cachent que par leur dessus.
+// traverse pas franchement. Le coin (triangle) a le sien. Les formes courbes
+// ou creuses (coques, arrondis) rendent −1 : leur balayage n'a pas de forme
+// close, elles ne cachent que par leur dessus.
 float hauteurTranche(int bi, vec2 world, vec2 relB, float hb) {
   vec4 dec = decodeAux(uBoxAux[bi].x);
-  if (dec.y > 0.5) return -1.0;
+  bool coin = dec.y > 2.5 && dec.y < 3.5;
+  if (dec.y > 0.5 && !coin) return -1.0;
   vec2 wb = world;
   vec2 rL = relB;
   float a = uBoxAux[bi].y;
@@ -2255,7 +2257,7 @@ float hauteurTranche(int bi, vec2 world, vec2 relB, float hb) {
   }
   // loin de la base de plus que le déplacement, le chemin ne la croise pas
   if (boxSdf(wb, uBoxes[bi]) > length(rL)) return -1.0;
-  vec2 fb = flancBalaye(wb, uBoxes[bi], rL);
+  vec2 fb = coin ? flancBalayeCoin(wb, uBoxes[bi], dec.z, rL) : flancBalaye(wb, uBoxes[bi], rL);
   return fb.x < -1.0 ? fb.y * hb : -1.0;
 }
 
@@ -3157,11 +3159,18 @@ void main() {
           // UNE BOÎTE : le balayage exact (flancBalaye, reliefParois.ts). Les
           // trois échantillons ne voyaient que cinq copies de la boîte : au
           // coin libre d'une paroi, le bord en biais du flanc tombait en
-          // escalier (le concepteur, 16/11). Les FORMES (dec.y > 0.5) gardent
-          // l'échantillonnage : leur balayage n'a pas de forme close.
+          // escalier (le concepteur, 16/11). Les formes COURBES ou creuses
+          // gardent l'échantillonnage : leur balayage n'a pas de forme close.
           if (dec.y < 0.5) {
             vec2 rL = vec2(caR * relB.x + saR * relB.y, -saR * relB.x + caR * relB.y);
             vec2 fb = flancBalaye(wb, uBoxes[bi], rL);
+            flanc = 1.0 - smoothstep(-1.0, 1.5, fb.x);
+            htFlanc = fb.y;
+          } else if (dec.y > 2.5 && dec.y < 3.5) {
+            // UN COIN (le triangle) : convexe, il a lui aussi son balayage
+            // exact — le sommet de sa tranche sortait en dents de scie
+            vec2 rL = vec2(caR * relB.x + saR * relB.y, -saR * relB.x + caR * relB.y);
+            vec2 fb = flancBalayeCoin(wb, uBoxes[bi], dec.z, rL);
             flanc = 1.0 - smoothstep(-1.0, 1.5, fb.x);
             htFlanc = fb.y;
           } else {
@@ -3499,6 +3508,13 @@ void main() {
         // l'aura. On voyait le bloc à sa base, cerclé de brume : ni sommet
         // déplacé, ni flanc. Sous son propre sommet, la brume s'arrête.
         aura *= 1.0 - solPropre;
+        // ELLE S'ARRÊTE AUX SOLIDES : c'est une lecture du SOL. Collée à un
+        // autre bloc, elle se peignait sur son dessus — « le halo traverse
+        // les murs » (le concepteur, 16/11). Là où le dessus d'un voisin
+        // couvre le pixel (libre), elle se tait ; relief allumé, sur toute
+        // surface dressée aussi, tranche ou dessus déplacé (la hauteur vue).
+        aura *= libre;
+        if (uRelief > 0.0) aura *= 1.0 - step(0.0, zVis);
         float mist = 0.5 + 0.5 * dnoise(world * 0.045 + vec2(uTime * 0.10, -uTime * 0.07));
         vec3 auraCol = mat < 1.5 ? vec3(0.12, 0.42, 0.45) : vec3(0.38, 0.20, 0.52);
         col += auraCol * aura * (0.45 + 0.55 * mist);

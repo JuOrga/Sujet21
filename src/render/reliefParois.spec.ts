@@ -11,6 +11,7 @@ import {
   fonduRelief,
   facesTranche,
   flancBalaye,
+  flancBalayeTriangle,
   fractionSommet,
   pointDuSommet,
   solCache,
@@ -666,8 +667,8 @@ describe('relief allumé, la surface la plus haute cache les autres', () => {
   it('la hauteur de la tranche se lit au balayage exact, dans le repère de la boîte', () => {
     expect(hauteurTranche).toContain('flancBalaye(')
     expect(hauteurTranche).toMatch(/fb\.y \* hb/)
-    // les formes (coques, arrondis) n'y entrent pas : leur balayage n'a pas de forme close
-    expect(hauteurTranche).toMatch(/dec\.y > 0\.5\) return -1\.0/)
+    // les formes courbes ou creuses n'y entrent pas (le coin, si) : leur balayage n'a pas de forme close
+    expect(hauteurTranche).toMatch(/dec\.y > 0\.5 && !coin\) return -1\.0/)
   })
 
   it('la couverture retient la hauteur vue : un dessus franc, sinon une tranche ; relief éteint, rien', () => {
@@ -682,5 +683,100 @@ describe('relief allumé, la surface la plus haute cache les autres', () => {
 
   it('un dessus sous une surface plus haute non plus — à hauteur égale, l’ordre du tableau reste', () => {
     expect(source).toMatch(/if \(uRelief > 0\.0 && hauteurBoite\(bi\) < zVis - 0\.5\) dV = max\(dV, 1\.0e4\);/)
+  })
+})
+
+// LE FLANC D'UN COIN (le triangle, la moitié d'une boîte), BALAYÉ EXACTEMENT
+// (retour du concepteur, 16/11, second tour) : « effet escalier sur l'arête
+// du bloc hydro » — un triangle hydrophobe collé à un bloc. Les formes
+// gardaient les cinq copies ; le sommet de la tranche du triangle sortait en
+// dents de scie. Un triangle est convexe : le chemin pied → sommet s'y lit
+// arête par arête, comme les tranches de la boîte.
+describe("le flanc d'un coin est le balayage exact du pied au sommet", () => {
+  const T = [0, 0, 240, 0, 0, 300] as const // angle droit en (0, 0)
+  const segment = (x: number, y: number, ax: number, ay: number, bx: number, by: number): number => {
+    const ex = bx - ax
+    const ey = by - ay
+    const t = Math.min(Math.max(((x - ax) * ex + (y - ay) * ey) / (ex * ex + ey * ey), 0), 1)
+    return Math.hypot(x - ax - t * ex, y - ay - t * ey)
+  }
+  const dedans = (x: number, y: number): boolean => x >= 0 && y >= 0 && x / 240 + y / 300 <= 1
+  const triangle = (x: number, y: number): number => {
+    const d = Math.min(segment(x, y, 0, 0, 240, 0), segment(x, y, 240, 0, 0, 300), segment(x, y, 0, 300, 0, 0))
+    return dedans(x, y) ? -d : d
+  }
+  const N = 4000
+  const reference = (x: number, y: number, rx: number, ry: number) => {
+    let dMin = Infinity
+    let tSortie = -1
+    for (let k = 0; k <= N; k++) {
+      const t = k / N
+      const dd = triangle(x - t * rx, y - t * ry)
+      dMin = Math.min(dMin, dd)
+      if (dd <= 0) tSortie = t
+    }
+    return { dMin, tSortie }
+  }
+  const deplacements = [
+    [30, 12],
+    [-25, 18],
+    [8, -35],
+    [-20, -28],
+  ] as const
+
+  it('dehors, la distance est celle du balayage : plus de dents au sommet de la tranche', () => {
+    for (const [rx, ry] of deplacements) {
+      for (let x = -50; x <= 290; x += 6.1) {
+        for (let y = -50; y <= 350; y += 7.3) {
+          const ref = reference(x, y, rx, ry)
+          if (ref.dMin <= 0.05) continue
+          expect(flancBalayeTriangle(x, y, T, rx, ry)[0]).toBeCloseTo(ref.dMin, 1)
+        }
+      }
+    }
+  })
+
+  it('dedans, la hauteur vue est le dernier passage du dedans au dehors', () => {
+    for (const [rx, ry] of deplacements) {
+      for (let x = -50; x <= 290; x += 6.1) {
+        for (let y = -50; y <= 350; y += 7.3) {
+          const ref = reference(x, y, rx, ry)
+          if (ref.dMin >= -0.05) continue
+          const [d, t] = flancBalayeTriangle(x, y, T, rx, ry)
+          expect(d).toBeLessThanOrEqual(0)
+          expect(Math.abs(t - ref.tSortie)).toBeLessThan(2 / N + 1e-6)
+        }
+      }
+    }
+  })
+
+  it("le sens des sommets ne compte pas : le même triangle, parcouru à l'envers", () => {
+    const E = [0, 0, 0, 300, 240, 0] as const
+    for (const [x, y] of [[250, 20], [100, 100], [-10, 310], [130, 160]] as const) {
+      const a = flancBalayeTriangle(x, y, T, 30, 12)
+      const b = flancBalayeTriangle(x, y, E, 30, 12)
+      expect(b[0]).toBeCloseTo(a[0], 6)
+      expect(b[1]).toBeCloseTo(a[1], 6)
+    }
+  })
+
+  it('le shader la prend pour les coins, tranche peinte et hauteur vue', () => {
+    expect(RELIEF_PAROIS_GLSL).toContain('vec2 flancBalayeTriangle(vec2 p, vec2 A, vec2 B, vec2 C, vec2 r)')
+    expect(boucle).toMatch(/flancBalayeCoin\(wb, uBoxes\[bi\], dec\.z, rL\)/)
+    expect(entre('float hauteurTranche(', '\n}\n')).toMatch(/flancBalayeCoin\(/)
+  })
+})
+
+// LE HALO DES HYDRO S'ARRÊTE AUX SOLIDES (retour du concepteur, 16/11) :
+// « le halo traverse les murs quand collé à une surface » — la brume d'un
+// bloc hydrophobe se peignait sur le dessus du bloc voisin. C'est une
+// lecture du SOL : là où un autre solide couvre le pixel, elle se tait.
+describe('le halo des hydro ne se peint pas sur un autre solide', () => {
+  const aura = entre("// L'aura dit la portée", 'col += auraCol * aura')
+  it("sous le dessus d'un voisin (libre), relief éteint ou allumé", () => {
+    expect(aura).toMatch(/aura \*= libre;/)
+  })
+  it('relief allumé : ni sur une tranche, ni sur un dessus déplacé (la hauteur vue)', () => {
+    expect(aura).toMatch(/if \(uRelief > 0\.0\) aura \*= 1\.0 - step\(0\.0, zVis\);/)
   })
 })
