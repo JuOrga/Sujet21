@@ -349,7 +349,7 @@ import {
 import { chargePiecesModule2d, peintCelluleSeule, peintModule2d, type Pieces } from './render/module2dCanvas'
 import { MAX_BOXES, Renderer } from './render/renderer'
 import { HAUTEUR_BLOCS } from './render/hauteurs'
-import { facesTranche, fractionSommet, pointDuSommet } from './render/reliefParois'
+import { facesTranche, fractionSommet, hauteurAppui, pointDuSommet, pointPose } from './render/reliefParois'
 import { remetReglagesParDefaut } from './game/remiseReglages'
 import { Motes, VIE_STRIDE, remplitVie, toucheLeCorps } from './render/vie'
 import { panDepuis } from './game/ouie'
@@ -9458,7 +9458,21 @@ function drawMecanismes(vw: number, vh: number, dpr: number): void {
   // hauts : elle prend leur sommet, comme un décalque prend celui de son mur.
   // Le calcul se fait à l'écran — l'homothétie autour du centre y est la même
   // que dans le monde (reliefParois.spec.ts). Relief éteint, f = 0 : S seul.
-  const fPortes = fractionSommet(RELIEF_K[reliefChoix], camera.zoom, HAUTEUR_BLOCS)
+  //
+  // À LA HAUTEUR DE CE QU'ELLES TOUCHENT. Elles prenaient d'office le sommet
+  // d'un mur haut : entre deux solides plus bas (vitre, hydro, membrane…),
+  // la barre dépassait leur dessus et s'en décollait vers les bords de
+  // l'écran. `fPortes` se règle donc avant chaque porte et chaque chasse
+  // (fractionAppui) sur les solides qui la bordent ; seule, sans rien autour,
+  // elle garde le mur haut d'avant.
+  const fMurHaut = fractionSommet(RELIEF_K[reliefChoix], camera.zoom, HAUTEUR_BLOCS)
+  let fPortes = fMurHaut
+  const hauteurEn = (x: number, y: number): number => renderer.hauteurSousDecal(x, y)
+  const fractionAppui = (r: { minX: number; minY: number; maxX: number; maxY: number }): number => {
+    if (fMurHaut <= 0) return 0 // relief éteint : ni sonde ni calcul
+    const h = hauteurAppui(r, hauteurEn)
+    return h < 0 ? fMurHaut : fractionSommet(RELIEF_K[reliefChoix], camera.zoom, h)
+  }
   const auSommet = (x: number, y: number): { sx: number; sy: number } => {
     const q = S(x, y)
     if (fPortes <= 0) return q
@@ -9468,11 +9482,26 @@ function drawMecanismes(vw: number, vh: number, dpr: number): void {
   // le pied, nommé : seule la tranche d'une porte s'y pose (le reste du
   // dessin des portes et des chasses prend le sommet)
   const auPied = S
+  // CE QUI EST POSÉ SUR UN SOLIDE PREND SON SOMMET, à la hauteur de CE
+  // solide : c'est la
+  // règle des décalques, avec la même recherche du support — une coupelle
+  // et le logement plaqué derrière elle tombent donc au même pixel. Au sol,
+  // ou relief éteint : S seul, sans recherche.
+  const surSupport = (x: number, y: number): { sx: number; sy: number } => {
+    const q = S(x, y)
+    const kRelief = RELIEF_K[reliefChoix]
+    if (kRelief <= 0) return q
+    const [sx, sy] = pointPose(
+      q.sx, q.sy, vw * 0.5, vh * 0.5, kRelief, camera.zoom, renderer.hauteurSousDecal(x, y),
+    )
+    return { sx, sy }
+  }
   for (let i = 0; i < portes.length; i++) {
     const p = portes[i]
     // sous un voile de cachette : la porte se tait (elle flotterait
     // au-dessus d'une paroi factice et vendrait le secret)
     if (dansCacheVoilee((p.minX + p.maxX) / 2, (p.minY + p.maxY) / 2)) continue
+    fPortes = fractionAppui(p)
     const a = auSommet(p.minX, p.maxY)
     const b = auSommet(p.maxX, p.minY)
     const avance =
@@ -10001,6 +10030,7 @@ function drawMecanismes(vw: number, vh: number, dpr: number): void {
     for (let i = 0; i < chasses.length; i++) {
       const c = chasses[i]
       if (dansCacheVoilee((c.minX + c.maxX) / 2, (c.minY + c.maxY) / 2)) continue
+      fPortes = fractionAppui(c)
       const a = auSommet(c.minX, c.maxY)
       const b = auSommet(c.maxX, c.minY)
       const w = b.sx - a.sx
@@ -10965,7 +10995,11 @@ function drawMecanismes(vw: number, vh: number, dpr: number): void {
     for (let i = 0; i < defs.length && i < sim.coupelles.length; i++) {
       const k = sim.coupelles[i]
       if (dansCacheVoilee(k.x, k.y)) continue
-      const p = S(k.x, k.y)
+      // RELIEF ALLUMÉ, ELLE SUIT LE SOMMET DE SON MUR : dessinée au pied,
+      // elle quittait le centre de son logement dès qu'elle s'éloignait du
+      // milieu de l'écran (le logement, plaqué sur le mur, glisse avec son
+      // dessus). La physique reste au pied : c'est là que le fluide touche.
+      const p = surSupport(k.x, k.y)
       const R = Math.max(6, k.r * z)
       const part = Math.min(1, k.bu / k.capacite)
       // la gorgée récente fait frémir l'outre (elle retombe en ~0,4 s)

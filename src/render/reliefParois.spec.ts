@@ -16,12 +16,14 @@ import {
   flancBalaye,
   flancBalayeTriangle,
   fractionSommet,
+  hauteurAppui,
   basesDuCorps,
   CORPS_RELIEF_GLSL,
   LUEUR_HAUT_FLANC,
   lueurCorpsFlanc,
   PAS_CORPS,
   pointDuSommet,
+  pointPose,
   solCache,
 } from './reliefParois'
 import { blocApres, occurrencesDans } from './blocsSource'
@@ -55,7 +57,8 @@ const drawDecals = entre('private drawDecals(', '\n  }\n')
 const decalFs = entre('const DECAL_FS = `', '}`')
 const rendu = entre('// Passe B — composition', '// Passe C — cellules')
 const decorNet = entre('private drawDecorNet(', '\n  }\n')
-const sousDecal = entre('private hauteurSousDecal(', '\n  }\n')
+// publique : la toile 2D y lit le support des coupelles (main.ts)
+const sousDecal = entre('\n  hauteurSousDecal(x: number', '\n  }\n')
 const passeSous = entre('private passeSousSommets(', '\n  }\n')
 const ecrit = entre('private ecritProfondeur(', '\n  }\n')
 
@@ -928,5 +931,132 @@ describe('le corps éclaire la tranche de la paroi qu’il approche', () => {
     expect(lecture).toContain('textureLod(uField, fuv, 0.0)')
     expect(lecture).toContain('* (1.0 - vap) * joueur')
     expect(CORPS_RELIEF_GLSL).not.toMatch(/\btexture\(/)
+  })
+})
+
+// LES COUPELLES RESTENT AU CENTRE DE LEUR LOGEMENT (16/11). Dessinées au
+// pied par la toile 2D, elles quittaient le logement rond plaqué sur le mur
+// — lui suit le sommet — dès qu'elles s'éloignaient du milieu de l'écran ;
+// caméra au-dessus, tout tombait juste (le concepteur).
+describe('ce que la toile 2D pose sur un mur suit son sommet, comme un décalque', () => {
+  const vw = 1590
+  const vh = 820
+  const cam = { x: 400, y: -150, z: 0.62 }
+  const S = (x: number, y: number): [number, number] => [
+    vw * 0.5 + (x - cam.x) * cam.z,
+    vh * 0.5 - (y - cam.y) * cam.z,
+  ]
+
+  it('une coupelle sur un mur tombe au pixel du centre du décalque de son logement', () => {
+    const k = 0.035
+    for (const h of [HAUTEUR_BLOCS, 90, 40]) {
+      for (const [x, y] of [[-700, 420], [1500, 430], [1500, -700], [cam.x, cam.y]] as const) {
+        // le décalque : ses coins passent sur le sommet dans le MONDE
+        // (drawDecals), autour de la caméra — son centre avec eux
+        const f = fractionSommet(k, cam.z, h)
+        const [wx, wy] = pointDuSommet(x, y, cam.x, cam.y, f)
+        const logement = S(wx, wy)
+        const [ex, ey] = S(x, y)
+        const coupelle = pointPose(ex, ey, vw * 0.5, vh * 0.5, k, cam.z, h)
+        expect(coupelle[0]).toBeCloseTo(logement[0], 6)
+        expect(coupelle[1]).toBeCloseTo(logement[1], 6)
+      }
+    }
+  })
+
+  it("au bord de l'écran elle s'écarte bel et bien du pied ; au centre, pas du tout", () => {
+    const [ex, ey] = S(1500, 430)
+    const p = pointPose(ex, ey, vw * 0.5, vh * 0.5, 0.035, cam.z, HAUTEUR_BLOCS)
+    // l'écart que le concepteur voyait : plus d'une dizaine de pixels
+    expect(Math.hypot(p[0] - ex, p[1] - ey)).toBeGreaterThan(10)
+    // elle fuit le centre, comme le dessus du mur
+    expect(Math.hypot(p[0] - vw * 0.5, p[1] - vh * 0.5)).toBeGreaterThan(
+      Math.hypot(ex - vw * 0.5, ey - vh * 0.5),
+    )
+    expect(pointPose(vw * 0.5, vh * 0.5, vw * 0.5, vh * 0.5, 0.07, 1, HAUTEUR_BLOCS)).toEqual([
+      vw * 0.5,
+      vh * 0.5,
+    ])
+  })
+
+  it('au sol (−1) ou relief éteint, rien ne bouge', () => {
+    expect(pointPose(1400, 60, 795, 410, 0.07, 1, -1)).toEqual([1400, 60])
+    expect(pointPose(1400, 60, 795, 410, 0, 1, HAUTEUR_BLOCS)).toEqual([1400, 60])
+  })
+
+  it('la toile cherche le support par la recherche des décalques, et les coupelles s\'y posent', () => {
+    const pose = main.slice(main.indexOf('const surSupport = '), main.indexOf('for (let i = 0; i < portes.length'))
+    expect(pose).toContain('renderer.hauteurSousDecal(x, y)')
+    expect(pose).toMatch(/pointPose\(\s*q\.sx, q\.sy, vw \* 0\.5, vh \* 0\.5, kRelief, camera\.zoom,/)
+    // relief éteint : ni recherche ni calcul
+    expect(pose).toMatch(/if \(kRelief <= 0\) return q/)
+    const coupelles = main.slice(
+      main.indexOf('const defs = level.coupelles ?? []\n    const t = performance.now()'),
+      main.indexOf('// les pastilles de CONDENSAT'),
+    )
+    expect(coupelles).toContain('const p = surSupport(k.x, k.y)')
+    expect(coupelles).not.toMatch(/[^A-Za-z]S\(/)
+  })
+})
+
+// LES PORTES ET LES CHASSES À LA HAUTEUR DE CE QU'ELLES TOUCHENT (16/11).
+// Elles prenaient d'office le sommet d'un mur haut : entre deux solides plus
+// bas, elles dépassaient leur dessus — le même écart que les coupelles.
+describe("une porte ou une chasse prend le sommet des solides qui la bordent", () => {
+  // un passage vertical de 200 u de large, fermé par une porte horizontale
+  const porte = { minX: -100, minY: -10, maxX: 100, maxY: 10 }
+  // deux solides de part et d'autre, de hauteurs données ; le sol entre eux
+  const salle =
+    (hGauche: number, hDroite: number) =>
+    (x: number, _y: number): number =>
+      x < -100 ? hGauche : x > 100 ? hDroite : -1
+
+  it('entre deux murs hauts : le mur haut, comme avant', () => {
+    expect(hauteurAppui(porte, salle(HAUTEUR_BLOCS, HAUTEUR_BLOCS))).toBe(HAUTEUR_BLOCS)
+  })
+
+  it('entre deux solides bas : leur hauteur, pas celle du mur haut', () => {
+    expect(hauteurAppui(porte, salle(40, 40))).toBe(40)
+    expect(hauteurAppui(porte, salle(90, 90))).toBe(90)
+  })
+
+  it('entre un haut et un bas : le plus haut', () => {
+    expect(hauteurAppui(porte, salle(40, HAUTEUR_BLOCS))).toBe(HAUTEUR_BLOCS)
+  })
+
+  it('une chasse bordée par le haut et le bas se lit aussi (les quatre côtés sont sondés)', () => {
+    const chasse = { minX: -300, minY: -60, maxX: 300, maxY: 60 }
+    const couloir = (_x: number, y: number): number => (Math.abs(y) > 60 ? 90 : -1)
+    expect(hauteurAppui(chasse, couloir)).toBe(90)
+  })
+
+  it('rien autour : −1, et la toile garde alors le mur haut', () => {
+    expect(hauteurAppui(porte, () => -1)).toBe(-1)
+    expect(main).toMatch(/return h < 0 \? fMurHaut : fractionSommet\(RELIEF_K\[reliefChoix\], camera\.zoom, h\)/)
+  })
+
+  it("l'écart que la règle retire : une porte entre deux vitres ne dépasse plus leur dessus", () => {
+    // au bord d'un écran de 1590 px, zoom 0,62, relief léger
+    const k = 0.035
+    const z = 0.62
+    const bord: [number, number] = [1500, 410]
+    const centre: [number, number] = [795, 410]
+    const vitre = pointDuSommet(bord[0], bord[1], centre[0], centre[1], fractionSommet(k, z, 40))
+    const avant = pointDuSommet(bord[0], bord[1], centre[0], centre[1], fractionSommet(k, z, HAUTEUR_BLOCS))
+    const apres = pointDuSommet(
+      bord[0], bord[1], centre[0], centre[1],
+      fractionSommet(k, z, hauteurAppui(porte, salle(40, 40))),
+    )
+    expect(avant[0] - vitre[0]).toBeGreaterThan(10) // plus de dix pixels de trop
+    expect(apres[0]).toBeCloseTo(vitre[0], 6)
+  })
+
+  it('la toile règle le sommet avant chaque porte et chaque chasse, par la recherche des décalques', () => {
+    expect(main).toContain('const hauteurEn = (x: number, y: number): number => renderer.hauteurSousDecal(x, y)')
+    expect(main).toContain('const h = hauteurAppui(r, hauteurEn)')
+    // relief éteint : pas de sonde
+    expect(main).toMatch(/if \(fMurHaut <= 0\) return 0/)
+    expect(main).toMatch(/fPortes = fractionAppui\(p\)\n\s*const a = auSommet\(p\.minX, p\.maxY\)/)
+    expect(main).toMatch(/fPortes = fractionAppui\(c\)\n\s*const a = auSommet\(c\.minX, c\.maxY\)/)
   })
 })
