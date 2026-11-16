@@ -150,6 +150,27 @@ export function lueurCorpsFlanc(corps: number, z: number, hCorps: number): numbe
 /** Ce qu'il reste de la lueur tout en haut d'un mur. */
 export const LUEUR_HAUT_FLANC = 0.4
 
+/** LE CORPS DEVINÉ. Relief allumé, le fluide passe SOUS les sommets : dans
+ *  une membrane, un évent, un rideau — les parois qu'une de ses phases
+ *  traverse —, sous le débord d'un dessus, derrière une tranche vue de biais.
+ *  Le masque l'y EFFAÇAIT : le corps disparaissait en traversant, et l'on ne
+ *  savait plus où il était ni ce qu'il en restait de l'autre côté (« continuer
+ *  à le voir », le concepteur, 16/11). Il s'y DEVINE maintenant, au travers :
+ *  un fond léger, et son contour franc. */
+export const DEVINE_FOND = 0.5
+export const DEVINE_LISERE = 0.95
+
+/** La part du corps qui reste peinte en un pixel : `cache` le sol que les
+ *  sommets cachent (solCache, 0..1), `lisere` 1 au contour du corps, 0 dans
+ *  sa masse. Rien de caché : 1, le corps d'avant, au bit près (relief éteint,
+ *  cache vaut 0 partout). Caché : le fond dans la masse, le liseré au bord —
+ *  jamais 0, jamais plein : la paroi reste devant, le corps se lit dessous. */
+export function corpsDevine(cache: number, lisere: number): number {
+  const c = Math.min(Math.max(cache, 0), 1)
+  const l = Math.min(Math.max(lisere, 0), 1)
+  return 1 - c * (1 - (DEVINE_FOND + (DEVINE_LISERE - DEVINE_FOND) * l))
+}
+
 /** LE FLANC D'UNE BOÎTE, BALAYÉ EXACTEMENT. Le point `p` (dans le repère de
  *  la boîte `b` = minX, minY, maxX, maxY) est sur la tranche s'il existe un
  *  t de [0, 1] tel que `p − t·r` soit dans la boîte : t = 0 le pied, t = 1
@@ -359,6 +380,11 @@ float solCache(float relief, float d, float dV, float flanc, float w, float opac
 float lueurCorpsFlanc(float corps, float z, float hCorps) {
   float h = max(hCorps, 1e-3);
   return clamp(corps, 0.0, 1.0) * (1.0 - (1.0 - ${glslFloat(LUEUR_HAUT_FLANC)}) * smoothstep(0.7 * h, 1.5 * h, z));
+}
+float corpsDevine(float cache, float lisere) {
+  float c = clamp(cache, 0.0, 1.0);
+  float l = clamp(lisere, 0.0, 1.0);
+  return 1.0 - c * (1.0 - mix(${glslFloat(DEVINE_FOND)}, ${glslFloat(DEVINE_LISERE)}, l));
 }
 // le flanc d'une boîte, balayé exactement (flancBalaye, reliefParois.ts) :
 // (distance signée au balayage, hauteur vue). La boîte se mesure ici, à la

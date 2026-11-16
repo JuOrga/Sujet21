@@ -69,6 +69,7 @@ import { ATLAS_COQUE } from './coqueAtlas'
 import { sondeRetournement, type Retournement } from './retournement'
 import { boutsEnMur, cleBoite } from '../game/conduite'
 import { MODULE2D_FS, MODULE2D_VS } from './module2dShader'
+import { boitesDansLaVue, boitesVueVides } from './portee'
 
 // Budgets de rendu : au-delà, les éléments excédentaires ne sont plus
 // dessinés (la physique, elle, les voit tous) — l'éditeur avertit quand un
@@ -919,6 +920,28 @@ uniform vec4 uBoxH[MAX_BOXES / 4];
 float hauteurBoite(int bi) {
   int r = bi - 4 * (bi / 4);
   return dot(uBoxH[bi / 4], vec4(equal(ivec4(r), ivec4(0, 1, 2, 3))));
+}
+// LA PORTÉE DE CHAQUE BOÎTE (render/portee.ts) : le rayon dont on agrandit sa
+// boîte englobante, non pivotée, pour contenir tout ce qu'elle peut peindre —
+// calculé une fois par image, côté CPU, avec les règles mêmes du rejet de la
+// peinture. Quatre par vec4, comme les hauteurs.
+// LE COÛT QU'ELLE RETIRE : chaque pixel parcourait TOUTES les boîtes, trois
+// fois (la salle, la couverture, la peinture), et payait pour chacune une
+// distance signée, un décodage et le classement de son matériau avant de
+// savoir qu'elle était trop loin — les trois quarts du travail de la
+// composition au hub (mesuré le 16/11/2026). horsPortee répond d'abord, pour
+// quatre comparaisons.
+uniform vec4 uBoxPortee[MAX_BOXES / 4];
+// LA COUVERTURE regarde plus loin que la peinture : la lumière des solides se
+// règle sur le plus proche, et le givre comme le sol chauffé la lisent loin de
+// leur boîte. Elle élargit chaque rayon de la plus grande portée du tableau
+// (portee.ts) — et de tout, si le tableau porte un vide ou une baie.
+uniform float uPorteeCouv;
+bool horsPortee(int bi, vec2 w, float e) {
+  int q = bi - 4 * (bi / 4);
+  float r = dot(uBoxPortee[bi / 4], vec4(equal(ivec4(q), ivec4(0, 1, 2, 3)))) + e;
+  vec4 b = uBoxes[bi];
+  return w.x < b.x - r || w.y < b.y - r || w.x > b.z + r || w.y > b.w + r;
 }
 ${RETOMBEE_TOIT_GLSL}
 // LES SURFACES SCULPTÉES PAR LES LAMPES (volume des parois, volet 3) : le
@@ -2614,6 +2637,8 @@ void main() {
     // Aucun uniforme de plus : les coques sont déjà là, dans uBoxes.
     roomD = 1.0e9;
     for (int bi = 0; bi < min(uBoxCount, MAX_BOXES); bi++) {
+      // hors de sa portée, une coque n'est plus la salle de ce pixel (portee.ts)
+      if (horsPortee(bi, world, 0.0)) continue;
       vec4 dec = decodeAux(uBoxAux[bi].x);
       if (dec.y < 4.5) continue; // seule une COQUE fait salle
       vec2 c = (uBoxes[bi].xy + uBoxes[bi].zw) * 0.5;
@@ -2991,12 +3016,13 @@ void main() {
   // passait devant (le concepteur, 16/11). −1 : rien de plus haut que le sol.
   float zVis = -1.0;
   for (int bi = 0; bi < min(uBoxCount, MAX_BOXES); bi++) {
+    // seules comptent les boîtes dont la portée, élargie, atteint ce pixel
+    if (horsPortee(bi, world, uPorteeCouv)) continue;
     float mc = decodeAux(uBoxAux[bi].x).x;
     if (mc > 2.5 && mc < 3.5) continue; // le sas est une bouche, il n'enterre rien
     if (mc > 10.5) continue;             // le vide et la baie sont des trous : rien à enterrer
     // le sommet de CETTE boîte, déplacé de sa part (sa hauteur) : le même que
-    // celui que la boucle des boîtes peint (relief éteint, rien à payer : la
-    // boucle passe sur TOUTES les boîtes, sans rejet)
+    // celui que la boucle des boîtes peint (relief éteint, rien à payer)
     vec2 pV = world;
     if (uRelief > 0.0) pV -= relDisp * facteurRelief(hauteurBoite(bi));
     float dc = sdfVisible(bi, pV);
@@ -3067,6 +3093,10 @@ void main() {
   // les boîtes — le fluide, peint après la boucle, ne s'y peint pas
   float solSousSommets = 0.0;
   for (int bi = 0; bi < min(uBoxCount, MAX_BOXES); bi++) {
+    // LA PORTÉE D'ABORD (portee.ts) : hors de son rectangle, la boîte ne peut
+    // rien peindre ici — ni distance, ni décodage, ni matériau à classer. Le
+    // court-circuit plus bas, lui, tranche au plus juste parmi celles qui restent.
+    if (horsPortee(bi, world, 0.0)) continue;
     // boîte oblique : le monde pivote dans le repère local de la boîte —
     // la distance signée (remplissage, arête, aura) suit la rotation
     vec2 wb = world;
@@ -3099,7 +3129,8 @@ void main() {
     // allumé, le glissement du sommet), la boîte ne peut plus teinter ce pixel — on
     // saute remplissage, bruit et mélanges. Sur un tableau à 30-40 boîtes,
     // chaque pixel n'en paie plus que les 1-2 qui le concernent. Le SAS garde
-    // son grand rayon d'aspiration : jamais coupé. Le rejet se fait sur la
+    // son grand rayon d'aspiration : ce court-circuit ne le coupe pas (sa
+    // portée, plus haut, s'en charge au-delà du halo). Le rejet se fait sur la
     // BOÎTE englobante : toute forme y est inscrite, il reste conservateur.
     if (solide) {
       // l'ombre courte et son flou doivent tenir dans le rayon de rejet
@@ -3226,6 +3257,13 @@ void main() {
       // se mesure sur la silhouette de leurs pièces — voir leurs branches)
       if (mat < 0.5 && uBoxAux[bi].z > 8.5) opaciteDessus = opaciteVitre(vitreReflDur(uBoxes[bi], wbV));
       if (!aPieces) solPropre = solCache(uRelief, d, dV, flanc, edgeW, opaciteDessus, matPermeable(mat) ? 1.0 : 0.0);
+      // AU PIED, RIEN N'EST CACHÉ. Hors de la base, la tranche se fond sur un
+      // pixel et demi : ce fondu comptait comme du sol caché, jusque sur la
+      // ligne du pied (hauteur vue 0). Sans conséquence tant que le corps
+      // s'arrêtait là ; depuis qu'il a une hauteur et passe DEVANT le pied,
+      // puis qu'il se devine sous les sommets, ce filet se peignait en trait
+      // cyan vif en travers du corps (vu au banc, à la fusion des deux).
+      if (d > 0.0 && dV > 0.0) solPropre *= smoothstep(0.0, 0.06, htFlanc);
       solSousSommets = max(solSousSommets, solPropre);
     }
     // ——— L'ÉPAISSEUR, AU SOL (volume des parois, volet 2) ————————————
@@ -4109,7 +4147,13 @@ void main() {
   // de l'eau suit body. Dans un perméable, il entre sous le dessus et
   // ressort au-delà du débord. Côté où le pied se voit, rien n'est caché : le
   // fluide touche le bas du flanc. Relief éteint, solSousSommets vaut 0.
-  body *= 1.0 - solSousSommets;
+  // IL S'Y DEVINE (corpsDevine, reliefParois.ts) : effacé net, le corps
+  // disparaissait dans une membrane, un évent, un rideau, et derrière toute
+  // tranche — on ne savait plus où il était. Un fond léger et son contour
+  // (lisereCorps : 1 au bord du champ, 0 dans la masse) restent peints,
+  // par-dessus la paroi.
+  float lisereCorps = 1.0 - smoothstep(th + s, th * 3.0, field2);
+  body *= corpsDevine(solSousSommets, lisereCorps);
   // La passe de vie (motes, lueur des gouttes perdues), peinte après, lit
   // ce masque dans la PROFONDEUR (voir drawVie) : 0 sous un sommet.
   gl_FragDepth = solSousSommets > 0.5 ? 0.0 : 1.0;
@@ -4570,6 +4614,16 @@ void main() {
     // nuit ne l'éteigne pas.
     water += plas * plasmaS * vap * 0.30 * crepite;
 
+    // LE CORPS DEVINÉ sous un sommet : une lueur, pas de la matière. Il
+    // garde la teinte de sa phase (glace, vapeur et plasma se lisent encore)
+    // mais tire vers un cyan clair, liseré plus vif — et ne dépend plus de la
+    // lumière de la pièce : sous un mur dans le noir, c'est justement là
+    // qu'on le cherche.
+    if (solSousSommets > 0.001) {
+      vec3 spectre = mix(water, vec3(0.60, 0.92, 1.00), 0.65)
+        + vec3(0.30, 0.38, 0.40) * lisereCorps;
+      water = mix(water, spectre, solSousSommets);
+    }
     col = mix(col, water, body);
     // L'eau qui recouvre l'œil du sas s'assombrit : elle sombre dans le trou
     col *= 1.0 - drainEye * body * 0.55;
@@ -6053,6 +6107,11 @@ export class Renderer {
   // LA HAUTEUR DE CHAQUE BOÎTE, case par case (uBoxH : quatre par vec4) —
   // tirée de hauteursBoites, calculée une fois par décor (hauteursCle)
   private readonly hauteurScratch = new Float32Array(MAX_BOXES)
+  // LES BOÎTES DE LA VUE : celles dont la portée touche l'écran, dans l'ordre
+  // de peinture, avec leur rayon — ce que la composition reçoit (portee.ts).
+  // Les scratchs ci-dessus restent ENTIERS : le cuiseur de la carte de lumière
+  // et la coque les lisent sans tri.
+  private readonly vue = boitesVueVides(MAX_BOXES)
   private hauteursBoites: Float32Array = new Float32Array(0)
   private readonly hauteursCle = new CleHauteurs()
   // la version de la table, une de plus à chaque calcul : la clé de cuisson
@@ -7493,22 +7552,44 @@ export class Renderer {
       (b.maxY - b.minY) * 0.5,
     )
     gl.uniform1f(cu['uSolModules'], this.solModules ? 1 : 0)
-    gl.uniform1i(cu['uBoxCount'], boxCount)
-    gl.uniform4fv(cu['uBoxes[0]'], this.boxScratch)
-    gl.uniform4fv(cu['uBoxAux[0]'], this.auxScratch)
-    gl.uniform4fv(cu['uBoxH[0]'], this.hauteurScratch)
-    gl.uniform1f(cu['uTime'], timeSec)
-    gl.uniform1f(cu['uExitRadius'], params.exitRadius)
     // les auras dessinées suivent la physique refroidie (mêmes formules que
     // le solveur) : le danger se lit toujours à sa vraie portée
-    gl.uniform1f(
-      cu['uColdBand'],
-      params.coldBand * (1 + params.chillColdGrowth * chill),
+    const bandeFroid = params.coldBand * (1 + params.chillColdGrowth * chill)
+    const bandeChaud = Math.max(0, params.heatBand * (1 - params.chillHeatFade * chill))
+    // LA COMPOSITION NE REÇOIT QUE LES BOÎTES DE LA VUE, chacune avec son
+    // rayon de portée (portee.ts) : celles dont rien ne peut atteindre
+    // l'écran ne partent pas, et le shader saute d'un test celles qui sont
+    // trop loin du pixel. Les rayons se calculent sur les bandes mêmes qui
+    // partent en uniformes juste dessous.
+    boitesDansLaVue(
+      boxCount,
+      this.boxScratch,
+      this.auxScratch,
+      this.hauteurScratch,
+      {
+        zoom: camera.zoom,
+        relief,
+        vueW: viewportW,
+        vueH: viewportH,
+        cx: camera.x,
+        cy: camera.y,
+        hydro: params.hydroBand,
+        chaud: bandeChaud,
+        froid: bandeFroid,
+        sas: params.exitRadius,
+      },
+      this.vue,
     )
-    gl.uniform1f(
-      cu['uHeatBand'],
-      Math.max(0, params.heatBand * (1 - params.chillHeatFade * chill)),
-    )
+    gl.uniform1i(cu['uBoxCount'], this.vue.n)
+    gl.uniform4fv(cu['uBoxes[0]'], this.vue.boxes)
+    gl.uniform4fv(cu['uBoxAux[0]'], this.vue.aux)
+    gl.uniform4fv(cu['uBoxH[0]'], this.vue.hauteurs)
+    gl.uniform4fv(cu['uBoxPortee[0]'], this.vue.portees)
+    gl.uniform1f(cu['uPorteeCouv'], this.vue.couverture)
+    gl.uniform1f(cu['uTime'], timeSec)
+    gl.uniform1f(cu['uExitRadius'], params.exitRadius)
+    gl.uniform1f(cu['uColdBand'], bandeFroid)
+    gl.uniform1f(cu['uHeatBand'], bandeChaud)
     gl.uniform1f(cu['uHydroBand'], params.hydroBand)
     gl.uniform1f(cu['uChill'], chill)
     gl.uniform1f(cu['uDecor'], decor)
