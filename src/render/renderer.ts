@@ -102,7 +102,7 @@ export const MAX_LUMIERES = 4
 // Un obstacle ordinaire monte à HAUTEUR_BLOCS et le rayon qui grimpe vers la
 // lampe lui passe dessus ; une COQUE (une chambre, un couloir) monte au
 // plafond et n'est jamais enjambée.
-import { HAUTEUR_BLOCS, HAUTEUR_COQUE } from './hauteurs'
+import { HAUTEUR_BLOCS, HAUTEUR_COQUE, HAUTEUR_CORPS } from './hauteurs'
 import {
   LUMIERE_PAR_DEFAUT,
   OMBRE_PORTEE_GLSL,
@@ -114,7 +114,7 @@ import {
 import { FOND_DALLE } from './fondCuve'
 import { OMBRE_POINTE_GLSL } from './ombrePointe'
 import { tranchesBandeau } from './lampes'
-import { RELIEF_PAROIS_GLSL, fractionSommet, pointDuSommet } from './reliefParois'
+import { CORPS_RELIEF_GLSL, RELIEF_PAROIS_GLSL, fractionSommet, pointDuSommet } from './reliefParois'
 import {
   CARREAU_MONDE,
   PROFONDEUR_RELIEF,
@@ -952,6 +952,7 @@ ${RELIEF_SURFACES_GLSL}
 // LE RELIEF 2.5D (volume des parois, volet 1) : la part du déplacement que
 // prend chaque sommet (sa hauteur), et le sol qu'un sommet déplacé cache.
 ${RELIEF_PAROIS_GLSL}
+${CORPS_RELIEF_GLSL}
 const float PROF_ATLAS[8] = float[8](${PROFONDEUR_RELIEF_ATLAS.map(glslFloat).join(', ')});
 // les UV d'un point de l'atlas des habillages, case \`tuile\`, motif calé sur
 // la boîte (origine, pas) — l'atlas est téléversé avec UNPACK_FLIP_Y : le V
@@ -1688,6 +1689,20 @@ vec2 rdFluide(vec2 pw) {
   return vec2(pres * icy, pres * (1.0 - icy));
 }
 
+// LE CORPS DEVANT LE PIED D'UNE TRANCHE, 0..1 : ce qui, là, éclaire la face
+// — le corps du joueur, eau ou glace. Ni la vapeur (un nuage ne s'adosse
+// pas), ni les gouttes égarées (elles sont éteintes : « eau libre plus
+// sombre »). Seuil large : la lueur précède le contact, elle dit l'approche.
+// textureLod : appelée dans la boucle des boîtes (gradientBoucles.spec.ts).
+float corpsAuPied(vec2 pw) {
+  vec2 fuv = ((pw - uCenter) * uZoom + uViewport * 0.5) / uViewport;
+  if (fuv.x < 0.0 || fuv.x > 1.0 || fuv.y < 0.0 || fuv.y > 1.0) return 0.0;
+  vec4 t = textureLod(uField, fuv, 0.0);
+  float vap = clamp(-t.a / max(t.r, 1e-5), 0.0, 1.0);
+  float joueur = clamp(t.b / max(t.r, 1e-5), 0.0, 1.0);
+  return smoothstep(0.35 * uThreshold, uThreshold, t.r / uFieldScale) * (1.0 - vap) * joueur;
+}
+
 // Un point du rideau (s le long, t en travers : 0 au rail, 1 au seuil) en
 // MONDE, rotation de la boîte comprise (l'inverse du dépivotage de la boucle)
 vec2 rdMonde(float s, float t, vec2 bmin, vec2 bsize, bool horiz, float ca, float sa) {
@@ -2367,7 +2382,7 @@ vec2 gradSdfBoite(int bi, vec2 wb, float d, vec4 dec, float bca, float bsa) {
 // gouttes libres portent tous leur ombre, sans une ligne de plus.
 // Marche en ESPACE ÉCRAN : hors du cadre, l'occulteur n'est pas dessiné, la
 // marche s'arrête — l'ombre ne coûte que ce qui se voit.
-#define HAUTEUR_CORPS 95.0
+#define HAUTEUR_CORPS ${glslFloat(HAUTEUR_CORPS)}
 // Hauteur des blocs — DOIT rester égale à celle du cuiseur de carte plus
 // bas : c'est elle qui place le DESSUS des solides dans la lumière.
 #define HAUTEUR_BLOCS 140.0
@@ -2580,7 +2595,13 @@ void main() {
   // (relief allumé) : rien de caché par défaut, sorties anticipées comprises
   gl_FragDepth = 1.0;
   vec2 uv = gl_FragCoord.xy / uCanvasSize;
-  vec4 tex = texture(uField, uv);
+  // LE CORPS A UNE HAUTEUR (reliefParois.ts : basesDuCorps). Relief allumé,
+  // son dessus glisse comme celui d'un solide de HAUTEUR_CORPS : le champ se
+  // lit le long du chemin pied → dessus, et le corps passe DEVANT le bas de
+  // la tranche du mur qu'il touche. Relief éteint : une lecture, au pied.
+  vec2 uvEau;
+  float rSommetCorps;
+  vec4 tex = champCorps(uField, uv, uRelief * clamp(uZoom * 1.2, 0.0, 1.0) * facteurRelief(HAUTEUR_CORPS), uvEau, rSommetCorps);
   // La couche d'eau ne se calcule que là où il y a de l'eau : loin du seuil,
   // le pixel sort transparent AVANT la boucle d'obstacles — c'est ce qui
   // rend la passe basse résolution presque gratuite hors du corps. Marge ×4 :
@@ -3236,6 +3257,13 @@ void main() {
       // se mesure sur la silhouette de leurs pièces — voir leurs branches)
       if (mat < 0.5 && uBoxAux[bi].z > 8.5) opaciteDessus = opaciteVitre(vitreReflDur(uBoxes[bi], wbV));
       if (!aPieces) solPropre = solCache(uRelief, d, dV, flanc, edgeW, opaciteDessus, matPermeable(mat) ? 1.0 : 0.0);
+      // AU PIED, RIEN N'EST CACHÉ. Hors de la base, la tranche se fond sur un
+      // pixel et demi : ce fondu comptait comme du sol caché, jusque sur la
+      // ligne du pied (hauteur vue 0). Sans conséquence tant que le corps
+      // s'arrêtait là ; depuis qu'il a une hauteur et passe DEVANT le pied,
+      // puis qu'il se devine sous les sommets, ce filet se peignait en trait
+      // cyan vif en travers du corps (vu au banc, à la fusion des deux).
+      if (d > 0.0 && dV > 0.0) solPropre *= smoothstep(0.0, 0.06, htFlanc);
       solSousSommets = max(solSousSommets, solPropre);
     }
     // ——— L'ÉPAISSEUR, AU SOL (volume des parois, volet 2) ————————————
@@ -3338,6 +3366,21 @@ void main() {
       fc *= mix(0.52, 1.15, 0.5 + 0.5 * face) * eclMat;
       // DEVANT ? Sous une surface plus haute (un dessus voisin, une tranche
       // plus haute), cette tranche est cachée : elle ne se peint pas
+      // LA LUEUR DU CORPS SUR LA TRANCHE (reliefParois.ts : lueurCorpsFlanc).
+      // Le pied de ce point de la face est à world − relB × htFlanc ; le
+      // corps se lit DEVANT, le long de la normale (à 10 u, là où il
+      // s'appuie, et à 32 u : la face s'éclaire dès qu'il approche) et de
+      // part et d'autre le long de l'arête (±24 u, ±50 u) — deux lectures
+      // seules découpaient la lueur en rectangle, bords nets, au droit du
+      // corps (vu au banc). La teinte est celle du halo qu'il pose au sol.
+      vec2 pied = world - relB * htFlanc;
+      vec2 pD = pied + nrm * 20.0;
+      float corps = (corpsAuPied(pied + nrm * 10.0) + corpsAuPied(pied + nrm * 32.0)
+                   + corpsAuPied(pD + tng * 24.0) + corpsAuPied(pD - tng * 24.0)
+                   + corpsAuPied(pD + tng * 50.0) + corpsAuPied(pD - tng * 50.0)) / 6.0;
+      if (corps > 0.003) {
+        fc += vec3(0.11, 0.26, 0.36) * (0.7 * lueurCorpsFlanc(corps, htFlanc * hB, HAUTEUR_CORPS));
+      }
       float devant = step(zVis - 0.5, htFlanc * hB);
       col = mix(col, fc, flanc * devant);
     }
@@ -4160,6 +4203,10 @@ void main() {
       water = mix(water, repos, 0.55 * clamp(uVital.z, 0.0, 1.0));
     }
     water = mix(water * 0.40, water, clamp(player, 0.0, 1.0)); // eau libre plus sombre
+    // LE CÔTÉ DU CORPS (relief allumé) : là où le dessus n'est pas dans le
+    // champ, on regarde son flanc — plus sombre, comme la tranche d'un mur
+    // sous son sommet. C'est ce qui lui donne une épaisseur de ce côté-là.
+    if (uRelief > 0.0) water *= mix(0.74, 1.0, smoothstep(th - s, th + s, rSommetCorps / uFieldScale));
 
     // Relief : pseudo-normale sur un champ FLOUTÉ (4 prélèvements écartés) —
     // les dérivées par pixel liraient chaque particule comme une bille.
@@ -4183,10 +4230,10 @@ void main() {
     float specular = 0.0;
     if (uEau > 0.5) {
       vec2 texel = 2.5 / vec2(textureSize(uField, 0));
-      float fL = texture(uField, uv - vec2(texel.x, 0.0)).r;
-      float fR = texture(uField, uv + vec2(texel.x, 0.0)).r;
-      float fB = texture(uField, uv - vec2(0.0, texel.y)).r;
-      float fT = texture(uField, uv + vec2(0.0, texel.y)).r;
+      float fL = texture(uField, uvEau - vec2(texel.x, 0.0)).r;
+      float fR = texture(uField, uvEau + vec2(texel.x, 0.0)).r;
+      float fB = texture(uField, uvEau - vec2(0.0, texel.y)).r;
+      float fT = texture(uField, uvEau + vec2(0.0, texel.y)).r;
       vec2 grad = vec2(fR - fL, fT - fB) / uFieldScale;
       nrm = normalize(vec3(-grad * 2.2, 1.0));
       diffuse = max(dot(nrm, lightDir), 0.0);
@@ -5783,12 +5830,19 @@ uniform float uFieldScale;
 // part dont ce sommet s'écarte du centre (reliefParois.ts : fractionSommet),
 // 0 au sol. L'eau qui l'efface se lit au PIED, sous le point du dessus.
 uniform float uSommet;
+// relief allumé, le corps a une hauteur : au SOL, un décalque s'efface sous
+// tout ce que le corps recouvre, son dessus compris (0 : relief éteint, ou
+// décalque posé sur un mur — là, l'eau se lit au pied, comme avant)
+uniform float uCorps;
 out vec4 outColor;
+${CORPS_RELIEF_GLSL}
 void main() {
   vec4 t = texture(uTexDecal, vUv);
   vec3 c = t.rgb * vec3(0.52, 0.62, 0.72); // refroidi, fondu dans la cuve
   vec2 auPied = 0.5 * uCanvasSize + (gl_FragCoord.xy - 0.5 * uCanvasSize) * (1.0 - uSommet);
-  float field = texture(uField, auPied / uCanvasSize).r / uFieldScale;
+  vec2 uvVu;
+  float rSommet;
+  float field = champCorps(uField, auPied / uCanvasSize, uCorps, uvVu, rSommet).r / uFieldScale;
   float th = uThreshold;
   float sfn = max(th * uSoftness, 1e-4);
   float fluide = smoothstep(th - sfn, th + sfn, field) * uEfface;
@@ -8048,6 +8102,8 @@ export class Renderer {
         f = hSupport >= 0 ? fractionSommet(this.reliefK, this.zoomRelief, hSupport) : 0
         this.passeSousSommets(hSupport < 0)
         gl.uniform1f(du['uSommet'], f)
+        // au sol, le dessus du corps recouvre le décalque comme son pied
+        gl.uniform1f(du['uCorps'], hSupport < 0 ? fractionSommet(this.reliefK, this.zoomRelief, HAUTEUR_CORPS) : 0)
       }
       const cx = this.centreRelief[0]
       const cy = this.centreRelief[1]
@@ -8089,6 +8145,7 @@ export class Renderer {
         // dernier décalque (sans effet tant que les lampes ne lisent pas
         // l'eau, mais un jour elles le pourraient)
         gl.uniform1f(du['uSommet'], 0)
+        gl.uniform1f(du['uCorps'], 0)
       }
     }
   }
