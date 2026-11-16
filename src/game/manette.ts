@@ -13,13 +13,13 @@
 //   B              retour à l'eau
 //   LB tenu        le CURSEUR dans le volume : le stick gauche le promène,
 //                  A regroupe le corps là où il est (game/curseurVolume.ts)
-//   RB             accélérer le temps
 //   RT / LT        zoomer / dézoomer (progressif, à la pression)
 //   stick droit    caméra                 croix ↕  zoom (aussi)
 //   L3             recadrer : caméra et zoom automatiques
 //   R3             dossier de descente — B le referme, comme la légende
-//   croix ↔        ralenti / accéléré      croix ↓  CONCLURE, quand
-//                  CONTINUER s'offre (il prend alors le pas sur le zoom)
+//   croix ↔        ralentir / accélérer le temps (RB est libre)
+//   croix ↓        CONCLURE, quand CONTINUER s'offre (il prend alors le
+//                  pas sur le zoom)
 //   Start          pause                  Select   recommencer
 //   A (menus)      valider le bouton principal visible
 

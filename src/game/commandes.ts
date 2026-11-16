@@ -91,7 +91,7 @@ export const MANOEUVRES: Manoeuvre[] = [
     section: 'Le temps',
     clavier: ',',
     // LB porte désormais le curseur de regroupement : ralentir tient à la
-    // croix ←, où il a toujours répondu aussi (RB accélère toujours)
+    // croix ←, où il a toujours répondu aussi
     manette: 14, // croix ←
   },
   {
@@ -100,7 +100,8 @@ export const MANOEUVRES: Manoeuvre[] = [
     aide: 'Le temps de la cuve se presse.',
     section: 'Le temps',
     clavier: '.',
-    manette: 5, // RB
+    // RB est libéré avec LB : le temps tient tout entier sur la croix ↔
+    manette: 15, // croix →
   },
   {
     id: 'pause',

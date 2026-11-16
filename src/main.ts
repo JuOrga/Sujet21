@@ -19892,8 +19892,8 @@ function corpsImage(now: number): boolean {
           input.onReset?.()
         }
       }
-      // le temps : croix ← ralentit, croix → et RB accélèrent (LB, tenu,
-      // porte le curseur de regroupement)
+      // le temps : croix ← ralentit, croix → accélère (LB, tenu, porte le
+      // curseur de regroupement ; RB est libre)
       if (manetteFait('ralentir')) input.stepWarp(-1)
       if (manetteFait('accelerer')) input.stepWarp(1)
       // les trois états sur les trois boutons restants : X glace, Y vapeur,

@@ -85,6 +85,7 @@ describe('la sortie offerte par CONTINUER', () => {
     // « ralentir » est sur la croix ← par défaut (LB porte le curseur) et la
     // croix ↔ règle le temps en dur : sans la garde, un appui sautait deux crans
     expect(boutonDe('ralentir')).toBe(BOUTON.GAUCHE)
+    expect(boutonDe('accelerer')).toBe(BOUTON.DROITE)
     expect(SRC).toContain("boutonDe('ralentir') !== BOUTON.GAUCHE &&")
     expect(SRC).toContain("boutonDe('accelerer') !== BOUTON.DROITE &&")
   })
