@@ -11,7 +11,7 @@ import { Regie } from './editor/regie'
 import { tirABlanc } from './game/tirABlanc'
 import { deleteReglage, fetchReglage, pushReglage } from './game/reglagesPartages'
 import { etatPlan, litPlanPublie, planAuDemarrage } from './game/planPartage'
-import { documentCarte, litCartePubliee } from './game/cartePartage'
+import { CLE_CARTE_BROUILLON, documentCarte, litBrouillonCarte, litCartePubliee } from './game/cartePartage'
 import {
   deleteReglageCodex,
   fetchReglagesCodex,
@@ -97,6 +97,7 @@ import {
   ORBES,
   accessibles,
   biomeDeSalle,
+  biomesAEtiqueter,
   biomeEffectif,
   biomesDeCarte,
   mecaniqueDuBiome,
@@ -1378,6 +1379,18 @@ void fetchReglage('plan-voie').then((p) => {
 let carte: CarteStation = CARTE_LIVREE
 let carteRun: EtatCarteRun = departCarte(carte)
 let cartePubliee: CarteStation | null = null
+/** Les biomes des menus Biome (éditeur de tableaux, planche) : la carte
+ *  jouée, et celle que l'éditeur de carte montre sur ce poste — son
+ *  brouillon, sinon la livrée (carteStation.ts, biomesAEtiqueter). */
+function biomesProposes(): { code: string; nom: string; horsJeu?: true }[] {
+  let brut: string | null = null
+  try {
+    brut = localStorage.getItem(CLE_CARTE_BROUILLON)
+  } catch {
+    // stockage refusé : la carte jouée seule
+  }
+  return biomesAEtiqueter(carte, litBrouillonCarte(brut) ?? CARTE_LIVREE)
+}
 function appliqueCartePubliee(c: CarteStation | null): void {
   carte = c ?? CARTE_LIVREE
   // l'état de run se relit contre la carte neuve : un module disparu
@@ -5908,7 +5921,7 @@ const chargeEditeur = chargeUneFois('l’éditeur de tableaux', async () => {
           .filter((s, i, t) => t.findIndex((o) => o.code === s.code) === i)
           .map((s) => ({ code: s.code, titre: s.titre })),
       // les biomes de la carte de la station : le champ Biome du tableau
-      biomes: () => biomesDeCarte(carte),
+      biomes: () => biomesProposes(),
       libraryChanged: (levels) => {
         libraryLevels = levels.map((s) => s.level)
         renderRegistres()
@@ -6290,7 +6303,7 @@ function renderPlanche(): void {
   // salles — d'un regard, quels biomes sont vides. L'ordre de jeu (◀ ▶,
   // glisser) ne se règle que sur la vue complète : un rang n'a de sens
   // que dans la liste entière.
-  const biomes = biomesDeCarte(carte)
+  const biomes = biomesProposes()
   // le biome effectif d'une salle (un ancien code de module suit son biome)
   // — lu ici, avant que la vignette n'appelle « carte » son élément
   const biomeDe = (code: string | undefined): string => biomeEffectif(carte, code)
@@ -6394,7 +6407,7 @@ function renderPlanche(): void {
       // un tableau encore marqué d'un code de module (« C1 ») se montre
       // dans le biome de ce module : rien à réétiqueter pour qu'il joue
       biomes
-        .map((b) => `<option value="${esc(b.code)}"${biomeDe(s.level.biome) === b.code ? ' selected' : ''}>${esc(b.code)} · ${esc(b.nom)}</option>`)
+        .map((b) => `<option value="${esc(b.code)}"${biomeDe(s.level.biome) === b.code ? ' selected' : ''}>${esc(b.code)} · ${esc(b.nom)}${b.horsJeu ? ' (carte non publiée)' : ''}</option>`)
         .join('') +
       (s.level.biome && !biomes.some((b) => b.code === biomeDe(s.level.biome))
         ? `<option value="${esc(s.level.biome)}" selected>${esc(s.level.biome)} (plus sur la carte)</option>`

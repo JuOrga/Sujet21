@@ -689,6 +689,23 @@ export function biomesDeCarte(c: CarteStation): { code: string; nom: string }[] 
   return out
 }
 
+/** LES BIOMES À PROPOSER pour étiqueter un tableau : ceux de la carte
+ *  JOUÉE, puis ceux que seule la carte de L'ÉDITEUR porte (le brouillon du
+ *  poste, sinon la livrée), marqués `horsJeu`. Le menu ne lisait que la
+ *  carte jouée (la publiée dès qu'elle arrive) : le concepteur voyait un
+ *  biome sur sa carte, dans l'éditeur de carte, et ne le retrouvait pas
+ *  dans le menu Biome du tableau (16/11). */
+export function biomesAEtiqueter(
+  jouee: CarteStation,
+  editee: CarteStation | null,
+): { code: string; nom: string; horsJeu?: true }[] {
+  const out: { code: string; nom: string; horsJeu?: true }[] = biomesDeCarte(jouee)
+  if (editee)
+    for (const b of biomesDeCarte(editee))
+      if (!out.some((x) => x.code === b.code)) out.push({ ...b, horsJeu: true })
+  return out
+}
+
 /** LE BIOME EFFECTIF d'un code porté par un tableau. Avant le 16/09 chaque
  *  module était son propre biome et les tableaux se marquaient du code du
  *  module (« C1 ») ; depuis, les modules se regroupent (« cryo »). Un

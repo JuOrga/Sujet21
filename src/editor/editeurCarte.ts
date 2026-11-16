@@ -20,7 +20,7 @@
 // manque, ENTRER) — sans quitter l'éditeur, pour vérifier qu'une
 // carte se traverse avant de la livrer.
 
-import { memeCarte, refusPublication } from '../game/cartePartage'
+import { CLE_CARTE_BROUILLON, memeCarte, refusPublication } from '../game/cartePartage'
 import {
   CRAN_MAX,
   CARTE_LIVREE,
@@ -69,7 +69,7 @@ export interface HooksEditeurCarte {
 }
 
 /** Le document en cours, retenu d'une séance à l'autre sur ce poste. */
-const CLE_CARTE = 'projet21.carte-station.v1'
+const CLE_CARTE = CLE_CARTE_BROUILLON
 const CLE_REGLAGES = 'projet21.carte-station.reglages.v1'
 
 type Outil = 'selection' | 'lier'

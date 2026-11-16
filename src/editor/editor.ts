@@ -457,7 +457,7 @@ export interface EditorHooks {
   sequences?(): { code: string; titre: string }[]
   /** LES BIOMES de la carte de la station (code + nom du module) : le
    * champ Biome du tableau en fait un menu. Absent : le champ se cache. */
-  biomes?(): { code: string; nom: string }[]
+  biomes?(): { code: string; nom: string; horsJeu?: true }[]
 }
 
 /**
@@ -778,7 +778,7 @@ export class LevelEditor {
       biomes
         .map(
           (b) =>
-            `<option value="${b.code}"${b.code === courant ? ' selected' : ''}>${b.code} · ${b.nom}</option>`,
+            `<option value="${b.code}"${b.code === courant ? ' selected' : ''}>${b.code} · ${b.nom}${b.horsJeu ? ' (carte non publiée)' : ''}</option>`,
         )
         .join('') +
       (orphelin ? `<option value="${courant}" selected>${courant} (plus sur la carte)</option>` : '')
