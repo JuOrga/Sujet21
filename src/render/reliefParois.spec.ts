@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
-import { HAUTEUR_BLOCS } from './hauteurs'
+import { HAUTEUR_BLOCS, HAUTEUR_CORPS } from './hauteurs'
 import { HAUTEUR_DE_RANG, RANG_DE_MATIERE } from './volume'
 import { MAT_GRILLE, MAT_MEMBRANE, MAT_RIDEAU } from '../game/level'
 import {
@@ -13,9 +13,11 @@ import {
   flancBalaye,
   flancBalayeTriangle,
   fractionSommet,
-  ombreCorpsFlanc,
-  PLI_CORPS_FLANC,
-  PORTEE_CORPS_FLANC,
+  basesDuCorps,
+  CORPS_RELIEF_GLSL,
+  LUEUR_HAUT_FLANC,
+  lueurCorpsFlanc,
+  PAS_CORPS,
   pointDuSommet,
   solCache,
 } from './reliefParois'
@@ -416,7 +418,7 @@ describe('les décalques plaqués sur un mur suivent son sommet', () => {
 
   it('relief éteint, ni recherche, ni appel GL, ni tableau de plus par décalque', () => {
     // tout le travail du relief, par décalque, sous une seule garde
-    expect(drawDecals).toMatch(/if \(this\.reliefK > 0\) \{\s*const hSupport = this\.hauteurSousDecal\([^}]*this\.passeSousSommets\(hSupport < 0\)\s*gl\.uniform1f\(du\['uSommet'\], f\)\s*\}/)
+    expect(drawDecals).toMatch(/if \(this\.reliefK > 0\) \{\s*const hSupport = this\.hauteurSousDecal\([^}]*this\.passeSousSommets\(hSupport < 0\)\s*gl\.uniform1f\(du\['uSommet'\], f\)[^}]*gl\.uniform1f\(du\['uCorps'\], [^}]*\}/)
     // aucun tableau par coin quand le décalque ne bouge pas
     expect(drawDecals).not.toMatch(/: \[x, y\]/)
     expect(drawDecals).toMatch(/if \(f > 0\) \{\s*const p = pointDuSommet\(/)
@@ -789,46 +791,88 @@ describe('le halo des hydro ne se peint pas sur un autre solide', () => {
 
 // Le concepteur, 16/11 : le corps collé à une paroi s'aplatissait contre une
 // bande qui se lisait comme du sol — la tranche, face verticale vue de biais.
-describe('le corps adossé à une paroi ombre sa tranche', () => {
+describe('relief allumé, le corps a une hauteur : il passe devant le bas de la tranche', () => {
   const H_CORPS = 95
-  it('sans corps au pied, la tranche garde son modelé : 0 à toute hauteur', () => {
-    for (let z = 0; z <= 140; z += 5) expect(ombreCorpsFlanc(0, z, H_CORPS)).toBe(0)
+  it('relief éteint, une seule lecture, au pied : le rendu d’avant', () => {
+    expect(basesDuCorps(0.8, 0.5, 0)).toEqual([0.8])
+    expect(CORPS_RELIEF_GLSL).toMatch(/if \(f <= 0\.0\) return t;/)
   })
-  it('au pied, le pli est plein ; il se desserre sans jamais remonter', () => {
-    expect(ombreCorpsFlanc(1, 0, H_CORPS)).toBe(1)
-    let avant = 1
-    for (let z = 1; z <= 140; z += 1) {
-      const o = ombreCorpsFlanc(1, z, H_CORPS)
-      expect(o, `z ${z}`).toBeLessThanOrEqual(avant + 1e-9)
-      avant = o
+  it('le dernier point lu est le DESSUS : la règle des sommets, à la hauteur du corps', () => {
+    for (const zoom of [0.9, 1.2, 2]) {
+      const f = fractionSommet(R, zoom, H_CORPS)
+      for (const u of [0.05, 0.4, 0.5, 0.93]) {
+        const bases = basesDuCorps(u, 0.5, f)
+        expect(bases).toHaveLength(PAS_CORPS + 1)
+        expect(bases[0]).toBe(u)
+        // le sommet du point de base b se voit en u : pointDuSommet(b) = u
+        const b = bases[PAS_CORPS]
+        expect(pointDuSommet(b, 0, 0.5, 0, f)[0]).toBeCloseTo(u, 9)
+        // les pas vont du pied au dessus, vers le centre, sans le dépasser
+        for (let i = 1; i < bases.length; i++) {
+          expect(Math.abs(bases[i] - 0.5)).toBeLessThanOrEqual(Math.abs(bases[i - 1] - 0.5) + 1e-12)
+        }
+      }
     }
   })
-  it("la portée monte à la hauteur du corps et s'y éteint : au-dessus, le mur est franc", () => {
-    // passé le pli, c'est la portée qui tient l'ombre — à sa densité
-    expect(ombreCorpsFlanc(1, PLI_CORPS_FLANC * H_CORPS, H_CORPS)).toBeCloseTo(PORTEE_CORPS_FLANC, 2)
-    expect(ombreCorpsFlanc(1, 0.6 * H_CORPS, H_CORPS)).toBeGreaterThan(0.1)
-    for (const z of [H_CORPS, 110, 140]) expect(ombreCorpsFlanc(1, z, H_CORPS)).toBe(0)
-    // une plaque basse (40) est ombrée jusqu'à son arête
-    expect(ombreCorpsFlanc(1, 40, H_CORPS)).toBeGreaterThan(0.4)
+  it('plus bas qu’un mur haut, il n’en recouvre pas toute la tranche', () => {
+    // le dessus du corps glisse de 95/140 de ce que glisse celui du mur
+    const fC = fractionSommet(R, 1.2, H_CORPS)
+    const fM = fractionSommet(R, 1.2, HAUTEUR_BLOCS)
+    expect(fC / fM).toBeCloseTo(H_CORPS / HAUTEUR_BLOCS, 9)
+  })
+  it('la composition lit le champ par cette règle, relief de l’eau compris', () => {
+    expect(source).toContain('#define HAUTEUR_CORPS ${glslFloat(HAUTEUR_CORPS)}')
+    expect(HAUTEUR_CORPS).toBe(H_CORPS)
+    expect(composeFs).toContain(
+      'vec4 tex = champCorps(uField, uv, uRelief * clamp(uZoom * 1.2, 0.0, 1.0) * facteurRelief(HAUTEUR_CORPS), uvEau, rSommetCorps);',
+    )
+    // les quatre voisins du relief de l'eau se lisent là où le corps a été vu
+    expect(occurrencesDans(composeFs, 'texture(uField, uvEau ')).toHaveLength(4)
+    expect(composeFs).not.toMatch(/texture\(uField, uv [-+]/)
+    // le côté du corps, plus sombre que son dessus — sous une garde uRelief
+    expect(composeFs).toContain('if (uRelief > 0.0) water *= mix(0.74, 1.0, smoothstep(th - s, th + s, rSommetCorps / uFieldScale));')
+  })
+  it('un décalque au sol s’efface aussi sous le dessus du corps ; sur un mur, au pied comme avant', () => {
+    expect(source).toContain('champCorps(uField, auPied / uCanvasSize, uCorps, uvVu, rSommet)')
+    expect(drawDecals).toContain(
+      "gl.uniform1f(du['uCorps'], hSupport < 0 ? fractionSommet(this.reliefK, this.zoomRelief, HAUTEUR_CORPS) : 0)",
+    )
+  })
+})
+
+describe('le corps éclaire la tranche de la paroi qu’il approche', () => {
+  const H_CORPS = 95
+  it('sans corps devant le pied, la tranche garde son modelé : 0 à toute hauteur', () => {
+    for (let z = 0; z <= 140; z += 5) expect(lueurCorpsFlanc(0, z, H_CORPS)).toBe(0)
+  })
+  it('pleine jusqu’à la hauteur du corps, elle retombe au-dessus sans s’éteindre ni remonter', () => {
+    for (const z of [0, 30, 0.7 * H_CORPS]) expect(lueurCorpsFlanc(1, z, H_CORPS)).toBe(1)
+    let avant = 1
+    for (let z = 0; z <= 200; z += 1) {
+      const l = lueurCorpsFlanc(1, z, H_CORPS)
+      expect(l, `z ${z}`).toBeLessThanOrEqual(avant + 1e-9)
+      expect(l).toBeGreaterThanOrEqual(LUEUR_HAUT_FLANC - 1e-9)
+      avant = l
+    }
+    expect(lueurCorpsFlanc(1, 140, H_CORPS)).toBeLessThan(0.6)
   })
   it('elle suit la présence du corps, bornée à 0..1', () => {
-    expect(ombreCorpsFlanc(0.5, 0, H_CORPS)).toBeCloseTo(0.5, 6)
-    expect(ombreCorpsFlanc(3, 0, H_CORPS)).toBe(1)
-    expect(ombreCorpsFlanc(-1, 0, H_CORPS)).toBe(0)
+    expect(lueurCorpsFlanc(0.5, 0, H_CORPS)).toBeCloseTo(0.5, 6)
+    expect(lueurCorpsFlanc(3, 0, H_CORPS)).toBe(1)
+    expect(lueurCorpsFlanc(-1, 0, H_CORPS)).toBe(0)
   })
-  it('le shader porte le jumeau, et le lit sur la tranche — au pied du point regardé', () => {
-    expect(RELIEF_PAROIS_GLSL).toContain('float ombreCorpsFlanc(float corps, float z, float hCorps)')
-    expect(RELIEF_PAROIS_GLSL).toContain(`${PLI_CORPS_FLANC} * h`)
-    expect(RELIEF_PAROIS_GLSL).toContain(`${PORTEE_CORPS_FLANC} * portee`)
+  it('le shader porte le jumeau, et le lit sur la tranche — devant le pied du point regardé', () => {
+    expect(RELIEF_PAROIS_GLSL).toContain('float lueurCorpsFlanc(float corps, float z, float hCorps)')
     const tranche = blocApres(flanc, 'if (flanc > 0.003 && !aPieces) {')
     expect(tranche).toContain('vec2 pied = world - relB * htFlanc;')
-    expect(tranche).toContain('ombreCorpsFlanc(corps, htFlanc * hB, HAUTEUR_CORPS)')
+    expect(tranche).toContain('lueurCorpsFlanc(corps, htFlanc * hB, HAUTEUR_CORPS)')
     // avant que la tranche ne se pose sur l'image
-    expect(tranche.indexOf('ombreCorpsFlanc(')).toBeLessThan(tranche.indexOf('col = mix(col, fc, flanc * devant);'))
+    expect(tranche.indexOf('lueurCorpsFlanc(')).toBeLessThan(tranche.indexOf('col = mix(col, fc, flanc * devant);'))
   })
-  it('la vapeur ne s’adosse pas, et le champ se lit sans gradient implicite (boucle des boîtes)', () => {
+  it('ni la vapeur ni les gouttes égarées n’éclairent, et le champ se lit sans gradient implicite', () => {
     const lecture = blocApres(source, 'float corpsAuPied(vec2 pw) {')
     expect(lecture).toContain('textureLod(uField, fuv, 0.0)')
-    expect(lecture).toContain('* (1.0 - vap)')
+    expect(lecture).toContain('* (1.0 - vap) * joueur')
+    expect(CORPS_RELIEF_GLSL).not.toMatch(/\btexture\(/)
   })
 })

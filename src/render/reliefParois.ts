@@ -111,32 +111,44 @@ export function solCache(
   return Math.max(sommet, tranche)
 }
 
-/** L'OMBRE QUE LE CORPS POSE SUR LA TRANCHE, 0..1. `corps` : la présence du
- *  fluide au pied de la face (0..1, lue juste devant le pied) ; `z` : la
- *  hauteur du point de la tranche qu'on regarde, en unités monde (0 au
- *  pied) ; `hCorps` : la hauteur du corps (HAUTEUR_CORPS, renderer.ts).
- *  POURQUOI : collé à une paroi, le corps s'aplatissait contre… rien de
- *  lisible. La tranche est une face VERTICALE vue de biais, mais à plat sur
- *  l'écran elle se lisait comme une bande de sol entre le dessus et la cuve
- *  (le concepteur, 16/11 : « quand il est en contact ça peut faire
- *  étrange »). Un volume posé contre un mur l'assombrit à SA hauteur : c'est
- *  cette ombre qui dit que la face se dresse. Deux lectures, comme au sol
- *  (l'épaisseur, renderer.ts) :
- *  - le PLI, serré et dense au pied : la ligne où le corps touche le mur ;
- *  - la PORTÉE, qui monte et s'éteint à la hauteur du corps — sur un mur
- *    haut elle s'arrête aux deux tiers de la face (95 sur 140), une plaque
- *    basse est ombrée jusqu'à son arête.
- *  Sans corps au pied, elle vaut 0 : la tranche garde son modelé d'avant. */
-export function ombreCorpsFlanc(corps: number, z: number, hCorps: number): number {
-  const h = Math.max(hCorps, 1e-3)
-  const pli = 1 - smoothstep(0, PLI_CORPS_FLANC * h, z)
-  const portee = 1 - smoothstep(0.45 * h, h, z)
-  return Math.min(Math.max(corps, 0), 1) * Math.max(pli, PORTEE_CORPS_FLANC * portee)
+/** LE CORPS A UNE HAUTEUR (relief allumé). Les parois étaient extrudées, le
+ *  corps peint à plat : collé à un mur, il s'arrêtait net sur la ligne du
+ *  pied, et la tranche — une face verticale vue de biais — se lisait comme
+ *  une bande de sol à côté de lui (le concepteur, 16/11 : « quand il est en
+ *  contact ça peut faire étrange »). Une première réponse, l'ombre du corps
+ *  sur la tranche, ne suffisait pas : la tranche est déjà sombre au pied.
+ *  Ce qui dit la profondeur, c'est le RECOUVREMENT : le dessus du corps
+ *  glisse comme celui d'un solide de sa hauteur, et passe DEVANT le bas de la
+ *  tranche. Le pixel `u` (coordonnée d'écran, centre `c`) montre le corps si
+ *  l'un des points de base `u − (u − c)·f·t`, t de 0 (le pied) à 1 (le
+ *  dessus), est dans le champ : ce sont ces points que la règle rend, le
+ *  pied d'abord, le dessus en dernier. `f` : fractionSommet à la hauteur du
+ *  corps ; 0 (relief éteint) ne rend que le pied — le rendu d'avant. */
+export function basesDuCorps(u: number, c: number, f: number): number[] {
+  if (!(f > 0)) return [u]
+  const bases = [u]
+  for (let i = 1; i <= PAS_CORPS; i++) bases.push(u - (u - c) * f * (i / PAS_CORPS))
+  return bases
 }
-/** Le pli : la part de la hauteur du corps où l'ombre est à son plein. */
-export const PLI_CORPS_FLANC = 0.22
-/** La portée : sa densité, face au pli (1). */
-export const PORTEE_CORPS_FLANC = 0.8
+/** Les pas du balayage, pied exclu. Trois : au relief fort, en bord d'un
+ *  écran de 1920, le dessus glisse de ~45 px — 15 px par pas, sous la
+ *  largeur d'une goutte (26 u), qui ne se dédouble donc pas. */
+export const PAS_CORPS = 3
+
+/** LA LUEUR DU CORPS SUR LA TRANCHE, 0..1. Le corps éclaire déjà le sol sous
+ *  lui (le halo du sujet) ; adossé à une paroi, sa lumière monte sur la face.
+ *  Dans une salle sombre, une lumière se lit là où une ombre se perd.
+ *  `corps` : sa présence devant le pied (0..1) ; `z` : la hauteur du point de
+ *  la tranche, unités monde ; `hCorps` : la hauteur du corps. Pleine jusqu'à
+ *  la hauteur du corps (qui la recouvre là où il touche : elle se voit sur
+ *  ses côtés et à son approche), elle retombe au-dessus sans s'éteindre —
+ *  le haut du mur reçoit encore le corps, de plus loin. */
+export function lueurCorpsFlanc(corps: number, z: number, hCorps: number): number {
+  const h = Math.max(hCorps, 1e-3)
+  return Math.min(Math.max(corps, 0), 1) * (1 - (1 - LUEUR_HAUT_FLANC) * smoothstep(0.7 * h, 1.5 * h, z))
+}
+/** Ce qu'il reste de la lueur tout en haut d'un mur. */
+export const LUEUR_HAUT_FLANC = 0.4
 
 /** LE FLANC D'UNE BOÎTE, BALAYÉ EXACTEMENT. Le point `p` (dans le repère de
  *  la boîte `b` = minX, minY, maxX, maxY) est sur la tranche s'il existe un
@@ -344,11 +356,9 @@ float solCache(float relief, float d, float dV, float flanc, float w, float opac
   float tranche = d > 0.0 ? flanc : flanc * permeable * smoothstep(0.5 * w, 1.5 * w, -d);
   return max(sommet, tranche);
 }
-float ombreCorpsFlanc(float corps, float z, float hCorps) {
+float lueurCorpsFlanc(float corps, float z, float hCorps) {
   float h = max(hCorps, 1e-3);
-  float pli = 1.0 - smoothstep(0.0, ${glslFloat(PLI_CORPS_FLANC)} * h, z);
-  float portee = 1.0 - smoothstep(0.45 * h, h, z);
-  return clamp(corps, 0.0, 1.0) * max(pli, ${glslFloat(PORTEE_CORPS_FLANC)} * portee);
+  return clamp(corps, 0.0, 1.0) * (1.0 - (1.0 - ${glslFloat(LUEUR_HAUT_FLANC)}) * smoothstep(0.7 * h, 1.5 * h, z));
 }
 // le flanc d'une boîte, balayé exactement (flancBalaye, reliefParois.ts) :
 // (distance signée au balayage, hauteur vue). La boîte se mesure ici, à la
@@ -452,5 +462,27 @@ vec2 flancBalayeCoin(vec2 p, vec4 b, float q0, vec2 r) {
 }
 float solCache(float relief, float d, float dV, float flanc, float w) {
   return solCache(relief, d, dV, flanc, w, 1.0, 0.0);
+}
+`
+
+/** Le jumeau GLSL de basesDuCorps, pour TOUT shader qui lit le corps dans le
+ *  champ (la composition, les décalques) : le texel le plus dense le long du
+ *  chemin pied → dessus. `uvVu` : où il a été lu (les voisins du relief de
+ *  l'eau se lisent là) ; `rSommet` : la densité au DESSUS seul — là où elle
+ *  manque, on regarde le côté du corps, pas son dessus. textureLod : appelé
+ *  aussi hors flot uniforme. */
+export const CORPS_RELIEF_GLSL = `vec4 champCorps(sampler2D champ, vec2 uv, float f, out vec2 uvVu, out float rSommet) {
+  vec4 t = textureLod(champ, uv, 0.0);
+  uvVu = uv;
+  rSommet = t.r;
+  if (f <= 0.0) return t;
+  vec2 dep = (uv - 0.5) * f;
+  for (int i = 1; i <= ${PAS_CORPS}; i++) {
+    vec2 u = uv - dep * (float(i) / ${glslFloat(PAS_CORPS)});
+    vec4 s = textureLod(champ, u, 0.0);
+    if (i == ${PAS_CORPS}) rSommet = s.r;
+    if (s.r > t.r) { t = s; uvVu = u; }
+  }
+  return t;
 }
 `
