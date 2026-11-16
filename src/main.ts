@@ -349,6 +349,7 @@ import { chargePiecesModule2d, peintCelluleSeule, peintModule2d, type Pieces } f
 import { MAX_BOXES, Renderer } from './render/renderer'
 import { HAUTEUR_BLOCS } from './render/hauteurs'
 import { facesTranche, fractionSommet, pointDuSommet } from './render/reliefParois'
+import { remetReglagesParDefaut } from './game/remiseReglages'
 import { Motes, VIE_STRIDE, remplitVie, toucheLeCorps } from './render/vie'
 import { panDepuis } from './game/ouie'
 import { dangerDevant, directionDeMarche, saccade, type Saccade } from './game/regard'
@@ -415,6 +416,7 @@ import {
   sourisInverse,
   toucheDe,
 } from './game/commandes'
+import { avanceCurseur, nouveauCurseurVolume, prendCurseur } from './game/curseurVolume'
 import { picto, type NomPicto } from './game/athPictos'
 import { entreesTiroir } from './game/athTiroir'
 import {
@@ -4200,6 +4202,10 @@ const parallaxeReglages = {
 ;(
   window as unknown as { __parallaxe: typeof parallaxeReglages }
 ).__parallaxe = parallaxeReglages
+// Relief LÉGER, liquide RICHE, éclairages ACTIFS pour tout le monde : les
+// choix anciens de ces quatre réglages sont effacés UNE fois, ici, avant
+// qu'on ne les lise juste dessous (remiseReglages.ts).
+remetReglagesParDefaut(localStorage)
 // Graphismes du LIQUIDE, séparés du décor : SOBRE débranche l'éclairage de
 // l'eau (relief, spéculaire, miroir, scintillement) dans le shader — la
 // silhouette, les couleurs de vitesse et les états restent. C'est le second
@@ -4241,9 +4247,10 @@ let lumiereActive = localStorage.getItem('sujet21-lumiere') !== 'off'
 let lumiereEauActive = localStorage.getItem('sujet21-lumiere-eau') !== 'off'
 // RELIEF 2.5D des parois : leur sommet fuit le centre de la caméra, la face
 // latérale se révèle du côté qui regarde le centre — en se déplaçant, on
-// aperçoit les flancs des éléments qu'on aborde. EXPÉRIMENTAL : OFF par
-// défaut le temps de la validation à la manette ; LÉGER puis FORT à l'essai.
-let reliefChoix = (localStorage.getItem('sujet21-relief') ?? 'off') as
+// aperçoit les flancs des éléments qu'on aborde. LÉGER par défaut (demande
+// du concepteur, 16/11 : la validation à la manette est faite) ; les OFF
+// choisis pendant l'essai sont effacés une fois (remiseReglages.ts).
+let reliefChoix = (localStorage.getItem('sujet21-relief') ?? 'leger') as
   | 'off'
   | 'leger'
   | 'fort'
@@ -8556,6 +8563,22 @@ if (!coffre.stockage.getItem(CLE_EVEIL)) input.freezeIntent = true
 const manette = new Manette()
 const manetteCurseur = { x: 0, y: 0 }
 let manetteTenait = false // le « doigt » manette était posé à l'image d'avant
+// LE CURSEUR DANS LE VOLUME (game/curseurVolume.ts) : LB tenu, le
+// stick gauche le promène dans le corps et A regroupe LÀ — le clic sur le
+// corps, qui n'existait qu'à la souris
+const curseurVol = nouveauCurseurVolume()
+let regroupeAuCurseur = false // A tenu en mode curseur : on se rassemble au curseur
+// A déjà enfoncé quand on prend ou lâche la gâchette : il attend d'être
+// relâché. Sans cela, lâcher la gâchette un instant avant A changeait le
+// regroupement en ÉJECTION (payante), et la prendre en pleine éjection la
+// changeait en regroupement — le geste d'après doit être un geste voulu.
+let manetteAttendRelache = false
+const CURSEUR_VOL_PX_S = 520 // course du curseur, stick à fond (px écran par seconde)
+/** Le bouton du curseur de regroupement est-il TENU ? */
+function curseurTenu(): boolean {
+  const b = boutonDe('curseur')
+  return b !== null && manette.tenu(b)
+}
 
 function boutonVisible(el: HTMLElement | null): el is HTMLElement {
   if (!el || (el as HTMLButtonElement).hidden) return false
@@ -11530,6 +11553,50 @@ function drawFantomes(vw: number, vh: number, dpr: number): void {
   }
 }
 
+// LE CURSEUR DE REGROUPEMENT : une mire posée DANS le corps, là où A le
+// reformera. Sombre sous clair : elle doit se lire sur l'eau comme sur le
+// fond de la cuve. Elle se resserre et s'allume quand A regroupe.
+function drawCurseurVolume(dpr: number): void {
+  if (
+    !curseurVol.actif ||
+    input.paused ||
+    !document.body.classList.contains('playing')
+  )
+    return
+  const dprC = Math.min(dpr, 2)
+  const g = fxCtx
+  g.setTransform(dprC, 0, 0, dprC, 0, 0)
+  const x = manetteCurseur.x
+  const y = manetteCurseur.y
+  const agit = regroupeAuCurseur
+  const r = agit ? 9 : 12 + 1.2 * Math.sin(elapsed * 5)
+  g.save()
+  g.lineCap = 'round'
+  for (const passe of [0, 1]) {
+    g.strokeStyle =
+      passe === 0
+        ? 'rgba(6,20,32,0.7)'
+        : agit
+          ? 'rgba(255,255,255,0.98)'
+          : 'rgba(215,240,255,0.92)'
+    g.lineWidth = passe === 0 ? 4.5 : 2
+    g.beginPath()
+    g.arc(x, y, r, 0, Math.PI * 2)
+    // quatre repères vers l'extérieur : le centre reste dégagé
+    for (let k = 0; k < 4; k++) {
+      const a = (k * Math.PI) / 2
+      g.moveTo(x + Math.cos(a) * (r + 3), y + Math.sin(a) * (r + 3))
+      g.lineTo(x + Math.cos(a) * (r + 9), y + Math.sin(a) * (r + 9))
+    }
+    g.stroke()
+  }
+  g.fillStyle = 'rgba(255,255,255,0.95)'
+  g.beginPath()
+  g.arc(x, y, 2, 0, Math.PI * 2)
+  g.fill()
+  g.restore()
+}
+
 function drawFleche(dtReal: number, dpr: number): void {
   const enJeu = document.body.classList.contains('playing')
   const aMain =
@@ -11541,6 +11608,8 @@ function drawFleche(dtReal: number, dpr: number): void {
     aMain &&
     enJeu &&
     manette.force > 0.03 &&
+    // gâchette tenue, le stick promène le curseur : il ne donne plus de cap
+    !curseurVol.actif &&
     !dash.aiming &&
     !input.paused
   // naissance et extinction en douceur
@@ -15015,7 +15084,8 @@ function mbIncline(surface: HTMLElement, cible: HTMLElement, amplitude = 9): voi
     cible.style.removeProperty('--ry')
   })
 }
-// Le fil de la cérémonie : bilan (temps 1-3, sautables) → versement (le
+// Le fil de la cérémonie : bilan (temps 1-3, sautables ; il ne passe
+// jamais seul, il attend un geste) → versement (le
 // surplus choisit sa destination) → draft (un tirage par palier franchi)
 // → fin (jauge et CONTINUER). Le versement et la suite ne se sautent pas.
 let mbEtape:
@@ -15201,6 +15271,9 @@ function mbFigeBilan(): void {
       if (val && b.gains[i]) val.textContent = b.gains[i].valeur
     })
   }
+  // le levier ressert au palier, où il PASSE la coulée : il y revient avec
+  // son premier mot, pas avec le CONTINUER d'un bilan lu jusqu'au bout
+  mbEl('mb-passer').textContent = 'PASSER ▸'
   mbEl('mb-passer').hidden = true
 }
 
@@ -17923,6 +17996,7 @@ function montreMiseEnBonbonne(b: BilanSalle): void {
   // LE LEVIER a le focus dès l'ouverture : Entrée, Espace et A le pressent
   // (la manette vise le seul bouton de l'écran), le clic aussi
   mbEl('mb-passer').hidden = false
+  mbEl('mb-passer').textContent = 'PASSER ▸'
   mbEl('mb-passer').focus({ preventScroll: true })
   const apres = (ms: number, fn: () => void): void => {
     mbTimers.push(window.setTimeout(fn, ms))
@@ -18014,8 +18088,15 @@ function montreMiseEnBonbonne(b: BilanSalle): void {
       requestAnimationFrame(roule)
     })
   })
-  // Temps 5 — LE VERSEMENT
-  apres(TEMPS_BILAN.versement, mbMontreVersement)
+  // Temps 5 — LA LECTURE EST FINIE, ET LE BILAN ATTEND. Il passait seul au
+  // versement à 4,9 s : le rang, le record, les gains s'en allaient avant
+  // d'être lus, et un joueur qui levait les yeux une seconde trouvait déjà
+  // la question des cuves. Rien ne quitte plus cet écran sans un geste
+  // (mbSauteBilan) ; le levier, qui disait PASSER tant que la lecture
+  // roulait, dit CONTINUER : il ne saute plus rien, il enchaîne.
+  apres(TEMPS_BILAN.lu, () => {
+    mbEl('mb-passer').textContent = 'CONTINUER ▸'
+  })
 }
 /** LE SAUT AU GESTE. Le bilan ne se passait qu'au pointeur : ni Entrée, ni
  *  Espace, ni A n'y faisaient rien. Le levier (qui a le focus) et le toucher
@@ -18031,7 +18112,8 @@ function mbSauteBilan(): void {
 mbEl('mb-passer').addEventListener('click', mbSauteBilan)
 // le même levier passe le palier (chacun ne répond qu'à son étape)
 mbEl('mb-passer').addEventListener('click', mbSauteEtalonnage)
-// un toucher pendant les temps 1-3 saute au versement (jamais l'inverse) ;
+// un toucher sur le bilan — en pleine lecture ou une fois lu — ouvre le
+// versement (jamais l'inverse) ;
 // au palier, il finit la coulée
 mbVeil?.addEventListener('pointerdown', (e) => {
   if ((e.target as HTMLElement).closest('button') !== null) return
@@ -19829,7 +19911,8 @@ function corpsImage(now: number): boolean {
           input.onReset?.()
         }
       }
-      // le temps aux épaules : LB ralentit, RB accélère (la croix ↔ aussi)
+      // le temps : croix ← ralentit, croix → accélère (LB, tenu, porte le
+      // curseur de regroupement ; RB est libre)
       if (manetteFait('ralentir')) input.stepWarp(-1)
       if (manetteFait('accelerer')) input.stepWarp(1)
       // les trois états sur les trois boutons restants : X glace, Y vapeur,
@@ -19842,8 +19925,28 @@ function corpsImage(now: number): boolean {
         // refermer un panneau léger (légende, états, instruments)
         input.demande('eau')
       }
-      if (manette.edge(BOUTON.GAUCHE)) input.stepWarp(-1)
-      if (manette.edge(BOUTON.DROITE)) input.stepWarp(1)
+      // CONCLURE : valide CONTINUER quand il s'offre. Posé sur un cran de
+      // la croix (↓ par défaut), il prend alors le pas sur ce que ce cran
+      // fait d'ordinaire — la caméra ne doit pas reculer, ni le temps
+      // changer, au moment où l'on conclut. Relevé AVANT de conclure : le
+      // geste retire le bouton, et le cran reprendrait son rôle à la même image.
+      const cranConclure = continuerOffert() ? boutonDe('conclure') : null
+      // la croix ↔ règle TOUJOURS le temps, même si « ralentir » ou
+      // « accélérer » ont été redéfinis ailleurs. Un cran qui porte déjà la
+      // manœuvre (← pour ralentir, par défaut) ne compte qu'une fois : sans
+      // cette garde, un appui sautait deux crans de vitesse.
+      if (
+        cranConclure !== BOUTON.GAUCHE &&
+        boutonDe('ralentir') !== BOUTON.GAUCHE &&
+        manette.edge(BOUTON.GAUCHE)
+      )
+        input.stepWarp(-1)
+      if (
+        cranConclure !== BOUTON.DROITE &&
+        boutonDe('accelerer') !== BOUTON.DROITE &&
+        manette.edge(BOUTON.DROITE)
+      )
+        input.stepWarp(1)
       // la croix HAUT verse la réserve : viser une fiole de douze pixels au
       // pavé tactile n'était pas un geste — au Deck, c'est un cran de croix
       if (manetteFait('verser')) verseEtDis()
@@ -19854,14 +19957,10 @@ function corpsImage(now: number): boolean {
       // Ouvert, c'est une couche LÉGÈRE (COUCHES_MENU) : B le referme
       // plus haut, sans repasser le corps à l'eau
       if (manetteFait('dossier')) ouvreDossier(!dossierOuvert)
-      // CONCLURE : valide CONTINUER quand il s'offre. Sur la croix ↓, il
-      // prend alors le pas sur le zoom arrière (LT dézoome toujours) — la
-      // caméra ne doit pas reculer d'un cran au moment où l'on conclut
-      const conclureSurBas =
-        boutonDe('conclure') === BOUTON.BAS && continuerOffert()
       if (manetteFait('conclure')) conclureSalle()
-      if (manette.zoomAvant) camera.zoomBy(Math.pow(1.9, dtReal), params)
-      if (manette.zoomArriere && !conclureSurBas)
+      if (manette.zoomAvant && cranConclure !== BOUTON.HAUT)
+        camera.zoomBy(Math.pow(1.9, dtReal), params)
+      if (manette.zoomArriere && cranConclure !== BOUTON.BAS)
         camera.zoomBy(Math.pow(1.9, -dtReal), params)
       // les grosses gâchettes zooment, la pression dose la vitesse
       if (manette.rtVal > 0.02)
@@ -19891,25 +19990,77 @@ function corpsImage(now: number): boolean {
         // et TIR DE GLACE : le stick dit où l'on envoie (« au joystick c'est
         // inversé », le concepteur, 17/09 — le tir suivait la règle de l'eau)
         const sens = input.gasIntent || (params.glaceTir > 0 && input.freezeIntent) ? 1 : -1
-        manetteCurseur.x = scx + manette.dirX * rPx * sens
-        manetteCurseur.y = scy + manette.dirY * rPx * sens
-        if (manette.agit) {
-          input.aimActive = true
+        const tenu = curseurTenu()
+        if (tenu !== curseurVol.actif) {
+          // on prend ou on lâche la gâchette : le doigt posé se relève, et
+          // un A encore enfoncé attend son relâchement (voir plus haut)
+          if (tenu) prendCurseur(curseurVol)
+          else curseurVol.actif = false
+          regroupeAuCurseur = false
+          manetteAttendRelache = manette.agit
+          if (manetteTenait) {
+            manetteTenait = false
+            input.aimActive = false
+          }
+        }
+        if (!manette.agit) manetteAttendRelache = false
+        if (curseurVol.actif) {
+          // LE CURSEUR DANS LE VOLUME : le stick ne vise plus, il promène
+          // le point où le corps se reformera. Vitesse à l'ÉCRAN (le zoom
+          // ne change pas la main), position dans le repère du corps.
+          const cxM = sim.stats.centroidX
+          const cyM = sim.stats.centroidY
+          avanceCurseur(
+            curseurVol,
+            manette.dirX * manette.force,
+            manette.dirY * manette.force,
+            (CURSEUR_VOL_PX_S * dtReal) / camera.zoom,
+            (dx, dy) => corpsSousLePointeur(cxM + dx, cyM + dy),
+          )
+          manetteCurseur.x = scx + curseurVol.dx * camera.zoom
+          manetteCurseur.y = scy - curseurVol.dy * camera.zoom
           input.aimClientX = manetteCurseur.x
           input.aimClientY = manetteCurseur.y
-          manetteTenait = true
-        } else if (manetteTenait) {
+          // A regroupe AU CURSEUR — en liquide seulement : en vapeur ou en
+          // glace, poser le doigt armerait un dash ou un tir vers le curseur,
+          // et le mode n'est pas là pour ça
+          const peut =
+            !input.gasIntent && !input.freezeIntent && !sim.dispersed
+          if (manette.agit && !manetteAttendRelache && peut) {
+            input.aimActive = true
+            manetteTenait = true
+            regroupeAuCurseur = true
+          } else if (manetteTenait) {
+            manetteTenait = false
+            input.aimActive = false
+            regroupeAuCurseur = false
+          }
+        } else {
+          manetteCurseur.x = scx + manette.dirX * rPx * sens
+          manetteCurseur.y = scy + manette.dirY * rPx * sens
+          if (manette.agit && !manetteAttendRelache) {
+            input.aimActive = true
+            input.aimClientX = manetteCurseur.x
+            input.aimClientY = manetteCurseur.y
+            manetteTenait = true
+          } else if (manetteTenait) {
+            manetteTenait = false
+            input.aimActive = false
+          } else if (manette.active) {
+            // le curseur suit même sans presser : la visée se prépare
+            input.aimClientX = manetteCurseur.x
+            input.aimClientY = manetteCurseur.y
+          }
+        }
+      } else {
+        // la souris ou le doigt a la main : le curseur de regroupement se range
+        curseurVol.actif = false
+        regroupeAuCurseur = false
+        if (manetteTenait) {
+          // …et s'ils l'ont reprise en pleine action manette, on relâche
           manetteTenait = false
           input.aimActive = false
-        } else if (manette.active) {
-          // le curseur suit même sans presser : la visée se prépare
-          input.aimClientX = manetteCurseur.x
-          input.aimClientY = manetteCurseur.y
         }
-      } else if (manetteTenait) {
-        // la souris a repris la main en pleine action manette : on relâche
-        manetteTenait = false
-        input.aimActive = false
       }
     }
   }
@@ -20050,12 +20201,16 @@ function corpsImage(now: number): boolean {
   // gratuite (rien ne part, rien ne se paie). Le stick n'a pas de point : il
   // rassemble au centre. Le doigt, lui, en a un : le corps se reforme LÀ où
   // on le touche (voir FluidSim.rassemble pour les garde-fous).
-  const rassembleAuCentre = manetteTenait && manette.force < 0.02
+  // Le CURSEUR de la manette (gâchette tenue) a un point, lui aussi : A y
+  // regroupe comme le doigt — et là, le stick promène le curseur, son neutre
+  // ne veut plus dire « au centre ».
+  const auCurseur = manetteTenait && regroupeAuCurseur
+  const rassembleAuCentre = manetteTenait && !auCurseur && manette.force < 0.02
   const rassembler =
     input.aimActive &&
     !input.gasIntent &&
     !sim.dispersed &&
-    (rassembleAuCentre || corpsSousLePointeur(aim.x, aim.y))
+    (rassembleAuCentre || auCurseur || corpsSousLePointeur(aim.x, aim.y))
   ;(window as unknown as { __rass: boolean }).__rass = rassembler // sonde de test
 
   if (rejeu) {
@@ -21234,6 +21389,7 @@ function corpsImage(now: number): boolean {
   drawRecharges(vw, vh, dpr, performance.now() / 1000)
   drawFantomes(vw, vh, dpr)
   drawFleche(dtReal, dpr)
+  drawCurseurVolume(dpr)
   majIdle(dtReal)
   majPresence(dtReal, aim.x, aim.y)
   aimMonde.x = aim.x

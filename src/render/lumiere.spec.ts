@@ -68,11 +68,13 @@ describe('Éclairage des volumes — la hauteur des coques', () => {
     // la coque au plafond, les autres à leur hauteur de la table (volume.ts,
     // hauteursBoites.spec.ts) — à hauteur égale, enjambée (un toit ne
     // s'ombre pas lui-même)
+    // (16/11 : la hauteur est nommée, hObs — la pointe de l'ombre s'y fond,
+    // ombrePointe.ts ; le seuil, lui, est le même)
     expect(source).toMatch(
-      /if\s*\(alt\s*>=\s*\(dec\.y\s*>\s*4\.5\s*\?\s*HAUTEUR_COQUE\s*:\s*hauteurBoite\(i\)\)\)\s*continue;/,
+      /float\s+hObs\s*=\s*dec\.y\s*>\s*4\.5\s*\?\s*HAUTEUR_COQUE\s*:\s*hauteurBoite\(i\);\s*if\s*\(alt\s*>=\s*hObs\)\s*continue;/,
     )
     // l'altitude passée au SDF : t·hLampe/distL, la montée réelle du rayon
-    expect(source).toMatch(/sceneSdf\(p\s*\+\s*dir\s*\*\s*t,\s*t\s*\*\s*hL\s*\/\s*distL\)/)
+    expect(source).toMatch(/sceneSdf\(p\s*\+\s*dir\s*\*\s*t,\s*t\s*\*\s*hL\s*\/\s*distL,\s*t\s*\/\s*pen\)/)
   })
 
   it('a la même valeur des deux côtés — TypeScript et shader', () => {

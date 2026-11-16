@@ -82,7 +82,7 @@ describe('le rang d’une salle', () => {
 })
 
 describe('les temps de la lecture', () => {
-  it('arrivent dans l’ordre du récit : titre, rang, litres, prime, lignes, condensat, versement', () => {
+  it('arrivent dans l’ordre du récit : titre, rang, litres, prime, lignes, condensat, puis la lecture est finie', () => {
     const t = TEMPS_BILAN
     expect(t.titre).toBe(0)
     expect(t.rang).toBeGreaterThan(t.titre)
@@ -90,11 +90,11 @@ describe('les temps de la lecture', () => {
     expect(t.prime).toBeGreaterThan(t.litres)
     expect(t.lignes).toBeGreaterThan(t.prime)
     expect(t.condensat).toBeGreaterThan(t.lignes + PAS_LIGNE_MS * 2)
-    expect(t.versement).toBeGreaterThan(t.condensat + 1000)
+    expect(t.lu).toBeGreaterThan(t.condensat + 1000)
   })
 
   it('tiennent en moins de six secondes — au-delà, on saute', () => {
-    expect(TEMPS_BILAN.versement).toBeLessThan(6000)
+    expect(TEMPS_BILAN.lu).toBeLessThan(6000)
   })
 })
 
@@ -568,8 +568,23 @@ describe('la cérémonie — le vocabulaire de la station', () => {
 // ni Entrée, ni Espace, ni A n'y faisaient rien (inventaire, étape 1). Il
 // devient une scène à UN héros, la bonbonne, et un levier qu'on presse.
 describe('la cérémonie — le bilan « SALLE FRANCHIE »', () => {
-  it('ne s’allonge pas : le versement arrive au plus tard à 4,9 s', () => {
-    expect(TEMPS_BILAN.versement).toBeLessThanOrEqual(4900)
+  it('ne s’allonge pas : la lecture est finie au plus tard à 4,9 s', () => {
+    expect(TEMPS_BILAN.lu).toBeLessThanOrEqual(4900)
+  })
+  // Le bilan passait SEUL au versement à 4,9 s : le rang, le record et les
+  // gains partaient avant d'être lus. Il attend désormais un geste — aucun
+  // minuteur de la lecture n'ouvre le versement, seul mbSauteBilan le fait.
+  it('ne passe jamais seul : aucun minuteur n’ouvre le versement', () => {
+    const bilan = corps('montreMiseEnBonbonne')
+    expect(bilan).not.toMatch(/mbMontreVersement/)
+    expect(corps('mbSauteBilan')).toMatch(/mbMontreVersement\(\)/)
+  })
+  it('le levier dit PASSER pendant la lecture, CONTINUER une fois lue', () => {
+    const bilan = corps('montreMiseEnBonbonne')
+    expect(bilan).toMatch(/mbEl\('mb-passer'\)\.textContent = 'PASSER ▸'/)
+    expect(bilan).toMatch(/apres\(TEMPS_BILAN\.lu, \(\) => \{\s*mbEl\('mb-passer'\)\.textContent = 'CONTINUER ▸'/)
+    // le levier ressert au palier : il y revient avec son premier mot
+    expect(corps('mbFigeBilan')).toMatch(/mbEl\('mb-passer'\)\.textContent = 'PASSER ▸'/)
   })
   it('se passe d’un geste : le levier est un bouton focalisé à l’ouverture', () => {
     expect(HTML).toMatch(/<button[^>]*id="mb-passer"/)

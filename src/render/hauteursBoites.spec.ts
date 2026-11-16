@@ -116,7 +116,7 @@ describe('la carte cuite lit la hauteur de chaque boîte', () => {
   it("un toit bas reçoit l'ombre d'un voisin plus haut : la carte en porte la visibilité dans son alpha", () => {
     // le cuiseur marche une seconde fois, depuis le TOIT, à la hauteur du toit
     expect(lightFs).toContain('float hT = hauteurToit(p);')
-    expect(lightFs).toMatch(/sceneSdf\(p \+ dir \* tT, hT \+ tT \* monte\)/)
+    expect(lightFs).toMatch(/sceneSdf\(p \+ dir \* tT, hT \+ tT \* monte, tT \/ pen\)/)
     expect(lightFs).toContain('outColor = vec4(clamp(total, 0.0, 1.0), toitVis);')
     // la composition la lit et l'applique à la lumière du dessus
     expect(composeFs).toMatch(/toitVis = lm4\.a;/)
