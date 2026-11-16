@@ -4073,7 +4073,13 @@ void main() {
   // de l'eau suit body. Dans un perméable, il entre sous le dessus et
   // ressort au-delà du débord. Côté où le pied se voit, rien n'est caché : le
   // fluide touche le bas du flanc. Relief éteint, solSousSommets vaut 0.
-  body *= 1.0 - solSousSommets;
+  // IL S'Y DEVINE (corpsDevine, reliefParois.ts) : effacé net, le corps
+  // disparaissait dans une membrane, un évent, un rideau, et derrière toute
+  // tranche — on ne savait plus où il était. Un fond léger et son contour
+  // (lisereCorps : 1 au bord du champ, 0 dans la masse) restent peints,
+  // par-dessus la paroi.
+  float lisereCorps = 1.0 - smoothstep(th + s, th * 3.0, field2);
+  body *= corpsDevine(solSousSommets, lisereCorps);
   // La passe de vie (motes, lueur des gouttes perdues), peinte après, lit
   // ce masque dans la PROFONDEUR (voir drawVie) : 0 sous un sommet.
   gl_FragDepth = solSousSommets > 0.5 ? 0.0 : 1.0;
@@ -4530,6 +4536,16 @@ void main() {
     // nuit ne l'éteigne pas.
     water += plas * plasmaS * vap * 0.30 * crepite;
 
+    // LE CORPS DEVINÉ sous un sommet : une lueur, pas de la matière. Il
+    // garde la teinte de sa phase (glace, vapeur et plasma se lisent encore)
+    // mais tire vers un cyan clair, liseré plus vif — et ne dépend plus de la
+    // lumière de la pièce : sous un mur dans le noir, c'est justement là
+    // qu'on le cherche.
+    if (solSousSommets > 0.001) {
+      vec3 spectre = mix(water, vec3(0.60, 0.92, 1.00), 0.65)
+        + vec3(0.30, 0.38, 0.40) * lisereCorps;
+      water = mix(water, spectre, solSousSommets);
+    }
     col = mix(col, water, body);
     // L'eau qui recouvre l'œil du sas s'assombrit : elle sombre dans le trou
     col *= 1.0 - drainEye * body * 0.55;
