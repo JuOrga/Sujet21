@@ -583,8 +583,16 @@ export function parseLevel(input: unknown): {
       r: Math.max(8, num(c.r, 26)),
     }
     // récepteur NOR (à maintien, la coupure scelle), MAINTIEN (suit le
-    // faisceau), BASCULE (chaque passage inverse) — tout le reste est TOR
-    if (c.mode === 'nor' || c.mode === 'maintien' || c.mode === 'bascule') cible.mode = c.mode
+    // faisceau), BASCULE (chaque passage inverse), MÉMOIRE et EFFACE (la
+    // fonction mémoire : l'une écrit, l'autre reprend) — tout le reste est TOR
+    if (
+      c.mode === 'nor' ||
+      c.mode === 'maintien' ||
+      c.mode === 'bascule' ||
+      c.mode === 'memoire' ||
+      c.mode === 'efface'
+    )
+      cible.mode = c.mode
     // le n° logique (canal) : conservé s'il est explicite et valable ;
     // absent, la pastille vaut sa position (indice + 1)
     const canal = Math.round(num(c.canal, 0))
@@ -1302,8 +1310,26 @@ export function checkLevel(brut: LevelDef, catalogue: InstrumentDef[] = catalogu
   // Une COUPELLE porte un canal au même titre qu'une pastille.
   const nCibles = level.cibles?.length ?? 0
   const canaux = new Set<number>()
-  for (let c = 0; c < nCibles; c++) canaux.add(canalDeCible(level.cibles!, c))
+  // Une pastille EFFACE ne compte pas : elle reprend des mémoires, elle
+  // n'alimente rien — une porte dont le canal n'a qu'elle ne bougerait jamais.
+  const canauxMemoire = new Set<number>()
+  for (let c = 0; c < nCibles; c++) {
+    const mode = level.cibles![c].mode
+    if (mode !== 'efface') canaux.add(canalDeCible(level.cibles!, c))
+    if (mode === 'memoire') canauxMemoire.add(canalDeCible(level.cibles!, c))
+  }
   for (const k of level.coupelles ?? []) canaux.add(k.canal)
+  // une EFFACE sans MÉMOIRE sur son canal ne reprend rien : presque toujours
+  // un numéro mal recopié (elle n'efface ni TOR, ni BASCULE)
+  for (let c = 0; c < nCibles; c++) {
+    if (level.cibles![c].mode !== 'efface') continue
+    const canal = canalDeCible(level.cibles!, c)
+    if (!canauxMemoire.has(canal))
+      v.push({
+        niveau: 'avertissement',
+        message: `Une pastille EFFACE porte le canal nº ${canal} — aucune pastille MÉMOIRE ne porte ce numéro : elle n’efface rien.`,
+      })
+  }
   for (const porte of level.portes ?? []) {
     if (porte.canal >= 0 && !canaux.has(porte.canal)) {
       v.push({
