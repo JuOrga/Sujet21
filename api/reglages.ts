@@ -5,6 +5,11 @@
 // l'écran qui le règle — le code du jeu porte la version livrée comme
 // filet, ce magasin porte celle du concepteur.
 //
+// Deux domaines ne sont pas des réglages mais des AVIS, écrits par ceux qui
+// jouent : « ecoute » (les musiques, game/ecouteAvis.ts) et « avis-salles »
+// (les salles, game/avisSalles.ts). Ils logent ici parce que le plan Hobby
+// compte douze fonctions et qu'elles sont toutes prises.
+//
 // Le serveur ne connaît pas la FORME de chaque document (elle vit dans le
 // code du jeu, qui la ramène dans ses bornes en la relisant : clampPlanVoie
 // pour le plan) ; il garde la taille, le domaine et l'auteur. Un magasin
@@ -19,7 +24,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { ecritDocument, litDocument } from './_magasin.js'
 
-const DOMAINES = ['plan-voie', 'carte', 'recompenses', 'textes', 'sequences', 'avaries', 'ecoute']
+const DOMAINES = ['plan-voie', 'carte', 'recompenses', 'textes', 'sequences', 'avaries', 'ecoute', 'avis-salles']
 const MAX_OCTETS = 200_000
 
 interface Magasin {

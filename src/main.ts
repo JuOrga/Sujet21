@@ -464,6 +464,22 @@ import {
 import { Jukebox, PISTES_ECOUTE } from './game/jukebox'
 import { auteurAvis, avisDe, ligneAvis, ligneBilan, lisAvisEcoute, poseAvis, type Avis, type DocumentAvis } from './game/ecouteAvis'
 import {
+  CODE_MAX,
+  CRANS_AVIS,
+  MOTS_AVIS,
+  avisAuGeste,
+  avisDeTouche,
+  carnetApresEnvoi,
+  elagueAvisSalles,
+  ligneMoyenne,
+  lisAvisSalles,
+  lisCarnetAvis,
+  noteAuCarnet,
+  superposeAttente,
+  type AvisSalle,
+  type CarnetAvis,
+} from './game/avisSalles'
+import {
   compteur,
   douce,
   GARDE_GESTE_MS,
@@ -3244,7 +3260,10 @@ const recordsEl = document.getElementById('records') as HTMLDivElement
 const recordsCorps = document.getElementById('records-corps') as HTMLDivElement
 function renderRecordsVoile(): void {
   recordsCorps.innerHTML = '<div class="rec-vide">Chargement du palmarès…</div>'
-  void fetchSharedBoard().then((board) => {
+  // L'AVIS DES JOUEURS sur chaque salle arrive avec le palmarès (deux fetch
+  // publics, aucune opération du magasin) ; hors ligne, il manque et rien
+  // d'autre ne change
+  void Promise.all([fetchSharedBoard(), fetchReglage('avis-salles')]).then(([board, avisPublies]) => {
     if (!board) {
       recordsCorps.innerHTML =
         '<div class="rec-vide">Palmarès injoignable (hors ligne ou serveur local).</div>' +
@@ -3296,9 +3315,20 @@ function renderRecordsVoile(): void {
     html += blocFantomes()
     html += '<div id="rec-fant-palmares"></div>'
     const tops = board.tops ?? {}
+    // mes avis pas encore publiés comptent déjà : on vient de les poser,
+    // ne pas les retrouver ici ferait croire qu'ils sont perdus
+    const avisSalles = superposeAttente(
+      lisAvisSalles(avisPublies?.document ?? null),
+      carnetAvis.attente,
+      auteurAvis(records.operator()),
+    )
     for (const lv of playedLevels()) {
       const t = tops[lv.code]
-      html += `<div class="rec-salle">${esc(lv.code)} — ${esc(lv.name)}</div>`
+      const avis = ligneMoyenne(avisSalles, lv.code)
+      html +=
+        `<div class="rec-salle">${esc(lv.code)} — ${esc(lv.name)}` +
+        (avis ? `<span class="rec-avis" title="l’avis des joueurs sur la salle, posé au bilan">AVIS ${avis}</span>` : '') +
+        `</div>`
       if (!t || t.note.length === 0) {
         html +=
           '<div class="rec-vide">Aucune collecte enregistrée — le palmarès est à prendre.</div>'
@@ -5259,9 +5289,59 @@ function entrerHub(): void {
   // s'appliquent. C'est ici que vit le fil narratif du roguelike.
   void joueMoment('premier-lancement').then(() => joueMoment('avant-hub'))
 }
+// L'AVIS DU JOUEUR SUR UNE SALLE (game/avisSalles.ts) : le CARNET du poste
+// — mes avis, et ceux qui attendent le magasin. La rangée du bilan
+// (mbAvisOuvre, plus bas) n'écrit que là.
+const CLE_AVIS_SALLES = 'sujet21-avis-salles-v1'
+let carnetAvis: CarnetAvis = (() => {
+  try {
+    return lisCarnetAvis(localStorage.getItem(CLE_AVIS_SALLES))
+  } catch {
+    return lisCarnetAvis(null)
+  }
+})()
+function gardeCarnetAvis(): void {
+  try {
+    localStorage.setItem(CLE_AVIS_SALLES, JSON.stringify(carnetAvis))
+  } catch {
+    // stockage plein ou interdit : l'avis tient jusqu'à la fin de la session
+  }
+}
+// LA PUBLICATION EST GROUPÉE : un avis par salle franchie, publié à
+// chaque bilan, coûterait 3 opérations du magasin par salle (2 put + 1
+// list, api/_magasin.ts) sur les 2 000 du mois. Le carnet se verse d'UN
+// coup : à la fin de la descente, au retour à la fiche, et au démarrage
+// s'il reste de l'attente (onglet fermé en pleine descente). On RELIT le
+// document publié avant d'écrire, et on pose notre attente par-dessus —
+// sans lecture, pas d'écriture : hors ligne, publier ce qu'on a en main
+// effacerait les avis de tous les autres. Deux postes qui publient dans la
+// même fenêtre du cache de lecture du magasin peuvent encore s'écraser :
+// accepté, comme pour l'avis sur une musique — c'est un sondage, pas un
+// registre.
+let avisSallesEnVol = false
+async function publieAvisSalles(): Promise<void> {
+  const envoi = carnetAvis.attente
+  if (avisSallesEnVol || Object.keys(envoi).length === 0) return
+  avisSallesEnVol = true
+  try {
+    const distant = await fetchReglage('avis-salles')
+    if (!distant) return
+    const auteur = auteurAvis(records.operator())
+    const doc = elagueAvisSalles(superposeAttente(lisAvisSalles(distant.document), envoi, auteur))
+    const r = await pushReglage('avis-salles', doc, auteur)
+    if (!r) return // refusé : l'attente reste au carnet, la prochaine occasion retentera
+    carnetAvis = carnetApresEnvoi(carnetAvis, envoi)
+    gardeCarnetAvis()
+  } finally {
+    avisSallesEnVol = false
+  }
+}
+void publieAvisSalles()
+
 function openHome(): void {
   document.body.classList.remove('playing')
   appelOeil()
+  void publieAvisSalles()
   // La fiche fige l'essai : revenir au menu, c'est faire une pause — la
   // cuve n'avance plus dans le dos du joueur.
   if (hasPlayed) input.paused = true
@@ -12935,6 +13015,8 @@ function simuleBonbonne(surplus = 2): void {
     recVol: '',
     recChr: '',
     note: 0,
+    // ni jugé : la cérémonie simulée n'a pas de salle derrière elle
+    codeAvis: null,
     // rien n'est crédité par une cérémonie simulée : les tuiles montrent ce
     // que la salle AURAIT rendu, sur la bourse et les registres tels quels
     gains: gainsDeSalle({
@@ -15216,6 +15298,9 @@ interface BilanSalle {
   note: number
   /** LA RÉCOLTE de la salle, en tuiles (game/recolte.ts, gainsDeSalle) */
   gains: Gain[]
+  /** le code de la salle que le joueur peut juger (game/avisSalles.ts) —
+   *  null : pas de rangée d'avis (cérémonie simulée, essai de l'éditeur) */
+  codeAvis: string | null
 }
 
 function mbEl(id: string): HTMLElement {
@@ -15239,6 +15324,7 @@ function fermeMiseEnBonbonne(): void {
   mbFeu.vide()
   miseEnBonbonne = false
   mbBilanCourant = null
+  mbAvisOuvre(null)
 }
 
 /** La part livrée, bornée à la bonbonne pleine : la prime peut porter
@@ -15283,6 +15369,8 @@ function mbFigeBilan(): void {
   // son premier mot, pas avec le CONTINUER d'un bilan lu jusqu'au bout
   mbEl('mb-passer').textContent = 'PASSER ▸'
   mbEl('mb-passer').hidden = true
+  // l'avis se pose au bilan, pas après : la rangée s'en va avec lui
+  mbAvisOuvre(null)
 }
 
 /** POSE UNE CUVE (cuveHTML) dans son hôte, et rend son liquide. Ses deux
@@ -17853,6 +17941,9 @@ function mbMontreFinDescente(issue: IssueDescente, r: ReleveDescente, suite: () 
   mbReleveHors()
   mbEl('mb-etal').hidden = true
   mbEl('mb-passer').hidden = true
+  mbAvisOuvre(null)
+  // la descente est finie : les avis posés en route partent au magasin
+  void publieAvisSalles()
   mbEl('mb-palier-eclair').hidden = true
   mbEl('mb-choix').hidden = false
   // le sceau du module se teinte : l'or de la bouclée, le rouge du figé
@@ -18005,6 +18096,8 @@ function montreMiseEnBonbonne(b: BilanSalle): void {
   // (la manette vise le seul bouton de l'écran), le clic aussi
   mbEl('mb-passer').hidden = false
   mbEl('mb-passer').textContent = 'PASSER ▸'
+  // la rangée d'avis AVANT le focus : c'est le levier qui le garde
+  mbAvisOuvre(b.codeAvis)
   mbEl('mb-passer').focus({ preventScroll: true })
   const apres = (ms: number, fn: () => void): void => {
     mbTimers.push(window.setTimeout(fn, ms))
@@ -18118,13 +18211,82 @@ function mbSauteBilan(): void {
   mbMontreVersement()
 }
 mbEl('mb-passer').addEventListener('click', mbSauteBilan)
+
+// ---- L'AVIS DU JOUEUR SUR LA SALLE (game/avisSalles.ts) ----
+// Cinq crans sous le levier du bilan, facultatifs : un clic, un toucher,
+// une touche de 1 à 5, ou la croix puis A. Poser un avis NE PASSE PAS le
+// bilan, et ne prend pas la main au levier : le focus lui revient aussitôt,
+// Entrée, Espace et A continuent d'enchaîner — sans cela, le A suivant
+// re-pressait le cran visé et retirait l'avis qu'on venait de poser.
+/** La salle que la rangée juge ; null : pas de rangée. */
+let mbAvisCode: string | null = null
+function mbAvisPeint(): void {
+  const mien: AvisSalle | 0 = mbAvisCode ? carnetAvis.miens[mbAvisCode]?.avis ?? 0 : 0
+  for (const cran of Array.from(mbEl('mb-avis-crans').children)) {
+    const n = Number((cran as HTMLElement).dataset.avis)
+    // la jauge : tous les crans jusqu'au mien s'allument
+    cran.classList.toggle('mb-on', mien > 0 && n <= mien)
+    cran.setAttribute('aria-pressed', n === mien ? 'true' : 'false')
+  }
+  mbEl('mb-avis').classList.toggle('mb-pose', mien > 0)
+  mbEl('mb-avis-mot').textContent = mien ? `${mien} / 5 — ${MOTS_AVIS[mien]}` : `1 : ${MOTS_AVIS[1]} — 5 : ${MOTS_AVIS[5]}`
+}
+/** Pose (ou retire, `null`) la rangée d'avis de la salle `code`. Les crans
+ *  sont REFAITS à chaque bilan : la manette retient l'élément visé d'un
+ *  écran à l'autre (focusParCouche) — un cran visé à la salle précédente,
+ *  resté dans le document, aurait gardé la visée à l'ouverture du bilan
+ *  suivant, et A aurait jugé la salle au lieu de passer. Rallumée sur mon
+ *  avis si j'ai déjà jugé cette salle. */
+function mbAvisOuvre(code: string | null): void {
+  mbAvisCode = code ? code.trim().slice(0, CODE_MAX) || null : null
+  mbEl('mb-avis').hidden = mbAvisCode === null
+  if (mbAvisCode === null) return
+  mbEl('mb-avis-crans').innerHTML = CRANS_AVIS.map(
+    (n) =>
+      `<button type="button" class="mb-avis-cran" data-avis="${n}" aria-pressed="false" ` +
+      `title="${n} / 5 — ${MOTS_AVIS[n]}" aria-label="${n} sur 5 : ${MOTS_AVIS[n]}">${n}</button>`,
+  ).join('')
+  mbAvisPeint()
+}
+function mbAvisVote(cran: AvisSalle): void {
+  if (!miseEnBonbonne || mbEtape !== 'bilan' || mbAvisCode === null) return
+  const mien: AvisSalle | 0 = carnetAvis.miens[mbAvisCode]?.avis ?? 0
+  carnetAvis = noteAuCarnet(carnetAvis, mbAvisCode, avisAuGeste(mien, cran), new Date().toISOString())
+  gardeCarnetAvis()
+  sonCeremonie('cartouche', 0.5)
+  mbAvisPeint()
+  const levier = mbEl('mb-passer')
+  levier.focus({ preventScroll: true })
+  focusParCouche.set('mb-veil', levier)
+}
+/** UN TOUCHER RATÉ ENTRE DEUX CRANS ne passe pas le bilan : on visait la
+ *  rangée, pas la suite. Et il ne prend pas le focus au levier
+ *  (preventDefault) : sans cela, Entrée et Espace ne passaient plus rien
+ *  après un clic à côté d'un cran (vu au banc, 16/11). Rend vrai si le
+ *  toucher était pour la rangée. */
+function mbToucheAvis(e: PointerEvent): boolean {
+  if ((e.target as HTMLElement).closest('.mb-avis') === null) return false
+  e.preventDefault()
+  return true
+}
+mbEl('mb-avis-crans').addEventListener('click', (e) => {
+  const cran = (e.target as HTMLElement).closest<HTMLElement>('.mb-avis-cran')
+  const n = cran ? avisDeTouche(cran.dataset.avis ?? '') : null
+  if (n !== null) mbAvisVote(n)
+})
+// les touches 1 à 5, tant que le bilan est à l'écran (mbAvisVote le vérifie)
+window.addEventListener('keydown', (e) => {
+  if (e.repeat || e.ctrlKey || e.metaKey || e.altKey) return
+  const n = avisDeTouche(e.key)
+  if (n !== null) mbAvisVote(n)
+})
 // le même levier passe le palier (chacun ne répond qu'à son étape)
 mbEl('mb-passer').addEventListener('click', mbSauteEtalonnage)
 // un toucher sur le bilan — en pleine lecture ou une fois lu — ouvre le
 // versement (jamais l'inverse) ;
 // au palier, il finit la coulée
 mbVeil?.addEventListener('pointerdown', (e) => {
-  if ((e.target as HTMLElement).closest('button') !== null) return
+  if ((e.target as HTMLElement).closest('button') !== null || mbToucheAvis(e)) return
   mbSauteBilan()
   mbSauteEtalonnage()
 })
@@ -21278,6 +21440,9 @@ function corpsImage(now: number): boolean {
           ? `${fmtTime(bests.chrono.time)}${bests.chrono.name ? ' · ' + htmlSafe(bests.chrono.name) : ''}`
           : '—',
         note: Math.round((surplus * 100 * 60) / (60 + run.tableauTime)),
+        // l'essai de l'éditeur ne juge pas : la salle n'est pas publiée,
+        // son code peut être celui d'une autre
+        codeAvis: testLevel ? null : level.code,
         // LA RÉCOLTE : ce que le sas a réellement crédité, en tuiles
         gains: gainsDeSalle({
           condensat: condSas,

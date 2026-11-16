@@ -6,7 +6,7 @@
 
 import { appelle } from './reseau'
 
-export type DomaineReglage = 'plan-voie' | 'carte' | 'recompenses' | 'textes' | 'sequences' | 'avaries' | 'ecoute'
+export type DomaineReglage = 'plan-voie' | 'carte' | 'recompenses' | 'textes' | 'sequences' | 'avaries' | 'ecoute' | 'avis-salles'
 
 export interface ReglagePublie {
   document: unknown

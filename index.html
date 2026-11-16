@@ -3037,6 +3037,8 @@
         font-family: var(--font-display); font-size: calc(11px * var(--ui)); letter-spacing: 0.16em;
         color: var(--specimen); border-top: 1px solid var(--line);
       }
+      /* l'avis des joueurs sur la salle : à droite du titre, plus sourd */
+      .rec-avis { float: right; letter-spacing: 0.08em; color: var(--mb-legende, #8ba3b8); }
       .rec-grille { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-top: 6px; }
       @media (max-width: 760px) { .rec-grille { grid-template-columns: 1fr; } }
       .rec-pod { border: 1px solid var(--line); border-radius: 6px; padding: 6px 8px; }
@@ -8468,6 +8470,35 @@
         align-self: center; flex: none; min-height: 38px; font-size: calc(11px * var(--ui));
       }
       .mb-passer[hidden] { display: none; }
+      /* L'AVIS SUR LA SALLE : une rangée sourde sous le levier — cinq crans
+         d'acier, le mot du cran à droite. Elle ne dispute rien à la
+         bonbonne : pas d'animation, pas de couleur avant qu'on y touche.
+         Posé, l'avis allume ses crans en menthe JUSQU'AU sien, comme une
+         jauge : « 4 » se lit à sa longueur, sans lire le chiffre. Les
+         étoiles restent au rang (le sceau), les crans à l'avis. */
+      .mb-avis {
+        align-self: center; flex: none;
+        display: flex; align-items: center; justify-content: center; flex-wrap: wrap; gap: 8px 14px;
+        font-size: calc(10.5px * var(--ui)); letter-spacing: 0.14em; color: var(--mb-legende);
+      }
+      .mb-avis[hidden] { display: none; }
+      .mb-avis-titre { font-family: var(--font-display); white-space: nowrap; }
+      .mb-avis-crans { display: inline-flex; gap: 6px; }
+      .mb-avis-cran {
+        width: 36px; height: 36px; padding: 0; border-radius: 0; cursor: pointer;
+        font-family: var(--font-display); font-size: calc(12px * var(--ui)); font-variant-numeric: tabular-nums;
+        color: var(--mb-legende); background: color-mix(in srgb, var(--mb-coque) 88%, transparent);
+        border: 1px solid color-mix(in srgb, var(--mb-legende) 55%, transparent);
+        transition: background-color 0.12s ease, color 0.12s ease, border-color 0.12s ease, transform 0.12s ease;
+      }
+      .mb-avis-cran:hover, .mb-avis-cran:focus-visible, .mb-avis-cran.pad-focus {
+        color: var(--mb-texte); border-color: var(--mb-texte); transform: translateY(-1px); outline: none;
+      }
+      .mb-avis-cran.mb-on {
+        color: var(--mb-coque-noire); background: var(--mb-menthe); border-color: var(--mb-menthe);
+      }
+      .mb-avis-mot { min-width: 13em; white-space: nowrap; letter-spacing: 0.06em; }
+      .mb-avis.mb-pose .mb-avis-mot { color: var(--mb-menthe); }
       /* ---- LE COMPACT : le relevé lu se replie en BANDEAU — le rang, le
          volume (et où il a été versé), puis chaque gain en une puce — et la
          scène revient aux cartes. C'est un RAPPEL de la salle, pas un solde :
@@ -9730,7 +9761,7 @@
            la poutre ouverte, le sceau posé (penché), la cartouche plaquée,
            le levier sans reflet, l'arc du manomètre rempli d'un coup */
         .mb-poutre, .mb-sceau, .mb-cartouche, .mb-levier, .mb-levier::after { animation: none; }
-        .mb-levier, .mb-mano-arc { transition: none; }
+        .mb-levier, .mb-mano-arc, .mb-avis-cran { transition: none; }
         .mb-fond::before, .mb-fond::after, .mb-flash.mb-on, .mb-scene.mb-secousse,
         .mb-sur, .mb-titre, .mb-etoiles i.mb-on, .mb-cuve-liquide::after,
         .mb-prime, .mb-record, .mb-etal, .mb-etal-palier.saute,
@@ -11595,6 +11626,16 @@
         <!-- LE LEVIER : il passe le bilan — au clic, au toucher, à Entrée,
              à Espace et à A (il a le focus dès l'ouverture) -->
         <button type="button" class="mb-levier mb-passer" id="mb-passer">PASSER ▸</button>
+        <!-- L'AVIS DU JOUEUR SUR LA SALLE (game/avisSalles.ts) : cinq crans,
+             un geste, facultatif. APRÈS le levier dans le document, exprès :
+             la manette vise le premier bouton de l'écran, et ce doit rester
+             le levier — A martelé passe le bilan, il ne juge pas la salle.
+             main.ts pose les crans à chaque bilan. -->
+        <div class="mb-avis" id="mb-avis" hidden>
+          <span class="mb-avis-titre" id="mb-avis-titre">VOTRE AVIS SUR CETTE SALLE</span>
+          <span class="mb-avis-crans" id="mb-avis-crans" role="group" aria-labelledby="mb-avis-titre"></span>
+          <span class="mb-avis-mot" id="mb-avis-mot" aria-live="polite"></span>
+        </div>
       </div>
       <!-- LE PALIER FRANCHI traverse l'écran : une POUTRE de la station,
            pas une ligne -->
