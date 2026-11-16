@@ -40,9 +40,7 @@ export const MANOEUVRES: Manoeuvre[] = [
     aide: 'Quand le sas a assez bu, le bouton CONTINUER s’offre : ce geste le valide. Tant qu’on ne le fait pas, le corps restant se pilote comme avant.',
     section: 'Le geste',
     clavier: 'Enter',
-    // la croix ↓ est passée au zoom arrière (avec la croix ↑) le jour où les
-    // gâchettes ont cessé de zoomer pour porter le curseur de regroupement
-    manette: 15, // croix →
+    manette: 13, // croix ↓
   },
   {
     // Le regroupement « là où l'on clique » n'existait qu'à la souris : le
@@ -52,7 +50,7 @@ export const MANOEUVRES: Manoeuvre[] = [
     aide: 'Tant que le bouton est tenu, le stick gauche promène un curseur dans le corps ; A regroupe le volume là où il se trouve — le geste du clic sur le corps, à la manette.',
     section: 'Le geste',
     clavier: null,
-    manette: 6, // LT
+    manette: 4, // LB (L1)
   },
   {
     id: 'glace',
@@ -92,7 +90,9 @@ export const MANOEUVRES: Manoeuvre[] = [
     aide: 'Le temps de la cuve s’étire — la physique suit, rien ne se fige.',
     section: 'Le temps',
     clavier: ',',
-    manette: 4, // LB
+    // LB porte désormais le curseur de regroupement : ralentir tient à la
+    // croix ←, où il a toujours répondu aussi (RB accélère toujours)
+    manette: 14, // croix ←
   },
   {
     id: 'accelerer',

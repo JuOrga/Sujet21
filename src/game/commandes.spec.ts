@@ -46,8 +46,10 @@ describe('commandes — les défauts', () => {
     expect(toucheDe('verser')).toBe('v')
     expect(boutonDe('glace')).toBe(2) // X
     expect(boutonDe('verser')).toBe(12) // croix ↑
-    expect(boutonDe('conclure')).toBe(15) // croix → (la croix ↓ dézoome)
-    expect(boutonDe('curseur')).toBe(6) // LT tenu : le curseur de regroupement
+    expect(boutonDe('conclure')).toBe(13) // croix ↓
+    expect(boutonDe('curseur')).toBe(4) // LB tenu : le curseur de regroupement
+    expect(boutonDe('ralentir')).toBe(14) // croix ← (LB est pris)
+    expect(boutonDe('accelerer')).toBe(5) // RB
     expect(toucheDe('curseur')).toBeNull() // la souris a déjà son clic
     expect(actionDeTouche('f')).toBe('glace')
     expect(actionDeTouche('F')).toBe('glace') // la casse ne compte pas

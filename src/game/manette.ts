@@ -11,14 +11,15 @@
 //   A              agir : éjecter (eau) · viser puis relâcher = dash (vapeur)
 //   X              glace (bascule)        Y        vapeur (bascule)
 //   B              retour à l'eau
-//   LB / RB        ralentir / accélérer le temps
-//   LT tenu        le CURSEUR dans le volume : le stick gauche le promène,
+//   LB tenu        le CURSEUR dans le volume : le stick gauche le promène,
 //                  A regroupe le corps là où il est (game/curseurVolume.ts)
-//   stick droit    caméra                 croix ↕  zoomer / dézoomer
+//   RB             accélérer le temps
+//   RT / LT        zoomer / dézoomer (progressif, à la pression)
+//   stick droit    caméra                 croix ↕  zoom (aussi)
 //   L3             recadrer : caméra et zoom automatiques
 //   R3             dossier de descente — B le referme, comme la légende
-//   croix ↔        ralenti / accéléré (aussi) — la croix → CONCLUT la salle
-//                  quand CONTINUER s'offre
+//   croix ↔        ralenti / accéléré      croix ↓  CONCLURE, quand
+//                  CONTINUER s'offre (il prend alors le pas sur le zoom)
 //   Start          pause                  Select   recommencer
 //   A (menus)      valider le bouton principal visible
 
@@ -61,8 +62,7 @@ export class Manette {
   /** Croix ↕ maintenue : zoom continu. */
   zoomAvant = false
   zoomArriere = false
-  /** Gâchettes analogiques. Elles ne zooment plus (la croix ↕ s'en charge) :
-   * LT tenu prend le curseur de regroupement, et fait Maj dans l'éditeur. */
+  /** Gâchettes analogiques : RT zoome, LT dézoome — la pression dose. */
   rtVal = 0
   ltVal = 0
 

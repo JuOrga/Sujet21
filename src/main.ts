@@ -8557,7 +8557,7 @@ if (!coffre.stockage.getItem(CLE_EVEIL)) input.freezeIntent = true
 const manette = new Manette()
 const manetteCurseur = { x: 0, y: 0 }
 let manetteTenait = false // le « doigt » manette était posé à l'image d'avant
-// LE CURSEUR DANS LE VOLUME (game/curseurVolume.ts) : gâchette tenue, le
+// LE CURSEUR DANS LE VOLUME (game/curseurVolume.ts) : LB tenu, le
 // stick gauche le promène dans le corps et A regroupe LÀ — le clic sur le
 // corps, qui n'existait qu'à la souris
 const curseurVol = nouveauCurseurVolume()
@@ -8590,7 +8590,7 @@ function boutonVisible(el: HTMLElement | null): el is HTMLElement {
  *  CONTINUER n'y est PAS : il s'offre en pleine partie, quand le corps a
  *  encore de quoi nager — A le validait dès son apparition, et le joueur ne
  *  pouvait plus piloter le reste du volume sans conclure. Il a son geste,
- *  « conclure » (croix → par défaut). */
+ *  « conclure » (croix ↓ par défaut). */
 function clicMenuManette(): boolean {
   for (const id of ['relance', 'overlay-btn']) {
     const el = document.getElementById(id)
@@ -19892,7 +19892,8 @@ function corpsImage(now: number): boolean {
           input.onReset?.()
         }
       }
-      // le temps aux épaules : LB ralentit, RB accélère (la croix ↔ aussi)
+      // le temps : croix ← ralentit, croix → et RB accélèrent (LB, tenu,
+      // porte le curseur de regroupement)
       if (manetteFait('ralentir')) input.stepWarp(-1)
       if (manetteFait('accelerer')) input.stepWarp(1)
       // les trois états sur les trois boutons restants : X glace, Y vapeur,
@@ -19906,14 +19907,26 @@ function corpsImage(now: number): boolean {
         input.demande('eau')
       }
       // CONCLURE : valide CONTINUER quand il s'offre. Posé sur un cran de
-      // la croix (→ par défaut), il prend alors le pas sur ce que ce cran
-      // fait d'ordinaire — le temps ne doit pas s'accélérer, ni la caméra
-      // reculer, au moment où l'on conclut. Relevé AVANT de conclure : le
+      // la croix (↓ par défaut), il prend alors le pas sur ce que ce cran
+      // fait d'ordinaire — la caméra ne doit pas reculer, ni le temps
+      // changer, au moment où l'on conclut. Relevé AVANT de conclure : le
       // geste retire le bouton, et le cran reprendrait son rôle à la même image.
       const cranConclure = continuerOffert() ? boutonDe('conclure') : null
-      if (cranConclure !== BOUTON.GAUCHE && manette.edge(BOUTON.GAUCHE))
+      // la croix ↔ règle TOUJOURS le temps, même si « ralentir » ou
+      // « accélérer » ont été redéfinis ailleurs. Un cran qui porte déjà la
+      // manœuvre (← pour ralentir, par défaut) ne compte qu'une fois : sans
+      // cette garde, un appui sautait deux crans de vitesse.
+      if (
+        cranConclure !== BOUTON.GAUCHE &&
+        boutonDe('ralentir') !== BOUTON.GAUCHE &&
+        manette.edge(BOUTON.GAUCHE)
+      )
         input.stepWarp(-1)
-      if (cranConclure !== BOUTON.DROITE && manette.edge(BOUTON.DROITE))
+      if (
+        cranConclure !== BOUTON.DROITE &&
+        boutonDe('accelerer') !== BOUTON.DROITE &&
+        manette.edge(BOUTON.DROITE)
+      )
         input.stepWarp(1)
       // la croix HAUT verse la réserve : viser une fiole de douze pixels au
       // pavé tactile n'était pas un geste — au Deck, c'est un cran de croix
@@ -19926,12 +19939,15 @@ function corpsImage(now: number): boolean {
       // plus haut, sans repasser le corps à l'eau
       if (manetteFait('dossier')) ouvreDossier(!dossierOuvert)
       if (manetteFait('conclure')) conclureSalle()
-      // LE ZOOM EST À LA CROIX ↕ : ↑ zoome, ↓ dézoome. Les gâchettes ne
-      // zooment plus — LT, tenu, porte le curseur de regroupement.
       if (manette.zoomAvant && cranConclure !== BOUTON.HAUT)
         camera.zoomBy(Math.pow(1.9, dtReal), params)
       if (manette.zoomArriere && cranConclure !== BOUTON.BAS)
         camera.zoomBy(Math.pow(1.9, -dtReal), params)
+      // les grosses gâchettes zooment, la pression dose la vitesse
+      if (manette.rtVal > 0.02)
+        camera.zoomBy(Math.pow(2.2, manette.rtVal * dtReal), params)
+      if (manette.ltVal > 0.02)
+        camera.zoomBy(Math.pow(2.2, -manette.ltVal * dtReal), params)
       if (!couche && (manette.panX !== 0 || manette.panY !== 0)) {
         // pousser à droite REGARDE à droite (le pan de drag est inversé) —
         // sauf panneau ouvert : le stick droit y DÉFILE, la caméra cède
