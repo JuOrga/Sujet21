@@ -429,8 +429,8 @@ describe('les décalques plaqués sur un mur suivent son sommet', () => {
 })
 
 // LÉGER PAR DÉFAUT (demande du concepteur, 16/11) : le relief était OFF le
-// temps de sa validation. Seul l'appareil sans réglage posé change — un OFF
-// choisi est écrit dans le stockage, il reste donc OFF.
+// temps de sa validation. Le défaut ne joint que l'appareil sans réglage
+// posé : les OFF de l'essai sont effacés à part (remiseReglages.spec.ts).
 describe('le relief est léger par défaut', () => {
   it('sans réglage posé, sujet21-relief vaut leger ; off reste un choix qui ne déplace rien', () => {
     expect(main).toContain("localStorage.getItem('sujet21-relief') ?? 'leger'")
