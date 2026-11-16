@@ -709,14 +709,24 @@ export function traceLaser(em: LaserDef, monde: TraceMonde): TraceResultat {
 }
 
 // ---- Les récepteurs : la mémoire des cibles, pure et testable ----------
-// Quatre familles (level.ts, CibleMode) :
+// Six familles (level.ts, CibleMode) :
 //   · TOR : un passage du faisceau allume POUR DE BON — la porte asservie
 //     s'ouvre et le reste (l'activation est acquise jusqu'au Recommencer) ;
 //   · NOR : active TANT QUE le faisceau la tient — à la PREMIÈRE coupure,
 //     la pastille grille : scellée, la porte se referme définitivement ;
 //   · MAINTIEN : active tant que le faisceau la tient, éteinte sinon,
 //     jamais grillée ;
-//   · BASCULE : chaque NOUVEAU passage inverse son état.
+//   · BASCULE : chaque NOUVEAU passage inverse son état ;
+//   · MÉMOIRE : un passage l'écrit à 1 et elle le reste — jusqu'à ce qu'une
+//     pastille EFFACE de son canal la remette à 0 ;
+//   · EFFACE : sous le faisceau, elle remet à 0 les MÉMOIRES de son canal.
+//     Elle n'alimente rien elle-même : ce n'est pas une source du canal.
+// MÉMOIRE + EFFACE, c'est la fonction mémoire des automaticiens (marche /
+// arrêt) : deux entrées distinctes, là où la bascule n'en a qu'une et
+// oblige à compter ses passages. L'EFFACEMENT EST PRIORITAIRE : tant que
+// le faisceau tient l'EFFACE, rien ne s'écrit — l'arrêt gagne, comme sur
+// une machine. Dès qu'il la quitte, une MÉMOIRE encore sous son faisceau
+// se réécrit (la mémoire suit des NIVEAUX, pas des fronts).
 // La persistance absorbe le tremblement d'une image (miroir de glace qui
 // frémit, porte qui s'ouvre et déplace le trajet à l'image suivante) : une
 // micro-coupure sous ce délai ne scelle pas, n'éteint pas un maintien, et
@@ -729,6 +739,7 @@ export interface EtatRecepteurs {
   dernierPhoton: number[] // date du dernier photon reçu, en secondes
   scellees: boolean[] // NOR : la coupure est passée par là — plus rien ne bouge
   basculees: boolean[] // BASCULE : son état courant (allumée ou éteinte)
+  memorisees: boolean[] // MÉMOIRE : le bit écrit, tant qu'aucun EFFACE ne l'a repris
 }
 
 export function creerEtatRecepteurs(n: number): EtatRecepteurs {
@@ -737,6 +748,7 @@ export function creerEtatRecepteurs(n: number): EtatRecepteurs {
     dernierPhoton: Array.from({ length: n }, () => -Infinity),
     scellees: Array.from({ length: n }, () => false),
     basculees: Array.from({ length: n }, () => false),
+    memorisees: Array.from({ length: n }, () => false),
   }
 }
 
@@ -747,7 +759,8 @@ function sousFaisceau(etat: EtatRecepteurs, c: number, now: number): boolean {
 
 /** Avancé une fois par image, APRÈS le traçage : consigne les photons reçus
  * (une BASCULE s'inverse au front montant : touchée alors qu'elle ne
- * l'était plus), puis scelle les NOR dont le faisceau vient de se couper. */
+ * l'était plus), scelle les NOR dont le faisceau vient de se couper, puis
+ * laisse les EFFACE sous faisceau remettre à 0 les MÉMOIRES de leur canal. */
 export function avancerRecepteurs(
   cibles: { mode?: CibleMode; canal?: number }[],
   touchees: number[],
@@ -759,8 +772,19 @@ export function avancerRecepteurs(
     // deux faisceaux sur la même pastille dans la même image : le second
     // la trouve déjà sous faisceau, il ne la rebascule pas
     if (cibles[c].mode === 'bascule' && !sousFaisceau(etat, c, now)) etat.basculees[c] = !etat.basculees[c]
+    if (cibles[c].mode === 'memoire') etat.memorisees[c] = true
     etat.vues[c] = true
     etat.dernierPhoton[c] = now
+  }
+  // L'EFFACEMENT, APRÈS les écritures de l'image : c'est cet ordre qui le
+  // rend prioritaire — une MÉMOIRE et son EFFACE éclairées dans la même
+  // image donnent 0, quel que soit l'ordre des faisceaux dans `touchees`.
+  for (let e = 0; e < cibles.length; e++) {
+    if (cibles[e].mode !== 'efface' || !sousFaisceau(etat, e, now)) continue
+    const canal = canalDeCible(cibles, e)
+    for (let c = 0; c < cibles.length; c++) {
+      if (cibles[c].mode === 'memoire' && canalDeCible(cibles, c) === canal) etat.memorisees[c] = false
+    }
   }
   for (let c = 0; c < cibles.length; c++) {
     if ((cibles[c].mode ?? 'tor') !== 'nor') continue
@@ -773,7 +797,8 @@ export function avancerRecepteurs(
 /** Une cible alimente-t-elle ses portes en cet instant ?
  * TOR : oui dès qu'elle a été vue. NOR : oui sous le faisceau (persistance
  * comprise), plus jamais une fois scellée. MAINTIEN : oui sous le faisceau,
- * toujours. BASCULE : selon son dernier basculement. */
+ * toujours. BASCULE : selon son dernier basculement. MÉMOIRE : selon son
+ * bit. EFFACE : jamais — elle commande les mémoires, pas les portes. */
 export function cibleActive(
   cible: { mode?: CibleMode; canal?: number },
   etat: EtatRecepteurs,
@@ -787,6 +812,10 @@ export function cibleActive(
       return sousFaisceau(etat, c, now)
     case 'bascule':
       return etat.basculees[c] === true
+    case 'memoire':
+      return etat.memorisees[c] === true
+    case 'efface':
+      return false
     default:
       return etat.vues[c] === true
   }
@@ -812,10 +841,24 @@ export interface SourceCanal {
   active: boolean
 }
 
+/** Le faisceau tient-il cette pastille EFFACE en cet instant ? Pour le
+ *  dessin seulement : `cibleActive` la dit éteinte (elle n'alimente rien),
+ *  mais le joueur doit voir que son faisceau porte. */
+export function effaceTenue(
+  cible: { mode?: CibleMode },
+  etat: EtatRecepteurs,
+  c: number,
+  now: number,
+): boolean {
+  return cible.mode === 'efface' && sousFaisceau(etat, c, now)
+}
+
 /** Le canal d'une porte l'alimente-t-il en cet instant ?
  * Négatif (porte scénarisée) ou sans source : jamais. Les `autres` sources
  * comptent EXACTEMENT comme des pastilles du même numéro : une porte en ET
- * sur le canal 2 attend la pastille ET la coupelle qui le portent. */
+ * sur le canal 2 attend la pastille ET la coupelle qui le portent.
+ * Une pastille EFFACE n'est PAS une source : comptée, elle rendrait le ET
+ * d'un canal à mémoires impossible (elle n'est jamais active). */
 export function canalActif(
   cibles: { mode?: CibleMode; canal?: number }[],
   canal: number,
@@ -828,7 +871,7 @@ export function canalActif(
   let sources = 0
   let actives = 0
   for (let c = 0; c < cibles.length; c++) {
-    if (canalDeCible(cibles, c) !== canal) continue
+    if (canalDeCible(cibles, c) !== canal || cibles[c].mode === 'efface') continue
     sources++
     if (cibleActive(cibles[c], etat, c, now)) actives++
   }

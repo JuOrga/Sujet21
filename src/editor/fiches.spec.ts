@@ -137,6 +137,14 @@ describe('les fiches de la bulle savante', () => {
     expect(tor.titre).toContain('TOR')
     expect(tor.resume).toContain('seul passage')
   })
+
+  it('la cible MÉMOIRE et la cible EFFACE ont chacune leur fiche', () => {
+    const fiche = (mode: 'memoire' | 'efface') =>
+      ficheElement({ kind: 'cible', index: 0 }, { ...niveau, cibles: [{ x: 0, y: 0, r: 14, mode, canal: 3 }] })!
+    expect(fiche('memoire').titre).toContain('MÉMOIRE')
+    expect(fiche('efface').titre).toContain('EFFACE')
+    expect(fiche('efface').resume).toContain('remise à zéro')
+  })
 })
 
 describe('la fiche du puits de gravité et l’impulsion du départ', () => {

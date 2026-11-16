@@ -394,6 +394,7 @@ import {
   creerEtatRecepteurs,
   avancerRecepteurs,
   cibleActive,
+  effaceTenue,
   canalActif,
   etatPorte,
   type PorteFermee,
@@ -10776,7 +10777,8 @@ function drawMecanismes(vw: number, vh: number, dpr: number): void {
   // dit « à maintien », la pastille GRILLÉE dit que la coupure est passée ;
   // le MAINTIEN porte un anneau pointillé bleu (il suit le faisceau, sans
   // jamais griller), la BASCULE deux demi-anneaux (elle change d'état à
-  // chaque passage)
+  // chaque passage), la MÉMOIRE un anneau plein vert d'eau (un bit qui
+  // tient), l'EFFACE une croix rouge (elle reprend, elle n'allume rien)
   const nowCibles = performance.now() / 1000
   for (let c = 0; c < cibles.length; c++) {
     const t = cibles[c]
@@ -10828,6 +10830,27 @@ function drawMecanismes(vw: number, vh: number, dpr: number): void {
         g.lineWidth = 1.8
         g.stroke()
       }
+    } else if (t.mode === 'memoire') {
+      g.beginPath()
+      g.arc(p.sx, p.sy, r * 0.72, 0, Math.PI * 2)
+      g.strokeStyle = lit ? '#c8ffe6' : '#4fa58a'
+      g.lineWidth = 1.8
+      g.stroke()
+    } else if (t.mode === 'efface') {
+      // `lit` reste faux pour elle (elle n'alimente rien) : c'est sa croix
+      // qui s'embrase tant que le faisceau la tient, pour que le joueur
+      // voie que son geste porte
+      const tenue = effaceTenue(t, laserEtat.recepteurs, c, nowCibles)
+      // quatre branches SANS centre : le cœur de la pastille se peint
+      // juste après, il mangerait le croisement
+      g.beginPath()
+      for (const [dx, dy] of [[1, 1], [1, -1], [-1, 1], [-1, -1]]) {
+        g.moveTo(p.sx + dx * r * 0.36, p.sy + dy * r * 0.36)
+        g.lineTo(p.sx + dx * r * 0.6, p.sy + dy * r * 0.6)
+      }
+      g.strokeStyle = tenue ? '#ff9c8f' : '#b0605a'
+      g.lineWidth = tenue ? 2.6 : 1.8
+      g.stroke()
     }
     g.beginPath()
     g.arc(p.sx, p.sy, r * 0.45, 0, Math.PI * 2)

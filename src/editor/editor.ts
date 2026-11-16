@@ -6124,6 +6124,8 @@ export class LevelEditor {
           `<option value="nor"${t.mode === 'nor' ? ' selected' : ''}>NOR — maintien : la coupure SCELLE</option>` +
           `<option value="maintien"${t.mode === 'maintien' ? ' selected' : ''}>MAINTIEN — active tant que le faisceau tient</option>` +
           `<option value="bascule"${t.mode === 'bascule' ? ' selected' : ''}>BASCULE — chaque passage inverse</option>` +
+          `<option value="memoire"${t.mode === 'memoire' ? ' selected' : ''}>MÉMOIRE — un passage l’écrit, une EFFACE la reprend</option>` +
+          `<option value="efface"${t.mode === 'efface' ? ' selected' : ''}>EFFACE — remet à zéro les MÉMOIRES du canal</option>` +
           `</select></label>`,
       )
       const explications: Record<string, string> = {
@@ -6131,8 +6133,29 @@ export class LevelEditor {
         nor: 'la porte n’est ouverte que FAISCEAU TENU ; à la première coupure, la pastille grille et la porte se scelle pour de bon.',
         maintien: 'active TANT QUE le faisceau la tient, éteinte dès qu’il part — jamais grillée. Le bouton-poussoir : l’entrée qui suit son opérande.',
         bascule: 'chaque NOUVEAU passage du faisceau inverse son état — allumée, éteinte, allumée… L’interrupteur : une mémoire qu’on peut effacer.',
+        memoire: 'un seul passage du faisceau l’écrit et elle reste allumée sans lui — jusqu’à ce qu’une pastille EFFACE du même numéro la remette à zéro. Elle se réécrit autant de fois qu’on veut.',
+        efface: 'sous le faisceau, elle remet à zéro toutes les pastilles MÉMOIRE de son numéro, et rien ne s’y écrit tant qu’il la tient. Elle n’alimente aucune porte.',
       }
       rows.push(`<p class="ed-empty">Cible nº ${canal} — ${explications[t.mode ?? 'tor']}</p>`)
+      // la fonction mémoire tient à DEUX pastilles du même numéro : dire tout
+      // de suite ce que celle-ci a en face, plutôt que de laisser découvrir
+      // en jeu qu'une mémoire ne s'efface jamais ou qu'une EFFACE ne reprend rien
+      if (t.mode === 'memoire' || t.mode === 'efface') {
+        const toutes = this.level.cibles ?? []
+        const autre = t.mode === 'memoire' ? 'efface' : 'memoire'
+        const n = toutes.filter((u, i) => u.mode === autre && canalDeCible(toutes, i) === canal).length
+        rows.push(
+          `<p class="ed-empty">${
+            t.mode === 'memoire'
+              ? n > 0
+                ? `Canal nº ${canal} : ${n} pastille${n > 1 ? 's' : ''} EFFACE la reprend${n > 1 ? 'nent' : ''}.`
+                : `Canal nº ${canal} : AUCUNE pastille EFFACE — cette mémoire ne s’effacera jamais (autant poser une TOR). Posez une cible EFFACE portant le nº ${canal}.`
+              : n > 0
+                ? `Canal nº ${canal} : elle reprend ${n} pastille${n > 1 ? 's' : ''} MÉMOIRE.`
+                : `Canal nº ${canal} : AUCUNE pastille MÉMOIRE — elle n’efface rien. Donnez-lui le numéro des mémoires à reprendre.`
+          }</p>`,
+        )
+      }
       rows.push(
         `<p class="ed-empty">Le N° se choisit librement : plusieurs pastilles peuvent porter le même — la porte décide alors si UNE suffit (OU), s’il les faut TOUTES (ET), ou s’il en faut UNE SEULE (OUEX). Son état de repos (ouverte) en fait le contraire : NON, NON-ET, NON-OU.</p>`,
       )
@@ -7101,7 +7124,8 @@ export class LevelEditor {
       t.r = Math.max(8, val('p-cr'))
       // TOR reste implicite (clé absente) : les fichiers existants ne changent pas
       const mode = text('p-cmode')
-      if (mode === 'nor' || mode === 'maintien' || mode === 'bascule') t.mode = mode
+      if (mode === 'nor' || mode === 'maintien' || mode === 'bascule' || mode === 'memoire' || mode === 'efface')
+        t.mode = mode
       else delete t.mode
     } else if (s.kind === 'condensat') {
       const c = (this.level.condensats ?? [])[s.index]
@@ -8456,6 +8480,24 @@ export class LevelEditor {
           g.lineWidth = 1.8
           g.stroke()
         }
+      } else if (t.mode === 'memoire') {
+        // l'anneau PLEIN vert d'eau : un bit qui tient (même dessin qu'en jeu)
+        g.beginPath()
+        g.arc(p.sx, p.sy, rr * 0.72, 0, Math.PI * 2)
+        g.strokeStyle = '#4fa58a'
+        g.lineWidth = 1.8
+        g.stroke()
+      } else if (t.mode === 'efface') {
+        // la croix rouge : elle reprend, elle n'allume rien. Quatre
+        // branches SANS centre : le cœur de la pastille porte son numéro
+        g.beginPath()
+        for (const [dx, dy] of [[1, 1], [1, -1], [-1, 1], [-1, -1]]) {
+          g.moveTo(p.sx + dx * rr * 0.36, p.sy + dy * rr * 0.36)
+          g.lineTo(p.sx + dx * rr * 0.6, p.sy + dy * rr * 0.6)
+        }
+        g.strokeStyle = '#b0605a'
+        g.lineWidth = 1.8
+        g.stroke()
       }
       g.fillStyle = touchees.has(i) ? '#0c1a14' : '#cfe2ef'
       g.font = '700 10px ui-monospace, monospace'

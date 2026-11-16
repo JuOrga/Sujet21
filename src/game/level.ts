@@ -465,7 +465,14 @@ export interface LaserDef {
 //     opérande ;
 //   · BASCULE : chaque NOUVEAU passage du faisceau inverse son état
 //     (allumée ↔ éteinte) — l'interrupteur, la mémoire qu'on peut effacer.
-export type CibleMode = 'tor' | 'nor' | 'maintien' | 'bascule'
+// Les deux dernières (16/11) forment LA FONCTION MÉMOIRE — marche / arrêt,
+// deux entrées distinctes là où la bascule n'en a qu'une :
+//   · MÉMOIRE : un passage du faisceau l'écrit à 1, et elle le reste —
+//     comme une TOR — jusqu'à ce qu'une pastille EFFACE du même canal la
+//     remette à 0 ;
+//   · EFFACE : sous le faisceau, elle remet à 0 toutes les MÉMOIRES de son
+//     canal (l'effacement est prioritaire). Elle n'alimente aucune porte.
+export type CibleMode = 'tor' | 'nor' | 'maintien' | 'bascule' | 'memoire' | 'efface'
 
 export interface CibleDef {
   x: number
