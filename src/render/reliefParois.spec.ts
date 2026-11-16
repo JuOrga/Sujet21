@@ -19,7 +19,10 @@ import {
   fractionSommet,
   hauteurAppui,
   basesDuCorps,
+  corpsVu,
   CORPS_RELIEF_GLSL,
+  GALBE_CORPS,
+  profilGalbe,
   LUEUR_HAUT_FLANC,
   lueurCorpsFlanc,
   PAS_CORPS,
@@ -938,16 +941,18 @@ describe('relief allumé, le corps a une hauteur : il passe devant le bas de la 
     expect(source).toContain('#define HAUTEUR_CORPS ${glslFloat(HAUTEUR_CORPS)}')
     expect(HAUTEUR_CORPS).toBe(H_CORPS)
     expect(composeFs).toContain(
-      'vec4 tex = champCorps(uField, uv, uRelief * clamp(uZoom * 1.2, 0.0, 1.0) * facteurRelief(HAUTEUR_CORPS), uvEau, rSommetCorps);',
+      'vec4 tex = champCorps(uField, uv, uRelief * clamp(uZoom * 1.2, 0.0, 1.0) * facteurRelief(HAUTEUR_CORPS), uThreshold * uFieldScale, uvEau, rSommetCorps);',
     )
     // les quatre voisins du relief de l'eau se lisent là où le corps a été vu
     expect(occurrencesDans(composeFs, 'texture(uField, uvEau ')).toHaveLength(4)
     expect(composeFs).not.toMatch(/texture\(uField, uv [-+]/)
-    // le côté du corps, plus sombre que son dessus — sous une garde uRelief
-    expect(composeFs).toContain('if (uRelief > 0.0) water *= mix(0.74, 1.0, smoothstep(th - s, th + s, rSommetCorps / uFieldScale));')
+    // l'épaule du corps, assombrie en dégradé large — sous une garde uRelief
+    expect(composeFs).toContain('if (uRelief > 0.0) water *= mix(0.86, 1.0, smoothstep(th * 0.6, th * (2.0 + GALBE_CORPS), rSommetCorps / uFieldScale));')
+    // plus le cran net d'un seuil de large, qui dessinait un ruban
+    expect(composeFs).not.toMatch(/smoothstep\(th - s, th \+ s, rSommetCorps/)
   })
   it('un décalque au sol s’efface aussi sous le dessus du corps ; sur un mur, au pied comme avant', () => {
-    expect(source).toContain('champCorps(uField, auPied / uCanvasSize, uCorps, uvVu, rSommet)')
+    expect(source).toContain('champCorps(uField, auPied / uCanvasSize, uCorps, uThreshold * uFieldScale, uvVu, rSommet)')
     expect(drawDecals).toContain(
       "gl.uniform1f(du['uCorps'], hSupport < 0 ? fractionSommet(this.reliefK, this.zoomRelief, HAUTEUR_CORPS) : 0)",
     )
@@ -1115,5 +1120,77 @@ describe("une porte ou une chasse prend le sommet des solides qui la bordent", (
     expect(main).toMatch(/if \(fMurHaut <= 0\) return 0/)
     expect(main).toMatch(/fPortes = fractionAppui\(p\)\n\s*const a = auSommet\(p\.minX, p\.maxY\)/)
     expect(main).toMatch(/fPortes = fractionAppui\(c\)\n\s*const a = auSommet\(c\.minX, c\.maxY\)/)
+  })
+})
+
+// LE CORPS EST GALBÉ (16/11) : « trop ruban, et comme si le haut du volume
+// était plat » (le concepteur). Extrudé, il gardait la même silhouette du
+// pied au dessus ; sa section rétrécit désormais en montant.
+describe('relief allumé, le corps est un dôme, pas un prisme', () => {
+  const TH = 0.8
+  // la lisière d'un corps : le champ monte du dehors vers le cœur (x en px)
+  const champ = (x: number): number => Math.max(0, 3.2 * Math.min(1, x / 40))
+  // ce que montre le pixel x, le dessus glissant de `glisse` px vers +x
+  // (le centre de l'écran est du côté du cœur)
+  const vu = (x: number, glisse: number, galbe: boolean): number => {
+    const d: number[] = []
+    for (let i = 0; i <= PAS_CORPS; i++) d.push(champ(x + (glisse * i) / PAS_CORPS))
+    return galbe ? corpsVu(d, TH).r : Math.max(...d)
+  }
+  const bord = (glisse: number, galbe: boolean): number => {
+    for (let x = -60; x < 60; x += 0.25) if (vu(x, glisse, galbe) >= TH) return x
+    return NaN
+  }
+
+  it('le profil est un quart de cercle : nul au pied, entier au dessus, raide puis plat', () => {
+    expect(profilGalbe(0)).toBe(0)
+    expect(profilGalbe(1)).toBe(1)
+    // à mi-hauteur la section n'a perdu que 13 % : l'épaule monte vite…
+    expect(profilGalbe(0.5)).toBeCloseTo(1 - Math.sqrt(0.75), 9)
+    expect(profilGalbe(0.5)).toBeLessThan(0.15)
+    // …et croît sans cesse
+    for (let t = 0.1; t <= 1; t += 0.1) expect(profilGalbe(t)).toBeGreaterThan(profilGalbe(t - 0.1))
+  })
+
+  it('le dessus demande un champ de cœur, pas de lisière', () => {
+    // le shader fait commencer le cœur à 1,8 seuil et l'atteint à 3,2
+    expect(1 + GALBE_CORPS).toBeGreaterThan(1.8)
+    expect(1 + GALBE_CORPS).toBeLessThan(3.2)
+  })
+
+  it('le dessus déborde moins du pied que celui du prisme : plus de bande de largeur constante', () => {
+    const pied = bord(0, true)
+    for (const glisse of [15, 30, 45]) {
+      const prisme = pied - bord(glisse, false)
+      const dome = pied - bord(glisse, true)
+      // le prisme déborde de tout le glissement ; le dôme, nettement moins
+      expect(prisme).toBeCloseTo(glisse, 0)
+      expect(dome).toBeGreaterThan(0)
+      expect(dome).toBeLessThan(prisme * 0.75)
+    }
+  })
+
+  it('le corps ne perd rien là où il était : jamais moins que le pied', () => {
+    for (const x of [-20, 0, 8, 20, 60]) {
+      for (const glisse of [0, 20, 45]) expect(vu(x, glisse, true)).toBeGreaterThanOrEqual(champ(x))
+    }
+  })
+
+  it('une goutte trop mince pour le dessus est simplement moins haute', () => {
+    // son champ ne dépasse pas 1,5 seuil : le dernier pas (le dessus) ne la montre pas
+    const goutte = [0, 0, 0, 1.5 * TH]
+    expect(corpsVu(goutte, TH).r).toBeLessThan(TH)
+    // un corps plein, lui, se voit par son dessus
+    const plein = [0, 0, 0, 3.2]
+    expect(corpsVu(plein, TH)).toEqual({ r: 3.2 - TH * GALBE_CORPS, pas: PAS_CORPS })
+  })
+
+  it('le shader applique la même règle, et rend le texel entier à l\'échelle', () => {
+    expect(CORPS_RELIEF_GLSL).toContain('float leve, out vec2 uvVu, out float rSommet')
+    expect(CORPS_RELIEF_GLSL).toContain(
+      `float e = s.r - leve * ${GALBE_CORPS.toFixed(1)} * (1.0 - sqrt(1.0 - h * h));`,
+    )
+    expect(CORPS_RELIEF_GLSL).toContain('if (e > t.r) { t = s * (e / max(s.r, 1e-6)); uvVu = u; }')
+    expect(source).toContain('#define GALBE_CORPS ${glslFloat(GALBE_CORPS)}')
   })
 })

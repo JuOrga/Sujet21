@@ -114,7 +114,7 @@ import {
 import { FOND_DALLE } from './fondCuve'
 import { OMBRE_POINTE_GLSL } from './ombrePointe'
 import { tranchesBandeau } from './lampes'
-import { CORPS_RELIEF_GLSL, RELIEF_PAROIS_GLSL, fractionSommet, pointDuSommet } from './reliefParois'
+import { CORPS_RELIEF_GLSL, GALBE_CORPS, RELIEF_PAROIS_GLSL, fractionSommet, pointDuSommet } from './reliefParois'
 import {
   CARREAU_MONDE,
   PROFONDEUR_RELIEF,
@@ -2383,6 +2383,7 @@ vec2 gradSdfBoite(int bi, vec2 wb, float d, vec4 dec, float bca, float bsa) {
 // Marche en ESPACE ÉCRAN : hors du cadre, l'occulteur n'est pas dessiné, la
 // marche s'arrête — l'ombre ne coûte que ce qui se voit.
 #define HAUTEUR_CORPS ${glslFloat(HAUTEUR_CORPS)}
+#define GALBE_CORPS ${glslFloat(GALBE_CORPS)}
 // Hauteur des blocs — DOIT rester égale à celle du cuiseur de carte plus
 // bas : c'est elle qui place le DESSUS des solides dans la lumière.
 #define HAUTEUR_BLOCS 140.0
@@ -2601,7 +2602,7 @@ void main() {
   // la tranche du mur qu'il touche. Relief éteint : une lecture, au pied.
   vec2 uvEau;
   float rSommetCorps;
-  vec4 tex = champCorps(uField, uv, uRelief * clamp(uZoom * 1.2, 0.0, 1.0) * facteurRelief(HAUTEUR_CORPS), uvEau, rSommetCorps);
+  vec4 tex = champCorps(uField, uv, uRelief * clamp(uZoom * 1.2, 0.0, 1.0) * facteurRelief(HAUTEUR_CORPS), uThreshold * uFieldScale, uvEau, rSommetCorps);
   // La couche d'eau ne se calcule que là où il y a de l'eau : loin du seuil,
   // le pixel sort transparent AVANT la boucle d'obstacles — c'est ce qui
   // rend la passe basse résolution presque gratuite hors du corps. Marge ×4 :
@@ -4221,10 +4222,14 @@ void main() {
       water = mix(water, repos, 0.55 * clamp(uVital.z, 0.0, 1.0));
     }
     water = mix(water * 0.40, water, clamp(player, 0.0, 1.0)); // eau libre plus sombre
-    // LE CÔTÉ DU CORPS (relief allumé) : là où le dessus n'est pas dans le
-    // champ, on regarde son flanc — plus sombre, comme la tranche d'un mur
-    // sous son sommet. C'est ce qui lui donne une épaisseur de ce côté-là.
-    if (uRelief > 0.0) water *= mix(0.74, 1.0, smoothstep(th - s, th + s, rSommetCorps / uFieldScale));
+    // L'ÉPAULE DU CORPS (relief allumé) : le corps est galbé (reliefParois.ts :
+    // profilGalbe), sa surface plonge vers le sol en approchant du bord. On
+    // l'assombrit donc en DÉGRADÉ LARGE et léger, de la lisière jusque dans le
+    // cœur — plus un cran net à largeur constante, qui dessinait un ruban
+    // autour d'un toit plat. (Essayé d'abord de th à th·(1 + galbe), à 0,80 :
+    // sur l'image avant/après, le bord intérieur du dégradé se lisait encore
+    // comme l'arête d'une bande.)
+    if (uRelief > 0.0) water *= mix(0.86, 1.0, smoothstep(th * 0.6, th * (2.0 + GALBE_CORPS), rSommetCorps / uFieldScale));
 
     // Relief : pseudo-normale sur un champ FLOUTÉ (4 prélèvements écartés) —
     // les dérivées par pixel liraient chaque particule comme une bille.
@@ -5860,7 +5865,7 @@ void main() {
   vec2 auPied = 0.5 * uCanvasSize + (gl_FragCoord.xy - 0.5 * uCanvasSize) * (1.0 - uSommet);
   vec2 uvVu;
   float rSommet;
-  float field = champCorps(uField, auPied / uCanvasSize, uCorps, uvVu, rSommet).r / uFieldScale;
+  float field = champCorps(uField, auPied / uCanvasSize, uCorps, uThreshold * uFieldScale, uvVu, rSommet).r / uFieldScale;
   float th = uThreshold;
   float sfn = max(th * uSoftness, 1e-4);
   float fluide = smoothstep(th - sfn, th + sfn, field) * uEfface;
