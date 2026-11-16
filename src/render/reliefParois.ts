@@ -244,6 +244,32 @@ export function flancBalaye(
   return [d, t]
 }
 
+/** LA FACE QUE MONTRE UN POINT DE LA TRANCHE d'une boîte : sa normale, dans
+ *  le repère de la boîte (mêmes `p`, `b`, `r` que flancBalaye). C'est la face
+ *  par laquelle le chemin `p − t·r` QUITTE la base en montant — celle où
+ *  tombe le pied du point.
+ *  POURQUOI : la tranche prenait la normale de l'arête la plus proche du
+ *  PIXEL. Près d'un bout de la face, l'arête la plus proche est celle d'à
+ *  côté, qu'on ne voit pas : un triangle à 45° y prenait une autre lumière,
+ *  une texture tournée d'un quart et une hauteur fausse — « quelques bugs
+ *  sur les faces verticales » (le concepteur, 16/11, deux captures).
+ *  [0, 0] si le sommet ne se déplace pas : il n'y a pas de tranche. */
+export function faceFlanc(
+  px: number,
+  py: number,
+  b: readonly number[],
+  rx: number,
+  ry: number,
+): [number, number] {
+  // la sortie le long de chaque axe : le plus grand des deux t où le chemin
+  // croise les bords de cet axe ; la première sortie des deux décide
+  const sx = Math.abs(rx) < 1e-6 ? Infinity : Math.max((px - b[2]) / rx, (px - b[0]) / rx)
+  const sy = Math.abs(ry) < 1e-6 ? Infinity : Math.max((py - b[3]) / ry, (py - b[1]) / ry)
+  if (sx === Infinity && sy === Infinity) return [0, 0]
+  // on sort par le côté OPPOSÉ au déplacement : la face regarde l'œil
+  return sx <= sy ? [rx < 0 ? 1 : -1, 0] : [0, ry < 0 ? 1 : -1]
+}
+
 /** LE FLANC D'UN TRIANGLE, BALAYÉ EXACTEMENT — le COIN, la moitié d'une
  *  boîte (formes.ts). Le même contrat que flancBalaye : [distance signée au
  *  balayage, hauteur vue], `tri` = ax, ay, bx, by, cx, cy dans le repère de
@@ -426,6 +452,15 @@ vec2 flancBalaye(vec2 p, vec4 b, vec2 r) {
     if (dc < d) { d = dc; t = tc; }
   }
   return vec2(d, t);
+}
+// la face que montre un point de la tranche d'une boîte (faceFlanc,
+// reliefParois.ts) : celle par où le chemin pied → sommet quitte la base,
+// pas l'arête la plus proche du pixel
+vec2 faceFlanc(vec2 p, vec4 b, vec2 r) {
+  float sx = abs(r.x) < 1e-6 ? 1.0e9 : max((p.x - b.z) / r.x, (p.x - b.x) / r.x);
+  float sy = abs(r.y) < 1e-6 ? 1.0e9 : max((p.y - b.w) / r.y, (p.y - b.y) / r.y);
+  if (sx > 0.5e9 && sy > 0.5e9) return vec2(0.0);
+  return sx <= sy ? vec2(r.x < 0.0 ? 1.0 : -1.0, 0.0) : vec2(0.0, r.y < 0.0 ? 1.0 : -1.0);
 }
 // le flanc d'un triangle, balayé exactement (flancBalayeTriangle,
 // reliefParois.ts) — et celui du COIN d'une boîte (q0 : l'angle droit, les
