@@ -84,6 +84,38 @@ export function pointPose(
   return pointDuSommet(sx, sy, cx, cy, fractionSommet(k, zoom, hSupport))
 }
 
+/** LA HAUTEUR DES SOLIDES QU'UN CADRE TOUCHE — une porte d'énergie, une
+ *  chasse : ce qui ferme ou remplit un passage prend le sommet de CE qui le
+ *  borde. Elles prenaient d'office celui d'un mur haut : juste entre deux
+ *  cloisons, mais entre deux solides plus bas (vitre, hydro, membrane…) le
+ *  dessin dépassait leur dessus et s'en décollait vers les bords de l'écran,
+ *  du même écart que les coupelles (le concepteur, 16/11 : « je me demande
+ *  si ce n'est pas le cas des portes également »).
+ *  On sonde à `marge` unités AU-DEHORS des quatre côtés (au quart, au milieu
+ *  et aux trois quarts) et on garde le plus haut — celui que l'image montre,
+ *  des solides qui se touchent partageant leur hauteur (volume.ts).
+ *  `hauteurEn` : la hauteur du solide en un point, négative au sol. Rend −1
+ *  si rien ne borde le cadre : à l'appelant de dire ce qu'il vaut seul. */
+export function hauteurAppui(
+  r: { minX: number; minY: number; maxX: number; maxY: number },
+  hauteurEn: (x: number, y: number) => number,
+  marge = 8,
+): number {
+  let h = -1
+  for (const t of [0.25, 0.5, 0.75]) {
+    const x = r.minX + (r.maxX - r.minX) * t
+    const y = r.minY + (r.maxY - r.minY) * t
+    h = Math.max(
+      h,
+      hauteurEn(r.minX - marge, y),
+      hauteurEn(r.maxX + marge, y),
+      hauteurEn(x, r.minY - marge),
+      hauteurEn(x, r.maxY + marge),
+    )
+  }
+  return h < 0 ? -1 : h
+}
+
 const smoothstep = (a: number, b: number, x: number): number => {
   const t = Math.min(Math.max((x - a) / (b - a), 0), 1)
   return t * t * (3 - 2 * t)
