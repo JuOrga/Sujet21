@@ -9812,13 +9812,19 @@ function drawMecanismes(vw: number, vh: number, dpr: number): void {
   // chasses : des courants de poussée — des chevrons qui FILENT dans le sens
   // du souffle tant qu'elle est active, un cadre discret et des chevrons
   // immobiles quand elle se tait. Le sens se lit avant d'y entrer.
+  //
+  // RELIEF ALLUMÉ, ELLE PREND LE SOMMET DES MURS, comme les portes : une
+  // chasse remplit l'espace entre deux cloisons hautes. Dessinée au pied, un
+  // jour s'ouvrait entre elle et le mur d'un côté et elle mordait sous celui
+  // d'en face — « les éléments paraissent décalés selon le point de vue »
+  // (le concepteur, 16/11 ; relief éteint, ils tombaient juste).
   {
     const chasses = level.chasses ?? []
     for (let i = 0; i < chasses.length; i++) {
       const c = chasses[i]
       if (dansCacheVoilee((c.minX + c.maxX) / 2, (c.minY + c.maxY) / 2)) continue
-      const a = S(c.minX, c.maxY)
-      const b = S(c.maxX, c.minY)
+      const a = auSommet(c.minX, c.maxY)
+      const b = auSommet(c.maxX, c.minY)
       const w = b.sx - a.sx
       const h = b.sy - a.sy
       const active = laserEtat.chassesActives[i] === true

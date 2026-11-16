@@ -481,3 +481,22 @@ describe("les portes d'énergie suivent le sommet des murs", () => {
     }
   })
 })
+
+// LES CHASSES SUIVENT LE SOMMET DES MURS (retour du concepteur, 16/11) :
+// relief allumé, le cadre et les chevrons d'un courant de poussée restaient
+// au PIED quand le dessus des murs qui le bordent fuyait le centre de
+// l'écran — un jour entre la chasse et la cloison d'un côté, la chasse qui
+// mord sous le mur de l'autre ; relief éteint, elle tombait juste. Une
+// chasse remplit l'espace entre deux murs hauts, comme une porte : elle
+// prend le même sommet (auSommet), dessinée elle aussi sur la toile 2D.
+describe('les chasses suivent le sommet des murs', () => {
+  const a = main.indexOf('// chasses : des courants de poussée')
+  const chasses = a < 0 ? '' : main.slice(a, main.indexOf('// rails magnétiques', a))
+
+  it('le cadre de la chasse passe par le sommet, plus aucun coin au pied', () => {
+    expect(chasses).toContain('const chasses = level.chasses')
+    expect(chasses).not.toMatch(/[^A-Za-z]S\(/)
+    expect(chasses).toMatch(/const a = auSommet\(c\.minX, c\.maxY\)/)
+    expect(chasses).toMatch(/const b = auSommet\(c\.maxX, c\.minY\)/)
+  })
+})
