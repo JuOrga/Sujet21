@@ -191,6 +191,47 @@ export function basesDuCorps(u: number, c: number, f: number): number[] {
  *  largeur d'une goutte (26 u), qui ne se dédouble donc pas. */
 export const PAS_CORPS = 3
 
+/** LE CORPS EST GALBÉ, PAS EXTRUDÉ. La première hauteur du corps en faisait
+ *  un prisme : la même silhouette du pied au dessus, un dessus plat, et entre
+ *  les deux une bande de largeur constante, assombrie d'un cran net — « trop
+ *  ruban, et comme si le haut du volume était plat alors que ce n'est pas
+ *  trop logique » (le concepteur, 16/11). Une goutte n'a ni arête ni toit :
+ *  sa section RÉTRÉCIT en montant.
+ *  Le champ dit déjà où l'on est dans le corps : il vaut le seuil au bord et
+ *  plus de trois fois le seuil au cœur. La section à la hauteur `t` (0 le
+ *  pied, 1 le dessus) est donc ce qui dépasse un seuil RELEVÉ de
+ *  `GALBE_CORPS · profilGalbe(t)` seuils : un quart de cercle, raide au pied
+ *  (l'épaule monte vite) et qui s'aplanit en haut — un dôme. Une goutte trop
+ *  mince pour atteindre le seuil du dessus est simplement moins haute. */
+export function profilGalbe(t: number): number {
+  const u = Math.min(Math.max(t, 0), 1)
+  return 1 - Math.sqrt(1 - u * u)
+}
+/** Ce qu'il faut de champ EN PLUS du seuil, en seuils, pour être sous le
+ *  dessus du corps. 1,2 : le dessus demande 2,2 seuils — dans le cœur (le
+ *  shader le fait commencer à 1,8), donc un grand corps garde un dessus, et
+ *  son épaule s'arrondit sur toute la lisière. */
+export const GALBE_CORPS = 1.2
+
+/** Ce que le pixel montre du corps, le jumeau de champCorps : `densites` le
+ *  champ lu aux points de basesDuCorps (pied d'abord), `seuil` le seuil du
+ *  corps. À chaque hauteur le champ est compté moins le relèvement de sa
+ *  section ; on garde le plus fort. Rend la densité vue (≥ celle du pied :
+ *  le corps ne perd rien là où il était) et le pas qui l'a donnée. */
+export function corpsVu(densites: readonly number[], seuil: number): { r: number; pas: number } {
+  let r = densites[0]
+  let pas = 0
+  const n = densites.length - 1
+  for (let i = 1; i <= n; i++) {
+    const e = densites[i] - seuil * GALBE_CORPS * profilGalbe(i / n)
+    if (e > r) {
+      r = e
+      pas = i
+    }
+  }
+  return { r, pas }
+}
+
 /** LA LUEUR DU CORPS SUR LA TRANCHE, 0..1. Le corps éclaire déjà le sol sous
  *  lui (le halo du sujet) ; adossé à une paroi, sa lumière monte sur la face.
  *  Dans une salle sombre, une lumière se lit là où une ombre se perd.
@@ -547,23 +588,28 @@ float solCache(float relief, float d, float dV, float flanc, float w) {
 }
 `
 
-/** Le jumeau GLSL de basesDuCorps, pour TOUT shader qui lit le corps dans le
- *  champ (la composition, les décalques) : le texel le plus dense le long du
- *  chemin pied → dessus. `uvVu` : où il a été lu (les voisins du relief de
- *  l'eau se lisent là) ; `rSommet` : la densité au DESSUS seul — là où elle
- *  manque, on regarde le côté du corps, pas son dessus. textureLod : appelé
- *  aussi hors flot uniforme. */
-export const CORPS_RELIEF_GLSL = `vec4 champCorps(sampler2D champ, vec2 uv, float f, out vec2 uvVu, out float rSommet) {
+/** Le jumeau GLSL de basesDuCorps et de corpsVu, pour TOUT shader qui lit le
+ *  corps dans le champ (la composition, les décalques) : le long du chemin
+ *  pied → dessus, le texel le plus dense une fois retiré le relèvement de sa
+ *  section (`leve` : le seuil du corps, dans l'unité du champ — le galbe).
+ *  Le texel rendu est mis à l'échelle ENTIER : les rapports que la
+ *  composition en tire (vitesse, phase, joueur) ne changent pas. `uvVu` : où
+ *  il a été lu (les voisins du relief de l'eau se lisent là) ; `rSommet` : la
+ *  densité au DESSUS seul — elle dit, de l'épaule au dessus, de combien le
+ *  corps s'arrondit ici. textureLod : appelé aussi hors flot uniforme. */
+export const CORPS_RELIEF_GLSL = `vec4 champCorps(sampler2D champ, vec2 uv, float f, float leve, out vec2 uvVu, out float rSommet) {
   vec4 t = textureLod(champ, uv, 0.0);
   uvVu = uv;
   rSommet = t.r;
   if (f <= 0.0) return t;
   vec2 dep = (uv - 0.5) * f;
   for (int i = 1; i <= ${PAS_CORPS}; i++) {
-    vec2 u = uv - dep * (float(i) / ${glslFloat(PAS_CORPS)});
+    float h = float(i) / ${glslFloat(PAS_CORPS)};
+    vec2 u = uv - dep * h;
     vec4 s = textureLod(champ, u, 0.0);
     if (i == ${PAS_CORPS}) rSommet = s.r;
-    if (s.r > t.r) { t = s; uvVu = u; }
+    float e = s.r - leve * ${glslFloat(GALBE_CORPS)} * (1.0 - sqrt(1.0 - h * h));
+    if (e > t.r) { t = s * (e / max(s.r, 1e-6)); uvVu = u; }
   }
   return t;
 }
