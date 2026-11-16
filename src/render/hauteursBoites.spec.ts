@@ -23,7 +23,9 @@ const entre = (debut: string, fin: string, depuis = 0): string => {
 
 const composeFs = entre('const COMPOSE_FS = `', '\n}`')
 const lightFs = entre('const LIGHT_FS = `', '\n}`')
-const sceneSdf = entre('float sceneSdf(vec2 p, float alt) {', '\n}', source.indexOf('const LIGHT_FS = `'))
+// (16/11 : la marche donne aussi `plein`, la distance de pleine lumière —
+// ombrePointe.ts ; le repère suit la signature)
+const sceneSdf = entre('float sceneSdf(vec2 p, float alt, float plein) {', '\n}', source.indexOf('const LIGHT_FS = `'))
 const epaisseur = entre("// ——— L'ÉPAISSEUR", '// ——— LE FLANC')
 
 describe('la table des hauteurs arrive au shader', () => {
@@ -116,7 +118,7 @@ describe('la carte cuite lit la hauteur de chaque boîte', () => {
   it("un toit bas reçoit l'ombre d'un voisin plus haut : la carte en porte la visibilité dans son alpha", () => {
     // le cuiseur marche une seconde fois, depuis le TOIT, à la hauteur du toit
     expect(lightFs).toContain('float hT = hauteurToit(p);')
-    expect(lightFs).toMatch(/sceneSdf\(p \+ dir \* tT, hT \+ tT \* monte\)/)
+    expect(lightFs).toMatch(/sceneSdf\(p \+ dir \* tT, hT \+ tT \* monte, tT \/ pen\)/)
     expect(lightFs).toContain('outColor = vec4(clamp(total, 0.0, 1.0), toitVis);')
     // la composition la lit et l'applique à la lumière du dessus
     expect(composeFs).toMatch(/toitVis = lm4\.a;/)
