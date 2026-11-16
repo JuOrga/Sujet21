@@ -8152,8 +8152,12 @@ export class Renderer {
 
   /** La hauteur du solide sur lequel est posé le décalque centré en (x, y)
    *  — le dernier peint, celui qu'on voit — ou −1 s'il est au sol. Seuls
-   *  les solides (ceux qui ont une hauteur, volume.ts) portent un dessus. */
-  private hauteurSousDecal(x: number, y: number): number {
+   *  les solides (ceux qui ont une hauteur, volume.ts) portent un dessus.
+   *  PUBLIQUE : la toile 2D (main.ts) y lit le support de ce qu'elle pose
+   *  sur un mur — une coupelle doit prendre le MÊME sommet que le décalque
+   *  de son logement, donc la même recherche. Elle lit les boîtes de la
+   *  dernière image peinte. */
+  hauteurSousDecal(x: number, y: number): number {
     for (let k = this.nBoitesImage - 1; k >= 0; k--) {
       const i = this.rangsScratch[k]
       const bx = this.boitesImage[i]
