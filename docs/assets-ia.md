@@ -239,6 +239,18 @@ existent, le jeu les dessine à la place du luminaire procédural, à la positio
 de chaque lampe posée (taille et rotation automatiques). Tant qu'ils n'existent
 pas, le dessin procédural reste en place — aucun risque.
 
+> **Refaits dans Blender le 16/11** (`tools/images/blender/lampes.py`). Les
+> deux images générées montraient un dos de lampe en métal clair, rien
+> d'allumé ; en jeu, des pastilles pâles et un bandeau étiré en pointes —
+> « c'est moche » (le concepteur). On regarde toujours le luminaire
+> par-dessus, mais la LUMIÈRE Y FUIT : un anneau clair autour du capot du
+> plafonnier, deux bandes de part et d'autre de l'épine du bandeau. À la
+> taille du jeu (une quinzaine de pixels), c'est la lumière qui doit
+> dominer : un simple liseré s'y réduisait à un fil. Le bandeau se dessine
+> en TROIS TRANCHES (`src/render/lampes.ts`) : deux embouts carrés jamais
+> étirés, un milieu uniforme qui prend la longueur. Les consignes de
+> génération ci-dessous sont gardées pour mémoire.
+
 ### 12a. `lampe-plafonnier.webp`
 **512×512 · WebP/PNG TRANSPARENT · parfaitement centré · vu du DESSUS**
 
@@ -769,6 +781,18 @@ Négatif : négatif commun + `rust, hexagonal mesh, warped grid, uneven holes,
 large holes, bright reflections, panel border`
 
 ### 18b. Le fond de cuve — `tank-bg.webp` ✅ REDESSINÉ DANS BLENDER (13/11)
+
+> **Devenu une GRANDE DALLE le 16/11** (`tools/images/blender/fond_cuve.py`).
+> Vu en jeu, le carreau de 900 unités se lisait « très basique » : deux
+> baies, le même hublot quatre à six fois par tableau. La dalle fait trois
+> carreaux sur deux (3072 × 2048 px, 2700 × 1800 unités : `FOND_DALLE`,
+> `src/render/fondCuve.ts`) — un tableau standard n'en voit qu'une — et
+> porte douze baies, un équipement différent dans chacune. Même ossature,
+> mêmes matières, même luminance (0,109 mesurée). Le même jour : la trame de
+> mesure du shader est retirée, et la paroi est collée au monde (plus de
+> parallaxe). La scène se bâtit À PART (`fond-cuve`), sans `vide_scene()`.
+> Livraison : `prepare.py tank-bg --depuis masters/images/fond-cuve`.
+
 
 > Plus de prompt à envoyer : le fond se dessine dans l'atelier
 > (`tools/images/blender/surfaces.py`, `cuve()`) — une ossature de cuve
