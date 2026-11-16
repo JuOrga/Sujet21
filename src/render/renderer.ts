@@ -2234,6 +2234,31 @@ float sdfVisible(int bi, vec2 p) {
   return dec.y > 0.5 ? formeSdf(wb, uBoxes[bi], dec.y, dec.z, dec.w) : db;
 }
 
+// LA HAUTEUR DE LA TRANCHE d'une boîte vue en ce pixel, relief allumé : le
+// chemin pied → sommet (relB, le déplacement de SON sommet) la traverse ici
+// à la hauteur fb.y × hb (flancBalaye, le balayage exact) ; −1 s'il ne la
+// traverse pas franchement. Les formes (coques, arrondis) rendent −1 : leur
+// balayage n'a pas de forme close, elles ne cachent que par leur dessus.
+float hauteurTranche(int bi, vec2 world, vec2 relB, float hb) {
+  vec4 dec = decodeAux(uBoxAux[bi].x);
+  if (dec.y > 0.5) return -1.0;
+  vec2 wb = world;
+  vec2 rL = relB;
+  float a = uBoxAux[bi].y;
+  if (abs(a) > 0.0005) {
+    vec2 bc = 0.5 * (uBoxes[bi].xy + uBoxes[bi].zw);
+    vec2 rel = world - bc;
+    float ca = cos(a);
+    float sa = sin(a);
+    wb = bc + vec2(ca * rel.x + sa * rel.y, -sa * rel.x + ca * rel.y);
+    rL = vec2(ca * relB.x + sa * relB.y, -sa * relB.x + ca * relB.y);
+  }
+  // loin de la base de plus que le déplacement, le chemin ne la croise pas
+  if (boxSdf(wb, uBoxes[bi]) > length(rL)) return -1.0;
+  vec2 fb = flancBalaye(wb, uBoxes[bi], rL);
+  return fb.x < -1.0 ? fb.y * hb : -1.0;
+}
+
 // ---- PAS D'OPÉRATION DE GRADIENT DANS LA BOUCLE DES BOÎTES ---------------
 //
 // POURQUOI. Le rapport de performance du 14/09/2026 (Firefox 155 sur
@@ -2924,6 +2949,14 @@ void main() {
   // comprise : on n'écrase que sur un STRICTEMENT plus petit.
   float dCouv = 1.0e9;
   int iCouv = -1;
+  // LA HAUTEUR VUE (relief allumé) : la plus haute surface en ce pixel — un
+  // dessus qui le couvre franchement (au-delà de son liseré), ou la tranche
+  // qu'y traverse un chemin pied → sommet. Une boîte ne peint ni sa tranche
+  // ni son dessus sous plus haut qu'eux : les flancs se peignaient dans
+  // l'ordre du tableau, et la face cachée d'un bloc collé à un autre passait
+  // par-dessus le dessus du voisin ; dans l'angle de deux blocs, le second
+  // passait devant (le concepteur, 16/11). −1 : rien de plus haut que le sol.
+  float zVis = -1.0;
   for (int bi = 0; bi < min(uBoxCount, MAX_BOXES); bi++) {
     float mc = decodeAux(uBoxAux[bi].x).x;
     if (mc > 2.5 && mc < 3.5) continue; // le sas est une bouche, il n'enterre rien
@@ -2937,6 +2970,10 @@ void main() {
     if (dc < dCouv) {
       dCouv = dc;
       iCouv = bi;
+    }
+    if (uRelief > 0.0) {
+      float hb = hauteurBoite(bi);
+      zVis = max(zVis, dc < -edgeW ? hb : hauteurTranche(bi, world, relDisp * facteurRelief(hb), hb));
     }
   }
   // LA LUMIÈRE SUR LE DESSUS DES SOLIDES, à la hauteur du toit qu'on
@@ -3249,8 +3286,15 @@ void main() {
       // chanfrein du dessus.
       float face = dot(nrm, lampeDir);
       fc *= mix(0.52, 1.15, 0.5 + 0.5 * face) * eclMat;
-      col = mix(col, fc, flanc);
+      // DEVANT ? Sous une surface plus haute (un dessus voisin, une tranche
+      // plus haute), cette tranche est cachée : elle ne se peint pas
+      float devant = step(zVis - 0.5, htFlanc * hB);
+      col = mix(col, fc, flanc * devant);
     }
+    // le dessus, de même : sous une surface plus haute, il ne se peint pas
+    // (à hauteur égale, rien ne change — l'ordre du tableau décide, comme
+    // les modules qui s'empilent l'attendent)
+    if (uRelief > 0.0 && hauteurBoite(bi) < zVis - 0.5) dV = max(dV, 1.0e4);
     if (mat < 2.5) {
       float fill = 1.0 - smoothstep(-edgeW, 0.0, dV);
       float edge = (1.0 - smoothstep(0.0, edgeW, abs(dV))) * libre;
