@@ -15078,7 +15078,8 @@ function mbIncline(surface: HTMLElement, cible: HTMLElement, amplitude = 9): voi
     cible.style.removeProperty('--ry')
   })
 }
-// Le fil de la cérémonie : bilan (temps 1-3, sautables) → versement (le
+// Le fil de la cérémonie : bilan (temps 1-3, sautables ; il ne passe
+// jamais seul, il attend un geste) → versement (le
 // surplus choisit sa destination) → draft (un tirage par palier franchi)
 // → fin (jauge et CONTINUER). Le versement et la suite ne se sautent pas.
 let mbEtape:
@@ -15264,6 +15265,9 @@ function mbFigeBilan(): void {
       if (val && b.gains[i]) val.textContent = b.gains[i].valeur
     })
   }
+  // le levier ressert au palier, où il PASSE la coulée : il y revient avec
+  // son premier mot, pas avec le CONTINUER d'un bilan lu jusqu'au bout
+  mbEl('mb-passer').textContent = 'PASSER ▸'
   mbEl('mb-passer').hidden = true
 }
 
@@ -17986,6 +17990,7 @@ function montreMiseEnBonbonne(b: BilanSalle): void {
   // LE LEVIER a le focus dès l'ouverture : Entrée, Espace et A le pressent
   // (la manette vise le seul bouton de l'écran), le clic aussi
   mbEl('mb-passer').hidden = false
+  mbEl('mb-passer').textContent = 'PASSER ▸'
   mbEl('mb-passer').focus({ preventScroll: true })
   const apres = (ms: number, fn: () => void): void => {
     mbTimers.push(window.setTimeout(fn, ms))
@@ -18077,8 +18082,15 @@ function montreMiseEnBonbonne(b: BilanSalle): void {
       requestAnimationFrame(roule)
     })
   })
-  // Temps 5 — LE VERSEMENT
-  apres(TEMPS_BILAN.versement, mbMontreVersement)
+  // Temps 5 — LA LECTURE EST FINIE, ET LE BILAN ATTEND. Il passait seul au
+  // versement à 4,9 s : le rang, le record, les gains s'en allaient avant
+  // d'être lus, et un joueur qui levait les yeux une seconde trouvait déjà
+  // la question des cuves. Rien ne quitte plus cet écran sans un geste
+  // (mbSauteBilan) ; le levier, qui disait PASSER tant que la lecture
+  // roulait, dit CONTINUER : il ne saute plus rien, il enchaîne.
+  apres(TEMPS_BILAN.lu, () => {
+    mbEl('mb-passer').textContent = 'CONTINUER ▸'
+  })
 }
 /** LE SAUT AU GESTE. Le bilan ne se passait qu'au pointeur : ni Entrée, ni
  *  Espace, ni A n'y faisaient rien. Le levier (qui a le focus) et le toucher
@@ -18094,7 +18106,8 @@ function mbSauteBilan(): void {
 mbEl('mb-passer').addEventListener('click', mbSauteBilan)
 // le même levier passe le palier (chacun ne répond qu'à son étape)
 mbEl('mb-passer').addEventListener('click', mbSauteEtalonnage)
-// un toucher pendant les temps 1-3 saute au versement (jamais l'inverse) ;
+// un toucher sur le bilan — en pleine lecture ou une fois lu — ouvre le
+// versement (jamais l'inverse) ;
 // au palier, il finit la coulée
 mbVeil?.addEventListener('pointerdown', (e) => {
   if ((e.target as HTMLElement).closest('button') !== null) return
