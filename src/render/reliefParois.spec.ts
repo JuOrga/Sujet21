@@ -9,6 +9,7 @@ import {
   RELIEF_PAROIS_GLSL,
   facteurRelief,
   fonduRelief,
+  facesTranche,
   flancBalaye,
   fractionSommet,
   pointDuSommet,
@@ -444,7 +445,7 @@ describe("les portes d'énergie suivent le sommet des murs", () => {
   const a = main.indexOf("// portes : barrières d'énergie")
   const portes = a < 0 ? '' : main.slice(a, main.indexOf('// LE COUPERET', a))
 
-  it("la boucle des portes ne pose plus aucun point au pied : tout passe par le sommet", () => {
+  it("la boucle des portes ne pose plus son dessus au pied : il passe par le sommet (la tranche nomme le pied, auPied)", () => {
     // la boucle seule : auSommet, lui, part de S
     const boucle = portes.slice(Math.max(0, portes.indexOf('for (let i = 0; i < portes.length')))
     expect(boucle).toContain('portePolygone(')
@@ -583,5 +584,69 @@ describe('le flanc d\'une boîte est le balayage exact du pied au sommet', () =>
     expect(RELIEF_PAROIS_GLSL).toContain('vec2 flancBalaye(vec2 p, vec4 b, vec2 r)')
     expect(boucle).toMatch(/flancBalaye\(wb, uBoxes\[bi\], rL\)/)
     expect(boucle).toMatch(/dec\.y > 0\.5/)
+  })
+})
+
+// LA PORTE A UNE TRANCHE (retour du concepteur, 16/11) : posée sur le sommet
+// des murs, elle tombait juste, mais « on ne voit pas de hauteur » — une
+// plaque peinte au niveau des toits. Ses faces LIBRES tournées vers l'œil
+// descendent maintenant du sommet au pied ; les deux bouts, collés aux murs
+// qu'elle relie, n'en ont pas (ils se peindraient sur les murs).
+describe("la tranche d'une porte d'énergie", () => {
+  // une porte couchée, 200 × 20, au-dessus et à droite du centre de l'écran
+  const P = { minX: 100, minY: 300, maxX: 300, maxY: 320 }
+  const C = [
+    { x: 100, y: 300 },
+    { x: 300, y: 300 },
+    { x: 300, y: 320 },
+    { x: 100, y: 320 },
+  ]
+  const nom = (f: { a: { x: number; y: number }; b: { x: number; y: number } }) =>
+    `${f.a.x},${f.a.y}>${f.b.x},${f.b.y}`
+
+  it("seule la face qui regarde le centre se voit ; les bouts contre les murs, jamais", () => {
+    // la caméra en bas à gauche : la face du bas regarde l'œil
+    expect(facesTranche(C, P, 0, 0).map(nom)).toEqual(['100,300>300,300'])
+    // la caméra au-dessus : la face du haut
+    expect(facesTranche(C, P, 200, 900).map(nom)).toEqual(['300,320>100,320'])
+    // la caméra loin à droite, à hauteur de la porte : le bout de droite
+    // regarde l'œil, mais il est contre un mur — rien
+    expect(facesTranche(C, P, 900, 310)).toEqual([])
+  })
+
+  it("une porte debout perd ses bouts en haut et en bas", () => {
+    const D = { minX: 0, minY: 0, maxX: 20, maxY: 200 }
+    const CD = [
+      { x: 0, y: 0 },
+      { x: 20, y: 0 },
+      { x: 20, y: 200 },
+      { x: 0, y: 200 },
+    ]
+    expect(facesTranche(CD, D, 500, 100).map(nom)).toEqual(['20,0>20,200'])
+    expect(facesTranche(CD, D, 10, -500)).toEqual([])
+  })
+
+  it("une porte qui se ferme : le FRONT, au milieu du passage, a sa tranche", () => {
+    // la moitié gauche matérialisée, le front en x = 200
+    const M = [
+      { x: 100, y: 300 },
+      { x: 200, y: 300 },
+      { x: 200, y: 320 },
+      { x: 100, y: 320 },
+    ]
+    expect(facesTranche(M, P, 900, 310).map(nom)).toEqual(['200,300>200,320'])
+  })
+
+  it("la boucle des portes peint la tranche du pied au sommet, sous le dessus", () => {
+    const a = main.indexOf("// portes : barrières d'énergie")
+    const portes = a < 0 ? '' : main.slice(a, main.indexOf('// LE COUPERET', a))
+    const tranche = portes.indexOf('facesTranche(contour, p, camera.x, camera.y)')
+    expect(tranche).toBeGreaterThan(0)
+    expect(portes.slice(tranche, tranche + 900)).toMatch(/auPied\(/)
+    expect(portes.slice(tranche, tranche + 900)).toMatch(/auSommet\(/)
+    // relief éteint, pas de tranche : le pied et le sommet se confondent
+    expect(portes).toMatch(/if \(fPortes > 0\)[^\n]*\n?[^\n]*facesTranche|fPortes > 0 \? facesTranche/)
+    // avant le dessus, qui la recouvre
+    expect(tranche).toBeLessThan(portes.indexOf("g.fillStyle = `rgba(255,72,72,"))
   })
 })

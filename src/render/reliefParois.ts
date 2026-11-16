@@ -184,6 +184,44 @@ export function flancBalaye(
   return [d, t]
 }
 
+type PointMonde = { x: number; y: number }
+type RectMonde = { minX: number; minY: number; maxX: number; maxY: number }
+
+/** LES FACES DE LA TRANCHE D'UNE PORTE D'ÉNERGIE, relief allumé : les arêtes
+ *  du `contour` (monde, sens trigonométrique — portePolygone) dont la face
+ *  regarde l'œil, posé au-dessus de (`cx`, `cy`), le centre de l'écran. Une
+ *  face se voit quand sa normale sortante pointe vers ce centre : de là, son
+ *  sommet a glissé au-delà de son pied. LES BOUTS sont exclus — les deux
+ *  petits côtés du rectangle `p`, collés aux murs que la porte relie : leur
+ *  tranche se peindrait sur ces murs. Le FRONT d'une porte qui se ferme, au
+ *  milieu du passage, est une face libre : il garde la sienne. */
+export function facesTranche(
+  contour: readonly PointMonde[],
+  p: RectMonde,
+  cx: number,
+  cy: number,
+): { a: PointMonde; b: PointMonde }[] {
+  const couchee = p.maxX - p.minX >= p.maxY - p.minY
+  const eps = 1e-6
+  const surBout = (a: PointMonde, b: PointMonde): boolean =>
+    couchee
+      ? Math.abs(a.x - b.x) < eps && (Math.abs(a.x - p.minX) < eps || Math.abs(a.x - p.maxX) < eps)
+      : Math.abs(a.y - b.y) < eps && (Math.abs(a.y - p.minY) < eps || Math.abs(a.y - p.maxY) < eps)
+  const faces: { a: PointMonde; b: PointMonde }[] = []
+  for (let k = 0; k < contour.length; k++) {
+    const a = contour[k]
+    const b = contour[(k + 1) % contour.length]
+    if (surBout(a, b)) continue
+    // la normale sortante d'une arête parcourue dans le sens trigonométrique
+    const nx = b.y - a.y
+    const ny = a.x - b.x
+    const mx = (a.x + b.x) / 2 - cx
+    const my = (a.y + b.y) / 2 - cy
+    if (nx * mx + ny * my < 0) faces.push({ a, b })
+  }
+  return faces
+}
+
 /** Les règles en GLSL, pour le shader de composition. */
 export const RELIEF_PAROIS_GLSL = `// (reliefParois.ts : les règles et leur jumeau TypeScript)
 float facteurRelief(float h) {
