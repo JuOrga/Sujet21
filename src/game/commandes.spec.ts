@@ -44,6 +44,7 @@ describe('commandes — les défauts', () => {
     expect(toucheDe('glace')).toBe('f')
     expect(toucheDe('vapeur')).toBe('g')
     expect(toucheDe('verser')).toBe('v')
+    expect(toucheDe('recadrer')).toBe('x') // recentrer la caméra sur le corps
     expect(boutonDe('glace')).toBe(2) // X
     expect(boutonDe('verser')).toBe(12) // croix ↑
     expect(boutonDe('conclure')).toBe(13) // croix ↓

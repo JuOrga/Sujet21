@@ -117,6 +117,12 @@ export class Camera {
   // Zoom ANCRÉ (pincement, molette) : le point du monde sous les doigts
   // reste sous les doigts — manipulation directe, immédiate. C'est la
   // différence entre « zoomer la carte » et « écarter le monde ».
+  //
+  // SAUF QUAND LA CAMÉRA SUIT LE CORPS : là, zoomer ne la décroche pas. Un
+  // cran de molette, le pointeur ailleurs que sur le corps, figeait le suivi
+  // (« ancrer fige aussi le suivi ») : le corps sortait du cadre et il
+  // fallait recadrer après chaque zoom. Le verrouillage ne se perd qu'en
+  // DÉPLAÇANT la caméra (panBy) ; verrouillée, le zoom se fait sur le corps.
   zoomAt(
     factor: number,
     clientX: number,
@@ -137,7 +143,7 @@ export class Camera {
     )
     this.manualZoom = z
     this.zoom = z
-    this.manualPan = true // ancrer fige aussi le suivi du corps
+    if (!this.manualPan) return // elle suit le corps : elle continue
     this.x = avant.x - (clientX - viewportW * 0.5) / z
     this.y = avant.y + (clientY - viewportH * 0.5) / z
   }

@@ -162,9 +162,9 @@ export const MANOEUVRES: Manoeuvre[] = [
   {
     id: 'recadrer',
     nom: 'Recadrer la caméra',
-    aide: 'La caméra revient au suivi automatique.',
+    aide: 'La caméra se recentre sur le corps et le suit de nouveau, zoom automatique compris. Zoomer ne lui fait pas perdre ce suivi ; seul un déplacement de la caméra le défait.',
     section: 'Les écrans',
-    clavier: null,
+    clavier: 'x',
     manette: 10, // L3
   },
   {
