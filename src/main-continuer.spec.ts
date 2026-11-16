@@ -69,4 +69,24 @@ describe('la sortie offerte par CONTINUER', () => {
     // conclure ne fait rien tant que le bouton ne s'offre pas
     expect(corps('conclureSalle')).toMatch(/if \(!continuerOffert\(\)\) return false/)
   })
+
+  it('le cran de croix qui conclut ne fait rien d’autre à ce moment-là', () => {
+    // la croix ↓ dézoome, la croix ↔ règle le temps : quand CONTINUER
+    // s'offre sur l'un de ces crans, conclure ne doit pas AUSSI reculer la
+    // caméra ni changer la vitesse de la cuve
+    expect(SRC).toContain(
+      "const cranConclure = continuerOffert() ? boutonDe('conclure') : null",
+    )
+    expect(SRC).toContain('cranConclure !== BOUTON.DROITE &&')
+    expect(SRC).toMatch(/manette\.zoomArriere && cranConclure !== BOUTON\.BAS/)
+  })
+
+  it('la croix ← ralentit UNE fois, bien qu’elle porte aussi la manœuvre', () => {
+    // « ralentir » est sur la croix ← par défaut (LB porte le curseur) et la
+    // croix ↔ règle le temps en dur : sans la garde, un appui sautait deux crans
+    expect(boutonDe('ralentir')).toBe(BOUTON.GAUCHE)
+    expect(boutonDe('accelerer')).toBe(BOUTON.DROITE)
+    expect(SRC).toContain("boutonDe('ralentir') !== BOUTON.GAUCHE &&")
+    expect(SRC).toContain("boutonDe('accelerer') !== BOUTON.DROITE &&")
+  })
 })

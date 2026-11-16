@@ -32,6 +32,9 @@ export function cibleHorsJeu(
 /** Les trois états qu'une COMMANDE peut viser (le plasma n'a pas de bouton). */
 export type EtatManuel = 'eau' | 'glace' | 'vapeur'
 
+/** Course du centre d'un pincement (px) avant qu'il ne déplace la caméra. */
+const PINCE_GLISSE = 14
+
 export class Input {
   aimActive = false
   aimClientX = 0
@@ -107,6 +110,12 @@ export class Input {
   private readonly pointers = new Map<number, { x: number; y: number }>()
   private pinchDist: number | null = null
   private pinchCenter: { x: number; y: number } | null = null
+  // Le pincement ne DÉPLACE la caméra qu'une fois son centre vraiment parti
+  // (PINCE_GLISSE px) : deux doigts qui s'écartent ne restent jamais centrés
+  // au pixel près, et ce tremblement suffisait à décrocher la caméra du
+  // corps — or zoomer ne doit pas lui faire perdre son suivi.
+  private pinchDepart: { x: number; y: number } | null = null
+  private pinchGlisse = false
   // Clic droit maintenu : déplacement de caméra ; relâché sans avoir bougé,
   // c'est le vortex (l'outil sandbox garde son geste historique)
   private rightDrag: {
@@ -228,6 +237,8 @@ export class Input {
         this.aimActive = false
         this.pinchDist = this.pinchDistance()
         this.pinchCenter = this.pinchCentroid()
+        this.pinchDepart = this.pinchCenter
+        this.pinchGlisse = false
         this.panVx = 0
         this.panVy = 0
         this.panLastT = performance.now() / 1000
@@ -272,7 +283,14 @@ export class Input {
           this.onZoom?.(d / this.pinchDist, c.x, c.y)
           this.pinchDist = d
         }
-        if (c !== null && this.pinchCenter !== null) {
+        if (
+          !this.pinchGlisse &&
+          c !== null &&
+          this.pinchDepart !== null &&
+          Math.hypot(c.x - this.pinchDepart.x, c.y - this.pinchDepart.y) > PINCE_GLISSE
+        )
+          this.pinchGlisse = true
+        if (this.pinchGlisse && c !== null && this.pinchCenter !== null) {
           const dx = c.x - this.pinchCenter.x
           const dy = c.y - this.pinchCenter.y
           if (dx !== 0 || dy !== 0) {
