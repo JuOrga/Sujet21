@@ -467,7 +467,6 @@ import {
   CODE_MAX,
   CRANS_AVIS,
   MOTS_AVIS,
-  avisAuGeste,
   avisDeTouche,
   carnetApresEnvoi,
   elagueAvisSalles,
@@ -18213,19 +18212,22 @@ function mbSauteBilan(): void {
 mbEl('mb-passer').addEventListener('click', mbSauteBilan)
 
 // ---- L'AVIS DU JOUEUR SUR LA SALLE (game/avisSalles.ts) ----
-// Cinq crans sous le levier du bilan, facultatifs : un clic, un toucher,
-// une touche de 1 à 5, ou la croix puis A. Poser un avis NE PASSE PAS le
-// bilan, et ne prend pas la main au levier : le focus lui revient aussitôt,
-// Entrée, Espace et A continuent d'enchaîner — sans cela, le A suivant
-// re-pressait le cran visé et retirait l'avis qu'on venait de poser.
+// Cinq crans sous le levier du bilan, puis PAS D'AVIS : un clic, un
+// toucher, une touche (1 à 5, 0 pour pas d'avis), ou la croix puis A. PAS
+// D'AVIS est l'état de départ — enfoncé tant qu'on n'a rien dit — et la
+// façon de retirer le sien : re-presser son cran ne le retire plus (un
+// double clic effaçait l'avis qu'il venait de poser). Poser un avis NE
+// PASSE PAS le bilan, et ne prend pas la main au levier : le focus lui
+// revient aussitôt, Entrée, Espace et A continuent d'enchaîner.
 /** La salle que la rangée juge ; null : pas de rangée. */
 let mbAvisCode: string | null = null
 function mbAvisPeint(): void {
   const mien: AvisSalle | 0 = mbAvisCode ? carnetAvis.miens[mbAvisCode]?.avis ?? 0 : 0
   for (const cran of Array.from(mbEl('mb-avis-crans').children)) {
     const n = Number((cran as HTMLElement).dataset.avis)
-    // la jauge : tous les crans jusqu'au mien s'allument
-    cran.classList.toggle('mb-on', mien > 0 && n <= mien)
+    // la jauge : tous les crans jusqu'au mien s'allument ; PAS D'AVIS (0)
+    // s'enfonce seul, sans la menthe — il ne dit rien de la salle
+    cran.classList.toggle('mb-on', n > 0 && n <= mien)
     cran.setAttribute('aria-pressed', n === mien ? 'true' : 'false')
   }
   mbEl('mb-avis').classList.toggle('mb-pose', mien > 0)
@@ -18241,18 +18243,22 @@ function mbAvisOuvre(code: string | null): void {
   mbAvisCode = code ? code.trim().slice(0, CODE_MAX) || null : null
   mbEl('mb-avis').hidden = mbAvisCode === null
   if (mbAvisCode === null) return
-  mbEl('mb-avis-crans').innerHTML = CRANS_AVIS.map(
-    (n) =>
-      `<button type="button" class="mb-avis-cran" data-avis="${n}" aria-pressed="false" ` +
-      `title="${n} / 5 — ${MOTS_AVIS[n]}" aria-label="${n} sur 5 : ${MOTS_AVIS[n]}">${n}</button>`,
-  ).join('')
+  mbEl('mb-avis-crans').innerHTML =
+    CRANS_AVIS.map(
+      (n) =>
+        `<button type="button" class="mb-avis-cran" data-avis="${n}" aria-pressed="false" ` +
+        `title="${n} / 5 — ${MOTS_AVIS[n]}" aria-label="${n} sur 5 : ${MOTS_AVIS[n]}">${n}</button>`,
+    ).join('') +
+    `<button type="button" class="mb-avis-cran mb-avis-sans" data-avis="0" aria-pressed="true" ` +
+    `title="ne pas juger cette salle (touche 0)">PAS D’AVIS</button>`
   mbAvisPeint()
 }
-function mbAvisVote(cran: AvisSalle): void {
+function mbAvisVote(cran: AvisSalle | 0): void {
   if (!miseEnBonbonne || mbEtape !== 'bilan' || mbAvisCode === null) return
-  const mien: AvisSalle | 0 = carnetAvis.miens[mbAvisCode]?.avis ?? 0
-  carnetAvis = noteAuCarnet(carnetAvis, mbAvisCode, avisAuGeste(mien, cran), new Date().toISOString())
-  gardeCarnetAvis()
+  const avant = carnetAvis
+  carnetAvis = noteAuCarnet(carnetAvis, mbAvisCode, cran, new Date().toISOString())
+  // rien n'a changé (PAS D'AVIS sans avis, son cran re-pressé) : rien à garder
+  if (carnetAvis !== avant) gardeCarnetAvis()
   sonCeremonie('cartouche', 0.5)
   mbAvisPeint()
   const levier = mbEl('mb-passer')
@@ -18274,7 +18280,7 @@ mbEl('mb-avis-crans').addEventListener('click', (e) => {
   const n = cran ? avisDeTouche(cran.dataset.avis ?? '') : null
   if (n !== null) mbAvisVote(n)
 })
-// les touches 1 à 5, tant que le bilan est à l'écran (mbAvisVote le vérifie)
+// les touches 1 à 5 et 0, tant que le bilan est à l'écran (mbAvisVote le vérifie)
 window.addEventListener('keydown', (e) => {
   if (e.repeat || e.ctrlKey || e.metaKey || e.altKey) return
   const n = avisDeTouche(e.key)

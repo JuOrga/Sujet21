@@ -4,7 +4,6 @@
 // sans fin sous les salles générées.
 import { describe, expect, it } from 'vitest'
 import {
-  avisAuGeste,
   avisDeTouche,
   avisSalleDe,
   carnetApresEnvoi,
@@ -96,16 +95,11 @@ describe('L’avis du joueur sur une salle', () => {
   })
 })
 
-describe('Le geste et la touche', () => {
-  it('presser un autre cran change d’avis, re-presser le sien le retire', () => {
-    expect(avisAuGeste(0, 4)).toBe(4)
-    expect(avisAuGeste(2, 4)).toBe(4)
-    expect(avisAuGeste(4, 4)).toBe(0)
-  })
-
-  it('seules les touches 1 à 5 posent un avis', () => {
+describe('La touche', () => {
+  it('1 à 5 posent un avis, 0 dit PAS D’AVIS, le reste ne dit rien', () => {
     expect(['1', '2', '3', '4', '5'].map(avisDeTouche)).toEqual([1, 2, 3, 4, 5])
-    for (const k of ['0', '6', '9', ' ', '', 'a', 'Enter', '12', 'F1']) expect(avisDeTouche(k)).toBeNull()
+    expect(avisDeTouche('0')).toBe(0)
+    for (const k of ['6', '9', ' ', '', 'a', 'Enter', '12', '00', 'F1']) expect(avisDeTouche(k)).toBeNull()
   })
 })
 
@@ -135,11 +129,27 @@ describe('Le carnet du poste', () => {
     expect(lisCarnetAvis(JSON.stringify(carnet)).attente).toEqual({ 'T-01': { avis: 0, date: 'd2' } })
   })
 
+  it('rien ne change, rien n’attend : PAS D’AVIS sans avis, ou son cran re-pressé, ne coûte pas d’écriture', () => {
+    const vide = lisCarnetAvis(null)
+    // le bilan passé sur « pas d'avis » : le carnet est rendu tel quel
+    expect(noteAuCarnet(vide, 'T-01', 0, 'd1')).toBe(vide)
+    const pose = noteAuCarnet(vide, 'T-01', 4, 'd1')
+    // re-presser son cran ne le retire pas et ne redate rien
+    expect(noteAuCarnet(pose, 'T-01', 4, 'd2')).toBe(pose)
+    // publié, puis PAS D'AVIS : là, le retrait attend
+    const publie = carnetApresEnvoi(pose, pose.attente)
+    expect(publie.attente).toEqual({})
+    expect(noteAuCarnet(publie, 'T-01', 0, 'd3').attente).toEqual({ 'T-01': { avis: 0, date: 'd3' } })
+  })
+
   it('l’attente se pose PAR-DESSUS le document relu : les avis des autres restent, le retrait retire', () => {
     let distant = poseAvisSalle(lisAvisSalles(null), 'T-01', 5, 'MARIE', 'd0')
     distant = poseAvisSalle(distant, 'T-01', 1, 'JULIEN', 'd0')
     distant = poseAvisSalle(distant, 'T-02', 3, 'JULIEN', 'd0')
-    let carnet = noteAuCarnet(lisCarnetAvis(null), 'T-01', 4, 'd1')
+    // T-02 : un avis déjà publié depuis ce poste, que PAS D'AVIS retire
+    let carnet = noteAuCarnet(lisCarnetAvis(null), 'T-02', 3, 'd0')
+    carnet = carnetApresEnvoi(carnet, carnet.attente)
+    carnet = noteAuCarnet(carnet, 'T-01', 4, 'd1')
     carnet = noteAuCarnet(carnet, 'T-02', 0, 'd2')
     carnet = noteAuCarnet(carnet, 'T-03', 2, 'd3')
     const doc = superposeAttente(distant, carnet.attente, 'JULIEN')

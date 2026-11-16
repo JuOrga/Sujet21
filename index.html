@@ -8497,6 +8497,14 @@
       .mb-avis-cran.mb-on {
         color: var(--mb-coque-noire); background: var(--mb-menthe); border-color: var(--mb-menthe);
       }
+      /* PAS D'AVIS : un cran plus large, au bout de la rangée. Enfoncé (il
+         l'est au départ), il s'éclaircit sans prendre la menthe : la menthe
+         dit ce qu'on pense de la salle, lui dit qu'on ne dit rien. */
+      .mb-avis-sans {
+        width: auto; padding: 0 12px; margin-left: 8px; white-space: nowrap;
+        font-size: calc(10px * var(--ui)); letter-spacing: 0.14em;
+      }
+      .mb-avis-sans[aria-pressed="true"] { color: var(--mb-texte); border-color: var(--mb-texte); }
       .mb-avis-mot { min-width: 13em; white-space: nowrap; letter-spacing: 0.06em; }
       .mb-avis.mb-pose .mb-avis-mot { color: var(--mb-menthe); }
       /* ---- LE COMPACT : le relevé lu se replie en BANDEAU — le rang, le
@@ -11626,8 +11634,8 @@
         <!-- LE LEVIER : il passe le bilan — au clic, au toucher, à Entrée,
              à Espace et à A (il a le focus dès l'ouverture) -->
         <button type="button" class="mb-levier mb-passer" id="mb-passer">PASSER ▸</button>
-        <!-- L'AVIS DU JOUEUR SUR LA SALLE (game/avisSalles.ts) : cinq crans,
-             un geste, facultatif. APRÈS le levier dans le document, exprès :
+        <!-- L'AVIS DU JOUEUR SUR LA SALLE (game/avisSalles.ts) : cinq crans
+             et PAS D'AVIS, un geste, facultatif. APRÈS le levier dans le document, exprès :
              la manette vise le premier bouton de l'écran, et ce doit rester
              le levier — A martelé passe le bilan, il ne juge pas la salle.
              main.ts pose les crans à chaque bilan. -->

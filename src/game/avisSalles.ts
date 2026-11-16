@@ -12,8 +12,10 @@
 // UN AVIS PAR PERSONNE ET PAR SALLE, de 1 à 5, le dernier posé fait foi.
 // La personne, c'est le nom de la borne (celui des records) — sans nom,
 // « anonyme », et tous les anonymes ne font qu'un : la même règle que
-// l'avis sur une musique (ecouteAvis.ts). Retirer le sien (re-presser son
-// cran) est l'absence d'entrée, pas une valeur rangée.
+// l'avis sur une musique (ecouteAvis.ts). « PAS D'AVIS » est un bouton à
+// part entière, au bout de la rangée : il retire le sien. Ce n'est pas une
+// valeur rangée mais l'absence d'entrée — et c'est l'état de départ, le
+// bouton est enfoncé tant qu'on n'a rien dit.
 //
 // DEUX ÉTAGES, parce qu'une écriture au magasin coûte 3 opérations sur les
 // 2 000 du mois (api/_magasin.ts) et qu'une descente franchit une dizaine
@@ -207,17 +209,12 @@ export function lisCarnetAvis(brut: string | null): CarnetAvis {
   return { miens, attente }
 }
 
-/** LE GESTE SUR UN CRAN : presser un autre cran change d'avis, re-presser
- *  le sien le retire — c'est la seule façon de revenir sur un clic parti
- *  trop vite, et elle ne demande pas de sixième bouton. */
-export function avisAuGeste(courant: AvisSalle | 0, presse: AvisSalle): AvisSalle | 0 {
-  return courant === presse ? 0 : presse
-}
-
-/** La touche du clavier qui pose un avis : « 1 » à « 5 », rangée du haut
- *  comme pavé numérique (les deux rendent le même `key`). */
-export function avisDeTouche(key: string): AvisSalle | null {
-  return key.length === 1 ? avisDeBrut(Number(key)) : null
+/** La touche du clavier qui pose un avis : « 1 » à « 5 », et « 0 » pour
+ *  PAS D'AVIS — rangée du haut comme pavé numérique (les deux rendent le
+ *  même `key`). null : la touche ne dit rien. */
+export function avisDeTouche(key: string): AvisSalle | 0 | null {
+  if (key === '0') return 0
+  return /^[1-5]$/.test(key) ? avisDeBrut(Number(key)) : null
 }
 
 /** Inscrit un avis au carnet — et rend un carnet NEUF : le mien change tout
@@ -225,6 +222,11 @@ export function avisDeTouche(key: string): AvisSalle | null {
 export function noteAuCarnet(carnet: CarnetAvis, code: string, avis: AvisSalle | 0, date: string): CarnetAvis {
   const c = codeDeBrut(code)
   if (!c) return carnet
+  // RIEN NE CHANGE, RIEN N'ATTEND : presser PAS D'AVIS sans avoir d'avis, ou
+  // re-presser son cran, ne met pas la salle en attente — sinon chaque
+  // bilan passé sur « pas d'avis » coûterait une écriture au magasin pour
+  // ne rien dire
+  if ((carnet.miens[c]?.avis ?? 0) === avis) return carnet
   const miens = { ...carnet.miens }
   if (avis === 0) delete miens[c]
   else miens[c] = { avis, date }
