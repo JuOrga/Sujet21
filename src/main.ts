@@ -4241,9 +4241,10 @@ let lumiereActive = localStorage.getItem('sujet21-lumiere') !== 'off'
 let lumiereEauActive = localStorage.getItem('sujet21-lumiere-eau') !== 'off'
 // RELIEF 2.5D des parois : leur sommet fuit le centre de la caméra, la face
 // latérale se révèle du côté qui regarde le centre — en se déplaçant, on
-// aperçoit les flancs des éléments qu'on aborde. EXPÉRIMENTAL : OFF par
-// défaut le temps de la validation à la manette ; LÉGER puis FORT à l'essai.
-let reliefChoix = (localStorage.getItem('sujet21-relief') ?? 'off') as
+// aperçoit les flancs des éléments qu'on aborde. LÉGER par défaut (demande
+// du concepteur, 16/11 : la validation à la manette est faite) ; un OFF déjà
+// choisi reste OFF, seul l'appareil sans réglage posé change de rendu.
+let reliefChoix = (localStorage.getItem('sujet21-relief') ?? 'leger') as
   | 'off'
   | 'leger'
   | 'fort'
