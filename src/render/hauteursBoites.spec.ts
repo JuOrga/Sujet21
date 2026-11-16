@@ -89,7 +89,12 @@ describe('la table des hauteurs arrive au shader', () => {
     expect(appels[0].entetes[0]).toMatch(/^if \(.*this\.hauteursCle.*\)$/)
     // case k du shader = boîte rangs[k] de la liste
     expect(source).toMatch(/this\.hauteurScratch\[k\]\s*=\s*this\.hauteursBoites\[i\]/)
-    expect(source).toContain("gl.uniform4fv(cu['uBoxH[0]'], this.hauteurScratch)")
+    // la composition ne reçoit que les boîtes de la VUE (portee.ts) : le tri
+    // lit cette table et recopie la hauteur de chaque boîte gardée à sa
+    // nouvelle case — même ordre (portee.spec.ts). Le cuiseur, lui, cuit le
+    // tableau entier : il garde la table telle quelle.
+    expect(source).toMatch(/boitesDansLaVue\(\s*boxCount,\s*this\.boxScratch,\s*this\.auxScratch,\s*this\.hauteurScratch,/)
+    expect(source).toContain("gl.uniform4fv(cu['uBoxH[0]'], this.vue.hauteurs)")
     expect(source).toContain("gl.uniform4fv(lu['uBoxH[0]'], this.hauteurScratch)")
   })
 })
