@@ -9,6 +9,8 @@ import {
   RELIEF_PAROIS_GLSL,
   facteurRelief,
   fonduRelief,
+  facesTranche,
+  flancBalaye,
   fractionSommet,
   pointDuSommet,
   solCache,
@@ -443,7 +445,7 @@ describe("les portes d'énergie suivent le sommet des murs", () => {
   const a = main.indexOf("// portes : barrières d'énergie")
   const portes = a < 0 ? '' : main.slice(a, main.indexOf('// LE COUPERET', a))
 
-  it("la boucle des portes ne pose plus aucun point au pied : tout passe par le sommet", () => {
+  it("la boucle des portes ne pose plus son dessus au pied : il passe par le sommet (la tranche nomme le pied, auPied)", () => {
     // la boucle seule : auSommet, lui, part de S
     const boucle = portes.slice(Math.max(0, portes.indexOf('for (let i = 0; i < portes.length')))
     expect(boucle).toContain('portePolygone(')
@@ -479,5 +481,172 @@ describe("les portes d'énergie suivent le sommet des murs", () => {
       expect(viaEcran[0]).toBeCloseTo(viaMonde[0], 6)
       expect(viaEcran[1]).toBeCloseTo(viaMonde[1], 6)
     }
+  })
+})
+
+// LES CHASSES SUIVENT LE SOMMET DES MURS (retour du concepteur, 16/11) :
+// relief allumé, le cadre et les chevrons d'un courant de poussée restaient
+// au PIED quand le dessus des murs qui le bordent fuyait le centre de
+// l'écran — un jour entre la chasse et la cloison d'un côté, la chasse qui
+// mord sous le mur de l'autre ; relief éteint, elle tombait juste. Une
+// chasse remplit l'espace entre deux murs hauts, comme une porte : elle
+// prend le même sommet (auSommet), dessinée elle aussi sur la toile 2D.
+describe('les chasses suivent le sommet des murs', () => {
+  const a = main.indexOf('// chasses : des courants de poussée')
+  const chasses = a < 0 ? '' : main.slice(a, main.indexOf('// rails magnétiques', a))
+
+  it('le cadre de la chasse passe par le sommet, plus aucun coin au pied', () => {
+    expect(chasses).toContain('const chasses = level.chasses')
+    expect(chasses).not.toMatch(/[^A-Za-z]S\(/)
+    expect(chasses).toMatch(/const a = auSommet\(c\.minX, c\.maxY\)/)
+    expect(chasses).toMatch(/const b = auSommet\(c\.maxX, c\.minY\)/)
+  })
+})
+
+// LE FLANC D'UNE BOÎTE, BALAYÉ EXACTEMENT (retour du concepteur, 16/11) :
+// relief allumé, au coin libre d'une paroi (les hydrophobes isolées, la
+// porte D2 contre le mur), le bord en biais du flanc tombait en ESCALIER —
+// quatre marches. Hors de la base, le flanc était la réunion de cinq copies
+// de la boîte (pied, quart, moitié, trois quarts, sommet) ; entre deux
+// copies, le coin dessinait une marche. La règle prend maintenant TOUT le
+// chemin du pied au sommet : la boîte balayée le long du déplacement.
+describe('le flanc d\'une boîte est le balayage exact du pied au sommet', () => {
+  // la référence : le chemin pied → sommet découpé très fin
+  const boite = (x: number, y: number, b: readonly number[]): number => {
+    const cx = (b[0] + b[2]) / 2
+    const cy = (b[1] + b[3]) / 2
+    const qx = Math.abs(x - cx) - (b[2] - b[0]) / 2
+    const qy = Math.abs(y - cy) - (b[3] - b[1]) / 2
+    return Math.hypot(Math.max(qx, 0), Math.max(qy, 0)) + Math.min(Math.max(qx, qy), 0)
+  }
+  const N = 4000
+  const reference = (x: number, y: number, b: readonly number[], rx: number, ry: number) => {
+    let dMin = Infinity
+    let tSortie = -1
+    for (let k = 0; k <= N; k++) {
+      const t = k / N
+      const dd = boite(x - t * rx, y - t * ry, b)
+      dMin = Math.min(dMin, dd)
+      if (dd <= 0) tSortie = t
+    }
+    return { dMin, tSortie }
+  }
+  const B = [0, 0, 40, 120] as const
+  const deplacements = [
+    [30, 12],
+    [-25, 18],
+    [8, -35],
+    [0, 20],
+    [22, 0],
+  ] as const
+
+  it('dehors, la distance est celle du balayage : pas de marche au coin', () => {
+    for (const [rx, ry] of deplacements) {
+      for (let x = -40; x <= 90; x += 3.7) {
+        for (let y = -40; y <= 170; y += 4.3) {
+          const ref = reference(x, y, B, rx, ry)
+          if (ref.dMin <= 0.05) continue
+          const [d] = flancBalaye(x, y, B, rx, ry)
+          expect(d).toBeCloseTo(ref.dMin, 1)
+        }
+      }
+    }
+  })
+
+  it('dedans, la hauteur vue est le dernier passage du dedans au dehors', () => {
+    for (const [rx, ry] of deplacements) {
+      for (let x = -40; x <= 90; x += 3.7) {
+        for (let y = -40; y <= 170; y += 4.3) {
+          const ref = reference(x, y, B, rx, ry)
+          if (ref.dMin >= -0.05) continue
+          const [d, t] = flancBalaye(x, y, B, rx, ry)
+          expect(d).toBeLessThanOrEqual(0)
+          expect(Math.abs(t - ref.tSortie)).toBeLessThan(2 / N + 1e-6)
+        }
+      }
+    }
+  })
+
+  it('le bord en biais est une droite : entre les quatre anciennes copies, le flanc ne se creuse plus', () => {
+    // le point au milieu du bord en biais, entre deux anciens échantillons
+    // (t = 1/8) : à un pixel en dedans du balayage, il est DANS le flanc
+    const [rx, ry] = [32, 16]
+    const t = 1 / 8
+    // le coin (40, 0) glissé de t·r, puis un pas vers l'intérieur du biais
+    const nx = ry / Math.hypot(rx, ry)
+    const ny = -rx / Math.hypot(rx, ry)
+    const x = 40 + t * rx - nx * 0.6
+    const y = 0 + t * ry - ny * 0.6
+    expect(flancBalaye(x, y, B, rx, ry)[0]).toBeLessThan(0)
+  })
+
+  it('le shader prend la règle pour les boîtes ; les formes gardent leur échantillonnage', () => {
+    expect(RELIEF_PAROIS_GLSL).toContain('vec2 flancBalaye(vec2 p, vec4 b, vec2 r)')
+    expect(boucle).toMatch(/flancBalaye\(wb, uBoxes\[bi\], rL\)/)
+    expect(boucle).toMatch(/dec\.y > 0\.5/)
+  })
+})
+
+// LA PORTE A UNE TRANCHE (retour du concepteur, 16/11) : posée sur le sommet
+// des murs, elle tombait juste, mais « on ne voit pas de hauteur » — une
+// plaque peinte au niveau des toits. Ses faces LIBRES tournées vers l'œil
+// descendent maintenant du sommet au pied ; les deux bouts, collés aux murs
+// qu'elle relie, n'en ont pas (ils se peindraient sur les murs).
+describe("la tranche d'une porte d'énergie", () => {
+  // une porte couchée, 200 × 20, au-dessus et à droite du centre de l'écran
+  const P = { minX: 100, minY: 300, maxX: 300, maxY: 320 }
+  const C = [
+    { x: 100, y: 300 },
+    { x: 300, y: 300 },
+    { x: 300, y: 320 },
+    { x: 100, y: 320 },
+  ]
+  const nom = (f: { a: { x: number; y: number }; b: { x: number; y: number } }) =>
+    `${f.a.x},${f.a.y}>${f.b.x},${f.b.y}`
+
+  it("seule la face qui regarde le centre se voit ; les bouts contre les murs, jamais", () => {
+    // la caméra en bas à gauche : la face du bas regarde l'œil
+    expect(facesTranche(C, P, 0, 0).map(nom)).toEqual(['100,300>300,300'])
+    // la caméra au-dessus : la face du haut
+    expect(facesTranche(C, P, 200, 900).map(nom)).toEqual(['300,320>100,320'])
+    // la caméra loin à droite, à hauteur de la porte : le bout de droite
+    // regarde l'œil, mais il est contre un mur — rien
+    expect(facesTranche(C, P, 900, 310)).toEqual([])
+  })
+
+  it("une porte debout perd ses bouts en haut et en bas", () => {
+    const D = { minX: 0, minY: 0, maxX: 20, maxY: 200 }
+    const CD = [
+      { x: 0, y: 0 },
+      { x: 20, y: 0 },
+      { x: 20, y: 200 },
+      { x: 0, y: 200 },
+    ]
+    expect(facesTranche(CD, D, 500, 100).map(nom)).toEqual(['20,0>20,200'])
+    expect(facesTranche(CD, D, 10, -500)).toEqual([])
+  })
+
+  it("une porte qui se ferme : le FRONT, au milieu du passage, a sa tranche", () => {
+    // la moitié gauche matérialisée, le front en x = 200
+    const M = [
+      { x: 100, y: 300 },
+      { x: 200, y: 300 },
+      { x: 200, y: 320 },
+      { x: 100, y: 320 },
+    ]
+    expect(facesTranche(M, P, 900, 310).map(nom)).toEqual(['200,300>200,320'])
+  })
+
+  it("la boucle des portes peint la tranche du pied au sommet, sous le dessus", () => {
+    const a = main.indexOf("// portes : barrières d'énergie")
+    const portes = a < 0 ? '' : main.slice(a, main.indexOf('// LE COUPERET', a))
+    const tranche = portes.indexOf('facesTranche(contour, p, camera.x, camera.y)')
+    expect(tranche).toBeGreaterThan(0)
+    expect(portes.slice(tranche, tranche + 900)).toMatch(/auPied\(/)
+    expect(portes.slice(tranche, tranche + 900)).toMatch(/auSommet\(/)
+    // relief éteint, pas de tranche : le pied et le sommet se confondent
+    expect(portes).toMatch(/if \(fPortes > 0\)[^\n]*\n?[^\n]*facesTranche|fPortes > 0 \? facesTranche/)
+    // avant le dessus, qui la recouvre
+    expect(tranche).toBeLessThan(portes.indexOf("g.fillStyle = `rgba(255,72,72,"))
   })
 })

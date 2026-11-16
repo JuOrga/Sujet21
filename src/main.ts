@@ -348,7 +348,7 @@ import {
 import { chargePiecesModule2d, peintCelluleSeule, peintModule2d, type Pieces } from './render/module2dCanvas'
 import { MAX_BOXES, Renderer } from './render/renderer'
 import { HAUTEUR_BLOCS } from './render/hauteurs'
-import { fractionSommet, pointDuSommet } from './render/reliefParois'
+import { facesTranche, fractionSommet, pointDuSommet } from './render/reliefParois'
 import { Motes, VIE_STRIDE, remplitVie, toucheLeCorps } from './render/vie'
 import { panDepuis } from './game/ouie'
 import { dangerDevant, directionDeMarche, saccade, type Saccade } from './game/regard'
@@ -9360,6 +9360,9 @@ function drawMecanismes(vw: number, vh: number, dpr: number): void {
     const [sx, sy] = pointDuSommet(q.sx, q.sy, vw * 0.5, vh * 0.5, fPortes)
     return { sx, sy }
   }
+  // le pied, nommé : seule la tranche d'une porte s'y pose (le reste du
+  // dessin des portes et des chasses prend le sommet)
+  const auPied = S
   for (let i = 0; i < portes.length; i++) {
     const p = portes[i]
     // sous un voile de cachette : la porte se tait (elle flotterait
@@ -9380,6 +9383,44 @@ function drawMecanismes(vw: number, vh: number, dpr: number): void {
     if (avance > 0) {
       const { contour, front } = portePolygone(p, avance)
       const puls = 0.75 + 0.25 * Math.sin(elapsed * 3.1 + i)
+      // LA TRANCHE : relief allumé, la barrière a la hauteur des murs qu'elle
+      // relie. Posée sur leur sommet, elle tombait juste mais restait une
+      // plaque peinte au niveau des toits — « on ne voit pas de hauteur »
+      // (le concepteur, 16/11). Ses faces libres tournées vers l'œil
+      // descendent au pied (facesTranche : ni les bouts collés aux murs, ni
+      // les faces de dos) : un voile plus dense en haut, qui s'éteint en
+      // touchant le sol, et la ligne du pied. Peinte avant le dessus, qui la
+      // recouvre. Relief éteint, le pied et le sommet se confondent : rien.
+      if (fPortes > 0) {
+        for (const { a: qa, b: qb } of facesTranche(contour, p, camera.x, camera.y)) {
+          const pa = auPied(qa.x, qa.y)
+          const pb = auPied(qb.x, qb.y)
+          const ha = auSommet(qa.x, qa.y)
+          const hb = auSommet(qb.x, qb.y)
+          const voile = g.createLinearGradient(
+            (pa.sx + pb.sx) / 2,
+            (pa.sy + pb.sy) / 2,
+            (ha.sx + hb.sx) / 2,
+            (ha.sy + hb.sy) / 2,
+          )
+          voile.addColorStop(0, `rgba(255,72,72,${(0.08 * puls).toFixed(3)})`)
+          voile.addColorStop(1, `rgba(255,72,72,${(0.36 * puls).toFixed(3)})`)
+          g.beginPath()
+          g.moveTo(pa.sx, pa.sy)
+          g.lineTo(pb.sx, pb.sy)
+          g.lineTo(hb.sx, hb.sy)
+          g.lineTo(ha.sx, ha.sy)
+          g.closePath()
+          g.fillStyle = voile
+          g.fill()
+          g.strokeStyle = `rgba(255,96,96,${(0.4 * puls).toFixed(3)})`
+          g.lineWidth = 1
+          g.beginPath()
+          g.moveTo(pa.sx, pa.sy)
+          g.lineTo(pb.sx, pb.sy)
+          g.stroke()
+        }
+      }
       g.save()
       g.beginPath()
       for (let k = 0; k < contour.length; k++) {
@@ -9844,13 +9885,19 @@ function drawMecanismes(vw: number, vh: number, dpr: number): void {
   // chasses : des courants de poussée — des chevrons qui FILENT dans le sens
   // du souffle tant qu'elle est active, un cadre discret et des chevrons
   // immobiles quand elle se tait. Le sens se lit avant d'y entrer.
+  //
+  // RELIEF ALLUMÉ, ELLE PREND LE SOMMET DES MURS, comme les portes : une
+  // chasse remplit l'espace entre deux cloisons hautes. Dessinée au pied, un
+  // jour s'ouvrait entre elle et le mur d'un côté et elle mordait sous celui
+  // d'en face — « les éléments paraissent décalés selon le point de vue »
+  // (le concepteur, 16/11 ; relief éteint, ils tombaient juste).
   {
     const chasses = level.chasses ?? []
     for (let i = 0; i < chasses.length; i++) {
       const c = chasses[i]
       if (dansCacheVoilee((c.minX + c.maxX) / 2, (c.minY + c.maxY) / 2)) continue
-      const a = S(c.minX, c.maxY)
-      const b = S(c.maxX, c.minY)
+      const a = auSommet(c.minX, c.maxY)
+      const b = auSommet(c.maxX, c.minY)
       const w = b.sx - a.sx
       const h = b.sy - a.sy
       const active = laserEtat.chassesActives[i] === true

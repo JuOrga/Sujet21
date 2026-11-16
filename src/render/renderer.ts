@@ -3117,20 +3117,32 @@ void main() {
           // mince que le déplacement) : la hauteur vue est le DERNIER passage
           // du dedans au dehors le long du chemin pied → sommet (avant, elle
           // restait à 0 : toute la tranche à la couleur du pied)
-          float dP = d;
-          for (int fs = 1; fs <= 3; fs++) {
-            vec2 wM = world - relB * (float(fs) / 4.0);
-            vec2 wbM = wM;
-            if (abs(bAngR) > 0.0005) {
-              vec2 relM = wM - bcR;
-              wbM = bcR + vec2(caR * relM.x + saR * relM.y, -saR * relM.x + caR * relM.y);
+          // UNE BOÎTE : le balayage exact (flancBalaye, reliefParois.ts). Les
+          // trois échantillons ne voyaient que cinq copies de la boîte : au
+          // coin libre d'une paroi, le bord en biais du flanc tombait en
+          // escalier (le concepteur, 16/11). Les FORMES (dec.y > 0.5) gardent
+          // l'échantillonnage : leur balayage n'a pas de forme close.
+          if (dec.y < 0.5) {
+            vec2 rL = vec2(caR * relB.x + saR * relB.y, -saR * relB.x + caR * relB.y);
+            vec2 fb = flancBalaye(wb, uBoxes[bi], rL);
+            flanc = 1.0 - smoothstep(-1.0, 1.5, fb.x);
+            htFlanc = fb.y;
+          } else {
+            float dP = d;
+            for (int fs = 1; fs <= 3; fs++) {
+              vec2 wM = world - relB * (float(fs) / 4.0);
+              vec2 wbM = wM;
+              if (abs(bAngR) > 0.0005) {
+                vec2 relM = wM - bcR;
+                wbM = bcR + vec2(caR * relM.x + saR * relM.y, -saR * relM.x + caR * relM.y);
+              }
+              float dM = formeSdf(wbM, uBoxes[bi], dec.y, dec.z, dec.w);
+              flanc = max(flanc, 1.0 - smoothstep(-1.0, 1.5, dM));
+              if (dP <= 0.0 && dM > 0.0) htFlanc = (float(fs) - 1.0 + dP / (dP - dM)) / 4.0;
+              dP = dM;
             }
-            float dM = dec.y > 0.5 ? formeSdf(wbM, uBoxes[bi], dec.y, dec.z, dec.w) : boxSdf(wbM, uBoxes[bi]);
-            flanc = max(flanc, 1.0 - smoothstep(-1.0, 1.5, dM));
-            if (dP <= 0.0 && dM > 0.0) htFlanc = (float(fs) - 1.0 + dP / (dP - dM)) / 4.0;
-            dP = dM;
+            if (dP <= 0.0) htFlanc = (3.0 + dP / (dP - dV)) / 4.0;
           }
-          if (dP <= 0.0) htFlanc = (3.0 + dP / (dP - dV)) / 4.0;
         }
       }
       // (les pièces n'en sont pas : leur dessus est leur IMAGE, le sol caché
