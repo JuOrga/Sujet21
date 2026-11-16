@@ -111,6 +111,79 @@ export function solCache(
   return Math.max(sommet, tranche)
 }
 
+/** LE FLANC D'UNE BOÎTE, BALAYÉ EXACTEMENT. Le point `p` (dans le repère de
+ *  la boîte `b` = minX, minY, maxX, maxY) est sur la tranche s'il existe un
+ *  t de [0, 1] tel que `p − t·r` soit dans la boîte : t = 0 le pied, t = 1
+ *  le sommet (`r` le déplacement du sommet, dans le même repère). Rend
+ *  [distance signée au balayage, hauteur vue].
+ *  POURQUOI pas des échantillons : le flanc était la réunion de cinq copies
+ *  de la boîte (pied, ¼, ½, ¾, sommet) ; au coin LIBRE d'une paroi, le bord
+ *  en biais du flanc tombait en escalier — quatre marches, « l'affichage
+ *  pose problème là où c'est en contact » (le concepteur, 16/11, les
+ *  hydrophobes isolées et la porte D2).
+ *  - Dedans : l'intervalle des t qui tombent dans la boîte se lit axe par axe
+ *    (les « tranches » d'un lancer de rayon). La hauteur vue est sa borne
+ *    haute — le DERNIER passage du dedans au dehors en montant ; la distance,
+ *    celle de la boîte au milieu de l'intervalle (négative, nulle au bord).
+ *  - Dehors : la distance d'un segment à un rectangle qu'il ne coupe pas —
+ *    le plus court de ses deux bouts à la boîte et des quatre coins au
+ *    segment. Exacte : le bord en biais est une droite. La hauteur vue est
+ *    celle du point le plus proche (le liseré d'anticrénelage suit la
+ *    tranche). */
+export function flancBalaye(
+  px: number,
+  py: number,
+  b: readonly number[],
+  rx: number,
+  ry: number,
+): [number, number] {
+  const boite = (x: number, y: number): number => {
+    const qx = Math.abs(x - (b[0] + b[2]) * 0.5) - (b[2] - b[0]) * 0.5
+    const qy = Math.abs(y - (b[1] + b[3]) * 0.5) - (b[3] - b[1]) * 0.5
+    return Math.hypot(Math.max(qx, 0), Math.max(qy, 0)) + Math.min(Math.max(qx, qy), 0)
+  }
+  let t0 = 0
+  let t1 = 1
+  const tranche = (p: number, r: number, lo: number, hi: number): void => {
+    if (Math.abs(r) < 1e-6) {
+      if (p < lo || p > hi) t0 = 2
+      return
+    }
+    const a = (p - hi) / r
+    const c = (p - lo) / r
+    t0 = Math.max(t0, Math.min(a, c))
+    t1 = Math.min(t1, Math.max(a, c))
+  }
+  tranche(px, rx, b[0], b[2])
+  tranche(py, ry, b[1], b[3])
+  if (t0 <= t1) {
+    const tm = 0.5 * (t0 + t1)
+    return [Math.min(boite(px - tm * rx, py - tm * ry), 0), t1]
+  }
+  let d = boite(px, py)
+  let t = 0
+  const d1 = boite(px - rx, py - ry)
+  if (d1 < d) {
+    d = d1
+    t = 1
+  }
+  const rr = Math.max(rx * rx + ry * ry, 1e-6)
+  for (const [cx, cy] of [
+    [b[0], b[1]],
+    [b[2], b[1]],
+    [b[0], b[3]],
+    [b[2], b[3]],
+  ]) {
+    const tc = Math.min(Math.max(((px - cx) * rx + (py - cy) * ry) / rr, 0), 1)
+    const dc = Math.hypot(px - tc * rx - cx, py - tc * ry - cy)
+    if (dc < d) {
+      d = dc
+      t = tc
+    }
+  }
+  return [d, t]
+}
+
 /** Les règles en GLSL, pour le shader de composition. */
 export const RELIEF_PAROIS_GLSL = `// (reliefParois.ts : les règles et leur jumeau TypeScript)
 float facteurRelief(float h) {
@@ -124,6 +197,47 @@ float solCache(float relief, float d, float dV, float flanc, float w, float opac
   float sommet = (1.0 - smoothstep(-w, 0.0, dV)) * opacite;
   float tranche = d > 0.0 ? flanc : flanc * permeable * smoothstep(0.5 * w, 1.5 * w, -d);
   return max(sommet, tranche);
+}
+// le flanc d'une boîte, balayé exactement (flancBalaye, reliefParois.ts) :
+// (distance signée au balayage, hauteur vue). La boîte se mesure ici, à la
+// main : boxSdf vient plus loin dans le shader.
+float boiteFlanc(vec2 p, vec4 b) {
+  vec2 q = abs(p - (b.xy + b.zw) * 0.5) - (b.zw - b.xy) * 0.5;
+  return length(max(q, 0.0)) + min(max(q.x, q.y), 0.0);
+}
+vec2 flancBalaye(vec2 p, vec4 b, vec2 r) {
+  float t0 = 0.0;
+  float t1 = 1.0;
+  for (int k = 0; k < 2; k++) {
+    float pk = k == 0 ? p.x : p.y;
+    float rk = k == 0 ? r.x : r.y;
+    float lo = k == 0 ? b.x : b.y;
+    float hi = k == 0 ? b.z : b.w;
+    if (abs(rk) < 1e-6) {
+      if (pk < lo || pk > hi) t0 = 2.0;
+    } else {
+      float a = (pk - hi) / rk;
+      float c = (pk - lo) / rk;
+      t0 = max(t0, min(a, c));
+      t1 = min(t1, max(a, c));
+    }
+  }
+  if (t0 <= t1) {
+    float tm = 0.5 * (t0 + t1);
+    return vec2(min(boiteFlanc(p - tm * r, b), 0.0), t1);
+  }
+  float d = boiteFlanc(p, b);
+  float t = 0.0;
+  float d1 = boiteFlanc(p - r, b);
+  if (d1 < d) { d = d1; t = 1.0; }
+  float rr = max(dot(r, r), 1e-6);
+  for (int k = 0; k < 4; k++) {
+    vec2 c = vec2(k == 0 || k == 2 ? b.x : b.z, k < 2 ? b.y : b.w);
+    float tc = clamp(dot(p - c, r) / rr, 0.0, 1.0);
+    float dc = length(p - tc * r - c);
+    if (dc < d) { d = dc; t = tc; }
+  }
+  return vec2(d, t);
 }
 float solCache(float relief, float d, float dV, float flanc, float w) {
   return solCache(relief, d, dV, flanc, w, 1.0, 0.0);
