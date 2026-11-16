@@ -1644,6 +1644,44 @@ describe('les fonctions logiques : récepteurs, règles, état de repos', () => 
     expect(relu.chasses![0].regle).toBe('ouex')
   })
 
+  it('les récepteurs MÉMOIRE et EFFACE se relisent et se réécrivent', () => {
+    const { level } = parseLevel({
+      ...base,
+      cibles: [
+        { x: 0, y: 0, r: 30, mode: 'memoire', canal: 4 },
+        { x: 100, y: 0, r: 30, mode: 'efface', canal: 4 },
+      ],
+      portes: [{ minX: 400, minY: -100, maxX: 440, maxY: 100, canal: 4 }],
+    })
+    expect(level!.cibles!.map((c) => c.mode)).toEqual(['memoire', 'efface'])
+    const relu = parseLevel(JSON.parse(serializeLevel(level!))).level!
+    expect(relu.cibles).toEqual(level!.cibles)
+  })
+
+  it('une EFFACE sans MÉMOIRE sur son canal est signalée ; une porte qui n’a qu’elle n’a pas de source', () => {
+    const messages = (cibles: unknown[]) =>
+      checkLevel(
+        parseLevel({
+          ...base,
+          lasers: [{ x: -500, y: 0, angle: 0 }],
+          cibles,
+          portes: [{ minX: 400, minY: -100, maxX: 440, maxY: 100, canal: 4 }],
+        }).level!,
+      ).map((m) => `${m.niveau} : ${m.message}`)
+    const efface = { x: 100, y: 0, r: 30, mode: 'efface', canal: 4 }
+    // le montage complet : rien à dire de la mémoire
+    const complet = messages([{ x: 0, y: 0, r: 30, mode: 'memoire', canal: 4 }, efface])
+    expect(complet.filter((m) => /EFFACE|canal nº 4/.test(m))).toEqual([])
+    // l'EFFACE seule : elle n'efface rien, et la porte n'a aucune source
+    const seule = messages([efface])
+    expect(seule.some((m) => m.startsWith('avertissement') && m.includes('EFFACE'))).toBe(true)
+    expect(seule.some((m) => m.startsWith('erreur') && m.includes('canal nº 4'))).toBe(true)
+    // une TOR du même numéro n'est pas une mémoire qu'on efface
+    const avecTor = messages([{ x: 0, y: 0, r: 30, canal: 4 }, efface])
+    expect(avecTor.some((m) => m.includes('EFFACE'))).toBe(true)
+    expect(avecTor.some((m) => m.startsWith('erreur') && m.includes('canal nº 4'))).toBe(false)
+  })
+
   it('une porte scénarisée ouverte au repos : l’éditeur prévient que rien ne la fermera', () => {
     const msgs = (repos?: 'ouverte'): string[] =>
       checkLevel(parseLevel({ ...base, portes: [{ minX: 400, minY: -100, maxX: 440, maxY: 100, canal: -1, ...(repos ? { repos } : {}) }] }).level!).map((v) => v.message)

@@ -15,7 +15,7 @@ porte était toujours **fermée au départ**. On ne pouvait donc écrire ni une
 entrée qui suit son opérande, ni un interrupteur, ni une porte qui se ferme
 quand on l'alimente.
 
-## 2. Les quatre récepteurs
+## 2. Les récepteurs
 
 | Mode | Il est actif… | Ce qu'il est |
 | --- | --- | --- |
@@ -23,6 +23,8 @@ quand on l'alimente.
 | **NOR** | tant que le faisceau tient, et grille à la première coupure | un maintien qui ne sert qu'une fois |
 | **MAINTIEN** *(nouveau)* | tant que le faisceau tient, éteint sinon, jamais grillé | le bouton-poussoir : l'entrée qui suit son opérande |
 | **BASCULE** *(nouveau)* | selon le nombre de passages : chaque nouveau passage inverse son état | l'interrupteur : une mémoire qu'on peut effacer |
+| **MÉMOIRE** *(16/11)* | dès le premier passage, jusqu'à ce qu'une EFFACE de son canal la reprenne | le bit qu'on écrit et qu'on efface |
+| **EFFACE** *(16/11)* | jamais : elle n'alimente rien | la remise à zéro des MÉMOIRES de son canal |
 
 - Une micro-coupure de moins de 0,12 s (`CIBLE_PERSISTANCE`) ne compte pas.
   Elle n'éteint pas un maintien et ne fait pas rebasculer une bascule ;
@@ -76,11 +78,58 @@ faut actionner un nombre impair de fois, deux bascules en OUEX qu'il faut
 mettre dans des états opposés, une porte ouverte au repos qu'une bascule
 referme puis rouvre.
 
-## 6. Dans l'éditeur
+## 6. La fonction mémoire *(16/11)*
 
-- **Cible**, panneau de droite → *Récepteur* : TOR, NOR, MAINTIEN ou
-  BASCULE. Le maintien porte un anneau pointillé bleu, la bascule deux
-  demi-anneaux violets, en jeu comme dans l'éditeur.
+*Le concepteur a demandé « une fonction logique mémoire […] via les lasers,
+cibles et portes ».* La TOR est une mémoire qu'on n'efface pas ; la BASCULE
+s'efface, mais par la même entrée qui l'écrit — il faut compter ses
+passages. Il manquait la mémoire des automaticiens, **marche / arrêt** :
+une entrée qui écrit, une autre qui efface.
+
+Elle tient à deux pastilles du **même numéro** :
+
+- une pastille **MÉMOIRE** — le faisceau la touche, le bit vaut 1 et le
+  reste sans faisceau ;
+- une pastille **EFFACE** — le faisceau la touche, toutes les MÉMOIRES de
+  son canal reviennent à 0.
+
+| MÉMOIRE éclairée | EFFACE éclairée | Le bit |
+| --- | --- | --- |
+| non | non | **garde sa valeur** |
+| oui | non | 1 |
+| non | oui | 0 |
+| oui | oui | 0 — l'effacement est prioritaire |
+
+- **L'effacement est prioritaire** : tant que le faisceau tient l'EFFACE,
+  rien ne s'écrit sur son canal. Dès qu'il la quitte (après la persistance
+  de 0,12 s), une MÉMOIRE encore sous son faisceau se réécrit.
+- L'EFFACE ne reprend **que** les MÉMOIRES de son canal : ni les TOR, ni
+  les BASCULES, ni les autres canaux.
+- L'EFFACE **n'est pas une source** : les règles OU, ET, OUEX l'ignorent.
+  Une porte dont le canal n'a qu'elle n'a aucune source, et la vérification
+  le dit ; une EFFACE sans MÉMOIRE sur son canal est signalée aussi.
+
+Ce qu'on en fait :
+
+| Montage | Ce que ça donne |
+| --- | --- |
+| 1 MÉMOIRE + 1 EFFACE, porte fermée au repos | marche / arrêt : un faisceau ouvre la porte, un autre la referme |
+| les mêmes, porte **ouverte** au repos | l'inverse : écrire ferme, effacer rouvre |
+| plusieurs MÉMOIRES + 1 EFFACE, porte en **ET** | un code à composer ; l'EFFACE est le piège qui remet tout à zéro |
+| 2 MÉMOIRES + 1 EFFACE, porte en **OUEX** | n'en écrire qu'une — et pouvoir se reprendre |
+
+## 7. Dans l'éditeur
+
+- **Cible**, panneau de droite → *Récepteur* : TOR, NOR, MAINTIEN,
+  BASCULE, MÉMOIRE ou EFFACE. Le maintien porte un anneau pointillé bleu,
+  la bascule deux demi-anneaux violets, la mémoire un anneau plein vert
+  d'eau, l'efface une croix rouge (qui s'embrase tant que le faisceau la
+  tient), en jeu comme dans l'éditeur.
+- Pour une **fonction mémoire** : poser deux cibles, leur donner le même
+  *N° (canal)*, régler l'une sur MÉMOIRE et l'autre sur EFFACE, puis
+  asservir une porte à ce numéro. Le panneau de chacune dit combien de
+  pastilles de l'autre sorte partagent son canal — et prévient s'il n'y
+  en a aucune.
 - **Porte**, panneau de droite → *Règle* (OU, ET, OUEX) et *État de repos*
   (fermée, ouverte). Une porte ouverte au repos est dessinée en cadre
   pointillé, et son étiquette le dit (`OUVERTE AU REPOS`). L'aperçu du
@@ -88,7 +137,7 @@ referme puis rouvre.
   repos.
 - **Chasse** → *Règle* : OU, ET ou OUEX, comme une porte.
 
-## 7. Où vit le code
+## 8. Où vit le code
 
 | Quoi | Où |
 | --- | --- |

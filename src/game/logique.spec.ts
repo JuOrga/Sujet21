@@ -123,3 +123,99 @@ describe('la porte OUVERTE AU REPOS — le NON', () => {
     expect(table('ouex', 'ouverte')).toEqual([true, false, false, true]) // équivalence
   })
 })
+
+// LA FONCTION MÉMOIRE (16/11) : marche / arrêt. Deux entrées distinctes —
+// la MÉMOIRE s'écrit, l'EFFACE du même canal la reprend.
+describe('la fonction MÉMOIRE — une pastille écrit, une autre efface', () => {
+  const montage = () => {
+    const cibles = [
+      { canal: 1, mode: 'memoire' as const },
+      { canal: 1, mode: 'efface' as const },
+    ]
+    return { cibles, etat: creerEtatRecepteurs(2) }
+  }
+
+  it('écrite d’un passage, elle tient sans faisceau ; l’EFFACE la remet à 0 ; elle se réécrit', () => {
+    const { cibles, etat } = montage()
+    expect(canalActif(cibles, 1, undefined, etat, 0)).toBe(false)
+    avancerRecepteurs(cibles, [0], etat, 1)
+    expect(cibleActive(cibles[0], etat, 0, 1)).toBe(true)
+    // le faisceau part : le bit reste (c'est ce qui la distingue du MAINTIEN)
+    avancerRecepteurs(cibles, [], etat, 5)
+    expect(canalActif(cibles, 1, undefined, etat, 5)).toBe(true)
+    // l'effacement
+    avancerRecepteurs(cibles, [1], etat, 6)
+    expect(canalActif(cibles, 1, undefined, etat, 6)).toBe(false)
+    // et il reste effacé une fois le faisceau d'effacement parti
+    avancerRecepteurs(cibles, [], etat, 8)
+    expect(canalActif(cibles, 1, undefined, etat, 8)).toBe(false)
+    // réécriture : la mémoire sert autant de fois qu'on veut
+    avancerRecepteurs(cibles, [0], etat, 9)
+    expect(canalActif(cibles, 1, undefined, etat, 9)).toBe(true)
+  })
+
+  it('l’effacement est PRIORITAIRE : les deux éclairées donnent 0, dans un ordre comme dans l’autre', () => {
+    for (const touchees of [[0, 1], [1, 0]]) {
+      const { cibles, etat } = montage()
+      avancerRecepteurs(cibles, touchees, etat, 1)
+      expect(cibleActive(cibles[0], etat, 0, 1)).toBe(false)
+    }
+  })
+
+  it('l’EFFACE lâchée, une MÉMOIRE encore sous son faisceau se réécrit', () => {
+    const { cibles, etat } = montage()
+    avancerRecepteurs(cibles, [0, 1], etat, 1)
+    expect(cibleActive(cibles[0], etat, 0, 1)).toBe(false)
+    // l'effacement tient encore pendant sa persistance
+    avancerRecepteurs(cibles, [0], etat, 1 + P * 0.5)
+    expect(cibleActive(cibles[0], etat, 0, 1 + P * 0.5)).toBe(false)
+    // passé la persistance, l'écriture reprend
+    avancerRecepteurs(cibles, [0], etat, 1 + P + 0.05)
+    expect(cibleActive(cibles[0], etat, 0, 1 + P + 0.05)).toBe(true)
+  })
+
+  it('l’EFFACE ne reprend que les MÉMOIRES de SON canal — ni les autres canaux, ni TOR, ni BASCULE', () => {
+    const cibles = [
+      { canal: 1, mode: 'memoire' as const },
+      { canal: 2, mode: 'memoire' as const },
+      { canal: 1 }, // TOR
+      { canal: 1, mode: 'bascule' as const },
+      { canal: 1, mode: 'efface' as const },
+    ]
+    const etat = creerEtatRecepteurs(5)
+    avancerRecepteurs(cibles, [0, 1, 2, 3], etat, 1)
+    avancerRecepteurs(cibles, [4], etat, 2)
+    expect(cibles.map((t, c) => cibleActive(t, etat, c, 2))).toEqual([false, true, true, true, false])
+  })
+
+  it('l’EFFACE n’est pas une source : elle n’alimente rien et ne bloque pas le ET', () => {
+    const cibles = [
+      { canal: 1, mode: 'memoire' as const },
+      { canal: 1, mode: 'memoire' as const },
+      { canal: 1, mode: 'efface' as const },
+    ]
+    const etat = creerEtatRecepteurs(3)
+    // seule sur son faisceau, elle n'ouvre rien
+    avancerRecepteurs(cibles, [2], etat, 1)
+    expect(canalActif(cibles, 1, undefined, etat, 1)).toBe(false)
+    // le digicode : deux bits à écrire, la porte ET les veut tous les deux
+    avancerRecepteurs(cibles, [0], etat, 2)
+    expect(canalActif(cibles, 1, 'et', etat, 2)).toBe(false)
+    avancerRecepteurs(cibles, [1], etat, 3)
+    expect(canalActif(cibles, 1, 'et', etat, 3)).toBe(true)
+    // une seule remise à zéro reprend les deux bits
+    avancerRecepteurs(cibles, [2], etat, 4)
+    expect(canalActif(cibles, 1, 'et', etat, 4)).toBe(false)
+    expect(canalActif(cibles, 1, undefined, etat, 4)).toBe(false)
+  })
+
+  it('avec une porte ouverte au repos : écrire la FERME, effacer la ROUVRE', () => {
+    const { cibles, etat } = montage()
+    const porte = { repos: 'ouverte' as const }
+    expect(etatPorte(porte, canalActif(cibles, 1, undefined, etat, 0))).toBe(true)
+    avancerRecepteurs(cibles, [0], etat, 1)
+    expect(etatPorte(porte, canalActif(cibles, 1, undefined, etat, 1))).toBe(false)
+    avancerRecepteurs(cibles, [1], etat, 2)
+    expect(etatPorte(porte, canalActif(cibles, 1, undefined, etat, 2))).toBe(true)
+  })
+})

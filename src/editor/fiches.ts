@@ -303,6 +303,24 @@ export const FICHES_GENRES: Record<string, Fiche> = {
       { cle: '·', txt: 'Une mémoire qu’on peut effacer — de quoi écrire des énigmes à états.' },
     ],
   },
+  'genre:cible-memoire': {
+    titre: 'Pastille réceptrice MÉMOIRE',
+    resume: 'Un bit qu’on écrit : un passage du faisceau l’allume, une pastille EFFACE le reprend.',
+    lignes: [
+      { cle: '·', txt: 'Écrite d’un seul passage, elle reste allumée sans faisceau — comme une TOR.' },
+      { cle: '·', txt: 'Une pastille EFFACE du même canal la remet à zéro ; elle se réécrit autant de fois qu’on veut.' },
+      { cle: '·', txt: 'Plusieurs MÉMOIRES sur un canal en ET : un code à composer, qu’une seule EFFACE remet à zéro.' },
+    ],
+  },
+  'genre:cible-efface': {
+    titre: 'Pastille réceptrice EFFACE',
+    resume: 'La remise à zéro : sous le faisceau, elle éteint les MÉMOIRES de son canal.',
+    lignes: [
+      { cle: '·', txt: 'Elle porte le numéro des MÉMOIRES qu’elle reprend — ni les TOR, ni les BASCULES, ni les autres canaux.' },
+      { cle: '·', txt: 'L’effacement est prioritaire : tant que le faisceau la tient, rien ne s’écrit sur son canal.' },
+      { cle: '·', txt: 'Elle n’alimente aucune porte : ce n’est pas une source, les règles OU, ET, OUEX l’ignorent.' },
+    ],
+  },
   'genre:porte': {
     titre: 'Porte asservie',
     resume: 'Une paroi commandée par ses pastilles.',
@@ -464,7 +482,11 @@ export function cleFiche(sel: SelFiche, level: LevelDef): string | null {
           ? 'genre:cible-maintien'
           : t?.mode === 'bascule'
             ? 'genre:cible-bascule'
-            : 'genre:cible-tor'
+            : t?.mode === 'memoire'
+              ? 'genre:cible-memoire'
+              : t?.mode === 'efface'
+                ? 'genre:cible-efface'
+                : 'genre:cible-tor'
     }
     case 'porte': {
       const p = (level.portes ?? [])[sel.index ?? -1]
