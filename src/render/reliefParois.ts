@@ -217,13 +217,24 @@ export const GALBE_CORPS = 1.2
  *  champ lu aux points de basesDuCorps (pied d'abord), `seuil` le seuil du
  *  corps. À chaque hauteur le champ est compté moins le relèvement de sa
  *  section ; on garde le plus fort. Rend la densité vue (≥ celle du pied :
- *  le corps ne perd rien là où il était) et le pas qui l'a donnée. */
-export function corpsVu(densites: readonly number[], seuil: number): { r: number; pas: number } {
+ *  le corps ne perd rien là où il était) et le pas qui l'a donnée.
+ *  LES GOUTTES ÉJECTÉES RESTENT À PLAT (17/11) : galbées comme le corps,
+ *  chacune devenait un petit dôme décalé vers le centre de l'écran — « l'effet
+ *  sur ces dernières n'est vraiment pas terrible, je préférerais sans » (le
+ *  concepteur). Seul le corps du joueur a une hauteur : au-dessus du pied,
+ *  on ne compte que SA part du champ, `duJoueur` (le canal b du champ, la
+ *  densité pondérée par l'appartenance au corps). Une goutte libre n'y pèse
+ *  rien : elle n'est lue qu'au pied, comme relief éteint. */
+export function corpsVu(
+  densites: readonly number[],
+  seuil: number,
+  duJoueur: readonly number[] = densites,
+): { r: number; pas: number } {
   let r = densites[0]
   let pas = 0
   const n = densites.length - 1
   for (let i = 1; i <= n; i++) {
-    const e = densites[i] - seuil * GALBE_CORPS * profilGalbe(i / n)
+    const e = duJoueur[i] - seuil * GALBE_CORPS * profilGalbe(i / n)
     if (e > r) {
       r = e
       pas = i
@@ -627,6 +638,8 @@ float solCache(float relief, float d, float dV, float flanc, float w) {
  *  corps dans le champ (la composition, les décalques) : le long du chemin
  *  pied → dessus, le texel le plus dense une fois retiré le relèvement de sa
  *  section (`leve` : le seuil du corps, dans l'unité du champ — le galbe).
+ *  Au-dessus du pied, seule la part du JOUEUR compte (s.b, pas s.r) : les
+ *  gouttes éjectées restent à plat (voir corpsVu).
  *  Le texel rendu est mis à l'échelle ENTIER : les rapports que la
  *  composition en tire (vitesse, phase, joueur) ne changent pas. `uvVu` : où
  *  il a été lu (les voisins du relief de l'eau se lisent là) ; `rSommet` : la
@@ -643,7 +656,7 @@ export const CORPS_RELIEF_GLSL = `vec4 champCorps(sampler2D champ, vec2 uv, floa
     vec2 u = uv - dep * h;
     vec4 s = textureLod(champ, u, 0.0);
     if (i == ${PAS_CORPS}) rSommet = s.r;
-    float e = s.r - leve * ${glslFloat(GALBE_CORPS)} * (1.0 - sqrt(1.0 - h * h));
+    float e = s.b - leve * ${glslFloat(GALBE_CORPS)} * (1.0 - sqrt(1.0 - h * h));
     if (e > t.r) { t = s * (e / max(s.r, 1e-6)); uvVu = u; }
   }
   return t;

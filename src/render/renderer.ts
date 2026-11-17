@@ -4228,8 +4228,10 @@ void main() {
     // cœur — plus un cran net à largeur constante, qui dessinait un ruban
     // autour d'un toit plat. (Essayé d'abord de th à th·(1 + galbe), à 0,80 :
     // sur l'image avant/après, le bord intérieur du dégradé se lisait encore
-    // comme l'arête d'une bande.)
-    if (uRelief > 0.0) water *= mix(0.86, 1.0, smoothstep(th * 0.6, th * (2.0 + GALBE_CORPS), rSommetCorps / uFieldScale));
+    // comme l'arête d'une bande.) Les gouttes éjectées n'ont pas de hauteur
+    // (champCorps ne lève que la part du joueur) : pas d'épaule non plus, le
+    // dégradé ne vaut que pour le corps.
+    if (uRelief > 0.0) water *= mix(1.0, mix(0.86, 1.0, smoothstep(th * 0.6, th * (2.0 + GALBE_CORPS), rSommetCorps / uFieldScale)), clamp(player, 0.0, 1.0));
 
     // Relief : pseudo-normale sur un champ FLOUTÉ (4 prélèvements écartés) —
     // les dérivées par pixel liraient chaque particule comme une bille.
