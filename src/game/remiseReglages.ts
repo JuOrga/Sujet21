@@ -25,18 +25,37 @@ export interface StockageReglages {
   removeItem(cle: string): void
 }
 
-/** Efface les quatre réglages si ce n'est pas déjà fait. Rend vrai quand la
- *  remise vient d'avoir lieu. */
+// LA SECONDE REMISE (demande du concepteur, 17/11) : le relief passe FORT
+// par défaut « pour tout le monde ». Le défaut seul ne joindrait que les
+// appareils vierges — or la première remise a fait LÉGER de tous les autres,
+// et le choix de chacun est écrit dès qu'il touche au bouton. Le relief seul
+// est effacé, une fois, sous un témoin neuf.
+export const CLE_REMISE_RELIEF_FORT = 'sujet21-reglages-remis-v2'
+export const REGLAGES_REMIS_V2 = ['sujet21-relief'] as const // → FORT
+
+/** Les remises, dans l'ordre : chacune passe une fois, sous son témoin. */
+export const REMISES: readonly { temoin: string; cles: readonly string[] }[] = [
+  { temoin: CLE_REMISE_REGLAGES, cles: REGLAGES_REMIS },
+  { temoin: CLE_REMISE_RELIEF_FORT, cles: REGLAGES_REMIS_V2 },
+]
+
+/** Passe les remises qui ne l'ont pas encore été. Rend vrai quand au moins
+ *  une vient d'avoir lieu. */
 export function remetReglagesParDefaut(stockage: StockageReglages): boolean {
-  try {
-    if (stockage.getItem(CLE_REMISE_REGLAGES) !== null) return false
-    // le témoin D'ABORD : si l'écriture est refusée (stockage plein ou
-    // interdit), on n'efface rien — mieux vaut un réglage ancien qu'une
-    // remise à zéro qui recommencerait à chaque lancement
-    stockage.setItem(CLE_REMISE_REGLAGES, '1')
-    for (const cle of REGLAGES_REMIS) stockage.removeItem(cle)
-    return true
-  } catch {
-    return false
+  let remis = false
+  for (const r of REMISES) {
+    try {
+      if (stockage.getItem(r.temoin) !== null) continue
+      // le témoin D'ABORD : si l'écriture est refusée (stockage plein ou
+      // interdit), on n'efface rien — mieux vaut un réglage ancien qu'une
+      // remise à zéro qui recommencerait à chaque lancement
+      stockage.setItem(r.temoin, '1')
+      for (const cle of r.cles) stockage.removeItem(cle)
+      remis = true
+    } catch {
+      // stockage refusé : les remises suivantes le seraient aussi
+      return remis
+    }
   }
+  return remis
 }
