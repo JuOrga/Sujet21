@@ -218,7 +218,7 @@ describe('chaudière — les jumeaux', () => {
     expect([x, l, xs, ls]).toEqual([16, CHAUDIERE_ATLAS.taille - 32, 16, CHAUDIERE_ATLAS.taille - 32])
   })
 
-  it('le shader peint la tranche des deux éléments à pièces, sous leur image', async () => {
+  it('le shader peint la tranche des éléments à pièces, sous leur image', async () => {
     const { readFileSync } = await import('node:fs')
     const src = readFileSync(new URL('../render/renderer.ts', import.meta.url), 'utf8')
     expect(src).toMatch(/const vec4 CH_CADRE_FLANC = \$\{v4\(A\.flanc\)\};/)
@@ -226,9 +226,11 @@ describe('chaudière — les jumeaux', () => {
     for (const [sorte, cadre, image] of [
       ['0', 'CH_CADRE_FLANC', 'col = col * (1.0 - fill * ch.a) + ch.rgb * eclMat * fill;'],
       ['1', 'SU_CADRE_FLANC', 'col = col * (1.0 - fill * ch.a) + ch.rgb * eclMat * fill + emis * fill;'],
+      // la conduite (17/11) : sa bande vit dans SON atlas, passé à la fonction
+      ['2', 'CN_CADRE_FLANC', 'col = col * (1.0 - fill * cnh.a) + cnh.rgb * eclMat * fill;'],
     ]) {
       const appel = src.indexOf(`flancPieces(${sorte}, wb, rLP, uBoxes[bi]`)
-      const peint = src.indexOf(`tranchePieces(${cadre},`)
+      const peint = src.search(new RegExp(`tranchePieces\\(\\w+, vec2\\(\\w+, \\w+\\), ${cadre},`))
       expect(appel, cadre).toBeGreaterThan(0)
       expect(peint, cadre).toBeGreaterThan(appel)
       // la tranche d'abord, l'image du dessus par-dessus
@@ -236,6 +238,7 @@ describe('chaudière — les jumeaux', () => {
     }
     // relief éteint, rien de tout cela ne se lit
     expect(src.match(/if \(uRelief > 0\.0 && (rampe|serp) && uHasChaud > 0\.5 && \(fill > 0\.0 \|\| flanc > 0\.003\)\)/g)).toHaveLength(2)
+    expect(src.match(/if \(uRelief > 0\.0 && tuyau && uHasFroid > 0\.5 && \(fill > 0\.0 \|\| flanc > 0\.003\)\)/g)).toHaveLength(1)
   })
 })
 
