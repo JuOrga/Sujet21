@@ -329,3 +329,68 @@ vec3 piedFlancCoque(vec2 w, vec2 c, float f, vec4 cuve, float cote) {
   if (s < 0.0 || s > (cote > 1.5 ? cuve.w - cuve.y : cuve.z - cuve.x)) return vec3(0.0);
   return vec3(t, s, 1.0);
 }`
+
+// ——— L'OMBRE AU PIED DE LA COQUE ———————————————————————————————————————
+// « La délimitation entre le sol et la paroi manque de quelque chose, peut-
+// être une ombre » (le concepteur, 17/11, capture relief fort). Depuis que la
+// coque se dresse, sa face tombe sur le fond sans rien qui l'y pose : le pied
+// n'avait que l'ombre de contact de 6 u (renderer.ts : contactCoque), et le
+// halo des parois ÉCLAIRCIT le fond le long d'elles — la face sombre et le
+// fond se confondaient. Les solides de la cuve, eux, ont deux lectures au
+// sol (volume des parois, volet 2) ; la coque, mur le plus haut du tableau,
+// les reçoit à son tour :
+//  - l'OCCLUSION, sur les quatre parois : l'angle du fond et du mur reçoit
+//    moins de lumière — sombre au pied, fondue sur OMBRE_PIED_PORTEE ;
+//  - l'OMBRE COURTE, à l'opposé de la lumière : la longueur d'un mur haut
+//    (OMBRE_COURTE_PAR_HAUTEUR × HAUTEUR_BLOCS, 56 u) — la hauteur bornée de
+//    la coque, celle de son relief.
+
+/** La part de lumière que l'occlusion ôte au pied même de la paroi. */
+export const OMBRE_PIED_FORCE = 0.55
+/** Sa portée sur le fond, en unités monde (au moins quelques pixels au recul,
+ *  voir le shader). */
+export const OMBRE_PIED_PORTEE = 36
+
+/** Ce que la coque ôte au FOND en (x, y) : [occlusion, ombre courte], chacune
+ *  de 0 à 1 ; [0, 0] hors de la cuve. (lx, ly) : la direction VERS la
+ *  lumière (unitaire) ; `portee` : celle de l'occlusion ; `long` et `flou` :
+ *  la longueur de l'ombre courte et son fondu. Le jumeau GLSL
+ *  (OMBRE_PIED_COQUE_GLSL) dit la même chose ; coque.spec.ts tient les deux. */
+export function ombrePiedCoque(
+  x: number,
+  y: number,
+  b: Bounds,
+  lx: number,
+  ly: number,
+  portee: number,
+  long: number,
+  flou: number,
+): [number, number] {
+  const d = Math.min(x - b.minX, b.maxX - x, y - b.minY, b.maxY - y)
+  if (d < 0) return [0, 0]
+  const ao = OMBRE_PIED_FORCE * Math.exp(-d / portee)
+  // depuis ce point du fond, on remonte VERS la lumière : la paroi croisée
+  // le premier, à la distance t, l'ombre si t est plus court que l'ombre
+  const tx = lx > 1e-6 ? (b.maxX - x) / lx : lx < -1e-6 ? (b.minX - x) / lx : Infinity
+  const ty = ly > 1e-6 ? (b.maxY - y) / ly : ly < -1e-6 ? (b.minY - y) / ly : Infinity
+  const t = Math.min(tx, ty)
+  const lisse = (a: number, c: number, v: number): number => {
+    const k = Math.min(Math.max((v - a) / (c - a), 0), 1)
+    return k * k * (3 - 2 * k)
+  }
+  // dense au pied, elle s'éclaircit en s'éloignant — comme celle des solides
+  const o = (1 - lisse(long, long + flou, t)) * (1 - 0.5 * lisse(0, long + flou, t))
+  return [ao, o]
+}
+
+export const OMBRE_PIED_COQUE_GLSL = `// (coque.ts : ombrePiedCoque, son jumeau TypeScript)
+vec2 ombrePiedCoque(vec2 p, vec2 bMin, vec2 bMax, vec2 l, float portee, float lng, float flou) {
+  float d = min(min(p.x - bMin.x, bMax.x - p.x), min(p.y - bMin.y, bMax.y - p.y));
+  if (d < 0.0) return vec2(0.0);
+  float ao = ${OMBRE_PIED_FORCE.toFixed(4)} * exp(-d / portee);
+  float tx = l.x > 1e-6 ? (bMax.x - p.x) / l.x : l.x < -1e-6 ? (bMin.x - p.x) / l.x : 1.0e9;
+  float ty = l.y > 1e-6 ? (bMax.y - p.y) / l.y : l.y < -1e-6 ? (bMin.y - p.y) / l.y : 1.0e9;
+  float t = min(tx, ty);
+  float o = (1.0 - smoothstep(lng, lng + flou, t)) * (1.0 - 0.5 * smoothstep(0.0, lng + flou, t));
+  return vec2(ao, o);
+}`

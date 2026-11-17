@@ -14,6 +14,10 @@ import {
   FLANC_COQUE_GLSL,
   FLANC_SOMMETS,
   MAX_VIDES_COQUE,
+  OMBRE_PIED_COQUE_GLSL,
+  OMBRE_PIED_FORCE,
+  OMBRE_PIED_PORTEE,
+  ombrePiedCoque,
   piedFlancCoque,
   remplitBandesCoque,
   remplitFlancsCoque,
@@ -397,5 +401,60 @@ describe('La coque a une hauteur : relief allumé, elle se dresse', () => {
     expect(draw.slice(i)).toMatch(/^gl\.drawArrays\(gl\.TRIANGLES, debutFlancs, FLANC_SOMMETS\)\s*this\.passeSousSommets\(false\)/)
     // relief éteint : ni écrite ni dessinée
     expect(draw).toContain('if (sommetCoque > 0) remplitFlancsCoque(b, this.hullScratch, debutFlancs)')
+  })
+})
+
+// « La délimitation entre le sol et la paroi manque de quelque chose, peut-
+// être une ombre » (le concepteur, 17/11) : la face dressée tombait sur le
+// fond sans rien qui l'y pose.
+describe('La coque ombre le fond à son pied', () => {
+  const source = readFileSync(fileURLToPath(new URL('./renderer.ts', import.meta.url)), 'utf8')
+  // la lumière vient du haut de l'écran (la direction par défaut)
+  const ombre = (x: number, y: number, l: [number, number] = [0, 1]) =>
+    ombrePiedCoque(x, y, cuve, l[0], l[1], OMBRE_PIED_PORTEE, 56, 12)
+
+  it('l’occlusion, sur les quatre parois : pleine au pied, fondue en s’éloignant', () => {
+    for (const [x, y] of [
+      [0, cuve.maxY],
+      [0, cuve.minY],
+      [cuve.minX, 0],
+      [cuve.maxX, 0],
+    ]) {
+      expect(ombre(x, y)[0]).toBeCloseTo(OMBRE_PIED_FORCE, 5)
+    }
+    expect(ombre(cuve.maxX - OMBRE_PIED_PORTEE, 0)[0]).toBeLessThan(OMBRE_PIED_FORCE * 0.4)
+    expect(ombre(0, 0)[0]).toBeLessThan(1e-6)
+    // hors de la cuve, la coque ne s'ombre pas elle-même
+    expect(ombre(cuve.maxX + 5, 0)).toEqual([0, 0])
+  })
+
+  it('l’ombre courte tombe à l’opposé de la lumière, de la longueur d’un mur haut', () => {
+    // lumière en haut : la paroi du haut ombre le fond sous elle…
+    expect(ombre(0, cuve.maxY - 10)[1]).toBeGreaterThan(0.5)
+    expect(ombre(0, cuve.maxY - 40)[1]).toBeGreaterThan(0.3)
+    // … jusqu'à 56 u et son fondu, pas au-delà
+    expect(ombre(0, cuve.maxY - 80)[1]).toBe(0)
+    // la paroi du bas, éclairée de face, n'en jette pas sur le fond
+    expect(ombre(0, cuve.minY + 10)[1]).toBe(0)
+    // la lumière de biais : la paroi qu'on croise en remontant vers elle
+    const biais: [number, number] = [Math.SQRT1_2, Math.SQRT1_2]
+    expect(ombre(cuve.maxX - 20, 0, biais)[1]).toBeGreaterThan(0.3)
+    expect(ombre(cuve.minX + 20, 0, biais)[1]).toBe(0)
+  })
+
+  it('le jumeau GLSL dit la même chose, et la composition s’en sert sur le fond de la cuve', () => {
+    expect(OMBRE_PIED_COQUE_GLSL).toContain('vec2 ombrePiedCoque(vec2 p, vec2 bMin, vec2 bMax, vec2 l, float portee, float lng, float flou)')
+    expect(OMBRE_PIED_COQUE_GLSL).toContain(`float ao = ${OMBRE_PIED_FORCE.toFixed(4)} * exp(-d / portee);`)
+    expect(OMBRE_PIED_COQUE_GLSL).toContain('float o = (1.0 - smoothstep(lng, lng + flou, t)) * (1.0 - 0.5 * smoothstep(0.0, lng + flou, t));')
+    expect(source).toContain('${OMBRE_PIED_COQUE_GLSL}')
+    const appel = source.indexOf('vec2 omb = ombrePiedCoque(world, uRoomCenter - uRoomHalf, uRoomCenter + uRoomHalf, lampeDir,')
+    expect(appel).toBeGreaterThan(0)
+    // après la direction de la lumière, avant la vie du vaisseau (les
+    // veilleuses sont des lumières, rien ne les ombre)
+    expect(source.lastIndexOf('if (an > 1e-5) lampeDir = acc / an;', appel)).toBeGreaterThan(0)
+    expect(source.indexOf('tank += shipLife(world, uZoom, uTime);', appel)).toBeGreaterThan(appel)
+    const bloc = source.slice(appel, source.indexOf('tank += shipLife(world, uZoom, uTime);', appel))
+    expect(bloc).toContain('tank *= 1.0 - omb.x;')
+    expect(bloc).toContain('omb.y * 0.65 * mix(0.75, 1.0, solEclaire)')
   })
 })
