@@ -188,3 +188,119 @@ export function remplitFondStation(b: Bounds, out: Float32Array, debut: number):
   }
   return STATION_SOMMETS
 }
+
+// ——— LA COQUE A UNE HAUTEUR (relief 2.5D) ————————————————————————————
+// « Il n'y a pas d'effet 2,5D sur les parois d'enceinte des tableaux » (le
+// concepteur, 17/11). Relief allumé, le dessus de chaque solide de la cuve
+// fuit le centre de l'écran et sa tranche se dresse (reliefParois.ts) ; la
+// coque, passe à part dessinée par-dessus, restait couchée au sol. Les murs
+// collés à la paroi glissaient sous elle : leur dessus s'arrêtait net au bord
+// de la cuve, et l'enceinte — la plus haute paroi du tableau — était la seule
+// à n'avoir ni dessus déplacé ni face.
+// La coque est désormais un mur haut comme les autres : son dessus (bande ET
+// frange, qui y est fixée) glisse de la même part qu'un mur haut — sa hauteur
+// est bornée à HAUTEUR_BLOCS par facteurRelief, comme pour toute coque —, et
+// sa FACE INTÉRIEURE, celle qui regarde la cuve, occupe l'anneau entre le
+// pied (le bord de la cuve) et le bord déplacé de son dessus.
+
+/** Le côté des faces intérieures dans vCote : 5 + le côté de la bande
+ *  (5 haut · 6 bas · 7 gauche · 8 droite). */
+export const COTE_FLANC = 5
+/** 4 faces × 2 triangles × 3 sommets. */
+export const FLANC_SOMMETS = 24
+
+/** Écrit, à partir de `debut` (en sommets), les quatre FACES INTÉRIEURES de
+ *  la coque : un trapèze par paroi, du pied (le bord de la cuve, a = 0) au
+ *  bord intérieur du dessus (a = 1). Les sommets portent le point du PIED ;
+ *  le shader pousse ceux du haut à la place de leur sommet (pointDuSommet,
+ *  reliefParois.ts) — les arêtes verticales de la cuve y deviennent les
+ *  rayons qui partent du centre, et deux faces voisines se partagent la
+ *  leur, sans recouvrement ni jour. Relief éteint, le trapèze est plat :
+ *  rien ne se peint. `s` court le long de la paroi comme pour les bandes. */
+export function remplitFlancsCoque(b: Bounds, out: Float32Array, debut: number): number {
+  const lx = b.maxX - b.minX
+  const ly = b.maxY - b.minY
+  let o = debut * COQUE_FLOTTANTS
+  const face = (cote: number, long: number, x0: number, y0: number, x1: number, y1: number) => {
+    // (s, a) : le long, la hauteur (0 pied, 1 sommet)
+    for (const [x, y, s, a] of [
+      [x0, y0, 0, 0],
+      [x1, y1, long, 0],
+      [x1, y1, long, 1],
+      [x0, y0, 0, 0],
+      [x1, y1, long, 1],
+      [x0, y0, 0, 1],
+    ]) {
+      out[o++] = x
+      out[o++] = y
+      out[o++] = s
+      out[o++] = a
+      out[o++] = COTE_FLANC + cote
+      out[o++] = long
+    }
+  }
+  face(COTE_HAUT, lx, b.minX, b.maxY, b.maxX, b.maxY)
+  face(COTE_BAS, lx, b.minX, b.minY, b.maxX, b.minY)
+  face(COTE_GAUCHE, ly, b.minX, b.minY, b.minX, b.maxY)
+  face(COTE_DROITE, ly, b.maxX, b.minY, b.maxX, b.maxY)
+  return FLANC_SOMMETS
+}
+
+/** CE QUE MONTRE UN POINT DE LA FACE INTÉRIEURE d'une paroi de coque. Le
+ *  point d'écran (wx, wy) — en unités monde — est sur la face s'il existe un
+ *  t de [0, 1] tel que `c + (w − c)(1 − t·f)` tombe sur la paroi : t = 0 le
+ *  pied, t = 1 le sommet (`f` : fractionSommet de la coque, `c` le centre de
+ *  l'écran). Rend [t, abscisse du pied le long de la paroi], ou null hors de
+ *  la face — au-delà d'un bout de la paroi (c'est la voisine), ou quand la
+ *  face tourne le dos au centre (l'œil est au-delà de la paroi : c'est sa
+ *  face extérieure qu'on verrait).
+ *  Exact : une paroi est une droite, un seul t la croise. Le jumeau GLSL
+ *  (FLANC_COQUE_GLSL) dit la même chose ; coque.spec.ts tient les deux. */
+export function piedFlancCoque(
+  wx: number,
+  wy: number,
+  cx: number,
+  cy: number,
+  f: number,
+  b: Bounds,
+  cote: number,
+): [number, number] | null {
+  if (f <= 0) return null
+  // la normale sortante de la paroi, et la position de la paroi sur elle
+  const nx = cote === COTE_GAUCHE ? -1 : cote === COTE_DROITE ? 1 : 0
+  const ny = cote === COTE_HAUT ? 1 : cote === COTE_BAS ? -1 : 0
+  const paroi = cote === COTE_HAUT ? b.maxY : cote === COTE_BAS ? -b.minY : cote === COTE_GAUCHE ? -b.minX : b.maxX
+  const den = nx * (wx - cx) + ny * (wy - cy)
+  const num = paroi - (nx * cx + ny * cy)
+  if (den <= 0 || num <= 0) return null
+  const k = num / den // 1 − t·f
+  const t = (1 - k) / f
+  if (t < 0 || t > 1) return null
+  const px = cx + (wx - cx) * k
+  const py = cy + (wy - cy) * k
+  const s = nx !== 0 ? py - b.minY : px - b.minX
+  // le pied au-delà d'un bout de la paroi : c'est la face voisine
+  if (s < 0 || s > (nx !== 0 ? b.maxY - b.minY : b.maxX - b.minX)) return null
+  return [t, s]
+}
+
+/** Le jumeau GLSL de piedFlancCoque : (t, s, 1) sur la face, (0, 0, 0)
+ *  dehors. `cote` : 0 haut · 1 bas · 2 gauche · 3 droite ; `cuve` : minX,
+ *  minY, maxX, maxY. */
+export const FLANC_COQUE_GLSL = `// (coque.ts : piedFlancCoque, son jumeau TypeScript)
+vec3 piedFlancCoque(vec2 w, vec2 c, float f, vec4 cuve, float cote) {
+  if (f <= 0.0) return vec3(0.0);
+  vec2 n = cote < 0.5 ? vec2(0.0, 1.0) : cote < 1.5 ? vec2(0.0, -1.0)
+         : cote < 2.5 ? vec2(-1.0, 0.0) : vec2(1.0, 0.0);
+  float paroi = cote < 0.5 ? cuve.w : cote < 1.5 ? -cuve.y : cote < 2.5 ? -cuve.x : cuve.z;
+  float den = dot(n, w - c);
+  float num = paroi - dot(n, c);
+  if (den <= 0.0 || num <= 0.0) return vec3(0.0);
+  float k = num / den;
+  float t = (1.0 - k) / f;
+  if (t < 0.0 || t > 1.0) return vec3(0.0);
+  vec2 p = c + (w - c) * k;
+  float s = cote > 1.5 ? p.y - cuve.y : p.x - cuve.x;
+  if (s < 0.0 || s > (cote > 1.5 ? cuve.w - cuve.y : cuve.z - cuve.x)) return vec3(0.0);
+  return vec3(t, s, 1.0);
+}`
