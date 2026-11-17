@@ -48,9 +48,13 @@ import {
   COQUE_FLOTTANTS,
   COQUE_REP,
   COQUE_SOMMETS,
+  COTE_FLANC,
+  FLANC_COQUE_GLSL,
+  FLANC_SOMMETS,
   MAX_VIDES_COQUE,
   STATION_SOMMETS,
   remplitBandesCoque,
+  remplitFlancsCoque,
   remplitFondStation,
   videsPercantLaCoque,
 } from './coque'
@@ -5317,14 +5321,26 @@ layout(location = 2) in vec2 aCote;
 uniform vec2 uCenter;
 uniform vec2 uViewport;
 uniform float uZoom;
+// LA COQUE A UNE HAUTEUR (coque.ts, remplitFlancsCoque) : relief allumé, son
+// dessus fuit le centre de l'écran de la part d'un mur haut
+// (reliefParois.ts : fractionSommet), 0 relief éteint. Le dessus — bande et
+// frange — est la base agrandie autour du centre (pointDuSommet) : une
+// homothétie, les varyings s'y interpolent donc exactement, et vWorld reste
+// le point de la BASE (les vides, les pièces, la texture s'y lisent).
+uniform float uSommet;
 out vec2 vUv;
 out vec2 vWorld;
 out vec2 vCote;
 void main() {
-  vec2 clip = (aPos - uCenter) * uZoom / (uViewport * 0.5);
+  vec2 ecran = aPos;
+  if (aCote.x < 3.5) ecran = uCenter + (aPos - uCenter) / (1.0 - uSommet);
+  // une face intérieure : son haut (aUv.y = 1) au sommet, son pied au sol.
+  // Elle lit son point d'ÉCRAN (piedFlancCoque) : vWorld le porte.
+  else if (aCote.x > 4.5) ecran = uCenter + (aPos - uCenter) / (1.0 - uSommet * aUv.y);
+  vec2 clip = (ecran - uCenter) * uZoom / (uViewport * 0.5);
   gl_Position = vec4(clip, 0.0, 1.0);
   vUv = aUv;
-  vWorld = aPos;
+  vWorld = aCote.x > 4.5 ? ecran : aPos;
   vCote = aCote;
 }`
 
@@ -5357,8 +5373,10 @@ uniform float uRep;
 uniform int uVideCount;
 uniform vec4 uVides[MAX_VIDES];   // minX, minY, maxX, maxY
 uniform vec2 uVidesAux[MAX_VIDES]; // code (matériau + forme), angle
+uniform float uSommet; // la part dont le dessus fuit le centre (voir HULL_VS)
 out vec4 outColor;
 ${LUMIERE_SCENE_GLSL}
+${FLANC_COQUE_GLSL}
 
 float boxSdf(vec2 world, vec4 b) {
   vec2 c = (b.xy + b.zw) * 0.5;
@@ -5739,6 +5757,39 @@ void poseLesPieces(inout vec4 acc, float px, bool embasesSeules) {
 
 void main() {
   float px = 1.0 / max(uZoom, 1e-4); // un pixel d'écran, en unités monde
+  if (vCote.x > 4.5) {
+    // LA FACE INTÉRIEURE DE LA PAROI (relief allumé) : un mur qui monte de la
+    // cuve, vu de biais. Le pied de ce point d'écran et sa hauteur vue
+    // (piedFlancCoque) ; la tôle de la coque — c'est déjà une paroi de
+    // machinerie vue de face, ses conduites et ses panneaux — couchée sur la
+    // hauteur, tassée comme l'est toute tranche. Ce qu'un solide de la cuve
+    // dresse devant elle (un mur collé à la paroi, dont le dessus déborde)
+    // l'emporte : la profondeur de la composition (0 sous un sommet) la
+    // retient, voir drawHull.
+    float cote = vCote.x - ${COTE_FLANC.toFixed(1)};
+    vec2 dO = cote < 0.5 ? vec2(0.0, 1.0) : cote < 1.5 ? vec2(0.0, -1.0)
+            : cote < 2.5 ? vec2(-1.0, 0.0) : vec2(1.0, 0.0);
+    vec3 fl = piedFlancCoque(vWorld, uCenter, uSommet, uCuve, cote);
+    // la tôle, sur la hauteur : du dessus du tube lumineux (pied) au bas du
+    // matelas (sommet) — le tube et le matelas sont ceux du DESSUS
+    vec2 uvF = vec2(fl.y / uRep, mix(0.14, 0.80, fl.x));
+    vec3 tole = textureGrad(uTexHull, uvF, dFdx(uvF), dFdy(uvF)).rgb;
+    if (fl.z < 0.5) discard;
+    vec2 pied = cote < 1.5 ? vec2(uCuve.x + fl.y, cote < 0.5 ? uCuve.w : uCuve.y)
+                           : vec2(cote < 2.5 ? uCuve.x : uCuve.z, uCuve.y + fl.y);
+    // un vide à cheval sur la paroi la coupe sur toute sa hauteur
+    float garde = smoothstep(0.0, px, videSdf(pied));
+    if (garde <= 0.0) discard;
+    // sombre au pied, franche en haut, le chant clair sous le dessus — la
+    // lecture des tranches de la composition ; et elle regarde la lumière
+    // (sa normale est −dO : elle fait face à la cuve)
+    float t = fl.x;
+    vec3 c = tole * lumiereFace() * mix(0.42, 1.0, sqrt(t));
+    c += c * 0.45 * smoothstep(0.82, 0.97, t);
+    c *= mix(0.52, 1.15, 0.5 + 0.5 * dot(-dO, uLumiereCoque));
+    outColor = vec4(c * garde, garde);
+    return;
+  }
   if (vCote.x > 3.5) {
     // LA STATION AUTOUR : le lointain (la poutre maîtresse, ses ailes et
     // ses radiateurs, en parallaxe), puis les modules voisins dans le plan
@@ -6041,8 +6092,9 @@ export class Renderer {
   private readonly hullVbo: WebGLBuffer
   private readonly decalVao: WebGLVertexArrayObject
   private readonly decalVbo: WebGLBuffer
-  // 4 bandes × 6 sommets × (pos, le long / en travers, côté / longueur)
-  private readonly hullScratch = new Float32Array((COQUE_SOMMETS + STATION_SOMMETS) * COQUE_FLOTTANTS)
+  // 4 bandes, le fond de station, 4 faces intérieures (relief) × (pos, le
+  // long / en travers, côté / longueur)
+  private readonly hullScratch = new Float32Array((COQUE_SOMMETS + STATION_SOMMETS + FLANC_SOMMETS) * COQUE_FLOTTANTS)
   // les vides qui percent la coque (coque.ts) : boîte, et (code, angle)
   private readonly videsCoque = new Float32Array(MAX_VIDES_COQUE * 4)
   private readonly videsCoqueAux = new Float32Array(MAX_VIDES_COQUE * 2)
@@ -7985,6 +8037,11 @@ export class Renderer {
     const boxCount = Math.min(boxes.length, MAX_BOXES)
     const sommets = remplitBandesCoque(b, this.hullScratch)
     remplitFondStation(b, this.hullScratch, sommets)
+    // les faces intérieures, après la station : relief éteint, ni écrites
+    // ni dessinées
+    const debutFlancs = sommets + STATION_SOMMETS
+    const sommetCoque = fractionSommet(this.reliefK, this.zoomRelief, HAUTEUR_COQUE)
+    if (sommetCoque > 0) remplitFlancsCoque(b, this.hullScratch, debutFlancs)
     // la composition ne change qu'avec la cuve et ses vides : recomposée
     // à ce moment-là seulement, pas à chaque image
     const vides = boxes.filter((bx) => bx.material === MAT_VIDE)
@@ -8010,6 +8067,7 @@ export class Renderer {
     gl.uniform1f(hu['uZoom'], camera.zoom)
     gl.uniform1f(hu['uTime'], timeSec)
     gl.uniform1f(hu['uEpais'], COQUE_EPAISSEUR)
+    gl.uniform1f(hu['uSommet'], sommetCoque)
     gl.uniform2f(hu['uLumiereCoque'], this.lumiereCoque[0], this.lumiereCoque[1])
     gl.uniform1f(hu['uRep'], this.hullRep)
     gl.uniform1i(hu['uVideCount'], nVides)
@@ -8043,6 +8101,16 @@ export class Renderer {
     // la station d'abord (dessous), puis les bandes de coque et leur frange
     if (this.exterieur) gl.drawArrays(gl.TRIANGLES, sommets, STATION_SOMMETS)
     gl.drawArrays(gl.TRIANGLES, 0, sommets)
+    // LES FACES INTÉRIEURES passent SOUS les sommets de la cuve : un mur collé
+    // à la paroi dresse son dessus devant elle — c'est lui qu'on voit, il est
+    // plus haut que la face en ce pixel (le long d'un même rayon, le plus
+    // haut est le plus près de l'œil). La composition l'a écrit dans sa
+    // profondeur (0 sous un sommet), comme pour la passe de vie.
+    if (sommetCoque > 0) {
+      this.passeSousSommets(true)
+      gl.drawArrays(gl.TRIANGLES, debutFlancs, FLANC_SOMMETS)
+      this.passeSousSommets(false)
+    }
     gl.bindVertexArray(null)
     gl.disable(gl.BLEND)
   }
