@@ -89,13 +89,13 @@ l'ordre qu'on veut.
 
 | # | image | section | ce que ça apporte |
 | --- | --- | --- | --- |
-| C1 | `hub-table-depart.webp` | §20b | le hub cesse d'être des plots nus |
-| C2 | `hub-mur-records.webp` | §20c | |
-| C3 | `hub-distillateur.webp` | §20e | |
-| C4 | `hub-bac-sable.webp` | §20d | |
-| C5 | `hub-eclairage.webp` | §20a | |
+| C1 | ~~`hub-table-depart.webp`~~ ✅ livré le 17/11 (Blender) | §20b | le hub cesse d'être des plots nus |
+| C2 | ~~`hub-mur-records.webp`~~ ✅ livré le 17/11 (Blender) | §20c | |
+| C3 | ~~`hub-distillateur.webp`~~ ✅ livré le 17/11 (Blender) | §20e | |
+| C4 | ~~`hub-bac-sable.webp`~~ ✅ livré le 17/11 (Blender) | §20d | |
+| C5 | ~~`hub-eclairage.webp`~~ ✅ livré le 17/11 (Blender) | §20a | |
 | C6 | `plafond-serre.webp` | §21a | la serre a enfin un reflet à elle |
-| C7 | `plafond-hub.webp` | §21b | le tableau le plus joué |
+| C7 | ~~`plafond-hub.webp`~~ ✅ livré le 17/11 (Blender) | §21b | le tableau le plus joué |
 | C8 | `cine/revelation-1..3.webp` | §22a-c | la révélation sur ses propres planches |
 | C9 | `cine/miroir-1..3.webp` | §22d-f | la fin de l'arc sur les siennes |
 | C10 | `cycle-icones.webp` | §23a | les états et les transformations sans emoji |
