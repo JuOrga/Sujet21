@@ -863,6 +863,22 @@ huit vues suffisent à une roue à six rayons (le mouvement se referme).
 
 ## 20. LES STATIONS DU HUB — cinq décalques pour le module Méduse
 
+> **✅ LIVRÉES le 17/11/2026, rendues dans Blender** (`tools/images/blender/hub_stations.py`,
+> dans l'atelier de la chaufferie) — les prompts ci-dessous restent la
+> description de chaque pièce. **Le hub va changer** (le concepteur, 17/11) :
+> les pièces ne sont PAS posées par le code ; ce sont cinq sortes de décor de
+> l'éditeur (bouton « Station du hub », la pièce se choisit dans le panneau)
+> que l'admin pose, dimensionne et multiplie où il veut. Une pièce `hub-*`
+> posée près du plot d'une station EN PANNE (le plot, plus 400 de marge — la
+> zone des écrans qui s'éteignent) s'assombrit en jeu : désaturée de 35 %, 45 %
+> de sa luminance (`DecalDef.panne`, posé par `appliqueReparations`, jamais
+> écrit dans un fichier). Réparée, elle revient. Opacité par défaut d'un
+> décalque : 0,55 — le curseur « Opacité » du panneau la rend pleine.
+> Mesures (`prepare.py`, famille « décalque ») : luminance 0,12 à 0,17, bord
+> plein 0 %, 18 à 36 Ko. Refaire : `stations()` puis `lance(list(PIECES),
+> SORTIE, 384)`, copier `SORTIE/alpha/<nom>.png` dans `masters/images/`, puis
+> `prepare.py <nom>`.
+
 Le hub est le tableau le plus joué, et ses **stations** (celles du tableau
 des avaries) n'y sont que des plots nus : un rectangle au sol que le corps
 touche pour payer la réparation. Leur illustration existe pour l'écran
@@ -987,6 +1003,12 @@ Négatif : négatif commun + `plants hanging into view, leaves, sunlight,
 warm light, pink, magenta, floor, people`
 
 ### 21b. `plafond-hub.webp` — le module Méduse
+
+> **✅ LIVRÉ le 17/11/2026, rendu dans Blender** (`plafond_hub()` dans
+> `hub_stations.py`) : la verrière aux seize nervures incurvées, le verre froid
+> qui s'éteint vers la jante sur le vide étoilé, douze hublots, la tôle
+> rivetée. Luminance 0,16 (0,24 permis), 63 Ko. Le champ « Plafond du reflet »
+> du tableau propose « hub ».
 
 ```
 [PRÉAMBULE — charte §5]
@@ -2797,12 +2819,42 @@ Les pièces existantes passent donc une seconde fois par la compression : écart
 moyen 1,59 / 255, PSNR 38,7 dB (prémultiplié), alpha inchangé — mesuré le 17/11.
 Poids 414 → 424 Ko (plafond 450).
 
-**Reste** : la conduite d'ammoniac (son atlas de 1024² est plein : il faudra
-l'agrandir) et les éléments à forme, dont la tranche est encore une teinte
-calculée (plaque froide, chaudière et surchauffeur à forme, membrane, rideau,
-miroir).
+**La conduite d'ammoniac (17/11, le soir)** : sa bande `flanc-conduite`
+(`tools/images/blender/flanc_conduite.py`) — le tuyau d'acier froid vu de côté,
+son dos gagné par le givre (dans la matière même du tuyau : plus la face
+regarde le haut, plus elle est blanche) et sa croûte, la barbe de glace et les
+stalactites sous le ventre, plus longues entre les selles, le bourrelet de
+givre au pied. Ni bride ni joint : sur le dessus, leur pas suit l'épaisseur du
+bloc (`CONDUITE.motif`, en fractions de T), la bande une période fixe — ils ne
+tomberaient jamais l'un sur l'autre. Trois essais avant celui-ci : des coussins
+de coton, puis des aiguilles dont la face à l'ombre se lisait en éclats noirs
+(le givre a maintenant un peu de lueur propre), puis un acier sourd à côté du
+dessus (d'où le reflet le long du tuyau).
+
+L'atlas de la conduite était plein : il passe de 1024² à **1024 × 2048**,
+agrandi vers le bas — les pièces du dessus ne bougent pas, la bande est au
+cadre `flanc` (16, 1040, 992, 120). `conduite_atlas.py` repart de l'atlas livré
+(les sources ne sont plus sur le poste). Seconde compression des pièces :
+écart moyen **2,67 / 255** sur l'opaque, alpha inchangé ; 441 → 439 Ko
+(plafond 450). Au shader, `tranchePieces` reçoit l'atlas qui porte la bande
+(celui des chaleurs ou celui de la conduite) ; `atlasCadre` rapporte u et v
+chacun à son côté — il lisait un carré.
+
+**Pas de nouvelle texture** : la composition lit déjà **16 textures**, le
+minimum que WebGL2 garantit ; une 17e passerait sur une carte à 32 unités et
+ne se lierait pas sur une machine à 16 (téléphones, Intel intégré, Mac, Chrome
+sous Windows). `src/render/unitesTexture.spec.ts` le garde : une image de plus
+va dans un atlas existant.
+
+**Reste** : les éléments à forme gardent une tranche calculée — leur DESSUS est
+calculé lui aussi (givre, rayures, serpentin, trame, poli) ; une bande Blender
+sous un dessus calculé jurerait (choix du concepteur, 17/11). Le rideau : pas
+pour l'instant.
 
 Refaire : dans Blender, `DOSSIER = r'…/tools/images/blender'`, exécuter
 `flancs_pieces.py`, puis `flancs()` et `lance(NOMS, SORTIE, 384)` ; copier les
 deux PNG dans `masters/images/sources/`, lancer `tools/images/chaudiere_atlas.py`
-puis `prepare.py chaudiere-atlas`.
+puis `prepare.py chaudiere-atlas`. La conduite : `flanc_conduite.py`, puis
+`flanc_conduite()` et `lance(['flanc-conduite'], SORTIE, 384)` ; copier le PNG
+dans `masters/images/sources/`, lancer `tools/images/conduite_atlas.py` puis
+`prepare.py conduite-atlas`.

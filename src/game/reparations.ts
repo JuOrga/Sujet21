@@ -162,6 +162,26 @@ export function fichesReparations(): ReparationDef[] {
 // pour que chaque porte garde son identité dans level.portes
 const CANAL_DEGAT = -21
 
+// La marge du DÉCOR d'une station autour de son plot : la vitrine (écrans,
+// pièces du hub) déborde le plot de contact. Une seule valeur pour les deux,
+// sinon un écran s'éteindrait sans que la pièce voisine s'assombrisse.
+const MARGE_DECOR = 400
+
+/** Le centre de ce décalque tombe-t-il dans le plot, élargi de `marge` ?
+ *  Bornes incluses. */
+function presDuPlot(
+  d: { x: number; y: number },
+  plot: { minX: number; minY: number; maxX: number; maxY: number },
+  marge: number,
+): boolean {
+  return (
+    d.x >= plot.minX - marge &&
+    d.x <= plot.maxX + marge &&
+    d.y >= plot.minY - marge &&
+    d.y <= plot.maxY + marge
+  )
+}
+
 /** Le hub tel que l'accident l'a laissé : le CIBLE (base), dégradé pour
  * chaque réparation non payée. Clone superficiel — base n'est JAMAIS
  * modifié (c'est peut-être l'entrée partagée de la bibliothèque). Un
@@ -244,16 +264,21 @@ export function appliqueReparations(
         tone: 'chaud',
       })
     }
+    // LES PIÈCES DU HUB (hub-*, posées par l'admin) s'assombrissent pour
+    // TOUTE station en panne, qu'elle ait des écrans ou non : la pièce est la
+    // station. Même zone que les écrans — une seule règle pour le décor
+    // d'une station. Le drapeau va sur une COPIE : la base vient peut-être
+    // de la bibliothèque, et la réparation doit la retrouver intacte.
+    if (plot && decals)
+      decals = decals.map((d) =>
+        d.kind.startsWith('hub-') && presDuPlot(d, plot, MARGE_DECOR) ? { ...d, panne: true } : d,
+      )
     if (r.eteintEcrans && plot) {
       // Les ÉCRANS DE DÉCOR s'éteignent LARGE (le plot, plus 400 de marge) :
       // la vitrine d'une station déborde son plot de contact.
       if (decals)
         decals = decals.map((d) =>
-          d.kind === 'ecran-on' &&
-          d.x >= plot.minX - 400 &&
-          d.x <= plot.maxX + 400 &&
-          d.y >= plot.minY - 400 &&
-          d.y <= plot.maxY + 400
+          d.kind === 'ecran-on' && presDuPlot(d, plot, MARGE_DECOR)
             ? { ...d, kind: 'ecran-off' as const }
             : d,
         )

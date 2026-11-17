@@ -6,6 +6,7 @@ import {
   ZONES_HUB_COMPACT,
   zonesDuHub,
 } from './hub'
+import type { LevelDef } from './level'
 import { REPARATIONS, appliqueReparations, reparationDef } from './reparations'
 
 const TOUTES = REPARATIONS.map((r) => r.id)
@@ -201,6 +202,95 @@ describe('les réparations — le hub accidenté', () => {
   it('reparationDef retrouve chaque fiche', () => {
     expect(reparationDef('distillateur')?.prix).toBe(40)
     expect(reparationDef('inconnue')).toBe(null)
+  })
+})
+
+// LES PIÈCES DU HUB S'ASSOMBRISSENT AVEC LEUR STATION. Posées par l'admin
+// (decals hub-*), elles portent en jeu un drapeau d'exécution `panne` quand
+// leur centre tombe dans le plot d'une station en panne, plus 400 de marge
+// — la règle des écrans, une seule pour tout le décor d'une station.
+describe('une station en panne assombrit les pièces du hub posées près d’elle', () => {
+  // un module réduit à une station : le distillateur, qui n'éteint AUCUN
+  // écran — l'assombrissement vaut pour toute station, pas seulement celles
+  // qui ont des consoles
+  const plot = { minX: 0, minY: 0, maxX: 100, maxY: 100 }
+  const module = (decals: NonNullable<LevelDef['decals']>): LevelDef => ({
+    ...TABLEAU_HUB_COMPACT,
+    ancres: [{ ...plot, role: 'station' as const, id: 'distillateur' }],
+    decals,
+  })
+  const panne = (lv: LevelDef): (boolean | undefined)[] => (lv.decals ?? []).map((d) => d.panne)
+
+  it('une pièce hub-* dans le plot, ou à 400 tout juste, est en panne', () => {
+    const lv = appliqueReparations(
+      module([
+        { x: 50, y: 50, w: 200, h: 200, kind: 'hub-distillateur' },
+        { x: 500, y: 50, w: 200, h: 200, kind: 'hub-eclairage' }, // maxX + 400
+        { x: 50, y: -400, w: 200, h: 200, kind: 'hub-bac-sable' }, // minY − 400
+      ]),
+      [],
+    )
+    expect(panne(lv)).toEqual([true, true, true])
+  })
+
+  it('réparée, la pièce revient : aucun drapeau résiduel', () => {
+    const lv = appliqueReparations(
+      module([{ x: 50, y: 50, w: 200, h: 200, kind: 'hub-distillateur' }]),
+      ['distillateur'],
+    )
+    expect(lv.decals!.some((d) => 'panne' in d)).toBe(false)
+  })
+
+  it('une station retirée de l’accident (enAvarie: false) n’assombrit jamais', () => {
+    const horsAccident = REPARATIONS.filter((r) => r.id !== 'distillateur')
+    const lv = appliqueReparations(
+      module([{ x: 50, y: 50, w: 200, h: 200, kind: 'hub-distillateur' }]),
+      [],
+      {},
+      horsAccident,
+    )
+    expect(lv.decals!.some((d) => 'panne' in d)).toBe(false)
+  })
+
+  it('au-delà de 400, et pour une pièce qui n’est pas du hub, rien ne bouge', () => {
+    const lv = appliqueReparations(
+      module([
+        { x: 501, y: 50, w: 200, h: 200, kind: 'hub-eclairage' },
+        { x: 50, y: -401, w: 200, h: 200, kind: 'hub-mur-records' },
+        { x: 50, y: 50, w: 190, h: 285, kind: 'vanne' },
+        { x: 50, y: 50, w: 160, h: 160, kind: 'tuyaux' },
+      ]),
+      [],
+    )
+    expect(lv.decals!.some((d) => 'panne' in d)).toBe(false)
+    expect(lv.decals!.map((d) => d.kind)).toEqual(['hub-eclairage', 'hub-mur-records', 'vanne', 'tuyaux'])
+  })
+
+  it('le tableau d’entrée n’est pas muté (il peut venir de la bibliothèque)', () => {
+    const base = module([{ x: 50, y: 50, w: 200, h: 200, kind: 'hub-distillateur' }])
+    const avant = JSON.stringify(base)
+    const lv = appliqueReparations(base, [])
+    expect(lv.decals![0].panne).toBe(true)
+    expect(JSON.stringify(base)).toBe(avant)
+    expect('panne' in base.decals![0]).toBe(false)
+  })
+
+  it('une station qui éteint ses écrans fait les deux : écran éteint, pièce sombre', () => {
+    const lv = appliqueReparations(
+      {
+        ...TABLEAU_HUB_COMPACT,
+        ancres: [{ ...plot, role: 'station' as const, id: 'mur-records' }],
+        decals: [
+          { x: 50, y: 50, w: 200, h: 120, kind: 'ecran-on' },
+          { x: 50, y: 50, w: 300, h: 90, kind: 'hub-mur-records' },
+        ],
+      },
+      [],
+    )
+    expect(lv.decals!.map((d) => [d.kind, d.panne])).toEqual([
+      ['ecran-off', undefined],
+      ['hub-mur-records', true],
+    ])
   })
 })
 

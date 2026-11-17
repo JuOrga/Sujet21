@@ -228,7 +228,8 @@ FAMILLES: list[Famille] = [
         note='une bande de vues côte à côte (tools/images/planche.py, docs/charte-visuelle.md §8)',
     ),
     Famille(
-        'atlas de la conduite', ('conduite-atlas',), taille=(1024, 1024), luma_max=0.60,
+        # (17/11) agrandi à 1024 × 2048 : la tranche du relief 2.5D au bas
+        'atlas de la conduite', ('conduite-atlas',), taille=(1024, 2048), luma_max=0.60,
         # mesuré : 450 Ko à 84, 398 Ko à 78 — il REMPLACE froid.webp (256 Ko) ;
         # la tête de vanne (25/09) le porte à 441 Ko à 78
         qualite=78, poids_max_ko=450,
@@ -252,7 +253,9 @@ FAMILLES: list[Famille] = [
     ),
     Famille(
         'décalque',
-        ('decal-*', 'fiole-*', 'serre-*', 'meta-*', 'sas-raccord*', 'zone-*', 'lampe-*'),
+        # hub-* : les pièces des stations du hub (blender/hub_stations.py) —
+        # sans motif, elles tombaient dans « (inconnue) », sans mesure d'alpha
+        ('decal-*', 'fiole-*', 'serre-*', 'meta-*', 'sas-raccord*', 'zone-*', 'lampe-*', 'hub-*'),
         alpha=True, cote_max=1600, luma_max=0.60, poids_max_ko=350,
         note='pièce détourée, bord transparent',
     ),
