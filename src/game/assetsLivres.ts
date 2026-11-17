@@ -120,6 +120,16 @@ const NOMS: Record<string, string> = {
   'distillateur.webp': 'Avarie — distillateur de primes',
   'aile-endormis.webp': 'Avarie — aile des endormis',
   'passerelle-4.webp': 'Avarie — passerelle du secteur 4',
+  // LES STATIONS DU HUB — rendues dans Blender (tools/images/blender/
+  // hub_stations.py), des décalques que l'admin pose dans l'éditeur ; à ne
+  // pas confondre avec les illustrations ci-dessus (même station, dossier
+  // avaries/, vue en perspective pour l'écran)
+  'hub-eclairage.webp': 'Hub — réseau d’éclairage',
+  'hub-table-depart.webp': 'Hub — table de départ',
+  'hub-mur-records.webp': 'Hub — mur des records',
+  'hub-bac-sable.webp': 'Hub — bac d’essai',
+  'hub-distillateur.webp': 'Hub — distillateur de primes',
+  'plafond-hub.webp': 'Plafond du reflet — le hub',
 }
 
 /** La rubrique d'un fichier, d'après son chemin. Tout finit classé : ce qui
@@ -142,8 +152,11 @@ export function rubriqueDe(url: string): string {
   // règle, chacune tombait dans « Autres » à sa livraison
   if (/^(ceremonie-|instruments-icones|fin-)/.test(f)) return 'Cérémonie station'
   if (f.startsWith('sas-')) return 'Coque & fonds'
+  // les pièces du hub sont des décalques comme la vanne : sans cette règle,
+  // elles tombaient dans « Autres » le jour de leur livraison
   if (
     f.startsWith('decal-') ||
+    f.startsWith('hub-') ||
     f.startsWith('iris') ||
     f.startsWith('lampe-') ||
     f.startsWith('plafond')

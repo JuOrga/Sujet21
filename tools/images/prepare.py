@@ -252,7 +252,9 @@ FAMILLES: list[Famille] = [
     ),
     Famille(
         'décalque',
-        ('decal-*', 'fiole-*', 'serre-*', 'meta-*', 'sas-raccord*', 'zone-*', 'lampe-*'),
+        # hub-* : les pièces des stations du hub (blender/hub_stations.py) —
+        # sans motif, elles tombaient dans « (inconnue) », sans mesure d'alpha
+        ('decal-*', 'fiole-*', 'serre-*', 'meta-*', 'sas-raccord*', 'zone-*', 'lampe-*', 'hub-*'),
         alpha=True, cote_max=1600, luma_max=0.60, poids_max_ko=350,
         note='pièce détourée, bord transparent',
     ),

@@ -932,6 +932,29 @@ describe('levelIO — les décalques de LA SERRE', () => {
     expect(relu.level!.decals).toEqual(level!.decals)
   })
 
+  // LES PIÈCES DU HUB : posées par l'admin dans l'éditeur, gardées dans la
+  // bibliothèque. Une sorte oubliée dans la liste de la lecture, et la
+  // pièce disparaît en silence au premier rechargement du tableau.
+  it('relit les cinq pièces du hub sans les écarter', () => {
+    const cinq = [
+      'hub-eclairage',
+      'hub-table-depart',
+      'hub-mur-records',
+      'hub-bac-sable',
+      'hub-distillateur',
+    ] as const
+    const { level, rejets } = parseLevel({
+      ...base,
+      decals: cinq.map((kind, i) => ({ x: i * 300, y: 0, w: 240, h: 240, kind })),
+    })
+    expect(rejets).toEqual([])
+    expect(level!.decals!.map((d) => d.kind)).toEqual([...cinq])
+    // l'aller-retour JSON (la sauvegarde de l'éditeur) les garde aussi
+    const relu = parseLevel(JSON.parse(serializeLevel(level!)))
+    expect(relu.rejets).toEqual([])
+    expect(relu.level!.decals).toEqual(level!.decals)
+  })
+
   it('les pastilles de condensat et la fiole posées main font l’aller-retour', () => {
     const { level, rejets } = parseLevel({
       ...base,

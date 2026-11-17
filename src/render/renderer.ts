@@ -6129,6 +6129,13 @@ const FICHIER_DECAL: Record<DecalDef['kind'], string> = {
   'meta-marchand': 'meta-marchand',
   'sas-raccord': 'sas-raccord',
   'sas-raccord-v': 'sas-raccord-v',
+  // LES STATIONS DU HUB : tant que l'image n'est pas livrée, le chargement
+  // échoue sans bruit et la pièce posée ne se dessine pas (textureDecal)
+  'hub-eclairage': 'hub-eclairage',
+  'hub-table-depart': 'hub-table-depart',
+  'hub-mur-records': 'hub-mur-records',
+  'hub-bac-sable': 'hub-bac-sable',
+  'hub-distillateur': 'hub-distillateur',
 }
 
 /** Les planches de vues livrées, lues une fois : le glob de Vite. */

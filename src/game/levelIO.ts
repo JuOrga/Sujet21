@@ -534,6 +534,13 @@ export function parseLevel(input: unknown): {
       'serre-ble-nain',
       'serre-rampe',
       'serre-rampe-a',
+      // les pièces du hub, posées par l'admin : sans elles ici, le hub
+      // rechargé depuis la bibliothèque perdait sa machinerie en silence
+      'hub-eclairage',
+      'hub-table-depart',
+      'hub-mur-records',
+      'hub-bac-sable',
+      'hub-distillateur',
     ] as const
     const kind = SORTES.find((s) => s === d.kind) ?? null
     const w = num(d.w, 0)
