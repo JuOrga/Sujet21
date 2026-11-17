@@ -26,7 +26,7 @@ export const TEXELS_CARREAU = 1024
  *  l'élévation vaut alpha × profondeur (+ une constante). C'est elle qui
  *  accorde les surfaces entre elles (§37, mesurée par relief.py). */
 export const PROFONDEUR_RELIEF = {
-  wall: 0.0084,
+  wall: 0.0205,
   wallA: 0.029,
   phile: 0.0051,
   phobe: 0.0157,
