@@ -1,4 +1,4 @@
-# Les tranches qui restent — conduite, éléments à forme, et la garde des 16 unités
+# La tranche de la conduite d'ammoniac, et la garde des 16 unités
 
 *Conception courte, 17/11/2026 — branche `claude/flancs-formes`.*
 
@@ -6,8 +6,7 @@
 
 Suite de #558 (tranches de la chaudière et du surchauffeur à pièces). Relief
 2.5D allumé, la conduite d'ammoniac soulève encore son image sans rien entre
-pied et dessus, et les éléments À FORME ont une tranche en teinte calculée
-(`matiereFlanc`) quand leur dessus porte une vraie image.
+pied et dessus.
 
 ## La contrainte qui décide de tout
 
@@ -26,11 +25,6 @@ vont dans les atlas existants.
    au bas, une bande `flanc-conduite` rendue dans Blender (même méthode que
    `flancs_pieces.py` : une période, bordée de sa propre répétition), lue par
    le chemin des tranches à pièces (`tranchePieces`).
-3. **La plaque froide à forme** : une bande `flanc-froid` dans le même atlas,
-   lue par `matiereFlanc` (branche 4) à la place de la teinte calculée.
-4. **La chaudière et le surchauffeur à forme** : ils reprennent les bandes
-   `flanc-chaud` et `flanc-surch` déjà livrées dans `chaudiere-atlas` — aucune
-   nouvelle image.
 
 ## Approches considérées
 
@@ -41,8 +35,12 @@ vont dans les atlas existants.
 
 ## Ce qu'on ne fait pas
 
-- **Membrane et miroir** : leur dessus est procédural ; une tranche Blender
-  jurerait. Ils gardent leur tranche calculée.
+- **Les éléments à forme** (plaque froide, chaudière, surchauffeur, membrane,
+  miroir) : leur DESSUS est calculé (givre, rayures, serpentin, trame, poli)
+  — vérifié dans la composition le 17/11, contrairement à ce que la première
+  version de cette note disait. Une tranche Blender sous un dessus calculé
+  jurerait ; ils gardent leur tranche calculée, cohérente avec leur dessus
+  (choix du concepteur, 17/11).
 - **Le rideau** : pas pour l'instant (concepteur, 17/11) ; il garde sa
   tranche calculée.
 - Les angles du chanfrein aux jonctions (« plus tard », 16/11).
