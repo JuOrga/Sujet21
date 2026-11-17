@@ -116,6 +116,25 @@ describe('catalogue — les surfaces dont l’alpha est un RELIEF (assets-ia §3
   })
 })
 
+describe('catalogue — LES STATIONS DU HUB, rangées avant même leur livraison', () => {
+  it('chaque pièce du hub et son plafond tombent dans la machinerie, bien nommés', () => {
+    // sans règle, une image « hub-* » tombait dans « Autres » le jour de sa
+    // livraison — et le test qui garde « Autres » vide virait au rouge
+    const attendus: [string, string][] = [
+      ['hub-eclairage.webp', 'Hub — réseau d’éclairage'],
+      ['hub-table-depart.webp', 'Hub — table de départ'],
+      ['hub-mur-records.webp', 'Hub — mur des records'],
+      ['hub-bac-sable.webp', 'Hub — bac d’essai'],
+      ['hub-distillateur.webp', 'Hub — distillateur de primes'],
+      ['plafond-hub.webp', 'Plafond du reflet — le hub'],
+    ]
+    for (const [f, nom] of attendus) {
+      expect(rubriqueDe(`/assets/${f}`), f).toBe('Machinerie & décalques')
+      expect(nomDe(`/assets/${f}`), f).toBe(nom)
+    }
+  })
+})
+
 describe('catalogue — LA CÉRÉMONIE STATION range ses planches rendues', () => {
   it('range les planches et objets de la cérémonie, et les scènes de fin, sous leur rubrique', () => {
     // les noms fixés par le contrat (iconesStation.ts, ceremonieObjets.ts,

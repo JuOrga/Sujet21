@@ -259,7 +259,9 @@ const ZONE_COLORS: Record<ZoneForce, string> = {
 // LES DÉCALQUES : le décor sans physique. Une seule liste, lue par l'outil,
 // par le panneau de propriétés et par les tests — le moteur lit la même
 // (game/level.ts) et la lecture d'un tableau écarte tout ce qui n'y est pas.
-const DECAL_SORTES: DecalDef['kind'][] = [
+// Exportées pour les tests (decalques.spec.ts) : la palette et la lecture
+// doivent garder la même liste.
+export const DECAL_SORTES: DecalDef['kind'][] = [
   'tuyaux',
   'vanne',
   'ecran-off',
@@ -269,8 +271,15 @@ const DECAL_SORTES: DecalDef['kind'][] = [
   'serre-ble-nain',
   'serre-rampe',
   'serre-rampe-a',
+  // les stations du hub : c'est l'admin qui les pose, le moteur ne fait que
+  // les assombrir quand leur station est en panne (reparations.ts)
+  'hub-eclairage',
+  'hub-table-depart',
+  'hub-mur-records',
+  'hub-bac-sable',
+  'hub-distillateur',
 ]
-const DECAL_NOMS: Record<DecalDef['kind'], string> = {
+export const DECAL_NOMS: Record<DecalDef['kind'], string> = {
   tuyaux: 'Tuyaux',
   vanne: 'Vanne',
   'ecran-off': 'Écran éteint',
@@ -288,6 +297,11 @@ const DECAL_NOMS: Record<DecalDef['kind'], string> = {
   'meta-marchand': 'Méta — le Sujet 12',
   'sas-raccord': 'Sas de raccord',
   'sas-raccord-v': 'Sas de raccord (quart de tour)',
+  'hub-eclairage': 'Hub — réseau d’éclairage',
+  'hub-table-depart': 'Hub — table de départ',
+  'hub-mur-records': 'Hub — mur des records',
+  'hub-bac-sable': 'Hub — bac d’essai',
+  'hub-distillateur': 'Hub — distillateur',
 }
 
 // LES ANCRES MÉTA : les rendez-vous du module. Jusqu'ici la géométrie du

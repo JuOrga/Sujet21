@@ -380,8 +380,22 @@ export interface DecalDef {
     // arrive à l'horizontale) et son quart de tour.
     | 'sas-raccord'
     | 'sas-raccord-v'
+    // LES STATIONS DU HUB : la machinerie des cinq stations de réparation,
+    // posées PAR L'ADMIN dans l'éditeur (groupe Décor), jamais synthétisées
+    // ni gravées dans le code — le hub va changer, la mise en scène lui
+    // revient. Près du plot d'une station en panne, la pièce s'assombrit.
+    | 'hub-eclairage'
+    | 'hub-table-depart'
+    | 'hub-mur-records'
+    | 'hub-bac-sable'
+    | 'hub-distillateur'
   flip?: boolean // miroir horizontal : la même pièce ne se répète pas telle quelle
   fade?: number // 0..1, opacité (défaut 0,55)
+  // DRAPEAU D'EXÉCUTION, posé par appliqueReparations (reparations.ts) sur
+  // le clone du hub joué : la pièce d'une station en panne s'assombrit au
+  // rendu. Jamais lu ni écrit par levelIO — un fichier qui le garderait
+  // laisserait la pièce sombre après la réparation.
+  panne?: boolean
 }
 
 // ---- Lampes (éclairage de la pièce, 2026) --------------------------------
@@ -420,6 +434,7 @@ export const PLAFONDS_CONNUS: string[] = [
   'breche',
   'chaufferie',
   'helice',
+  'hub',
 ]
 
 export const LAMPE_HAUTEUR_DEFAUT = 420
