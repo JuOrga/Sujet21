@@ -32,16 +32,6 @@ NOMS = ['hab-caissons', 'hab-conduites', 'hab-poutrelle', 'hab-blindage',
         'hab-aeration', 'hab-hublots', 'hab-ecrans', 'hab-cables']
 
 
-def diagonale(at, mat, a, b, large, yf, yb, var=0.0):
-    """une barre droite de a à b (dans le plan du mur), de largeur `large`"""
-    (xa, za), (xb, zb) = a, b
-    dx, dz = xb - xa, zb - za
-    L = math.hypot(dx, dz)
-    cx, cz = (xa + xb) / 2, (za + zb) / 2
-    rot = Matrix.Rotation(-math.atan2(dz, dx), 4, 'Y')
-    at.boite(mat, cx - L / 2, cx + L / 2, cz - large / 2, cz + large / 2, yf, yb, var, rot=rot)
-
-
 # ---------------------------------------------------------------- 1 caissons
 def caissons(at, rng):
     """des caisses de stockage empilées en quinconce, chacune sa teinte d'usure,

@@ -99,7 +99,8 @@ tilt, off-center, motion blur`
 > nervures, trappes, évents, petits boîtiers, deux faisceaux de conduites
 > verticales ; luminance 0,15 (0,17 avant), raccord 0,5 / 0,3 (1,0 / 1,7),
 > 19 Ko (207), livrée à 1024² comme le reste de la famille. Ce qui suit
-> reste pour mémoire.
+> reste pour mémoire. **Le mur est redessiné en isogrid le 17/11** (§37) : ses
+> plaques décalées se lisaient en pavés sur le dessus des parois.
 **1024×1024 · PNG · tileable sur les deux axes**
 
 Le mur par défaut montre sa couture : raccord vertical **4,7** (seuil 3,0),
@@ -2682,6 +2683,29 @@ dominante** (la médiane) — plus bas, c'est plat : le fond des joints, noir so
 toute lampe, mangeait l'échelle (un rivet n'avait que 25 niveaux). Une image
 opaque (alpha 1 partout) est un dessus plat.
 
+**Le mur est redessiné (17/11).** L'appareil de plaques décalées se lisait en
+pavés sur le dessus des parois (on n'en voyait que les joints) et en mur de
+briques sur un bloc rond. `wall.webp` est maintenant un **isogrid** — le
+treillis de nervures en triangles fraisé dans la peau des modules pressurisés,
+un bossage percé à chaque nœud, deux trappes de visite à six pans et neuf
+caches vissés par carreau (`surfaces.py`, `mur`). Sept mailles sur huit rangées
+pour 230 unités : une maille de 33 unités, soit une rangée de triangles sur une
+paroi mince, qui se lit en poutre à treillis. Même acier, même luminance
+(0,148), même échelle au shader ; seule la profondeur change (0,0084 avant ; les nervures
+dépassent de 12 mm, les trappes de 20). L'alpha, plus fouillé, pèse 104 Ko. La
+pastille de la légende est refaite avec lui.
+
+**La seconde paroi suit (17/11).** `wall-a` était la tôle de la chaufferie en
+acier froid, à 520 unités : fondue dans l'isogrid, elle y faisait monter des
+tôles et des conduites sans rapport (retour du concepteur, sur l'aperçu). Elle
+est maintenant **le même treillis, à la même échelle (230) et dans le même
+acier** — nervures et nœuds tombent sur ceux du mur, le fondu n'y change rien —
+avec d'autres accessoires : deux trappes ailleurs, sept caches, un chemin de
+câbles capoté (`surfaces.py`, `isogrid`, `bati_wall_a`). 10,9 % des pixels
+diffèrent du mur. Profondeur 0,0205 (0,0290 avant), 106 Ko. **Ne pas lui
+redonner une échelle à elle** : deux treillis de pas différents se
+superposeraient dans le fondu.
+
 **Pour le shader** : l'élévation vaut `alpha × profondeur` (+ une constante), en
 largeurs de carreau — le carreau est rendu à 1024 px pour une largeur. La pente
 vraie entre deux texels voisins est donc `Δalpha × profondeur × 1024` ; libre
@@ -2690,8 +2714,8 @@ les accorde :
 
 | surface | profondeur (carreau) | luminance avant → après | raccord couleur x / y | raccord relief x / y | poids avant → après |
 | --- | --- | --- | --- | --- | --- |
-| `wall` | 0,0084 | 0,15 → 0,15 | 0,5 / 0,5 | 0,0 / 0,0 | 8 → 23 Ko |
-| `wall-a` | 0,0290 | 0,15 → 0,14 | 0,5 / 0,5 | 0,0 / 0,0 | 19 → 63 Ko |
+| `wall` | 0,0205 | 0,15 → 0,15 | 0,5 / 0,5 | 0,0 / 0,0 | 8 → 23 → 104 Ko |
+| `wall-a` | 0,0205 | 0,15 → 0,15 | 0,5 / 0,5 | 0,0 / 0,0 | 19 → 63 → 106 Ko |
 | `phile` | 0,0051 | 0,18 → 0,18 | 0,5 / 1,0 | 0,8 / 1,0 | 49 → 204 Ko |
 | `phobe` | 0,0157 | 0,15 → 0,16 | 0,6 / 0,6 | 1,0 / 1,1 | 28 → 238 Ko |
 | `paroi-atlas` | par case, ci-dessous | 0,13 → 0,12 (chauds 1 → 2 %) | — | — | 107 → 342 Ko |

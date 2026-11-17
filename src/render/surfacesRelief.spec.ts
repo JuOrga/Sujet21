@@ -25,7 +25,7 @@ function enteteWebp(fichier: string): { l: number; h: number; alpha: boolean } {
 }
 
 // les tailles d'avant (13/11) : le shader répète chaque surface à son échelle
-// (230, 520, 170, 210 unités) et lit l'atlas par cases de 1024
+// (230, 230, 170, 210 unités) et lit l'atlas par cases de 1024
 const SURFACES: Record<string, [number, number]> = {
   'wall.webp': [1024, 1024],
   'wall-a.webp': [1024, 1024],
