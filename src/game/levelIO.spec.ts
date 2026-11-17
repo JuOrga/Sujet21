@@ -932,6 +932,50 @@ describe('levelIO — les décalques de LA SERRE', () => {
     expect(relu.level!.decals).toEqual(level!.decals)
   })
 
+  // LES PIÈCES DU HUB : posées par l'admin dans l'éditeur, gardées dans la
+  // bibliothèque. Une sorte oubliée dans la liste de la lecture, et la
+  // pièce disparaît en silence au premier rechargement du tableau.
+  it('relit les cinq pièces du hub sans les écarter', () => {
+    const cinq = [
+      'hub-eclairage',
+      'hub-table-depart',
+      'hub-mur-records',
+      'hub-bac-sable',
+      'hub-distillateur',
+    ] as const
+    const { level, rejets } = parseLevel({
+      ...base,
+      decals: cinq.map((kind, i) => ({ x: i * 300, y: 0, w: 240, h: 240, kind })),
+    })
+    expect(rejets).toEqual([])
+    expect(level!.decals!.map((d) => d.kind)).toEqual([...cinq])
+    // l'aller-retour JSON (la sauvegarde de l'éditeur) les garde aussi
+    const relu = parseLevel(JSON.parse(serializeLevel(level!)))
+    expect(relu.rejets).toEqual([])
+    expect(relu.level!.decals).toEqual(level!.decals)
+  })
+
+  // LE DRAPEAU DE PANNE est d'exécution (appliqueReparations le pose sur un
+  // clone du hub) : ni un fichier, ni la bibliothèque ne doivent le porter —
+  // sinon la pièce resterait sombre une fois la station réparée.
+  it('le drapeau panne ne s’écrit jamais et ne se relit jamais', () => {
+    const brut = parseLevel({
+      ...base,
+      decals: [{ x: 0, y: 0, w: 240, h: 240, kind: 'hub-distillateur' }],
+    }).level!
+    // le clone dégradé, tel que appliqueReparations le rend
+    const sombre = { ...brut, decals: brut.decals!.map((d) => ({ ...d, panne: true })) }
+    // écrit : le fichier ne le porte pas
+    const json = serializeLevel(sombre)
+    expect(json).not.toContain('panne')
+    // relu depuis un fichier qui le porterait quand même (main, vieux poste)
+    const { level, rejets } = parseLevel(JSON.parse(JSON.stringify(sombre)))
+    expect(rejets).toEqual([])
+    expect('panne' in level!.decals![0]).toBe(false)
+    // et l'écriture n'a pas touché le tableau en mémoire
+    expect(sombre.decals[0].panne).toBe(true)
+  })
+
   it('les pastilles de condensat et la fiole posées main font l’aller-retour', () => {
     const { level, rejets } = parseLevel({
       ...base,

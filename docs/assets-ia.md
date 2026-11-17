@@ -863,6 +863,22 @@ huit vues suffisent à une roue à six rayons (le mouvement se referme).
 
 ## 20. LES STATIONS DU HUB — cinq décalques pour le module Méduse
 
+> **✅ LIVRÉES le 17/11/2026, rendues dans Blender** (`tools/images/blender/hub_stations.py`,
+> dans l'atelier de la chaufferie) — les prompts ci-dessous restent la
+> description de chaque pièce. **Le hub va changer** (le concepteur, 17/11) :
+> les pièces ne sont PAS posées par le code ; ce sont cinq sortes de décor de
+> l'éditeur (bouton « Station du hub », la pièce se choisit dans le panneau)
+> que l'admin pose, dimensionne et multiplie où il veut. Une pièce `hub-*`
+> posée près du plot d'une station EN PANNE (le plot, plus 400 de marge — la
+> zone des écrans qui s'éteignent) s'assombrit en jeu : désaturée de 35 %, 45 %
+> de sa luminance (`DecalDef.panne`, posé par `appliqueReparations`, jamais
+> écrit dans un fichier). Réparée, elle revient. Opacité par défaut d'un
+> décalque : 0,55 — le curseur « Opacité » du panneau la rend pleine.
+> Mesures (`prepare.py`, famille « décalque ») : luminance 0,12 à 0,17, bord
+> plein 0 %, 18 à 36 Ko. Refaire : `stations()` puis `lance(list(PIECES),
+> SORTIE, 384)`, copier `SORTIE/alpha/<nom>.png` dans `masters/images/`, puis
+> `prepare.py <nom>`.
+
 Le hub est le tableau le plus joué, et ses **stations** (celles du tableau
 des avaries) n'y sont que des plots nus : un rectangle au sol que le corps
 touche pour payer la réparation. Leur illustration existe pour l'écran
@@ -987,6 +1003,12 @@ Négatif : négatif commun + `plants hanging into view, leaves, sunlight,
 warm light, pink, magenta, floor, people`
 
 ### 21b. `plafond-hub.webp` — le module Méduse
+
+> **✅ LIVRÉ le 17/11/2026, rendu dans Blender** (`plafond_hub()` dans
+> `hub_stations.py`) : la verrière aux seize nervures incurvées, le verre froid
+> qui s'éteint vers la jante sur le vide étoilé, douze hublots, la tôle
+> rivetée. Luminance 0,16 (0,24 permis), 63 Ko. Le champ « Plafond du reflet »
+> du tableau propose « hub ».
 
 ```
 [PRÉAMBULE — charte §5]
