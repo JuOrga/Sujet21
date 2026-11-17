@@ -6037,11 +6037,18 @@ uniform float uSommet;
 // tout ce que le corps recouvre, son dessus compris (0 : relief éteint, ou
 // décalque posé sur un mur — là, l'eau se lit au pied, comme avant)
 uniform float uCorps;
+// 1 : la pièce appartient à une station EN PANNE (DecalDef.panne, posé par
+// appliqueReparations) — éteinte plutôt que retirée, pour qu'on voie ce
+// qu'il y a à réparer. Une seule image livrée par pièce, en état de marche :
+// l'assombrissement est le travail du moteur.
+uniform float uPanne;
 out vec4 outColor;
 ${CORPS_RELIEF_GLSL}
 void main() {
   vec4 t = texture(uTexDecal, vUv);
   vec3 c = t.rgb * vec3(0.52, 0.62, 0.72); // refroidi, fondu dans la cuve
+  // désaturée de 35 %, puis 45 % de sa luminance : morte mais lisible
+  if (uPanne > 0.5) c = mix(c, vec3(dot(c, vec3(0.299, 0.587, 0.114))), 0.35) * 0.45;
   vec2 auPied = 0.5 * uCanvasSize + (gl_FragCoord.xy - 0.5 * uCanvasSize) * (1.0 - uSommet);
   vec2 uvVu;
   float rSommet;
@@ -8361,6 +8368,9 @@ export class Renderer {
       gl.uniform1i(du['uTexDecal'], 0)
       gl.uniform1f(du['uFade'], d.fade ?? 0.55)
       gl.uniform1f(du['uEfface'], 1)
+      // posé à CHAQUE pièce : l'uniforme garde sa valeur d'un dessin à
+      // l'autre, une pièce saine suivant une pièce en panne serait éteinte
+      gl.uniform1f(du['uPanne'], d.panne ? 1 : 0)
       gl.drawArrays(gl.TRIANGLES, 0, 6)
     }
     if (started) {
@@ -8454,6 +8464,9 @@ export class Renderer {
       gl.uniform1i(du['uTexDecal'], 0)
       gl.uniform1f(du['uFade'], 0.92)
       gl.uniform1f(du['uEfface'], 0)
+      // même programme que les décalques : un luminaire n'hérite pas de la
+      // panne de la dernière pièce dessinée
+      gl.uniform1f(du['uPanne'], 0)
       gl.bindBuffer(gl.ARRAY_BUFFER, this.decalVbo)
       // LE BANDEAU EN TROIS TRANCHES (lampes.ts) : deux embouts carrés, un
       // milieu qui prend la longueur. D'un seul quad, l'image s'étirait

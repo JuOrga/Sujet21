@@ -955,6 +955,27 @@ describe('levelIO — les décalques de LA SERRE', () => {
     expect(relu.level!.decals).toEqual(level!.decals)
   })
 
+  // LE DRAPEAU DE PANNE est d'exécution (appliqueReparations le pose sur un
+  // clone du hub) : ni un fichier, ni la bibliothèque ne doivent le porter —
+  // sinon la pièce resterait sombre une fois la station réparée.
+  it('le drapeau panne ne s’écrit jamais et ne se relit jamais', () => {
+    const brut = parseLevel({
+      ...base,
+      decals: [{ x: 0, y: 0, w: 240, h: 240, kind: 'hub-distillateur' }],
+    }).level!
+    // le clone dégradé, tel que appliqueReparations le rend
+    const sombre = { ...brut, decals: brut.decals!.map((d) => ({ ...d, panne: true })) }
+    // écrit : le fichier ne le porte pas
+    const json = serializeLevel(sombre)
+    expect(json).not.toContain('panne')
+    // relu depuis un fichier qui le porterait quand même (main, vieux poste)
+    const { level, rejets } = parseLevel(JSON.parse(JSON.stringify(sombre)))
+    expect(rejets).toEqual([])
+    expect('panne' in level!.decals![0]).toBe(false)
+    // et l'écriture n'a pas touché le tableau en mémoire
+    expect(sombre.decals[0].panne).toBe(true)
+  })
+
   it('les pastilles de condensat et la fiole posées main font l’aller-retour', () => {
     const { level, rejets } = parseLevel({
       ...base,

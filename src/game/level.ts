@@ -391,6 +391,11 @@ export interface DecalDef {
     | 'hub-distillateur'
   flip?: boolean // miroir horizontal : la même pièce ne se répète pas telle quelle
   fade?: number // 0..1, opacité (défaut 0,55)
+  // DRAPEAU D'EXÉCUTION, posé par appliqueReparations (reparations.ts) sur
+  // le clone du hub joué : la pièce d'une station en panne s'assombrit au
+  // rendu. Jamais lu ni écrit par levelIO — un fichier qui le garderait
+  // laisserait la pièce sombre après la réparation.
+  panne?: boolean
 }
 
 // ---- Lampes (éclairage de la pièce, 2026) --------------------------------

@@ -1160,7 +1160,15 @@ export function serializeLevel(level: LevelDef): string {
   if (level.marchand) out.marchand = level.marchand
   if (level.eclats?.length) out.eclats = level.eclats
   if (level.lumieres && level.lumieres.length > 0) out.lumieres = level.lumieres
-  if (level.decals && level.decals.length > 0) out.decals = level.decals
+  // le drapeau de panne est d'exécution (appliqueReparations) : il ne
+  // s'écrit pas — l'éditeur n'écrit que son tableau brut, mais un clone
+  // dégradé passé ici par mégarde figerait la pièce sombre pour de bon
+  if (level.decals && level.decals.length > 0)
+    out.decals = level.decals.map((d) => {
+      if (d.panne === undefined) return d
+      const { panne: _, ...sans } = d
+      return sans
+    })
   if (level.figure) out.figure = level.figure
   if (level.ambiance) out.ambiance = level.ambiance
   if (level.etats === 'libres') out.etats = 'libres'
