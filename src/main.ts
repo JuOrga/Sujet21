@@ -210,6 +210,7 @@ import {
   departCarte,
   entreModule,
   franchitSalle,
+  sauteAuDernierRang,
   litEtatCarteRun,
   longueurRun as longueurRunCarte,
   moduleCourant,
@@ -13021,6 +13022,36 @@ function valideSalleCourante(): string {
   return 'ok'
 }
 
+// VALIDER LE MODULE EN COURS (outil de conception). Traverser un module
+// salle par salle, c'est six fois « Valider », six cérémonies, six choix de
+// porte — pour qui veut seulement voir le module SUIVANT, ou la carte. Ici
+// les salles restantes sont comptées franchies (sauteAuDernierRang), puis
+// la salle en cours se conclut exactement comme « Valider la salle en
+// cours » : vraie cérémonie, et le module épuisé ouvre son bilan puis la
+// carte. Rien de plus ne se gagne : les salles sautées ne livrent ni
+// condensat, ni mémoire, ni orbe de cache — un outil ne crédite pas ce
+// qu'on n'a pas joué.
+function valideModuleCourant(): { r: string; sautees: number } {
+  if (!hasPlayed) return { r: 'menu', sautees: 0 }
+  if (salleHub()) return { r: 'hub', sautees: 0 }
+  // un essai de tableau (éditeur, mini-jeu seul) n'est dans aucun module
+  if (testLevel) return { r: 'essai', sautees: 0 }
+  const m = moduleEnCours()
+  if (!m || m.niveaux <= 0) return { r: 'hors-module', sautees: 0 }
+  // L'ÉCONOMAT DE MI-DESCENTE (module non tissé) est une annexe : sa
+  // sortie ne franchit aucune salle, le module ne s'épuiserait pas — et la
+  // salle choisie, qui l'attend, se jouerait au rang d'après la fin
+  if (estEconomat(level) && !carteRun.tissage) return { r: 'economat', sautees: 0 }
+  const r = valideSalleCourante()
+  if (r !== 'ok') return { r, sautees: 0 }
+  // le sas n'est franchi qu'à l'image suivante : le rang se pose AVANT,
+  // et c'est franchitSalle, sur le vrai chemin, qui épuise le module
+  const saut = sauteAuDernierRang(carte, carteRun)
+  carteRun = saut.etat
+  voieRang += saut.sautees // la descente se creuse d'autant
+  return { r: 'ok', sautees: saut.sautees }
+}
+
 // PASSER LE HUB (outil de conception). Le hub est un tableau comme un
 // autre pour le concepteur — sauf qu'il faut le TRAVERSER À LA NAGE
 // jusqu'au bon sas, et que le sas n'est pas un détail de trajet : c'est
@@ -14175,6 +14206,36 @@ function lanceManoeuvre(quoi: string): void {
                 : r === 'deja'
                   ? 'La salle est déjà conclue (cérémonie ouverte ou expédition achevée).'
                   : 'Le corps est dispersé : plus rien à livrer.',
+          )
+        }
+        break
+      }
+      case 'valider-module': {
+        const { r, sautees } = valideModuleCourant()
+        if (r === 'ok') {
+          // même raison que pour la salle : la fiche fige l'essai
+          pupitreEl.hidden = true
+          closeHome()
+          pupDit(
+            sautees > 0
+              ? `${sautees} salle${sautees > 1 ? 's' : ''} passée${sautees > 1 ? 's' : ''} : la salle en cours se conclut, le module s’épuise.`
+              : 'C’était déjà la dernière salle du module : elle se conclut, le module s’épuise.',
+          )
+        } else {
+          pupDit(
+            r === 'menu'
+              ? 'Aucun essai en cours : lancez une descente d’abord.'
+              : r === 'hub'
+                ? 'Au hub il n’y a pas de module à traverser : prenez « Partir par le sas principal ».'
+                : r === 'essai'
+                  ? 'Un essai de tableau n’est dans aucun module : lancez une descente.'
+                  : r === 'hors-module'
+                    ? 'Aucun module à salles en cours (un nœud de la carte) : choisissez d’abord une coursive.'
+                    : r === 'economat'
+                      ? 'Vous êtes à l’Économat de mi-descente : sortez-en, puis validez le module.'
+                      : r === 'deja'
+                        ? 'La salle est déjà conclue (cérémonie ouverte ou expédition achevée).'
+                        : 'Le corps est dispersé : plus rien à livrer.',
           )
         }
         break
