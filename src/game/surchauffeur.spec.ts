@@ -192,6 +192,7 @@ describe('surchauffeur — les jumeaux', () => {
     expect(cadre('S_CORPS')).toEqual(SURCHAUFFEUR_ATLAS.corps)
     expect(cadre('S_BOUT')).toEqual(SURCHAUFFEUR_ATLAS.bout)
     expect(cadre('S_DOME')).toEqual(SURCHAUFFEUR_ATLAS.dome)
+    expect(cadre('S_FLANC')).toEqual(SURCHAUFFEUR_ATLAS.flanc)
     expect(Number(py.match(/^HAUTEUR = (\d+)/m)![1])).toBe(2048)
   })
 })

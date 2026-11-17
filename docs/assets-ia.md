@@ -2752,3 +2752,57 @@ tools/images/blender/relief.py SORTIE masters/images wall wall-a phile phobe`.
 Les habillages : `habillages.py`, `habillages()`, `lance(NOMS, SORTIE, 384)`,
 puis `python -I tools/images/blender/habillages.py SORTIE
 masters/images/paroi-atlas.png`. Enfin `prepare.py`.
+
+## 38. LES FLANCS DES ÉLÉMENTS À PIÈCES — la tranche de la chaudière et du surchauffeur (17/11)
+
+Relief 2.5D allumé, un mur se dresse : son dessus glisse et sa tranche porte sa
+matière (`matiereFlanc`). La chaudière et le surchauffeur rectangulaires sont
+composés **par pièces** — leur dessus est une image de l'atlas des chaleurs. Leur
+image se soulevait bien, mais rien ne se peignait entre son pied et elle : la
+rampe flottait à plat à côté de parois qui avaient leur volume (le concepteur,
+17/11 : « quand on voit la perspective il n'y a pas de texture pour cet
+élément »).
+
+**Deux bandes, rendues dans Blender** (`tools/images/blender/flancs_pieces.py`),
+dans la place restée libre au bas de `chaudiere-atlas.webp` :
+
+| bande | cadre (x, y, l, h) | ce qu'on y voit |
+| --- | --- | --- |
+| `flanc-chaud` | 16, 1802, 992, 120 | le carter : socle boulonné, persiennes où rougeoient les résistances, un montant entre deux panneaux, une bande de danger un panneau sur deux, corniche rivetée |
+| `flanc-surch` | 16, 1926, 992, 120 | la borne : le même socle, et entre deux cerclages le verre où bout la vapeur dorée |
+
+Une bande est **une période** : 992 px pour 580 unités de jeu le long de l'arête
+(`FLANC_PIECES.periode`, jumeau de `PERIODE` dans le script), 120 px pour les 140
+unités d'un mur haut, le pied en bas. Elle est bordée de 16 px de sa propre
+répétition de chaque côté : le filtrage ne sort jamais du motif. Dans l'atelier,
+la bande se dessine en unités de jeu, puis chaque objet est mis à l'échelle (la
+période dans 1 : le bruit des matières, pris sur un tore de période 1, se
+raccorde par construction). L'acier est celui des pièces de l'atlas — sombre,
+revenu, rouillé aux bords —, pas le bleu nuit des parois ; la lumière est celle
+de la charte, venue du haut (sur une face verticale, c'est elle qui allume les
+dessus des reliefs).
+
+**Au shader** (`renderer.ts` : `flancPieces`, `tranchePieces`) : la tranche se
+cherche sur la silhouette des PIÈCES (pas sur la boîte), le long du chemin pied →
+sommet, en douze pas (à six, le bord en biais des coins tombait en marches). Elle
+se peint SOUS l'image du dessus, cache le sol comme le flanc d'un mur, et prend la
+lumière d'une tranche de mur ; ce qui luit (les pixels ambre : résistances,
+vapeur) brille par soi-même — la vapeur de la borne pâlit avec sa charge. Relief
+éteint, rien de tout cela ne se lit.
+
+**L'atlas a été complété depuis l'image livrée** : les sources générées du 26/09
+(`chaudiere-*.png`, `surch-*.png`) ne sont plus sur le poste, `chaudiere_atlas.py`
+repart alors de `public/assets/chaudiere-atlas.webp` et n'y pose que les flancs.
+Les pièces existantes passent donc une seconde fois par la compression : écart
+moyen 1,59 / 255, PSNR 38,7 dB (prémultiplié), alpha inchangé — mesuré le 17/11.
+Poids 414 → 424 Ko (plafond 450).
+
+**Reste** : la conduite d'ammoniac (son atlas de 1024² est plein : il faudra
+l'agrandir) et les éléments à forme, dont la tranche est encore une teinte
+calculée (plaque froide, chaudière et surchauffeur à forme, membrane, rideau,
+miroir).
+
+Refaire : dans Blender, `DOSSIER = r'…/tools/images/blender'`, exécuter
+`flancs_pieces.py`, puis `flancs()` et `lance(NOMS, SORTIE, 384)` ; copier les
+deux PNG dans `masters/images/sources/`, lancer `tools/images/chaudiere_atlas.py`
+puis `prepare.py chaudiere-atlas`.

@@ -426,6 +426,18 @@ export const CHAUDIERE_ATLAS = {
   bruleur: [660, 312, 185, 185],
   compacte: [0, 628, 396, 396],
   sol: [404, 628, 616, 308],
+  // la TRANCHE de la rampe, pour le relief 2.5D (FLANC_PIECES)
+  flanc: [16, 1802, 992, 120],
+} as const
+
+/** LES FLANCS DES ÉLÉMENTS À PIÈCES. Relief allumé, l'image de la chaudière
+ *  et celle du surchauffeur se soulevaient sans rien entre leur pied et
+ *  elles. Chacun a sa bande dans l'atlas des chaleurs (`flanc`, rendue par
+ *  tools/images/blender/flancs_pieces.py) : sa largeur est UNE PÉRIODE, de
+ *  `periode` unités de jeu le long de l'arête ; sa hauteur, celle du solide,
+ *  du pied (en bas) au sommet. JUMEAU de PERIODE dans flancs_pieces.py. */
+export const FLANC_PIECES = {
+  periode: 580,
 } as const
 
 /** LE DESSIN SELON LA PLACE :
@@ -541,6 +553,8 @@ export const SURCHAUFFEUR_ATLAS = {
   corps: [0, 1036, 1024, 338],
   bout: [0, 1384, 453, 410],
   dome: [463, 1384, 400, 400],
+  // la TRANCHE de la borne, pour le relief 2.5D (FLANC_PIECES)
+  flanc: [16, 1926, 992, 120],
 } as const
 
 /** LE RIDEAU LAMELLAIRE : une porte de chambre froide à lanières de PVC
