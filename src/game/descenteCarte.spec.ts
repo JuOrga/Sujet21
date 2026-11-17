@@ -23,6 +23,7 @@ import {
   moduleFini,
   objectifAtteint,
   orbesDuCycle,
+  sauteAuDernierRang,
 } from './descenteCarte'
 
 const c = CARTE_LIVREE
@@ -134,6 +135,40 @@ describe('la descente sur la carte', () => {
     e = six(e)
     expect(objectifAtteint(c, e)).toBe(true)
     expect(e.visites).toEqual(['HUB', 'T2', 'C2', 'P2', 'ANTI'])
+  })
+
+  it('passer le module (outil) : la salle en cours devient la dernière, son sas épuise le module', () => {
+    // T2, six salles : on est à la deuxième, entrée par la voie 1
+    let e = choisitVoie(franchitSalle(choisitVoie(entreModule(c, departCarte(c), 'T2', [])!, 0)), 1)
+    expect(e.niveau).toBe(1)
+    const { etat, sautees } = sauteAuDernierRang(c, e)
+    expect(sautees).toBe(4) // les rangs 1 à 4 : la salle en cours prend le rang 5
+    expect(etat.niveau).toBe(5)
+    expect(moduleFini(c, etat)).toBe(false) // la salle en cours reste à conclure
+    // la trace garde le rang joué, les rangs sautés sont « sans porte »
+    expect(etat.trace).toEqual([0, VOIE_INCONNUE, VOIE_INCONNUE, VOIE_INCONNUE, VOIE_INCONNUE])
+    expect(derniereVoie(etat)).toBeNull()
+    // son sas franchi : le module est épuisé, rien de plus — le suivant
+    // s'entame à zéro, sans rang d'avance
+    e = franchitSalle(etat)
+    expect(moduleFini(c, e)).toBe(true)
+    expect(e.niveau).toBe(6)
+    expect(entreModule(c, e, 'C2', [])!.niveau).toBe(0)
+  })
+
+  it('passer le module : rien à sauter à la dernière salle, ni hors d’un module à salles', () => {
+    const e = { ...entreModule(c, departCarte(c), 'T2', [])!, niveau: 5 }
+    expect(sauteAuDernierRang(c, e)).toEqual({ etat: e, sautees: 0 })
+    // le HUB n'a pas de salle : l'état ne bouge pas
+    const hub = departCarte(c)
+    expect(sauteAuDernierRang(c, hub)).toEqual({ etat: hub, sautees: 0 })
+  })
+
+  it('passer le module objectif : son sas boucle l’expédition', () => {
+    const e = { module: 'OBS', niveau: 0, visites: ['HUB', 'T2', 'C2', 'P2', 'ANTI'], revelations: {}, tissage: '', trace: [], graineRun: '' }
+    const { etat } = sauteAuDernierRang(c, e)
+    expect(objectifAtteint(c, etat)).toBe(false)
+    expect(objectifAtteint(c, franchitSalle(etat))).toBe(true)
   })
 
   it('la longueur de la run découle du trajet et s’affine en route', () => {

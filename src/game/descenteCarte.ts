@@ -152,6 +152,29 @@ export function franchitSalle(e: EtatCarteRun): EtatCarteRun {
   return { ...e, niveau: e.niveau + 1 }
 }
 
+/** PASSER LE MODULE (outil de conception) : la salle en cours devient la
+ *  DERNIÈRE du module — celles qu'on saute comptent comme franchies, sans
+ *  porte (voie inconnue dans la trace, qui garde ainsi ses rangs). Il ne
+ *  reste qu'à conclure la salle par le vrai chemin : franchitSalle épuise
+ *  le module, et c'est la carte qui s'ouvre, comme au bout d'une traversée.
+ *
+ *  Pourquoi ne pas épuiser le module d'un coup ? La salle en cours n'aurait
+ *  plus de rang à elle : son sas, franchi ensuite, compterait une salle de
+ *  trop — le module suivant s'entamerait avec un rang d'avance.
+ *
+ *  `sautees` dit combien de salles ont été passées : l'appelant creuse la
+ *  descente d'autant (voieRang), sans quoi la longueur annoncée et la
+ *  difficulté des salles suivantes resteraient en retard d'un module. */
+export function sauteAuDernierRang(c: CarteStation, e: EtatCarteRun): { etat: EtatCarteRun; sautees: number } {
+  const m = moduleCourant(c, e)
+  if (!m || m.niveaux <= 0) return { etat: e, sautees: 0 }
+  const cible = m.niveaux - 1
+  if (e.niveau >= cible) return { etat: e, sautees: 0 }
+  const trace = e.trace.slice(0, e.niveau)
+  while (trace.length < cible) trace.push(VOIE_INCONNUE)
+  return { etat: { ...e, niveau: cible, trace }, sautees: cible - e.niveau }
+}
+
 export interface ChoixModule {
   module: ModuleCarte
   lien: LienCarte
