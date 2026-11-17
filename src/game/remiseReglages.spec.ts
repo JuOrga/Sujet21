@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import {
   CLE_REMISE_REGLAGES,
+  CLE_REMISE_RELIEF_FORT,
   REGLAGES_REMIS,
   remetReglagesParDefaut,
   type StockageReglages,
@@ -40,7 +41,7 @@ describe('la remise à zéro des réglages graphiques', () => {
   })
 
   it('ne passe qu’une fois : le réglage refait ensuite par le joueur tient', () => {
-    const s = faux({ 'sujet21-eau': 'sobre' })
+    const s = faux({ 'sujet21-eau': 'sobre', [CLE_REMISE_RELIEF_FORT]: '1' })
     remetReglagesParDefaut(s)
     s.setItem('sujet21-eau', 'sobre') // la machine rame : le joueur revient à SOBRE
     s.setItem('sujet21-relief', 'off')
@@ -75,5 +76,39 @@ describe('main.ts remet les réglages AVANT de les lire', () => {
       const lecture = main.indexOf(`localStorage.getItem('${cle}')`)
       expect(lecture, cle).toBeGreaterThan(appel)
     }
+  })
+})
+
+// Le relief passe FORT par défaut (17/11) : la première remise avait fait
+// LÉGER de tous les appareils, et le choix s'écrit dès qu'on touche au bouton.
+describe('la seconde remise : le relief FORT pour tout le monde', () => {
+  const main = readFileSync(new URL('../main.ts', import.meta.url), 'utf8')
+
+  it('le défaut est FORT', () => {
+    expect(main).toContain("let reliefChoix = (localStorage.getItem('sujet21-relief') ?? 'fort') as")
+  })
+
+  it('un appareil déjà remis une fois perd son LÉGER, et lui seul', () => {
+    const s = faux({ [CLE_REMISE_REGLAGES]: '1', 'sujet21-relief': 'leger', 'sujet21-eau': 'sobre' })
+    expect(remetReglagesParDefaut(s)).toBe(true)
+    expect(s.getItem('sujet21-relief')).toBeNull()
+    expect(s.getItem('sujet21-eau')).toBe('sobre')
+    expect(s.getItem(CLE_REMISE_RELIEF_FORT)).not.toBeNull()
+  })
+
+  it('une fois seulement : le LÉGER choisi ensuite tient', () => {
+    const s = faux({ [CLE_REMISE_REGLAGES]: '1' })
+    remetReglagesParDefaut(s)
+    s.setItem('sujet21-relief', 'leger')
+    expect(remetReglagesParDefaut(s)).toBe(false)
+    expect(s.getItem('sujet21-relief')).toBe('leger')
+  })
+
+  it('un appareil jamais remis passe les deux remises d’un coup', () => {
+    const s = faux({ 'sujet21-relief': 'off' })
+    expect(remetReglagesParDefaut(s)).toBe(true)
+    expect(s.getItem('sujet21-relief')).toBeNull()
+    expect(s.getItem(CLE_REMISE_REGLAGES)).not.toBeNull()
+    expect(s.getItem(CLE_REMISE_RELIEF_FORT)).not.toBeNull()
   })
 })

@@ -4247,8 +4247,8 @@ const parallaxeReglages = {
 ;(
   window as unknown as { __parallaxe: typeof parallaxeReglages }
 ).__parallaxe = parallaxeReglages
-// Relief LÉGER, liquide RICHE, éclairages ACTIFS pour tout le monde : les
-// choix anciens de ces quatre réglages sont effacés UNE fois, ici, avant
+// Relief FORT, liquide RICHE, éclairages ACTIFS pour tout le monde : les
+// choix anciens de ces réglages sont effacés UNE fois par remise, ici, avant
 // qu'on ne les lise juste dessous (remiseReglages.ts).
 remetReglagesParDefaut(localStorage)
 // Graphismes du LIQUIDE, séparés du décor : SOBRE débranche l'éclairage de
@@ -4292,10 +4292,10 @@ let lumiereActive = localStorage.getItem('sujet21-lumiere') !== 'off'
 let lumiereEauActive = localStorage.getItem('sujet21-lumiere-eau') !== 'off'
 // RELIEF 2.5D des parois : leur sommet fuit le centre de la caméra, la face
 // latérale se révèle du côté qui regarde le centre — en se déplaçant, on
-// aperçoit les flancs des éléments qu'on aborde. LÉGER par défaut (demande
-// du concepteur, 16/11 : la validation à la manette est faite) ; les OFF
-// choisis pendant l'essai sont effacés une fois (remiseReglages.ts).
-let reliefChoix = (localStorage.getItem('sujet21-relief') ?? 'leger') as
+// aperçoit les flancs des éléments qu'on aborde. FORT par défaut (demande
+// du concepteur, 17/11, après LÉGER le 16/11) ; les choix anciens sont
+// effacés une fois, ceux de l'essai puis tous (remiseReglages.ts).
+let reliefChoix = (localStorage.getItem('sujet21-relief') ?? 'fort') as
   | 'off'
   | 'leger'
   | 'fort'

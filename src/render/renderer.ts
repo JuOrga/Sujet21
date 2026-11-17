@@ -53,6 +53,8 @@ import {
   FLANC_COQUE_GLSL,
   FLANC_SOMMETS,
   MAX_VIDES_COQUE,
+  OMBRE_PIED_COQUE_GLSL,
+  OMBRE_PIED_PORTEE,
   STATION_SOMMETS,
   remplitBandesCoque,
   remplitFlancsCoque,
@@ -2368,6 +2370,8 @@ float sdfBoiteLocal(int bi, vec2 wb, vec4 dec) {
 // sa PORTÉE : au-delà, elle vaut exactement 0 et ses trois distances ne se
 // paient pas — le creux d'une coque, toute une salle (volume.ts)
 ${OMBRE_PORTEE_GLSL}
+// l'ombre au pied de la COQUE de la cuve (coque.ts : ombrePiedCoque)
+${OMBRE_PIED_COQUE_GLSL}
 // le gradient du SDF de base d'une boîte, au point wb de son repère local
 // (dépivoté), par différences finies : d est la distance déjà calculée en
 // wb, (bca, bsa) le cosinus et le sinus de l'angle de la boîte — les axes du
@@ -2939,6 +2943,20 @@ void main() {
       float halo = pow(max(0.0, 1.0 - dl / rayon), 2.0);
       tank += (uLampesCol[li] * 0.5 + vec3(0.1, 0.09, 0.06)) * halo * 0.55 * uLampesInt[li];
     }
+  }
+  // L'OMBRE AU PIED DE LA COQUE (coque.ts : ombrePiedCoque). Sa face
+  // dressée tombait sur le fond sans rien qui l'y pose (le concepteur,
+  // 17/11). L'occlusion sur les quatre parois — au moins quelques pixels au
+  // recul —, et l'ombre courte d'un mur haut à l'opposé de la lumière : dans
+  // l'ombre cuite elle s'efface un peu, jamais sous les trois quarts, comme
+  // celle des solides. Les tableaux en modules : leurs coques sont des
+  // solides, la boucle des boîtes leur donne déjà les leurs. Avant la vie du
+  // vaisseau : les veilleuses sont des lumières, rien ne les ombre.
+  if (uSolModules < 0.5) {
+    vec2 omb = ombrePiedCoque(world, uRoomCenter - uRoomHalf, uRoomCenter + uRoomHalf, lampeDir,
+                              max(${OMBRE_PIED_PORTEE.toFixed(1)}, 6.0 * pxMonde), OMBRE_COURTE, OMBRE_COURTE_FLOU);
+    tank *= 1.0 - omb.x;
+    tank = mix(tank, tank * vec3(0.50, 0.56, 0.70), omb.y * 0.65 * mix(0.75, 1.0, solEclaire));
   }
   // la vie du vaisseau : veilleuses, poussières en dérive, respiration
   if (uDecor > 0.5) tank += shipLife(world, uZoom, uTime);
