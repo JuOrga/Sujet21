@@ -62,20 +62,9 @@ def mat_brosse(nom, base, clair, graine, brosse=0.10, rouille=None):
 
 
 # ------------------------------------------------------- l'atelier, en plus
-def _plaque_coupee(self, mat, x0, x1, z0, z1, yf, yb, var=0.0, coins=(0, 0, 0, 0)):
-    """une plaque à coins coupés en biseau : coins = (bas-gauche, bas-droite,
-    haut-droite, haut-gauche), la taille de la coupe (0 : coin droit)"""
-    bg, bd, hd, hg = coins
-    pts = []
-    for (x, z, c, dx, dz) in ((x0, z0, bg, 1, 1), (x1, z0, bd, -1, 1), (x1, z1, hd, -1, -1), (x0, z1, hg, 1, -1)):
-        if c:
-            # dans l'ordre du contour : on arrive par le côté vertical ou horizontal
-            if (dx, dz) in ((1, 1), (-1, -1)):
-                pts += [(x, z + dz * c), (x + dx * c, z)]
-            else:
-                pts += [(x + dx * c, z), (x, z + dz * c)]
-        else:
-            pts.append((x, z))
+def _prisme(self, mat, pts, yf, yb, var=0.0):
+    """un prisme : le contour `pts` (x, z), dans le plan du mur, tiré de la
+    face avant yf au fond yb — une trappe à six pans, un cache en triangle"""
     bm = self._bm(mat)
     av = [bm.verts.new((x, yf, z)) for x, z in pts]
     ar = [bm.verts.new((x, yb, z)) for x, z in pts]
@@ -88,7 +77,17 @@ def _plaque_coupee(self, mat, x0, x1, z0, z1, yf, yb, var=0.0, coins=(0, 0, 0, 0
     self._marque(mat, av + ar, var)
 
 
-Atelier.plaque_coupee = _plaque_coupee
+Atelier.prisme = _prisme
+
+
+def diagonale(at, mat, a, b, large, yf, yb, var=0.0):
+    """une barre droite de a à b (dans le plan du mur), de largeur `large`"""
+    (xa, za), (xb, zb) = a, b
+    dx, dz = xb - xa, zb - za
+    L = math.hypot(dx, dz)
+    cx, cz = (xa + xb) / 2, (za + zb) / 2
+    rot = Matrix.Rotation(-math.atan2(dz, dx), 4, 'Y')
+    at.boite(mat, cx - L / 2, cx + L / 2, cz - large / 2, cz + large / 2, yf, yb, var, rot=rot)
 
 
 def fond(P, mats, nom='fond'):
@@ -125,29 +124,125 @@ def rangee(coutures):
 
 
 # ------------------------------------------------------------------- le mur
-# relevé sur l'ancien wall.webp (1024 px) : quatre rangées de plaques
-# décalées, des coins coupés aux marches, un rivet à chaque coin, parfois deux
-MUR = [
-    # (bas, haut, coutures, coins coupés {indice de plaque: coins})
-    (0.000, 0.262, (0.15, 0.54, 0.895), {0: (0, 0, 0.02, 0), 1: (0, 0.02, 0, 0)}),
-    (0.262, 0.500, (0.12, 0.26, 0.72), {1: (0.025, 0, 0, 0.025), 2: (0, 0.025, 0, 0)}),
-    (0.500, 0.765, (0.0, 0.16, 0.555, 0.895), {1: (0, 0, 0, 0.02), 2: (0.02, 0, 0, 0)}),
-    (0.765, 1.000, (0.125, 0.545, 0.90), {2: (0, 0, 0.02, 0)}),
-]
+# LE DESSUS DES PAROIS (17/11, troisième dessin). Le mur était un appareil de
+# plaques décalées, relevé sur l'ancienne image générée : quatre rangées, des
+# joints noirs. Sur le dessus d'une paroi de 40 unités, on n'en voyait que les
+# joints, à intervalles — « on dirait presque des pavés », et sur un bloc rond,
+# un mur de briques. Rien n'y disait la station.
+#
+# Ici, un ISOGRID : la peau des modules pressurisés, un treillis de nervures
+# en triangles fraisé dans la masse, un bossage percé à chaque nœud. Le dessin
+# n'a pas de sens privilégié (trois directions de nervures) : une paroi le
+# coupe sous n'importe quel angle sans qu'il change de nature, et une paroi
+# mince, qui n'en montre qu'une rangée, se lit en poutre à treillis. Ce sont
+# les lampes du jeu qui le sculptent (le relief dans l'alpha) : les nervures
+# prennent la lumière d'un côté, les alvéoles restent dans l'ombre.
+#
+# Le raccord : sept mailles en largeur, huit rangées en hauteur. Un triangle
+# équilatéral voudrait des rangées de 0,1237 ; elles font 0,125 — un pour cent
+# d'écart, que l'œil ne voit pas, et le treillis se referme sur le carreau.
+MAILLES, RANGS = 7, 8
+NERVURE = 0.011       # sa largeur (2,5 unités de jeu : le carreau en couvre 230)
+HAUT_NERVURE = 0.012  # ce dont elle dépasse du fond des alvéoles
+BOSSAGE = 0.019       # le rayon du bossage d'un nœud
+
+
+def noeud(i, j):
+    """le nœud i de la rangée j ; une rangée sur deux est décalée d'une
+    demi-maille"""
+    return ((i + 0.5 * (j % 2)) / MAILLES, j / RANGS)
+
+
+def voisins_haut(i, j):
+    """les deux nœuds au-dessus de (i, j) : à gauche, à droite"""
+    return ((i, j + 1), (i + 1, j + 1)) if j % 2 else ((i - 1, j + 1), (i, j + 1))
+
+
+def rentre(pts, k):
+    """le contour ramené vers son centre : k = 1, inchangé"""
+    cx = sum(p[0] for p in pts) / len(pts)
+    cz = sum(p[1] for p in pts) / len(pts)
+    return [(cx + (x - cx) * k, cz + (z - cz) * k) for x, z in pts]
+
+
+def trappe_six_pans(at, i, j, var):
+    """une trappe de visite posée sur les nervures, autour d'un nœud : six
+    pans, un boulon à chaque angle, une poignée encastrée au centre"""
+    x, z = noeud(i, j)
+    g, d = voisins_haut(i, j)
+    bg, bd = ((i, j - 1), (i + 1, j - 1)) if j % 2 else ((i - 1, j - 1), (i, j - 1))
+    tour = [noeud(i + 1, j), noeud(*d), noeud(*g), noeud(i - 1, j), noeud(*bg), noeud(*bd)]
+    y = -HAUT_NERVURE
+    at.prisme('plat', rentre(tour, 0.80), y - 0.005, y + 0.002, var)
+    for (px, pz) in rentre(tour, 0.66):
+        at.cylindre('ecrou', px, pz, 0.0062, y - 0.0085, y - 0.005, var, seg=6)
+    at.anneau('rail', x, z, 0.034, 0.024, y - 0.0075, y - 0.005, var, seg=48)
+    at.disque('fond', x, z, 0.024, y - 0.0052, y - 0.004, 0, seg=48)
+    at.boite('rail', x - 0.022, x + 0.022, z - 0.004, z + 0.004, y - 0.0075, y - 0.005, var)
+
+
+def cache(at, tri, var):
+    """un cache vissé dans une alvéole : une tôle en triangle, en retrait des
+    nervures, une vis à chaque pointe"""
+    y = -HAUT_NERVURE * 0.6
+    at.prisme('plat', rentre(tri, 0.70), y, 0.0, var)
+    for (px, pz) in rentre(tri, 0.50):
+        at.dome('rivet', px, pz, 0.0034, y, var)
+
+
+def isogrid(at, rng, trappes, caches, bande=()):
+    """le treillis, et ce qu'il porte : des trappes de visite (leurs nœuds),
+    `caches` caches semés au hasard, et une `bande` (rangée, première maille,
+    dernière) d'alvéoles toutes cachées — un chemin de câbles capoté"""
+    # le fond des alvéoles : une seule peau, JUSTE le carreau (débordante,
+    # elle se superposait à ses copies et le bord sortait en liseré)
+    at.boite('tole', 0.0, 1.0, 0.0, 1.0, 0.0, FOND_Y, 0)
+    y = -HAUT_NERVURE
+    triangles = []
+    for j in range(RANGS):
+        for i in range(MAILLES):
+            p = noeud(i, j)
+            g, d = voisins_haut(i, j)
+            # chaque nervure une seule fois : vers la droite, et les deux
+            # montantes ; ce qui sort du carreau, la copie voisine le ramène
+            for q in (noeud(i + 1, j), noeud(*g), noeud(*d)):
+                diagonale(at, 'rail', p, q, NERVURE, y, 0.0, 0.0)
+            at.cylindre('rail', p[0], p[1], BOSSAGE, y - 0.002, 0.0, 0.0, seg=24)
+            at.disque('fond', p[0], p[1], 0.0065, y - 0.0024, y - 0.001, 0, seg=20)
+            triangles.append(((i, j), (p, noeud(i + 1, j), noeud(*d))))
+            triangles.append(((i, j), (p, noeud(*d), noeud(*g))))
+    # deux trappes de visite par carreau, loin l'une de l'autre ; les
+    # alvéoles qu'elles couvrent ne portent rien d'autre
+    for (i, j) in trappes:
+        trappe_six_pans(at, i, j, rng.uniform(-1, 1))
+
+    def loin(tri):
+        cx = sum(p[0] for p in tri) / 3
+        cz = sum(p[1] for p in tri) / 3
+        for (i, j) in trappes:
+            tx, tz = noeud(i, j)
+            dx = min(abs(cx - tx), 1 - abs(cx - tx))
+            dz = min(abs(cz - tz), 1 - abs(cz - tz))
+            if math.hypot(dx, dz) < 1.25 / MAILLES:
+                return False
+        return True
+    capotes = []
+    if bande:
+        jb, i0, i1 = bande
+        capotes = [t for (i, j), t in triangles if j == jb and i0 <= i <= i1]
+        var = rng.uniform(-1, 1)
+        for tri in capotes:
+            cache(at, tri, var)
+    libres = [t for _, t in triangles if loin(t) and t not in capotes]
+    rng.shuffle(libres)
+    # (des trous d'allègement, essai 1 : noirs et ronds, ils se lisaient en
+    # impacts — et une peau pressurisée n'est pas percée)
+    for tri in libres[:caches]:
+        cache(at, tri, rng.uniform(-1, 1))
 
 
 def mur(at, rng):
-    for (z0, z1, coutures, coupes) in MUR:
-        for i, (x0, x1) in enumerate(rangee(coutures)):
-            g = JEU / 2
-            var = rng.uniform(-1, 1)
-            at.plaque_coupee('panneau', x0 + g, x1 - g, z0 + g, z1 - g, 0.0, FOND_Y, var, coupes.get(i, (0, 0, 0, 0)))
-            # un rivet à chaque coin, en retrait ; un sur cinq, doublé
-            for (x, z, sx, sz) in ((x0, z0, 1, 1), (x1, z0, -1, 1), (x1, z1, -1, -1), (x0, z1, 1, -1)):
-                rx, rz = x + sx * 0.016, z + sz * 0.016
-                at.dome('rivet', rx, rz, 0.0045, 0.0, var)
-                if rng.random() < 0.2:
-                    at.dome('rivet', rx + sx * 0.011, rz, 0.0038, 0.0, var)
+    isogrid(at, rng, [(1, 2), (5, 6)], 9)
 
 
 # ------------------------------------------------------------ le fond de cuve
@@ -463,59 +558,18 @@ def bati_phobe(at, rng):
 
 # ------------------------------------------------------- la seconde paroi
 # wall-a : la paroi qui alterne avec le mur sur les longs murs (le shader
-# fond l'une dans l'autre selon un bruit très lent, à l'échelle 520 contre
-# 230). Elle doit donc être PLUS FOUILLÉE que le mur, dans le même acier
-# froid — c'est le relief qui rompt la répétition, pas la couleur. La mise
-# en page et les panneaux sont ceux de la tôle de la chaufferie (dispose,
-# plaque, nervures, trappe), sans ce qui y dit la chaleur : ni matelas, ni
-# suie, ni veilleuse ambre.
+# fond l'une dans l'autre selon un bruit très lent). C'était la tôle de la
+# chaufferie dans l'acier froid, à l'échelle 520 contre 230 : sous les
+# plaques du mur, elle rompait la répétition. Sous l'isogrid (17/11), elle
+# jurait — des tôles et des conduites qui montaient en fondu dans le
+# treillis, deux dessins sans rapport sur la même paroi. Elle est donc LE
+# MÊME TREILLIS, à la même échelle et dans le même acier : nervures et
+# nœuds tombent exactement sur ceux du mur, le fondu n'y change rien, et
+# seuls les accessoires diffèrent — d'autres trappes, d'autres caches, un
+# chemin de câbles capoté. La répétition reste rompue, le dessin reste un.
 
 def bati_wall_a(at, rng):
-    g = JEU / 2
-    for (x0, x1, z0, z1, sorte) in dispose(rng, [0.2, 0.26, 0.18, 0.36], [0.16, 0.22, 0.3, 0.4]):
-        w, h = x1 - x0, z1 - z0
-        a = (x0 + g, x1 - g, z0 + g, z1 - g)
-        yf = rng.choice((0.0, 0.0, -0.003, -0.006))
-        var = rng.uniform(-1, 1)
-        t = rng.random()
-        if sorte is None and t < 0.2 and w >= 0.16:
-            nervures(at, *a, yf, var)
-        elif sorte is None and t < 0.34 and w >= 0.14 and h >= 0.14:
-            trappe(at, *a, yf, var)
-        elif sorte is None and t < 0.48 and w >= 0.2 and h >= 0.16:
-            plaque(at, *a, yf, var)
-            grille(at, a[0] + 0.03, a[1] - 0.03, a[2] + 0.03, a[3] - 0.03, var)
-        else:
-            plaque(at, *a, yf, var)
-            # une plaque nue sur deux porte un petit équipement : sans eux, la
-            # paroi sortait plus propre et plus sage que le mur (essai 1)
-            if w >= 0.1 and h >= 0.1 and rng.random() < 0.55:
-                petit_equipement(at, *a, yf, var, rng)
-    # deux faisceaux de conduites verticales, qui font le tour du carreau
-    for xc in (rng.uniform(0.05, 0.4), rng.uniform(0.55, 0.9)):
-        for k, dx in enumerate((-0.011, 0.011)):
-            at.tube('tuyau', (xc + dx, -0.016, -0.02), (xc + dx, -0.016, 1.02), 0.0075, seg=16)
-        for i in range(4):
-            z = (i + 0.5) / 4 + rng.uniform(-0.04, 0.04)
-            at.boite('lame', xc - 0.024, xc + 0.024, z - 0.007, z + 0.007, -0.026, -0.006, 0)
-
-
-def petit_equipement(at, x0, x1, z0, z1, yf, var, rng):
-    """un boîtier de raccordement, ou des fentes d'aération, dans un coin de
-    la plaque"""
-    if rng.random() < 0.5:
-        bw, bh = min(0.08, (x1 - x0) * 0.5), min(0.06, (z1 - z0) * 0.5)
-        bx = x0 + 0.02 if rng.random() < 0.5 else x1 - 0.02 - bw
-        bz = z0 + 0.02 if rng.random() < 0.5 else z1 - 0.02 - bh
-        at.boite('peinture', bx, bx + bw, bz, bz + bh, yf - 0.01, yf, var)
-        at.boite('fond', bx + 0.008, bx + bw - 0.008, bz + bh - 0.016, bz + bh - 0.01, yf - 0.0105, yf - 0.009, 0)
-    else:
-        n = rng.randint(3, 5)
-        sx = x0 + 0.025
-        sz = z1 - 0.03
-        for i in range(n):
-            z = sz - i * 0.012
-            at.boite('fond', sx, sx + min(0.07, (x1 - x0) * 0.45), z - 0.0025, z + 0.0025, yf - 0.0005, yf + 0.002, 0)
+    isogrid(at, rng, [(0, 6), (4, 1)], 7, bande=(4, 2, 4))
 
 
 def gouttes_lisses(C, mats):
@@ -543,7 +597,16 @@ def surfaces(neutre=True):
     mats['rail'] = mat_brosse('rail', (0x18, 0x24, 0x2a), (0x30, 0x40, 0x48), 33, brosse=0.05)
     mats['plat'] = mats['rail']
     mats['voyant'] = mat_simple('voyant', (0x10, 0x40, 0x40), rug=0.3, emission=(0x5a, 0xf0, 0xe0), force=3.0)
-    carreau(sc, mats, 'wall', mur, relief=neutre)
+    # l'isogrid : le fond des alvéoles dans l'acier du mur, les nervures un
+    # cran plus claires (leur dessus est fraisé, il accroche le jour) et les
+    # caches entre les deux
+    mats_mur = dict(mats)
+    mats_mur['tole'] = mats['panneau']
+    mats_mur['rail'] = mat_brosse('nervure', (0x30, 0x3c, 0x4a), (0x58, 0x68, 0x7a), 35, brosse=0.06)
+    mats_mur['plat'] = mat_brosse('cache', (0x2a, 0x35, 0x42), (0x4e, 0x5c, 0x6c), 36, brosse=0.10)
+    mats_mur['rivet'] = mats_mur['plat']
+    mats_mur['ecrou'] = mat_simple('ecrou', (0x50, 0x58, 0x60), rug=0.45, metal=0.6)
+    carreau(sc, mats_mur, 'wall', mur, relief=neutre)
     # le fond de cuve : plus sombre, plus sarcelle (l'ancien : 0,11)
     mats_cuve = dict(mats)
     mats_cuve['panneau'] = mat_brosse('cuve', (0x10, 0x1a, 0x20), (0x24, 0x32, 0x3a), 37, brosse=0.04, rouille=(0x22, 0x2a, 0x2a))
@@ -568,12 +631,8 @@ def surfaces(neutre=True):
     # son reflet qui la dessine
     mats['goutte'] = mat_simple('goutte', (0x3c, 0x2c, 0x52), rug=0.04)
     carreau(sc, mats, 'phobe', bati_phobe, extra=gouttes_lisses, relief=neutre)
-    # la seconde paroi : l'acier du mur, un rien plus vert et plus usé
-    # (l'ancienne mesurait 0,17 de luminance ; à 223032 / 46585a, 0,137 :
-    # plus sombre que le mur, elle s'y lisait en tache)
-    mats_a = dict(mats)
-    mats_a['peinture'] = mat_brosse('paroi-a', (0x27, 0x36, 0x38), (0x50, 0x63, 0x65), 43, brosse=0.08, rouille=(0x2c, 0x32, 0x2c))
-    mats_a['rivet'] = mats_a['panneau'] = mats_a['peinture']
-    carreau(sc, mats_a, 'wall-a', bati_wall_a, relief=neutre)
+    # la seconde paroi : les matières MÊMES du mur — une teinte à elle
+    # (elle était un rien plus verte) se lirait en tache dans le fondu
+    carreau(sc, mats_mur, 'wall-a', bati_wall_a, relief=neutre)
     (lumiere_neutre if neutre else lumiere_camera)(sc)
     sc.cycles.device = 'GPU'
