@@ -9,11 +9,18 @@ import {
   COTE_BAS,
   COTE_DROITE,
   COTE_GAUCHE,
+  COTE_FLANC,
   COTE_HAUT,
+  FLANC_COQUE_GLSL,
+  FLANC_SOMMETS,
   MAX_VIDES_COQUE,
+  piedFlancCoque,
   remplitBandesCoque,
+  remplitFlancsCoque,
   videsPercantLaCoque,
 } from './coque'
+import { fractionSommet, pointDuSommet } from './reliefParois'
+import { HAUTEUR_BLOCS, HAUTEUR_COQUE } from './hauteurs'
 import { MAT_BAIE, MAT_VIDE, MAT_WALL } from '../game/level'
 
 // La cuve standard : 2400 × 1500.
@@ -258,5 +265,137 @@ describe('Le shader de coque tient sa promesse', () => {
   it('et drawHull lui passe bien les vides retenus', () => {
     expect(source).toMatch(/videsPercantLaCoque\(/)
     expect(source).toMatch(/uniform4fv\(hu\['uVides\[0\]'\]/)
+  })
+})
+
+// « Il n'y a pas d'effet 2,5D sur les parois d'enceinte des tableaux » (le
+// concepteur, 17/11) : relief allumé, la coque restait couchée au sol.
+describe('La coque a une hauteur : relief allumé, elle se dresse', () => {
+  const source = readFileSync(fileURLToPath(new URL('./renderer.ts', import.meta.url)), 'utf8')
+  const vs = source.slice(source.indexOf('const HULL_VS'), source.indexOf('const HULL_FS'))
+  const fs = source.slice(source.indexOf('const HULL_FS'), source.indexOf('// Décalques de décor'))
+  const draw = source.slice(source.indexOf('  private drawHull('), source.indexOf('  // Décalques : un quad par pièce'))
+  // le centre de l'écran dans la cuve, la part d'un mur haut au relief fort
+  const c = { x: 300, y: -100 }
+  const f = fractionSommet(0.07, 1.3, HAUTEUR_COQUE)
+
+  it('la coque glisse de la part d’un mur haut, ni plus ni moins', () => {
+    // sa hauteur (2400) est bornée à celle du mur haut, comme toute coque
+    expect(f).toBe(fractionSommet(0.07, 1.3, HAUTEUR_BLOCS))
+    expect(f).toBeGreaterThan(0)
+  })
+
+  it('le dessus de la coque (bande et frange) est la base agrandie autour du centre', () => {
+    // la règle des décalques posés sur un mur (pointDuSommet), sur les sommets
+    expect(vs).toContain('if (aCote.x < 3.5) ecran = uCenter + (aPos - uCenter) / (1.0 - uSommet);')
+    // la station autour (côté 4) reste au sol : elle n'est pas la coque
+    expect(vs).not.toMatch(/aCote\.x < 4\.5\) ecran/)
+    // le fragment lit la BASE : vides, pièces et texture ne glissent pas
+    expect(vs).toContain('vWorld = aCote.x > 4.5 ? ecran : aPos;')
+    expect(draw).toContain("gl.uniform1f(hu['uSommet'], sommetCoque)")
+    expect(draw).toContain('fractionSommet(this.reliefK, this.zoomRelief, HAUTEUR_COQUE)')
+  })
+
+  it('quatre faces intérieures, du pied (le bord de la cuve) au sommet', () => {
+    const out = new Float32Array(FLANC_SOMMETS * COQUE_FLOTTANTS)
+    expect(remplitFlancsCoque(cuve, out, 0)).toBe(FLANC_SOMMETS)
+    const sommets = Array.from({ length: FLANC_SOMMETS }, (_, i) => {
+      const o = i * COQUE_FLOTTANTS
+      return { x: out[o], y: out[o + 1], s: out[o + 2], a: out[o + 3], cote: out[o + 4] - COTE_FLANC }
+    })
+    for (let face = 0; face < 4; face++) {
+      const vs6 = sommets.slice(face * 6, face * 6 + 6)
+      for (const v of vs6) {
+        expect(v.cote).toBe(face)
+        expect([0, 1]).toContain(v.a)
+        // chaque sommet est sur SA paroi : au pied comme en haut (le shader
+        // pousse le haut, la géométrie ne porte que le pied)
+        if (face === COTE_HAUT) expect(v.y).toBe(cuve.maxY)
+        if (face === COTE_BAS) expect(v.y).toBe(cuve.minY)
+        if (face === COTE_GAUCHE) expect(v.x).toBe(cuve.minX)
+        if (face === COTE_DROITE) expect(v.x).toBe(cuve.maxX)
+      }
+      // deux triangles non dégénérés une fois le haut poussé
+      expect(vs6.filter((v) => v.a === 1)).toHaveLength(3)
+    }
+    expect(vs).toContain('else if (aCote.x > 4.5) ecran = uCenter + (aPos - uCenter) / (1.0 - uSommet * aUv.y);')
+  })
+
+  it('le pied d’un point de la face : t = 0 au bord de la cuve, t = 1 au bord du dessus', () => {
+    // au pied, sur la paroi du haut
+    const pied = piedFlancCoque(-200, cuve.maxY + 1e-6, c.x, c.y, f, cuve, COTE_HAUT)
+    expect(pied).not.toBeNull()
+    expect(pied![0]).toBeCloseTo(0, 5)
+    expect(pied![1]).toBeCloseTo(-200 - cuve.minX, 4)
+    // au sommet : le point de la paroi que le dessus a déplacé
+    const [hx, hy] = pointDuSommet(-200, cuve.maxY, c.x, c.y, f)
+    const haut = piedFlancCoque(hx, hy - 1e-6, c.x, c.y, f, cuve, COTE_HAUT)
+    expect(haut).not.toBeNull()
+    expect(haut![0]).toBeCloseTo(1, 4)
+    expect(haut![1]).toBeCloseTo(-200 - cuve.minX, 3)
+    // à mi-chemin à l'écran : la hauteur vue est entre les deux
+    const mi = piedFlancCoque((-200 + hx) / 2, (cuve.maxY + hy) / 2, c.x, c.y, f, cuve, COTE_HAUT)!
+    expect(mi[0]).toBeGreaterThan(0.3)
+    expect(mi[0]).toBeLessThan(0.7)
+    // dans la cuve, ou au-delà du dessus : pas sur la face
+    expect(piedFlancCoque(-200, cuve.maxY - 5, c.x, c.y, f, cuve, COTE_HAUT)).toBeNull()
+    expect(piedFlancCoque(hx, hy + 5, c.x, c.y, f, cuve, COTE_HAUT)).toBeNull()
+    // relief éteint : il n'y a pas de face
+    expect(piedFlancCoque(-200, cuve.maxY + 1, c.x, c.y, 0, cuve, COTE_HAUT)).toBeNull()
+  })
+
+  it('les quatre faces pavent l’anneau entre la cuve et le dessus, sans jour ni recouvrement', () => {
+    // un balayage de l'écran : tout point entre le bord de la cuve et le bord
+    // déplacé du dessus est sur UNE face, et sur une seule ; aucun ailleurs
+    const s = 1 / (1 - f)
+    let dansAnneau = 0
+    for (let ix = -40; ix <= 40; ix++) {
+      for (let iy = -40; iy <= 40; iy++) {
+        const x = c.x + ix * 41.3
+        const y = c.y + iy * 27.7
+        const dansCuve = x > cuve.minX && x < cuve.maxX && y > cuve.minY && y < cuve.maxY
+        const dansDessus =
+          x > c.x + (cuve.minX - c.x) * s && x < c.x + (cuve.maxX - c.x) * s &&
+          y > c.y + (cuve.minY - c.y) * s && y < c.y + (cuve.maxY - c.y) * s
+        const faces = [COTE_HAUT, COTE_BAS, COTE_GAUCHE, COTE_DROITE].filter(
+          (k) => piedFlancCoque(x, y, c.x, c.y, f, cuve, k) !== null,
+        )
+        if (!dansCuve && dansDessus) {
+          dansAnneau++
+          expect(faces).toHaveLength(1)
+        } else {
+          expect(faces).toHaveLength(0)
+        }
+      }
+    }
+    expect(dansAnneau).toBeGreaterThan(20)
+  })
+
+  it('l’œil au-delà d’une paroi : sa face intérieure lui tourne le dos', () => {
+    const loin = { x: 0, y: cuve.maxY + 400 }
+    for (let y = cuve.maxY - 300; y < cuve.maxY + 600; y += 7) {
+      expect(piedFlancCoque(0, y, loin.x, loin.y, f, cuve, COTE_HAUT)).toBeNull()
+    }
+  })
+
+  it('le jumeau GLSL dit la même chose, et le shader de coque s’en sert', () => {
+    expect(FLANC_COQUE_GLSL).toContain('vec3 piedFlancCoque(vec2 w, vec2 c, float f, vec4 cuve, float cote)')
+    expect(FLANC_COQUE_GLSL).toContain('if (den <= 0.0 || num <= 0.0) return vec3(0.0);')
+    expect(FLANC_COQUE_GLSL).toContain('float t = (1.0 - k) / f;')
+    expect(FLANC_COQUE_GLSL).toContain('if (t < 0.0 || t > 1.0) return vec3(0.0);')
+    expect(FLANC_COQUE_GLSL).toContain('if (s < 0.0 || s > (cote > 1.5 ? cuve.w - cuve.y : cuve.z - cuve.x)) return vec3(0.0);')
+    expect(fs).toContain('${FLANC_COQUE_GLSL}')
+    expect(fs).toContain('vec3 fl = piedFlancCoque(vWorld, uCenter, uSommet, uCuve, cote);')
+  })
+
+  it('la face passe SOUS ce qu’un solide de la cuve dresse devant elle', () => {
+    // un mur collé à la paroi : son dessus déborde sur la face, il est plus
+    // haut qu'elle en ce pixel — la profondeur de la composition le dit
+    const i = draw.indexOf('gl.drawArrays(gl.TRIANGLES, debutFlancs, FLANC_SOMMETS)')
+    expect(i).toBeGreaterThan(0)
+    expect(draw.slice(0, i)).toMatch(/this\.passeSousSommets\(true\)\s*$/)
+    expect(draw.slice(i)).toMatch(/^gl\.drawArrays\(gl\.TRIANGLES, debutFlancs, FLANC_SOMMETS\)\s*this\.passeSousSommets\(false\)/)
+    // relief éteint : ni écrite ni dessinée
+    expect(draw).toContain('if (sommetCoque > 0) remplitFlancsCoque(b, this.hullScratch, debutFlancs)')
   })
 })
