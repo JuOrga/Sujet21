@@ -270,7 +270,34 @@ describe('conduite — les jumeaux', () => {
     expect(cadre('JOINT')).toEqual(CONDUITE_ATLAS.joint)
     expect(cadre('GIVRE')).toEqual(CONDUITE_ATLAS.givre)
     expect(cadre('VANNE')).toEqual(CONDUITE_ATLAS.vanne)
+    expect(cadre('FLANC')).toEqual(CONDUITE_ATLAS.flanc)
     expect(Number(py.match(/^TAILLE = (\d+)/m)![1])).toBe(CONDUITE_ATLAS.taille)
+    expect(Number(py.match(/^HAUTEUR = (\d+)/m)![1])).toBe(CONDUITE_ATLAS.hauteur)
+  })
+
+  // LA TRANCHE (relief 2.5D, 17/11) : l'atlas s'agrandit vers le bas. Les
+  // pièces du dessus ne bougent pas — mais le shader les lisait sur un
+  // CARRÉ (le même côté pour u et pour v) : resté ainsi, tout le dessus de
+  // la conduite se serait lu de travers.
+  it('la bande de la tranche tient dans l’atlas, sous les pièces, sans en recouvrir aucune', () => {
+    const A = CONDUITE_ATLAS
+    const [x, y, w, h] = A.flanc
+    expect(A.hauteur).toBe(2048)
+    expect(x >= 0 && y >= 0 && x + w <= A.taille && y + h <= A.hauteur).toBe(true)
+    for (const c of [A.corps, A.bout, A.joint, A.givre, A.vanne]) {
+      const recoupe = x < c[0] + c[2] && c[0] < x + w && y < c[1] + c[3] && c[1] < y + h
+      expect(recoupe).toBe(false)
+    }
+  })
+
+  it('le shader lit l’atlas sur sa vraie hauteur, et la tranche dans le même atlas', async () => {
+    const { readFileSync } = await import('node:fs')
+    const src = readFileSync(new URL('../render/renderer.ts', import.meta.url), 'utf8')
+    expect(src).toMatch(/const float CN_ATLAS_H = \$\{f\(A\.hauteur\)\};/)
+    expect(src).toMatch(/const vec4 CN_CADRE_FLANC = \$\{v4\(A\.flanc\)\};/)
+    // plus aucune lecture qui suppose un carré
+    expect(src).not.toMatch(/CN_ATLAS - pa\.y\) \/ CN_ATLAS/)
+    expect(src).toMatch(/tranchePieces\(uTexFroid, vec2\(CN_ATLAS, CN_ATLAS_H\), CN_CADRE_FLANC/)
   })
 })
 
