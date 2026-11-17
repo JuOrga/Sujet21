@@ -894,7 +894,9 @@ const RETOMBEE_TOIT_GLSL = `float retombeeToit(float dn, float portee, float hRe
   return f + 0.85 * pow(max(0.0, 1.0 - dn / (hRel * 0.55 + 60.0)), 1.6);
 }`
 
-const COMPOSE_FS = `#version 300 es
+// Exporté pour unitesTexture.spec.ts : ce shader lit 16 textures, le
+// minimum garanti par WebGL2 — le test compte sur la source ASSEMBLÉE.
+export const COMPOSE_FS = `#version 300 es
 precision highp float;
 #define MAX_BOXES 160
 #define MAX_WAVES 8
