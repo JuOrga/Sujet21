@@ -6,9 +6,9 @@ import {
   COQUE_FLOTTANTS,
   COQUE_FRANGE,
   COQUE_SOMMETS,
+  COTE_BAS,
   COTE_DROITE,
   COTE_GAUCHE,
-  COTE_BAS,
   COTE_FLANC,
   COTE_HAUT,
   FLANC_COQUE_GLSL,
@@ -115,7 +115,7 @@ describe('Les bandes de coque et leur frange de matériel', () => {
     return { x: out[o], y: out[o + 1], s: out[o + 2], a: out[o + 3], cote: out[o + 4], long: out[o + 5] }
   })
 
-  it('quatre bandes, deux triangles chacune', () => {
+  it('quatre bandes, deux morceaux chacune (la coque, la frange), deux triangles par morceau', () => {
     expect(n).toBe(COQUE_SOMMETS)
   })
 
@@ -143,11 +143,103 @@ describe('Les bandes de coque et leur frange de matériel', () => {
     }
   })
 
-  it('les verticales s’arrêtent à la cuve : les franges ne se chevauchent pas dans les angles', () => {
-    const verticales = sommets.filter((v) => v.cote === COTE_GAUCHE || v.cote === COTE_DROITE)
+  // les triangles, trois sommets par trois ; ceux de la COQUE (a ≤ épaisseur)
+  // à part de ceux de la frange
+  const triangles = Array.from({ length: n / 3 }, (_, i) => sommets.slice(i * 3, i * 3 + 3))
+  const T = COQUE_EPAISSEUR
+  const coque = triangles.filter((t) => t.every((v) => v.a <= T))
+  const frange = triangles.filter((t) => t.every((v) => v.a >= T))
+
+  it('chaque triangle est tout coque ou tout frange', () => {
+    expect(coque.length + frange.length).toBe(triangles.length)
+    expect(coque.length).toBe(8)
+  })
+
+  it('les franges verticales s’arrêtent à la cuve : elles ne chevauchent pas les horizontales', () => {
+    const verticales = frange.flat().filter((v) => v.cote === COTE_GAUCHE || v.cote === COTE_DROITE)
     expect(Math.min(...verticales.map((v) => v.y))).toBe(cuve.minY)
     expect(Math.max(...verticales.map((v) => v.y))).toBe(cuve.maxY)
     for (const v of verticales) expect(v.long).toBe(cuve.maxY - cuve.minY)
+  })
+
+  // Le point (x, y) est-il DANS le triangle (strictement, à 1e-6 près) ? Si
+  // oui, ses (s, a) interpolés.
+  function dans(t: (typeof sommets)[number][], x: number, y: number) {
+    const [p, q, r] = t
+    const det = (q.x - p.x) * (r.y - p.y) - (r.x - p.x) * (q.y - p.y)
+    const l1 = ((x - p.x) * (r.y - p.y) - (r.x - p.x) * (y - p.y)) / det
+    const l2 = ((q.x - p.x) * (y - p.y) - (x - p.x) * (q.y - p.y)) / det
+    const l0 = 1 - l1 - l2
+    if (Math.min(l0, l1, l2) < -1e-6) return null
+    return { cote: p.cote, s: l0 * p.s + l1 * q.s + l2 * r.s, a: l0 * p.a + l1 * q.a + l2 * r.a }
+  }
+
+  it('LES ANGLES SONT COUPÉS D’ONGLET : chaque point du carré d’angle revient à la paroi la plus proche', () => {
+    // le retour du 17/11 : en haut à gauche, la bande du haut couvrait tout
+    // le carré d'angle et le montant s'y arrêtait net — une couture droite
+    // au lieu d'un angle. Sur la diagonale, les deux bandes se partagent le
+    // carré : la tôle tourne l'angle.
+    const angles = [
+      { x: cuve.minX, y: cuve.maxY, sx: -1, sy: 1, horiz: COTE_HAUT, vert: COTE_GAUCHE },
+      { x: cuve.maxX, y: cuve.maxY, sx: 1, sy: 1, horiz: COTE_HAUT, vert: COTE_DROITE },
+      { x: cuve.minX, y: cuve.minY, sx: -1, sy: -1, horiz: COTE_BAS, vert: COTE_GAUCHE },
+      { x: cuve.maxX, y: cuve.minY, sx: 1, sy: -1, horiz: COTE_BAS, vert: COTE_DROITE },
+    ]
+    for (const c of angles) {
+      for (const u of [5, 30, 52, 80]) {
+        for (const v of [3, 29, 61, 85]) {
+          // u : la profondeur dans le montant (en x), v : dans la bande (en y)
+          const x = c.x + c.sx * u
+          const y = c.y + c.sy * v
+          const touches = coque.map((t) => dans(t, x, y)).filter((h) => h !== null)
+          expect(touches.length).toBe(1)
+          const h = touches[0]!
+          // le biais : du côté du montant, la verticale ; sinon l'horizontale
+          expect(h.cote).toBe(u > v ? c.vert : c.horiz)
+          // et « en travers » reste la distance au bord INTÉRIEUR de SA
+          // paroi : le tube lumineux et le chanfrein tournent l'angle
+          expect(h.a).toBeCloseTo(u > v ? u : v, 6)
+        }
+      }
+    }
+  })
+
+  it('le long des parois, la coque n’a ni trou ni doublon', () => {
+    for (const s of [0.5, 0.25, 0.75]) {
+      for (const a of [1, 45, 89]) {
+        const pts = [
+          [cuve.minX + s * (cuve.maxX - cuve.minX), cuve.maxY + a],
+          [cuve.minX + s * (cuve.maxX - cuve.minX), cuve.minY - a],
+          [cuve.minX - a, cuve.minY + s * (cuve.maxY - cuve.minY)],
+          [cuve.maxX + a, cuve.minY + s * (cuve.maxY - cuve.minY)],
+        ]
+        for (const [x, y] of pts) {
+          // un point intérieur à un quad est couvert par ses DEUX triangles
+          // seulement s'il tombe sur leur diagonale : on n'en tolère qu'un
+          const touches = coque.filter((t) => dans(t, x, y) !== null)
+          expect(touches.length).toBeGreaterThanOrEqual(1)
+          expect(new Set(touches.map((t) => t[0].cote)).size).toBe(1)
+        }
+      }
+    }
+  })
+
+  it('les biais partagés tombent au même flottant : pas de fente entre deux bandes', () => {
+    const cle = (v: { x: number; y: number }) => `${Math.fround(v.x)},${Math.fround(v.y)}`
+    const coins = [
+      [cuve.minX - T, cuve.maxY + T],
+      [cuve.maxX + T, cuve.maxY + T],
+      [cuve.minX - T, cuve.minY - T],
+      [cuve.maxX + T, cuve.minY - T],
+    ].map(([x, y]) => cle({ x, y }))
+    const extremes = new Map<string, Set<number>>()
+    for (const v of coque.flat()) {
+      const k = cle(v)
+      if (!extremes.has(k)) extremes.set(k, new Set())
+      extremes.get(k)!.add(v.cote)
+    }
+    // chaque coin extérieur est un sommet de DEUX bandes, à l'identique
+    for (const k of coins) expect(extremes.get(k)?.size).toBe(2)
   })
 })
 
