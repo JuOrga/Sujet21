@@ -58,6 +58,19 @@ CADRE_SOL = (404, 628, 616, 308)
 CADRE_S_CORPS = (0, 1036, 1024, 338)
 CADRE_S_BOUT = (0, 1384, 453, 410)
 CADRE_S_DOME = (463, 1384, 400, 400)
+# LES FLANCS (17/11) : la tranche de la chaudière et celle du surchauffeur
+# pour le relief 2.5D, dans la bande restée libre au bas de l'atlas. Rendues
+# par tools/images/blender/flancs_pieces.py, elles se RÉPÈTENT le long de
+# l'arête : le cadre est la période (992 px pour PERIODE_FLANC unités de jeu,
+# 120 px pour la hauteur d'un mur), et l'image collée déborde de MARGE_FLANC
+# px de chaque côté, déjà répétée — le filtrage ne lit jamais hors du motif.
+CADRE_FLANC = (16, 1802, 992, 120)
+CADRE_S_FLANC = (16, 1926, 992, 120)
+MARGE_FLANC = 16
+# le rendu de Blender : une période de 1024 px, plus sa marge de chaque côté
+RENDU_FLANC_PERIODE = 1024
+RENDU_FLANC_MARGE = 20
+LIVRE = os.path.join(ROOT, 'public', 'assets', 'chaudiere-atlas.webp')
 
 
 def ambre(a: np.ndarray, zone: tuple[int, int, int, int] | None = None) -> None:
@@ -123,7 +136,21 @@ def tete() -> Image.Image:
     return dore(im).crop((1030, 107, 1774, 780))
 
 
-def main() -> None:
+def flanc(nom: str, cadre: tuple[int, int, int, int]) -> tuple[Image.Image, tuple[int, int]]:
+    """Une bande de flanc ramenée à la largeur de l'atlas : sa période passe
+    de 1024 px à la largeur du cadre, et il reste MARGE_FLANC px de répétition
+    de part et d'autre. Rend la bande et le coin où la coller."""
+    im = lis(nom)
+    x, y, w, h = cadre
+    assert im.size == (RENDU_FLANC_PERIODE + 2 * RENDU_FLANC_MARGE, h), (nom, im.size)
+    # MARGE_FLANC px de l'atlas valent, dans le rendu :
+    m = MARGE_FLANC * RENDU_FLANC_PERIODE / w
+    g = RENDU_FLANC_MARGE - m
+    bande = im.resize((w + 2 * MARGE_FLANC, h), Image.LANCZOS, box=(g, 0, im.width - g, h))
+    return bande, (x - MARGE_FLANC, y)
+
+
+def pieces() -> Image.Image:
     atlas = Image.new('RGBA', (TAILLE, HAUTEUR), (0, 0, 0, 0))
     # LE TRONÇON : le carter, rail à rail (lignes 38 à 681 sur 724,
     # mesurées) — au-dessus et au-dessous, une bande de fond que le
@@ -151,6 +178,24 @@ def main() -> None:
     # ajusté sur son bord) : ses brides tiennent dans le cadre. Sa vapeur
     # BOUILLONNE, sans spirale (une spirale dans un rond, c'était le sas)
     colle(atlas, dore(lis('surch-dome.png')).crop((22, 12, 1230, 1220)), CADRE_S_DOME)
+    return atlas
+
+
+def main() -> None:
+    # Les images générées du 26/09 (chaudiere-*.png, surch-*.png) ne sont pas
+    # dans le dépôt, et plus sur tous les postes : sans elles, on repart de
+    # l'atlas LIVRÉ, dont les pièces ne bougent pas, et l'on n'y pose que les
+    # flancs. (Une seconde compression des pièces : mesurée à la livraison,
+    # docs/assets-ia.md §38.)
+    if os.path.exists(os.path.join(SRC, 'chaudiere-troncon.png')):
+        atlas = pieces()
+    else:
+        print('sources du 26/09 absentes : on repart de', os.path.relpath(LIVRE, ROOT))
+        atlas = Image.open(LIVRE).convert('RGBA')
+        assert atlas.size == (TAILLE, HAUTEUR), atlas.size
+    for nom, cadre in (('flanc-chaud.png', CADRE_FLANC), ('flanc-surch.png', CADRE_S_FLANC)):
+        bande, coin = flanc(nom, cadre)
+        atlas.paste(bande, coin)
     saigne(atlas).save(DST)
     print('écrit', os.path.relpath(DST, ROOT))
 
