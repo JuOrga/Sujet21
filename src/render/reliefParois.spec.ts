@@ -137,10 +137,10 @@ describe('les règles pures du relief', () => {
     expect(garde).toContain('solSousSommets = max(solSousSommets, solPropre);')
     // le masque du fluide ne grandit que sous une garde uRelief — les solides
     // comme les trois branches à pièces (surchauffeur, chaudière, conduite),
-    // et la TRANCHE de la chaudière et du surchauffeur (17/11) : elle cache
-    // le sol comme le flanc d'un mur
+    // et la TRANCHE de la chaudière, du surchauffeur et de la conduite
+    // (17/11) : elle cache le sol comme le flanc d'un mur
     const versements = occurrencesDans(composeFs, 'solSousSommets = max(')
-    expect(versements.length).toBe(6)
+    expect(versements.length).toBe(7)
     for (const v of versements) {
       expect(v.entetes.some((e) => e.includes('uRelief > 0.0')), composeFs.slice(v.position, v.position + 90)).toBe(true)
     }

@@ -241,7 +241,9 @@ const float CN_JOINT_BAS = ${f(C.jointBas)};
 const float CN_BRIDE_JOINT = ${f(C.brideJoint)};
 const float CN_PAS = ${f(C.pas)};
 const float CN_ATLAS = ${f(A.taille)};
+const float CN_ATLAS_H = ${f(A.hauteur)};
 const vec4 CN_CORPS = ${v4(A.corps)};
+const vec4 CN_CADRE_FLANC = ${v4(A.flanc)};
 const vec4 CN_CADRE_BOUT = ${v4(A.bout)};
 const vec4 CN_CADRE_JOINT = ${v4(A.joint)};
 const vec4 CN_CADRE_GIVRE = ${v4(A.givre)};
@@ -894,7 +896,9 @@ const RETOMBEE_TOIT_GLSL = `float retombeeToit(float dn, float portee, float hRe
   return f + 0.85 * pow(max(0.0, 1.0 - dn / (hRel * 0.55 + 60.0)), 1.6);
 }`
 
-const COMPOSE_FS = `#version 300 es
+// Exporté pour unitesTexture.spec.ts : ce shader lit 16 textures, le
+// minimum garanti par WebGL2 — le test compte sur la source ASSEMBLÉE.
+export const COMPOSE_FS = `#version 300 es
 precision highp float;
 #define MAX_BOXES 160
 #define MAX_WAVES 8
@@ -1433,9 +1437,11 @@ float nh3Lisse(float bord, float x, float px) {
 vec4 atlasCadre(vec4 cadre, vec2 f, float px, float ppw) {
   if (f.x < 0.0 || f.x > 1.0 || f.y < 0.0 || f.y > 1.0) return vec4(0.0);
   vec2 pa = cadre.xy + clamp(f * cadre.zw, vec2(0.5), cadre.zw - 0.5);
-  vec2 uv = vec2(pa.x, CN_ATLAS - pa.y) / CN_ATLAS; // téléversé avec FLIP_Y
-  float g = px * ppw / CN_ATLAS;
-  vec4 c = textureGrad(uTexFroid, uv, vec2(g, 0.0), vec2(0.0, g));
+  // téléversé avec FLIP_Y ; l'atlas n'est plus carré (1024 × 2048, la
+  // tranche en bas) : u et v se rapportent chacun à leur côté
+  vec2 uv = vec2(pa.x / CN_ATLAS, (CN_ATLAS_H - pa.y) / CN_ATLAS_H);
+  float g = px * ppw;
+  vec4 c = textureGrad(uTexFroid, uv, vec2(g / CN_ATLAS, 0.0), vec2(0.0, g / CN_ATLAS_H));
   return vec4(c.rgb * c.a, c.a); // prémultiplié
 }
 
@@ -2495,7 +2501,9 @@ float ombreVolume(vec2 world, float dansEau) {
 // pour cet élément »). Leur tranche se cherche donc sur LEUR silhouette, le
 // long du chemin pied → sommet, et porte une bande de l'atlas
 // (tools/images/blender/flancs_pieces.py).
+// 0 la chaudière, 1 le surchauffeur, 2 la conduite d'ammoniac (17/11)
 float piecesSdf(int sorte, vec2 p, vec4 box, float code) {
+  if (sorte == 2) return conduiteSdf(p, box, code);
   return sorte == 0 ? chaudiereSdf(p, box, code) : surchSdf(p, box, code);
 }
 
@@ -2538,15 +2546,18 @@ vec2 flancPieces(int sorte, vec2 wb, vec2 rL, vec4 box, float code, float dG, fl
 // d'une tranche de mur (sombre au pied, le chant clair, la face tournée vers
 // la lampe) ; ce qui LUIT (les résistances, la vapeur : les pixels ambre de
 // la bande) brille par soi-même, à la force « lueur ».
-vec3 tranchePieces(vec4 cadre, vec2 pf, vec2 nP, vec2 nW, float ht, vec2 rL, float px,
-                   vec2 lampe, vec3 ecl, float lueur) {
+// tex, atlas : l'atlas qui porte la bande et sa taille en pixels — celui des
+// chaleurs (chaudière, surchauffeur) ou celui de la conduite : aucune unité
+// de texture de plus (unitesTexture.spec.ts), la bande vit avec ses pièces.
+vec3 tranchePieces(sampler2D tex, vec2 atlas, vec4 cadre, vec2 pf, vec2 nP, vec2 nW, float ht, vec2 rL,
+                   float px, vec2 lampe, vec3 ecl, float lueur) {
   vec2 tng = vec2(-nP.y, nP.x);
   vec2 f = vec2(fract(dot(pf, tng) / FLANC_PIECES_PERIODE), 1.0 - ht);
   vec2 pa = cadre.xy + vec2(f.x * cadre.z, clamp(f.y * cadre.w, 0.5, cadre.w - 0.5));
-  vec2 uv = vec2(pa.x / CH_ATLAS, (CH_ATLAS_H - pa.y) / CH_ATLAS_H);
+  vec2 uv = vec2(pa.x / atlas.x, (atlas.y - pa.y) / atlas.y);
   float gu = min(px * cadre.z / FLANC_PIECES_PERIODE, 4.0);
   float gv = min(cadre.w * px / max(abs(dot(rL, nP)), px), 8.0);
-  vec3 c = textureGrad(uTexChaud, uv, vec2(gu / CH_ATLAS, 0.0), vec2(0.0, gv / CH_ATLAS_H)).rgb;
+  vec3 c = textureGrad(tex, uv, vec2(gu / atlas.x, 0.0), vec2(0.0, gv / atlas.y)).rgb;
   vec3 acier = c * mix(0.42, 1.0, sqrt(ht));
   acier += acier * 0.45 * smoothstep(0.82, 0.97, ht);
   acier *= mix(0.52, 1.15, 0.5 + 0.5 * dot(nW, lampe)) * ecl;
@@ -3846,7 +3857,7 @@ void main() {
         if (fp.x > 0.003) {
           vec2 nW = vec2(bca * nP.x - bsa * nP.y, bsa * nP.x + bca * nP.y);
           float pouls = 0.9 + 0.1 * sin(uTime * 3.1);
-          vec3 fc = tranchePieces(SU_CADRE_FLANC, wb - rLP * fp.y, nP, nW, fp.y, rLP, pxMonde,
+          vec3 fc = tranchePieces(uTexChaud, vec2(CH_ATLAS, CH_ATLAS_H), SU_CADRE_FLANC, wb - rLP * fp.y, nP, nW, fp.y, rLP, pxMonde,
                                   lampeDir, eclMat, mix(0.22, 1.0, charge) * pouls);
           col = mix(col, fc, fp.x);
           solSousSommets = max(solSousSommets, fp.x * smoothstep(0.0, 0.06, fp.y));
@@ -3977,7 +3988,7 @@ void main() {
         if (fp.x > 0.003) {
           vec2 nW = vec2(bca * nP.x - bsa * nP.y, bsa * nP.x + bca * nP.y);
           float pouls = 0.85 + 0.15 * sin(uTime * 1.6 + 0.8);
-          vec3 fc = tranchePieces(CH_CADRE_FLANC, wb - rLP * fp.y, nP, nW, fp.y, rLP, pxMonde,
+          vec3 fc = tranchePieces(uTexChaud, vec2(CH_ATLAS, CH_ATLAS_H), CH_CADRE_FLANC, wb - rLP * fp.y, nP, nW, fp.y, rLP, pxMonde,
                                   lampeDir, eclMat, pouls);
           col = mix(col, fc, fp.x);
           solSousSommets = max(solSousSommets, fp.x * smoothstep(0.0, 0.06, fp.y));
@@ -4081,6 +4092,26 @@ void main() {
         float eclat = smoothstep(0.72, 0.94, dnoise(wS * 0.22));
         cnh = vec4(vec3(0.15, 0.21, 0.29) + vec3(0.26, 0.34, 0.40) * eclat * 0.55, 1.0) * couvS;
       }
+      // LA TRANCHE de la conduite (tranchePieces), sous son image : le tuyau
+      // vu de côté, son dos gagné par le givre, la barbe de glace sous le
+      // ventre (17/11 — elle flottait à plat, comme la chaudière avant). Une
+      // plaque À FORME n'a pas de tuyau : sa tranche reste celle de sa
+      // matière (matiereFlanc), comme son dessus.
+      float trancheN = 0.0;
+      if (uRelief > 0.0 && tuyau && uHasFroid > 0.5 && (fill > 0.0 || flanc > 0.003)) {
+        vec2 rLP = wb - wbV;
+        vec2 nP;
+        vec2 fp = flancPieces(2, wb, rLP, uBoxes[bi], sensC, dG, conduiteSdf(wbV, uBoxes[bi], sensC), nP);
+        if (fp.x > 0.003) {
+          vec2 nW = vec2(bca * nP.x - bsa * nP.y, bsa * nP.x + bca * nP.y);
+          // rien n'y luit : la glace n'a pas de lueur propre
+          vec3 fc = tranchePieces(uTexFroid, vec2(CN_ATLAS, CN_ATLAS_H), CN_CADRE_FLANC, wb - rLP * fp.y, nP, nW,
+                                  fp.y, rLP, pxMonde, lampeDir, eclMat, 0.0);
+          col = mix(col, fc, fp.x);
+          solSousSommets = max(solSousSommets, fp.x * smoothstep(0.0, 0.06, fp.y));
+          trancheN = fp.x;
+        }
+      }
       col = col * (1.0 - fill * cnh.a) + cnh.rgb * eclMat * fill;
       // relief allumé : l'image déplacée cache le sol (voir le surchauffeur)
       if (uRelief > 0.0 && tuyau && fill > 0.0) {
@@ -4111,7 +4142,8 @@ void main() {
           col *= 1.0 - 0.40 * arete * max(surImg, surSol);
         }
       }
-      float hors = (1.0 - fill * cnh.a) * surSol;
+      // (la brume et les fuites se posent au sol : pas sur la tranche)
+      float hors = (1.0 - fill * cnh.a) * surSol * (1.0 - trancheN);
       // (la brume ne baisse que SOUS l'image — pas dans la forme de collision,
       // dont les rectangles de brides se lisaient en pavés plus sombres)
       col += brumeNH3(wb, max(dG, 0.0), uColdBand) * hors;

@@ -16,7 +16,13 @@ Les sources (docs/assets-ia.md, « La conduite d'ammoniac ») :
   masters/images/sources/conduite-givre.png     le givre du sol, détouré
   masters/images/sources/conduite-vanne.webp    la tête de vanne (petits blocs)
 
-Sortie : masters/images/conduite-atlas.png (1024², RGBA), que
+LA TRANCHE (17/11, relief 2.5D) : au bas d'un atlas agrandi à 1024 × 2048,
+la bande `flanc-conduite` rendue par tools/images/blender/flanc_conduite.py
+(masters/images/sources/flanc-conduite.png). Les sources générées ci-dessus
+ne sont plus sur tous les postes : sans elles, on repart de l'atlas LIVRÉ,
+dont les pièces ne bougent pas, et l'on n'y pose que la tranche.
+
+Sortie : masters/images/conduite-atlas.png (1024 × 2048, RGBA), que
 tools/images/prepare.py livre ensuite en public/assets/conduite-atlas.webp.
 
 LES CADRES CI-DESSOUS SONT UN CONTRAT avec le shader et la physique : les
@@ -42,6 +48,9 @@ DST = os.path.join(ROOT, 'masters', 'images', 'conduite-atlas.png')
 # l'atlas de 2048² pesait 1,07 Mo en WebP (mesuré), sans rien de visible en
 # plus.
 TAILLE = 1024
+# la moitié basse : la tranche, et la place pour ce qui viendra
+HAUTEUR = 2048
+LIVRE = os.path.join(ROOT, 'public', 'assets', 'conduite-atlas.webp')
 # (x, y, largeur, hauteur) dans l'atlas, en pixels depuis le HAUT-gauche.
 # Le shader lit les mêmes cadres (CONDUITE_ATLAS dans game/formes.ts).
 CADRE_CORPS = (0, 0, 1024, 341)
@@ -49,6 +58,14 @@ CADRE_BOUT = (0, 350, 370, 276)
 CADRE_JOINT = (380, 350, 451, 365)
 CADRE_GIVRE = (384, 720, 608, 304)
 CADRE_VANNE = (0, 640, 370, 361)
+# LA TRANCHE : une période (992 px pour FLANC_PIECES.periode unités de jeu),
+# 120 px pour la hauteur d'un mur haut, le pied en bas ; collée avec
+# MARGE_FLANC px de sa propre répétition de chaque côté (le filtrage ne sort
+# jamais du motif) — comme celles de la chaudière (chaudiere_atlas.py)
+CADRE_FLANC = (16, 1040, 992, 120)
+MARGE_FLANC = 16
+RENDU_FLANC_PERIODE = 1024
+RENDU_FLANC_MARGE = 20
 
 
 def lis(nom: str) -> Image.Image:
@@ -101,7 +118,26 @@ def saigne(atlas: Image.Image, passes: int = 24) -> Image.Image:
     return Image.fromarray(np.clip(a, 0, 255).astype(np.uint8), 'RGBA')
 
 
-def main() -> None:
+def flanc() -> tuple[Image.Image, tuple[int, int]]:
+    """la bande rendue (1024 px de période + 20 de marge de chaque côté),
+    ramenée à la largeur du cadre ; il reste MARGE_FLANC px de répétition"""
+    x, y, w, h = CADRE_FLANC
+    im = lis('flanc-conduite.png').convert('RGBA')
+    assert im.size == (RENDU_FLANC_PERIODE + 2 * RENDU_FLANC_MARGE, h), im.size
+    m = MARGE_FLANC * RENDU_FLANC_PERIODE / w
+    g = RENDU_FLANC_MARGE - m
+    bande = im.resize((w + 2 * MARGE_FLANC, h), Image.LANCZOS, box=(g, 0, im.width - g, h))
+    return bande, (x - MARGE_FLANC, y)
+
+
+def haut_livre() -> Image.Image:
+    """les pièces de l'atlas LIVRÉ (sa moitié haute, s'il est déjà agrandi)"""
+    livre = Image.open(LIVRE).convert('RGBA')
+    assert livre.width == TAILLE and livre.height in (TAILLE, HAUTEUR), livre.size
+    return livre.crop((0, 0, TAILLE, TAILLE))
+
+
+def pieces() -> Image.Image:
     atlas = Image.new('RGBA', (TAILLE, TAILLE), (0, 0, 0, 0))
     colle(atlas, corps(), CADRE_CORPS)
     # LA TRAVERSÉE DE SOL (le bout libre) : de l'amorce de la bride (x 845)
@@ -116,6 +152,23 @@ def main() -> None:
     # LA VANNE (les blocs presque carrés) : la plaque (x 48..1074,
     # y 70..1058, mesurée) et 10 à 16 px de marge, centrée sur la plaque
     colle(atlas, lis('conduite-vanne.webp').crop((38, 54, 1084, 1074)), CADRE_VANNE)
+    return saigne(atlas)
+
+
+def main() -> None:
+    if os.path.exists(os.path.join(SRC, 'conduite-troncon.png')):
+        haut = pieces()
+    else:
+        # (une seconde compression des pièces : mesurée à la livraison,
+        # docs/assets-ia.md §38)
+        print('sources absentes : on repart de', os.path.relpath(LIVRE, ROOT))
+        haut = haut_livre()
+    atlas = Image.new('RGBA', (TAILLE, HAUTEUR), (0, 0, 0, 0))
+    atlas.paste(haut, (0, 0))
+    bande, coin = flanc()
+    atlas.paste(bande, coin)
+    # le saignement ne touche que le transparent : les pièces du haut, déjà
+    # saignées, ne bougent pas
     saigne(atlas).save(DST)
     print('écrit', os.path.relpath(DST, ROOT))
 

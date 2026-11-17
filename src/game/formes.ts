@@ -259,11 +259,17 @@ export const CONDUITE = {
  *  de tools/images/conduite_atlas.py (vérifié par conduite.spec.ts). */
 export const CONDUITE_ATLAS = {
   taille: 1024,
+  // (17/11) l'atlas s'agrandit VERS LE BAS : les pièces du dessus restent où
+  // elles étaient, la moitié basse loge la tranche du relief 2.5D
+  hauteur: 2048,
   corps: [0, 0, 1024, 341],
   bout: [0, 350, 370, 276],
   joint: [380, 350, 451, 365],
   givre: [384, 720, 608, 304],
   vanne: [0, 640, 370, 361],
+  // la TRANCHE de la conduite, pour le relief 2.5D (FLANC_PIECES) : une
+  // période de la bande rendue par tools/images/blender/flanc_conduite.py
+  flanc: [16, 1040, 992, 120],
 } as const
 
 /** LE SENS du tuyau (ObstacleBox.sens) : 0 auto — le long du grand côté —,
