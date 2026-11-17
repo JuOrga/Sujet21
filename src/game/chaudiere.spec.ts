@@ -4,6 +4,8 @@ import {
   BOUT_MUR_POS,
   CHAUDIERE,
   CHAUDIERE_ATLAS,
+  FLANC_PIECES,
+  SURCHAUFFEUR_ATLAS,
   FORME_CHAUDIERE,
   FORME_DISQUE,
   BOUT_MUR_NEG,
@@ -195,7 +197,45 @@ describe('chaudière — les jumeaux', () => {
     expect(cadre('BRULEUR')).toEqual(CHAUDIERE_ATLAS.bruleur)
     expect(cadre('COMPACTE')).toEqual(CHAUDIERE_ATLAS.compacte)
     expect(cadre('SOL')).toEqual(CHAUDIERE_ATLAS.sol)
+    expect(cadre('FLANC')).toEqual(CHAUDIERE_ATLAS.flanc)
     expect(Number(py.match(/^TAILLE = (\d+)/m)![1])).toBe(CHAUDIERE_ATLAS.taille)
+  })
+
+  // LA TRANCHE (17/11). Relief allumé, l'image de la rampe se soulevait sans
+  // rien entre son pied et elle : elle a sa bande dans l'atlas, et le shader
+  // la peint sous l'image, pour la chaudière comme pour le surchauffeur.
+  it('la tranche : une bande dans la place libre de l’atlas, à la période de l’atelier', async () => {
+    const { readFileSync } = await import('node:fs')
+    const blender = readFileSync(new URL('../../tools/images/blender/flancs_pieces.py', import.meta.url), 'utf8')
+    expect(Number(blender.match(/^PERIODE = ([\d.]+)/m)![1])).toBe(FLANC_PIECES.periode)
+    // sous les pièces du surchauffeur (jusqu'à 1794), dans l'atlas, et sans
+    // toucher la bande voisine : 16 px de répétition de chaque côté
+    const [x, y, l, h] = CHAUDIERE_ATLAS.flanc
+    const [xs, ys, ls, hs] = SURCHAUFFEUR_ATLAS.flanc
+    expect(y).toBeGreaterThanOrEqual(1794)
+    expect(ys).toBeGreaterThanOrEqual(y + h)
+    expect(ys + hs).toBeLessThanOrEqual(CHAUDIERE_ATLAS.hauteur)
+    expect([x, l, xs, ls]).toEqual([16, CHAUDIERE_ATLAS.taille - 32, 16, CHAUDIERE_ATLAS.taille - 32])
+  })
+
+  it('le shader peint la tranche des deux éléments à pièces, sous leur image', async () => {
+    const { readFileSync } = await import('node:fs')
+    const src = readFileSync(new URL('../render/renderer.ts', import.meta.url), 'utf8')
+    expect(src).toMatch(/const vec4 CH_CADRE_FLANC = \$\{v4\(A\.flanc\)\};/)
+    expect(src).toMatch(/const vec4 SU_CADRE_FLANC = \$\{v4\(A\.flanc\)\};/)
+    for (const [sorte, cadre, image] of [
+      ['0', 'CH_CADRE_FLANC', 'col = col * (1.0 - fill * ch.a) + ch.rgb * eclMat * fill;'],
+      ['1', 'SU_CADRE_FLANC', 'col = col * (1.0 - fill * ch.a) + ch.rgb * eclMat * fill + emis * fill;'],
+    ]) {
+      const appel = src.indexOf(`flancPieces(${sorte}, wb, rLP, uBoxes[bi]`)
+      const peint = src.indexOf(`tranchePieces(${cadre},`)
+      expect(appel, cadre).toBeGreaterThan(0)
+      expect(peint, cadre).toBeGreaterThan(appel)
+      // la tranche d'abord, l'image du dessus par-dessus
+      expect(src.indexOf(image), cadre).toBeGreaterThan(peint)
+    }
+    // relief éteint, rien de tout cela ne se lit
+    expect(src.match(/if \(uRelief > 0\.0 && (rampe|serp) && uHasChaud > 0\.5 && \(fill > 0\.0 \|\| flanc > 0\.003\)\)/g)).toHaveLength(2)
   })
 })
 

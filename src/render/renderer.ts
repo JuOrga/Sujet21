@@ -31,6 +31,7 @@ import {
   FORME_COQUE,
   CHAUDIERE,
   CHAUDIERE_ATLAS,
+  FLANC_PIECES,
   SURCHAUFFEUR,
   SURCHAUFFEUR_ATLAS,
   RIDEAU,
@@ -431,6 +432,8 @@ const vec4 CH_CADRE_JOINT = ${v4(A.joint)};
 const vec4 CH_CADRE_BRULEUR = ${v4(A.bruleur)};
 const vec4 CH_CADRE_COMPACTE = ${v4(A.compacte)};
 const vec4 CH_CADRE_SOL = ${v4(A.sol)};
+const vec4 CH_CADRE_FLANC = ${v4(A.flanc)};
+const float FLANC_PIECES_PERIODE = ${f(FLANC_PIECES.periode)};
 
 // 0 compacte, 1 courte, 2 longue — JUMEAU de modeChaudiere (formes.ts)
 float modeChaudiere(float L, float T) {
@@ -551,6 +554,7 @@ const float SU_RAYON_VERRE = ${f(C.rayonVerre)};
 const vec4 SU_CADRE_CORPS = ${v4(A.corps)};
 const vec4 SU_CADRE_BOUT = ${v4(A.bout)};
 const vec4 SU_CADRE_DOME = ${v4(A.dome)};
+const vec4 SU_CADRE_FLANC = ${v4(A.flanc)};
 
 // 0 dôme, 1 courte, 2 longue — JUMEAU de modeSurchauffeur (formes.ts)
 float modeSurch(float L, float T) {
@@ -2478,6 +2482,75 @@ float ombreVolume(vec2 world, float dansEau) {
   return clamp(occ, 0.0, 1.0) * (1.0 - dansEau);
 }
 
+// LA TRANCHE D'UN ÉLÉMENT À PIÈCES (17/11). La chaudière et le surchauffeur
+// rectangulaires ne sont pas des boîtes pleines : leur dessus est une IMAGE
+// de l'atlas des chaleurs, leur silhouette celle de leurs pièces. Relief
+// allumé, l'image se soulevait — et RIEN ne se peignait entre son pied et
+// elle : la rampe flottait à plat à côté de parois qui avaient leur volume
+// (le concepteur : « quand on voit la perspective il n'y a pas de texture
+// pour cet élément »). Leur tranche se cherche donc sur LEUR silhouette, le
+// long du chemin pied → sommet, et porte une bande de l'atlas
+// (tools/images/blender/flancs_pieces.py).
+float piecesSdf(int sorte, vec2 p, vec4 box, float code) {
+  return sorte == 0 ? chaudiereSdf(p, box, code) : surchSdf(p, box, code);
+}
+
+// (couverture, hauteur vue : 0 au pied, 1 au sommet) de la tranche en ce
+// pixel ; nrm, la normale de la face au pied, dans le repère de la boîte.
+// wb : le pixel dans ce repère ; rL : le déplacement du sommet (le dessus se
+// lit en wb − rL) ; dG, dGV : la silhouette au pied et au sommet. Le chemin
+// se lit en douze pas — la hauteur vue est son DERNIER passage du dedans au
+// dehors, comme pour les formes courbes (trois pas y suffisent : leur
+// tranche est lisse ; ici la rampe a des coins francs : à trois pas, puis
+// à six, son bord en biais tombait en marches, vues au banc).
+vec2 flancPieces(int sorte, vec2 wb, vec2 rL, vec4 box, float code, float dG, float dGV, out vec2 nrm) {
+  nrm = vec2(0.0, 1.0);
+  float couv = dG <= 0.0 ? 1.0 : 0.0;
+  float ht = 0.0;
+  float dP = dG;
+  for (int fs = 1; fs <= 11; fs++) {
+    float dM = piecesSdf(sorte, wb - rL * (float(fs) / 12.0), box, code);
+    couv = max(couv, 1.0 - smoothstep(-1.0, 1.5, dM));
+    if (dP <= 0.0 && dM > 0.0) ht = (float(fs) - 1.0 + dP / (dP - dM)) / 12.0;
+    dP = dM;
+  }
+  if (dP <= 0.0 && dGV > 0.0) ht = (11.0 + dP / (dP - dGV)) / 12.0;
+  if (couv < 0.003) return vec2(0.0);
+  vec2 pf = wb - rL * ht;
+  float d0 = piecesSdf(sorte, pf, box, code);
+  vec2 g = vec2(piecesSdf(sorte, pf + vec2(1.0, 0.0), box, code) - d0,
+                piecesSdf(sorte, pf + vec2(0.0, 1.0), box, code) - d0);
+  if (dot(g, g) > 1e-6) nrm = normalize(g);
+  return vec2(couv, ht);
+}
+
+// La bande de l'atlas sur cette tranche, ÉCLAIRÉE : pf, le pied du point
+// (repère de la boîte) ; nP sa normale là, nW la même dans le monde ; ht la
+// hauteur vue ; rL le déplacement du sommet. L'abscisse court le long de
+// l'arête et se répète (fract : le cadre est bordé de sa propre répétition,
+// le filtrage ne sort jamais du motif) ; le niveau de détail s'écrit à la
+// main, et à part dans chaque sens — la face est vue de biais, ses 120
+// texels de haut se tassent dans quelques pixels. L'acier prend la lumière
+// d'une tranche de mur (sombre au pied, le chant clair, la face tournée vers
+// la lampe) ; ce qui LUIT (les résistances, la vapeur : les pixels ambre de
+// la bande) brille par soi-même, à la force « lueur ».
+vec3 tranchePieces(vec4 cadre, vec2 pf, vec2 nP, vec2 nW, float ht, vec2 rL, float px,
+                   vec2 lampe, vec3 ecl, float lueur) {
+  vec2 tng = vec2(-nP.y, nP.x);
+  vec2 f = vec2(fract(dot(pf, tng) / FLANC_PIECES_PERIODE), 1.0 - ht);
+  vec2 pa = cadre.xy + vec2(f.x * cadre.z, clamp(f.y * cadre.w, 0.5, cadre.w - 0.5));
+  vec2 uv = vec2(pa.x / CH_ATLAS, (CH_ATLAS_H - pa.y) / CH_ATLAS_H);
+  float gu = min(px * cadre.z / FLANC_PIECES_PERIODE, 4.0);
+  float gv = min(cadre.w * px / max(abs(dot(rL, nP)), px), 8.0);
+  vec3 c = textureGrad(uTexChaud, uv, vec2(gu / CH_ATLAS, 0.0), vec2(0.0, gv / CH_ATLAS_H)).rgb;
+  vec3 acier = c * mix(0.42, 1.0, sqrt(ht));
+  acier += acier * 0.45 * smoothstep(0.82, 0.97, ht);
+  acier *= mix(0.52, 1.15, 0.5 + 0.5 * dot(nW, lampe)) * ecl;
+  // (la rouille de l'acier tire sur le roux : elle reste de l'acier)
+  float braise = smoothstep(0.30, 0.55, c.r - c.b);
+  return mix(acier, c * lueur, braise);
+}
+
 // LA MATIÈRE SUR LA TRANCHE (volume des parois, volet 1). Le flanc d'un
 // solide porte la texture de son élément, projetée sur sa face : ft.x le
 // long de l'arête, ft.y la hauteur depuis le pied, en unités monde ; h la
@@ -3745,6 +3818,23 @@ void main() {
         ch = vec4(metal, 1.0) * couvS;
         emis = lueur * tube * 0.85 * couvS;
       }
+      // LA TRANCHE de la borne (tranchePieces), sous son image : le verre où
+      // bout la vapeur — elle pâlit avec la charge, comme celle du dessus
+      float trancheS = 0.0;
+      if (uRelief > 0.0 && serp && uHasChaud > 0.5 && (fill > 0.0 || flanc > 0.003)) {
+        vec2 rLP = wb - wbV;
+        vec2 nP;
+        vec2 fp = flancPieces(1, wb, rLP, uBoxes[bi], zS, dG, surchSdf(wbV, uBoxes[bi], zS), nP);
+        if (fp.x > 0.003) {
+          vec2 nW = vec2(bca * nP.x - bsa * nP.y, bsa * nP.x + bca * nP.y);
+          float pouls = 0.9 + 0.1 * sin(uTime * 3.1);
+          vec3 fc = tranchePieces(SU_CADRE_FLANC, wb - rLP * fp.y, nP, nW, fp.y, rLP, pxMonde,
+                                  lampeDir, eclMat, mix(0.22, 1.0, charge) * pouls);
+          col = mix(col, fc, fp.x);
+          solSousSommets = max(solSousSommets, fp.x * smoothstep(0.0, 0.06, fp.y));
+          trancheS = fp.x;
+        }
+      }
       col = col * (1.0 - fill * ch.a) + ch.rgb * eclMat * fill + emis * fill;
       // relief allumé : l'image déplacée cache le sol partout où elle couvre —
       // mesuré sur la silhouette de ses pièces au sommet (dGV) et l'alpha de
@@ -3754,7 +3844,8 @@ void main() {
         float dGV = surchSdf(wbV, uBoxes[bi], zS);
         solSousSommets = max(solSousSommets, solCache(uRelief, dG, dGV, 0.0, edgeW) * fill * ch.a);
       }
-      float hors = (1.0 - fill * ch.a) * surSol;
+      // (le halo et l'air chaud se posent au sol : pas sur la tranche)
+      float hors = (1.0 - fill * ch.a) * surSol * (1.0 - trancheS);
       // le halo dit « approchez en vapeur » : il meurt avec la charge — et,
       // chargé, l'air tremble autour de la borne
       float aura = 1.0 - smoothstep(0.0, 60.0, max(dG, 0.0));
@@ -3858,13 +3949,31 @@ void main() {
         float stripe = 0.5 + 0.5 * sin((wS.x + wS.y - uTime * 46.0) * 0.14);
         ch = vec4(vec3(0.26, 0.11, 0.05) + vec3(0.42, 0.17, 0.04) * smoothstep(0.35, 0.85, stripe), 1.0) * couvS;
       }
+      // LA TRANCHE de la rampe (tranchePieces), sous son image : le carter et
+      // ses persiennes, où les résistances rougeoient au rythme du dessus
+      float trancheC = 0.0;
+      if (uRelief > 0.0 && rampe && uHasChaud > 0.5 && (fill > 0.0 || flanc > 0.003)) {
+        vec2 rLP = wb - wbV;
+        vec2 nP;
+        vec2 fp = flancPieces(0, wb, rLP, uBoxes[bi], codeC, dG, chaudiereSdf(wbV, uBoxes[bi], codeC), nP);
+        if (fp.x > 0.003) {
+          vec2 nW = vec2(bca * nP.x - bsa * nP.y, bsa * nP.x + bca * nP.y);
+          float pouls = 0.85 + 0.15 * sin(uTime * 1.6 + 0.8);
+          vec3 fc = tranchePieces(CH_CADRE_FLANC, wb - rLP * fp.y, nP, nW, fp.y, rLP, pxMonde,
+                                  lampeDir, eclMat, pouls);
+          col = mix(col, fc, fp.x);
+          solSousSommets = max(solSousSommets, fp.x * smoothstep(0.0, 0.06, fp.y));
+          trancheC = fp.x;
+        }
+      }
       col = col * (1.0 - fill * ch.a) + ch.rgb * eclMat * fill;
       // relief allumé : l'image déplacée cache le sol (voir le surchauffeur)
       if (uRelief > 0.0 && rampe && fill > 0.0) {
         float dGV = chaudiereSdf(wbV, uBoxes[bi], codeC);
         solSousSommets = max(solSousSommets, solCache(uRelief, dG, dGV, 0.0, edgeW) * fill * ch.a);
       }
-      float hors = (1.0 - fill * ch.a) * surSol;
+      // (l'air qui brûle et la lueur se posent au sol : pas sur la tranche)
+      float hors = (1.0 - fill * ch.a) * surSol * (1.0 - trancheC);
       // l'air qui brûle autour, et — riche seulement — la lueur que les
       // barreaux jettent au sol, au rythme de leur onde, et les braises
       col += airChaud(wb, max(dG, 0.0), auraR) * hors;
