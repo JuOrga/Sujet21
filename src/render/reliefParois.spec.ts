@@ -947,7 +947,8 @@ describe('relief allumé, le corps a une hauteur : il passe devant le bas de la 
     expect(occurrencesDans(composeFs, 'texture(uField, uvEau ')).toHaveLength(4)
     expect(composeFs).not.toMatch(/texture\(uField, uv [-+]/)
     // l'épaule du corps, assombrie en dégradé large — sous une garde uRelief
-    expect(composeFs).toContain('if (uRelief > 0.0) water *= mix(0.86, 1.0, smoothstep(th * 0.6, th * (2.0 + GALBE_CORPS), rSommetCorps / uFieldScale));')
+    // — et le corps seul : une goutte éjectée (player 0) n'a pas d'épaule
+    expect(composeFs).toContain('if (uRelief > 0.0) water *= mix(1.0, mix(0.86, 1.0, smoothstep(th * 0.6, th * (2.0 + GALBE_CORPS), rSommetCorps / uFieldScale)), clamp(player, 0.0, 1.0));')
     // plus le cran net d'un seuil de large, qui dessinait un ruban
     expect(composeFs).not.toMatch(/smoothstep\(th - s, th \+ s, rSommetCorps/)
   })
@@ -1188,9 +1189,34 @@ describe('relief allumé, le corps est un dôme, pas un prisme', () => {
   it('le shader applique la même règle, et rend le texel entier à l\'échelle', () => {
     expect(CORPS_RELIEF_GLSL).toContain('float leve, out vec2 uvVu, out float rSommet')
     expect(CORPS_RELIEF_GLSL).toContain(
-      `float e = s.r - leve * ${GALBE_CORPS.toFixed(1)} * (1.0 - sqrt(1.0 - h * h));`,
+      `float e = s.b - leve * ${GALBE_CORPS.toFixed(1)} * (1.0 - sqrt(1.0 - h * h));`,
     )
+    // au-dessus du pied, la part du joueur (b), jamais tout le champ (r)
+    expect(CORPS_RELIEF_GLSL).not.toContain('float e = s.r')
     expect(CORPS_RELIEF_GLSL).toContain('if (e > t.r) { t = s * (e / max(s.r, 1e-6)); uvVu = u; }')
     expect(source).toContain('#define GALBE_CORPS ${glslFloat(GALBE_CORPS)}')
+  })
+})
+
+// LES GOUTTES ÉJECTÉES RESTENT À PLAT (17/11) : galbées comme le corps,
+// chacune devenait un petit dôme décalé — « l'effet sur ces dernières n'est
+// vraiment pas terrible, je préférerais sans » (le concepteur).
+describe('relief allumé, seul le corps a une hauteur : les gouttes éjectées restent au pied', () => {
+  const TH = 0.8
+  it('une goutte libre, même dense, n\'est lue qu\'au pied', () => {
+    // une goutte bien formée glisse sous le pixel : le dessus la verrait…
+    const goutte = [0, 0, 2.6, 3.2]
+    expect(corpsVu(goutte, TH).pas).toBeGreaterThan(0)
+    // …mais elle n'est pas du corps (canal b nul) : rien ne monte
+    expect(corpsVu(goutte, TH, [0, 0, 0, 0])).toEqual({ r: 0, pas: 0 })
+    // et là où elle est vraiment, elle reste entière
+    expect(corpsVu([1.5, 0, 0, 0], TH, [0, 0, 0, 0])).toEqual({ r: 1.5, pas: 0 })
+  })
+  it('le corps garde sa hauteur, une goutte voisine ne la change pas', () => {
+    const corps = [0, 0, 0, 3.2]
+    const seul = corpsVu(corps, TH, corps)
+    expect(seul).toEqual({ r: 3.2 - TH * GALBE_CORPS, pas: PAS_CORPS })
+    // une goutte libre au même étage gonfle r, pas b : même lecture
+    expect(corpsVu([0, 0, 0, 4.4], TH, corps)).toEqual(seul)
   })
 })
