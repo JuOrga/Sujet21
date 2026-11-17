@@ -496,13 +496,14 @@ describe('les décalques plaqués sur un mur suivent son sommet', () => {
   })
 })
 
-// LÉGER PAR DÉFAUT (demande du concepteur, 16/11) : le relief était OFF le
-// temps de sa validation. Le défaut ne joint que l'appareil sans réglage
-// posé : les OFF de l'essai sont effacés à part (remiseReglages.spec.ts).
-describe('le relief est léger par défaut', () => {
-  it('sans réglage posé, sujet21-relief vaut leger ; off reste un choix qui ne déplace rien', () => {
-    expect(main).toContain("localStorage.getItem('sujet21-relief') ?? 'leger'")
-    expect(main).toMatch(/const RELIEF_K = \{ off: 0, leger: 0\.035, /)
+// FORT PAR DÉFAUT (demande du concepteur, 17/11, après LÉGER le 16/11) : le
+// relief était OFF le temps de sa validation. Le défaut ne joint que
+// l'appareil sans réglage posé : les choix anciens sont effacés à part
+// (remiseReglages.spec.ts). Les deux crans gardent leur force.
+describe('le relief est fort par défaut', () => {
+  it('sans réglage posé, sujet21-relief vaut fort ; off reste un choix qui ne déplace rien', () => {
+    expect(main).toContain("localStorage.getItem('sujet21-relief') ?? 'fort'")
+    expect(main).toMatch(/const RELIEF_K = \{ off: 0, leger: 0\.035, fort: 0\.07 \}/)
   })
 })
 
