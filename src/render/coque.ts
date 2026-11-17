@@ -38,8 +38,9 @@ export const MAX_VIDES_COQUE = 16
 /** Flottants par sommet : position (2), le long / en travers (2), côté et
  *  longueur utile de la paroi (2). */
 export const COQUE_FLOTTANTS = 6
-/** 4 bandes × 2 triangles × 3 sommets. */
-export const COQUE_SOMMETS = 24
+/** 4 bandes × 2 morceaux (la coque d'onglet, la frange) × 2 triangles ×
+ *  3 sommets. */
+export const COQUE_SOMMETS = 48
 /** Le FOND DE STATION : un grand quadrilatère sous les bandes, où se posent
  *  les modules voisins et le lointain (compositionCoque.ts). Côté 4 : le
  *  shader le reconnaît, et s'arrête sur la cuve et sa coque. */
@@ -59,9 +60,21 @@ export const COTE_DROITE = 3
  *  Chaque sommet porte (x, y, s, a, côté, longueur) : `s` court le long de
  *  la paroi depuis l'angle bas-gauche de la cuve, `a` monte du bord
  *  INTÉRIEUR (0, le tube lumineux) vers le dehors (épaisseur + frange).
- *  Les bandes horizontales débordent d'une épaisseur aux deux bouts et
- *  couvrent les angles, comme avant ; les verticales s'arrêtent à la cuve —
- *  les franges ne se chevauchent donc jamais. */
+ *
+ *  LES ANGLES SONT COUPÉS D'ONGLET, comme un cadre. Chaque bande a deux
+ *  morceaux : la COQUE (0 ≤ a ≤ épaisseur), un trapèze dont le bord
+ *  intérieur court de 0 à la longueur et le bord extérieur déborde d'une
+ *  épaisseur à chaque bout — les quatre se rejoignent sur les diagonales des
+ *  angles ; puis la FRANGE (au-delà), un rectangle.
+ *  Avant, les bandes horizontales couvraient seules les carrés d'angle et
+ *  les verticales s'y arrêtaient net : en haut à gauche, la tôle du haut
+ *  filait par-dessus le montant, dont les plaques, le tube et le chanfrein
+ *  butaient sur une couture droite (retour du concepteur, 17/11 : « il
+ *  faudrait que cela fusionne »). Coupés d'onglet, la tôle, les conduites
+ *  et le tube lumineux tournent l'angle ensemble.
+ *  Les franges, elles, gardent leur partage : les horizontales débordent
+ *  d'une épaisseur aux deux bouts, les verticales s'arrêtent à la cuve —
+ *  elles ne se chevauchent jamais. */
 export function remplitBandesCoque(
   b: Bounds,
   out: Float32Array,
@@ -81,31 +94,43 @@ export function remplitBandesCoque(
     out[o++] = cote
     out[o++] = long
   }
-  // deux triangles (p0 p1 p2) (p0 p2 p3) ; p0/p1 au bord intérieur
-  const bande = (
+  // un quadrilatère (s, a) en deux triangles (p0 p1 p2) (p0 p2 p3) : `s`
+  // et `a` sont affines dans le monde, l'interpolation les rend exacts
+  // jusque dans le biais de l'onglet
+  const quad = (
     cote: number,
     long: number,
-    s0: number,
-    s1: number,
+    coins: readonly [number, number][],
     pos: (s: number, a: number) => [number, number],
   ) => {
-    const coins: [number, number][] = [
-      [s0, 0],
-      [s1, 0],
-      [s1, H],
-      [s0, 0],
-      [s1, H],
-      [s0, H],
-    ]
-    for (const [s, a] of coins) {
+    const [p0, p1, p2, p3] = coins
+    for (const [s, a] of [p0, p1, p2, p0, p2, p3]) {
       const [x, y] = pos(s, a)
       sommet(x, y, s, a, cote, long)
     }
   }
-  bande(COTE_HAUT, lx, -T, lx + T, (s, a) => [b.minX + s, b.maxY + a])
-  bande(COTE_BAS, lx, -T, lx + T, (s, a) => [b.minX + s, b.minY - a])
-  bande(COTE_GAUCHE, ly, 0, ly, (s, a) => [b.minX - a, b.minY + s])
-  bande(COTE_DROITE, ly, 0, ly, (s, a) => [b.maxX + a, b.minY + s])
+  const bande = (
+    cote: number,
+    long: number,
+    f0: number,
+    f1: number,
+    pos: (s: number, a: number) => [number, number],
+  ) => {
+    // la coque, coupée d'onglet : bord intérieur [0, long], bord extérieur
+    // [−T, long + T] — le biais tombe sur la diagonale du carré d'angle
+    quad(cote, long, [[0, 0], [long, 0], [long + T, T], [-T, T]], pos)
+    // la frange, de f0 à f1 le long de la paroi
+    quad(cote, long, [[f0, T], [f1, T], [f1, H], [f0, H]], pos)
+  }
+  // les positions se calculent depuis l'angle le plus proche : les sommets
+  // que deux bandes partagent sur un biais tombent au même flottant, sans
+  // fente d'un pixel entre elles
+  const le = (min: number, max: number, l: number, s: number) =>
+    s <= l / 2 ? min + s : max - (l - s)
+  bande(COTE_HAUT, lx, -T, lx + T, (s, a) => [le(b.minX, b.maxX, lx, s), b.maxY + a])
+  bande(COTE_BAS, lx, -T, lx + T, (s, a) => [le(b.minX, b.maxX, lx, s), b.minY - a])
+  bande(COTE_GAUCHE, ly, 0, ly, (s, a) => [b.minX - a, le(b.minY, b.maxY, ly, s)])
+  bande(COTE_DROITE, ly, 0, ly, (s, a) => [b.maxX + a, le(b.minY, b.maxY, ly, s)])
   return o / COQUE_FLOTTANTS
 }
 
