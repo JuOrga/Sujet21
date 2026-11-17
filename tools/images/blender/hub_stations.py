@@ -440,12 +440,101 @@ def distillateur(sc, mats):
     declare_dans(nom, P, w, h)
 
 
+# ------------------------------------------------------------ le plafond
+def mat_verriere(nom, force):
+    """le verre de la verrière : du vide noir et quelques étoiles derrière,
+    une lueur froide (#d6e8f5) qui monte vers le centre — c'est ce que la
+    flaque renvoie d'abord, plus clair que tout le reste (§21b)"""
+    mat = bpy.data.materials.new(nom)
+    nt, N, L = noeuds(mat)
+    out = N.new('ShaderNodeOutputMaterial')
+    em = N.new('ShaderNodeEmission')
+    L.new(em.outputs[0], out.inputs[0])
+    geo = N.new('ShaderNodeNewGeometry')
+    sep = N.new('ShaderNodeSeparateXYZ')
+    L.new(geo.outputs['Position'], sep.inputs[0])
+    # la distance au centre du plafond (0, 0.5)
+    dx = sep.outputs['X']
+    dz = op(nt, 'SUBTRACT', sep.outputs['Z'], 0.5)
+    r = op(nt, 'SQRT', op(nt, 'ADD', op(nt, 'MULTIPLY', dx, dx), op(nt, 'MULTIPLY', dz, dz)))
+    # (essai 1, de 0,34 à 0 : le verre sortait d'un blanc égal jusqu'à la
+    # jante — le vide ne se voyait plus ; la lueur s'éteint vers le bord)
+    lueur = op(nt, 'POWER', rampe(nt, r, 0.27, 0.0), 1.6)
+    # les étoiles : un bruit très fin, seuillé — rares, nettes
+    tex = N.new('ShaderNodeTexNoise')
+    L.new(geo.outputs['Position'], tex.inputs['Vector'])
+    tex.inputs['Scale'].default_value = 420.0
+    tex.inputs['Detail'].default_value = 0.0
+    etoiles = rampe(nt, tex.outputs['Fac'], 0.74, 0.80)
+    c = melange(nt, op(nt, 'MULTIPLY', lueur, 0.85), lin((0x03, 0x05, 0x0a)), lin((0xd6, 0xe8, 0xf5)))
+    c = melange(nt, op(nt, 'MULTIPLY', etoiles, 0.9), c, lin((0xf4, 0xf8, 0xff)))
+    L.new(c, em.inputs['Color'])
+    em.inputs['Strength'].default_value = force
+    return mat
+
+
+def plafond_hub(sc, mats):
+    """§21b — LE PLAFOND DU MODULE MÉDUSE, vu d'en dessous : la grande
+    verrière ronde aux nervures rayonnantes (la cloche d'une méduse), la
+    couronne de hublots, la tôle rivetée, chemins de câbles et grosses
+    conduites entre les deux"""
+    nom = 'plafond-hub'
+    P = parent(sc, nom)
+    at = Atelier()
+    C = (0.0, 0.5)
+    # la tôle : seize plaques rivetées, joints sombres
+    at.boite('fond', -0.5, 0.5, 0.0, 1.0, 0.02, 0.04, 0)
+    rng = random.Random(21)
+    for i in range(4):
+        for j in range(4):
+            x0, z0 = -0.5 + i * 0.25, j * 0.25
+            at.boite('peinture', x0 + 0.003, x0 + 0.247, z0 + 0.003, z0 + 0.247, 0.0, 0.02, rng.uniform(-0.6, 0.4))
+            rivets(at, x0 + 0.003, x0 + 0.247, z0 + 0.003, z0 + 0.247, 0.0, 0, retrait=0.008, pas=0.03, r=0.003)
+    # les grosses conduites qui longent le plafond, et deux chemins de câbles
+    for z in (0.09, 0.91):
+        at.fut('tuyau', -0.52, 0.52, 0.022, 0, -0.03, z)
+        for x in (-0.38, -0.12, 0.14, 0.4):
+            at.fut('peinture', x - 0.008, x + 0.008, 0.027, 0, -0.03, z)
+    for x in (-0.44, 0.44):
+        at.boite('peinture', x - 0.03, x + 0.03, 0.12, 0.88, -0.03, 0.0, -0.3)
+        for k in range(5):
+            at.tube('cable', (x - 0.02 + k * 0.01, -0.035, 0.12), (x - 0.02 + k * 0.01, -0.035, 0.88), 0.004, seg=8)
+        for z in (0.2, 0.4, 0.6, 0.8):
+            at.boite('peinture', x - 0.034, x + 0.034, z - 0.006, z + 0.006, -0.042, -0.03, 0)
+    # la couronne des hublots
+    n = 12
+    for k in range(n):
+        a = 2 * math.pi * (k + 0.5) / n
+        x, z = C[0] + 0.335 * math.cos(a), C[1] + 0.335 * math.sin(a)
+        at.anneau('peinture', x, z, 0.038, 0.026, -0.03, 0.0, -0.2, seg=32)
+        at.boulons(x, z, 0.032, 8, -0.031, rr=0.0028)
+        at.cylindre('hublot', x, z, 0.027, -0.012, -0.005, 0, seg=32)
+    # la verrière : le verre, la jante, deux cerclages, seize nervures
+    at.cylindre('verriere', C[0], C[1], 0.27, -0.01, -0.004, 0, seg=96)
+    at.anneau('peinture', C[0], C[1], 0.3, 0.265, -0.04, 0.0, -0.2, seg=96)
+    at.boulons(C[0], C[1], 0.283, 48, -0.041, rr=0.0032)
+    for rr in (0.18, 0.095):
+        at.anneau('tuyau', C[0], C[1], rr + 0.005, rr - 0.005, -0.03, -0.01, 0, seg=80)
+    for k in range(16):
+        a = 2 * math.pi * k / 16
+        # la nervure s'incurve un peu : la cloche d'une méduse, pas une roue
+        pts = [(C[0] + r * math.cos(a + 0.18 * r), -0.02, C[1] + r * math.sin(a + 0.18 * r)) for r in (0.03, 0.1, 0.18, 0.268)]
+        for p0, p1 in zip(pts, pts[1:]):
+            at.tube('tuyau', p0, p1, 0.006, seg=8)
+    at.cylindre('peinture', C[0], C[1], 0.035, -0.035, -0.01, -0.2, seg=40)
+    at.boulons(C[0], C[1], 0.025, 8, -0.036, rr=0.0025)
+    at.objets(P, mats, BISEAU_HUB, True, nom)
+    declare(nom, P, -0.5, 0.5, 0.0, 1.0, alpha=False)
+
+
 def stations():
     vide_scene()
     PIECES.clear()
     sc = bpy.context.scene
     mats = matieres_hub()
-    for f in (eclairage, table_depart, mur_records, bac_sable, distillateur):
+    mats['verriere'] = mat_verriere('verriere', 1.0)
+    mats['hublot'] = mat_verriere('hublot', 0.45)
+    for f in (eclairage, table_depart, mur_records, bac_sable, distillateur, plafond_hub):
         f(sc, mats)
     lumiere_camera(sc)
     sc.cycles.device = 'GPU'
