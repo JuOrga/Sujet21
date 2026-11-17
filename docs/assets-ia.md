@@ -2695,6 +2695,17 @@ paroi mince, qui se lit en poutre à treillis. Même acier, même luminance
 dépassent de 12 mm, les trappes de 20). L'alpha, plus fouillé, pèse 104 Ko. La
 pastille de la légende est refaite avec lui.
 
+**La seconde paroi suit (17/11).** `wall-a` était la tôle de la chaufferie en
+acier froid, à 520 unités : fondue dans l'isogrid, elle y faisait monter des
+tôles et des conduites sans rapport (retour du concepteur, sur l'aperçu). Elle
+est maintenant **le même treillis, à la même échelle (230) et dans le même
+acier** — nervures et nœuds tombent sur ceux du mur, le fondu n'y change rien —
+avec d'autres accessoires : deux trappes ailleurs, sept caches, un chemin de
+câbles capoté (`surfaces.py`, `isogrid`, `bati_wall_a`). 10,9 % des pixels
+diffèrent du mur. Profondeur 0,0205 (0,0290 avant), 106 Ko. **Ne pas lui
+redonner une échelle à elle** : deux treillis de pas différents se
+superposeraient dans le fondu.
+
 **Pour le shader** : l'élévation vaut `alpha × profondeur` (+ une constante), en
 largeurs de carreau — le carreau est rendu à 1024 px pour une largeur. La pente
 vraie entre deux texels voisins est donc `Δalpha × profondeur × 1024` ; libre
@@ -2704,7 +2715,7 @@ les accorde :
 | surface | profondeur (carreau) | luminance avant → après | raccord couleur x / y | raccord relief x / y | poids avant → après |
 | --- | --- | --- | --- | --- | --- |
 | `wall` | 0,0205 | 0,15 → 0,15 | 0,5 / 0,5 | 0,0 / 0,0 | 8 → 23 → 104 Ko |
-| `wall-a` | 0,0290 | 0,15 → 0,14 | 0,5 / 0,5 | 0,0 / 0,0 | 19 → 63 Ko |
+| `wall-a` | 0,0205 | 0,15 → 0,15 | 0,5 / 0,5 | 0,0 / 0,0 | 19 → 63 → 106 Ko |
 | `phile` | 0,0051 | 0,18 → 0,18 | 0,5 / 1,0 | 0,8 / 1,0 | 49 → 204 Ko |
 | `phobe` | 0,0157 | 0,15 → 0,16 | 0,6 / 0,6 | 1,0 / 1,1 | 28 → 238 Ko |
 | `paroi-atlas` | par case, ci-dessous | 0,13 → 0,12 (chauds 1 → 2 %) | — | — | 107 → 342 Ko |

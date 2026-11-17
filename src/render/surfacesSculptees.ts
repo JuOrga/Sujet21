@@ -27,7 +27,7 @@ export const TEXELS_CARREAU = 1024
  *  accorde les surfaces entre elles (§37, mesurée par relief.py). */
 export const PROFONDEUR_RELIEF = {
   wall: 0.0205,
-  wallA: 0.029,
+  wallA: 0.0205,
   phile: 0.0051,
   phobe: 0.0157,
 } as const
@@ -44,7 +44,11 @@ export const PROFONDEUR_RELIEF_ATLAS: readonly number[] = [
  *  couleur comme pour le relief). */
 export const CARREAU_MONDE = {
   wall: 230,
-  wallA: 520,
+  // la seconde paroi porte LE MÊME treillis que le mur : à la même échelle,
+  // leurs nervures tombent l'une sur l'autre et le fondu ne mêle que les
+  // accessoires. À 520 (son échelle d'avant l'isogrid), deux treillis de
+  // pas différents se superposeraient dans le fondu.
+  wallA: 230,
   phile: 210,
   phobe: 170,
 } as const
