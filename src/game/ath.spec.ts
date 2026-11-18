@@ -6,6 +6,7 @@ import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import { BULLES, PICTOS, type NomPicto } from './athPictos'
 import { iconeCeremonieHTML } from './iconesStation'
+import { iconeCycleHTML } from './iconesPeintes'
 
 const HTML = readFileSync(new URL('../../index.html', import.meta.url), 'utf-8')
 const MAIN = readFileSync(new URL('../main.ts', import.meta.url), 'utf-8')
@@ -100,6 +101,20 @@ describe('le cadran des états', () => {
     const regle = CSS_ATH.match(/#statebar \.st-ico \{[^}]*\}/)?.[0] ?? ''
     expect(regle).not.toBe('')
     expect(regle).not.toContain('clip-path')
+  })
+
+  it('pose dans chaque logement l’icône peinte de son état, à côté du trait qui la remplace tant qu’elle manque', () => {
+    const bar = HTML.slice(HTML.indexOf('<div id="statebar"'), HTML.indexOf('id="state-zone"'))
+    const etats = { eau: 'liquide', glace: 'solide', vapeur: 'gaz' } as const
+    for (const [n, etat] of Object.entries(etats)) {
+      const debut = bar.indexOf(`id="state-${n}"`)
+      const slot = bar.slice(debut, bar.indexOf('</span>', debut))
+      expect(slot, n).toContain(`data-picto="${n}"`)
+      // sans repli : le trait EST le repli, jamais un emoji
+      expect(slot, n).toContain(iconeCycleHTML(etat))
+    }
+    // la planche arrivée, le trait des logements s'efface — lui seul
+    expect(CSS_ATH).toMatch(/html\.planche-cycle #statebar \.st-ico \.picto \{\s*display: none;/)
   })
 
   it('ne s’empile plus sur la barre du bas : --tb-h a disparu', () => {

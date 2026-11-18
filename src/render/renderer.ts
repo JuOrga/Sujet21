@@ -11,6 +11,7 @@ import {
   LAMPE_HAUTEUR_MAX,
   LAMPE_HAUTEUR_MIN,
   MAT_VIDE,
+  MAT_BAIE,
   lampeCouleurRVB,
   MAT_CHAUD,
   MAT_FROID,
@@ -121,7 +122,15 @@ import {
 import { FOND_DALLE } from './fondCuve'
 import { OMBRE_POINTE_GLSL } from './ombrePointe'
 import { tranchesBandeau } from './lampes'
-import { CORPS_RELIEF_GLSL, GALBE_CORPS, RELIEF_PAROIS_GLSL, fractionSommet, pointDuSommet } from './reliefParois'
+import {
+  AFFINAGE,
+  CORPS_RELIEF_GLSL,
+  GALBE_CORPS,
+  PAS_AFFINE,
+  RELIEF_PAROIS_GLSL,
+  fractionSommet,
+  pointDuSommet,
+} from './reliefParois'
 import {
   CARREAU_MONDE,
   PROFONDEUR_RELIEF,
@@ -1705,6 +1714,34 @@ vec2 rdFluide(vec2 pw) {
   return vec2(pres * icy, pres * (1.0 - icy));
 }
 
+// LE REFLET DU CORPS dans une vitre sous lui : x l'image renvoyée, y la lueur
+// que le verre prend autour. Le reflet tombe SOUS le corps à l'écran, comme
+// sur un sol brillant vu de face : décalé vers le centre de l'écran (le point
+// de fuite du relief), il restait caché derrière le corps — un croissant de
+// quelques pixels, qu'on ne voyait pas. L'image est lue floue (cinq
+// prélèvements), la lueur plus large encore : une vitre ne rend qu'une part
+// de la lumière, et pas nette.
+float presenceChamp(vec2 pw, float seuil) {
+  vec2 fuv = ((pw - uCenter) * uZoom + uViewport * 0.5) / uViewport;
+  if (fuv.x < 0.0 || fuv.x > 1.0 || fuv.y < 0.0 || fuv.y > 1.0) return 0.0;
+  return smoothstep(0.35 * seuil, seuil, textureLod(uField, fuv, 0.0).r / uFieldScale);
+}
+vec2 refletCorps(vec2 w) {
+  vec2 q = w + vec2(0.0, 75.0); // le monde a y vers le haut : l'image descend
+  float r = 18.0;
+  float image = (presenceChamp(q, uThreshold) * 2.0 +
+                 presenceChamp(q + vec2(r, 0.0), uThreshold) +
+                 presenceChamp(q - vec2(r, 0.0), uThreshold) +
+                 presenceChamp(q + vec2(0.0, r), uThreshold) +
+                 presenceChamp(q - vec2(0.0, r), uThreshold)) / 6.0;
+  float R = 60.0;
+  float lueur = (presenceChamp(w + vec2(R, 0.0), uThreshold * 0.5) +
+                 presenceChamp(w - vec2(R, 0.0), uThreshold * 0.5) +
+                 presenceChamp(w + vec2(0.0, R), uThreshold * 0.5) +
+                 presenceChamp(w - vec2(0.0, R), uThreshold * 0.5)) * 0.25;
+  return vec2(image, lueur);
+}
+
 // LE CORPS DEVANT LE PIED D'UNE TRANCHE, 0..1 : ce qui, là, éclaire la face
 // — le corps du joueur, eau ou glace. Ni la vapeur (un nuage ne s'adosse
 // pas), ni les gouttes égarées (elles sont éteintes : « eau libre plus
@@ -2302,13 +2339,14 @@ float sdfVisible(int bi, vec2 p) {
 // LA HAUTEUR DE LA TRANCHE d'une boîte vue en ce pixel, relief allumé : le
 // chemin pied → sommet (relB, le déplacement de SON sommet) la traverse ici
 // à la hauteur fb.y × hb (flancBalaye, le balayage exact) ; −1 s'il ne la
-// traverse pas franchement. Le coin (triangle) a le sien. Les formes courbes
-// ou creuses (coques, arrondis) rendent −1 : leur balayage n'a pas de forme
-// close, elles ne cachent que par leur dessus.
+// traverse pas franchement. Le disque, la capsule et le coin ont le leur
+// (18/11 : le disque et la capsule rendaient −1, leur tranche ne cachait
+// rien de plus bas). L'arc et la coque rendent −1 : leur balayage n'a pas de
+// forme close — douze pas par boîte et par pixel, ici, ce serait payer la
+// tranche deux fois ; ils ne cachent que par leur dessus.
 float hauteurTranche(int bi, vec2 world, vec2 relB, float hb) {
   vec4 dec = decodeAux(uBoxAux[bi].x);
-  bool coin = dec.y > 2.5 && dec.y < 3.5;
-  if (dec.y > 0.5 && !coin) return -1.0;
+  if (dec.y > 3.5) return -1.0;
   vec2 wb = world;
   vec2 rL = relB;
   float a = uBoxAux[bi].y;
@@ -2322,7 +2360,10 @@ float hauteurTranche(int bi, vec2 world, vec2 relB, float hb) {
   }
   // loin de la base de plus que le déplacement, le chemin ne la croise pas
   if (boxSdf(wb, uBoxes[bi]) > length(rL)) return -1.0;
-  vec2 fb = coin ? flancBalayeCoin(wb, uBoxes[bi], dec.z, rL) : flancBalaye(wb, uBoxes[bi], rL);
+  vec2 fb = dec.y < 0.5 ? flancBalaye(wb, uBoxes[bi], rL)
+          : dec.y < 1.5 ? flancBalayeDisque(wb, uBoxes[bi], rL)
+          : dec.y < 2.5 ? flancBalayeCapsule(wb, uBoxes[bi], rL)
+          : flancBalayeCoin(wb, uBoxes[bi], dec.z, rL);
   return fb.x < -1.0 ? fb.y * hb : -1.0;
 }
 
@@ -2357,6 +2398,66 @@ float hauteurTranche(int bi, vec2 world, vec2 relB, float hb) {
 // distance vaut la dérivée d'écran à un facteur positif près — mieux, même :
 // dFdx lisait la valeur du pixel voisin, indéfinie quand ce voisin avait
 // sauté la boîte d'un continue.
+
+// LA TRANCHE D'UN ARC OU D'UNE COQUE (flancAffine, reliefParois.ts — le
+// jumeau TS testé contre la force brute) : (couverture, hauteur vue). Ni
+// convexes ni closes, elles n'ont pas de balayage en formule fermée : le
+// chemin pied → sommet (wb − t·rL) se lit en PAS_AFFINE pas, et le DERNIER
+// passage du dedans au dehors s'affine par AFFINAGE dichotomies et une
+// sécante. Leur tranche était cinq copies (pied, ¼, ½, ¾, sommet), lues en
+// marches sur le bord en biais, la hauteur linéaire entre deux — et sur la
+// base estimée par deux distances, fausse dès que le chemin passe le creux
+// d'une coque (conception du 18/11). d, dV : la distance au pied et au
+// sommet, déjà connues. Aucune opération de gradient : on est dans la
+// boucle des boîtes (gradientBoucles.spec.ts).
+// LA COQUE SE REJETTE loin de ses parois : sa distance est 1-lipschitzienne
+// (volume.ts), à plus du déplacement et du fondu aucun pas ne touche la
+// silhouette — même image, et le creux, toute une salle, ne paie plus le
+// chemin. L'arc, à distance approchée, paie partout.
+// DES BORNES QUE LE COMPILATEUR NE CONNAÎT PAS (nPas, nAff : la constante,
+// plus min(dec.y, 0) qui vaut 0 — dec.y, la forme, n'est jamais négative,
+// mais il ne le sait pas). Bornées par des constantes, ces deux boucles se
+// déroulaient : quinze copies de formeSdf dans le corps de la boucle des
+// boîtes, payées par CHAQUE pixel au banc logiciel, même sans arc ni coque à
+// l'écran — tableau 1 (un disque, des rectangles), relief fort, 640 × 400 :
+// dev 1 404 ms par image, bornes constantes 1 483, ces bornes 1 457 (trois
+// passes alternées chacun, 18/11). Et fxc (Firefox sous Windows) n'a pas à
+// dérouler ce qu'il ne peut pas compter (voir plus bas, gradSdfBoite).
+vec2 flancAffine(vec2 wb, vec2 rL, vec4 b, vec4 dec, float d, float dV) {
+  if (dec.y > 4.5 && d > length(rL) + 1.5) return vec2(0.0);
+  int nPas = ${PAS_AFFINE} + int(min(dec.y, 0.0));
+  int nAff = ${AFFINAGE} + int(min(dec.y, 0.0));
+  float couv = d <= 0.0 ? 1.0 : 0.0;
+  float dP = d;
+  float dMin = d;
+  float tMin = 0.0;
+  float lo = -1.0;
+  float hi = 0.0;
+  float dLo = 0.0;
+  float dHi = 0.0;
+  for (int k = 1; k <= nPas; k++) {
+    float t = float(k) / ${glslFloat(PAS_AFFINE)};
+    float dM = k == ${PAS_AFFINE} ? dV : formeSdf(wb - rL * t, b, dec.y, dec.z, dec.w);
+    couv = max(couv, 1.0 - smoothstep(-1.0, 1.5, dM));
+    if (dP <= 0.0 && dM > 0.0) {
+      lo = float(k - 1) / ${glslFloat(PAS_AFFINE)};
+      hi = t;
+      dLo = dP;
+      dHi = dM;
+    }
+    if (dM < dMin) { dMin = dM; tMin = t; }
+    dP = dM;
+  }
+  // sans passage : la hauteur du pas le plus proche (le liseré suit la
+  // tranche, comme celui de flancBalaye)
+  if (lo < 0.0) return vec2(couv, dP <= 0.0 ? 1.0 : tMin);
+  for (int i = 0; i < nAff; i++) {
+    float m = 0.5 * (lo + hi);
+    float dm = formeSdf(wb - rL * m, b, dec.y, dec.z, dec.w);
+    if (dm <= 0.0) { lo = m; dLo = dm; } else { hi = m; dHi = dm; }
+  }
+  return vec2(couv, lo + (hi - lo) * dLo / (dLo - dHi));
+}
 
 // la distance signée d'une boîte en un point QUELCONQUE de son repère local
 // (l'ombre courte la lit hors du pixel) : la forme si elle en a une
@@ -2512,9 +2613,9 @@ float piecesSdf(int sorte, vec2 p, vec4 box, float code) {
 // wb : le pixel dans ce repère ; rL : le déplacement du sommet (le dessus se
 // lit en wb − rL) ; dG, dGV : la silhouette au pied et au sommet. Le chemin
 // se lit en douze pas — la hauteur vue est son DERNIER passage du dedans au
-// dehors, comme pour les formes courbes (trois pas y suffisent : leur
-// tranche est lisse ; ici la rampe a des coins francs : à trois pas, puis
-// à six, son bord en biais tombait en marches, vues au banc).
+// dehors, comme pour l'arc et la coque (flancAffine, qui affine en plus ce
+// passage ; ici la rampe a des coins francs : à trois pas, puis à six, son
+// bord en biais tombait en marches, vues au banc).
 vec2 flancPieces(int sorte, vec2 wb, vec2 rL, vec4 box, float code, float dG, float dGV, out vec2 nrm) {
   nrm = vec2(0.0, 1.0);
   float couv = dG <= 0.0 ? 1.0 : 0.0;
@@ -2933,6 +3034,10 @@ void main() {
   // ce que les lampes laissent de lumière au TOIT ici (1 : aucun voisin plus
   // haut ne l'ombre) — la carte le porte dans son alpha (voir LIGHT_FS)
   float toitVis = 1.0;
+  // la lumière que le FOND reçoit ici — retenue pour ce qui est peint DANS
+  // le fond, l'iris du sas : sans elle, il gardait sa pleine lumière là où
+  // le fond tombait au noir, et se lisait posé sur l'image (18/11)
+  vec3 eclFond = vec3(1.0);
   if (uLumiere > 0.5) {
     vec2 luv = (world - uLightMapMin) * uLightMapInvSize;
     // la carte est COLORÉE : chaque lampe y a versé sa teinte × visibilité
@@ -2940,7 +3045,8 @@ void main() {
     vec3 lm = lm4.rgb;
     toitVis = lm4.a;
     solEclaire = clamp(max(lm.r, max(lm.g, lm.b)), 0.0, 1.0);
-    tank *= uAmbiante + 0.95 * lm;
+    eclFond = vec3(uAmbiante) + 0.95 * lm;
+    tank *= eclFond;
     // un léger surcroît dans les pleins feux — la teinte suit les lampes
     tank += lm * lm * 0.06;
     // la monture de chaque lampe : un point de sa couleur au plafond —
@@ -3199,6 +3305,9 @@ void main() {
   // LE SOL QUE LES SOMMETS CACHENT (relief allumé) : le plus grand sur toutes
   // les boîtes — le fluide, peint après la boucle, ne s'y peint pas
   float solSousSommets = 0.0;
+  // LA VITRE DE LA VITRINE sous ce pixel (baie d'habillage 1), 0..1 : retenue
+  // dans la boucle, le reflet du corps s'y peint après elle (refletCorps)
+  float vitreVitrine = 0.0;
   for (int bi = 0; bi < min(uBoxCount, MAX_BOXES); bi++) {
     // LA PORTÉE D'ABORD (portee.ts) : hors de son rectangle, la boîte ne peut
     // rien peindre ici — ni distance, ni décodage, ni matériau à classer. Le
@@ -3271,9 +3380,10 @@ void main() {
     // habillages la suivent ; wS, le même point dans le monde (sans le pivot
     // de la boîte), où se lisent les motifs et les textures du dessus. d
     // reste LA BASE : ombres portées, auras et physique y demeurent ancrées.
-    // Entre les deux : le FLANC, échantillonné à trois hauteurs
-    // intermédiaires (les parois minces ne laissent pas de trou quand le
-    // sommet glisse au-delà de leur épaisseur).
+    // Entre les deux : le FLANC, le balayage du pied au sommet — exact pour
+    // les formes convexes, en douze pas affinés pour l'arc et la coque (les
+    // parois minces ne laissent pas de trou quand le sommet glisse au-delà de
+    // leur épaisseur).
     // LA LONGUEUR DU FLANC SUIT LA HAUTEUR (volume.ts, reliefParois.ts) : le
     // sommet ne prend que sa part du déplacement — un mur haut garde le flanc
     // d'avant, un hydro moyen n'en a que 90/140, une plaque basse 40/140.
@@ -3325,42 +3435,30 @@ void main() {
         // pixel : près d'un bout de la face, c'est l'arête d'à côté, et un
         // triangle à 45° prenait une hauteur fausse (le concepteur, 16/11,
         // « les faces verticales »). Le balayage vaut des deux côtés du pied.
-        // Les formes COURBES ou creuses gardent l'estime et l'échantillonnage :
-        // leur balayage n'a pas de forme close.
-        if (dec.y < 0.5) {
-          vec2 rL = vec2(caR * relB.x + saR * relB.y, -saR * relB.x + caR * relB.y);
-          vec2 fb = flancBalaye(wb, uBoxes[bi], rL);
+        // (le chemin, dans le repère de la boîte : relB dépivoté)
+        vec2 rL = vec2(caR * relB.x + saR * relB.y, -saR * relB.x + caR * relB.y);
+        if (dec.y < 3.5) {
+          // UNE BOÎTE, UN DISQUE, UNE CAPSULE, UN COIN : convexes, leur
+          // balayage a une forme close. Le disque et la capsule gardaient cinq
+          // copies de leur silhouette (pied, ¼, ½, ¾, sommet), lues en marches
+          // sur le bord en biais, et sur la base une hauteur estimée par deux
+          // distances (conception du 18/11) ; le coin sortait en dents de scie
+          vec2 fb = dec.y < 0.5 ? flancBalaye(wb, uBoxes[bi], rL)
+                  : dec.y < 1.5 ? flancBalayeDisque(wb, uBoxes[bi], rL)
+                  : dec.y < 2.5 ? flancBalayeCapsule(wb, uBoxes[bi], rL)
+                  : flancBalayeCoin(wb, uBoxes[bi], dec.z, rL);
           // sur la base, sous le vide : pleine tranche
           flanc = d <= 0.0 ? 1.0 : 1.0 - smoothstep(-1.0, 1.5, fb.x);
           htFlanc = fb.y;
-        } else if (dec.y > 2.5 && dec.y < 3.5) {
-          // UN COIN (le triangle) : convexe, il a lui aussi son balayage
-          // exact — le sommet de sa tranche sortait en dents de scie
-          vec2 rL = vec2(caR * relB.x + saR * relB.y, -saR * relB.x + caR * relB.y);
-          vec2 fb = flancBalayeCoin(wb, uBoxes[bi], dec.z, rL);
-          flanc = d <= 0.0 ? 1.0 : 1.0 - smoothstep(-1.0, 1.5, fb.x);
-          htFlanc = fb.y;
-        } else if (d <= 0.0) {
-          flanc = 1.0; // sur la base, sous le vide : pleine tranche
-          // le chemin du pied au sommet coupe la base ici et le sommet à son
-          // bord : la hauteur vue est la part du chemin, estimée par les DEUX
-          // SDF
-          htFlanc = clamp(-d / max(dV - d, 1e-3), 0.0, 1.0);
         } else {
-          float dP = d;
-          for (int fs = 1; fs <= 3; fs++) {
-            vec2 wM = world - relB * (float(fs) / 4.0);
-            vec2 wbM = wM;
-            if (abs(bAngR) > 0.0005) {
-              vec2 relM = wM - bcR;
-              wbM = bcR + vec2(caR * relM.x + saR * relM.y, -saR * relM.x + caR * relM.y);
-            }
-            float dM = formeSdf(wbM, uBoxes[bi], dec.y, dec.z, dec.w);
-            flanc = max(flanc, 1.0 - smoothstep(-1.0, 1.5, dM));
-            if (dP <= 0.0 && dM > 0.0) htFlanc = (float(fs) - 1.0 + dP / (dP - dM)) / 4.0;
-            dP = dM;
-          }
-          if (dP <= 0.0) htFlanc = (3.0 + dP / (dP - dV)) / 4.0;
+          // L'ARC ET LA COQUE, ni convexes ni closes : douze pas et le dernier
+          // passage affiné (flancAffine) — sur la base aussi, où deux
+          // distances estimaient la hauteur, fausse dès que le chemin passe
+          // le creux d'une coque
+          vec2 fa = flancAffine(wb, rL, uBoxes[bi], dec, d, dV);
+          // sur la base, sous le vide : pleine tranche
+          flanc = d <= 0.0 ? 1.0 : fa.x;
+          htFlanc = fa.y;
         }
       }
       // (les pièces n'en sont pas : leur dessus est leur IMAGE, le sol caché
@@ -3766,8 +3864,43 @@ void main() {
         float verre = 1.0 - smoothstep(-montW - edgeW, -montW, d);
         float monture = fill - verre;
         vec3 ciel = voidCol + vec3(0.025, 0.040, 0.065);
-        float band = 0.5 + 0.5 * sin((world.x + world.y) * 0.016 - uTime * 0.22);
-        float sweep = smoothstep(0.88, 0.995, band);
+        float sweep;
+        if (uBoxAux[bi].z > 0.5) {
+          // LA VITRE DE LA VITRINE (habillage 1 — game/cuveAccueil.ts). Le
+          // balayage d'une baie se répète sur toute sa largeur : sur un
+          // hublot de 1 400 u, cinq bandes pareilles (« les reflets se
+          // répètent trop », le concepteur, 18/11). Ici, DEUX reflets fixés
+          // au verre, un large et un fin, comme sur une vraie vitre : des
+          // segments qui s'éteignent avant le bord, et dérivent à peine.
+          vec2 bcV = 0.5 * (uBoxes[bi].xy + uBoxes[bi].zw);
+          float rV = max(1.0, 0.5 * (uBoxes[bi].z - uBoxes[bi].x));
+          vec2 qV = (wb - bcV) / rV;
+          float sV = dot(qV, vec2(0.7071, 0.7071));
+          float tV = dot(qV, vec2(0.7071, -0.7071));
+          float gV = 0.025 * sin(uTime * 0.11);
+          float large = exp(-pow((sV - 0.30 - gV) / 0.11, 2.0));
+          float fin = exp(-pow((sV - 0.53 - gV) / 0.025, 2.0));
+          float corde = sqrt(max(0.0, 1.0 - sV * sV));
+          float segment = 1.0 - smoothstep(0.35 * corde, 0.85 * corde, abs(tV + 0.10));
+          // LE VERRE SE VOIT SANS ÉCLAIRCIR LA NUIT : le fond reste sombre
+          // (« un fond assez sombre quand même », le concepteur, 18/11 —
+          // mesuré, le verre d'une baie triplait la luminance du ciel : 0,062
+          // dans la vitre pour 0,021 dehors). Ici le dehors est seulement
+          // bleui, sans le voile ajouté des baies ; le verre se lit à son
+          // pourtour, qui s'éclaire (vu de biais, il renvoie plus), et à ses
+          // reflets.
+          float bordV = smoothstep(0.80, 0.99, length(qV));
+          ciel = mix(voidCol, voidCol * vec3(0.80, 0.95, 1.25) + vec3(0.004, 0.010, 0.022), 0.85)
+               + vec3(0.05, 0.08, 0.11) * bordV;
+          // les reflets se POSENT sur le verre (un mélange, pas un ajout) :
+          // sur les étoiles claires, une lueur ajoutée ne se lisait pas
+          ciel = mix(ciel, vec3(0.78, 0.86, 0.95), clamp(0.22 * large + 0.40 * fin, 0.0, 1.0) * segment);
+          sweep = 0.0;
+          vitreVitrine = max(vitreVitrine, verre);
+        } else {
+          float band = 0.5 + 0.5 * sin((world.x + world.y) * 0.016 - uTime * 0.22);
+          sweep = smoothstep(0.88, 0.995, band);
+        }
         ciel += vec3(0.10, 0.13, 0.17) * sweep * eclSolide;
         // un reflet fixe sur le bord intérieur de la vitre : le verre a une épaisseur
         float lisere = (1.0 - smoothstep(0.0, edgeW * 1.5, abs(d + montW))) * fill;
@@ -4162,7 +4295,9 @@ void main() {
       // halo de courant : stries qui convergent en spirale vers la bouche
       float reach = 1.0 - smoothstep(rad * 0.6, max(uExitRadius, rad), dh);
       float streaks = 0.5 + 0.5 * sin(ang * 5.0 - dh * 0.055 + uTime * 3.2);
-      col += vec3(0.05, 0.28, 0.22) * streaks * reach * reach * 0.35;
+      // (le sarcelle de la charte, #63b7e6 : la bouche est l'accent froid de
+      // la cuve — le vert est réservé à la serre ; à luminance égale)
+      col += vec3(0.12, 0.23, 0.29) * streaks * reach * reach * 0.35;
       float eye = 1.0 - smoothstep(rad * 0.22, rad * 0.5, dh);
       drainEye = max(drainEye, eye);
       if (uHasIris > 0.5) {
@@ -4179,15 +4314,29 @@ void main() {
         vec3 irisCol = textureGrad(uTexIris, cuv + 0.5,
                                    vec2(pxMonde / (2.0 * frameR), 0.0),
                                    vec2(0.0, pxMonde / (2.0 * frameR))).rgb;
-        // Détourage serré : le cadre touche le bord de l'image, on coupe juste
-        // à l'intérieur pour que le fond brun ne déborde jamais.
-        float aMask = 1.0 - smoothstep(0.435, 0.465, length(rel) / (2.0 * frameR));
-        // assise : léger sombre sous le cadre pour le détacher de la paroi
-        col = mix(col, vec3(0.004, 0.010, 0.012), (1.0 - smoothstep(rad * 0.8, frameR * 1.1, dh)) * 0.45);
+        // Détourage AU BORD DU CADRE de l'image Blender : son cadre s'arrête
+        // à 0,429 de la largeur (alpha mesuré : 254 à 0,428, 0 à 0,432) et
+        // tout est noir transparent au-delà. L'ancien détourage, 0,435 →
+        // 0,465, était réglé pour l'image d'avant, opaque jusqu'au bord : il
+        // peignait ce noir en anneau épais autour du cadre (18/11). Coupé au
+        // pixel près, en espace monde.
+        float rCadre = 0.429 * 2.0 * frameR;
+        float aMask = 1.0 - smoothstep(rCadre - pxMonde, rCadre, dh);
+        // L'iris est SERTI DANS LE FOND, pas posé dessus (le concepteur,
+        // 18/11 : « très posé sur l'image ») : il prend la lumière du fond
+        // — dans le noir d'une salle sans ambiante, il s'assombrit avec la
+        // paroi au lieu d'y briller seul — et son cadre affleure, marqué
+        // d'un simple JOINT. L'« assise » d'avant, un anneau sombre jusqu'à
+        // 1,1 rayon de cadre, débordait sur le fond comme une ombre portée :
+        // c'était elle qui le décollait.
+        irisCol *= eclFond;
+        float joint = 1.0 - smoothstep(0.0, max(1.5 * pxMonde, 1.0), abs(dh - rCadre));
         col = mix(col, irisCol, aMask);
-        // l'anneau vert respire par-dessus l'image
+        col *= 1.0 - 0.55 * joint;
+        // l'anneau sarcelle respire par-dessus l'image (il était VERT, hors
+        // charte — docs/assets-ia.md §4 ; même luminance qu'avant)
         float ring = exp(-pow((dh - rad * 0.74) * 5.0 / rad, 2.0));
-        col += vec3(0.10, 0.55, 0.40) * ring * pulse * 0.5;
+        col += vec3(0.23, 0.43, 0.54) * ring * pulse * 0.5;
       } else {
         // gorge de l'entonnoir : l'espace s'assombrit en tombant vers le trou
         float throat = 1.0 - smoothstep(0.0, rad, dh);
@@ -4196,7 +4345,7 @@ void main() {
         col = mix(col, vec3(0.0, 0.002, 0.004), eye);
         // anneau lumineux qui respire au bord de la gorge
         float ring = exp(-pow((dh - rad * 0.55) * 6.0 / rad, 2.0));
-        col += vec3(0.15, 0.75, 0.55) * ring * pulse * 0.8;
+        col += vec3(0.33, 0.62, 0.77) * ring * pulse * 0.8;
       }
     }
     // Relief d'éclairage : un biseau directionnel, devenu un chanfrein franc.
@@ -4265,6 +4414,16 @@ void main() {
     dansEau *= 1.0 - solSousSommets;
     float ombre = ombreVolume(world, dansEau);
     col = mix(col, col * vec3(0.44, 0.51, 0.66), ombre * 0.72);
+  }
+
+  // LE REFLET DU VOLUME dans la vitre de la vitrine (« il faudrait un reflet
+  // du volume », le concepteur, 18/11). Lu ICI, hors de la boucle des boîtes,
+  // qui n'a retenu que la part de verre : ses lectures du champ y seraient
+  // recopiées pour chaque boîte par les compilateurs qui la déroulent.
+  if (vitreVitrine > 0.0) {
+    vec2 rc = refletCorps(world);
+    col = mix(col, vec3(0.42, 0.64, 0.88), rc.x * 0.45 * vitreVitrine);
+    col += vec3(0.05, 0.10, 0.15) * rc.y * vitreVitrine;
   }
 
   // Ondes d'éjection : anneaux qui traversent le volume depuis le point
@@ -7691,7 +7850,11 @@ export class Renderer {
                 this.chargeLissee(bx, sim.surchauffeurVide(bx) ? 0 : 1, timeSec) + 2 * (bx.sens ?? 0)
               : rideau
                 ? rideau[0]
-                : 1
+                : bx.material === MAT_BAIE
+                  ? // l'habillage d'une baie : 1, la vitre de la vitrine
+                    // (game/cuveAccueil.ts) — ses deux reflets et celui du corps
+                    (bx.skin ?? 0)
+                  : 1
       // aux.w : la portée d'aura (chaudière) — ou, d'un SURCHAUFFEUR, son
       // ÉCLAT de recharge (1 à l'instant du dash rendu, 0 après ~0,9 s) —
       // ou, d'un RIDEAU, l'ouverture du ressort de ses lanières

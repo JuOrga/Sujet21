@@ -181,39 +181,374 @@
         outline-offset: 2px;
       }
 
-      /* ---- Accueil : la fiche d'expérience, en dossier LARGE sur l'essai
-         vivant — elle occupe une bonne partie de l'écran, en deux colonnes :
-         le protocole (titre, consigne, boutons) et le dossier (figure,
-         registres, commandes). Sur écran étroit, les colonnes s'empilent. ---- */
+      /* ---- L'ACCUEIL : le poste d'observation ----
+         La fiche était un dossier de 1 060 px posé DEVANT l'échantillon :
+         douze boutons du même poids, un relevé de six cases, un palmarès,
+         une figure qui montrait en image ce qui vivait déjà derrière. Elle
+         devient un rail : un titre, UN verbe (le seul aplat de couleur),
+         six lieux nommés d'un mot, quatre pictogrammes. La valeur d'un lieu
+         ne paraît que sur la ligne visée ; un point ambre dit qu'il y a du
+         neuf. L'échantillon garde la scène, et son litrage le suit.
+         Trois crans : le rail à gauche (bureau, Steam Deck), le rail
+         resserré en deux colonnes (téléphone tourné), le rail étalé autour
+         d'une fenêtre sur la cuve (téléphone debout). ---- */
       #home {
+        --acc-large: 310px; /* la largeur du texte du rail */
         position: fixed;
         inset: 0 auto 0 0;
-        width: min(1060px, 100vw);
+        z-index: 20;
+        width: min(48vw, 500px);
+        box-sizing: border-box;
+        padding: calc(44px + env(safe-area-inset-top)) 0 calc(22px + env(safe-area-inset-bottom)) max(40px, env(safe-area-inset-left));
         display: flex;
         flex-direction: column;
-        justify-content: center;
-        gap: 22px;
-        padding: 28px clamp(20px, 4vw, 56px);
-        box-sizing: border-box;
-        background: linear-gradient(100deg, rgba(6, 13, 23, 0.96) 72%, rgba(6, 13, 23, 0.62));
-        border-right: 1px solid var(--line);
-        backdrop-filter: blur(6px);
+        gap: 26px;
+        /* le rail s'efface vers la cuve : pas de bord, pas de panneau */
+        background: linear-gradient(90deg, rgba(3, 7, 16, 0.94) 0, rgba(3, 7, 16, 0.86) 60%, rgba(3, 7, 16, 0) 100%);
         overflow-y: auto;
-        z-index: 20;
+        scrollbar-width: none; /* sur Steam Deck la barre s'affichait pour trois pixels de trop */
         transition: opacity 0.45s ease, transform 0.45s ease;
       }
-      .home-cols {
-        display: flex;
-        gap: clamp(26px, 4vw, 52px);
-        align-items: flex-start;
+      #home::-webkit-scrollbar { display: none; }
+      #home > * { width: min(var(--acc-large), 100%); flex: none; }
+      body.playing #home {
+        opacity: 0;
+        transform: translateX(-24px);
+        pointer-events: none;
       }
-      .home-col {
-        flex: 1 1 0;
+      .acc-titre {
+        margin: 0;
+        font-family: var(--font-display);
+        font-weight: 400;
+        font-size: calc(34px * var(--ui));
+        line-height: 1.05;
+        letter-spacing: 0.04em;
+        color: var(--ink);
+      }
+      .acc-titre em { font-style: normal; color: var(--specimen); }
+      /* En pause, la fiche change de visage : la salle est figée derrière,
+         le titre se tait et dit seulement PAUSE, en ambre */
+      .acc-pause { display: none; }
+      #home.pause .acc-jeu { display: none; }
+      #home.pause .acc-pause {
+        display: inline;
+        font-size: calc(13px * var(--ui));
+        letter-spacing: 0.24em;
+        color: #f2c98e;
+      }
+      .acc-devise {
+        margin: 9px 0 0;
+        font-family: var(--font-mono);
+        font-size: calc(13px * var(--ui));
+        color: var(--dim);
+      }
+      .acc-fenetre { display: none; }
+      #home > .acc-ressort { flex: 1 1 0; min-height: 0; } /* pousse les réglages au pied du rail */
+
+      /* LE VERBE : le seul aplat de couleur, taillé d'un chanfrein */
+      #start {
+        appearance: none;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        width: 100%;
+        min-height: 58px;
+        padding: 0 20px;
+        border: 0;
+        background: var(--specimen);
+        color: var(--void);
+        text-align: left;
+        cursor: pointer;
+        clip-path: polygon(0 0, calc(100% - 14px) 0, 100% 14px, 100% 100%, 0 100%);
+        transition: background 0.15s ease;
+      }
+      #start b {
+        font-family: var(--font-display);
+        font-weight: 400;
+        font-size: calc(14px * var(--ui));
+        letter-spacing: 0.16em;
+      }
+      #start small {
+        font-family: var(--font-mono);
+        font-size: calc(12px * var(--ui));
+        font-variant-numeric: tabular-nums;
+        white-space: nowrap;
+        opacity: 0.75;
+      }
+      /* le chanfrein rogne le liseré : c'est la teinte qui dit le focus */
+      #start:hover,
+      #start:focus-visible,
+      #start.pad-focus { background: var(--glow); }
+      .acc-second { display: flex; flex-wrap: wrap; column-gap: 22px; }
+      .acc-second button {
+        appearance: none;
+        margin-top: 10px;
+        padding: 4px 0;
+        background: none;
+        border: 0;
+        font-family: var(--font-display);
+        font-size: calc(9.5px * var(--ui));
+        letter-spacing: 0.14em;
+        color: var(--dim);
+        cursor: pointer;
+      }
+      .acc-second button:hover,
+      .acc-second button:focus-visible { color: var(--glow); }
+      /* QUITTER en deux temps : armé, il le dit en rouge */
+      #start-abandon.arme { color: var(--alert); }
+
+      /* LES LIEUX : un nom ; la valeur ne paraît que sur la ligne visée */
+      .acc-lieux { display: flex; flex-direction: column; }
+      .acc-lieu {
+        appearance: none;
+        position: relative;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        width: 100%;
+        min-height: 44px;
+        padding: 0 12px 0 14px;
+        background: none;
+        border: 0;
+        color: var(--ink);
+        text-align: left;
+        cursor: pointer;
+      }
+      .acc-lieu > span {
+        font-family: var(--font-display);
+        font-size: calc(12px * var(--ui));
+        letter-spacing: 0.16em;
+        white-space: nowrap;
+      }
+      .acc-lieu small {
+        margin-left: auto;
+        font-family: var(--font-mono);
+        font-size: calc(12px * var(--ui));
+        font-variant-numeric: tabular-nums;
+        white-space: nowrap;
+        color: var(--dim);
+        opacity: 0;
+        transition: opacity 0.15s ease;
+      }
+      .acc-voyant {
+        flex: none;
+        width: 6px;
+        height: 6px;
+        border-radius: 50%;
+        background: #f2c98e;
+        box-shadow: 0 0 9px rgba(242, 201, 142, 0.8);
+        animation: acc-veille 2.4s ease-in-out infinite;
+      }
+      .acc-voyant[hidden] { display: none; }
+      @keyframes acc-veille {
+        50% { box-shadow: 0 0 3px rgba(242, 201, 142, 0.5); opacity: 0.65; }
+      }
+      /* la ligne visée : un voile, deux équerres — pas le liseré des
+         panneaux, qui encadrerait la ligne comme un champ de formulaire */
+      .acc-lieu:hover,
+      .acc-lieu:focus-visible,
+      #home .acc-lieu.pad-focus {
+        background: rgba(99, 183, 230, 0.09);
+        outline: none !important;
+        box-shadow: none;
+      }
+      .acc-lieu:is(:hover, :focus-visible, .pad-focus) > span { color: var(--glow); }
+      .acc-lieu:is(:hover, :focus-visible, .pad-focus) small { opacity: 1; }
+      .acc-lieu:is(:hover, :focus-visible, .pad-focus)::before,
+      .acc-lieu:is(:hover, :focus-visible, .pad-focus)::after {
+        content: '';
+        position: absolute;
+        width: 8px;
+        height: 8px;
+        border: 0 solid var(--specimen);
+      }
+      .acc-lieu:is(:hover, :focus-visible, .pad-focus)::before { left: 0; top: 0; border-top-width: 1.5px; border-left-width: 1.5px; }
+      .acc-lieu:is(:hover, :focus-visible, .pad-focus)::after { right: 0; bottom: 0; border-bottom-width: 1.5px; border-right-width: 1.5px; }
+      .acc-outil > span { font-size: calc(10px * var(--ui)); color: var(--dim); }
+
+      /* LES RÉGLAGES : quatre pictogrammes, le nom en infobulle */
+      .acc-reglages { display: flex; gap: 4px; margin-left: 4px; }
+      .acc-reglages button {
+        appearance: none;
+        display: grid;
+        place-items: center;
+        width: 40px;
+        height: 40px;
+        padding: 0;
+        background: none;
+        border: 1px solid transparent;
+        color: var(--dim);
+        cursor: pointer;
+      }
+      .acc-reglages button[hidden] { display: none; }
+      .acc-reglages svg {
+        width: 19px;
+        height: 19px;
+        fill: none;
+        stroke: currentColor;
+        stroke-width: 1.5;
+        stroke-linejoin: round;
+        stroke-linecap: round;
+      }
+      .acc-reglages button:hover,
+      .acc-reglages button:focus-visible { border-color: var(--line-strong); color: var(--glow); }
+
+      /* LA SCÈNE : l'écusson, la version, le litrage qui suit le corps */
+      #accueil-scene {
+        position: fixed;
+        inset: 0;
+        z-index: 19;
+        pointer-events: none;
+        transition: opacity 0.45s ease, visibility 0s;
+      }
+      body.playing #accueil-scene {
+        opacity: 0;
+        visibility: hidden;
+        transition: opacity 0.45s ease, visibility 0s 0.45s;
+      }
+      .acc-ecusson {
+        position: absolute;
+        top: calc(20px + env(safe-area-inset-top));
+        right: max(22px, env(safe-area-inset-right));
+        width: 46px;
+        height: 46px;
+        border-radius: 50%;
+        border: 1px solid var(--line-strong);
+      }
+      /* la version, en petit au coin — sept tapes dessus ouvrent le mode
+         concepteur : elle doit donc rester touchable */
+      #version-jeu {
+        position: absolute;
+        right: max(16px, env(safe-area-inset-right));
+        bottom: calc(12px + env(safe-area-inset-bottom));
+        font-family: var(--font-mono);
+        font-size: calc(10px * var(--ui));
+        letter-spacing: 0.06em;
+        color: var(--dim);
+        opacity: 0.6;
+        pointer-events: auto;
+        user-select: none;
+        -webkit-user-select: none;
+      }
+      /* le litrage : un point au bord du corps, un trait qui monte, le
+         nombre posé sur son soulignement. main.ts déplace l'ancre. */
+      #accueil-releve { position: absolute; left: 0; top: 0; }
+      #accueil-releve[hidden] { display: none; }
+      #accueil-releve::before {
+        content: '';
+        position: absolute;
+        left: -2.5px;
+        top: -2.5px;
+        width: 5px;
+        height: 5px;
+        border-radius: 50%;
+        background: var(--glow);
+      }
+      #accueil-releve i {
+        position: absolute;
+        left: 0;
+        top: 0;
+        width: 34px;
+        height: 1px;
+        background: rgba(150, 200, 235, 0.45);
+        transform-origin: 0 0;
+        transform: rotate(-50deg);
+      }
+      #home-volume {
+        position: absolute;
+        left: 21px;
+        bottom: 26px;
+        padding: 0 4px 3px 6px;
+        border-bottom: 1px solid rgba(150, 200, 235, 0.45);
+        font-family: var(--font-display);
+        font-size: calc(16px * var(--ui));
+        letter-spacing: 0.04em;
+        font-variant-numeric: tabular-nums;
+        white-space: nowrap;
+        color: var(--glow);
+      }
+
+      /* le nom d'opérateur, dans le voile SAUVEGARDES */
+      .sv-operateur {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 12px 12px 0;
+        font-family: var(--font-mono);
+        font-size: calc(11px * var(--ui));
+        letter-spacing: 0.16em;
+        color: var(--dim);
+      }
+      .sv-operateur input {
+        flex: 0 1 200px;
         min-width: 0;
-        display: flex;
-        flex-direction: column;
-        gap: 22px;
+        padding: 7px 10px;
+        background: rgba(3, 7, 16, 0.6);
+        border: 1px solid var(--line-strong);
+        color: var(--specimen);
+        font-family: var(--font-mono);
+        font-size: calc(13px * var(--ui));
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
       }
+
+      /* -- écran bas (Steam Deck : 1280 × 800) : les lignes se resserrent -- */
+      @media (max-height: 680px) {
+        #home { gap: 18px; padding-top: calc(28px + env(safe-area-inset-top)); padding-bottom: 14px; }
+        .acc-titre { font-size: calc(30px * var(--ui)); }
+        .acc-lieu { min-height: 38px; }
+      }
+      /* -- téléphone tourné : le rail se resserre, les lieux sur deux colonnes -- */
+      @media (max-height: 520px) {
+        #home {
+          --acc-large: 330px;
+          width: min(46vw, 400px);
+          gap: 9px;
+          padding: calc(12px + env(safe-area-inset-top)) 0 calc(8px + env(safe-area-inset-bottom)) max(18px, env(safe-area-inset-left));
+        }
+        .acc-titre { font-size: calc(20px * var(--ui)); }
+        .acc-devise, .acc-lieu small { display: none; }
+        #start { min-height: 44px; }
+        .acc-second button { margin-top: 4px; }
+        .acc-lieux { display: grid; grid-template-columns: 1fr 1fr; column-gap: 10px; }
+        .acc-lieu { min-height: 34px; padding: 0 8px; }
+        .acc-lieu > span { font-size: calc(9.5px * var(--ui)); }
+        .acc-reglages button { width: 34px; height: 32px; }
+        .acc-ecusson { width: 34px; height: 34px; top: calc(10px + env(safe-area-inset-top)); }
+      }
+      /* -- téléphone debout : le titre en haut, la cuve au milieu, le verbe
+         sous le pouce. Le rail couvre l'écran mais la fenêtre laisse passer
+         le toucher : la cuve se joue à travers. -- */
+      @media (max-width: 700px) and (min-height: 521px) {
+        #home {
+          inset: 0;
+          width: 100vw;
+          gap: 14px;
+          padding: calc(16px + env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) calc(10px + env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left));
+          background: linear-gradient(180deg, rgba(3, 7, 16, 0.9) 0, rgba(3, 7, 16, 0) 12%, rgba(3, 7, 16, 0) 54%, rgba(3, 7, 16, 0.94) 68%);
+          pointer-events: none;
+        }
+        #home > * { width: 100%; pointer-events: auto; }
+        #home > .acc-fenetre { display: block; flex: 1 1 0; min-height: 100px; pointer-events: none; }
+        #home > .acc-ressort { display: none; }
+        .acc-tete { padding-right: 60px; }
+        .acc-titre { font-size: calc(26px * var(--ui)); }
+        .acc-devise { font-size: calc(12px * var(--ui)); margin-top: 5px; }
+        .acc-lieux { display: grid; grid-template-columns: 1fr 1fr; column-gap: 12px; }
+        .acc-lieu { border-top: 1px solid var(--line); padding: 0 10px; }
+        .acc-lieu > span { font-size: calc(10px * var(--ui)); letter-spacing: 0.13em; }
+        .acc-lieu small { display: none; }
+        .acc-reglages { justify-content: space-between; margin: 0; }
+        .acc-reglages button { flex: 1 1 0; height: 40px; }
+        .acc-ecusson { width: 38px; height: 38px; top: calc(14px + env(safe-area-inset-top)); right: max(16px, env(safe-area-inset-right)); }
+        #version-jeu { bottom: auto; top: calc(58px + env(safe-area-inset-top)); }
+        body.playing #home { transform: translateY(24px); }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        .acc-voyant { animation: none; }
+      }
+
       /* Le bouton visé à la manette : un liseré net, visible de loin */
       /* Le liseré du focus MANETTE — partout où la croix navigue : la
          fiche, mais aussi tous les panneaux et sous-menus. */
@@ -226,54 +561,6 @@
         box-shadow: 0 0 14px rgba(99, 183, 230, 0.45);
       }
 
-      /* ---- Boutons jumeaux de la fiche : commandes + records + plein écran ---- */
-      /* La rangée d'outils : une CONSOLE — chips uniformes, grille qui
-         s'adapte seule (1 rangée sur grand écran, 2-3 colonnes sur téléphone),
-         cibles tactiles généreuses. Le glyphe est tinté échantillon : la
-         rangée appartient au labo, pas au navigateur. */
-      .home-duo {
-        display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(104px, 1fr));
-        gap: 8px;
-        margin-top: 14px;
-      }
-      #home .home-duo button {
-        appearance: none;
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        justify-content: center;
-        gap: 5px;
-        min-height: 54px;
-        padding: 8px 4px;
-        background: linear-gradient(180deg, rgba(18, 32, 50, 0.72), rgba(8, 16, 28, 0.88));
-        border: 1px solid var(--line);
-        border-radius: 8px;
-        color: var(--ink);
-        font-family: var(--font-display);
-        font-size: calc(9px * var(--ui));
-        letter-spacing: 0.13em;
-        line-height: 1.15;
-        cursor: pointer;
-        transition: border-color 0.15s ease, box-shadow 0.15s ease, transform 0.08s ease;
-      }
-      #home .home-duo button i {
-        font-style: normal;
-        font-size: calc(17px * var(--ui));
-        line-height: 1;
-        color: var(--specimen);
-        text-shadow: 0 0 10px rgba(46, 198, 201, 0.35);
-      }
-      #home .home-duo button span { text-align: center; }
-      #home .home-duo button:hover {
-        border-color: var(--specimen);
-        box-shadow: 0 0 14px rgba(46, 198, 201, 0.16), inset 0 0 18px rgba(46, 198, 201, 0.05);
-      }
-      #home .home-duo button:active { transform: translateY(1px); }
-      #home .home-duo button:focus-visible {
-        outline: 2px solid var(--specimen);
-        outline-offset: 2px;
-      }
       /* LE LECTEUR (joueurs et concepteur) : une seule ligne sous la rangée d'outils — l'étiquette,
          quatre touches de magnétophone, le titre de la musique de l'accueil,
          les trois touches d'avis. Le titre se coupe plutôt que de replier
@@ -295,7 +582,7 @@
         color: var(--specimen);
         margin-right: 2px;
       }
-      #home .home-ecoute button {
+      .home-ecoute button {
         appearance: none;
         flex: 0 0 auto;
         min-width: 34px;
@@ -309,9 +596,9 @@
         line-height: 1;
         cursor: pointer;
       }
-      #home .home-ecoute button:hover { border-color: var(--specimen); }
-      #home .home-ecoute button:focus-visible { outline: 2px solid var(--specimen); outline-offset: 2px; }
-      #home .home-ecoute button.actif { box-shadow: inset 0 0 12px rgba(46, 198, 201, 0.25); }
+      .home-ecoute button:hover { border-color: var(--specimen); }
+      .home-ecoute button:focus-visible { outline: 2px solid var(--specimen); outline-offset: 2px; }
+      .home-ecoute button.actif { box-shadow: inset 0 0 12px rgba(46, 198, 201, 0.25); }
       .home-ecoute-titre {
         flex: 1 1 auto;
         min-width: 0;
@@ -335,56 +622,16 @@
         gap: 4px;
         margin-left: 2px;
       }
-      #home .home-ecoute-avis button {
+      .home-ecoute-avis button {
         min-width: 30px;
         padding: 0 6px;
         font-family: var(--font-mono);
         font-size: calc(11px * var(--ui));
       }
-      #home .home-ecoute-avis button:disabled { opacity: 0.35; cursor: default; }
-      #home .home-ecoute-avis button[aria-pressed="true"] { border-color: var(--specimen); box-shadow: inset 0 0 12px rgba(99, 183, 230, 0.25); }
-      #home .home-ecoute-avis #ecoute-plus[aria-pressed="true"] { color: var(--valid); border-color: var(--valid); box-shadow: inset 0 0 12px rgba(63, 214, 155, 0.3); }
-      #home .home-ecoute-avis #ecoute-moins[aria-pressed="true"] { color: var(--alert); border-color: var(--alert); box-shadow: inset 0 0 12px rgba(224, 104, 92, 0.3); }
-      /* LA VOIE SEMI-PROCÉDURALE : le seul bouton de la rangée à porter un
-         liséré vert-menthe — la couleur des salles GÉNÉRÉES, celle de son
-         étiquette dans la cérémonie. Il respire lentement pour attirer
-         l'œil sans clignoter (le mouvement se coupe si la machine demande
-         qu'on l'épargne). */
-      #home .home-duo button#home-voie {
-        border-color: var(--valid);
-        box-shadow: 0 0 0 1px rgba(63, 214, 155, 0.22),
-          0 0 12px rgba(63, 214, 155, 0.16);
-        animation: voie-liseret 3s ease-in-out infinite;
-      }
-      #home .home-duo button#home-voie i { color: #6dffb8; }
-      #home .home-duo button#home-voie:hover {
-        border-color: #8affd0;
-        box-shadow: 0 0 0 1px rgba(109, 255, 184, 0.55),
-          0 0 22px rgba(63, 214, 155, 0.34);
-      }
-      @keyframes voie-liseret {
-        0%, 100% {
-          box-shadow: 0 0 0 1px rgba(63, 214, 155, 0.2),
-            0 0 10px rgba(63, 214, 155, 0.12);
-        }
-        50% {
-          box-shadow: 0 0 0 1px rgba(63, 214, 155, 0.5),
-            0 0 20px rgba(63, 214, 155, 0.3);
-        }
-      }
-      @media (prefers-reduced-motion: reduce) {
-        #home .home-duo button#home-voie { animation: none; }
-      }
-      @media (pointer: coarse) {
-        #home .home-duo { grid-template-columns: repeat(auto-fit, minmax(96px, 1fr)); }
-        #home #home .home-duo button { min-height: 62px; font-size: calc(9.5px * var(--ui)); }
-        #home #home .home-duo button i { font-size: calc(20px * var(--ui)); }
-      }
-      /* le bouton RECORDS n'existe que là où les registres sont cachés */
-      #home-recs {
-        display: none;
-      }
-
+      .home-ecoute-avis button:disabled { opacity: 0.35; cursor: default; }
+      .home-ecoute-avis button[aria-pressed="true"] { border-color: var(--specimen); box-shadow: inset 0 0 12px rgba(99, 183, 230, 0.25); }
+      .home-ecoute-avis #ecoute-plus[aria-pressed="true"] { color: var(--valid); border-color: var(--valid); box-shadow: inset 0 0 12px rgba(63, 214, 155, 0.3); }
+      .home-ecoute-avis #ecoute-moins[aria-pressed="true"] { color: var(--alert); border-color: var(--alert); box-shadow: inset 0 0 12px rgba(224, 104, 92, 0.3); }
       /* ---- Le voile RECORDS (mobile) : les registres, à la demande ---- */
       #recs {
         position: fixed;
@@ -934,7 +1181,6 @@
       /* LA RÉGIE : la console du concepteur — sous les outils (57+), au-dessus de l'accueil */
       #regie { position: fixed; inset: 0; z-index: 56; background: rgba(2, 6, 12, 0.82); display: flex; align-items: center; justify-content: center; padding: 18px; }
       #regie[hidden] { display: none; }
-      .home-regie { border-color: var(--specimen) !important; }
       .rg-boite { width: min(1180px, 96vw); height: min(820px, 92vh); display: flex; flex-direction: column; background: var(--panel); border: 1px solid var(--specimen); border-radius: 12px; box-shadow: 0 30px 80px rgba(0, 0, 0, 0.6); overflow: hidden; }
       .rg-tete { display: flex; align-items: baseline; gap: 14px; padding: 14px 18px; border-bottom: 1px solid var(--line); }
       .rg-tete h2 { margin: 0; font-family: var(--font-display); font-size: calc(15px * var(--ui)); letter-spacing: 0.24em; color: var(--specimen); }
@@ -2441,7 +2687,10 @@
         height: 102px;
         animation: cy-scintille 5s ease-in-out infinite;
       }
-      .cy-glacon i {
+      /* les trois FACES seulement (enfants directs) : en `.cy-glacon i`, la
+         règle prenait aussi la plaque peinte logée dans le flocon gravé, qui
+         sortait en carré de 48 px encadré, au bord du glaçon (18/11) */
+      .cy-glacon > i {
         position: absolute;
         left: 0;
         top: 0;
@@ -2465,11 +2714,15 @@
       /* le flocon gravé sur la face claire, et un éclat qui glisse */
       .cy-glacon em {
         position: absolute;
+        /* au CENTRE de la face du haut (27 px : son losange va de 3 à 51) :
+           calée par son bord haut à 24 px, la plaque peinte, plus haute que
+           l'ancien flocon de texte, tombait sur la pointe basse de la face */
         left: 50%;
-        top: 24px;
-        transform: translateX(-50%);
+        top: 27px;
+        transform: translate(-50%, -50%);
+        display: flex;
         font-style: normal;
-        font-size: calc(15px * var(--ui));
+        font-size: calc(19px * var(--ui));
         color: rgba(20, 52, 82, 0.85);
         text-shadow: 0 0 6px rgba(255, 255, 255, 0.7);
       }
@@ -2701,7 +2954,10 @@
         gap: 12px;
         width: 100%;
         text-align: left;
-        padding: 12px 16px;
+        /* 5 px et non 12 : la plaque de 46 px donne déjà sa hauteur à la
+           ligne. À 6 px, les huit lignes défilaient à 1280 × 720 (mesuré
+           le 18/11) ; à 5, chaque ligne reste sous les 58,4 px d'avant */
+        padding: 5px 16px;
         background: rgba(10, 20, 32, 0.85);
         border: 1px solid var(--line);
         border-left-width: 3px;
@@ -2710,6 +2966,10 @@
         cursor: default;
       }
       .cy-reg b { font-family: var(--font-display); font-size: calc(12px * var(--ui)); letter-spacing: 0.2em; font-weight: 600; display: block; }
+      /* la transformation peinte (source → cible), en tête de sa ligne. Ses
+         DEUX symboles et la flèche tiennent dans la plaque : à 32 px, chacun
+         tombait à 8 px de haut (18/11) ; à 46 px ils se lisent. */
+      .cy-reg .ico-cycle { flex: none; font-size: calc(34px * var(--ui)); }
       .cy-reg small { display: block; font-size: calc(8.5px * var(--ui)); letter-spacing: 0.14em; color: var(--dim); margin-top: 4px; }
       .cy-reg em {
         margin-left: auto;
@@ -2717,7 +2977,11 @@
         font-family: var(--font-display);
         font-size: calc(9px * var(--ui));
         letter-spacing: 0.2em;
-        white-space: nowrap;
+        /* sur deux lignes s'il le faut, calé à droite : d'une traite, « ORBE
+           MANQUANT · 10 AU MARCHAND » débordait de la ligne et le PRIX, la
+           seule chose à lire, tombait hors du cadre (18/11) */
+        text-align: right;
+        line-height: 1.5;
         color: var(--dim);
       }
       /* ACQUIS = VERT ici aussi : registre et schéma disent la même chose */
@@ -3090,14 +3354,6 @@
       }
       #livraisons-corps { padding: 4px 14px 16px; }
       #liv-version { font-family: var(--font-mono); letter-spacing: 0.06em; color: var(--dim); text-transform: none; }
-      /* la version du jeu, en petit sous le titre — discrète mais toujours là */
-      #version-jeu {
-        font-family: var(--font-mono);
-        font-size: calc(10px * var(--ui));
-        letter-spacing: 0.22em;
-        color: var(--dim);
-        margin: -8px 0 10px;
-      }
       .liv-e { margin-top: 14px; border-top: 1px solid var(--line); padding-top: 8px; }
       .liv-e h3 {
         margin: 0; font-family: var(--font-display); font-size: calc(11.5px * var(--ui));
@@ -4312,189 +4568,6 @@
         box-shadow: 0 0 12px rgba(255, 122, 106, 0.4);
       }
 
-      /* La fiche défile si elle déborde, mais sans ascenseur visible :
-         sur Steam Deck la barre s'affichait pour trois pixels de trop. */
-      #home {
-        scrollbar-width: none;
-      }
-      #home::-webkit-scrollbar {
-        display: none;
-      }
-      @media (max-width: 1080px) {
-        #home {
-          width: min(520px, 100vw);
-        }
-        .home-cols {
-          flex-direction: column;
-          align-items: stretch;
-        }
-      }
-      body.playing #home {
-        opacity: 0;
-        transform: translateX(-24px);
-        pointer-events: none;
-      }
-      .home-eyebrow {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        gap: 14px;
-        font-size: calc(11px * var(--ui));
-        letter-spacing: 0.22em;
-        color: var(--dim);
-        border-bottom: 1px solid var(--line);
-        padding-bottom: 14px;
-      }
-      /* Écusson de mission : l'image est carrée à fond plein, le cercle CSS la détoure */
-      .home-badge {
-        width: 58px;
-        height: 58px;
-        flex: none;
-        border-radius: 50%;
-        border: 1px solid var(--line-strong);
-        box-shadow: 0 0 14px rgba(99, 183, 230, 0.18);
-      }
-      .home-figure {
-        margin: 0;
-        border: 1px solid var(--line);
-        background: #04080f;
-      }
-      .home-figure img {
-        display: block;
-        width: 100%;
-        height: clamp(170px, 24vh, 240px);
-        object-fit: cover;
-        object-position: center 30%;
-      }
-      .home-figure figcaption {
-        font-size: calc(9.5px * var(--ui));
-        letter-spacing: 0.16em;
-        color: var(--dim);
-        padding: 7px 10px;
-        border-top: 1px solid var(--line);
-      }
-      .home-title {
-        font-family: var(--font-display);
-        font-size: clamp(26px, 5.2vw, 52px);
-        line-height: 1.24;
-        letter-spacing: 0.08em;
-        margin: 0;
-        color: var(--ink);
-      }
-      .home-title em {
-        font-style: normal;
-        color: var(--specimen);
-      }
-      .home-pitch {
-        font-size: calc(13px * var(--ui));
-        line-height: 1.7;
-        color: var(--dim);
-        margin: 0;
-        max-width: 34ch;
-      }
-      .home-pitch strong {
-        color: var(--ink);
-        font-weight: 600;
-      }
-
-      /* Relevé vivant : l'accueil lit l'échantillon qui dérive derrière */
-      .home-readout {
-        display: flex;
-        gap: 26px;
-        padding: 12px 14px;
-        border: 1px solid var(--line);
-        border-left: 2px solid var(--specimen);
-        background: rgba(99, 183, 230, 0.05);
-      }
-      .home-readout div {
-        display: flex;
-        flex-direction: column;
-        gap: 2px;
-      }
-      .home-readout dt {
-        font-size: calc(10px * var(--ui));
-        letter-spacing: 0.18em;
-        color: var(--dim);
-        margin: 0;
-      }
-      .home-readout dd {
-        font-size: calc(17px * var(--ui));
-        color: var(--specimen);
-        margin: 0;
-      }
-
-      #start {
-        font-family: var(--font-display);
-        font-size: calc(13px * var(--ui));
-        letter-spacing: 0.14em;
-        padding: 15px 22px;
-        color: var(--void);
-        background: var(--specimen);
-        border: none;
-        cursor: pointer;
-        transition: background 0.2s ease, transform 0.15s ease;
-      }
-      #start:hover {
-        background: var(--glow);
-        transform: translateY(-1px);
-      }
-      /* Abandonner la run : le geste qui arrête tout et renvoie au labo.
-         Ton danger, en retrait — il ne rivalise pas avec REPRENDRE. */
-      #start-abandon {
-        font-family: var(--font-display);
-        font-size: calc(11px * var(--ui));
-        letter-spacing: 0.12em;
-        padding: 11px 16px;
-        color: #e8927c;
-        background: rgba(232, 146, 124, 0.07);
-        border: 1px solid rgba(232, 146, 124, 0.4);
-        border-radius: 4px;
-        cursor: pointer;
-        transition: background 0.2s ease, border-color 0.2s ease;
-      }
-      #start-abandon:hover {
-        background: rgba(232, 146, 124, 0.16);
-        border-color: #e8927c;
-      }
-      #start-abandon.arme {
-        color: #06121e;
-        background: #e8927c;
-        border-color: #e8927c;
-      }
-
-      /* L'éditeur et les autres outils vivent dans la grille de la console
-         (mêmes tuiles que SALLES/RECORDS) : des outils, pas des actions de
-         jeu — fini les boutons pointillés qui faisaient tache. */
-      /* Le son ne peut pas naître tout seul : le navigateur exige un geste.
-         Plutôt que d'attendre le clic sur COMMENCER — qui ferait entendre
-         l'accueil une demi-seconde avant de basculer en cuve — la fiche
-         propose d'ouvrir le son ici. Le bouton disparaît dès qu'il a servi,
-         ou dès qu'un autre geste a réveillé la bande-son. */
-      #home-son {
-        font-family: var(--font-display);
-        font-size: calc(13px * var(--ui));
-        letter-spacing: 0.14em;
-        padding: 13px 16px;
-        margin-bottom: -4px;
-        color: #06121e;
-        background: #63b7e6;
-        border: 1px solid #63b7e6;
-        border-radius: 5px;
-        cursor: pointer;
-        transition: color 0.2s ease, border-color 0.2s ease, background 0.2s ease;
-        animation: son-appel 2.2s ease-in-out infinite;
-      }
-      @keyframes son-appel {
-        0%, 100% { box-shadow: 0 0 0 rgba(99, 183, 230, 0); }
-        50% { box-shadow: 0 0 22px rgba(99, 183, 230, 0.65); }
-      }
-      #home-son:hover {
-        background: rgba(99, 183, 230, 0.14);
-        border-color: #63b7e6;
-      }
-      #home-son[hidden] {
-        display: none;
-      }
       /* Registres du labo : l'écran record de la fiche d'expérience */
       .home-records {
         border: 1px solid var(--line);
@@ -4722,65 +4795,7 @@
           display: none;
         }
       }
-      .home-foot {
-        font-size: calc(10.5px * var(--ui));
-        letter-spacing: 0.06em;
-        color: var(--dim);
-        opacity: 0.75;
-      }
-
       @media (max-width: 700px) {
-        /* Au doigt : la fiche occupe tout l'écran — un bout de cuve vide qui
-           dépasse en haut n'apporte rien, l'essai reprend au bouton */
-        #home {
-          inset: 0;
-          width: 100vw;
-          gap: 13px;
-          padding: calc(14px + env(safe-area-inset-top)) 18px calc(14px + env(safe-area-inset-bottom));
-          border-right: none;
-          justify-content: safe center; /* centré si court, défilable si long */
-          background: linear-gradient(180deg, rgba(6, 13, 23, 0.96), rgba(6, 13, 23, 0.99));
-        }
-        body.playing #home {
-          transform: translateY(24px);
-        }
-        #home .home-records {
-          display: none; /* derrière le bouton RECORDS */
-        }
-        #home-recs {
-          display: block;
-        }
-        .home-eyebrow {
-          font-size: calc(9px * var(--ui));
-          letter-spacing: 0.16em;
-          padding-bottom: 10px;
-        }
-        .home-badge {
-          width: 40px;
-          height: 40px;
-        }
-        .home-title {
-          font-size: calc(23px * var(--ui));
-        }
-        .home-pitch {
-          font-size: calc(12px * var(--ui));
-          line-height: 1.6;
-          max-width: none;
-        }
-        .home-figure {
-          display: none; /* au doigt, la fiche va à l'essentiel */
-        }
-        .home-readout {
-          justify-content: space-between;
-          gap: 10px;
-          padding: 10px 12px;
-        }
-        .home-readout dd {
-          font-size: calc(15px * var(--ui));
-        }
-        #start {
-          padding: 14px 18px;
-        }
         .rec-row {
           font-size: calc(10.5px * var(--ui));
           gap: 8px;
@@ -4793,22 +4808,6 @@
           font-size: calc(10.5px * var(--ui));
           line-height: 2;
           padding-top: 10px;
-        }
-        .home-foot {
-          display: none; /* le méta-texte du prototype n'aide pas au doigt */
-        }
-      }
-      @media (max-height: 720px) {
-        .home-figure {
-          display: none; /* petits écrans : la fiche reste lisible sans la planche */
-        }
-        /* scopé à la fiche : déplacés dans le voile RECORDS, les
-           registres redeviennent visibles */
-        #home .home-records {
-          display: none; /* derrière le bouton RECORDS : la fiche respire */
-        }
-        #home-recs {
-          display: block;
         }
       }
 
@@ -5140,6 +5139,50 @@
         background-size: 300% 200%, 88% 88%;
         background-position: calc(var(--ic-x) * 50%) calc(var(--ic-y) * 100%), center;
       }
+      /* LES PLANCHES PEINTES DU CYCLE ET DES TROPHÉES (game/iconesPeintes.ts).
+         Même découpe que .ico-meta, mais la planche ne se montre QUE lorsque
+         la racine porte planche-cycle / planche-trophees, posée par le guet à
+         l'arrivée d'une image réelle : une image de fond absente ne se voit
+         pas, elle ne dit pas qu'elle manque. D'ici là, l'emoji d'avant
+         (.ico-repli) tient la place, et une pastille sans repli (une
+         transformation, un logement de l'ATH) ne prend aucune place. */
+      .ico-cycle,
+      .ico-trophee {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 1.35em;
+        height: 1.35em;
+        vertical-align: -0.3em;
+        font-style: normal;
+        background-repeat: no-repeat;
+      }
+      .ico-cycle:empty,
+      .ico-trophee:empty {
+        display: none;
+      }
+      html.planche-cycle .ico-cycle {
+        display: inline-flex;
+        background-image: url('/assets/cycle-icones.webp');
+        background-size: 400% 300%;
+        background-position: calc(var(--ic-x) * 33.3333%) calc(var(--ic-y) * 50%);
+      }
+      html.planche-trophees .ico-trophee {
+        display: inline-flex;
+        background-image: url('/assets/trophees-icones.webp');
+        background-size: 400% 200%;
+        background-position: calc(var(--ic-x) * 33.3333%) calc(var(--ic-y) * 100%);
+      }
+      html.planche-cycle .ico-cycle > .ico-repli,
+      html.planche-trophees .ico-trophee > .ico-repli {
+        visibility: hidden;
+      }
+      /* en SVG (la carte de la station) : la fenêtre sur la case OU l'emoji */
+      .ico-cycle-repli { text-anchor: middle; dominant-baseline: central; }
+      html:not(.planche-cycle) .ico-cycle-svg,
+      html.planche-cycle .ico-cycle-repli {
+        display: none;
+      }
       /* le toucher dit le nom : une étiquette éphémère sous la pastille */
       .hud-chip.ouvert::after {
         content: attr(data-nom);
@@ -5286,6 +5329,32 @@
       }
       #state-eau { --ventre: 11%; }
       #state-vapeur { --ventre: 7%; }
+      /* L'ÉTAT PEINT (game/iconesPeintes.ts) : dans le logement, la case de
+         la planche du cycle prend la place du symbole au trait dès que la
+         planche est arrivée ; d'ici là, le trait reste. La bulle, son
+         liseré, ses classes et ses animations ne changent pas. 1,4 em :
+         24 px au repos, 32 px pour l'état courant (--ui à 1) — plafonné à
+         62 % du logement, pour qu'aux grandes échelles de texte l'icône ne
+         déborde pas du ventre de la goutte. */
+      #statebar .st-ico .ico-cycle {
+        grid-area: 1 / 1;
+        position: relative;
+        top: var(--ventre, 0%);
+        width: min(1.4em, 62%);
+        height: min(1.4em, 62%);
+      }
+      html.planche-cycle #statebar .st-ico .picto {
+        display: none;
+      }
+      /* le logement courant est PLEIN, à la teinte de son état : une icône de
+         la même teinte s'y noierait — un liseré sombre la détache */
+      #statebar button.st-cur .ico-cycle {
+        filter: drop-shadow(0 0 1px var(--void)) drop-shadow(0 0 2px var(--void));
+      }
+      /* cadenassé, le logement passe au gris : l'icône le suit */
+      #statebar button.st-verrou .ico-cycle {
+        filter: grayscale(1);
+      }
       #statebar button:hover .st-forme {
         fill: rgba(20, 36, 54, 0.8);
       }
@@ -6545,7 +6614,8 @@
       .cs-jeu .cs-mod:hover { filter: drop-shadow(0 0 10px var(--z)); }
       @keyframes cs-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.7; } }
       .cs-glyphe { text-anchor: middle; dominant-baseline: central; paint-order: stroke; stroke: #030710; stroke-width: 3px; }
-      .cs-cadenas { text-anchor: middle; dominant-baseline: central; font-size: 22px; }
+      /* le verrou au trait de l'ATH (athPictos), dans sa boîte de 24 */
+      .cs-cadenas { fill: none; stroke: #eef8ff; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; filter: drop-shadow(0 0 3px #030710); }
       .cs-coche { text-anchor: middle; dominant-baseline: central; font-size: 15px; font-weight: 600; fill: #63b7e6; paint-order: stroke; stroke: #030710; stroke-width: 3px; }
       .cs-cran { text-anchor: middle; dominant-baseline: central; font-size: 15px; font-weight: 600; letter-spacing: 0.04em; paint-order: stroke; stroke: #030710; stroke-width: 3px; }
       /* le nom se détoure du fond : il croise parfois une coursive */
@@ -7611,7 +7681,7 @@
         #home,
         #hud,
         #touchbar,
-        #start,
+        #accueil-scene,
         #gauge-fill {
           transition: none;
         }
@@ -7619,94 +7689,6 @@
           animation: none;
         }
       }
-      /* Écrans bas (Steam Deck : 1280 × 800) : la fiche se resserre pour
-         tenir sans défiler */
-      @media (max-height: 840px) and (min-width: 700px) {
-        #home {
-          gap: 12px;
-          padding-top: 16px;
-          padding-bottom: 16px;
-        }
-        .home-col {
-          gap: 12px;
-        }
-        .home-title {
-          font-size: clamp(24px, 3.6vw, 38px);
-        }
-        .home-figure img {
-          height: clamp(110px, 16vh, 160px);
-        }
-      }
-      /* ---- Paysage bas (téléphone tourné) : la fiche tient en UNE page ---- */
-      @media (max-height: 520px) {
-        #home {
-          width: 100vw;
-          gap: 6px;
-          padding: calc(8px + env(safe-area-inset-top)) 22px calc(8px + env(safe-area-inset-bottom));
-          border-right: none;
-          justify-content: safe center;
-        }
-        .home-cols {
-          flex-direction: row;
-          gap: 24px;
-          align-items: stretch;
-          flex: 1 1 0;
-          min-height: 0;
-          overflow: hidden;
-        }
-        .home-col {
-          gap: 7px;
-          min-height: 0;
-          overflow-y: auto;
-          scrollbar-width: none;
-        }
-        .home-col::-webkit-scrollbar {
-          display: none;
-        }
-        .home-figure {
-          display: none;
-        }
-        .home-title {
-          font-size: calc(19px * var(--ui));
-        }
-        /* au téléphone tourné, la fiche est un MENU : le texte de
-           présentation cède sa place aux boutons */
-        .home-pitch {
-          display: none;
-        }
-        .home-eyebrow {
-          font-size: calc(8.5px * var(--ui));
-          padding-bottom: 6px;
-        }
-        .home-badge {
-          width: 30px;
-          height: 30px;
-        }
-        /* les boutons se resserrent : cinq tiennent dans la colonne */
-        #home button {
-          padding: 8px 10px;
-          font-size: calc(10.5px * var(--ui));
-          letter-spacing: 0.1em;
-        }
-        .home-readout {
-          font-size: calc(11px * var(--ui));
-        }
-        /* les registres passent derrière le bouton RECORDS : la colonne
-           de droite se retire, la fiche est un menu plein cadre */
-        .home-cols > .home-col:last-child {
-          display: none;
-        }
-        #home-recs {
-          display: block;
-        }
-        .home-foot {
-          display: none;
-        }
-        #home-seq {
-          display: none;
-        }
-      }
-    
       /* ---- Instruments embarqués : le panneau de détail (pastille 🧰) ---- */
       #instr-panel {
         position: fixed; top: calc(var(--coins-bas, 96px) + 10px); right: 14px; z-index: 46;
@@ -10094,97 +10076,75 @@
     <canvas id="fx-canvas"></canvas>
     <div id="world-labels" aria-hidden="true"></div>
 
-    <aside id="home" aria-label="Fiche d'essai">
-      <div class="home-eyebrow">
-        <span>COMPLEXE ORBITAL MÉDUSE — PROTOCOLE «&nbsp;TENSION DE SURFACE&nbsp;»</span>
-        <img class="home-badge" src="/assets/badge.webp" alt="Écusson de la mission Sujet 21" />
+    <!-- L'ACCUEIL : le poste d'observation. Un rail étroit à gauche — un
+         titre, UN verbe, six lieux nommés d'un mot, quatre pictogrammes —
+         et l'échantillon vivant au milieu de l'écran, sans rien par-dessus.
+         La fiche d'avant (1 060 px, douze boutons du même poids, un relevé
+         de six cases, un palmarès, une figure) cachait la seule chose qui
+         bouge. Les identifiants des boutons n'ont pas changé : main.ts y
+         branche toujours les mêmes écrans. game/accueil.ts dit les libellés. -->
+    <aside id="home" aria-label="Menu">
+      <div class="acc-tete">
+        <h1 class="acc-titre"><span class="acc-jeu">SUJET <em>21</em></span><span class="acc-pause">PAUSE</span></h1>
+        <p class="acc-devise" id="acc-devise">Se déplacer, c’est rétrécir.</p>
       </div>
-      <div class="home-cols">
-      <div class="home-col">
-      <h1 class="home-title">SUJET <em>21</em></h1>
-      <div id="version-jeu" aria-label="Version du jeu"></div>
-      <p class="home-pitch">
-        Vous êtes un volume de fluide spéculaire en apesanteur. La seule façon d'avancer&nbsp;:
-        éjecter une partie de vous-même. <strong>Se déplacer, c'est rétrécir.</strong>
-        Rejoignez le sas avant de vous disperser. Le laboratoire consigne chaque
-        essai — personne ne se demande encore pourquoi l'échantillon insiste.
-      </p>
-      <dl class="home-readout" aria-label="Relevé de l'échantillon">
-        <div><dt>ÉCHANTILLON</dt><dd id="home-volume">— L</dd></div>
-        <div><dt>PARTICULES</dt><dd id="home-particles">—</dd></div>
-        <div><dt>ÉTAT</dt><dd id="home-state">en dérive</dd></div>
-        <div><dt>CONDENSAT (RUN)</dt><dd id="home-condensat">0 cL</dd></div>
-        <div><dt>MÉMOIRE</dt><dd id="home-memoire">0</dd></div>
-        <div><dt>ORBES</dt><dd id="home-orbes">0</dd></div>
-      </dl>
-      <button id="start" type="button">COMMENCER L'ESSAI</button>
-      <button id="home-restart" type="button" hidden>RECOMMENCER LE TABLEAU</button>
-      <button id="start-abandon" type="button" hidden>ABANDONNER LA RUN — RETOUR AU LABO</button>
-      <div class="home-duo" role="group" aria-label="Outils du protocole">
-        <button id="home-station" type="button" title="LA STATION : le plan général du complexe orbital — les modules et leurs coursives, tels que la descente les traverse. On y voit d'où l'on vient, où l'on est, ce qui est ouvert et ce qui attend un orbe"><i>🛰&#xFE0E;</i><span>LA STATION</span></button>
-        <!-- LES OUTILS DU CONCEPTEUR ont une seule porte : LA RÉGIE. Les
-             anciens boutons (éditeur, carte, descente, planche, montage,
-             récit & fins, textes, récompenses, marchand, règles, salles,
-             pupitre) sont devenus ses sections — un seul endroit, et l'état
-             du partage à côté de chaque outil. ?editeur et ?carte dans
-             l'URL restent des raccourcis. -->
-        <button id="home-regie" type="button" data-dev class="home-regie" title="LA RÉGIE : la console du concepteur — tous les outils du système de run (carte, descente, planche, récit et fins, scénario, codex, marchand, récompenses, textes, éditeur de tableaux, règles, salles, pupitre), ce qui est publié pour tout le monde, et le tir à blanc"><i>◎</i><span>RÉGIE</span></button>
-        <button id="home-records" type="button"><i>✦</i><span>RECORDS</span></button>
-        <button id="home-sauvegardes" type="button" title="SAUVEGARDES : les trois emplacements — chacun est une partie entière (records, codex, trophées, mémoires, run en cours). Changer d’emplacement recharge le jeu"><i>▤</i><span>SAUVEGARDES</span></button>
-        <button id="home-codex" type="button" title="Le manuel écrit par la partie : chaque interaction découverte débloque sa fiche"><i>◉</i><span>CODEX</span></button>
-        <button id="home-fioles" type="button" title="La collection d’échantillons scellés : deux fioles s’équipent pour la run"><i>⚗&#xFE0E;</i><span>FIOLES</span></button>
-        <button id="home-cycle" type="button" title="L’écran des mémoires : le cycle des états — chaque transformation manuelle est un lien à tisser en mémoire"><i>⚛</i><span>LES MÉMOIRES</span></button>
-        <button id="home-livraisons" type="button" data-dev><i>◈</i><span>NOTES DE VERSION</span></button>
-        <button id="home-cmds" type="button"><i>⌘</i><span>COMMANDES</span></button>
-        <button id="home-params" type="button"><i>⚙&#xFE0E;</i><span>PARAMÈTRES</span></button>
-        <button id="home-mute" type="button"><i>♪</i><span>SON</span></button>
-        <button id="home-plein" type="button"><i>⛶</i><span>PLEIN ÉCRAN</span></button>
+      <!-- au téléphone debout, la fenêtre sur la cuve : le rail s'étale autour -->
+      <div class="acc-fenetre" aria-hidden="true"></div>
+      <div class="acc-action">
+        <button id="start" type="button" class="acc-verbe"><b id="acc-verbe-nom">COMMENCER</b><small id="acc-verbe-detail"></small></button>
+        <div class="acc-second">
+          <button id="home-restart" type="button" hidden>RECOMMENCER</button>
+          <button id="start-abandon" type="button" hidden>QUITTER</button>
+        </div>
       </div>
-      <!-- LE LECTEUR, pour tout le monde : la musique de l'accueil elle-même
-           — une piste tirée au sort à l'ouverture parmi les musiques du
-           projet, telle que le jeu la joue — pour se faire une oreille et la
-           noter sans la chercher. Les avis des joueurs comptent comme ceux
-           du concepteur, sous le nom de leur borne. -->
-      <div id="home-ecoute" class="home-ecoute" role="group" aria-label="La musique de l’accueil">
-        <span class="home-ecoute-etiq">ÉCOUTE</span>
-        <button id="ecoute-prec" type="button" title="Piste précédente" aria-label="Piste précédente">⏮&#xFE0E;</button>
-        <button id="ecoute-lecture" type="button" title="Lecture de la piste chargée" aria-label="Lecture">▶&#xFE0E;</button>
-        <button id="ecoute-stop" type="button" title="Arrêt : l'accueil se tait, la piste reste chargée" aria-label="Arrêt">■</button>
-        <button id="ecoute-suiv" type="button" title="Piste suivante" aria-label="Piste suivante">⏭&#xFE0E;</button>
-        <span id="ecoute-titre" class="home-ecoute-titre" aria-live="polite">la musique de l’accueil</span>
-        <!-- L'AVIS, partagé : un avis par personne (le nom de la borne) et
-             par piste, le total dans le titre, publié au magasin des
-             réglages pour tous les postes. -->
-        <span class="home-ecoute-avis" role="group" aria-label="Mon avis sur la piste en cours">
-          <button id="ecoute-moins" type="button" title="On n'en veut pas (mon −1)" aria-label="Écarter la piste" aria-pressed="false" disabled>−1</button>
-          <button id="ecoute-neutre" type="button" title="Sans avis (retire le mien)" aria-label="Sans avis" aria-pressed="false" disabled>○</button>
-          <button id="ecoute-plus" type="button" title="Elle est bien (mon +1)" aria-label="Retenir la piste" aria-pressed="false" disabled>+1</button>
-        </span>
+      <!-- LES LIEUX : un nom, une valeur courte qui ne paraît que sur la
+           ligne visée, un point ambre quand il y a du neuf. Au tout premier
+           lancement, seul SAUVEGARDES paraît (game/accueil.ts). -->
+      <nav class="acc-lieux" aria-label="Le laboratoire">
+        <button id="home-cycle" type="button" class="acc-lieu" title="Le cycle des états : chaque transformation manuelle est un lien à tisser en mémoire"><span>MÉMOIRES</span><i class="acc-voyant" hidden></i><small></small></button>
+        <button id="home-fioles" type="button" class="acc-lieu" title="La collection d’échantillons scellés : deux fioles s’équipent pour la run"><span>FIOLES</span><i class="acc-voyant" hidden></i><small></small></button>
+        <button id="home-codex" type="button" class="acc-lieu" title="Le manuel écrit par la partie : chaque interaction découverte débloque sa fiche"><span>CODEX</span><i class="acc-voyant" hidden></i><small></small></button>
+        <button id="home-station" type="button" class="acc-lieu" title="Le plan du complexe orbital : les modules et leurs coursives"><span>STATION</span><i class="acc-voyant" hidden></i><small></small></button>
+        <button id="home-records" type="button" class="acc-lieu" title="Le palmarès du protocole, les trophées et les fantômes"><span>RECORDS</span><i class="acc-voyant" hidden></i><small></small></button>
+        <button id="home-sauvegardes" type="button" class="acc-lieu" title="Les trois emplacements : chacun est une partie entière. Le nom d’opérateur s’y change"><span>SAUVEGARDES</span><i class="acc-voyant" hidden></i><small></small></button>
+        <!-- LES OUTILS DU CONCEPTEUR ont une seule porte : LA RÉGIE (ses
+             sections : carte, descente, planche, récit et fins, montage,
+             textes, récompenses, marchand, règles, salles, pupitre).
+             ?editeur et ?carte dans l'URL restent des raccourcis. -->
+        <button id="home-regie" type="button" data-dev class="acc-lieu acc-outil" title="LA RÉGIE : la console du concepteur — tous les outils du système de run, ce qui est publié pour tout le monde, et le tir à blanc"><span>RÉGIE</span></button>
+        <button id="home-livraisons" type="button" data-dev class="acc-lieu acc-outil"><span>NOTES DE VERSION</span></button>
+      </nav>
+      <div class="acc-ressort"></div>
+      <div class="acc-reglages" role="group" aria-label="Réglages">
+        <button id="home-cmds" type="button" title="Commandes" aria-label="Commandes"></button>
+        <button id="home-params" type="button" title="Paramètres" aria-label="Paramètres"></button>
+        <button id="home-mute" type="button" title="Son" aria-label="Son"></button>
+        <button id="home-plein" type="button" title="Plein écran" aria-label="Plein écran"></button>
       </div>
-      <div id="home-seq" class="rec-note"></div>
-      </div>
-      <div class="home-col">
-      <figure class="home-figure">
-        <img src="/assets/home.webp" alt="Échantillon de fluide spéculaire en lévitation dans la cuve d'essai" loading="lazy" />
-        <figcaption>FIG. 1 — ÉCHANTILLON EN SUSPENSION, CUVE D'ESSAI</figcaption>
-      </figure>
-      <div class="home-records" aria-label="Registres du labo">
-        <div class="rec-head"><span>PALMARÈS DU PROTOCOLE</span>
-          <input id="rec-name" maxlength="12" placeholder="VOTRE NOM — REQUIS"
-            aria-label="Nom d'opérateur, obligatoire pour plonger" autocomplete="nickname" required />
-          <span id="rec-essai"></span></div>
-        <div id="rec-need" hidden>Renseignez votre nom d'opérateur pour plonger — il signera vos records.</div>
-        <div class="rec-note">Records partagés entre tous les opérateurs du protocole.</div>
-        <div id="rec-rows"></div>
-      </div>
-      </div>
-      </div>
-      <div class="home-foot">
-        Prototype de travail — BANC, dans le tiroir ≡, ouvre le banc de réglage :
-        la physique se modifie en direct, et les NOTES DE VERSION consignent
-        chaque mise à jour.
+      <!-- LES REGISTRES : le palmarès condensé et le champ du nom ne sont
+           plus sur la fiche. Ils attendent ici, cachés : si la plongée
+           réclame un nom, requireName les montre dans le voile RECORDS. -->
+      <div class="acc-registres" hidden>
+        <div class="home-records" aria-label="Registres du labo">
+          <div class="rec-head"><span>PALMARÈS DU PROTOCOLE</span>
+            <input id="rec-name" maxlength="12" placeholder="VOTRE NOM — REQUIS"
+              aria-label="Nom d'opérateur, obligatoire pour plonger" autocomplete="nickname" required />
+            <span id="rec-essai"></span></div>
+          <div id="rec-need" hidden>Renseignez votre nom d'opérateur pour plonger — il signera vos records.</div>
+          <div class="rec-note">Records partagés entre tous les opérateurs du protocole.</div>
+          <div id="rec-rows"></div>
+        </div>
       </div>
     </aside>
+    <!-- LA SCÈNE DE L'ACCUEIL, hors du rail (il glisse en se retirant, et
+         un parent transformé décalerait ce qui est fixé) : l'écusson, la
+         version — sept tapes dessus ouvrent le mode concepteur — et le
+         litrage, qui suit l'échantillon au bord de son contour. -->
+    <div id="accueil-scene">
+      <img class="acc-ecusson" src="/assets/badge.webp" alt="Écusson de la mission Sujet 21" />
+      <div id="version-jeu" aria-label="Version du jeu"></div>
+      <div id="accueil-releve" aria-hidden="true"><i></i><span id="home-volume">— L</span></div>
+    </div>
 
     <!-- L'ATH, HAUT DE L'ÉCRAN : deux coins, plus de bandeau. À gauche le
          MODULE VITAL (le litrage, la fiole, la jauge et son seuil — ce qu'on
@@ -10277,13 +10237,13 @@
     </div>
     <div id="statebar" aria-label="État de l'échantillon">
       <button id="state-eau" type="button" title="redevenir liquide">
-        <span class="st-ico"><svg class="st-bulle" data-bulle="eau" viewBox="0 0 48 48" aria-hidden="true" focusable="false"><path class="st-forme" d="M24 3C31 13 39 21 39 30a15 15 0 0 1-30 0C9 21 17 13 24 3z"/></svg><svg class="picto" data-picto="eau" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M4 9.5c2.7-2.4 5.3-2.4 8 0s5.3 2.4 8 0M4 15.5c2.7-2.4 5.3-2.4 8 0s5.3 2.4 8 0"/></svg></span><span class="st-label">LIQUIDE</span><kbd hidden></kbd>
+        <span class="st-ico"><svg class="st-bulle" data-bulle="eau" viewBox="0 0 48 48" aria-hidden="true" focusable="false"><path class="st-forme" d="M24 3C31 13 39 21 39 30a15 15 0 0 1-30 0C9 21 17 13 24 3z"/></svg><svg class="picto" data-picto="eau" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M4 9.5c2.7-2.4 5.3-2.4 8 0s5.3 2.4 8 0M4 15.5c2.7-2.4 5.3-2.4 8 0s5.3 2.4 8 0"/></svg><i class="ico-cycle" style="--ic-x:1;--ic-y:0" aria-hidden="true"></i></span><span class="st-label">LIQUIDE</span><kbd hidden></kbd>
       </button>
       <button id="state-glace" type="button" title="se changer en glace (F) : le bloc garde son élan">
-        <span class="st-ico"><svg class="st-bulle" data-bulle="glace" viewBox="0 0 48 48" aria-hidden="true" focusable="false"><path class="st-forme" d="M24 3l18.2 10.5v21L24 45 5.8 34.5v-21z"/><path class="st-aretes" d="M5.8 13.5L24 24l18.2-10.5M24 24v21"/></svg><svg class="picto" data-picto="glace" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 3v18M4.2 7.5l15.6 9M19.8 7.5l-15.6 9M12 6.5l-2-2M12 6.5l2-2M12 17.5l-2 2M12 17.5l2 2"/></svg></span><span class="st-label">GLACE</span><kbd>F</kbd>
+        <span class="st-ico"><svg class="st-bulle" data-bulle="glace" viewBox="0 0 48 48" aria-hidden="true" focusable="false"><path class="st-forme" d="M24 3l18.2 10.5v21L24 45 5.8 34.5v-21z"/><path class="st-aretes" d="M5.8 13.5L24 24l18.2-10.5M24 24v21"/></svg><svg class="picto" data-picto="glace" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 3v18M4.2 7.5l15.6 9M19.8 7.5l-15.6 9M12 6.5l-2-2M12 6.5l2-2M12 17.5l-2 2M12 17.5l2 2"/></svg><i class="ico-cycle" style="--ic-x:0;--ic-y:0" aria-hidden="true"></i></span><span class="st-label">GLACE</span><kbd>F</kbd>
       </button>
       <button id="state-vapeur" type="button" title="se changer en vapeur (G) : visez — le temps ralentit — relâchez, le nuage fuse ; la distance du doigt fait la puissance">
-        <span class="st-ico"><svg class="st-bulle" data-bulle="vapeur" viewBox="0 0 48 48" aria-hidden="true" focusable="false"><path class="st-forme" d="M12.75 41.25a10 10 0 0 1-1.5-19.875 13.75 13.75 0 0 1 26.75 2.5 8.75 8.75 0 0 1-1.5 17.375z"/></svg><svg class="picto" data-picto="vapeur" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M8 20c-2-3 2-5 0-8s2-5 0-8M12 20c-2-3 2-5 0-8s2-5 0-8M16 20c-2-3 2-5 0-8s2-5 0-8"/></svg></span><span class="st-label">VAPEUR</span><kbd>G</kbd>
+        <span class="st-ico"><svg class="st-bulle" data-bulle="vapeur" viewBox="0 0 48 48" aria-hidden="true" focusable="false"><path class="st-forme" d="M12.75 41.25a10 10 0 0 1-1.5-19.875 13.75 13.75 0 0 1 26.75 2.5 8.75 8.75 0 0 1-1.5 17.375z"/></svg><svg class="picto" data-picto="vapeur" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M8 20c-2-3 2-5 0-8s2-5 0-8M12 20c-2-3 2-5 0-8s2-5 0-8M16 20c-2-3 2-5 0-8s2-5 0-8"/></svg><i class="ico-cycle" style="--ic-x:2;--ic-y:0" aria-hidden="true"></i></span><span class="st-label">VAPEUR</span><kbd>G</kbd>
       </button>
       <div id="state-zone" hidden></div>
     </div>
@@ -10691,8 +10651,8 @@
         <div class="cmds-page home-commands" data-page="tactile" hidden>
           <kbd>toucher</kbd>éjecter vers le doigt — le corps part à l'opposé<br />
           <kbd>sur le corps</kbd>doigt posé SUR le volume : se rassembler (gratuit)<br />
-          <kbd>❄</kbd>glace, re-toucher pour dégeler
-          <kbd>💨</kbd>vapeur : viser puis relâcher = dash<br />
+          <kbd><i class="ico-cycle" style="--ic-x:0;--ic-y:0" aria-hidden="true"><span class="ico-repli">❄</span></i></kbd>glace, re-toucher pour dégeler
+          <kbd><i class="ico-cycle" style="--ic-x:2;--ic-y:0" aria-hidden="true"><span class="ico-repli">💨</span></i></kbd>vapeur : viser puis relâcher = dash<br />
           <kbd>2 doigts</kbd>pincer : zoom · glisser : déplacer la caméra<br />
           <kbd>≡</kbd>le tiroir : LÉGENDE, ÉTATS, RECADRER, BANC, FICHE D’ESSAI…
         </div>
@@ -11074,7 +11034,7 @@
               <path class="cy-perdu" d="M 640 868 C 724 894 806 890 896 852" />
             </svg>
             <div class="cy-etat" id="cy-solide">
-              <span class="cy-glacon"><i class="gl-haut"></i><i class="gl-gauche"></i><i class="gl-droit"></i><em>❄&#xFE0E;</em></span>
+              <span class="cy-glacon"><i class="gl-haut"></i><i class="gl-gauche"></i><i class="gl-droit"></i><em><i class="ico-cycle" style="--ic-x:0;--ic-y:0" aria-hidden="true"><span class="ico-repli">❄&#xFE0E;</span></i></em></span>
               <b>SOLIDE</b><small>GLACE</small>
             </div>
             <div class="cy-etat" id="cy-liquide">
@@ -11140,6 +11100,10 @@
           s’exporte en fichier et se réimporte ailleurs : c’est ce fichier que
           le Steam Cloud synchronisera.
         </div>
+        <!-- LE NOM D'OPÉRATEUR de cet emplacement : il signe les records.
+             Il vivait sur la fiche d'accueil ; il se change ici. -->
+        <label class="sv-operateur" for="sv-operateur"><span>OPÉRATEUR</span>
+          <input id="sv-operateur" maxlength="12" autocomplete="nickname" spellcheck="false" placeholder="VOTRE NOM" /></label>
         <div id="sv-corps"></div>
         <input type="file" id="sv-fichier" accept="application/json,.json" hidden aria-label="Fichier de sauvegarde à importer" />
       </div>
@@ -11185,7 +11149,29 @@
         <div class="salles-tete"><span>PARAMÈTRES</span>
           <button type="button" id="params-fermer" aria-label="Fermer">✕</button></div>
         <div class="params-corps">
-          <div class="params-nom">COMMANDES — CLAVIER, SOURIS, MANETTE</div>
+          <div class="params-nom">LA MUSIQUE DE L’ACCUEIL</div>
+          <!-- LE LECTEUR, pour tout le monde : la musique de l'accueil elle-même
+               — une piste tirée au sort à l'ouverture parmi les musiques du
+               projet, telle que le jeu la joue — pour se faire une oreille et la
+               noter sans la chercher. Les avis des joueurs comptent comme ceux
+               du concepteur, sous le nom de leur borne. -->
+          <div id="home-ecoute" class="home-ecoute" role="group" aria-label="La musique de l’accueil">
+            <span class="home-ecoute-etiq">ÉCOUTE</span>
+            <button id="ecoute-prec" type="button" title="Piste précédente" aria-label="Piste précédente">⏮&#xFE0E;</button>
+            <button id="ecoute-lecture" type="button" title="Lecture de la piste chargée" aria-label="Lecture">▶&#xFE0E;</button>
+            <button id="ecoute-stop" type="button" title="Arrêt : l'accueil se tait, la piste reste chargée" aria-label="Arrêt">■</button>
+            <button id="ecoute-suiv" type="button" title="Piste suivante" aria-label="Piste suivante">⏭&#xFE0E;</button>
+            <span id="ecoute-titre" class="home-ecoute-titre" aria-live="polite">la musique de l’accueil</span>
+            <!-- L'AVIS, partagé : un avis par personne (le nom de la borne) et
+                 par piste, le total dans le titre, publié au magasin des
+                 réglages pour tous les postes. -->
+            <span class="home-ecoute-avis" role="group" aria-label="Mon avis sur la piste en cours">
+              <button id="ecoute-moins" type="button" title="On n'en veut pas (mon −1)" aria-label="Écarter la piste" aria-pressed="false" disabled>−1</button>
+              <button id="ecoute-neutre" type="button" title="Sans avis (retire le mien)" aria-label="Sans avis" aria-pressed="false" disabled>○</button>
+              <button id="ecoute-plus" type="button" title="Elle est bien (mon +1)" aria-label="Retenir la piste" aria-pressed="false" disabled>+1</button>
+            </span>
+          </div>
+          <div class="params-nom" style="margin-top: 16px">COMMANDES — CLAVIER, SOURIS, MANETTE</div>
           <div class="params-desc">
             Chaque manœuvre du jeu peut changer de touche et de bouton :
             les états, le temps, la bonbonne, les écrans. Le réglage est
@@ -11485,10 +11471,10 @@
         Se déplacer, c'est rétrécir : chaque impulsion se paie en volume.</p>
       </div>
       <div class="ob-etape" data-etape="1" hidden>
-        <div class="ob-anim ob-etats"><b>💧</b><b>❄</b><b>💨</b></div>
+        <div class="ob-anim ob-etats"><b><i class="ico-cycle" style="--ic-x:1;--ic-y:0" aria-hidden="true"><span class="ico-repli">💧</span></i></b><b><i class="ico-cycle" style="--ic-x:0;--ic-y:0" aria-hidden="true"><span class="ico-repli">❄</span></i></b><b><i class="ico-cycle" style="--ic-x:2;--ic-y:0" aria-hidden="true"><span class="ico-repli">💨</span></i></b></div>
         <h3>TROIS ÉTATS</h3>
-        <p class="ob-t">❄ la glace garde son élan et réfléchit les lasers ·
-        💨 la vapeur passe les évents — visez (le temps ralentit), relâchez : dash.</p>
+        <p class="ob-t"><i class="ico-cycle" style="--ic-x:0;--ic-y:0" aria-hidden="true"><span class="ico-repli">❄</span></i> la glace garde son élan et réfléchit les lasers ·
+        <i class="ico-cycle" style="--ic-x:2;--ic-y:0" aria-hidden="true"><span class="ico-repli">💨</span></i> la vapeur passe les évents — visez (le temps ralentit), relâchez : dash.</p>
         <p class="ob-p"><b>F</b> la glace : garde son élan, réfléchit les lasers ·
         <b>G</b> la vapeur : passe les évents — visez (le temps ralentit), relâchez : dash.</p>
       </div>
@@ -11528,7 +11514,7 @@
     <!-- L'ÉVEIL : la prise en main scénarisée — cryostase, dégel, volume -->
     <div id="eveil1" class="eveil-voile" hidden aria-label="Éveil — sortie de cryostase">
       <div class="ev-sur">COMPLEXE ORBITAL MÉDUSE — SORTIE DE CRYOSTASE</div>
-      <div class="ev-icone">❄</div>
+      <div class="ev-icone"><i class="ico-cycle" style="--ic-x:0;--ic-y:0" aria-hidden="true"><span class="ico-repli">❄</span></i></div>
       <h3 class="ev-titre">VOUS ÊTES SOUS FORME DE GLACE</h3>
       <p class="ev-texte">La cryostase s'achève, sujet 21 : vous dérivez, gelé, dans la
       cuve d'essai. Sous cette forme, nul moyen de vous diriger — mais rien ne se
@@ -11539,7 +11525,7 @@
     </div>
     <div id="eveil2" class="eveil-voile" hidden aria-label="Éveil — le volume">
       <div class="ev-sur">PREMIÈRE ANALYSE — LE FLUIDE SPÉCULAIRE</div>
-      <div class="ev-icone">💧</div>
+      <div class="ev-icone"><i class="ico-cycle" style="--ic-x:1;--ic-y:0" aria-hidden="true"><span class="ico-repli">💧</span></i></div>
       <h3 class="ev-titre">VOUS ÊTES CE QUI RESTE</h3>
       <p class="ev-texte">Vous l'avez senti : chaque impulsion éjecte un peu de vous.
       Se déplacer, c'est rétrécir — le volume est à la fois votre vie, votre monnaie
@@ -11549,8 +11535,8 @@
       <button class="ev-continuer" type="button">PLONGER</button>
     </div>
     <div id="eveil-invite" hidden aria-hidden="true">
-      <span class="ei-boite"><span class="ei-t">TOUCHEZ <b>💧</b> — REDEVENEZ LIQUIDE</span><span
-        class="ei-p"><b>F</b> OU <b>💧</b> — REDEVENEZ LIQUIDE</span></span>
+      <span class="ei-boite"><span class="ei-t">TOUCHEZ <b><i class="ico-cycle" style="--ic-x:1;--ic-y:0" aria-hidden="true"><span class="ico-repli">💧</span></i></b> — REDEVENEZ LIQUIDE</span><span
+        class="ei-p"><b>F</b> OU <b><i class="ico-cycle" style="--ic-x:1;--ic-y:0" aria-hidden="true"><span class="ico-repli">💧</span></i></b> — REDEVENEZ LIQUIDE</span></span>
       <span class="ei-fleche">▼</span>
     </div>
 
@@ -11735,15 +11721,15 @@
         <span><b>Sas</b> — la bouche d'aspiration boit l'échantillon et le met en
         bonbonne : c'est la sortie.</span></div>
       <div class="lg-states">ÉTATS —
-        <b>💧 LIQUIDE</b> : pilotable, éjecter pour avancer ·
-        <b>❄ GLACE</b> (F) : le bloc garde son élan, re-presser dégèle ·
-        <b>💨 VAPEUR</b> (G) : la bascule coûte 20 % du volume (gouttes récupérables) et rend 3 dashs — viser ralentit le temps, relâcher = dash.</div>
+        <b><i class="ico-cycle" style="--ic-x:1;--ic-y:0" aria-hidden="true"><span class="ico-repli">💧</span></i> LIQUIDE</b> : pilotable, éjecter pour avancer ·
+        <b><i class="ico-cycle" style="--ic-x:0;--ic-y:0" aria-hidden="true"><span class="ico-repli">❄</span></i> GLACE</b> (F) : le bloc garde son élan, re-presser dégèle ·
+        <b><i class="ico-cycle" style="--ic-x:2;--ic-y:0" aria-hidden="true"><span class="ico-repli">💨</span></i> VAPEUR</b> (G) : la bascule coûte 20 % du volume (gouttes récupérables) et rend 3 dashs — viser ralentit le temps, relâcher = dash.</div>
     </div>
 
     <div id="states" role="dialog" aria-label="Les trois états : qui bloque quoi">
       <div class="lg-head"><span>LES TROIS ÉTATS — QUI BLOQUE QUOI</span>
         <button id="states-close" type="button" title="fermer (E)">✕</button></div>
-      <div class="lg-row"><span class="st-big">💧</span>
+      <div class="lg-row"><span class="st-big"><i class="ico-cycle" style="--ic-x:1;--ic-y:0" aria-hidden="true"><span class="ico-repli">💧</span></i></span>
         <span><b>LIQUIDE</b> — pilotable : éjecter pour avancer.<br />
         Bloqué par les <i class="m-mur">parois</i>, les <i class="m-grille">évents</i>
         et le <i class="m-froid">rideau lamellaire</i> ·
@@ -11754,7 +11740,7 @@
         gelé par les <i class="m-froid">plaques froides</i> ·
         vaporisé par les <i class="m-chaud">chaudières</i> (à 95 % de présence) ·
         le <i class="m-sas">sas</i> l'aspire.</span></div>
-      <div class="lg-row"><span class="st-big">❄</span>
+      <div class="lg-row"><span class="st-big"><i class="ico-cycle" style="--ic-x:0;--ic-y:0" aria-hidden="true"><span class="ico-repli">❄</span></i></span>
         <span><b>GLACE</b> (F) — bloc rigide : garde son élan, plus de propulsion.<br />
         Rebondit sur les <i class="m-mur">parois</i> et les <i class="m-grille">évents</i> —
         comme un bumper sur l'<i class="m-phobe">hydrophobe</i>, freinée par
@@ -11764,7 +11750,7 @@
         <i class="m-froid">soudée</i> au contact d'une plaque froide ·
         dégelée par les <i class="m-chaud">chaudières</i> ·
         le <i class="m-sas">sas</i> la hale et l'avale — entrer solide paie une prime.</span></div>
-      <div class="lg-row"><span class="st-big">💨</span>
+      <div class="lg-row"><span class="st-big"><i class="ico-cycle" style="--ic-x:2;--ic-y:0" aria-hidden="true"><span class="ico-repli">💨</span></i></span>
         <span><b>VAPEUR</b> (G) — viser ralentit fortement le temps, relâcher
         lance le nuage d'un trait (dash) : la distance du doigt règle la
         puissance. La BASCULE en vapeur coûte 20 % du volume (une gerbe de

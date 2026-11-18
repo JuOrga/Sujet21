@@ -49,6 +49,12 @@ export class Input {
   /** La visée en cours a été ANNULÉE (second doigt posé pour pincer) : elle
    *  ne doit rien déclencher en la quittant — ni dash, ni éjection. */
   aimAnnulee = false
+  /** LA VITRINE : une salle qui se TOUCHE hors partie — la cuve de
+   *  l'accueil (game/cuveAccueil.ts), où le joueur éjecte avant même de
+   *  commencer et voit la matière lui revenir. Seul le geste d'éjecter y
+   *  passe : ni caméra à la main, ni pincement, ni vortex. main.ts la
+   *  branche ; par défaut, rien ne se touche hors partie. */
+  vitrine: () => boolean = () => false
 
   toggleFreeze(): void {
     this.freezeIntent = !this.freezeIntent
@@ -196,13 +202,17 @@ export class Input {
     // taisent tant que la partie n'est pas au premier plan.
     const enJeu = (): boolean => document.body.classList.contains('playing')
     target.addEventListener('pointerdown', (e) => {
-      if (!enJeu() || this.gelees) return
+      if (this.gelees) return
+      const vitrine = !enJeu() && this.vitrine()
+      if (!enJeu() && !vitrine) return
       // BOUTONS DE LA SOURIS : inversés (réglage des commandes), le clic
       // DROIT éjecte et le GAUCHE attrape la caméra — les gauchers et les
       // souris à pouce y tiennent
       const inv = sourisInverse()
       const bAgir = inv ? 2 : 0
       const bCamera = inv ? 0 : 2
+      // dans la vitrine, un seul doigt et un seul bouton : éjecter
+      if (vitrine && (e.button !== bAgir || this.pointers.size > 0 || this.vortexArmed)) return
       if (e.button === bCamera) {
         // Maintenu : déplacement de caméra ; bref : vortex (au relâchement)
         this.rightDrag = {
