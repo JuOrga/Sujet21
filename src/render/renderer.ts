@@ -4162,7 +4162,9 @@ void main() {
       // halo de courant : stries qui convergent en spirale vers la bouche
       float reach = 1.0 - smoothstep(rad * 0.6, max(uExitRadius, rad), dh);
       float streaks = 0.5 + 0.5 * sin(ang * 5.0 - dh * 0.055 + uTime * 3.2);
-      col += vec3(0.05, 0.28, 0.22) * streaks * reach * reach * 0.35;
+      // (le sarcelle de la charte, #63b7e6 : la bouche est l'accent froid de
+      // la cuve — le vert est réservé à la serre ; à luminance égale)
+      col += vec3(0.12, 0.23, 0.29) * streaks * reach * reach * 0.35;
       float eye = 1.0 - smoothstep(rad * 0.22, rad * 0.5, dh);
       drainEye = max(drainEye, eye);
       if (uHasIris > 0.5) {
@@ -4185,9 +4187,10 @@ void main() {
         // assise : léger sombre sous le cadre pour le détacher de la paroi
         col = mix(col, vec3(0.004, 0.010, 0.012), (1.0 - smoothstep(rad * 0.8, frameR * 1.1, dh)) * 0.45);
         col = mix(col, irisCol, aMask);
-        // l'anneau vert respire par-dessus l'image
+        // l'anneau sarcelle respire par-dessus l'image (il était VERT, hors
+        // charte — docs/assets-ia.md §4 ; même luminance qu'avant)
         float ring = exp(-pow((dh - rad * 0.74) * 5.0 / rad, 2.0));
-        col += vec3(0.10, 0.55, 0.40) * ring * pulse * 0.5;
+        col += vec3(0.23, 0.43, 0.54) * ring * pulse * 0.5;
       } else {
         // gorge de l'entonnoir : l'espace s'assombrit en tombant vers le trou
         float throat = 1.0 - smoothstep(0.0, rad, dh);
@@ -4196,7 +4199,7 @@ void main() {
         col = mix(col, vec3(0.0, 0.002, 0.004), eye);
         // anneau lumineux qui respire au bord de la gorge
         float ring = exp(-pow((dh - rad * 0.55) * 6.0 / rad, 2.0));
-        col += vec3(0.15, 0.75, 0.55) * ring * pulse * 0.8;
+        col += vec3(0.33, 0.62, 0.77) * ring * pulse * 0.8;
       }
     }
     // Relief d'éclairage : un biseau directionnel, devenu un chanfrein franc.

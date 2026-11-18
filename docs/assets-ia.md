@@ -70,7 +70,16 @@ no text
 ```
 Négatif : `background, floor, shadow on ground, perspective, text`
 
-## 4. Bouche du sas (iris mécanique) ✗ À REFAIRE
+## 4. Bouche du sas (iris mécanique) ✅ REFAIT le 18/11
+
+> **Rendu dans Blender** (`tools/images/blender/iris.py`), frère du sas de
+> raccord (même acier, mêmes veilleuses ambre) : douze lamelles inclinées, le
+> filet sarcelle, le cadre riveté. Ses rayons suivent ceux du shader — les
+> lamelles TOURNENT jusqu'à 205 px du centre, la transition (205 → 282 px) est
+> faite d'anneaux lisses où la rotation ne se voit pas, le cadre est fixe
+> au-delà. L'anneau qui respire et les stries du courant, peints par le
+> shader, passent du VERT au sarcelle à luminance égale (`bouchSas.spec.ts`).
+> Mesures : luminance 0,23, 1 % de pixels chauds (33 % avant), 34 Ko.
 **1024×1024 · PNG transparent · parfaitement centré**
 
 L'iris livré est **opaque sur un fond brun** (33 % de pixels chauds, la
@@ -599,6 +608,15 @@ shader (le décor actuel : étoiles, nébulosité, caustiques, métal brossé…
 prompts ci-dessus visent Midjourney, DALL·E, Flux, Stable Diffusion, etc.
 
 ## 16. LE SAS DE RACCORD — `sas-raccord.webp` et `sas-raccord-v.webp` — PRIORITÉ 1
+
+> **✅ LIVRÉ le 18/11/2026, rendu dans Blender** (`tools/images/blender/sas_raccord.py`,
+> d'après la référence ci-dessous) : la géométrie imposée est tenue (1024 ×
+> 1280, ouverture centrée de 800 px à alpha nul, brides de 300 à 410 et de 615
+> à 725). `tools/images/sas_atlas.py` fond les moignons au transparent sur
+> leurs 130 derniers px (sur l'alpha : un fondu de matière s'éteignait mal sous
+> la lumière) et tourne la pièce pour `sas-raccord-v`. Mesures : luminance
+> 0,20, bord plein 0 %, 26 et 27 Ko. En jeu, `__decor()` liste les sas du hub
+> aux tailles attendues (384 × 480, 480 × 384), centrés sur leurs jonctions.
 
 **Toujours manquant au 10/09/2026.** Le moteur pose déjà la pièce à chaque
 jonction (quatorze sur le module Méduse) et n'attend que le fichier : c'est
