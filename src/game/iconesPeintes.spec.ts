@@ -216,6 +216,31 @@ describe('la feuille découpe les planches à leur grille', () => {
     expect(r).toContain('calc(var(--ic-x) * 33.3333%) calc(var(--ic-y) * 100%)')
   })
 
+  // Vu sur l'aperçu du 18/11 : aux Mémoires, la plaque du SOLIDE sortait en
+  // carré de 48 px encadré, le bord gauche au milieu du glaçon. La règle des
+  // faces, `.cy-glacon i` (absolu, 46 px, bordure), prenait aussi le <i> de
+  // la pastille glissé dans le flocon gravé : avant la planche, ce flocon
+  // était du texte et rien ne l'attrapait.
+  it('les faces du glaçon ne prennent pas la plaque gravée dessus', () => {
+    expect(HTML).not.toMatch(/\.cy-glacon i \{/)
+    expect(regle('.cy-glacon > i')).toContain('position: absolute')
+    expect(HTML).toMatch(/<span class="cy-glacon">(<i class="gl-[a-z]+"><\/i>){3}<em><i class="ico-cycle"/)
+  })
+
+  // Les transformations peignent DEUX symboles et une flèche sur une plaque :
+  // à 32 px, chaque symbole tombait à 8 px de haut, illisible (aperçu du
+  // 18/11, « les icônes à droite sont trop petites »).
+  it('au registre, la plaque d’une transformation est assez grande pour ses deux symboles', () => {
+    const taille = /font-size: calc\((\d+)px \* var\(--ui\)\)/.exec(regle('.cy-reg .ico-cycle'))
+    expect(Number(taille?.[1]) * 1.35).toBeGreaterThanOrEqual(45)
+  })
+
+  // D'une traite, « ORBE MANQUANT · 10 AU MARCHAND » sortait de 156 px de sa
+  // ligne (banc du 18/11, 1280 × 800) : le prix ne se lisait plus.
+  it('au registre, le statut passe à la ligne plutôt que de sortir du cadre', () => {
+    expect(regle('.cy-reg em')).not.toContain('nowrap')
+  })
+
   it('cache l’emoji de repli dès que la planche est là', () => {
     expect(HTML).toMatch(new RegExp(`html\\.${CLASSE_PLANCHE_CYCLE} \\.ico-cycle > \\.ico-repli`))
     expect(HTML).toMatch(new RegExp(`html\\.${CLASSE_PLANCHE_TROPHEES} \\.ico-trophee > \\.ico-repli`))

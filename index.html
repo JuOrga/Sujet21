@@ -2441,7 +2441,10 @@
         height: 102px;
         animation: cy-scintille 5s ease-in-out infinite;
       }
-      .cy-glacon i {
+      /* les trois FACES seulement (enfants directs) : en `.cy-glacon i`, la
+         règle prenait aussi la plaque peinte logée dans le flocon gravé, qui
+         sortait en carré de 48 px encadré, au bord du glaçon (18/11) */
+      .cy-glacon > i {
         position: absolute;
         left: 0;
         top: 0;
@@ -2465,11 +2468,15 @@
       /* le flocon gravé sur la face claire, et un éclat qui glisse */
       .cy-glacon em {
         position: absolute;
+        /* au CENTRE de la face du haut (27 px : son losange va de 3 à 51) :
+           calée par son bord haut à 24 px, la plaque peinte, plus haute que
+           l'ancien flocon de texte, tombait sur la pointe basse de la face */
         left: 50%;
-        top: 24px;
-        transform: translateX(-50%);
+        top: 27px;
+        transform: translate(-50%, -50%);
+        display: flex;
         font-style: normal;
-        font-size: calc(15px * var(--ui));
+        font-size: calc(19px * var(--ui));
         color: rgba(20, 52, 82, 0.85);
         text-shadow: 0 0 6px rgba(255, 255, 255, 0.7);
       }
@@ -2701,7 +2708,10 @@
         gap: 12px;
         width: 100%;
         text-align: left;
-        padding: 12px 16px;
+        /* 5 px et non 12 : la plaque de 46 px donne déjà sa hauteur à la
+           ligne. À 6 px, les huit lignes défilaient à 1280 × 720 (mesuré
+           le 18/11) ; à 5, chaque ligne reste sous les 58,4 px d'avant */
+        padding: 5px 16px;
         background: rgba(10, 20, 32, 0.85);
         border: 1px solid var(--line);
         border-left-width: 3px;
@@ -2710,8 +2720,10 @@
         cursor: default;
       }
       .cy-reg b { font-family: var(--font-display); font-size: calc(12px * var(--ui)); letter-spacing: 0.2em; font-weight: 600; display: block; }
-      /* la transformation peinte (source → cible), en tête de sa ligne */
-      .cy-reg .ico-cycle { flex: none; font-size: calc(24px * var(--ui)); }
+      /* la transformation peinte (source → cible), en tête de sa ligne. Ses
+         DEUX symboles et la flèche tiennent dans la plaque : à 32 px, chacun
+         tombait à 8 px de haut (18/11) ; à 46 px ils se lisent. */
+      .cy-reg .ico-cycle { flex: none; font-size: calc(34px * var(--ui)); }
       .cy-reg small { display: block; font-size: calc(8.5px * var(--ui)); letter-spacing: 0.14em; color: var(--dim); margin-top: 4px; }
       .cy-reg em {
         margin-left: auto;
@@ -2719,7 +2731,11 @@
         font-family: var(--font-display);
         font-size: calc(9px * var(--ui));
         letter-spacing: 0.2em;
-        white-space: nowrap;
+        /* sur deux lignes s'il le faut, calé à droite : d'une traite, « ORBE
+           MANQUANT · 10 AU MARCHAND » débordait de la ligne et le PRIX, la
+           seule chose à lire, tombait hors du cadre (18/11) */
+        text-align: right;
+        line-height: 1.5;
         color: var(--dim);
       }
       /* ACQUIS = VERT ici aussi : registre et schéma disent la même chose */
