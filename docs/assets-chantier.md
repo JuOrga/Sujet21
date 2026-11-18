@@ -66,7 +66,7 @@ l'ordre qu'on veut.
 
 | # | image | section | pourquoi d'abord |
 | --- | --- | --- | --- |
-| A1 | `sas-raccord.webp` | §16 | posé par le moteur à 14 jonctions, référence fournie, rien à intégrer |
+| A1 | ~~`sas-raccord.webp`~~ ✅ livré le 18/11 (Blender) | §16 | posé par le moteur à 14 jonctions, référence fournie, rien à intégrer |
 | A2 | `decal-vanne.webp` (reprise) | §19 | coupée par le cadre, et c'est la première pièce à animer |
 | A3 | `decal-vanne-anime.webp` | §19 | la première bande de la chaîne — depuis A2 |
 | A4 | `wall.webp` (reprise) | §5 | le mur par défaut de toute cuve montre sa couture |
@@ -77,7 +77,7 @@ l'ordre qu'on veut.
 
 | # | image | section | note |
 | --- | --- | --- | --- |
-| B1 | `iris.webp` (reprise) | §4 | après A1, avec le sas en référence |
+| B1 | ~~`iris.webp` (reprise)~~ ✅ refait le 18/11 (Blender) | §4 | après A1, avec le sas en référence |
 | B2 | `serre-roquette.webp` | §14a | j'ajoute la sorte à l'éditeur à la livraison |
 | B3 | `serre-tomates.webp` | §14c | idem |
 | B4 | `decal-ecran-on-anime.webp` | §17 | depuis l'écran livré |

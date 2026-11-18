@@ -2933,6 +2933,10 @@ void main() {
   // ce que les lampes laissent de lumière au TOIT ici (1 : aucun voisin plus
   // haut ne l'ombre) — la carte le porte dans son alpha (voir LIGHT_FS)
   float toitVis = 1.0;
+  // la lumière que le FOND reçoit ici — retenue pour ce qui est peint DANS
+  // le fond, l'iris du sas : sans elle, il gardait sa pleine lumière là où
+  // le fond tombait au noir, et se lisait posé sur l'image (18/11)
+  vec3 eclFond = vec3(1.0);
   if (uLumiere > 0.5) {
     vec2 luv = (world - uLightMapMin) * uLightMapInvSize;
     // la carte est COLORÉE : chaque lampe y a versé sa teinte × visibilité
@@ -2940,7 +2944,8 @@ void main() {
     vec3 lm = lm4.rgb;
     toitVis = lm4.a;
     solEclaire = clamp(max(lm.r, max(lm.g, lm.b)), 0.0, 1.0);
-    tank *= uAmbiante + 0.95 * lm;
+    eclFond = vec3(uAmbiante) + 0.95 * lm;
+    tank *= eclFond;
     // un léger surcroît dans les pleins feux — la teinte suit les lampes
     tank += lm * lm * 0.06;
     // la monture de chaque lampe : un point de sa couleur au plafond —
@@ -4162,7 +4167,9 @@ void main() {
       // halo de courant : stries qui convergent en spirale vers la bouche
       float reach = 1.0 - smoothstep(rad * 0.6, max(uExitRadius, rad), dh);
       float streaks = 0.5 + 0.5 * sin(ang * 5.0 - dh * 0.055 + uTime * 3.2);
-      col += vec3(0.05, 0.28, 0.22) * streaks * reach * reach * 0.35;
+      // (le sarcelle de la charte, #63b7e6 : la bouche est l'accent froid de
+      // la cuve — le vert est réservé à la serre ; à luminance égale)
+      col += vec3(0.12, 0.23, 0.29) * streaks * reach * reach * 0.35;
       float eye = 1.0 - smoothstep(rad * 0.22, rad * 0.5, dh);
       drainEye = max(drainEye, eye);
       if (uHasIris > 0.5) {
@@ -4179,15 +4186,29 @@ void main() {
         vec3 irisCol = textureGrad(uTexIris, cuv + 0.5,
                                    vec2(pxMonde / (2.0 * frameR), 0.0),
                                    vec2(0.0, pxMonde / (2.0 * frameR))).rgb;
-        // Détourage serré : le cadre touche le bord de l'image, on coupe juste
-        // à l'intérieur pour que le fond brun ne déborde jamais.
-        float aMask = 1.0 - smoothstep(0.435, 0.465, length(rel) / (2.0 * frameR));
-        // assise : léger sombre sous le cadre pour le détacher de la paroi
-        col = mix(col, vec3(0.004, 0.010, 0.012), (1.0 - smoothstep(rad * 0.8, frameR * 1.1, dh)) * 0.45);
+        // Détourage AU BORD DU CADRE de l'image Blender : son cadre s'arrête
+        // à 0,429 de la largeur (alpha mesuré : 254 à 0,428, 0 à 0,432) et
+        // tout est noir transparent au-delà. L'ancien détourage, 0,435 →
+        // 0,465, était réglé pour l'image d'avant, opaque jusqu'au bord : il
+        // peignait ce noir en anneau épais autour du cadre (18/11). Coupé au
+        // pixel près, en espace monde.
+        float rCadre = 0.429 * 2.0 * frameR;
+        float aMask = 1.0 - smoothstep(rCadre - pxMonde, rCadre, dh);
+        // L'iris est SERTI DANS LE FOND, pas posé dessus (le concepteur,
+        // 18/11 : « très posé sur l'image ») : il prend la lumière du fond
+        // — dans le noir d'une salle sans ambiante, il s'assombrit avec la
+        // paroi au lieu d'y briller seul — et son cadre affleure, marqué
+        // d'un simple JOINT. L'« assise » d'avant, un anneau sombre jusqu'à
+        // 1,1 rayon de cadre, débordait sur le fond comme une ombre portée :
+        // c'était elle qui le décollait.
+        irisCol *= eclFond;
+        float joint = 1.0 - smoothstep(0.0, max(1.5 * pxMonde, 1.0), abs(dh - rCadre));
         col = mix(col, irisCol, aMask);
-        // l'anneau vert respire par-dessus l'image
+        col *= 1.0 - 0.55 * joint;
+        // l'anneau sarcelle respire par-dessus l'image (il était VERT, hors
+        // charte — docs/assets-ia.md §4 ; même luminance qu'avant)
         float ring = exp(-pow((dh - rad * 0.74) * 5.0 / rad, 2.0));
-        col += vec3(0.10, 0.55, 0.40) * ring * pulse * 0.5;
+        col += vec3(0.23, 0.43, 0.54) * ring * pulse * 0.5;
       } else {
         // gorge de l'entonnoir : l'espace s'assombrit en tombant vers le trou
         float throat = 1.0 - smoothstep(0.0, rad, dh);
@@ -4196,7 +4217,7 @@ void main() {
         col = mix(col, vec3(0.0, 0.002, 0.004), eye);
         // anneau lumineux qui respire au bord de la gorge
         float ring = exp(-pow((dh - rad * 0.55) * 6.0 / rad, 2.0));
-        col += vec3(0.15, 0.75, 0.55) * ring * pulse * 0.8;
+        col += vec3(0.33, 0.62, 0.77) * ring * pulse * 0.8;
       }
     }
     // Relief d'éclairage : un biseau directionnel, devenu un chanfrein franc.
