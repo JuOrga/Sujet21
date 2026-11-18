@@ -714,11 +714,11 @@ describe('la face que montre un point de la tranche', () => {
     // les formes : le gradient se lit AU PIED du point, pas sous le pixel
     expect(flanc).not.toMatch(/gradSdfBoite\(bi, wb, d,/)
     expect(flanc).toMatch(/gradSdfBoite\(bi, wbPied, /)
-    // dans la base, une boîte ou un coin ne devinent plus leur hauteur par
-    // deux distances : seules les formes courbes gardent cette estime
-    const estime = boucle.indexOf('htFlanc = clamp(-d / max(dV - d')
-    expect(estime).toBeGreaterThan(0)
-    expect(boucle.slice(0, estime)).toMatch(/else if \(d <= 0\.0\) \{[^}]*$/)
+    // dans la base, plus aucune forme ne devine sa hauteur par deux
+    // distances (18/11 : l'arc et la coque la gardaient — fausse dès que le
+    // chemin passe le creux d'une coque)
+    expect(boucle).not.toContain('htFlanc = clamp(-d / max(dV - d')
+    expect(boucle).not.toMatch(/else if \(d <= 0\.0\)/)
   })
 })
 
@@ -1143,6 +1143,23 @@ describe("la tranche d'un arc et d'une coque : douze pas, puis l'affinage", () =
     }
     // le creux de la coque en est fait, presque entier
     expect(rejetes).toBeGreaterThan(500)
+  })
+
+  it('le shader prend la règle : douze pas, trois dichotomies, plus les trois pas ni l’estime', () => {
+    const affine = entre('vec2 flancAffine(', '\n}\n')
+    expect(affine).toContain('for (int k = 1; k <= ${PAS_AFFINE}; k++) {')
+    expect(affine).toContain('for (int i = 0; i < ${AFFINAGE}; i++) {')
+    // le dernier pas est le sommet, déjà mesuré
+    expect(affine).toContain('float dM = k == ${PAS_AFFINE} ? dV : formeSdf(wb - rL * t, b, dec.y, dec.z, dec.w);')
+    // la sécante dans l'intervalle affiné
+    expect(affine).toContain('return vec2(couv, lo + (hi - lo) * dLo / (dLo - dHi));')
+    // le rejet, pour la coque seule (l'arc a une distance approchée)
+    expect(affine).toMatch(/if \(dec\.y > 4\.5 && d > length\(rL\) \+ 1\.5\) return vec2\(0\.0\);/)
+    // la boucle des boîtes l'appelle pour l'arc et la coque, sur la base aussi
+    expect(boucle).toMatch(/\} else \{[^}]*vec2 fa = flancAffine\(wb, rL, uBoxes\[bi\], dec, d, dV\);\s*(\/\/[^\n]*\n\s*)*flanc = d <= 0\.0 \? 1\.0 : fa\.x;\s*htFlanc = fa\.y;/)
+    // plus les trois pas à ¼ ½ ¾
+    expect(boucle).not.toMatch(/\/ 4\.0\)/)
+    expect(boucle).not.toMatch(/for \(int fs = 1; fs <= 3; fs\+\+\)/)
   })
 })
 
