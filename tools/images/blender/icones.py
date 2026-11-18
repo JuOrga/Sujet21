@@ -150,12 +150,29 @@ def fleche(at, x0, x1, z):
     trace(at, 'neutre', [(x1 - 0.012, z + 0.011), (x1, z), (x1 - 0.012, z - 0.011)], TRAIT * 0.7)
 
 
+# L'ÉTENDUE de chaque symbole, à gauche et à droite de son point de pose, en
+# fractions de son échelle (trait compris) : le flocon est large, la goutte
+# étroite, le souffle déborde d'un côté.
+ETENDUE = {'solide': (0.98, 0.98), 'liquide': (0.68, 0.68), 'gaz': (1.08, 1.04), 'plasma': (0.5, 0.5)}
+
+
 def transformation(at, src, dst):
-    # symétriques autour du centre de la plaque, la flèche AU MILIEU (essai 1,
-    # posée à l'œil : elle collait au symbole de gauche — vu par le concepteur)
-    SYMBOLES[src](at, -0.047, Z0, 0.032)
-    SYMBOLES[dst](at, 0.047, Z0, 0.032)
-    fleche(at, -0.009, 0.009, Z0)
+    """source, flèche, cible : posés selon leur LARGEUR réelle, le même jour
+    de part et d'autre de la flèche, et le groupe centré sur la plaque.
+    (Essai 1, à l'œil ; essai 2, symboles symétriques et flèche au centre de
+    la plaque : la flèche y était, mais une goutte étroite à côté d'un flocon
+    large laissait deux jours inégaux — le concepteur : « ça fait pas
+    centré ».)"""
+    s, jour, lg = 0.032, 0.008, 0.02
+    gs, ds = (e * s for e in ETENDUE[src])
+    gd, dd = (e * s for e in ETENDUE[dst])
+    total = gs + ds + jour + lg + jour + gd + dd
+    x = -total / 2
+    SYMBOLES[src](at, x + gs, Z0, s)
+    x += gs + ds + jour
+    fleche(at, x, x + lg, Z0)
+    x += lg + jour
+    SYMBOLES[dst](at, x + gd, Z0, s)
 
 
 # ------------------------------------------------------------ les trophées
