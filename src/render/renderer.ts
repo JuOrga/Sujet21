@@ -11,6 +11,7 @@ import {
   LAMPE_HAUTEUR_MAX,
   LAMPE_HAUTEUR_MIN,
   MAT_VIDE,
+  MAT_BAIE,
   lampeCouleurRVB,
   MAT_CHAUD,
   MAT_FROID,
@@ -1713,6 +1714,34 @@ vec2 rdFluide(vec2 pw) {
   return vec2(pres * icy, pres * (1.0 - icy));
 }
 
+// LE REFLET DU CORPS dans une vitre sous lui : x l'image renvoyée, y la lueur
+// que le verre prend autour. Le reflet tombe SOUS le corps à l'écran, comme
+// sur un sol brillant vu de face : décalé vers le centre de l'écran (le point
+// de fuite du relief), il restait caché derrière le corps — un croissant de
+// quelques pixels, qu'on ne voyait pas. L'image est lue floue (cinq
+// prélèvements), la lueur plus large encore : une vitre ne rend qu'une part
+// de la lumière, et pas nette.
+float presenceChamp(vec2 pw, float seuil) {
+  vec2 fuv = ((pw - uCenter) * uZoom + uViewport * 0.5) / uViewport;
+  if (fuv.x < 0.0 || fuv.x > 1.0 || fuv.y < 0.0 || fuv.y > 1.0) return 0.0;
+  return smoothstep(0.35 * seuil, seuil, textureLod(uField, fuv, 0.0).r / uFieldScale);
+}
+vec2 refletCorps(vec2 w) {
+  vec2 q = w + vec2(0.0, 75.0); // le monde a y vers le haut : l'image descend
+  float r = 18.0;
+  float image = (presenceChamp(q, uThreshold) * 2.0 +
+                 presenceChamp(q + vec2(r, 0.0), uThreshold) +
+                 presenceChamp(q - vec2(r, 0.0), uThreshold) +
+                 presenceChamp(q + vec2(0.0, r), uThreshold) +
+                 presenceChamp(q - vec2(0.0, r), uThreshold)) / 6.0;
+  float R = 60.0;
+  float lueur = (presenceChamp(w + vec2(R, 0.0), uThreshold * 0.5) +
+                 presenceChamp(w - vec2(R, 0.0), uThreshold * 0.5) +
+                 presenceChamp(w + vec2(0.0, R), uThreshold * 0.5) +
+                 presenceChamp(w - vec2(0.0, R), uThreshold * 0.5)) * 0.25;
+  return vec2(image, lueur);
+}
+
 // LE CORPS DEVANT LE PIED D'UNE TRANCHE, 0..1 : ce qui, là, éclaire la face
 // — le corps du joueur, eau ou glace. Ni la vapeur (un nuage ne s'adosse
 // pas), ni les gouttes égarées (elles sont éteintes : « eau libre plus
@@ -3276,6 +3305,9 @@ void main() {
   // LE SOL QUE LES SOMMETS CACHENT (relief allumé) : le plus grand sur toutes
   // les boîtes — le fluide, peint après la boucle, ne s'y peint pas
   float solSousSommets = 0.0;
+  // LA VITRE DE LA VITRINE sous ce pixel (baie d'habillage 1), 0..1 : retenue
+  // dans la boucle, le reflet du corps s'y peint après elle (refletCorps)
+  float vitreVitrine = 0.0;
   for (int bi = 0; bi < min(uBoxCount, MAX_BOXES); bi++) {
     // LA PORTÉE D'ABORD (portee.ts) : hors de son rectangle, la boîte ne peut
     // rien peindre ici — ni distance, ni décodage, ni matériau à classer. Le
@@ -3832,8 +3864,43 @@ void main() {
         float verre = 1.0 - smoothstep(-montW - edgeW, -montW, d);
         float monture = fill - verre;
         vec3 ciel = voidCol + vec3(0.025, 0.040, 0.065);
-        float band = 0.5 + 0.5 * sin((world.x + world.y) * 0.016 - uTime * 0.22);
-        float sweep = smoothstep(0.88, 0.995, band);
+        float sweep;
+        if (uBoxAux[bi].z > 0.5) {
+          // LA VITRE DE LA VITRINE (habillage 1 — game/cuveAccueil.ts). Le
+          // balayage d'une baie se répète sur toute sa largeur : sur un
+          // hublot de 1 400 u, cinq bandes pareilles (« les reflets se
+          // répètent trop », le concepteur, 18/11). Ici, DEUX reflets fixés
+          // au verre, un large et un fin, comme sur une vraie vitre : des
+          // segments qui s'éteignent avant le bord, et dérivent à peine.
+          vec2 bcV = 0.5 * (uBoxes[bi].xy + uBoxes[bi].zw);
+          float rV = max(1.0, 0.5 * (uBoxes[bi].z - uBoxes[bi].x));
+          vec2 qV = (wb - bcV) / rV;
+          float sV = dot(qV, vec2(0.7071, 0.7071));
+          float tV = dot(qV, vec2(0.7071, -0.7071));
+          float gV = 0.025 * sin(uTime * 0.11);
+          float large = exp(-pow((sV - 0.30 - gV) / 0.11, 2.0));
+          float fin = exp(-pow((sV - 0.53 - gV) / 0.025, 2.0));
+          float corde = sqrt(max(0.0, 1.0 - sV * sV));
+          float segment = 1.0 - smoothstep(0.35 * corde, 0.85 * corde, abs(tV + 0.10));
+          // LE VERRE SE VOIT SANS ÉCLAIRCIR LA NUIT : le fond reste sombre
+          // (« un fond assez sombre quand même », le concepteur, 18/11 —
+          // mesuré, le verre d'une baie triplait la luminance du ciel : 0,062
+          // dans la vitre pour 0,021 dehors). Ici le dehors est seulement
+          // bleui, sans le voile ajouté des baies ; le verre se lit à son
+          // pourtour, qui s'éclaire (vu de biais, il renvoie plus), et à ses
+          // reflets.
+          float bordV = smoothstep(0.80, 0.99, length(qV));
+          ciel = mix(voidCol, voidCol * vec3(0.80, 0.95, 1.25) + vec3(0.004, 0.010, 0.022), 0.85)
+               + vec3(0.05, 0.08, 0.11) * bordV;
+          // les reflets se POSENT sur le verre (un mélange, pas un ajout) :
+          // sur les étoiles claires, une lueur ajoutée ne se lisait pas
+          ciel = mix(ciel, vec3(0.78, 0.86, 0.95), clamp(0.22 * large + 0.40 * fin, 0.0, 1.0) * segment);
+          sweep = 0.0;
+          vitreVitrine = max(vitreVitrine, verre);
+        } else {
+          float band = 0.5 + 0.5 * sin((world.x + world.y) * 0.016 - uTime * 0.22);
+          sweep = smoothstep(0.88, 0.995, band);
+        }
         ciel += vec3(0.10, 0.13, 0.17) * sweep * eclSolide;
         // un reflet fixe sur le bord intérieur de la vitre : le verre a une épaisseur
         float lisere = (1.0 - smoothstep(0.0, edgeW * 1.5, abs(d + montW))) * fill;
@@ -4347,6 +4414,16 @@ void main() {
     dansEau *= 1.0 - solSousSommets;
     float ombre = ombreVolume(world, dansEau);
     col = mix(col, col * vec3(0.44, 0.51, 0.66), ombre * 0.72);
+  }
+
+  // LE REFLET DU VOLUME dans la vitre de la vitrine (« il faudrait un reflet
+  // du volume », le concepteur, 18/11). Lu ICI, hors de la boucle des boîtes,
+  // qui n'a retenu que la part de verre : ses lectures du champ y seraient
+  // recopiées pour chaque boîte par les compilateurs qui la déroulent.
+  if (vitreVitrine > 0.0) {
+    vec2 rc = refletCorps(world);
+    col = mix(col, vec3(0.42, 0.64, 0.88), rc.x * 0.45 * vitreVitrine);
+    col += vec3(0.05, 0.10, 0.15) * rc.y * vitreVitrine;
   }
 
   // Ondes d'éjection : anneaux qui traversent le volume depuis le point
@@ -7773,7 +7850,11 @@ export class Renderer {
                 this.chargeLissee(bx, sim.surchauffeurVide(bx) ? 0 : 1, timeSec) + 2 * (bx.sens ?? 0)
               : rideau
                 ? rideau[0]
-                : 1
+                : bx.material === MAT_BAIE
+                  ? // l'habillage d'une baie : 1, la vitre de la vitrine
+                    // (game/cuveAccueil.ts) — ses deux reflets et celui du corps
+                    (bx.skin ?? 0)
+                  : 1
       // aux.w : la portée d'aura (chaudière) — ou, d'un SURCHAUFFEUR, son
       // ÉCLAT de recharge (1 à l'instant du dash rendu, 0 après ~0,9 s) —
       // ou, d'un RIDEAU, l'ouverture du ressort de ses lanières

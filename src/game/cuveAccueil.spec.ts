@@ -3,7 +3,9 @@ import { describe, expect, it } from 'vitest'
 import { DEFAULT_PARAMS } from '../sim/params'
 import { FluidSim, KIND_PLAYER } from '../sim/solver'
 import { zonesDuHub } from './hub'
-import { ANNEAU_EPAISSEUR, ANNEAU_RAYON, CODE_ACCUEIL, PUITS_ACCUEIL, cadreAccueil, tableauAccueil } from './cuveAccueil'
+import { ANNEAU_EPAISSEUR, ANNEAU_RAYON, CODE_ACCUEIL, PUITS_ACCUEIL, VITRE_RAYON, cadreAccueil, tableauAccueil } from './cuveAccueil'
+import { FORME_DISQUE } from './formes'
+import { MAT_BAIE, estUnFond, sansPhysique } from './level'
 import { sansSas } from './ronde'
 
 // LA GARDE DE LA CUVE DE L'ACCUEIL : ce qui est éjecté REVIENT. Le vrai
@@ -65,6 +67,45 @@ describe('la cuve de l’accueil — une vitrine, pas une salle', () => {
 
   it('reste sous 2 600 u : le hub ne lui prête ni sas ni comptoir codés en dur', () => {
     expect(zonesDuHub(lv)).toBeNull()
+  })
+
+  it('a une vitre sous l’échantillon : un disque de baie, sans physique, sous la paroi', () => {
+    const vitres = lv.boxes.filter((b) => b.material === MAT_BAIE)
+    expect(vitres).toHaveLength(1)
+    const v = vitres[0]
+    expect(v.forme).toBe(FORME_DISQUE)
+    expect(v.maxX).toBe(VITRE_RAYON)
+    expect(v.minX).toBe(-VITRE_RAYON)
+    // centrée sous le corps, et sa bordure passe SOUS la paroi de l'anneau :
+    // aucun jour entre la monture et la coque
+    expect((v.minX + v.maxX) / 2).toBe(lv.spawn.x)
+    expect((v.minY + v.maxY) / 2).toBe(lv.spawn.y)
+    expect(VITRE_RAYON).toBeGreaterThan(ANNEAU_RAYON - ANNEAU_EPAISSEUR)
+    expect(VITRE_RAYON).toBeLessThan(ANNEAU_RAYON)
+    // du décor : le solveur ne la voit pas, et elle se peint sous tout
+    expect(sansPhysique(v.material)).toBe(true)
+    expect(estUnFond(v.material)).toBe(true)
+  })
+
+  it('est la vitre de la vitrine (habillage 1), et le rendu la lit comme telle', () => {
+    const v = lv.boxes.find((b) => b.material === MAT_BAIE)!
+    expect(v.skin).toBe(1)
+    const RENDU = readFileSync(new URL('../render/renderer.ts', import.meta.url), 'utf-8')
+    // l'habillage d'une baie part au shader (aux.z) : sans lui, la vitre
+    // reprendrait le balayage répété des baies du jeu
+    const i = RENDU.indexOf('bx.material === MAT_BAIE')
+    expect(i).toBeGreaterThan(-1)
+    expect(RENDU.slice(i, i + 300)).toContain('(bx.skin ?? 0)')
+    // deux reflets fixés au verre, et le corps renvoyé dessous
+    expect(RENDU).toContain('vitreVitrine = max(vitreVitrine, verre)')
+    expect(RENDU).toContain('vec2 rc = refletCorps(world)')
+  })
+
+  it('montre un ciel étoilé derrière la vitre — ni la Terre, ni la Voie lactée — quel que soit le ciel de la partie', () => {
+    const MAIN = readFileSync(new URL('../main.ts', import.meta.url), 'utf-8')
+    expect(MAIN).toContain("const cielVu: CielChoix = level.code === CODE_ACCUEIL ? 'procedural' : cielChoix")
+    expect(MAIN).toContain('renderer.setCiel(CIEL_MODE[cielVu])')
+    expect(MAIN).toContain("if (cielVu === 'terre') {")
   })
 
   it('a un cœur de puits plus large que l’anneau : pas de halo, qui étire', () => {

@@ -21966,10 +21966,16 @@ function corpsImage(now: number): boolean {
   // ni rester en retard d'un tableau.
   renderer.setSolModules(level.coque === 'structures')
   renderer.setExterieur(exterieurActif)
-  renderer.setCiel(CIEL_MODE[cielChoix])
+  // LA CUVE DE L'ACCUEIL (et de la pause) a son ciel à elle : un ciel
+  // étoilé, rien d'autre (« enlève la Terre derrière », puis « pas la Voie
+  // lactée, juste un ciel étoilé », le concepteur, 18/11). Le procédural :
+  // des étoiles sur la nuit, rien à télécharger. La partie garde le ciel
+  // que le joueur a choisi.
+  const cielVu: CielChoix = level.code === CODE_ACCUEIL ? 'procedural' : cielChoix
+  renderer.setCiel(CIEL_MODE[cielVu])
   // LA PLAQUE, cadrée à l'image : une seule Voie lactée, jamais agrandie
   // au-delà de ce que l'image rend net sur CET écran (densité native)
-  if (cielChoix === 'plaque' && renderer.plaqueTexels > 0) {
+  if (cielVu === 'plaque' && renderer.plaqueTexels > 0) {
     plaqueReglages.taille = cielReglages.taille
     const c = cadrePlaque(
       camera.x, camera.y, camera.zoom, vw, vh,
@@ -21985,7 +21991,7 @@ function corpsImage(now: number): boolean {
   // LA TERRE, à l'horloge du joueur : la station a avancé depuis l'image
   // précédente, le Soleil aussi — c'est Date.now() et non le temps du jeu,
   // qui s'arrête en pause : dehors, l'orbite ne s'arrête pas.
-  if (cielChoix === 'terre') {
+  if (cielVu === 'terre') {
     renderer.setTerre(
       cadreTerre(Date.now(), camera.x, camera.y, vw, vh, terreCadre, terreReglages),
     )
