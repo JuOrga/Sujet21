@@ -1131,6 +1131,18 @@ Même famille que `meta-icones.webp` : la passer en référence de style
 icônes une par une en 512², nommées `cycle-icone-1.webp`… et
 `trophee-icone-1.webp`… dans l'ordre des tableaux, j'assemble.
 
+> **✅ LIVRÉES le 18/11/2026, rendues dans Blender** (`tools/images/blender/icones.py`,
+> une pièce par case de 256 px, assemblées et CERNÉES par
+> `tools/images/icones_planches.py` : à 24 px dans l'ATH, l'état courant est
+> posé sur un fond de sa propre teinte — sans cerne, la goutte s'y noyait).
+> Branchées par `src/game/iconesPeintes.ts` : l'écran du cycle, les rayons du
+> codex, les transformations (qui n'avaient aucune icône), les logements du
+> cadran de l'ATH (les boutons d'interface restent au trait), les badges de la
+> carte de la station (son cadenas devient le `verrou` au trait), les trophées.
+> Sans les planches, chaque endroit retombe sur son ancien dessin. Mesures
+> (famille « planche d'icônes ») : cycle luminance 0,31, 17 % de pixels chauds
+> (la vapeur, chaude dans la charte), 55 Ko ; trophées 0,28, 2 %, 46 Ko.
+
 ### 23a. Le cycle — `cycle-icones.webp`
 **1024×768 · transparent · grille 4×3 de cases 256 · 2D**
 
