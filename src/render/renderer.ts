@@ -122,7 +122,15 @@ import {
 import { FOND_DALLE } from './fondCuve'
 import { OMBRE_POINTE_GLSL } from './ombrePointe'
 import { tranchesBandeau } from './lampes'
-import { CORPS_RELIEF_GLSL, GALBE_CORPS, RELIEF_PAROIS_GLSL, fractionSommet, pointDuSommet } from './reliefParois'
+import {
+  AFFINAGE,
+  CORPS_RELIEF_GLSL,
+  GALBE_CORPS,
+  PAS_AFFINE,
+  RELIEF_PAROIS_GLSL,
+  fractionSommet,
+  pointDuSommet,
+} from './reliefParois'
 import {
   CARREAU_MONDE,
   PROFONDEUR_RELIEF,
@@ -2331,13 +2339,14 @@ float sdfVisible(int bi, vec2 p) {
 // LA HAUTEUR DE LA TRANCHE d'une boîte vue en ce pixel, relief allumé : le
 // chemin pied → sommet (relB, le déplacement de SON sommet) la traverse ici
 // à la hauteur fb.y × hb (flancBalaye, le balayage exact) ; −1 s'il ne la
-// traverse pas franchement. Le coin (triangle) a le sien. Les formes courbes
-// ou creuses (coques, arrondis) rendent −1 : leur balayage n'a pas de forme
-// close, elles ne cachent que par leur dessus.
+// traverse pas franchement. Le disque, la capsule et le coin ont le leur
+// (18/11 : le disque et la capsule rendaient −1, leur tranche ne cachait
+// rien de plus bas). L'arc et la coque rendent −1 : leur balayage n'a pas de
+// forme close — douze pas par boîte et par pixel, ici, ce serait payer la
+// tranche deux fois ; ils ne cachent que par leur dessus.
 float hauteurTranche(int bi, vec2 world, vec2 relB, float hb) {
   vec4 dec = decodeAux(uBoxAux[bi].x);
-  bool coin = dec.y > 2.5 && dec.y < 3.5;
-  if (dec.y > 0.5 && !coin) return -1.0;
+  if (dec.y > 3.5) return -1.0;
   vec2 wb = world;
   vec2 rL = relB;
   float a = uBoxAux[bi].y;
@@ -2351,7 +2360,10 @@ float hauteurTranche(int bi, vec2 world, vec2 relB, float hb) {
   }
   // loin de la base de plus que le déplacement, le chemin ne la croise pas
   if (boxSdf(wb, uBoxes[bi]) > length(rL)) return -1.0;
-  vec2 fb = coin ? flancBalayeCoin(wb, uBoxes[bi], dec.z, rL) : flancBalaye(wb, uBoxes[bi], rL);
+  vec2 fb = dec.y < 0.5 ? flancBalaye(wb, uBoxes[bi], rL)
+          : dec.y < 1.5 ? flancBalayeDisque(wb, uBoxes[bi], rL)
+          : dec.y < 2.5 ? flancBalayeCapsule(wb, uBoxes[bi], rL)
+          : flancBalayeCoin(wb, uBoxes[bi], dec.z, rL);
   return fb.x < -1.0 ? fb.y * hb : -1.0;
 }
 
@@ -2386,6 +2398,66 @@ float hauteurTranche(int bi, vec2 world, vec2 relB, float hb) {
 // distance vaut la dérivée d'écran à un facteur positif près — mieux, même :
 // dFdx lisait la valeur du pixel voisin, indéfinie quand ce voisin avait
 // sauté la boîte d'un continue.
+
+// LA TRANCHE D'UN ARC OU D'UNE COQUE (flancAffine, reliefParois.ts — le
+// jumeau TS testé contre la force brute) : (couverture, hauteur vue). Ni
+// convexes ni closes, elles n'ont pas de balayage en formule fermée : le
+// chemin pied → sommet (wb − t·rL) se lit en PAS_AFFINE pas, et le DERNIER
+// passage du dedans au dehors s'affine par AFFINAGE dichotomies et une
+// sécante. Leur tranche était cinq copies (pied, ¼, ½, ¾, sommet), lues en
+// marches sur le bord en biais, la hauteur linéaire entre deux — et sur la
+// base estimée par deux distances, fausse dès que le chemin passe le creux
+// d'une coque (conception du 18/11). d, dV : la distance au pied et au
+// sommet, déjà connues. Aucune opération de gradient : on est dans la
+// boucle des boîtes (gradientBoucles.spec.ts).
+// LA COQUE SE REJETTE loin de ses parois : sa distance est 1-lipschitzienne
+// (volume.ts), à plus du déplacement et du fondu aucun pas ne touche la
+// silhouette — même image, et le creux, toute une salle, ne paie plus le
+// chemin. L'arc, à distance approchée, paie partout.
+// DES BORNES QUE LE COMPILATEUR NE CONNAÎT PAS (nPas, nAff : la constante,
+// plus min(dec.y, 0) qui vaut 0 — dec.y, la forme, n'est jamais négative,
+// mais il ne le sait pas). Bornées par des constantes, ces deux boucles se
+// déroulaient : quinze copies de formeSdf dans le corps de la boucle des
+// boîtes, payées par CHAQUE pixel au banc logiciel, même sans arc ni coque à
+// l'écran — tableau 1 (un disque, des rectangles), relief fort, 640 × 400 :
+// dev 1 404 ms par image, bornes constantes 1 483, ces bornes 1 457 (trois
+// passes alternées chacun, 18/11). Et fxc (Firefox sous Windows) n'a pas à
+// dérouler ce qu'il ne peut pas compter (voir plus bas, gradSdfBoite).
+vec2 flancAffine(vec2 wb, vec2 rL, vec4 b, vec4 dec, float d, float dV) {
+  if (dec.y > 4.5 && d > length(rL) + 1.5) return vec2(0.0);
+  int nPas = ${PAS_AFFINE} + int(min(dec.y, 0.0));
+  int nAff = ${AFFINAGE} + int(min(dec.y, 0.0));
+  float couv = d <= 0.0 ? 1.0 : 0.0;
+  float dP = d;
+  float dMin = d;
+  float tMin = 0.0;
+  float lo = -1.0;
+  float hi = 0.0;
+  float dLo = 0.0;
+  float dHi = 0.0;
+  for (int k = 1; k <= nPas; k++) {
+    float t = float(k) / ${glslFloat(PAS_AFFINE)};
+    float dM = k == ${PAS_AFFINE} ? dV : formeSdf(wb - rL * t, b, dec.y, dec.z, dec.w);
+    couv = max(couv, 1.0 - smoothstep(-1.0, 1.5, dM));
+    if (dP <= 0.0 && dM > 0.0) {
+      lo = float(k - 1) / ${glslFloat(PAS_AFFINE)};
+      hi = t;
+      dLo = dP;
+      dHi = dM;
+    }
+    if (dM < dMin) { dMin = dM; tMin = t; }
+    dP = dM;
+  }
+  // sans passage : la hauteur du pas le plus proche (le liseré suit la
+  // tranche, comme celui de flancBalaye)
+  if (lo < 0.0) return vec2(couv, dP <= 0.0 ? 1.0 : tMin);
+  for (int i = 0; i < nAff; i++) {
+    float m = 0.5 * (lo + hi);
+    float dm = formeSdf(wb - rL * m, b, dec.y, dec.z, dec.w);
+    if (dm <= 0.0) { lo = m; dLo = dm; } else { hi = m; dHi = dm; }
+  }
+  return vec2(couv, lo + (hi - lo) * dLo / (dLo - dHi));
+}
 
 // la distance signée d'une boîte en un point QUELCONQUE de son repère local
 // (l'ombre courte la lit hors du pixel) : la forme si elle en a une
@@ -2541,9 +2613,9 @@ float piecesSdf(int sorte, vec2 p, vec4 box, float code) {
 // wb : le pixel dans ce repère ; rL : le déplacement du sommet (le dessus se
 // lit en wb − rL) ; dG, dGV : la silhouette au pied et au sommet. Le chemin
 // se lit en douze pas — la hauteur vue est son DERNIER passage du dedans au
-// dehors, comme pour les formes courbes (trois pas y suffisent : leur
-// tranche est lisse ; ici la rampe a des coins francs : à trois pas, puis
-// à six, son bord en biais tombait en marches, vues au banc).
+// dehors, comme pour l'arc et la coque (flancAffine, qui affine en plus ce
+// passage ; ici la rampe a des coins francs : à trois pas, puis à six, son
+// bord en biais tombait en marches, vues au banc).
 vec2 flancPieces(int sorte, vec2 wb, vec2 rL, vec4 box, float code, float dG, float dGV, out vec2 nrm) {
   nrm = vec2(0.0, 1.0);
   float couv = dG <= 0.0 ? 1.0 : 0.0;
@@ -3308,9 +3380,10 @@ void main() {
     // habillages la suivent ; wS, le même point dans le monde (sans le pivot
     // de la boîte), où se lisent les motifs et les textures du dessus. d
     // reste LA BASE : ombres portées, auras et physique y demeurent ancrées.
-    // Entre les deux : le FLANC, échantillonné à trois hauteurs
-    // intermédiaires (les parois minces ne laissent pas de trou quand le
-    // sommet glisse au-delà de leur épaisseur).
+    // Entre les deux : le FLANC, le balayage du pied au sommet — exact pour
+    // les formes convexes, en douze pas affinés pour l'arc et la coque (les
+    // parois minces ne laissent pas de trou quand le sommet glisse au-delà de
+    // leur épaisseur).
     // LA LONGUEUR DU FLANC SUIT LA HAUTEUR (volume.ts, reliefParois.ts) : le
     // sommet ne prend que sa part du déplacement — un mur haut garde le flanc
     // d'avant, un hydro moyen n'en a que 90/140, une plaque basse 40/140.
@@ -3362,42 +3435,30 @@ void main() {
         // pixel : près d'un bout de la face, c'est l'arête d'à côté, et un
         // triangle à 45° prenait une hauteur fausse (le concepteur, 16/11,
         // « les faces verticales »). Le balayage vaut des deux côtés du pied.
-        // Les formes COURBES ou creuses gardent l'estime et l'échantillonnage :
-        // leur balayage n'a pas de forme close.
-        if (dec.y < 0.5) {
-          vec2 rL = vec2(caR * relB.x + saR * relB.y, -saR * relB.x + caR * relB.y);
-          vec2 fb = flancBalaye(wb, uBoxes[bi], rL);
+        // (le chemin, dans le repère de la boîte : relB dépivoté)
+        vec2 rL = vec2(caR * relB.x + saR * relB.y, -saR * relB.x + caR * relB.y);
+        if (dec.y < 3.5) {
+          // UNE BOÎTE, UN DISQUE, UNE CAPSULE, UN COIN : convexes, leur
+          // balayage a une forme close. Le disque et la capsule gardaient cinq
+          // copies de leur silhouette (pied, ¼, ½, ¾, sommet), lues en marches
+          // sur le bord en biais, et sur la base une hauteur estimée par deux
+          // distances (conception du 18/11) ; le coin sortait en dents de scie
+          vec2 fb = dec.y < 0.5 ? flancBalaye(wb, uBoxes[bi], rL)
+                  : dec.y < 1.5 ? flancBalayeDisque(wb, uBoxes[bi], rL)
+                  : dec.y < 2.5 ? flancBalayeCapsule(wb, uBoxes[bi], rL)
+                  : flancBalayeCoin(wb, uBoxes[bi], dec.z, rL);
           // sur la base, sous le vide : pleine tranche
           flanc = d <= 0.0 ? 1.0 : 1.0 - smoothstep(-1.0, 1.5, fb.x);
           htFlanc = fb.y;
-        } else if (dec.y > 2.5 && dec.y < 3.5) {
-          // UN COIN (le triangle) : convexe, il a lui aussi son balayage
-          // exact — le sommet de sa tranche sortait en dents de scie
-          vec2 rL = vec2(caR * relB.x + saR * relB.y, -saR * relB.x + caR * relB.y);
-          vec2 fb = flancBalayeCoin(wb, uBoxes[bi], dec.z, rL);
-          flanc = d <= 0.0 ? 1.0 : 1.0 - smoothstep(-1.0, 1.5, fb.x);
-          htFlanc = fb.y;
-        } else if (d <= 0.0) {
-          flanc = 1.0; // sur la base, sous le vide : pleine tranche
-          // le chemin du pied au sommet coupe la base ici et le sommet à son
-          // bord : la hauteur vue est la part du chemin, estimée par les DEUX
-          // SDF
-          htFlanc = clamp(-d / max(dV - d, 1e-3), 0.0, 1.0);
         } else {
-          float dP = d;
-          for (int fs = 1; fs <= 3; fs++) {
-            vec2 wM = world - relB * (float(fs) / 4.0);
-            vec2 wbM = wM;
-            if (abs(bAngR) > 0.0005) {
-              vec2 relM = wM - bcR;
-              wbM = bcR + vec2(caR * relM.x + saR * relM.y, -saR * relM.x + caR * relM.y);
-            }
-            float dM = formeSdf(wbM, uBoxes[bi], dec.y, dec.z, dec.w);
-            flanc = max(flanc, 1.0 - smoothstep(-1.0, 1.5, dM));
-            if (dP <= 0.0 && dM > 0.0) htFlanc = (float(fs) - 1.0 + dP / (dP - dM)) / 4.0;
-            dP = dM;
-          }
-          if (dP <= 0.0) htFlanc = (3.0 + dP / (dP - dV)) / 4.0;
+          // L'ARC ET LA COQUE, ni convexes ni closes : douze pas et le dernier
+          // passage affiné (flancAffine) — sur la base aussi, où deux
+          // distances estimaient la hauteur, fausse dès que le chemin passe
+          // le creux d'une coque
+          vec2 fa = flancAffine(wb, rL, uBoxes[bi], dec, d, dV);
+          // sur la base, sous le vide : pleine tranche
+          flanc = d <= 0.0 ? 1.0 : fa.x;
+          htFlanc = fa.y;
         }
       }
       // (les pièces n'en sont pas : leur dessus est leur IMAGE, le sol caché
