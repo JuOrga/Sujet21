@@ -15,6 +15,14 @@
 // du décor (sansPhysique) : le corps passe dessus comme sur un sol, et la
 // physique mesurée plus bas n'en dépend pas.
 //
+// Puis, la vitre vue : « enlève la Terre derrière ; les reflets se répètent
+// trop, et il faudrait un reflet du volume » — et « pas la Voie lactée,
+// juste un ciel étoilé ». Derrière le verre, des étoiles sur la nuit
+// (main.ts impose le ciel procédural à la cuve) ; la vitre porte
+// l'habillage 1, que le rendu lit comme LA VITRE DE LA VITRINE : deux
+// reflets fixés au verre, et le corps renvoyé dessous (renderer.ts,
+// refletCorps).
+//
 // LE PUITS EST HARMONIQUE PARTOUT DANS L'ANNEAU (son cœur le déborde) :
 // a = force · r / rayon, et toutes les orbites ont la MÊME période. Tout
 // ce qui part d'un point y revient donc au même instant, une demi-période
@@ -69,6 +77,9 @@ export function tableauAccueil(): LevelDef {
         maxY: VITRE_RAYON,
         material: MAT_BAIE,
         forme: FORME_DISQUE,
+        // l'habillage 1 d'une baie : la vitre de la vitrine — deux reflets
+        // fixés au verre au lieu du balayage répété, et le reflet du corps
+        skin: 1,
       },
       {
         minX: -R,

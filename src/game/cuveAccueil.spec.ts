@@ -87,6 +87,27 @@ describe('la cuve de l’accueil — une vitrine, pas une salle', () => {
     expect(estUnFond(v.material)).toBe(true)
   })
 
+  it('est la vitre de la vitrine (habillage 1), et le rendu la lit comme telle', () => {
+    const v = lv.boxes.find((b) => b.material === MAT_BAIE)!
+    expect(v.skin).toBe(1)
+    const RENDU = readFileSync(new URL('../render/renderer.ts', import.meta.url), 'utf-8')
+    // l'habillage d'une baie part au shader (aux.z) : sans lui, la vitre
+    // reprendrait le balayage répété des baies du jeu
+    const i = RENDU.indexOf('bx.material === MAT_BAIE')
+    expect(i).toBeGreaterThan(-1)
+    expect(RENDU.slice(i, i + 300)).toContain('(bx.skin ?? 0)')
+    // deux reflets fixés au verre, et le corps renvoyé dessous
+    expect(RENDU).toContain('vitreVitrine = max(vitreVitrine, verre)')
+    expect(RENDU).toContain('vec2 rc = refletCorps(world)')
+  })
+
+  it('montre un ciel étoilé derrière la vitre — ni la Terre, ni la Voie lactée — quel que soit le ciel de la partie', () => {
+    const MAIN = readFileSync(new URL('../main.ts', import.meta.url), 'utf-8')
+    expect(MAIN).toContain("const cielVu: CielChoix = level.code === CODE_ACCUEIL ? 'procedural' : cielChoix")
+    expect(MAIN).toContain('renderer.setCiel(CIEL_MODE[cielVu])')
+    expect(MAIN).toContain("if (cielVu === 'terre') {")
+  })
+
   it('a un cœur de puits plus large que l’anneau : pas de halo, qui étire', () => {
     expect(PUITS_ACCUEIL.rayon!).toBeGreaterThan(ANNEAU_RAYON)
   })
