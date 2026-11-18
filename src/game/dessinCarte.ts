@@ -35,6 +35,8 @@ import {
   type ModuleCarte,
   type TypeModule,
 } from './carteStation'
+import { PICTOS, picto, type NomPicto } from './athPictos'
+import { etatsEnIcones, glypheEtat, iconeCycleSVG } from './iconesPeintes'
 
 export interface OptionsDessin {
   /** le module où se trouve le joueur — null : pas de joueur (édition) */
@@ -194,6 +196,8 @@ export interface EntreeLegende {
   cle: string
   /** le signe tel que le plan le porte ; vide : une pastille dessinée par la feuille */
   signe: string
+  /** un tracé au trait de l'ATH, quand le plan porte celui-là (le verrou) */
+  picto?: NomPicto
   texte: string
   couleur?: string
   tirets?: boolean
@@ -212,7 +216,7 @@ export function legendeCarte(c: CarteStation): EntreeLegende[] {
   ]
   const typesUtilises = new Set(c.liens.map((l) => l.type))
   if ([...typesUtilises].some((t) => c.typesLiens[t]?.condition))
-    out.push({ genre: 'etat', cle: 'verrou', signe: '🔒', texte: 'un orbe manque' })
+    out.push({ genre: 'etat', cle: 'verrou', signe: '', picto: 'verrou', texte: 'un orbe manque' })
   if (c.modules.some((m) => m.cran > 0))
     out.push({ genre: 'etat', cle: 'cran', signe: '+1', texte: 'confinement : plus dur, paie plus', couleur: c.palette.chaud })
   // les natures, dans l'ordre de leur première apparition sur la carte
@@ -239,10 +243,14 @@ export function legendeCarteHTML(c: CarteStation): string {
       const signe =
         e.genre === 'coursive'
           ? `<i class="cs-lg-trait${e.tirets ? ' cs-lg-tirets' : ''}" style="--c:${esc(e.couleur ?? '')}"></i>`
-          : e.signe
-            ? `<i class="cs-lg-signe"${e.couleur ? ` style="color:${esc(e.couleur)}"` : ''}>${esc(e.signe)}</i>`
-            : `<i class="cs-lg-fut cs-lg-${esc(e.cle)}"></i>`
-      return `<li class="cs-lg cs-lg-${e.genre}">${signe}${esc(e.texte)}</li>`
+          : e.picto
+            ? `<i class="cs-lg-signe">${picto(e.picto)}</i>`
+            : e.signe
+              ? `<i class="cs-lg-signe"${e.couleur ? ` style="color:${esc(e.couleur)}"` : ''}>${esc(e.signe)}</i>`
+              : `<i class="cs-lg-fut cs-lg-${esc(e.cle)}"></i>`
+      // le nom d'une coursive conditionnelle vient de son badge (« ❄ glace ») :
+      // son glyphe d'état devient l'icône peinte, l'emoji en repli
+      return `<li class="cs-lg cs-lg-${e.genre}">${signe}${etatsEnIcones(esc(e.texte))}</li>`
     })
     .join('')
 }
@@ -582,6 +590,9 @@ function routes(L: LienDessine[], o: OptionsDessin): string {
   )
 }
 
+/** le côté de l'icône d'état d'un badge, dans sa plaque haute de 22 */
+const BADGE_ICONE = 18
+
 function badges(c: CarteStation, L: LienDessine[]): string {
   return (
     `<g class="cs-badges">` +
@@ -589,12 +600,19 @@ function badges(c: CarteStation, L: LienDessine[]): string {
       .map((e) => {
         const x = (e.x1 + e.x2) / 2
         const y = (e.y1 + e.y2) / 2 + (e.y2 < e.y1 ? -20 : 20)
-        const texte = e.badge!
-        const w = texte.length * 8.3 + 18
+        // « ❄ GLACE » : la donnée garde son glyphe (le concepteur la tape
+        // ainsi) ; le plan le sépare et pose l'icône peinte de l'état à sa
+        // place, le mot à côté — l'emoji revient si la planche manque
+        const sep = glypheEtat(e.badge!)
+        const mot = sep ? sep.reste : e.badge!
+        const pas = sep ? BADGE_ICONE + 3 : 0
+        const w = mot.length * 8.3 + 18 + pas
+        const ico = sep ? iconeCycleSVG(sep.etat, Number(n1(-w / 2 + 7)), -BADGE_ICONE / 2, BADGE_ICONE, sep.glyphe, e.couleur) : ''
         return (
           `<g class="cs-badge" transform="translate(${n1(x)} ${n1(y)})">` +
           `<rect x="${n1(-w / 2)}" y="-11" width="${n1(w)}" height="22" rx="3" fill="${c.palette.plaqueSombre}" stroke="${e.couleur}"/>` +
-          `<text x="0" y="4.5" fill="${e.couleur}">${esc(texte)}</text></g>`
+          ico +
+          `<text x="${n1(pas / 2)}" y="4.5" fill="${e.couleur}">${esc(mot)}</text></g>`
         )
       })
       .join('') +
@@ -712,7 +730,9 @@ function module(c: CarteStation, m0: ModuleCarte, k: number, o: OptionsDessin, j
     s += `<text class="cs-glyphe" x="${n1(m.x)}" y="${n1(m.y)}" font-size="${fonte}" fill="${estCourant ? P.texte : zc}">${glyphe}</text>`
   s += `</g>`
   if (verrou)
-    s += `${forme(0)} class="cs-voile" fill="rgba(3,7,16,.55)"/><text class="cs-cadenas" x="${n1(m.x)}" y="${n1(m.y)}">🔒</text>`
+    // le VERROU de l'ATH, au trait, et non l'emoji 🔒 : un cadenas jaune
+    // sous Windows, gris sous macOS, un carré vide sans police emoji
+    s += `${forme(0)} class="cs-voile" fill="rgba(3,7,16,.55)"/><path class="cs-cadenas" d="${PICTOS.verrou}" transform="translate(${n1(m.x - 12)} ${n1(m.y - 12)})"/>`
   if (visite && !estCourant)
     s += `<text class="cs-coche" x="${n1(l + m.w - 10)}" y="${n1(t + 10)}">✓</text>`
   // LE CONFINEMENT SUPÉRIEUR se lit sur le plan avant qu'on s'y engage : le

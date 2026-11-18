@@ -63,6 +63,15 @@ describe('catalogue — les images des écrans se rangent par leur dossier', () 
   })
 })
 
+describe('catalogue — les planches d’icônes peintes, attendues avant leur livraison', () => {
+  it('se rangent et se nomment dès qu’on les dépose', () => {
+    expect(rubriqueDe('/assets/cycle-icones.webp')).toBe('Objets & emblèmes')
+    expect(rubriqueDe('/assets/trophees-icones.webp')).toBe('Objets & emblèmes')
+    expect(nomDe('/assets/cycle-icones.webp')).toBe('Icônes — cycle des états et transformations (4×3)')
+    expect(nomDe('/assets/trophees-icones.webp')).toBe('Icônes — trophées (4×2)')
+  })
+})
+
 describe('catalogue — LA SERRE accueille ses cultures avant même les fichiers', () => {
   it('range toute image « serre- » dans sa rubrique, et la nomme', () => {
     // les quatre pièces annoncées aux concepteurs (docs/assets-ia.md)

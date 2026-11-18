@@ -2710,6 +2710,8 @@
         cursor: default;
       }
       .cy-reg b { font-family: var(--font-display); font-size: calc(12px * var(--ui)); letter-spacing: 0.2em; font-weight: 600; display: block; }
+      /* la transformation peinte (source → cible), en tête de sa ligne */
+      .cy-reg .ico-cycle { flex: none; font-size: calc(24px * var(--ui)); }
       .cy-reg small { display: block; font-size: calc(8.5px * var(--ui)); letter-spacing: 0.14em; color: var(--dim); margin-top: 4px; }
       .cy-reg em {
         margin-left: auto;
@@ -5140,6 +5142,50 @@
         background-size: 300% 200%, 88% 88%;
         background-position: calc(var(--ic-x) * 50%) calc(var(--ic-y) * 100%), center;
       }
+      /* LES PLANCHES PEINTES DU CYCLE ET DES TROPHÉES (game/iconesPeintes.ts).
+         Même découpe que .ico-meta, mais la planche ne se montre QUE lorsque
+         la racine porte planche-cycle / planche-trophees, posée par le guet à
+         l'arrivée d'une image réelle : une image de fond absente ne se voit
+         pas, elle ne dit pas qu'elle manque. D'ici là, l'emoji d'avant
+         (.ico-repli) tient la place, et une pastille sans repli (une
+         transformation, un logement de l'ATH) ne prend aucune place. */
+      .ico-cycle,
+      .ico-trophee {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 1.35em;
+        height: 1.35em;
+        vertical-align: -0.3em;
+        font-style: normal;
+        background-repeat: no-repeat;
+      }
+      .ico-cycle:empty,
+      .ico-trophee:empty {
+        display: none;
+      }
+      html.planche-cycle .ico-cycle {
+        display: inline-flex;
+        background-image: url('/assets/cycle-icones.webp');
+        background-size: 400% 300%;
+        background-position: calc(var(--ic-x) * 33.3333%) calc(var(--ic-y) * 50%);
+      }
+      html.planche-trophees .ico-trophee {
+        display: inline-flex;
+        background-image: url('/assets/trophees-icones.webp');
+        background-size: 400% 200%;
+        background-position: calc(var(--ic-x) * 33.3333%) calc(var(--ic-y) * 100%);
+      }
+      html.planche-cycle .ico-cycle > .ico-repli,
+      html.planche-trophees .ico-trophee > .ico-repli {
+        visibility: hidden;
+      }
+      /* en SVG (la carte de la station) : la fenêtre sur la case OU l'emoji */
+      .ico-cycle-repli { text-anchor: middle; dominant-baseline: central; }
+      html:not(.planche-cycle) .ico-cycle-svg,
+      html.planche-cycle .ico-cycle-repli {
+        display: none;
+      }
       /* le toucher dit le nom : une étiquette éphémère sous la pastille */
       .hud-chip.ouvert::after {
         content: attr(data-nom);
@@ -5286,6 +5332,32 @@
       }
       #state-eau { --ventre: 11%; }
       #state-vapeur { --ventre: 7%; }
+      /* L'ÉTAT PEINT (game/iconesPeintes.ts) : dans le logement, la case de
+         la planche du cycle prend la place du symbole au trait dès que la
+         planche est arrivée ; d'ici là, le trait reste. La bulle, son
+         liseré, ses classes et ses animations ne changent pas. 1,4 em :
+         24 px au repos, 32 px pour l'état courant (--ui à 1) — plafonné à
+         62 % du logement, pour qu'aux grandes échelles de texte l'icône ne
+         déborde pas du ventre de la goutte. */
+      #statebar .st-ico .ico-cycle {
+        grid-area: 1 / 1;
+        position: relative;
+        top: var(--ventre, 0%);
+        width: min(1.4em, 62%);
+        height: min(1.4em, 62%);
+      }
+      html.planche-cycle #statebar .st-ico .picto {
+        display: none;
+      }
+      /* le logement courant est PLEIN, à la teinte de son état : une icône de
+         la même teinte s'y noierait — un liseré sombre la détache */
+      #statebar button.st-cur .ico-cycle {
+        filter: drop-shadow(0 0 1px var(--void)) drop-shadow(0 0 2px var(--void));
+      }
+      /* cadenassé, le logement passe au gris : l'icône le suit */
+      #statebar button.st-verrou .ico-cycle {
+        filter: grayscale(1);
+      }
       #statebar button:hover .st-forme {
         fill: rgba(20, 36, 54, 0.8);
       }
@@ -6545,7 +6617,8 @@
       .cs-jeu .cs-mod:hover { filter: drop-shadow(0 0 10px var(--z)); }
       @keyframes cs-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.7; } }
       .cs-glyphe { text-anchor: middle; dominant-baseline: central; paint-order: stroke; stroke: #030710; stroke-width: 3px; }
-      .cs-cadenas { text-anchor: middle; dominant-baseline: central; font-size: 22px; }
+      /* le verrou au trait de l'ATH (athPictos), dans sa boîte de 24 */
+      .cs-cadenas { fill: none; stroke: #eef8ff; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; filter: drop-shadow(0 0 3px #030710); }
       .cs-coche { text-anchor: middle; dominant-baseline: central; font-size: 15px; font-weight: 600; fill: #63b7e6; paint-order: stroke; stroke: #030710; stroke-width: 3px; }
       .cs-cran { text-anchor: middle; dominant-baseline: central; font-size: 15px; font-weight: 600; letter-spacing: 0.04em; paint-order: stroke; stroke: #030710; stroke-width: 3px; }
       /* le nom se détoure du fond : il croise parfois une coursive */
@@ -10277,13 +10350,13 @@
     </div>
     <div id="statebar" aria-label="État de l'échantillon">
       <button id="state-eau" type="button" title="redevenir liquide">
-        <span class="st-ico"><svg class="st-bulle" data-bulle="eau" viewBox="0 0 48 48" aria-hidden="true" focusable="false"><path class="st-forme" d="M24 3C31 13 39 21 39 30a15 15 0 0 1-30 0C9 21 17 13 24 3z"/></svg><svg class="picto" data-picto="eau" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M4 9.5c2.7-2.4 5.3-2.4 8 0s5.3 2.4 8 0M4 15.5c2.7-2.4 5.3-2.4 8 0s5.3 2.4 8 0"/></svg></span><span class="st-label">LIQUIDE</span><kbd hidden></kbd>
+        <span class="st-ico"><svg class="st-bulle" data-bulle="eau" viewBox="0 0 48 48" aria-hidden="true" focusable="false"><path class="st-forme" d="M24 3C31 13 39 21 39 30a15 15 0 0 1-30 0C9 21 17 13 24 3z"/></svg><svg class="picto" data-picto="eau" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M4 9.5c2.7-2.4 5.3-2.4 8 0s5.3 2.4 8 0M4 15.5c2.7-2.4 5.3-2.4 8 0s5.3 2.4 8 0"/></svg><i class="ico-cycle" style="--ic-x:1;--ic-y:0" aria-hidden="true"></i></span><span class="st-label">LIQUIDE</span><kbd hidden></kbd>
       </button>
       <button id="state-glace" type="button" title="se changer en glace (F) : le bloc garde son élan">
-        <span class="st-ico"><svg class="st-bulle" data-bulle="glace" viewBox="0 0 48 48" aria-hidden="true" focusable="false"><path class="st-forme" d="M24 3l18.2 10.5v21L24 45 5.8 34.5v-21z"/><path class="st-aretes" d="M5.8 13.5L24 24l18.2-10.5M24 24v21"/></svg><svg class="picto" data-picto="glace" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 3v18M4.2 7.5l15.6 9M19.8 7.5l-15.6 9M12 6.5l-2-2M12 6.5l2-2M12 17.5l-2 2M12 17.5l2 2"/></svg></span><span class="st-label">GLACE</span><kbd>F</kbd>
+        <span class="st-ico"><svg class="st-bulle" data-bulle="glace" viewBox="0 0 48 48" aria-hidden="true" focusable="false"><path class="st-forme" d="M24 3l18.2 10.5v21L24 45 5.8 34.5v-21z"/><path class="st-aretes" d="M5.8 13.5L24 24l18.2-10.5M24 24v21"/></svg><svg class="picto" data-picto="glace" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 3v18M4.2 7.5l15.6 9M19.8 7.5l-15.6 9M12 6.5l-2-2M12 6.5l2-2M12 17.5l-2 2M12 17.5l2 2"/></svg><i class="ico-cycle" style="--ic-x:0;--ic-y:0" aria-hidden="true"></i></span><span class="st-label">GLACE</span><kbd>F</kbd>
       </button>
       <button id="state-vapeur" type="button" title="se changer en vapeur (G) : visez — le temps ralentit — relâchez, le nuage fuse ; la distance du doigt fait la puissance">
-        <span class="st-ico"><svg class="st-bulle" data-bulle="vapeur" viewBox="0 0 48 48" aria-hidden="true" focusable="false"><path class="st-forme" d="M12.75 41.25a10 10 0 0 1-1.5-19.875 13.75 13.75 0 0 1 26.75 2.5 8.75 8.75 0 0 1-1.5 17.375z"/></svg><svg class="picto" data-picto="vapeur" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M8 20c-2-3 2-5 0-8s2-5 0-8M12 20c-2-3 2-5 0-8s2-5 0-8M16 20c-2-3 2-5 0-8s2-5 0-8"/></svg></span><span class="st-label">VAPEUR</span><kbd>G</kbd>
+        <span class="st-ico"><svg class="st-bulle" data-bulle="vapeur" viewBox="0 0 48 48" aria-hidden="true" focusable="false"><path class="st-forme" d="M12.75 41.25a10 10 0 0 1-1.5-19.875 13.75 13.75 0 0 1 26.75 2.5 8.75 8.75 0 0 1-1.5 17.375z"/></svg><svg class="picto" data-picto="vapeur" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M8 20c-2-3 2-5 0-8s2-5 0-8M12 20c-2-3 2-5 0-8s2-5 0-8M16 20c-2-3 2-5 0-8s2-5 0-8"/></svg><i class="ico-cycle" style="--ic-x:2;--ic-y:0" aria-hidden="true"></i></span><span class="st-label">VAPEUR</span><kbd>G</kbd>
       </button>
       <div id="state-zone" hidden></div>
     </div>
@@ -10691,8 +10764,8 @@
         <div class="cmds-page home-commands" data-page="tactile" hidden>
           <kbd>toucher</kbd>éjecter vers le doigt — le corps part à l'opposé<br />
           <kbd>sur le corps</kbd>doigt posé SUR le volume : se rassembler (gratuit)<br />
-          <kbd>❄</kbd>glace, re-toucher pour dégeler
-          <kbd>💨</kbd>vapeur : viser puis relâcher = dash<br />
+          <kbd><i class="ico-cycle" style="--ic-x:0;--ic-y:0" aria-hidden="true"><span class="ico-repli">❄</span></i></kbd>glace, re-toucher pour dégeler
+          <kbd><i class="ico-cycle" style="--ic-x:2;--ic-y:0" aria-hidden="true"><span class="ico-repli">💨</span></i></kbd>vapeur : viser puis relâcher = dash<br />
           <kbd>2 doigts</kbd>pincer : zoom · glisser : déplacer la caméra<br />
           <kbd>≡</kbd>le tiroir : LÉGENDE, ÉTATS, RECADRER, BANC, FICHE D’ESSAI…
         </div>
@@ -11074,7 +11147,7 @@
               <path class="cy-perdu" d="M 640 868 C 724 894 806 890 896 852" />
             </svg>
             <div class="cy-etat" id="cy-solide">
-              <span class="cy-glacon"><i class="gl-haut"></i><i class="gl-gauche"></i><i class="gl-droit"></i><em>❄&#xFE0E;</em></span>
+              <span class="cy-glacon"><i class="gl-haut"></i><i class="gl-gauche"></i><i class="gl-droit"></i><em><i class="ico-cycle" style="--ic-x:0;--ic-y:0" aria-hidden="true"><span class="ico-repli">❄&#xFE0E;</span></i></em></span>
               <b>SOLIDE</b><small>GLACE</small>
             </div>
             <div class="cy-etat" id="cy-liquide">
@@ -11485,10 +11558,10 @@
         Se déplacer, c'est rétrécir : chaque impulsion se paie en volume.</p>
       </div>
       <div class="ob-etape" data-etape="1" hidden>
-        <div class="ob-anim ob-etats"><b>💧</b><b>❄</b><b>💨</b></div>
+        <div class="ob-anim ob-etats"><b><i class="ico-cycle" style="--ic-x:1;--ic-y:0" aria-hidden="true"><span class="ico-repli">💧</span></i></b><b><i class="ico-cycle" style="--ic-x:0;--ic-y:0" aria-hidden="true"><span class="ico-repli">❄</span></i></b><b><i class="ico-cycle" style="--ic-x:2;--ic-y:0" aria-hidden="true"><span class="ico-repli">💨</span></i></b></div>
         <h3>TROIS ÉTATS</h3>
-        <p class="ob-t">❄ la glace garde son élan et réfléchit les lasers ·
-        💨 la vapeur passe les évents — visez (le temps ralentit), relâchez : dash.</p>
+        <p class="ob-t"><i class="ico-cycle" style="--ic-x:0;--ic-y:0" aria-hidden="true"><span class="ico-repli">❄</span></i> la glace garde son élan et réfléchit les lasers ·
+        <i class="ico-cycle" style="--ic-x:2;--ic-y:0" aria-hidden="true"><span class="ico-repli">💨</span></i> la vapeur passe les évents — visez (le temps ralentit), relâchez : dash.</p>
         <p class="ob-p"><b>F</b> la glace : garde son élan, réfléchit les lasers ·
         <b>G</b> la vapeur : passe les évents — visez (le temps ralentit), relâchez : dash.</p>
       </div>
@@ -11528,7 +11601,7 @@
     <!-- L'ÉVEIL : la prise en main scénarisée — cryostase, dégel, volume -->
     <div id="eveil1" class="eveil-voile" hidden aria-label="Éveil — sortie de cryostase">
       <div class="ev-sur">COMPLEXE ORBITAL MÉDUSE — SORTIE DE CRYOSTASE</div>
-      <div class="ev-icone">❄</div>
+      <div class="ev-icone"><i class="ico-cycle" style="--ic-x:0;--ic-y:0" aria-hidden="true"><span class="ico-repli">❄</span></i></div>
       <h3 class="ev-titre">VOUS ÊTES SOUS FORME DE GLACE</h3>
       <p class="ev-texte">La cryostase s'achève, sujet 21 : vous dérivez, gelé, dans la
       cuve d'essai. Sous cette forme, nul moyen de vous diriger — mais rien ne se
@@ -11539,7 +11612,7 @@
     </div>
     <div id="eveil2" class="eveil-voile" hidden aria-label="Éveil — le volume">
       <div class="ev-sur">PREMIÈRE ANALYSE — LE FLUIDE SPÉCULAIRE</div>
-      <div class="ev-icone">💧</div>
+      <div class="ev-icone"><i class="ico-cycle" style="--ic-x:1;--ic-y:0" aria-hidden="true"><span class="ico-repli">💧</span></i></div>
       <h3 class="ev-titre">VOUS ÊTES CE QUI RESTE</h3>
       <p class="ev-texte">Vous l'avez senti : chaque impulsion éjecte un peu de vous.
       Se déplacer, c'est rétrécir — le volume est à la fois votre vie, votre monnaie
@@ -11549,8 +11622,8 @@
       <button class="ev-continuer" type="button">PLONGER</button>
     </div>
     <div id="eveil-invite" hidden aria-hidden="true">
-      <span class="ei-boite"><span class="ei-t">TOUCHEZ <b>💧</b> — REDEVENEZ LIQUIDE</span><span
-        class="ei-p"><b>F</b> OU <b>💧</b> — REDEVENEZ LIQUIDE</span></span>
+      <span class="ei-boite"><span class="ei-t">TOUCHEZ <b><i class="ico-cycle" style="--ic-x:1;--ic-y:0" aria-hidden="true"><span class="ico-repli">💧</span></i></b> — REDEVENEZ LIQUIDE</span><span
+        class="ei-p"><b>F</b> OU <b><i class="ico-cycle" style="--ic-x:1;--ic-y:0" aria-hidden="true"><span class="ico-repli">💧</span></i></b> — REDEVENEZ LIQUIDE</span></span>
       <span class="ei-fleche">▼</span>
     </div>
 
@@ -11735,15 +11808,15 @@
         <span><b>Sas</b> — la bouche d'aspiration boit l'échantillon et le met en
         bonbonne : c'est la sortie.</span></div>
       <div class="lg-states">ÉTATS —
-        <b>💧 LIQUIDE</b> : pilotable, éjecter pour avancer ·
-        <b>❄ GLACE</b> (F) : le bloc garde son élan, re-presser dégèle ·
-        <b>💨 VAPEUR</b> (G) : la bascule coûte 20 % du volume (gouttes récupérables) et rend 3 dashs — viser ralentit le temps, relâcher = dash.</div>
+        <b><i class="ico-cycle" style="--ic-x:1;--ic-y:0" aria-hidden="true"><span class="ico-repli">💧</span></i> LIQUIDE</b> : pilotable, éjecter pour avancer ·
+        <b><i class="ico-cycle" style="--ic-x:0;--ic-y:0" aria-hidden="true"><span class="ico-repli">❄</span></i> GLACE</b> (F) : le bloc garde son élan, re-presser dégèle ·
+        <b><i class="ico-cycle" style="--ic-x:2;--ic-y:0" aria-hidden="true"><span class="ico-repli">💨</span></i> VAPEUR</b> (G) : la bascule coûte 20 % du volume (gouttes récupérables) et rend 3 dashs — viser ralentit le temps, relâcher = dash.</div>
     </div>
 
     <div id="states" role="dialog" aria-label="Les trois états : qui bloque quoi">
       <div class="lg-head"><span>LES TROIS ÉTATS — QUI BLOQUE QUOI</span>
         <button id="states-close" type="button" title="fermer (E)">✕</button></div>
-      <div class="lg-row"><span class="st-big">💧</span>
+      <div class="lg-row"><span class="st-big"><i class="ico-cycle" style="--ic-x:1;--ic-y:0" aria-hidden="true"><span class="ico-repli">💧</span></i></span>
         <span><b>LIQUIDE</b> — pilotable : éjecter pour avancer.<br />
         Bloqué par les <i class="m-mur">parois</i>, les <i class="m-grille">évents</i>
         et le <i class="m-froid">rideau lamellaire</i> ·
@@ -11754,7 +11827,7 @@
         gelé par les <i class="m-froid">plaques froides</i> ·
         vaporisé par les <i class="m-chaud">chaudières</i> (à 95 % de présence) ·
         le <i class="m-sas">sas</i> l'aspire.</span></div>
-      <div class="lg-row"><span class="st-big">❄</span>
+      <div class="lg-row"><span class="st-big"><i class="ico-cycle" style="--ic-x:0;--ic-y:0" aria-hidden="true"><span class="ico-repli">❄</span></i></span>
         <span><b>GLACE</b> (F) — bloc rigide : garde son élan, plus de propulsion.<br />
         Rebondit sur les <i class="m-mur">parois</i> et les <i class="m-grille">évents</i> —
         comme un bumper sur l'<i class="m-phobe">hydrophobe</i>, freinée par
@@ -11764,7 +11837,7 @@
         <i class="m-froid">soudée</i> au contact d'une plaque froide ·
         dégelée par les <i class="m-chaud">chaudières</i> ·
         le <i class="m-sas">sas</i> la hale et l'avale — entrer solide paie une prime.</span></div>
-      <div class="lg-row"><span class="st-big">💨</span>
+      <div class="lg-row"><span class="st-big"><i class="ico-cycle" style="--ic-x:2;--ic-y:0" aria-hidden="true"><span class="ico-repli">💨</span></i></span>
         <span><b>VAPEUR</b> (G) — viser ralentit fortement le temps, relâcher
         lance le nuage d'un trait (dash) : la distance du doigt règle la
         puissance. La BASCULE en vapeur coûte 20 % du volume (une gerbe de

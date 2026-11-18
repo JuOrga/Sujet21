@@ -637,8 +637,22 @@ import {
   VIDE_DELAI,
   VIDE_ENGLOUTI,
 } from './game/vide'
+import {
+  estIconeCycle,
+  etatsEnIcones,
+  guettePlanchesPeintes,
+  iconeCycleHTML,
+  iconeEtatHTML,
+  iconeTropheeHTML,
+} from './game/iconesPeintes'
 
 const CAPACITY = 4096
+
+// LES PLANCHES PEINTES (cycle des états, trophées) : guettées dès
+// l'ouverture. Tant qu'elles manquent, chaque pastille montre l'emoji
+// d'avant ; à leur arrivée, la racine prend sa classe et la feuille bascule
+// toutes les pastilles d'un coup — y compris celles déjà affichées.
+guettePlanchesPeintes(document.documentElement)
 
 // L'AMORÇAGE, RACONTÉ À LA PAGE. index.html affiche un mot de chargement dès
 // le premier pixel et tient une veille (la garde d'amorçage) ; chaque étape
@@ -2165,6 +2179,15 @@ const gaugeThreshold = el('gauge-threshold')
 const hudPerte = el('hud-perte')
 const hudRosee = el('hud-rosee')
 const hudDanger = el('hud-danger')
+/** L'alarme en HTML (une icône peinte y entre), réécrite seulement quand elle
+ *  CHANGE : elle se recalcule à chaque image, et un innerHTML rebâtit ses
+ *  nœuds — l'icône clignoterait, et la région « assertive » se relirait. */
+let alarmeHTML = ''
+function ecritAlarme(html: string): void {
+  if (html === alarmeHTML) return
+  alarmeHTML = html
+  hudDanger.innerHTML = html
+}
 const objArrow = el('obj-arrow')
 const objArrowGlyph = objArrow.firstElementChild as HTMLElement
 const objDist = el('obj-dist')
@@ -3053,6 +3076,8 @@ const toastFile: {
   // l'article du méta, quand il y en a un : son icône vient alors de LA
   // PLANCHE (la même sur toutes les machines), pas d'un emoji système
   article?: string
+  // le trophée, quand c'en est un : sa case de la planche des trophées
+  trophee?: string
 }[] = []
 function toastGenre(t: {
   sur?: string
@@ -3082,7 +3107,7 @@ const TOAST_TEINTE: Record<ToastGenre, string> = {
 let toastTimer = 0
 let toastHorloge = 0
 trophees.onDebloque = (t) => {
-  toastFile.push({ nom: `${t.nom} · +10 mémoire`, icone: t.icone })
+  toastFile.push({ nom: `${t.nom} · +10 mémoire`, icone: t.icone, trophee: t.id })
   audio.collect()
   // chaque trophée grave sa mémoire — une seule fois, l'amont le garantit
   gagneMemoireRun(10)
@@ -3144,10 +3169,13 @@ function majToast(): void {
   tropheeToast.style.setProperty('--tt', TOAST_TEINTE[genre])
   tropheeToast.style.setProperty('--dur', `${duree}s`)
   tropheeToast.dataset.genre = genre
-  // un article passe par sa planche (la mémoire d'un éclat, l'échantillon de
-  // secours : le dessin de la cérémonie) ; un trophée, une fiche ou une
-  // fiole n'ont pas de dessin rendu et gardent leur glyphe
-  const glyphe = t.article ? iconeMetaHTML(t.article, t.icone) : `<i>${t.icone}</i>`
+  // un trophée et un article passent par leur planche (la mémoire d'un
+  // éclat, l'échantillon de secours : le dessin de la cérémonie), l'emoji
+  // en repli ; une fiche ou une fiole n'ont pas de dessin rendu et gardent
+  // leur glyphe
+  const glyphe = t.trophee
+    ? iconeTropheeHTML(t.trophee, t.icone)
+    : t.article ? iconeMetaHTML(t.article, t.icone) : `<i>${t.icone}</i>`
   tropheeToast.innerHTML =
     `<span class="tt-cartouche">${glyphe}</span>` +
     `<span class="tt-corps"><b>${t.sur ?? 'TROPHÉE DÉBLOQUÉ'}</b>` +
@@ -3322,7 +3350,7 @@ function renderRecordsVoile(): void {
       const date = ok
         ? new Date(trophees.quand(t.id)).toLocaleDateString('fr-FR')
         : ''
-      html += `<div class="tro-carte${ok ? '' : ' verrou'}"><i>${t.icone}</i><div><b>${t.nom}</b><span>${t.desc}</span>${ok ? `<em>débloqué le ${date}</em>` : ''}</div></div>`
+      html += `<div class="tro-carte${ok ? '' : ' verrou'}">${iconeTropheeHTML(t.id, t.icone)}<div><b>${t.nom}</b><span>${t.desc}</span>${ok ? `<em>débloqué le ${date}</em>` : ''}</div></div>`
     }
     html += '</div>'
     html += blocFantomes()
@@ -3521,7 +3549,11 @@ function renderCycleVoile(): void {
       ?.setAttribute('data-etat', statut)
     const de = ETATS_CYCLE[t.de].nom
     const vers = ETATS_CYCLE[t.vers].nom
-    registre += `<button type="button" class="cy-reg cy-${statut}" data-transfo="${t.id}" title="${t.desc}"><span><b>${t.nom}</b><small>${de} → ${vers}</small></span><em>${sous}</em></button>`
+    // la transformation a sa case sur la planche du cycle (source → cible) :
+    // elle n'avait aucune icône, elle n'en montre toujours aucune tant que
+    // la planche manque — la pastille vide ne prend pas de place
+    const ico = estIconeCycle(t.id) ? iconeCycleHTML(t.id) : ''
+    registre += `<button type="button" class="cy-reg cy-${statut}" data-transfo="${t.id}" title="${t.desc}">${ico}<span><b>${t.nom}</b><small>${de} → ${vers}</small></span><em>${sous}</em></button>`
   }
   cycleRegListe.innerHTML = registre
   cycleScene.classList.remove('cy-isole') // le registre est neuf : rien n'est survolé
@@ -16452,8 +16484,11 @@ function mbMontreCarte(raison: 'depart' | 'suite'): void {
   // ligne tient sur une ligne (points de suspension au-delà, le texte
   // entier en infobulle) : la carte ne bouge plus d'un pixel.
   const escF = (t: string): string => t.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;')
+  // le nom d'une coursive conditionnelle vient de son badge (« ❄ glace ») :
+  // à la ligne, son glyphe d'état devient l'icône peinte (l'emoji en repli) ;
+  // l'infobulle, du texte seul, le garde
   const lignes = (a: string, b: string, c: string): void => {
-    fiche.innerHTML = [a, b, c].map((t) => `<span title="${escF(t)}">${escF(t)}</span>`).join('')
+    fiche.innerHTML = [a, b, c].map((t) => `<span title="${escF(t)}">${etatsEnIcones(escF(t))}</span>`).join('')
   }
   const ouvertes = choix.filter((x) => !x.orbeManquant).length
   const defaut = `${ouvertes} coursive${ouvertes > 1 ? 's' : ''} ouverte${ouvertes > 1 ? 's' : ''} · descente ${voieRang} / ${longueurRun()} salles`
@@ -22113,15 +22148,20 @@ function corpsImage(now: number): boolean {
     menaceDuVide > 0 ||
     (alive && !aspireAssez && (endgame.spent || endgame.lastCall || nearLast))
   if (menaceDuVide > 0) {
-    hudDanger.textContent = vide.prise
-      ? '⚠ LE VIDE ASPIRE L’ÉCHANTILLON'
-      : `⚠ AU-DESSUS DU VIDE — QUITTEZ LA BRÈCHE (${Math.ceil(VIDE_DELAI * (1 - menaceDuVide))} s)`
+    ecritAlarme(
+      vide.prise
+        ? '⚠ LE VIDE ASPIRE L’ÉCHANTILLON'
+        : `⚠ AU-DESSUS DU VIDE — QUITTEZ LA BRÈCHE (${Math.ceil(VIDE_DELAI * (1 - menaceDuVide))} s)`,
+    )
   } else if (inDanger) {
-    hudDanger.textContent = endgame.spent
-      ? '❄ DERNIÈRE IMPULSION DONNÉE — L’ÉCHANTILLON DÉRIVE'
-      : endgame.lastCall
-        ? '⚠ RÉSERVE À SEC — LA PROCHAINE IMPULSION EST LA DERNIÈRE'
-        : '⚠ RÉSERVE BASSE — LA DERNIÈRE IMPULSION APPROCHE'
+    // la dérive gelée porte l'icône peinte de la glace (l'emoji en repli)
+    ecritAlarme(
+      endgame.spent
+        ? `${iconeEtatHTML('solide')} DERNIÈRE IMPULSION DONNÉE — L’ÉCHANTILLON DÉRIVE`
+        : endgame.lastCall
+          ? '⚠ RÉSERVE À SEC — LA PROCHAINE IMPULSION EST LA DERNIÈRE'
+          : '⚠ RÉSERVE BASSE — LA DERNIÈRE IMPULSION APPROCHE',
+    )
   }
   hudDanger.classList.toggle(
     'visible',
