@@ -1147,8 +1147,13 @@ describe("la tranche d'un arc et d'une coque : douze pas, puis l'affinage", () =
 
   it('le shader prend la règle : douze pas, trois dichotomies, plus les trois pas ni l’estime', () => {
     const affine = entre('vec2 flancAffine(', '\n}\n')
-    expect(affine).toContain('for (int k = 1; k <= ${PAS_AFFINE}; k++) {')
-    expect(affine).toContain('for (int i = 0; i < ${AFFINAGE}; i++) {')
+    // des bornes que le compilateur ne peut pas compter : bornées par des
+    // constantes, les deux boucles se déroulaient — quinze formeSdf dans la
+    // boucle des boîtes, payées par chaque pixel au banc logiciel
+    expect(affine).toContain('int nPas = ${PAS_AFFINE} + int(min(dec.y, 0.0));')
+    expect(affine).toContain('int nAff = ${AFFINAGE} + int(min(dec.y, 0.0));')
+    expect(affine).toContain('for (int k = 1; k <= nPas; k++) {')
+    expect(affine).toContain('for (int i = 0; i < nAff; i++) {')
     // le dernier pas est le sommet, déjà mesuré
     expect(affine).toContain('float dM = k == ${PAS_AFFINE} ? dV : formeSdf(wb - rL * t, b, dec.y, dec.z, dec.w);')
     // la sécante dans l'intervalle affiné

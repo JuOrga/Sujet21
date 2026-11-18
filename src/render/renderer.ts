@@ -2385,8 +2385,19 @@ float hauteurTranche(int bi, vec2 world, vec2 relB, float hb) {
 // (volume.ts), à plus du déplacement et du fondu aucun pas ne touche la
 // silhouette — même image, et le creux, toute une salle, ne paie plus le
 // chemin. L'arc, à distance approchée, paie partout.
+// DES BORNES QUE LE COMPILATEUR NE CONNAÎT PAS (nPas, nAff : la constante,
+// plus min(dec.y, 0) qui vaut 0 — dec.y, la forme, n'est jamais négative,
+// mais il ne le sait pas). Bornées par des constantes, ces deux boucles se
+// déroulaient : quinze copies de formeSdf dans le corps de la boucle des
+// boîtes, payées par CHAQUE pixel au banc logiciel, même sans arc ni coque à
+// l'écran — tableau 1 (un disque, des rectangles), relief fort, 640 × 400 :
+// dev 1 404 ms par image, bornes constantes 1 483, ces bornes 1 457 (trois
+// passes alternées chacun, 18/11). Et fxc (Firefox sous Windows) n'a pas à
+// dérouler ce qu'il ne peut pas compter (voir plus bas, gradSdfBoite).
 vec2 flancAffine(vec2 wb, vec2 rL, vec4 b, vec4 dec, float d, float dV) {
   if (dec.y > 4.5 && d > length(rL) + 1.5) return vec2(0.0);
+  int nPas = ${PAS_AFFINE} + int(min(dec.y, 0.0));
+  int nAff = ${AFFINAGE} + int(min(dec.y, 0.0));
   float couv = d <= 0.0 ? 1.0 : 0.0;
   float dP = d;
   float dMin = d;
@@ -2395,7 +2406,7 @@ vec2 flancAffine(vec2 wb, vec2 rL, vec4 b, vec4 dec, float d, float dV) {
   float hi = 0.0;
   float dLo = 0.0;
   float dHi = 0.0;
-  for (int k = 1; k <= ${PAS_AFFINE}; k++) {
+  for (int k = 1; k <= nPas; k++) {
     float t = float(k) / ${glslFloat(PAS_AFFINE)};
     float dM = k == ${PAS_AFFINE} ? dV : formeSdf(wb - rL * t, b, dec.y, dec.z, dec.w);
     couv = max(couv, 1.0 - smoothstep(-1.0, 1.5, dM));
@@ -2411,7 +2422,7 @@ vec2 flancAffine(vec2 wb, vec2 rL, vec4 b, vec4 dec, float d, float dV) {
   // sans passage : la hauteur du pas le plus proche (le liseré suit la
   // tranche, comme celui de flancBalaye)
   if (lo < 0.0) return vec2(couv, dP <= 0.0 ? 1.0 : tMin);
-  for (int i = 0; i < ${AFFINAGE}; i++) {
+  for (int i = 0; i < nAff; i++) {
     float m = 0.5 * (lo + hi);
     float dm = formeSdf(wb - rL * m, b, dec.y, dec.z, dec.w);
     if (dm <= 0.0) { lo = m; dLo = dm; } else { hi = m; dHi = dm; }
