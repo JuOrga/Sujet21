@@ -176,7 +176,7 @@ describe('les états écrits en dur dans index.html', () => {
   // l'écran du cycle, l'accueil, l'éveil, la légende et le panneau des états
   // portent leurs icônes dans le gabarit : une case décalée y montrerait la
   // goutte à la place du cristal, sans que rien d'autre ne tombe
-  const poses = [...HTML.matchAll(/<i class="ico-cycle" style="--ic-x:(\d+);--ic-y:(\d+)" aria-hidden="true"><span class="ico-repli">([^<]*)<\/span><\/i>/g)]
+  const poses = [...HTML.matchAll(/<i class="ico-cycle" style="--ic-x:(\d+);--ic-y:(\d+)" aria-hidden="true">(?:<span class="ico-repli">([^<]*)<\/span>)?<\/i>/g)]
 
   it('ont toutes la forme que iconeCycleHTML écrit', () => {
     expect(poses.length).toBe((HTML.match(/<i class="ico-cycle"/g) ?? []).length)
@@ -185,6 +185,8 @@ describe('les états écrits en dur dans index.html', () => {
 
   it('posent chacune la case de l’état que dit son emoji de repli', () => {
     for (const [, x, y, repli] of poses) {
+      // sans repli : un logement de l'ATH, que ath.spec vérifie
+      if (repli === undefined) continue
       const id = ICONES_CYCLE[Number(x) + Number(y) * ICONES_CYCLE_COLONNES]
       const emoji = repli.replace('&#xFE0E;', '')
       expect(ETATS_CYCLE[id as EtatCycle]?.icone, `${repli} posé sur la case ${id}`).toBe(emoji)
