@@ -304,6 +304,11 @@
       "liters": 1.26,
       "time": 65.2,
       "name": "JU"
+    },
+    "HUB": {
+      "liters": 7.08,
+      "time": 403.3,
+      "name": "LE MOUGE II"
     }
   },
   "expedition": {
@@ -1238,6 +1243,13 @@
           "name": "ANTALGEEK",
           "note": 110,
           "quand": "2026-11-16T20:50:52.007Z"
+        },
+        {
+          "liters": 1.8,
+          "time": 28.7,
+          "name": "LE MOUGE II",
+          "note": 122,
+          "quand": "2026-11-17T21:20:11.834Z"
         }
       ],
       "chrono": [
@@ -1247,6 +1259,13 @@
           "name": "JU",
           "note": 94,
           "quand": "2026-08-29T22:14:38.300Z"
+        },
+        {
+          "liters": 1.8,
+          "time": 28.7,
+          "name": "LE MOUGE II",
+          "note": 122,
+          "quand": "2026-11-17T21:20:11.834Z"
         },
         {
           "liters": 1.43,
@@ -1277,6 +1296,13 @@
           "name": "BOIZ",
           "note": 122,
           "quand": "2026-09-19T19:59:09.943Z"
+        },
+        {
+          "liters": 1.8,
+          "time": 28.7,
+          "name": "LE MOUGE II",
+          "note": 122,
+          "quand": "2026-11-17T21:20:11.834Z"
         },
         {
           "liters": 1.82,
@@ -2504,6 +2530,35 @@
           "name": "JU",
           "note": 60,
           "quand": "2026-09-26T09:38:56.452Z"
+        }
+      ]
+    },
+    "HUB": {
+      "volume": [
+        {
+          "liters": 7.08,
+          "time": 403.3,
+          "name": "LE MOUGE II",
+          "note": 92,
+          "quand": "2026-11-17T21:18:15.996Z"
+        }
+      ],
+      "chrono": [
+        {
+          "liters": 7.08,
+          "time": 403.3,
+          "name": "LE MOUGE II",
+          "note": 92,
+          "quand": "2026-11-17T21:18:15.996Z"
+        }
+      ],
+      "note": [
+        {
+          "liters": 7.08,
+          "time": 403.3,
+          "name": "LE MOUGE II",
+          "note": 92,
+          "quand": "2026-11-17T21:18:15.996Z"
         }
       ]
     }
