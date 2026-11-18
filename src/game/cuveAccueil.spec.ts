@@ -95,3 +95,45 @@ describe('la cuve de l’accueil — une vitrine, pas une salle', () => {
     expect(MAIN.indexOf('let hasPlayed = false')).toBeLessThan(MAIN.indexOf('\napplyLevel()'))
   })
 })
+
+// LA PAUSE MONTRE LA CUVE : main.ts met la partie de côté à l'ouverture de
+// la fiche et la rend avant tout ce qui fait jouer. Rien ne relie ces gestes
+// qu'un nom en toutes lettres : la garde les lit dans la source.
+describe('la pause montre la cuve, la partie attend de côté', () => {
+  const MAIN = readFileSync(new URL('../main.ts', import.meta.url), 'utf-8')
+  const corps = (nom: string): string => {
+    const i = MAIN.indexOf(`function ${nom}(`)
+    expect(i, `function ${nom} manque à main.ts`).toBeGreaterThan(-1)
+    return MAIN.slice(i, MAIN.indexOf('\n}\n', i))
+  }
+
+  it('la fiche ouverte sur une partie montre la cuve', () => {
+    expect(corps('openHome')).toContain('montreCuvePause()')
+  })
+
+  it('la cuve a son solveur à elle : createSim recouvrirait les réglages de la partie', () => {
+    const montre = corps('montreCuvePause')
+    expect(montre).not.toContain('createSim(')
+    expect(montre).toContain('new FluidSim(')
+    expect(montre).toContain('CUVE_ACCUEIL')
+  })
+
+  it('la partie revient avant tout ce qui fait jouer : reprendre, recharger une salle', () => {
+    expect(corps('restart').split('\n').slice(0, 5).join('\n')).toContain('rendPartie()')
+    const ferme = corps('closeHome')
+    expect(ferme.indexOf('rendPartie()')).toBeGreaterThan(-1)
+    expect(ferme.indexOf('rendPartie()')).toBeLessThan(ferme.lastIndexOf("classList.add('playing')"))
+  })
+
+  it('jamais la cuve en pleine partie : la boucle rend la partie si le jeu reprend', () => {
+    expect(MAIN).toContain("if (vitrinePause && document.body.classList.contains('playing')) rendPartie()")
+  })
+
+  it('pendant la pause, seule la cuve avance : la boucle a sa branche à elle', () => {
+    expect(MAIN).toMatch(/\} else if \(vitrinePause\) \{\s*\/\/ LA CUVE DE LA PAUSE/)
+  })
+
+  it('une salle recalculée pendant la pause attend avec la partie', () => {
+    expect(corps('applyLevel')).toContain('vitrinePause.level = lv')
+  })
+})

@@ -1176,6 +1176,17 @@ let auHub = !new URLSearchParams(location.search).has('tableau')
 // premier applyLevel du chargement, qui le lit pour choisir la cuve.
 let hasPlayed = false
 const CUVE_ACCUEIL = tableauAccueil()
+// LA PAUSE MONTRE LA CUVE (le concepteur, 18/11 : « le jeu est figé et on se
+// retrouve sur la structure ronde de l'accueil, complètement à part du
+// niveau en cours »). La partie part de côté TOUT ENTIÈRE — sa salle, sa
+// simulation, le cadrage de sa caméra — et rien d'elle n'avance : la fiche
+// la tient en pause (input.paused). La cuve a sa propre simulation, neuve,
+// qui seule avance. Non nulle : la cuve est à l'écran, la partie attend ici.
+let vitrinePause: {
+  level: LevelDef
+  sim: FluidSim
+  cam: { x: number; y: number; zoom: number; manualZoom: number | null; manualPan: boolean }
+} | null = null
 /** Le hub est-il la salle JOUÉE ? `auHub` seul ne le dit pas : il vaut vrai
  *  dès le chargement, et l'essai d'éditeur ne le baisse pas (la salle
  *  essayée passe devant le hub sans l'effacer, pour que « quitter » y
@@ -1879,7 +1890,7 @@ function applyLevel(): void {
   // LES STRUCTURES DE COQUE se déplient ICI, à l'entonnoir unique : le jeu
   // et le bouton ESSAYER de l'éditeur voient exactement la même chose. Un
   // tableau sans structure traverse sans être touché (même référence).
-  level = niveauExpanse(
+  const lv = niveauExpanse(
     testLevel ??
       (auHub && !hasPlayed
         ? CUVE_ACCUEIL
@@ -1891,6 +1902,18 @@ function applyLevel(): void {
           playedLevels()[levelIndex] ??
           playedLevels()[0])),
   )
+  // LA PAUSE MONTRE LA CUVE (vitrinePause) : la salle recalculée attend de
+  // côté, avec la partie ; c'est rendPartie qui la posera à la reprise
+  if (vitrinePause) {
+    vitrinePause.level = lv
+    return
+  }
+  level = lv
+  poseLevel()
+}
+/** Ce qui se déduit de la salle posée : parois du rendu, bouche du sas,
+ *  ambiance, étiquettes. Rejoué tel quel quand la pause rend la salle. */
+function poseLevel(): void {
   levelHasCold = level.boxes.some((b) => b.material === MAT_FROID)
   rebuildRenderBoxes()
   exitMouth.x = (level.exit.minX + level.exit.maxX) * 0.5
@@ -5331,6 +5354,7 @@ function closeHome(): void {
     entrerHub()
     return
   }
+  rendPartie() // la salle reprend l'écran, telle qu'on l'a laissée
   document.body.classList.add('playing')
   input.paused = false // la fiche figeait l'essai : il repart
   majAccueil()
@@ -5405,6 +5429,53 @@ async function publieAvisSalles(): Promise<void> {
 }
 void publieAvisSalles()
 
+/** La fiche s'ouvre sur une partie : la partie part de côté, intacte, et
+ *  la cuve de l'accueil prend l'écran avec sa propre simulation — neuve à
+ *  chaque pause, comme au premier jour : 4,5 L, en eau, au centre. */
+function montreCuvePause(): void {
+  if (vitrinePause || !hasPlayed) return
+  vitrinePause = {
+    level,
+    sim,
+    cam: {
+      x: camera.x,
+      y: camera.y,
+      zoom: camera.zoom,
+      manualZoom: camera.manualZoom,
+      manualPan: camera.manualPan,
+    },
+  }
+  level = niveauExpanse(CUVE_ACCUEIL)
+  poseLevel()
+  // PAS createSim : il recouvre les réglages du banc par ceux de la salle et
+  // repose les cartes imposées — la partie les retrouverait défaits. La
+  // cuve n'a ni réglage ni carte : un solveur nu, son anneau, son corps.
+  const s = new FluidSim(params, level.bounds, CAPACITY)
+  appliqueMoteur(s)
+  s.setLevel(level.boxes, level.sponges)
+  s.spawnDisc(level.spawn.x, level.spawn.y, level.spawn.n, KIND_PLAYER)
+  sim = s
+  exposeSim()
+  prevision = null // la ligne prédite était celle de la salle
+}
+/** La partie revient, telle qu'on l'a laissée : sa salle, sa simulation,
+ *  sa caméra. Appelée avant tout ce qui fait jouer (reprendre, recommencer,
+ *  quitter, essayer) — et la boucle la rappelle si la partie se remet à
+ *  jouer par un autre chemin : jamais la cuve en pleine partie. */
+function rendPartie(): void {
+  const v = vitrinePause
+  if (!v) return
+  vitrinePause = null
+  level = v.level
+  poseLevel()
+  sim = v.sim
+  exposeSim()
+  prevision = null
+  camera.snapTo(v.cam.x, v.cam.y, v.cam.zoom)
+  camera.manualZoom = v.cam.manualZoom
+  camera.manualPan = v.cam.manualPan
+}
+
 function openHome(): void {
   document.body.classList.remove('playing')
   appelOeil()
@@ -5412,6 +5483,7 @@ function openHome(): void {
   // La fiche fige l'essai : revenir au menu, c'est faire une pause — la
   // cuve n'avance plus dans le dos du joueur.
   if (hasPlayed) input.paused = true
+  montreCuvePause() // la pause montre la cuve ; la partie attend de côté
   homeRestartBtn.hidden = !hasPlayed
   majBoutonsRun() // et la fiche se relit (majAccueil)
 }
@@ -18684,6 +18756,9 @@ function annonceVoieCarte(): void {
 }
 
 function restart(): void {
+  // la cuve de la pause s'efface d'abord : la salle qu'on recharge (ou
+  // qu'on quitte) est celle de la partie, pas la vitrine
+  rendPartie()
   // un rejeu ne survit qu'à SA salle : toute autre salle chargée y met fin
   // (avant sauveRun, qui graverait sinon une réserve à zéro)
   if (rejeu && testLevel !== rejeu.niveau) finRejeu()
@@ -20254,6 +20329,10 @@ function corpsImage(now: number): boolean {
   if (dtReal > 0) fpsSmoothed += (1 / dtReal - fpsSmoothed) * 0.05
 
   updateQuality(dtReal)
+  // jamais la cuve de la pause en pleine partie : quel que soit le chemin qui
+  // a remis le jeu en marche sans passer par rendPartie, la partie reprend
+  // l'écran avant que la moindre logique de jeu ne tourne sur la vitrine
+  if (vitrinePause && document.body.classList.contains('playing')) rendPartie()
   const vw = window.innerWidth
   const vh = window.innerHeight
   // l'échelle fixe choisie s'applique ici : seul le canvas est mis à
@@ -20532,8 +20611,10 @@ function corpsImage(now: number): boolean {
     input.freezeIntent = zoneActive === 'glace'
     input.gasIntent = zoneActive === 'vapeur'
   }
-  sim.freezeIntent = input.freezeIntent
-  sim.gasIntent = input.gasIntent
+  // la cuve de la pause est à part : le corps de la partie était peut-être
+  // en glace, le sien reste en eau
+  sim.freezeIntent = vitrinePause ? false : input.freezeIntent
+  sim.gasIntent = vitrinePause ? false : input.gasIntent
   // AU PALET, la ligne gèle : tant qu'un lancer est en cours, le corps est
   // tenu en glace quoi que fasse le joueur — le lancer fini, l'intention
   // redevient la sienne et la glace fond (thawTime du mini-jeu)
@@ -20757,6 +20838,25 @@ function corpsImage(now: number): boolean {
     )
     physRaw = performance.now() - physT0
     monitor.physMs += (physRaw - monitor.physMs) * 0.08
+  } else if (vitrinePause) {
+    // LA CUVE DE LA PAUSE : la partie est figée (input.paused), la cuve seule
+    // avance — le geste (éjecter, se rassembler sous le doigt), son puits,
+    // son pas. Rien d'autre du jeu ne tourne : ni chrono, ni séquence, ni
+    // fantôme, ni sas — ils appartiennent à la partie mise de côté.
+    loop.advance(
+      dtReal,
+      1,
+      params.dt,
+      () => {
+        if (input.aimActive && !sim.dispersed) {
+          if (rassembler) sim.rassemble(params.dt, aim.x, aim.y)
+          else sim.eject(aim.x, aim.y, params.dt)
+        }
+        sim.applyPuits(level.puits ?? [], params.dt)
+        sim.step(params.dt)
+      },
+      8,
+    )
   }
 
   // ---- LES PORTES vers le solveur. HORS du bloc des lasers : un tableau
