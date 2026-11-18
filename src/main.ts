@@ -586,6 +586,7 @@ import {
   type CondensatDef,
 } from './game/condensat'
 import { FIOLES, FIOLES_SLOTS, fioleDef } from './game/fioles'
+import { CODE_ACCUEIL, cadreAccueil, tableauAccueil } from './game/cuveAccueil'
 import {
   LIEUX_ACCUEIL,
   LIEUX_PREMIER_LANCEMENT,
@@ -1165,9 +1166,16 @@ const exitMouth = { x: 0, y: 0 }
 // LE HUB : le module d'accueil (src/game/hub.ts) — la zone de départ du
 // roguelike. Prioritaire derrière les essais (testLevel) : l'éditeur et les
 // parcours d'essai passent toujours devant. C'est aussi le décor du
-// CHARGEMENT : derrière la fiche, l'échantillon dérive déjà dans la cuve
-// d'entraînement (sauf navigation directe ?tableau=N, outil de conception).
+// CHARGEMENT : derrière la fiche, l'échantillon dérive déjà — dans la CUVE
+// DE L'ACCUEIL, l'anneau et son puits (game/cuveAccueil.ts), tant qu'aucune
+// partie n'a commencé (sauf navigation directe ?tableau=N, outil de
+// conception). COMMENCER entre au hub ; « quitter » y ramène la fiche, et
+// la fiche ramène la cuve.
 let auHub = !new URLSearchParams(location.search).has('tableau')
+// Une partie tourne-t-elle derrière la fiche ? Déclaré ICI, avant le
+// premier applyLevel du chargement, qui le lit pour choisir la cuve.
+let hasPlayed = false
+const CUVE_ACCUEIL = tableauAccueil()
 /** Le hub est-il la salle JOUÉE ? `auHub` seul ne le dit pas : il vaut vrai
  *  dès le chargement, et l'essai d'éditeur ne le baisse pas (la salle
  *  essayée passe devant le hub sans l'effacer, pour que « quitter » y
@@ -1873,7 +1881,9 @@ function applyLevel(): void {
   // tableau sans structure traverse sans être touché (même référence).
   level = niveauExpanse(
     testLevel ??
-      (auHub
+      (auHub && !hasPlayed
+        ? CUVE_ACCUEIL
+        : auHub
         ? hubJoue()
         : (economatIntercalaire ??
           minijeuIntercalaire ??
@@ -2174,6 +2184,17 @@ const releveAccueil = el('accueil-releve')
 // (en haut à droite), projeté par la caméra comme les étiquettes du monde.
 // Le relevé d'avant était un tableau de six cases à côté de la cuve ; on
 // lisait le chiffre, pas le corps. Dispersé ou hors champ : il se tait.
+/** La place que le menu laisse à la cuve, en px CSS : au téléphone debout,
+ *  la fenêtre du rail ; ailleurs, tout ce qui est à droite du verbe. */
+function placeLibreAccueil(vw: number, vh: number): { left: number; top: number; right: number; bottom: number } {
+  const fenetre = document.querySelector<HTMLElement>('#home .acc-fenetre')
+  if (fenetre && fenetre.offsetHeight > 0) {
+    const r = fenetre.getBoundingClientRect()
+    return { left: 0, top: r.top, right: vw, bottom: r.bottom }
+  }
+  const verbe = startBtn.getBoundingClientRect()
+  return { left: verbe.right > 0 ? verbe.right + 24 : 0, top: 0, right: vw, bottom: vh }
+}
 function placeReleveAccueil(): void {
   const z = camera.zoom
   const r = Math.max(10, sim.stats.rmsRadius * 1.35 * z)
@@ -2382,7 +2403,6 @@ function requireName(): boolean {
 // directement, ou l'entrée « fiche » du tiroir ≡.
 // L'essai continue de dériver derrière la fiche — elle observe, elle ne fige pas.
 const startBtn = document.getElementById('start') as HTMLButtonElement
-let hasPlayed = false
 // ---- Onboarding tactile : trois gestes, montrés une fois, au premier
 // lancement sur écran tactile. Le voile intercepte les touchers (il couvre
 // le canvas) et fige l'essai le temps de la lecture.
@@ -9127,6 +9147,10 @@ let manettePollNow = 0
   },
 }
 input.attach(canvas)
+// la cuve de l'accueil se touche dès le menu (game/cuveAccueil.ts) : seul
+// le geste d'éjecter, et seulement elle — un voile ouvert par-dessus prend
+// les touchers avant le canvas
+input.vitrine = () => level.code === CODE_ACCUEIL
 
 const monitor: BenchMonitor = {
   fps: 0,
@@ -19078,9 +19102,11 @@ function quitteAuMenu(): void {
   auHub = true
   hasPlayed = false // la partie est close : le bouton redit COMMENCER
   document.body.classList.remove('playing')
-  input.paused = true
+  // la cuve de l'accueil revient derrière la fiche, et elle VIT comme au
+  // chargement : figée, elle ne rendrait plus ce qu'on y éjecte
+  input.paused = false
   homeRestartBtn.hidden = true
-  restart() // le décor du hub reprend sa place derrière la fiche
+  restart() // la cuve de l'accueil reprend sa place derrière la fiche
   majVoieHud()
   majBoutonsRun()
   openHome()
@@ -21750,6 +21776,12 @@ function corpsImage(now: number): boolean {
     const fitZoom =
       Math.min(vw / (b.maxX - b.minX), vh / (b.maxY - b.minY)) * 0.94
     camera.snapTo((b.minX + b.maxX) * 0.5, (b.minY + b.maxY) * 0.5, fitZoom)
+  } else if (level.code === CODE_ACCUEIL) {
+    // LA CUVE DE L'ACCUEIL se montre entière, au milieu de la place que le
+    // menu laisse : la caméra ne suit pas le corps (il revient toujours au
+    // centre, game/cuveAccueil.ts), elle cadre la vitrine
+    const c = cadreAccueil(vw, vh, placeLibreAccueil(vw, vh))
+    camera.snapTo(c.x, c.y, c.zoom)
   } else if (rejeu) {
     // le rejeu : la caméra suit le fantôme, et reste où il a bu le sas
     const e = rejeu.lecteur.a(run.tableauTime) ?? rejeu.dernier
