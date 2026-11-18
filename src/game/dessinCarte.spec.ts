@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest'
+import { PICTOS, picto } from './athPictos'
 import { CARTE_LIVREE, cloneCarte, parseCarte } from './carteStation'
+import { iconeEtatHTML } from './iconesPeintes'
 import {
   ETATS_DITS,
   amarrageTelescope,
@@ -51,8 +53,15 @@ describe('dessinCarteSVG — le plan, depuis les données', () => {
 
   it('pose les badges des transfos, et les coursives en trois traits', () => {
     const svg = dessinCarteSVG(CARTE_LIVREE, base)
-    expect(svg).toContain('❄ GLACE')
-    expect(svg).toContain('💨 GAZ')
+    // le glyphe de la donnée devient l'icône peinte de l'état (l'emoji en
+    // repli, à la même place) ; le mot reste écrit
+    expect(svg).toMatch(/<text x="10\.5" y="4\.5" fill="#a7ddf5">GLACE<\/text>/)
+    expect(svg).toMatch(/<text x="10\.5" y="4\.5" fill="#f2c98e">GAZ<\/text>/)
+    expect(compte(svg, /viewBox="0 0 256 256"/g)).toBeGreaterThan(0) // solide
+    expect(compte(svg, /viewBox="512 0 256 256"/g)).toBeGreaterThan(0) // gaz
+    expect(svg).toContain('<text class="ico-cycle-repli"')
+    expect(svg).not.toContain('❄ GLACE')
+    expect(svg).not.toContain('💨 GAZ')
     // paroi, sol, anneaux « 4 44 » — pour les 12 coursives
     expect(compte(svg, /stroke-dasharray="4 44"/g)).toBe(21)
   })
@@ -71,7 +80,10 @@ describe('dessinCarteSVG — le plan, depuis les données', () => {
     expect(svg).toContain('cs-cible cs-sel" data-mod="T2"')
     expect(svg).toMatch(/cs-verrou" data-mod="T1"/)
     expect(svg).toMatch(/cs-verrou" data-mod="T3"/)
-    expect(compte(svg, /🔒/g)).toBe(2)
+    // le verrou au trait de l'ATH, plus l'emoji
+    expect(compte(svg, /<path class="cs-cadenas" d="([^"]+)"/g)).toBe(2)
+    expect(svg).toContain(`class="cs-cadenas" d="${PICTOS.verrou}"`)
+    expect(svg).not.toContain('🔒')
     // seule la coursive OUVERTE coule : les deux verrouillées ne disent pas « par ici »
     expect(compte(svg, /cs-active/g)).toBe(1)
     expect(compte(svg, /cs-fermee/g)).toBe(2)
@@ -372,5 +384,11 @@ describe('la légende — ce que le plan montre sans le dire', () => {
     expect(html).toContain('combat &lt;dur&gt;')
     expect(html).toContain('<i class="cs-lg-trait cs-lg-tirets" style="--c:#7f9cb0"></i>voie secondaire')
     expect(html).toContain('<i class="cs-lg-fut cs-lg-allume"></i>allumé : joignable d’ici')
+    // le cadenas de la légende est celui du plan : le verrou au trait
+    expect(html).toContain(`<i class="cs-lg-signe">${picto('verrou')}</i>un orbe manque`)
+    expect(html).not.toContain('🔒')
+    // une coursive conditionnelle : l'icône peinte de son état, puis son nom
+    expect(html).toContain(`${iconeEtatHTML('solide')} glace — orbe requis`)
+    expect(html).toContain(`${iconeEtatHTML('gaz')} gaz — orbe requis`)
   })
 })

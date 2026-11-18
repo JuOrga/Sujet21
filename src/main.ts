@@ -639,6 +639,7 @@ import {
 } from './game/vide'
 import {
   estIconeCycle,
+  etatsEnIcones,
   guettePlanchesPeintes,
   iconeCycleHTML,
   iconeEtatHTML,
@@ -16477,8 +16478,11 @@ function mbMontreCarte(raison: 'depart' | 'suite'): void {
   // ligne tient sur une ligne (points de suspension au-delà, le texte
   // entier en infobulle) : la carte ne bouge plus d'un pixel.
   const escF = (t: string): string => t.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;')
+  // le nom d'une coursive conditionnelle vient de son badge (« ❄ glace ») :
+  // à la ligne, son glyphe d'état devient l'icône peinte (l'emoji en repli) ;
+  // l'infobulle, du texte seul, le garde
   const lignes = (a: string, b: string, c: string): void => {
-    fiche.innerHTML = [a, b, c].map((t) => `<span title="${escF(t)}">${escF(t)}</span>`).join('')
+    fiche.innerHTML = [a, b, c].map((t) => `<span title="${escF(t)}">${etatsEnIcones(escF(t))}</span>`).join('')
   }
   const ouvertes = choix.filter((x) => !x.orbeManquant).length
   const defaut = `${ouvertes} coursive${ouvertes > 1 ? 's' : ''} ouverte${ouvertes > 1 ? 's' : ''} · descente ${voieRang} / ${longueurRun()} salles`

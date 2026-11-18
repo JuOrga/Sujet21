@@ -6617,7 +6617,8 @@
       .cs-jeu .cs-mod:hover { filter: drop-shadow(0 0 10px var(--z)); }
       @keyframes cs-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.7; } }
       .cs-glyphe { text-anchor: middle; dominant-baseline: central; paint-order: stroke; stroke: #030710; stroke-width: 3px; }
-      .cs-cadenas { text-anchor: middle; dominant-baseline: central; font-size: 22px; }
+      /* le verrou au trait de l'ATH (athPictos), dans sa boîte de 24 */
+      .cs-cadenas { fill: none; stroke: #eef8ff; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; filter: drop-shadow(0 0 3px #030710); }
       .cs-coche { text-anchor: middle; dominant-baseline: central; font-size: 15px; font-weight: 600; fill: #63b7e6; paint-order: stroke; stroke: #030710; stroke-width: 3px; }
       .cs-cran { text-anchor: middle; dominant-baseline: central; font-size: 15px; font-weight: 600; letter-spacing: 0.04em; paint-order: stroke; stroke: #030710; stroke-width: 3px; }
       /* le nom se détoure du fond : il croise parfois une coursive */
