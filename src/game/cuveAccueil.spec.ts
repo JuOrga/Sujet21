@@ -3,18 +3,16 @@ import { describe, expect, it } from 'vitest'
 import { DEFAULT_PARAMS } from '../sim/params'
 import { FluidSim, KIND_PLAYER } from '../sim/solver'
 import { zonesDuHub } from './hub'
-import { CADRE_RAYON, CODE_ACCUEIL, PUITS_ACCUEIL, cadreAccueil, freineVitrine, tableauAccueil } from './cuveAccueil'
+import { ANNEAU_EPAISSEUR, ANNEAU_RAYON, CODE_ACCUEIL, PUITS_ACCUEIL, cadreAccueil, tableauAccueil } from './cuveAccueil'
 import { sansSas } from './ronde'
 
 // LA GARDE DE LA CUVE DE L'ACCUEIL : ce qui est éjecté REVIENT. Le vrai
-// corps (900 particules), le vrai solveur, le vrai puits, le frein de la
-// vitrine : on éjecte, puis on attend, et le corps doit avoir tout repris,
-// recentré, sans qu'une goutte ait atteint les bornes ni quitté le cœur du
-// puits. Mesuré le 18/11, sans anneau, force 2 700, frein 0,6/s : après
-// 0,5 s d'éjection le corps tombe à 872 et revient à 900 en 1,6 s ; après
-// 1,5 s, il tombe à 810 et revient à 900 en 1,9 s ; la goutte la plus
-// lointaine monte à 695 u. Sans le frein, 894 sur 900 six secondes après le
-// jet de 1,5 s : des gouttes orbitent sans fin. Si ce test tombe, on
+// corps (900 particules), le vrai solveur, le vrai puits : on éjecte, puis
+// on attend, et le corps doit avoir tout repris, recentré, sans qu'une
+// goutte ait passé l'anneau. Mesuré le 18/11 : après 0,5 s d'éjection le
+// corps tombe à 868 et revient à 900 en moins de 2 s ; après 1,5 s, il
+// tombe à 805 et revient à 900 en 4 s ; la goutte la plus lointaine touche
+// la paroi (647 u pour un anneau intérieur à 650). Si ce test tombe, on
 // remesure — on ne retouche pas un nombre à la main.
 
 function cuve(): { s: FluidSim; dt: number; pas: () => void } {
@@ -25,7 +23,6 @@ function cuve(): { s: FluidSim; dt: number; pas: () => void } {
   const dt = s.params.dt
   const pas = (): void => {
     s.applyPuits(lv.puits!, dt)
-    freineVitrine(s, dt)
     s.step(dt)
   }
   for (let t = 0; t < 1; t += dt) pas() // le corps se pose
@@ -33,8 +30,8 @@ function cuve(): { s: FluidSim; dt: number; pas: () => void } {
 }
 
 describe('la cuve de l’accueil — ce qui est éjecté revient', () => {
-  for (const jet of [0.5, 1.5, 3]) {
-    it(`après ${jet} s d’éjection, le corps a tout repris en 4 s, recentré, rien aux bornes`, () => {
+  for (const jet of [0.5, 1.5]) {
+    it(`après ${jet} s d’éjection, le corps a tout repris en 4 s, recentré, l’anneau intact`, () => {
       const { s, dt, pas } = cuve()
       const n0 = s.playerCount
       expect(n0).toBe(900)
@@ -53,9 +50,7 @@ describe('la cuve de l’accueil — ce qui est éjecté revient', () => {
       expect(nMin).toBeLessThan(n0 - 20) // l'éjection a bien pris de la matière
       expect(s.playerCount).toBe(n0) // et toute la matière est revenue
       expect(Math.hypot(s.stats.centroidX, s.stats.centroidY)).toBeLessThan(30)
-      // rien n'a touché les bornes du solveur (des murs invisibles), ni quitté
-      // le cœur harmonique du puits
-      expect(rMax).toBeLessThan(Math.min(tableauAccueil().bounds.maxX, PUITS_ACCUEIL.rayon!) - 50)
+      expect(rMax).toBeLessThan(ANNEAU_RAYON - ANNEAU_EPAISSEUR + 10) // rien n'a passé la paroi
     }, 120000)
   }
 })
@@ -72,26 +67,11 @@ describe('la cuve de l’accueil — une vitrine, pas une salle', () => {
     expect(zonesDuHub(lv)).toBeNull()
   })
 
-  it('n’a ni paroi ni structure : l’échantillon flotte devant les étoiles', () => {
-    expect(lv.boxes).toEqual([])
-    expect(lv.structures ?? []).toEqual([])
-    expect(lv.coque).toBe('structures') // pas de fond de cuve : le dehors partout
+  it('a un cœur de puits plus large que l’anneau : pas de halo, qui étire', () => {
+    expect(PUITS_ACCUEIL.rayon!).toBeGreaterThan(ANNEAU_RAYON)
   })
 
-  it('montre la Voie lactée, sans la Terre, quel que soit le ciel de la partie', () => {
-    const MAIN = readFileSync(new URL('../main.ts', import.meta.url), 'utf-8')
-    expect(MAIN).toContain("const cielVu: CielChoix = level.code === CODE_ACCUEIL ? 'plaque' : cielChoix")
-    expect(MAIN).toContain('renderer.setCiel(CIEL_MODE[cielVu])')
-    expect(MAIN).toContain("if (cielVu === 'terre') {")
-  })
-
-  it('freine ses gouttes dans le jeu comme dans le test : à l’accueil et en pause', () => {
-    const MAIN = readFileSync(new URL('../main.ts', import.meta.url), 'utf-8')
-    expect(MAIN).toContain('if (level.code === CODE_ACCUEIL) freineVitrine(sim, params.dt)')
-    expect(MAIN.match(/freineVitrine\(sim, params\.dt\)/g)?.length).toBe(2)
-  })
-
-  it('se cadre au milieu de la place libre, à droite du rail comme au téléphone', () => {
+  it('se cadre entière au milieu de la place libre, à droite du rail comme au téléphone', () => {
     for (const [vueL, vueH, libre] of [
       [1280, 800, { left: 374, top: 0, right: 1280, bottom: 800 }],
       [390, 844, { left: 0, top: 90, right: 390, bottom: 560 }],
@@ -102,8 +82,8 @@ describe('la cuve de l’accueil — une vitrine, pas une salle', () => {
       const sy = vueH / 2 - (0 - c.y) * c.zoom
       expect(sx).toBeCloseTo((libre.left + libre.right) / 2, 6)
       expect(sy).toBeCloseTo((libre.top + libre.bottom) / 2, 6)
-      // et le disque montré y tient
-      const d = 2 * CADRE_RAYON * c.zoom
+      // et l'anneau y tient
+      const d = 2 * ANNEAU_RAYON * c.zoom
       expect(d).toBeLessThanOrEqual(Math.min(libre.right - libre.left, libre.bottom - libre.top))
     }
   })

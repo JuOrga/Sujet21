@@ -586,7 +586,7 @@ import {
   type CondensatDef,
 } from './game/condensat'
 import { FIOLES, FIOLES_SLOTS, fioleDef } from './game/fioles'
-import { CODE_ACCUEIL, cadreAccueil, freineVitrine, tableauAccueil } from './game/cuveAccueil'
+import { CODE_ACCUEIL, cadreAccueil, tableauAccueil } from './game/cuveAccueil'
 import {
   LIEUX_ACCUEIL,
   LIEUX_PREMIER_LANCEMENT,
@@ -1167,7 +1167,7 @@ const exitMouth = { x: 0, y: 0 }
 // roguelike. Prioritaire derrière les essais (testLevel) : l'éditeur et les
 // parcours d'essai passent toujours devant. C'est aussi le décor du
 // CHARGEMENT : derrière la fiche, l'échantillon dérive déjà — dans la CUVE
-// DE L'ACCUEIL, un puits devant les étoiles (game/cuveAccueil.ts), tant qu'aucune
+// DE L'ACCUEIL, l'anneau et son puits (game/cuveAccueil.ts), tant qu'aucune
 // partie n'a commencé (sauf navigation directe ?tableau=N, outil de
 // conception). COMMENCER entre au hub ; « quitter » y ramène la fiche, et
 // la fiche ramène la cuve.
@@ -5449,7 +5449,7 @@ function montreCuvePause(): void {
   poseLevel()
   // PAS createSim : il recouvre les réglages du banc par ceux de la salle et
   // repose les cartes imposées — la partie les retrouverait défaits. La
-  // cuve n'a ni réglage ni carte : un solveur nu, son puits, son corps.
+  // cuve n'a ni réglage ni carte : un solveur nu, son anneau, son corps.
   const s = new FluidSim(params, level.bounds, CAPACITY)
   appliqueMoteur(s)
   s.setLevel(level.boxes, level.sponges)
@@ -20818,9 +20818,6 @@ function corpsImage(now: number): boolean {
         // LES PUITS DE GRAVITÉ : la seule accélération pure, avant le pas comme
         // les autres champs — muets tant que l'impulsion de départ attend
         if (!impulsionEnAttente && (level.puits?.length ?? 0) > 0) sim.applyPuits(level.puits!, params.dt)
-        // la cuve de l'accueil freine ses gouttes : sans paroi, une goutte
-        // partie de biais orbiterait sans fin (game/cuveAccueil.ts)
-        if (level.code === CODE_ACCUEIL) freineVitrine(sim, params.dt)
         // Rien ne freine le corps figé : dans le vide, une dérive reste une
         // trajectoire. Elle peut encore rencontrer une paroi, rebondir, et
         // finir dans le sas — c'est au joueur de décider quand y renoncer.
@@ -20856,7 +20853,6 @@ function corpsImage(now: number): boolean {
           else sim.eject(aim.x, aim.y, params.dt)
         }
         sim.applyPuits(level.puits ?? [], params.dt)
-        freineVitrine(sim, params.dt)
         sim.step(params.dt)
       },
       8,
@@ -21881,9 +21877,9 @@ function corpsImage(now: number): boolean {
       Math.min(vw / (b.maxX - b.minX), vh / (b.maxY - b.minY)) * 0.94
     camera.snapTo((b.minX + b.maxX) * 0.5, (b.minY + b.maxY) * 0.5, fitZoom)
   } else if (level.code === CODE_ACCUEIL) {
-    // LA CUVE DE L'ACCUEIL se cadre au milieu de la place que le menu
-    // laisse : la caméra ne suit pas le corps (il revient toujours au
-    // centre, game/cuveAccueil.ts), elle montre la vitrine
+    // LA CUVE DE L'ACCUEIL se montre entière, au milieu de la place que le
+    // menu laisse : la caméra ne suit pas le corps (il revient toujours au
+    // centre, game/cuveAccueil.ts), elle cadre la vitrine
     const c = cadreAccueil(vw, vh, placeLibreAccueil(vw, vh))
     camera.snapTo(c.x, c.y, c.zoom)
   } else if (rejeu) {
@@ -21935,14 +21931,10 @@ function corpsImage(now: number): boolean {
   // ni rester en retard d'un tableau.
   renderer.setSolModules(level.coque === 'structures')
   renderer.setExterieur(exterieurActif)
-  // LA CUVE DE L'ACCUEIL (et de la pause) a son ciel à elle : la Voie lactée,
-  // sans la Terre — « juste un beau fond étoilé », le concepteur, 18/11.
-  // La partie garde le ciel que le joueur a choisi.
-  const cielVu: CielChoix = level.code === CODE_ACCUEIL ? 'plaque' : cielChoix
-  renderer.setCiel(CIEL_MODE[cielVu])
+  renderer.setCiel(CIEL_MODE[cielChoix])
   // LA PLAQUE, cadrée à l'image : une seule Voie lactée, jamais agrandie
   // au-delà de ce que l'image rend net sur CET écran (densité native)
-  if (cielVu === 'plaque' && renderer.plaqueTexels > 0) {
+  if (cielChoix === 'plaque' && renderer.plaqueTexels > 0) {
     plaqueReglages.taille = cielReglages.taille
     const c = cadrePlaque(
       camera.x, camera.y, camera.zoom, vw, vh,
@@ -21958,7 +21950,7 @@ function corpsImage(now: number): boolean {
   // LA TERRE, à l'horloge du joueur : la station a avancé depuis l'image
   // précédente, le Soleil aussi — c'est Date.now() et non le temps du jeu,
   // qui s'arrête en pause : dehors, l'orbite ne s'arrête pas.
-  if (cielVu === 'terre') {
+  if (cielChoix === 'terre') {
     renderer.setTerre(
       cadreTerre(Date.now(), camera.x, camera.y, vw, vh, terreCadre, terreReglages),
     )
