@@ -109,6 +109,10 @@ const NOMS: Record<string, string> = {
   'ceremonie-maitrise-verre.webp': 'Cérémonie — colonne de maîtrise (verre)',
   'ceremonie-anneau.webp': 'Cérémonie — anneau de palier (intact, brisé)',
   'instruments-icones.webp': 'Cérémonie — planche des instruments et contreparties (8×4)',
+  // LES ICÔNES PEINTES (docs/assets-ia.md §23) : le cycle des états et les
+  // trophées, rendus dans Blender — noms imposés par iconesPeintes.ts
+  'cycle-icones.webp': 'Icônes — cycle des états et transformations (4×3)',
+  'trophees-icones.webp': 'Icônes — trophées (4×2)',
   'fin-capsule.webp': 'Fin — la bonbonne scellée part en capsule',
   'fin-fiole-brisee.webp': 'Fin — l’échantillon perdu, la fiole brisée',
   // les illustrations du tableau des avaries (public/assets/avaries/<id>.webp),
@@ -163,7 +167,9 @@ export function rubriqueDe(url: string): string {
   )
     return 'Machinerie & décalques'
   if (/^(hull|coque-|coque2d-|tank-bg|stars|ciel|terre|etoiles|home|card-)/.test(f)) return 'Coque & fonds'
-  if (/^(fiole|badge)/.test(f)) return 'Objets & emblèmes'
+  // les deux planches d'icônes peintes : sans cette règle, chacune tombait
+  // dans « Autres » le jour de sa livraison
+  if (/^(fiole|badge|cycle-icones|trophees-icones)/.test(f)) return 'Objets & emblèmes'
   return 'Autres'
 }
 

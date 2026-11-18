@@ -118,3 +118,12 @@ describe('la place d’une fiche', () => {
     expect(toutesLesFiches().map((d) => d.id).sort()).toEqual(fichesCodex().map((d) => d.id).sort())
   })
 })
+
+describe('les rayons d’état prennent l’icône peinte du cycle', () => {
+  it('liquide, solide, gaz — et le scellé, le quatrième état', () => {
+    const etats = Object.fromEntries(RAYONS_FICHES.map((r) => [r.id, r.etat ?? null]))
+    expect(etats).toEqual({ eau: 'liquide', glace: 'solide', vapeur: 'gaz', phenomenes: null, scelle: 'plasma' })
+    // le journal n'est pas un état : il garde ses emoji
+    expect(RAYONS_JOURNAL.every((r) => r.etat === undefined)).toBe(true)
+  })
+})

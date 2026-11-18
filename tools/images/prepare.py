@@ -221,6 +221,14 @@ FAMILLES: list[Famille] = [
         note='1600×900 paysage : la capsule bouclée, la fiole brisée',
     ),
     Famille(
+        # (18/11) les icônes peintes qui remplacent les emoji : la vapeur est
+        # CHAUDE dans la charte (#f2c98e) — sur la planche du cycle, ses cinq
+        # nuées font 17 % de pixels chauds, voulus
+        'planche d’icônes', ('cycle-icones', 'trophees-icones'), alpha=True, cote_max=1024,
+        luma_max=0.40, chaud_max=0.25, poids_max_ko=120,
+        note='cases de 256, cernées (tools/images/icones_planches.py) — leur ordre est un contrat avec src/game/iconesPeintes.ts',
+    ),
+    Famille(
         'planche de vues', ('*-anime', 'meta-eclat', 'meta-icones'), alpha=True, cote_max=4096,
         poids_max_ko=600,
         # 4096 : le plancher de MAX_TEXTURE_SIZE sur les téléphones encore en
