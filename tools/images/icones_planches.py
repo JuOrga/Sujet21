@@ -32,7 +32,9 @@ ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)
 SRC = os.path.join(ROOT, 'masters', 'images', 'sources', 'icones')
 DST = os.path.join(ROOT, 'masters', 'images')
 CASE = 256
-CERNE = 15  # rayon du cerne, en px de la case
+# (15 au premier jet, des objets nus ; la plaque a maintenant sa lunette :
+# un liseré fin suffit à la détacher d'un logement de sa teinte)
+CERNE = 5  # rayon du cerne, en px de la case
 TEINTE_CERNE = (8, 12, 18)
 
 CYCLE = ['solide', 'liquide', 'gaz', 'plasma',
