@@ -7,6 +7,14 @@
 // pas une vitrine. Ici, rien qu'un anneau de coque et l'échantillon au
 // milieu, dans le vide.
 //
+// LA VITRE. Puis, l'anneau vu (et un fond étoilé seul essayé, puis écarté) :
+// « comme s'il y avait une vitre sous lui ». L'intérieur de l'anneau devient
+// une baie vitrée (MAT_BAIE) en disque : le dehors se voit au travers, teinté
+// à peine, un reflet qui balaie le verre, une monture rivée contre la paroi.
+// L'échantillon flotte au-dessus d'un hublot, pas dans le vide. La baie est
+// du décor (sansPhysique) : le corps passe dessus comme sur un sol, et la
+// physique mesurée plus bas n'en dépend pas.
+//
 // LE PUITS EST HARMONIQUE PARTOUT DANS L'ANNEAU (son cœur le déborde) :
 // a = force · r / rayon, et toutes les orbites ont la MÊME période. Tout
 // ce qui part d'un point y revient donc au même instant, une demi-période
@@ -18,14 +26,19 @@
 //
 // Les nombres sont MESURÉS sur le vrai solveur (cuveAccueil.spec.ts) :
 // à refaire si on les touche.
-import { FORME_ARC } from './formes'
-import { MAT_WALL, type LevelDef, type PuitsDef } from './level'
+import { FORME_ARC, FORME_DISQUE } from './formes'
+import { MAT_BAIE, MAT_WALL, type LevelDef, type PuitsDef } from './level'
 
 export const CODE_ACCUEIL = 'ACCUEIL'
 
 /** Le rayon extérieur de l'anneau (u), et son épaisseur. */
 export const ANNEAU_RAYON = 720
 export const ANNEAU_EPAISSEUR = 70
+
+/** Le rayon de la vitre (u) : elle passe sous la paroi de l'anneau, pour que
+ *  sa monture se lise contre la paroi et qu'aucun jour ne reste entre les
+ *  deux. */
+export const VITRE_RAYON = ANNEAU_RAYON - ANNEAU_EPAISSEUR / 2
 
 /** Le puits du centre : un cœur plus large que l'anneau (le halo képlérien,
  *  qui étire, n'existe jamais dans la cuve), une force qui ramène une goutte
@@ -47,6 +60,16 @@ export function tableauAccueil(): LevelDef {
     // la boîte reste hors de l'anneau, inatteignable
     exit: { minX: 900, minY: -40, maxX: 960, maxY: 40 },
     boxes: [
+      // LA VITRE sous l'échantillon — un fond (estUnFond) : elle se peint sous
+      // tout le reste, quel que soit son rang
+      {
+        minX: -VITRE_RAYON,
+        minY: -VITRE_RAYON,
+        maxX: VITRE_RAYON,
+        maxY: VITRE_RAYON,
+        material: MAT_BAIE,
+        forme: FORME_DISQUE,
+      },
       {
         minX: -R,
         minY: -R,
