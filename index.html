@@ -5140,6 +5140,50 @@
         background-size: 300% 200%, 88% 88%;
         background-position: calc(var(--ic-x) * 50%) calc(var(--ic-y) * 100%), center;
       }
+      /* LES PLANCHES PEINTES DU CYCLE ET DES TROPHÉES (game/iconesPeintes.ts).
+         Même découpe que .ico-meta, mais la planche ne se montre QUE lorsque
+         la racine porte planche-cycle / planche-trophees, posée par le guet à
+         l'arrivée d'une image réelle : une image de fond absente ne se voit
+         pas, elle ne dit pas qu'elle manque. D'ici là, l'emoji d'avant
+         (.ico-repli) tient la place, et une pastille sans repli (une
+         transformation, un logement de l'ATH) ne prend aucune place. */
+      .ico-cycle,
+      .ico-trophee {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 1.35em;
+        height: 1.35em;
+        vertical-align: -0.3em;
+        font-style: normal;
+        background-repeat: no-repeat;
+      }
+      .ico-cycle:empty,
+      .ico-trophee:empty {
+        display: none;
+      }
+      html.planche-cycle .ico-cycle {
+        display: inline-flex;
+        background-image: url('/assets/cycle-icones.webp');
+        background-size: 400% 300%;
+        background-position: calc(var(--ic-x) * 33.3333%) calc(var(--ic-y) * 50%);
+      }
+      html.planche-trophees .ico-trophee {
+        display: inline-flex;
+        background-image: url('/assets/trophees-icones.webp');
+        background-size: 400% 200%;
+        background-position: calc(var(--ic-x) * 33.3333%) calc(var(--ic-y) * 100%);
+      }
+      html.planche-cycle .ico-cycle > .ico-repli,
+      html.planche-trophees .ico-trophee > .ico-repli {
+        visibility: hidden;
+      }
+      /* en SVG (la carte de la station) : la fenêtre sur la case OU l'emoji */
+      .ico-cycle-repli { text-anchor: middle; dominant-baseline: central; }
+      html:not(.planche-cycle) .ico-cycle-svg,
+      html.planche-cycle .ico-cycle-repli {
+        display: none;
+      }
       /* le toucher dit le nom : une étiquette éphémère sous la pastille */
       .hud-chip.ouvert::after {
         content: attr(data-nom);

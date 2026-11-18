@@ -637,8 +637,15 @@ import {
   VIDE_DELAI,
   VIDE_ENGLOUTI,
 } from './game/vide'
+import { guettePlanchesPeintes } from './game/iconesPeintes'
 
 const CAPACITY = 4096
+
+// LES PLANCHES PEINTES (cycle des états, trophées) : guettées dès
+// l'ouverture. Tant qu'elles manquent, chaque pastille montre l'emoji
+// d'avant ; à leur arrivée, la racine prend sa classe et la feuille bascule
+// toutes les pastilles d'un coup — y compris celles déjà affichées.
+guettePlanchesPeintes(document.documentElement)
 
 // L'AMORÇAGE, RACONTÉ À LA PAGE. index.html affiche un mot de chargement dès
 // le premier pixel et tient une veille (la garde d'amorçage) ; chaque étape
