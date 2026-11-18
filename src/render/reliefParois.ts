@@ -459,6 +459,247 @@ export function flancBalayeTriangle(
   return [d, t]
 }
 
+/** LE FLANC D'UN DISQUE, BALAYÉ EXACTEMENT — l'ellipse inscrite dans la
+ *  boîte `b` (formeSdf : un cercle si la boîte est carrée). Le même contrat
+ *  que flancBalaye : [distance signée au balayage, hauteur vue].
+ *  POURQUOI : la tranche d'un disque était l'empilement de cinq copies de sa
+ *  silhouette ; sur le bord en biais, les copies se lisaient en marches, et
+ *  sur la base la hauteur s'estimait par deux distances (conception du 18/11).
+ *  Une ellipse est l'image d'un cercle par la mise à l'échelle de ses axes, et
+ *  cette mise à l'échelle garde les t : divisés par les demi-axes, `q` (le
+ *  pixel depuis le centre) et `r` font du balayage celui d'un disque unité —
+ *  |q − t·r| = 1, une équation du second degré. L'intervalle est EXACT, pour
+ *  l'ovale comme pour le rond.
+ *  Dehors, le point du chemin le plus proche du disque unité (une capsule,
+ *  dans l'espace mis à l'échelle), mesuré par la distance du shader : exacte
+ *  pour un cercle (celle de la capsule), approchée pour l'ovale comme l'est
+ *  déjà son dessus (FORMES_DISTANCE_APPROCHEE, volume.ts) — juste le long des
+ *  flancs droits du balayage, qui restent des droites sous la mise à
+ *  l'échelle. */
+export function flancBalayeDisque(
+  px: number,
+  py: number,
+  b: readonly number[],
+  rx: number,
+  ry: number,
+): [number, number] {
+  const hx = Math.max((b[2] - b[0]) * 0.5, 1e-6)
+  const hy = Math.max((b[3] - b[1]) * 0.5, 1e-6)
+  const ox = px - (b[0] + b[2]) * 0.5
+  const oy = py - (b[1] + b[3]) * 0.5
+  // la distance de formeSdf, à l'identique
+  const ellipse = (x: number, y: number): number => {
+    const k0 = Math.hypot(x / hx, y / hy)
+    if (k0 < 1e-6) return -Math.min(hx, hy)
+    return (k0 * (k0 - 1)) / Math.hypot(x / (hx * hx), y / (hy * hy))
+  }
+  const qx = ox / hx
+  const qy = oy / hy
+  const sx = rx / hx
+  const sy = ry / hy
+  const rr = sx * sx + sy * sy
+  const qr = qx * sx + qy * sy
+  const qq = qx * qx + qy * qy
+  let t0 = 2
+  let t1 = -1
+  if (rr < 1e-12) {
+    if (qq <= 1) {
+      t0 = 0
+      t1 = 1
+    }
+  } else {
+    const D = qr * qr - rr * (qq - 1)
+    if (D >= 0) {
+      const s = Math.sqrt(D)
+      t0 = Math.max((qr - s) / rr, 0)
+      t1 = Math.min((qr + s) / rr, 1)
+    }
+  }
+  if (t0 <= t1) {
+    const tm = 0.5 * (t0 + t1)
+    return [Math.min(ellipse(ox - tm * rx, oy - tm * ry), 0), t1]
+  }
+  const tc = rr < 1e-12 ? 0 : Math.min(Math.max(qr / rr, 0), 1)
+  return [ellipse(ox - tc * rx, oy - tc * ry), tc]
+}
+
+/** LE FLANC D'UNE CAPSULE, BALAYÉ EXACTEMENT — le segment sur le grand axe
+ *  de la boîte `b`, de rayon le demi petit côté (formeSdf). Le même contrat
+ *  que flancBalaye.
+ *  POURQUOI : comme le disque, cinq copies et des marches (conception du
+ *  18/11). La capsule est la réunion de ses deux disques de bout et d'une
+ *  bande (le segment épaissi de R en travers) : l'ensemble des t est la
+ *  réunion de leurs trois intervalles — un intervalle, la capsule étant
+ *  convexe ; sa borne haute, le plus grand des bouts, est la hauteur vue.
+ *  Dehors, la capsule balayée est le parallélogramme (A, B, A + r, B + r)
+ *  arrondi de R : la distance à ses quatre côtés, moins R. Exacte. */
+export function flancBalayeCapsule(
+  px: number,
+  py: number,
+  b: readonly number[],
+  rx: number,
+  ry: number,
+): [number, number] {
+  const hx = Math.max((b[2] - b[0]) * 0.5, 1e-6)
+  const hy = Math.max((b[3] - b[1]) * 0.5, 1e-6)
+  const R = Math.min(hx, hy)
+  const ax = Math.max(hx - R, 0)
+  const ay = Math.max(hy - R, 0)
+  const qx = px - (b[0] + b[2]) * 0.5
+  const qy = py - (b[1] + b[3]) * 0.5
+  const capsule = (x: number, y: number): number =>
+    Math.hypot(x - Math.min(Math.max(x, -ax), ax), y - Math.min(Math.max(y, -ay), ay)) - R
+  const rr = rx * rx + ry * ry
+  let t0 = 2
+  let t1 = -1
+  const unir = (lo: number, hi: number): void => {
+    lo = Math.max(lo, 0)
+    hi = Math.min(hi, 1)
+    if (lo > hi) return
+    t0 = Math.min(t0, lo)
+    t1 = Math.max(t1, hi)
+  }
+  // les deux disques de bout
+  for (const s of [-1, 1]) {
+    const ux = qx - s * ax
+    const uy = qy - s * ay
+    const uu = ux * ux + uy * uy
+    if (rr < 1e-12) {
+      if (uu <= R * R) unir(0, 1)
+      continue
+    }
+    const ur = ux * rx + uy * ry
+    const D = ur * ur - rr * (uu - R * R)
+    if (D >= 0) {
+      const sq = Math.sqrt(D)
+      unir((ur - sq) / rr, (ur + sq) / rr)
+    }
+  }
+  // la bande : le rectangle du segment épaissi de R en travers, lu axe par
+  // axe comme la boîte de flancBalaye
+  const ex = hx >= hy ? ax : hx
+  const ey = hx >= hy ? hy : ay
+  let s0 = 0
+  let s1 = 1
+  for (const [q, r, e] of [
+    [qx, rx, ex],
+    [qy, ry, ey],
+  ]) {
+    if (Math.abs(r) < 1e-6) {
+      if (Math.abs(q) > e) s0 = 2
+      continue
+    }
+    const a = (q - e) / r
+    const c = (q + e) / r
+    s0 = Math.max(s0, Math.min(a, c))
+    s1 = Math.min(s1, Math.max(a, c))
+  }
+  unir(s0, s1)
+  if (t0 <= t1) {
+    const tm = 0.5 * (t0 + t1)
+    return [Math.min(capsule(qx - tm * rx, qy - tm * ry), 0), t1]
+  }
+  // le segment [A, B] à t = 0 et à t = 1, et le chemin de ses deux bouts
+  // (A = −a, B = +a : u court de A à B)
+  const segment = (x: number, y: number): number => {
+    const ex = 2 * ax
+    const ey = 2 * ay
+    const u = Math.min(Math.max(((x + ax) * ex + (y + ay) * ey) / Math.max(ex * ex + ey * ey, 1e-6), 0), 1)
+    return Math.hypot(x + ax - u * ex, y + ay - u * ey)
+  }
+  let d = segment(qx, qy)
+  let t = 0
+  const d1 = segment(qx - rx, qy - ry)
+  if (d1 < d) {
+    d = d1
+    t = 1
+  }
+  const rrc = Math.max(rr, 1e-6)
+  for (const s of [-1, 1]) {
+    const tc = Math.min(Math.max(((qx - s * ax) * rx + (qy - s * ay) * ry) / rrc, 0), 1)
+    const dc = Math.hypot(qx - tc * rx - s * ax, qy - tc * ry - s * ay)
+    if (dc < d) {
+      d = dc
+      t = tc
+    }
+  }
+  return [d - R, t]
+}
+
+/** Les pas du chemin pied → sommet d'un ARC ou d'une COQUE, et les
+ *  dichotomies qui affinent le dernier passage (flancAffine). */
+export const PAS_AFFINE = 12
+export const AFFINAGE = 3
+
+/** LA TRANCHE D'UNE FORME SANS BALAYAGE CLOS — l'arc, la coque : ni
+ *  convexes ni closes (la coque est creuse, percée de portes). `sdf` : la
+ *  distance signée de la forme dans le repère de la boîte ; `p`, `r` comme
+ *  flancBalaye. Rend [couverture 0..1, hauteur vue].
+ *  POURQUOI : leur tranche était la réunion de cinq copies (pied, ¼, ½, ¾,
+ *  sommet), la hauteur vue linéaire entre deux copies, et sur la base estimée
+ *  par deux distances — fausse dès que le chemin traverse le creux d'une
+ *  coque. Le chemin se lit maintenant en PAS_AFFINE pas (les marches de la
+ *  couverture quatre fois plus petites), et le DERNIER passage du dedans au
+ *  dehors s'affine par AFFINAGE dichotomies puis une sécante : la hauteur vue
+ *  tombe à un huitième de pas du vrai passage (conception du 18/11).
+ *  Une course dedans plus courte qu'un pas peut s'enjamber : la limite
+ *  assumée de l'échantillonnage, comme avant.
+ *  Sans passage (aucun pas dedans), la hauteur est celle du pas le plus
+ *  proche de la silhouette : le liseré d'anticrénelage suit la tranche,
+ *  comme celui de flancBalaye — il prenait la hauteur 0, le pied.
+ *  `lipschitz` : une distance 1-lipschitzienne (la coque, pas l'arc —
+ *  FORMES_DISTANCE_APPROCHEE, volume.ts) se rejette à plus du déplacement et
+ *  du fondu de la silhouette : aucun pas ne peut y toucher, l'image est la
+ *  même et le creux d'une coque — toute une salle — ne paie plus le chemin. */
+export function flancAffine(
+  sdf: (x: number, y: number) => number,
+  px: number,
+  py: number,
+  rx: number,
+  ry: number,
+  lipschitz = false,
+): [number, number] {
+  const d0 = sdf(px, py)
+  if (lipschitz && d0 > Math.hypot(rx, ry) + 1.5) return [0, 0]
+  let couv = d0 <= 0 ? 1 : 0
+  let dP = d0
+  let dMin = d0
+  let tMin = 0
+  let lo = -1
+  let hi = 0
+  let dLo = 0
+  let dHi = 0
+  for (let k = 1; k <= PAS_AFFINE; k++) {
+    const t = k / PAS_AFFINE
+    const dM = sdf(px - t * rx, py - t * ry)
+    couv = Math.max(couv, 1 - smoothstep(-1, 1.5, dM))
+    if (dP <= 0 && dM > 0) {
+      lo = (k - 1) / PAS_AFFINE
+      hi = t
+      dLo = dP
+      dHi = dM
+    }
+    if (dM < dMin) {
+      dMin = dM
+      tMin = t
+    }
+    dP = dM
+  }
+  if (lo < 0) return [couv, dP <= 0 ? 1 : tMin]
+  for (let i = 0; i < AFFINAGE; i++) {
+    const m = 0.5 * (lo + hi)
+    const dm = sdf(px - m * rx, py - m * ry)
+    if (dm <= 0) {
+      lo = m
+      dLo = dm
+    } else {
+      hi = m
+      dHi = dm
+    }
+  }
+  return [couv, lo + ((hi - lo) * dLo) / (dLo - dHi)]
+}
+
 type PointMonde = { x: number; y: number }
 type RectMonde = { minX: number; minY: number; maxX: number; maxY: number }
 

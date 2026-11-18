@@ -4,6 +4,7 @@ import { fileURLToPath } from 'node:url'
 import { HAUTEUR_BLOCS, HAUTEUR_CORPS } from './hauteurs'
 import { HAUTEUR_DE_RANG, RANG_DE_MATIERE } from './volume'
 import { MAT_GRILLE, MAT_MEMBRANE, MAT_RIDEAU } from '../game/level'
+import { COQUE_EST, COQUE_NORD, FORME_ARC, coqueSdfLocal, formeContact, type FormeContact } from '../game/formes'
 import {
   DEVINE_FOND,
   DEVINE_LISERE,
@@ -14,8 +15,13 @@ import {
   fonduRelief,
   faceFlanc,
   facesTranche,
+  flancAffine,
   flancBalaye,
+  flancBalayeCapsule,
+  flancBalayeDisque,
   flancBalayeTriangle,
+  AFFINAGE,
+  PAS_AFFINE,
   fractionSommet,
   hauteurAppui,
   basesDuCorps,
@@ -892,6 +898,236 @@ describe("le flanc d'un coin est le balayage exact du pied au sommet", () => {
     expect(RELIEF_PAROIS_GLSL).toContain('vec2 flancBalayeTriangle(vec2 p, vec2 A, vec2 B, vec2 C, vec2 r)')
     expect(boucle).toMatch(/flancBalayeCoin\(wb, uBoxes\[bi\], dec\.z, rL\)/)
     expect(entre('float hauteurTranche(', '\n}\n')).toMatch(/flancBalayeCoin\(/)
+  })
+})
+
+// LE FLANC D'UN DISQUE ET D'UNE CAPSULE, BALAYÉ EXACTEMENT (conception du
+// 18/11, docs/superpowers/specs/2026-11-18-formes-courbes-design.md) : relief
+// allumé, leur tranche était l'empilement de cinq copies de la silhouette
+// (pied, ¼, ½, ¾, sommet) ; sur le bord en biais, les copies se lisaient en
+// marches. Un disque balayé est une capsule, une capsule balayée un
+// parallélogramme arrondi : l'intervalle des t et la distance se lisent en
+// formule fermée.
+describe("le flanc d'un disque et d'une capsule est le balayage exact du pied au sommet", () => {
+  const N = 4000
+  // les silhouettes de formeSdf (renderer.ts), dans le repère de la boîte
+  const capsuleExacte = (b: readonly number[]) => (x: number, y: number): number => {
+    const hx = (b[2] - b[0]) / 2
+    const hy = (b[3] - b[1]) / 2
+    const R = Math.min(hx, hy)
+    const ax = Math.max(hx - R, 0)
+    const ay = Math.max(hy - R, 0)
+    const qx = x - (b[0] + b[2]) / 2
+    const qy = y - (b[1] + b[3]) / 2
+    return Math.hypot(qx - Math.min(Math.max(qx, -ax), ax), qy - Math.min(Math.max(qy, -ay), ay)) - R
+  }
+  // l'ellipse inscrite : DEDANS se lit exactement ; la distance est celle,
+  // approchée, du shader (k0·(k0 − 1)/k1 — exacte pour un cercle)
+  const ellipseApprochee = (b: readonly number[]) => (x: number, y: number): number => {
+    const hx = (b[2] - b[0]) / 2
+    const hy = (b[3] - b[1]) / 2
+    const qx = x - (b[0] + b[2]) / 2
+    const qy = y - (b[1] + b[3]) / 2
+    const k0 = Math.hypot(qx / hx, qy / hy)
+    if (k0 < 1e-6) return -Math.min(hx, hy)
+    return (k0 * (k0 - 1)) / Math.hypot(qx / (hx * hx), qy / (hy * hy))
+  }
+  const reference = (forme: (x: number, y: number) => number, x: number, y: number, rx: number, ry: number) => {
+    let dMin = Infinity
+    let tSortie = -1
+    for (let k = 0; k <= N; k++) {
+      const t = k / N
+      const dd = forme(x - t * rx, y - t * ry)
+      dMin = Math.min(dMin, dd)
+      if (dd <= 0) tSortie = t
+    }
+    return { dMin, tSortie }
+  }
+  // les quatre quadrants, et les deux axes
+  const deplacements = [
+    [30, 12],
+    [-25, 18],
+    [8, -35],
+    [-20, -28],
+    [0, 20],
+    [22, 0],
+  ] as const
+  type Cas = {
+    nom: string
+    b: readonly number[]
+    sdf: (x: number, y: number) => number
+    flanc: (x: number, y: number, b: readonly number[], rx: number, ry: number) => [number, number]
+  }
+  const ROND = [0, 0, 120, 120] as const
+  const OVALE = [0, 0, 220, 80] as const
+  const COUCHEE = [0, 0, 200, 60] as const
+  const DEBOUT = [0, 0, 50, 180] as const
+  const cas: Cas[] = [
+    { nom: 'disque rond', b: ROND, sdf: ellipseApprochee(ROND), flanc: flancBalayeDisque },
+    { nom: 'disque ovale', b: OVALE, sdf: ellipseApprochee(OVALE), flanc: flancBalayeDisque },
+    { nom: 'capsule couchée', b: COUCHEE, sdf: capsuleExacte(COUCHEE), flanc: flancBalayeCapsule },
+    { nom: 'capsule debout', b: DEBOUT, sdf: capsuleExacte(DEBOUT), flanc: flancBalayeCapsule },
+  ]
+  // la grille : la base, la tranche, et le dehors tout autour — une fois
+  // pour toutes (la référence coûte quatre mille pas par point)
+  const points = cas.map((c) => {
+    const pts: { x: number; y: number; rx: number; ry: number; dMin: number; tSortie: number }[] = []
+    for (const [rx, ry] of deplacements) {
+      for (let x = c.b[0] - 45; x <= c.b[2] + 45; x += (c.b[2] - c.b[0] + 90) / 23) {
+        for (let y = c.b[1] - 45; y <= c.b[3] + 45; y += (c.b[3] - c.b[1] + 90) / 19) {
+          pts.push({ x, y, rx, ry, ...reference(c.sdf, x, y, rx, ry) })
+        }
+      }
+    }
+    return pts
+  })
+
+  it('dedans, la hauteur vue est le dernier passage du dedans au dehors — sur la base comme dans la tranche', () => {
+    cas.forEach((c, i) => {
+      let base = 0
+      let tranche = 0
+      for (const p of points[i]) {
+        if (p.dMin >= -0.05) continue
+        const [d, t] = c.flanc(p.x, p.y, c.b, p.rx, p.ry)
+        expect(d, `${c.nom} (${p.x}, ${p.y})`).toBeLessThanOrEqual(0)
+        expect(Math.abs(t - p.tSortie), `${c.nom} (${p.x}, ${p.y}) r (${p.rx}, ${p.ry})`).toBeLessThan(2 / N + 1e-6)
+        if (c.sdf(p.x, p.y) <= 0) base++
+        else tranche++
+      }
+      // la grille passe bien par les deux
+      expect(base, c.nom).toBeGreaterThan(50)
+      expect(tranche, c.nom).toBeGreaterThan(20)
+    })
+  })
+
+  it('dehors, la distance est celle du balayage : le disque rond et la capsule, exactement', () => {
+    for (const i of [0, 2, 3]) {
+      for (const p of points[i]) {
+        if (p.dMin <= 0.05) continue
+        const [d] = cas[i].flanc(p.x, p.y, cas[i].b, p.rx, p.ry)
+        expect(d, `${cas[i].nom} (${p.x}, ${p.y}) r (${p.rx}, ${p.ry})`).toBeCloseTo(p.dMin, 1)
+      }
+    }
+  })
+
+  it("dehors, l'ovale : le bon côté partout, et la distance du shader près du bord, là où se joue l'anticrénelage", () => {
+    for (const p of points[1]) {
+      if (p.dMin <= 0.05) continue
+      const [d] = flancBalayeDisque(p.x, p.y, OVALE, p.rx, p.ry)
+      expect(d).toBeGreaterThan(0)
+      if (p.dMin < 4) expect(Math.abs(d - p.dMin), `(${p.x}, ${p.y}) r (${p.rx}, ${p.ry})`).toBeLessThan(0.5)
+    }
+  })
+
+  it('le bord en biais est une droite : entre les anciennes copies, la tranche ne se creuse plus', () => {
+    // un petit disque (rayon 10) qui glisse loin : le point de la tangente au
+    // milieu du balayage, entre deux anciennes copies (t = 3/8), un peu en
+    // dedans
+    const PETIT = [0, 0, 20, 20] as const
+    const [rx, ry] = [40, 20]
+    const L = Math.hypot(rx, ry)
+    const [nx, ny] = [ry / L, -rx / L] // la normale de la tangente, vers le dehors
+    const t = 3 / 8
+    const x = 10 + 10 * nx + t * rx - 0.6 * nx
+    const y = 10 + 10 * ny + t * ry - 0.6 * ny
+    expect(flancBalayeDisque(x, y, PETIT, rx, ry)[0]).toBeLessThan(0)
+    // les cinq copies, elles, laissaient ce point dehors : la marche
+    const petit = ellipseApprochee(PETIT)
+    expect(Math.min(...[0, 1, 2, 3, 4].map((k) => petit(x - (k / 4) * rx, y - (k / 4) * ry)))).toBeGreaterThan(0)
+    // une petite capsule couchée, par son bout droit, de même
+    const CAPS = [0, 0, 60, 20] as const
+    const cx = 50 + 10 * nx + t * rx - 0.6 * nx
+    const cy = 10 + 10 * ny + t * ry - 0.6 * ny
+    expect(flancBalayeCapsule(cx, cy, CAPS, rx, ry)[0]).toBeLessThan(0)
+    const caps = capsuleExacte(CAPS)
+    expect(Math.min(...[0, 1, 2, 3, 4].map((k) => caps(cx - (k / 4) * rx, cy - (k / 4) * ry)))).toBeGreaterThan(0)
+  })
+})
+
+// LA TRANCHE D'UN ARC ET D'UNE COQUE, AFFINÉE (conception du 18/11) : ni
+// convexes ni closes (la coque est creuse et percée de portes), elles n'ont
+// pas de balayage en formule fermée. Le chemin pied → sommet se lit en douze
+// pas — les marches de la couverture quatre fois plus petites qu'à trois — et
+// le DERNIER passage du dedans au dehors s'affine par dichotomie : la hauteur
+// vue n'est plus linéaire par morceaux entre deux copies.
+describe("la tranche d'un arc et d'une coque : douze pas, puis l'affinage", () => {
+  const N = 4000
+  const H = { cotes: COQUE_NORD | COQUE_EST, chanfrein: 0.25, ep: 64, porte: 256 }
+  const coque = (x: number, y: number): number => coqueSdfLocal(x, y, 600, 400, H)
+  const sortie: FormeContact = { dist: 0, nx: 0, ny: 1 }
+  const ARC = { minX: -300, minY: -40, maxX: 300, maxY: 260, forme: FORME_ARC, p0: 0.35, p1: 120, p2: 0 }
+  const arc = (x: number, y: number): number => {
+    formeContact(x, y, ARC, sortie)
+    return sortie.dist
+  }
+  // la référence : le dernier passage, et la longueur de la dernière course
+  // DEDANS (plus courte qu'un pas, douze pas peuvent l'enjamber — la limite
+  // assumée de l'échantillonnage)
+  const reference = (sdf: (x: number, y: number) => number, x: number, y: number, rx: number, ry: number) => {
+    let tSortie = -1
+    let tEntree = -1
+    let avant = false
+    for (let k = 0; k <= N; k++) {
+      const t = k / N
+      const dedans = sdf(x - t * rx, y - t * ry) <= 0
+      if (dedans && !avant) tEntree = t
+      if (dedans) tSortie = t
+      avant = dedans
+    }
+    return { tSortie, course: tSortie - tEntree }
+  }
+  const formes = [
+    { nom: 'coque', sdf: coque, x0: -680, x1: 680, y0: -480, y1: 480, pas: 17, lipschitz: true },
+    { nom: 'arc', sdf: arc, x0: -340, x1: 340, y0: -80, y1: 300, pas: 21, lipschitz: false },
+  ]
+
+  it('la hauteur vue tombe à un huitième de pas du dernier passage du dedans au dehors', () => {
+    expect(PAS_AFFINE).toBe(12)
+    expect(AFFINAGE).toBe(3)
+    for (const f of formes) {
+      let vus = 0
+      for (const [rx, ry] of [[-45, -30], [38, -20], [12, 44], [-50, 8]] as const) {
+        for (let x = f.x0; x <= f.x1; x += f.pas) {
+          for (let y = f.y0; y <= f.y1; y += f.pas * 0.9) {
+            // seulement là où le shader l'appelle : le sommet ne couvre pas
+            if (f.sdf(x - rx, y - ry) <= 0) continue
+            // (loin des parois d'une coque, le chemin ne les touche pas : la
+            // référence s'y épargne ses quatre mille pas)
+            if (f.lipschitz && f.sdf(x, y) > Math.hypot(rx, ry) + 2) continue
+            const ref = reference(f.sdf, x, y, rx, ry)
+            if (ref.tSortie < 0 || ref.course < 1 / PAS_AFFINE) continue
+            const [couv, t] = flancAffine(f.sdf, x, y, rx, ry)
+            expect(couv).toBeGreaterThan(0)
+            expect(Math.abs(t - ref.tSortie), `${f.nom} (${x}, ${y}) r (${rx}, ${ry})`).toBeLessThan(
+              1 / (PAS_AFFINE * 2 ** AFFINAGE) + 2 / N,
+            )
+            vus++
+          }
+        }
+      }
+      expect(vus, f.nom).toBeGreaterThan(100)
+    }
+  })
+
+  it('une coque se rejette loin de ses parois : même image, sans les quinze distances', () => {
+    // sa distance est 1-lipschitzienne (volume.ts) : à plus du déplacement et
+    // du fondu de toute paroi, aucun pas ne peut toucher la silhouette. La
+    // hauteur vue ne se lit que là où la tranche couvre (le shader la garde
+    // derrière flanc > 0,003) : sans couverture, elle ne change rien.
+    let rejetes = 0
+    for (const [rx, ry] of [[-45, -30], [12, 44]] as const) {
+      for (let x = -680; x <= 680; x += 37) {
+        for (let y = -480; y <= 480; y += 29) {
+          const vite = flancAffine(coque, x, y, rx, ry, true)
+          const lent = flancAffine(coque, x, y, rx, ry)
+          expect(vite[0]).toBe(lent[0])
+          if (lent[0] > 0) expect(vite[1]).toBe(lent[1])
+          if (coque(x, y) > Math.hypot(rx, ry) + 1.5) rejetes++
+        }
+      }
+    }
+    // le creux de la coque en est fait, presque entier
+    expect(rejetes).toBeGreaterThan(500)
   })
 })
 
