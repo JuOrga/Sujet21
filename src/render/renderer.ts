@@ -3816,11 +3816,16 @@ void main() {
           float fin = exp(-pow((sV - 0.53 - gV) / 0.025, 2.0));
           float corde = sqrt(max(0.0, 1.0 - sV * sV));
           float segment = 1.0 - smoothstep(0.35 * corde, 0.85 * corde, abs(tV + 0.10));
-          // LE VERRE SE VOIT : derrière lui, le dehors s'assombrit et bleuit
-          // un peu, et le pourtour s'éclaire (le verre vu de biais renvoie
-          // plus) — sur la Voie lactée, une teinte ajoutée seule disparaissait
+          // LE VERRE SE VOIT SANS ÉCLAIRCIR LA NUIT : le fond reste sombre
+          // (« un fond assez sombre quand même », le concepteur, 18/11 —
+          // mesuré, le verre d'une baie triplait la luminance du ciel : 0,062
+          // dans la vitre pour 0,021 dehors). Ici le dehors est seulement
+          // bleui, sans le voile ajouté des baies ; le verre se lit à son
+          // pourtour, qui s'éclaire (vu de biais, il renvoie plus), et à ses
+          // reflets.
           float bordV = smoothstep(0.80, 0.99, length(qV));
-          ciel = mix(ciel, vec3(0.020, 0.045, 0.080), 0.30) + vec3(0.05, 0.08, 0.11) * bordV;
+          ciel = mix(voidCol, voidCol * vec3(0.80, 0.95, 1.25) + vec3(0.004, 0.010, 0.022), 0.85)
+               + vec3(0.05, 0.08, 0.11) * bordV;
           // les reflets se POSENT sur le verre (un mélange, pas un ajout) :
           // sur les étoiles claires, une lueur ajoutée ne se lisait pas
           ciel = mix(ciel, vec3(0.78, 0.86, 0.95), clamp(0.22 * large + 0.40 * fin, 0.0, 1.0) * segment);
