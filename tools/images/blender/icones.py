@@ -151,9 +151,11 @@ def fleche(at, x0, x1, z):
 
 
 def transformation(at, src, dst):
-    SYMBOLES[src](at, -0.045, Z0, 0.032)
-    SYMBOLES[dst](at, 0.048, Z0, 0.032)
-    fleche(at, -0.01, 0.012, Z0)
+    # symétriques autour du centre de la plaque, la flèche AU MILIEU (essai 1,
+    # posée à l'œil : elle collait au symbole de gauche — vu par le concepteur)
+    SYMBOLES[src](at, -0.047, Z0, 0.032)
+    SYMBOLES[dst](at, 0.047, Z0, 0.032)
+    fleche(at, -0.009, 0.009, Z0)
 
 
 # ------------------------------------------------------------ les trophées
