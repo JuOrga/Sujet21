@@ -2302,13 +2302,14 @@ float sdfVisible(int bi, vec2 p) {
 // LA HAUTEUR DE LA TRANCHE d'une boîte vue en ce pixel, relief allumé : le
 // chemin pied → sommet (relB, le déplacement de SON sommet) la traverse ici
 // à la hauteur fb.y × hb (flancBalaye, le balayage exact) ; −1 s'il ne la
-// traverse pas franchement. Le coin (triangle) a le sien. Les formes courbes
-// ou creuses (coques, arrondis) rendent −1 : leur balayage n'a pas de forme
-// close, elles ne cachent que par leur dessus.
+// traverse pas franchement. Le disque, la capsule et le coin ont le leur
+// (18/11 : le disque et la capsule rendaient −1, leur tranche ne cachait
+// rien de plus bas). L'arc et la coque rendent −1 : leur balayage n'a pas de
+// forme close — douze pas par boîte et par pixel, ici, ce serait payer la
+// tranche deux fois ; ils ne cachent que par leur dessus.
 float hauteurTranche(int bi, vec2 world, vec2 relB, float hb) {
   vec4 dec = decodeAux(uBoxAux[bi].x);
-  bool coin = dec.y > 2.5 && dec.y < 3.5;
-  if (dec.y > 0.5 && !coin) return -1.0;
+  if (dec.y > 3.5) return -1.0;
   vec2 wb = world;
   vec2 rL = relB;
   float a = uBoxAux[bi].y;
@@ -2322,7 +2323,10 @@ float hauteurTranche(int bi, vec2 world, vec2 relB, float hb) {
   }
   // loin de la base de plus que le déplacement, le chemin ne la croise pas
   if (boxSdf(wb, uBoxes[bi]) > length(rL)) return -1.0;
-  vec2 fb = coin ? flancBalayeCoin(wb, uBoxes[bi], dec.z, rL) : flancBalaye(wb, uBoxes[bi], rL);
+  vec2 fb = dec.y < 0.5 ? flancBalaye(wb, uBoxes[bi], rL)
+          : dec.y < 1.5 ? flancBalayeDisque(wb, uBoxes[bi], rL)
+          : dec.y < 2.5 ? flancBalayeCapsule(wb, uBoxes[bi], rL)
+          : flancBalayeCoin(wb, uBoxes[bi], dec.z, rL);
   return fb.x < -1.0 ? fb.y * hb : -1.0;
 }
 
@@ -3325,19 +3329,19 @@ void main() {
         // pixel : près d'un bout de la face, c'est l'arête d'à côté, et un
         // triangle à 45° prenait une hauteur fausse (le concepteur, 16/11,
         // « les faces verticales »). Le balayage vaut des deux côtés du pied.
-        // Les formes COURBES ou creuses gardent l'estime et l'échantillonnage :
-        // leur balayage n'a pas de forme close.
-        if (dec.y < 0.5) {
-          vec2 rL = vec2(caR * relB.x + saR * relB.y, -saR * relB.x + caR * relB.y);
-          vec2 fb = flancBalaye(wb, uBoxes[bi], rL);
+        // (le chemin, dans le repère de la boîte : relB dépivoté)
+        vec2 rL = vec2(caR * relB.x + saR * relB.y, -saR * relB.x + caR * relB.y);
+        if (dec.y < 3.5) {
+          // UNE BOÎTE, UN DISQUE, UNE CAPSULE, UN COIN : convexes, leur
+          // balayage a une forme close. Le disque et la capsule gardaient cinq
+          // copies de leur silhouette (pied, ¼, ½, ¾, sommet), lues en marches
+          // sur le bord en biais, et sur la base une hauteur estimée par deux
+          // distances (conception du 18/11) ; le coin sortait en dents de scie
+          vec2 fb = dec.y < 0.5 ? flancBalaye(wb, uBoxes[bi], rL)
+                  : dec.y < 1.5 ? flancBalayeDisque(wb, uBoxes[bi], rL)
+                  : dec.y < 2.5 ? flancBalayeCapsule(wb, uBoxes[bi], rL)
+                  : flancBalayeCoin(wb, uBoxes[bi], dec.z, rL);
           // sur la base, sous le vide : pleine tranche
-          flanc = d <= 0.0 ? 1.0 : 1.0 - smoothstep(-1.0, 1.5, fb.x);
-          htFlanc = fb.y;
-        } else if (dec.y > 2.5 && dec.y < 3.5) {
-          // UN COIN (le triangle) : convexe, il a lui aussi son balayage
-          // exact — le sommet de sa tranche sortait en dents de scie
-          vec2 rL = vec2(caR * relB.x + saR * relB.y, -saR * relB.x + caR * relB.y);
-          vec2 fb = flancBalayeCoin(wb, uBoxes[bi], dec.z, rL);
           flanc = d <= 0.0 ? 1.0 : 1.0 - smoothstep(-1.0, 1.5, fb.x);
           htFlanc = fb.y;
         } else if (d <= 0.0) {
@@ -3349,13 +3353,7 @@ void main() {
         } else {
           float dP = d;
           for (int fs = 1; fs <= 3; fs++) {
-            vec2 wM = world - relB * (float(fs) / 4.0);
-            vec2 wbM = wM;
-            if (abs(bAngR) > 0.0005) {
-              vec2 relM = wM - bcR;
-              wbM = bcR + vec2(caR * relM.x + saR * relM.y, -saR * relM.x + caR * relM.y);
-            }
-            float dM = formeSdf(wbM, uBoxes[bi], dec.y, dec.z, dec.w);
+            float dM = formeSdf(wb - rL * (float(fs) / 4.0), uBoxes[bi], dec.y, dec.z, dec.w);
             flanc = max(flanc, 1.0 - smoothstep(-1.0, 1.5, dM));
             if (dP <= 0.0 && dM > 0.0) htFlanc = (float(fs) - 1.0 + dP / (dP - dM)) / 4.0;
             dP = dM;

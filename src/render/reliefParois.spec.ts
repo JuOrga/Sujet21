@@ -245,7 +245,8 @@ describe('le shader : la longueur du flanc suit la hauteur', () => {
   it('le sommet de chaque boîte s’écarte de SA part du déplacement', () => {
     expect(boucle).toMatch(/relB = relDisp \* facteurRelief\(hauteurBoite\(bi\)\)/)
     expect(boucle).toContain('vec2 wT = world - relB;')
-    expect(boucle).toMatch(/world - relB \* \(float\(fs\) \/ 4\.0\)/)
+    // le chemin de la tranche aussi : relB, dépivoté dans le repère de la boîte
+    expect(boucle).toContain('vec2 rL = vec2(caR * relB.x + saR * relB.y, -saR * relB.x + caR * relB.y);')
     // plus rien ne prend le déplacement entier
     expect(boucle).not.toContain('world - relDisp;')
     expect(boucle).not.toMatch(/world - relDisp \* \(float/)
@@ -659,10 +660,9 @@ describe('le flanc d\'une boîte est le balayage exact du pied au sommet', () =>
     expect(flancBalaye(x, y, B, rx, ry)[0]).toBeLessThan(0)
   })
 
-  it('le shader prend la règle pour les boîtes ; les formes gardent leur échantillonnage', () => {
+  it('le shader prend la règle pour les boîtes', () => {
     expect(RELIEF_PAROIS_GLSL).toContain('vec2 flancBalaye(vec2 p, vec4 b, vec2 r)')
     expect(boucle).toMatch(/flancBalaye\(wb, uBoxes\[bi\], rL\)/)
-    expect(boucle).toMatch(/dec\.y > 0\.5/)
   })
 })
 
@@ -801,8 +801,11 @@ describe('relief allumé, la surface la plus haute cache les autres', () => {
   it('la hauteur de la tranche se lit au balayage exact, dans le repère de la boîte', () => {
     expect(hauteurTranche).toContain('flancBalaye(')
     expect(hauteurTranche).toMatch(/fb\.y \* hb/)
-    // les formes courbes ou creuses n'y entrent pas (le coin, si) : leur balayage n'a pas de forme close
-    expect(hauteurTranche).toMatch(/dec\.y > 0\.5 && !coin\) return -1\.0/)
+    // le disque, la capsule et le coin y entrent (18/11) ; l'arc et la coque,
+    // non : leur balayage n'a pas de forme close
+    expect(hauteurTranche).toMatch(/if \(dec\.y > 3\.5\) return -1\.0;/)
+    expect(hauteurTranche).toMatch(/dec\.y < 1\.5 \? flancBalayeDisque\(wb, uBoxes\[bi\], rL\)/)
+    expect(hauteurTranche).toMatch(/dec\.y < 2\.5 \? flancBalayeCapsule\(wb, uBoxes\[bi\], rL\)/)
   })
 
   it('la couverture retient la hauteur vue : un dessus franc, sinon une tranche ; relief éteint, rien', () => {
@@ -1041,6 +1044,18 @@ describe("le flanc d'un disque et d'une capsule est le balayage exact du pied au
     expect(flancBalayeCapsule(cx, cy, CAPS, rx, ry)[0]).toBeLessThan(0)
     const caps = capsuleExacte(CAPS)
     expect(Math.min(...[0, 1, 2, 3, 4].map((k) => caps(cx - (k / 4) * rx, cy - (k / 4) * ry)))).toBeGreaterThan(0)
+  })
+
+  it('le shader les prend : la tranche peinte et sa hauteur vue, plus de copies pour eux', () => {
+    expect(RELIEF_PAROIS_GLSL).toContain('vec2 flancBalayeDisque(vec2 p, vec4 b, vec2 r)')
+    expect(RELIEF_PAROIS_GLSL).toContain('vec2 flancBalayeCapsule(vec2 p, vec4 b, vec2 r)')
+    // la distance de l'ellipse, celle de formeSdf à l'identique
+    expect(RELIEF_PAROIS_GLSL).toContain('return k0 * (k0 - 1.0) / length(o / (h * h));')
+    expect(source).toContain('return k0 * (k0 - 1.0) / k1;')
+    // une seule branche pour les quatre formes convexes, la boîte d'abord
+    expect(boucle).toMatch(
+      /if \(dec\.y < 3\.5\) \{[\s\S]*?vec2 fb = dec\.y < 0\.5 \? flancBalaye\(wb, uBoxes\[bi\], rL\)\s*: dec\.y < 1\.5 \? flancBalayeDisque\(wb, uBoxes\[bi\], rL\)\s*: dec\.y < 2\.5 \? flancBalayeCapsule\(wb, uBoxes\[bi\], rL\)\s*: flancBalayeCoin\(wb, uBoxes\[bi\], dec\.z, rL\);/,
+    )
   })
 })
 

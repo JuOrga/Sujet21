@@ -870,6 +870,104 @@ vec2 flancBalayeCoin(vec2 p, vec4 b, float q0, vec2 r) {
   else               { A = vec2(-h.x,  h.y); B = vec2(-h.x, -h.y); C = vec2( h.x,  h.y); }
   return flancBalayeTriangle(p, c + A, c + B, c + C, r);
 }
+// le flanc d'un disque, balayé exactement (flancBalayeDisque,
+// reliefParois.ts) : l'ellipse ramenée au disque unité par ses demi-axes,
+// qui gardent les t. ellipseFlanc : la distance de formeSdf, à l'identique
+// (formeSdf vient plus loin dans le shader)
+float ellipseFlanc(vec2 o, vec2 h) {
+  float k0 = length(o / h);
+  if (k0 < 1e-6) return -min(h.x, h.y);
+  return k0 * (k0 - 1.0) / length(o / (h * h));
+}
+vec2 flancBalayeDisque(vec2 p, vec4 b, vec2 r) {
+  vec2 h = max((b.zw - b.xy) * 0.5, vec2(1e-6));
+  vec2 o = p - (b.xy + b.zw) * 0.5;
+  vec2 q = o / h;
+  vec2 s = r / h;
+  float rr = dot(s, s);
+  float qr = dot(q, s);
+  float qq = dot(q, q);
+  float t0 = 2.0;
+  float t1 = -1.0;
+  if (rr < 1e-12) {
+    if (qq <= 1.0) { t0 = 0.0; t1 = 1.0; }
+  } else {
+    float D = qr * qr - rr * (qq - 1.0);
+    if (D >= 0.0) {
+      float sq = sqrt(D);
+      t0 = max((qr - sq) / rr, 0.0);
+      t1 = min((qr + sq) / rr, 1.0);
+    }
+  }
+  if (t0 <= t1) return vec2(min(ellipseFlanc(o - 0.5 * (t0 + t1) * r, h), 0.0), t1);
+  float tc = rr < 1e-12 ? 0.0 : clamp(qr / rr, 0.0, 1.0);
+  return vec2(ellipseFlanc(o - tc * r, h), tc);
+}
+// le flanc d'une capsule, balayé exactement (flancBalayeCapsule,
+// reliefParois.ts) : la réunion des intervalles des deux disques de bout et
+// de la bande ; dehors, le parallélogramme balayé arrondi du rayon
+vec2 flancBalayeCapsule(vec2 p, vec4 b, vec2 r) {
+  vec2 h = max((b.zw - b.xy) * 0.5, vec2(1e-6));
+  float R = min(h.x, h.y);
+  vec2 a = max(h - vec2(R), 0.0);
+  vec2 q = p - (b.xy + b.zw) * 0.5;
+  float rr = dot(r, r);
+  float t0 = 2.0;
+  float t1 = -1.0;
+  for (int k = 0; k < 2; k++) {
+    vec2 u = q - (k == 0 ? -a : a);
+    float uu = dot(u, u);
+    float lo = 2.0;
+    float hi = -1.0;
+    if (rr < 1e-12) {
+      if (uu <= R * R) { lo = 0.0; hi = 1.0; }
+    } else {
+      float ur = dot(u, r);
+      float D = ur * ur - rr * (uu - R * R);
+      if (D >= 0.0) {
+        float sq = sqrt(D);
+        lo = (ur - sq) / rr;
+        hi = (ur + sq) / rr;
+      }
+    }
+    lo = max(lo, 0.0);
+    hi = min(hi, 1.0);
+    if (lo <= hi) { t0 = min(t0, lo); t1 = max(t1, hi); }
+  }
+  vec2 e = h.x >= h.y ? vec2(a.x, h.y) : vec2(h.x, a.y);
+  float s0 = 0.0;
+  float s1 = 1.0;
+  for (int k = 0; k < 2; k++) {
+    float qk = k == 0 ? q.x : q.y;
+    float rk = k == 0 ? r.x : r.y;
+    float ek = k == 0 ? e.x : e.y;
+    if (abs(rk) < 1e-6) {
+      if (abs(qk) > ek) s0 = 2.0;
+    } else {
+      float c0 = (qk - ek) / rk;
+      float c1 = (qk + ek) / rk;
+      s0 = max(s0, min(c0, c1));
+      s1 = min(s1, max(c0, c1));
+    }
+  }
+  if (s0 <= s1) { t0 = min(t0, s0); t1 = max(t1, s1); }
+  if (t0 <= t1) {
+    vec2 m = q - 0.5 * (t0 + t1) * r;
+    return vec2(min(length(m - clamp(m, -a, a)) - R, 0.0), t1);
+  }
+  float d = segmentFlanc(q, -a, a);
+  float t = 0.0;
+  float d1 = segmentFlanc(q - r, -a, a);
+  if (d1 < d) { d = d1; t = 1.0; }
+  float rrc = max(rr, 1e-6);
+  for (int k = 0; k < 2; k++) {
+    vec2 c = k == 0 ? -a : a;
+    float tc = clamp(dot(q - c, r) / rrc, 0.0, 1.0);
+    float dc = length(q - tc * r - c);
+    if (dc < d) { d = dc; t = tc; }
+  }
+  return vec2(d - R, t);
+}
 float solCache(float relief, float d, float dV, float flanc, float w) {
   return solCache(relief, d, dV, flanc, w, 1.0, 0.0);
 }
