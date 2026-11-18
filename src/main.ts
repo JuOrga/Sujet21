@@ -586,6 +586,14 @@ import {
   type CondensatDef,
 } from './game/condensat'
 import { FIOLES, FIOLES_SLOTS, fioleDef } from './game/fioles'
+import { CODE_ACCUEIL, cadreAccueil, tableauAccueil } from './game/cuveAccueil'
+import {
+  LIEUX_ACCUEIL,
+  LIEUX_PREMIER_LANCEMENT,
+  PICTOS_ACCUEIL,
+  valeursLieux,
+  verbeAccueil,
+} from './game/accueil'
 import {
   ETATS_CYCLE,
   TRANSFOS_CYCLE,
@@ -753,7 +761,6 @@ function gagneCondensat(cl: number): void {
   // tout ce qui entre en bourse compte à la récolte du module, d'où que ça
   // vienne (sas, pastille, halte, rencontre) : un seul point de passage
   run.recolte.condensatCl += Math.round(cl)
-  majCondensatUI()
 }
 /** Débite la réserve de la run si elle suffit (cartes payantes de la mise
  * en bonbonne, étal de l'Économat). */
@@ -761,20 +768,13 @@ function depenseCondensat(cl: number): boolean {
   if (cl <= 0) return true
   if (condensat < cl) return false
   condensat -= cl
-  majCondensatUI()
   return true
 }
 /** La PURGE : la fin de run (réussie, perdue ou abandonnée) confisque la
  * matière. Le compteur repart à zéro — la mémoire, elle, ne bouge pas. */
 function purgeCondensat(): void {
   condensat = 0
-  majCondensatUI()
 }
-function majCondensatUI(): void {
-  const dd = document.getElementById('home-condensat')
-  if (dd) dd.textContent = `${condensat} cL`
-}
-majCondensatUI()
 
 // LA LECTURE DES RÉCOMPENSES. Le jeu ne demande jamais « ai-je telle
 // carte » : il demande ce que vaut un LEVIER, tous instruments confondus.
@@ -874,10 +874,11 @@ window.addEventListener('keydown', eveilAudio)
 // bouton d'activation. La fiche garde un simple MUTE, comme la barre du jeu.
 const btnMute = document.getElementById('home-mute') as HTMLButtonElement | null
 function majInviteSon(): void {
-  if (btnMute)
-    btnMute.innerHTML = audio.enabled
-      ? '<i>♪</i><span>SON</span>'
-      : '<i>⊘</i><span>MUET</span>'
+  if (!btnMute) return
+  btnMute.innerHTML = audio.enabled ? PICTOS_ACCUEIL.son : PICTOS_ACCUEIL.muet
+  const nom = audio.enabled ? 'Son' : 'Son coupé'
+  btnMute.title = nom
+  btnMute.setAttribute('aria-label', nom)
 }
 btnMute?.addEventListener('click', () => {
   audio.setEnabled(!audio.enabled)
@@ -912,11 +913,11 @@ const records = new Records(coffre.stockage)
 // registres. De l'information, pas de la matière : la purge de fin de run
 // ne peut pas la confisquer — le Sujet se souvient, même d'une run
 // échouée. Elle paiera l'arbre de l'Éveil (améliorations permanentes).
+// L'accueil se relit à son prochain passage dans la boucle (majAccueil) :
+// la ligne MÉMOIRES montre les orbes, et la mémoire paie ce qui s'y tisse.
+let accueilPerime = true
 function majMemoireUI(): void {
-  const dd = document.getElementById('home-memoire')
-  if (dd) dd.textContent = String(records.memoire())
-  const orbes = document.getElementById('home-orbes')
-  if (orbes) orbes.textContent = String(records.orbes().length)
+  accueilPerime = true
 }
 /** Grave la mémoire ET tient le compteur de butin de la run courante.
  * La fiole de SOUVENIR majore chaque gain de 25 %. */
@@ -1179,9 +1180,27 @@ const exitMouth = { x: 0, y: 0 }
 // LE HUB : le module d'accueil (src/game/hub.ts) — la zone de départ du
 // roguelike. Prioritaire derrière les essais (testLevel) : l'éditeur et les
 // parcours d'essai passent toujours devant. C'est aussi le décor du
-// CHARGEMENT : derrière la fiche, l'échantillon dérive déjà dans la cuve
-// d'entraînement (sauf navigation directe ?tableau=N, outil de conception).
+// CHARGEMENT : derrière la fiche, l'échantillon dérive déjà — dans la CUVE
+// DE L'ACCUEIL, l'anneau et son puits (game/cuveAccueil.ts), tant qu'aucune
+// partie n'a commencé (sauf navigation directe ?tableau=N, outil de
+// conception). COMMENCER entre au hub ; « quitter » y ramène la fiche, et
+// la fiche ramène la cuve.
 let auHub = !new URLSearchParams(location.search).has('tableau')
+// Une partie tourne-t-elle derrière la fiche ? Déclaré ICI, avant le
+// premier applyLevel du chargement, qui le lit pour choisir la cuve.
+let hasPlayed = false
+const CUVE_ACCUEIL = tableauAccueil()
+// LA PAUSE MONTRE LA CUVE (le concepteur, 18/11 : « le jeu est figé et on se
+// retrouve sur la structure ronde de l'accueil, complètement à part du
+// niveau en cours »). La partie part de côté TOUT ENTIÈRE — sa salle, sa
+// simulation, le cadrage de sa caméra — et rien d'elle n'avance : la fiche
+// la tient en pause (input.paused). La cuve a sa propre simulation, neuve,
+// qui seule avance. Non nulle : la cuve est à l'écran, la partie attend ici.
+let vitrinePause: {
+  level: LevelDef
+  sim: FluidSim
+  cam: { x: number; y: number; zoom: number; manualZoom: number | null; manualPan: boolean }
+} | null = null
 /** Le hub est-il la salle JOUÉE ? `auHub` seul ne le dit pas : il vaut vrai
  *  dès le chargement, et l'essai d'éditeur ne le baisse pas (la salle
  *  essayée passe devant le hub sans l'effacer, pour que « quitter » y
@@ -1885,9 +1904,11 @@ function applyLevel(): void {
   // LES STRUCTURES DE COQUE se déplient ICI, à l'entonnoir unique : le jeu
   // et le bouton ESSAYER de l'éditeur voient exactement la même chose. Un
   // tableau sans structure traverse sans être touché (même référence).
-  level = niveauExpanse(
+  const lv = niveauExpanse(
     testLevel ??
-      (auHub
+      (auHub && !hasPlayed
+        ? CUVE_ACCUEIL
+        : auHub
         ? hubJoue()
         : (economatIntercalaire ??
           minijeuIntercalaire ??
@@ -1895,6 +1916,18 @@ function applyLevel(): void {
           playedLevels()[levelIndex] ??
           playedLevels()[0])),
   )
+  // LA PAUSE MONTRE LA CUVE (vitrinePause) : la salle recalculée attend de
+  // côté, avec la partie ; c'est rendPartie qui la posera à la reprise
+  if (vitrinePause) {
+    vitrinePause.level = lv
+    return
+  }
+  level = lv
+  poseLevel()
+}
+/** Ce qui se déduit de la salle posée : parois du rendu, bouche du sas,
+ *  ambiance, étiquettes. Rejoué tel quel quand la pause rend la salle. */
+function poseLevel(): void {
   levelHasCold = level.boxes.some((b) => b.material === MAT_FROID)
   rebuildRenderBoxes()
   exitMouth.x = (level.exit.minX + level.exit.maxX) * 0.5
@@ -2192,8 +2225,31 @@ const objArrow = el('obj-arrow')
 const objArrowGlyph = objArrow.firstElementChild as HTMLElement
 const objDist = el('obj-dist')
 const homeVolume = el('home-volume')
-const homeParticles = el('home-particles')
-const homeState = el('home-state')
+const releveAccueil = el('accueil-releve')
+// Le litrage de l'accueil SUIT l'échantillon : un point au bord du corps
+// (en haut à droite), projeté par la caméra comme les étiquettes du monde.
+// Le relevé d'avant était un tableau de six cases à côté de la cuve ; on
+// lisait le chiffre, pas le corps. Dispersé ou hors champ : il se tait.
+/** La place que le menu laisse à la cuve, en px CSS : au téléphone debout,
+ *  la fenêtre du rail ; ailleurs, tout ce qui est à droite du verbe. */
+function placeLibreAccueil(vw: number, vh: number): { left: number; top: number; right: number; bottom: number } {
+  const fenetre = document.querySelector<HTMLElement>('#home .acc-fenetre')
+  if (fenetre && fenetre.offsetHeight > 0) {
+    const r = fenetre.getBoundingClientRect()
+    return { left: 0, top: r.top, right: vw, bottom: r.bottom }
+  }
+  const verbe = startBtn.getBoundingClientRect()
+  return { left: verbe.right > 0 ? verbe.right + 24 : 0, top: 0, right: vw, bottom: vh }
+}
+function placeReleveAccueil(): void {
+  const z = camera.zoom
+  const r = Math.max(10, sim.stats.rmsRadius * 1.35 * z)
+  const ax = window.innerWidth / 2 + (sim.stats.centroidX - camera.x) * z + r * 0.72
+  const ay = window.innerHeight / 2 - (sim.stats.centroidY - camera.y) * z - r * 0.72
+  const dedans = !sim.dispersed && ax > 0 && ax < window.innerWidth - 120 && ay > 50 && ay < window.innerHeight
+  releveAccueil.hidden = !dedans
+  if (dedans) releveAccueil.style.transform = `translate(${ax.toFixed(1)}px, ${ay.toFixed(1)}px)`
+}
 const recEssai = el('rec-essai')
 const recRows = el('rec-rows')
 
@@ -2393,7 +2449,6 @@ function requireName(): boolean {
 // directement, ou l'entrée « fiche » du tiroir ≡.
 // L'essai continue de dériver derrière la fiche — elle observe, elle ne fige pas.
 const startBtn = document.getElementById('start') as HTMLButtonElement
-let hasPlayed = false
 // ---- Onboarding tactile : trois gestes, montrés une fois, au premier
 // lancement sur écran tactile. Le voile intercepte les touchers (il couvre
 // le canvas) et fige l'essai le temps de la lecture.
@@ -2803,10 +2858,10 @@ renderSalles()
 // journal en Markdown, hors ligne compris.
 const livraisonsEl = document.getElementById('livraisons') as HTMLDivElement
 {
-  // la version, affichée partout depuis la même source : sous le titre de
-  // la fiche (en petit) et dans l'en-tête du voile
+  // la version, affichée partout depuis la même source : au coin de
+  // l'accueil (en petit) et dans l'en-tête du voile
   const versionJeu = document.getElementById('version-jeu')
-  if (versionJeu) versionJeu.textContent = `v${VERSION} — prototype`
+  if (versionJeu) versionJeu.textContent = `v${VERSION}`
 
   // ---- MODE CONCEPTEUR : deux accueils dans le même jeu ----
   // L'accueil PUBLIC ne montre que l'essentiel (jouer, records, codex,
@@ -3787,9 +3842,23 @@ function renderSauvegardesVoile(): void {
 function ouvreSauvegardes(): void {
   svEffaceArme = null
   svDit = null
+  if (svOperateur) svOperateur.value = records.operator()
   sauvegardesEl.hidden = false
   renderSauvegardesVoile()
 }
+// LE NOM D'OPÉRATEUR se change ici : il vivait sur la fiche d'accueil, qui
+// ne garde que ce qui se joue. Vide, il reste ce qu'il était — le protocole
+// n'admet pas d'opérateur anonyme (le voile de signature l'a exigé).
+const svOperateur = document.getElementById('sv-operateur') as HTMLInputElement | null
+svOperateur?.addEventListener('change', () => {
+  const nom = svOperateur.value.trim()
+  if (nom) {
+    records.setOperator(nom)
+    recName.value = records.operator()
+    renderRegistres()
+  }
+  svOperateur.value = records.operator()
+})
 document.getElementById('home-sauvegardes')?.addEventListener('click', ouvreSauvegardes)
 document.getElementById('sauvegardes-fermer')?.addEventListener('click', () => {
   sauvegardesEl.hidden = true
@@ -4045,6 +4114,14 @@ const atelierJournal = new AtelierJournal(atelierJournalEl, {
   fermer: () => atelierJournal.close(),
 })
 document.getElementById('home-codex')?.addEventListener('click', () => {
+  // ce que le codex compte à l'ouverture est « vu » : le voyant de la
+  // fiche ne se rallume qu'à la prochaine découverte
+  try {
+    coffre.stockage.setItem(CLE_CODEX_VU, String(codex.compte()))
+  } catch {
+    // stockage muet : le voyant restera allumé, sans autre gravité
+  }
+  accueilPerime = true
   ecranCodex.open()
 })
 // Ouvert DEPUIS LE TOAST en pleine partie, le codex fige l'essai (lecture au
@@ -5092,7 +5169,7 @@ document.getElementById('proto-rejouer')?.addEventListener('click', () => {
   document.body.classList.add('playing')
   input.paused = false
   hasPlayed = true
-  startBtn.textContent = "REPRENDRE L'ESSAI"
+  majAccueil()
   homeRestartBtn.hidden = false
   restart()
   lanceEveil()
@@ -5290,7 +5367,7 @@ function closeHome(): void {
     hasPlayed = true
     document.body.classList.add('playing')
     input.paused = false
-    startBtn.textContent = "REPRENDRE L'ESSAI"
+    majAccueil()
     homeRestartBtn.hidden = false
     restart()
     return
@@ -5309,9 +5386,10 @@ function closeHome(): void {
     entrerHub()
     return
   }
+  rendPartie() // la salle reprend l'écran, telle qu'on l'a laissée
   document.body.classList.add('playing')
   input.paused = false // la fiche figeait l'essai : il repart
-  startBtn.textContent = "REPRENDRE L'ESSAI"
+  majAccueil()
   homeRestartBtn.hidden = false
 }
 
@@ -5324,7 +5402,7 @@ function entrerHub(): void {
   hasPlayed = true
   document.body.classList.add('playing')
   input.paused = false
-  startBtn.textContent = "REPRENDRE L'ESSAI"
+  majAccueil()
   homeRestartBtn.hidden = false
   restart()
   montrerOnboard()
@@ -5383,6 +5461,53 @@ async function publieAvisSalles(): Promise<void> {
 }
 void publieAvisSalles()
 
+/** La fiche s'ouvre sur une partie : la partie part de côté, intacte, et
+ *  la cuve de l'accueil prend l'écran avec sa propre simulation — neuve à
+ *  chaque pause, comme au premier jour : 4,5 L, en eau, au centre. */
+function montreCuvePause(): void {
+  if (vitrinePause || !hasPlayed) return
+  vitrinePause = {
+    level,
+    sim,
+    cam: {
+      x: camera.x,
+      y: camera.y,
+      zoom: camera.zoom,
+      manualZoom: camera.manualZoom,
+      manualPan: camera.manualPan,
+    },
+  }
+  level = niveauExpanse(CUVE_ACCUEIL)
+  poseLevel()
+  // PAS createSim : il recouvre les réglages du banc par ceux de la salle et
+  // repose les cartes imposées — la partie les retrouverait défaits. La
+  // cuve n'a ni réglage ni carte : un solveur nu, son anneau, son corps.
+  const s = new FluidSim(params, level.bounds, CAPACITY)
+  appliqueMoteur(s)
+  s.setLevel(level.boxes, level.sponges)
+  s.spawnDisc(level.spawn.x, level.spawn.y, level.spawn.n, KIND_PLAYER)
+  sim = s
+  exposeSim()
+  prevision = null // la ligne prédite était celle de la salle
+}
+/** La partie revient, telle qu'on l'a laissée : sa salle, sa simulation,
+ *  sa caméra. Appelée avant tout ce qui fait jouer (reprendre, recommencer,
+ *  quitter, essayer) — et la boucle la rappelle si la partie se remet à
+ *  jouer par un autre chemin : jamais la cuve en pleine partie. */
+function rendPartie(): void {
+  const v = vitrinePause
+  if (!v) return
+  vitrinePause = null
+  level = v.level
+  poseLevel()
+  sim = v.sim
+  exposeSim()
+  prevision = null
+  camera.snapTo(v.cam.x, v.cam.y, v.cam.zoom)
+  camera.manualZoom = v.cam.manualZoom
+  camera.manualPan = v.cam.manualPan
+}
+
 function openHome(): void {
   document.body.classList.remove('playing')
   appelOeil()
@@ -5390,8 +5515,9 @@ function openHome(): void {
   // La fiche fige l'essai : revenir au menu, c'est faire une pause — la
   // cuve n'avance plus dans le dos du joueur.
   if (hasPlayed) input.paused = true
+  montreCuvePause() // la pause montre la cuve ; la partie attend de côté
   homeRestartBtn.hidden = !hasPlayed
-  majBoutonsRun()
+  majBoutonsRun() // et la fiche se relit (majAccueil)
 }
 // LE BOUTON PRINCIPAL : il n'y a qu'UNE descente et qu'une porte. Reprendre
 // celle qui est sauvée, ou rejoindre le module — c'est son sas qui lance.
@@ -5527,7 +5653,6 @@ function reprendreRun(save: RunSauvee): void {
   run.xp = save.xp
   run.livreTotal = save.livreTotal
   condensat = Math.max(0, Math.round(save.condensat ?? 0))
-  majCondensatUI()
   run.memoireGagnee = Math.max(0, Math.round(save.memoireGagnee ?? 0))
   economatIntercalaire = null
   minijeuIntercalaire = null
@@ -5546,7 +5671,7 @@ function reprendreRun(save: RunSauvee): void {
   hasPlayed = true
   document.body.classList.add('playing')
   input.paused = false
-  startBtn.textContent = "REPRENDRE L'ESSAI"
+  majAccueil()
   homeRestartBtn.hidden = false
   appliqueProvisions() // les provisions du comptoir valent aussi à la reprise
   restart()
@@ -5554,8 +5679,6 @@ function reprendreRun(save: RunSauvee): void {
   majBoutonsRun()
 }
 function majBoutonsRun(): void {
-  const save = runSauvee()
-  const total = longueurRun() // la descente dure ce que la carte dit
   const btnAband = document.getElementById(
     'start-abandon',
   ) as HTMLButtonElement | null
@@ -5565,15 +5688,80 @@ function majBoutonsRun(): void {
     btnAband.hidden = auHub || !!testLevel || !hasPlayed
     if (btnAband.hidden) {
       btnAband.classList.remove('arme')
-      btnAband.textContent = 'QUITTER LA DESCENTE — RETOUR AU MENU'
+      btnAband.textContent = 'QUITTER'
     }
   }
-  if (!hasPlayed) {
-    // hors partie, le bouton dit ce qu'il fera : reprendre la descente
-    // sauvée, ou en commencer une (par le module et son sas)
-    startBtn.textContent = save
-      ? `REPRENDRE LA DESCENTE — SALLE ${(save.rang ?? save.index) + 1}/${total}`
-      : "COMMENCER L'ESSAI"
+  // hors partie, le bouton dit ce qu'il fera : reprendre la descente
+  // sauvée, ou en commencer une (par le module et son sas)
+  majAccueil()
+}
+
+// ---- L'ACCUEIL : le verbe, les lieux et leurs valeurs (game/accueil.ts).
+// La seule écriture des libellés de la fiche. On l'appelle quand l'état
+// change d'un coup (ouverture, fermeture, reprise) ; la boucle la relit
+// tant que la fiche est à l'écran (accueilPerime, ou chaque seconde) : les
+// écrans qu'elle ouvre changent ce qu'elle dit — un orbe tissé, une fiole
+// équipée — et personne ne prévient la fiche en les refermant.
+const CLE_CODEX_VU = 'sujet21-accueil-codex-vu'
+function codexVu(): number {
+  try {
+    return Math.max(0, Number(coffre.stockage.getItem(CLE_CODEX_VU)) || 0)
+  } catch {
+    return 0
+  }
+}
+let accueilLu = 0 // l'instant de la dernière relecture (performance.now)
+function ecritSiChange(el: Element | null, texte: string): void {
+  if (el && el.textContent !== texte) el.textContent = texte
+}
+function majAccueil(): void {
+  accueilPerime = false
+  accueilLu = performance.now()
+  const homeEl = document.getElementById('home')
+  if (!homeEl) return
+  // une partie tourne derrière : la fiche est une PAUSE (le titre le dit)
+  homeEl.classList.toggle('pause', hasPlayed)
+  const save = hasPlayed ? null : runSauvee()
+  const enDescente = hasPlayed && !auHub && !testLevel
+  const verbe = verbeAccueil({
+    pause: hasPlayed,
+    enDescente,
+    rang: enDescente ? voieRang : save ? (save.rang ?? save.index) : null,
+    total: longueurRun(),
+  })
+  ecritSiChange(document.getElementById('acc-verbe-nom'), verbe.nom)
+  ecritSiChange(document.getElementById('acc-verbe-detail'), verbe.detail)
+  // LA FICHE GRANDIT AVEC LA PARTIE : au tout premier lancement, un nouveau
+  // venu n'a qu'une chose à faire. Le reste paraît dès que la partie a
+  // laissé une trace — ou tout de suite pour le concepteur.
+  const progression =
+    hasPlayed ||
+    !!save ||
+    eveilJoue() ||
+    codex.compte() > 0 ||
+    records.memoire() > 0 ||
+    document.body.classList.contains('concepteur')
+  const devise = document.getElementById('acc-devise')
+  if (devise) devise.hidden = progression
+  const etatCarte = enDescente ? carteRun : save?.carte ? litEtatCarteRun(save.carte, carte) : null
+  const valeurs = valeursLieux({
+    orbes: records.orbes().length,
+    fiolesEquipees: records.fiolesEquipees().length,
+    fiolesLogements: FIOLES_SLOTS,
+    codexConnues: codex.compte(),
+    codexTotal: fichesCodex().length,
+    codexVu: codexVu(),
+    module: etatCarte ? (carte.modules.find((m) => m.id === etatCarte.module)?.nom ?? '') : '',
+    recordSalles: records.expedition()?.tableaux ?? 0,
+    emplacement: coffre.actif,
+  })
+  for (const id of LIEUX_ACCUEIL) {
+    const b = document.getElementById(id)
+    if (!b) continue
+    b.hidden = !progression && !LIEUX_PREMIER_LANCEMENT.includes(id)
+    ecritSiChange(b.querySelector('small'), valeurs[id].val)
+    const voyant = b.querySelector<HTMLElement>('.acc-voyant')
+    if (voyant) voyant.hidden = !valeurs[id].neuf
   }
 }
 // Abandonner : en DEUX temps (l'expédition en cours se perd — un clic de
@@ -5582,11 +5770,11 @@ document.getElementById('start-abandon')?.addEventListener('click', (e) => {
   const b = e.currentTarget as HTMLButtonElement
   if (!b.classList.contains('arme')) {
     b.classList.add('arme')
-    b.textContent = 'CONFIRMER — LA DESCENTE EN COURS SERA PERDUE'
+    b.textContent = 'CONFIRMER — LA DESCENTE SERA PERDUE'
     return
   }
   b.classList.remove('arme')
-  b.textContent = 'QUITTER LA DESCENTE — RETOUR AU MENU'
+  b.textContent = 'QUITTER'
   quitteAuMenu()
 })
 // au chargement, la fiche est déjà à l'écran : les boutons disent tout de
@@ -5597,7 +5785,7 @@ homeRestartBtn.addEventListener('click', () => {
   if (requireName()) return
   document.body.classList.add('playing')
   input.paused = false
-  startBtn.textContent = "REPRENDRE L'ESSAI"
+  majAccueil()
   resetAction()
 })
 // Un essai HORS EXPÉDITION : un tableau (ou une file de tableaux) joué à
@@ -5748,7 +5936,7 @@ function joueCinesEnTete(puis: () => void): void {
 }
 function startTest(etapes: (LevelDef | CinematiqueDef)[]): void {
   if (requireName()) {
-    openHome() // le champ du nom vit sur la fiche : on la montre pour le remplir
+    openHome() // le champ du nom s'ouvre dans le voile des registres, sur la fiche
     return
   }
   testQueue = etapes.slice()
@@ -5763,7 +5951,7 @@ function startTest(etapes: (LevelDef | CinematiqueDef)[]): void {
   // du carton de journal — sinon les deux se jouaient en double, en décalé.
   document.body.classList.add('playing')
   input.paused = false
-  startBtn.textContent = "REPRENDRE L'ESSAI"
+  majAccueil()
   homeRestartBtn.hidden = false
   joueCinesEnTete(() => {
     const lv = testQueue.shift()
@@ -8214,10 +8402,10 @@ reglesEl?.addEventListener('pointerdown', (e) => {
 
 // La fiche annonce la séquence jouée : bibliothèque partagée en tête
 // (si elle en contient), puis l'expédition livrée à la suite.
-const homeSeq = el('home-seq')
+const homeSeq = el('version-jeu')
 function updateLibraryButton(): void {
   const nb = libraryLevels.filter((l) => !estCodeHub(l.code)).length
-  homeSeq.textContent =
+  homeSeq.title =
     nb > 0
       ? `Séquence : ${nb} tableau(x) de la bibliothèque, puis l'expédition livrée — ${playedLevels().length} salles en tout.`
       : `Expédition livrée : ${TABLEAUX.length} tableaux. La bibliothèque partagée est vide.`
@@ -8574,6 +8762,20 @@ cmdsEl.addEventListener('pointerdown', (e) => {
 const pleinBtn = document.getElementById(
   'home-plein',
 ) as HTMLButtonElement | null
+function majPictoPlein(): void {
+  if (!pleinBtn) return
+  pleinBtn.innerHTML = document.fullscreenElement ? PICTOS_ACCUEIL.quitterPlein : PICTOS_ACCUEIL.plein
+  const nom = document.fullscreenElement ? 'Quitter le plein écran' : 'Plein écran'
+  pleinBtn.title = nom
+  pleinBtn.setAttribute('aria-label', nom)
+}
+majPictoPlein()
+{
+  const cmds = document.getElementById('home-cmds')
+  if (cmds) cmds.innerHTML = PICTOS_ACCUEIL.commandes
+  const params = document.getElementById('home-params')
+  if (params) params.innerHTML = PICTOS_ACCUEIL.parametres
+}
 if (pleinBtn) {
   if (!document.documentElement.requestFullscreen) {
     pleinBtn.hidden = true
@@ -8583,9 +8785,7 @@ if (pleinBtn) {
       else void document.documentElement.requestFullscreen().catch(() => {})
     })
     document.addEventListener('fullscreenchange', () => {
-      pleinBtn.innerHTML = document.fullscreenElement
-        ? '<i>⛶</i><span>QUITTER</span>'
-        : '<i>⛶</i><span>PLEIN ÉCRAN</span>'
+      majPictoPlein()
     })
   }
 }
@@ -9051,6 +9251,10 @@ let manettePollNow = 0
   },
 }
 input.attach(canvas)
+// la cuve de l'accueil se touche dès le menu (game/cuveAccueil.ts) : seul
+// le geste d'éjecter, et seulement elle — un voile ouvert par-dessus prend
+// les touchers avant le canvas
+input.vitrine = () => level.code === CODE_ACCUEIL
 
 const monitor: BenchMonitor = {
   fps: 0,
@@ -18587,6 +18791,9 @@ function annonceVoieCarte(): void {
 }
 
 function restart(): void {
+  // la cuve de la pause s'efface d'abord : la salle qu'on recharge (ou
+  // qu'on quitte) est celle de la partie, pas la vitrine
+  rendPartie()
   // un rejeu ne survit qu'à SA salle : toute autre salle chargée y met fin
   // (avant sauveRun, qui graverait sinon une réserve à zéro)
   if (rejeu && testLevel !== rejeu.niveau) finRejeu()
@@ -19005,9 +19212,11 @@ function quitteAuMenu(): void {
   auHub = true
   hasPlayed = false // la partie est close : le bouton redit COMMENCER
   document.body.classList.remove('playing')
-  input.paused = true
+  // la cuve de l'accueil revient derrière la fiche, et elle VIT comme au
+  // chargement : figée, elle ne rendrait plus ce qu'on y éjecte
+  input.paused = false
   homeRestartBtn.hidden = true
-  restart() // le décor du hub reprend sa place derrière la fiche
+  restart() // la cuve de l'accueil reprend sa place derrière la fiche
   majVoieHud()
   majBoutonsRun()
   openHome()
@@ -20155,6 +20364,10 @@ function corpsImage(now: number): boolean {
   if (dtReal > 0) fpsSmoothed += (1 / dtReal - fpsSmoothed) * 0.05
 
   updateQuality(dtReal)
+  // jamais la cuve de la pause en pleine partie : quel que soit le chemin qui
+  // a remis le jeu en marche sans passer par rendPartie, la partie reprend
+  // l'écran avant que la moindre logique de jeu ne tourne sur la vitrine
+  if (vitrinePause && document.body.classList.contains('playing')) rendPartie()
   const vw = window.innerWidth
   const vh = window.innerHeight
   // l'échelle fixe choisie s'applique ici : seul le canvas est mis à
@@ -20433,8 +20646,10 @@ function corpsImage(now: number): boolean {
     input.freezeIntent = zoneActive === 'glace'
     input.gasIntent = zoneActive === 'vapeur'
   }
-  sim.freezeIntent = input.freezeIntent
-  sim.gasIntent = input.gasIntent
+  // la cuve de la pause est à part : le corps de la partie était peut-être
+  // en glace, le sien reste en eau
+  sim.freezeIntent = vitrinePause ? false : input.freezeIntent
+  sim.gasIntent = vitrinePause ? false : input.gasIntent
   // AU PALET, la ligne gèle : tant qu'un lancer est en cours, le corps est
   // tenu en glace quoi que fasse le joueur — le lancer fini, l'intention
   // redevient la sienne et la glace fond (thawTime du mini-jeu)
@@ -20658,6 +20873,25 @@ function corpsImage(now: number): boolean {
     )
     physRaw = performance.now() - physT0
     monitor.physMs += (physRaw - monitor.physMs) * 0.08
+  } else if (vitrinePause) {
+    // LA CUVE DE LA PAUSE : la partie est figée (input.paused), la cuve seule
+    // avance — le geste (éjecter, se rassembler sous le doigt), son puits,
+    // son pas. Rien d'autre du jeu ne tourne : ni chrono, ni séquence, ni
+    // fantôme, ni sas — ils appartiennent à la partie mise de côté.
+    loop.advance(
+      dtReal,
+      1,
+      params.dt,
+      () => {
+        if (input.aimActive && !sim.dispersed) {
+          if (rassembler) sim.rassemble(params.dt, aim.x, aim.y)
+          else sim.eject(aim.x, aim.y, params.dt)
+        }
+        sim.applyPuits(level.puits ?? [], params.dt)
+        sim.step(params.dt)
+      },
+      8,
+    )
   }
 
   // ---- LES PORTES vers le solveur. HORS du bloc des lasers : un tableau
@@ -21677,6 +21911,12 @@ function corpsImage(now: number): boolean {
     const fitZoom =
       Math.min(vw / (b.maxX - b.minX), vh / (b.maxY - b.minY)) * 0.94
     camera.snapTo((b.minX + b.maxX) * 0.5, (b.minY + b.maxY) * 0.5, fitZoom)
+  } else if (level.code === CODE_ACCUEIL) {
+    // LA CUVE DE L'ACCUEIL se montre entière, au milieu de la place que le
+    // menu laisse : la caméra ne suit pas le corps (il revient toujours au
+    // centre, game/cuveAccueil.ts), elle cadre la vitrine
+    const c = cadreAccueil(vw, vh, placeLibreAccueil(vw, vh))
+    camera.snapTo(c.x, c.y, c.zoom)
   } else if (rejeu) {
     // le rejeu : la caméra suit le fantôme, et reste où il a bu le sas
     const e = rejeu.lecteur.a(run.tableauTime) ?? rejeu.dernier
@@ -22444,11 +22684,11 @@ function corpsImage(now: number): boolean {
   document.body.classList.toggle('dispersed', sim.dispersed)
   majVitesse()
 
-  // Relevé vivant de la fiche d'essai
+  // Relevé vivant de l'accueil : le litrage, posé au bord de l'échantillon
   if (!document.body.classList.contains('playing')) {
     homeVolume.textContent = `${sim.liters().toFixed(2)} L`
-    homeParticles.textContent = `${sim.playerCount}`
-    homeState.textContent = sim.dispersed ? 'dispersé' : 'en dérive'
+    placeReleveAccueil()
+    if (accueilPerime || performance.now() - accueilLu > 1000) majAccueil()
   }
 
   // ---- LA RUN SE CONCLUT D'ELLE-MÊME ------------------------------------

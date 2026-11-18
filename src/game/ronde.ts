@@ -17,6 +17,7 @@
 // qui diffère de la valeur au centre dans le halo en 1/r² — la recherche
 // tire avec ce champ moyenné, et le vrai solveur vérifie (sim/ronde.spec.ts).
 import { estMiniJeu } from './minijeux'
+import { CODE_ACCUEIL } from './cuveAccueil'
 import type { ImpulsionDef, LevelDef, PuitsDef } from './level'
 
 export const CODE_RONDE = 'DEMO-RONDE'
@@ -55,9 +56,10 @@ export const REGLES_RONDE: ReglesRonde = {
 }
 
 /** Ce tableau se joue SANS SAS : rien ne se dessine, rien n'aspire, rien ne
- *  conclut — les mini-jeux (qui mesurent) et la ronde (qui montre). */
+ *  conclut — les mini-jeux (qui mesurent), la ronde (qui montre) et la cuve
+ *  de l'accueil (qui attend derrière le menu). */
 export function sansSas(level: { code: string; minijeu?: LevelDef['minijeu'] }): boolean {
-  return estMiniJeu(level) || level.code === CODE_RONDE
+  return estMiniJeu(level) || level.code === CODE_RONDE || level.code === CODE_ACCUEIL
 }
 
 export function tableauRonde(regles: ReglesRonde = REGLES_RONDE): LevelDef {
