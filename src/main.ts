@@ -637,7 +637,12 @@ import {
   VIDE_DELAI,
   VIDE_ENGLOUTI,
 } from './game/vide'
-import { guettePlanchesPeintes } from './game/iconesPeintes'
+import {
+  estIconeCycle,
+  guettePlanchesPeintes,
+  iconeCycleHTML,
+  iconeEtatHTML,
+} from './game/iconesPeintes'
 
 const CAPACITY = 4096
 
@@ -2172,6 +2177,15 @@ const gaugeThreshold = el('gauge-threshold')
 const hudPerte = el('hud-perte')
 const hudRosee = el('hud-rosee')
 const hudDanger = el('hud-danger')
+/** L'alarme en HTML (une icône peinte y entre), réécrite seulement quand elle
+ *  CHANGE : elle se recalcule à chaque image, et un innerHTML rebâtit ses
+ *  nœuds — l'icône clignoterait, et la région « assertive » se relirait. */
+let alarmeHTML = ''
+function ecritAlarme(html: string): void {
+  if (html === alarmeHTML) return
+  alarmeHTML = html
+  hudDanger.innerHTML = html
+}
 const objArrow = el('obj-arrow')
 const objArrowGlyph = objArrow.firstElementChild as HTMLElement
 const objDist = el('obj-dist')
@@ -3528,7 +3542,11 @@ function renderCycleVoile(): void {
       ?.setAttribute('data-etat', statut)
     const de = ETATS_CYCLE[t.de].nom
     const vers = ETATS_CYCLE[t.vers].nom
-    registre += `<button type="button" class="cy-reg cy-${statut}" data-transfo="${t.id}" title="${t.desc}"><span><b>${t.nom}</b><small>${de} → ${vers}</small></span><em>${sous}</em></button>`
+    // la transformation a sa case sur la planche du cycle (source → cible) :
+    // elle n'avait aucune icône, elle n'en montre toujours aucune tant que
+    // la planche manque — la pastille vide ne prend pas de place
+    const ico = estIconeCycle(t.id) ? iconeCycleHTML(t.id) : ''
+    registre += `<button type="button" class="cy-reg cy-${statut}" data-transfo="${t.id}" title="${t.desc}">${ico}<span><b>${t.nom}</b><small>${de} → ${vers}</small></span><em>${sous}</em></button>`
   }
   cycleRegListe.innerHTML = registre
   cycleScene.classList.remove('cy-isole') // le registre est neuf : rien n'est survolé
@@ -22120,15 +22138,20 @@ function corpsImage(now: number): boolean {
     menaceDuVide > 0 ||
     (alive && !aspireAssez && (endgame.spent || endgame.lastCall || nearLast))
   if (menaceDuVide > 0) {
-    hudDanger.textContent = vide.prise
-      ? '⚠ LE VIDE ASPIRE L’ÉCHANTILLON'
-      : `⚠ AU-DESSUS DU VIDE — QUITTEZ LA BRÈCHE (${Math.ceil(VIDE_DELAI * (1 - menaceDuVide))} s)`
+    ecritAlarme(
+      vide.prise
+        ? '⚠ LE VIDE ASPIRE L’ÉCHANTILLON'
+        : `⚠ AU-DESSUS DU VIDE — QUITTEZ LA BRÈCHE (${Math.ceil(VIDE_DELAI * (1 - menaceDuVide))} s)`,
+    )
   } else if (inDanger) {
-    hudDanger.textContent = endgame.spent
-      ? '❄ DERNIÈRE IMPULSION DONNÉE — L’ÉCHANTILLON DÉRIVE'
-      : endgame.lastCall
-        ? '⚠ RÉSERVE À SEC — LA PROCHAINE IMPULSION EST LA DERNIÈRE'
-        : '⚠ RÉSERVE BASSE — LA DERNIÈRE IMPULSION APPROCHE'
+    // la dérive gelée porte l'icône peinte de la glace (l'emoji en repli)
+    ecritAlarme(
+      endgame.spent
+        ? `${iconeEtatHTML('solide')} DERNIÈRE IMPULSION DONNÉE — L’ÉCHANTILLON DÉRIVE`
+        : endgame.lastCall
+          ? '⚠ RÉSERVE À SEC — LA PROCHAINE IMPULSION EST LA DERNIÈRE'
+          : '⚠ RÉSERVE BASSE — LA DERNIÈRE IMPULSION APPROCHE',
+    )
   }
   hudDanger.classList.toggle(
     'visible',

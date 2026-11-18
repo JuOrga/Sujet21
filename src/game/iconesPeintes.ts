@@ -53,6 +53,12 @@ export function caseCycle(id: string): number | null {
   return c < 0 ? null : c
 }
 
+/** Un id venu des données (une transformation de TRANSFOS_CYCLE) a-t-il sa
+ *  case sur la planche du cycle ? */
+export function estIconeCycle(id: string): id is IconeCycle {
+  return caseCycle(id) !== null
+}
+
 /** La case d'un trophée, ou null (trophée ajouté après la planche). */
 export function caseTrophee(id: string): number | null {
   const c = ORDRE_TROPHEES.indexOf(id)

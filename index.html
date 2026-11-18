@@ -2710,6 +2710,8 @@
         cursor: default;
       }
       .cy-reg b { font-family: var(--font-display); font-size: calc(12px * var(--ui)); letter-spacing: 0.2em; font-weight: 600; display: block; }
+      /* la transformation peinte (source → cible), en tête de sa ligne */
+      .cy-reg .ico-cycle { flex: none; font-size: calc(24px * var(--ui)); }
       .cy-reg small { display: block; font-size: calc(8.5px * var(--ui)); letter-spacing: 0.14em; color: var(--dim); margin-top: 4px; }
       .cy-reg em {
         margin-left: auto;
@@ -10735,8 +10737,8 @@
         <div class="cmds-page home-commands" data-page="tactile" hidden>
           <kbd>toucher</kbd>éjecter vers le doigt — le corps part à l'opposé<br />
           <kbd>sur le corps</kbd>doigt posé SUR le volume : se rassembler (gratuit)<br />
-          <kbd>❄</kbd>glace, re-toucher pour dégeler
-          <kbd>💨</kbd>vapeur : viser puis relâcher = dash<br />
+          <kbd><i class="ico-cycle" style="--ic-x:0;--ic-y:0" aria-hidden="true"><span class="ico-repli">❄</span></i></kbd>glace, re-toucher pour dégeler
+          <kbd><i class="ico-cycle" style="--ic-x:2;--ic-y:0" aria-hidden="true"><span class="ico-repli">💨</span></i></kbd>vapeur : viser puis relâcher = dash<br />
           <kbd>2 doigts</kbd>pincer : zoom · glisser : déplacer la caméra<br />
           <kbd>≡</kbd>le tiroir : LÉGENDE, ÉTATS, RECADRER, BANC, FICHE D’ESSAI…
         </div>
@@ -11118,7 +11120,7 @@
               <path class="cy-perdu" d="M 640 868 C 724 894 806 890 896 852" />
             </svg>
             <div class="cy-etat" id="cy-solide">
-              <span class="cy-glacon"><i class="gl-haut"></i><i class="gl-gauche"></i><i class="gl-droit"></i><em>❄&#xFE0E;</em></span>
+              <span class="cy-glacon"><i class="gl-haut"></i><i class="gl-gauche"></i><i class="gl-droit"></i><em><i class="ico-cycle" style="--ic-x:0;--ic-y:0" aria-hidden="true"><span class="ico-repli">❄&#xFE0E;</span></i></em></span>
               <b>SOLIDE</b><small>GLACE</small>
             </div>
             <div class="cy-etat" id="cy-liquide">
@@ -11529,10 +11531,10 @@
         Se déplacer, c'est rétrécir : chaque impulsion se paie en volume.</p>
       </div>
       <div class="ob-etape" data-etape="1" hidden>
-        <div class="ob-anim ob-etats"><b>💧</b><b>❄</b><b>💨</b></div>
+        <div class="ob-anim ob-etats"><b><i class="ico-cycle" style="--ic-x:1;--ic-y:0" aria-hidden="true"><span class="ico-repli">💧</span></i></b><b><i class="ico-cycle" style="--ic-x:0;--ic-y:0" aria-hidden="true"><span class="ico-repli">❄</span></i></b><b><i class="ico-cycle" style="--ic-x:2;--ic-y:0" aria-hidden="true"><span class="ico-repli">💨</span></i></b></div>
         <h3>TROIS ÉTATS</h3>
-        <p class="ob-t">❄ la glace garde son élan et réfléchit les lasers ·
-        💨 la vapeur passe les évents — visez (le temps ralentit), relâchez : dash.</p>
+        <p class="ob-t"><i class="ico-cycle" style="--ic-x:0;--ic-y:0" aria-hidden="true"><span class="ico-repli">❄</span></i> la glace garde son élan et réfléchit les lasers ·
+        <i class="ico-cycle" style="--ic-x:2;--ic-y:0" aria-hidden="true"><span class="ico-repli">💨</span></i> la vapeur passe les évents — visez (le temps ralentit), relâchez : dash.</p>
         <p class="ob-p"><b>F</b> la glace : garde son élan, réfléchit les lasers ·
         <b>G</b> la vapeur : passe les évents — visez (le temps ralentit), relâchez : dash.</p>
       </div>
@@ -11572,7 +11574,7 @@
     <!-- L'ÉVEIL : la prise en main scénarisée — cryostase, dégel, volume -->
     <div id="eveil1" class="eveil-voile" hidden aria-label="Éveil — sortie de cryostase">
       <div class="ev-sur">COMPLEXE ORBITAL MÉDUSE — SORTIE DE CRYOSTASE</div>
-      <div class="ev-icone">❄</div>
+      <div class="ev-icone"><i class="ico-cycle" style="--ic-x:0;--ic-y:0" aria-hidden="true"><span class="ico-repli">❄</span></i></div>
       <h3 class="ev-titre">VOUS ÊTES SOUS FORME DE GLACE</h3>
       <p class="ev-texte">La cryostase s'achève, sujet 21 : vous dérivez, gelé, dans la
       cuve d'essai. Sous cette forme, nul moyen de vous diriger — mais rien ne se
@@ -11583,7 +11585,7 @@
     </div>
     <div id="eveil2" class="eveil-voile" hidden aria-label="Éveil — le volume">
       <div class="ev-sur">PREMIÈRE ANALYSE — LE FLUIDE SPÉCULAIRE</div>
-      <div class="ev-icone">💧</div>
+      <div class="ev-icone"><i class="ico-cycle" style="--ic-x:1;--ic-y:0" aria-hidden="true"><span class="ico-repli">💧</span></i></div>
       <h3 class="ev-titre">VOUS ÊTES CE QUI RESTE</h3>
       <p class="ev-texte">Vous l'avez senti : chaque impulsion éjecte un peu de vous.
       Se déplacer, c'est rétrécir — le volume est à la fois votre vie, votre monnaie
@@ -11593,8 +11595,8 @@
       <button class="ev-continuer" type="button">PLONGER</button>
     </div>
     <div id="eveil-invite" hidden aria-hidden="true">
-      <span class="ei-boite"><span class="ei-t">TOUCHEZ <b>💧</b> — REDEVENEZ LIQUIDE</span><span
-        class="ei-p"><b>F</b> OU <b>💧</b> — REDEVENEZ LIQUIDE</span></span>
+      <span class="ei-boite"><span class="ei-t">TOUCHEZ <b><i class="ico-cycle" style="--ic-x:1;--ic-y:0" aria-hidden="true"><span class="ico-repli">💧</span></i></b> — REDEVENEZ LIQUIDE</span><span
+        class="ei-p"><b>F</b> OU <b><i class="ico-cycle" style="--ic-x:1;--ic-y:0" aria-hidden="true"><span class="ico-repli">💧</span></i></b> — REDEVENEZ LIQUIDE</span></span>
       <span class="ei-fleche">▼</span>
     </div>
 
@@ -11779,15 +11781,15 @@
         <span><b>Sas</b> — la bouche d'aspiration boit l'échantillon et le met en
         bonbonne : c'est la sortie.</span></div>
       <div class="lg-states">ÉTATS —
-        <b>💧 LIQUIDE</b> : pilotable, éjecter pour avancer ·
-        <b>❄ GLACE</b> (F) : le bloc garde son élan, re-presser dégèle ·
-        <b>💨 VAPEUR</b> (G) : la bascule coûte 20 % du volume (gouttes récupérables) et rend 3 dashs — viser ralentit le temps, relâcher = dash.</div>
+        <b><i class="ico-cycle" style="--ic-x:1;--ic-y:0" aria-hidden="true"><span class="ico-repli">💧</span></i> LIQUIDE</b> : pilotable, éjecter pour avancer ·
+        <b><i class="ico-cycle" style="--ic-x:0;--ic-y:0" aria-hidden="true"><span class="ico-repli">❄</span></i> GLACE</b> (F) : le bloc garde son élan, re-presser dégèle ·
+        <b><i class="ico-cycle" style="--ic-x:2;--ic-y:0" aria-hidden="true"><span class="ico-repli">💨</span></i> VAPEUR</b> (G) : la bascule coûte 20 % du volume (gouttes récupérables) et rend 3 dashs — viser ralentit le temps, relâcher = dash.</div>
     </div>
 
     <div id="states" role="dialog" aria-label="Les trois états : qui bloque quoi">
       <div class="lg-head"><span>LES TROIS ÉTATS — QUI BLOQUE QUOI</span>
         <button id="states-close" type="button" title="fermer (E)">✕</button></div>
-      <div class="lg-row"><span class="st-big">💧</span>
+      <div class="lg-row"><span class="st-big"><i class="ico-cycle" style="--ic-x:1;--ic-y:0" aria-hidden="true"><span class="ico-repli">💧</span></i></span>
         <span><b>LIQUIDE</b> — pilotable : éjecter pour avancer.<br />
         Bloqué par les <i class="m-mur">parois</i>, les <i class="m-grille">évents</i>
         et le <i class="m-froid">rideau lamellaire</i> ·
@@ -11798,7 +11800,7 @@
         gelé par les <i class="m-froid">plaques froides</i> ·
         vaporisé par les <i class="m-chaud">chaudières</i> (à 95 % de présence) ·
         le <i class="m-sas">sas</i> l'aspire.</span></div>
-      <div class="lg-row"><span class="st-big">❄</span>
+      <div class="lg-row"><span class="st-big"><i class="ico-cycle" style="--ic-x:0;--ic-y:0" aria-hidden="true"><span class="ico-repli">❄</span></i></span>
         <span><b>GLACE</b> (F) — bloc rigide : garde son élan, plus de propulsion.<br />
         Rebondit sur les <i class="m-mur">parois</i> et les <i class="m-grille">évents</i> —
         comme un bumper sur l'<i class="m-phobe">hydrophobe</i>, freinée par
@@ -11808,7 +11810,7 @@
         <i class="m-froid">soudée</i> au contact d'une plaque froide ·
         dégelée par les <i class="m-chaud">chaudières</i> ·
         le <i class="m-sas">sas</i> la hale et l'avale — entrer solide paie une prime.</span></div>
-      <div class="lg-row"><span class="st-big">💨</span>
+      <div class="lg-row"><span class="st-big"><i class="ico-cycle" style="--ic-x:2;--ic-y:0" aria-hidden="true"><span class="ico-repli">💨</span></i></span>
         <span><b>VAPEUR</b> (G) — viser ralentit fortement le temps, relâcher
         lance le nuage d'un trait (dash) : la distance du doigt règle la
         puissance. La BASCULE en vapeur coûte 20 % du volume (une gerbe de

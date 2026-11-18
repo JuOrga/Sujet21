@@ -82,10 +82,9 @@ const AUTRES_GLYPHES: { fichier: string; extrait: string; pourquoi: string; fois
   { fichier: 'src/game/ecranAvaries.ts', extrait: 'av-apercu--absente" style="--t:${sec.teinte}"><i>${sec.icone}</i>', pourquoi: 'secteur du vaisseau' },
   { fichier: 'src/game/ecranAvaries.ts', extrait: 'decoding="async"><i>${st.icone}</i>', pourquoi: 'station du vaisseau' },
   // ---- le codex : rayons, fiches et jalons du journal
-  { fichier: 'src/game/ecranCodex.ts', extrait: '</svg><i>${r.icone}</i></span>', pourquoi: 'rayon du codex' },
+  { fichier: 'src/game/ecranCodex.ts', extrait: 'iconeCycleHTML(r.etat, r.icone) : `<i>${r.icone}</i>`', pourquoi: 'rayon du codex sans état (phénomènes, journal) : pas de dessin peint' },
   { fichier: 'src/game/ecranCodex.ts', extrait: '<span class="cx-medaille"><i>${ok ? d.icone : \'?\'}</i>', pourquoi: 'jalon du journal' },
   { fichier: 'src/game/ecranCodex.ts', extrait: '<span class="cx-hex"><i>${ok ? d.icone : \'?\'}</i>', pourquoi: 'fiche du codex' },
-  { fichier: 'src/game/ecranCodex.ts', extrait: '<span class="cx-hex cx-hex--grand"><i>${r.icone}</i>', pourquoi: 'rayon du codex' },
   { fichier: 'src/game/ecranCodex.ts', extrait: '<span class="cx-hex cx-hex--grand"><i>${d.icone}</i></span><em>', pourquoi: 'fiche du codex' },
   { fichier: 'src/game/ecranCodex.ts', extrait: '<i>${ok ? x.icone : \'?\'}</i><span>', pourquoi: 'fiche citée du codex' },
   // ---- le marchand : rayons et articles (orbes, améliorations, provisions)

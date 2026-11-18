@@ -57,6 +57,7 @@ import {
   type ModeCodex,
   type RayonCodex,
 } from './codexVue'
+import { iconeCycleHTML } from './iconesPeintes'
 import {
   PiloteEcran,
   colonnesDe,
@@ -103,6 +104,13 @@ export interface HooksCodex {
 const esc = (t: string): string =>
   t.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
 const RAYON = 119.4 // le périmètre de l'anneau (r = 19)
+
+/** Le glyphe d'un rayon : un ÉTAT prend son icône de la planche du cycle —
+ *  la même que l'écran des mémoires —, son emoji en repli tant qu'elle
+ *  manque ; les phénomènes et le journal n'ont pas de dessin peint. */
+function glypheRayon(r: RayonCodex): string {
+  return r.etat ? iconeCycleHTML(r.etat, r.icone) : `<i>${r.icone}</i>`
+}
 
 export class EcranCodex {
   private mode: ModeCodex = 'fiches'
@@ -281,7 +289,7 @@ export class EcranCodex {
         const on = r.id === this.rayon
         return (
           `<button type="button" class="cx-rayon${on ? ' on' : ''}${r.scelle ? ' cx-scelle' : ''}" data-rayon="${r.id}" style="--t:${r.teinte}">` +
-          `<span class="cx-anneau"><svg viewBox="0 0 44 44"><circle cx="22" cy="22" r="19"/><circle class="cx-arc" cx="22" cy="22" r="19" stroke-dasharray="${RAYON}" stroke-dashoffset="${(RAYON * (1 - part)).toFixed(1)}"/></svg><i>${r.icone}</i></span>` +
+          `<span class="cx-anneau"><svg viewBox="0 0 44 44"><circle cx="22" cy="22" r="19"/><circle class="cx-arc" cx="22" cy="22" r="19" stroke-dasharray="${RAYON}" stroke-dashoffset="${(RAYON * (1 - part)).toFixed(1)}"/></svg>${glypheRayon(r)}</span>` +
           `<span class="cx-rayon-txt"><b>${esc(r.nom)}</b><small>${r.scelle ? 'VERROUILLÉ' : `${faites} / ${fiches.length}`}</small></span></button>`
         )
       })
@@ -385,7 +393,7 @@ export class EcranCodex {
     panneau.querySelectorAll('video').forEach((v) => v.pause())
     const d = this.sel ? fichesDuRayon(r).find((x) => x.id === this.sel) : undefined
     if (!d) {
-      panneau.innerHTML = `<div class="cx-fiche-vide"><span class="cx-hex cx-hex--grand"><i>${r.icone}</i></span><p>${esc(r.scelle ? 'Secteur sous clé.' : 'Choisissez une fiche.')}</p></div>`
+      panneau.innerHTML = `<div class="cx-fiche-vide"><span class="cx-hex cx-hex--grand">${glypheRayon(r)}</span><p>${esc(r.scelle ? 'Secteur sous clé.' : 'Choisissez une fiche.')}</p></div>`
       return
     }
     // le message de l'atelier parle d'UNE fiche : il ne suit pas la suivante

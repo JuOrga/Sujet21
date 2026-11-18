@@ -16,6 +16,7 @@ import {
   caseTrophee,
   dessineIconeCycle,
   dessineIconeTrophee,
+  estIconeCycle,
   etatsEnIcones,
   glypheEtat,
   guettePlanche,
@@ -44,6 +45,11 @@ describe('la planche du cycle — le contrat avec l’atelier', () => {
     for (const t of TRANSFOS_CYCLE) expect(caseCycle(t.id), t.id).not.toBeNull()
     expect(caseCycle('vaporisation')).toBe(7)
     expect(caseCycle('deionisation')).toBe(11)
+  })
+
+  it('reconnaît un id de transformation venu des données', () => {
+    expect(estIconeCycle('sublimation')).toBe(true)
+    expect(estIconeCycle('teleportation')).toBe(false)
   })
 
   it('ne répond pas pour un nom hérité d’Object', () => {
@@ -163,6 +169,26 @@ describe('le guet des planches : la classe ne se pose qu’à une image réelle'
   it('ne pose rien pour un fichier absent ou de taille nulle', () => {
     expect(guette('echec').classes.size).toBe(0)
     expect(guette('vide').classes.size).toBe(0)
+  })
+})
+
+describe('les états écrits en dur dans index.html', () => {
+  // l'écran du cycle, l'accueil, l'éveil, la légende et le panneau des états
+  // portent leurs icônes dans le gabarit : une case décalée y montrerait la
+  // goutte à la place du cristal, sans que rien d'autre ne tombe
+  const poses = [...HTML.matchAll(/<i class="ico-cycle" style="--ic-x:(\d+);--ic-y:(\d+)" aria-hidden="true"><span class="ico-repli">([^<]*)<\/span><\/i>/g)]
+
+  it('ont toutes la forme que iconeCycleHTML écrit', () => {
+    expect(poses.length).toBe((HTML.match(/<i class="ico-cycle"/g) ?? []).length)
+    expect(poses.length).toBeGreaterThanOrEqual(18)
+  })
+
+  it('posent chacune la case de l’état que dit son emoji de repli', () => {
+    for (const [, x, y, repli] of poses) {
+      const id = ICONES_CYCLE[Number(x) + Number(y) * ICONES_CYCLE_COLONNES]
+      const emoji = repli.replace('&#xFE0E;', '')
+      expect(ETATS_CYCLE[id as EtatCycle]?.icone, `${repli} posé sur la case ${id}`).toBe(emoji)
+    }
   })
 })
 

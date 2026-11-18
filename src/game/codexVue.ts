@@ -16,6 +16,7 @@
 // à prendre, pas un chiffre à afficher.
 
 import { fichesCodex, type CodexDef, type CodexGroupe } from './codex'
+import type { EtatCycle } from './cycle'
 import {
   MAT_CHAUD,
   MAT_FROID,
@@ -39,7 +40,11 @@ export interface RayonCodex {
   /** le groupe du codex qu'il montre — null : un rayon sans fiche (scellé) */
   groupe: CodexGroupe | null
   nom: string
+  /** l'emoji du rayon — le repli de son icône peinte quand il a un `etat` */
   icone: string
+  /** l'état du cycle qu'il montre : son icône vient alors de la planche du
+   *  cycle (iconesPeintes.ts) ; les phénomènes et le journal n'en ont pas */
+  etat?: EtatCycle
   teinte: string
   sous: string
   scelle?: boolean
@@ -48,11 +53,11 @@ export interface RayonCodex {
 /** Les rayons des FICHES : les trois états, les phénomènes, et le
  *  quatrième état sous clé — annoncé, pas joué (le plasma). */
 export const RAYONS_FICHES: readonly RayonCodex[] = [
-  { id: 'eau', groupe: 'eau', nom: 'LIQUIDE', icone: '💧', teinte: '#63b7e6', sous: 'Ce que le fluide fait quand il coule' },
-  { id: 'glace', groupe: 'glace', nom: 'SOLIDE', icone: '❄', teinte: '#a7ddf5', sous: 'Ce que la glace endure et brise' },
-  { id: 'vapeur', groupe: 'vapeur', nom: 'GAZ', icone: '💨', teinte: '#ffdda6', sous: 'Ce que la vapeur traverse et pousse' },
+  { id: 'eau', groupe: 'eau', nom: 'LIQUIDE', icone: '💧', etat: 'liquide', teinte: '#63b7e6', sous: 'Ce que le fluide fait quand il coule' },
+  { id: 'glace', groupe: 'glace', nom: 'SOLIDE', icone: '❄', etat: 'solide', teinte: '#a7ddf5', sous: 'Ce que la glace endure et brise' },
+  { id: 'vapeur', groupe: 'vapeur', nom: 'GAZ', icone: '💨', etat: 'gaz', teinte: '#ffdda6', sous: 'Ce que la vapeur traverse et pousse' },
   { id: 'phenomenes', groupe: 'phenomenes', nom: 'PHÉNOMÈNES', icone: '✦', teinte: '#3fd69b', sous: 'Ce que le vaisseau fait au sujet' },
-  { id: 'scelle', groupe: null, nom: 'SCELLÉ', icone: '⚛', teinte: '#b48cff', sous: 'Le quatrième état. Secteur sous clé.', scelle: true },
+  { id: 'scelle', groupe: null, nom: 'SCELLÉ', icone: '⚛', etat: 'plasma', teinte: '#b48cff', sous: 'Le quatrième état. Secteur sous clé.', scelle: true },
 ]
 
 /** Le JOURNAL : le récit et les FINS, des paliers numérotés servis dans
