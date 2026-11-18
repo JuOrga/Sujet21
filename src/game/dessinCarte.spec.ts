@@ -59,7 +59,9 @@ describe('dessinCarteSVG — le plan, depuis les données', () => {
     expect(svg).toMatch(/<text x="10\.5" y="4\.5" fill="#f2c98e">GAZ<\/text>/)
     expect(compte(svg, /viewBox="0 0 256 256"/g)).toBeGreaterThan(0) // solide
     expect(compte(svg, /viewBox="512 0 256 256"/g)).toBeGreaterThan(0) // gaz
-    expect(svg).toContain('<text class="ico-cycle-repli"')
+    // le repli à la couleur de la coursive, comme l'était « ❄ GLACE »
+    expect(svg).toMatch(/<text class="ico-cycle-repli"[^>]* fill="#a7ddf5">❄<\/text>/)
+    expect(svg).toMatch(/<text class="ico-cycle-repli"[^>]* fill="#f2c98e">💨<\/text>/)
     expect(svg).not.toContain('❄ GLACE')
     expect(svg).not.toContain('💨 GAZ')
     // paroi, sol, anneaux « 4 44 » — pour les 12 coursives

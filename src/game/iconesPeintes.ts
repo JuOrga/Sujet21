@@ -129,15 +129,24 @@ export function etatsEnIcones(html: string): string {
 // planche entière posée dedans. Le repli est un <text> à la même place ; la
 // feuille montre l'un ou l'autre selon la classe de la racine.
 
-/** L'icône du cycle en SVG, carrée de `cote`, coin haut-gauche en (x, y). */
-export function iconeCycleSVG(id: IconeCycle, x: number, y: number, cote: number, secours: string): string {
+/** L'icône du cycle en SVG, carrée de `cote`, coin haut-gauche en (x, y). Le
+ *  repli prend `couleur` : un glyphe au trait (❄ sans police emoji) serait
+ *  sinon peint en noir, invisible sur la plaque sombre. */
+export function iconeCycleSVG(
+  id: IconeCycle,
+  x: number,
+  y: number,
+  cote: number,
+  secours: string,
+  couleur = 'currentColor',
+): string {
   const c = ICONES_CYCLE.indexOf(id)
   const vx = (c % ICONES_CYCLE_COLONNES) * CYCLE_CASE
   const vy = Math.floor(c / ICONES_CYCLE_COLONNES) * CYCLE_CASE
   return (
     `<svg class="ico-cycle-svg" x="${x}" y="${y}" width="${cote}" height="${cote}" viewBox="${vx} ${vy} ${CYCLE_CASE} ${CYCLE_CASE}" aria-hidden="true">` +
     `<image href="${ICONES_CYCLE_URL}" width="${CYCLE_CASE * ICONES_CYCLE_COLONNES}" height="${CYCLE_CASE * ICONES_CYCLE_RANGEES}"/></svg>` +
-    `<text class="ico-cycle-repli" x="${x + cote / 2}" y="${y + cote / 2}">${echappe(secours)}</text>`
+    `<text class="ico-cycle-repli" x="${x + cote / 2}" y="${y + cote / 2}" fill="${echappe(couleur)}">${echappe(secours)}</text>`
   )
 }
 

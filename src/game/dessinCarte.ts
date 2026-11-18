@@ -607,7 +607,7 @@ function badges(c: CarteStation, L: LienDessine[]): string {
         const mot = sep ? sep.reste : e.badge!
         const pas = sep ? BADGE_ICONE + 3 : 0
         const w = mot.length * 8.3 + 18 + pas
-        const ico = sep ? iconeCycleSVG(sep.etat, Number(n1(-w / 2 + 7)), -BADGE_ICONE / 2, BADGE_ICONE, sep.glyphe) : ''
+        const ico = sep ? iconeCycleSVG(sep.etat, Number(n1(-w / 2 + 7)), -BADGE_ICONE / 2, BADGE_ICONE, sep.glyphe, e.couleur) : ''
         return (
           `<g class="cs-badge" transform="translate(${n1(x)} ${n1(y)})">` +
           `<rect x="${n1(-w / 2)}" y="-11" width="${n1(w)}" height="22" rx="3" fill="${c.palette.plaqueSombre}" stroke="${e.couleur}"/>` +

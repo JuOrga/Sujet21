@@ -116,6 +116,8 @@ describe('en SVG : une fenêtre sur la case, l’emoji en repli', () => {
     expect(s).toContain('<svg class="ico-cycle-svg" x="10" y="-8" width="16" height="16" viewBox="512 0 256 256"')
     expect(s).toContain('<image href="/assets/cycle-icones.webp" width="1024" height="768"')
     expect(s).toMatch(/<text class="ico-cycle-repli"[^>]*>💨<\/text>/)
+    // le repli à la couleur demandée : un ❄ au trait, sans fill, sortait noir
+    expect(iconeCycleSVG('solide', 0, 0, 16, '❄', '#a7ddf5')).toMatch(/<text class="ico-cycle-repli"[^>]* fill="#a7ddf5">❄<\/text>/)
   })
 })
 
