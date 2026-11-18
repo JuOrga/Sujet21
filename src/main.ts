@@ -643,6 +643,7 @@ import {
   guettePlanchesPeintes,
   iconeCycleHTML,
   iconeEtatHTML,
+  iconeTropheeHTML,
 } from './game/iconesPeintes'
 
 const CAPACITY = 4096
@@ -3075,6 +3076,8 @@ const toastFile: {
   // l'article du méta, quand il y en a un : son icône vient alors de LA
   // PLANCHE (la même sur toutes les machines), pas d'un emoji système
   article?: string
+  // le trophée, quand c'en est un : sa case de la planche des trophées
+  trophee?: string
 }[] = []
 function toastGenre(t: {
   sur?: string
@@ -3104,7 +3107,7 @@ const TOAST_TEINTE: Record<ToastGenre, string> = {
 let toastTimer = 0
 let toastHorloge = 0
 trophees.onDebloque = (t) => {
-  toastFile.push({ nom: `${t.nom} · +10 mémoire`, icone: t.icone })
+  toastFile.push({ nom: `${t.nom} · +10 mémoire`, icone: t.icone, trophee: t.id })
   audio.collect()
   // chaque trophée grave sa mémoire — une seule fois, l'amont le garantit
   gagneMemoireRun(10)
@@ -3166,10 +3169,13 @@ function majToast(): void {
   tropheeToast.style.setProperty('--tt', TOAST_TEINTE[genre])
   tropheeToast.style.setProperty('--dur', `${duree}s`)
   tropheeToast.dataset.genre = genre
-  // un article passe par sa planche (la mémoire d'un éclat, l'échantillon de
-  // secours : le dessin de la cérémonie) ; un trophée, une fiche ou une
-  // fiole n'ont pas de dessin rendu et gardent leur glyphe
-  const glyphe = t.article ? iconeMetaHTML(t.article, t.icone) : `<i>${t.icone}</i>`
+  // un trophée et un article passent par leur planche (la mémoire d'un
+  // éclat, l'échantillon de secours : le dessin de la cérémonie), l'emoji
+  // en repli ; une fiche ou une fiole n'ont pas de dessin rendu et gardent
+  // leur glyphe
+  const glyphe = t.trophee
+    ? iconeTropheeHTML(t.trophee, t.icone)
+    : t.article ? iconeMetaHTML(t.article, t.icone) : `<i>${t.icone}</i>`
   tropheeToast.innerHTML =
     `<span class="tt-cartouche">${glyphe}</span>` +
     `<span class="tt-corps"><b>${t.sur ?? 'TROPHÉE DÉBLOQUÉ'}</b>` +
@@ -3344,7 +3350,7 @@ function renderRecordsVoile(): void {
       const date = ok
         ? new Date(trophees.quand(t.id)).toLocaleDateString('fr-FR')
         : ''
-      html += `<div class="tro-carte${ok ? '' : ' verrou'}"><i>${t.icone}</i><div><b>${t.nom}</b><span>${t.desc}</span>${ok ? `<em>débloqué le ${date}</em>` : ''}</div></div>`
+      html += `<div class="tro-carte${ok ? '' : ' verrou'}">${iconeTropheeHTML(t.id, t.icone)}<div><b>${t.nom}</b><span>${t.desc}</span>${ok ? `<em>débloqué le ${date}</em>` : ''}</div></div>`
     }
     html += '</div>'
     html += blocFantomes()

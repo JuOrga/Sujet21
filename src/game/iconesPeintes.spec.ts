@@ -219,3 +219,16 @@ describe('la feuille découpe les planches à leur grille', () => {
     expect(HTML).toMatch(new RegExp(`html\\.${CLASSE_PLANCHE_TROPHEES} \\.ico-trophee > \\.ico-repli`))
   })
 })
+
+describe('les trophées passent par leur planche', () => {
+  const MAIN = readFileSync(new URL('../main.ts', import.meta.url), 'utf-8')
+
+  it('la carte du dossier des trophées', () => {
+    expect(MAIN).toContain('<div class="tro-carte${ok ? \'\' : \' verrou\'}">${iconeTropheeHTML(t.id, t.icone)}')
+  })
+
+  it('le toast d’un déblocage : le trophée voyage avec son id jusqu’à la pastille', () => {
+    expect(MAIN).toContain('icone: t.icone, trophee: t.id })')
+    expect(MAIN).toContain('iconeTropheeHTML(t.trophee, t.icone)')
+  })
+})

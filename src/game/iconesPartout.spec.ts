@@ -54,7 +54,7 @@ const MOTIFS = [
 ]
 
 /** Une interpolation qui passe déjà par une planche rendue n'est pas un reste. */
-const DEJA_RENDUE = /icone(Ceremonie|Instrument)HTML\(/
+const DEJA_RENDUE = /icone(Ceremonie|Instrument|Cycle|Etat|Trophee)HTML\(/
 
 /** Les `.icone` qui NE SONT PAS des instruments, et que rien ne remplace : la
  *  conception ne donne de dessin rendu qu'aux instruments, aux contreparties
@@ -93,9 +93,8 @@ const AUTRES_GLYPHES: { fichier: string; extrait: string; pourquoi: string; fois
   { fichier: 'src/game/marchandVue.ts', extrait: "iconeMonnaieHTML(a.id)) || `<i>${a.icone}</i>`", pourquoi: 'orbe ou amélioration : pas de dessin rendu' },
   // ---- l'éditeur des récompenses : un refus qui cite un NOM, pas une icône
   { fichier: 'src/game/recompenses.ts', extrait: '${autres.find((c) => c.icone === icone)?.nom}', pourquoi: 'refus de l’atelier, qui nomme la carte' },
-  // ---- main.ts : trophées, fiches, fioles — et la cérémonie, déjà rendue
-  { fichier: 'src/main.ts', extrait: 'iconeMetaHTML(t.article, t.icone) : `<i>${t.icone}</i>`', pourquoi: 'toast d’un trophée, d’une fiche ou d’une fiole' },
-  { fichier: 'src/main.ts', extrait: '<div class="tro-carte${ok ? \'\' : \' verrou\'}"><i>${t.icone}</i>', pourquoi: 'trophée' },
+  // ---- main.ts : fiches, fioles — les trophées et la cérémonie, déjà rendus
+  { fichier: 'src/main.ts', extrait: 'iconeMetaHTML(t.article, t.icone) : `<i>${t.icone}</i>`', pourquoi: 'toast d’une fiche ou d’une fiole' },
   { fichier: 'src/main.ts', extrait: '<i>${f.icone}</i><div><b>${f.nom}', pourquoi: 'fiole du dossier' },
   { fichier: 'src/main.ts', extrait: "g.fillText(fichePupitre(q.ecran)?.icone ?? '?', cx, cy)", pourquoi: 'écran de pupitre, au canvas du jeu' },
   { fichier: 'src/main.ts', extrait: 'mb-cartouche-${iconeDuGlyphe(o.icone) ?? \'offre\'}', pourquoi: 'nom de classe tiré du glyphe (cérémonie, déjà rendue)', fois: 2 },
