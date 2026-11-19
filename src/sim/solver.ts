@@ -1162,6 +1162,24 @@ export class FluidSim {
     return i
   }
 
+  /** UNE GOUTTE DU CORPS DÉJÀ EN VOL, posée telle quelle : libre, marquée
+   *  du corps (duCorps = 1, comme une goutte éjectée sortie du halo), à la
+   *  vitesse donnée. Elle compte dans le volume de référence (la jauge lit
+   *  playerCount / baseVolume) : posée À LA PLACE d'une particule du corps,
+   *  elle laisse la jauge pleine moins ce qui est dehors — exactement l'état
+   *  d'un corps qui vient de tirer. Le rappel des égarées la reprend si le
+   *  corps repasse à portée. Sert aux satellites de la cuve de l'accueil
+   *  (game/cuveAccueil.ts). Renvoie l'indice, ou −1 si la cuve est pleine. */
+  poseEgaree(x: number, y: number, vx: number, vy: number): number {
+    const i = this.addParticle(x, y, KIND_FREE)
+    if (i < 0) return -1
+    this.velX[i] = vx
+    this.velY[i] = vy
+    this.duCorps[i] = 1
+    this.baseVolume++
+    return i
+  }
+
   // Disque de n particules sur réseau hexagonal, centré en (cx, cy).
   spawnDisc(cx: number, cy: number, n: number, kind: number): void {
     const s = this.params.particleSpacing
