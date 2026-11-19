@@ -92,8 +92,9 @@ export type GenreMessage = 'OFFER' | 'ANSWER' | 'CANDIDATE' | 'LEAVE'
 
 export type Inscription =
   | { ok: true; annuaire: Annuaire }
-  /** `pris` : ce nom est déjà inscrit (tirer un autre code). */
-  | { ok: false; pris: boolean; raison: string }
+  /** `pris` : ce nom est déjà inscrit (tirer un autre code). `detail` : ce
+   *  que le carnet de bord en dit, pour qui doit comprendre la panne. */
+  | { ok: false; pris: boolean; raison: string; detail: string }
 
 export class Annuaire {
   /** Un message d'un autre inscrit. */
@@ -105,11 +106,43 @@ export class Annuaire {
   surFerme: (() => void) | null = null
   private pouls = 0
   private ferme_ = false
+  // LE CARNET DE BORD. L'annuaire est un service tiers qu'on ne peut pas
+  // interroger depuis l'environnement d'analyse : quand il raccroche chez un
+  // joueur, la seule trace est ce que SON navigateur a vu. On la note donc,
+  // et l'écran l'écrit sous le message d'erreur — une capture d'écran
+  // suffit alors à dire si c'est le réseau (1006), le service (1000, 1008,
+  // 1013…) ou un refus motivé.
+  private readonly ne = performance.now()
+  private ouvertA = -1
+  private fermeA = -1
+  private codeFermeture = 0
+  private raisonFermeture = ''
+  private fermeturePropre = false
+  private erreurService = ''
+  private recus = 0
+  private envoyes = 0
+  private dernierRecu = ''
+  private dernierEnvoye = ''
 
   private constructor(
     private readonly ws: WebSocket,
     readonly nom: string,
   ) {}
+
+  /** Le carnet de bord, en une ligne. */
+  diagnostic(): string {
+    const ms = (t: number): string => `${Math.round(t - this.ne)} ms`
+    const morceaux = [this.ouvertA < 0 ? 'jamais inscrit' : `inscrit en ${ms(this.ouvertA)}`]
+    morceaux.push(`envoyé ${this.envoyes}${this.dernierEnvoye ? ' (dernier : ' + this.dernierEnvoye + ')' : ''}`)
+    morceaux.push(`reçu ${this.recus}${this.dernierRecu ? ' (dernier : ' + this.dernierRecu + ')' : ''}`)
+    if (this.erreurService) morceaux.push(`le service dit : « ${this.erreurService.slice(0, 120)} »`)
+    if (this.fermeA >= 0) {
+      morceaux.push(
+        `coupé à ${ms(this.fermeA)}, code ${this.codeFermeture}${this.fermeturePropre ? '' : ' (coupure sèche)'}${this.raisonFermeture ? ' « ' + this.raisonFermeture.slice(0, 80) + ' »' : ''}`,
+      )
+    }
+    return morceaux.join(' · ')
+  }
 
   /** S'inscrit à l'annuaire sous `nom`. */
   static inscrit(adresse: string, nom: string): Promise<Inscription> {
@@ -121,18 +154,21 @@ export class Annuaire {
         window.clearTimeout(minuteur)
         rend(r)
       }
+      const echec = (pris: boolean, raison: string): void => conclut({ ok: false, pris, raison, detail: a ? a.diagnostic() : '' })
       const jeton = Math.random().toString(36).slice(2) + Math.random().toString(36).slice(2)
+      let a: Annuaire | null = null
       let ws: WebSocket
       try {
         ws = new WebSocket(`${adresse}?key=${CLE}&id=${encodeURIComponent(nom)}&token=${jeton}&version=1.5.4`)
       } catch {
-        conclut({ ok: false, pris: false, raison: 'L’annuaire est injoignable depuis ce navigateur.' })
+        echec(false, 'L’annuaire est injoignable depuis ce navigateur.')
         return
       }
-      const a = new Annuaire(ws, nom)
+      const moi = new Annuaire(ws, nom)
+      a = moi
       const minuteur = window.setTimeout(() => {
-        a.ferme()
-        conclut({ ok: false, pris: false, raison: 'L’annuaire ne répond pas. Vérifiez la connexion, puis réessayez dans un instant.' })
+        echec(false, 'L’annuaire ne répond pas. Vérifiez la connexion, puis réessayez dans un instant.')
+        moi.ferme()
       }, DELAI_INSCRIPTION_MS)
       ws.onmessage = (ev) => {
         let m: { type?: string; src?: string; payload?: unknown }
@@ -141,31 +177,45 @@ export class Annuaire {
         } catch {
           return
         }
+        moi.recus++
+        moi.dernierRecu = String(m.type ?? '?')
+        // un refus motivé, à quelque moment qu'il arrive : on garde le motif
+        if (m.type === 'ERROR' || m.type === 'INVALID-KEY' || m.type === 'ID-TAKEN') {
+          const motif = (m.payload as { msg?: unknown } | undefined)?.msg
+          moi.erreurService = typeof motif === 'string' ? motif : String(m.type)
+        }
         if (!fini) {
           if (m.type === 'OPEN') {
-            a.pouls = window.setInterval(() => a.envoieBrut({ type: 'HEARTBEAT' }), POULS_MS)
-            conclut({ ok: true, annuaire: a })
+            moi.ouvertA = performance.now()
+            moi.pouls = window.setInterval(() => moi.envoieBrut({ type: 'HEARTBEAT' }), POULS_MS)
+            conclut({ ok: true, annuaire: moi })
           } else if (m.type === 'ID-TAKEN') {
-            a.ferme()
-            conclut({ ok: false, pris: true, raison: 'Ce code est déjà pris.' })
+            echec(true, 'Ce code est déjà pris.')
+            moi.ferme()
           } else if (m.type === 'ERROR' || m.type === 'INVALID-KEY') {
-            a.ferme()
-            conclut({ ok: false, pris: false, raison: 'L’annuaire a refusé l’inscription. Réessayez dans un instant.' })
+            echec(false, 'L’annuaire a refusé l’inscription. Réessayez dans un instant.')
+            moi.ferme()
           }
           return
         }
-        if (m.type === 'EXPIRE' && typeof m.src === 'string') a.surAbsent?.(m.src)
+        if (m.type === 'EXPIRE' && typeof m.src === 'string') moi.surAbsent?.(m.src)
         else if ((m.type === 'OFFER' || m.type === 'ANSWER' || m.type === 'CANDIDATE' || m.type === 'LEAVE') && typeof m.src === 'string') {
-          a.surMessage?.(m.src, m.type, m.payload)
+          moi.surMessage?.(m.src, m.type, m.payload)
         }
       }
       ws.onerror = () => {
-        conclut({ ok: false, pris: false, raison: 'L’annuaire est injoignable. Vérifiez la connexion, puis réessayez dans un instant.' })
+        echec(false, 'L’annuaire est injoignable. Vérifiez la connexion, puis réessayez dans un instant.')
       }
-      ws.onclose = () => {
-        window.clearInterval(a.pouls)
-        conclut({ ok: false, pris: false, raison: 'L’annuaire a coupé la connexion. Réessayez dans un instant.' })
-        if (!a.ferme_) a.surFerme?.()
+      ws.onclose = (ev) => {
+        window.clearInterval(moi.pouls)
+        if (!moi.ferme_) {
+          moi.fermeA = performance.now()
+          moi.codeFermeture = ev.code
+          moi.raisonFermeture = ev.reason
+          moi.fermeturePropre = ev.wasClean
+        }
+        echec(false, 'L’annuaire a coupé la connexion. Réessayez dans un instant.')
+        if (!moi.ferme_) moi.surFerme?.()
       }
     })
   }
@@ -174,6 +224,11 @@ export class Annuaire {
     if (this.ws.readyState !== WebSocket.OPEN) return
     try {
       this.ws.send(JSON.stringify(message))
+      const genre = (message as { type?: unknown }).type
+      if (genre !== 'HEARTBEAT') {
+        this.envoyes++
+        this.dernierEnvoye = String(genre)
+      }
     } catch {
       // la connexion vient de tomber : surFerme le dira
     }

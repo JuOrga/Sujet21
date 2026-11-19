@@ -29,6 +29,10 @@ import { Annuaire, nomDePartie, tireCode } from './annuaire'
 const SERVEURS: RTCIceServer[] = [
   { urls: ['stun:stun.l.google.com:19302', 'stun:stun.cloudflare.com:3478'] },
 ]
+/** Le temps laissé au navigateur pour recenser ses adresses avant que sa
+ *  description ne parte. Passé ce délai on envoie ce qu'on a, et le reste
+ *  suit : un STUN muet ne doit pas retarder la partie. */
+const DELAI_RECENSEMENT_MS = 2500
 /** L'ENGORGEMENT. Quand la ligne de l'hôte ne suit pas (une image pèse
  *  ~11 Ko, trente par seconde), le navigateur met ce qui ne part pas en
  *  file. Empiler, c'est envoyer des images de plus en plus VIEILLES : la
@@ -77,10 +81,10 @@ class LiaisonRTC implements Liaison {
   surFlux: ((octets: Uint8Array) => void) | null = null
   surOrdre: ((ordre: Ordre) => void) | null = null
   readonly pc: RTCPeerConnection
-  /** Chaque adresse que ce navigateur se découvre part aussitôt chez
-   *  l'autre, par l'annuaire : la liaison n'attend pas la fin du
-   *  recensement. */
+  /** Une adresse découverte APRÈS le départ de la description (rare : le
+   *  recensement est en général fini) part à son tour par l'annuaire. */
   surCandidat: ((c: RTCIceCandidateInit) => void) | null = null
+  private descriptionPartie = false
   private distantePosee = false
   private readonly candidatsEnAttente: RTCIceCandidateInit[] = []
   private readonly flux: RTCDataChannel
@@ -120,7 +124,7 @@ class LiaisonRTC implements Liaison {
       if (!c) return
       if (c.type === 'srflx') this.adresses.publiques++
       else if (c.type === 'host') this.adresses.locales++
-      this.surCandidat?.(c.toJSON())
+      if (this.descriptionPartie) this.surCandidat?.(c.toJSON())
     }
     this.pc.onconnectionstatechange = () => {
       const s = this.pc.connectionState
@@ -180,6 +184,28 @@ class LiaisonRTC implements Liaison {
     }
   }
 
+  /** La description de CE navigateur, avec les adresses qu'il s'est
+   *  trouvées. On laisse au recensement le temps de finir (2,5 s au plus) :
+   *  la description part alors en UN message, adresses comprises, au lieu
+   *  d'une rafale de dix. L'annuaire est un service public et gratuit — on
+   *  lui parle peu, et la liaison ne dépend plus de ce qu'il reste joignable
+   *  pendant toute la rafale. */
+  async descriptionPrete(): Promise<string> {
+    if (this.pc.iceGatheringState !== 'complete') {
+      await new Promise<void>((fini) => {
+        const minuteur = window.setTimeout(fini, DELAI_RECENSEMENT_MS)
+        this.pc.addEventListener('icegatheringstatechange', () => {
+          if (this.pc.iceGatheringState === 'complete') {
+            window.clearTimeout(minuteur)
+            fini()
+          }
+        })
+      })
+    }
+    this.descriptionPartie = true
+    return this.pc.localDescription?.sdp ?? ''
+  }
+
   /** Pose la description de l'autre navigateur, puis les adresses qu'il
    *  avait déjà envoyées (elles peuvent arriver avant elle). */
   async poseDistante(d: RTCSessionDescriptionInit): Promise<void> {
@@ -206,12 +232,27 @@ export function liaisonPossible(): boolean {
   return typeof RTCPeerConnection === 'function' && typeof WebSocket === 'function'
 }
 
-/** Ce qui voyage par l'annuaire : une description, ou une adresse. */
-function estDescription(x: unknown): x is { sdp: string } {
-  return typeof x === 'object' && x !== null && typeof (x as { sdp?: unknown }).sdp === 'string'
+// CE QUI VOYAGE PAR L'ANNUAIRE. On écrit les messages comme les écrit le
+// client officiel de PeerJS (la description dans `sdp`, un `type` et un
+// `connectionId` à côté) : l'annuaire public est SON service, et rien ne
+// garantit qu'il relaie de bonne grâce une forme qu'il n'a jamais vue.
+interface Enveloppe {
+  sdp?: { type?: unknown; sdp?: unknown }
+  candidate?: unknown
+  connectionId?: unknown
 }
-function estCandidat(x: unknown): x is RTCIceCandidateInit {
-  return typeof x === 'object' && x !== null && typeof (x as { candidate?: unknown }).candidate === 'string'
+function descriptionDe(x: unknown, genre: 'offer' | 'answer'): string | null {
+  const e = x as Enveloppe | null
+  if (!e || typeof e !== 'object' || !e.sdp || typeof e.sdp !== 'object') return null
+  return e.sdp.type === genre && typeof e.sdp.sdp === 'string' ? e.sdp.sdp : null
+}
+function candidatDe(x: unknown): RTCIceCandidateInit | null {
+  const c = (x as Enveloppe | null)?.candidate as RTCIceCandidateInit | undefined
+  return c && typeof c === 'object' && typeof c.candidate === 'string' ? c : null
+}
+function identifiantDe(x: unknown): string {
+  const id = (x as Enveloppe | null)?.connectionId
+  return typeof id === 'string' ? id : ''
 }
 
 /** Une partie CRÉÉE, qui attend son invité. */
@@ -220,12 +261,13 @@ export interface Accueil {
   readonly code: string
   /** Un invité s'est présenté : voici la liaison qui s'établit avec lui. */
   surLiaison: ((l: Liaison) => void) | null
-  /** L'annuaire est tombé avant qu'un invité n'arrive. */
-  surPerdu: (() => void) | null
+  /** L'annuaire est tombé avant qu'un invité n'arrive. `detail` : son
+   *  carnet de bord. */
+  surPerdu: ((detail: string) => void) | null
   ferme(): void
 }
 
-export type Creation = { ok: true; accueil: Accueil } | { ok: false; raison: string }
+export type Creation = { ok: true; accueil: Accueil } | { ok: false; raison: string; detail: string }
 
 /** CRÉER : inscrit la partie à l'annuaire sous un code court, et attend.
  *  Rien ne presse : l'hôte peut laisser la page ouverte dix minutes, l'ami
@@ -237,7 +279,7 @@ export async function creePartie(adresse: string): Promise<Creation> {
     const r = await Annuaire.inscrit(adresse, nomDePartie(code))
     if (!r.ok) {
       if (r.pris) continue
-      return { ok: false, raison: r.raison }
+      return { ok: false, raison: r.raison, detail: r.detail }
     }
     const annuaire = r.annuaire
     let enCours: LiaisonRTC | null = null
@@ -250,18 +292,21 @@ export async function creePartie(adresse: string): Promise<Creation> {
     }
     annuaire.surFerme = () => {
       // l'annuaire tombé APRÈS l'ouverture de la liaison ne change rien
-      if (!enCours || enCours.etat === 'attente') accueil.surPerdu?.()
+      if (!enCours || enCours.etat === 'attente') accueil.surPerdu?.(annuaire.diagnostic())
     }
     annuaire.surMessage = (de, genre, charge) => {
-      if (genre === 'OFFER' && estDescription(charge)) {
+      const offre = genre === 'OFFER' ? descriptionDe(charge, 'offer') : null
+      if (offre !== null) {
         // un invité à la fois : on n'en écoute un second que si la liaison
         // avec le premier a échoué (il peut alors réessayer sans que l'hôte
-        // ait à recréer la partie)
-        if (enCours && enCours.etat !== 'echec') return
+        // ait à recréer la partie) — ou si c'est le même qui revient
+        if (enCours && enCours.etat !== 'echec' && de !== invite) return
+        if (enCours && de === invite && enCours.etat === 'ouverte') return
         const l = new LiaisonRTC()
         enCours = l
         invite = de
-        l.surCandidat = (c) => annuaire.envoie(de, 'CANDIDATE', c)
+        const connectionId = identifiantDe(charge)
+        l.surCandidat = (c) => annuaire.envoie(de, 'CANDIDATE', { candidate: c, type: 'data', connectionId })
         // la liaison directe ouverte, l'annuaire ne sert plus : on raccroche
         l.pc.addEventListener('connectionstatechange', () => {
           if (l.pc.connectionState === 'connected') annuaire.ferme()
@@ -269,44 +314,50 @@ export async function creePartie(adresse: string): Promise<Creation> {
         accueil.surLiaison?.(l)
         void (async () => {
           try {
-            await l.poseDistante({ type: 'offer', sdp: charge.sdp })
+            await l.poseDistante({ type: 'offer', sdp: offre })
             await l.pc.setLocalDescription(await l.pc.createAnswer())
-            annuaire.envoie(de, 'ANSWER', { sdp: l.pc.localDescription?.sdp ?? '' })
+            const sdp = await l.descriptionPrete()
+            annuaire.envoie(de, 'ANSWER', { sdp: { type: 'answer', sdp }, type: 'data', connectionId, browser: 'sujet21' })
           } catch {
             l.echoue()
           }
         })()
-      } else if (genre === 'CANDIDATE' && de === invite && estCandidat(charge)) {
-        enCours?.ajouteCandidat(charge)
+        return
       }
+      const candidat = genre === 'CANDIDATE' && de === invite ? candidatDe(charge) : null
+      if (candidat) enCours?.ajouteCandidat(candidat)
     }
     return { ok: true, accueil }
   }
-  return { ok: false, raison: 'Aucun code libre n’a pu être tiré. Réessayez.' }
+  return { ok: false, raison: 'Aucun code libre n’a pu être tiré. Réessayez.', detail: '' }
 }
 
-export type Jonction = { ok: true; liaison: Liaison } | { ok: false; raison: string }
+export type Jonction = { ok: true; liaison: Liaison } | { ok: false; raison: string; detail: string }
 
 /** Le temps laissé à l'hôte pour répondre par l'annuaire. L'annuaire rend
  *  lui-même le message au bout de cinq secondes si personne ne porte ce
- *  code ; ce délai-ci couvre le cas où il ne dirait rien. */
-const DELAI_REPONSE_MS = 12_000
+ *  code ; ce délai-ci couvre le cas où il ne dirait rien, et le temps que
+ *  l'hôte recense ses adresses. */
+const DELAI_REPONSE_MS = 15_000
 
-/** REJOINDRE : cherche la partie sous ce code et ouvre la liaison. */
-export async function rejointPartie(adresse: string, code: string): Promise<Jonction> {
+/** UNE tentative de rejoindre. `reessayable` : l'échec vient de l'annuaire
+ *  lui-même (connexion tombée), pas du code — recommencer a un sens. */
+async function tenteDeRejoindre(adresse: string, code: string): Promise<Jonction & { reessayable?: boolean }> {
   const hote = nomDePartie(code)
   const r = await Annuaire.inscrit(adresse, 'sujet21-invite-' + Math.random().toString(36).slice(2, 12))
-  if (!r.ok) return { ok: false, raison: r.raison }
+  if (!r.ok) return { ok: false, raison: r.raison, detail: r.detail, reessayable: !r.pris }
   const annuaire = r.annuaire
   const l = new LiaisonRTC()
-  l.surCandidat = (c) => annuaire.envoie(hote, 'CANDIDATE', c)
+  const connectionId = 'dc_' + Math.random().toString(36).slice(2, 12)
+  l.surCandidat = (c) => annuaire.envoie(hote, 'CANDIDATE', { candidate: c, type: 'data', connectionId })
   l.pc.addEventListener('connectionstatechange', () => {
     const s = l.pc.connectionState
     if (s === 'connected' || s === 'failed' || s === 'closed') annuaire.ferme()
   })
-  return new Promise<Jonction>((rend) => {
+  return new Promise((rend) => {
     let fini = false
-    const conclut = (j: Jonction): void => {
+    let minuteur = 0
+    const conclut = (j: Jonction & { reessayable?: boolean }): void => {
       if (fini) return
       fini = true
       window.clearTimeout(minuteur)
@@ -316,34 +367,65 @@ export async function rejointPartie(adresse: string, code: string): Promise<Jonc
       }
       rend(j)
     }
-    const minuteur = window.setTimeout(
-      () => conclut({ ok: false, raison: 'La partie ne répond pas. Vérifiez le code, et que votre ami a toujours la page « Créer une partie » ouverte.' }),
-      DELAI_REPONSE_MS,
-    )
+    const echec = (raison: string, reessayable = false): void => conclut({ ok: false, raison, detail: annuaire.diagnostic(), reessayable })
     annuaire.surAbsent = (nom) => {
-      if (nom === hote) conclut({ ok: false, raison: 'Aucune partie n’attend sous ce code. Vérifiez-le auprès de votre ami : sa page « Créer une partie » doit rester ouverte.' })
+      if (nom === hote) echec('Aucune partie n’attend sous ce code. Vérifiez-le auprès de votre ami : sa page « Créer une partie » doit rester ouverte.')
     }
-    annuaire.surFerme = () => conclut({ ok: false, raison: 'L’annuaire a coupé la connexion. Réessayez dans un instant.' })
+    annuaire.surFerme = () => echec('L’annuaire a coupé la connexion avant que la partie ne réponde.', true)
     annuaire.surMessage = (de, genre, charge) => {
       if (de !== hote) return
-      if (genre === 'ANSWER' && estDescription(charge)) {
-        l.poseDistante({ type: 'answer', sdp: charge.sdp }).then(
+      const reponse = genre === 'ANSWER' ? descriptionDe(charge, 'answer') : null
+      if (reponse !== null) {
+        l.poseDistante({ type: 'answer', sdp: reponse }).then(
           () => conclut({ ok: true, liaison: l }),
-          () => conclut({ ok: false, raison: 'La réponse de la partie n’est pas lisible par ce navigateur.' }),
+          () => echec('La réponse de la partie n’est pas lisible par ce navigateur.'),
         )
-      } else if (genre === 'CANDIDATE' && estCandidat(charge)) {
-        l.ajouteCandidat(charge)
+        return
       }
+      const candidat = genre === 'CANDIDATE' ? candidatDe(charge) : null
+      if (candidat) l.ajouteCandidat(candidat)
     }
     void (async () => {
       try {
         await l.pc.setLocalDescription(await l.pc.createOffer())
-        annuaire.envoie(hote, 'OFFER', { sdp: l.pc.localDescription?.sdp ?? '' })
+        const sdp = await l.descriptionPrete()
+        if (fini) return
+        annuaire.envoie(hote, 'OFFER', {
+          sdp: { type: 'offer', sdp },
+          type: 'data',
+          connectionId,
+          label: connectionId,
+          reliable: true,
+          serialization: 'json',
+          browser: 'sujet21',
+        })
+        minuteur = window.setTimeout(
+          () => echec('La partie ne répond pas. Vérifiez le code, et que votre ami a toujours la page « Créer une partie » ouverte.'),
+          DELAI_REPONSE_MS,
+        )
       } catch {
-        conclut({ ok: false, raison: 'Ce navigateur n’a pas pu préparer la liaison.' })
+        echec('Ce navigateur n’a pas pu préparer la liaison.')
       }
     })()
   })
+}
+
+/** REJOINDRE : cherche la partie sous ce code et ouvre la liaison. Si
+ *  l'annuaire raccroche en route, on retente — deux fois, après une
+ *  seconde : un service public a ses hoquets, et ce n'est pas au joueur de
+ *  recliquer. */
+export async function rejointPartie(adresse: string, code: string): Promise<Jonction> {
+  let dernier: Jonction = { ok: false, raison: '', detail: '' }
+  const details: string[] = []
+  for (let essai = 1; essai <= 3; essai++) {
+    const j = await tenteDeRejoindre(adresse, code)
+    if (j.ok) return j
+    details.push(`essai ${essai} : ${j.detail || 'sans trace'}`)
+    dernier = j
+    if (!j.reessayable) break
+    await new Promise((suite) => window.setTimeout(suite, 1000))
+  }
+  return { ok: false, raison: dernier.ok ? '' : dernier.raison, detail: details.join(' | ') }
 }
 
 /** Pourquoi la liaison n'a pas pu s'établir, en clair — ce que le

@@ -63,6 +63,7 @@ const STYLE = `
 .mu-mot { min-height: 1.5em; line-height: 1.5; }
 .mu-mot[data-ton="alerte"] { color: var(--alert, #e0685c); }
 .mu-mot[data-ton="bon"] { color: var(--valid, #3fd69b); }
+.mu-detail { color: var(--dim, #7f9cb0); font-size: 0.78em; line-height: 1.5; margin: 0; word-break: break-word; user-select: all; }
 .mu-jeu { position: absolute; inset: 0; }
 .mu-jeu canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; cursor: crosshair; }
 .mu-ath { position: absolute; top: 14px; left: 14px; display: flex; flex-direction: column; gap: 8px; pointer-events: none; min-width: 230px; }
@@ -108,6 +109,7 @@ const GABARIT = `
     <div class="mu-rang"><button type="button" data-geste="copier-code" disabled>COPIER LE CODE</button><button type="button" data-geste="copier-lien" disabled>COPIER LE LIEN</button><span class="mu-mot" data-mot="copie"></span></div>
   </div>
   <p class="mu-mot" data-mot="creation"></p>
+  <p class="mu-detail" data-detail="creation"></p>
   <div class="mu-rang"><button type="button" class="mu-discret" data-geste="retour">ANNULER</button></div>
 </div>
 
@@ -122,6 +124,7 @@ const GABARIT = `
     </form>
   </div>
   <p class="mu-mot" data-mot="jonction"></p>
+  <p class="mu-detail" data-detail="jonction"></p>
   <div class="mu-rang"><button type="button" class="mu-discret" data-geste="retour">ANNULER</button></div>
 </div>
 
@@ -191,6 +194,12 @@ export function creeEcranMulti(quitte: () => void): EcranMulti {
     const e = el<HTMLElement>(`[data-mot="${nom}"]`)
     e.textContent = texte
     e.dataset.ton = ton
+  }
+
+  /** Le détail technique d'une panne, sous le message : c'est ce qu'il
+   *  faut photographier pour qu'on sache ce qui s'est passé. */
+  const detail = (ou: 'creation' | 'jonction', texte: string): void => {
+    el<HTMLElement>(`[data-detail="${ou}"]`).textContent = texte ? 'Détail pour le dépannage — ' + texte : ''
   }
 
   function construit(): HTMLDivElement {
@@ -284,6 +293,9 @@ export function creeEcranMulti(quitte: () => void): EcranMulti {
     } else if (etat === 'echec') {
       window.clearTimeout(minuteurLiaison)
       const raison = expliqueEchec(l)
+      if (page === 'creation' || page === 'jonction') {
+        detail(page, `mise en relation faite, liaison directe refusée · adresses trouvées par ce navigateur : ${l.adresses.locales} locale(s), ${l.adresses.publiques} publique(s)`)
+      }
       if (page === 'creation') mot('creation', 'La liaison n’a pas pu s’établir. ' + raison + ' Votre ami peut réessayer avec le même code.', 'alerte')
       else if (page === 'jonction') {
         mot('jonction', 'La liaison n’a pas pu s’établir. ' + raison, 'alerte')
@@ -379,6 +391,7 @@ export function creeEcranMulti(quitte: () => void): EcranMulti {
     el<HTMLButtonElement>('[data-geste="copier-code"]').disabled = true
     el<HTMLButtonElement>('[data-geste="copier-lien"]').disabled = true
     mot('copie', '')
+    detail('creation', '')
     mot('creation', 'Inscription de la partie…')
     const c = await creePartie(adresseAnnuaire(location.search))
     // l'écran a pu être quitté pendant l'inscription
@@ -388,6 +401,7 @@ export function creeEcranMulti(quitte: () => void): EcranMulti {
     }
     if (!c.ok) {
       mot('creation', c.raison, 'alerte')
+      detail('creation', c.detail)
       return
     }
     accueil = c.accueil
@@ -402,8 +416,9 @@ export function creeEcranMulti(quitte: () => void): EcranMulti {
       brancheLiaison(l)
       armeMinuteur('creation')
     }
-    c.accueil.surPerdu = () => {
+    c.accueil.surPerdu = (trace) => {
       if (accueil !== c.accueil || page !== 'creation') return
+      detail('creation', trace)
       el<HTMLButtonElement>('[data-geste="copier-code"]').disabled = true
       el<HTMLButtonElement>('[data-geste="copier-lien"]').disabled = true
       mot('creation', 'L’annuaire a coupé la connexion : ce code ne marche plus. Annulez, puis recréez la partie.', 'alerte')
@@ -422,6 +437,7 @@ export function creeEcranMulti(quitte: () => void): EcranMulti {
     champ.value = code
     el<HTMLButtonElement>('[data-geste="valider-code"]').disabled = false
     mot('jonction', '')
+    detail('jonction', '')
     if (code) void valideCode()
     else champ.focus()
   }
@@ -435,6 +451,7 @@ export function creeEcranMulti(quitte: () => void): EcranMulti {
       return
     }
     bouton.disabled = true
+    detail('jonction', '')
     mot('jonction', 'Recherche de la partie…')
     fermeLiaison()
     const j = await rejointPartie(adresseAnnuaire(location.search), lu.code)
@@ -445,6 +462,7 @@ export function creeEcranMulti(quitte: () => void): EcranMulti {
     if (!j.ok) {
       bouton.disabled = false
       mot('jonction', j.raison, 'alerte')
+      detail('jonction', j.detail)
       return
     }
     mot('jonction', 'Partie trouvée : liaison en cours…')
