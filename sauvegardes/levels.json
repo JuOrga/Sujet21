@@ -8366,6 +8366,747 @@
       }
     },
     {
+      "id": "le-berceau-2",
+      "auteur": "EXPÉDITION L",
+      "majAt": "2026-11-18T16:39:10.222Z",
+      "codeAuteur": "EXPÉDITION L",
+      "codeAt": "2026-11-18T16:39:10.222Z",
+      "level": {
+        "name": "Le berceau",
+        "code": "21-01",
+        "journal": "Étalonnage, cellule 1. Première dérive libre : chaque impulsion éjecte une part de lui-même — il l’a compris au deuxième essai, et depuis il économise ses gouttes comme un vieux pilote son carburant. — Dr N. Véga",
+        "bounds": {
+          "minX": -1200,
+          "minY": -750,
+          "maxX": 1200,
+          "maxY": 750
+        },
+        "spawn": {
+          "x": -950,
+          "y": 0,
+          "n": 900
+        },
+        "exit": {
+          "minX": 1040,
+          "minY": -120,
+          "maxX": 1180,
+          "maxY": 120
+        },
+        "par": 5,
+        "boxes": [
+          {
+            "minX": -560,
+            "minY": -750,
+            "maxX": -480,
+            "maxY": -320,
+            "material": 0
+          },
+          {
+            "minX": -560,
+            "minY": 320,
+            "maxX": -480,
+            "maxY": 750,
+            "material": 0
+          },
+          {
+            "minX": -40,
+            "minY": -140,
+            "maxX": 240,
+            "maxY": 140,
+            "material": 0,
+            "forme": 1
+          },
+          {
+            "minX": 760,
+            "minY": -750,
+            "maxX": 840,
+            "maxY": -340,
+            "material": 0
+          },
+          {
+            "minX": 760,
+            "minY": 340,
+            "maxX": 840,
+            "maxY": 750,
+            "material": 0
+          }
+        ],
+        "sponges": [],
+        "labels": [
+          {
+            "x": -520,
+            "y": 260,
+            "text": "PAROI — ABSORBE",
+            "tone": "mur",
+            "picto": {
+              "couleur": "#5b7ba6",
+              "eau": 1,
+              "glace": 0,
+              "vapeur": 1
+            }
+          },
+          {
+            "x": 100,
+            "y": 240,
+            "text": "CHAQUE IMPULSION COÛTE UNE GOUTTE",
+            "tone": "mur",
+            "rang": "secteur"
+          },
+          {
+            "x": 1110,
+            "y": 180,
+            "text": "SAS — LE COLLECTEUR",
+            "tone": "sas"
+          }
+        ],
+        "decals": [
+          {
+            "x": -1080,
+            "y": 420,
+            "w": 160,
+            "h": 160,
+            "kind": "tuyaux",
+            "fade": 0.45
+          },
+          {
+            "x": 460,
+            "y": -640,
+            "w": 150,
+            "h": 225,
+            "kind": "vanne",
+            "fade": 0.4
+          }
+        ],
+        "lumieres": [
+          {
+            "x": -450,
+            "y": 0,
+            "forme": "bandeau",
+            "longueur": 620,
+            "angle": 90,
+            "h": 170,
+            "portee": 850,
+            "intensite": 1.15,
+            "taille": 1
+          },
+          {
+            "x": 700,
+            "y": 0,
+            "forme": "bandeau",
+            "longueur": 520,
+            "angle": 90,
+            "h": 150,
+            "portee": 700,
+            "intensite": 1,
+            "couleur": "#dfe8f2",
+            "taille": 1
+          },
+          {
+            "x": 1110,
+            "y": 0,
+            "h": 300,
+            "portee": 520,
+            "intensite": 1,
+            "couleur": "#3fd69b",
+            "taille": 1
+          }
+        ],
+        "ambiante": 0
+      }
+    },
+    {
+      "id": "l-ancrage-3",
+      "auteur": "EXPÉDITION L",
+      "majAt": "2026-11-18T16:39:11.815Z",
+      "codeAuteur": "EXPÉDITION L",
+      "codeAt": "2026-11-18T16:39:11.815Z",
+      "level": {
+        "name": "L’ancrage",
+        "code": "21-03",
+        "journal": "Cellule 3, revêtement mouillant. La surface le retient — il s’y colle, y rampe, s’y repose. S’en arracher lui coûte une impulsion : il ne s’arrache donc que lorsqu’il a fini de viser. Nous lui avons offert des ancres ; il en a fait des affûts. — Dr N. Véga",
+        "bounds": {
+          "minX": -1200,
+          "minY": -750,
+          "maxX": 1200,
+          "maxY": 750
+        },
+        "spawn": {
+          "x": -950,
+          "y": 0,
+          "n": 900
+        },
+        "exit": {
+          "minX": 1040,
+          "minY": -120,
+          "maxX": 1180,
+          "maxY": 120
+        },
+        "par": 6,
+        "boxes": [
+          {
+            "minX": -660,
+            "minY": -80,
+            "maxX": -460,
+            "maxY": 40,
+            "material": 1
+          },
+          {
+            "minX": -160,
+            "minY": -750,
+            "maxX": -80,
+            "maxY": 240,
+            "material": 0
+          },
+          {
+            "minX": -180,
+            "minY": 240,
+            "maxX": -60,
+            "maxY": 320,
+            "material": 1
+          },
+          {
+            "minX": 480,
+            "minY": -60,
+            "maxX": 660,
+            "maxY": 40,
+            "material": 1
+          },
+          {
+            "minX": 760,
+            "minY": -750,
+            "maxX": 840,
+            "maxY": -80,
+            "material": 0
+          },
+          {
+            "minX": 760,
+            "minY": 160,
+            "maxX": 840,
+            "maxY": 750,
+            "material": 0
+          }
+        ],
+        "sponges": [],
+        "labels": [
+          {
+            "x": -560,
+            "y": -160,
+            "text": "HYDROPHILE — RETIENT",
+            "tone": "phile",
+            "picto": {
+              "couleur": "#3fae9c",
+              "eau": 0,
+              "glace": 1,
+              "vapeur": 1
+            }
+          },
+          {
+            "x": -120,
+            "y": 400,
+            "text": "S’ARRACHER COÛTE UNE IMPULSION",
+            "tone": "phile",
+            "rang": "secteur"
+          },
+          {
+            "x": 570,
+            "y": 120,
+            "text": "L’AFFÛT",
+            "tone": "phile"
+          },
+          {
+            "x": 800,
+            "y": 240,
+            "text": "LA FENÊTRE",
+            "tone": "mur"
+          },
+          {
+            "x": 1110,
+            "y": 180,
+            "text": "SAS",
+            "tone": "sas"
+          }
+        ],
+        "decals": [
+          {
+            "x": 1080,
+            "y": 560,
+            "w": 165,
+            "h": 165,
+            "kind": "tuyaux",
+            "fade": 0.45
+          }
+        ],
+        "lumieres": [
+          {
+            "x": -220,
+            "y": -160,
+            "forme": "bandeau",
+            "longueur": 760,
+            "angle": 90,
+            "h": 160,
+            "portee": 850,
+            "intensite": 1.15,
+            "couleur": "#63b7e6",
+            "taille": 1
+          },
+          {
+            "x": 730,
+            "y": 30,
+            "forme": "bandeau",
+            "longueur": 520,
+            "angle": 90,
+            "h": 150,
+            "portee": 640,
+            "intensite": 1,
+            "taille": 1
+          },
+          {
+            "x": 1110,
+            "y": 0,
+            "h": 300,
+            "portee": 500,
+            "intensite": 1,
+            "couleur": "#3fd69b",
+            "taille": 1
+          }
+        ],
+        "ambiante": 0
+      }
+    },
+    {
+      "id": "le-premier-gel-3",
+      "auteur": "EXPÉDITION L",
+      "majAt": "2026-11-18T16:39:12.464Z",
+      "codeAuteur": "EXPÉDITION L",
+      "codeAt": "2026-11-18T16:39:12.464Z",
+      "level": {
+        "name": "Le premier gel",
+        "code": "21-04",
+        "journal": "Cellule 4, plaques cryogéniques. Le froid devait être une punition : tout ce qui s’attarde se fige, et tout ce qui se fige s’amarre. Il a foncé sur la plaque à pleine vitesse — arrêt net, pas une goutte perdue — a visé la fenêtre depuis son amarre, s’est dégelé, et l’a passée d’une seule impulsion. Le châtiment est devenu son frein de précision. — Dr N. Véga",
+        "bounds": {
+          "minX": -1200,
+          "minY": -750,
+          "maxX": 1200,
+          "maxY": 750
+        },
+        "spawn": {
+          "x": -950,
+          "y": 0,
+          "n": 900
+        },
+        "exit": {
+          "minX": 1040,
+          "minY": -120,
+          "maxX": 1180,
+          "maxY": 120
+        },
+        "par": 6,
+        "boxes": [
+          {
+            "minX": -620,
+            "minY": -360,
+            "maxX": -520,
+            "maxY": -260,
+            "material": 4
+          },
+          {
+            "minX": -140,
+            "minY": -750,
+            "maxX": -60,
+            "maxY": -220,
+            "material": 4
+          },
+          {
+            "minX": -140,
+            "minY": 220,
+            "maxX": -60,
+            "maxY": 750,
+            "material": 4
+          },
+          {
+            "minX": 540,
+            "minY": -70,
+            "maxX": 680,
+            "maxY": 70,
+            "material": 4
+          },
+          {
+            "minX": 780,
+            "minY": -750,
+            "maxX": 860,
+            "maxY": -100,
+            "material": 0
+          },
+          {
+            "minX": 780,
+            "minY": 100,
+            "maxX": 860,
+            "maxY": 750,
+            "material": 0
+          }
+        ],
+        "sponges": [],
+        "labels": [
+          {
+            "x": -570,
+            "y": -440,
+            "text": "PLAQUE FROIDE — FIGE",
+            "tone": "froid",
+            "picto": {
+              "couleur": "#8fc8ee",
+              "eau": 3,
+              "glace": 1,
+              "vapeur": 2
+            }
+          },
+          {
+            "x": -100,
+            "y": 60,
+            "text": "PORTE DE GIVRE",
+            "tone": "froid",
+            "rang": "secteur"
+          },
+          {
+            "x": 610,
+            "y": 160,
+            "text": "LE FREIN — S’ÉCRASER, C’EST S’AMARRER",
+            "tone": "froid"
+          },
+          {
+            "x": 820,
+            "y": 200,
+            "text": "LA FENÊTRE",
+            "tone": "mur"
+          },
+          {
+            "x": 1110,
+            "y": 180,
+            "text": "SAS",
+            "tone": "sas"
+          }
+        ],
+        "decals": [
+          {
+            "x": -1080,
+            "y": 560,
+            "w": 190,
+            "h": 285,
+            "kind": "vanne",
+            "fade": 0.42
+          }
+        ],
+        "lumieres": [
+          {
+            "x": -190,
+            "y": 0,
+            "forme": "bandeau",
+            "longueur": 820,
+            "angle": 90,
+            "h": 150,
+            "portee": 880,
+            "intensite": 1.15,
+            "couleur": "#bfe0ff",
+            "taille": 1
+          },
+          {
+            "x": 740,
+            "y": 0,
+            "forme": "bandeau",
+            "longueur": 560,
+            "angle": 90,
+            "h": 150,
+            "portee": 620,
+            "intensite": 0.95,
+            "couleur": "#8fc8ee",
+            "taille": 1
+          },
+          {
+            "x": 1110,
+            "y": 0,
+            "h": 300,
+            "portee": 500,
+            "intensite": 1,
+            "couleur": "#3fd69b",
+            "taille": 1
+          }
+        ],
+        "ambiante": 0
+      }
+    },
+    {
+      "id": "le-premier-souffle-3",
+      "auteur": "EXPÉDITION L",
+      "majAt": "2026-11-18T16:39:13.245Z",
+      "codeAuteur": "EXPÉDITION L",
+      "codeAt": "2026-11-18T16:39:13.245Z",
+      "level": {
+        "name": "Le premier souffle",
+        "code": "21-05",
+        "journal": "Cellule 5, conduite d’air. Il a léché la chaudière, s’est défait en vapeur, et l’évent l’a laissé passer comme une rumeur. Ce que le souffle a semé en route a perlé sur le dépôt froid — et il est revenu le boire. Rien ne se perd. Nous devrions graver cette phrase. — Dr N. Véga",
+        "bounds": {
+          "minX": -1200,
+          "minY": -750,
+          "maxX": 1200,
+          "maxY": 750
+        },
+        "spawn": {
+          "x": -950,
+          "y": 0,
+          "n": 900
+        },
+        "exit": {
+          "minX": 1040,
+          "minY": -120,
+          "maxX": 1180,
+          "maxY": 120
+        },
+        "par": 7,
+        "boxes": [
+          {
+            "minX": -660,
+            "minY": -520,
+            "maxX": -420,
+            "maxY": -440,
+            "material": 6
+          },
+          {
+            "minX": 60,
+            "minY": -750,
+            "maxX": 100,
+            "maxY": 220,
+            "material": 5
+          },
+          {
+            "minX": 620,
+            "minY": -750,
+            "maxX": 660,
+            "maxY": 750,
+            "material": 5
+          },
+          {
+            "minX": 760,
+            "minY": -360,
+            "maxX": 900,
+            "maxY": -300,
+            "material": 4
+          }
+        ],
+        "sponges": [],
+        "labels": [
+          {
+            "x": -540,
+            "y": -600,
+            "text": "CHAUDIÈRE — DISPERSE",
+            "tone": "chaud",
+            "picto": {
+              "couleur": "#e8843c",
+              "eau": 2,
+              "glace": 3,
+              "vapeur": 0
+            }
+          },
+          {
+            "x": 80,
+            "y": -420,
+            "text": "ÉVENT — SEULE LA VAPEUR PASSE",
+            "tone": "grille",
+            "picto": {
+              "couleur": "#7fae9e",
+              "eau": 1,
+              "glace": 1,
+              "vapeur": 0
+            }
+          },
+          {
+            "x": 640,
+            "y": 420,
+            "text": "ÉVENT",
+            "tone": "grille"
+          },
+          {
+            "x": 830,
+            "y": -440,
+            "text": "DÉPÔT FROID — LA ROSÉE SE REBOIT",
+            "tone": "froid"
+          },
+          {
+            "x": 1110,
+            "y": 180,
+            "text": "SAS",
+            "tone": "sas"
+          }
+        ],
+        "decals": [
+          {
+            "x": -1080,
+            "y": -560,
+            "w": 150,
+            "h": 225,
+            "kind": "vanne",
+            "fade": 0.42
+          },
+          {
+            "x": 400,
+            "y": 640,
+            "w": 160,
+            "h": 160,
+            "kind": "tuyaux",
+            "fade": 0.4
+          }
+        ],
+        "lumieres": [
+          {
+            "x": -540,
+            "y": -570,
+            "forme": "bandeau",
+            "longueur": 520,
+            "angle": 0,
+            "h": 160,
+            "portee": 820,
+            "intensite": 1.1,
+            "couleur": "#e8a05a",
+            "taille": 1
+          },
+          {
+            "x": 20,
+            "y": -80,
+            "forme": "bandeau",
+            "longueur": 900,
+            "angle": 90,
+            "h": 170,
+            "portee": 760,
+            "intensite": 1.05,
+            "taille": 1
+          },
+          {
+            "x": 830,
+            "y": -240,
+            "forme": "bandeau",
+            "longueur": 300,
+            "angle": 0,
+            "h": 150,
+            "portee": 520,
+            "intensite": 0.9,
+            "couleur": "#8fc8ee",
+            "taille": 1
+          },
+          {
+            "x": 1110,
+            "y": 0,
+            "h": 300,
+            "portee": 480,
+            "intensite": 1,
+            "couleur": "#3fd69b",
+            "taille": 1
+          }
+        ],
+        "ambiante": 0,
+        "brume": 0.14
+      }
+    },
+    {
+      "id": "le-sas-2",
+      "auteur": "EXPÉDITION L",
+      "majAt": "2026-11-18T16:39:14.737Z",
+      "codeAuteur": "EXPÉDITION L",
+      "codeAt": "2026-11-18T16:39:14.737Z",
+      "level": {
+        "name": "Le sas",
+        "code": "21-A",
+        "journal": "Cohésion nominale. L’échantillon dérive vers le collecteur avec une constance… inhabituelle. Sept essais, sept trajectoires identiques. — Dr N. Véga",
+        "bounds": {
+          "minX": -1200,
+          "minY": -750,
+          "maxX": 1200,
+          "maxY": 750
+        },
+        "spawn": {
+          "x": -950,
+          "y": 0,
+          "n": 900
+        },
+        "exit": {
+          "minX": 1040,
+          "minY": -420,
+          "maxX": 1180,
+          "maxY": -180
+        },
+        "boxes": [
+          {
+            "minX": -420,
+            "minY": -750,
+            "maxX": -360,
+            "maxY": -380,
+            "material": 2
+          },
+          {
+            "minX": -420,
+            "minY": -180,
+            "maxX": -360,
+            "maxY": 180,
+            "material": 2
+          },
+          {
+            "minX": -420,
+            "minY": 380,
+            "maxX": -360,
+            "maxY": 750,
+            "material": 2
+          },
+          {
+            "minX": -80,
+            "minY": -160,
+            "maxX": 240,
+            "maxY": -40,
+            "material": 1
+          },
+          {
+            "minX": 560,
+            "minY": 240,
+            "maxX": 640,
+            "maxY": 750,
+            "material": 0
+          }
+        ],
+        "sponges": [
+          {
+            "minX": 560,
+            "minY": -750,
+            "cols": 2,
+            "rows": 33,
+            "cellSize": 24,
+            "capacityPerCell": 5
+          }
+        ],
+        "labels": [
+          {
+            "x": -390,
+            "y": 0,
+            "text": "HYDROPHOBE",
+            "tone": "phobe"
+          },
+          {
+            "x": 80,
+            "y": -100,
+            "text": "HYDROPHILE",
+            "tone": "phile"
+          },
+          {
+            "x": 584,
+            "y": -60,
+            "text": "ÉPONGE",
+            "tone": "eponge"
+          },
+          {
+            "x": 1110,
+            "y": -300,
+            "text": "SAS",
+            "tone": "sas"
+          }
+        ]
+      }
+    },
+    {
       "id": "la-chambre-froide",
       "auteur": "EXPÉDITION L",
       "majAt": "2026-08-14T22:36:28.140Z",
@@ -8572,6 +9313,611 @@
             "tone": "sas"
           }
         ]
+      }
+    },
+    {
+      "id": "le-rideau-3",
+      "auteur": "EXPÉDITION L",
+      "majAt": "2026-11-18T16:39:15.437Z",
+      "codeAuteur": "EXPÉDITION L",
+      "codeAt": "2026-11-18T16:39:15.437Z",
+      "level": {
+        "name": "Le rideau",
+        "code": "21-08",
+        "journal": "Cellule 8, rideau lamellaire. L’eau s’y écrase, la vapeur s’y émiette — mais un bloc lancé l’écarte comme une épaule ouvre une porte battante. Il s’est gelé, s’est jeté, et le rideau a claqué derrière lui. Nous avons entendu le claquement depuis la salle d’observation. — Dr N. Véga",
+        "bounds": {
+          "minX": -1200,
+          "minY": -750,
+          "maxX": 1200,
+          "maxY": 750
+        },
+        "spawn": {
+          "x": -950,
+          "y": 0,
+          "n": 900
+        },
+        "exit": {
+          "minX": 1040,
+          "minY": -120,
+          "maxX": 1180,
+          "maxY": 120
+        },
+        "par": 6,
+        "boxes": [
+          {
+            "minX": -620,
+            "minY": -520,
+            "maxX": -580,
+            "maxY": -280,
+            "material": 8
+          },
+          {
+            "minX": -720,
+            "minY": -160,
+            "maxX": -620,
+            "maxY": -60,
+            "material": 4
+          },
+          {
+            "minX": 0,
+            "minY": -750,
+            "maxX": 40,
+            "maxY": 750,
+            "material": 8
+          },
+          {
+            "minX": 360,
+            "minY": -120,
+            "maxX": 520,
+            "maxY": -40,
+            "material": 4
+          },
+          {
+            "minX": 700,
+            "minY": -750,
+            "maxX": 740,
+            "maxY": -200,
+            "material": 0
+          },
+          {
+            "minX": 700,
+            "minY": -200,
+            "maxX": 740,
+            "maxY": 240,
+            "material": 8
+          },
+          {
+            "minX": 700,
+            "minY": 240,
+            "maxX": 740,
+            "maxY": 750,
+            "material": 0
+          }
+        ],
+        "sponges": [],
+        "labels": [
+          {
+            "x": -600,
+            "y": -600,
+            "text": "RIDEAU — SEULE LA GLACE PASSE",
+            "tone": "froid",
+            "picto": {
+              "couleur": "#8fb4d8",
+              "eau": 0,
+              "glace": 3,
+              "vapeur": 0
+            }
+          },
+          {
+            "x": -670,
+            "y": -240,
+            "text": "MOUILLAGE FROID",
+            "tone": "froid"
+          },
+          {
+            "x": 440,
+            "y": 40,
+            "text": "LA CHARGE",
+            "tone": "froid",
+            "rang": "secteur"
+          },
+          {
+            "x": 1110,
+            "y": 180,
+            "text": "SAS",
+            "tone": "sas"
+          }
+        ],
+        "decals": [
+          {
+            "x": -1080,
+            "y": 520,
+            "w": 190,
+            "h": 285,
+            "kind": "vanne",
+            "fade": 0.4
+          }
+        ],
+        "lumieres": [
+          {
+            "x": -70,
+            "y": 0,
+            "forme": "bandeau",
+            "longueur": 940,
+            "angle": 90,
+            "h": 160,
+            "portee": 900,
+            "intensite": 1.1,
+            "couleur": "#8fb4d8",
+            "taille": 1
+          },
+          {
+            "x": 560,
+            "y": 200,
+            "forme": "bandeau",
+            "longueur": 520,
+            "angle": 0,
+            "h": 140,
+            "portee": 620,
+            "intensite": 1,
+            "taille": 1
+          },
+          {
+            "x": 1110,
+            "y": 0,
+            "h": 300,
+            "portee": 500,
+            "intensite": 1,
+            "couleur": "#3fd69b",
+            "taille": 1
+          }
+        ],
+        "ambiante": 0
+      }
+    },
+    {
+      "id": "les-regimes-2",
+      "auteur": "EXPÉDITION L",
+      "majAt": "2026-11-18T16:39:16.143Z",
+      "codeAuteur": "EXPÉDITION L",
+      "codeAt": "2026-11-18T16:39:16.143Z",
+      "level": {
+        "name": "Les régimes",
+        "code": "21-09",
+        "journal": "Cellule 9, régimes imposés. Un hublot fendu glace tout ce qui passe devant ; une conduite rompue vaporise. Il n’a pas lutté contre les régimes : il les a utilisés — armure de glace gratuite ici, souffle gratuit là. Les accidents de la station sont devenus ses outils de travail. — Dr N. Véga",
+        "bounds": {
+          "minX": -1200,
+          "minY": -750,
+          "maxX": 1200,
+          "maxY": 750
+        },
+        "spawn": {
+          "x": -950,
+          "y": 0,
+          "n": 900
+        },
+        "exit": {
+          "minX": 1040,
+          "minY": -120,
+          "maxX": 1180,
+          "maxY": 120
+        },
+        "par": 7,
+        "boxes": [
+          {
+            "minX": 100,
+            "minY": -750,
+            "maxX": 140,
+            "maxY": 750,
+            "material": 5
+          },
+          {
+            "minX": 740,
+            "minY": 140,
+            "maxX": 980,
+            "maxY": 200,
+            "material": 0
+          },
+          {
+            "minX": 740,
+            "minY": -200,
+            "maxX": 980,
+            "maxY": -140,
+            "material": 0
+          }
+        ],
+        "sponges": [],
+        "zones": [
+          {
+            "minX": -700,
+            "minY": 300,
+            "maxX": -380,
+            "maxY": 700,
+            "force": "glace"
+          },
+          {
+            "minX": -80,
+            "minY": -750,
+            "maxX": 320,
+            "maxY": 750,
+            "force": "vapeur"
+          },
+          {
+            "minX": 440,
+            "minY": -160,
+            "maxX": 720,
+            "maxY": 160,
+            "force": "glace"
+          }
+        ],
+        "labels": [
+          {
+            "x": -540,
+            "y": 220,
+            "text": "HUBLOT FENDU — IMPOSE LA GLACE",
+            "tone": "froid"
+          },
+          {
+            "x": 120,
+            "y": -420,
+            "text": "CONDUITE ROMPUE — IMPOSE LA VAPEUR",
+            "tone": "chaud"
+          },
+          {
+            "x": 120,
+            "y": 320,
+            "text": "ÉVENT",
+            "tone": "grille"
+          },
+          {
+            "x": 580,
+            "y": 240,
+            "text": "L’ARMURE GRATUITE",
+            "tone": "froid"
+          },
+          {
+            "x": 1110,
+            "y": 180,
+            "text": "SAS",
+            "tone": "sas"
+          }
+        ],
+        "decals": [
+          {
+            "x": -1080,
+            "y": -540,
+            "w": 160,
+            "h": 160,
+            "kind": "tuyaux",
+            "fade": 0.4
+          }
+        ],
+        "lumieres": [
+          {
+            "x": -700,
+            "y": 60,
+            "forme": "bandeau",
+            "longueur": 680,
+            "angle": 90,
+            "h": 170,
+            "portee": 720,
+            "intensite": 1.05,
+            "taille": 1
+          },
+          {
+            "x": 200,
+            "y": 0,
+            "forme": "bandeau",
+            "longueur": 1000,
+            "angle": 90,
+            "h": 190,
+            "portee": 720,
+            "intensite": 1.05,
+            "couleur": "#e8a05a",
+            "taille": 1
+          },
+          {
+            "x": 580,
+            "y": 220,
+            "forme": "bandeau",
+            "longueur": 300,
+            "angle": 0,
+            "h": 160,
+            "portee": 480,
+            "intensite": 0.9,
+            "couleur": "#8fc8ee",
+            "taille": 1
+          },
+          {
+            "x": 1110,
+            "y": 0,
+            "h": 300,
+            "portee": 480,
+            "intensite": 1,
+            "couleur": "#3fd69b",
+            "taille": 1
+          }
+        ],
+        "ambiante": 0
+      }
+    },
+    {
+      "id": "la-serre-2",
+      "auteur": "EXPÉDITION L",
+      "majAt": "2026-11-18T16:39:17.355Z",
+      "codeAuteur": "EXPÉDITION L",
+      "codeAt": "2026-11-18T16:39:17.355Z",
+      "level": {
+        "name": "La serre",
+        "code": "21-E",
+        "journal": "Les parois mouillantes devaient l’immobiliser. Il s’en sert comme de prises d’escalade : il se colle, il vise, il s’arrache. Le protocole lui a appris la patience. — Dr N. Véga",
+        "bounds": {
+          "minX": -1200,
+          "minY": -750,
+          "maxX": 1200,
+          "maxY": 750
+        },
+        "spawn": {
+          "x": -950,
+          "y": 0,
+          "n": 900
+        },
+        "exit": {
+          "minX": 1040,
+          "minY": -320,
+          "maxX": 1180,
+          "maxY": -80
+        },
+        "boxes": [
+          {
+            "minX": -560,
+            "minY": 80,
+            "maxX": -240,
+            "maxY": 200,
+            "material": 1
+          },
+          {
+            "minX": -80,
+            "minY": -420,
+            "maxX": 240,
+            "maxY": -300,
+            "material": 1
+          },
+          {
+            "minX": 120,
+            "minY": 520,
+            "maxX": 520,
+            "maxY": 640,
+            "material": 6
+          },
+          {
+            "minX": 560,
+            "minY": 300,
+            "maxX": 640,
+            "maxY": 750,
+            "material": 0
+          }
+        ],
+        "sponges": [
+          {
+            "minX": 560,
+            "minY": -750,
+            "cols": 2,
+            "rows": 35,
+            "cellSize": 24,
+            "capacityPerCell": 5
+          }
+        ],
+        "labels": [
+          {
+            "x": -400,
+            "y": 140,
+            "text": "HYDROPHILE",
+            "tone": "phile"
+          },
+          {
+            "x": 80,
+            "y": -360,
+            "text": "HYDROPHILE",
+            "tone": "phile"
+          },
+          {
+            "x": 320,
+            "y": 580,
+            "text": "CHAUDIÈRE",
+            "tone": "chaud"
+          },
+          {
+            "x": 584,
+            "y": -200,
+            "text": "ÉPONGE",
+            "tone": "eponge"
+          },
+          {
+            "x": 1110,
+            "y": -360,
+            "text": "SAS",
+            "tone": "sas"
+          }
+        ]
+      }
+    },
+    {
+      "id": "la-halte",
+      "auteur": "EXPÉDITION L",
+      "majAt": "2026-11-18T16:39:19.133Z",
+      "codeAuteur": "EXPÉDITION L",
+      "codeAt": "2026-11-18T16:39:19.133Z",
+      "level": {
+        "name": "La halte",
+        "code": "21-10",
+        "journal": "Cellule 10, bornes de surchauffe. Chaque borne frôlée en vapeur rend UNE impulsion de nuage — une seule, puis elle s’éteint. Il a tracé sa route de borne en borne comme un pilote lit ses balises, et il est arrivé au dépôt avec de la réserve. Nous appelions ça une halte. Lui, un ravitaillement. — Dr N. Véga",
+        "bounds": {
+          "minX": -1200,
+          "minY": -750,
+          "maxX": 1200,
+          "maxY": 750
+        },
+        "spawn": {
+          "x": -950,
+          "y": 0,
+          "n": 900
+        },
+        "exit": {
+          "minX": 1040,
+          "minY": -120,
+          "maxX": 1180,
+          "maxY": 120
+        },
+        "par": 8,
+        "boxes": [
+          {
+            "minX": -700,
+            "minY": -500,
+            "maxX": -500,
+            "maxY": -420,
+            "material": 6
+          },
+          {
+            "minX": -660,
+            "minY": 120,
+            "maxX": -600,
+            "maxY": 320,
+            "material": 9
+          },
+          {
+            "minX": -80,
+            "minY": -260,
+            "maxX": -20,
+            "maxY": -60,
+            "material": 9
+          },
+          {
+            "minX": 320,
+            "minY": 60,
+            "maxX": 380,
+            "maxY": 260,
+            "material": 9
+          },
+          {
+            "minX": 640,
+            "minY": -750,
+            "maxX": 700,
+            "maxY": 420,
+            "material": 0
+          },
+          {
+            "minX": 560,
+            "minY": 480,
+            "maxX": 620,
+            "maxY": 680,
+            "material": 9
+          },
+          {
+            "minX": 760,
+            "minY": -200,
+            "maxX": 900,
+            "maxY": -140,
+            "material": 4
+          }
+        ],
+        "sponges": [],
+        "labels": [
+          {
+            "x": -630,
+            "y": 400,
+            "text": "BORNE — UN DASH, UNE FOIS",
+            "tone": "chaud",
+            "picto": {
+              "couleur": "#f2c98e",
+              "eau": 0,
+              "glace": 0,
+              "vapeur": 3
+            }
+          },
+          {
+            "x": -600,
+            "y": -580,
+            "text": "CHAUDIÈRE",
+            "tone": "chaud"
+          },
+          {
+            "x": 150,
+            "y": -360,
+            "text": "LA LIGNE DE RAVITAILLEMENT",
+            "tone": "chaud"
+          },
+          {
+            "x": 830,
+            "y": -280,
+            "text": "DÉPÔT FROID",
+            "tone": "froid"
+          },
+          {
+            "x": 1110,
+            "y": 180,
+            "text": "SAS",
+            "tone": "sas"
+          }
+        ],
+        "decals": [
+          {
+            "x": 1090,
+            "y": 560,
+            "w": 165,
+            "h": 165,
+            "kind": "tuyaux",
+            "fade": 0.42
+          }
+        ],
+        "lumieres": [
+          {
+            "x": -600,
+            "y": -560,
+            "forme": "bandeau",
+            "longueur": 420,
+            "angle": 0,
+            "h": 160,
+            "portee": 780,
+            "intensite": 1.05,
+            "couleur": "#e8a05a",
+            "taille": 1
+          },
+          {
+            "x": 150,
+            "y": 0,
+            "forme": "bandeau",
+            "longueur": 920,
+            "angle": 90,
+            "h": 190,
+            "portee": 820,
+            "intensite": 1.1,
+            "taille": 1
+          },
+          {
+            "x": 830,
+            "y": -240,
+            "forme": "bandeau",
+            "longueur": 280,
+            "angle": 0,
+            "h": 150,
+            "portee": 480,
+            "intensite": 0.9,
+            "couleur": "#8fc8ee",
+            "taille": 1
+          },
+          {
+            "x": 1110,
+            "y": 0,
+            "h": 300,
+            "portee": 480,
+            "intensite": 1,
+            "couleur": "#3fd69b",
+            "taille": 1
+          }
+        ],
+        "ambiante": 0,
+        "brume": 0.1
       }
     },
     {
@@ -8811,6 +10157,144 @@
             "tone": "sas"
           }
         ]
+      }
+    },
+    {
+      "id": "la-voie-lumineuse",
+      "auteur": "EXPÉDITION L",
+      "majAt": "2026-11-18T16:39:19.968Z",
+      "codeAuteur": "EXPÉDITION L",
+      "codeAt": "2026-11-18T16:39:19.968Z",
+      "level": {
+        "name": "La voie lumineuse",
+        "code": "21-11",
+        "journal": "Cellule 11, éclairage réduit. Nous avons éteint la salle pour mesurer sa dépendance au visuel. Il a suivi les flaques de lumière comme des pierres de gué, s’est posé dans chacune, et n’a jamais dévié dans le noir. La lumière n’est pas un décor. C’est une carte, et il la lit. — Dr N. Véga",
+        "bounds": {
+          "minX": -1200,
+          "minY": -750,
+          "maxX": 1200,
+          "maxY": 750
+        },
+        "spawn": {
+          "x": -950,
+          "y": 0,
+          "n": 900
+        },
+        "exit": {
+          "minX": 1040,
+          "minY": -120,
+          "maxX": 1180,
+          "maxY": 120
+        },
+        "par": 6,
+        "boxes": [
+          {
+            "minX": -400,
+            "minY": -300,
+            "maxX": -280,
+            "maxY": -120,
+            "material": 0
+          },
+          {
+            "minX": -100,
+            "minY": 200,
+            "maxX": 60,
+            "maxY": 340,
+            "material": 0
+          },
+          {
+            "minX": 400,
+            "minY": -350,
+            "maxX": 520,
+            "maxY": -200,
+            "material": 0
+          },
+          {
+            "minX": 660,
+            "minY": 300,
+            "maxX": 780,
+            "maxY": 460,
+            "material": 0
+          },
+          {
+            "minX": -160,
+            "minY": -120,
+            "maxX": 0,
+            "maxY": -60,
+            "material": 1
+          },
+          {
+            "minX": 340,
+            "minY": 80,
+            "maxX": 500,
+            "maxY": 160,
+            "material": 1
+          }
+        ],
+        "sponges": [],
+        "labels": [
+          {
+            "x": -800,
+            "y": 200,
+            "text": "SUIVRE LA LUMIÈRE",
+            "tone": "mur",
+            "rang": "secteur"
+          },
+          {
+            "x": -80,
+            "y": -200,
+            "text": "HYDROPHILE — SE POSER DANS LA LUMIÈRE",
+            "tone": "phile"
+          },
+          {
+            "x": 1110,
+            "y": 180,
+            "text": "SAS",
+            "tone": "sas"
+          }
+        ],
+        "lumieres": [
+          {
+            "x": -840,
+            "y": 0,
+            "forme": "bandeau",
+            "longueur": 480,
+            "angle": 90,
+            "h": 180,
+            "portee": 620,
+            "intensite": 1.1,
+            "taille": 1
+          },
+          {
+            "x": -80,
+            "y": -40,
+            "h": 240,
+            "portee": 480,
+            "intensite": 1.05,
+            "couleur": "#63b7e6",
+            "taille": 1
+          },
+          {
+            "x": 420,
+            "y": 160,
+            "h": 240,
+            "portee": 480,
+            "intensite": 1.05,
+            "couleur": "#63b7e6",
+            "taille": 1
+          },
+          {
+            "x": 1110,
+            "y": 0,
+            "h": 320,
+            "portee": 620,
+            "intensite": 1.15,
+            "couleur": "#3fd69b",
+            "taille": 1
+          }
+        ],
+        "ambiante": 0,
+        "brume": 0.1
       }
     },
     {
@@ -9212,6 +10696,190 @@
       }
     },
     {
+      "id": "les-deux-verrous",
+      "auteur": "EXPÉDITION L",
+      "majAt": "2026-11-18T16:39:20.766Z",
+      "codeAuteur": "EXPÉDITION L",
+      "codeAt": "2026-11-18T16:39:20.766Z",
+      "level": {
+        "name": "Les deux verrous",
+        "code": "21-K",
+        "journal": "Deux verrous, deux états. Il s’est figé pour renvoyer le premier faisceau, puis répandu pour plier le second — sans une hésitation entre les deux. Nous pensions tester sa mémoire. C’est lui qui teste notre imagination. — Dr N. Véga",
+        "bounds": {
+          "minX": -1200,
+          "minY": -750,
+          "maxX": 1200,
+          "maxY": 750
+        },
+        "spawn": {
+          "x": -950,
+          "y": 0,
+          "n": 900
+        },
+        "exit": {
+          "minX": 1040,
+          "minY": -120,
+          "maxX": 1180,
+          "maxY": 120
+        },
+        "boxes": [
+          {
+            "minX": 520,
+            "minY": -300,
+            "maxX": 580,
+            "maxY": 100,
+            "material": 0
+          },
+          {
+            "minX": -160,
+            "minY": -280,
+            "maxX": 200,
+            "maxY": -220,
+            "material": 4
+          },
+          {
+            "minX": 40,
+            "minY": 260,
+            "maxX": 400,
+            "maxY": 330,
+            "material": 1
+          },
+          {
+            "minX": 860,
+            "minY": -750,
+            "maxX": 900,
+            "maxY": -170,
+            "material": 0
+          },
+          {
+            "minX": 860,
+            "minY": 170,
+            "maxX": 900,
+            "maxY": 750,
+            "material": 0
+          },
+          {
+            "minX": 950,
+            "minY": -750,
+            "maxX": 990,
+            "maxY": -160,
+            "material": 0
+          },
+          {
+            "minX": 950,
+            "minY": 160,
+            "maxX": 990,
+            "maxY": 750,
+            "material": 0
+          },
+          {
+            "minX": -600,
+            "minY": 660,
+            "maxX": -380,
+            "maxY": 750,
+            "material": 0
+          }
+        ],
+        "sponges": [],
+        "labels": [
+          {
+            "x": -700,
+            "y": -160,
+            "text": "ÉMETTEUR I",
+            "tone": "chaud"
+          },
+          {
+            "x": -900,
+            "y": 420,
+            "text": "ÉMETTEUR II",
+            "tone": "chaud"
+          },
+          {
+            "x": 20,
+            "y": -330,
+            "text": "BERCEAU FROID",
+            "tone": "froid"
+          },
+          {
+            "x": 220,
+            "y": 210,
+            "text": "HYDROPHILE",
+            "tone": "phile"
+          },
+          {
+            "x": -440,
+            "y": 350,
+            "text": "RÉCEPTEUR I",
+            "tone": "sas"
+          },
+          {
+            "x": 660,
+            "y": 380,
+            "text": "RÉCEPTEUR II",
+            "tone": "sas"
+          },
+          {
+            "x": 880,
+            "y": -80,
+            "text": "PORTE I",
+            "tone": "chaud"
+          },
+          {
+            "x": 970,
+            "y": 220,
+            "text": "PORTE II",
+            "tone": "chaud"
+          },
+          {
+            "x": 1110,
+            "y": 160,
+            "text": "SAS",
+            "tone": "sas"
+          }
+        ],
+        "lasers": [
+          {
+            "x": -700,
+            "y": -80,
+            "angle": 0
+          },
+          {
+            "x": -900,
+            "y": 500,
+            "angle": 0
+          }
+        ],
+        "cibles": [
+          {
+            "x": -440,
+            "y": 260,
+            "r": 46
+          },
+          {
+            "x": 660,
+            "y": 280,
+            "r": 52
+          }
+        ],
+        "portes": [
+          {
+            "minX": 860,
+            "minY": -170,
+            "maxX": 900,
+            "maxY": 170,
+            "canal": 1
+          },
+          {
+            "minX": 950,
+            "minY": -160,
+            "maxX": 990,
+            "maxY": 160,
+            "canal": 2
+          }
+        ]
+      }
+    },
+    {
       "id": "a-travers-l-event",
       "auteur": "EXPÉDITION L",
       "majAt": "2026-08-14T22:36:32.361Z",
@@ -9520,6 +11188,255 @@
             "x": -414,
             "y": 698,
             "cl": 8
+          }
+        ]
+      }
+    },
+    {
+      "id": "la-traversee-des-etats-2",
+      "auteur": "EXPÉDITION L",
+      "majAt": "2026-11-18T16:39:21.452Z",
+      "codeAuteur": "EXPÉDITION L",
+      "codeAt": "2026-11-18T16:39:21.452Z",
+      "level": {
+        "name": "La traversée des états",
+        "code": "21-M",
+        "journal": "Miroir, prisme, arc : trois salles, trois verrous, un seul échantillon. Il a changé d’état à chaque porte, dans l’ordre exact, comme s’il relisait nos plans par-dessus mon épaule. Je signe le rapport : ce n’est plus un échantillon. C’est un équipier. — Dr N. Véga",
+        "bounds": {
+          "minX": -1200,
+          "minY": -750,
+          "maxX": 1200,
+          "maxY": 750
+        },
+        "spawn": {
+          "x": -950,
+          "y": 0,
+          "n": 900
+        },
+        "exit": {
+          "minX": 1040,
+          "minY": -120,
+          "maxX": 1180,
+          "maxY": 120
+        },
+        "boxes": [
+          {
+            "minX": -720,
+            "minY": -280,
+            "maxX": -440,
+            "maxY": -220,
+            "material": 4
+          },
+          {
+            "minX": -400,
+            "minY": -750,
+            "maxX": -360,
+            "maxY": -170,
+            "material": 0
+          },
+          {
+            "minX": -400,
+            "minY": 170,
+            "maxX": -360,
+            "maxY": 750,
+            "material": 0
+          },
+          {
+            "minX": -160,
+            "minY": 60,
+            "maxX": 120,
+            "maxY": 130,
+            "material": 1
+          },
+          {
+            "minX": 300,
+            "minY": -750,
+            "maxX": 340,
+            "maxY": -170,
+            "material": 0
+          },
+          {
+            "minX": 300,
+            "minY": 170,
+            "maxX": 340,
+            "maxY": 750,
+            "material": 0
+          },
+          {
+            "minX": 500,
+            "minY": -60,
+            "maxX": 660,
+            "maxY": 0,
+            "material": 6
+          },
+          {
+            "minX": 700,
+            "minY": -420,
+            "maxX": 860,
+            "maxY": -360,
+            "material": 4
+          },
+          {
+            "minX": 980,
+            "minY": -750,
+            "maxX": 1020,
+            "maxY": -160,
+            "material": 0
+          },
+          {
+            "minX": 980,
+            "minY": 160,
+            "maxX": 1020,
+            "maxY": 750,
+            "material": 0
+          }
+        ],
+        "sponges": [],
+        "labels": [
+          {
+            "x": -1100,
+            "y": -160,
+            "text": "ÉMETTEUR I",
+            "tone": "chaud"
+          },
+          {
+            "x": -580,
+            "y": -330,
+            "text": "BERCEAU FROID",
+            "tone": "froid"
+          },
+          {
+            "x": -380,
+            "y": 220,
+            "text": "PORTE I",
+            "tone": "chaud"
+          },
+          {
+            "x": -330,
+            "y": 240,
+            "text": "ÉMETTEUR II",
+            "tone": "chaud"
+          },
+          {
+            "x": -20,
+            "y": 10,
+            "text": "HYDROPHILE",
+            "tone": "phile"
+          },
+          {
+            "x": 320,
+            "y": 220,
+            "text": "PORTE II",
+            "tone": "chaud"
+          },
+          {
+            "x": 380,
+            "y": 80,
+            "text": "ÉMETTEUR III",
+            "tone": "chaud"
+          },
+          {
+            "x": 580,
+            "y": -110,
+            "text": "COLONNE CHAUDE",
+            "tone": "chaud"
+          },
+          {
+            "x": 780,
+            "y": -480,
+            "text": "DÉPÔT FROID",
+            "tone": "froid"
+          },
+          {
+            "x": 1000,
+            "y": 220,
+            "text": "PORTE III",
+            "tone": "chaud"
+          },
+          {
+            "x": 1110,
+            "y": 160,
+            "text": "SAS",
+            "tone": "sas"
+          }
+        ],
+        "lasers": [
+          {
+            "x": -1100,
+            "y": -80,
+            "angle": 0
+          },
+          {
+            "x": -330,
+            "y": 300,
+            "angle": 0
+          },
+          {
+            "x": 380,
+            "y": 140,
+            "angle": 0
+          }
+        ],
+        "cibles": [
+          {
+            "x": -960,
+            "y": 260,
+            "r": 46
+          },
+          {
+            "x": 285,
+            "y": 160,
+            "r": 46
+          },
+          {
+            "x": 900,
+            "y": 260,
+            "r": 46
+          }
+        ],
+        "portes": [
+          {
+            "minX": -400,
+            "minY": -170,
+            "maxX": -360,
+            "maxY": 170,
+            "canal": 1
+          },
+          {
+            "minX": 300,
+            "minY": -170,
+            "maxX": 340,
+            "maxY": 170,
+            "canal": 2
+          },
+          {
+            "minX": 980,
+            "minY": -160,
+            "maxX": 1020,
+            "maxY": 160,
+            "canal": 3
+          }
+        ],
+        "rails": [
+          {
+            "points": [
+              {
+                "x": 600,
+                "y": 140
+              },
+              {
+                "x": 600,
+                "y": 540
+              },
+              {
+                "x": 900,
+                "y": 540
+              },
+              {
+                "x": 900,
+                "y": 320
+              }
+            ]
           }
         ]
       }
@@ -22085,6 +24002,140 @@
             "seuil": 0.1,
             "canal": 2,
             "aspiration": 0
+          }
+        ]
+      }
+    },
+    {
+      "id": "cuve-de-confinement",
+      "auteur": "BOIZ",
+      "majAt": "2026-11-18T16:06:50.677Z",
+      "codeAuteur": "BOIZ",
+      "codeAt": "2026-11-18T15:49:56.862Z",
+      "level": {
+        "name": "cuve de confinement",
+        "code": "21-?",
+        "journal": "Entrée de journal du protocole : ce que le laboratoire a observé dans cette cuve.",
+        "bounds": {
+          "minX": -1200,
+          "minY": -750,
+          "maxX": 1200,
+          "maxY": 750
+        },
+        "spawn": {
+          "x": -948,
+          "y": -333,
+          "n": 900
+        },
+        "exit": {
+          "minX": 983,
+          "minY": -78,
+          "maxX": 1123,
+          "maxY": 78
+        },
+        "boxes": [
+          {
+            "minX": -1045.719,
+            "minY": -900.281,
+            "maxX": -846.045,
+            "maxY": -400.045,
+            "angle": -90,
+            "forme": 4,
+            "material": 2
+          },
+          {
+            "minX": -1196,
+            "minY": -595,
+            "maxX": -1107,
+            "maxY": -362,
+            "material": 0
+          },
+          {
+            "minX": -1196,
+            "minY": -294,
+            "maxX": -1107,
+            "maxY": -86,
+            "material": 0
+          },
+          {
+            "minX": -1045,
+            "minY": -271,
+            "maxX": -845.326,
+            "maxY": 229.236,
+            "angle": 90,
+            "forme": 4,
+            "material": 2
+          },
+          {
+            "minX": -1151.5,
+            "minY": -332,
+            "maxX": -1107,
+            "maxY": -294,
+            "forme": 3,
+            "p0": 3,
+            "material": 0
+          },
+          {
+            "minX": -1151.5,
+            "minY": -362,
+            "maxX": -1107,
+            "maxY": -324.1233686245671,
+            "angle": 180,
+            "forme": 3,
+            "p0": 3,
+            "material": 0
+          },
+          {
+            "minX": -1196,
+            "minY": -362,
+            "maxX": -1151.5,
+            "maxY": -324,
+            "forme": 3,
+            "material": 0
+          },
+          {
+            "minX": -1196,
+            "minY": -332,
+            "maxX": -1151.5,
+            "maxY": -294,
+            "forme": 3,
+            "p0": 2,
+            "material": 0
+          }
+        ],
+        "sponges": [],
+        "labels": [
+          {
+            "x": 1110,
+            "y": 0,
+            "text": "SAS",
+            "tone": "sas"
+          }
+        ],
+        "par": 3,
+        "lasers": [
+          {
+            "x": -1199,
+            "y": -48,
+            "angle": 270
+          }
+        ],
+        "cibles": [
+          {
+            "x": -1193,
+            "y": -707,
+            "r": 26,
+            "mode": "nor"
+          }
+        ],
+        "portes": [
+          {
+            "minX": -784,
+            "minY": -595,
+            "maxX": -695,
+            "maxY": -79,
+            "canal": 1,
+            "repos": "ouverte"
           }
         ]
       }
