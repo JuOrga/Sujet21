@@ -586,7 +586,7 @@ import {
   type CondensatDef,
 } from './game/condensat'
 import { FIOLES, FIOLES_SLOTS, fioleDef } from './game/fioles'
-import { CODE_ACCUEIL, cadreAccueil, tableauAccueil } from './game/cuveAccueil'
+import { CODE_ACCUEIL, cadreAccueil, satellitesAccueil, tableauAccueil } from './game/cuveAccueil'
 import {
   LIEUX_ACCUEIL,
   LIEUX_PREMIER_LANCEMENT,
@@ -1040,7 +1040,9 @@ function createSim(level: LevelDef): FluidSim {
     params.plasmaRailRadius * 2.5,
     params.plasmaRailRadius,
   )
-  sim.spawnDisc(level.spawn.x, level.spawn.y, volumeDepart(level), KIND_PLAYER)
+  // la cuve de l'accueil naît avec ses satellites (peupleCuve)
+  if (level.code === CODE_ACCUEIL) peupleCuve(sim, volumeDepart(level))
+  else sim.spawnDisc(level.spawn.x, level.spawn.y, volumeDepart(level), KIND_PLAYER)
   // l'impulsion se tient jusqu'à la fin de l'entrée de caméra (voir sertImpulsion)
   impulsionEnAttente = level.spawn.impulsion ?? null
   // né dans une zone qui impose la vapeur : le corps EST un nuage dès la
@@ -5461,6 +5463,15 @@ async function publieAvisSalles(): Promise<void> {
 }
 void publieAvisSalles()
 
+/** LA CUVE NAÎT AVEC SES SATELLITES (game/cuveAccueil.ts) : quelques
+ *  boules du corps déjà en orbite, tirées au sort à CHAQUE ouverture — au
+ *  chargement comme à chaque pause. Elles sont prises AU corps : n est le
+ *  total, le corps en garde ce qui n'est pas en orbite. */
+function peupleCuve(s: FluidSim, n: number): void {
+  const billes = satellitesAccueil(Math.random, s.params.particleSpacing)
+  s.spawnDisc(CUVE_ACCUEIL.spawn.x, CUVE_ACCUEIL.spawn.y, Math.max(1, n - billes.length), KIND_PLAYER)
+  for (const b of billes) s.poseEgaree(b.x, b.y, b.vx, b.vy)
+}
 /** La fiche s'ouvre sur une partie : la partie part de côté, intacte, et
  *  la cuve de l'accueil prend l'écran avec sa propre simulation — neuve à
  *  chaque pause, comme au premier jour : 4,5 L, en eau, au centre. */
@@ -5485,7 +5496,7 @@ function montreCuvePause(): void {
   const s = new FluidSim(params, level.bounds, CAPACITY)
   appliqueMoteur(s)
   s.setLevel(level.boxes, level.sponges)
-  s.spawnDisc(level.spawn.x, level.spawn.y, level.spawn.n, KIND_PLAYER)
+  peupleCuve(s, level.spawn.n)
   sim = s
   exposeSim()
   prevision = null // la ligne prédite était celle de la salle
