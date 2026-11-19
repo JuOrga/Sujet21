@@ -177,14 +177,21 @@ bouton **MULTI** sur l'accueil (`?dev`). Tout vit dans [`src/multi/`](src/multi/
 - **Ce qui est là** : une grande salle vide, deux corps de couleurs
   différentes, le jet, le don (la matière tirée dans l'autre devient la
   sienne), ESSAYER SEUL pour piloter les deux corps sur une machine.
+- **Le relais** : quand les deux réseaux refusent la liaison directe (vu
+  au troisième essai entre deux maisons), la partie passe par le relais
+  public de PeerJS — même service tiers que l'annuaire, gratuit et sans
+  garantie. L'hôte envoie alors quinze images par seconde au lieu de
+  trente, et la ligne d'état dit « par le relais ».
+- **Quand ça ne marche pas** : l'écran écrit sous le message d'erreur un
+  « détail pour le dépannage » (ce que l'annuaire a répondu, les adresses
+  trouvées de chaque côté). C'est lui qu'il faut photographier.
 - **Ce qui manque** : les gestes entre joueurs (s'ouvrir pour fusionner, se
-  fermer pour se séparer), les salles, tout état autre que l'eau. Et un
-  RELAIS : si les deux box refusent la liaison directe, la partie ne se
-  fait pas — l'écran le dit.
+  fermer pour se séparer), les salles, tout état autre que l'eau.
 - **Le débit** : une image pèse 10,9 Ko (1 800 particules à six octets),
-  trente par seconde au plus — soit 2,6 Mbit/s en envoi chez l'hôte, par le
-  calcul ; la ligne d'état de la partie affiche le débit réel. Si la ligne
-  ne suit pas, l'hôte saute des images au lieu de prendre du retard.
+  trente par seconde au plus — 325 Ko/s mesurés à pleine cadence, soit
+  2,6 Mbit/s en envoi chez l'hôte ; la ligne d'état de la partie affiche le
+  débit réel. Si la ligne ne suit pas, l'hôte saute des images au lieu de
+  prendre du retard.
 
 ## Ce qui n'est pas fait
 

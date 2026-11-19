@@ -9,12 +9,17 @@
 //  - l'annuaire (annuaire.ts), par qui les deux navigateurs s'échangent
 //    leurs descriptions et leurs adresses, au fil de l'eau.
 //
-// CE QUI PEUT ÉCHOUER, et qu'on ne peut pas savoir d'avance : certaines box
-// (et beaucoup de réseaux mobiles ou d'entreprise) n'acceptent pas qu'on
-// frappe à leur porte, même invitées. La liaison directe est alors
-// impossible et il faudrait un RELAIS (un serveur TURN, payant au débit) —
-// il n'y en a pas ici. L'écran le dit en clair plutôt que d'attendre sans
-// fin.
+// LE RELAIS. Certaines box (et beaucoup de réseaux mobiles ou d'entreprise)
+// n'acceptent pas qu'on frappe à leur porte, même invitées : la liaison
+// directe est alors impossible. C'est arrivé au troisième essai du
+// concepteur et de son ami (19/11) : « mise en relation faite, liaison
+// directe refusée ». Il faut alors un RELAIS (un serveur TURN) par lequel
+// passe toute la partie. On emploie celui que PeerJS offre avec son
+// annuaire — même service tiers, mêmes réserves : gratuit, sans garantie,
+// et tenu par des bénévoles. D'où deux égards : le navigateur ne s'en sert
+// QUE si le direct échoue (c'est la règle d'ICE), et l'hôte envoie alors
+// moitié moins d'images (voir `parRelais`). La partie reste chiffrée de
+// bout en bout : le relais transporte, il ne lit pas.
 //
 // DEUX CANAUX sur la même liaison :
 //  - `flux` : sans reprise ni ordre, pour les images et les commandes — une
@@ -24,10 +29,18 @@
 
 import { Annuaire, nomDePartie, tireCode } from './annuaire'
 
-/** Les serveurs STUN publics interrogés au départ. Deux, chez deux
- *  hébergeurs : si l'un est muet, l'autre répond. */
+/** Les serveurs interrogés au départ : deux STUN publics, chez deux
+ *  hébergeurs (si l'un est muet, l'autre répond), et le relais de PeerJS,
+ *  sous les identifiants PUBLICS que sa bibliothèque porte en clair — ce
+ *  ne sont pas des secrets. Le relais est aussi demandé en TCP : certains
+ *  réseaux ne laissent sortir que cela. */
 const SERVEURS: RTCIceServer[] = [
   { urls: ['stun:stun.l.google.com:19302', 'stun:stun.cloudflare.com:3478'] },
+  {
+    urls: ['turn:eu-0.turn.peerjs.com:3478', 'turn:eu-0.turn.peerjs.com:3478?transport=tcp', 'turn:us-0.turn.peerjs.com:3478'],
+    username: 'peerjs',
+    credential: 'peerjsp',
+  },
 ]
 /** Le temps laissé au navigateur pour recenser ses adresses avant que sa
  *  description ne parte. Passé ce délai on envoie ce qu'on a, et le reste
@@ -59,7 +72,12 @@ export interface Liaison {
   readonly recus: number
   readonly envoyes: number
   /** Ce que le recensement a trouvé : sert au diagnostic d'un échec. */
-  readonly adresses: { locales: number; publiques: number }
+  readonly adresses: Adresses
+  /** La partie passe par le relais (le direct a échoué) : l'hôte ménage
+   *  alors le débit. */
+  readonly parRelais: boolean
+  /** Ce que la liaison sait d'elle-même, en une ligne, pour le dépannage. */
+  diagnostic(): string
   /** La file d'envoi déborde : l'image suivante est à sauter. */
   readonly engorgee: boolean
   surEtat: ((etat: EtatLiaison) => void) | null
@@ -72,11 +90,35 @@ export interface Liaison {
   ferme(): void
 }
 
+/** Les adresses qu'un navigateur s'est trouvées, par nature. */
+export interface Adresses {
+  locales: number
+  /** vues de l'extérieur (par un STUN) */
+  publiques: number
+  /** obtenues du relais */
+  relais: number
+}
+
+/** Range une adresse (une ligne « candidate:… ») dans son compte. */
+function compte(a: Adresses, ligne: string): void {
+  if (/ typ relay/.test(ligne)) a.relais++
+  else if (/ typ (srflx|prflx)/.test(ligne)) a.publiques++
+  else if (/ typ host/.test(ligne)) a.locales++
+}
+
 class LiaisonRTC implements Liaison {
   etat: EtatLiaison = 'attente'
   recus = 0
   envoyes = 0
-  adresses = { locales: 0, publiques: 0 }
+  adresses: Adresses = { locales: 0, publiques: 0, relais: 0 }
+  /** Les adresses que l'AUTRE navigateur nous a données. */
+  readonly distantes: Adresses = { locales: 0, publiques: 0, relais: 0 }
+  parRelais = false
+  // Les ports sous lesquels les STUN nous ont vus. Deux serveurs qui voient
+  // DEUX ports différents : la box change de port à chaque destinataire
+  // (« symétrique ») — c'est le cas où le direct ne passe pas.
+  private readonly portsPublics = new Set<string>()
+  private veille = 0
   surEtat: ((etat: EtatLiaison) => void) | null = null
   surFlux: ((octets: Uint8Array) => void) | null = null
   surOrdre: ((ordre: Ordre) => void) | null = null
@@ -122,12 +164,18 @@ class LiaisonRTC implements Liaison {
     this.pc.onicecandidate = (ev) => {
       const c = ev.candidate
       if (!c) return
-      if (c.type === 'srflx') this.adresses.publiques++
-      else if (c.type === 'host') this.adresses.locales++
+      compte(this.adresses, c.candidate)
+      if (c.type === 'srflx' && c.address) this.portsPublics.add(`${c.address}:${c.port}`)
       if (this.descriptionPartie) this.surCandidat?.(c.toJSON())
     }
     this.pc.onconnectionstatechange = () => {
       const s = this.pc.connectionState
+      if (s === 'connected') {
+        // par où passe-t-on ? Le chemin peut changer en cours de partie
+        // (le direct qui finit par s'ouvrir) : on regarde de temps en temps.
+        void this.regardeChemin()
+        if (!this.veille) this.veille = window.setInterval(() => void this.regardeChemin(), 5000)
+      }
       if (s === 'failed') this.passe(this.etat === 'ouverte' ? 'coupee' : 'echec')
       else if (s === 'closed') this.passe(this.etat === 'ouverte' ? 'coupee' : this.etat)
       // « disconnected » n'est pas une fin : le navigateur réessaie seul,
@@ -137,6 +185,30 @@ class LiaisonRTC implements Liaison {
 
   get engorgee(): boolean {
     return this.flux.readyState === 'open' && this.flux.bufferedAmount > FILE_ENGORGEE_OCTETS
+  }
+
+  /** Lit, dans les statistiques du navigateur, si le chemin retenu passe
+   *  par le relais (d'un côté ou de l'autre). */
+  private async regardeChemin(): Promise<void> {
+    try {
+      const stats = await this.pc.getStats()
+      let paire: { localCandidateId?: string; remoteCandidateId?: string } | undefined
+      stats.forEach((r: { type?: string; selectedCandidatePairId?: string }) => {
+        if (r.type === 'transport' && r.selectedCandidatePairId) paire = stats.get(r.selectedCandidatePairId)
+      })
+      if (!paire) return
+      const nature = (id?: string): string => (id ? ((stats.get(id) as { candidateType?: string } | undefined)?.candidateType ?? '') : '')
+      this.parRelais = nature(paire.localCandidateId) === 'relay' || nature(paire.remoteCandidateId) === 'relay'
+    } catch {
+      // pas de statistiques ici : on garde ce qu'on savait
+    }
+  }
+
+  diagnostic(): string {
+    const dit = (a: Adresses): string => `${a.locales} locale(s), ${a.publiques} publique(s), ${a.relais} par relais`
+    const box = this.portsPublics.size > 1 ? ' · cette box change de port selon le destinataire (elle refuse le direct)' : ''
+    const chemin = this.etat === 'ouverte' ? ` · chemin : ${this.parRelais ? 'par le relais' : 'direct'}` : ''
+    return `ce navigateur : ${dit(this.adresses)}${box} · l’autre : ${dit(this.distantes)}${chemin}`
   }
 
   private passe(etat: EtatLiaison): void {
@@ -177,6 +249,8 @@ class LiaisonRTC implements Liaison {
   ferme(): void {
     this.envoieOrdre({ t: 'adieu' })
     this.passe(this.etat === 'ouverte' ? 'coupee' : this.etat)
+    window.clearInterval(this.veille)
+    this.veille = 0
     try {
       this.pc.close()
     } catch {
@@ -210,6 +284,7 @@ class LiaisonRTC implements Liaison {
    *  avait déjà envoyées (elles peuvent arriver avant elle). */
   async poseDistante(d: RTCSessionDescriptionInit): Promise<void> {
     await this.pc.setRemoteDescription(d)
+    for (const ligne of (d.sdp ?? '').split(/\r?\n/)) if (ligne.startsWith('a=candidate:')) compte(this.distantes, ligne)
     this.distantePosee = true
     for (const c of this.candidatsEnAttente.splice(0)) this.ajouteCandidat(c)
   }
@@ -220,6 +295,7 @@ class LiaisonRTC implements Liaison {
       this.candidatsEnAttente.push(c)
       return
     }
+    compte(this.distantes, c.candidate ?? '')
     // une adresse inutilisable (famille réseau absente ici) n'est pas une
     // panne : les autres suffisent
     this.pc.addIceCandidate(c).catch(() => {})
@@ -431,14 +507,17 @@ export async function rejointPartie(adresse: string, code: string): Promise<Jonc
 /** Pourquoi la liaison n'a pas pu s'établir, en clair — ce que le
  *  recensement a vu oriente le diagnostic. */
 export function expliqueEchec(l: Liaison): string {
-  if (l.adresses.publiques === 0) {
+  if (l.adresses.publiques === 0 && l.adresses.relais === 0) {
     return (
-      'Ce navigateur n’a pas pu connaître son adresse publique : un pare-feu ou le réseau bloque la découverte. ' +
-      'Essayez un autre réseau, ou désactivez un VPN.'
+      'Ce navigateur n’a pu joindre ni les serveurs d’adresses ni le relais : un pare-feu, un VPN ou le réseau bloque tout ce qui n’est pas une page web. ' +
+      'Essayez un autre réseau, ou désactivez le VPN.'
     )
   }
-  return (
-    'Les deux box n’ont pas accepté la liaison directe. Cela arrive avec certains fournisseurs et sur les réseaux mobiles. ' +
-    'Il faudrait un relais, que ce prototype n’a pas : dites-le, c’est une information utile.'
-  )
+  if (l.adresses.relais === 0) {
+    return (
+      'Les deux réseaux refusent la liaison directe, et le relais n’a pas répondu à ce navigateur. ' +
+      'Réessayez dans un instant ; si cela dure, le relais public est en panne.'
+    )
+  }
+  return 'Ni la liaison directe ni le relais n’ont abouti. Réessayez ; si cela dure, envoyez le détail ci-dessous.'
 }

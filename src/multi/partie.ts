@@ -40,6 +40,10 @@ export const DEPARTS: readonly { x: number; y: number }[] = [
  *  à 120 pas par seconde ; l'invité prolonge chaque image avec les vitesses
  *  jusqu'à la suivante. */
 export const CADENCE_ETAT = 30
+/** La cadence quand la partie passe par le RELAIS : moitié moins. Le relais
+ *  est un service public et gratuit — on y fait passer 165 Ko/s au lieu de
+ *  330, et l'invité prolonge chaque image deux fois plus longtemps. */
+export const CADENCE_RELAIS = 15
 
 export class Hote {
   sim: FluidSimMulti

@@ -18,7 +18,7 @@ import { NoyauxWasm } from '../sim/wasm'
 import { cadreSalle, cadreVoulu, ecranVersMonde, mondeVersEcran, suitCadre, type Cadre } from './cadrage'
 import { adresseAnnuaire, litCodePartie, LONGUEUR_CODE } from './annuaire'
 import { creePartie, expliqueEchec, liaisonPossible, rejointPartie, type Accueil, type EtatLiaison, type Liaison, type Ordre } from './liaison'
-import { CADENCE_ETAT, CAPACITE, Hote, Miroir, SALLE } from './partie'
+import { CADENCE_ETAT, CADENCE_RELAIS, CAPACITE, Hote, Miroir, SALLE } from './partie'
 import { RenduMulti, couleurCss } from './renduMulti'
 import { VERSION_TRAME, decodeCommande, encodeCommande, type Commande, type CorpsTrame, type Particules } from './trame'
 
@@ -294,7 +294,7 @@ export function creeEcranMulti(quitte: () => void): EcranMulti {
       window.clearTimeout(minuteurLiaison)
       const raison = expliqueEchec(l)
       if (page === 'creation' || page === 'jonction') {
-        detail(page, `mise en relation faite, liaison directe refusée · adresses trouvées par ce navigateur : ${l.adresses.locales} locale(s), ${l.adresses.publiques} publique(s)`)
+        detail(page, 'mise en relation faite, liaison refusée · ' + l.diagnostic())
       }
       if (page === 'creation') mot('creation', 'La liaison n’a pas pu s’établir. ' + raison + ' Votre ami peut réessayer avec le même code.', 'alerte')
       else if (page === 'jonction') {
@@ -478,6 +478,7 @@ export function creeEcranMulti(quitte: () => void): EcranMulti {
     minuteurLiaison = window.setTimeout(() => {
       if (!l || l !== liaison || l.etat !== 'attente' || page !== ou) return
       mot(ou, 'La liaison ne s’établit pas. ' + expliqueEchec(l), 'alerte')
+      detail(ou, 'mise en relation faite, liaison en attente depuis 20 s · ' + l.diagnostic())
       if (ou === 'jonction') el<HTMLButtonElement>('[data-geste="valider-code"]').disabled = false
     }, 20_000)
   }
@@ -654,7 +655,7 @@ export function creeEcranMulti(quitte: () => void): EcranMulti {
       if (role === 'hote' && liaison) {
         resteEnvoi -= dt
         if (resteEnvoi <= 0) {
-          resteEnvoi += 1 / CADENCE_ETAT
+          resteEnvoi += 1 / (liaison.parRelais ? CADENCE_RELAIS : CADENCE_ETAT)
           if (resteEnvoi < 0) resteEnvoi = 0
           // ligne engorgée : on saute l'image ENTIÈRE (un morceau seul ne
           // sert à rien) — la cadence s'ajuste à ce que la ligne porte
@@ -707,7 +708,7 @@ export function creeEcranMulti(quitte: () => void): EcranMulti {
         const envoyes = (liaison.envoyes - debitEnvoyes) / duree / 1024
         debitRecus = liaison.recus
         debitEnvoyes = liaison.envoyes
-        debitTexte = `envoi ${envoyes.toFixed(0)} ko/s · réception ${recus.toFixed(0)} ko/s`
+        debitTexte = `${liaison.parRelais ? 'par le relais' : 'en direct'} · envoi ${envoyes.toFixed(0)} ko/s · réception ${recus.toFixed(0)} ko/s`
         if (imagesSautees > 0) debitTexte += ` · ${imagesSautees} image(s) sautée(s) : la ligne ne suit pas`
       }
       const silence = role === 'invite' && miroir ? miroir.age(maintenant) : 0
