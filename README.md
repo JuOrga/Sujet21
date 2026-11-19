@@ -157,13 +157,18 @@ codex, trophées, cycle, récompenses, voie, générateur) et les écrans
 Un essai de partie à deux, chacun chez soi, derrière le mode concepteur :
 bouton **MULTI** sur l'accueil (`?dev`). Tout vit dans [`src/multi/`](src/multi/).
 
-- **Créer / rejoindre** : deux codes à s'échanger par message (l'invitation,
-  puis la réponse). Aucun serveur de jeu, aucune fonction Vercel de plus,
-  aucune opération Blob — `src/multi/invitation.ts` dit pourquoi.
+- **Créer / rejoindre** : l'hôte reçoit un code de cinq caractères, l'ami le
+  tape — ou ouvre le lien `?dev&multi=CODE`, qui mène droit dans la partie.
+  La mise en relation passe par l'annuaire PUBLIC de PeerJS (un service
+  tiers, gratuit, sans compte) : aucun serveur de jeu, aucune fonction
+  Vercel de plus, aucune opération Blob. `src/multi/annuaire.ts` dit
+  pourquoi, et raconte la panne du premier essai (deux longs codes à
+  relayer à la main, un délai que personne ne tenait).
 - **Qui simule** : la machine qui CRÉE la partie. L'autre envoie sa commande
   et affiche ce qu'il reçoit (rejouer les mêmes gestes sur deux machines ne
-  donne pas le même film — `src/game/fantome.ts`). L'hôte garde sa fenêtre
-  au premier plan : un onglet en arrière-plan ne simule plus.
+  donne pas le même film — `src/game/fantome.ts`). La partie continue quand
+  la fenêtre de l'hôte passe en arrière-plan ; elle s'arrête s'il ferme
+  l'onglet.
 - **Le solveur du jeu n'est pas touché.** `src/multi/solveurMulti.ts` en est
   une copie qui tient plusieurs corps, chaque particule portant son
   propriétaire ; un test de parité la tient, à un joueur, sur les mêmes

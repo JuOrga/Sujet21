@@ -8747,13 +8747,22 @@ const chargeMulti = chargeUneFois('le multi', async () => {
     multiOuvert = false
   })
 })
-document.getElementById('home-multi')?.addEventListener('click', () => {
+const ouvreMulti = (code?: string): void => {
   void chargeMulti().then((ecran) => {
     if (!ecran) return
     multiOuvert = true
-    ecran.ouvre()
+    ecran.ouvre(code)
   })
-})
+}
+document.getElementById('home-multi')?.addEventListener('click', () => ouvreMulti())
+// LE LIEN D'INVITATION : « ?dev&multi=CODE » mène droit dans la partie —
+// l'ami n'a ni bouton à trouver ni code à taper (sur un téléphone, c'est la
+// différence entre rejoindre et renoncer). Le lien ne vaut qu'en mode
+// concepteur, comme le bouton : sans « ?dev », il ne fait rien.
+{
+  const code = new URLSearchParams(location.search).get('multi')
+  if (code && document.body.classList.contains('concepteur')) ouvreMulti(code)
+}
 // Sonde de test : la carte en cours d'édition
 ;(window as unknown as { __carte: () => unknown }).__carte = () =>
   editeurCarte?.carteCourante() ?? null

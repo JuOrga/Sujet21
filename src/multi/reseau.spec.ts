@@ -15,7 +15,7 @@ import {
   particulesVides,
   type CorpsTrame,
 } from './trame'
-import { PREFIXE_INVITATION, PREFIXE_REPONSE, faitCode, litCode } from './invitation'
+import { ALPHABET_CODE, LONGUEUR_CODE, adresseAnnuaire, litCodePartie, nomDePartie, tireCode } from './annuaire'
 import { CAPACITE, DEPARTS, Hote, Miroir, SALLE, VOLUME_DEPART } from './partie'
 
 const UN_CORPS: CorpsTrame = {
@@ -118,50 +118,50 @@ describe('trame — la commande', () => {
   })
 })
 
-describe('le code d’invitation', () => {
-  // une description de navigateur ressemble à cela : des lignes, des
-  // adresses, des empreintes
-  const DESCRIPTION =
-    'v=0\r\no=- 4611731400430051336 2 IN IP4 127.0.0.1\r\ns=-\r\nt=0 0\r\na=group:BUNDLE 0\r\n' +
-    'm=application 9 UDP/DTLS/SCTP webrtc-datachannel\r\nc=IN IP4 0.0.0.0\r\n' +
-    'a=candidate:1 1 udp 2113937151 192.168.1.20 51234 typ host\r\n' +
-    'a=candidate:2 1 udp 1677729535 203.0.113.7 51234 typ srflx raddr 192.168.1.20 rport 51234\r\n' +
-    'a=ice-ufrag:abcd\r\na=ice-pwd:0123456789abcdefghijklmn\r\n' +
-    'a=fingerprint:sha-256 AA:BB:CC:DD:EE:FF:00:11:22:33:44:55:66:77:88:99:AA:BB:CC:DD:EE:FF:00:11:22:33:44:55:66:77:88:99\r\n' +
-    'a=setup:actpass\r\na=mid:0\r\na=sctp-port:5000\r\n'
-
-  it('fait l’aller-retour, et n’emploie que des caractères qui survivent à une messagerie', async () => {
-    const code = await faitCode('invitation', DESCRIPTION)
-    expect(code.startsWith(PREFIXE_INVITATION + '.')).toBe(true)
-    expect(code).toMatch(/^[A-Za-z0-9._-]+$/)
-    const lu = await litCode('invitation', code)
-    expect(lu).toEqual({ ok: true, description: DESCRIPTION })
+describe('le code de partie', () => {
+  it('un code tiré fait cinq caractères de l’alphabet, sans lettre qui se confonde', () => {
+    for (let k = 0; k < 200; k++) {
+      const code = tireCode()
+      expect(code).toHaveLength(LONGUEUR_CODE)
+      for (const c of code) expect(ALPHABET_CODE).toContain(c)
+      expect(code).not.toMatch(/[IO01]/)
+    }
+    // les bornes du hasard ne sortent pas de l'alphabet
+    expect(tireCode(() => 0)).toBe('AAAAA')
+    expect(tireCode(() => 0.999999)).toBe('99999')
   })
 
-  it('tolère ce qu’une messagerie ajoute autour', async () => {
-    const code = await faitCode('reponse', DESCRIPTION)
-    const abime = `  « ${code.slice(0, 40)}\n${code.slice(40)} »\n`
-    expect(await litCode('reponse', abime)).toEqual({ ok: true, description: DESCRIPTION })
+  it('un code tapé est remis au propre : minuscules, espaces et tirets tolérés', () => {
+    expect(litCodePartie('k7q2m')).toEqual({ ok: true, code: 'K7Q2M' })
+    expect(litCodePartie('  K7-Q2 M \n')).toEqual({ ok: true, code: 'K7Q2M' })
   })
 
-  it('nomme l’erreur la plus probable : le mauvais code dans la mauvaise case', async () => {
-    const invitation = await faitCode('invitation', DESCRIPTION)
-    const reponse = await faitCode('reponse', DESCRIPTION)
-    expect(reponse.startsWith(PREFIXE_REPONSE + '.')).toBe(true)
-    const a = await litCode('reponse', invitation)
-    expect(a.ok).toBe(false)
-    if (!a.ok) expect(a.raison).toContain('INVITATION')
-    const b = await litCode('invitation', reponse)
-    expect(b.ok).toBe(false)
-    if (!b.ok) expect(b.raison).toContain('RÉPONSE')
+  it('refuse le vide, la mauvaise longueur et le caractère impossible — en disant pourquoi', () => {
+    const vide = litCodePartie('   ')
+    expect(vide.ok).toBe(false)
+    const court = litCodePartie('K7Q')
+    expect(court.ok).toBe(false)
+    if (!court.ok) expect(court.raison).toContain('3')
+    // 0 et O n'existent dans aucun code : c'est une faute de recopie
+    const zero = litCodePartie('K0Q2M')
+    expect(zero.ok).toBe(false)
+    if (!zero.ok) expect(zero.raison).toContain('0')
   })
 
-  it('refuse le vide, le n’importe quoi et le code tronqué — en disant pourquoi', async () => {
-    const code = await faitCode('invitation', DESCRIPTION)
-    for (const mauvais of ['', 'bonjour', code.slice(0, code.length - 30), PREFIXE_INVITATION + '.@@@@']) {
-      const r = await litCode('invitation', mauvais)
-      expect(r.ok).toBe(false)
-      if (!r.ok) expect(r.raison.length).toBeGreaterThan(10)
+  it('le nom à l’annuaire porte notre préfixe, et ne dépend pas de la casse', () => {
+    expect(nomDePartie('K7Q2M')).toBe('sujet21-multi-k7q2m')
+    // l'annuaire n'accepte que lettres, chiffres, tirets, espaces et tirets bas
+    expect(nomDePartie('K7Q2M')).toMatch(/^[A-Za-z0-9]+(?:[ _-][A-Za-z0-9]+)*$/)
+  })
+
+  it('l’annuaire est le public, sauf désigné en local — un lien piégé ne le détourne pas', () => {
+    const publique = adresseAnnuaire('')
+    expect(publique).toMatch(/^wss:\/\//)
+    expect(adresseAnnuaire('?dev&multi=K7Q2M')).toBe(publique)
+    expect(adresseAnnuaire('?annuaire=ws://localhost:9000/peerjs')).toBe('ws://localhost:9000/peerjs')
+    expect(adresseAnnuaire('?annuaire=ws://127.0.0.1:9000/peerjs')).toBe('ws://127.0.0.1:9000/peerjs')
+    for (const piege of ['wss://mechant.example/peerjs', 'ws://localhost.mechant.example/peerjs', 'ws://mechant.example/?x=ws://localhost/']) {
+      expect(adresseAnnuaire('?annuaire=' + encodeURIComponent(piege))).toBe(publique)
     }
   })
 })

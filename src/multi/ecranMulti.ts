@@ -16,7 +16,8 @@
 
 import { NoyauxWasm } from '../sim/wasm'
 import { cadreSalle, cadreVoulu, ecranVersMonde, mondeVersEcran, suitCadre, type Cadre } from './cadrage'
-import { creeInvitation, expliqueEchec, liaisonPossible, rejoint, type EtatLiaison, type Invitation, type Liaison, type Ordre } from './liaison'
+import { adresseAnnuaire, litCodePartie, LONGUEUR_CODE } from './annuaire'
+import { creePartie, expliqueEchec, liaisonPossible, rejointPartie, type Accueil, type EtatLiaison, type Liaison, type Ordre } from './liaison'
 import { CADENCE_ETAT, CAPACITE, Hote, Miroir, SALLE } from './partie'
 import { RenduMulti, couleurCss } from './renduMulti'
 import { VERSION_TRAME, decodeCommande, encodeCommande, type Commande, type CorpsTrame, type Particules } from './trame'
@@ -25,7 +26,9 @@ type Role = 'hote' | 'invite' | 'seul'
 type Page = 'salon' | 'creation' | 'jonction' | 'jeu'
 
 export interface EcranMulti {
-  ouvre(): void
+  /** Ouvre l'écran. Avec un code (celui d'un lien d'invitation), il va
+   *  droit rejoindre cette partie. */
+  ouvre(code?: string): void
   ferme(): void
   ouvert(): boolean
 }
@@ -48,12 +51,14 @@ const STYLE = `
 .mu-choix button b { font-family: var(--font-display, sans-serif); font-weight: 400; letter-spacing: 0.14em; }
 .mu-choix button span { color: var(--dim, #7f9cb0); letter-spacing: 0; line-height: 1.4; }
 .mu-etape { border: 1px solid var(--line, rgba(150,200,235,.16)); padding: 14px; display: flex; flex-direction: column; gap: 10px; }
-.mu-etape[data-etat="attente"] { opacity: 0.45; }
 .mu-etape h3 { margin: 0; font-size: 1em; font-weight: 400; letter-spacing: 0.1em; color: var(--glow, #a7ddf5); }
 .mu-etape p { margin: 0; color: var(--dim, #7f9cb0); line-height: 1.5; }
-.mu-etape textarea { width: 100%; box-sizing: border-box; min-height: 5.2em; resize: vertical; background: rgba(0, 0, 0, 0.35); color: var(--ink, #d9ecf7);
-  border: 1px solid var(--line-strong, rgba(150,200,235,.38)); font: inherit; font-size: 0.85em; padding: 8px; word-break: break-all; }
-.mu-etape textarea:focus { outline: none; border-color: var(--glow, #a7ddf5); }
+.mu-code { font-family: var(--font-display, sans-serif); font-size: calc(46px * var(--ui, 1)); letter-spacing: 0.32em; text-align: center; padding: 0.35em 0 0.35em 0.32em;
+  color: var(--glow, #a7ddf5); background: rgba(0, 0, 0, 0.35); border: 1px solid var(--line-strong, rgba(150,200,235,.38)); user-select: all; }
+.mu-etape input { width: 100%; box-sizing: border-box; background: rgba(0, 0, 0, 0.35); color: var(--ink, #d9ecf7); border: 1px solid var(--line-strong, rgba(150,200,235,.38));
+  font-family: var(--font-display, sans-serif); font-size: calc(34px * var(--ui, 1)); letter-spacing: 0.3em; text-align: center; padding: 0.35em 0.2em; text-transform: uppercase; }
+.mu-etape input:focus { outline: none; border-color: var(--glow, #a7ddf5); }
+.mu-etape form { display: flex; flex-direction: column; gap: 10px; margin: 0; }
 .mu-rang { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
 .mu-mot { min-height: 1.5em; line-height: 1.5; }
 .mu-mot[data-ton="alerte"] { color: var(--alert, #e0685c); }
@@ -82,10 +87,10 @@ const STYLE = `
 const GABARIT = `
 <div class="mu-salon" data-page="salon">
   <h2 class="mu-titre">MULTI</h2>
-  <p class="mu-sous">Prototype à deux, chacun chez soi. L’un crée la partie, l’autre la rejoint : deux codes à s’échanger par message, aucun compte, aucun serveur de jeu.</p>
+  <p class="mu-sous">Prototype à deux, chacun chez soi. L’un crée la partie et donne son code, l’autre le tape. Aucun compte.</p>
   <div class="mu-choix">
     <button type="button" data-geste="creer"><b>CRÉER UNE PARTIE</b><span>Votre machine fait tourner la simulation : à choisir sur le PC le plus puissant.</span></button>
-    <button type="button" data-geste="rejoindre"><b>REJOINDRE UNE PARTIE</b><span>Vous avez reçu un code d’invitation.</span></button>
+    <button type="button" data-geste="rejoindre"><b>REJOINDRE UNE PARTIE</b><span>Votre ami vous a donné un code de cinq caractères.</span></button>
   </div>
   <div class="mu-rang">
     <button type="button" class="mu-discret" data-geste="seul">ESSAYER SEUL</button>
@@ -96,17 +101,11 @@ const GABARIT = `
 
 <div class="mu-salon" data-page="creation" hidden>
   <h2 class="mu-titre">CRÉER UNE PARTIE</h2>
-  <div class="mu-etape" data-etape="c1">
-    <h3>1 · ENVOYEZ CE CODE À VOTRE AMI</h3>
-    <p>Par le moyen que vous voulez (message, courriel). Il le collera dans « Rejoindre une partie ».</p>
-    <textarea readonly data-champ="invitation" aria-label="Code d’invitation" placeholder="Le code se prépare…"></textarea>
-    <div class="mu-rang"><button type="button" data-geste="copier-invitation" disabled>COPIER LE CODE</button><span class="mu-mot" data-mot="copie-invitation"></span></div>
-  </div>
-  <div class="mu-etape" data-etape="c2" data-etat="attente">
-    <h3>2 · COLLEZ ICI SA RÉPONSE</h3>
-    <p>En rejoignant, votre ami reçoit un code de réponse : il vous le renvoie, vous le collez ici.</p>
-    <textarea data-champ="reponse" aria-label="Code de réponse" placeholder="Collez le code de réponse" disabled></textarea>
-    <div class="mu-rang"><button type="button" class="mu-fort" data-geste="valider-reponse" disabled>LANCER LA LIAISON</button></div>
+  <div class="mu-etape">
+    <h3>DONNEZ CE CODE À VOTRE AMI</h3>
+    <p>Il le tape dans « Rejoindre une partie ». Ou envoyez-lui le lien : il arrive droit dans la partie. Rien ne presse — laissez cette page ouverte, la partie démarre toute seule quand il arrive.</p>
+    <div class="mu-code" data-code aria-live="polite" aria-label="Code de la partie">·····</div>
+    <div class="mu-rang"><button type="button" data-geste="copier-code" disabled>COPIER LE CODE</button><button type="button" data-geste="copier-lien" disabled>COPIER LE LIEN</button><span class="mu-mot" data-mot="copie"></span></div>
   </div>
   <p class="mu-mot" data-mot="creation"></p>
   <div class="mu-rang"><button type="button" class="mu-discret" data-geste="retour">ANNULER</button></div>
@@ -114,17 +113,13 @@ const GABARIT = `
 
 <div class="mu-salon" data-page="jonction" hidden>
   <h2 class="mu-titre">REJOINDRE UNE PARTIE</h2>
-  <div class="mu-etape" data-etape="j1">
-    <h3>1 · COLLEZ LE CODE D’INVITATION</h3>
-    <p>Celui que vous a envoyé la personne qui a créé la partie.</p>
-    <textarea data-champ="invitation-recue" aria-label="Code d’invitation reçu" placeholder="Collez le code d’invitation"></textarea>
-    <div class="mu-rang"><button type="button" class="mu-fort" data-geste="valider-invitation">VALIDER</button></div>
-  </div>
-  <div class="mu-etape" data-etape="j2" data-etat="attente">
-    <h3>2 · RENVOYEZ CE CODE DE RÉPONSE</h3>
-    <p>Votre ami le collera chez lui. La partie démarre toute seule dès que la liaison est faite : gardez cette page ouverte.</p>
-    <textarea readonly data-champ="reponse-faite" aria-label="Code de réponse" placeholder="Le code de réponse apparaîtra ici"></textarea>
-    <div class="mu-rang"><button type="button" data-geste="copier-reponse" disabled>COPIER LE CODE</button><span class="mu-mot" data-mot="copie-reponse"></span></div>
+  <div class="mu-etape">
+    <h3>TAPEZ LE CODE DE LA PARTIE</h3>
+    <p>Cinq caractères, donnés par la personne qui a créé la partie.</p>
+    <form data-formulaire="code">
+      <input type="text" data-champ="code" autocapitalize="characters" autocomplete="off" autocorrect="off" spellcheck="false" maxlength="12" aria-label="Code de la partie" placeholder="·····">
+      <div class="mu-rang"><button type="submit" class="mu-fort" data-geste="valider-code">REJOINDRE</button></div>
+    </form>
   </div>
   <p class="mu-mot" data-mot="jonction"></p>
   <div class="mu-rang"><button type="button" class="mu-discret" data-geste="retour">ANNULER</button></div>
@@ -159,7 +154,9 @@ export function creeEcranMulti(quitte: () => void): EcranMulti {
   let hote: Hote | null = null
   let miroir: Miroir | null = null
   let liaison: Liaison | null = null
-  let invitation: Invitation | null = null
+  let accueil: Accueil | null = null
+  /** le code de la partie créée (pour le copier) */
+  let codePartie = ''
   let noyaux: NoyauxWasm | null = null
   let cadre: Cadre = cadreSalle(SALLE, 16 / 9)
   let rafId = 0
@@ -209,7 +206,13 @@ export function creeEcranMulti(quitte: () => void): EcranMulti {
     document.body.appendChild(r)
     r.addEventListener('click', (ev) => {
       const b = (ev.target as HTMLElement).closest<HTMLButtonElement>('button[data-geste]')
-      if (b && !b.disabled) void geste(b.dataset.geste ?? '')
+      // le bouton d'un formulaire agit par « submit » (ci-dessous) : la
+      // touche Entrée dans le champ fait alors le même geste que le clic
+      if (b && !b.disabled && b.type !== 'submit') void geste(b.dataset.geste ?? '')
+    })
+    r.querySelector<HTMLFormElement>('[data-formulaire="code"]')!.addEventListener('submit', (ev) => {
+      ev.preventDefault()
+      void geste('valider-code')
     })
     brancheToile(r.querySelector('canvas')!)
     // la fenêtre qui perd la main ne doit pas laisser un jet coincé ouvert
@@ -225,24 +228,36 @@ export function creeEcranMulti(quitte: () => void): EcranMulti {
     for (const e of racine.querySelectorAll<HTMLElement>('[data-page]')) e.hidden = e.dataset.page !== p
   }
 
-  async function copie(champ: string, motNom: string): Promise<void> {
-    const zone = el<HTMLTextAreaElement>(`[data-champ="${champ}"]`)
+  async function copie(texte: string): Promise<void> {
     try {
-      await navigator.clipboard.writeText(zone.value)
-      mot(motNom, 'Copié.', 'bon')
+      await navigator.clipboard.writeText(texte)
+      mot('copie', 'Copié.', 'bon')
     } catch {
-      // presse-papiers refusé (page non sécurisée, permission) : on
-      // sélectionne, l'utilisateur fait Ctrl+C
-      zone.focus()
-      zone.select()
-      mot(motNom, 'Le code est sélectionné : copiez-le (Ctrl+C).')
+      // presse-papiers refusé (permission, page non sécurisée) : le code
+      // est écrit en grand, il se recopie à la main
+      mot('copie', 'La copie est refusée par ce navigateur : recopiez le code à la main.')
     }
+  }
+
+  /** Le lien qui mène droit dans la partie : l'ami n'a rien à taper. */
+  function lienPartie(): string {
+    const u = new URL(location.href)
+    u.search = ''
+    u.hash = ''
+    u.searchParams.set('dev', '')
+    u.searchParams.set('multi', codePartie)
+    // « ?dev=&multi=X » → « ?dev&multi=X » : plus court, et c'est la forme
+    // que tout le dépôt écrit
+    return u.toString().replace('dev=&', 'dev&')
   }
 
   // ---- LA LIAISON ---------------------------------------------------------
 
   function brancheLiaison(l: Liaison): void {
+    // une liaison précédente qui a échoué laisse la place (l'ami réessaie)
+    if (liaison && liaison !== l) liaison.ferme()
     liaison = l
+    seqCommandeRecue = -1
     l.surEtat = (etat) => surEtatLiaison(l, etat)
     l.surOrdre = (o) => surOrdre(o)
     l.surFlux = (octets) => {
@@ -256,6 +271,8 @@ export function creeEcranMulti(quitte: () => void): EcranMulti {
         }
       }
     }
+    // la liaison a pu s'ouvrir (ou tomber) avant qu'on ne l'écoute
+    if (l.etat !== 'attente') surEtatLiaison(l, l.etat)
   }
 
   function surEtatLiaison(l: Liaison, etat: EtatLiaison): void {
@@ -267,8 +284,11 @@ export function creeEcranMulti(quitte: () => void): EcranMulti {
     } else if (etat === 'echec') {
       window.clearTimeout(minuteurLiaison)
       const raison = expliqueEchec(l)
-      if (page === 'creation') mot('creation', 'La liaison n’a pas pu s’établir. ' + raison, 'alerte')
-      else if (page === 'jonction') mot('jonction', 'La liaison n’a pas pu s’établir. ' + raison, 'alerte')
+      if (page === 'creation') mot('creation', 'La liaison n’a pas pu s’établir. ' + raison + ' Votre ami peut réessayer avec le même code.', 'alerte')
+      else if (page === 'jonction') {
+        mot('jonction', 'La liaison n’a pas pu s’établir. ' + raison, 'alerte')
+        el<HTMLButtonElement>('[data-geste="valider-code"]').disabled = false
+      }
     } else if (etat === 'coupee' && page === 'jeu') {
       voile('La liaison est coupée : l’autre joueur a quitté la partie, ou sa connexion est tombée.')
     }
@@ -293,7 +313,9 @@ export function creeEcranMulti(quitte: () => void): EcranMulti {
     window.clearTimeout(minuteurLiaison)
     const l = liaison
     liaison = null
-    invitation = null
+    const a = accueil
+    accueil = null
+    a?.ferme()
     l?.ferme()
   }
 
@@ -322,17 +344,14 @@ export function creeEcranMulti(quitte: () => void): EcranMulti {
         fermeLiaison()
         montre('salon')
         return
-      case 'copier-invitation':
-        await copie('invitation', 'copie-invitation')
+      case 'copier-code':
+        await copie(codePartie)
         return
-      case 'copier-reponse':
-        await copie('reponse-faite', 'copie-reponse')
+      case 'copier-lien':
+        await copie(lienPartie())
         return
-      case 'valider-reponse':
-        await valideReponse()
-        return
-      case 'valider-invitation':
-        await valideInvitation()
+      case 'valider-code':
+        await valideCode()
         return
       case 'recommencer':
         if (role === 'invite') liaison?.envoieOrdre({ t: 'recommence' })
@@ -355,54 +374,43 @@ export function creeEcranMulti(quitte: () => void): EcranMulti {
     role = 'hote'
     fermeLiaison()
     montre('creation')
-    el<HTMLTextAreaElement>('[data-champ="invitation"]').value = ''
-    el<HTMLTextAreaElement>('[data-champ="reponse"]').value = ''
-    el<HTMLTextAreaElement>('[data-champ="reponse"]').disabled = true
-    el<HTMLButtonElement>('[data-geste="copier-invitation"]').disabled = true
-    el<HTMLButtonElement>('[data-geste="valider-reponse"]').disabled = true
-    el<HTMLElement>('[data-etape="c2"]').dataset.etat = 'attente'
-    mot('copie-invitation', '')
-    mot('creation', 'Préparation du code d’invitation…')
-    try {
-      const inv = await creeInvitation()
-      // l'écran a pu être quitté pendant la préparation
-      if (page !== 'creation' || role !== 'hote') {
-        inv.liaison.ferme()
-        return
-      }
-      invitation = inv
-      brancheLiaison(inv.liaison)
-      el<HTMLTextAreaElement>('[data-champ="invitation"]').value = inv.code
-      el<HTMLButtonElement>('[data-geste="copier-invitation"]').disabled = false
-      el<HTMLTextAreaElement>('[data-champ="reponse"]').disabled = false
-      el<HTMLButtonElement>('[data-geste="valider-reponse"]').disabled = false
-      el<HTMLElement>('[data-etape="c2"]').dataset.etat = ''
-      mot(
-        'creation',
-        inv.liaison.adresses.publiques === 0
-          ? 'Code prêt — mais ce navigateur n’a pas trouvé son adresse publique : la liaison ne marchera sans doute qu’entre deux machines du même réseau.'
-          : 'Code prêt. Envoyez-le, puis attendez la réponse de votre ami.',
-        inv.liaison.adresses.publiques === 0 ? 'alerte' : '',
-      )
-    } catch (e) {
-      console.error('multi : création', e)
-      mot('creation', 'Le code n’a pas pu être préparé. Rechargez la page et réessayez.', 'alerte')
-    }
-  }
-
-  async function valideReponse(): Promise<void> {
-    if (!invitation) return
-    const r = await invitation.repond(el<HTMLTextAreaElement>('[data-champ="reponse"]').value)
-    if (!r.ok) {
-      mot('creation', r.raison, 'alerte')
+    codePartie = ''
+    el<HTMLElement>('[data-code]').textContent = '·'.repeat(LONGUEUR_CODE)
+    el<HTMLButtonElement>('[data-geste="copier-code"]').disabled = true
+    el<HTMLButtonElement>('[data-geste="copier-lien"]').disabled = true
+    mot('copie', '')
+    mot('creation', 'Inscription de la partie…')
+    const c = await creePartie(adresseAnnuaire(location.search))
+    // l'écran a pu être quitté pendant l'inscription
+    if (page !== 'creation' || role !== 'hote') {
+      if (c.ok) c.accueil.ferme()
       return
     }
-    el<HTMLButtonElement>('[data-geste="valider-reponse"]').disabled = true
-    mot('creation', 'Liaison en cours…')
-    armeMinuteur()
+    if (!c.ok) {
+      mot('creation', c.raison, 'alerte')
+      return
+    }
+    accueil = c.accueil
+    codePartie = c.accueil.code
+    el<HTMLElement>('[data-code]').textContent = codePartie
+    el<HTMLButtonElement>('[data-geste="copier-code"]').disabled = false
+    el<HTMLButtonElement>('[data-geste="copier-lien"]').disabled = false
+    mot('creation', 'En attente de votre ami…')
+    c.accueil.surLiaison = (l) => {
+      if (accueil !== c.accueil) return
+      mot('creation', 'Votre ami arrive : liaison en cours…')
+      brancheLiaison(l)
+      armeMinuteur('creation')
+    }
+    c.accueil.surPerdu = () => {
+      if (accueil !== c.accueil || page !== 'creation') return
+      el<HTMLButtonElement>('[data-geste="copier-code"]').disabled = true
+      el<HTMLButtonElement>('[data-geste="copier-lien"]').disabled = true
+      mot('creation', 'L’annuaire a coupé la connexion : ce code ne marche plus. Annulez, puis recréez la partie.', 'alerte')
+    }
   }
 
-  function ouvreJonction(): void {
+  function ouvreJonction(code = ''): void {
     if (!liaisonPossible()) {
       mot('salon', 'Ce navigateur ne sait pas ouvrir de liaison directe. Essayez avec Chrome ou Edge à jour.', 'alerte')
       return
@@ -410,21 +418,26 @@ export function creeEcranMulti(quitte: () => void): EcranMulti {
     role = 'invite'
     fermeLiaison()
     montre('jonction')
-    el<HTMLTextAreaElement>('[data-champ="invitation-recue"]').value = ''
-    el<HTMLTextAreaElement>('[data-champ="reponse-faite"]').value = ''
-    el<HTMLButtonElement>('[data-geste="copier-reponse"]').disabled = true
-    el<HTMLButtonElement>('[data-geste="valider-invitation"]').disabled = false
-    el<HTMLElement>('[data-etape="j2"]').dataset.etat = 'attente'
-    mot('copie-reponse', '')
+    const champ = el<HTMLInputElement>('[data-champ="code"]')
+    champ.value = code
+    el<HTMLButtonElement>('[data-geste="valider-code"]').disabled = false
     mot('jonction', '')
+    if (code) void valideCode()
+    else champ.focus()
   }
 
-  async function valideInvitation(): Promise<void> {
-    const bouton = el<HTMLButtonElement>('[data-geste="valider-invitation"]')
+  async function valideCode(): Promise<void> {
+    const bouton = el<HTMLButtonElement>('[data-geste="valider-code"]')
+    if (bouton.disabled) return
+    const lu = litCodePartie(el<HTMLInputElement>('[data-champ="code"]').value)
+    if (!lu.ok) {
+      mot('jonction', lu.raison, 'alerte')
+      return
+    }
     bouton.disabled = true
-    mot('jonction', 'Préparation du code de réponse…')
+    mot('jonction', 'Recherche de la partie…')
     fermeLiaison()
-    const j = await rejoint(el<HTMLTextAreaElement>('[data-champ="invitation-recue"]').value)
+    const j = await rejointPartie(adresseAnnuaire(location.search), lu.code)
     if (page !== 'jonction' || role !== 'invite') {
       if (j.ok) j.liaison.ferme()
       return
@@ -434,21 +447,20 @@ export function creeEcranMulti(quitte: () => void): EcranMulti {
       mot('jonction', j.raison, 'alerte')
       return
     }
+    mot('jonction', 'Partie trouvée : liaison en cours…')
     brancheLiaison(j.liaison)
-    el<HTMLTextAreaElement>('[data-champ="reponse-faite"]').value = j.code
-    el<HTMLButtonElement>('[data-geste="copier-reponse"]').disabled = false
-    el<HTMLElement>('[data-etape="j2"]').dataset.etat = ''
-    mot('jonction', 'Code de réponse prêt. Renvoyez-le : la partie démarre dès que votre ami l’a collé.')
+    armeMinuteur('jonction')
   }
 
-  /** Vingt secondes après la réponse, une liaison qui ne s'ouvre pas ne
-   *  s'ouvrira plus : on le dit, avec ce qu'on en sait. */
-  function armeMinuteur(): void {
+  /** Vingt secondes après la mise en relation, une liaison qui ne s'ouvre
+   *  pas ne s'ouvrira plus : on le dit, avec ce qu'on en sait. */
+  function armeMinuteur(ou: 'creation' | 'jonction'): void {
     window.clearTimeout(minuteurLiaison)
     const l = liaison
     minuteurLiaison = window.setTimeout(() => {
-      if (!l || l !== liaison || l.etat !== 'attente' || page !== 'creation') return
-      mot('creation', 'La liaison ne s’établit pas. ' + expliqueEchec(l), 'alerte')
+      if (!l || l !== liaison || l.etat !== 'attente' || page !== ou) return
+      mot(ou, 'La liaison ne s’établit pas. ' + expliqueEchec(l), 'alerte')
+      if (ou === 'jonction') el<HTMLButtonElement>('[data-geste="valider-code"]').disabled = false
     }, 20_000)
   }
 
@@ -504,7 +516,7 @@ export function creeEcranMulti(quitte: () => void): EcranMulti {
     }
     el<HTMLElement>('[data-aide]').textContent =
       r === 'hote'
-        ? 'Maintenez le clic : la matière part vers le pointeur, le corps part à l’opposé. Gardez cette fenêtre au premier plan : c’est elle qui simule.'
+        ? 'Maintenez le clic : la matière part vers le pointeur, le corps part à l’opposé. Votre machine simule la partie : ne fermez pas cet onglet.'
         : 'Maintenez le clic : la matière part vers le pointeur, le corps part à l’opposé.'
     cadre = cadreSalle(SALLE, rendu.aspect())
     seqCommande = 0
@@ -520,12 +532,14 @@ export function creeEcranMulti(quitte: () => void): EcranMulti {
     pointeur.actif = false
     marqueEtiquette()
     dernier = performance.now()
+    if (r === 'hote') lanceBattement()
     rafId = requestAnimationFrame(image)
   }
 
   function arretePartie(): void {
     if (rafId) cancelAnimationFrame(rafId)
     rafId = 0
+    arreteBattement()
     const avaitRendu = rendu !== null
     rendu?.libere()
     rendu = null
@@ -564,15 +578,50 @@ export function creeEcranMulti(quitte: () => void): EcranMulti {
     toile.addEventListener('contextmenu', (ev) => ev.preventDefault())
   }
 
+  // LE BATTEMENT D'ARRIÈRE-PLAN. Un navigateur n'appelle plus
+  // requestAnimationFrame pour une fenêtre cachée (un alt-tab qui la
+  // recouvre, un autre onglet) et ralentit ses minuteries à une par seconde :
+  // la simulation de l'hôte s'arrêterait, et l'invité regarderait une image
+  // figée. Les minuteries d'un WORKER, elles, ne sont pas ralenties : il bat
+  // soixante fois par seconde, et quand la page est cachée c'est lui qui
+  // fait avancer la partie — sans dessiner, personne ne regarde.
+  let battement: Worker | null = null
+  let battementUrl = ''
+  function lanceBattement(): void {
+    if (battement) return
+    try {
+      battementUrl = URL.createObjectURL(new Blob(['setInterval(function(){postMessage(0)},16)'], { type: 'text/javascript' }))
+      battement = new Worker(battementUrl)
+      battement.onmessage = () => {
+        if (document.hidden && rendu && role === 'hote') tour(performance.now(), false)
+      }
+    } catch {
+      // pas de worker ici : la partie se figera fenêtre cachée, rien de plus
+      battement = null
+    }
+  }
+  function arreteBattement(): void {
+    battement?.terminate()
+    battement = null
+    if (battementUrl) URL.revokeObjectURL(battementUrl)
+    battementUrl = ''
+  }
+
   function image(maintenant: number): void {
     rafId = requestAnimationFrame(image)
+    tour(maintenant, true)
+  }
+
+  /** Un tour de partie. `dessine` est faux quand la fenêtre est cachée :
+   *  on simule et on envoie, on ne peint rien. */
+  function tour(maintenant: number, dessine: boolean): void {
     if (!rendu) return
     const dt = Math.min(0.1, Math.max(0, (maintenant - dernier) / 1000))
     dernier = maintenant
 
     // la commande de CE joueur, dans le monde
     const vise = ecranVersMonde(cadre, pointeur.fx, pointeur.fy)
-    const commande: Commande = { pousse: pointeur.actif, x: vise.x, y: vise.y }
+    const commande: Commande = { pousse: pointeur.actif && dessine, x: vise.x, y: vise.y }
 
     let particules: Particules
     let corps: CorpsTrame[]
@@ -599,6 +648,7 @@ export function creeEcranMulti(quitte: () => void): EcranMulti {
       corps = h.corps()
     }
 
+    if (!dessine) return
     if (corps.length > 0) cadre = suitCadre(cadre, cadreVoulu(corps, SALLE, rendu.aspect()), dt)
     rendu.dessine(particules, cadre, SALLE)
     peintAth(corps, maintenant, dt)
@@ -674,7 +724,7 @@ export function creeEcranMulti(quitte: () => void): EcranMulti {
   }
 
   const api: EcranMulti = {
-    ouvre(): void {
+    ouvre(code?: string): void {
       if (!racine) racine = construit()
       if (!ouvert) {
         window.addEventListener('keydown', bouclier, true)
@@ -684,6 +734,7 @@ export function creeEcranMulti(quitte: () => void): EcranMulti {
       racine.hidden = false
       mot('salon', '')
       montre('salon')
+      if (code) ouvreJonction(code)
     },
     ferme(): void {
       arretePartie()

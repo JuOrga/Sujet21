@@ -60,4 +60,12 @@ describe('le multi reste à part', () => {
     expect(bouton).not.toBeNull()
     expect(bouton![0]).toMatch(/\bdata-dev\b/)
   })
+
+  it('le lien d’invitation ne vaut qu’en mode concepteur, comme le bouton', () => {
+    // « ?multi=CODE » sans « ?dev » ne doit rien ouvrir : le prototype reste
+    // derrière le mode concepteur
+    const lien = MAIN.slice(MAIN.indexOf(".get('multi')"), MAIN.indexOf(".get('multi')") + 160)
+    expect(lien).toMatch(/classList\.contains\('concepteur'\)/)
+    expect(lien).toMatch(/ouvreMulti\(code\)/)
+  })
 })
