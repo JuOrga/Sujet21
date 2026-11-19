@@ -16,9 +16,9 @@
 
 import { NoyauxWasm } from '../sim/wasm'
 import { cadreSalle, cadreVoulu, ecranVersMonde, mondeVersEcran, suitCadre, type Cadre } from './cadrage'
-import { adresseAnnuaire, litCodePartie, LONGUEUR_CODE } from './annuaire'
-import { creePartie, expliqueEchec, liaisonPossible, rejointPartie, type Accueil, type EtatLiaison, type Liaison, type Ordre } from './liaison'
-import { CADENCE_ETAT, CADENCE_RELAIS, CAPACITE, Hote, Miroir, SALLE } from './partie'
+import { litCodePartie, LONGUEUR_CODE } from './code'
+import { CADENCE_ETAT, CAPACITE, Hote, Miroir, SALLE } from './partie'
+import { adresseRelais, creePartie, liaisonPossible, rejointPartie, type EtatLiaison, type Liaison, type Ordre } from './relais'
 import { RenduMulti, couleurCss } from './renduMulti'
 import { VERSION_TRAME, decodeCommande, encodeCommande, type Commande, type CorpsTrame, type Particules } from './trame'
 
@@ -157,7 +157,6 @@ export function creeEcranMulti(quitte: () => void): EcranMulti {
   let hote: Hote | null = null
   let miroir: Miroir | null = null
   let liaison: Liaison | null = null
-  let accueil: Accueil | null = null
   /** le code de la partie créée (pour le copier) */
   let codePartie = ''
   let noyaux: NoyauxWasm | null = null
@@ -287,22 +286,18 @@ export function creeEcranMulti(quitte: () => void): EcranMulti {
   function surEtatLiaison(l: Liaison, etat: EtatLiaison): void {
     if (l !== liaison) return
     if (etat === 'ouverte') {
-      window.clearTimeout(minuteurLiaison)
+      // la liaison reste « ouverte » à travers les reconnexions au relais :
+      // on ne passe ici qu'UNE fois, et la partie n'est lancée qu'une fois
       l.envoieOrdre({ t: 'salut', version: VERSION_TRAME })
       lancePartie(role)
     } else if (etat === 'echec') {
-      window.clearTimeout(minuteurLiaison)
-      const raison = expliqueEchec(l)
       if (page === 'creation' || page === 'jonction') {
-        detail(page, 'mise en relation faite, liaison refusée · ' + l.diagnostic())
-      }
-      if (page === 'creation') mot('creation', 'La liaison n’a pas pu s’établir. ' + raison + ' Votre ami peut réessayer avec le même code.', 'alerte')
-      else if (page === 'jonction') {
-        mot('jonction', 'La liaison n’a pas pu s’établir. ' + raison, 'alerte')
-        el<HTMLButtonElement>('[data-geste="valider-code"]').disabled = false
+        mot(page, l.raison || 'La partie n’a pas pu s’établir.', 'alerte')
+        detail(page, l.diagnostic())
+        if (page === 'jonction') el<HTMLButtonElement>('[data-geste="valider-code"]').disabled = false
       }
     } else if (etat === 'coupee' && page === 'jeu') {
-      voile('La liaison est coupée : l’autre joueur a quitté la partie, ou sa connexion est tombée.')
+      voile((l.raison || 'La liaison est coupée.') + ' — ' + l.diagnostic())
     }
   }
 
@@ -325,9 +320,6 @@ export function creeEcranMulti(quitte: () => void): EcranMulti {
     window.clearTimeout(minuteurLiaison)
     const l = liaison
     liaison = null
-    const a = accueil
-    accueil = null
-    a?.ferme()
     l?.ferme()
   }
 
@@ -380,7 +372,7 @@ export function creeEcranMulti(quitte: () => void): EcranMulti {
 
   async function ouvreCreation(): Promise<void> {
     if (!liaisonPossible()) {
-      mot('salon', 'Ce navigateur ne sait pas ouvrir de liaison directe. Essayez avec Chrome ou Edge à jour.', 'alerte')
+      mot('salon', 'Ce navigateur est trop ancien pour le multi. Essayez avec Chrome ou Edge à jour.', 'alerte')
       return
     }
     role = 'hote'
@@ -392,11 +384,11 @@ export function creeEcranMulti(quitte: () => void): EcranMulti {
     el<HTMLButtonElement>('[data-geste="copier-lien"]').disabled = true
     mot('copie', '')
     detail('creation', '')
-    mot('creation', 'Inscription de la partie…')
-    const c = await creePartie(adresseAnnuaire(location.search))
-    // l'écran a pu être quitté pendant l'inscription
+    mot('creation', 'Ouverture de la partie…')
+    const c = await creePartie(adresseRelais(location.search))
+    // l'écran a pu être quitté pendant l'ouverture
     if (page !== 'creation' || role !== 'hote') {
-      if (c.ok) c.accueil.ferme()
+      if (c.ok) c.accueil.liaison.ferme()
       return
     }
     if (!c.ok) {
@@ -404,30 +396,18 @@ export function creeEcranMulti(quitte: () => void): EcranMulti {
       detail('creation', c.detail)
       return
     }
-    accueil = c.accueil
     codePartie = c.accueil.code
     el<HTMLElement>('[data-code]').textContent = codePartie
     el<HTMLButtonElement>('[data-geste="copier-code"]').disabled = false
     el<HTMLButtonElement>('[data-geste="copier-lien"]').disabled = false
     mot('creation', 'En attente de votre ami…')
-    c.accueil.surLiaison = (l) => {
-      if (accueil !== c.accueil) return
-      mot('creation', 'Votre ami arrive : liaison en cours…')
-      brancheLiaison(l)
-      armeMinuteur('creation')
-    }
-    c.accueil.surPerdu = (trace) => {
-      if (accueil !== c.accueil || page !== 'creation') return
-      detail('creation', trace)
-      el<HTMLButtonElement>('[data-geste="copier-code"]').disabled = true
-      el<HTMLButtonElement>('[data-geste="copier-lien"]').disabled = true
-      mot('creation', 'L’annuaire a coupé la connexion : ce code ne marche plus. Annulez, puis recréez la partie.', 'alerte')
-    }
+    // la liaison est déjà là : elle s'ouvre quand l'ami prend place
+    brancheLiaison(c.accueil.liaison)
   }
 
   function ouvreJonction(code = ''): void {
     if (!liaisonPossible()) {
-      mot('salon', 'Ce navigateur ne sait pas ouvrir de liaison directe. Essayez avec Chrome ou Edge à jour.', 'alerte')
+      mot('salon', 'Ce navigateur est trop ancien pour le multi. Essayez avec Chrome ou Edge à jour.', 'alerte')
       return
     }
     role = 'invite'
@@ -454,7 +434,7 @@ export function creeEcranMulti(quitte: () => void): EcranMulti {
     detail('jonction', '')
     mot('jonction', 'Recherche de la partie…')
     fermeLiaison()
-    const j = await rejointPartie(adresseAnnuaire(location.search), lu.code)
+    const j = await rejointPartie(adresseRelais(location.search), lu.code)
     if (page !== 'jonction' || role !== 'invite') {
       if (j.ok) j.liaison.ferme()
       return
@@ -465,22 +445,8 @@ export function creeEcranMulti(quitte: () => void): EcranMulti {
       detail('jonction', j.detail)
       return
     }
-    mot('jonction', 'Partie trouvée : liaison en cours…')
+    mot('jonction', 'Partie trouvée…')
     brancheLiaison(j.liaison)
-    armeMinuteur('jonction')
-  }
-
-  /** Vingt secondes après la mise en relation, une liaison qui ne s'ouvre
-   *  pas ne s'ouvrira plus : on le dit, avec ce qu'on en sait. */
-  function armeMinuteur(ou: 'creation' | 'jonction'): void {
-    window.clearTimeout(minuteurLiaison)
-    const l = liaison
-    minuteurLiaison = window.setTimeout(() => {
-      if (!l || l !== liaison || l.etat !== 'attente' || page !== ou) return
-      mot(ou, 'La liaison ne s’établit pas. ' + expliqueEchec(l), 'alerte')
-      detail(ou, 'mise en relation faite, liaison en attente depuis 20 s · ' + l.diagnostic())
-      if (ou === 'jonction') el<HTMLButtonElement>('[data-geste="valider-code"]').disabled = false
-    }, 20_000)
   }
 
   // ---- LA PARTIE ----------------------------------------------------------
@@ -655,7 +621,7 @@ export function creeEcranMulti(quitte: () => void): EcranMulti {
       if (role === 'hote' && liaison) {
         resteEnvoi -= dt
         if (resteEnvoi <= 0) {
-          resteEnvoi += 1 / (liaison.parRelais ? CADENCE_RELAIS : CADENCE_ETAT)
+          resteEnvoi += 1 / CADENCE_ETAT
           if (resteEnvoi < 0) resteEnvoi = 0
           // ligne engorgée : on saute l'image ENTIÈRE (un morceau seul ne
           // sert à rien) — la cadence s'ajuste à ce que la ligne porte
@@ -708,7 +674,7 @@ export function creeEcranMulti(quitte: () => void): EcranMulti {
         const envoyes = (liaison.envoyes - debitEnvoyes) / duree / 1024
         debitRecus = liaison.recus
         debitEnvoyes = liaison.envoyes
-        debitTexte = `${liaison.parRelais ? 'par le relais' : 'en direct'} · envoi ${envoyes.toFixed(0)} ko/s · réception ${recus.toFixed(0)} ko/s`
+        debitTexte = `envoi ${envoyes.toFixed(0)} ko/s · réception ${recus.toFixed(0)} ko/s`
         if (imagesSautees > 0) debitTexte += ` · ${imagesSautees} image(s) sautée(s) : la ligne ne suit pas`
       }
       const silence = role === 'invite' && miroir ? miroir.age(maintenant) : 0

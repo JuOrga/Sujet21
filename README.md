@@ -159,11 +159,12 @@ bouton **MULTI** sur l'accueil (`?dev`). Tout vit dans [`src/multi/`](src/multi/
 
 - **Créer / rejoindre** : l'hôte reçoit un code de cinq caractères, l'ami le
   tape — ou ouvre le lien `?dev&multi=CODE`, qui mène droit dans la partie.
-  La mise en relation passe par l'annuaire PUBLIC de PeerJS (un service
-  tiers, gratuit, sans compte) : aucun serveur de jeu, aucune fonction
-  Vercel de plus, aucune opération Blob. `src/multi/annuaire.ts` dit
-  pourquoi, et raconte la panne du premier essai (deux longs codes à
-  relayer à la main, un délai que personne ne tenait).
+- **Le relais** : toute la partie passe par un petit serveur à nous,
+  [`relais/`](relais/), un projet Vercel À PART (`sujet21-relais`) qui tient
+  les deux connexions et remet à l'un ce qu'envoie l'autre. Trois essais de
+  liaison directe entre deux maisons avaient échoué — `relais/index.js` les
+  raconte. Il se déploie par la gâchette `relais-go`, qui l'essaie aussitôt
+  en ligne depuis le serveur de GitHub.
 - **Qui simule** : la machine qui CRÉE la partie. L'autre envoie sa commande
   et affiche ce qu'il reçoit (rejouer les mêmes gestes sur deux machines ne
   donne pas le même film — `src/game/fantome.ts`). La partie continue quand
@@ -177,21 +178,15 @@ bouton **MULTI** sur l'accueil (`?dev`). Tout vit dans [`src/multi/`](src/multi/
 - **Ce qui est là** : une grande salle vide, deux corps de couleurs
   différentes, le jet, le don (la matière tirée dans l'autre devient la
   sienne), ESSAYER SEUL pour piloter les deux corps sur une machine.
-- **Le relais** : quand les deux réseaux refusent la liaison directe (vu
-  au troisième essai entre deux maisons), la partie passe par le relais
-  public de PeerJS — même service tiers que l'annuaire, gratuit et sans
-  garantie. L'hôte envoie alors quinze images par seconde au lieu de
-  trente, et la ligne d'état dit « par le relais ».
 - **Quand ça ne marche pas** : l'écran écrit sous le message d'erreur un
-  « détail pour le dépannage » (ce que l'annuaire a répondu, les adresses
-  trouvées de chaque côté). C'est lui qu'il faut photographier.
+  « détail pour le dépannage » (le relais joint, les instances vues, les
+  coupures). C'est lui qu'il faut photographier.
 - **Ce qui manque** : les gestes entre joueurs (s'ouvrir pour fusionner, se
   fermer pour se séparer), les salles, tout état autre que l'eau.
 - **Le débit** : une image pèse 10,9 Ko (1 800 particules à six octets),
-  trente par seconde au plus — 325 Ko/s mesurés à pleine cadence, soit
-  2,6 Mbit/s en envoi chez l'hôte ; la ligne d'état de la partie affiche le
-  débit réel. Si la ligne ne suit pas, l'hôte saute des images au lieu de
-  prendre du retard.
+  vingt par seconde — 209 Ko/s mesurés en local, soit 1,7 Mbit/s en envoi
+  chez l'hôte, que le relais reçoit puis renvoie. Si la ligne ne suit pas,
+  l'hôte saute des images au lieu de prendre du retard.
 
 ## Ce qui n'est pas fait
 

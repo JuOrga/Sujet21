@@ -1,0 +1,75 @@
+# LE RELAIS DU MULTI — déployé à la demande, jamais tout seul.
+#
+# relais/ est un PROJET VERCEL À PART (sujet21-relais) : le serveur par qui
+# passe une partie à deux (relais/index.js dit pourquoi). Il ne change
+# presque jamais ; il ne se déploie donc que sur un geste :
+#
+#   git push -f origin <votre-branche>:relais-go     # la gâchette
+#
+# ou relais → Run workflow. Aucune poussée sur prod, dev ou une branche de
+# travail ne lance ce workflow : il coûte une minute d'Actions par
+# déploiement du relais, et rien le reste du temps.
+#
+# Après le déploiement, l'essai (relais/essai.mjs) joue deux joueurs contre
+# le relais EN LIGNE, depuis ce serveur-ci — l'environnement d'analyse ne
+# le joint pas. Le résumé de l'exécution dit ce qu'il a vu.
+
+name: relais
+
+on:
+  push:
+    branches: [relais-go]
+    paths-ignore:
+      - 'docs/**'
+      - 'masters/**'
+      - 'ops/**'
+      - '**/*.md'
+  workflow_dispatch:
+
+concurrency:
+  group: relais
+  cancel-in-progress: true
+
+jobs:
+  deploie:
+    runs-on: ubuntu-latest
+    env:
+      PROJET: sujet21-relais
+      EQUIPE: julianamets-projects
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Déployer le relais
+        working-directory: relais
+        run: |
+          set -euo pipefail
+          jeton='${{ secrets.VERCEL_TOKEN }}'
+          # le projet est créé à la première fois ; ensuite la commande
+          # échoue (« existe déjà ») et c'est sans importance
+          npx vercel@59.6.2 project add "$PROJET" --scope "$EQUIPE" --token="$jeton" || true
+          npx vercel@59.6.2 link --yes --project "$PROJET" --scope "$EQUIPE" --token="$jeton"
+          url=$(npx vercel@59.6.2 deploy --prod --yes --scope "$EQUIPE" --token="$jeton" | tail -1)
+          echo "déployé → $url"
+          echo "URL=$url" >> "$GITHUB_ENV"
+      - name: Essayer le relais en ligne
+        working-directory: relais
+        run: |
+          set -uo pipefail
+          domaine="$PROJET-$EQUIPE.vercel.app"
+          npm install --no-audit --no-fund >/dev/null 2>&1
+          {
+            echo "## Le relais"
+            echo
+            echo "Déploiement : $URL"
+            echo
+            echo "Domaine : \`$domaine\`"
+            echo
+            echo '```'
+            echo "== pouls =="
+            curl -sS -m 20 "https://$domaine/" -w "\nHTTP %{http_code}\n" || true
+            echo "== essai à deux joueurs =="
+            node essai.mjs "wss://$domaine/ws" 8 2>&1 || true
+            echo '```'
+          } | tee -a "$GITHUB_STEP_SUMMARY"

@@ -144,3 +144,22 @@ restauration que personne n'a essayée serait un piège.
 
 Ceux-là **écrivent** vers l'API. Une sauvegarde fraîche avant de les lancer
 est une bonne habitude — c'est maintenant à un `git push` près.
+
+## Le relais du multi
+
+`relais/` est le serveur par qui passe une partie à deux : un projet Vercel
+à part, `sujet21-relais`, hors du déploiement du jeu. Il se déploie par sa
+gâchette, et seulement par elle :
+
+```bash
+git push -f origin <votre-branche>:relais-go
+```
+
+Le workflow `relais` le déploie en production, puis lance `relais/essai.mjs`
+contre le relais en ligne : deux connexions, comme deux joueurs, des images
+de la taille des vraies pendant huit secondes. Le résumé de l'exécution dit
+si la paire s'est faite, si les deux étaient sur la même instance, combien
+d'images sont arrivées et en combien de temps.
+
+En local : `cd relais && npm install && PORT=9100 node index.js`, puis le
+jeu avec `?relais=ws://127.0.0.1:9100/ws`.

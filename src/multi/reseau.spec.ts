@@ -15,7 +15,8 @@ import {
   particulesVides,
   type CorpsTrame,
 } from './trame'
-import { ALPHABET_CODE, LONGUEUR_CODE, adresseAnnuaire, litCodePartie, nomDePartie, tireCode } from './annuaire'
+import { ALPHABET_CODE, LONGUEUR_CODE, litCodePartie, tireCode } from './code'
+import { adresseRelais } from './relais'
 import { CAPACITE, DEPARTS, Hote, Miroir, SALLE, VOLUME_DEPART } from './partie'
 
 const UN_CORPS: CorpsTrame = {
@@ -148,20 +149,14 @@ describe('le code de partie', () => {
     if (!zero.ok) expect(zero.raison).toContain('0')
   })
 
-  it('le nom à l’annuaire porte notre préfixe, et ne dépend pas de la casse', () => {
-    expect(nomDePartie('K7Q2M')).toBe('sujet21-multi-k7q2m')
-    // l'annuaire n'accepte que lettres, chiffres, tirets, espaces et tirets bas
-    expect(nomDePartie('K7Q2M')).toMatch(/^[A-Za-z0-9]+(?:[ _-][A-Za-z0-9]+)*$/)
-  })
-
-  it('l’annuaire est le public, sauf désigné en local — un lien piégé ne le détourne pas', () => {
-    const publique = adresseAnnuaire('')
-    expect(publique).toMatch(/^wss:\/\//)
-    expect(adresseAnnuaire('?dev&multi=K7Q2M')).toBe(publique)
-    expect(adresseAnnuaire('?annuaire=ws://localhost:9000/peerjs')).toBe('ws://localhost:9000/peerjs')
-    expect(adresseAnnuaire('?annuaire=ws://127.0.0.1:9000/peerjs')).toBe('ws://127.0.0.1:9000/peerjs')
-    for (const piege of ['wss://mechant.example/peerjs', 'ws://localhost.mechant.example/peerjs', 'ws://mechant.example/?x=ws://localhost/']) {
-      expect(adresseAnnuaire('?annuaire=' + encodeURIComponent(piege))).toBe(publique)
+  it('le relais est celui du projet, sauf désigné en local — un lien piégé ne le détourne pas', () => {
+    const enLigne = adresseRelais('')
+    expect(enLigne).toMatch(/^wss:\/\/sujet21-relais[a-z0-9-]*\.vercel\.app\/ws$/)
+    expect(adresseRelais('?dev&multi=K7Q2M')).toBe(enLigne)
+    expect(adresseRelais('?relais=ws://localhost:9100/ws')).toBe('ws://localhost:9100/ws')
+    expect(adresseRelais('?relais=ws://127.0.0.1:9100/ws')).toBe('ws://127.0.0.1:9100/ws')
+    for (const piege of ['wss://mechant.example/ws', 'ws://localhost.mechant.example/ws', 'ws://mechant.example/?x=ws://localhost/']) {
+      expect(adresseRelais('?relais=' + encodeURIComponent(piege))).toBe(enLigne)
     }
   })
 })
