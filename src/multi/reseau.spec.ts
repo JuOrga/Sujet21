@@ -151,7 +151,8 @@ describe('le code de partie', () => {
 
   it('le relais est celui du projet, sauf désigné en local — un lien piégé ne le détourne pas', () => {
     const enLigne = adresseRelais('')
-    expect(enLigne).toMatch(/^wss:\/\/sujet21-relais[a-z0-9-]*\.vercel\.app\/ws$/)
+    // un déploiement du projet du jeu, et rien d'autre
+    expect(enLigne).toMatch(/^wss:\/\/sujet21-[a-z0-9]+-julianamets-projects\.vercel\.app\/ws$/)
     expect(adresseRelais('?dev&multi=K7Q2M')).toBe(enLigne)
     expect(adresseRelais('?relais=ws://localhost:9100/ws')).toBe('ws://localhost:9100/ws')
     expect(adresseRelais('?relais=ws://127.0.0.1:9100/ws')).toBe('ws://127.0.0.1:9100/ws')

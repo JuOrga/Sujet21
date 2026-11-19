@@ -1,8 +1,8 @@
 // LA LIAISON PAR LE RELAIS — le côté navigateur de relais/index.js.
 //
 // Trois essais de liaison DIRECTE entre deux maisons ont échoué (relais/
-// index.js raconte lesquels). La partie passe donc par un serveur, sur le
-// compte Vercel du projet : chaque joueur y ouvre une connexion avec le code
+// index.js raconte lesquels). La partie passe donc par un serveur, dans le
+// projet Vercel du jeu : chaque joueur y ouvre une connexion avec le code
 // de la partie, et tout ce que l'un envoie est remis à l'autre. Un réseau
 // qui affiche une page web laisse passer cette connexion — plus de box qui
 // refuse, plus d'annuaire tiers, plus de délai à tenir.
@@ -20,10 +20,14 @@
 
 import { tireCode } from './code'
 
-/** L'adresse du relais en ligne : le projet Vercel « sujet21-relais », sous
- *  le domaine que Vercel donne à tout projet (<projet>-<équipe>.vercel.app)
- *  — il existe dès le premier déploiement, sans rien réserver. */
-const RELAIS_PUBLIC = 'wss://sujet21-relais-julianamets-projects.vercel.app/ws'
+/** L'adresse du relais en ligne. C'est celle d'UN DÉPLOIEMENT : le relais
+ *  vit dans le projet Vercel du jeu comme un aperçu à part, et un aperçu
+ *  reçoit une adresse neuve à chaque fois. Redéployer le relais (la gâchette
+ *  relais-go) demande donc de mettre cette ligne à jour — l'adresse est en
+ *  tête du résumé de l'exécution. Déployé le 19/11/2026, essayé depuis le
+ *  serveur de GitHub : paire faite sur une même instance, 318 morceaux
+ *  d'image envoyés, 318 reçus, 93 ms de trajet médian. */
+const RELAIS_PUBLIC = 'wss://sujet21-lc200nkp5-julianamets-projects.vercel.app/ws'
 /** Le temps laissé au relais pour nous installer. */
 const DELAI_INSTALLATION_MS = 10_000
 /** Au-delà de ce silence, la partie est perdue : on a essayé de revenir, ou

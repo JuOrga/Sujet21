@@ -160,11 +160,14 @@ bouton **MULTI** sur l'accueil (`?dev`). Tout vit dans [`src/multi/`](src/multi/
 - **Créer / rejoindre** : l'hôte reçoit un code de cinq caractères, l'ami le
   tape — ou ouvre le lien `?dev&multi=CODE`, qui mène droit dans la partie.
 - **Le relais** : toute la partie passe par un petit serveur à nous,
-  [`relais/`](relais/), un projet Vercel À PART (`sujet21-relais`) qui tient
-  les deux connexions et remet à l'un ce qu'envoie l'autre. Trois essais de
-  liaison directe entre deux maisons avaient échoué — `relais/index.js` les
-  raconte. Il se déploie par la gâchette `relais-go`, qui l'essaie aussitôt
-  en ligne depuis le serveur de GitHub.
+  [`relais/`](relais/), qui tient les deux connexions et remet à l'un ce
+  qu'envoie l'autre. Trois essais de liaison directe entre deux maisons
+  avaient échoué — `relais/index.js` les raconte. Il vit dans le projet
+  Vercel du jeu, comme un déploiement à part qui ne contient que lui (le
+  jeton du dépôt ne peut pas créer de projet). Il se déploie par la
+  gâchette `relais-go`, qui l'essaie aussitôt en ligne depuis le serveur de
+  GitHub ; son adresse change à chaque déploiement, et le jeu la porte dans
+  `src/multi/relais.ts`.
 - **Qui simule** : la machine qui CRÉE la partie. L'autre envoie sa commande
   et affiche ce qu'il reçoit (rejouer les mêmes gestes sur deux machines ne
   donne pas le même film — `src/game/fantome.ts`). La partie continue quand
@@ -184,9 +187,9 @@ bouton **MULTI** sur l'accueil (`?dev`). Tout vit dans [`src/multi/`](src/multi/
 - **Ce qui manque** : les gestes entre joueurs (s'ouvrir pour fusionner, se
   fermer pour se séparer), les salles, tout état autre que l'eau.
 - **Le débit** : une image pèse 10,9 Ko (1 800 particules à six octets),
-  vingt par seconde — 209 Ko/s mesurés en local, soit 1,7 Mbit/s en envoi
-  chez l'hôte, que le relais reçoit puis renvoie. Si la ligne ne suit pas,
-  l'hôte saute des images au lieu de prendre du retard.
+  vingt par seconde — 212 Ko/s mesurés à travers le relais en ligne, soit
+  1,7 Mbit/s en envoi chez l'hôte, que le relais reçoit puis renvoie. Si la
+  ligne ne suit pas, l'hôte saute des images au lieu de prendre du retard.
 
 ## Ce qui n'est pas fait
 
