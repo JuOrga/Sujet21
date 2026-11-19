@@ -50,8 +50,14 @@ export const VITRE_RAYON = ANNEAU_RAYON - ANNEAU_EPAISSEUR / 2
 
 /** Le puits du centre : un cœur plus large que l'anneau (le halo képlérien,
  *  qui étire, n'existe jamais dans la cuve), une force qui ramène une goutte
- *  lancée à la vitesse d'éjection avant qu'elle n'atteigne la paroi. */
-export const PUITS_ACCUEIL: PuitsDef = { x: 0, y: 0, force: 3600, rayon: 1000 }
+ *  lancée à la vitesse d'éjection avant qu'elle n'atteigne la paroi.
+ *
+ *  3 000 et non plus 3 600 : « réduis un peu la gravité » (le concepteur,
+ *  19/11). La période passe de 3,3 s à 3,6 s (2π·√(rayon/force)) : les
+ *  gouttes montent plus loin et reviennent plus lentement, et le corps se
+ *  laisse un peu plus déporter. Plus bas, le retour traîne : à 2 800,
+ *  18 gouttes sur 900 sont encore dehors 4 s après (cuveAccueil.spec.ts). */
+export const PUITS_ACCUEIL: PuitsDef = { x: 0, y: 0, force: 3000, rayon: 1000 }
 
 export function tableauAccueil(): LevelDef {
   const R = ANNEAU_RAYON

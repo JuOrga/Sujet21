@@ -9,11 +9,17 @@ import { MAT_BAIE, estUnFond, sansPhysique } from './level'
 import { sansSas } from './ronde'
 
 // LA GARDE DE LA CUVE DE L'ACCUEIL : ce qui est éjecté REVIENT. Le vrai
-// corps (900 particules), le vrai solveur, le vrai puits : on éjecte, puis
-// on attend, et le corps doit avoir tout repris, recentré, sans qu'une
-// goutte ait passé l'anneau. Mesuré le 18/11 : après 0,5 s d'éjection le
-// corps tombe à 868 et revient à 900 en moins de 2 s ; après 1,5 s, il
-// tombe à 805 et revient à 900 en 4 s ; la goutte la plus lointaine touche
+// corps (900 particules), le vrai solveur, le vrai puits : on éjecte dans
+// six directions, puis on attend 4 s, et le corps doit avoir repris presque
+// tout, recentré, sans qu'une goutte ait passé l'anneau.
+//
+// « Presque » : une goutte qui frôle la paroi peut y gagner un moment
+// cinétique, et elle tourne alors autour du centre sans repasser par le
+// corps. Mesuré le 19/11 sur six directions, après 0,5 s et 1,5 s
+// d'éjection : à la force d'origine (3 600), il en restait au pire 15
+// dehors (885/900) ; à 3 000 (« réduis un peu la gravité », le concepteur
+// le 19/11), au pire 9 (891/900) ; à 2 800, 18 (882) — le retour traîne.
+// D'où le seuil : 15 gouttes au plus. La goutte la plus lointaine touche
 // la paroi (647 u pour un anneau intérieur à 650). Si ce test tombe, on
 // remesure — on ne retouche pas un nombre à la main.
 
@@ -33,26 +39,30 @@ function cuve(): { s: FluidSim; dt: number; pas: () => void } {
 
 describe('la cuve de l’accueil — ce qui est éjecté revient', () => {
   for (const jet of [0.5, 1.5]) {
-    it(`après ${jet} s d’éjection, le corps a tout repris en 4 s, recentré, l’anneau intact`, () => {
-      const { s, dt, pas } = cuve()
-      const n0 = s.playerCount
-      expect(n0).toBe(900)
-      let rMax = 0
-      let nMin = n0
-      for (let t = 0; t < jet + 4; t += dt) {
-        if (t < jet) {
-          s.updatePlayerStats()
-          s.eject(s.stats.centroidX + 500, s.stats.centroidY + 100, dt)
+    it(`après ${jet} s d’éjection, dans six directions, le corps a repris presque tout en 4 s, recentré, l’anneau intact`, () => {
+      for (let k = 0; k < 6; k++) {
+        const a = (k / 6) * 2 * Math.PI
+        const { s, dt, pas } = cuve()
+        const n0 = s.playerCount
+        expect(n0).toBe(900)
+        let rMax = 0
+        let nMin = n0
+        for (let t = 0; t < jet + 4; t += dt) {
+          if (t < jet) {
+            s.updatePlayerStats()
+            s.eject(s.stats.centroidX + 500 * Math.cos(a), s.stats.centroidY + 500 * Math.sin(a), dt)
+          }
+          pas()
+          for (let i = 0; i < s.count; i++) rMax = Math.max(rMax, Math.hypot(s.posX[i], s.posY[i]))
+          nMin = Math.min(nMin, s.playerCount)
         }
-        pas()
-        for (let i = 0; i < s.count; i++) rMax = Math.max(rMax, Math.hypot(s.posX[i], s.posY[i]))
-        nMin = Math.min(nMin, s.playerCount)
+        s.updatePlayerStats()
+        const dir = `direction ${k}/6`
+        expect(nMin, dir).toBeLessThan(n0 - 20) // l'éjection a bien pris de la matière
+        expect(s.playerCount, dir).toBeGreaterThanOrEqual(n0 - 15) // et elle est revenue
+        expect(Math.hypot(s.stats.centroidX, s.stats.centroidY), dir).toBeLessThan(30)
+        expect(rMax, dir).toBeLessThan(ANNEAU_RAYON - ANNEAU_EPAISSEUR + 10) // rien n'a passé la paroi
       }
-      s.updatePlayerStats()
-      expect(nMin).toBeLessThan(n0 - 20) // l'éjection a bien pris de la matière
-      expect(s.playerCount).toBe(n0) // et toute la matière est revenue
-      expect(Math.hypot(s.stats.centroidX, s.stats.centroidY)).toBeLessThan(30)
-      expect(rMax).toBeLessThan(ANNEAU_RAYON - ANNEAU_EPAISSEUR + 10) // rien n'a passé la paroi
     }, 120000)
   }
 })
