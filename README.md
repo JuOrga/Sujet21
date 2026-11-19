@@ -152,6 +152,35 @@ recondensation, WASM), les règles de jeu (bonbonnes, condensat, économat,
 codex, trophées, cycle, récompenses, voie, générateur) et les écrans
 (commandes, cinématiques, planche, éditeur, bibliothèque partagée).
 
+## Le multi (prototype)
+
+Un essai de partie à deux, chacun chez soi, derrière le mode concepteur :
+bouton **MULTI** sur l'accueil (`?dev`). Tout vit dans [`src/multi/`](src/multi/).
+
+- **Créer / rejoindre** : deux codes à s'échanger par message (l'invitation,
+  puis la réponse). Aucun serveur de jeu, aucune fonction Vercel de plus,
+  aucune opération Blob — `src/multi/invitation.ts` dit pourquoi.
+- **Qui simule** : la machine qui CRÉE la partie. L'autre envoie sa commande
+  et affiche ce qu'il reçoit (rejouer les mêmes gestes sur deux machines ne
+  donne pas le même film — `src/game/fantome.ts`). L'hôte garde sa fenêtre
+  au premier plan : un onglet en arrière-plan ne simule plus.
+- **Le solveur du jeu n'est pas touché.** `src/multi/solveurMulti.ts` en est
+  une copie qui tient plusieurs corps, chaque particule portant son
+  propriétaire ; un test de parité la tient, à un joueur, sur les mêmes
+  nombres que l'original, au bit près. Le rendu aussi est à part
+  (`renduMulti.ts`) : deux couleurs, sans l'éclairage ni les décors du jeu.
+- **Ce qui est là** : une grande salle vide, deux corps de couleurs
+  différentes, le jet, le don (la matière tirée dans l'autre devient la
+  sienne), ESSAYER SEUL pour piloter les deux corps sur une machine.
+- **Ce qui manque** : les gestes entre joueurs (s'ouvrir pour fusionner, se
+  fermer pour se séparer), les salles, tout état autre que l'eau. Et un
+  RELAIS : si les deux box refusent la liaison directe, la partie ne se
+  fait pas — l'écran le dit.
+- **Le débit** : une image pèse 10,9 Ko (1 800 particules à six octets),
+  trente par seconde au plus — soit 2,6 Mbit/s en envoi chez l'hôte, par le
+  calcul ; la ligne d'état de la partie affiche le débit réel. Si la ligne
+  ne suit pas, l'hôte saute des images au lieu de prendre du retard.
+
 ## Ce qui n'est pas fait
 
 - **Le boss.** La Pompe de reprise n'est qu'une esquisse écrite
