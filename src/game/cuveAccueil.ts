@@ -36,6 +36,7 @@
 // à refaire si on les touche.
 import { FORME_ARC, FORME_DISQUE } from './formes'
 import { MAT_BAIE, MAT_WALL, type LevelDef, type PuitsDef } from './level'
+import { vitesseCirculaire } from './puits'
 
 export const CODE_ACCUEIL = 'ACCUEIL'
 
@@ -58,6 +59,80 @@ export const VITRE_RAYON = ANNEAU_RAYON - ANNEAU_EPAISSEUR / 2
  *  laisse un peu plus déporter. Plus bas, le retour traîne : à 2 800,
  *  18 gouttes sur 900 sont encore dehors 4 s après (cuveAccueil.spec.ts). */
 export const PUITS_ACCUEIL: PuitsDef = { x: 0, y: 0, force: 3000, rayon: 1000 }
+
+/** LES SATELLITES : quelques boules du corps déjà en orbite à l'ouverture.
+ *
+ *  Le concepteur, 19/11 : « dès l'ouverture du menu, des boules du
+ *  satellite en orbite autour du volume — ça le fait souvent en s'amusant
+ *  avec, mais je souhaite que par défaut il y en ait, de façon aléatoire à
+ *  chaque ouverture ». En jouant, ce sont les gouttes éjectées qui ont
+ *  frôlé la paroi : elles y ont pris un moment cinétique et tournent sans
+ *  repasser par le corps (cuveAccueil.spec.ts, la garde du retour). Ici on
+ *  les pose d'emblée, prises AU corps : le total reste celui du spawn.
+ *
+ *  Le puits étant harmonique, une vitesse circulaire donne un cercle et
+ *  toute autre vitesse TANGENTE une ellipse CENTRÉE (demi-axes r et f·r) :
+ *  la boule reste entre r et f·r, sans jamais plonger vers le corps. Les
+ *  orbites ont toutes la même période — le système tourne d'un bloc, et
+ *  deux boules sur des cercles distincts ne se rencontrent jamais.
+ *
+ *  Bornes MESURÉES sur le vrai solveur (cuveAccueil.spec.ts) :
+ *  - le rayon : au-dessus du halo de capture du corps (≈ 180 u, 2,5 fois
+ *    son rayon quadratique de 73 u) — sinon le rappel des égarées les
+ *    reprend aussitôt —, et sous la paroi (650 u) même au bout de l'ellipse ;
+ *  - la taille : jusqu'à 5 billes, une boule tient 30 s en orbite sans se
+ *    défaire ; à 19, la différence de vitesse entre ses deux bords la
+ *    déchire en un tour. */
+export const SATELLITES_RAYON_MIN = 230
+export const SATELLITES_RAYON_MAX = 560
+/** Le nombre de boules (bornes incluses) et de billes par boule. */
+export const SATELLITES_BOULES: readonly [number, number] = [3, 6]
+export const SATELLITES_BILLES: readonly [number, number] = [2, 5]
+/** L'écart à la vitesse circulaire : 0,92 à 1,08 — des ellipses à peine
+ *  aplaties, pour que le ballet ne soit pas un mécanisme d'horloge. */
+export const SATELLITES_EXCENTRICITE = 0.08
+
+export interface BilleSatellite {
+  x: number
+  y: number
+  vx: number
+  vy: number
+}
+
+/** Les billes des satellites, tirées au sort (alea : Math.random en jeu, une
+ *  suite fixée en test). Chaque boule a son anneau à elle : la plage de
+ *  rayons est découpée en autant de bandes que de boules, et chaque boule
+ *  tombe au milieu de sa bande (± un quart) — deux boules voisines restent
+ *  à une demi-bande au moins l'une de l'autre. Toutes tournent dans le
+ *  même sens, tiré lui aussi. `espacement` est celui du réseau du corps
+ *  (params.particleSpacing) : une boule y est un petit amas hexagonal. */
+export function satellitesAccueil(alea: () => number, espacement: number): BilleSatellite[] {
+  const P = PUITS_ACCUEIL
+  const entre = ([a, b]: readonly [number, number]): number => a + Math.floor(alea() * (b - a + 1))
+  const nBoules = entre(SATELLITES_BOULES)
+  const sens = alea() < 0.5 ? 1 : -1
+  const bande = (SATELLITES_RAYON_MAX - SATELLITES_RAYON_MIN) / nBoules
+  const billes: BilleSatellite[] = []
+  for (let b = 0; b < nBoules; b++) {
+    const r = SATELLITES_RAYON_MIN + bande * (b + 0.5 + (alea() - 0.5) * 0.5)
+    const phase = alea() * 2 * Math.PI
+    const f = 1 + (alea() * 2 - 1) * SATELLITES_EXCENTRICITE
+    // la vitesse angulaire du centre de la boule, appliquée à TOUTE la
+    // boule comme à un solide : ses billes partent ensemble
+    const w = (sens * f * vitesseCirculaire(P, r)) / r
+    const cx = P.x + r * Math.cos(phase)
+    const cy = P.y + r * Math.sin(phase)
+    const n = entre(SATELLITES_BILLES)
+    for (let k = 0; k < n; k++) {
+      // la bille 0 au centre, les suivantes en couronne hexagonale
+      const a = ((k - 1) / 6) * 2 * Math.PI + phase
+      const x = k === 0 ? cx : cx + espacement * Math.cos(a)
+      const y = k === 0 ? cy : cy + espacement * Math.sin(a)
+      billes.push({ x, y, vx: -w * (y - P.y), vy: w * (x - P.x) })
+    }
+  }
+  return billes
+}
 
 export function tableauAccueil(): LevelDef {
   const R = ANNEAU_RAYON

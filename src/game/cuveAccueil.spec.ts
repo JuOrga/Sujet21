@@ -3,7 +3,20 @@ import { describe, expect, it } from 'vitest'
 import { DEFAULT_PARAMS } from '../sim/params'
 import { FluidSim, KIND_PLAYER } from '../sim/solver'
 import { zonesDuHub } from './hub'
-import { ANNEAU_EPAISSEUR, ANNEAU_RAYON, CODE_ACCUEIL, PUITS_ACCUEIL, VITRE_RAYON, cadreAccueil, tableauAccueil } from './cuveAccueil'
+import {
+  ANNEAU_EPAISSEUR,
+  ANNEAU_RAYON,
+  CODE_ACCUEIL,
+  PUITS_ACCUEIL,
+  SATELLITES_BILLES,
+  SATELLITES_BOULES,
+  SATELLITES_RAYON_MAX,
+  SATELLITES_RAYON_MIN,
+  VITRE_RAYON,
+  cadreAccueil,
+  satellitesAccueil,
+  tableauAccueil,
+} from './cuveAccueil'
 import { FORME_DISQUE } from './formes'
 import { MAT_BAIE, estUnFond, sansPhysique } from './level'
 import { sansSas } from './ronde'
@@ -186,5 +199,92 @@ describe('la pause montre la cuve, la partie attend de côté', () => {
 
   it('une salle recalculée pendant la pause attend avec la partie', () => {
     expect(corps('applyLevel')).toContain('vitrinePause.level = lv')
+  })
+})
+
+// LES SATELLITES : des boules du corps en orbite dès l'ouverture, tirées au
+// sort à chaque fois. Une suite pseudo-aléatoire FIXÉE rend le tirage
+// reproductible ici ; le jeu passe Math.random.
+function suite(graine: number): () => number {
+  let a = graine >>> 0
+  return () => {
+    a = (a + 0x6d2b79f5) >>> 0
+    let t = a
+    t = Math.imul(t ^ (t >>> 15), t | 1)
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61)
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296
+  }
+}
+
+describe('la cuve de l’accueil — des satellites en orbite dès l’ouverture', () => {
+  const ESP = DEFAULT_PARAMS.particleSpacing
+
+  it('tire 3 à 6 boules de 2 à 5 billes, et un autre tirage à chaque ouverture', () => {
+    const vus = new Set<string>()
+    for (let g = 1; g <= 40; g++) {
+      const billes = satellitesAccueil(suite(g), ESP)
+      expect(billes.length).toBeGreaterThanOrEqual(SATELLITES_BOULES[0] * SATELLITES_BILLES[0])
+      expect(billes.length).toBeLessThanOrEqual(SATELLITES_BOULES[1] * SATELLITES_BILLES[1])
+      for (const b of billes) {
+        const r = Math.hypot(b.x - PUITS_ACCUEIL.x, b.y - PUITS_ACCUEIL.y)
+        expect(r).toBeGreaterThan(SATELLITES_RAYON_MIN - ESP)
+        expect(r).toBeLessThan(SATELLITES_RAYON_MAX + ESP)
+      }
+      vus.add(billes.map((b) => b.x.toFixed(1)).join(','))
+    }
+    expect(vus.size).toBe(40) // jamais deux ouvertures pareilles
+    // et Math.random par défaut : deux appels, deux ciels
+    expect(satellitesAccueil(Math.random, ESP)[0].x).not.toBe(satellitesAccueil(Math.random, ESP)[0].x)
+  })
+
+  // Mesuré le 19/11, graines 1 à 4, 20 s (plus de cinq tours) : aucune bille
+  // reprise ni perdue, toutes entre 0,9 × le rayon minimal et la paroi. On
+  // compte les billes libres DANS LA BANDE, seconde par seconde : le corps
+  // lui-même lâche par instants une particule de son bord, que le relabel
+  // marque libre (une à 106 u, graine 3, à 12,7 s) et reprend au pas suivant —
+  // ce n'est pas un satellite qui tombe.
+  for (const g of [1, 2, 3, 4]) {
+    it(`graine ${g} : les boules tournent 20 s sans retomber sur le corps ni toucher la paroi`, () => {
+      const lv = tableauAccueil()
+      const s = new FluidSim({ ...DEFAULT_PARAMS }, lv.bounds, 4096)
+      s.setLevel(lv.boxes, lv.sponges)
+      const billes = satellitesAccueil(suite(g), s.params.particleSpacing)
+      // comme peupleCuve (main.ts) : prises au corps, le total reste 900
+      s.spawnDisc(lv.spawn.x, lv.spawn.y, lv.spawn.n - billes.length, KIND_PLAYER)
+      for (const b of billes) s.poseEgaree(b.x, b.y, b.vx, b.vy)
+      expect(s.count).toBe(lv.spawn.n)
+      expect(s.baseVolume).toBe(lv.spawn.n)
+      const dt = s.params.dt
+      const rBas = SATELLITES_RAYON_MIN * 0.9
+      const rHaut = ANNEAU_RAYON - ANNEAU_EPAISSEUR
+      let pas = 0
+      for (let t = 0; t < 20; t += dt, pas++) {
+        s.applyPuits(lv.puits!, dt)
+        s.step(dt)
+        if (pas % Math.round(1 / dt) !== 0) continue
+        let enOrbite = 0
+        for (let i = 0; i < s.count; i++) {
+          if (s.kind[i] === KIND_PLAYER) continue
+          const r = Math.hypot(s.posX[i], s.posY[i])
+          if (r > rBas && r < rHaut) enOrbite++
+        }
+        expect(enOrbite, `à ${t.toFixed(1)} s`).toBe(billes.length)
+      }
+      s.updatePlayerStats()
+      // aucune reprise : le corps a toujours ce qu'il avait
+      expect(s.playerCount).toBe(lv.spawn.n - billes.length)
+      expect(Math.hypot(s.stats.centroidX, s.stats.centroidY)).toBeLessThan(30)
+    }, 120000)
+  }
+
+  it('la cuve naît peuplée au chargement comme à chaque pause', () => {
+    const MAIN = readFileSync(new URL('../main.ts', import.meta.url), 'utf-8')
+    const corps = (nom: string): string => {
+      const i = MAIN.indexOf(`function ${nom}(`)
+      return MAIN.slice(i, MAIN.indexOf('\n}\n', i))
+    }
+    expect(corps('peupleCuve')).toContain('satellitesAccueil(Math.random')
+    expect(corps('createSim')).toContain('if (level.code === CODE_ACCUEIL) peupleCuve(sim, volumeDepart(level))')
+    expect(corps('montreCuvePause')).toContain('peupleCuve(s, level.spawn.n)')
   })
 })
