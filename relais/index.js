@@ -25,9 +25,10 @@
 //    relais dit à chacun le nom de son instance, et l'invité qui ne trouve
 //    personne se reconnecte avant de conclure que le code est faux.
 //
-// Ce dossier est un PROJET VERCEL À PART (sujet21-relais) : les douze
-// fonctions du projet du jeu sont prises (api/reglages.ts), et le jeu n'a
-// pas à dépendre de ce prototype. Rien ici n'est importé par le jeu.
+// OÙ IL VIT : dans le projet Vercel du jeu, mais comme un déploiement À
+// PART qui ne contient que ce dossier (.github/workflows/relais.yml dit
+// pourquoi pas un projet à lui). Rien ici n'est importé par le jeu, et le
+// jeu n'a pas à dépendre de ce prototype.
 
 import { createServer } from 'node:http'
 import { randomBytes } from 'node:crypto'

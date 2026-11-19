@@ -1,20 +1,37 @@
 # LE RELAIS DU MULTI — déployé à la demande, jamais tout seul.
 #
-# relais/ est un PROJET VERCEL À PART (sujet21-relais) : le serveur par qui
-# passe une partie à deux (relais/index.js dit pourquoi). Il ne change
-# presque jamais ; il ne se déploie donc que sur un geste :
+# relais/ est le serveur par qui passe une partie à deux (relais/index.js
+# dit pourquoi). Il ne change presque jamais ; il ne se déploie donc que sur
+# un geste :
 #
 #   git push -f origin <votre-branche>:relais-go     # la gâchette
+#
+# ou relais → Run workflow. Aucune poussée sur prod, dev ou une branche de
+# travail ne lance ce workflow : il coûte une minute d'Actions par
+# déploiement du relais, et rien le reste du temps.
+#
+# OÙ IL VIT. On voulait un projet Vercel à part (sujet21-relais). Le jeton
+# du dépôt ne peut pas en créer — « You don't have permission to create the
+# project », par la ligne de commande comme par l'API : il est borné au
+# projet du jeu, et c'est une borne qu'on ne contourne pas. Le relais est
+# donc déployé DANS le projet du jeu, comme un APERÇU qui ne contient que
+# lui : son dossier, son vercel.json (qui se déclare en Express), une seule
+# fonction — la limite des douze fonctions vaut par déploiement, pas par
+# projet. Le site en ligne n'est pas touché.
+#
+#   ⚠️ JAMAIS `--prod` ICI. Un déploiement de production depuis relais/
+#   remplacerait le JEU par le relais sur sujet21.vercel.app.
+#
+# Un aperçu reçoit une adresse NEUVE à chaque déploiement : c'est elle que
+# le jeu doit viser (src/multi/relais.ts, RELAIS_PUBLIC). Redéployer le
+# relais, c'est donc aussi mettre cette constante à jour. Le jour où le
+# multi sort du prototype, il lui faudra son projet et une adresse fixe.
 #
 # LE PIÈGE DE LA PREMIÈRE FOIS : pousser sur une gâchette qui n'existe pas
 # encore, avec des commits que le dépôt connaît déjà, ne lance rien —
 # GitHub ne voit aucun fichier modifié, et `paths-ignore` écarte l'exécution.
 # La gâchette existe désormais ; si on la recrée un jour, la poser d'abord
 # sur un commit ancien, puis sur le bon.
-#
-# ou relais → Run workflow. Aucune poussée sur prod, dev ou une branche de
-# travail ne lance ce workflow : il coûte une minute d'Actions par
-# déploiement du relais, et rien le reste du temps.
 #
 # Après le déploiement, l'essai (relais/essai.mjs) joue deux joueurs contre
 # le relais EN LIGNE, depuis ce serveur-ci — l'environnement d'analyse ne
@@ -40,67 +57,36 @@ jobs:
   deploie:
     runs-on: ubuntu-latest
     env:
-      PROJET: sujet21-relais
+      VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+      VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      # LE JETON DU DÉPÔT N'EST PAS CELUI D'UN UTILISATEUR. La première
-      # version de cette étape créait le projet par la ligne de commande
-      # (`vercel project add`, `vercel link`) : « Not able to load user —
-      # User not found (404) ». Le jeton déploie un projet DONT ON LUI DONNE
-      # L'IDENTIFIANT (c'est ce que fait deploy.yml), il ne sait pas dire
-      # « qui suis-je ». On cherche donc le projet par l'API, on le crée par
-      # l'API s'il manque, et on déploie comme le jeu : équipe et projet
-      # passés par l'environnement.
-      - name: Déployer le relais
+      - name: Déployer le relais (un aperçu, jamais la production)
         working-directory: relais
-        env:
-          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
         run: |
           set -euo pipefail
-          jeton='${{ secrets.VERCEL_TOKEN }}'
-          api='https://api.vercel.com'
-          champ() { node -e 'let d="";process.stdin.on("data",c=>d+=c).on("end",()=>{try{const o=JSON.parse(d);console.log(String(process.argv[1].split(".").reduce((x,k)=>x==null?x:x[k],o)??""))}catch{console.log("")}})' "$1"; }
-          rep=$(curl -sS -H "Authorization: Bearer $jeton" "$api/v9/projects/$PROJET?teamId=$VERCEL_ORG_ID")
-          id=$(echo "$rep" | champ id)
-          if [ -z "$id" ]; then
-            echo "le projet $PROJET n'existe pas encore : création"
-            rep=$(curl -sS -X POST -H "Authorization: Bearer $jeton" -H 'Content-Type: application/json' \
-              "$api/v11/projects?teamId=$VERCEL_ORG_ID" -d "{\"name\":\"$PROJET\",\"framework\":\"express\"}")
-            id=$(echo "$rep" | champ id)
-            if [ -z "$id" ]; then
-              echo "::error::création du projet refusée : $(echo "$rep" | champ error.code) — $(echo "$rep" | champ error.message)"
-              exit 1
-            fi
-          fi
-          echo "projet $PROJET trouvé"
-          export VERCEL_PROJECT_ID="$id"
-          url=$(npx vercel@59.6.2 deploy --prod --yes --token="$jeton" | tail -1)
+          # PAS de --prod : voir l'avertissement en tête de ce fichier
+          url=$(npx vercel@59.6.2 deploy --yes --token=${{ secrets.VERCEL_TOKEN }} | tail -1)
           echo "déployé → $url"
           echo "URL=$url" >> "$GITHUB_ENV"
-          # les domaines du projet : c'est le premier que le jeu doit viser
-          domaines=$(curl -sS -H "Authorization: Bearer $jeton" "$api/v9/projects/$id/domains?teamId=$VERCEL_ORG_ID" \
-            | node -e 'let d="";process.stdin.on("data",c=>d+=c).on("end",()=>{try{console.log((JSON.parse(d).domains??[]).map(x=>x.name).join(" "))}catch{console.log("")}})')
-          echo "domaines : $domaines"
-          echo "DOMAINES=$domaines" >> "$GITHUB_ENV"
       - name: Essayer le relais en ligne
         working-directory: relais
         run: |
           set -uo pipefail
-          domaine=$(echo "$DOMAINES" | cut -d' ' -f1)
-          [ -n "$domaine" ] || domaine=$(echo "$URL" | sed 's#^https://##')
+          domaine=$(echo "$URL" | sed 's#^https://##')
           npm install --no-audit --no-fund >/dev/null 2>&1
           {
             echo "## Le relais"
             echo
-            echo "Déploiement : $URL"
+            echo "### 👉 \`$domaine\`"
             echo
-            echo "Domaines : \`$DOMAINES\`"
+            echo "C'est l'adresse que le jeu doit viser : \`RELAIS_PUBLIC\` dans \`src/multi/relais.ts\`."
             echo
             echo '```'
-            echo "== pouls de $domaine =="
+            echo "== pouls =="
             curl -sS -m 20 "https://$domaine/" -w "\nHTTP %{http_code}\n" || true
             echo "== essai à deux joueurs =="
             node essai.mjs "wss://$domaine/ws" 8 2>&1 || true
