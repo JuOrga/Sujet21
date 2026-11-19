@@ -42,6 +42,18 @@ export function verbeAccueil(e: EtatVerbe): Verbe {
   return { nom: 'COMMENCER', detail: '' }
 }
 
+/** LE VERBE ATTEND LE RENDU. À la première visite (et après chaque
+ *  livraison qui touche aux shaders), le rendu complet met parfois des
+ *  minutes à se compiler : le menu et la cuve s'ouvrent avant lui, sur un
+ *  rendu réduit (render/renderer.ts, pretVitrine), et le bouton principal
+ *  reste bloqué jusqu'au bout. Ce mot remplace alors son détail : il dit
+ *  que ça avance, sans jargon — le compte suffit. Court : il se replie sur
+ *  deux lignes dans le bouton (« chargement », puis le compte), le rail du
+ *  menu ne laisse pas la place d'une phrase à côté du verbe. */
+export function motPreparation(fait: number, total: number): string {
+  return total > 0 ? `chargement ${Math.min(fait, total)} / ${total}` : 'chargement'
+}
+
 /** Les lieux de la fiche, dans l'ordre du rail. Les identifiants sont ceux
  *  des boutons : main.ts y a branché les écrans qu'ils ouvrent. */
 export const LIEUX_ACCUEIL = [

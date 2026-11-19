@@ -592,6 +592,7 @@ import {
   LIEUX_PREMIER_LANCEMENT,
   PICTOS_ACCUEIL,
   valeursLieux,
+  motPreparation,
   verbeAccueil,
 } from './game/accueil'
 import {
@@ -1192,6 +1193,14 @@ let auHub = !new URLSearchParams(location.search).has('tableau')
 // premier applyLevel du chargement, qui le lit pour choisir la cuve.
 let hasPlayed = false
 const CUVE_ACCUEIL = tableauAccueil()
+// LE RENDU COMPLET EST-IL LÀ ? Le menu et la cuve s'ouvrent avant lui, sur
+// le rendu réduit de la vitrine (renderer.pretVitrine) : tant que c'est
+// non, rien ne quitte la cuve — le bouton principal est bloqué (majAccueil,
+// closeHome) et dit où en est la préparation. C'est la boucle qui le lève.
+let renduComplet = false
+let preparationFaite = -1 // le dernier compte montré sur le bouton
+// posé à la naissance du renderer : la fiche se relit AVANT lui au chargement
+let avancementRendu: (() => { fait: number; total: number }) | null = null
 // LA PAUSE MONTRE LA CUVE (le concepteur, 18/11 : « le jeu est figé et on se
 // retrouve sur la structure ronde de l'accueil, complètement à part du
 // niveau en cours »). La partie part de côté TOUT ENTIÈRE — sa salle, sa
@@ -5362,6 +5371,8 @@ const homeRestartBtn = document.getElementById(
   'home-restart',
 ) as HTMLButtonElement
 function closeHome(): void {
+  // le rendu complet se prépare encore : seule la cuve sait se dessiner
+  if (!renduComplet) return
   if (requireName()) return // pas de plongée sans opérateur identifié
   // NAVIGATION DIRECTE (?tableau=N, outil de conception) : on entre dans
   // CETTE salle — le bouton ne doit pas renvoyer au module d'accueil.
@@ -5741,7 +5752,12 @@ function majAccueil(): void {
     total: longueurRun(),
   })
   ecritSiChange(document.getElementById('acc-verbe-nom'), verbe.nom)
-  ecritSiChange(document.getElementById('acc-verbe-detail'), verbe.detail)
+  // le rendu complet se prépare : le verbe est là, mais il attend, et son
+  // détail dit où en est la préparation
+  const av = renduComplet ? null : (avancementRendu?.() ?? { fait: 0, total: 0 })
+  ecritSiChange(document.getElementById('acc-verbe-detail'), av ? motPreparation(av.fait, av.total) : verbe.detail)
+  startBtn.disabled = !renduComplet
+  startBtn.setAttribute('aria-busy', renduComplet ? 'false' : 'true')
   // LA FICHE GRANDIT AVEC LA PARTIE : au tout premier lancement, un nouveau
   // venu n'a qu'une chose à faire. Le reste paraît dès que la partie a
   // laissé une trace — ou tout de suite pour le concepteur.
@@ -8878,6 +8894,9 @@ fetch('/noyaux.wasm')
 
 const renderer = new Renderer(canvas, CAPACITY)
 const rendererNe = performance.now() // pour dater l'attente de compilation
+avancementRendu = () => renderer.avancementCompilation()
+// Sonde de banc : le renderer (tools/banc-vitrine compare ses deux variantes)
+;(window as unknown as { __rendu: Renderer }).__rendu = renderer
 const loop = new FixedLoop()
 const input = new Input()
 // Ouverture directe par ?editeur — APRÈS la naissance d'input : openEditor
@@ -20321,8 +20340,24 @@ let amorceSignalee = false
 // ordinaires, sans pouvoir le mesurer d'ici) et la date de la première
 // image depuis l'ouverture de la page. Un chiffre mesuré sur la machine du
 // joueur vaut mieux qu'une estimation.
-const amorce = { compileRenduMs: -1, premiereImageMs: -1 }
+// compileRenduMs date la PREMIÈRE image (la vitrine, quand elle sert) ;
+// compileCompletMs, le rendu complet — c'est l'écart entre les deux que la
+// vitrine épargne au joueur.
+const amorce = { compileRenduMs: -1, premiereImageMs: -1, compileCompletMs: -1, vitrine: false }
 let attenteRenduDite = false
+// LE VOILE DU CHARGEMENT, RAPPELÉ. La garde d'amorçage (index.html) ne
+// parle plus après la première image ; si une salle est demandée avant que
+// le rendu complet soit là, c'est ce même voile qui revient, avec le compte.
+let voileRenduMontre = false
+function voileRendu(montre: boolean, fait: number, total: number): void {
+  if (!montre && !voileRenduMontre) return
+  const a = document.getElementById('amorce')
+  if (!a) return
+  voileRenduMontre = montre
+  a.hidden = !montre
+  a.classList.toggle('fini', !montre)
+  if (montre) ecritSiChange(document.getElementById('amorce-etape'), `le rendu se compile… ${fait}/${total}`)
+}
 
 // LE CORPS DE L'IMAGE. Il ne réarme rien : c'est `frame`, l'enveloppe
 // (tout en bas), qui garde la chaîne de requestAnimationFrame — une
@@ -20336,14 +20371,35 @@ function corpsImage(now: number): boolean {
   // désarme la garde — sera une vraie image. L'étape n'est dite qu'UNE fois :
   // la redire à chaque image réarmerait la veille sans fin, et un pilote qui
   // ne finit jamais sa compilation doit finir par être signalé.
-  if (!renderer.pret()) {
-    if (!attenteRenduDite) {
-      attenteRenduDite = true
-      etapeAmorce('rendu')
-    }
+  if (!renduComplet && renderer.pret()) {
+    renduComplet = true
+    amorce.compileCompletMs = Math.round(performance.now() - rendererNe)
+    voileRendu(false, 0, 0)
+    majAccueil() // le verbe se débloque
+  }
+  if (!renduComplet) {
     const av = renderer.avancementCompilation()
-    poulsAmorce(av.fait, av.total)
-    return false
+    // LA VITRINE : la cuve de l'accueil sait se dessiner avant le reste
+    // (deux petits programmes au lieu du gros). Toute autre salle attend.
+    const enCuve = level.code === CODE_ACCUEIL && !vitrinePause
+    if (!(enCuve && renderer.pretVitrine())) {
+      if (!attenteRenduDite) {
+        attenteRenduDite = true
+        etapeAmorce('rendu')
+      }
+      poulsAmorce(av.fait, av.total)
+      // une salle demandée alors que la première image a déjà eu lieu (un
+      // chemin que le bouton bloqué ne couvre pas) : le voile du chargement
+      // revient dire l'attente, plutôt qu'une image figée sans un mot
+      if (amorceSignalee) voileRendu(true, av.fait, av.total)
+      return false
+    }
+    voileRendu(false, 0, 0)
+    amorce.vitrine = true
+    if (av.fait !== preparationFaite) {
+      preparationFaite = av.fait
+      majAccueil() // le compte avance sur le bouton
+    }
   }
   if (!amorceSignalee) {
     amorceSignalee = true

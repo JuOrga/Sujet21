@@ -700,6 +700,7 @@ float formeSdf(vec2 w, vec4 b, float forme, float q0, float q1) {
     float k1 = length(p / (half_ * half_));
     return k0 * (k0 - 1.0) / k1;
   }
+#ifndef VITRINE
   if (forme < 2.5) { // capsule : segment sur le grand axe, bouts ronds
     float r = min(half_.x, half_.y);
     vec2 a = max(half_ - vec2(r), 0.0);
@@ -769,6 +770,7 @@ float formeSdf(vec2 w, vec4 b, float forme, float q0, float q1) {
     }
     return d;
   }
+#endif
   // arc d'anneau — la boîte est la boîte englobante EXACTE de la silhouette,
   // BOUTS COMPRIS (miroir de arcRayons/arcContactAxe : calotte débordante,
   // coupe nette, ou griffe à tranchants droits — trois boîtes). q1 porte
@@ -2345,6 +2347,10 @@ float sdfVisible(int bi, vec2 p) {
 // forme close — douze pas par boîte et par pixel, ici, ce serait payer la
 // tranche deux fois ; ils ne cachent que par leur dessus.
 float hauteurTranche(int bi, vec2 world, vec2 relB, float hb) {
+#ifdef VITRINE
+  // le seul solide de la cuve est son anneau, un arc : pas de tranche balayée
+  return -1.0;
+#else
   vec4 dec = decodeAux(uBoxAux[bi].x);
   if (dec.y > 3.5) return -1.0;
   vec2 wb = world;
@@ -2365,6 +2371,7 @@ float hauteurTranche(int bi, vec2 world, vec2 relB, float hb) {
           : dec.y < 2.5 ? flancBalayeCapsule(wb, uBoxes[bi], rL)
           : flancBalayeCoin(wb, uBoxes[bi], dec.z, rL);
   return fb.x < -1.0 ? fb.y * hb : -1.0;
+#endif
 }
 
 // ---- PAS D'OPÉRATION DE GRADIENT DANS LA BOUCLE DES BOÎTES ---------------
@@ -2678,6 +2685,7 @@ vec3 tranchePieces(sampler2D tex, vec2 atlas, vec4 cadre, vec2 pf, vec2 nP, vec2
 vec3 matiereFlanc(int mi, float skin, float blendA, vec2 ft, float h, vec2 gx, vec2 gy) {
   float px = max(max(length(gx), length(gy)), 1e-3);
   if (mi == 0) {
+#ifndef VITRINE
     if (skin > 8.5) {
       // VITRE : la tranche du DORMANT, le cadre d'acier qui tient le verre,
       // et à mi-hauteur la feuille de verre feuilleté, un filet sombre
@@ -2700,6 +2708,7 @@ vec3 matiereFlanc(int mi, float skin, float blendA, vec2 ft, float h, vec2 gx, v
       // (à garder en phase avec les caissons tracés du remplissage)
       return vec3(0.105, 0.125, 0.155) * (0.85 + 0.30 * dnoise(ft * 0.05));
     }
+#endif
     if (uHasWall > 0.5) {
       // le MUR : son acier, et la seconde paroi mêlée comme sur le dessus
       // (à garder en phase avec le remplissage du mur ; le repli sans texture
@@ -2712,6 +2721,7 @@ vec3 matiereFlanc(int mi, float skin, float blendA, vec2 ft, float h, vec2 gx, v
     }
     return vec3(0.10, 0.13, 0.17) * (0.88 + 0.24 * dnoise(ft * vec2(0.03, 0.30)));
   }
+#ifndef VITRINE
   if (mi == 1) {
     // HYDROPHILE : l'émail mouillé (à garder en phase avec son remplissage,
     // le repli sans texture compris)
@@ -2781,6 +2791,7 @@ vec3 matiereFlanc(int mi, float skin, float blendA, vec2 ft, float h, vec2 gx, v
     base *= 0.86 + 0.14 * dnoise(ft * 0.021);
     return base + vec3(0.05) * smoothstep(0.80, 1.0, 0.5 + 0.5 * sin(ft.x * 0.55));
   }
+#endif
   return vec3(0.0);
 }
 
@@ -2825,6 +2836,11 @@ void main() {
   // La cuve d'essai flotte dans le vide : le décor se scinde en deux mondes
   // de part et d'autre de la coque (roomD < 0 : intérieur).
   float roomD;
+#ifdef VITRINE
+  // la cuve est un tableau en modules sans coque : aucune salle, le dehors
+  // partout — ce que la boucle ci-dessous rend quand elle ne trouve rien
+  roomD = 1.0e9;
+#else
   if (uSolModules > 0.5) {
     // LE SOL NE VIT QU'À L'INTÉRIEUR DES MODULES : la salle n'est plus le
     // rectangle de la toile, c'est l'union des creux des COQUES posées.
@@ -2886,12 +2902,14 @@ void main() {
     vec2 dr = abs(world - uRoomCenter) - uRoomHalf;
     roomD = max(dr.x, dr.y);
   }
+#endif
   float inRoom = 1.0 - smoothstep(0.0, 6.0 / uZoom, roomD);
 
   // Dehors : nuit orbitale — texture générée si chargée (deux couches, la
   // lointaine en parallaxe : elle suit à moitié la caméra), sinon décor
   // procédural d'intérim.
   vec3 voidCol;
+#ifndef VITRINE
   if (uCielMode > 2.5) {
     // LA TERRE (render/terre.ts) — l'horloge du joueur, le jour et la nuit
     // de l'instant, vue de l'ISS ou d'un point de Lagrange.
@@ -2952,7 +2970,10 @@ void main() {
       : texture(uTexStars, coucheFond(world, uParCiel) / 3400.0).rgb;
     vec3 near_ = texture(uTexStars, coucheFond(world, uParSemis) / 1500.0).rgb;
     voidCol = (far_ * 0.4 + near_ * 0.6) * 0.55;
-  } else {
+  } else
+#endif
+  // la cuve de l'accueil impose le ciel procédural (main.ts, cielVu)
+  {
     voidCol = vec3(0.004, 0.007, 0.014);
     if (uDecor > 0.5) {
       float neb = vnoise(world * 0.0016 + vec2(3.7, 1.3));
@@ -2972,6 +2993,8 @@ void main() {
   // Le fond texturé (panneaux, conduites, liserés) remplace l'aplat procédural
   // dès qu'il est chargé — échantillonné avec une légère parallaxe : la paroi
   // est DERRIÈRE l'eau, elle suit un peu la caméra et la profondeur se sent.
+  // (le sol de cuve ne se voit qu'en salle : la vitrine n'en a pas)
+#ifndef VITRINE
   vec2 nuv = uv * 2.0 - 1.0;
   float vign = 1.0 - 0.35 * dot(nuv, nuv);
   vec3 tankTex = texture(uTexTank, coucheFond(world, uParCuve) / FOND_DALLE).rgb;
@@ -2997,6 +3020,7 @@ void main() {
     float contactCoque = (1.0 - smoothstep(0.0, max(6.0, 2.0 * pxMonde), -roomD)) * step(roomD, 0.0);
     tank *= 1.0 - 0.45 * contactCoque;
   }
+#endif
   // Éclairage de la pièce : la carte précalculée (visibilité × retombée)
   // module le FOND — les ombres portées se couchent sur la cuve, les blocs
   // eux-mêmes restent éclairés (leur épaisseur vient du chanfrein et de la
@@ -3046,6 +3070,7 @@ void main() {
     toitVis = lm4.a;
     solEclaire = clamp(max(lm.r, max(lm.g, lm.b)), 0.0, 1.0);
     eclFond = vec3(uAmbiante) + 0.95 * lm;
+#ifndef VITRINE
     tank *= eclFond;
     // un léger surcroît dans les pleins feux — la teinte suit les lampes
     tank += lm * lm * 0.06;
@@ -3060,6 +3085,7 @@ void main() {
       float halo = pow(max(0.0, 1.0 - dl / rayon), 2.0);
       tank += (uLampesCol[li] * 0.5 + vec3(0.1, 0.09, 0.06)) * halo * 0.55 * uLampesInt[li];
     }
+#endif
   }
   // L'OMBRE AU PIED DE LA COQUE (coque.ts : ombrePiedCoque). Sa face
   // dressée tombait sur le fond sans rien qui l'y pose (le concepteur,
@@ -3069,6 +3095,7 @@ void main() {
   // celle des solides. Les tableaux en modules : leurs coques sont des
   // solides, la boucle des boîtes leur donne déjà les leurs. Avant la vie du
   // vaisseau : les veilleuses sont des lumières, rien ne les ombre.
+#ifndef VITRINE
   if (uSolModules < 0.5) {
     vec2 omb = ombrePiedCoque(world, uRoomCenter - uRoomHalf, uRoomCenter + uRoomHalf, lampeDir,
                               max(${OMBRE_PIED_PORTEE.toFixed(1)}, 6.0 * pxMonde), OMBRE_COURTE, OMBRE_COURTE_FLOU);
@@ -3077,7 +3104,13 @@ void main() {
   }
   // la vie du vaisseau : veilleuses, poussières en dérive, respiration
   if (uDecor > 0.5) tank += shipLife(world, uZoom, uTime);
+#endif
 
+#ifdef VITRINE
+  // pas de salle dans la cuve (roomD = 1e9, inRoom = 0) : le fond EST le
+  // dehors, et ni la coque de toile ni son liseré ne paraissent
+  vec3 col = voidCol;
+#else
   vec3 col = mix(voidCol, tank, inRoom);
 
   // La coque : bande procédurale d'intérim — la passe texturée (dessinée
@@ -3097,10 +3130,12 @@ void main() {
     float bord = (1.0 - smoothstep(0.0, 4.0 / uZoom, abs(roomD - 1.5 / uZoom)));
     col += lumiereArete(nRoom) * bord;
   }
+#endif
 
   // Zones d'état, sous les surfaces : un voile teinté qui emplit la région,
   // un liseré net à la frontière, et des chevrons lents qui balaient vers
   // l'intérieur — on voit qu'on entre dans un régime imposé, pas dans un décor.
+#ifndef VITRINE
   for (int zi = 0; zi < MAX_ZONES; zi++) {
     if (zi >= uZoneCount) break;
     float f = uZoneForce[zi];
@@ -3169,6 +3204,7 @@ void main() {
     // limite se devine, elle ne se trace pas
     col += fogCol * exp(-abs(szn - 1.0) * 26.0) * 0.14 * fog * fog * fogAmp;
   }
+#endif
 
   // Textures des matériaux : prélevées hors des branches (flux de contrôle
   // uniforme requis par les mipmaps), utilisées dans la boucle d'obstacles.
@@ -3438,6 +3474,7 @@ void main() {
         // (le chemin, dans le repère de la boîte : relB dépivoté)
         vec2 rL = vec2(caR * relB.x + saR * relB.y, -saR * relB.x + caR * relB.y);
         if (dec.y < 3.5) {
+#ifndef VITRINE
           // UNE BOÎTE, UN DISQUE, UNE CAPSULE, UN COIN : convexes, leur
           // balayage a une forme close. Le disque et la capsule gardaient cinq
           // copies de leur silhouette (pied, ¼, ½, ¾, sommet), lues en marches
@@ -3450,6 +3487,7 @@ void main() {
           // sur la base, sous le vide : pleine tranche
           flanc = d <= 0.0 ? 1.0 : 1.0 - smoothstep(-1.0, 1.5, fb.x);
           htFlanc = fb.y;
+#endif
         } else {
           // L'ARC ET LA COQUE, ni convexes ni closes : douze pas et le dernier
           // passage affiné (flancAffine) — sur la base aussi, où deux
@@ -3463,7 +3501,9 @@ void main() {
       }
       // (les pièces n'en sont pas : leur dessus est leur IMAGE, le sol caché
       // se mesure sur la silhouette de leurs pièces — voir leurs branches)
+#ifndef VITRINE
       if (mat < 0.5 && uBoxAux[bi].z > 8.5) opaciteDessus = opaciteVitre(vitreReflDur(uBoxes[bi], wbV));
+#endif
       if (!aPieces) solPropre = solCache(uRelief, d, dV, flanc, edgeW, opaciteDessus, matPermeable(mat) ? 1.0 : 0.0);
       // AU PIED, RIEN N'EST CACHÉ. Hors de la base, la tranche se fond sur un
       // pixel et demi : ce fondu comptait comme du sol caché, jusque sur la
@@ -3557,8 +3597,10 @@ void main() {
       vec2 rLF = vec2(bca * relB.x + bsa * relB.y, -bsa * relB.x + bca * relB.y);
       vec2 nrm;
       if (dec.y < 0.5) {
+#ifndef VITRINE
         vec2 nL = faceFlanc(wb, uBoxes[bi], rLF);
         nrm = vec2(bca * nL.x - bsa * nL.y, bsa * nL.x + bca * nL.y);
+#endif
       } else {
         vec2 wbPied = wb - rLF * htFlanc;
         vec2 gB = gradSdfBoite(bi, wbPied, sdfBoiteLocal(bi, wbPied, dec), dec, bca, bsa);
@@ -3624,6 +3666,7 @@ void main() {
         // repère LOCAL de la boîte (wb) : ils pivotent avec elle.
         float skin = uBoxAux[bi].z;
         edgeCol = vec3(0.30, 0.38, 0.46);
+#ifndef VITRINE
         if (skin > 8.5) {
           // VITRE — verre feuilleté sur dormant métallique. Une paroi, donc
           // le corps y bute comme sur le reste ; mais on VOIT au travers, et
@@ -3715,7 +3758,10 @@ void main() {
           float teinte = 0.85 + 0.3 * hash21(cel + 7.7);
           fillCol = vec3(0.105, 0.125, 0.155) * teinte * (0.55 + 0.45 * bordC);
           edgeCol = vec3(0.32, 0.39, 0.46);
-        } else if (uHasWall > 0.5) {
+        } else
+#endif
+        // (l'anneau de la cuve n'a pas d'habillage : la vitrine saute les neuf)
+        if (uHasWall > 0.5) {
           float cW = ${glslFloat(CARREAU_MONDE.wall)};
           float cA = ${glslFloat(CARREAU_MONDE.wallA)};
           // RELIEF ALLUMÉ, la texture se relit au SOMMET de cette boîte (wS) :
@@ -3750,6 +3796,7 @@ void main() {
         } else {
           fillCol = vec3(0.10, 0.13, 0.17) * (0.88 + 0.24 * dnoise(wS * vec2(0.03, 0.30)));
         }
+#ifndef VITRINE
       } else if (mat < 1.5) { // hydrophile : mouillé, brillant, reflet qui glisse
         float sheen = 0.5 + 0.5 * sin(wS.x * 0.045 + wS.y * 0.10 + uTime * 0.7);
         float cH = ${glslFloat(CARREAU_MONDE.phile)};
@@ -3792,9 +3839,11 @@ void main() {
           ? texPhobeC * 0.75 * lumiereRelief(sPhobe, lampeDir)
           : vec3(0.16, 0.11, 0.20) + vec3(0.07, 0.035, 0.10) * wax;
         edgeCol = vec3(0.62, 0.42, 0.78);
+#endif
       }
       col = mix(col, fillCol * eclMat, fill * fillA);
       col = mix(col, edgeCol * eclMat, edge * 0.9);
+#ifndef VITRINE
       if (mat > 0.5) {
         // L'aura dit la portée : une brume diffuse sur toute la bande
         // d'influence, sur le modèle de la chaleur du radiateur — turquoise
@@ -3826,6 +3875,7 @@ void main() {
         vec3 auraCol = mat < 1.5 ? vec3(0.12, 0.42, 0.45) : vec3(0.38, 0.20, 0.52);
         col += auraCol * aura * (0.45 + 0.55 * mist);
       }
+#endif
     } else if (mat > 10.5) {
       // LE DEHORS, VU D'ICI. Le plancher s'efface et le vide paraît — le
       // MÊME ciel que celui qui entoure les modules (voidCol) : mêmes
@@ -3916,6 +3966,7 @@ void main() {
         float edge = (1.0 - smoothstep(0.0, edgeW, abs(d))) * libre;
         col = mix(col, vec3(0.42, 0.52, 0.64) * eclSolide, edge * 0.7);
       }
+#ifndef VITRINE
     } else if (mat > 9.5) {
       // MIROIR FIXE : la paroi polie qui plie le faisceau (laser.ts fait la
       // vraie optique — ici, le POLI se voit) : métal froid presque blanc,
@@ -4347,6 +4398,7 @@ void main() {
         float ring = exp(-pow((dh - rad * 0.55) * 6.0 / rad, 2.0));
         col += vec3(0.33, 0.62, 0.77) * ring * pulse * 0.8;
       }
+#endif
     }
     // Relief d'éclairage : un biseau directionnel, devenu un chanfrein franc.
     // LE CHANFREIN (volume des parois, volet 2) : l'arête du dessus coupée
@@ -5102,7 +5154,7 @@ void main() {
 // le SDF de la scène) : la pénombre vient du passage au ras des solides. La
 // grille et le sas laissent passer la lumière — la même règle que le laser.
 // Par image, le coût retombe à UNE lecture de texture dans la composition.
-const LIGHT_FS = `#version 300 es
+export const LIGHT_FS = `#version 300 es
 precision highp float;
 #define MAX_BOXES 160
 #define MAX_LUMIERES 4
@@ -5244,6 +5296,7 @@ float sceneSdf(vec2 p, float alt, float plein) {
       float sa = sin(ang);
       wb = bc + vec2(ca * rel.x + sa * rel.y, -sa * rel.x + ca * rel.y);
     }
+#ifndef VITRINE
     // la CONDUITE D'AMMONIAC ombre comme son TUYAU. Ni la boîte (une ombre
     // carrée trahissait le bloc), ni la forme de collision : ses brides y
     // sont des rectangles de toute la largeur, et leur ombre projetée
@@ -5275,6 +5328,7 @@ float sceneSdf(vec2 p, float alt, float plein) {
                                    hC ? szC.x : szC.y, hC ? szC.y : szC.x) + leve);
       continue;
     }
+#endif
     d = min(d, formeSdf(wb, uBoxes[i], dec.y, dec.z, dec.w) + leve);
   }
   return d;
@@ -5437,9 +5491,14 @@ void main() {
     // éponge et une vitre sont du mobilier, pas des cloisons — les border à
     // tLim les ferait tamiser tout le trajet, et l'ombre des barreaux
     // s'étendrait à toute la salle.
+#ifdef VITRINE
+    // ni évent, ni éponge, ni paroi de verre dans la cuve : rien ne tamise
+    float tamis = 1.0;
+#else
     float tamis = grilleTrans(p, dir, min(distL, tBloc), hL, distL)
       * epongeTrans(p, dir, min(distL, tBloc))
       * vitreTrans(p, dir, min(distL, tBloc), hL, distL);
+#endif
     // la VISIBILITÉ de cette lampe depuis ce texel, SANS le rebond : c'est
     // elle qui dit si la lampe éclaire vraiment ici — l'ombre dynamique du
     // corps s'y pèse, pour ne pas projeter l'ombre d'une lampe murée
@@ -6271,6 +6330,18 @@ export function passeNetteRequise(dprNatif: number, dpr: number, decorNet: boole
  *  habillages un à un. L'ancienne clé recollait une chaîne par boîte À CHAQUE
  *  IMAGE (relecture finale, mineur 6), pour une table qui ne change qu'avec
  *  le décor. */
+/** LA SOURCE D'UNE VARIANTE VITRINE : la même, avec `#define VITRINE` en
+ *  tête. Tout ce que la cuve de l'accueil ne montre pas est entouré de
+ *  `#ifndef VITRINE` dans la source : le préprocesseur l'ôte AVANT que le
+ *  pilote ne voie le shader, c'est donc autant de moins à traduire et à
+ *  compiler. Une seule source, deux programmes — la vitrine ne peut pas
+ *  dériver du rendu complet. Gardé par vitrine.spec.ts. */
+export function sourceVitrine(fs: string): string {
+  const tete = '#version 300 es\n'
+  if (!fs.startsWith(tete)) throw new Error('sourceVitrine : la source ne commence pas par #version 300 es')
+  return tete + '#define VITRINE\n' + fs.slice(tete.length)
+}
+
 export class CleHauteurs {
   private boites = ''
   private readonly habillages: number[] = []
@@ -6348,9 +6419,9 @@ export class Renderer {
   private readonly gl: WebGL2RenderingContext
   private readonly canvas: HTMLCanvasElement
   private readonly splatProgram: WebGLProgram
-  private readonly composeProgram: WebGLProgram
+  private composeProgram: WebGLProgram
   private readonly spongeProgram: WebGLProgram
-  private readonly hullProgram: WebGLProgram
+  private hullProgram!: WebGLProgram
   private readonly recopieProgram: WebGLProgram
   // LE DÉCOR NET (réglage « Décor », PARAMÈTRES). Aux résolutions réduites,
   // TOUTE l'image se calcule en moins de pixels puis s'agrandit ; au décor
@@ -6407,8 +6478,8 @@ export class Renderer {
   private cibleW = 1
   private cibleH = 1
   private readonly decalProgram: WebGLProgram
-  private readonly module2dProgram: WebGLProgram
-  private readonly lightProgram: WebGLProgram
+  private module2dProgram!: WebGLProgram
+  private lightProgram: WebGLProgram
   private readonly vieProgram: WebGLProgram
   private readonly vieVao: WebGLVertexArrayObject
   private readonly vieVbo: WebGLBuffer
@@ -6567,8 +6638,38 @@ export class Renderer {
   // Les programmes se compilent EN COULISSE (render/programmes.ts) : le
   // constructeur ne les attend pas, c'est `pret()` qui le dit, image après
   // image, et le rendu ne commence qu'à son premier oui.
-  private readonly programmes: Programmes
+  //
+  // EN DEUX TEMPS (le concepteur, 19/11 : « un premier petit chargement
+  // pour le menu et la cuve, et les boutons bloqués tant que ce n'est pas
+  // fini — au moins on peut jouer avec le volume dès le menu »). Le shader
+  // de composition complet coûte des MINUTES au compilateur Direct3D à la
+  // première visite, et rien ne s'affichait avant lui. Trois lots :
+  //  · les COMMUNS — cinq petits programmes, les mêmes dans les deux temps ;
+  //  · la VITRINE — la composition et la carte de lumière réduites à ce que
+  //    la cuve de l'accueil montre (#define VITRINE, voir sourceVitrine) :
+  //    dès qu'ils sont liés, la cuve se dessine (pretVitrine) ;
+  //  · les COMPLETS — lancés seulement ALORS, pour ne pas disputer les fils
+  //    du pilote aux deux premiers lots : `pret()` dit oui à leur verdict,
+  //    et le rendu bascule sur eux.
+  // Sans compilation parallèle (Firefox), la question au pilote GÈLE le fil
+  // le temps de la compilation : un menu affiché puis figé deux minutes
+  // serait pire que l'écran de chargement. Tout part alors d'un coup, comme
+  // avant, et la vitrine ne sert pas.
+  private readonly programmesCommuns: Programmes
+  private readonly programmesVitrine: Programmes
+  private programmes: Programmes | null = null
   private programmesPrets = false
+  private communsReleves = false
+  // la vitrine : 'attente' tant que le pilote travaille, 'prete' une fois
+  // liée, 'refusee' si un pilote n'en veut pas (le jeu attend alors les
+  // complets, comme avant — une variante de confort ne doit rien casser)
+  private etatVitrine: 'attente' | 'prete' | 'refusee' = 'attente'
+  private varianteVitrine = false
+  private readonly composeVitrine: WebGLProgram
+  private readonly lightVitrine: WebGLProgram
+  private composeComplet: WebGLProgram | null = null
+  private lightComplet: WebGLProgram | null = null
+  private uniformesVariantes: Record<string, Record<string, WebGLUniformLocation | null>> = {}
   // la direction VERS la lumière du chanfrein de la coque (posée par la
   // composition, lue par drawHull dans la même image)
   private lumiereCoque: readonly [number, number] = LUMIERE_PAR_DEFAUT
@@ -6608,27 +6709,29 @@ export class Renderer {
 
     // Lancés, pas attendus : le shader de composition pèse plus de cent
     // kilo-octets et son édition de liens prenait des secondes de fil
-    // principal. Le verdict et les uniformes viennent dans `pret()`.
-    this.programmes = new Programmes(gl, [
+    // principal. Le verdict et les uniformes viennent dans `pretVitrine()`
+    // et `pret()`.
+    this.programmesCommuns = new Programmes(gl, [
       { nom: 'splat', vs: SPLAT_VS, fs: SPLAT_FS },
-      { nom: 'compose', vs: COMPOSE_VS, fs: COMPOSE_FS },
       { nom: 'sponge', vs: SPONGE_VS, fs: SPONGE_FS },
-      { nom: 'hull', vs: HULL_VS, fs: HULL_FS },
       { nom: 'decal', vs: DECAL_VS, fs: DECAL_FS },
-      { nom: 'module2d', vs: MODULE2D_VS, fs: MODULE2D_FS },
-      { nom: 'light', vs: COMPOSE_VS, fs: LIGHT_FS },
       { nom: 'vie', vs: VIE_VS, fs: VIE_FS },
       { nom: 'recopie', vs: COMPOSE_VS, fs: RECOPIE_FS },
     ])
-    this.splatProgram = this.programmes.programme('splat')
-    this.composeProgram = this.programmes.programme('compose')
-    this.spongeProgram = this.programmes.programme('sponge')
-    this.hullProgram = this.programmes.programme('hull')
-    this.decalProgram = this.programmes.programme('decal')
-    this.module2dProgram = this.programmes.programme('module2d')
-    this.lightProgram = this.programmes.programme('light')
-    this.vieProgram = this.programmes.programme('vie')
-    this.recopieProgram = this.programmes.programme('recopie')
+    this.programmesVitrine = new Programmes(gl, [
+      { nom: 'compose', vs: COMPOSE_VS, fs: sourceVitrine(COMPOSE_FS) },
+      { nom: 'light', vs: COMPOSE_VS, fs: sourceVitrine(LIGHT_FS) },
+    ])
+    this.splatProgram = this.programmesCommuns.programme('splat')
+    this.spongeProgram = this.programmesCommuns.programme('sponge')
+    this.decalProgram = this.programmesCommuns.programme('decal')
+    this.vieProgram = this.programmesCommuns.programme('vie')
+    this.recopieProgram = this.programmesCommuns.programme('recopie')
+    this.composeVitrine = this.programmesVitrine.programme('compose')
+    this.lightVitrine = this.programmesVitrine.programme('light')
+    this.composeProgram = this.composeVitrine
+    this.lightProgram = this.lightVitrine
+    if (!this.programmesCommuns.enParallele) this.lanceComplets()
 
     this.scratch = new Float32Array(capacity * 7)
     this.splatVao = gl.createVertexArray()!
@@ -6932,30 +7035,132 @@ export class Renderer {
    * tableau (LevelDef.coque). */
   private solModules = false
 
+  /** Les quatre programmes lourds partent chez le pilote. */
+  private lanceComplets(): void {
+    if (this.programmes) return
+    this.programmes = new Programmes(this.gl, [
+      { nom: 'compose', vs: COMPOSE_VS, fs: COMPOSE_FS },
+      { nom: 'hull', vs: HULL_VS, fs: HULL_FS },
+      { nom: 'module2d', vs: MODULE2D_VS, fs: MODULE2D_FS },
+      { nom: 'light', vs: COMPOSE_VS, fs: LIGHT_FS },
+    ])
+    this.composeComplet = this.programmes.programme('compose')
+    this.lightComplet = this.programmes.programme('light')
+    this.hullProgram = this.programmes.programme('hull')
+    this.module2dProgram = this.programmes.programme('module2d')
+  }
+
+  /** Les cinq petits programmes sont-ils liés ? Leurs uniformes sont
+   *  relevés au premier oui. */
+  private communsPrets(): boolean {
+    if (this.communsReleves) return true
+    if (!this.programmesCommuns.pret()) return false
+    for (const nom of ['splat', 'sponge', 'decal', 'vie', 'recopie'])
+      this.uniforms[nom] = this.programmesCommuns.uniformes(nom)
+    this.communsReleves = true
+    return true
+  }
+
+  /** Le rendu passe sur la variante dite : ses deux programmes et leurs
+   *  uniformes. La carte de lumière recuit — elle a été cuite par l'autre. */
+  private choisitVariante(vitrine: boolean): void {
+    this.varianteVitrine = vitrine
+    this.composeProgram = vitrine ? this.composeVitrine : this.composeComplet!
+    this.lightProgram = vitrine ? this.lightVitrine : this.lightComplet!
+    const u = this.uniformesVariantes
+    this.uniforms['compose'] = u[vitrine ? 'composeVitrine' : 'compose']
+    this.uniforms['light'] = u[vitrine ? 'lightVitrine' : 'light']
+    this.lightKey = ''
+  }
+
+  /**
+   * LA CUVE DE L'ACCUEIL peut-elle se dessiner ? Oui dès que les communs et
+   * la vitrine sont liés — bien avant `pret()`. Le rendu ne sait alors
+   * montrer QUE la cuve (un anneau, une vitre, le corps, le ciel
+   * procédural) : c'est main.ts qui tient le joueur dans la cuve tant que
+   * `pret()` répond non. Toujours non sans compilation parallèle, ou si un
+   * pilote refuse la variante : le jeu attend alors `pret()`, comme avant.
+   * Le deuxième oui lance les programmes complets.
+   */
+  pretVitrine(): boolean {
+    if (this.programmesPrets) return false // le rendu complet a pris la suite
+    if (this.etatVitrine === 'prete') {
+      // les complets partent à l'image SUIVANTE : la première image de la
+      // cuve est déjà chez le pilote, rien de ce qu'il fera d'eux — même
+      // une édition de liens qui bloquerait — ne peut plus la retenir
+      this.lanceComplets()
+      return true
+    }
+    if (this.etatVitrine === 'refusee' || !this.programmesCommuns.enParallele) return false
+    if (!this.communsPrets()) return false
+    try {
+      if (!this.programmesVitrine.pret()) return false
+    } catch (e) {
+      // un pilote qui refuse la variante réduite n'a pas à priver le joueur
+      // du jeu : on le note, et on attend le rendu complet
+      console.warn('La vitrine du menu ne se compile pas ici, on attend le rendu complet.', e)
+      this.etatVitrine = 'refusee'
+      this.lanceComplets()
+      return false
+    }
+    this.uniformesVariantes['composeVitrine'] = this.programmesVitrine.uniformes('compose')
+    this.uniformesVariantes['lightVitrine'] = this.programmesVitrine.uniformes('light')
+    this.etatVitrine = 'prete'
+    this.choisitVariante(true)
+    return true
+  }
+
   /**
    * Les programmes sont-ils liés ? À demander à chaque image avant de
-   * dessiner : non tant que le pilote compile (le fil principal reste libre,
-   * l'écran garde le mot du chargement), oui pour de bon ensuite. Un shader
-   * refusé se dit ici, en exception, comme il se disait au constructeur.
+   * dessiner autre chose que la cuve de l'accueil : non tant que le pilote
+   * compile (le fil principal reste libre), oui pour de bon ensuite. Un
+   * shader refusé se dit ici, en exception, comme il se disait au
+   * constructeur.
    */
   pret(): boolean {
     if (this.programmesPrets) return true
-    if (!this.programmes.pret()) return false
-    for (const nom of ['splat', 'compose', 'sponge', 'hull', 'decal', 'light', 'vie', 'recopie', 'module2d'])
-      this.uniforms[nom] = this.programmes.uniformes(nom)
+    // la vitrine d'abord : c'est son verdict qui lance les complets
+    if (this.etatVitrine === 'attente' && this.programmesCommuns.enParallele) this.pretVitrine()
+    if (!this.communsPrets()) return false
+    if (!this.programmes || !this.programmes.pret()) return false
+    for (const nom of ['hull', 'module2d']) this.uniforms[nom] = this.programmes.uniformes(nom)
+    this.uniformesVariantes['compose'] = this.programmes.uniformes('compose')
+    this.uniformesVariantes['light'] = this.programmes.uniformes('light')
+    this.choisitVariante(false)
     this.programmesPrets = true
+    return true
+  }
+
+  /** La variante en service (diagnostic, banc). */
+  get enVitrine(): boolean {
+    return this.varianteVitrine
+  }
+
+  /** BANC SEULEMENT : repasse sur la variante dite, les deux étant liées —
+   *  pour comparer la même image rendue par l'une et par l'autre
+   *  (tools/banc-vitrine). Faux si la variante demandée n'est pas là. */
+  forceVariante(vitrine: boolean): boolean {
+    if (!this.programmesPrets) return false
+    if (vitrine && this.etatVitrine !== 'prete') return false
+    this.choisitVariante(vitrine)
     return true
   }
 
   /** L'extension de compilation parallèle est-elle là ? (rapport de perf) */
   get compileEnParallele(): boolean {
-    return this.programmes.enParallele
+    return this.programmesCommuns.enParallele
   }
 
   /** Où en est la compilation : programmes liés / programmes en tout (à
-   *  lire à l'image, tant que `pret()` répond non — voir programmes.ts). */
+   *  lire à l'image, tant que `pret()` répond non — voir programmes.ts).
+   *  Les deux programmes de la vitrine ne comptent pas : ils doublent la
+   *  composition et la lumière, le compte reste celui du rendu complet. */
   avancementCompilation(): { fait: number; total: number; restants: string[] } {
-    return this.programmes.avancement()
+    const c = this.programmesCommuns.avancement()
+    const l = this.programmes
+      ? this.programmes.avancement()
+      : { fait: 0, total: 4, restants: ['compose', 'hull', 'module2d', 'light'] }
+    return { fait: c.fait + l.fait, total: c.total + l.total, restants: [...c.restants, ...l.restants] }
   }
 
   /**
@@ -8201,9 +8406,11 @@ export class Renderer {
     // Passe B bis, avant la coque — LE MODULE EN 2D autour de la salle
     // (render/module2d.ts) : par-dessus le ciel, jamais dans la salle, et la
     // coque de la salle repasse par-dessus son bord
-    if (!this.solModules) this.drawModule2d(camera, viewportW, viewportH, timeSec)
-    if (!this.solModules)
-      this.drawHull(sim, camera, viewportW, viewportH, boxes, timeSec)
+    // (en vitrine, ni module ni coque : leurs programmes ne sont pas liés —
+    // la cuve de l'accueil, seule salle montrée alors, n'en a pas)
+    const autour = !this.solModules && this.programmesPrets
+    if (autour) this.drawModule2d(camera, viewportW, viewportH, timeSec)
+    if (autour) this.drawHull(sim, camera, viewportW, viewportH, boxes, timeSec)
 
     // Passe B ter — décalques de décor (tuyaux, vannes), effacés sous l'eau
     this.drawDecals(decals, camera, viewportW, viewportH, params, timeSec)
@@ -8214,7 +8421,7 @@ export class Renderer {
     // LA COUVERTURE de la transition entre deux salles (module2d.ts) : par-
     // dessus TOUTE la salle — sa coque, ses décalques, ses éponges —, la
     // cellule qui grossit ; et la cellule quittée, nette
-    if (!this.solModules) {
+    if (autour) {
       this.drawModule2d(camera, viewportW, viewportH, timeSec, 1)
       this.drawModule2d(camera, viewportW, viewportH, timeSec, 2)
     }

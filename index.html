@@ -280,6 +280,25 @@
       #start:hover,
       #start:focus-visible,
       #start.pad-focus { background: var(--glow); }
+      /* LE VERBE ATTEND : le rendu complet se prépare encore (main.ts,
+         renduComplet). Il reste lisible — c'est la promesse de la fiche —
+         mais éteint, et son détail compte ce qui est prêt. */
+      #start:disabled {
+        background: color-mix(in srgb, var(--specimen) 38%, var(--void));
+        cursor: progress;
+      }
+      /* « chargement », puis le compte dessous : à côté du verbe, la ligne
+         entière ne tenait pas dans le rail (elle sortait coupée) */
+      #start:disabled small {
+        opacity: 1;
+        white-space: normal;
+        max-width: 11ch;
+        text-align: right;
+        line-height: 1.3;
+        animation: acc-prepare 1.6s ease-in-out infinite;
+      }
+      @keyframes acc-prepare { 50% { opacity: 0.45; } }
+      @media (prefers-reduced-motion: reduce) { #start:disabled small { animation: none; } }
       .acc-second { display: flex; flex-wrap: wrap; column-gap: 22px; }
       .acc-second button {
         appearance: none;

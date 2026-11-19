@@ -4,6 +4,7 @@ import {
   LIEUX_ACCUEIL,
   LIEUX_PREMIER_LANCEMENT,
   PICTOS_ACCUEIL,
+  motPreparation,
   valeursLieux,
   verbeAccueil,
   type EtatLieux,
@@ -18,6 +19,12 @@ const HTML = readFileSync(new URL('../../index.html', import.meta.url), 'utf-8')
 const MAIN = readFileSync(new URL('../main.ts', import.meta.url), 'utf-8')
 
 describe('le verbe de l’accueil', () => {
+  it('pendant que le rendu complet se prépare, son détail compte ce qui est prêt', () => {
+    expect(motPreparation(5, 9)).toBe('chargement 5 / 9')
+    expect(motPreparation(12, 9)).toBe('chargement 9 / 9')
+    expect(motPreparation(0, 0)).toBe('chargement')
+  })
+
   it('commence quand rien n’attend', () => {
     expect(verbeAccueil({ pause: false, enDescente: false, rang: null, total: 30 })).toEqual({
       nom: 'COMMENCER',
