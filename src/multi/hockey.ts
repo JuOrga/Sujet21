@@ -38,12 +38,14 @@ const RESTITUTION_PAROI = 0.85
 const FROTTEMENT = 0.2
 /** Aucun palet ne va plus vite : au-delà il traverserait un corps en un pas. */
 const VITESSE_MAX_PALET = 2200
-/** La part du disque du palet qu'un corps ouvert doit recouvrir pour le
- *  prendre : frôlé, il passe à travers ; englouti à moitié, il est pris. */
-const PART_PRISE = 0.5
-/** L'aire qu'occupe une particule au repos, en u² (900 particules font un
- *  rond de 103,4 u de rayon). */
-const AIRE_PARTICULE = 37.3
+/** Un corps OUVERT prend le palet dès qu'il le TOUCHE : ce nombre de ses
+ *  particules au contact suffit (trois, pour qu'une goutte du bord égarée
+ *  n'y suffise pas). La première règle demandait que le corps recouvre la
+ *  moitié du palet : frôlé, il passait à travers le corps ouvert sans être
+ *  pris — « quand le volume touche le palet et qu'on est ouvert, le volume
+ *  doit absorber le palet » (le concepteur, 20/11). Une fois pris, il est
+ *  aspiré vers le cœur du corps. */
+const TOUCHE_PRISE = 3
 /** On ne garde pas le palet : au bout de ce délai il s'échappe. */
 export const TENUE_MAX = 3
 /** Le temps qu'il faut le tenir pour le lancer à pleine force. */
@@ -172,18 +174,21 @@ export class Hockey {
     p.x += p.vx * dt
     p.y += p.vy * dt
 
-    // sorti du corps qui l'a lancé : il redevient un obstacle pour lui
-    if (this.sortDe >= 0 && p.dessous[this.sortDe] === 0) this.sortDe = -1
+    // sorti du corps qui l'a lancé (il ne le touche plus du tout) : il
+    // redevient un obstacle pour lui, et celui-ci peut le reprendre
+    if (this.sortDe >= 0 && p.touche[this.sortDe] === 0) this.sortDe = -1
 
-    // pris par un corps OUVERT qui l'engloutit
-    const plein = (Math.PI * p.rayon * p.rayon) / AIRE_PARTICULE
-    for (let j = 0; j < sim.corps.length && this.tenuPar < 0; j++) {
+    // pris par un corps OUVERT qui le touche — et si les deux le touchent
+    // ensemble, par celui qui le touche le plus
+    let preneur = -1
+    for (let j = 0; j < sim.corps.length; j++) {
       const c = sim.corps[j]
       if (!c.ouvert || j === this.sortDe || c.dispersed) continue
       if (j === this.auRepos && this.repos > 0) continue
-      if (p.dessous[j] < plein * PART_PRISE) continue
-      this.prend(sim, j)
+      if (p.touche[j] < TOUCHE_PRISE) continue
+      if (preneur < 0 || p.touche[j] > p.touche[preneur]) preneur = j
     }
+    if (preneur >= 0) this.prend(sim, preneur)
 
     return this.parois(p)
   }

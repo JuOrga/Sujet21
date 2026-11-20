@@ -202,9 +202,12 @@ export interface PaletSim {
   recuY: number
   /** Par joueur : combien de particules de son corps sont sous le palet. */
   readonly dessous: Int32Array
+  /** Par joueur : combien de particules de son corps le TOUCHENT (sous lui,
+   *  ou dans la couche où il se fait sentir). */
+  readonly touche: Int32Array
 }
 export function paletVide(): PaletSim {
-  return { actif: false, x: 0, y: 0, vx: 0, vy: 0, rayon: 48, masse: 120, traverse: 0, recuX: 0, recuY: 0, dessous: new Int32Array(JOUEURS_MAX) }
+  return { actif: false, x: 0, y: 0, vx: 0, vy: 0, rayon: 48, masse: 120, traverse: 0, recuX: 0, recuY: 0, dessous: new Int32Array(JOUEURS_MAX), touche: new Int32Array(JOUEURS_MAX) }
 }
 /** Le nombre de cases par corps du tampon de forme (voir FluidSimMulti.forme). */
 const FORME = 12
@@ -3181,6 +3184,7 @@ export class FluidSimMulti {
       palet.recuX = 0
       palet.recuY = 0
       palet.dessous.fill(0)
+      palet.touche.fill(0)
     }
     if (cloisons || palet.actif) {
       const paletActif = palet.actif
@@ -3237,7 +3241,10 @@ export class FluidSimMulti {
           const r2 = dx * dx + dy * dy
           if (r2 < porteeP2) {
             const r = Math.sqrt(r2) + 1e-6
-            if (duCorps && r < palet.rayon) palet.dessous[pi]++
+            if (duCorps) {
+              palet.touche[pi]++
+              if (r < palet.rayon) palet.dessous[pi]++
+            }
             // un corps ouvert (ou celui qui vient de lancer) le laisse passer ;
             // une goutte libre, jamais : le jet POUSSE le palet
             if (!(duCorps && ((palet.traverse >> pi) & 1) === 1)) {

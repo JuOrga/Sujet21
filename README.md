@@ -192,7 +192,7 @@ bouton **MULTI** sur l'accueil (`?dev`). Tout vit dans [`src/multi/`](src/multi/
   rebondissent et redeviennent ronds (« le rebond », « la peau tendue »).
 - **Le mode HOCKEY** (à choisir au salon, avant de créer la partie) : un
   terrain plus court, une cage par camp, un palet. Fermé, le corps amortit
-  le palet et le renvoie ; OUVERT, il l'avale — et se refermer le LANCE
+  le palet et le renvoie ; OUVERT, il l'avale dès qu'il le touche — et se refermer le LANCE
   vers le pointeur, d'autant plus fort qu'on l'a tenu (trois secondes au
   plus, après quoi il s'échappe). Le jet le pousse aussi. Le premier à cinq
   buts gagne. La règle est dans `hockey.ts` ; le solveur n'en connaît que

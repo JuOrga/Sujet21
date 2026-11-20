@@ -145,6 +145,43 @@ describe('hockey — avaler, porter, lancer', () => {
     expect(c.playerCount).toBe(900)
   })
 
+  it('il suffit de le TOUCHER, ouvert, pour l’absorber : frôlé au bord, il est pris et aspiré au cœur', () => {
+    // la première règle voulait le palet à moitié recouvert : frôlé, il
+    // traversait le corps ouvert sans être pris
+    const h = new Hote(2, undefined, MODE_HOCKEY)
+    pas(h, 60)
+    const c = h.sim.corps[1]
+    h.commande(1, { pousse: false, ouvert: true, x: 0, y: MILIEU_Y })
+    // le palet passe AU BORD du corps : son centre à 135 u au-dessus du cœur
+    // (le corps fait ~103 u de rayon, le palet 48 : ils se recouvrent de 16 u)
+    const p = h.sim.palet
+    p.y = MILIEU_Y - 135
+    p.vx = 500
+    let prisA = -1
+    for (let s = 0; s < 300 && prisA < 0; s++) {
+      pas(h, 1)
+      if (h.hockey!.tenuPar === 1) prisA = Math.hypot(p.x - c.stats.centroidX, p.y - c.stats.centroidY)
+    }
+    // pris alors qu'il n'était qu'au bord, loin du cœur…
+    expect(h.hockey!.tenuPar).toBe(1)
+    expect(prisA).toBeGreaterThan(100)
+    // …puis aspiré : une demi-seconde après, il est au cœur du corps
+    pas(h, 60)
+    expect(Math.hypot(p.x - h.sim.corps[1].stats.centroidX, p.y - h.sim.corps[1].stats.centroidY)).toBeLessThan(15)
+  })
+
+  it('FERMÉ, le toucher ne l’absorbe pas', () => {
+    const h = new Hote(2, undefined, MODE_HOCKEY)
+    pas(h, 60)
+    const p = h.sim.palet
+    p.y = MILIEU_Y - 135
+    p.vx = 500
+    for (let s = 0; s < 300; s++) {
+      pas(h, 1)
+      expect(h.hockey!.tenuPar).toBe(-1)
+    }
+  })
+
   it('se refermer LANCE le palet vers le pointeur, sans rien arracher au corps', () => {
     const h = prise()
     pas(h, Math.ceil(CHARGE_PLEINE * 120) + 10)
