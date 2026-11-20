@@ -181,6 +181,8 @@ export const JOUEURS_MAX = 4
 /** Le propriétaire d'une particule qui n'est à personne (semée par la
  *  salle, ou jamais attribuée). */
 export const SANS_PROPRIO = 255
+/** Le nombre de cases par corps du tampon de forme (voir FluidSimMulti.forme). */
+const FORME = 12
 
 /** L'ÉTAT D'UN CORPS : tout ce que le solveur du jeu tenait en champs
  *  uniques, parce qu'il n'y avait qu'un corps. */
@@ -321,6 +323,14 @@ export class FluidSimMulti {
   private readonly rebondX = new Float32Array(JOUEURS_MAX)
   private readonly rebondY = new Float32Array(JOUEURS_MAX)
   private readonly rebondMasse = new Int32Array(JOUEURS_MAX)
+  private readonly rebondBiaisX = new Float64Array(JOUEURS_MAX)
+  private readonly rebondBiaisY = new Float64Array(JOUEURS_MAX)
+  /** Par corps : centre (x, y), moments (xx, yy, xy), somme des poids de
+   *  l'écrasement, et moments des vitesses (la vitesse de déformation) —
+   *  voir ECRASEMENT, TENSION_PEAU et AMORTI_PEAU. */
+  private readonly forme = new Float64Array(JOUEURS_MAX * FORME)
+  /** Par corps : combien de ses particules touchent de la matière étrangère. */
+  private readonly rebondTouche = new Int32Array(JOUEURS_MAX)
   /** Y a-t-il une cloison quelque part ? Faux à un joueur : le solveur du
    *  jeu n'a pas de cloisons, et la parité au bit près en dépend. */
   private cloisons = false
@@ -365,6 +375,55 @@ export class FluidSimMulti {
    *  (restitution −0,1), et à 0,5 un jet d'une seconde déchirait le corps
    *  fermé qu'il visait (447 particules sur 900 lui restaient). */
   static PART_PROPRE = 0
+
+  // L'ÉCRASEMENT. Rendu à parts égales, le ressort faisait reculer le corps
+  // comme un bloc : deux corps fermés se renvoyaient sans changer de forme —
+  // « on dirait de la glace, ce n'est pas du tout réaliste » (le concepteur,
+  // 20/11, deuxième essai). Une goutte qui en heurte une autre S'ÉCRASE : sa
+  // face de contact s'arrête la première, l'arrière continue sur sa lancée.
+  // Le ressort est donc réparti de biais — davantage aux particules du côté
+  // du contact, moins à celles de l'arrière : la somme reste la même (le
+  // corps recule autant), mais il s'aplatit contre l'obstacle.
+  /** La pente de ce biais : le poids d'une particule va de 0 à 2 et passe
+   *  par 1 au centre du corps. À 0, c'est le bloc rigide d'avant. À 3, le
+   *  tiers du corps tourné vers le contact reçoit double, le tiers opposé
+   *  ne reçoit rien. Mesuré, corps de 900 lancé sur un autre au repos
+   *  (largeur sur hauteur au plus fort de l'écrasement, puis revenu à 1,00
+   *  en deux secondes) : 0,90 à 80 u/s, 0,83 à 160, 0,71 à 320. */
+  static ECRASEMENT = 3
+  // LA PEAU TENDUE. Écrasé, le corps doit revenir : l'eau du jeu ne se
+  // reforme pas seule, elle resterait en galette. Un corps FERMÉ est tendu
+  // par sa peau — un rappel vers la forme ronde, proportionnel à
+  // l'allongement, qui resserre le grand axe et regonfle le petit. Il ne
+  // change ni le volume, ni la quantité de mouvement, ni la rotation ; il
+  // fait trembler le corps après le choc, comme une goutte.
+  /** La raideur de ce rappel, en s⁻² (l'accélération d'une particule par
+   *  unité de distance au centre, pour un allongement de 100 %). */
+  static TENSION_PEAU = 12
+  /** Le rappel du BORD, en s⁻² : ce qui dépasse du rond que le corps
+   *  remplirait est ramené vers son centre. Le rappel d'allongement ne voit
+   *  qu'un ovale ; un corps qui vient de tirer garde une forme de boomerang
+   *  qui n'est allongée dans aucun sens (vu à l'écran, 20/11) — celui-ci la
+   *  résorbe. */
+  static RAPPEL_BORD = 12
+  /** Le rayon du rond qu'occupent n particules, en pas de particule par
+   *  racine de n (mesuré : 900 particules au repos font 103,4 u de rayon). */
+  static RAYON_ROND = 0.5222
+  /** L'allongement au-delà duquel le rappel ne grandit plus : un corps
+   *  étiré en ruban revient, il n'est pas rappelé d'un coup de fouet. */
+  static PLAFOND_PEAU = 0.6
+  /** Ce qui calme le tremblement, en s⁻¹ : la déformation qui va trop vite
+   *  est freinée. Sans lui le corps tremblait encore, d'autant, quatre
+   *  secondes après le choc ; à 2 il dépasse le rond une fois (1,05 à
+   *  160 u/s) et s'y pose. */
+  static AMORTI_PEAU = 2
+  /** La peau ne se tend pas sur un corps MÊLÉ à un autre. Deux corps fondus
+   *  dont l'un se referme sont encore l'un dans l'autre : tendu aussitôt, il
+   *  se ramassait en boule au milieu de l'autre et en était chassé comme un
+   *  pépin (mesuré : 500 u/s). La tension décroît donc avec la part du corps
+   *  au contact de matière étrangère, et s'annule à cette part-ci — au
+   *  contact simple, seule la couche du bord touche. */
+  static PEAU_MELEE = 0.15
 
   /** Pose les cloisons d'après l'état ouvert/fermé de chaque corps. */
   private poseCloisons(): void {
@@ -3078,10 +3137,12 @@ export class FluidSimMulti {
       const recuX = this.rebondX
       const recuY = this.rebondY
       const masse = this.rebondMasse
+      const touche = this.rebondTouche
       for (let j = 0; j < nbCorps; j++) {
         recuX[j] = 0
         recuY[j] = 0
         masse[j] = 0
+        touche[j] = 0
       }
       for (let i = 0; i < n; i++) {
         if (gaseous[i] === 1 || frozen[i] === 1) continue
@@ -3110,6 +3171,7 @@ export class FluidSimMulti {
         }
         if (fx === 0 && fy === 0) continue
         if (duCorps) {
+          touche[pi]++
           // une particule de corps ne recule pas seule : son corps recule —
           // sauf une petite part, qu'elle garde (voir PART_PROPRE)
           recuX[pi] += fx * partCorps
@@ -3121,16 +3183,134 @@ export class FluidSimMulti {
           velY[i] += fy
         }
       }
+      // la forme de chaque corps : son centre, puis ses moments
+      const forme = this.forme
+      forme.fill(0)
+      for (let i = 0; i < n; i++) {
+        const pi = proprio[i]
+        if (this.kind[i] !== KIND_PLAYER || pi >= nbCorps || gaseous[i] === 1 || frozen[i] === 1) continue
+        forme[pi * FORME] += prdX[i]
+        forme[pi * FORME + 1] += prdY[i]
+      }
+      const ecrasement = FluidSimMulti.ECRASEMENT
       for (let j = 0; j < nbCorps; j++) {
-        if (masse[j] === 0 || (recuX[j] === 0 && recuY[j] === 0)) continue
-        recuX[j] /= masse[j]
-        recuY[j] /= masse[j]
+        if (masse[j] === 0) continue
+        forme[j * FORME] /= masse[j]
+        forme[j * FORME + 1] /= masse[j]
+        // la direction du recul, et le rayon du corps : l'écrasement se
+        // mesure le long de l'une, à l'échelle de l'autre
+        const norme = Math.hypot(recuX[j], recuY[j])
+        const rayon = Math.max(this.corps[j].stats.rmsRadius * Math.SQRT2, h)
+        this.rebondBiaisX[j] = norme > 0 ? (-ecrasement * recuX[j]) / (norme * rayon) : 0
+        this.rebondBiaisY[j] = norme > 0 ? (-ecrasement * recuY[j]) / (norme * rayon) : 0
+        forme[j * FORME + 10] = FluidSimMulti.RAYON_ROND * p.particleSpacing * Math.sqrt(masse[j])
       }
       for (let i = 0; i < n; i++) {
         const pi = proprio[i]
         if (this.kind[i] !== KIND_PLAYER || pi >= nbCorps || gaseous[i] === 1 || frozen[i] === 1) continue
-        velX[i] += recuX[pi]
-        velY[i] += recuY[pi]
+        const k = pi * FORME
+        const dx = prdX[i] - forme[k]
+        const dy = prdY[i] - forme[k + 1]
+        forme[k + 2] += dx * dx
+        forme[k + 3] += dy * dy
+        forme[k + 4] += dx * dy
+        // le poids de l'écrasement : 1 au centre, plus du côté du contact
+        // (à l'opposé du recul), moins à l'arrière — jamais négatif
+        let w = 1 + dx * this.rebondBiaisX[pi] + dy * this.rebondBiaisY[pi]
+        if (w < 0) w = 0
+        else if (w > 2) w = 2
+        forme[k + 5] += w
+        // la vitesse de déformation (la vitesse d'ensemble n'y compte pas :
+        // les écarts au centre se compensent)
+        forme[k + 6] += velX[i] * dx - velY[i] * dy
+        forme[k + 7] += velX[i] * dy + velY[i] * dx
+        // ce qui dépasse du rond : la somme des rappels, pour en retirer la
+        // moyenne (le corps ne doit pas avancer de s'être arrondi)
+        const d2 = dx * dx + dy * dy
+        const rond = forme[k + 10]
+        if (d2 > rond * rond) {
+          const d = Math.sqrt(d2)
+          const depasse = (d - rond) / d
+          forme[k + 8] += dx * depasse
+          forme[k + 9] += dy * depasse
+        }
+      }
+      // la peau tendue : par corps FERMÉ, la matrice du rappel vers le rond
+      const tension = FluidSimMulti.TENSION_PEAU * dt
+      const plafondPeau = FluidSimMulti.PLAFOND_PEAU
+      const amorti = FluidSimMulti.AMORTI_PEAU * dt
+      const bord = FluidSimMulti.RAPPEL_BORD * dt
+      const melee = FluidSimMulti.PEAU_MELEE
+      for (let j = 0; j < nbCorps; j++) {
+        const k = j * FORME
+        const c = this.corps[j]
+        const moyen = (forme[k + 2] + forme[k + 3]) / 2
+        if (masse[j] < 12 || c.ouvert || c.dispersed || moyen <= 0) {
+          forme[k + 2] = 0
+          forme[k + 3] = 0
+          forme[k + 4] = 0
+          forme[k + 11] = 0
+          continue
+        }
+        // l'allongement : (moments / moment moyen) − identité. Sa trace est
+        // nulle — ce qu'un axe perd, l'autre le gagne : le volume est gardé.
+        let axx = forme[k + 2] / moyen - 1
+        let axy = forme[k + 4] / moyen
+        const ampleur = Math.hypot(axx, axy)
+        if (ampleur > plafondPeau) {
+          axx *= plafondPeau / ampleur
+          axy *= plafondPeau / ampleur
+        }
+        // mêlé à un autre, le corps n'est pas tendu (voir PEAU_MELEE)
+        let tendu = 1 - touche[j] / (melee * masse[j])
+        if (tendu < 0) tendu = 0
+        // le frein : la part de la vitesse qui DÉFORME (sans gonfler ni
+        // tourner), ramenée au moment moyen
+        const exx = forme[k + 6] / (2 * moyen)
+        const exy = forme[k + 7] / (2 * moyen)
+        const mxx = -tension * tendu * axx - amorti * exx
+        forme[k + 2] = mxx
+        forme[k + 3] = -mxx
+        forme[k + 4] = -tension * tendu * axy - amorti * exy
+        forme[k + 11] = -bord * tendu
+        forme[k + 8] /= masse[j]
+        forme[k + 9] /= masse[j]
+      }
+      for (let i = 0; i < n; i++) {
+        const pi = proprio[i]
+        if (this.kind[i] !== KIND_PLAYER || pi >= nbCorps || gaseous[i] === 1 || frozen[i] === 1) continue
+        const k = pi * FORME
+        const dx = prdX[i] - forme[k]
+        const dy = prdY[i] - forme[k + 1]
+        // le rappel de la peau
+        let ax = forme[k + 2] * dx + forme[k + 4] * dy
+        let ay = forme[k + 4] * dx + forme[k + 3] * dy
+        // le rappel du bord, moyenne retirée
+        const coef = forme[k + 11]
+        if (coef !== 0) {
+          const d2 = dx * dx + dy * dy
+          const rond = forme[k + 10]
+          let bx = -forme[k + 8]
+          let by = -forme[k + 9]
+          if (d2 > rond * rond) {
+            const depasse = 1 - rond / Math.sqrt(d2)
+            bx += dx * depasse
+            by += dy * depasse
+          }
+          ax += coef * bx
+          ay += coef * by
+        }
+        // le recul du corps, réparti de biais
+        if (forme[k + 5] > 0 && (recuX[pi] !== 0 || recuY[pi] !== 0)) {
+          let w = 1 + dx * this.rebondBiaisX[pi] + dy * this.rebondBiaisY[pi]
+          if (w < 0) w = 0
+          else if (w > 2) w = 2
+          w /= forme[k + 5]
+          ax += recuX[pi] * w
+          ay += recuY[pi] * w
+        }
+        velX[i] += ax
+        velY[i] += ay
       }
     }
 
