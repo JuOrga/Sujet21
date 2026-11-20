@@ -60,7 +60,7 @@ const POIDS_GOUTTE = 4
 export interface SceneHockey {
   /** La hauteur de l'ouverture des cages. */
   cage: number
-  palet: { x: number; y: number; rayon: number } | null
+  palet: { x: number; y: number; rayon: number; vx: number; vy: number } | null
   /** Le joueur qui tient le palet (−1 : personne), sa charge (0 à 1) et le
    *  point qu'il vise : le lancer partira vers là. */
   porteur: number
@@ -68,6 +68,17 @@ export interface SceneHockey {
   viseeX: number
   viseeY: number
 }
+
+/** Un ÉCLAT : l'onde qui part d'un choc. `age` en secondes, `force` de 0 à 1. */
+export interface Eclat {
+  x: number
+  y: number
+  age: number
+  force: number
+}
+/** Le nombre d'éclats dessinés à la fois, et leur durée (s). */
+export const ECLATS_MAX = 4
+export const DUREE_ECLAT = 0.45
 
 const VS_CHAMP = `#version 300 es
 layout(location = 0) in vec2 aPos;
@@ -125,6 +136,8 @@ uniform float uTemps;     // secondes, pour le souffle d'un corps ouvert
 uniform float uCage;      // hockey : la hauteur de l'ouverture des cages (0 : pas de cage)
 uniform vec4 uPalet;      // hockey : x, y, rayon, 1 s'il est en jeu
 uniform vec4 uPorteur;    // hockey : qui le tient (−1 : personne), sa charge, sa visée (x, y)
+uniform vec2 uPaletV;     // hockey : la vitesse du palet (sa traînée)
+uniform vec4 uEclats[4];  // les chocs en cours : x, y, âge (s), force (0 : aucun)
 out vec4 o;
 
 float grille(vec2 m, float pas) {
@@ -229,6 +242,18 @@ void main() {
     glace *= mix(1.0, 0.58, smoothstep(0.6, 1.0, rp));
     glace = mix(glace, vec3(0.2, 0.27, 0.33), smoothstep(0.74, 0.78, rp) * (1.0 - smoothstep(0.84, 0.88, rp)) * 0.7);
     glace += 0.22 * (1.0 - smoothstep(0.0, 0.45, length(dp / uPalet.z - vec2(-0.32, -0.36))));
+    // la traînée : libre et lancé, il laisse un sillage qui dit d'où il
+    // vient et à quelle allure — sans elle un palet rapide ne se suit pas
+    float allure = length(uPaletV);
+    if (uPorteur.x < -0.5 && allure > 140.0) {
+      vec2 u = uPaletV / allure;
+      float derriere = -dot(dp, u);
+      float longueur = min(300.0, allure * 0.18);
+      float effile = 1.0 - derriere / longueur;
+      float travers = abs(dp.x * u.y - dp.y * u.x);
+      float sillage = step(0.0, derriere) * step(derriere, longueur) * (1.0 - smoothstep(uPalet.z * effile * 0.55, uPalet.z * effile, travers));
+      image += vec3(0.55, 0.78, 0.95) * 0.3 * effile * sillage * (1.0 - disque);
+    }
     // une ombre portée, pour le détacher du fond comme de l'eau
     image *= 1.0 - 0.45 * (1.0 - smoothstep(1.0, 1.35, rp)) * (1.0 - disque);
     if (uPorteur.x > -0.5) {
@@ -253,6 +278,17 @@ void main() {
       }
     }
     image = mix(image, glace, disque);
+  }
+
+  // ---- les éclats : une onde claire qui part de chaque choc et s'efface
+  for (int k = 0; k < 4; k++) {
+    vec4 e = uEclats[k];
+    float t = e.z / 0.45;
+    if (e.w <= 0.0 || t >= 1.0) continue;
+    float rayonOnde = 28.0 + 240.0 * t * (0.45 + 0.55 * e.w);
+    float ecartOnde = abs(length(monde - e.xy) - rayonOnde);
+    float onde = 1.0 - smoothstep(0.0, 4.0 + 12.0 * (1.0 - t) + uPixel, ecartOnde);
+    image += onde * (1.0 - t) * (1.0 - t) * (0.35 + 0.65 * e.w) * vec3(0.72, 0.88, 1.0) * 0.6;
   }
 
   o = vec4(image, 1.0);
@@ -292,6 +328,7 @@ export class RenduMulti {
   private readonly cible: WebGLFramebuffer
   private readonly texture: WebGLTexture
   private donnees: Float32Array
+  private readonly eclats = new Float32Array(ECLATS_MAX * 4)
   private largeur = 0
   private hauteur = 0
   /** Le champ tient-il en demi-flottants ? Sinon huit bits, et le gain
@@ -363,7 +400,7 @@ export class RenduMulti {
   }
 
   /** `ouverts[j]` : le joueur j est-il ouvert ? `temps` en secondes. */
-  dessine(p: Particules, cadre: Cadre, salle: Bornes, ouverts: readonly boolean[] = [], temps = 0, scene: SceneHockey | null = null): void {
+  dessine(p: Particules, cadre: Cadre, salle: Bornes, ouverts: readonly boolean[] = [], temps = 0, scene: SceneHockey | null = null, eclats: readonly Eclat[] = []): void {
     const gl = this.gl
     this.accorde()
     const n = Math.min(p.n, this.donnees.length / 3)
@@ -414,6 +451,16 @@ export class RenduMulti {
     const palet = scene?.palet ?? null
     gl.uniform1f(gl.getUniformLocation(this.progEcran, 'uCage'), scene ? scene.cage : 0)
     gl.uniform4f(gl.getUniformLocation(this.progEcran, 'uPalet'), palet?.x ?? 0, palet?.y ?? 0, palet?.rayon ?? 1, palet ? 1 : 0)
+    gl.uniform2f(gl.getUniformLocation(this.progEcran, 'uPaletV'), palet?.vx ?? 0, palet?.vy ?? 0)
+    const e = this.eclats
+    e.fill(0)
+    for (let k = 0; k < Math.min(ECLATS_MAX, eclats.length); k++) {
+      e[k * 4] = eclats[k].x
+      e[k * 4 + 1] = eclats[k].y
+      e[k * 4 + 2] = eclats[k].age
+      e[k * 4 + 3] = eclats[k].force
+    }
+    gl.uniform4fv(gl.getUniformLocation(this.progEcran, 'uEclats'), e)
     gl.uniform4f(gl.getUniformLocation(this.progEcran, 'uPorteur'), scene?.porteur ?? -1, scene?.charge ?? 0, scene?.viseeX ?? 0, scene?.viseeY ?? 0)
     gl.bindVertexArray(this.vaoVide)
     gl.drawArrays(gl.TRIANGLES, 0, 3)

@@ -18,7 +18,7 @@
 // à se retourner : c'est le temps que l'adversaire a pour venir bousculer.
 
 import { KIND_PLAYER, type FluidSimMulti } from './solveurMulti'
-import { PHASE_BUT, PHASE_FINI, PHASE_JEU, type Bornes, type Commande, type JeuTrame } from './trame'
+import { PHASE_BUT, PHASE_DECOMPTE, PHASE_FINI, PHASE_JEU, type Bornes, type Commande, type JeuTrame } from './trame'
 
 /** LE TERRAIN : plus petit que la salle libre (3840 × 2160). Se déplacer
  *  coûte de la matière ; sur un terrain trop long on arrive devant la cage
@@ -62,8 +62,30 @@ const DELAI_RETOUR = 0.5
  *  ce repos, rester ouvert suffirait à le garder indéfiniment, par tranches
  *  de trois secondes. */
 const REPOS_ECHAPPE = 1.5
-/** La pause après un but, avant la remise en jeu. */
-const PAUSE_BUT = 2
+/** La pause après un but, avant que chacun retourne à sa place. */
+const PAUSE_BUT = 1.2
+/** LE DÉCOMPTE de l'engagement : « 3, 2, 1 », sept dixièmes chacun. Pendant
+ *  ce temps personne ne pousse, et le palet attend. */
+export const DECOMPTE = 2.1
+/** La durée d'un match. À la fin, le meilleur score gagne ; à égalité, le
+ *  prochain but (le « but en or »). */
+export const DUREE_MATCH = 180
+/** Après un but, le palet est rendu à celui qui vient d'ENCAISSER : posé de
+ *  son côté, à cette distance du centre. Au premier engagement, au centre. */
+const DECALAGE_ENGAGEMENT = 380
+/** LE VOL. Un corps FERMÉ qui percute le porteur lui fait lâcher le palet,
+ *  s'il arrive assez vite (u/s, vitesse de rapprochement des deux cœurs).
+ *  Sans cela il n'y avait rien à faire contre le porteur, qu'attendre. Une
+ *  poussée soutenue y arrive ; un dash, à coup sûr. */
+const VITESSE_VOL = 130
+/** Les deux corps se touchent quand leurs cœurs sont à moins que la somme de
+ *  leurs rayons, plus cette marge (u). */
+const MARGE_VOL = 18
+/** La vitesse à laquelle le palet volé s'échappe, à l'opposé de celui qui a
+ *  frappé (u/s). */
+const SORTIE_VOL = 380
+/** Le rayon du rond qu'occupent n particules (solveurMulti.ts, RAYON_ROND). */
+const rayonCorps = (n: number): number => 0.5222 * 6.6 * Math.sqrt(Math.max(0, n))
 /** Le premier à ce score gagne. */
 export const BUTS_POUR_GAGNER = 5
 
@@ -85,8 +107,20 @@ export class Hockey {
    *  combien de temps encore. */
   private auRepos = -1
   private repos = 0
+  /** Le temps de jeu qui reste (s), ce qui reste du décompte, et si l'on
+   *  joue le but en or. */
+  chrono = DUREE_MATCH
+  decompte = 0
+  enOr = false
+  /** À qui rendre le palet au prochain engagement (−1 : au centre). */
+  private pour = -1
 
-  /** Pose le palet au centre, immobile : l'engagement. */
+  /** Pendant le décompte, personne ne pousse. */
+  get gele(): boolean {
+    return this.phase === PHASE_DECOMPTE
+  }
+
+  /** L'engagement : le palet posé, immobile, et le décompte qui part. */
   engage(sim: FluidSimMulti): void {
     const p = sim.palet
     // la matière tirée revient à son corps d'où qu'elle soit : au hockey on
@@ -97,10 +131,11 @@ export class Hockey {
     // 720 u (mesuré : il donne au palet la même vitesse, 77 u/s, que le
     // délai soit entier ou réduit).
     sim.reabsorbFactor = DELAI_RETOUR
-    p.actif = true
+    // posé, mais pas encore en jeu : il le sera à la fin du décompte
+    p.actif = false
     p.rayon = RAYON_PALET
     p.masse = MASSE_PALET
-    p.x = (TERRAIN.minX + TERRAIN.maxX) / 2
+    p.x = (TERRAIN.minX + TERRAIN.maxX) / 2 + (this.pour < 0 ? 0 : this.pour === 0 ? -DECALAGE_ENGAGEMENT : DECALAGE_ENGAGEMENT)
     p.y = (TERRAIN.minY + TERRAIN.maxY) / 2
     p.vx = 0
     p.vy = 0
@@ -112,7 +147,8 @@ export class Hockey {
     this.sortDe = -1
     this.auRepos = -1
     this.repos = 0
-    this.phase = PHASE_JEU
+    this.phase = PHASE_DECOMPTE
+    this.decompte = DECOMPTE
   }
 
   /** Un match neuf. */
@@ -120,6 +156,9 @@ export class Hockey {
     this.scores[0] = 0
     this.scores[1] = 0
     this.buteur = -1
+    this.chrono = DUREE_MATCH
+    this.enOr = false
+    this.pour = -1
     this.engage(sim)
   }
 
@@ -146,6 +185,31 @@ export class Hockey {
       if (this.pause > 0) return null
       return 'engagement'
     }
+    if (this.phase === PHASE_DECOMPTE) {
+      this.decompte -= dt
+      if (this.decompte > 0) return null
+      this.decompte = 0
+      this.phase = PHASE_JEU
+      p.actif = true
+      return null
+    }
+    // le temps de jeu : il ne court que quand on joue
+    if (!this.enOr) {
+      this.chrono -= dt
+      if (this.chrono <= 0) {
+        this.chrono = 0
+        if (this.scores[0] === this.scores[1]) {
+          this.enOr = true
+        } else {
+          // au temps : le meilleur score gagne
+          this.buteur = this.scores[0] > this.scores[1] ? 0 : 1
+          this.phase = PHASE_FINI
+          p.actif = false
+          this.tenuPar = -1
+          return 'fini'
+        }
+      }
+    }
 
     if (this.repos > 0) this.repos -= dt
     if (this.tenuPar >= 0) {
@@ -153,7 +217,10 @@ export class Hockey {
       const c = sim.corps[j]
       this.tenuDepuis += dt
       const lache = !c.ouvert || c.dispersed || c.playerCount < 12
-      if (lache || this.tenuDepuis >= TENUE_MAX) {
+      const voleur = lache ? -1 : this.voleur(sim, j)
+      if (voleur >= 0) {
+        this.vole(sim, j, voleur)
+      } else if (lache || this.tenuDepuis >= TENUE_MAX) {
         this.lance(sim, j, commandes[j], !lache || c.dispersed)
       } else {
         // porté : il suit le cœur du corps
@@ -199,6 +266,47 @@ export class Hockey {
     if (preneur >= 0) this.prend(sim, preneur)
 
     return this.parois(p)
+  }
+
+  /** Qui fait lâcher le palet au porteur j : un corps FERMÉ au contact, qui
+   *  arrive assez vite. −1 si personne. */
+  private voleur(sim: FluidSimMulti, j: number): number {
+    const c = sim.corps[j]
+    for (let k = 0; k < sim.corps.length; k++) {
+      if (k === j) continue
+      const a = sim.corps[k]
+      if (a.ouvert || a.dispersed || a.playerCount < 12) continue
+      const dx = c.stats.centroidX - a.stats.centroidX
+      const dy = c.stats.centroidY - a.stats.centroidY
+      const d = Math.hypot(dx, dy)
+      if (d < 1 || d > rayonCorps(c.playerCount) + rayonCorps(a.playerCount) + MARGE_VOL) continue
+      // la vitesse à laquelle les deux se rapprochent, et la part qu'y prend
+      // le corps k : c'est LUI qui doit foncer. Vu à l'essai avec la seule
+      // vitesse de rapprochement — le porteur qui venait buter sur un
+      // adversaire immobile se faisait « voler » le palet par lui.
+      const approche = ((a.stats.velX - c.stats.velX) * dx + (a.stats.velY - c.stats.velY) * dy) / d
+      const elan = (a.stats.velX * dx + a.stats.velY * dy) / d
+      if (approche > VITESSE_VOL && elan > approche / 2) return k
+    }
+    return -1
+  }
+
+  /** Le palet est arraché au porteur j par le choc du corps k : il file à
+   *  l'opposé de celui qui a frappé, et le porteur ne le reprend pas aussitôt. */
+  private vole(sim: FluidSimMulti, j: number, k: number): void {
+    const p = sim.palet
+    const c = sim.corps[j]
+    const a = sim.corps[k]
+    const dx = c.stats.centroidX - a.stats.centroidX
+    const dy = c.stats.centroidY - a.stats.centroidY
+    const d = Math.hypot(dx, dy) || 1
+    p.vx = c.stats.velX + (dx / d) * SORTIE_VOL
+    p.vy = c.stats.velY + (dy / d) * SORTIE_VOL
+    this.tenuPar = -1
+    this.tenuDepuis = 0
+    this.sortDe = j
+    this.auRepos = j
+    this.repos = REPOS_ECHAPPE
   }
 
   /** Le corps j prend le palet : il en encaisse l'élan (c'est l'amorti). */
@@ -293,7 +401,9 @@ export class Hockey {
     p.vy = 0
     this.tenuPar = -1
     this.sortDe = -1
-    if (this.scores[buteur] >= BUTS_POUR_GAGNER) {
+    // le palet sera rendu à celui qui encaisse
+    this.pour = 1 - buteur
+    if (this.enOr || this.scores[buteur] >= BUTS_POUR_GAGNER) {
       this.phase = PHASE_FINI
       return 'fini'
     }
@@ -306,7 +416,8 @@ export class Hockey {
   etat(sim: FluidSimMulti): JeuTrame {
     const p = sim.palet
     return {
-      paletActif: p.actif,
+      // pendant le décompte il est posé, donc visible, sans être en jeu
+      paletActif: p.actif || this.phase === PHASE_DECOMPTE,
       paletX: p.x,
       paletY: p.y,
       paletVx: p.vx,
@@ -316,6 +427,9 @@ export class Hockey {
       scores: [this.scores[0], this.scores[1]],
       phase: this.phase,
       buteur: this.buteur,
+      chrono: this.chrono,
+      decompte: this.phase === PHASE_DECOMPTE ? this.decompte : 0,
+      enOr: this.enOr,
     }
   }
 }

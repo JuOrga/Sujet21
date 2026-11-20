@@ -198,6 +198,15 @@ bouton **MULTI** sur l'accueil (`?dev`). Tout vit dans [`src/multi/`](src/multi/
   buts gagne. La règle est dans `hockey.ts` ; le solveur n'en connaît que
   le contact du palet avec l'eau. Au hockey la matière tirée revient à son
   corps d'où qu'elle soit — on y pousse sans cesse.
+  Un match dure trois minutes (le meilleur score gagne, et à égalité le
+  prochain but) ; chaque engagement commence par un décompte, et après un
+  but le palet est rendu à celui qui l'a encaissé. Un corps FERMÉ qui
+  percute le porteur lui ARRACHE le palet — s'il arrive assez vite, et
+  c'est lui qui doit foncer.
+- **Le DASH** (Maj, le bouton à l'écran, B ou RB à la manette) : une brusque
+  accélération dans le sens où une poussée enverrait le corps, rechargée
+  en un peu plus de deux secondes. Il vaut dans les deux modes ; au hockey
+  il sert à prendre le palet au porteur.
 - **La manette** (`manetteMulti.ts`) : le stick gauche dit où l'on VA (le
   jet part à l'opposé, et le palet part du côté du stick), A ou RT pousse,
   LT ou LB ouvre tant qu'on tient, Start recommence. Un réticule montre la
@@ -215,8 +224,9 @@ bouton **MULTI** sur l'accueil (`?dev`). Tout vit dans [`src/multi/`](src/multi/
   « détail pour le dépannage » (le relais joint, les instances vues, les
   coupures). C'est lui qu'il faut photographier.
 - **Ce qui manque** : les salles, tout état autre que l'eau, et les
-  graphismes du jeu — le multi a son rendu. Au hockey : un vrai contact du
-  palet avec les poteaux, et de quoi voler le palet à qui le porte.
+  graphismes du jeu — le multi a son rendu. Au hockey : une cage posée
+  DANS le terrain, qu'on puisse contourner, et un vrai contact du palet
+  avec ses poteaux.
 - **Le débit** : une image pèse 10,9 Ko (1 800 particules à six octets),
   vingt par seconde — 212 Ko/s mesurés à travers le relais en ligne, soit
   1,7 Mbit/s en envoi chez l'hôte, que le relais reçoit puis renvoie. Si la

@@ -1,12 +1,21 @@
 import { describe, expect, it } from 'vitest'
 import { DEFAULT_PARAMS } from '../sim/params'
-import { BUTS_POUR_GAGNER, CAGE, CHARGE_PLEINE, Hockey, RAYON_PALET, TENUE_MAX, TERRAIN } from './hockey'
+import { BUTS_POUR_GAGNER, CAGE, CHARGE_PLEINE, DECOMPTE, DUREE_MATCH, Hockey, RAYON_PALET, TENUE_MAX, TERRAIN } from './hockey'
 import { Hote, Miroir, SALLE } from './partie'
 import { FluidSimMulti, KIND_PLAYER } from './solveurMulti'
-import { MODE_HOCKEY, MODE_LIBRE, PHASE_BUT, PHASE_FINI, PHASE_JEU, encodeEtat, litEnteteEtat, modeTrame, particulesVides, type Commande, type JeuTrame } from './trame'
+import { MODE_HOCKEY, MODE_LIBRE, PHASE_BUT, PHASE_DECOMPTE, PHASE_FINI, PHASE_JEU, encodeEtat, litEnteteEtat, modeTrame, particulesVides, type Commande, type JeuTrame } from './trame'
 
 const pas = (h: Hote, n: number): void => {
   for (let s = 0; s < n; s++) h.avance(h.params.dt, 1e9)
+}
+/** Une partie de hockey dont le décompte de l'engagement est passé : les
+ *  corps ont eu une demi-seconde pour se poser, le palet est en jeu. */
+const enJeu = (): Hote => {
+  const h = new Hote(2, undefined, MODE_HOCKEY)
+  pas(h, 60)
+  h.hockey!.decompte = 0
+  pas(h, 1)
+  return h
 }
 const MILIEU_X = (TERRAIN.minX + TERRAIN.maxX) / 2
 const MILIEU_Y = (TERRAIN.minY + TERRAIN.maxY) / 2
@@ -34,17 +43,31 @@ const aplati = (sim: FluidSimMulti, j: number): number => {
 }
 
 describe('hockey — le palet et l’eau', () => {
-  it('à l’engagement : le palet au centre, immobile, chacun dans son camp', () => {
+  it('à l’engagement : le palet posé au centre, chacun dans son camp, et un DÉCOMPTE avant de jouer', () => {
     const h = new Hote(2, undefined, MODE_HOCKEY)
-    pas(h, 120)
     const p = h.sim.palet
+    // pendant le décompte : le palet est posé (on le voit) mais pas en jeu,
+    // et pousser ne fait pas bouger
+    h.commande(0, { pousse: true, ouvert: false, x: 0, y: MILIEU_Y })
+    pas(h, 120)
+    expect(h.jeu()).toMatchObject({ scores: [0, 0], phase: PHASE_DECOMPTE, tenuPar: -1, paletActif: true })
+    expect(h.jeu()!.decompte).toBeCloseTo(DECOMPTE - 1, 1)
+    expect(p.actif).toBe(false)
+    expect(h.sim.corps[0].playerCount).toBe(900)
+    expect(Math.abs(h.sim.corps[0].stats.velX)).toBeLessThan(5)
+    expect(h.jeu()!.chrono).toBe(DUREE_MATCH)
+    // le décompte fini : on joue, le chrono court
+    h.commande(0, { pousse: false, ouvert: false, x: 0, y: MILIEU_Y })
+    pas(h, Math.ceil((DECOMPTE - 1) * 120) + 2)
+    expect(h.jeu()!.phase).toBe(PHASE_JEU)
     expect(p.actif).toBe(true)
     expect(p.x).toBeCloseTo(MILIEU_X, 3)
     expect(p.y).toBeCloseTo(MILIEU_Y, 3)
     expect(Math.hypot(p.vx, p.vy)).toBeLessThan(1)
     expect(h.sim.corps[0].stats.centroidX).toBeLessThan(MILIEU_X - 500)
     expect(h.sim.corps[1].stats.centroidX).toBeGreaterThan(MILIEU_X + 500)
-    expect(h.jeu()).toMatchObject({ scores: [0, 0], phase: PHASE_JEU, tenuPar: -1 })
+    pas(h, 60)
+    expect(h.jeu()!.chrono).toBeLessThan(DUREE_MATCH - 0.4)
   })
 
   it('en partie libre, il n’y a ni palet ni retour de loin', () => {
@@ -58,9 +81,8 @@ describe('hockey — le palet et l’eau', () => {
   it('un corps FERMÉ amortit le palet : il s’écrase, le renvoie, et rien n’y entre', () => {
     // la demande : « si on n'ouvre pas le volume, le palet rebondit dessus —
     // pas comme un glaçon, il y a un amorti, une déformation du liquide »
-    const h = new Hote(2, undefined, MODE_HOCKEY)
+    const h = enJeu()
     const p = h.sim.palet
-    pas(h, 60)
     p.vx = 800
     let ecrase = 1
     let auCoeur = 0
@@ -89,8 +111,7 @@ describe('hockey — le palet et l’eau', () => {
   })
 
   it('le jet POUSSE le palet', () => {
-    const h = new Hote(2, undefined, MODE_HOCKEY)
-    pas(h, 60)
+    const h = enJeu()
     h.commande(0, { pousse: true, ouvert: false, x: MILIEU_X, y: MILIEU_Y })
     pas(h, 120)
     h.commande(0, { pousse: false, ouvert: false, x: MILIEU_X, y: MILIEU_Y })
@@ -104,7 +125,12 @@ describe('hockey — le palet et l’eau', () => {
     const mesure = (mode: number): { pendant: number; vitesse: number; apres: number } => {
       const h = new Hote(2, undefined, mode)
       pas(h, 60)
-      if (h.hockey) h.sim.palet.y = 200 // le palet hors du chemin
+      if (h.hockey) {
+        // le décompte passé, et le palet hors du chemin
+        h.hockey.decompte = 0
+        pas(h, 1)
+        h.sim.palet.y = 200
+      }
       // on pousse quatre secondes en biais…
       h.commande(0, { pousse: true, ouvert: false, x: 0, y: h.salle.maxY / 2 + 500 })
       pas(h, 480)
@@ -134,8 +160,7 @@ describe('hockey — le palet et l’eau', () => {
 describe('hockey — avaler, porter, lancer', () => {
   /** Le joueur 1 s'ouvre, le palet lui arrive dessus : il le tient. */
   const prise = (): Hote => {
-    const h = new Hote(2, undefined, MODE_HOCKEY)
-    pas(h, 60)
+    const h = enJeu()
     h.commande(1, { pousse: false, ouvert: true, x: 0, y: MILIEU_Y })
     h.sim.palet.vx = 600
     for (let s = 0; s < 360 && h.hockey!.tenuPar !== 1; s++) pas(h, 1)
@@ -157,8 +182,7 @@ describe('hockey — avaler, porter, lancer', () => {
   it('il suffit de le TOUCHER, ouvert, pour l’absorber : frôlé au bord, il est pris et aspiré au cœur', () => {
     // la première règle voulait le palet à moitié recouvert : frôlé, il
     // traversait le corps ouvert sans être pris
-    const h = new Hote(2, undefined, MODE_HOCKEY)
-    pas(h, 60)
+    const h = enJeu()
     const c = h.sim.corps[1]
     h.commande(1, { pousse: false, ouvert: true, x: 0, y: MILIEU_Y })
     // le palet passe AU BORD du corps : son centre à 135 u au-dessus du cœur
@@ -180,8 +204,7 @@ describe('hockey — avaler, porter, lancer', () => {
   })
 
   it('FERMÉ, le toucher ne l’absorbe pas', () => {
-    const h = new Hote(2, undefined, MODE_HOCKEY)
-    pas(h, 60)
+    const h = enJeu()
     const p = h.sim.palet
     p.y = MILIEU_Y - 135
     p.vx = 500
@@ -237,6 +260,156 @@ describe('hockey — avaler, porter, lancer', () => {
   })
 })
 
+describe('hockey — voler le palet, dasher', () => {
+  /** Le joueur 1, ouvert, tient le palet ; le joueur 0 est amené tout près,
+   *  fermé, à gauche de lui. */
+  const faceAFace = (): Hote => {
+    const h = enJeu()
+    h.commande(1, { pousse: false, ouvert: true, x: TERRAIN.maxX, y: MILIEU_Y })
+    h.sim.palet.vx = 600
+    for (let s = 0; s < 360 && h.hockey!.tenuPar !== 1; s++) pas(h, 1)
+    pas(h, 30)
+    // on rapproche le corps 0 : ses particules, d'un bloc
+    const s = h.sim
+    const ecart = s.corps[1].stats.centroidX - s.corps[0].stats.centroidX - 300
+    for (let i = 0; i < s.count; i++) if (s.proprio[i] === 0) s.posX[i] += ecart
+    pas(h, 2)
+    return h
+  }
+  /** Donne une vitesse à tout le corps j. */
+  const lance = (h: Hote, j: number, vx: number): void => {
+    const s = h.sim
+    for (let i = 0; i < s.count; i++) if (s.kind[i] === KIND_PLAYER && s.proprio[i] === j) s.velX[i] += vx
+  }
+
+  it('un corps FERMÉ qui percute le porteur lui fait lâcher le palet', () => {
+    // avant, il n'y avait rien à faire contre le porteur, qu'attendre
+    const h = faceAFace()
+    expect(h.hockey!.tenuPar).toBe(1)
+    lance(h, 0, 300)
+    let lache = -1
+    for (let s = 0; s < 240 && lache < 0; s++) {
+      pas(h, 1)
+      if (h.hockey!.tenuPar < 0) lache = s
+    }
+    expect(lache).toBeGreaterThanOrEqual(0)
+    // le palet file à l'opposé de celui qui a frappé (vers la droite)
+    expect(h.sim.palet.vx).toBeGreaterThan(250)
+    // et le porteur, toujours ouvert, ne le reprend pas aussitôt
+    pas(h, 20)
+    expect(h.sim.corps[1].ouvert).toBe(true)
+    expect(h.hockey!.tenuPar).toBe(-1)
+  })
+
+  it('le porteur qui vient lui-même buter sur un corps fermé IMMOBILE garde le palet', () => {
+    // vu à l'essai : avec la seule vitesse de rapprochement, c'est le
+    // défenseur immobile qui « volait » le palet
+    const h = faceAFace()
+    lance(h, 1, -300)
+    for (let s = 0; s < 200; s++) {
+      pas(h, 1)
+      if (h.hockey!.tenuDepuis > 2.6) break
+      expect(h.hockey!.tenuPar).toBe(1)
+    }
+  })
+
+  it('venir le toucher doucement ne suffit pas', () => {
+    const h = faceAFace()
+    lance(h, 0, 60)
+    for (let s = 0; s < 300; s++) {
+      pas(h, 1)
+      expect(h.hockey!.tenuPar).toBe(1)
+      if (h.hockey!.tenuDepuis > 2.6) break
+    }
+  })
+
+  it('un corps OUVERT ne vole rien, même lancé fort', () => {
+    const h = faceAFace()
+    h.commande(0, { pousse: false, ouvert: true, x: 0, y: MILIEU_Y })
+    pas(h, 1)
+    lance(h, 0, 300)
+    for (let s = 0; s < 120; s++) {
+      pas(h, 1)
+      if (h.hockey!.tenuDepuis > 2.6) break
+      expect(h.hockey!.tenuPar).toBe(1)
+    }
+  })
+
+  /** La vitesse moyenne du corps j, lue sur ses particules (les statistiques
+   *  du corps ne sont rafraîchies que de loin en loin). */
+  const vitesse = (h: Hote, j: number): { x: number; y: number } => {
+    const s = h.sim
+    let x = 0
+    let y = 0
+    let m = 0
+    for (let i = 0; i < s.count; i++) {
+      if (s.kind[i] !== KIND_PLAYER || s.proprio[i] !== j) continue
+      x += s.velX[i]
+      y += s.velY[i]
+      m++
+    }
+    return { x: x / m, y: y / m }
+  }
+
+  it('LE DASH : un appui, une brusque accélération à l’opposé du pointeur, puis une recharge', () => {
+    const h = enJeu()
+    const c = (): number => vitesse(h, 0).x
+    expect(h.corps()[0].dashPret).toBe(true)
+    // le pointeur à gauche : comme une poussée, le dash envoie à droite
+    h.commande(0, { pousse: false, ouvert: false, x: 0, y: MILIEU_Y, dash: true })
+    pas(h, 2)
+    expect(c()).toBeGreaterThan(350)
+    expect(h.corps()[0]).toMatchObject({ dashPret: false, dash: true })
+    // tenu, il ne repart pas ; relâché puis repressé trop tôt, non plus
+    const v1 = c()
+    pas(h, 30)
+    h.commande(0, { pousse: false, ouvert: false, x: 0, y: MILIEU_Y, dash: false })
+    pas(h, 2)
+    h.commande(0, { pousse: false, ouvert: false, x: 0, y: MILIEU_Y, dash: true })
+    pas(h, 2)
+    expect(c()).toBeLessThanOrEqual(v1 + 1)
+    expect(h.corps()[0].dash).toBe(false)
+    // rechargé (2,2 s), un nouvel appui le relance
+    h.commande(0, { pousse: false, ouvert: false, x: 0, y: MILIEU_Y, dash: false })
+    pas(h, 270)
+    expect(h.corps()[0].dashPret).toBe(true)
+    const v2 = c()
+    h.commande(0, { pousse: false, ouvert: false, x: 0, y: MILIEU_Y, dash: true })
+    pas(h, 2)
+    expect(c()).toBeGreaterThan(v2 + 350)
+    expect(h.sim.corps[0].playerCount).toBe(900)
+  })
+
+  it('à la manette, le dash va du côté du stick', () => {
+    const h = enJeu()
+    const s = h.sim.corps[0].stats
+    h.commande(0, { pousse: false, ouvert: false, x: s.centroidX, y: s.centroidY - 300, aller: true, dash: true })
+    pas(h, 2)
+    expect(vitesse(h, 0).y).toBeLessThan(-350)
+  })
+
+  it('pendant le décompte de l’engagement, on ne dashe pas', () => {
+    const h = new Hote(2, undefined, MODE_HOCKEY)
+    pas(h, 30)
+    h.commande(0, { pousse: false, ouvert: false, x: 0, y: MILIEU_Y, dash: true })
+    pas(h, 5)
+    expect(Math.abs(vitesse(h, 0).x)).toBeLessThan(10)
+    expect(h.corps()[0].dashPret).toBe(true)
+  })
+
+  it('un dash sur le porteur lui prend le palet', () => {
+    const h = faceAFace()
+    // le pointeur à gauche du corps 0 : il dashe vers la droite, sur le porteur
+    h.commande(0, { pousse: false, ouvert: false, x: 0, y: MILIEU_Y, dash: true })
+    let lache = false
+    for (let s = 0; s < 120 && !lache; s++) {
+      pas(h, 1)
+      lache = h.hockey!.tenuPar < 0
+    }
+    expect(lache).toBe(true)
+  })
+})
+
 describe('hockey — les parois, les cages, le score', () => {
   /** Un terrain léger pour la règle seule : deux petits corps loin du palet. */
   const petit = (): { sim: FluidSimMulti; jeu: Hockey; commandes: Commande[]; avance: (n: number) => string[] } => {
@@ -249,6 +422,9 @@ describe('hockey — les parois, les cages, le score', () => {
     sim.relabel()
     const jeu = new Hockey()
     jeu.engage(sim)
+    // la règle seule : le décompte est passé, on joue
+    jeu.decompte = 0
+    jeu.apres(sim, [], sim.params.dt)
     const commandes: Commande[] = [
       { pousse: false, ouvert: false, x: 0, y: 0 },
       { pousse: false, ouvert: false, x: 0, y: 0 },
@@ -259,6 +435,7 @@ describe('hockey — les parois, les cages, le score', () => {
         jeu.avant(sim)
         sim.step(sim.params.dt)
         const e = jeu.apres(sim, commandes, sim.params.dt)
+        // (comme l'hôte : l'engagement repose le palet et lance le décompte)
         if (e === 'engagement') jeu.engage(sim)
         if (e) vus.push(e)
       }
@@ -313,11 +490,17 @@ describe('hockey — les parois, les cages, le score', () => {
     expect(jeu.phase).toBe(PHASE_BUT)
     expect(jeu.buteur).toBe(1)
     expect(p.actif).toBe(false)
-    // deux secondes plus tard, le palet est remis au centre
-    expect(avance(300)).toEqual(['engagement'])
+    // la pause, puis l'engagement : le palet est RENDU à celui qui a
+    // encaissé (le joueur 0, à gauche), et le décompte part
+    expect(avance(200)).toEqual(['engagement'])
+    expect(jeu.phase).toBe(PHASE_DECOMPTE)
+    expect(p.actif).toBe(false)
+    expect(p.x).toBeLessThan(MILIEU_X - 300)
+    expect(p.x).toBeGreaterThan(MILIEU_X - 500)
+    // le décompte fini, on rejoue
+    expect(avance(Math.ceil(DECOMPTE * 120) + 2)).toEqual([])
     expect(jeu.phase).toBe(PHASE_JEU)
     expect(p.actif).toBe(true)
-    expect(p.x).toBeCloseTo(MILIEU_X, 3)
     expect(Math.hypot(p.vx, p.vy)).toBeLessThan(1)
   })
 
@@ -336,23 +519,31 @@ describe('hockey — les parois, les cages, le score', () => {
       sim.palet.x = TERRAIN.maxX - 300
       sim.palet.y = MILIEU_Y
       sim.palet.vx = 900
-      vus.push(...avance(320))
+      // le but, la pause, l'engagement, le décompte : plus de trois secondes
+      vus.push(...avance(60))
+      if (jeu.phase !== PHASE_FINI) {
+        vus.push(...avance(200))
+        jeu.decompte = 0
+        avance(1)
+      }
     }
     expect(vus.filter((e) => e === 'but').length).toBe(BUTS_POUR_GAGNER - 1)
+    expect(vus.filter((e) => e === 'engagement').length).toBe(BUTS_POUR_GAGNER - 1)
     expect(vus[vus.length - 1]).toBe('fini')
     expect(jeu.scores).toEqual([BUTS_POUR_GAGNER, 0])
     expect(jeu.phase).toBe(PHASE_FINI)
     // fini : plus rien ne bouge au score
     expect(avance(300)).toEqual([])
+    // un match neuf : le score et le chrono repartent, et l'on engage
     jeu.recommence(sim)
     expect(jeu.scores).toEqual([0, 0])
-    expect(jeu.phase).toBe(PHASE_JEU)
-    expect(sim.palet.actif).toBe(true)
+    expect(jeu.chrono).toBe(DUREE_MATCH)
+    expect(jeu.phase).toBe(PHASE_DECOMPTE)
+    expect(sim.palet.x).toBeCloseTo(MILIEU_X, 3)
   })
 
-  it('après un but, l’hôte remet chacun à sa place', () => {
-    const h = new Hote(2, undefined, MODE_HOCKEY)
-    pas(h, 30)
+  it('après un but, l’hôte remet chacun à sa place et garde le score', () => {
+    const h = enJeu()
     h.commande(0, { pousse: true, ouvert: false, x: 0, y: 0 })
     pas(h, 120)
     h.commande(0, { pousse: false, ouvert: false, x: 0, y: 0 })
@@ -361,24 +552,68 @@ describe('hockey — les parois, les cages, le score', () => {
     h.sim.palet.vx = -900
     pas(h, 60)
     expect(h.jeu()!.scores).toEqual([0, 1])
-    pas(h, 300)
-    expect(h.jeu()!.phase).toBe(PHASE_JEU)
+    pas(h, 200)
+    expect(h.jeu()!.phase).toBe(PHASE_DECOMPTE)
     expect(h.sim.corps[0].playerCount).toBe(900)
     expect(h.sim.corps[0].stats.centroidX).toBeCloseTo(TERRAIN.maxX * 0.25, -1)
-    expect(h.sim.palet.x).toBeCloseTo(MILIEU_X, 3)
-    // le score, lui, est gardé
+    // le palet rendu au joueur 0, qui vient d'encaisser
+    expect(h.sim.palet.x).toBeLessThan(MILIEU_X - 300)
     expect(h.jeu()!.scores).toEqual([0, 1])
+  })
+
+  it('LE TEMPS : à la fin le meilleur score gagne', () => {
+    const { sim, jeu, avance } = petit()
+    sim.palet.x = TERRAIN.maxX - 300
+    sim.palet.vx = 900
+    avance(60)
+    expect(jeu.scores).toEqual([1, 0])
+    avance(200)
+    jeu.decompte = 0
+    avance(1)
+    jeu.chrono = 0.05
+    expect(avance(20)).toEqual(['fini'])
+    expect(jeu.phase).toBe(PHASE_FINI)
+    expect(jeu.buteur).toBe(0)
+  })
+
+  it('LE TEMPS : à égalité, le prochain but gagne', () => {
+    const { sim, jeu, avance } = petit()
+    jeu.chrono = 0.05
+    expect(avance(20)).toEqual([])
+    expect(jeu.enOr).toBe(true)
+    expect(jeu.phase).toBe(PHASE_JEU)
+    sim.palet.x = 300
+    sim.palet.vx = -900
+    expect(avance(60)).toEqual(['fini'])
+    expect(jeu.scores).toEqual([0, 1])
+    expect(jeu.buteur).toBe(1)
+  })
+
+  it('le chrono ne court ni pendant le décompte ni pendant la pause d’un but', () => {
+    const { sim, jeu, avance } = petit()
+    avance(120)
+    const t = jeu.chrono
+    expect(t).toBeCloseTo(DUREE_MATCH - 1, 1)
+    sim.palet.x = 300
+    sim.palet.vx = -900
+    avance(60)
+    expect(jeu.phase).toBe(PHASE_BUT)
+    const auBut = jeu.chrono
+    expect(auBut).toBeLessThan(t)
+    avance(300)
+    expect(jeu.phase).toBe(PHASE_DECOMPTE)
+    expect(jeu.chrono).toBe(auBut)
   })
 })
 
 describe('hockey — ce qui voyage', () => {
-  const JEU: JeuTrame = { paletActif: true, paletX: 1234.5, paletY: 678.25, paletVx: -910, paletVy: 42, tenuPar: 1, charge: 0.6, scores: [3, 4], phase: PHASE_BUT, buteur: 0 }
+  const JEU: JeuTrame = { paletActif: true, paletX: 1234.5, paletY: 678.25, paletVx: -910, paletVy: 42, tenuPar: 1, charge: 0.6, scores: [3, 4], phase: PHASE_BUT, buteur: 0, chrono: 123.4, decompte: 1.4, enOr: true }
 
   it('l’état du hockey fait l’aller-retour dans la trame', () => {
     const morceaux = encodeEtat(7, 1.5, TERRAIN, [], particulesVides(4), JEU)
     expect(modeTrame(morceaux[0])).toBe(MODE_HOCKEY)
     const e = litEnteteEtat(morceaux[0], TERRAIN)!
-    expect(e.jeu).toMatchObject({ ...JEU, charge: expect.closeTo(0.6, 2) })
+    expect(e.jeu).toMatchObject({ ...JEU, charge: expect.closeTo(0.6, 2), chrono: expect.closeTo(123.4, 3), decompte: expect.closeTo(1.4, 3) })
   })
 
   it('une partie libre n’en porte pas', () => {
@@ -392,6 +627,8 @@ describe('hockey — ce qui voyage', () => {
     const m = new Miroir()
     expect(m.salle).toBe(SALLE)
     pas(h, 10)
+    h.hockey!.decompte = 0
+    pas(h, 1)
     h.sim.palet.vx = 300
     pas(h, 1)
     for (const morceau of h.image()) m.recoit(morceau, 1000)

@@ -12,7 +12,7 @@
 //     qu'un joueur qui a coupé le son du jeu ne soit pas surpris ici.
 
 import { loadAudioPrefs } from '../game/audio'
-import { PHASE_FINI, PHASE_JEU, type Bornes, type CorpsTrame, type JeuTrame } from './trame'
+import { PHASE_DECOMPTE, PHASE_FINI, PHASE_JEU, type Bornes, type CorpsTrame, type JeuTrame } from './trame'
 
 /** Ce qu'on regarde du jeu, à un instant. */
 export interface Instantane {
@@ -25,17 +25,26 @@ export interface Instantane {
   rayonPalet: number
 }
 
-export type TypeSon = 'paroi' | 'choc-palet' | 'prise' | 'lancer' | 'but' | 'engagement' | 'fin' | 'ouvre' | 'ferme' | 'contact'
+export type TypeSon = 'paroi' | 'choc-palet' | 'prise' | 'lancer' | 'but' | 'engagement' | 'fin' | 'ouvre' | 'ferme' | 'contact' | 'dash' | 'tic'
 
 export interface Son {
   type: TypeSon
   /** De 0 à 1 : la violence du choc, la charge du lancer. */
   force: number
-  /** Où cela s'est passé, en unités monde (pour le placer à gauche ou à droite). */
+  /** Où cela s'est passé, en unités monde (pour le placer à gauche ou à
+   *  droite, et pour l'éclat qui l'accompagne à l'écran). */
   x: number
+  y: number
   /** Cela concerne-t-il le joueur de cette machine ? (un but marqué par lui,
    *  son corps qui s'ouvre) */
   mien: boolean
+}
+
+/** Le chiffre qu'affiche le décompte pour ce qu'il en reste : 3, 2, 1 (sept
+ *  dixièmes chacun). Borné à 3 : 2,1 / 0,7 donne 3,0000000000000004, et
+ *  l'arrondi au-dessus affichait un « 4 » à la première image. */
+export function chiffreDecompte(reste: number): number {
+  return Math.max(1, Math.min(3, Math.ceil(reste / 0.7 - 1e-6)))
 }
 
 /** Le rayon du rond qu'occupent n particules (solveurMulti.ts, RAYON_ROND,
@@ -54,13 +63,17 @@ export function entend(avant: Instantane | null, apres: Instantane, moi: number)
   if (!avant) return []
   const sons: Son[] = []
   const milieu = (apres.salle.minX + apres.salle.maxX) / 2
+  const milieuY = (apres.salle.minY + apres.salle.maxY) / 2
+  /** Le chiffre qu'affiche le décompte : 3, 2, 1 (sept dixièmes chacun). */
+  const chiffre = (j: JeuTrame): number => (j.phase === PHASE_DECOMPTE ? chiffreDecompte(j.decompte) : 0)
 
   // ---- les corps : s'ouvrir, se refermer, se heurter
   const n = Math.min(avant.corps.length, apres.corps.length)
   for (let j = 0; j < n; j++) {
     const a = avant.corps[j]
     const b = apres.corps[j]
-    if (a.ouvert !== b.ouvert) sons.push({ type: b.ouvert ? 'ouvre' : 'ferme', force: j === moi ? 1 : 0.4, x: b.x, mien: j === moi })
+    if (a.ouvert !== b.ouvert) sons.push({ type: b.ouvert ? 'ouvre' : 'ferme', force: j === moi ? 1 : 0.4, x: b.x, y: b.y, mien: j === moi })
+    if (b.dash && !a.dash) sons.push({ type: 'dash', force: j === moi ? 1 : 0.6, x: b.x, y: b.y, mien: j === moi })
   }
   if (n >= 2 && apres.t > avant.t) {
     const [a0, a1] = [avant.corps[0], avant.corps[1]]
@@ -73,7 +86,7 @@ export function entend(avant: Instantane | null, apres: Instantane, moi: number)
       const approche = (dAvant - dApres) / (apres.t - avant.t)
       // le moment où ils ENTRENT au contact, et pas tout le temps qu'il dure
       if (dAvant > touche && dApres <= touche && approche > APPROCHE_MIN) {
-        sons.push({ type: 'contact', force: Math.min(1, approche / 400), x: (b0.x + b1.x) / 2, mien: true })
+        sons.push({ type: 'contact', force: Math.min(1, approche / 400), x: (b0.x + b1.x) / 2, y: (b0.y + b1.y) / 2, mien: true })
       }
     }
   }
@@ -84,14 +97,19 @@ export function entend(avant: Instantane | null, apres: Instantane, moi: number)
   if (ja && jb) {
     const marques = jb.scores[0] + jb.scores[1] - ja.scores[0] - ja.scores[1]
     if (marques > 0) {
-      sons.push({ type: jb.phase === PHASE_FINI ? 'fin' : 'but', force: 1, x: milieu, mien: jb.buteur === moi })
+      sons.push({ type: jb.phase === PHASE_FINI ? 'fin' : 'but', force: 1, x: milieu, y: milieuY, mien: jb.buteur === moi })
+    } else if (jb.phase === PHASE_FINI && ja.phase !== PHASE_FINI) {
+      // la fin au temps, sans but
+      sons.push({ type: 'fin', force: 1, x: milieu, y: milieuY, mien: jb.buteur === moi })
+    } else if (chiffre(jb) > 0 && chiffre(jb) !== chiffre(ja)) {
+      sons.push({ type: 'tic', force: 1, x: milieu, y: milieuY, mien: true })
     } else if (ja.phase !== PHASE_JEU && jb.phase === PHASE_JEU) {
-      sons.push({ type: 'engagement', force: 1, x: milieu, mien: true })
+      sons.push({ type: 'engagement', force: 1, x: milieu, y: milieuY, mien: true })
     } else if (ja.tenuPar < 0 && jb.tenuPar >= 0) {
-      sons.push({ type: 'prise', force: 1, x: jb.paletX, mien: jb.tenuPar === moi })
+      sons.push({ type: 'prise', force: 1, x: jb.paletX, y: jb.paletY, mien: jb.tenuPar === moi })
     } else if (ja.tenuPar >= 0 && jb.tenuPar < 0 && jb.paletActif) {
       const vitesse = Math.hypot(jb.paletVx, jb.paletVy)
-      sons.push({ type: 'lancer', force: Math.min(1, vitesse / 1500), x: jb.paletX, mien: ja.tenuPar === moi })
+      sons.push({ type: 'lancer', force: Math.min(1, vitesse / 1500), x: jb.paletX, y: jb.paletY, mien: ja.tenuPar === moi })
     } else if (ja.paletActif && jb.paletActif && ja.tenuPar < 0 && jb.tenuPar < 0) {
       // libre avant comme après : un saut de vitesse, c'est un choc
       const saut = Math.hypot(jb.paletVx - ja.paletVx, jb.paletVy - ja.paletVy)
@@ -102,9 +120,9 @@ export function entend(avant: Instantane | null, apres: Instantane, moi: number)
         const surUnBord = (jb.paletY - s.minY < r || s.maxY - jb.paletY < r) && ja.paletVy * jb.paletVy < 0
         if (surUnCote || surUnBord) {
           const vitesse = Math.hypot(ja.paletVx, ja.paletVy)
-          sons.push({ type: 'paroi', force: Math.min(1, vitesse / 1200), x: jb.paletX, mien: true })
+          sons.push({ type: 'paroi', force: Math.min(1, vitesse / 1200), x: jb.paletX, y: jb.paletY, mien: true })
         } else {
-          sons.push({ type: 'choc-palet', force: Math.min(1, saut / 600), x: jb.paletX, mien: true })
+          sons.push({ type: 'choc-palet', force: Math.min(1, saut / 600), x: jb.paletX, y: jb.paletY, mien: true })
         }
       }
     }
@@ -238,7 +256,16 @@ export class SonsMulti {
         this.note(sortie, 'sine', 640, 400, 0.09, 0.1 * f)
         break
       case 'engagement':
-        this.note(sortie, 'triangle', 660, 660, 0.09, 0.16)
+        // le « partez » : plus haut et plus long que les tics du décompte
+        this.note(sortie, 'triangle', 880, 880, 0.22, 0.2)
+        break
+      case 'tic':
+        this.note(sortie, 'triangle', 440, 440, 0.09, 0.16)
+        break
+      case 'dash':
+        // un coup de vent
+        this.note(sortie, 'sine', 170, 520, 0.16, 0.16 * f)
+        this.souffle(sortie, 900, 0.22, 0.3 * f)
         break
       case 'but':
         this.arpege(sortie, son.mien ? BUT_POUR : BUT_CONTRE, 0.11, 0.22)

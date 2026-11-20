@@ -50,6 +50,12 @@ export function departDe(salle: Bornes, j: number): { x: number; y: number } {
   const part = j % 2 === 0 ? 0.25 : 0.75
   return { x: salle.minX + (salle.maxX - salle.minX) * part, y: (salle.minY + salle.maxY) / 2 }
 }
+/** LE DASH : la vitesse qu'il ajoute d'un coup au corps (u/s) — une longue
+ *  poussée en donne ~60 par seconde —, le temps qu'il met à se recharger, et
+ *  la durée pendant laquelle on le dit « en cours » (l'éclat, le son). */
+export const DASH_VITESSE = 420
+export const DASH_REPOS = 2.2
+const DASH_VU = 0.25
 /** La cadence d'envoi de l'état, en images par seconde. Le solveur tourne
  *  à 120 pas par seconde ; l'invité prolonge chaque image avec les vitesses
  *  jusqu'à la suivante. Vingt, et non plus trente : la partie passe par le
@@ -69,6 +75,11 @@ export class Hote {
   readonly salle: Bornes
   readonly hockey: Hockey | null
   private readonly joueurs: number
+  // LE DASH, par joueur : ce qui reste avant qu'il soit rechargé, s'il vient
+  // de partir (pour l'éclat et le son), et si son bouton était déjà tenu.
+  private readonly dashRepos: number[] = []
+  private readonly dashVu: number[] = []
+  private readonly dashTenu: boolean[] = []
   private readonly boucle = new FixedLoop()
   private seq = 0
   private readonly tampon = particulesVides(CAPACITE)
@@ -80,7 +91,12 @@ export class Hote {
     this.salle = salleDe(mode)
     this.hockey = mode === MODE_HOCKEY ? new Hockey() : null
     this.commandes = []
-    for (let j = 0; j < joueurs; j++) this.commandes.push({ pousse: false, ouvert: false, x: 0, y: 0 })
+    for (let j = 0; j < joueurs; j++) {
+      this.commandes.push({ pousse: false, ouvert: false, x: 0, y: 0 })
+      this.dashRepos.push(0)
+      this.dashVu.push(0)
+      this.dashTenu.push(false)
+    }
     this.sim = this.naissance()
   }
 
@@ -107,7 +123,10 @@ export class Hote {
       c.pousse = false
       c.ouvert = false
       c.aller = false
+      c.dash = false
     }
+    this.dashRepos.fill(0)
+    this.dashVu.fill(0)
   }
 
   /** Pose la commande d'un joueur. La visée est ramenée dans la salle : ce
@@ -118,6 +137,7 @@ export class Hote {
     cible.pousse = c.pousse
     cible.ouvert = c.ouvert
     cible.aller = c.aller === true
+    cible.dash = c.dash === true
     cible.x = Math.min(this.salle.maxX, Math.max(this.salle.minX, c.x))
     cible.y = Math.min(this.salle.maxY, Math.max(this.salle.minY, c.y))
   }
@@ -134,7 +154,10 @@ export class Hote {
           const c = this.commandes[j]
           // ouvert ou fermé : c'est le pas qui pose les cloisons
           this.sim.corps[j].ouvert = c.ouvert
-          if (!c.pousse) continue
+          // pendant le décompte de l'engagement, personne ne bouge
+          const gele = this.hockey?.gele === true
+          this.dash(j, c, dt, gele)
+          if (!c.pousse || gele) continue
           this.sim.courant = j
           // Le geste du jeu, tel quel : le pointeur posé SUR son corps le
           // RASSEMBLE là (rien ne part, rien ne se paie) ; ailleurs, il
@@ -158,6 +181,36 @@ export class Hote {
       },
       budgetMs,
     )
+  }
+
+  /** LE DASH : une brusque accélération dans le sens où une poussée
+   *  enverrait le corps — à l'opposé du pointeur à la souris, du côté du
+   *  stick à la manette. C'est l'APPUI qui le déclenche, et il se recharge. */
+  private dash(j: number, c: Commande, dt: number, gele: boolean): void {
+    if (this.dashRepos[j] > 0) this.dashRepos[j] -= dt
+    if (this.dashVu[j] > 0) this.dashVu[j] -= dt
+    const appui = c.dash === true && !this.dashTenu[j]
+    this.dashTenu[j] = c.dash === true
+    const corps = this.sim.corps[j]
+    if (!appui || gele || this.dashRepos[j] > 0 || corps.dispersed || corps.playerCount < 12) return
+    let dx = c.x - corps.stats.centroidX
+    let dy = c.y - corps.stats.centroidY
+    if (!c.aller) {
+      dx = -dx
+      dy = -dy
+    }
+    const d = Math.hypot(dx, dy)
+    if (d < 1) return
+    const s = this.sim
+    const vx = (dx / d) * DASH_VITESSE
+    const vy = (dy / d) * DASH_VITESSE
+    for (let i = 0; i < s.count; i++) {
+      if (s.kind[i] !== KIND_PLAYER || s.proprio[i] !== j) continue
+      s.velX[i] += vx
+      s.velY[i] += vy
+    }
+    this.dashRepos[j] = DASH_REPOS
+    this.dashVu[j] = DASH_VU
   }
 
   /** Le point visé est-il sur le corps de ce joueur ? (La règle du jeu :
@@ -207,6 +260,8 @@ export class Hote {
       disperse: c.dispersed,
       pousse: this.commandes[j].pousse && !c.dispersed,
       ouvert: c.ouvert,
+      dashPret: this.dashRepos[j] <= 0,
+      dash: this.dashVu[j] > 0,
       viseeX: this.commandes[j].x,
       viseeY: this.commandes[j].y,
     }))

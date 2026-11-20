@@ -54,6 +54,17 @@ describe('manette du multi — la lecture', () => {
     }
   })
 
+  it('B ou RB : le dash, tenu tant que le bouton l’est (l’hôte en lit l’appui)', () => {
+    const e = nouvelEtatManette()
+    for (const b of [1, 5]) {
+      litManette(pad(1, 0, b), e)
+      expect(e.dash).toBe(true)
+      expect(commandeManette(e, 0, 0).dash).toBe(true)
+    }
+    litManette(pad(1, 0), e)
+    expect(commandeManette(e, 0, 0).dash).toBe(false)
+  })
+
   it('Start recommence UNE fois par appui, même tenu', () => {
     const e = nouvelEtatManette()
     litManette(pad(0, 0, START), e)
@@ -134,6 +145,9 @@ describe('manette du multi — chez l’hôte', () => {
   it('au hockey, le palet part du côté où pointe le stick', () => {
     const h = new Hote(2, undefined, MODE_HOCKEY)
     pas(h, 60)
+    // le décompte de l'engagement passé
+    h.hockey!.decompte = 0
+    pas(h, 1)
     const e = nouvelEtatManette()
     const commande = (p: PadLu): void => {
       litManette(p, e)

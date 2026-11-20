@@ -20,12 +20,13 @@ import { CADENCE_ETAT, CAPACITE, Hote, Miroir, SALLE } from './partie'
 import { BUTS_POUR_GAGNER, CAGE, RAYON_PALET } from './hockey'
 import { commandeManette, defileCaractere, litManette, litMenu, nouvelEtatManette, nouvelEtatMenu, voisinMenu, type PadLu } from './manetteMulti'
 import { adresseRelais, creePartie, liaisonPossible, rejointPartie, type EtatLiaison, type Liaison, type Ordre } from './relais'
-import { RenduMulti, couleurCss, type SceneHockey } from './renduMulti'
-import { SonsMulti, entend, type Instantane } from './sonsMulti'
+import { DUREE_ECLAT, ECLATS_MAX, RenduMulti, couleurCss, type Eclat, type SceneHockey } from './renduMulti'
+import { SonsMulti, chiffreDecompte, entend, type Instantane } from './sonsMulti'
 import {
   MODE_HOCKEY,
   MODE_LIBRE,
   PHASE_BUT,
+  PHASE_DECOMPTE,
   PHASE_FINI,
   PHASE_JEU,
   VERSION_TRAME,
@@ -111,6 +112,16 @@ const STYLE = `
 .mu-codepad span { width: 1.5em; padding: 0.2em 0; text-align: center; border: 1px solid var(--line, #24384a); }
 .mu-codepad span[data-ici="1"] { border-color: var(--accent, #8fd3ff); box-shadow: inset 0 0 0 1px var(--accent, #8fd3ff); }
 .mu-codepad + small { display: block; text-align: center; color: var(--dim, #7f9cb0); }
+.mu-dash { position: absolute; right: 14px; bottom: 150px; display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 0.8em 1.3em !important; touch-action: none; user-select: none; }
+.mu-dash small { color: var(--dim, #7f9cb0); font-size: 0.7em; letter-spacing: 0.04em; }
+.mu-dash[data-pret="0"] { opacity: 0.35; }
+.mu-score em { font-style: normal; font-family: var(--font-mono, monospace); letter-spacing: 0.12em; color: var(--dim, #7f9cb0); }
+.mu-decompte { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); font-family: var(--font-display, sans-serif); font-size: calc(140px * var(--ui, 1)); pointer-events: none; opacity: 0.85; text-shadow: 0 0 40px rgba(143, 211, 255, 0.5); }
+.mu-decompte[hidden] { display: none; }
+.mu-flash { position: absolute; inset: 0; pointer-events: none; opacity: 0; }
+.mu-flash[data-vif="1"] { animation: mu-flash 0.7s ease-out; }
+@keyframes mu-flash { from { opacity: 0.42; } to { opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { .mu-flash[data-vif="1"] { animation: none; } }
 .mu-modes { margin-bottom: 12px; }
 .mu-modes button { padding: 0.9em 1em; opacity: 0.6; }
 .mu-modes button[data-choisi="1"] { opacity: 1; border-color: var(--accent, #8fd3ff); box-shadow: inset 0 0 0 1px var(--accent, #8fd3ff); }
@@ -179,13 +190,16 @@ const GABARIT = `
     <div class="mu-jauge" data-jauge="1"><i></i><div class="mu-barre"><u></u></div><b>100 %</b><small></small></div>
     <div class="mu-lien" data-lien></div>
   </div>
-  <div class="mu-score" data-score hidden><div><b data-but="0">0</b><span>—</span><b data-but="1">0</b></div><small data-score-mot></small></div>
+  <div class="mu-flash" data-flash></div>
+  <div class="mu-score" data-score hidden><div><b data-but="0">0</b><span>—</span><b data-but="1">0</b></div><em data-chrono></em><small data-score-mot></small></div>
+  <div class="mu-decompte" data-decompte hidden></div>
   <div class="mu-actions">
     <button type="button" data-geste="autre" hidden>L’AUTRE : FERMÉ</button>
     <button type="button" data-geste="changer" hidden>CHANGER DE CORPS</button>
     <button type="button" data-geste="recommencer">RECOMMENCER</button>
     <button type="button" data-geste="quitter-partie">QUITTER</button>
   </div>
+  <button type="button" class="mu-dash" data-tenir="dash" data-pret="1" aria-label="Dash">DASH<small>maj</small></button>
   <button type="button" class="mu-tenir" data-tenir="ouvrir" aria-label="S’ouvrir (à maintenir)">S’OUVRIR<small>à maintenir · espace</small></button>
   <div class="mu-aide" data-aide></div>
   <div class="mu-voile" data-voile hidden><div><p data-voile-mot></p><span class="mu-rang" style="justify-content:center"><button type="button" class="mu-fort" data-geste="retour-salon">REVENIR AU SALON</button></span></div></div>
@@ -233,6 +247,12 @@ export function creeEcranMulti(quitte: () => void): EcranMulti {
   // d'une image à la suivante.
   const sons = new SonsMulti()
   let instantane: Instantane | null = null
+  // LE DASH : son bouton, tenu au clavier (Maj), à l'écran ou à la manette —
+  // c'est l'hôte qui en lit l'appui.
+  const dash = { clavier: false, bouton: false, manette: false }
+  // LES ÉCLATS : l'onde qui part d'un choc, à l'écran (l'heure de sa naissance
+  // en secondes). Ils naissent des mêmes événements que les sons.
+  const eclats: { x: number; y: number; ne: number; force: number }[] = []
   /** SEUL : l'autre corps, qu'on ne pilote pas, est-il ouvert ? (un
    *  interrupteur, puisqu'on n'a qu'une main) */
   let autreOuvert = false
@@ -311,12 +331,23 @@ export function creeEcranMulti(quitte: () => void): EcranMulti {
     tenir.addEventListener('pointerup', () => tient(false))
     tenir.addEventListener('pointercancel', () => tient(false))
     tenir.addEventListener('contextmenu', (ev) => ev.preventDefault())
+    const boutonDash = r.querySelector<HTMLButtonElement>('[data-tenir="dash"]')!
+    boutonDash.addEventListener('pointerdown', (ev) => {
+      boutonDash.setPointerCapture(ev.pointerId)
+      dash.bouton = true
+      ev.preventDefault()
+    })
+    boutonDash.addEventListener('pointerup', () => (dash.bouton = false))
+    boutonDash.addEventListener('pointercancel', () => (dash.bouton = false))
+    boutonDash.addEventListener('contextmenu', (ev) => ev.preventDefault())
     // la fenêtre qui perd la main ne doit pas laisser un jet coincé ouvert
     window.addEventListener('blur', () => {
       pointeur.actif = false
       ouvre.clavier = false
       ouvre.souris = false
       ouvre.bouton = false
+      dash.clavier = false
+      dash.bouton = false
     })
     return r
   }
@@ -590,6 +621,9 @@ export function creeEcranMulti(quitte: () => void): EcranMulti {
     }
     aideDuMode = -1
     instantane = null
+    eclats.length = 0
+    dash.clavier = false
+    dash.bouton = false
     el<HTMLElement>('[data-score]').hidden = true
     el<HTMLButtonElement>('[data-geste="autre"]').hidden = r !== 'seul'
     ouvre.clavier = false
@@ -717,6 +751,7 @@ export function creeEcranMulti(quitte: () => void): EcranMulti {
     }
     const aLaManette = manette.connectee && monCoeur.connu && mainManette > mainPointeur
     ouvre.manette = aLaManette && manette.ouvert
+    dash.manette = aLaManette && manette.dash
     let commande: Commande
     if (aLaManette) {
       commande = commandeManette(manette, monCoeur.x, monCoeur.y)
@@ -732,10 +767,12 @@ export function creeEcranMulti(quitte: () => void): EcranMulti {
     } else {
       commande = { pousse: pointeur.actif, ouvert: jeMOuvre(), x: vise.x, y: vise.y }
     }
+    commande.dash = dash.clavier || dash.bouton || dash.manette
     // onglet à l'arrière-plan : on ne pousse ni ne s'ouvre à l'aveugle
     if (!dessine) {
       commande.pousse = false
       commande.ouvert = false
+      commande.dash = false
     }
 
     let particules: Particules
@@ -784,7 +821,20 @@ export function creeEcranMulti(quitte: () => void): EcranMulti {
     const entendus = entend(instantane, apres, moi)
     instantane = apres
     if (dessine) {
-      for (const son of entendus) sons.joue(son, (son.x - cadre.cx) / cadre.demiL)
+      for (const son of entendus) {
+        sons.joue(son, (son.x - cadre.cx) / cadre.demiL)
+        // un choc, une onde ; un but, l'écran qui s'illumine à la couleur du buteur
+        if (son.type === 'paroi' || son.type === 'choc-palet' || son.type === 'contact' || son.type === 'dash' || son.type === 'lancer' || son.type === 'prise') {
+          if (eclats.length >= ECLATS_MAX) eclats.shift()
+          eclats.push({ x: son.x, y: son.y, ne: maintenant / 1000, force: Math.max(0.3, son.force) })
+        } else if ((son.type === 'but' || son.type === 'fin') && jeu && jeu.buteur >= 0) {
+          const flash = el<HTMLElement>('[data-flash]')
+          flash.style.background = couleurCss(jeu.buteur)
+          flash.dataset.vif = '0'
+          void flash.offsetWidth // relance l'animation
+          flash.dataset.vif = '1'
+        }
+      }
       // le jet : le sien plein, celui de l'autre en retrait
       const jet = corps[moi]?.pousse ? 1 : corps.some((c) => c.pousse) ? 0.4 : 0
       sons.continu(jet, jeu && jeu.tenuPar === moi ? jeu.charge : -1)
@@ -800,21 +850,27 @@ export function creeEcranMulti(quitte: () => void): EcranMulti {
     if (!dessine) return
     // AU HOCKEY on voit tout le terrain, toujours : il faut lire les deux
     // cages et le palet d'un coup d'œil, pas seulement les deux corps
-    const voulu = jeu ? cadreSalle(salle, rendu.aspect()) : corps.length > 0 ? cadreVoulu(corps, salle, rendu.aspect()) : cadre
+    // …avec de la place au-dessus pour le score et les jauges, et dessous
+    // pour l'aide : ils mordaient sur le terrain
+    const terrainEtMarges: Bornes = { minX: salle.minX, minY: salle.minY - 150, maxX: salle.maxX, maxY: salle.maxY + 90 }
+    const voulu = jeu ? cadreSalle(terrainEtMarges, rendu.aspect()) : corps.length > 0 ? cadreVoulu(corps, salle, rendu.aspect()) : cadre
     cadre = suitCadre(cadre, voulu, dt)
     let scene: SceneHockey | null = null
     if (jeu) {
       const porteur = corps[jeu.tenuPar]
       scene = {
         cage: CAGE,
-        palet: jeu.paletActif ? { x: jeu.paletX, y: jeu.paletY, rayon: RAYON_PALET } : null,
+        palet: jeu.paletActif ? { x: jeu.paletX, y: jeu.paletY, rayon: RAYON_PALET, vx: jeu.paletVx, vy: jeu.paletVy } : null,
         porteur: porteur ? jeu.tenuPar : -1,
         charge: jeu.charge,
         viseeX: porteur?.viseeX ?? 0,
         viseeY: porteur?.viseeY ?? 0,
       }
     }
-    rendu.dessine(particules, cadre, salle, corps.map((c) => c.ouvert), maintenant / 1000, scene)
+    while (eclats.length > 0 && maintenant / 1000 - eclats[0].ne >= DUREE_ECLAT) eclats.shift()
+    const ondes: Eclat[] = eclats.map((e) => ({ x: e.x, y: e.y, age: maintenant / 1000 - e.ne, force: e.force }))
+    rendu.dessine(particules, cadre, salle, corps.map((c) => c.ouvert), maintenant / 1000, scene, ondes)
+    el<HTMLElement>('[data-tenir="dash"]').dataset.pret = corps[moi]?.dashPret === false ? '0' : '1' 
     peintReticule(aLaManette, commande)
     peintAide(jeu ? MODE_HOCKEY : MODE_LIBRE)
     peintScore(jeu)
@@ -955,22 +1011,34 @@ export function creeEcranMulti(quitte: () => void): EcranMulti {
     const commun = 'Clic maintenu : la matière part vers le pointeur, le corps à l’opposé — sur votre corps, il se rassemble. '
     const propre =
       mode === MODE_HOCKEY
-        ? 'ESPACE ou clic droit maintenu : vous OUVRIR pour avaler le palet ; relâchez, il part vers le pointeur, plus fort si vous l’avez tenu. Fermé, vous le renvoyez. Le palet dans la cage adverse : un but.'
-        : 'ESPACE ou clic droit maintenu : vous OUVRIR. Deux corps ouverts fusionnent ; un corps ouvert boit ce qu’on lui tire ; fermé, il repousse.'
-    const pad = ' MANETTE : le stick gauche pour aller, A ou RT pour pousser, LT ou LB pour s’ouvrir ; Start recommence, Select quitte.'
+        ? 'ESPACE ou clic droit maintenu : vous OUVRIR pour avaler le palet ; relâchez, il part vers le pointeur, plus fort si vous l’avez tenu. Fermé, vous le renvoyez — et vous l’arrachez au porteur en le percutant. MAJ : un dash. Le palet dans la cage adverse : un but.'
+        : 'ESPACE ou clic droit maintenu : vous OUVRIR. Deux corps ouverts fusionnent ; un corps ouvert boit ce qu’on lui tire ; fermé, il repousse. MAJ : un dash.'
+    const pad = ' MANETTE : le stick gauche pour aller, A ou RT pour pousser, LT ou LB pour s’ouvrir, B ou RB pour dasher ; Start recommence, Select quitte.'
     el<HTMLElement>('[data-aide]').textContent = commun + propre + pad + (role === 'hote' ? ' Votre machine simule la partie : ne fermez pas cet onglet.' : '')
   }
 
   function peintScore(jeu: JeuTrame | null): void {
     const boite = el<HTMLElement>('[data-score]')
     boite.hidden = !jeu
-    if (!jeu) return
+    if (!jeu) {
+      el<HTMLElement>('[data-decompte]').hidden = true
+      return
+    }
     for (let j = 0; j < 2; j++) {
       const b = el<HTMLElement>(`[data-but="${j}"]`)
       const texte = String(jeu.scores[j])
       if (b.textContent !== texte) b.textContent = texte
       b.style.color = couleurCss(j)
     }
+    // le chrono, ou le but en or ; et le grand chiffre du décompte
+    const restant = Math.ceil(jeu.chrono)
+    const chrono = jeu.enOr ? 'BUT EN OR' : `${Math.floor(restant / 60)}:${String(restant % 60).padStart(2, '0')}`
+    const ec = el<HTMLElement>('[data-chrono]')
+    if (ec.textContent !== chrono) ec.textContent = chrono
+    const grand = el<HTMLElement>('[data-decompte]')
+    const chiffre = jeu.phase === PHASE_DECOMPTE ? String(chiffreDecompte(jeu.decompte)) : ''
+    grand.hidden = chiffre === ''
+    if (grand.textContent !== chiffre) grand.textContent = chiffre
     const quiMarque = jeu.buteur === moi ? 'VOUS' : role === 'seul' ? 'L’AUTRE CORPS' : 'VOTRE AMI'
     const mot =
       jeu.phase === PHASE_FINI
@@ -982,7 +1050,7 @@ export function creeEcranMulti(quitte: () => void): EcranMulti {
           : ''
     const e = el<HTMLElement>('[data-score-mot]')
     if (e.textContent !== mot) e.textContent = mot
-    e.style.color = jeu.phase === PHASE_JEU || jeu.buteur < 0 ? '' : couleurCss(jeu.buteur)
+    e.style.color = jeu.phase === PHASE_JEU || jeu.phase === PHASE_DECOMPTE || jeu.buteur < 0 ? '' : couleurCss(jeu.buteur)
   }
 
   function peintAth(corps: CorpsTrame[], maintenant: number, dt: number): void {
@@ -1058,6 +1126,8 @@ export function creeEcranMulti(quitte: () => void): EcranMulti {
       ouvre.clavier = ev.type === 'keydown'
       ev.preventDefault()
     }
+    // MAJ, en jeu : le dash
+    if (page === 'jeu' && (ev.code === 'ShiftLeft' || ev.code === 'ShiftRight')) dash.clavier = ev.type === 'keydown' 
   }
 
   const api: EcranMulti = {
@@ -1102,6 +1172,7 @@ export function creeEcranMulti(quitte: () => void): EcranMulti {
     corps: role === 'invite' ? (miroir?.corps ?? []) : (hote?.corps() ?? []),
     jeu: role === 'invite' ? (miroir?.jeu(performance.now()) ?? null) : (hote?.jeu() ?? null),
     sons: { ...sons.joues },
+    cadre: { ...cadre },
     images: miroir ? { recues: miroir.recues, perdues: miroir.perdues } : null,
     particules: role === 'invite' ? (miroir?.vue(performance.now()).n ?? 0) : (hote?.sim.count ?? 0),
     tSim: role === 'invite' ? (miroir?.tSim ?? 0) : (hote?.tSim ?? 0),

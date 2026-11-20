@@ -26,7 +26,7 @@ export const TRAME_ETAT = 1
 export const TRAME_COMMANDE = 2
 /** La version du format : l'invité refuse une trame d'une autre version
  *  plutôt que de dessiner n'importe quoi. */
-export const VERSION_TRAME = 3
+export const VERSION_TRAME = 4
 
 /** Les particules par morceau d'état. Un canal de données porte au moins
  *  16 Ko par message sur tous les navigateurs ; 1 024 particules à six
@@ -83,6 +83,10 @@ export interface CorpsTrame {
   pousse: boolean
   /** il est OUVERT : il accepte la matière des autres (fusion, don) */
   ouvert: boolean
+  /** son DASH est rechargé */
+  dashPret?: boolean
+  /** il vient de dasher (vrai un quart de seconde : l'éclat, le son) */
+  dash?: boolean
   viseeX: number
   viseeY: number
 }
@@ -111,7 +115,7 @@ export function particulesVides(capacite: number): Particules {
 
 const OCTETS_CORPS = 18
 const ENTETE_FIXE = 16
-const OCTETS_JEU = 22
+const OCTETS_JEU = 25
 
 /** Le mode de la partie, tel qu'il voyage (octet 3 de l'en-tête). L'invité
  *  l'apprend de l'hôte : c'est lui qui dit dans quelle salle on joue. */
@@ -122,6 +126,9 @@ export const MODE_HOCKEY = 1
 export const PHASE_JEU = 0
 export const PHASE_BUT = 1
 export const PHASE_FINI = 2
+/** Le décompte de l'engagement : chacun est à sa place, le palet est posé,
+ *  personne ne bouge encore. */
+export const PHASE_DECOMPTE = 3
 
 /** L'état du HOCKEY : le palet, qui le tient, et le score. Il est répété
  *  dans chaque morceau, comme l'état des corps — 22 octets. */
@@ -137,8 +144,14 @@ export interface JeuTrame {
   charge: number
   scores: [number, number]
   phase: number
-  /** Le dernier buteur, ou −1. */
+  /** Le dernier buteur (ou le vainqueur au temps), ou −1. */
   buteur: number
+  /** Le temps de jeu qui reste, en secondes. */
+  chrono: number
+  /** Ce qui reste du décompte de l'engagement, en secondes (0 hors décompte). */
+  decompte: number
+  /** Le temps est écoulé à égalité : le prochain but gagne. */
+  enOr: boolean
 }
 
 /** Le mode qu'annonce un morceau d'état, ou −1 si ce n'en est pas un. */
@@ -188,7 +201,7 @@ export function encodeEtat(
       v.setUint16(o + 4, c.base, true)
       v.setFloat32(o + 6, c.x, true)
       v.setFloat32(o + 10, c.y, true)
-      v.setUint8(o + 14, (c.disperse ? 1 : 0) | (c.pousse ? 2 : 0) | (c.ouvert ? 4 : 0))
+      v.setUint8(o + 14, (c.disperse ? 1 : 0) | (c.pousse ? 2 : 0) | (c.ouvert ? 4 : 0) | (c.dashPret ? 8 : 0) | (c.dash ? 16 : 0))
       // la visée voyage en 12 bits par axe, comme une particule
       const qx = Math.round(borne((c.viseeX - bornes.minX) / largeur, 0, 1) * 4095)
       const qy = Math.round(borne((c.viseeY - bornes.minY) / hauteur, 0, 1) * 4095)
@@ -206,8 +219,11 @@ export function encodeEtat(
       v.setUint8(o + 17, Math.round(borne(jeu.charge, 0, 1) * 255))
       v.setUint8(o + 18, borne(jeu.scores[0], 0, 255))
       v.setUint8(o + 19, borne(jeu.scores[1], 0, 255))
-      v.setUint8(o + 20, (jeu.phase & 0x7f) | (jeu.paletActif ? 0x80 : 0))
+      v.setUint8(o + 20, (jeu.phase & 0x3f) | (jeu.enOr ? 0x40 : 0) | (jeu.paletActif ? 0x80 : 0))
       v.setUint8(o + 21, jeu.buteur < 0 ? 255 : jeu.buteur)
+      // le chrono et le décompte voyagent au dixième de seconde
+      v.setUint16(o + 22, Math.round(borne(jeu.chrono, 0, 6000) * 10), true)
+      v.setUint8(o + 24, Math.round(borne(jeu.decompte, 0, 25) * 10))
       o += OCTETS_JEU
     }
     for (let k = 0; k < nombre; k++) {
@@ -275,6 +291,8 @@ export function litEnteteEtat(octets: Uint8Array, bornes: Bornes): EnteteEtat | 
       disperse: (drapeaux & 1) !== 0,
       pousse: (drapeaux & 2) !== 0,
       ouvert: (drapeaux & 4) !== 0,
+      dashPret: (drapeaux & 8) !== 0,
+      dash: (drapeaux & 16) !== 0,
       viseeX: bornes.minX + ((b0 | ((b1 & 0x0f) << 8)) / 4095) * largeur,
       viseeY: bornes.minY + (((b1 >> 4) | (b2 << 4)) / 4095) * hauteur,
     })
@@ -293,9 +311,12 @@ export function litEnteteEtat(octets: Uint8Array, bornes: Bornes): EnteteEtat | 
       tenuPar: tenu === 255 ? -1 : tenu,
       charge: v.getUint8(o + 17) / 255,
       scores: [v.getUint8(o + 18), v.getUint8(o + 19)],
-      phase: etat & 0x7f,
+      phase: etat & 0x3f,
+      enOr: (etat & 0x40) !== 0,
       paletActif: (etat & 0x80) !== 0,
       buteur: buteur === 255 ? -1 : buteur,
+      chrono: v.getUint16(o + 22, true) / 10,
+      decompte: v.getUint8(o + 24) / 10,
     }
   }
   return { seq: v.getUint32(4, true), tSim: v.getFloat32(8, true), total, debut, nombre, corps, jeu }
@@ -336,6 +357,9 @@ export interface Commande {
    *  rapport au cœur du corps. C'est la manette (manetteMulti.ts) ; à la
    *  souris on vise le jet. Le palet, lui, part toujours vers la visée. */
   aller?: boolean
+  /** Le bouton du DASH est tenu (c'est son appui qui le déclenche, chez
+   *  l'hôte : une commande perdue en route ne le fait pas partir deux fois). */
+  dash?: boolean
 }
 
 export const COMMANDE_NEUTRE: Commande = { pousse: false, ouvert: false, x: 0, y: 0 }
@@ -346,7 +370,7 @@ export function encodeCommande(seq: number, c: Commande): Uint8Array {
   v.setUint8(0, TRAME_COMMANDE)
   v.setUint8(1, VERSION_TRAME)
   v.setUint32(2, seq, true)
-  v.setUint8(6, (c.pousse ? 1 : 0) | (c.ouvert ? 2 : 0) | (c.aller ? 4 : 0))
+  v.setUint8(6, (c.pousse ? 1 : 0) | (c.ouvert ? 2 : 0) | (c.aller ? 4 : 0) | (c.dash ? 8 : 0))
   v.setFloat32(7, c.x, true)
   v.setFloat32(11, c.y, true)
   return octets
@@ -361,5 +385,5 @@ export function decodeCommande(octets: Uint8Array): { seq: number; commande: Com
   // un nombre qui n'en est pas un ne doit pas entrer dans le solveur
   if (!Number.isFinite(x) || !Number.isFinite(y)) return null
   const drapeaux = v.getUint8(6)
-  return { seq: v.getUint32(2, true), commande: { pousse: (drapeaux & 1) !== 0, ouvert: (drapeaux & 2) !== 0, x, y, aller: (drapeaux & 4) !== 0 } }
+  return { seq: v.getUint32(2, true), commande: { pousse: (drapeaux & 1) !== 0, ouvert: (drapeaux & 2) !== 0, x, y, aller: (drapeaux & 4) !== 0, dash: (drapeaux & 8) !== 0 } }
 }
