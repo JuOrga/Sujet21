@@ -55,6 +55,9 @@ const LANCER_MIN = 500
 const LANCER_MAX = 1500
 /** Échappé faute de l'avoir lancé, il tombe mollement. */
 const LANCER_ECHAPPE = 220
+/** Le délai avant qu'une goutte tirée puisse revenir, en part de celui du
+ *  jeu (1,2 s). */
+const DELAI_RETOUR = 0.5
 /** Qui a laissé ÉCHAPPER le palet ne peut pas le reprendre aussitôt : sans
  *  ce repos, rester ouvert suffirait à le garder indéfiniment, par tranches
  *  de trois secondes. */
@@ -89,6 +92,11 @@ export class Hockey {
     // la matière tirée revient à son corps d'où qu'elle soit : au hockey on
     // pousse sans cesse, et on ne va pas ramasser ses gouttes
     sim.rappelSansLimite = true
+    // …et elle n'attend pas : dans le jeu une goutte éjectée n'est
+    // rappelable qu'au bout de 1,2 s ; ici la moitié. Le jet porte encore à
+    // 720 u (mesuré : il donne au palet la même vitesse, 77 u/s, que le
+    // délai soit entier ou réduit).
+    sim.reabsorbFactor = DELAI_RETOUR
     p.actif = true
     p.rayon = RAYON_PALET
     p.masse = MASSE_PALET

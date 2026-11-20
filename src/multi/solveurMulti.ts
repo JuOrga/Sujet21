@@ -460,11 +460,21 @@ export class FluidSimMulti {
    *  palet au centre y arrive avec 593 particules sur 900, et il lui en
    *  reste 126 après une poursuite. Faux par défaut : rien ne change. */
   rappelSansLimite = false
-  /** Une goutte qui s'ÉLOIGNE du corps plus vite que cela est un jet en
-   *  vol : on ne la rappelle pas (u/s). */
-  static VITESSE_POSEE = 200
+  // LE RETOUR DES GOUTTES AU HOCKEY (voir applyStrayRecall). Le premier
+  // réglage visait une vitesse égale à la distance au cœur du corps : la
+  // goutte ralentissait de plus en plus en approchant, et mettait plusieurs
+  // secondes à rentrer — « les gouttes de propulsion doivent rejoindre plus
+  // rapidement le volume à qui elles appartiennent » (le concepteur, 20/11).
   /** Le plafond de la vitesse de retour, vue du corps (u/s). */
-  static VITESSE_RETOUR = 900
+  static VITESSE_RETOUR = 1200
+  /** La vitesse visée par unité de distance à la surface du corps (s⁻¹). */
+  static GAIN_RETOUR = 5
+  /** Elle ne descend pas sous ce plancher : la goutte arrive, elle ne
+   *  traîne pas devant le corps (u/s). */
+  static PLANCHER_RETOUR = 160
+  /** La vivacité du demi-tour (s⁻¹) : à quelle allure la goutte prend la
+   *  vitesse visée. */
+  static VIRAGE_RETOUR = 10
   /** Le palet du hockey (inactif hors de ce mode : rien ne change alors). */
   readonly palet: PaletSim = paletVide()
   /** La raideur du contact avec le palet, en u/s² pour une particule
@@ -3714,30 +3724,32 @@ export class FluidSimMulti {
       const dx = cx - this.posX[i]
       const dy = cy - this.posY[i]
       const d2 = dx * dx + dy * dy
-      if (d2 > c2) {
-        // trop loin : perdue là où elle gît — allez la chercher. Sauf au
-        // hockey (rappelSansLimite), où la goutte revient de partout — sauf
-        // le jet en plein vol : le rappeler le freinait, et le corps, qui
-        // encaissait l'opposé, n'avançait plus (mesuré : 13 u/s après
-        // quatre secondes de poussée, contre 249).
-        if (!this.rappelSansLimite) continue
-        // la vitesse de la goutte VUE DU CORPS, le long de la ligne qui les
-        // joint (positive : elle revient)
+      if (this.rappelSansLimite) {
+        // AU HOCKEY la goutte revient de PARTOUT, et vite — dans le jeu, hors
+        // du rayon de capture elle est perdue là où elle gît (« allez la
+        // chercher »). Deux écarts assumés à la règle du jeu, propres à ce
+        // mode :
+        //  - ce retour, le corps ne le PAIE pas (pas d'antisymétrie) : payé,
+        //    il y perdait le tiers de son élan dans les deux secondes suivant
+        //    la poussée (179 u/s tombés à 78), tiré en arrière par ses
+        //    propres gouttes — et rappeler le jet en vol l'empêchait
+        //    d'avancer (13 u/s après quatre secondes de poussée, contre 249) ;
+        //  - la vitesse de retour se règle sur la distance à la SURFACE du
+        //    corps, avec un plancher : la goutte file tant qu'elle est loin,
+        //    et se pose sans le bousculer.
         const dl = Math.sqrt(d2)
+        if (dl < 1e-3) continue
         const radiale = ((this.velX[i] - this.stats.velX) * dx + (this.velY[i] - this.stats.velY) * dy) / dl
-        if (radiale < -FluidSimMulti.VITESSE_POSEE) continue
-        // Ce retour de loin, le corps ne le PAIE pas : il y perdait le tiers
-        // de son élan dans les deux secondes suivant la poussée (179 u/s
-        // tombés à 78), tiré en arrière par ses propres gouttes. C'est une
-        // entorse assumée à l'antisymétrie du jeu, propre au hockey. La
-        // goutte ralentit en approchant (sa vitesse cible est sa distance) :
-        // elle se pose sur le corps, elle ne le pousse pas.
-        const kl = Math.min(1, 5 * dt)
-        const cible = Math.min(FluidSimMulti.VITESSE_RETOUR, dl)
+        const surface = dl - this.stats.rmsRadius * Math.SQRT2
+        let cible = FluidSimMulti.GAIN_RETOUR * surface
+        if (cible < FluidSimMulti.PLANCHER_RETOUR) cible = FluidSimMulti.PLANCHER_RETOUR
+        else if (cible > FluidSimMulti.VITESSE_RETOUR) cible = FluidSimMulti.VITESSE_RETOUR
+        const kl = Math.min(1, FluidSimMulti.VIRAGE_RETOUR * dt)
         this.velX[i] += ((cible - radiale) * dx * kl) / dl
         this.velY[i] += ((cible - radiale) * dy * kl) / dl
         continue
       }
+      if (d2 > c2) continue // trop loin : perdue là où elle gît — allez la chercher
       const d = Math.sqrt(d2)
       if (d < 1e-3) continue
       // même asservissement en vitesse que le rappel de condensation : la

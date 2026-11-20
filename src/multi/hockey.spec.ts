@@ -99,26 +99,35 @@ describe('hockey — le palet et l’eau', () => {
     expect(h.sim.palet.vx).toBeGreaterThan(50)
   })
 
-  it('la matière tirée REVIENT au corps, sans le freiner', () => {
+  it('la matière tirée REVIENT au corps, et vite, sans le freiner', () => {
     // sans ce retour, un corps arrivait au palet avec 593 particules sur 900
-    const mesure = (mode: number): { compte: number; vitesse: number } => {
+    const mesure = (mode: number): { pendant: number; vitesse: number; apres: number } => {
       const h = new Hote(2, undefined, mode)
       pas(h, 60)
       if (h.hockey) h.sim.palet.y = 200 // le palet hors du chemin
-      // on pousse quatre secondes en biais, puis on laisse filer six secondes
+      // on pousse quatre secondes en biais…
       h.commande(0, { pousse: true, ouvert: false, x: 0, y: h.salle.maxY / 2 + 500 })
       pas(h, 480)
+      const pendant = h.sim.corps[0].playerCount
+      const vitesse = h.sim.corps[0].stats.velX
+      // …puis on laisse filer deux secondes
       h.commande(0, { pousse: false, ouvert: false, x: 0, y: h.salle.maxY / 2 + 500 })
-      pas(h, 720)
-      return { compte: h.sim.corps[0].playerCount, vitesse: h.sim.corps[0].stats.velX }
+      pas(h, 240)
+      return { pendant, vitesse, apres: h.sim.corps[0].playerCount }
     }
     const libre = mesure(MODE_LIBRE)
     const hockey = mesure(MODE_HOCKEY)
-    // mesuré : 626 particules en partie libre, 780 au hockey
-    expect(hockey.compte).toBeGreaterThan(libre.compte + 80)
-    // et la même vitesse à peu de chose près (215 et 214 u/s) : le retour
-    // n'est ni un frein ni une propulsion
-    expect(Math.abs(hockey.vitesse - libre.vitesse)).toBeLessThan(30)
+    // en partie libre la matière tirée est perdue (mesuré : 639 puis 626)
+    expect(libre.apres).toBeLessThan(700)
+    // au hockey le corps reste gros PENDANT la poussée (mesuré : ~840 ; 628
+    // avec le premier réglage du retour, qui laissait les gouttes traîner)…
+    expect(hockey.pendant).toBeGreaterThan(780)
+    // …et il est presque entier deux secondes après (mesuré : 890 à 900)
+    expect(hockey.apres).toBeGreaterThan(870)
+    // le retour n'est pas un frein ; il pousse un peu (mesuré : 255 u/s
+    // contre 213, les gouttes qui rentrent arrivent par l'arrière)
+    expect(hockey.vitesse).toBeGreaterThan(libre.vitesse * 0.9)
+    expect(hockey.vitesse).toBeLessThan(libre.vitesse * 1.4)
   })
 })
 
