@@ -191,7 +191,9 @@ bouton **MULTI** sur l'accueil (`?dev`). Tout vit dans [`src/multi/`](src/multi/
   Deux corps fermés qui se percutent S'ÉCRASENT l'un contre l'autre,
   rebondissent et redeviennent ronds (« le rebond », « la peau tendue »).
 - **Le mode HOCKEY** (à choisir au salon, avant de créer la partie) : un
-  terrain plus court, une cage par camp, un palet. Fermé, le corps amortit
+  terrain plus court, un palet, et une cage par camp posée DANS le terrain
+  (trois parois, ouvertes vers le centre : on passe derrière, l'eau et le
+  palet y butent, et l'on ne marque que par devant). Fermé, le corps amortit
   le palet et le renvoie ; OUVERT, il l'avale dès qu'il le touche — et se refermer le LANCE
   vers le pointeur, d'autant plus fort qu'on l'a tenu (trois secondes au
   plus, après quoi il s'échappe). Le jet le pousse aussi. Le premier à cinq
@@ -224,9 +226,7 @@ bouton **MULTI** sur l'accueil (`?dev`). Tout vit dans [`src/multi/`](src/multi/
   « détail pour le dépannage » (le relais joint, les instances vues, les
   coupures). C'est lui qu'il faut photographier.
 - **Ce qui manque** : les salles, tout état autre que l'eau, et les
-  graphismes du jeu — le multi a son rendu. Au hockey : une cage posée
-  DANS le terrain, qu'on puisse contourner, et un vrai contact du palet
-  avec ses poteaux.
+  graphismes du jeu — le multi a son rendu.
 - **Le débit** : une image pèse 10,9 Ko (1 800 particules à six octets),
   vingt par seconde — 212 Ko/s mesurés à travers le relais en ligne, soit
   1,7 Mbit/s en envoi chez l'hôte, que le relais reçoit puis renvoie. Si la

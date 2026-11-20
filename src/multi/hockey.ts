@@ -17,6 +17,7 @@
 // apprendre. Et comme on avance en tirant derrière soi, viser la cage oblige
 // à se retourner : c'est le temps que l'adversaire a pour venir bousculer.
 
+import { MAT_WALL } from '../game/level'
 import { KIND_PLAYER, type FluidSimMulti } from './solveurMulti'
 import { PHASE_BUT, PHASE_DECOMPTE, PHASE_FINI, PHASE_JEU, type Bornes, type Commande, type JeuTrame } from './trame'
 
@@ -24,8 +25,46 @@ import { PHASE_BUT, PHASE_DECOMPTE, PHASE_FINI, PHASE_JEU, type Bornes, type Com
  *  coûte de la matière ; sur un terrain trop long on arrive devant la cage
  *  avec la moitié de son corps. */
 export const TERRAIN: Bornes = { minX: 0, minY: 0, maxX: 2880, maxY: 1620 }
-/** La hauteur de l'ouverture d'une cage : un tiers de la paroi. */
-export const CAGE = 540
+// LES CAGES sont posées DANS le terrain, en retrait du fond : on passe
+// derrière, comme sur une vraie patinoire (« je pensais à un terrain de
+// hockey dans le sens où on peut passer derrière la cage », le concepteur,
+// 20/11). La première version ouvrait simplement la paroi du fond sur un
+// tiers de sa hauteur. Une cage, ce sont trois parois — un fond, deux côtés —
+// ouvertes vers le centre : le palet et l'eau y butent, et l'on n'y entre
+// que par devant.
+/** La distance de la ligne de but à la paroi du fond du terrain. */
+export const LIGNE_BUT = 470
+/** La profondeur d'une cage, de sa ligne de but à son fond. Derrière, il
+ *  reste 284 u jusqu'au bord du terrain : un corps de 900 particules (~210 u
+ *  de large) y passe. */
+export const PROFONDEUR_CAGE = 150
+/** La hauteur de son ouverture : deux corps de large. */
+export const OUVERTURE_CAGE = 420
+/** L'épaisseur de ses parois. Une goutte tirée fait 12 u par pas : à 36 u,
+ *  elle ne les traverse pas. */
+export const EPAISSEUR_CAGE = 36
+
+/** Les six parois des deux cages (trois chacune), en unités monde. */
+export function paroisCages(): Bornes[] {
+  const milieu = (TERRAIN.minY + TERRAIN.maxY) / 2
+  const haut = milieu - OUVERTURE_CAGE / 2
+  const bas = milieu + OUVERTURE_CAGE / 2
+  const fond = LIGNE_BUT - PROFONDEUR_CAGE
+  const e = EPAISSEUR_CAGE
+  // côté gauche : x compté depuis la paroi de gauche ; à droite, en miroir
+  const cote = (x0: number, x1: number): [number, number][] => [
+    [TERRAIN.minX + x0, TERRAIN.minX + x1],
+    [TERRAIN.maxX - x1, TERRAIN.maxX - x0],
+  ]
+  const parois: Bornes[] = []
+  for (const [minX, maxX] of cote(fond - e, fond)) parois.push({ minX, minY: haut - e, maxX, maxY: bas + e })
+  for (const [minX, maxX] of cote(fond, LIGNE_BUT)) {
+    parois.push({ minX, minY: haut - e, maxX, maxY: haut })
+    parois.push({ minX, minY: bas, maxX, maxY: bas + e })
+  }
+  return parois
+}
+const PAROIS_CAGES = paroisCages()
 /** Le rayon du palet : un corps de 900 particules fait ~105 u de rayon. */
 export const RAYON_PALET = 48
 /** Sa masse, en particules. Lourd, il ne se laisserait pas arrêter ; léger,
@@ -131,6 +170,11 @@ export class Hockey {
     // 720 u (mesuré : il donne au palet la même vitesse, 77 u/s, que le
     // délai soit entier ou réduit).
     sim.reabsorbFactor = DELAI_RETOUR
+    // les cages : des parois pour l'eau aussi
+    sim.setLevel(
+      PAROIS_CAGES.map((b) => ({ ...b, material: MAT_WALL })),
+      [],
+    )
     // posé, mais pas encore en jeu : il le sera à la fin du décompte
     p.actif = false
     p.rayon = RAYON_PALET
@@ -229,7 +273,8 @@ export class Hockey {
         p.y += (c.stats.centroidY - p.y) * suit
         p.vx = c.stats.velX
         p.vy = c.stats.velY
-        return null
+        // porté jusque dans une cage : c'est un but aussi
+        return this.dansUneCage(p)
       }
     } else {
       // libre : ce que l'eau lui a rendu pendant le pas
@@ -362,9 +407,10 @@ export class Hockey {
     }
   }
 
-  /** Les parois et les cages. Le joueur 0 garde la cage de GAUCHE. */
+  /** Les parois du terrain, les parois des cages, et le but. */
   private parois(p: FluidSimMulti['palet']): Evenement {
     const r = p.rayon
+    // le tour du terrain : il n'a plus d'ouverture, les cages sont dedans
     if (p.y - r < TERRAIN.minY) {
       p.y = TERRAIN.minY + r
       if (p.vy < 0) p.vy = -p.vy * RESTITUTION_PAROI
@@ -372,24 +418,60 @@ export class Hockey {
       p.y = TERRAIN.maxY - r
       if (p.vy > 0) p.vy = -p.vy * RESTITUTION_PAROI
     }
-    const milieu = (TERRAIN.minY + TERRAIN.maxY) / 2
-    // dans l'axe de la cage : le palet entier passe entre les poteaux
-    const dansLAxe = Math.abs(p.y - milieu) < CAGE / 2 - r
     if (p.x - r < TERRAIN.minX) {
-      if (dansLAxe) {
-        if (p.x < TERRAIN.minX) return this.but(p, 1)
-      } else {
-        p.x = TERRAIN.minX + r
-        if (p.vx < 0) p.vx = -p.vx * RESTITUTION_PAROI
-      }
+      p.x = TERRAIN.minX + r
+      if (p.vx < 0) p.vx = -p.vx * RESTITUTION_PAROI
     } else if (p.x + r > TERRAIN.maxX) {
-      if (dansLAxe) {
-        if (p.x > TERRAIN.maxX) return this.but(p, 0)
+      p.x = TERRAIN.maxX - r
+      if (p.vx > 0) p.vx = -p.vx * RESTITUTION_PAROI
+    }
+    // les parois des cages : un disque contre un rectangle
+    for (const b of PAROIS_CAGES) {
+      const qx = p.x < b.minX ? b.minX : p.x > b.maxX ? b.maxX : p.x
+      const qy = p.y < b.minY ? b.minY : p.y > b.maxY ? b.maxY : p.y
+      let nx = p.x - qx
+      let ny = p.y - qy
+      const d2 = nx * nx + ny * ny
+      if (d2 >= r * r) continue
+      let d = Math.sqrt(d2)
+      if (d < 1e-6) {
+        // son centre est DANS la paroi : il ressort par le plus court
+        const g = p.x - b.minX
+        const dr = b.maxX - p.x
+        const h = p.y - b.minY
+        const ba = b.maxY - p.y
+        const m = Math.min(g, dr, h, ba)
+        nx = m === g ? -1 : m === dr ? 1 : 0
+        ny = m === h ? -1 : m === ba ? 1 : 0
+        if (nx !== 0) ny = 0
+        p.x += nx * (m + r)
+        p.y += ny * (m + r)
+        d = 1
       } else {
-        p.x = TERRAIN.maxX - r
-        if (p.vx > 0) p.vx = -p.vx * RESTITUTION_PAROI
+        nx /= d
+        ny /= d
+        p.x += nx * (r - d)
+        p.y += ny * (r - d)
+      }
+      const vn = p.vx * nx + p.vy * ny
+      if (vn < 0) {
+        p.vx -= (1 + RESTITUTION_PAROI) * vn * nx
+        p.vy -= (1 + RESTITUTION_PAROI) * vn * ny
       }
     }
+    return this.dansUneCage(p)
+  }
+
+  /** LE BUT : le palet a franchi la ligne d'une cage — plus qu'à moitié
+   *  dedans. Les parois ne laissent entrer que par devant ; porté par un
+   *  joueur, il compte aussi. Le joueur 0 garde la cage de GAUCHE. */
+  private dansUneCage(p: FluidSimMulti['palet']): Evenement {
+    if (Math.abs(p.y - (TERRAIN.minY + TERRAIN.maxY) / 2) >= OUVERTURE_CAGE / 2) return null
+    const seuil = p.rayon * 0.5
+    const gauche = p.x - TERRAIN.minX
+    if (gauche < LIGNE_BUT - seuil && gauche > LIGNE_BUT - PROFONDEUR_CAGE) return this.but(p, 1)
+    const droite = TERRAIN.maxX - p.x
+    if (droite < LIGNE_BUT - seuil && droite > LIGNE_BUT - PROFONDEUR_CAGE) return this.but(p, 0)
     return null
   }
 

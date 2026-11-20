@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { DEFAULT_PARAMS } from '../sim/params'
-import { BUTS_POUR_GAGNER, CAGE, CHARGE_PLEINE, DECOMPTE, DUREE_MATCH, Hockey, RAYON_PALET, TENUE_MAX, TERRAIN } from './hockey'
+import { BUTS_POUR_GAGNER, CHARGE_PLEINE, DECOMPTE, DUREE_MATCH, EPAISSEUR_CAGE, Hockey, LIGNE_BUT, OUVERTURE_CAGE, PROFONDEUR_CAGE, RAYON_PALET, TENUE_MAX, TERRAIN, paroisCages } from './hockey'
 import { Hote, Miroir, SALLE } from './partie'
 import { FluidSimMulti, KIND_PLAYER } from './solveurMulti'
 import { MODE_HOCKEY, MODE_LIBRE, PHASE_BUT, PHASE_DECOMPTE, PHASE_FINI, PHASE_JEU, encodeEtat, litEnteteEtat, modeTrame, particulesVides, type Commande, type JeuTrame } from './trame'
@@ -17,6 +17,22 @@ const enJeu = (): Hote => {
   pas(h, 1)
   return h
 }
+/** La vitesse moyenne du corps j, lue sur ses particules (les statistiques
+ *  du corps ne sont rafraîchies que de loin en loin). */
+const vitesse = (h: Hote, j: number): { x: number; y: number } => {
+  const s = h.sim
+  let x = 0
+  let y = 0
+  let m = 0
+  for (let i = 0; i < s.count; i++) {
+    if (s.kind[i] !== KIND_PLAYER || s.proprio[i] !== j) continue
+    x += s.velX[i]
+    y += s.velY[i]
+    m++
+  }
+  return { x: x / m, y: y / m }
+}
+
 const MILIEU_X = (TERRAIN.minX + TERRAIN.maxX) / 2
 const MILIEU_Y = (TERRAIN.minY + TERRAIN.maxY) / 2
 /** Largeur sur hauteur du corps j : 1 pour un rond. */
@@ -218,7 +234,7 @@ describe('hockey — avaler, porter, lancer', () => {
     const h = prise()
     pas(h, Math.ceil(CHARGE_PLEINE * 120) + 10)
     expect(h.jeu()!.charge).toBe(1)
-    const avant = h.sim.corps[1].stats.velX
+    const avant = vitesse(h, 1).x
     // on vise à gauche, et on se referme
     h.commande(1, { pousse: false, ouvert: false, x: 0, y: MILIEU_Y })
     pas(h, 1)
@@ -226,6 +242,9 @@ describe('hockey — avaler, porter, lancer', () => {
     expect(h.hockey!.tenuPar).toBe(-1)
     expect(p.vx).toBeLessThan(-1300)
     expect(Math.abs(p.vy)).toBeLessThan(60)
+    // le recul : le corps est reparti à l'opposé du lancer (mesuré : +200 u/s)
+    // — lu aussitôt : une seconde plus tard il a filé jusque dans sa cage
+    expect(vitesse(h, 1).x).toBeGreaterThan(avant + 120)
     let pire = 900
     for (let s = 0; s < 120; s++) {
       pas(h, 1)
@@ -234,8 +253,6 @@ describe('hockey — avaler, porter, lancer', () => {
     // le défaut vu à la première version : le pas où le porteur se refermait,
     // le palet au cœur de son corps en chassait la matière (351 sur 900)
     expect(pire).toBe(900)
-    // le recul : le corps est reparti à l'opposé du lancer (mesuré : +200 u/s)
-    expect(h.sim.corps[1].stats.velX).toBeGreaterThan(avant + 120)
     // et le palet est bien SORTI du corps, vers la gauche
     expect(p.x).toBeLessThan(h.sim.corps[1].stats.centroidX - 200)
   })
@@ -334,22 +351,6 @@ describe('hockey — voler le palet, dasher', () => {
       expect(h.hockey!.tenuPar).toBe(1)
     }
   })
-
-  /** La vitesse moyenne du corps j, lue sur ses particules (les statistiques
-   *  du corps ne sont rafraîchies que de loin en loin). */
-  const vitesse = (h: Hote, j: number): { x: number; y: number } => {
-    const s = h.sim
-    let x = 0
-    let y = 0
-    let m = 0
-    for (let i = 0; i < s.count; i++) {
-      if (s.kind[i] !== KIND_PLAYER || s.proprio[i] !== j) continue
-      x += s.velX[i]
-      y += s.velY[i]
-      m++
-    }
-    return { x: x / m, y: y / m }
-  }
 
   it('LE DASH : un appui, une brusque accélération à l’opposé du pointeur, puis une recharge', () => {
     const h = enJeu()
@@ -466,22 +467,126 @@ describe('hockey — les parois, les cages, le score', () => {
     expect(Math.abs(p.vy)).toBeGreaterThan(300)
   })
 
-  it('à côté de la cage, la paroi renvoie : pas de but', () => {
+  it('le fond du terrain renvoie partout : la cage n’y est plus', () => {
     const { sim, jeu, avance } = petit()
     const p = sim.palet
-    p.x = 300
-    p.y = MILIEU_Y - CAGE / 2 - 150
+    // derrière la cage de gauche, dans son axe : avant, c'était un but
+    p.x = 150
+    p.y = MILIEU_Y
     p.vx = -900
-    const vus = avance(120)
+    const vus = avance(20)
     expect(vus).toEqual([])
     expect(jeu.scores).toEqual([0, 0])
     expect(p.vx).toBeGreaterThan(0)
   })
 
+  it('PAR DERRIÈRE, le fond de la cage renvoie le palet : pas de but', () => {
+    const { sim, jeu, avance } = petit()
+    const p = sim.palet
+    p.x = 120
+    p.y = MILIEU_Y
+    p.vx = 900
+    let plusLoin = 0
+    const vus: string[] = []
+    for (let s = 0; s < 60; s++) {
+      vus.push(...avance(1))
+      plusLoin = Math.max(plusLoin, p.x)
+    }
+    expect(vus).toEqual([])
+    expect(jeu.scores).toEqual([0, 0])
+    // il n'a jamais dépassé le dos de la cage…
+    const dos = LIGNE_BUT - PROFONDEUR_CAGE - EPAISSEUR_CAGE
+    expect(plusLoin + RAYON_PALET).toBeLessThanOrEqual(dos + 1)
+    // …qu'il a bien touché
+    expect(plusLoin + RAYON_PALET).toBeGreaterThan(dos - 12)
+  })
+
+  it('PAR LE CÔTÉ non plus : la paroi le renvoie', () => {
+    const { sim, jeu, avance } = petit()
+    const p = sim.palet
+    p.x = LIGNE_BUT - PROFONDEUR_CAGE / 2
+    p.y = MILIEU_Y - OUVERTURE_CAGE / 2 - 300
+    p.vy = 900
+    const vus = avance(60)
+    expect(vus).toEqual([])
+    expect(jeu.scores).toEqual([0, 0])
+    expect(p.vy).toBeLessThan(0)
+    expect(p.y).toBeLessThan(MILIEU_Y - OUVERTURE_CAGE / 2)
+  })
+
+  it('on PASSE DERRIÈRE la cage : le palet y file d’un bord à l’autre', () => {
+    const { sim, avance } = petit()
+    const p = sim.palet
+    p.x = 140
+    p.y = 300
+    p.vy = 900
+    avance(150)
+    // il a traversé toute la hauteur de la cage par derrière, sans dévier
+    expect(p.y).toBeGreaterThan(MILIEU_Y + OUVERTURE_CAGE / 2 + 100)
+    expect(p.x).toBeCloseTo(140, 3)
+    expect(p.vy).toBeGreaterThan(0)
+  })
+
+  it('l’eau bute sur les parois de la cage : rien ne les traverse', () => {
+    const h = enJeu()
+    // le corps 0 est lancé dans sa propre cage, par devant
+    const sim = h.sim
+    for (let i = 0; i < sim.count; i++) if (sim.kind[i] === KIND_PLAYER && sim.proprio[i] === 0) sim.velX[i] -= 500
+    const parois = paroisCages()
+    let enfonce = 0
+    let derriere = 0
+    for (let s = 0; s < 300; s++) {
+      pas(h, 1)
+      if (s % 10 !== 9) continue
+      for (let i = 0; i < sim.count; i++) {
+        if (sim.proprio[i] !== 0) continue
+        const x = sim.posX[i]
+        const y = sim.posY[i]
+        // de combien elle est enfoncée dans une paroi (0 : dehors)
+        for (const b of parois) {
+          const e = Math.min(x - b.minX, b.maxX - x, y - b.minY, b.maxY - y)
+          if (e > enfonce) enfonce = e
+        }
+        // derrière le dos de la cage, dans son axe : il aurait fallu le traverser
+        if (x < LIGNE_BUT - PROFONDEUR_CAGE - EPAISSEUR_CAGE - 3 && Math.abs(y - MILIEU_Y) < OUVERTURE_CAGE / 2 - 20) derriere++
+      }
+    }
+    // une particule lancée à 500 u/s s'y enfonce à peine (mesuré : 3,3 u au
+    // pire, pour une paroi de 36 u)
+    expect(enfonce).toBeLessThan(8)
+    expect(derriere).toBe(0)
+    // le corps est bien entré dans la cage (c'est de l'eau, il s'y loge)
+    expect(sim.corps[0].stats.centroidX).toBeLessThan(LIGNE_BUT + 60)
+  })
+
+  it('porté jusque dans la cage adverse, le palet compte aussi', () => {
+    const { sim, jeu, commandes, avance } = petit()
+    // le petit corps 1 (à droite) est ouvert, le palet posé sur lui : il le tient
+    commandes[1].ouvert = true
+    sim.corps[1].ouvert = true
+    const c = sim.corps[1].stats
+    sim.palet.x = c.centroidX
+    sim.palet.y = c.centroidY
+    avance(5)
+    expect(jeu.tenuPar).toBe(1)
+    // on dépose le corps (et donc le palet) dans la cage de gauche
+    const dx = LIGNE_BUT - 90 - c.centroidX
+    const dy = MILIEU_Y - c.centroidY
+    for (let i = 0; i < sim.count; i++) {
+      if (sim.proprio[i] !== 1) continue
+      sim.posX[i] += dx
+      sim.posY[i] += dy
+    }
+    const vus = avance(80)
+    expect(vus).toContain('but')
+    expect(jeu.scores).toEqual([0, 1])
+  })
+
   it('dans la cage de GAUCHE : un but pour le joueur 1, une pause, puis l’engagement', () => {
     const { sim, jeu, avance } = petit()
     const p = sim.palet
-    p.x = 300
+    // par DEVANT, dans l'ouverture de la cage
+    p.x = 700
     p.y = MILIEU_Y + 40
     p.vx = -900
     const vus = avance(60)
@@ -506,7 +611,7 @@ describe('hockey — les parois, les cages, le score', () => {
 
   it('dans la cage de DROITE : un but pour le joueur 0', () => {
     const { sim, jeu, avance } = petit()
-    sim.palet.x = TERRAIN.maxX - 300
+    sim.palet.x = TERRAIN.maxX - 700
     sim.palet.vx = 900
     expect(avance(60)).toEqual(['but'])
     expect(jeu.scores).toEqual([1, 0])
@@ -516,7 +621,7 @@ describe('hockey — les parois, les cages, le score', () => {
     const { sim, jeu, avance } = petit()
     const vus: string[] = []
     for (let k = 0; k < BUTS_POUR_GAGNER; k++) {
-      sim.palet.x = TERRAIN.maxX - 300
+      sim.palet.x = TERRAIN.maxX - 700
       sim.palet.y = MILIEU_Y
       sim.palet.vx = 900
       // le but, la pause, l'engagement, le décompte : plus de trois secondes
@@ -547,7 +652,7 @@ describe('hockey — les parois, les cages, le score', () => {
     h.commande(0, { pousse: true, ouvert: false, x: 0, y: 0 })
     pas(h, 120)
     h.commande(0, { pousse: false, ouvert: false, x: 0, y: 0 })
-    h.sim.palet.x = 200
+    h.sim.palet.x = 620
     h.sim.palet.y = MILIEU_Y
     h.sim.palet.vx = -900
     pas(h, 60)
@@ -563,7 +668,7 @@ describe('hockey — les parois, les cages, le score', () => {
 
   it('LE TEMPS : à la fin le meilleur score gagne', () => {
     const { sim, jeu, avance } = petit()
-    sim.palet.x = TERRAIN.maxX - 300
+    sim.palet.x = TERRAIN.maxX - 700
     sim.palet.vx = 900
     avance(60)
     expect(jeu.scores).toEqual([1, 0])
@@ -582,7 +687,7 @@ describe('hockey — les parois, les cages, le score', () => {
     expect(avance(20)).toEqual([])
     expect(jeu.enOr).toBe(true)
     expect(jeu.phase).toBe(PHASE_JEU)
-    sim.palet.x = 300
+    sim.palet.x = 700
     sim.palet.vx = -900
     expect(avance(60)).toEqual(['fini'])
     expect(jeu.scores).toEqual([0, 1])
@@ -594,7 +699,7 @@ describe('hockey — les parois, les cages, le score', () => {
     avance(120)
     const t = jeu.chrono
     expect(t).toBeCloseTo(DUREE_MATCH - 1, 1)
-    sim.palet.x = 300
+    sim.palet.x = 700
     sim.palet.vx = -900
     avance(60)
     expect(jeu.phase).toBe(PHASE_BUT)

@@ -58,8 +58,9 @@ const POIDS_GOUTTE = 4
 
 /** Ce que le hockey ajoute à l'image : le palet et les cages. */
 export interface SceneHockey {
-  /** La hauteur de l'ouverture des cages. */
-  cage: number
+  /** Les cages : la distance de la ligne de but au fond du terrain, leur
+   *  profondeur, la hauteur de leur ouverture, l'épaisseur de leurs parois. */
+  cage: { ligne: number; profondeur: number; ouverture: number; epaisseur: number }
   palet: { x: number; y: number; rayon: number; vx: number; vy: number } | null
   /** Le joueur qui tient le palet (−1 : personne), sa charge (0 à 1) et le
    *  point qu'il vise : le lancer partira vers là. */
@@ -133,7 +134,7 @@ uniform float uGain;      // le champ est stocké divisé par ce gain (texture 8
 uniform float uPixel;     // la taille d'un pixel, en unités monde
 uniform vec4 uOuvert;     // 1 si le joueur de ce canal est OUVERT
 uniform float uTemps;     // secondes, pour le souffle d'un corps ouvert
-uniform float uCage;      // hockey : la hauteur de l'ouverture des cages (0 : pas de cage)
+uniform vec4 uCage;       // hockey : ligne de but, profondeur, ouverture, épaisseur des parois (0 : pas de cage)
 uniform vec4 uPalet;      // hockey : x, y, rayon, 1 s'il est en jeu
 uniform vec4 uPorteur;    // hockey : qui le tient (−1 : personne), sa charge, sa visée (x, y)
 uniform vec2 uPaletV;     // hockey : la vitesse du palet (sa traînée)
@@ -161,28 +162,38 @@ void main() {
   vec2 dMur = min(monde - uSalle.xy, uSalle.zw - monde);
   float mur = min(dMur.x, dMur.y);
   float trait = 1.0 - smoothstep(0.0, max(6.0, uPixel * 2.0), abs(mur));
-  // ---- le hockey : les cages. La paroi s'ouvre sur un tiers de sa hauteur ;
-  // chaque cage porte la couleur de celui qui la GARDE.
-  float milieuY = (uSalle.y + uSalle.w) * 0.5;
-  float dansLAxe = uCage > 0.0 ? 1.0 - smoothstep(uCage * 0.5 - uPixel, uCage * 0.5 + uPixel, abs(monde.y - milieuY)) : 0.0;
-  float surUnCote = step(dMur.x, dMur.y);
-  trait *= 1.0 - dansLAxe * surUnCote;
   fond += trait * vec3(0.38, 0.55, 0.68);
   fond += salle * exp(-max(mur, 0.0) / 90.0) * vec3(0.03, 0.055, 0.075);
-  if (uCage > 0.0) {
+  // ---- le hockey : les cages, posées DANS le terrain — on passe derrière.
+  // Chacune porte la couleur de celui qui la GARDE.
+  if (uCage.x > 0.0) {
+    float milieuY = (uSalle.y + uSalle.w) * 0.5;
     float aGauche = step(monde.x, (uSalle.x + uSalle.z) * 0.5);
     vec3 camp = mix(uCouleurs[1], uCouleurs[0], aGauche);
-    // le filet, derrière la ligne
-    float derriere = -dMur.x;
-    float filet = dansLAxe * step(0.0, derriere) * (1.0 - smoothstep(52.0, 60.0, derriere));
-    fond += filet * camp * (0.16 + 0.22 * grille(monde, 20.0));
-    // les poteaux
-    vec2 poteau = vec2(dMur.x, abs(abs(monde.y - milieuY) - uCage * 0.5));
-    fond += (1.0 - smoothstep(9.0, 9.0 + uPixel * 2.0, length(poteau))) * camp;
-    // la zone du gardien, et la ligne du milieu : des repères, pas des murs
-    float zone = length(vec2(dMur.x, monde.y - milieuY));
-    fond += salle * camp * 0.05 * (1.0 - smoothstep(uCage * 0.5 - 4.0, uCage * 0.5, zone));
-    fond += salle * camp * 0.22 * (1.0 - smoothstep(0.0, uPixel * 2.0, abs(zone - uCage * 0.5)));
+    // les deux cages se dessinent d'un coup, en miroir : la distance au fond
+    // de SON côté du terrain, et l'écart à l'axe
+    float duFond = mix(uSalle.z - monde.x, monde.x - uSalle.x, aGauche);
+    float ecartAxe = abs(monde.y - milieuY);
+    float ligne = uCage.x;
+    float creux = uCage.x - uCage.y;      // le fond de la cage, côté intérieur
+    float demi = uCage.z * 0.5;
+    float ep = uCage.w;
+    float net = uPixel * 1.5;
+    // le filet, dans la cage
+    float dedans = step(creux, duFond) * step(duFond, ligne) * step(ecartAxe, demi);
+    fond += salle * dedans * camp * (0.07 + 0.2 * grille(monde, 20.0));
+    // ses trois parois : le fond et les deux côtés
+    float paroiFond = smoothstep(creux - ep - net, creux - ep, duFond) * (1.0 - smoothstep(creux, creux + net, duFond)) * (1.0 - smoothstep(demi + ep, demi + ep + net, ecartAxe));
+    float paroiCote = smoothstep(creux - ep - net, creux - ep, duFond) * (1.0 - smoothstep(ligne, ligne + net, duFond)) * smoothstep(demi - net, demi, ecartAxe) * (1.0 - smoothstep(demi + ep, demi + ep + net, ecartAxe));
+    float paroi = max(paroiFond, paroiCote);
+    fond = mix(fond, camp * 0.62 + vec3(0.05), salle * paroi);
+    // la ligne de but, et la zone du gardien devant elle
+    fond += salle * camp * 0.5 * step(ecartAxe, demi) * (1.0 - smoothstep(0.0, uPixel * 2.0, abs(duFond - ligne)));
+    float zone = length(vec2(max(duFond - ligne, 0.0), monde.y - milieuY));
+    float devant = step(ligne, duFond);
+    fond += salle * devant * camp * 0.045 * (1.0 - smoothstep(demi + 56.0, demi + 60.0, zone));
+    fond += salle * devant * camp * 0.2 * (1.0 - smoothstep(0.0, uPixel * 2.0, abs(zone - demi - 60.0)));
+    // la ligne du milieu : un repère, pas un mur
     float axe = abs(monde.x - (uSalle.x + uSalle.z) * 0.5);
     fond += salle * vec3(0.05, 0.08, 0.1) * (1.0 - smoothstep(0.0, uPixel * 2.0, axe));
   }
@@ -449,7 +460,8 @@ export class RenduMulti {
     gl.uniform4f(gl.getUniformLocation(this.progEcran, 'uOuvert'), ouverts[0] ? 1 : 0, ouverts[1] ? 1 : 0, ouverts[2] ? 1 : 0, ouverts[3] ? 1 : 0)
     gl.uniform1f(gl.getUniformLocation(this.progEcran, 'uTemps'), temps % 1000)
     const palet = scene?.palet ?? null
-    gl.uniform1f(gl.getUniformLocation(this.progEcran, 'uCage'), scene ? scene.cage : 0)
+    const cage = scene?.cage
+    gl.uniform4f(gl.getUniformLocation(this.progEcran, 'uCage'), cage?.ligne ?? 0, cage?.profondeur ?? 0, cage?.ouverture ?? 0, cage?.epaisseur ?? 0)
     gl.uniform4f(gl.getUniformLocation(this.progEcran, 'uPalet'), palet?.x ?? 0, palet?.y ?? 0, palet?.rayon ?? 1, palet ? 1 : 0)
     gl.uniform2f(gl.getUniformLocation(this.progEcran, 'uPaletV'), palet?.vx ?? 0, palet?.vy ?? 0)
     const e = this.eclats

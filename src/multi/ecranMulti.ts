@@ -17,7 +17,7 @@
 import { cadreSalle, cadreVoulu, ecranVersMonde, mondeVersEcran, suitCadre, type Cadre } from './cadrage'
 import { ALPHABET_CODE, litCodePartie, LONGUEUR_CODE } from './code'
 import { CADENCE_ETAT, CAPACITE, Hote, Miroir, SALLE } from './partie'
-import { BUTS_POUR_GAGNER, CAGE, RAYON_PALET } from './hockey'
+import { BUTS_POUR_GAGNER, EPAISSEUR_CAGE, LIGNE_BUT, OUVERTURE_CAGE, PROFONDEUR_CAGE, RAYON_PALET } from './hockey'
 import { commandeManette, defileCaractere, litManette, litMenu, nouvelEtatManette, nouvelEtatMenu, voisinMenu, type PadLu } from './manetteMulti'
 import { adresseRelais, creePartie, liaisonPossible, rejointPartie, type EtatLiaison, type Liaison, type Ordre } from './relais'
 import { DUREE_ECLAT, ECLATS_MAX, RenduMulti, couleurCss, type Eclat, type SceneHockey } from './renduMulti'
@@ -859,7 +859,7 @@ export function creeEcranMulti(quitte: () => void): EcranMulti {
     if (jeu) {
       const porteur = corps[jeu.tenuPar]
       scene = {
-        cage: CAGE,
+        cage: { ligne: LIGNE_BUT, profondeur: PROFONDEUR_CAGE, ouverture: OUVERTURE_CAGE, epaisseur: EPAISSEUR_CAGE },
         palet: jeu.paletActif ? { x: jeu.paletX, y: jeu.paletY, rayon: RAYON_PALET, vx: jeu.paletVx, vy: jeu.paletVy } : null,
         porteur: porteur ? jeu.tenuPar : -1,
         charge: jeu.charge,
