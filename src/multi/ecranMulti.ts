@@ -17,9 +17,24 @@
 import { cadreSalle, cadreVoulu, ecranVersMonde, mondeVersEcran, suitCadre, type Cadre } from './cadrage'
 import { litCodePartie, LONGUEUR_CODE } from './code'
 import { CADENCE_ETAT, CAPACITE, Hote, Miroir, SALLE } from './partie'
+import { BUTS_POUR_GAGNER, CAGE, RAYON_PALET } from './hockey'
 import { adresseRelais, creePartie, liaisonPossible, rejointPartie, type EtatLiaison, type Liaison, type Ordre } from './relais'
-import { RenduMulti, couleurCss } from './renduMulti'
-import { VERSION_TRAME, decodeCommande, encodeCommande, type Commande, type CorpsTrame, type Particules } from './trame'
+import { RenduMulti, couleurCss, type SceneHockey } from './renduMulti'
+import {
+  MODE_HOCKEY,
+  MODE_LIBRE,
+  PHASE_BUT,
+  PHASE_FINI,
+  PHASE_JEU,
+  VERSION_TRAME,
+  decodeCommande,
+  encodeCommande,
+  type Bornes,
+  type Commande,
+  type CorpsTrame,
+  type JeuTrame,
+  type Particules,
+} from './trame'
 
 type Role = 'hote' | 'invite' | 'seul'
 type Page = 'salon' | 'creation' | 'jonction' | 'jeu'
@@ -85,13 +100,25 @@ const STYLE = `
 .mu-voile div { max-width: 520px; display: flex; flex-direction: column; gap: 14px; text-align: center; line-height: 1.5; }
 .mu-etiquette { position: absolute; transform: translate(-50%, -50%); pointer-events: none; font-family: var(--font-display, sans-serif); letter-spacing: 0.2em;
   font-size: calc(12px * var(--ui, 1)); text-shadow: 0 0 8px #000, 0 0 2px #000; transition: opacity 0.6s; }
-@media (max-width: 560px) { .mu-choix { grid-template-columns: 1fr; } }
+.mu-modes { margin-bottom: 12px; }
+.mu-modes button { padding: 0.9em 1em; opacity: 0.6; }
+.mu-modes button[data-choisi="1"] { opacity: 1; border-color: var(--accent, #8fd3ff); box-shadow: inset 0 0 0 1px var(--accent, #8fd3ff); }
+.mu-score { position: absolute; top: 14px; left: 50%; transform: translateX(-50%); display: flex; flex-direction: column; align-items: center; gap: 4px; pointer-events: none; font-family: var(--font-display, sans-serif); }
+.mu-score[hidden] { display: none; }
+.mu-score div { display: flex; align-items: baseline; gap: 0.5em; font-size: 2.2em; letter-spacing: 0.06em; }
+.mu-score div span { color: var(--dim, #7f9cb0); font-size: 0.6em; }
+.mu-score small { letter-spacing: 0.18em; min-height: 1.2em; }
+@media (max-width: 560px) { .mu-choix { grid-template-columns: 1fr; } .mu-score { top: 150px; } }
 `
 
 const GABARIT = `
 <div class="mu-salon" data-page="salon">
   <h2 class="mu-titre">MULTI</h2>
   <p class="mu-sous">Prototype à deux, chacun chez soi. L’un crée la partie et donne son code, l’autre le tape. Aucun compte.</p>
+  <div class="mu-choix mu-modes" role="group" aria-label="Le mode de jeu">
+    <button type="button" data-mode="0" data-choisi="1"><b>MODE LIBRE</b><span>Une grande salle vide, pour essayer les gestes.</span></button>
+    <button type="button" data-mode="1" data-choisi="0"><b>MODE HOCKEY</b><span>Un palet, deux cages. Le premier à ${BUTS_POUR_GAGNER} buts gagne.</span></button>
+  </div>
   <div class="mu-choix">
     <button type="button" data-geste="creer"><b>CRÉER UNE PARTIE</b><span>Votre machine fait tourner la simulation : à choisir sur le PC le plus puissant.</span></button>
     <button type="button" data-geste="rejoindre"><b>REJOINDRE UNE PARTIE</b><span>Votre ami vous a donné un code de cinq caractères.</span></button>
@@ -139,6 +166,7 @@ const GABARIT = `
     <div class="mu-jauge" data-jauge="1"><i></i><div class="mu-barre"><u></u></div><b>100 %</b><small></small></div>
     <div class="mu-lien" data-lien></div>
   </div>
+  <div class="mu-score" data-score hidden><div><b data-but="0">0</b><span>—</span><b data-but="1">0</b></div><small data-score-mot></small></div>
   <div class="mu-actions">
     <button type="button" data-geste="autre" hidden>L’AUTRE : FERMÉ</button>
     <button type="button" data-geste="changer" hidden>CHANGER DE CORPS</button>
@@ -165,6 +193,8 @@ export function creeEcranMulti(quitte: () => void): EcranMulti {
   /** le code de la partie créée (pour le copier) */
   let codePartie = ''
   let cadre: Cadre = cadreSalle(SALLE, 16 / 9)
+  /** Le mode choisi au salon, pour la partie qu'on crée. */
+  let modeChoisi: number = MODE_LIBRE
   let rafId = 0
   let dernier = 0
   let resteEnvoi = 0
@@ -224,6 +254,14 @@ export function creeEcranMulti(quitte: () => void): EcranMulti {
     r.innerHTML = GABARIT
     document.body.appendChild(r)
     r.addEventListener('click', (ev) => {
+      const m = (ev.target as HTMLElement).closest<HTMLButtonElement>('button[data-mode]')
+      if (m) {
+        // le mode vaut pour la partie qu'on CRÉE (ou qu'on essaie seul) ;
+        // celui qui rejoint l'apprend de l'hôte
+        modeChoisi = Number(m.dataset.mode) === MODE_HOCKEY ? MODE_HOCKEY : MODE_LIBRE
+        for (const e of r.querySelectorAll<HTMLElement>('button[data-mode]')) e.dataset.choisi = Number(e.dataset.mode) === modeChoisi ? '1' : '0'
+        return
+      }
       const b = (ev.target as HTMLElement).closest<HTMLButtonElement>('button[data-geste]')
       // le bouton d'un formulaire agit par « submit » (ci-dessous) : la
       // touche Entrée dans le champ fait alors le même geste que le clic
@@ -518,19 +556,17 @@ export function creeEcranMulti(quitte: () => void): EcranMulti {
     if (r === 'invite') {
       miroir = new Miroir()
     } else {
-      hote = new Hote()
+      hote = new Hote(2, undefined, modeChoisi)
     }
-    el<HTMLElement>('[data-aide]').textContent =
-      'Clic maintenu : la matière part vers le pointeur, le corps à l’opposé — sur votre corps, il se rassemble. ' +
-      'ESPACE ou clic droit maintenu : vous OUVRIR. Deux corps ouverts fusionnent ; un corps ouvert boit ce qu’on lui tire ; fermé, il repousse.' +
-      (r === 'hote' ? ' Votre machine simule la partie : ne fermez pas cet onglet.' : '')
+    aideDuMode = -1
+    el<HTMLElement>('[data-score]').hidden = true
     el<HTMLButtonElement>('[data-geste="autre"]').hidden = r !== 'seul'
     ouvre.clavier = false
     ouvre.souris = false
     ouvre.bouton = false
     autreOuvert = false
     peintAutre()
-    cadre = cadreSalle(SALLE, rendu.aspect())
+    cadre = cadreSalle(hote?.salle ?? SALLE, rendu.aspect())
     seqCommande = 0
     seqCommandeRecue = -1
     latenceMs = -1
@@ -645,16 +681,21 @@ export function creeEcranMulti(quitte: () => void): EcranMulti {
 
     let particules: Particules
     let corps: CorpsTrame[]
+    let jeu: JeuTrame | null
+    let salle: Bornes
     if (role === 'invite') {
       liaison?.envoieFlux(encodeCommande(++seqCommande, commande))
       particules = miroir!.vue(maintenant)
       corps = miroir!.corps
+      jeu = miroir!.jeu(maintenant)
+      salle = miroir!.salle
     } else {
       const h = hote!
       h.commande(moi, commande)
       // SEUL : le corps qu'on ne pilote pas ne pousse pas, et tient l'état
-      // de son interrupteur
-      if (role === 'seul') h.commande(1 - moi, { pousse: false, ouvert: autreOuvert, x: 0, y: 0 })
+      // de son interrupteur ; il vise où vise le pointeur (au hockey, c'est
+      // par là qu'il lancerait le palet)
+      if (role === 'seul') h.commande(1 - moi, { pousse: false, ouvert: autreOuvert, x: vise.x, y: vise.y })
       h.avance(dt)
       if (role === 'hote' && liaison) {
         resteEnvoi -= dt
@@ -669,13 +710,70 @@ export function creeEcranMulti(quitte: () => void): EcranMulti {
       }
       particules = h.vue()
       corps = h.corps()
+      jeu = h.jeu()
+      salle = h.salle
     }
 
     if (!dessine) return
-    if (corps.length > 0) cadre = suitCadre(cadre, cadreVoulu(corps, SALLE, rendu.aspect()), dt)
-    rendu.dessine(particules, cadre, SALLE, corps.map((c) => c.ouvert), maintenant / 1000)
+    // AU HOCKEY on voit tout le terrain, toujours : il faut lire les deux
+    // cages et le palet d'un coup d'œil, pas seulement les deux corps
+    const voulu = jeu ? cadreSalle(salle, rendu.aspect()) : corps.length > 0 ? cadreVoulu(corps, salle, rendu.aspect()) : cadre
+    cadre = suitCadre(cadre, voulu, dt)
+    let scene: SceneHockey | null = null
+    if (jeu) {
+      const porteur = corps[jeu.tenuPar]
+      scene = {
+        cage: CAGE,
+        palet: jeu.paletActif ? { x: jeu.paletX, y: jeu.paletY, rayon: RAYON_PALET } : null,
+        porteur: porteur ? jeu.tenuPar : -1,
+        charge: jeu.charge,
+        viseeX: porteur?.viseeX ?? 0,
+        viseeY: porteur?.viseeY ?? 0,
+      }
+    }
+    rendu.dessine(particules, cadre, salle, corps.map((c) => c.ouvert), maintenant / 1000, scene)
+    peintAide(jeu ? MODE_HOCKEY : MODE_LIBRE)
+    peintScore(jeu)
     peintAth(corps, maintenant, dt)
     el<HTMLElement>('[data-tenir="ouvrir"]').dataset.tenu = jeMOuvre() ? '1' : '0'
+  }
+
+  /** L'aide du bas d'écran suit le mode — que l'invité n'apprend qu'à la
+   *  première image reçue. */
+  let aideDuMode = -1
+  function peintAide(mode: number): void {
+    if (mode === aideDuMode) return
+    aideDuMode = mode
+    const commun = 'Clic maintenu : la matière part vers le pointeur, le corps à l’opposé — sur votre corps, il se rassemble. '
+    const propre =
+      mode === MODE_HOCKEY
+        ? 'ESPACE ou clic droit maintenu : vous OUVRIR pour avaler le palet ; relâchez, il part vers le pointeur, plus fort si vous l’avez tenu. Fermé, vous le renvoyez. Le palet dans la cage adverse : un but.'
+        : 'ESPACE ou clic droit maintenu : vous OUVRIR. Deux corps ouverts fusionnent ; un corps ouvert boit ce qu’on lui tire ; fermé, il repousse.'
+    el<HTMLElement>('[data-aide]').textContent = commun + propre + (role === 'hote' ? ' Votre machine simule la partie : ne fermez pas cet onglet.' : '')
+  }
+
+  function peintScore(jeu: JeuTrame | null): void {
+    const boite = el<HTMLElement>('[data-score]')
+    boite.hidden = !jeu
+    if (!jeu) return
+    for (let j = 0; j < 2; j++) {
+      const b = el<HTMLElement>(`[data-but="${j}"]`)
+      const texte = String(jeu.scores[j])
+      if (b.textContent !== texte) b.textContent = texte
+      b.style.color = couleurCss(j)
+    }
+    const quiMarque = jeu.buteur === moi ? 'VOUS' : role === 'seul' ? 'L’AUTRE CORPS' : 'VOTRE AMI'
+    const mot =
+      jeu.phase === PHASE_FINI
+        ? jeu.buteur === moi
+          ? 'VOUS GAGNEZ — RECOMMENCER POUR REJOUER'
+          : `${quiMarque} GAGNE — RECOMMENCER POUR REJOUER`
+        : jeu.phase === PHASE_BUT
+          ? `BUT — ${quiMarque}`
+          : ''
+    const e = el<HTMLElement>('[data-score-mot]')
+    if (e.textContent !== mot) e.textContent = mot
+    e.style.color = jeu.phase === PHASE_JEU || jeu.buteur < 0 ? '' : couleurCss(jeu.buteur)
   }
 
   function peintAth(corps: CorpsTrame[], maintenant: number, dt: number): void {
@@ -788,6 +886,7 @@ export function creeEcranMulti(quitte: () => void): EcranMulti {
     debit: debitTexte,
     imagesSautees,
     corps: role === 'invite' ? (miroir?.corps ?? []) : (hote?.corps() ?? []),
+    jeu: role === 'invite' ? (miroir?.jeu(performance.now()) ?? null) : (hote?.jeu() ?? null),
     images: miroir ? { recues: miroir.recues, perdues: miroir.perdues } : null,
     particules: role === 'invite' ? (miroir?.vue(performance.now()).n ?? 0) : (hote?.sim.count ?? 0),
     tSim: role === 'invite' ? (miroir?.tSim ?? 0) : (hote?.tSim ?? 0),

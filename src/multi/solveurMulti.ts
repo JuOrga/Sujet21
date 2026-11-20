@@ -181,6 +181,31 @@ export const JOUEURS_MAX = 4
 /** Le propriétaire d'une particule qui n'est à personne (semée par la
  *  salle, ou jamais attribuée). */
 export const SANS_PROPRIO = 255
+/** LE PALET du hockey : un disque solide posé dans la salle. Le solveur n'en
+ *  connaît que le CONTACT avec l'eau — il repousse les particules, et note ce
+ *  qu'elles lui rendent. Sa course, les parois, les cages, qui le tient et
+ *  qui le lance : c'est la règle du jeu, et elle vit dans palet.ts. */
+export interface PaletSim {
+  actif: boolean
+  x: number
+  y: number
+  vx: number
+  vy: number
+  rayon: number
+  /** Sa masse, comptée en particules (une particule pèse 1). */
+  masse: number
+  /** Les corps qu'il TRAVERSE, un bit par joueur : un corps ouvert le laisse
+   *  entrer, et celui qui vient de le lancer le laisse sortir. */
+  traverse: number
+  /** La quantité de mouvement que l'eau lui a rendue pendant le pas. */
+  recuX: number
+  recuY: number
+  /** Par joueur : combien de particules de son corps sont sous le palet. */
+  readonly dessous: Int32Array
+}
+export function paletVide(): PaletSim {
+  return { actif: false, x: 0, y: 0, vx: 0, vy: 0, rayon: 48, masse: 120, traverse: 0, recuX: 0, recuY: 0, dessous: new Int32Array(JOUEURS_MAX) }
+}
 /** Le nombre de cases par corps du tampon de forme (voir FluidSimMulti.forme). */
 const FORME = 12
 
@@ -424,6 +449,31 @@ export class FluidSimMulti {
    *  au contact de matière étrangère, et s'annule à cette part-ci — au
    *  contact simple, seule la couche du bord touche. */
   static PEAU_MELEE = 0.15
+
+  /** AU HOCKEY, la matière tirée revient à son corps d'où qu'elle soit. Dans
+   *  le jeu, une goutte tombée hors du rayon de capture est perdue — « allez
+   *  la chercher » ; sur un terrain où l'on se déplace sans cesse, c'était
+   *  la ruine : mesuré à l'écran, un corps qui pousse pour rejoindre le
+   *  palet au centre y arrive avec 593 particules sur 900, et il lui en
+   *  reste 126 après une poursuite. Faux par défaut : rien ne change. */
+  rappelSansLimite = false
+  /** Une goutte qui s'ÉLOIGNE du corps plus vite que cela est un jet en
+   *  vol : on ne la rappelle pas (u/s). */
+  static VITESSE_POSEE = 200
+  /** Le plafond de la vitesse de retour, vue du corps (u/s). */
+  static VITESSE_RETOUR = 900
+  /** Le palet du hockey (inactif hors de ce mode : rien ne change alors). */
+  readonly palet: PaletSim = paletVide()
+  /** La raideur du contact avec le palet, en u/s² pour une particule
+   *  enfoncée d'une marge entière. Comme le rebond entre corps, ce que
+   *  reçoit une particule de corps va au corps entier, de biais : le corps
+   *  s'écrase sur le palet et le renvoie. */
+  static RAIDEUR_PALET = 60000
+  /** L'épaisseur, en rayons de noyau, de la couche où le palet se fait
+   *  sentir avant d'être touché. */
+  static MARGE_PALET = 1
+  /** Le plafond de la force, en marges enfoncées. */
+  static PLAFOND_PALET = 3
 
   /** Pose les cloisons d'après l'état ouvert/fermé de chaque corps. */
   private poseCloisons(): void {
@@ -3126,7 +3176,19 @@ export class FluidSimMulti {
     // d'étrangères à portée se repousse ; le terme est exactement opposé pour
     // i et j, et ce qu'un corps reçoit par ses particules lui est rendu en
     // entier, réparti : la quantité de mouvement d'ensemble est conservée.
-    if (cloisons) {
+    const palet = this.palet
+    if (palet.actif) {
+      palet.recuX = 0
+      palet.recuY = 0
+      palet.dessous.fill(0)
+    }
+    if (cloisons || palet.actif) {
+      const paletActif = palet.actif
+      const margeP = FluidSimMulti.MARGE_PALET * h
+      const porteeP = palet.rayon + margeP
+      const porteeP2 = porteeP * porteeP
+      const raideurP = FluidSimMulti.RAIDEUR_PALET * dt
+      const plafondP = FluidSimMulti.PLAFOND_PALET
       const portee = FluidSimMulti.PORTEE_REBOND * h
       const portee2 = portee * portee
       const raideur = FluidSimMulti.RAIDEUR_REBOND * dt
@@ -3168,6 +3230,42 @@ export class FluidSimMulti {
           const f = (raideur * force) / r
           fx += dx * f
           fy += dy * f
+        }
+        if (paletActif) {
+          const dx = xi - palet.x
+          const dy = yi - palet.y
+          const r2 = dx * dx + dy * dy
+          if (r2 < porteeP2) {
+            const r = Math.sqrt(r2) + 1e-6
+            if (duCorps && r < palet.rayon) palet.dessous[pi]++
+            // un corps ouvert (ou celui qui vient de lancer) le laisse passer ;
+            // une goutte libre, jamais : le jet POUSSE le palet
+            if (!(duCorps && ((palet.traverse >> pi) & 1) === 1)) {
+              let q = (porteeP - r) / margeP
+              if (q > plafondP) q = plafondP
+              const f = (raideurP * q) / r
+              fx += dx * f
+              fy += dy * f
+              palet.recuX -= dx * f
+              palet.recuY -= dy * f
+              if (r < palet.rayon) {
+                // LE NOYAU DUR : rien n'entre dans le palet. La particule est
+                // remise à sa surface, et ce qu'elle perd de vitesse vers lui
+                // lui est donné.
+                const nx = dx / r
+                const ny = dy / r
+                prdX[i] = palet.x + nx * palet.rayon
+                prdY[i] = palet.y + ny * palet.rayon
+                const vn = (velX[i] - palet.vx) * nx + (velY[i] - palet.vy) * ny
+                if (vn < 0) {
+                  velX[i] -= vn * nx
+                  velY[i] -= vn * ny
+                  palet.recuX += vn * nx
+                  palet.recuY += vn * ny
+                }
+              }
+            }
+          }
         }
         if (fx === 0 && fy === 0) continue
         if (duCorps) {
@@ -3609,7 +3707,30 @@ export class FluidSimMulti {
       const dx = cx - this.posX[i]
       const dy = cy - this.posY[i]
       const d2 = dx * dx + dy * dy
-      if (d2 > c2) continue // trop loin : perdue là où elle gît — allez la chercher
+      if (d2 > c2) {
+        // trop loin : perdue là où elle gît — allez la chercher. Sauf au
+        // hockey (rappelSansLimite), où la goutte revient de partout — sauf
+        // le jet en plein vol : le rappeler le freinait, et le corps, qui
+        // encaissait l'opposé, n'avançait plus (mesuré : 13 u/s après
+        // quatre secondes de poussée, contre 249).
+        if (!this.rappelSansLimite) continue
+        // la vitesse de la goutte VUE DU CORPS, le long de la ligne qui les
+        // joint (positive : elle revient)
+        const dl = Math.sqrt(d2)
+        const radiale = ((this.velX[i] - this.stats.velX) * dx + (this.velY[i] - this.stats.velY) * dy) / dl
+        if (radiale < -FluidSimMulti.VITESSE_POSEE) continue
+        // Ce retour de loin, le corps ne le PAIE pas : il y perdait le tiers
+        // de son élan dans les deux secondes suivant la poussée (179 u/s
+        // tombés à 78), tiré en arrière par ses propres gouttes. C'est une
+        // entorse assumée à l'antisymétrie du jeu, propre au hockey. La
+        // goutte ralentit en approchant (sa vitesse cible est sa distance) :
+        // elle se pose sur le corps, elle ne le pousse pas.
+        const kl = Math.min(1, 5 * dt)
+        const cible = Math.min(FluidSimMulti.VITESSE_RETOUR, dl)
+        this.velX[i] += ((cible - radiale) * dx * kl) / dl
+        this.velY[i] += ((cible - radiale) * dy * kl) / dl
+        continue
+      }
       const d = Math.sqrt(d2)
       if (d < 1e-3) continue
       // même asservissement en vitesse que le rappel de condensation : la

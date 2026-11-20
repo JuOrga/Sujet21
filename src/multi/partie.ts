@@ -9,15 +9,20 @@
 import { DEFAULT_PARAMS, type SimParams } from '../sim/params'
 import { FixedLoop } from '../game/loop'
 import { FluidSimMulti, KIND_PLAYER, SANS_PROPRIO } from './solveurMulti'
+import { Hockey, TERRAIN } from './hockey'
 import {
+  MODE_HOCKEY,
+  MODE_LIBRE,
   attributs,
   decodeParticules,
   encodeEtat,
   litEnteteEtat,
+  modeTrame,
   particulesVides,
   type Bornes,
   type Commande,
   type CorpsTrame,
+  type JeuTrame,
   type Particules,
 } from './trame'
 
@@ -35,6 +40,16 @@ export const DEPARTS: readonly { x: number; y: number }[] = [
   { x: SALLE.minX + (SALLE.maxX - SALLE.minX) * 0.25, y: (SALLE.minY + SALLE.maxY) / 2 },
   { x: SALLE.minX + (SALLE.maxX - SALLE.minX) * 0.75, y: (SALLE.minY + SALLE.maxY) / 2 },
 ]
+/** La salle d'un mode : le hockey a son terrain, plus court. */
+export function salleDe(mode: number): Bornes {
+  return mode === MODE_HOCKEY ? TERRAIN : SALLE
+}
+/** Où naît le joueur j dans une salle : face à face, à mi-hauteur, au quart
+ *  et aux trois quarts de la longueur. */
+export function departDe(salle: Bornes, j: number): { x: number; y: number } {
+  const part = j % 2 === 0 ? 0.25 : 0.75
+  return { x: salle.minX + (salle.maxX - salle.minX) * part, y: (salle.minY + salle.maxY) / 2 }
+}
 /** La cadence d'envoi de l'état, en images par seconde. Le solveur tourne
  *  à 120 pas par seconde ; l'invité prolonge chaque image avec les vitesses
  *  jusqu'à la suivante. Vingt, et non plus trente : la partie passe par le
@@ -49,34 +64,43 @@ export class Hote {
   readonly commandes: Commande[]
   /** Le temps simulé depuis le début de la manche (s). */
   tSim = 0
+  /** Le mode de la partie, sa salle, et la règle du hockey s'il y a lieu. */
+  readonly mode: number
+  readonly salle: Bornes
+  readonly hockey: Hockey | null
   private readonly joueurs: number
   private readonly boucle = new FixedLoop()
   private seq = 0
   private readonly tampon = particulesVides(CAPACITE)
 
-  constructor(joueurs = 2, params: SimParams = { ...DEFAULT_PARAMS }) {
+  constructor(joueurs = 2, params: SimParams = { ...DEFAULT_PARAMS }, mode: number = MODE_LIBRE) {
     this.joueurs = joueurs
     this.params = params
+    this.mode = mode
+    this.salle = salleDe(mode)
+    this.hockey = mode === MODE_HOCKEY ? new Hockey() : null
     this.commandes = []
     for (let j = 0; j < joueurs; j++) this.commandes.push({ pousse: false, ouvert: false, x: 0, y: 0 })
     this.sim = this.naissance()
   }
 
   private naissance(): FluidSimMulti {
-    const sim = new FluidSimMulti(this.params, SALLE, CAPACITE, this.joueurs)
+    const sim = new FluidSimMulti(this.params, this.salle, CAPACITE, this.joueurs)
     for (let j = 0; j < this.joueurs; j++) {
       sim.courant = j
-      const d = DEPARTS[j % DEPARTS.length]
+      const d = departDe(this.salle, j)
       sim.spawnDisc(d.x, d.y, VOLUME_DEPART, KIND_PLAYER)
     }
     sim.courant = 0
     sim.relabel()
+    this.hockey?.engage(sim)
     return sim
   }
 
   /** Une manche neuve : les deux corps reviennent à leur départ. */
   recommence(): void {
     this.sim = this.naissance()
+    this.hockey?.recommence(this.sim)
     this.tSim = 0
     this.boucle.reset()
     for (const c of this.commandes) {
@@ -92,8 +116,8 @@ export class Hote {
     if (!cible) return
     cible.pousse = c.pousse
     cible.ouvert = c.ouvert
-    cible.x = Math.min(SALLE.maxX, Math.max(SALLE.minX, c.x))
-    cible.y = Math.min(SALLE.maxY, Math.max(SALLE.minY, c.y))
+    cible.x = Math.min(this.salle.maxX, Math.max(this.salle.minX, c.x))
+    cible.y = Math.min(this.salle.maxY, Math.max(this.salle.minY, c.y))
   }
 
   /** Avance la simulation du temps réel écoulé. Rend le nombre de pas. */
@@ -118,8 +142,12 @@ export class Hote {
           else this.sim.eject(c.x, c.y, dt)
         }
         this.sim.courant = 0
+        this.hockey?.avant(this.sim)
         this.sim.step(dt)
         this.tSim += dt
+        // après un but et sa pause : tout le monde retourne à son départ,
+        // le palet au centre
+        if (this.hockey?.apres(this.sim, this.commandes, dt) === 'engagement') this.sim = this.naissance()
       },
       budgetMs,
     )
@@ -177,9 +205,14 @@ export class Hote {
     }))
   }
 
+  /** L'état du hockey (le palet, le score), ou null en partie libre. */
+  jeu(): JeuTrame | null {
+    return this.hockey ? this.hockey.etat(this.sim) : null
+  }
+
   /** L'image courante, en morceaux prêts à partir. */
   image(): Uint8Array[] {
-    return encodeEtat(this.seq++, this.tSim, SALLE, this.corps(), this.vue())
+    return encodeEtat(this.seq++, this.tSim, this.salle, this.corps(), this.vue(), this.jeu())
   }
 }
 
@@ -189,6 +222,12 @@ export class Hote {
 const PROLONGE_MAX_S = 0.12
 
 export class Miroir {
+  /** Le mode et la salle : c'est l'hôte qui les annonce, dans chaque image. */
+  mode: number = MODE_LIBRE
+  salle: Bornes = SALLE
+  /** L'état du hockey de la dernière image complète, ou null. */
+  private jeuRecu: JeuTrame | null = null
+  private jeuEnCours: JeuTrame | null = null
   /** Les corps de la dernière image complète. */
   corps: CorpsTrame[] = []
   /** Le temps simulé de la dernière image complète. */
@@ -210,7 +249,13 @@ export class Miroir {
   /** Reçoit un morceau. `maintenant` est une horloge en millisecondes
    *  (performance.now). Rend true si une image vient d'être complétée. */
   recoit(octets: Uint8Array, maintenant: number): boolean {
-    const e = litEnteteEtat(octets, SALLE)
+    const mode = modeTrame(octets)
+    if (mode < 0) return false
+    if (mode !== this.mode) {
+      this.mode = mode
+      this.salle = salleDe(mode)
+    }
+    const e = litEnteteEtat(octets, this.salle)
     if (!e) return false
     // en retard : une image plus récente est déjà là, ou en cours
     if (e.seq <= this.seq || e.seq < this.seqEnCours) return false
@@ -221,9 +266,10 @@ export class Miroir {
       this.recuEnCours = 0
       this.enCours.n = Math.min(e.total, CAPACITE)
     }
-    decodeParticules(octets, e, SALLE, this.enCours)
+    decodeParticules(octets, e, this.salle, this.enCours)
     this.recuEnCours += e.nombre
     this.corpsEnCours = e.corps
+    this.jeuEnCours = e.jeu
     this.tSimEnCours = e.tSim
     if (this.recuEnCours < e.total) return false
     // complète : elle devient l'image affichée, l'ancienne sert de brouillon
@@ -231,6 +277,7 @@ export class Miroir {
     this.affichee = this.enCours
     this.enCours = ancienne
     this.corps = this.corpsEnCours
+    this.jeuRecu = this.jeuEnCours
     this.tSim = this.tSimEnCours
     this.seq = e.seq
     this.seqEnCours = -1
@@ -245,6 +292,15 @@ export class Miroir {
     return this.seq < 0 ? Infinity : (maintenant - this.dateImage) / 1000
   }
 
+  /** L'état du hockey à dessiner MAINTENANT : le palet libre est prolongé
+   *  par sa vitesse, comme une goutte en vol. */
+  jeu(maintenant: number): JeuTrame | null {
+    const j = this.jeuRecu
+    if (!j) return null
+    const dt = Math.min(PROLONGE_MAX_S, Math.max(0, this.age(maintenant)))
+    return { ...j, paletX: j.paletX + j.paletVx * dt, paletY: j.paletY + j.paletVy * dt }
+  }
+
   /** Les particules à dessiner MAINTENANT : la dernière image, prolongée
    *  par ses vitesses du temps écoulé depuis. En apesanteur une goutte en
    *  vol va tout droit : la prolongation est exacte pour elle, et à peine
@@ -252,14 +308,15 @@ export class Miroir {
   vue(maintenant: number): Particules {
     const a = this.affichee
     const s = this.sortie
+    const salle = this.salle
     const dt = Math.min(PROLONGE_MAX_S, Math.max(0, this.age(maintenant)))
     const n = this.seq < 0 ? 0 : a.n
     s.n = n
     for (let i = 0; i < n; i++) {
       const x = a.x[i] + a.vx[i] * dt
       const y = a.y[i] + a.vy[i] * dt
-      s.x[i] = x < SALLE.minX ? SALLE.minX : x > SALLE.maxX ? SALLE.maxX : x
-      s.y[i] = y < SALLE.minY ? SALLE.minY : y > SALLE.maxY ? SALLE.maxY : y
+      s.x[i] = x < salle.minX ? salle.minX : x > salle.maxX ? salle.maxX : x
+      s.y[i] = y < salle.minY ? salle.minY : y > salle.maxY ? salle.maxY : y
       s.vx[i] = a.vx[i]
       s.vy[i] = a.vy[i]
       s.attr[i] = a.attr[i]

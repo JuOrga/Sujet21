@@ -188,11 +188,22 @@ bouton **MULTI** sur l'accueil (`?dev`). Tout vit dans [`src/multi/`](src/multi/
   deux ; l'un se referme, ils se SÉPARENT. Un corps ouvert BOIT ce qu'on
   lui tire (le don) ; fermé, le jet le bouscule. Seul un jet se donne : un
   morceau détaché reste à son corps. `solveurMulti.ts`, « les cloisons ».
+  Deux corps fermés qui se percutent S'ÉCRASENT l'un contre l'autre,
+  rebondissent et redeviennent ronds (« le rebond », « la peau tendue »).
+- **Le mode HOCKEY** (à choisir au salon, avant de créer la partie) : un
+  terrain plus court, une cage par camp, un palet. Fermé, le corps amortit
+  le palet et le renvoie ; OUVERT, il l'avale — et se refermer le LANCE
+  vers le pointeur, d'autant plus fort qu'on l'a tenu (trois secondes au
+  plus, après quoi il s'échappe). Le jet le pousse aussi. Le premier à cinq
+  buts gagne. La règle est dans `hockey.ts` ; le solveur n'en connaît que
+  le contact du palet avec l'eau. Au hockey la matière tirée revient à son
+  corps d'où qu'elle soit — on y pousse sans cesse.
 - **Quand ça ne marche pas** : l'écran écrit sous le message d'erreur un
   « détail pour le dépannage » (le relais joint, les instances vues, les
   coupures). C'est lui qu'il faut photographier.
-- **Ce qui manque** : un but (rien ne se gagne encore), les salles, tout
-  état autre que l'eau, et les graphismes du jeu — le multi a son rendu.
+- **Ce qui manque** : les salles, tout état autre que l'eau, et les
+  graphismes du jeu — le multi a son rendu. Au hockey : un vrai contact du
+  palet avec les poteaux, et de quoi voler le palet à qui le porte.
 - **Le débit** : une image pèse 10,9 Ko (1 800 particules à six octets),
   vingt par seconde — 212 Ko/s mesurés à travers le relais en ligne, soit
   1,7 Mbit/s en envoi chez l'hôte, que le relais reçoit puis renvoie. Si la

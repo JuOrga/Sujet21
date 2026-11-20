@@ -26,7 +26,7 @@ export const TRAME_ETAT = 1
 export const TRAME_COMMANDE = 2
 /** La version du format : l'invité refuse une trame d'une autre version
  *  plutôt que de dessiner n'importe quoi. */
-export const VERSION_TRAME = 2
+export const VERSION_TRAME = 3
 
 /** Les particules par morceau d'état. Un canal de données porte au moins
  *  16 Ko par message sur tous les navigateurs ; 1 024 particules à six
@@ -111,6 +111,41 @@ export function particulesVides(capacite: number): Particules {
 
 const OCTETS_CORPS = 18
 const ENTETE_FIXE = 16
+const OCTETS_JEU = 22
+
+/** Le mode de la partie, tel qu'il voyage (octet 3 de l'en-tête). L'invité
+ *  l'apprend de l'hôte : c'est lui qui dit dans quelle salle on joue. */
+export const MODE_LIBRE = 0
+export const MODE_HOCKEY = 1
+
+/** Les phases d'une partie de hockey. */
+export const PHASE_JEU = 0
+export const PHASE_BUT = 1
+export const PHASE_FINI = 2
+
+/** L'état du HOCKEY : le palet, qui le tient, et le score. Il est répété
+ *  dans chaque morceau, comme l'état des corps — 22 octets. */
+export interface JeuTrame {
+  paletActif: boolean
+  paletX: number
+  paletY: number
+  paletVx: number
+  paletVy: number
+  /** Le joueur qui tient le palet, ou −1. */
+  tenuPar: number
+  /** La charge du lancer, de 0 à 1. */
+  charge: number
+  scores: [number, number]
+  phase: number
+  /** Le dernier buteur, ou −1. */
+  buteur: number
+}
+
+/** Le mode qu'annonce un morceau d'état, ou −1 si ce n'en est pas un. */
+export function modeTrame(octets: Uint8Array): number {
+  if (octets.length < ENTETE_FIXE || octets[0] !== TRAME_ETAT || octets[1] !== VERSION_TRAME) return -1
+  return octets[3]
+}
 
 function borne(v: number, min: number, max: number): number {
   return v < min ? min : v > max ? max : v
@@ -126,11 +161,12 @@ export function encodeEtat(
   bornes: Bornes,
   corps: readonly CorpsTrame[],
   p: Particules,
+  jeu: JeuTrame | null = null,
 ): Uint8Array[] {
   const morceaux: Uint8Array[] = []
   const largeur = bornes.maxX - bornes.minX
   const hauteur = bornes.maxY - bornes.minY
-  const entete = ENTETE_FIXE + corps.length * OCTETS_CORPS
+  const entete = ENTETE_FIXE + corps.length * OCTETS_CORPS + (jeu ? OCTETS_JEU : 0)
   const nbMorceaux = Math.max(1, Math.ceil(p.n / PARTICULES_PAR_MORCEAU))
   for (let m = 0; m < nbMorceaux; m++) {
     const debut = m * PARTICULES_PAR_MORCEAU
@@ -140,7 +176,7 @@ export function encodeEtat(
     v.setUint8(0, TRAME_ETAT)
     v.setUint8(1, VERSION_TRAME)
     v.setUint8(2, corps.length)
-    v.setUint8(3, 0)
+    v.setUint8(3, jeu ? MODE_HOCKEY : MODE_LIBRE)
     v.setUint32(4, seq, true)
     v.setFloat32(8, tSim, true)
     v.setUint16(12, p.n, true)
@@ -160,6 +196,19 @@ export function encodeEtat(
       v.setUint8(o + 16, ((qx >> 8) & 0x0f) | ((qy & 0x0f) << 4))
       v.setUint8(o + 17, (qy >> 4) & 0xff)
       o += OCTETS_CORPS
+    }
+    if (jeu) {
+      v.setFloat32(o, jeu.paletX, true)
+      v.setFloat32(o + 4, jeu.paletY, true)
+      v.setFloat32(o + 8, jeu.paletVx, true)
+      v.setFloat32(o + 12, jeu.paletVy, true)
+      v.setUint8(o + 16, jeu.tenuPar < 0 ? 255 : jeu.tenuPar)
+      v.setUint8(o + 17, Math.round(borne(jeu.charge, 0, 1) * 255))
+      v.setUint8(o + 18, borne(jeu.scores[0], 0, 255))
+      v.setUint8(o + 19, borne(jeu.scores[1], 0, 255))
+      v.setUint8(o + 20, (jeu.phase & 0x7f) | (jeu.paletActif ? 0x80 : 0))
+      v.setUint8(o + 21, jeu.buteur < 0 ? 255 : jeu.buteur)
+      o += OCTETS_JEU
     }
     for (let k = 0; k < nombre; k++) {
       const i = debut + k
@@ -186,6 +235,8 @@ export interface EnteteEtat {
   debut: number
   nombre: number
   corps: CorpsTrame[]
+  /** L'état du hockey, ou null en partie libre. */
+  jeu: JeuTrame | null
 }
 
 /** Lit l'en-tête d'un morceau d'état, ou null si ce n'en est pas un (autre
@@ -196,7 +247,9 @@ export function litEnteteEtat(octets: Uint8Array, bornes: Bornes): EnteteEtat | 
   const v = new DataView(octets.buffer, octets.byteOffset, octets.byteLength)
   if (v.getUint8(0) !== TRAME_ETAT || v.getUint8(1) !== VERSION_TRAME) return null
   const nbCorps = v.getUint8(2)
-  const entete = ENTETE_FIXE + nbCorps * OCTETS_CORPS
+  const mode = v.getUint8(3)
+  if (mode !== MODE_LIBRE && mode !== MODE_HOCKEY) return null
+  const entete = ENTETE_FIXE + nbCorps * OCTETS_CORPS + (mode === MODE_HOCKEY ? OCTETS_JEU : 0)
   if (octets.length < entete) return null
   const reste = octets.length - entete
   if (reste % OCTETS_PAR_PARTICULE !== 0) return null
@@ -227,7 +280,25 @@ export function litEnteteEtat(octets: Uint8Array, bornes: Bornes): EnteteEtat | 
     })
     o += OCTETS_CORPS
   }
-  return { seq: v.getUint32(4, true), tSim: v.getFloat32(8, true), total, debut, nombre, corps }
+  let jeu: JeuTrame | null = null
+  if (mode === MODE_HOCKEY) {
+    const tenu = v.getUint8(o + 16)
+    const etat = v.getUint8(o + 20)
+    const buteur = v.getUint8(o + 21)
+    jeu = {
+      paletX: v.getFloat32(o, true),
+      paletY: v.getFloat32(o + 4, true),
+      paletVx: v.getFloat32(o + 8, true),
+      paletVy: v.getFloat32(o + 12, true),
+      tenuPar: tenu === 255 ? -1 : tenu,
+      charge: v.getUint8(o + 17) / 255,
+      scores: [v.getUint8(o + 18), v.getUint8(o + 19)],
+      phase: etat & 0x7f,
+      paletActif: (etat & 0x80) !== 0,
+      buteur: buteur === 255 ? -1 : buteur,
+    }
+  }
+  return { seq: v.getUint32(4, true), tSim: v.getFloat32(8, true), total, debut, nombre, corps, jeu }
 }
 
 /** Pose les particules d'un morceau dans `vers`, à leur tranche. L'en-tête

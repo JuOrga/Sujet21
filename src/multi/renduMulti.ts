@@ -56,6 +56,19 @@ const SEUIL = 3
  *  8 u de rayon. */
 const POIDS_GOUTTE = 4
 
+/** Ce que le hockey ajoute à l'image : le palet et les cages. */
+export interface SceneHockey {
+  /** La hauteur de l'ouverture des cages. */
+  cage: number
+  palet: { x: number; y: number; rayon: number } | null
+  /** Le joueur qui tient le palet (−1 : personne), sa charge (0 à 1) et le
+   *  point qu'il vise : le lancer partira vers là. */
+  porteur: number
+  charge: number
+  viseeX: number
+  viseeY: number
+}
+
 const VS_CHAMP = `#version 300 es
 layout(location = 0) in vec2 aPos;
 layout(location = 1) in float aCanal;
@@ -109,6 +122,9 @@ uniform float uGain;      // le champ est stocké divisé par ce gain (texture 8
 uniform float uPixel;     // la taille d'un pixel, en unités monde
 uniform vec4 uOuvert;     // 1 si le joueur de ce canal est OUVERT
 uniform float uTemps;     // secondes, pour le souffle d'un corps ouvert
+uniform float uCage;      // hockey : la hauteur de l'ouverture des cages (0 : pas de cage)
+uniform vec4 uPalet;      // hockey : x, y, rayon, 1 s'il est en jeu
+uniform vec4 uPorteur;    // hockey : qui le tient (−1 : personne), sa charge, sa visée (x, y)
 out vec4 o;
 
 float grille(vec2 m, float pas) {
@@ -132,8 +148,31 @@ void main() {
   vec2 dMur = min(monde - uSalle.xy, uSalle.zw - monde);
   float mur = min(dMur.x, dMur.y);
   float trait = 1.0 - smoothstep(0.0, max(6.0, uPixel * 2.0), abs(mur));
+  // ---- le hockey : les cages. La paroi s'ouvre sur un tiers de sa hauteur ;
+  // chaque cage porte la couleur de celui qui la GARDE.
+  float milieuY = (uSalle.y + uSalle.w) * 0.5;
+  float dansLAxe = uCage > 0.0 ? 1.0 - smoothstep(uCage * 0.5 - uPixel, uCage * 0.5 + uPixel, abs(monde.y - milieuY)) : 0.0;
+  float surUnCote = step(dMur.x, dMur.y);
+  trait *= 1.0 - dansLAxe * surUnCote;
   fond += trait * vec3(0.38, 0.55, 0.68);
   fond += salle * exp(-max(mur, 0.0) / 90.0) * vec3(0.03, 0.055, 0.075);
+  if (uCage > 0.0) {
+    float aGauche = step(monde.x, (uSalle.x + uSalle.z) * 0.5);
+    vec3 camp = mix(uCouleurs[1], uCouleurs[0], aGauche);
+    // le filet, derrière la ligne
+    float derriere = -dMur.x;
+    float filet = dansLAxe * step(0.0, derriere) * (1.0 - smoothstep(52.0, 60.0, derriere));
+    fond += filet * camp * (0.16 + 0.22 * grille(monde, 20.0));
+    // les poteaux
+    vec2 poteau = vec2(dMur.x, abs(abs(monde.y - milieuY) - uCage * 0.5));
+    fond += (1.0 - smoothstep(9.0, 9.0 + uPixel * 2.0, length(poteau))) * camp;
+    // la zone du gardien, et la ligne du milieu : des repères, pas des murs
+    float zone = length(vec2(dMur.x, monde.y - milieuY));
+    fond += salle * camp * 0.05 * (1.0 - smoothstep(uCage * 0.5 - 4.0, uCage * 0.5, zone));
+    fond += salle * camp * 0.22 * (1.0 - smoothstep(0.0, uPixel * 2.0, abs(zone - uCage * 0.5)));
+    float axe = abs(monde.x - (uSalle.x + uSalle.z) * 0.5);
+    fond += salle * vec3(0.05, 0.08, 0.1) * (1.0 - smoothstep(0.0, uPixel * 2.0, axe));
+  }
 
   // ---- l'eau
   vec4 ch = texture(uChamp, vUv) * uGain;
@@ -179,7 +218,44 @@ void main() {
   float halo = smoothstep(0.0, uSeuil, total) * (1.0 - eau);
   fond += halo * teinte * (0.14 + ouv * (0.2 + 0.25 * souffle));
 
-  o = vec4(mix(fond, couleur, eau), 1.0);
+  vec3 image = mix(fond, couleur, eau);
+
+  // ---- le hockey : le palet, par-dessus l'eau (porté, il doit rester visible)
+  if (uPalet.w > 0.5) {
+    vec2 dp = monde - uPalet.xy;
+    float rp = length(dp) / uPalet.z;
+    float disque = 1.0 - smoothstep(1.0 - uPixel / uPalet.z, 1.0 + uPixel / uPalet.z, rp);
+    vec3 glace = vec3(0.86, 0.91, 0.95);
+    glace *= mix(1.0, 0.58, smoothstep(0.6, 1.0, rp));
+    glace = mix(glace, vec3(0.2, 0.27, 0.33), smoothstep(0.74, 0.78, rp) * (1.0 - smoothstep(0.84, 0.88, rp)) * 0.7);
+    glace += 0.22 * (1.0 - smoothstep(0.0, 0.45, length(dp / uPalet.z - vec2(-0.32, -0.36))));
+    // une ombre portée, pour le détacher du fond comme de l'eau
+    image *= 1.0 - 0.45 * (1.0 - smoothstep(1.0, 1.35, rp)) * (1.0 - disque);
+    if (uPorteur.x > -0.5) {
+      vec3 teintePorteur = uCouleurs[int(uPorteur.x + 0.5)];
+      glace = mix(glace, teintePorteur, 0.3);
+      // l'anneau de charge : il s'épaissit tant qu'on tient
+      float epais = 3.0 + 13.0 * uPorteur.y;
+      float anneau = smoothstep(1.0, 1.0 + uPixel * 2.0 / uPalet.z, rp) * (1.0 - smoothstep(epais, epais + uPixel * 2.0, (rp - 1.0) * uPalet.z - 5.0));
+      image = mix(image, teintePorteur * 1.25, anneau * 0.85);
+      // le trait de visée : le lancer partira par là, d'autant plus loin
+      // que la charge est haute
+      vec2 vers = uPorteur.zw - uPalet.xy;
+      float lv = length(vers);
+      if (lv > 1.0) {
+        vec2 u = vers / lv;
+        float le = dot(dp, u);
+        float ecartAxe = abs(dp.x * u.y - dp.y * u.x);
+        float portee = uPalet.z + 30.0 + 320.0 * (0.25 + 0.75 * uPorteur.y);
+        float surLeTrait = step(uPalet.z + 26.0, le) * step(le, portee) * (1.0 - smoothstep(3.0, 3.0 + uPixel * 2.0, ecartAxe));
+        float tirets = step(0.45, fract(le / 34.0));
+        image = mix(image, teintePorteur * 1.3, surLeTrait * tirets * 0.9);
+      }
+    }
+    image = mix(image, glace, disque);
+  }
+
+  o = vec4(image, 1.0);
 }`
 
 function compile(gl: WebGL2RenderingContext, type: number, source: string): WebGLShader {
@@ -287,7 +363,7 @@ export class RenduMulti {
   }
 
   /** `ouverts[j]` : le joueur j est-il ouvert ? `temps` en secondes. */
-  dessine(p: Particules, cadre: Cadre, salle: Bornes, ouverts: readonly boolean[] = [], temps = 0): void {
+  dessine(p: Particules, cadre: Cadre, salle: Bornes, ouverts: readonly boolean[] = [], temps = 0, scene: SceneHockey | null = null): void {
     const gl = this.gl
     this.accorde()
     const n = Math.min(p.n, this.donnees.length / 3)
@@ -335,6 +411,10 @@ export class RenduMulti {
     gl.uniform1f(gl.getUniformLocation(this.progEcran, 'uPixel'), 1 / pixelsParUnite)
     gl.uniform4f(gl.getUniformLocation(this.progEcran, 'uOuvert'), ouverts[0] ? 1 : 0, ouverts[1] ? 1 : 0, ouverts[2] ? 1 : 0, ouverts[3] ? 1 : 0)
     gl.uniform1f(gl.getUniformLocation(this.progEcran, 'uTemps'), temps % 1000)
+    const palet = scene?.palet ?? null
+    gl.uniform1f(gl.getUniformLocation(this.progEcran, 'uCage'), scene ? scene.cage : 0)
+    gl.uniform4f(gl.getUniformLocation(this.progEcran, 'uPalet'), palet?.x ?? 0, palet?.y ?? 0, palet?.rayon ?? 1, palet ? 1 : 0)
+    gl.uniform4f(gl.getUniformLocation(this.progEcran, 'uPorteur'), scene?.porteur ?? -1, scene?.charge ?? 0, scene?.viseeX ?? 0, scene?.viseeY ?? 0)
     gl.bindVertexArray(this.vaoVide)
     gl.drawArrays(gl.TRIANGLES, 0, 3)
     gl.bindVertexArray(null)
