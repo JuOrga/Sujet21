@@ -317,18 +317,54 @@ export class FluidSimMulti {
   // un fragment reste à son corps, même au milieu de celui d'un autre, et
   // lui revient dès qu'ils se retrouvent.
   private readonly tiree: Uint8Array
+  // tampons du rebond : l'élan reçu par chaque corps, et son nombre de particules
+  private readonly rebondX = new Float32Array(JOUEURS_MAX)
+  private readonly rebondY = new Float32Array(JOUEURS_MAX)
+  private readonly rebondMasse = new Int32Array(JOUEURS_MAX)
   /** Y a-t-il une cloison quelque part ? Faux à un joueur : le solveur du
    *  jeu n'a pas de cloisons, et la parité au bit près en dépend. */
   private cloisons = false
-  /** La distance sous laquelle deux particules étrangères sont écartées, en
-   *  pas de particule. À 1,15 une particule ne passe pas entre deux voisines
-   *  de la surface d'en face (elles sont à un pas l'une de l'autre). */
-  static readonly ECART_CLOISON = 1.15
-  /** La part de l'écart corrigée à chaque itération, et son plafond par
-   *  paire (en fraction du rayon du noyau) : assez pour qu'un jet rebondisse,
-   *  pas assez pour que deux corps emmêlés qui se ferment EXPLOSENT. */
-  static readonly RAIDEUR_CLOISON = 0.5
-  static readonly PLAFOND_CLOISON = 0.25
+  // LE REBOND. La pression seule tient les étrangères à distance, mais elle
+  // ne REND rien : deux corps fermés qui se rencontrent s'écrasent l'un
+  // contre l'autre et repartent collés, à la même vitesse — mesuré, la
+  // restitution est nulle (80 u/s contre 0 → 44 et 36), et les corps
+  // s'aplatissent du simple au double. À l'écran cela se lit comme une
+  // fusion : « même sans s'ouvrir, les corps fusionnent à moitié » (le
+  // concepteur, 20/11, premier essai des gestes à deux appareils).
+  //
+  // Un corps fermé a donc une PEAU : chaque paire d'étrangères à portée se
+  // repousse comme un ressort, et ce que reçoit une particule de corps est
+  // réparti sur TOUT son corps — il recule d'un bloc au lieu de se creuser
+  // au point de contact. Un ressort rend ce qu'il prend : les corps
+  // rebondissent, et gardent leur forme. Une goutte libre, elle, encaisse
+  // seule : le jet tiré dans un corps fermé ricoche, et le pousse entier
+  // sans le labourer.
+  /** La raideur du ressort, en u/s² pour une paire à mi-portée. Il durcit
+   *  de près (force en portée / distance − 1) : deux corps lancés fort ne se
+   *  traversent pas. */
+  static RAIDEUR_REBOND = 20000
+  /** Sa portée, en rayons de noyau : là où deux étrangères se « sentent ». */
+  static PORTEE_REBOND = 1
+  /** Le plafond de la force d'une paire, en multiples de la raideur. */
+  static PLAFOND_REBOND = 6
+  // LA PRESSION, elle, ne joue plus que de TRÈS près (0,6 pas de
+  // particule). Elle ne rend rien de ce qu'elle prend : laissée à pleine
+  // portée, elle arrêtait les corps avant le ressort, et le rebond était
+  // nul — mesuré à 80 u/s : restitution 0,01 avec elle, 1,06 sans. Mais
+  // sans elle du tout, deux corps fondus qui se referment ne se démêlent
+  // plus : leurs particules sont entremêlées, le ressort s'annule en
+  // moyenne (il pousse les corps, pas les particules) — c'est la pression,
+  // particule par particule, qui rend à chacun sa place. À 0,6 pas elle
+  // démêle encore (89 u d'écart fondus, 390 u quatre secondes après s'être
+  // refermé) et laisse le ressort rendre : restitution 0,42 à 80 u/s, 0,37
+  // à 160, 0,25 à 320 (à un pas entier : 0,21 / 0,25 / 0,15).
+  static PORTEE_PRESSION = 0.6
+  /** La part du ressort que chaque particule de corps garde pour elle au
+   *  lieu de la verser au corps entier. Zéro, et ce n'est pas un oubli :
+   *  essayée à 0,2, 0,3 et 0,5, elle creusait le corps au point de contact
+   *  (restitution −0,1), et à 0,5 un jet d'une seconde déchirait le corps
+   *  fermé qu'il visait (447 particules sur 900 lui restaient). */
+  static PART_PROPRE = 0
 
   /** Pose les cloisons d'après l'état ouvert/fermé de chaque corps. */
   private poseCloisons(): void {
@@ -2708,9 +2744,9 @@ export class FluidSimMulti {
     const cloisons = this.cloisons
     const cloison = this.cloison
     const proprio = this.proprio
-    const ecart = FluidSimMulti.ECART_CLOISON * p.particleSpacing
-    const ecart2 = ecart * ecart
     const lambdaE = this.lambdaE
+    const serre = FluidSimMulti.PORTEE_PRESSION * p.particleSpacing
+    const serre2 = serre * serre
     const selfRho = k.poly6Coeff * h2 * h2 * h2
     // Exposant de cohésion : puissance entière déroulée quand c'est possible
     // (Math.pow dans la boucle de paires coûte cher sur petites machines)
@@ -2783,7 +2819,9 @@ export class FluidSimMulti {
             const ey = yi - prdY[j]
             const e2 = ex * ex + ey * ey
             const er = Math.sqrt(e2)
-            if (e2 >= h2 || er < 1e-6) {
+            // seulement de TRÈS près (voir PORTEE_PRESSION) : au-delà, c'est
+            // le rebond qui tient les étrangères à distance
+            if (e2 >= serre2 || er < 1e-6) {
               pairW[e] = 0
               pairC[e] = 0
               continue
@@ -2915,38 +2953,6 @@ export class FluidSimMulti {
         dpY[i] = dy0
       }
 
-      // L'ÉCARTEMENT DES ÉTRANGÈRES : deux particules que sépare une cloison
-      // et qui se trouvent à moins d'un écart l'une de l'autre sont repoussées,
-      // chacune de la moitié — le terme est exactement opposé pour i et j
-      // (toutes deux lisent les mêmes positions), la quantité de mouvement
-      // est conservée. C'est ce qui fait REBONDIR un corps fermé contre un
-      // autre, et un jet contre un corps fermé.
-      if (cloisons) {
-        const plafond = FluidSimMulti.PLAFOND_CLOISON * h
-        const raideur = FluidSimMulti.RAIDEUR_CLOISON * 0.5
-        for (let i = 0; i < n; i++) {
-          if (gaseous[i] === 1) continue
-          const xi = prdX[i]
-          const yi = prdY[i]
-          const pi = proprio[i]
-          const ci = cloison[i]
-          const end = nbStart[i + 1]
-          for (let e = nbStart[i]; e < end; e++) {
-            const j = nbList[e]
-            if (pi === proprio[j] || (ci | cloison[j]) === 0 || gaseous[j] === 1) continue
-            const dx = xi - prdX[j]
-            const dy = yi - prdY[j]
-            const r2 = dx * dx + dy * dy
-            if (r2 >= ecart2 || r2 < 1e-12) continue
-            const r = Math.sqrt(r2)
-            let pousse = (ecart - r) * raideur
-            if (pousse > plafond) pousse = plafond
-            dpX[i] += (dx / r) * pousse
-            dpY[i] += (dy / r) * pousse
-          }
-        }
-      }
-
       for (let i = 0; i < n; i++) {
         if (frozen[i] === 1) continue // masse infinie : la correction ne s'applique qu'au liquide
         prdX[i] += dpX[i]
@@ -3054,6 +3060,77 @@ export class FluidSimMulti {
       for (let i = 0; i < n; i++) {
         velX[i] += dvX[i]
         velY[i] += dvY[i]
+      }
+    }
+
+    // 4bis-b. LE REBOND des corps fermés (voir RAIDEUR_REBOND). Chaque paire
+    // d'étrangères à portée se repousse ; le terme est exactement opposé pour
+    // i et j, et ce qu'un corps reçoit par ses particules lui est rendu en
+    // entier, réparti : la quantité de mouvement d'ensemble est conservée.
+    if (cloisons) {
+      const portee = FluidSimMulti.PORTEE_REBOND * h
+      const portee2 = portee * portee
+      const raideur = FluidSimMulti.RAIDEUR_REBOND * dt
+      const plafondRebond = FluidSimMulti.PLAFOND_REBOND
+      const partPropre = FluidSimMulti.PART_PROPRE
+      const partCorps = 1 - partPropre
+      const nbCorps = this.corps.length
+      const recuX = this.rebondX
+      const recuY = this.rebondY
+      const masse = this.rebondMasse
+      for (let j = 0; j < nbCorps; j++) {
+        recuX[j] = 0
+        recuY[j] = 0
+        masse[j] = 0
+      }
+      for (let i = 0; i < n; i++) {
+        if (gaseous[i] === 1 || frozen[i] === 1) continue
+        const pi = proprio[i]
+        const ci = cloison[i]
+        const duCorps = this.kind[i] === KIND_PLAYER && pi < nbCorps
+        if (duCorps) masse[pi]++
+        const xi = prdX[i]
+        const yi = prdY[i]
+        let fx = 0
+        let fy = 0
+        const end = nbStart[i + 1]
+        for (let e = nbStart[i]; e < end; e++) {
+          const j = nbList[e]
+          if (pi === proprio[j] || (ci | cloison[j]) === 0 || gaseous[j] === 1) continue
+          const dx = xi - prdX[j]
+          const dy = yi - prdY[j]
+          const r2 = dx * dx + dy * dy
+          if (r2 >= portee2 || r2 < 1e-12) continue
+          const r = Math.sqrt(r2)
+          let force = portee / r - 1
+          if (force > plafondRebond) force = plafondRebond
+          const f = (raideur * force) / r
+          fx += dx * f
+          fy += dy * f
+        }
+        if (fx === 0 && fy === 0) continue
+        if (duCorps) {
+          // une particule de corps ne recule pas seule : son corps recule —
+          // sauf une petite part, qu'elle garde (voir PART_PROPRE)
+          recuX[pi] += fx * partCorps
+          recuY[pi] += fy * partCorps
+          velX[i] += fx * partPropre
+          velY[i] += fy * partPropre
+        } else {
+          velX[i] += fx
+          velY[i] += fy
+        }
+      }
+      for (let j = 0; j < nbCorps; j++) {
+        if (masse[j] === 0 || (recuX[j] === 0 && recuY[j] === 0)) continue
+        recuX[j] /= masse[j]
+        recuY[j] /= masse[j]
+      }
+      for (let i = 0; i < n; i++) {
+        const pi = proprio[i]
+        if (this.kind[i] !== KIND_PLAYER || pi >= nbCorps || gaseous[i] === 1 || frozen[i] === 1) continue
+        velX[i] += recuX[pi]
+        velY[i] += recuY[pi]
       }
     }
 

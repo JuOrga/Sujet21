@@ -11,10 +11,18 @@
 //  1. LE CHAMP. Chaque particule dépose une tache douce dans une texture,
 //     en addition, sur le CANAL de son propriétaire (rouge = joueur 0,
 //     vert = joueur 1, bleu = joueur 2, alpha = joueur 3 ou personne).
-//  2. LA SURFACE. Là où la somme des canaux passe le seuil, il y a de
-//     l'eau ; sa couleur est le mélange des couleurs des joueurs, au
-//     prorata de leurs canaux. Deux corps qui se touchent se fondent donc
-//     en un dégradé — on VOIT la matière se mêler, et à qui elle est.
+//  2. LA SURFACE. Les corps OUVERTS forment un seul groupe : leurs canaux
+//     s'ajoutent, et là où la somme passe le seuil il y a de l'eau, teintée
+//     au prorata — deux corps ouverts qui se touchent se fondent en un
+//     dégradé, on VOIT la matière se mêler. Un corps FERMÉ, lui, est un
+//     groupe à lui seul, et les groupes se DISPUTENT la place : le champ de
+//     chacun est diminué de celui des autres. Entre deux corps fermés au
+//     contact, aucun ne l'emporte — il reste un VIDE, et deux peaux.
+//
+//     La première version additionnait tous les canaux, ouverts ou non : deux
+//     corps fermés collés se dessinaient d'un seul contour, en dégradé —
+//     « même si on ne fait pas s'ouvrir, les corps fusionnent à moitié » (le
+//     concepteur, 20/11). La physique les séparait, l'image les fondait.
 
 import type { Cadre } from './cadrage'
 import { ATTR_CORPS, ATTR_ORPHELINE, ATTR_PROPRIO, type Bornes, type Particules } from './trame'
@@ -129,10 +137,24 @@ void main() {
 
   // ---- l'eau
   vec4 ch = texture(uChamp, vUv) * uGain;
-  float total = ch.r + ch.g + ch.b + ch.a;
+  // les groupes : tous les ouverts ensemble, chaque fermé pour lui
+  float champOuvert = dot(ch, uOuvert);
+  vec4 fermes = ch * (1.0 - uOuvert);
+  float champFerme = max(max(fermes.r, fermes.g), max(fermes.b, fermes.a));
+  float gagnant = max(champOuvert, champFerme);
+  float somme = ch.r + ch.g + ch.b + ch.a;
+  // le champ du groupe gagnant, diminué de celui des autres : là où deux
+  // groupes se valent il tombe à zéro — c'est le vide entre deux peaux
+  float total = max(2.0 * gagnant - somme, 0.0);
   float bord = fwidth(total) * 0.9 + 1e-4;
   float eau = smoothstep(uSeuil - bord, uSeuil + bord, total);
-  vec3 teinte = (ch.r * uCouleurs[0] + ch.g * uCouleurs[1] + ch.b * uCouleurs[2] + ch.a * uCouleurs[3]) / max(total, 1e-4);
+  // ouv : le pixel est-il au groupe des ouverts ? (à égalité, oui)
+  float ouv = step(champFerme, champOuvert);
+  vec4 po = ch * uOuvert;
+  vec3 teinteOuverte = (po.r * uCouleurs[0] + po.g * uCouleurs[1] + po.b * uCouleurs[2] + po.a * uCouleurs[3]) / max(champOuvert, 1e-4);
+  // un corps fermé garde SA couleur, pure, jusqu'au bord
+  vec3 teinteFermee = fermes.r >= champFerme ? uCouleurs[0] : fermes.g >= champFerme ? uCouleurs[1] : fermes.b >= champFerme ? uCouleurs[2] : uCouleurs[3];
+  vec3 teinte = mix(teinteFermee, teinteOuverte, ouv);
   // l'épaisseur : le cœur est plus dense, le bord plus clair (le ménisque)
   float coeur = clamp((total - uSeuil) / 9.0, 0.0, 1.0);
   float menisque = 1.0 - smoothstep(uSeuil, uSeuil + 3.5, total);
@@ -149,7 +171,6 @@ void main() {
   // OUVERT OU FERMÉ, lisible d'un coup d'œil. Un corps FERMÉ porte une peau :
   // un liseré sombre et net au bord, la cloison qu'on ne traverse pas. Un
   // corps OUVERT n'en a pas : son bord est clair et il respire.
-  float ouv = dot(ch, uOuvert) / max(total, 1e-4);
   float peau = 1.0 - smoothstep(uSeuil, uSeuil + 1.3, total);
   couleur = mix(couleur, couleur * 0.3, peau * (1.0 - ouv) * 0.85);
   float souffle = 0.5 + 0.5 * sin(uTemps * 5.0);

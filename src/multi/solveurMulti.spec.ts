@@ -286,13 +286,63 @@ describe('solveur du multi — les gestes : ouvert, fermé', () => {
     expect(communs(sim)).toBe(0)
     expect(matiere(sim, 0)).toBe(300)
     expect(matiere(sim, 1)).toBe(300)
-    // ils se sont bien touchés (la pression porte à un rayon de noyau)…
+    // ils se sont bien touchés (le ressort porte à un rayon de noyau)…
     expect(pire).toBeLessThan(sim.params.kernelRadius)
-    // …sans jamais s'interpénétrer : toujours plus d'un pas de particule
-    expect(pire).toBeGreaterThan(sim.params.particleSpacing)
+    // …sans jamais s'interpénétrer : la pression reprend la main sous 0,6
+    // pas de particule, rien ne descend en dessous
+    expect(pire).toBeGreaterThan(sim.params.particleSpacing * FluidSimMulti.PORTEE_PRESSION)
     // et le choc s'est transmis : le second est parti, le premier a ralenti
     expect(sim.corps[1].stats.velX).toBeGreaterThan(15)
     expect(sim.corps[0].stats.velX).toBeLessThan(105)
+  })
+
+  it('deux corps FERMÉS REBONDISSENT : ils repartent chacun de son côté, et RONDS', () => {
+    // le défaut noté au premier essai des gestes à deux appareils (20/11) :
+    // « même si on ne fait pas s'ouvrir, les corps fusionnent à moitié quand
+    // même ». Rien ne passait de l'un à l'autre, mais le choc était
+    // parfaitement mou : les deux corps s'écrasaient l'un contre l'autre et
+    // repartaient COLLÉS, à la même vitesse — à l'écran, une fusion.
+    const sim = duo(900, 320)
+    const dt = sim.params.dt
+    const rayon = sim.corps[0].stats.rmsRadius
+    sim.courant = 0
+    sim.lanceCorps(80, 0)
+    let etale = 0
+    for (let s = 0; s < 660; s++) {
+      sim.step(dt)
+      etale = Math.max(etale, sim.corps[0].stats.rmsRadius, sim.corps[1].stats.rmsRadius)
+    }
+    const a = sim.corps[0].stats
+    const b = sim.corps[1].stats
+    // la restitution : la vitesse à laquelle ils se quittent, rapportée à
+    // celle à laquelle ils se sont rencontrés. Mesurée à 0,42 ; avant le
+    // ressort elle était de −0,12 (ils repartaient ensemble, mêlés au bord).
+    expect((b.velX - a.velX) / 80).toBeGreaterThan(0.25)
+    // ils se sont QUITTÉS : plus rien de l'un à portée de l'autre
+    expect(plusProche(sim)).toBeGreaterThan(sim.params.kernelRadius * 2)
+    // et aucun ne s'est écrasé : le corps recule d'un bloc
+    expect(etale).toBeLessThan(rayon * 1.15)
+    expect(sim.corps[0].playerCount).toBe(900)
+    expect(sim.corps[1].playerCount).toBe(900)
+  })
+
+  it('lancés FORT, deux corps fermés ne se traversent pas', () => {
+    const sim = duo(900, 320)
+    const dt = sim.params.dt
+    sim.courant = 0
+    sim.lanceCorps(320, 0)
+    let pire = Infinity
+    for (let s = 0; s < 525; s++) {
+      sim.step(dt)
+      if (s % 15 === 0) pire = Math.min(pire, plusProche(sim))
+    }
+    sim.relabel()
+    expect(communs(sim)).toBe(0)
+    expect(pire).toBeGreaterThan(sim.params.particleSpacing * FluidSimMulti.PORTEE_PRESSION)
+    // chacun est resté de son côté
+    expect(sim.corps[0].stats.centroidX).toBeLessThan(sim.corps[1].stats.centroidX)
+    expect(matiere(sim, 0)).toBe(900)
+    expect(matiere(sim, 1)).toBe(900)
   })
 
   it('le choc de deux corps fermés conserve la quantité de mouvement', () => {
