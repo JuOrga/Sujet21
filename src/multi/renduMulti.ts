@@ -99,6 +99,8 @@ uniform vec3 uCouleurs[4];
 uniform float uSeuil;
 uniform float uGain;      // le champ est stocké divisé par ce gain (texture 8 bits)
 uniform float uPixel;     // la taille d'un pixel, en unités monde
+uniform vec4 uOuvert;     // 1 si le joueur de ce canal est OUVERT
+uniform float uTemps;     // secondes, pour le souffle d'un corps ouvert
 out vec4 o;
 
 float grille(vec2 m, float pas) {
@@ -144,9 +146,17 @@ void main() {
   vec3 couleur = teinte * mix(0.5, 0.82, coeur) * mix(0.72, 1.12, jour);
   couleur += menisque * teinte * 0.22;
   couleur += eclat * 0.4;
+  // OUVERT OU FERMÉ, lisible d'un coup d'œil. Un corps FERMÉ porte une peau :
+  // un liseré sombre et net au bord, la cloison qu'on ne traverse pas. Un
+  // corps OUVERT n'en a pas : son bord est clair et il respire.
+  float ouv = dot(ch, uOuvert) / max(total, 1e-4);
+  float peau = 1.0 - smoothstep(uSeuil, uSeuil + 1.3, total);
+  couleur = mix(couleur, couleur * 0.3, peau * (1.0 - ouv) * 0.85);
+  float souffle = 0.5 + 0.5 * sin(uTemps * 5.0);
+  couleur += menisque * ouv * (0.22 + 0.3 * souffle);
   // un souffle de lumière autour du corps, dans sa teinte
   float halo = smoothstep(0.0, uSeuil, total) * (1.0 - eau);
-  fond += halo * teinte * 0.14;
+  fond += halo * teinte * (0.14 + ouv * (0.2 + 0.25 * souffle));
 
   o = vec4(mix(fond, couleur, eau), 1.0);
 }`
@@ -255,7 +265,8 @@ export class RenduMulti {
     return h > 0 ? l / h : 16 / 9
   }
 
-  dessine(p: Particules, cadre: Cadre, salle: Bornes): void {
+  /** `ouverts[j]` : le joueur j est-il ouvert ? `temps` en secondes. */
+  dessine(p: Particules, cadre: Cadre, salle: Bornes, ouverts: readonly boolean[] = [], temps = 0): void {
     const gl = this.gl
     this.accorde()
     const n = Math.min(p.n, this.donnees.length / 3)
@@ -301,6 +312,8 @@ export class RenduMulti {
     gl.uniform1f(gl.getUniformLocation(this.progEcran, 'uSeuil'), SEUIL)
     gl.uniform1f(gl.getUniformLocation(this.progEcran, 'uGain'), 1 / this.gain)
     gl.uniform1f(gl.getUniformLocation(this.progEcran, 'uPixel'), 1 / pixelsParUnite)
+    gl.uniform4f(gl.getUniformLocation(this.progEcran, 'uOuvert'), ouverts[0] ? 1 : 0, ouverts[1] ? 1 : 0, ouverts[2] ? 1 : 0, ouverts[3] ? 1 : 0)
+    gl.uniform1f(gl.getUniformLocation(this.progEcran, 'uTemps'), temps % 1000)
     gl.bindVertexArray(this.vaoVide)
     gl.drawArrays(gl.TRIANGLES, 0, 3)
     gl.bindVertexArray(null)

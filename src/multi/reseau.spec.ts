@@ -27,6 +27,7 @@ const UN_CORPS: CorpsTrame = {
   y: 678.25,
   disperse: false,
   pousse: true,
+  ouvert: false,
   viseeX: 3000,
   viseeY: 100,
 }
@@ -81,6 +82,16 @@ describe('trame — l’état', () => {
     expect(e.corps[1].pousse).toBe(false)
   })
 
+  it('l’ouverture d’un corps voyage avec lui', () => {
+    const p = particulesVides(1)
+    const e = litEnteteEtat(encodeEtat(1, 0, SALLE, [{ ...UN_CORPS, ouvert: true }, UN_CORPS], p)[0], SALLE)!
+    expect(e.corps[0].ouvert).toBe(true)
+    expect(e.corps[1].ouvert).toBe(false)
+    // sans déranger ses voisins dans l'octet
+    expect(e.corps[0].pousse).toBe(true)
+    expect(e.corps[0].disperse).toBe(false)
+  })
+
   it('une image de 1 800 particules part en deux morceaux de moins de 16 Ko', () => {
     const p = particulesVides(CAPACITE)
     p.n = 1800
@@ -101,20 +112,29 @@ describe('trame — l’état', () => {
     autreVersion[1] = 99
     expect(litEnteteEtat(autreVersion, SALLE)).toBeNull()
     expect(litEnteteEtat(bonne.subarray(0, bonne.length - 3), SALLE)).toBeNull()
-    expect(litEnteteEtat(encodeCommande(1, { pousse: true, x: 1, y: 2 }), SALLE)).toBeNull()
+    expect(litEnteteEtat(encodeCommande(1, { pousse: true, ouvert: false, x: 1, y: 2 }), SALLE)).toBeNull()
   })
 })
 
 describe('trame — la commande', () => {
   it('fait l’aller-retour', () => {
-    const r = decodeCommande(encodeCommande(42, { pousse: true, x: 1234.5, y: -8 }))!
+    const r = decodeCommande(encodeCommande(42, { pousse: true, ouvert: false, x: 1234.5, y: -8 }))!
     expect(r.seq).toBe(42)
-    expect(r.commande).toEqual({ pousse: true, x: 1234.5, y: -8 })
+    expect(r.commande).toEqual({ pousse: true, ouvert: false, x: 1234.5, y: -8 })
+  })
+
+  it('porte l’ouverture, et ne la confond pas avec la poussée', () => {
+    const a = decodeCommande(encodeCommande(1, { pousse: false, ouvert: true, x: 0, y: 0 }))!.commande
+    expect(a.pousse).toBe(false)
+    expect(a.ouvert).toBe(true)
+    const b = decodeCommande(encodeCommande(2, { pousse: true, ouvert: true, x: 0, y: 0 }))!.commande
+    expect(b.pousse).toBe(true)
+    expect(b.ouvert).toBe(true)
   })
 
   it('refuse ce qui n’est pas un nombre : rien de tel n’entre dans le solveur', () => {
-    expect(decodeCommande(encodeCommande(1, { pousse: true, x: Number.NaN, y: 0 }))).toBeNull()
-    expect(decodeCommande(encodeCommande(1, { pousse: true, x: 0, y: Infinity }))).toBeNull()
+    expect(decodeCommande(encodeCommande(1, { pousse: true, ouvert: false, x: Number.NaN, y: 0 }))).toBeNull()
+    expect(decodeCommande(encodeCommande(1, { pousse: true, ouvert: false, x: 0, y: Infinity }))).toBeNull()
     expect(decodeCommande(new Uint8Array(4))).toBeNull()
   })
 })
@@ -176,7 +196,7 @@ describe('la partie — de l’hôte au miroir', () => {
   it('la commande de l’invité meut SON corps, pas celui de l’hôte', () => {
     const h = new Hote()
     // l'invité (joueur 1) pousse vers la droite : son corps part à gauche
-    h.commande(1, decodeCommande(encodeCommande(1, { pousse: true, x: SALLE.maxX, y: DEPARTS[1].y }))!.commande)
+    h.commande(1, decodeCommande(encodeCommande(1, { pousse: true, ouvert: false, x: SALLE.maxX, y: DEPARTS[1].y }))!.commande)
     for (let k = 0; k < 60; k++) h.avance(1 / 60, Infinity)
     expect(h.sim.corps[1].stats.velX).toBeLessThan(-10)
     expect(Math.abs(h.sim.corps[0].stats.velX)).toBeLessThan(0.5)
@@ -184,9 +204,42 @@ describe('la partie — de l’hôte au miroir', () => {
     expect(h.corps()[0].pousse).toBe(false)
   })
 
+  it('la commande ouvre et referme le corps dans le solveur, et l’image le dit', () => {
+    const h = new Hote()
+    h.commande(1, { pousse: false, ouvert: true, x: 0, y: 0 })
+    h.avance(1 / 60, Infinity)
+    expect(h.sim.corps[1].ouvert).toBe(true)
+    expect(h.sim.corps[0].ouvert).toBe(false)
+    expect(h.corps()[1].ouvert).toBe(true)
+    h.commande(1, { pousse: false, ouvert: false, x: 0, y: 0 })
+    h.avance(1 / 60, Infinity)
+    expect(h.sim.corps[1].ouvert).toBe(false)
+  })
+
+  it('le pointeur posé sur son corps le RASSEMBLE : rien ne part', () => {
+    const h = new Hote()
+    // le joueur 0 vise le centre de son corps et maintient
+    h.commande(0, { pousse: true, ouvert: false, x: DEPARTS[0].x, y: DEPARTS[0].y })
+    for (let k = 0; k < 60; k++) h.avance(1 / 60, Infinity)
+    expect(h.sim.corps[0].playerCount + h.sim.corps[0].enPretCount).toBe(VOLUME_DEPART)
+    // le même geste, pointeur AILLEURS : la matière part
+    h.commande(0, { pousse: true, ouvert: false, x: SALLE.minX, y: 0 })
+    for (let k = 0; k < 60; k++) h.avance(1 / 60, Infinity)
+    expect(h.sim.corps[0].playerCount).toBeLessThan(VOLUME_DEPART)
+  })
+
+  it('recommencer referme tout le monde', () => {
+    const h = new Hote()
+    h.commande(0, { pousse: false, ouvert: true, x: 0, y: 0 })
+    h.avance(1 / 60, Infinity)
+    h.recommence()
+    expect(h.commandes[0].ouvert).toBe(false)
+    expect(h.sim.corps[0].ouvert).toBe(false)
+  })
+
   it('une visée hors de la salle y est ramenée', () => {
     const h = new Hote()
-    h.commande(0, { pousse: true, x: -1e9, y: 1e9 })
+    h.commande(0, { pousse: true, ouvert: false, x: -1e9, y: 1e9 })
     expect(h.commandes[0].x).toBe(SALLE.minX)
     expect(h.commandes[0].y).toBe(SALLE.maxY)
   })
@@ -194,7 +247,7 @@ describe('la partie — de l’hôte au miroir', () => {
   it('le miroir voit ce que l’hôte simule, à moins d’une unité', () => {
     const h = new Hote()
     const m = new Miroir()
-    h.commande(0, { pousse: true, x: SALLE.minX, y: 300 })
+    h.commande(0, { pousse: true, ouvert: false, x: SALLE.minX, y: 300 })
     for (let k = 0; k < 30; k++) h.avance(1 / 60, Infinity)
     let complete = false
     for (const morceau of h.image()) complete = m.recoit(morceau, 1000) || complete
@@ -215,7 +268,7 @@ describe('la partie — de l’hôte au miroir', () => {
   it('entre deux images, le miroir prolonge le mouvement — et s’arrête si la liaison se tait', () => {
     const h = new Hote()
     const m = new Miroir()
-    h.commande(0, { pousse: true, x: SALLE.minX, y: DEPARTS[0].y })
+    h.commande(0, { pousse: true, ouvert: false, x: SALLE.minX, y: DEPARTS[0].y })
     for (let k = 0; k < 120; k++) h.avance(1 / 60, Infinity)
     for (const morceau of h.image()) m.recoit(morceau, 0)
     // une goutte en vol : la plus rapide de l'image
@@ -251,7 +304,7 @@ describe('la partie — de l’hôte au miroir', () => {
 
   it('recommencer rend les deux corps entiers à leur départ', () => {
     const h = new Hote()
-    h.commande(0, { pousse: true, x: SALLE.minX, y: 0 })
+    h.commande(0, { pousse: true, ouvert: false, x: SALLE.minX, y: 0 })
     for (let k = 0; k < 120; k++) h.avance(1 / 60, Infinity)
     expect(h.sim.corps[0].playerCount).toBeLessThan(VOLUME_DEPART)
     h.recommence()

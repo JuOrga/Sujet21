@@ -26,7 +26,7 @@ export const TRAME_ETAT = 1
 export const TRAME_COMMANDE = 2
 /** La version du format : l'invité refuse une trame d'une autre version
  *  plutôt que de dessiner n'importe quoi. */
-export const VERSION_TRAME = 1
+export const VERSION_TRAME = 2
 
 /** Les particules par morceau d'état. Un canal de données porte au moins
  *  16 Ko par message sur tous les navigateurs ; 1 024 particules à six
@@ -81,6 +81,8 @@ export interface CorpsTrame {
   disperse: boolean
   /** il pousse en ce moment (l'autre le voit viser) */
   pousse: boolean
+  /** il est OUVERT : il accepte la matière des autres (fusion, don) */
+  ouvert: boolean
   viseeX: number
   viseeY: number
 }
@@ -150,7 +152,7 @@ export function encodeEtat(
       v.setUint16(o + 4, c.base, true)
       v.setFloat32(o + 6, c.x, true)
       v.setFloat32(o + 10, c.y, true)
-      v.setUint8(o + 14, (c.disperse ? 1 : 0) | (c.pousse ? 2 : 0))
+      v.setUint8(o + 14, (c.disperse ? 1 : 0) | (c.pousse ? 2 : 0) | (c.ouvert ? 4 : 0))
       // la visée voyage en 12 bits par axe, comme une particule
       const qx = Math.round(borne((c.viseeX - bornes.minX) / largeur, 0, 1) * 4095)
       const qy = Math.round(borne((c.viseeY - bornes.minY) / hauteur, 0, 1) * 4095)
@@ -219,6 +221,7 @@ export function litEnteteEtat(octets: Uint8Array, bornes: Bornes): EnteteEtat | 
       y: v.getFloat32(o + 10, true),
       disperse: (drapeaux & 1) !== 0,
       pousse: (drapeaux & 2) !== 0,
+      ouvert: (drapeaux & 4) !== 0,
       viseeX: bornes.minX + ((b0 | ((b1 & 0x0f) << 8)) / 4095) * largeur,
       viseeY: bornes.minY + (((b1 >> 4) | (b2 << 4)) / 4095) * hauteur,
     })
@@ -253,12 +256,14 @@ export function decodeParticules(octets: Uint8Array, e: EnteteEtat, bornes: Born
 export interface Commande {
   /** le joueur maintient la poussée */
   pousse: boolean
+  /** le joueur se tient OUVERT (il accepte la matière des autres) */
+  ouvert: boolean
   /** le point visé, en unités monde */
   x: number
   y: number
 }
 
-export const COMMANDE_NEUTRE: Commande = { pousse: false, x: 0, y: 0 }
+export const COMMANDE_NEUTRE: Commande = { pousse: false, ouvert: false, x: 0, y: 0 }
 
 export function encodeCommande(seq: number, c: Commande): Uint8Array {
   const octets = new Uint8Array(15)
@@ -266,7 +271,7 @@ export function encodeCommande(seq: number, c: Commande): Uint8Array {
   v.setUint8(0, TRAME_COMMANDE)
   v.setUint8(1, VERSION_TRAME)
   v.setUint32(2, seq, true)
-  v.setUint8(6, c.pousse ? 1 : 0)
+  v.setUint8(6, (c.pousse ? 1 : 0) | (c.ouvert ? 2 : 0))
   v.setFloat32(7, c.x, true)
   v.setFloat32(11, c.y, true)
   return octets
@@ -280,5 +285,6 @@ export function decodeCommande(octets: Uint8Array): { seq: number; commande: Com
   const y = v.getFloat32(11, true)
   // un nombre qui n'en est pas un ne doit pas entrer dans le solveur
   if (!Number.isFinite(x) || !Number.isFinite(y)) return null
-  return { seq: v.getUint32(2, true), commande: { pousse: (v.getUint8(6) & 1) !== 0, x, y } }
+  const drapeaux = v.getUint8(6)
+  return { seq: v.getUint32(2, true), commande: { pousse: (drapeaux & 1) !== 0, ouvert: (drapeaux & 2) !== 0, x, y } }
 }

@@ -14,7 +14,6 @@
 //  - l'INVITÉ (celui qui rejoint) envoie sa commande et affiche ;
 //  - SEUL : les deux corps sur une machine, pour essayer sans personne.
 
-import { NoyauxWasm } from '../sim/wasm'
 import { cadreSalle, cadreVoulu, ecranVersMonde, mondeVersEcran, suitCadre, type Cadre } from './cadrage'
 import { litCodePartie, LONGUEUR_CODE } from './code'
 import { CADENCE_ETAT, CAPACITE, Hote, Miroir, SALLE } from './partie'
@@ -76,7 +75,11 @@ const STYLE = `
 .mu-lien { color: var(--dim, #7f9cb0); font-size: 0.8em; padding: 0 2px; font-variant-numeric: tabular-nums; }
 .mu-actions { position: absolute; top: 14px; right: 14px; display: flex; gap: 8px; }
 .mu-actions button { background: var(--panel, rgba(9,18,30,.82)); padding: 0.5em 0.9em; font-size: 0.85em; }
-.mu-aide { position: absolute; left: 0; right: 0; bottom: 16px; text-align: center; color: var(--dim, #7f9cb0); pointer-events: none; font-size: 0.85em; padding: 0 16px; }
+.mu-tenir { position: absolute; right: 14px; bottom: 64px; display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 1em 1.3em !important;
+  background: var(--panel, rgba(9,18,30,.82)) !important; touch-action: none; user-select: none; -webkit-user-select: none; }
+.mu-tenir small { color: var(--dim, #7f9cb0); font-size: 0.7em; letter-spacing: 0.04em; }
+.mu-tenir[data-tenu="1"] { background: rgba(167, 221, 245, 0.28) !important; border-color: var(--glow, #a7ddf5) !important; }
+.mu-aide { position: absolute; left: 0; right: 150px; bottom: 16px; text-align: center; color: var(--dim, #7f9cb0); pointer-events: none; font-size: 0.85em; padding: 0 16px; }
 .mu-voile { position: absolute; inset: 0; background: rgba(2, 6, 12, 0.78); display: flex; align-items: center; justify-content: center; padding: 18px; }
 .mu-voile[hidden] { display: none; }
 .mu-voile div { max-width: 520px; display: flex; flex-direction: column; gap: 14px; text-align: center; line-height: 1.5; }
@@ -137,11 +140,13 @@ const GABARIT = `
     <div class="mu-lien" data-lien></div>
   </div>
   <div class="mu-actions">
+    <button type="button" data-geste="autre" hidden>L’AUTRE : FERMÉ</button>
     <button type="button" data-geste="changer" hidden>CHANGER DE CORPS</button>
     <button type="button" data-geste="recommencer">RECOMMENCER</button>
     <button type="button" data-geste="quitter-partie">QUITTER</button>
   </div>
-  <div class="mu-aide" data-aide>Maintenez le clic : la matière part vers le pointeur, le corps part à l’opposé.</div>
+  <button type="button" class="mu-tenir" data-tenir="ouvrir" aria-label="S’ouvrir (à maintenir)">S’OUVRIR<small>à maintenir · espace</small></button>
+  <div class="mu-aide" data-aide></div>
   <div class="mu-voile" data-voile hidden><div><p data-voile-mot></p><span class="mu-rang" style="justify-content:center"><button type="button" class="mu-fort" data-geste="retour-salon">REVENIR AU SALON</button></span></div></div>
 </div>
 `
@@ -159,7 +164,6 @@ export function creeEcranMulti(quitte: () => void): EcranMulti {
   let liaison: Liaison | null = null
   /** le code de la partie créée (pour le copier) */
   let codePartie = ''
-  let noyaux: NoyauxWasm | null = null
   let cadre: Cadre = cadreSalle(SALLE, 16 / 9)
   let rafId = 0
   let dernier = 0
@@ -170,6 +174,13 @@ export function creeEcranMulti(quitte: () => void): EcranMulti {
   let moi = 0
   // le pointeur, en fraction de la toile
   const pointeur = { actif: false, fx: 0.5, fy: 0.5 }
+  // S'OUVRIR se TIENT (espace, clic droit, ou le bouton à l'écran) : le
+  // pacte ne vaut que tant qu'on y consent. Relâcher, c'est se refermer.
+  const ouvre = { clavier: false, souris: false, bouton: false }
+  const jeMOuvre = (): boolean => ouvre.clavier || ouvre.souris || ouvre.bouton
+  /** SEUL : l'autre corps, qu'on ne pilote pas, est-il ouvert ? (un
+   *  interrupteur, puisqu'on n'a qu'une main) */
+  let autreOuvert = false
   // le pouls de la liaison
   let poulsId = 0
   let poulsParti = 0
@@ -223,9 +234,24 @@ export function creeEcranMulti(quitte: () => void): EcranMulti {
       void geste('valider-code')
     })
     brancheToile(r.querySelector('canvas')!)
+    const tenir = r.querySelector<HTMLButtonElement>('[data-tenir="ouvrir"]')!
+    const tient = (oui: boolean): void => {
+      ouvre.bouton = oui
+    }
+    tenir.addEventListener('pointerdown', (ev) => {
+      tenir.setPointerCapture(ev.pointerId)
+      tient(true)
+      ev.preventDefault()
+    })
+    tenir.addEventListener('pointerup', () => tient(false))
+    tenir.addEventListener('pointercancel', () => tient(false))
+    tenir.addEventListener('contextmenu', (ev) => ev.preventDefault())
     // la fenêtre qui perd la main ne doit pas laisser un jet coincé ouvert
     window.addEventListener('blur', () => {
       pointeur.actif = false
+      ouvre.clavier = false
+      ouvre.souris = false
+      ouvre.bouton = false
     })
     return r
   }
@@ -363,9 +389,13 @@ export function creeEcranMulti(quitte: () => void): EcranMulti {
         return
       case 'changer':
         // SEUL : le pointeur passe d'un corps à l'autre
-        if (hote) hote.commande(moi, { pousse: false, x: 0, y: 0 })
         moi = moi === 0 ? 1 : 0
         marqueEtiquette()
+        return
+      case 'autre':
+        // SEUL : ouvrir ou refermer le corps qu'on ne pilote pas
+        autreOuvert = !autreOuvert
+        peintAutre()
         return
     }
   }
@@ -456,6 +486,10 @@ export function creeEcranMulti(quitte: () => void): EcranMulti {
     el<HTMLElement>('[data-voile]').hidden = false
   }
 
+  function peintAutre(): void {
+    el<HTMLButtonElement>('[data-geste="autre"]').textContent = autreOuvert ? 'L’AUTRE : OUVERT' : 'L’AUTRE : FERMÉ'
+  }
+
   function marqueEtiquette(): void {
     etiquetteJusqua = performance.now() + 5000
   }
@@ -485,24 +519,17 @@ export function creeEcranMulti(quitte: () => void): EcranMulti {
       miroir = new Miroir()
     } else {
       hote = new Hote()
-      hote.poseNoyaux(noyaux)
-      if (!noyaux) {
-        // les noyaux compilés, en arrière-plan : la partie démarre sur le
-        // moteur JS et bascule dès qu'ils sont là. Échec = on reste en JS.
-        fetch('/noyaux.wasm')
-          .then((rep) => (rep.ok ? rep.arrayBuffer() : Promise.reject(new Error(String(rep.status)))))
-          .then((tampon) => NoyauxWasm.charge(tampon))
-          .then((n) => {
-            noyaux = n
-            hote?.poseNoyaux(n)
-          })
-          .catch(() => {})
-      }
     }
     el<HTMLElement>('[data-aide]').textContent =
-      r === 'hote'
-        ? 'Maintenez le clic : la matière part vers le pointeur, le corps part à l’opposé. Votre machine simule la partie : ne fermez pas cet onglet.'
-        : 'Maintenez le clic : la matière part vers le pointeur, le corps part à l’opposé.'
+      'Clic maintenu : la matière part vers le pointeur, le corps à l’opposé — sur votre corps, il se rassemble. ' +
+      'ESPACE ou clic droit maintenu : vous OUVRIR. Deux corps ouverts fusionnent ; un corps ouvert boit ce qu’on lui tire ; fermé, il repousse.' +
+      (r === 'hote' ? ' Votre machine simule la partie : ne fermez pas cet onglet.' : '')
+    el<HTMLButtonElement>('[data-geste="autre"]').hidden = r !== 'seul'
+    ouvre.clavier = false
+    ouvre.souris = false
+    ouvre.bouton = false
+    autreOuvert = false
+    peintAutre()
     cadre = cadreSalle(SALLE, rendu.aspect())
     seqCommande = 0
     seqCommandeRecue = -1
@@ -547,18 +574,26 @@ export function creeEcranMulti(quitte: () => void): EcranMulti {
       pointeur.fx = (ev.clientX - b.left) / Math.max(1, b.width)
       pointeur.fy = (ev.clientY - b.top) / Math.max(1, b.height)
     }
+    // Les boutons se lisent dans le masque de CHAQUE événement : presser le
+    // clic droit pendant que le gauche est tenu n'envoie pas de « pointerdown »
+    // mais un « pointermove » — c'est le masque qui dit vrai. Gauche (ou le
+    // doigt) : pousser. Droit : s'ouvrir.
+    const lit = (ev: PointerEvent): void => {
+      suit(ev)
+      pointeur.actif = (ev.buttons & 1) !== 0
+      ouvre.souris = ev.pointerType === 'mouse' && (ev.buttons & 2) !== 0
+    }
     const lache = (): void => {
       pointeur.actif = false
+      ouvre.souris = false
     }
     toile.addEventListener('pointerdown', (ev) => {
-      if (ev.button !== 0) return
       toile.setPointerCapture(ev.pointerId)
-      suit(ev)
-      pointeur.actif = true
+      lit(ev)
       ev.preventDefault()
     })
-    toile.addEventListener('pointermove', suit)
-    toile.addEventListener('pointerup', lache)
+    toile.addEventListener('pointermove', lit)
+    toile.addEventListener('pointerup', lit)
     toile.addEventListener('pointercancel', lache)
     toile.addEventListener('contextmenu', (ev) => ev.preventDefault())
   }
@@ -606,7 +641,7 @@ export function creeEcranMulti(quitte: () => void): EcranMulti {
 
     // la commande de CE joueur, dans le monde
     const vise = ecranVersMonde(cadre, pointeur.fx, pointeur.fy)
-    const commande: Commande = { pousse: pointeur.actif && dessine, x: vise.x, y: vise.y }
+    const commande: Commande = { pousse: pointeur.actif && dessine, ouvert: jeMOuvre() && dessine, x: vise.x, y: vise.y }
 
     let particules: Particules
     let corps: CorpsTrame[]
@@ -617,6 +652,9 @@ export function creeEcranMulti(quitte: () => void): EcranMulti {
     } else {
       const h = hote!
       h.commande(moi, commande)
+      // SEUL : le corps qu'on ne pilote pas ne pousse pas, et tient l'état
+      // de son interrupteur
+      if (role === 'seul') h.commande(1 - moi, { pousse: false, ouvert: autreOuvert, x: 0, y: 0 })
       h.avance(dt)
       if (role === 'hote' && liaison) {
         resteEnvoi -= dt
@@ -635,8 +673,9 @@ export function creeEcranMulti(quitte: () => void): EcranMulti {
 
     if (!dessine) return
     if (corps.length > 0) cadre = suitCadre(cadre, cadreVoulu(corps, SALLE, rendu.aspect()), dt)
-    rendu.dessine(particules, cadre, SALLE)
+    rendu.dessine(particules, cadre, SALLE, corps.map((c) => c.ouvert), maintenant / 1000)
     peintAth(corps, maintenant, dt)
+    el<HTMLElement>('[data-tenir="ouvrir"]').dataset.tenu = jeMOuvre() ? '1' : '0'
   }
 
   function peintAth(corps: CorpsTrame[], maintenant: number, dt: number): void {
@@ -651,7 +690,7 @@ export function creeEcranMulti(quitte: () => void): EcranMulti {
       barre.style.width = `${(part * 100).toFixed(1)}%`
       boite.querySelector('b')!.textContent = c ? `${Math.round(part * 100)} %` : '—'
       const qui = j === moi ? 'VOUS' : role === 'seul' ? 'L’AUTRE CORPS' : 'VOTRE AMI'
-      boite.querySelector('small')!.textContent = c?.disperse ? `${qui} · DISPERSÉ` : qui
+      boite.querySelector('small')!.textContent = c?.disperse ? `${qui} · DISPERSÉ` : c?.ouvert ? `${qui} · OUVERT` : qui
     }
 
     // le pouls et le débit, une fois par seconde
@@ -706,6 +745,12 @@ export function creeEcranMulti(quitte: () => void): EcranMulti {
   // défaut n'est pas empêchée : coller un code dans un champ marche.
   const bouclier = (ev: KeyboardEvent): void => {
     ev.stopPropagation()
+    // ESPACE, en jeu : s'ouvrir tant qu'elle est tenue. (On empêche son
+    // action par défaut : elle « cliquerait » le dernier bouton touché.)
+    if (page === 'jeu' && ev.code === 'Space') {
+      ouvre.clavier = ev.type === 'keydown'
+      ev.preventDefault()
+    }
   }
 
   const api: EcranMulti = {
@@ -746,7 +791,7 @@ export function creeEcranMulti(quitte: () => void): EcranMulti {
     images: miroir ? { recues: miroir.recues, perdues: miroir.perdues } : null,
     particules: role === 'invite' ? (miroir?.vue(performance.now()).n ?? 0) : (hote?.sim.count ?? 0),
     tSim: role === 'invite' ? (miroir?.tSim ?? 0) : (hote?.tSim ?? 0),
-    wasm: hote ? hote.sim.moteurWasm : null,
+    ouvert: jeMOuvre(),
   })
 
   return api

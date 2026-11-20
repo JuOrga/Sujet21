@@ -7,7 +7,6 @@
 // n'importe quel tuyau.
 
 import { DEFAULT_PARAMS, type SimParams } from '../sim/params'
-import type { NoyauxWasm } from '../sim/wasm'
 import { FixedLoop } from '../game/loop'
 import { FluidSimMulti, KIND_PLAYER, SANS_PROPRIO } from './solveurMulti'
 import {
@@ -53,14 +52,13 @@ export class Hote {
   private readonly joueurs: number
   private readonly boucle = new FixedLoop()
   private seq = 0
-  private noyaux: NoyauxWasm | null = null
   private readonly tampon = particulesVides(CAPACITE)
 
   constructor(joueurs = 2, params: SimParams = { ...DEFAULT_PARAMS }) {
     this.joueurs = joueurs
     this.params = params
     this.commandes = []
-    for (let j = 0; j < joueurs; j++) this.commandes.push({ pousse: false, x: 0, y: 0 })
+    for (let j = 0; j < joueurs; j++) this.commandes.push({ pousse: false, ouvert: false, x: 0, y: 0 })
     this.sim = this.naissance()
   }
 
@@ -73,16 +71,7 @@ export class Hote {
     }
     sim.courant = 0
     sim.relabel()
-    sim.noyauxWasm = this.noyaux
-    sim.moteurWasm = this.noyaux !== null
     return sim
-  }
-
-  /** Branche les noyaux compilés (plus rapides) ; sans eux, le moteur JS. */
-  poseNoyaux(n: NoyauxWasm | null): void {
-    this.noyaux = n
-    this.sim.noyauxWasm = n
-    this.sim.moteurWasm = n !== null
   }
 
   /** Une manche neuve : les deux corps reviennent à leur départ. */
@@ -90,7 +79,10 @@ export class Hote {
     this.sim = this.naissance()
     this.tSim = 0
     this.boucle.reset()
-    for (const c of this.commandes) c.pousse = false
+    for (const c of this.commandes) {
+      c.pousse = false
+      c.ouvert = false
+    }
   }
 
   /** Pose la commande d'un joueur. La visée est ramenée dans la salle : ce
@@ -99,6 +91,7 @@ export class Hote {
     const cible = this.commandes[j]
     if (!cible) return
     cible.pousse = c.pousse
+    cible.ouvert = c.ouvert
     cible.x = Math.min(SALLE.maxX, Math.max(SALLE.minX, c.x))
     cible.y = Math.min(SALLE.maxY, Math.max(SALLE.minY, c.y))
   }
@@ -113,9 +106,16 @@ export class Hote {
       () => {
         for (let j = 0; j < this.joueurs; j++) {
           const c = this.commandes[j]
+          // ouvert ou fermé : c'est le pas qui pose les cloisons
+          this.sim.corps[j].ouvert = c.ouvert
           if (!c.pousse) continue
           this.sim.courant = j
-          this.sim.eject(c.x, c.y, dt)
+          // Le geste du jeu, tel quel : le pointeur posé SUR son corps le
+          // RASSEMBLE là (rien ne part, rien ne se paie) ; ailleurs, il
+          // éjecte. À deux c'est le seul remède aux chocs : un corps bousculé
+          // s'étale, et ne se reforme pas tout seul.
+          if (this.surSonCorps(j, c.x, c.y)) this.sim.rassemble(dt, c.x, c.y)
+          else this.sim.eject(c.x, c.y, dt)
         }
         this.sim.courant = 0
         this.sim.step(dt)
@@ -123,6 +123,22 @@ export class Hote {
       },
       budgetMs,
     )
+  }
+
+  /** Le point visé est-il sur le corps de ce joueur ? (La règle du jeu :
+   *  main.ts, corpsSousLePointeur — une particule du corps à moins de 1,6
+   *  rayon de noyau.) */
+  private surSonCorps(j: number, x: number, y: number): boolean {
+    const s = this.sim
+    const r = this.params.kernelRadius * 1.6
+    const r2 = r * r
+    for (let i = 0; i < s.count; i++) {
+      if (s.kind[i] !== KIND_PLAYER || s.proprio[i] !== j) continue
+      const dx = s.posX[i] - x
+      const dy = s.posY[i] - y
+      if (dx * dx + dy * dy < r2) return true
+    }
+    return false
   }
 
   /** Les particules telles que le rendu les lit (l'hôte se regarde en
@@ -155,6 +171,7 @@ export class Hote {
       y: c.stats.centroidY,
       disperse: c.dispersed,
       pousse: this.commandes[j].pousse && !c.dispersed,
+      ouvert: c.ouvert,
       viseeX: this.commandes[j].x,
       viseeY: this.commandes[j].y,
     }))

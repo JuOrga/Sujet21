@@ -138,6 +138,8 @@ describe('solveur du multi — deux corps', () => {
   it('LE DON : la matière tirée dans l’autre devient la sienne', () => {
     const sim = duo(300, 700)
     const dt = sim.params.dt
+    // le don est un geste du RECEVEUR : il s'ouvre, et boit ce qu'on lui tire
+    sim.corps[1].ouvert = true
     // le joueur 0 tire en plein dans le joueur 1 pendant une seconde, puis
     // on laisse les gouttes arriver et leur délai se purger
     for (let s = 0; s < 480; s++) {
@@ -181,6 +183,8 @@ describe('solveur du multi — deux corps', () => {
     // les siennes », le plus gros avalerait l'autre au premier relabel
     const sim = duo(300, 150)
     const dt = sim.params.dt
+    sim.corps[0].ouvert = true
+    sim.corps[1].ouvert = true
     for (let s = 0; s < 240; s++) sim.step(dt)
     sim.relabel()
     expect(sim.corps[0].playerCount + sim.corps[0].enPretCount).toBe(300)
@@ -203,7 +207,13 @@ describe('solveur du multi — deux corps', () => {
     }
     expect(sim.corps[0].dispersed).toBe(true)
     expect(sim.corps[1].dispersed).toBe(false)
-    expect(sim.corps[1].playerCount).toBe(300)
+    // sa MATIÈRE est intacte (le recul du premier lui envoie une particule,
+    // qui rebondit sur lui en détachant deux ou trois gouttes : le corps
+    // compte 297, la matière 300)
+    let matiere = 0
+    for (let i = 0; i < sim.count; i++) if (sim.proprio[i] === 1) matiere++
+    expect(matiere).toBe(300)
+    expect(sim.corps[1].playerCount).toBeGreaterThan(290)
   })
 
   it('le pas rend la parole à qui l’avait', () => {
@@ -223,3 +233,191 @@ describe('solveur du multi — deux corps', () => {
     expect(Array.from(c.proprio.subarray(0, c.count))).toEqual(Array.from(sim.proprio.subarray(0, sim.count)))
   })
 })
+
+describe('solveur du multi — les gestes : ouvert, fermé', () => {
+  /** Les amas (étiquettes) où un joueur a des particules de corps. */
+  const amasDe = (sim: FluidSimMulti, j: number): Set<number> => {
+    const a = new Set<number>()
+    for (let i = 0; i < sim.count; i++) if (sim.kind[i] === KIND_PLAYER && sim.proprio[i] === j) a.add(sim.labels[i])
+    return a
+  }
+  const communs = (sim: FluidSimMulti): number => {
+    const a = amasDe(sim, 0)
+    return [...amasDe(sim, 1)].filter((x) => a.has(x)).length
+  }
+  const matiere = (sim: FluidSimMulti, j: number): number => {
+    let c = 0
+    for (let i = 0; i < sim.count; i++) if (sim.proprio[i] === j) c++
+    return c
+  }
+  /** La plus petite distance entre une particule de l'un et une de l'autre. */
+  const plusProche = (sim: FluidSimMulti): number => {
+    let d = Infinity
+    for (let i = 0; i < sim.count; i++) {
+      if (sim.proprio[i] !== 0) continue
+      for (let j = 0; j < sim.count; j++) {
+        if (sim.proprio[j] !== 1) continue
+        const r = Math.hypot(sim.posX[i] - sim.posX[j], sim.posY[i] - sim.posY[j])
+        if (r < d) d = r
+      }
+    }
+    return d
+  }
+
+  it('un corps naît FERMÉ', () => {
+    const sim = duo(100, 800)
+    expect(sim.corps[0].ouvert).toBe(false)
+    expect(sim.corps[1].ouvert).toBe(false)
+  })
+
+  it('deux corps FERMÉS qui se percutent ne se mêlent pas : ni amas commun, ni matière passée, ni particule de l’un parmi celles de l’autre', () => {
+    // le défaut noté au premier essai à deux : « deux corps qui se touchent
+    // se mêlent sans qu'on l'ait choisi »
+    const sim = duo(300, 300)
+    const dt = sim.params.dt
+    sim.courant = 0
+    sim.lanceCorps(120, 0)
+    let pire = Infinity
+    for (let s = 0; s < 480; s++) {
+      sim.step(dt)
+      if (s % 20 === 0 && s > 60) pire = Math.min(pire, plusProche(sim))
+    }
+    sim.relabel()
+    expect(communs(sim)).toBe(0)
+    expect(matiere(sim, 0)).toBe(300)
+    expect(matiere(sim, 1)).toBe(300)
+    // ils se sont bien touchés (la pression porte à un rayon de noyau)…
+    expect(pire).toBeLessThan(sim.params.kernelRadius)
+    // …sans jamais s'interpénétrer : toujours plus d'un pas de particule
+    expect(pire).toBeGreaterThan(sim.params.particleSpacing)
+    // et le choc s'est transmis : le second est parti, le premier a ralenti
+    expect(sim.corps[1].stats.velX).toBeGreaterThan(15)
+    expect(sim.corps[0].stats.velX).toBeLessThan(105)
+  })
+
+  it('le choc de deux corps fermés conserve la quantité de mouvement', () => {
+    const sim = duo(300, 300)
+    const dt = sim.params.dt
+    sim.courant = 0
+    sim.lanceCorps(120, 0)
+    const avant = sim.totalMomentum()
+    for (let s = 0; s < 360; s++) sim.step(dt)
+    const apres = sim.totalMomentum()
+    expect(Math.abs(apres.px - avant.px)).toBeLessThan(avant.px * 0.001)
+    expect(Math.abs(apres.py)).toBeLessThan(5)
+  })
+
+  it('un seul des deux ouvert : pas de fusion — c’est un PACTE', () => {
+    const sim = duo(300, 300)
+    const dt = sim.params.dt
+    sim.corps[1].ouvert = true
+    sim.courant = 0
+    sim.lanceCorps(120, 0)
+    for (let s = 0; s < 480; s++) sim.step(dt)
+    sim.relabel()
+    expect(communs(sim)).toBe(0)
+    expect(matiere(sim, 0)).toBe(300)
+    expect(matiere(sim, 1)).toBe(300)
+  })
+
+  it('les DEUX ouverts : ils fusionnent en un seul amas, et chacun garde les siennes', () => {
+    const sim = duo(300, 300)
+    const dt = sim.params.dt
+    sim.corps[0].ouvert = true
+    sim.corps[1].ouvert = true
+    sim.courant = 0
+    sim.lanceCorps(120, 0)
+    for (let s = 0; s < 480; s++) sim.step(dt)
+    sim.relabel()
+    expect(communs(sim)).toBe(1)
+    expect(sim.corps[0].playerCount + sim.corps[0].enPretCount).toBe(300)
+    expect(sim.corps[1].playerCount + sim.corps[1].enPretCount).toBe(300)
+  })
+
+  it('SE REFERMER sépare : plus d’amas commun, les corps s’écartent, et rien n’explose', () => {
+    const sim = duo(300, 300)
+    const dt = sim.params.dt
+    sim.corps[0].ouvert = true
+    sim.corps[1].ouvert = true
+    sim.courant = 0
+    sim.lanceCorps(120, 0)
+    for (let s = 0; s < 480; s++) sim.step(dt)
+    sim.relabel()
+    expect(communs(sim)).toBe(1)
+    const ecartAvant = sim.corps[1].stats.centroidX - sim.corps[0].stats.centroidX
+    // le joueur 0 se referme
+    sim.corps[0].ouvert = false
+    let vmax = 0
+    for (let s = 0; s < 240; s++) {
+      sim.step(dt)
+      for (let i = 0; i < sim.count; i++) vmax = Math.max(vmax, Math.hypot(sim.velX[i], sim.velY[i]))
+    }
+    sim.relabel()
+    expect(communs(sim)).toBe(0)
+    expect(sim.corps[1].stats.centroidX - sim.corps[0].stats.centroidX).toBeGreaterThan(ecartAvant)
+    // la séparation pousse, elle ne catapulte pas (un jet part à 1 400 u/s)
+    expect(vmax).toBeLessThan(700)
+    // la matière qui change de main à la séparation reste marginale
+    expect(Math.abs(matiere(sim, 0) - 300)).toBeLessThan(30)
+    expect(matiere(sim, 0) + matiere(sim, 1)).toBe(600)
+  })
+
+  it('le jet tiré dans un corps FERMÉ ne lui donne rien : il le bouscule', () => {
+    const sim = duo(300, 700)
+    const dt = sim.params.dt
+    for (let s = 0; s < 480; s++) {
+      sim.courant = 0
+      if (s < 120) sim.eject(350, 0, dt)
+      sim.step(dt)
+    }
+    sim.relabel()
+    expect(matiere(sim, 1)).toBe(300)
+    expect(matiere(sim, 0)).toBe(300)
+    expect(sim.corps[1].stats.velX).toBeGreaterThan(5)
+  })
+
+  it('un corps OUVERT boit ce qu’on lui tire, pas les morceaux de l’autre', () => {
+    // le défaut vu à l'écran : dans une fusion brouillonne, le plus gros
+    // avalait les fragments de l'autre (851 particules, puis 332)
+    const sim = duo(300, 420)
+    const dt = sim.params.dt
+    sim.corps[0].ouvert = true
+    // vingt particules du joueur 1 se DÉTACHENT de son corps et viennent se
+    // poser contre le joueur 0 — des fragments, pas un jet
+    const a = sim.corps[0].stats
+    let prises = 0
+    for (let i = 0; i < sim.count && prises < 20; i++) {
+      if (sim.kind[i] !== KIND_PLAYER || sim.proprio[i] !== 1) continue
+      const angle = (prises / 20) * Math.PI - Math.PI / 2
+      sim.posX[i] = a.centroidX + Math.cos(angle) * 72
+      sim.posY[i] = a.centroidY + Math.sin(angle) * 72
+      sim.velX[i] = 0
+      sim.velY[i] = 0
+      prises++
+    }
+    for (let s = 0; s < 360; s++) sim.step(dt)
+    sim.relabel()
+    expect(matiere(sim, 1)).toBe(300)
+    expect(matiere(sim, 0)).toBe(300)
+    // et le corps ouvert n'a pas grossi de la matière des autres
+    expect(sim.corps[0].playerCount + sim.corps[0].enPretCount).toBeLessThanOrEqual(300)
+  })
+
+  it('un corps fermé ne boit rien d’étranger, même collé à l’un de ses fragments', () => {
+    // la fuite trouvée en écrivant les cloisons : une goutte de l'autre,
+    // collée à un fragment du corps fermé, revenait AVEC lui au relabel
+    const sim = duo(300, 700)
+    const dt = sim.params.dt
+    for (let s = 0; s < 720; s++) {
+      sim.courant = 0
+      if (s < 180) sim.eject(350, 0, dt)
+      sim.step(dt)
+    }
+    sim.relabel()
+    let etrangeres = 0
+    for (let i = 0; i < sim.count; i++) if (sim.kind[i] === KIND_PLAYER && sim.proprio[i] === 1) etrangeres++
+    expect(etrangeres).toBe(sim.corps[1].playerCount)
+    expect(matiere(sim, 1)).toBe(300)
+  })
+})
+

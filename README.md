@@ -179,13 +179,20 @@ bouton **MULTI** sur l'accueil (`?dev`). Tout vit dans [`src/multi/`](src/multi/
   nombres que l'original, au bit près. Le rendu aussi est à part
   (`renduMulti.ts`) : deux couleurs, sans l'éclairage ni les décors du jeu.
 - **Ce qui est là** : une grande salle vide, deux corps de couleurs
-  différentes, le jet, le don (la matière tirée dans l'autre devient la
-  sienne), ESSAYER SEUL pour piloter les deux corps sur une machine.
+  différentes, le jet, se rassembler (le pointeur posé sur son corps, comme
+  dans le jeu), ESSAYER SEUL pour piloter les deux corps sur une machine.
+- **Les gestes entre joueurs** : un corps est FERMÉ par défaut — il ne se
+  mélange à rien d'étranger, deux corps fermés se bousculent sans se mêler.
+  S'OUVRIR se tient (espace, clic droit, ou le bouton à l'écran) : deux
+  corps ouverts FUSIONNENT en gardant chacun leur matière, et se pilotent à
+  deux ; l'un se referme, ils se SÉPARENT. Un corps ouvert BOIT ce qu'on
+  lui tire (le don) ; fermé, le jet le bouscule. Seul un jet se donne : un
+  morceau détaché reste à son corps. `solveurMulti.ts`, « les cloisons ».
 - **Quand ça ne marche pas** : l'écran écrit sous le message d'erreur un
   « détail pour le dépannage » (le relais joint, les instances vues, les
   coupures). C'est lui qu'il faut photographier.
-- **Ce qui manque** : les gestes entre joueurs (s'ouvrir pour fusionner, se
-  fermer pour se séparer), les salles, tout état autre que l'eau.
+- **Ce qui manque** : un but (rien ne se gagne encore), les salles, tout
+  état autre que l'eau, et les graphismes du jeu — le multi a son rendu.
 - **Le débit** : une image pèse 10,9 Ko (1 800 particules à six octets),
   vingt par seconde — 212 Ko/s mesurés à travers le relais en ligne, soit
   1,7 Mbit/s en envoi chez l'hôte, que le relais reçoit puis renvoie. Si la

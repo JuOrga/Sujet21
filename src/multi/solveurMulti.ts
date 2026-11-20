@@ -21,7 +21,10 @@
 //  - « est du corps » (`estCorps`) veut dire : du corps DU COURANT. Le
 //    corps d'un autre joueur est, pour le courant, de la matière qui presse
 //    et qu'on ne pilote pas ;
-//  - `relabel` attribue les amas à PLUSIEURS corps (voir sa note).
+//  - `relabel` attribue les amas à PLUSIEURS corps (voir sa note) ;
+//  - LES CLOISONS (voir `poseCloisons`) : un corps FERMÉ ne se mélange à
+//    aucune matière étrangère, deux corps ne fusionnent que s'ils sont tous
+//    deux OUVERTS. Ce sont les gestes du jeu à deux.
 //
 // CE QUI DORT : la glace, la vapeur, le plasma, les éponges, les coupelles,
 // les rails, le sas. Leur code est là, il parle du joueur courant, et la
@@ -189,6 +192,9 @@ export interface EtatCorps {
   enPretCount: number
   criticalTimer: number
   ejectCarry: number
+  /** OUVERT : ce corps accepte la matière des autres (fusion, don).
+   *  Fermé (le défaut), il la repousse. */
+  ouvert: boolean
   stats: PlayerStats
   rass: { actif: boolean; vu: boolean; resteX: number; resteY: number; uX: number; uY: number }
 }
@@ -202,6 +208,7 @@ function etatCorpsNeuf(): EtatCorps {
     enPretCount: 0,
     criticalTimer: 0,
     ejectCarry: 0,
+    ouvert: false,
     stats: { count: 0, centroidX: 0, centroidY: 0, velX: 0, velY: 0, rmsRadius: 1 },
     rass: { actif: false, vu: false, resteX: 0, resteY: 0, uX: 0, uY: 0 },
   }
@@ -276,6 +283,66 @@ export class FluidSimMulti {
   private readonly labelDe = new Int32Array(JOUEURS_MAX)
   private readonly tailleDe = new Int32Array(JOUEURS_MAX)
   private readonly compteDe = new Int32Array(JOUEURS_MAX)
+  // LES CLOISONS — pourquoi deux corps ne se mélangent pas tout seuls.
+  //
+  // Le solveur tient l'eau par sa densité : une particule en manque de
+  // voisines est tirée vers elles, c'est la tension de surface. Deux corps
+  // qui se touchent n'ont donc plus de surface à leur contact — ils ne font
+  // qu'un, qu'on le veuille ou non. Au premier essai à deux, c'était le
+  // défaut noté : « deux corps qui se touchent se mêlent sans qu'on l'ait
+  // choisi ».
+  //
+  // La règle du jeu à deux : la fusion est un PACTE. Une particule de corps
+  // FERMÉ ne compte pour voisine qu'une particule du même propriétaire ;
+  // toute autre matière lui est étrangère — elle ne presse pas, ne colle
+  // pas, ne se lie pas, et un écartement la tient à distance (voir le pas).
+  // Dès que les DEUX corps sont ouverts, la paire redevient de l'eau
+  // ordinaire : ils fusionnent. Une goutte libre n'a pas de cloison : elle
+  // se mêle à qui veut bien d'elle — tirée dans un corps ouvert elle est
+  // BUE (le don), tirée dans un corps fermé elle REBONDIT et le bouscule.
+  //
+  // `cloison[i]` vaut 1 pour une particule d'un corps fermé. Deux particules
+  // i et j sont ÉTRANGÈRES l'une à l'autre si elles n'ont pas le même
+  // propriétaire et que l'une des deux au moins porte une cloison.
+  private readonly cloison: Uint8Array
+  /** Le multiplicateur de la pression entre étrangères, par particule. */
+  private readonly lambdaE: Float32Array
+  // LA GOUTTE TIRÉE. Un corps ouvert boit ce qu'on lui TIRE — c'est le don,
+  // un geste. Il ne doit pas boire pour autant les MORCEAUX de l'autre : un
+  // corps bousculé se défait en fragments, et dans une fusion un peu
+  // brouillonne le plus gros avalait la moitié de l'autre (mesuré à l'écran :
+  // 851 particules avant de s'ouvrir, 332 cinq secondes après). La marque
+  // dit donc d'où vient une goutte libre : 1 si elle est partie d'un JET,
+  // 0 si elle s'est détachée. Seule une goutte tirée change de propriétaire ;
+  // un fragment reste à son corps, même au milieu de celui d'un autre, et
+  // lui revient dès qu'ils se retrouvent.
+  private readonly tiree: Uint8Array
+  /** Y a-t-il une cloison quelque part ? Faux à un joueur : le solveur du
+   *  jeu n'a pas de cloisons, et la parité au bit près en dépend. */
+  private cloisons = false
+  /** La distance sous laquelle deux particules étrangères sont écartées, en
+   *  pas de particule. À 1,15 une particule ne passe pas entre deux voisines
+   *  de la surface d'en face (elles sont à un pas l'une de l'autre). */
+  static readonly ECART_CLOISON = 1.15
+  /** La part de l'écart corrigée à chaque itération, et son plafond par
+   *  paire (en fraction du rayon du noyau) : assez pour qu'un jet rebondisse,
+   *  pas assez pour que deux corps emmêlés qui se ferment EXPLOSENT. */
+  static readonly RAIDEUR_CLOISON = 0.5
+  static readonly PLAFOND_CLOISON = 0.25
+
+  /** Pose les cloisons d'après l'état ouvert/fermé de chaque corps. */
+  private poseCloisons(): void {
+    const n = this.count
+    this.cloisons = false
+    if (this.corps.length < 2) return
+    for (let i = 0; i < n; i++) {
+      const pr = this.proprio[i]
+      const c = this.kind[i] === KIND_PLAYER && pr < this.corps.length && !this.corps[pr].ouvert ? 1 : 0
+      this.cloison[i] = c
+      if (c === 1) this.cloisons = true
+    }
+  }
+
   /** Cette particule est-elle du corps DU JOUEUR COURANT ? */
   private estCorps(i: number): boolean {
     return this.kind[i] === KIND_PLAYER && this.proprio[i] === this.courant
@@ -553,6 +620,9 @@ export class FluidSimMulti {
     this.corps = []
     for (let j = 0; j < nb; j++) this.corps.push(etatCorpsNeuf())
     this.proprio = new Uint8Array(capacity).fill(SANS_PROPRIO)
+    this.cloison = new Uint8Array(capacity)
+    this.lambdaE = new Float32Array(capacity)
+    this.tiree = new Uint8Array(capacity)
     this.params = params
     this.bounds = bounds
     this.capacity = capacity
@@ -1273,6 +1343,7 @@ export class FluidSimMulti {
       this.souffle[i] = this.souffle[last]
       this.duCorps[i] = this.duCorps[last]
       this.proprio[i] = this.proprio[last]
+      this.tiree[i] = this.tiree[last]
     }
     this.count = last
   }
@@ -1297,6 +1368,7 @@ export class FluidSimMulti {
     this.souffle[i] = 0
     this.duCorps[i] = 0
     this.proprio[i] = kind === KIND_PLAYER ? this.courant : SANS_PROPRIO
+    this.tiree[i] = 0
     if (kind === KIND_PLAYER) this.playerCount++
     return i
   }
@@ -1505,6 +1577,7 @@ export class FluidSimMulti {
       // donc du halo — la jauge ne cille pas d'une image, elle ne baissera
       // qu'à la SORTIE réelle (constatée au relabel suivant)
       this.duCorps[best] = 2
+      this.tiree[best] = 1 // partie d'un jet : elle peut être donnée
       this.enPretCount++
       this.playerCount--
 
@@ -2424,10 +2497,12 @@ export class FluidSimMulti {
     ]
     for (const [a, b] of entiers) b.set(a.subarray(0, n))
     c.proprio.set(this.proprio.subarray(0, n))
+    c.tiree.set(this.tiree.subarray(0, n))
     c.courant = this.courant
     for (let j = 0; j < this.corps.length; j++) {
       c.corps[j].baseVolume = this.corps[j].baseVolume
       c.corps[j].playerCount = this.corps[j].playerCount
+      c.corps[j].ouvert = this.corps[j].ouvert
     }
     c.freezeIntent = this.freezeIntent
     c.gasIntent = this.gasIntent
@@ -2496,6 +2571,7 @@ export class FluidSimMulti {
     permuteF(this.souffle)
     permuteI(this.duCorps)
     permuteI(this.proprio)
+    permuteI(this.tiree)
     permuteI(this.labels)
     permuteI(this.iceLabels)
     permuteI(this.contactMat)
@@ -2589,7 +2665,10 @@ export class FluidSimMulti {
     // les noyaux compilés (asm/noyaux.ts) — mêmes formules, même ordre
     // d'opérations, vérifié par le test de parité. Le reste du pas (glace,
     // gaz, matériaux, obstacles) continue en JS sur les mêmes tableaux.
-    const wasm = this.moteurWasm && besoinVoisins ? this.noyauxWasm : null
+    // (les noyaux compilés sont ceux du jeu : ils ne connaissent pas les
+    // cloisons. À plusieurs joueurs le pas se fait donc en JS — mesuré à
+    // 4,6 ms pour 1 800 particules, contre 3,6 ms compilé.)
+    const wasm = this.moteurWasm && besoinVoisins && this.corps.length < 2 ? this.noyauxWasm : null
     if (wasm) {
       wasm.assure(this.capacity, grid.nx * grid.ny)
       wasm.prdX.set(prdX.subarray(0, n))
@@ -2624,6 +2703,14 @@ export class FluidSimMulti {
       }
       nbStart[n] = cursor
     }
+    // les cloisons du pas : qui est étranger à qui (rien à un seul joueur)
+    this.poseCloisons()
+    const cloisons = this.cloisons
+    const cloison = this.cloison
+    const proprio = this.proprio
+    const ecart = FluidSimMulti.ECART_CLOISON * p.particleSpacing
+    const ecart2 = ecart * ecart
+    const lambdaE = this.lambdaE
     const selfRho = k.poly6Coeff * h2 * h2 * h2
     // Exposant de cohésion : puissance entière déroulée quand c'est possible
     // (Math.pow dans la boucle de paires coûte cher sur petites machines)
@@ -2674,12 +2761,46 @@ export class FluidSimMulti {
         let sumGradX = 0
         let sumGradY = 0
         let sumGrad2 = 0
+        // la part des étrangères (reste à zéro sans cloisons)
+        let rhoE = 0
+        let sumGradEX = 0
+        let sumGradEY = 0
+        let sumGradE2 = 0
         const end = nbStart[i + 1]
         for (let e = nbStart[i]; e < end; e++) {
           const j = nbList[e]
           if (gaseous[j] === 1) {
             pairW[e] = 0
             pairC[e] = 0
+            continue
+          }
+          // UNE ÉTRANGÈRE n'est pas de la même eau : elle ne compte pas dans
+          // la densité qui tient ce corps (pas de cohésion avec elle — chaque
+          // corps garde sa surface face à l'autre), mais elle PRESSE : on la
+          // note à part, et la passe suivante l'écarte dès que la place manque
+          if (cloisons && proprio[i] !== proprio[j] && (cloison[i] | cloison[j]) !== 0) {
+            const ex = xi - prdX[j]
+            const ey = yi - prdY[j]
+            const e2 = ex * ex + ey * ey
+            const er = Math.sqrt(e2)
+            if (e2 >= h2 || er < 1e-6) {
+              pairW[e] = 0
+              pairC[e] = 0
+              continue
+            }
+            const et = h2 - e2
+            rhoE += k.poly6Coeff * et * et * et
+            const eg = h - er
+            const ec = (k.spikyGradCoeff * eg * eg) / er
+            pairDx[e] = ex
+            pairDy[e] = ey
+            pairW[e] = -1 // la marque d'une paire étrangère
+            pairC[e] = ec
+            const egx = ec * ex * invRho0
+            const egy = ec * ey * invRho0
+            sumGradEX += egx
+            sumGradEY += egy
+            sumGradE2 += egx * egx + egy * egy
             continue
           }
           const dx = xi - prdX[j]
@@ -2717,6 +2838,22 @@ export class FluidSimMulti {
         const denom =
           sumGrad2 + sumGradX * sumGradX + sumGradY * sumGradY + p.epsilonLambda
         lambda[i] = -C / denom
+        // LA PRESSION ENTRE ÉTRANGÈRES : la contrainte porte sur la densité de
+        // TOUT ce qui entoure la particule, et ne joue que dans un sens — trop
+        // serré, on s'écarte ; pas assez, on ne s'attire pas. C'est l'eau et
+        // l'huile : chacune tient par elle-même, aucune ne cède sa place.
+        if (cloisons) {
+          let le = 0
+          if (rhoE > 0) {
+            const Ct = (rho + rhoE) * invRho0 - 1
+            if (Ct > 0) {
+              const gx = sumGradX + sumGradEX
+              const gy = sumGradY + sumGradEY
+              le = -Ct / (sumGrad2 + sumGradE2 + gx * gx + gy * gy + p.epsilonLambda)
+            }
+          }
+          lambdaE[i] = le
+        }
       }
 
       // Plafond de correction PAR PAIRE : le terme est exactement opposé pour
@@ -2738,6 +2875,21 @@ export class FluidSimMulti {
         for (let e = nbStart[i]; e < end; e++) {
           const c = pairC[e]
           if (c === 0) continue
+          if (pairW[e] < 0) {
+            // paire étrangère : la pression seule, plafonnée comme les autres
+            const se = (lambdaE[i] + lambdaE[nbList[e]]) * invRho0
+            let ex = se * c * pairDx[e]
+            let ey = se * c * pairDy[e]
+            const em = ex * ex + ey * ey
+            if (em > maxPairDp2) {
+              const sm = maxPairDp / Math.sqrt(em)
+              ex *= sm
+              ey *= sm
+            }
+            dx0 += ex
+            dy0 += ey
+            continue
+          }
           const ratio = pairW[e] * invWDq
           let powed: number
           if (sCorrNInt > 0) {
@@ -2761,6 +2913,38 @@ export class FluidSimMulti {
         }
         dpX[i] = dx0
         dpY[i] = dy0
+      }
+
+      // L'ÉCARTEMENT DES ÉTRANGÈRES : deux particules que sépare une cloison
+      // et qui se trouvent à moins d'un écart l'une de l'autre sont repoussées,
+      // chacune de la moitié — le terme est exactement opposé pour i et j
+      // (toutes deux lisent les mêmes positions), la quantité de mouvement
+      // est conservée. C'est ce qui fait REBONDIR un corps fermé contre un
+      // autre, et un jet contre un corps fermé.
+      if (cloisons) {
+        const plafond = FluidSimMulti.PLAFOND_CLOISON * h
+        const raideur = FluidSimMulti.RAIDEUR_CLOISON * 0.5
+        for (let i = 0; i < n; i++) {
+          if (gaseous[i] === 1) continue
+          const xi = prdX[i]
+          const yi = prdY[i]
+          const pi = proprio[i]
+          const ci = cloison[i]
+          const end = nbStart[i + 1]
+          for (let e = nbStart[i]; e < end; e++) {
+            const j = nbList[e]
+            if (pi === proprio[j] || (ci | cloison[j]) === 0 || gaseous[j] === 1) continue
+            const dx = xi - prdX[j]
+            const dy = yi - prdY[j]
+            const r2 = dx * dx + dy * dy
+            if (r2 >= ecart2 || r2 < 1e-12) continue
+            const r = Math.sqrt(r2)
+            let pousse = (ecart - r) * raideur
+            if (pousse > plafond) pousse = plafond
+            dpX[i] += (dx / r) * pousse
+            dpY[i] += (dy / r) * pousse
+          }
+        }
       }
 
       for (let i = 0; i < n; i++) {
@@ -2853,6 +3037,8 @@ export class FluidSimMulti {
         for (let e = nbStart[i]; e < end; e++) {
           const j = nbList[e]
           if (gaseous[j] === 1) continue
+          // deux étrangères glissent l'une sur l'autre : pas de viscosité
+          if (cloisons && proprio[i] !== proprio[j] && (cloison[i] | cloison[j]) !== 0) continue
           const dx = xi - prdX[j]
           const dy = yi - prdY[j]
           const r2 = dx * dx + dy * dy
@@ -4474,6 +4660,12 @@ export class FluidSimMulti {
     // dans un tampon (grid.collect, zéro allocation), puis filtrés en place —
     // le parcours en profondeur ne paie plus deux couches de fermetures par
     // particule visitée (relabel était le pic CPU périodique de la frame).
+    // les cloisons valent aussi pour les amas : deux corps fermés au contact
+    // restent DEUX amas, et la goutte qui touche un corps fermé n'est pas à lui
+    this.poseCloisons()
+    const cloisons = this.cloisons
+    const cloison = this.cloison
+    const proprio = this.proprio
     const scratch = this.relabelScratch
     const forEachNeighbor = (i: number, cb: (j: number) => void) => {
       const xi = posX[i]
@@ -4492,6 +4684,7 @@ export class FluidSimMulti {
       )
       for (let e = 0; e < end; e++) {
         const j = scratch[e]
+        if (cloisons && proprio[i] !== proprio[j] && (cloison[i] | cloison[j]) !== 0) continue
         const v = gi > gasLink[j] ? gi : gasLink[j]
         if (v > 0) {
           const dx = xi - posX[j]
@@ -4570,9 +4763,14 @@ export class FluidSimMulti {
           cible = pr < nb && labelDe[pr] === c ? pr : gros
         }
       }
+      // Ce qu'un corps accepte d'un AUTRE : rien s'il est fermé (même par
+      // ricochet — une goutte étrangère collée à l'un de SES fragments
+      // reviendrait sinon avec lui), et, ouvert, seulement une goutte TIRÉE.
+      if (cible >= 0 && nb > 1 && this.proprio[i] !== cible && (!this.corps[cible].ouvert || this.tiree[i] === 0)) cible = -1
       if (cible >= 0) {
         this.kind[i] = KIND_PLAYER
         this.proprio[i] = cible
+        this.tiree[i] = 0
         this.duCorps[i] = 0 // reprise : la marque d'égarement s'efface
         this.compteDe[cible]++
       } else {
