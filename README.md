@@ -152,6 +152,52 @@ recondensation, WASM), les règles de jeu (bonbonnes, condensat, économat,
 codex, trophées, cycle, récompenses, voie, générateur) et les écrans
 (commandes, cinématiques, planche, éditeur, bibliothèque partagée).
 
+## Le multi (prototype)
+
+Un essai de partie à deux, chacun chez soi, derrière le mode concepteur :
+bouton **MULTI** sur l'accueil (`?dev`). Tout vit dans [`src/multi/`](src/multi/).
+
+- **Créer / rejoindre** : l'hôte reçoit un code de cinq caractères, l'ami le
+  tape — ou ouvre le lien `?dev&multi=CODE`, qui mène droit dans la partie.
+- **Le relais** : toute la partie passe par un petit serveur à nous,
+  [`relais/`](relais/), qui tient les deux connexions et remet à l'un ce
+  qu'envoie l'autre. Trois essais de liaison directe entre deux maisons
+  avaient échoué — `relais/index.js` les raconte. Il vit dans le projet
+  Vercel du jeu, comme un déploiement à part qui ne contient que lui (le
+  jeton du dépôt ne peut pas créer de projet). Il se déploie par la
+  gâchette `relais-go`, qui l'essaie aussitôt en ligne depuis le serveur de
+  GitHub ; son adresse change à chaque déploiement, et le jeu la porte dans
+  `src/multi/relais.ts`.
+- **Qui simule** : la machine qui CRÉE la partie. L'autre envoie sa commande
+  et affiche ce qu'il reçoit (rejouer les mêmes gestes sur deux machines ne
+  donne pas le même film — `src/game/fantome.ts`). La partie continue quand
+  la fenêtre de l'hôte passe en arrière-plan ; elle s'arrête s'il ferme
+  l'onglet.
+- **Le solveur du jeu n'est pas touché.** `src/multi/solveurMulti.ts` en est
+  une copie qui tient plusieurs corps, chaque particule portant son
+  propriétaire ; un test de parité la tient, à un joueur, sur les mêmes
+  nombres que l'original, au bit près. Le rendu aussi est à part
+  (`renduMulti.ts`) : deux couleurs, sans l'éclairage ni les décors du jeu.
+- **Ce qui est là** : une grande salle vide, deux corps de couleurs
+  différentes, le jet, se rassembler (le pointeur posé sur son corps, comme
+  dans le jeu), ESSAYER SEUL pour piloter les deux corps sur une machine.
+- **Les gestes entre joueurs** : un corps est FERMÉ par défaut — il ne se
+  mélange à rien d'étranger, deux corps fermés se bousculent sans se mêler.
+  S'OUVRIR se tient (espace, clic droit, ou le bouton à l'écran) : deux
+  corps ouverts FUSIONNENT en gardant chacun leur matière, et se pilotent à
+  deux ; l'un se referme, ils se SÉPARENT. Un corps ouvert BOIT ce qu'on
+  lui tire (le don) ; fermé, le jet le bouscule. Seul un jet se donne : un
+  morceau détaché reste à son corps. `solveurMulti.ts`, « les cloisons ».
+- **Quand ça ne marche pas** : l'écran écrit sous le message d'erreur un
+  « détail pour le dépannage » (le relais joint, les instances vues, les
+  coupures). C'est lui qu'il faut photographier.
+- **Ce qui manque** : un but (rien ne se gagne encore), les salles, tout
+  état autre que l'eau, et les graphismes du jeu — le multi a son rendu.
+- **Le débit** : une image pèse 10,9 Ko (1 800 particules à six octets),
+  vingt par seconde — 212 Ko/s mesurés à travers le relais en ligne, soit
+  1,7 Mbit/s en envoi chez l'hôte, que le relais reçoit puis renvoie. Si la
+  ligne ne suit pas, l'hôte saute des images au lieu de prendre du retard.
+
 ## Ce qui n'est pas fait
 
 - **Le boss.** La Pompe de reprise n'est qu'une esquisse écrite
