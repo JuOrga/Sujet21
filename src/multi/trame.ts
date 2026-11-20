@@ -332,6 +332,10 @@ export interface Commande {
   /** le point visé, en unités monde */
   x: number
   y: number
+  /** La visée dit où ALLER, et non où tirer : le jet part à l'opposé, par
+   *  rapport au cœur du corps. C'est la manette (manetteMulti.ts) ; à la
+   *  souris on vise le jet. Le palet, lui, part toujours vers la visée. */
+  aller?: boolean
 }
 
 export const COMMANDE_NEUTRE: Commande = { pousse: false, ouvert: false, x: 0, y: 0 }
@@ -342,7 +346,7 @@ export function encodeCommande(seq: number, c: Commande): Uint8Array {
   v.setUint8(0, TRAME_COMMANDE)
   v.setUint8(1, VERSION_TRAME)
   v.setUint32(2, seq, true)
-  v.setUint8(6, (c.pousse ? 1 : 0) | (c.ouvert ? 2 : 0))
+  v.setUint8(6, (c.pousse ? 1 : 0) | (c.ouvert ? 2 : 0) | (c.aller ? 4 : 0))
   v.setFloat32(7, c.x, true)
   v.setFloat32(11, c.y, true)
   return octets
@@ -357,5 +361,5 @@ export function decodeCommande(octets: Uint8Array): { seq: number; commande: Com
   // un nombre qui n'en est pas un ne doit pas entrer dans le solveur
   if (!Number.isFinite(x) || !Number.isFinite(y)) return null
   const drapeaux = v.getUint8(6)
-  return { seq: v.getUint32(2, true), commande: { pousse: (drapeaux & 1) !== 0, ouvert: (drapeaux & 2) !== 0, x, y } }
+  return { seq: v.getUint32(2, true), commande: { pousse: (drapeaux & 1) !== 0, ouvert: (drapeaux & 2) !== 0, x, y, aller: (drapeaux & 4) !== 0 } }
 }

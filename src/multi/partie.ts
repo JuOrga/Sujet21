@@ -106,6 +106,7 @@ export class Hote {
     for (const c of this.commandes) {
       c.pousse = false
       c.ouvert = false
+      c.aller = false
     }
   }
 
@@ -116,6 +117,7 @@ export class Hote {
     if (!cible) return
     cible.pousse = c.pousse
     cible.ouvert = c.ouvert
+    cible.aller = c.aller === true
     cible.x = Math.min(this.salle.maxX, Math.max(this.salle.minX, c.x))
     cible.y = Math.min(this.salle.maxY, Math.max(this.salle.minY, c.y))
   }
@@ -139,7 +141,12 @@ export class Hote {
           // éjecte. À deux c'est le seul remède aux chocs : un corps bousculé
           // s'étale, et ne se reforme pas tout seul.
           if (this.surSonCorps(j, c.x, c.y)) this.sim.rassemble(dt, c.x, c.y)
-          else this.sim.eject(c.x, c.y, dt)
+          else if (c.aller) {
+            // la manette dit où ALLER : le jet part à l'opposé, de l'autre
+            // côté du cœur du corps
+            const s = this.sim.corps[j].stats
+            this.sim.eject(2 * s.centroidX - c.x, 2 * s.centroidY - c.y, dt)
+          } else this.sim.eject(c.x, c.y, dt)
         }
         this.sim.courant = 0
         this.hockey?.avant(this.sim)

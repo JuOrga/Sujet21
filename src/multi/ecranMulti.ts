@@ -18,6 +18,7 @@ import { cadreSalle, cadreVoulu, ecranVersMonde, mondeVersEcran, suitCadre, type
 import { litCodePartie, LONGUEUR_CODE } from './code'
 import { CADENCE_ETAT, CAPACITE, Hote, Miroir, SALLE } from './partie'
 import { BUTS_POUR_GAGNER, CAGE, RAYON_PALET } from './hockey'
+import { commandeManette, litManette, nouvelEtatManette, type PadLu } from './manetteMulti'
 import { adresseRelais, creePartie, liaisonPossible, rejointPartie, type EtatLiaison, type Liaison, type Ordre } from './relais'
 import { RenduMulti, couleurCss, type SceneHockey } from './renduMulti'
 import {
@@ -100,6 +101,9 @@ const STYLE = `
 .mu-voile div { max-width: 520px; display: flex; flex-direction: column; gap: 14px; text-align: center; line-height: 1.5; }
 .mu-etiquette { position: absolute; transform: translate(-50%, -50%); pointer-events: none; font-family: var(--font-display, sans-serif); letter-spacing: 0.2em;
   font-size: calc(12px * var(--ui, 1)); text-shadow: 0 0 8px #000, 0 0 2px #000; transition: opacity 0.6s; }
+.mu-reticule { position: absolute; width: 22px; height: 22px; margin: -11px 0 0 -11px; border: 2px solid currentColor; border-radius: 50%; pointer-events: none; opacity: 0.75; }
+.mu-reticule[hidden] { display: none; }
+.mu-reticule[data-pousse="1"] { opacity: 1; background: currentColor; box-shadow: 0 0 12px currentColor; }
 .mu-modes { margin-bottom: 12px; }
 .mu-modes button { padding: 0.9em 1em; opacity: 0.6; }
 .mu-modes button[data-choisi="1"] { opacity: 1; border-color: var(--accent, #8fd3ff); box-shadow: inset 0 0 0 1px var(--accent, #8fd3ff); }
@@ -161,6 +165,7 @@ const GABARIT = `
 <div class="mu-jeu" data-page="jeu" hidden>
   <canvas aria-label="La salle du multi"></canvas>
   <div class="mu-etiquette" data-etiquette hidden>VOUS</div>
+  <div class="mu-reticule" data-reticule hidden></div>
   <div class="mu-ath">
     <div class="mu-jauge" data-jauge="0"><i></i><div class="mu-barre"><u></u></div><b>100 %</b><small></small></div>
     <div class="mu-jauge" data-jauge="1"><i></i><div class="mu-barre"><u></u></div><b>100 %</b><small></small></div>
@@ -206,8 +211,16 @@ export function creeEcranMulti(quitte: () => void): EcranMulti {
   const pointeur = { actif: false, fx: 0.5, fy: 0.5 }
   // S'OUVRIR se TIENT (espace, clic droit, ou le bouton à l'écran) : le
   // pacte ne vaut que tant qu'on y consent. Relâcher, c'est se refermer.
-  const ouvre = { clavier: false, souris: false, bouton: false }
-  const jeMOuvre = (): boolean => ouvre.clavier || ouvre.souris || ouvre.bouton
+  const ouvre = { clavier: false, souris: false, bouton: false, manette: false }
+  const jeMOuvre = (): boolean => ouvre.clavier || ouvre.souris || ouvre.bouton || ouvre.manette
+  // LA MANETTE (manetteMulti.ts). Elle et le pointeur se passent la main :
+  // le dernier des deux à avoir bougé commande.
+  const manette = nouvelEtatManette()
+  let mainManette = -1
+  let mainPointeur = 0
+  /** Le cœur du corps qu'on pilote, à la dernière image : la manette vise
+   *  autour de lui. */
+  const monCoeur = { x: 0, y: 0, connu: false }
   /** SEUL : l'autre corps, qu'on ne pilote pas, est-il ouvert ? (un
    *  interrupteur, puisqu'on n'a qu'une main) */
   let autreOuvert = false
@@ -609,6 +622,7 @@ export function creeEcranMulti(quitte: () => void): EcranMulti {
       const b = toile.getBoundingClientRect()
       pointeur.fx = (ev.clientX - b.left) / Math.max(1, b.width)
       pointeur.fy = (ev.clientY - b.top) / Math.max(1, b.height)
+      mainPointeur = performance.now()
     }
     // Les boutons se lisent dans le masque de CHAQUE événement : presser le
     // clic droit pendant que le gauche est tenu n'envoie pas de « pointerdown »
@@ -677,7 +691,26 @@ export function creeEcranMulti(quitte: () => void): EcranMulti {
 
     // la commande de CE joueur, dans le monde
     const vise = ecranVersMonde(cadre, pointeur.fx, pointeur.fy)
-    const commande: Commande = { pousse: pointeur.actif && dessine, ouvert: jeMOuvre() && dessine, x: vise.x, y: vise.y }
+    litManette(padCourant(), manette)
+    if (manette.vie) mainManette = maintenant
+    const aLaManette = manette.connectee && monCoeur.connu && mainManette > mainPointeur
+    ouvre.manette = aLaManette && manette.ouvert
+    let commande: Commande
+    if (aLaManette) {
+      commande = commandeManette(manette, monCoeur.x, monCoeur.y)
+      commande.ouvert = jeMOuvre()
+      if (manette.recommence) {
+        if (role === 'invite') liaison?.envoieOrdre({ t: 'recommence' })
+        else recommence()
+      }
+    } else {
+      commande = { pousse: pointeur.actif, ouvert: jeMOuvre(), x: vise.x, y: vise.y }
+    }
+    // onglet à l'arrière-plan : on ne pousse ni ne s'ouvre à l'aveugle
+    if (!dessine) {
+      commande.pousse = false
+      commande.ouvert = false
+    }
 
     let particules: Particules
     let corps: CorpsTrame[]
@@ -695,7 +728,7 @@ export function creeEcranMulti(quitte: () => void): EcranMulti {
       // SEUL : le corps qu'on ne pilote pas ne pousse pas, et tient l'état
       // de son interrupteur ; il vise où vise le pointeur (au hockey, c'est
       // par là qu'il lancerait le palet)
-      if (role === 'seul') h.commande(1 - moi, { pousse: false, ouvert: autreOuvert, x: vise.x, y: vise.y })
+      if (role === 'seul') h.commande(1 - moi, { pousse: false, ouvert: autreOuvert, x: commande.x, y: commande.y })
       h.avance(dt)
       if (role === 'hote' && liaison) {
         resteEnvoi -= dt
@@ -714,6 +747,12 @@ export function creeEcranMulti(quitte: () => void): EcranMulti {
       salle = h.salle
     }
 
+    const mien = corps[moi]
+    monCoeur.connu = !!mien && !mien.disperse
+    if (mien) {
+      monCoeur.x = mien.x
+      monCoeur.y = mien.y
+    }
     if (!dessine) return
     // AU HOCKEY on voit tout le terrain, toujours : il faut lire les deux
     // cages et le palet d'un coup d'œil, pas seulement les deux corps
@@ -732,10 +771,35 @@ export function creeEcranMulti(quitte: () => void): EcranMulti {
       }
     }
     rendu.dessine(particules, cadre, salle, corps.map((c) => c.ouvert), maintenant / 1000, scene)
+    peintReticule(aLaManette, commande)
     peintAide(jeu ? MODE_HOCKEY : MODE_LIBRE)
     peintScore(jeu)
     peintAth(corps, maintenant, dt)
     el<HTMLElement>('[data-tenir="ouvrir"]').dataset.tenu = jeMOuvre() ? '1' : '0'
+  }
+
+  /** La manette branchée sur cette machine, ou null. */
+  function padCourant(): PadLu | null {
+    const pads = typeof navigator !== 'undefined' && navigator.getGamepads ? navigator.getGamepads() : []
+    for (const gp of pads) if (gp?.connected && gp.mapping === 'standard') return gp
+    for (const gp of pads) if (gp?.connected) return gp
+    return null
+  }
+
+  /** À la manette il n'y a pas de pointeur à l'écran : un réticule montre
+   *  où l'on va (et par où partirait le palet). */
+  function peintReticule(visible: boolean, commande: Commande): void {
+    const r = el<HTMLElement>('[data-reticule]')
+    if (!visible) {
+      if (!r.hidden) r.hidden = true
+      return
+    }
+    const e = mondeVersEcran(cadre, commande.x, commande.y)
+    r.hidden = false
+    r.style.left = `${(e.fx * 100).toFixed(2)}%`
+    r.style.top = `${(e.fy * 100).toFixed(2)}%`
+    r.style.color = couleurCss(moi)
+    r.dataset.pousse = commande.pousse ? '1' : '0'
   }
 
   /** L'aide du bas d'écran suit le mode — que l'invité n'apprend qu'à la
@@ -749,7 +813,8 @@ export function creeEcranMulti(quitte: () => void): EcranMulti {
       mode === MODE_HOCKEY
         ? 'ESPACE ou clic droit maintenu : vous OUVRIR pour avaler le palet ; relâchez, il part vers le pointeur, plus fort si vous l’avez tenu. Fermé, vous le renvoyez. Le palet dans la cage adverse : un but.'
         : 'ESPACE ou clic droit maintenu : vous OUVRIR. Deux corps ouverts fusionnent ; un corps ouvert boit ce qu’on lui tire ; fermé, il repousse.'
-    el<HTMLElement>('[data-aide]').textContent = commun + propre + (role === 'hote' ? ' Votre machine simule la partie : ne fermez pas cet onglet.' : '')
+    const pad = ' MANETTE : le stick gauche pour aller, A ou RT pour pousser, LT ou LB pour s’ouvrir.'
+    el<HTMLElement>('[data-aide]').textContent = commun + propre + pad + (role === 'hote' ? ' Votre machine simule la partie : ne fermez pas cet onglet.' : '')
   }
 
   function peintScore(jeu: JeuTrame | null): void {

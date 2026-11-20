@@ -198,6 +198,11 @@ bouton **MULTI** sur l'accueil (`?dev`). Tout vit dans [`src/multi/`](src/multi/
   buts gagne. La règle est dans `hockey.ts` ; le solveur n'en connaît que
   le contact du palet avec l'eau. Au hockey la matière tirée revient à son
   corps d'où qu'elle soit — on y pousse sans cesse.
+- **La manette** (`manetteMulti.ts`) : le stick gauche dit où l'on VA (le
+  jet part à l'opposé, et le palet part du côté du stick), A ou RT pousse,
+  LT ou LB ouvre tant qu'on tient, Start recommence. Un réticule montre la
+  visée. La manette et la souris se passent la main : la dernière à avoir
+  bougé commande. Le salon, lui, se parcourt encore à la souris.
 - **Quand ça ne marche pas** : l'écran écrit sous le message d'erreur un
   « détail pour le dépannage » (le relais joint, les instances vues, les
   coupures). C'est lui qu'il faut photographier.

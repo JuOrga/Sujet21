@@ -120,7 +120,8 @@ describe('trame — la commande', () => {
   it('fait l’aller-retour', () => {
     const r = decodeCommande(encodeCommande(42, { pousse: true, ouvert: false, x: 1234.5, y: -8 }))!
     expect(r.seq).toBe(42)
-    expect(r.commande).toEqual({ pousse: true, ouvert: false, x: 1234.5, y: -8 })
+    // la commande décodée dit toujours si la visée est « où aller » (la manette)
+    expect(r.commande).toEqual({ pousse: true, ouvert: false, x: 1234.5, y: -8, aller: false })
   })
 
   it('porte l’ouverture, et ne la confond pas avec la poussée', () => {
