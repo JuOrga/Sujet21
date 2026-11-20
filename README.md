@@ -202,7 +202,15 @@ bouton **MULTI** sur l'accueil (`?dev`). Tout vit dans [`src/multi/`](src/multi/
   jet part à l'opposé, et le palet part du côté du stick), A ou RT pousse,
   LT ou LB ouvre tant qu'on tient, Start recommence. Un réticule montre la
   visée. La manette et la souris se passent la main : la dernière à avoir
-  bougé commande. Le salon, lui, se parcourt encore à la souris.
+  bougé commande. Select quitte la partie. AU SALON, la croix ou le stick
+  passent d'un bouton à l'autre, A valide, B revient ; pour rejoindre, le
+  code se compose à la croix (←→ la case, ↑↓ le caractère).
+- **Les sons** (`sonsMulti.ts`) : le jet, s'ouvrir et se refermer, le choc
+  de deux corps, et au hockey le palet sur la paroi, contre un corps,
+  avalé, lancé (une note monte tant qu'on le tient), le but, la fin. Tout
+  est synthétisé, sans fichier ; ce qu'on entend se déduit de ce qu'on
+  affiche, d'une image à la suivante — rien de plus ne voyage. Le volume
+  et la coupure du son sont ceux réglés dans le jeu.
 - **Quand ça ne marche pas** : l'écran écrit sous le message d'erreur un
   « détail pour le dépannage » (le relais joint, les instances vues, les
   coupures). C'est lui qu'il faut photographier.

@@ -8745,6 +8745,11 @@ const chargeMulti = chargeUneFois('le multi', async () => {
   const { creeEcranMulti } = await import('./multi/ecranMulti')
   return creeEcranMulti(() => {
     multiOuvert = false
+    // La manette du jeu n'est pas relevée tant que le multi couvre l'écran,
+    // mais elle n'a pas cessé de NOTER les appuis : sans cette relève à
+    // blanc, le A qui vient de valider « retour à l'accueil » dans le multi
+    // validerait aussi le bouton principal de l'accueil à l'image suivante.
+    manette.poll(performance.now() / 1000)
   })
 })
 const ouvreMulti = (code?: string): void => {

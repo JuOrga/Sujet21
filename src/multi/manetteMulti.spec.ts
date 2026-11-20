@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { commandeManette, litManette, nouvelEtatManette, type PadLu } from './manetteMulti'
+import { commandeManette, defileCaractere, litManette, litMenu, nouvelEtatManette, nouvelEtatMenu, voisinMenu, type PadLu } from './manetteMulti'
+import { ALPHABET_CODE } from './code'
 import { Hote } from './partie'
 import { MODE_HOCKEY, decodeCommande, encodeCommande } from './trame'
 
@@ -12,7 +13,11 @@ const A = 0
 const LB = 4
 const LT = 6
 const RT = 7
+const B = 1
+const SELECT = 8
 const START = 9
+const HAUT = 12
+const DROITE = 15
 
 describe('manette du multi — la lecture', () => {
   it('le stick donne la direction et l’inclinaison, au-delà de la zone morte', () => {
@@ -152,5 +157,71 @@ describe('manette du multi — chez l’hôte', () => {
     expect(h.hockey!.tenuPar).toBe(-1)
     expect(h.sim.palet.vy).toBeLessThan(-1200)
     expect(Math.abs(h.sim.palet.vx)).toBeLessThan(200)
+  })
+})
+
+describe('manette du multi — au salon', () => {
+  it('Select quitte, une fois par appui', () => {
+    const e = nouvelEtatManette()
+    litManette(pad(0, 0, SELECT), e)
+    expect(e.quitte).toBe(true)
+    litManette(pad(0, 0, SELECT), e)
+    expect(e.quitte).toBe(false)
+  })
+
+  it('le bouton encore tenu à l’ouverture du salon ne valide pas', () => {
+    const e = nouvelEtatMenu()
+    // on vient de valider MULTI sur l'accueil : A est toujours enfoncé
+    expect(litMenu(pad(0, 0, A), e, 0).valide).toBe(false)
+    expect(litMenu(pad(0, 0), e, 40).valide).toBe(false)
+    expect(litMenu(pad(0, 0, A), e, 80).valide).toBe(true)
+    expect(litMenu(pad(0, 0, A), e, 120).valide).toBe(false)
+  })
+
+  it('B revient en arrière', () => {
+    const e = nouvelEtatMenu()
+    litMenu(pad(0, 0), e, 0)
+    expect(litMenu(pad(0, 0, B), e, 40).retour).toBe(true)
+  })
+
+  it('la croix donne un pas, puis se répète si on la tient', () => {
+    const e = nouvelEtatMenu()
+    expect(litMenu(pad(0, 0, DROITE), e, 0)).toMatchObject({ dx: 1, dy: 0 })
+    expect(litMenu(pad(0, 0, DROITE), e, 200)).toMatchObject({ dx: 0, dy: 0 })
+    expect(litMenu(pad(0, 0, DROITE), e, 400)).toMatchObject({ dx: 1 })
+    expect(litMenu(pad(0, 0, DROITE), e, 460)).toMatchObject({ dx: 0 })
+    expect(litMenu(pad(0, 0, DROITE), e, 540)).toMatchObject({ dx: 1 })
+    expect(litMenu(pad(0, 0, HAUT), e, 560)).toMatchObject({ dx: 0, dy: -1 })
+  })
+
+  it('le stick vaut une croix, franchement incliné seulement', () => {
+    const e = nouvelEtatMenu()
+    expect(litMenu(pad(0.4, 0), e, 0)).toMatchObject({ dx: 0, dy: 0 })
+    expect(litMenu(pad(0, 0.9), e, 40)).toMatchObject({ dx: 0, dy: 1 })
+    expect(litMenu(pad(-0.9, 0.2), e, 80)).toMatchObject({ dx: -1, dy: 0 })
+  })
+
+  it('d’un bouton à l’autre : le plus proche du côté demandé, sur sa ligne d’abord', () => {
+    // le salon : deux modes en haut, deux choix dessous, deux petits boutons en bas
+    const boutons = [
+      { x: 100, y: 100 }, { x: 300, y: 100 },
+      { x: 100, y: 200 }, { x: 300, y: 200 },
+      { x: 60, y: 280 }, { x: 180, y: 280 },
+    ]
+    expect(voisinMenu(boutons[0], boutons, 1, 0)).toBe(1)
+    expect(voisinMenu(boutons[0], boutons, 0, 1)).toBe(2)
+    expect(voisinMenu(boutons[3], boutons, -1, 0)).toBe(2)
+    expect(voisinMenu(boutons[2], boutons, 0, 1)).toBe(4)
+    // rien à gauche du premier : on reste où l'on est
+    expect(voisinMenu(boutons[0], boutons, -1, 0)).toBe(-1)
+  })
+
+  it('le code se compose en faisant défiler l’alphabet des codes, qui boucle', () => {
+    expect(defileCaractere(ALPHABET_CODE, 'A', 1)).toBe('B')
+    expect(defileCaractere(ALPHABET_CODE, 'A', -1)).toBe('9')
+    expect(defileCaractere(ALPHABET_CODE, '9', 1)).toBe('A')
+    // ni I ni O n'existent dans un code : H mène à J
+    expect(defileCaractere(ALPHABET_CODE, 'H', 1)).toBe('J')
+    expect(defileCaractere(ALPHABET_CODE, '?', 1)).toBe('A')
   })
 })

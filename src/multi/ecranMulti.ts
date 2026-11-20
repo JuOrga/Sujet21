@@ -15,12 +15,13 @@
 //  - SEUL : les deux corps sur une machine, pour essayer sans personne.
 
 import { cadreSalle, cadreVoulu, ecranVersMonde, mondeVersEcran, suitCadre, type Cadre } from './cadrage'
-import { litCodePartie, LONGUEUR_CODE } from './code'
+import { ALPHABET_CODE, litCodePartie, LONGUEUR_CODE } from './code'
 import { CADENCE_ETAT, CAPACITE, Hote, Miroir, SALLE } from './partie'
 import { BUTS_POUR_GAGNER, CAGE, RAYON_PALET } from './hockey'
-import { commandeManette, litManette, nouvelEtatManette, type PadLu } from './manetteMulti'
+import { commandeManette, defileCaractere, litManette, litMenu, nouvelEtatManette, nouvelEtatMenu, voisinMenu, type PadLu } from './manetteMulti'
 import { adresseRelais, creePartie, liaisonPossible, rejointPartie, type EtatLiaison, type Liaison, type Ordre } from './relais'
 import { RenduMulti, couleurCss, type SceneHockey } from './renduMulti'
+import { SonsMulti, entend, type Instantane } from './sonsMulti'
 import {
   MODE_HOCKEY,
   MODE_LIBRE,
@@ -104,6 +105,12 @@ const STYLE = `
 .mu-reticule { position: absolute; width: 22px; height: 22px; margin: -11px 0 0 -11px; border: 2px solid currentColor; border-radius: 50%; pointer-events: none; opacity: 0.75; }
 .mu-reticule[hidden] { display: none; }
 .mu-reticule[data-pousse="1"] { opacity: 1; background: currentColor; box-shadow: 0 0 12px currentColor; }
+#multi button[data-pad="1"] { outline: 2px solid var(--accent, #8fd3ff); outline-offset: 3px; opacity: 1; }
+.mu-codepad { display: flex; gap: 10px; justify-content: center; margin: 10px 0 4px; font-family: var(--font-display, sans-serif); font-size: calc(34px * var(--ui, 1)); }
+.mu-codepad[hidden] { display: none; }
+.mu-codepad span { width: 1.5em; padding: 0.2em 0; text-align: center; border: 1px solid var(--line, #24384a); }
+.mu-codepad span[data-ici="1"] { border-color: var(--accent, #8fd3ff); box-shadow: inset 0 0 0 1px var(--accent, #8fd3ff); }
+.mu-codepad + small { display: block; text-align: center; color: var(--dim, #7f9cb0); }
 .mu-modes { margin-bottom: 12px; }
 .mu-modes button { padding: 0.9em 1em; opacity: 0.6; }
 .mu-modes button[data-choisi="1"] { opacity: 1; border-color: var(--accent, #8fd3ff); box-shadow: inset 0 0 0 1px var(--accent, #8fd3ff); }
@@ -154,6 +161,7 @@ const GABARIT = `
     <p>Cinq caractères, donnés par la personne qui a créé la partie.</p>
     <form data-formulaire="code">
       <input type="text" data-champ="code" autocapitalize="characters" autocomplete="off" autocorrect="off" spellcheck="false" maxlength="12" aria-label="Code de la partie" placeholder="·····">
+      <div class="mu-codepad" data-codepad hidden></div><small data-codepad-aide hidden>MANETTE : ←→ la case · ↑↓ le caractère · A rejoindre · B annuler</small>
       <div class="mu-rang"><button type="submit" class="mu-fort" data-geste="valider-code">REJOINDRE</button></div>
     </form>
   </div>
@@ -221,6 +229,10 @@ export function creeEcranMulti(quitte: () => void): EcranMulti {
   /** Le cœur du corps qu'on pilote, à la dernière image : la manette vise
    *  autour de lui. */
   const monCoeur = { x: 0, y: 0, connu: false }
+  // LES SONS (sonsMulti.ts) : ce qu'on entend se déduit de ce qu'on affiche,
+  // d'une image à la suivante.
+  const sons = new SonsMulti()
+  let instantane: Instantane | null = null
   /** SEUL : l'autre corps, qu'on ne pilote pas, est-il ouvert ? (un
    *  interrupteur, puisqu'on n'a qu'une main) */
   let autreOuvert = false
@@ -267,6 +279,8 @@ export function creeEcranMulti(quitte: () => void): EcranMulti {
     r.innerHTML = GABARIT
     document.body.appendChild(r)
     r.addEventListener('click', (ev) => {
+      // le navigateur ne laisse sonner qu'après un geste : le premier clic
+      sons.reveille()
       const m = (ev.target as HTMLElement).closest<HTMLButtonElement>('button[data-mode]')
       if (m) {
         // le mode vaut pour la partie qu'on CRÉE (ou qu'on essaie seul) ;
@@ -496,6 +510,9 @@ export function creeEcranMulti(quitte: () => void): EcranMulti {
     montre('jonction')
     const champ = el<HTMLInputElement>('[data-champ="code"]')
     champ.value = code
+    casePad = 0
+    el<HTMLElement>('[data-codepad]').hidden = true
+    el<HTMLElement>('[data-codepad-aide]').hidden = true
     el<HTMLButtonElement>('[data-geste="valider-code"]').disabled = false
     mot('jonction', '')
     detail('jonction', '')
@@ -572,6 +589,7 @@ export function creeEcranMulti(quitte: () => void): EcranMulti {
       hote = new Hote(2, undefined, modeChoisi)
     }
     aideDuMode = -1
+    instantane = null
     el<HTMLElement>('[data-score]').hidden = true
     el<HTMLButtonElement>('[data-geste="autre"]').hidden = r !== 'seul'
     ouvre.clavier = false
@@ -601,6 +619,7 @@ export function creeEcranMulti(quitte: () => void): EcranMulti {
     if (rafId) cancelAnimationFrame(rafId)
     rafId = 0
     arreteBattement()
+    sons.silence()
     const avaitRendu = rendu !== null
     rendu?.libere()
     rendu = null
@@ -692,7 +711,10 @@ export function creeEcranMulti(quitte: () => void): EcranMulti {
     // la commande de CE joueur, dans le monde
     const vise = ecranVersMonde(cadre, pointeur.fx, pointeur.fy)
     litManette(padCourant(), manette)
-    if (manette.vie) mainManette = maintenant
+    if (manette.vie) {
+      mainManette = maintenant
+      sons.reveille()
+    }
     const aLaManette = manette.connectee && monCoeur.connu && mainManette > mainPointeur
     ouvre.manette = aLaManette && manette.ouvert
     let commande: Commande
@@ -702,6 +724,10 @@ export function creeEcranMulti(quitte: () => void): EcranMulti {
       if (manette.recommence) {
         if (role === 'invite') liaison?.envoieOrdre({ t: 'recommence' })
         else recommence()
+      }
+      if (manette.quitte) {
+        void geste('quitter-partie')
+        return
       }
     } else {
       commande = { pousse: pointeur.actif, ouvert: jeMOuvre(), x: vise.x, y: vise.y }
@@ -747,6 +773,24 @@ export function creeEcranMulti(quitte: () => void): EcranMulti {
       salle = h.salle
     }
 
+    // ---- les sons : ce qui vient d'arriver, puis ce qui dure
+    const apres: Instantane = {
+      t: role === 'invite' ? miroir!.tSim : hote!.tSim,
+      corps,
+      jeu,
+      salle,
+      rayonPalet: jeu ? RAYON_PALET : 0,
+    }
+    const entendus = entend(instantane, apres, moi)
+    instantane = apres
+    if (dessine) {
+      for (const son of entendus) sons.joue(son, (son.x - cadre.cx) / cadre.demiL)
+      // le jet : le sien plein, celui de l'autre en retrait
+      const jet = corps[moi]?.pousse ? 1 : corps.some((c) => c.pousse) ? 0.4 : 0
+      sons.continu(jet, jeu && jeu.tenuPar === moi ? jeu.charge : -1)
+    } else {
+      sons.silence()
+    }
     const mien = corps[moi]
     monCoeur.connu = !!mien && !mien.disperse
     if (mien) {
@@ -776,6 +820,106 @@ export function creeEcranMulti(quitte: () => void): EcranMulti {
     peintScore(jeu)
     peintAth(corps, maintenant, dt)
     el<HTMLElement>('[data-tenir="ouvrir"]').dataset.tenu = jeMOuvre() ? '1' : '0'
+  }
+
+  // ---- LA MANETTE AU SALON -------------------------------------------------
+  // En jeu la manette joue ; au salon (et sur un message qui barre l'écran)
+  // elle passe d'un bouton à l'autre. Elle se lit sur une minuterie : le
+  // salon n'a pas de boucle d'image.
+  const menu = nouvelEtatMenu()
+  let menuId = 0
+  let boutonPad: HTMLButtonElement | null = null
+  /** REJOINDRE à la manette : la case du code qu'on compose. */
+  let casePad = 0
+
+  function marquePad(b: HTMLButtonElement | null): void {
+    if (boutonPad === b) return
+    if (boutonPad) delete boutonPad.dataset.pad
+    boutonPad = b
+    if (b) b.dataset.pad = '1'
+  }
+
+  /** Les boutons qu'on peut atteindre : ceux de la page montrée — ou du
+   *  message, s'il y en a un devant. */
+  function boutonsDuSalon(): HTMLButtonElement[] {
+    if (!racine) return []
+    const zone = page === 'jeu' ? '[data-voile]' : `[data-page="${page}"]`
+    return [...racine.querySelectorAll<HTMLButtonElement>(`${zone} button`)].filter((b) => !b.disabled && b.offsetParent !== null)
+  }
+
+  /** Le code qu'on compose à la croix, case par case. */
+  function composeCode(dx: number, dy: number): void {
+    const champ = el<HTMLInputElement>('[data-champ="code"]')
+    const lu = champ.value.toUpperCase().replace(/[^A-Z0-9]/g, '')
+    // (une case vide n'est pas un caractère de l'alphabet : « includes('') »
+    // dit vrai pour toute chaîne, d'où le test de longueur)
+    const cases = Array.from({ length: LONGUEUR_CODE }, (_, i) => {
+      const c = lu[i] ?? ''
+      return c.length === 1 && ALPHABET_CODE.includes(c) ? c : ALPHABET_CODE[0]
+    })
+    if (dx !== 0) casePad = Math.min(LONGUEUR_CODE - 1, Math.max(0, casePad + dx))
+    // vers le haut, on avance dans l'alphabet
+    if (dy !== 0) cases[casePad] = defileCaractere(ALPHABET_CODE, cases[casePad], -dy)
+    champ.value = cases.join('')
+    const boite = el<HTMLElement>('[data-codepad]')
+    boite.hidden = false
+    el<HTMLElement>('[data-codepad-aide]').hidden = false
+    boite.replaceChildren(
+      ...cases.map((c, i) => {
+        const e = document.createElement('span')
+        e.textContent = c
+        e.dataset.ici = i === casePad ? '1' : '0'
+        return e
+      }),
+    )
+  }
+
+  function tourMenu(maintenant: number): void {
+    const pad = padCourant()
+    const g = litMenu(pad, menu, maintenant)
+    if (!pad || !racine) return
+    if (g.valide || g.retour) sons.reveille()
+    const barre = page === 'jeu' && !el<HTMLElement>('[data-voile]').hidden
+    if (page === 'jeu' && !barre) {
+      marquePad(null) // en jeu, la manette joue
+      return
+    }
+    const clique = (selecteur: string): boolean => {
+      const zone = page === 'jeu' ? '[data-voile]' : `[data-page="${page}"]`
+      const b = racine!.querySelector<HTMLButtonElement>(`${zone} ${selecteur}`)
+      if (!b || b.disabled) return false
+      b.click()
+      return true
+    }
+    if (g.retour) {
+      marquePad(null)
+      if (!clique('[data-geste="retour"]') && !clique('[data-geste="retour-salon"]')) clique('[data-geste="quitter"]')
+      return
+    }
+    if (page === 'jonction') {
+      if (g.dx !== 0 || g.dy !== 0) composeCode(g.dx, g.dy)
+      if (g.valide) clique('[data-geste="valider-code"]')
+      return
+    }
+    const boutons = boutonsDuSalon()
+    if (boutons.length === 0) return
+    const courant = boutonPad && boutons.includes(boutonPad) ? boutonPad : null
+    if (g.dx !== 0 || g.dy !== 0) {
+      if (!courant) {
+        marquePad(boutons[0])
+      } else {
+        const centre = (b: HTMLElement): { x: number; y: number } => {
+          const r = b.getBoundingClientRect()
+          return { x: r.left + r.width / 2, y: r.top + r.height / 2 }
+        }
+        const i = voisinMenu(centre(courant), boutons.map(centre), g.dx, g.dy)
+        if (i >= 0) marquePad(boutons[i])
+      }
+    }
+    if (g.valide) {
+      if (courant) courant.click()
+      else marquePad(boutons[0])
+    }
   }
 
   /** La manette branchée sur cette machine, ou null. */
@@ -813,7 +957,7 @@ export function creeEcranMulti(quitte: () => void): EcranMulti {
       mode === MODE_HOCKEY
         ? 'ESPACE ou clic droit maintenu : vous OUVRIR pour avaler le palet ; relâchez, il part vers le pointeur, plus fort si vous l’avez tenu. Fermé, vous le renvoyez. Le palet dans la cage adverse : un but.'
         : 'ESPACE ou clic droit maintenu : vous OUVRIR. Deux corps ouverts fusionnent ; un corps ouvert boit ce qu’on lui tire ; fermé, il repousse.'
-    const pad = ' MANETTE : le stick gauche pour aller, A ou RT pour pousser, LT ou LB pour s’ouvrir.'
+    const pad = ' MANETTE : le stick gauche pour aller, A ou RT pour pousser, LT ou LB pour s’ouvrir ; Start recommence, Select quitte.'
     el<HTMLElement>('[data-aide]').textContent = commun + propre + pad + (role === 'hote' ? ' Votre machine simule la partie : ne fermez pas cet onglet.' : '')
   }
 
@@ -925,11 +1069,16 @@ export function creeEcranMulti(quitte: () => void): EcranMulti {
       }
       ouvert = true
       racine.hidden = false
+      window.clearInterval(menuId)
+      menuId = window.setInterval(() => tourMenu(performance.now()), 40)
       mot('salon', '')
       montre('salon')
       if (code) ouvreJonction(code)
     },
     ferme(): void {
+      window.clearInterval(menuId)
+      marquePad(null)
+      sons.ferme()
       arretePartie()
       fermeLiaison()
       window.removeEventListener('keydown', bouclier, true)
@@ -952,6 +1101,7 @@ export function creeEcranMulti(quitte: () => void): EcranMulti {
     imagesSautees,
     corps: role === 'invite' ? (miroir?.corps ?? []) : (hote?.corps() ?? []),
     jeu: role === 'invite' ? (miroir?.jeu(performance.now()) ?? null) : (hote?.jeu() ?? null),
+    sons: { ...sons.joues },
     images: miroir ? { recues: miroir.recues, perdues: miroir.perdues } : null,
     particules: role === 'invite' ? (miroir?.vue(performance.now()).n ?? 0) : (hote?.sim.count ?? 0),
     tSim: role === 'invite' ? (miroir?.tSim ?? 0) : (hote?.tSim ?? 0),
