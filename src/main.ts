@@ -15068,7 +15068,7 @@ function mbMontreChoixPalet(dernier: Lancer): void {
       if (elu || gesteTropTot(performance.now(), ouvertA)) return
       elu = true
       mbFlash()
-      mbEclate(btn, { n: 50, teintes: MB_MENTHE, vitesse: 420, gravite: 400, forme: 'etincelle', duree: 0.8, taille: 4 })
+      mbEclate(btn, { n: 50, teintes: MB_EAU, vitesse: 420, gravite: 400, forme: 'etincelle', duree: 0.8, taille: 4 })
       sonCeremonie('levier')
       // le flash et le feu vivent dans le voile : le fermer dans le même
       // tour les cachait avant leur première image. On ferme 260 ms plus
@@ -15505,11 +15505,15 @@ function mbSecousse(force = 0.6): void {
   mbScene.classList.add('mb-secousse')
 }
 
-// les teintes des rafales : l'or du record, la menthe du palier, le bleu
-// de l'eau, et la teinte d'une carte ou d'un rang quand elle est connue
-const MB_OR = ['#ffd977', '#ffe9a8', '#fff4d6', '#f2c98e']
-const MB_MENTHE = ['#6dffb8', '#a9ffd6', '#8fd8c8', '#eaf6ff']
-const MB_EAU = ['#63b7e6', '#a7ddf5', '#eaf6ff', '#4fa8d8']
+// les teintes des rafales, à la charte de l'accueil comme le reste de la
+// cérémonie (index.html, « le poste d'observation continue ») : l'ambre de
+// ce qui se gagne (le record, le palier), le vert de la seule maîtrise, et
+// le bleu du spécimen — celui de l'eau, et de tout choix qu'on prend. Le
+// feu jetait de l'or vif et de la menthe fluo sur un écran qui n'en porte
+// plus ; la teinte d'une carte ou d'un rang s'y ajoute quand elle est connue
+const MB_OR = ['#f2c98e', '#f7dcb4', '#fbeed9', '#d9ecf7']
+const MB_MENTHE = ['#3fd69b', '#8fe6c4', '#a7ddf5', '#d9ecf7']
+const MB_EAU = ['#63b7e6', '#a7ddf5', '#d9ecf7', '#4fa8d8']
 
 /** L'INCLINAISON d'une carte sous le pointeur : elle suit la main, comme
  *  une carte qu'on tiendrait. Posée en variables CSS sur `cible`, lue par
@@ -15792,13 +15796,15 @@ function mbMontreVersement(): void {
   if (!b) return
   const host = mbCartes()
   host.innerHTML = ''
-  // le bilan est lu : la poutre se replie et pose la question, une ligne
-  // rappelle la salle — rien d'autre au-dessus des cuves. La question
-  // garde le titre replié, comme celle des salles : grossie (mb-question),
-  // elle se cassait sur deux lignes dans la poutre
+  // le bilan est lu : le titre se replie et pose la question, une ligne
+  // rappelle la salle — rien d'autre au-dessus des cuves. La question se
+  // lit EN CLAIR, comme celle des salles (mbQuestion) : elle gardait le
+  // titre replié, éteint, parce que grossie elle se cassait sur deux lignes
+  // entre les bandes de la poutre — les bandes sont parties (21/11), et une
+  // question posée au joueur ne se lit plus en gris
   mbScene.classList.add('mb-compact')
   mbEl('mb-releve').hidden = true
-  mbEl('mb-titre').textContent = 'OÙ VERSER LE SURPLUS ?'
+  mbQuestion('OÙ VERSER LE SURPLUS ?')
   mbEl('mb-choix').hidden = false
   mbEl('mb-choix-titre').textContent = `SALLE FRANCHIE · ${level.code} · ${rangDeSalle(b.pct).nom}`
   const cap = capBonbonne()
@@ -15837,7 +15843,7 @@ function mbMontreVersement(): void {
   ): { btn: HTMLButtonElement; liquide: HTMLElement | null } => {
     const btn = document.createElement('button')
     btn.type = 'button'
-    btn.className = `mb-dest mb-coupe-diag mb-dest-${o}`
+    btn.className = `mb-dest mb-coupe mb-dest-${o}`
     btn.style.setProperty('--i', String(i))
     btn.title = titre
     btn.innerHTML =
@@ -16497,8 +16503,8 @@ function mbMontreDraft(): void {
         bouton: true,
         prix: carte.prix,
       }) +
-      // LE DOS, une vraie face peinte à 180° : la tôle de la station et
-      // l'icône du tirage
+      // LE DOS, une vraie face peinte à 180° : le même corps que la face,
+      // et l'icône du tirage, éteinte
       `<span class="mb-pli-dos" aria-hidden="true">${iconeCeremonieHTML('tirage')}</span>`
     const btn = pli.firstElementChild as HTMLButtonElement
     btn.style.setProperty('--i', String(i))
@@ -16533,8 +16539,8 @@ function mbMontreDraft(): void {
       pli.style.removeProperty('--ry')
       host.classList.add('mb-elu')
       pli.classList.add('mb-elu-c')
-      const fam = getComputedStyle(btn).getPropertyValue('--fam').trim() || '#6dffb8'
-      mbEclate(btn, { n: 70, teintes: [fam, '#eaf6ff', ...MB_MENTHE], vitesse: 420, gravite: 520, forme: 'confetti', duree: 1.4, taille: 6 })
+      const fam = getComputedStyle(btn).getPropertyValue('--fam').trim() || '#63b7e6'
+      mbEclate(btn, { n: 70, teintes: [fam, ...MB_EAU], vitesse: 420, gravite: 520, forme: 'confetti', duree: 1.4, taille: 6 })
       mbEclate(btn, { n: 40, teintes: [fam, '#ffffff'], vitesse: 600, gravite: 200, forme: 'etincelle', duree: 0.7, taille: 4 })
       mbSecousse(0.5)
       // le levier « vies » se consomme À L'INSTANT (une vie n'est pas un
@@ -16673,7 +16679,7 @@ function mbMontreCarte(raison: 'depart' | 'suite'): void {
   const orbes = orbesAcquis()
   const choix = choixModules(carte, carteRun, orbes)
   const scene = document.createElement('div')
-  // taillé au chanfrein, comme les modules qu'il dessine (.mb-coupe)
+  // un vrai cadre (.mb-coupe) : le coin coupé du verbe, et un filet
   scene.className = 'mb-station-carte mb-coupe'
   // LE CADRE DE L'ÉCRAN ÉPOUSE CELUI DU PLAN (dessinCarte, cadreCarte) : la
   // feuille le tenait à 1600 / 804, la taille d'une scène qui en fait 2100
@@ -17011,7 +17017,7 @@ function mbMontreRepos(m: ModuleCarte, suite: () => void = () => mbMontreCarte('
       majBoutonsRun()
       sauveRun() // la halte prise s'écrit : une reprise ne la rejoue pas
       mbFlash()
-      mbEclate(btn, { n: 50, teintes: MB_MENTHE, vitesse: 420, gravite: 400, forme: 'etincelle', duree: 0.8, taille: 4 })
+      mbEclate(btn, { n: 50, teintes: MB_EAU, vitesse: 420, gravite: 400, forme: 'etincelle', duree: 0.8, taille: 4 })
       sonCeremonie('levier')
       suite()
     })
@@ -17054,7 +17060,7 @@ function mbMontreDon(m: ModuleCarte, suite: () => void = () => mbMontreCarte('su
     majBoutonsRun()
     sauveRun()
     mbFlash()
-    mbEclate(btn, { n: 50, teintes: MB_MENTHE, vitesse: 420, gravite: 400, forme: 'etincelle', duree: 0.8, taille: 4 })
+    mbEclate(btn, { n: 50, teintes: MB_EAU, vitesse: 420, gravite: 400, forme: 'etincelle', duree: 0.8, taille: 4 })
     sonCeremonie('levier')
     suite()
   })
@@ -17643,7 +17649,7 @@ function mbPorte(
 ): HTMLButtonElement {
   const btn = document.createElement('button')
   btn.type = 'button'
-  // taillée au chanfrein, comme un module de la station (.mb-coupe)
+  // le cadre de la cérémonie (.mb-coupe) : rien au repos, la visée le révèle
   btn.className = 'mb-porte mb-coupe'
   btn.style.setProperty('--i', String(i))
   // l'infobulle garde tout ce que la porte ne dit plus en ligne : le
@@ -17660,9 +17666,10 @@ function mbPorte(
     o.figure ? `<i>FIGURE ${htmlSafe(o.figure.toUpperCase())}</i>` : '',
   ].join('')
   btn.innerHTML =
-    // ENTRER est un levier, celui qu'on tire pour passer (porteArmee.ts y
-    // écrit « TOUCHEZ ENCORE » au doigt) — au pied de la vitrine : dans
-    // l'angle du haut, il couvrait le repère de la voie
+    // ENTRER est le verbe de la porte (.mb-levier) : il ne paraît qu'à la
+    // visée — et sur la porte armée au doigt, où porteArmee.ts y écrit
+    // « TOUCHEZ ENCORE ». Au pied de la vitrine : dans l'angle du haut, il
+    // couvrait le repère de la voie
     `<span class="mb-porte-vue">${mbNumeroPorte(i, o.voie)}<canvas width="440" height="252"></canvas>` +
     `<span class="mb-porte-entrer mb-levier">ENTRER ▸</span></span>` +
     `<b>${htmlSafe(lv.code)}</b><small>${htmlSafe(lv.name)}</small>` +
@@ -17687,7 +17694,7 @@ function mbPorte(
     bande.ponctuation('sting-collecte', 0.7)
     mbFlash()
     mbSecousse(0.7)
-    mbEclate(btn, { n: 80, teintes: MB_MENTHE, vitesse: 520, gravite: 260, forme: 'etincelle', duree: 0.9, taille: 4 })
+    mbEclate(btn, { n: 80, teintes: MB_EAU, vitesse: 520, gravite: 260, forme: 'etincelle', duree: 0.9, taille: 4 })
     // la porte s'ouvre en 550 ms, puis on passe ; sans animation, tout de suite
     window.setTimeout(() => {
       if (!miseEnBonbonne) return
@@ -17891,7 +17898,7 @@ function mbMontreResultatMiniJeu(r: NonNullable<typeof minijeuResultat>, suite: 
     if (btn.disabled || gesteTropTot(performance.now(), ouvertA)) return
     btn.disabled = true
     mbFlash()
-    mbEclate(btn, { n: 50, teintes: MB_MENTHE, vitesse: 420, gravite: 400, forme: 'etincelle', duree: 0.8, taille: 4 })
+    mbEclate(btn, { n: 50, teintes: MB_EAU, vitesse: 420, gravite: 400, forme: 'etincelle', duree: 0.8, taille: 4 })
     sonCeremonie('levier')
     // le sting reste au verdict juste : c'est un record du trait
     if (res.verdict === 'juste') bande.ponctuation('sting-record', 0.6)
@@ -17961,7 +17968,7 @@ function mbMontreCache(m: ModuleCarte): void {
   halte.className = 'mb-halte mb-halte-a-recit'
   halte.innerHTML =
     `<div class="mb-halte-heros">${iconeCeremonieHTML('cache')}</div>` +
-    `<div class="mb-ev-recit mb-ev-issue mb-coupe-diag"><em>${htmlSafe(m.nom)}</em><p>${htmlSafe(texte)}</p></div>` +
+    `<div class="mb-ev-recit mb-ev-issue mb-coupe"><em>${htmlSafe(m.nom)}</em><p>${htmlSafe(texte)}</p></div>` +
     (prise && !dejaTenu
       ? `<div class="mb-halte-puces">${plaqueHTML({ cle: 'orbe', icone: 'orbe', valeur: nomOrbe, nom: 'ORBE D’ESSENCE' }, 0)}</div>`
       : '')
@@ -17980,7 +17987,7 @@ function mbMontreCache(m: ModuleCarte): void {
     if (btn.disabled || gesteTropTot(performance.now(), ouvertA)) return
     btn.disabled = true
     mbFlash()
-    mbEclate(btn, { n: 50, teintes: MB_MENTHE, vitesse: 420, gravite: 400, forme: 'etincelle', duree: 0.8, taille: 4 })
+    mbEclate(btn, { n: 50, teintes: MB_EAU, vitesse: 420, gravite: 400, forme: 'etincelle', duree: 0.8, taille: 4 })
     sonCeremonie('levier')
     mbApresHalte()
   })
@@ -18131,7 +18138,7 @@ function mbPeintEvenement(ev: EvenementDef, alea: () => number): void {
   halte.className = 'mb-halte mb-halte-a-recit'
   halte.innerHTML = `<div class="mb-halte-heros">${iconeCeremonieHTML('rencontre')}</div>`
   const recit = document.createElement('div')
-  recit.className = 'mb-ev-recit mb-coupe-diag'
+  recit.className = 'mb-ev-recit mb-coupe'
   recit.innerHTML = `<em>${htmlSafe(ev.lieu)}</em><p>${htmlSafe(ev.texte)}</p>`
   halte.appendChild(recit)
   const rangee = document.createElement('div')
@@ -18161,7 +18168,7 @@ function mbPeintEvenement(ev: EvenementDef, alea: () => number): void {
     btn.addEventListener('click', () => {
       if (elu || gesteTropTot(performance.now(), ouvertA)) return
       elu = true
-      mbEclate(btn, { n: 50, teintes: MB_MENTHE, vitesse: 420, gravite: 400, forme: 'etincelle', duree: 0.8, taille: 4 })
+      mbEclate(btn, { n: 50, teintes: MB_EAU, vitesse: 420, gravite: 400, forme: 'etincelle', duree: 0.8, taille: 4 })
       sonCeremonie('levier')
       mbTranche(ev, choix, alea) // le flash part avec l'issue
     })
@@ -18195,7 +18202,7 @@ function mbTranche(ev: EvenementDef, choix: ChoixEvenement, alea: () => number):
   halte.className = 'mb-halte mb-halte-a-recit'
   halte.innerHTML =
     `<div class="mb-halte-heros">${iconeCeremonieHTML('rencontre')}</div>` +
-    `<div class="mb-ev-recit mb-ev-issue mb-coupe-diag"><em>${htmlSafe(choix.libelle)} — ${htmlSafe(choix.detail)}</em><p>${htmlSafe(issue.texte)}</p></div>` +
+    `<div class="mb-ev-recit mb-ev-issue mb-coupe"><em>${htmlSafe(choix.libelle)} — ${htmlSafe(choix.detail)}</em><p>${htmlSafe(issue.texte)}</p></div>` +
     `<ul class="mb-halte-puces">${dites.map((l, i) => puceHTML(l, i, instrument)).join('')}</ul>`
   host.appendChild(halte)
   const ouvertA = performance.now()
@@ -18236,7 +18243,7 @@ function mbMontreFin(): void {
     btn.disabled = true
     sonCeremonie('levier')
     mbFlash()
-    mbEclate(btn, { n: 50, teintes: MB_MENTHE, vitesse: 420, gravite: 400, forme: 'etincelle', duree: 0.8, taille: 4 })
+    mbEclate(btn, { n: 50, teintes: MB_EAU, vitesse: 420, gravite: 400, forme: 'etincelle', duree: 0.8, taille: 4 })
     window.setTimeout(() => {
       if (!miseEnBonbonne) return
       fermeMiseEnBonbonne()
@@ -18470,7 +18477,7 @@ function montreMiseEnBonbonne(b: BilanSalle): void {
     if (verdict.etoiles >= 4) bande.ponctuation('sting-record', 0.7)
     mbEclate(rang, {
       n: 40 + verdict.etoiles * 16,
-      teintes: [verdict.teinte, '#eaf6ff', ...MB_MENTHE],
+      teintes: [verdict.teinte, ...MB_EAU],
       vitesse: 480,
       gravite: 420,
       forme: 'etincelle',
@@ -18529,7 +18536,7 @@ function montreMiseEnBonbonne(b: BilanSalle): void {
     if (!g) return
     apres(TEMPS_BILAN.condensat + 170 * i, () => {
       c.classList.add('mb-on')
-      const teinte = getComputedStyle(c).getPropertyValue('--mb-liseret').trim() || '#6dffb8'
+      const teinte = getComputedStyle(c).getPropertyValue('--mb-liseret').trim() || '#63b7e6'
       mbEclate(c.querySelector('.mb-cartouche-alv'), { n: 22, teintes: [teinte, '#eaf6ff'], vitesse: 220, gravite: 420, duree: 0.8, taille: 3 })
       sonCeremonie('cartouche', g.cle === 'orbe' || g.cle === 'tirage' ? 1 : 0.7)
       const val = c.querySelector('.mb-cartouche-val')
@@ -18584,7 +18591,7 @@ function mbAvisPeint(): void {
   for (const cran of Array.from(mbEl('mb-avis-crans').children)) {
     const n = Number((cran as HTMLElement).dataset.avis)
     // la jauge : tous les crans jusqu'au mien s'allument ; PAS D'AVIS (0)
-    // s'enfonce seul, sans la menthe — il ne dit rien de la salle
+    // s'enfonce seul, sans l'aplat — il ne dit rien de la salle
     cran.classList.toggle('mb-on', n > 0 && n <= mien)
     cran.setAttribute('aria-pressed', n === mien ? 'true' : 'false')
   }
