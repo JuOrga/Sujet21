@@ -30,6 +30,7 @@ import {
   RAYON_COINS,
   RAYON_PALET,
 } from './hockey'
+import { ARENE, MANCHES_POUR_GAGNER } from './sumo'
 import { commandeManette, defileCaractere, litManette, litMenu, nouvelEtatManette, nouvelEtatMenu, voisinMenu, type PadLu } from './manetteMulti'
 import { adresseRelais, creePartie, liaisonPossible, rejointPartie, type EtatLiaison, type Liaison, type Ordre } from './relais'
 import { DUREE_ECLAT, ECLATS_MAX, RenduMulti, couleurCss, type Eclat, type SceneHockey } from './renduMulti'
@@ -37,6 +38,7 @@ import { SonsMulti, chiffreDecompte, entend, type Instantane } from './sonsMulti
 import {
   MODE_HOCKEY,
   MODE_LIBRE,
+  MODE_SUMO,
   PHASE_BUT,
   PHASE_DECOMPTE,
   PHASE_FINI,
@@ -134,7 +136,7 @@ const STYLE = `
 .mu-flash[data-vif="1"] { animation: mu-flash 0.7s ease-out; }
 @keyframes mu-flash { from { opacity: 0.42; } to { opacity: 0; } }
 @media (prefers-reduced-motion: reduce) { .mu-flash[data-vif="1"] { animation: none; } }
-.mu-modes { margin-bottom: 12px; }
+.mu-modes { margin-bottom: 12px; grid-template-columns: 1fr 1fr 1fr; }
 .mu-modes button { padding: 0.9em 1em; opacity: 0.6; }
 .mu-modes button[data-choisi="1"] { opacity: 1; border-color: var(--accent, #8fd3ff); box-shadow: inset 0 0 0 1px var(--accent, #8fd3ff); }
 .mu-score { position: absolute; top: 14px; left: 50%; transform: translateX(-50%); display: flex; flex-direction: column; align-items: center; gap: 4px; pointer-events: none; font-family: var(--font-display, sans-serif); }
@@ -152,6 +154,7 @@ const GABARIT = `
   <div class="mu-choix mu-modes" role="group" aria-label="Le mode de jeu">
     <button type="button" data-mode="0" data-choisi="1"><b>MODE LIBRE</b><span>Une grande salle vide, pour essayer les gestes.</span></button>
     <button type="button" data-mode="1" data-choisi="0"><b>MODE HOCKEY</b><span>Un palet, deux cages. Le premier à ${BUTS_POUR_GAGNER} buts gagne.</span></button>
+    <button type="button" data-mode="2" data-choisi="0"><b>MODE SUMO</b><span>Un anneau qui se resserre. Poussez l’autre dehors : ${MANCHES_POUR_GAGNER} manches gagnantes.</span></button>
   </div>
   <div class="mu-choix">
     <button type="button" data-geste="creer"><b>CRÉER UNE PARTIE</b><span>Votre machine fait tourner la simulation : à choisir sur le PC le plus puissant.</span></button>
@@ -317,7 +320,8 @@ export function creeEcranMulti(quitte: () => void): EcranMulti {
       if (m) {
         // le mode vaut pour la partie qu'on CRÉE (ou qu'on essaie seul) ;
         // celui qui rejoint l'apprend de l'hôte
-        modeChoisi = Number(m.dataset.mode) === MODE_HOCKEY ? MODE_HOCKEY : MODE_LIBRE
+        const voulu = Number(m.dataset.mode)
+        modeChoisi = voulu === MODE_HOCKEY || voulu === MODE_SUMO ? voulu : MODE_LIBRE
         for (const e of r.querySelectorAll<HTMLElement>('button[data-mode]')) e.dataset.choisi = Number(e.dataset.mode) === modeChoisi ? '1' : '0'
         return
       }
@@ -870,11 +874,15 @@ export function creeEcranMulti(quitte: () => void): EcranMulti {
     cadre = suitCadre(cadre, voulu, dt)
     let scene: SceneHockey | null = null
     if (jeu) {
+      const hockey = jeu.mode === MODE_HOCKEY
       const porteur = corps[jeu.tenuPar]
       scene = {
-        coins: RAYON_COINS,
+        // la patinoire, ses cercles et ses cages : au hockey seulement
+        coins: hockey ? RAYON_COINS : 0,
         miseEnJeu: { decalage: CERCLE_DECALAGE, ecart: CERCLE_ECART, rayon: RAYON_CERCLE },
-        cage: { ligne: LIGNE_BUT, profondeur: PROFONDEUR_CAGE, demiOuverture: DEMI_OUVERTURE, demiFond: DEMI_FOND, epaisseur: EPAISSEUR_CAGE },
+        cage: { ligne: hockey ? LIGNE_BUT : 0, profondeur: PROFONDEUR_CAGE, demiOuverture: DEMI_OUVERTURE, demiFond: DEMI_FOND, epaisseur: EPAISSEUR_CAGE },
+        // l'anneau : au sumo seulement
+        anneau: jeu.mode === MODE_SUMO ? { x: (ARENE.minX + ARENE.maxX) / 2, y: (ARENE.minY + ARENE.maxY) / 2, rayon: jeu.anneau } : null,
         palet: jeu.paletActif ? { x: jeu.paletX, y: jeu.paletY, rayon: RAYON_PALET, vx: jeu.paletVx, vy: jeu.paletVy } : null,
         porteur: porteur ? jeu.tenuPar : -1,
         charge: jeu.charge,
@@ -887,7 +895,8 @@ export function creeEcranMulti(quitte: () => void): EcranMulti {
     rendu.dessine(particules, cadre, salle, corps.map((c) => c.ouvert), maintenant / 1000, scene, ondes)
     el<HTMLElement>('[data-tenir="dash"]').dataset.pret = corps[moi]?.dashPret === false ? '0' : '1' 
     peintReticule(aLaManette, commande)
-    peintAide(jeu ? MODE_HOCKEY : MODE_LIBRE)
+    el<HTMLElement>('[data-tenir="ouvrir"]').hidden = jeu?.mode === MODE_SUMO
+    peintAide(jeu ? jeu.mode : MODE_LIBRE)
     peintScore(jeu)
     peintAth(corps, maintenant, dt)
     el<HTMLElement>('[data-tenir="ouvrir"]').dataset.tenu = jeMOuvre() ? '1' : '0'
@@ -1025,7 +1034,9 @@ export function creeEcranMulti(quitte: () => void): EcranMulti {
     aideDuMode = mode
     const commun = 'Clic maintenu : la matière part vers le pointeur, le corps à l’opposé — sur votre corps, il se rassemble. '
     const propre =
-      mode === MODE_HOCKEY
+      mode === MODE_SUMO
+        ? 'Poussez l’autre HORS de l’anneau, qui se resserre : son cœur dehors, la manche est à vous. MAJ : un dash. On ne s’ouvre pas au sumo.'
+        : mode === MODE_HOCKEY
         ? 'ESPACE ou clic droit maintenu : vous OUVRIR pour avaler le palet ; relâchez, il part vers le pointeur, plus fort si vous l’avez tenu. Fermé, vous le renvoyez — et vous l’arrachez au porteur en le percutant. MAJ : un dash. Le palet dans la cage adverse : un but.'
         : 'ESPACE ou clic droit maintenu : vous OUVRIR. Deux corps ouverts fusionnent ; un corps ouvert boit ce qu’on lui tire ; fermé, il repousse. MAJ : un dash.'
     const pad = ' MANETTE : le stick gauche pour aller, A ou RT pour pousser, LT ou LB pour s’ouvrir, B ou RB pour dasher ; Start recommence, Select quitte.'
@@ -1048,6 +1059,7 @@ export function creeEcranMulti(quitte: () => void): EcranMulti {
     // le chrono, ou le but en or ; et le grand chiffre du décompte
     const restant = Math.ceil(jeu.chrono)
     const chrono = jeu.enOr ? 'BUT EN OR' : `${Math.floor(restant / 60)}:${String(restant % 60).padStart(2, '0')}`
+    const sumo = jeu.mode === MODE_SUMO
     const ec = el<HTMLElement>('[data-chrono]')
     if (ec.textContent !== chrono) ec.textContent = chrono
     const grand = el<HTMLElement>('[data-decompte]')
@@ -1061,7 +1073,11 @@ export function creeEcranMulti(quitte: () => void): EcranMulti {
           ? 'VOUS GAGNEZ — RECOMMENCER POUR REJOUER'
           : `${quiMarque} GAGNE — RECOMMENCER POUR REJOUER`
         : jeu.phase === PHASE_BUT
-          ? `BUT — ${quiMarque}`
+          ? sumo
+            ? jeu.buteur < 0
+              ? 'TOUS LES DEUX DEHORS — À REJOUER'
+              : `MANCHE — ${quiMarque}`
+            : `BUT — ${quiMarque}`
           : ''
     const e = el<HTMLElement>('[data-score-mot]')
     if (e.textContent !== mot) e.textContent = mot

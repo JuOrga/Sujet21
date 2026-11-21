@@ -26,7 +26,7 @@ export const TRAME_ETAT = 1
 export const TRAME_COMMANDE = 2
 /** La version du format : l'invité refuse une trame d'une autre version
  *  plutôt que de dessiner n'importe quoi. */
-export const VERSION_TRAME = 4
+export const VERSION_TRAME = 5
 
 /** Les particules par morceau d'état. Un canal de données porte au moins
  *  16 Ko par message sur tous les navigateurs ; 1 024 particules à six
@@ -115,12 +115,13 @@ export function particulesVides(capacite: number): Particules {
 
 const OCTETS_CORPS = 18
 const ENTETE_FIXE = 16
-const OCTETS_JEU = 25
+const OCTETS_JEU = 27
 
 /** Le mode de la partie, tel qu'il voyage (octet 3 de l'en-tête). L'invité
  *  l'apprend de l'hôte : c'est lui qui dit dans quelle salle on joue. */
 export const MODE_LIBRE = 0
 export const MODE_HOCKEY = 1
+export const MODE_SUMO = 2
 
 /** Les phases d'une partie de hockey. */
 export const PHASE_JEU = 0
@@ -133,6 +134,8 @@ export const PHASE_DECOMPTE = 3
 /** L'état du HOCKEY : le palet, qui le tient, et le score. Il est répété
  *  dans chaque morceau, comme l'état des corps — 22 octets. */
 export interface JeuTrame {
+  /** Le jeu qu'on joue (MODE_HOCKEY, MODE_SUMO) : il décide de la salle. */
+  mode: number
   paletActif: boolean
   paletX: number
   paletY: number
@@ -152,6 +155,8 @@ export interface JeuTrame {
   decompte: number
   /** Le temps est écoulé à égalité : le prochain but gagne. */
   enOr: boolean
+  /** SUMO : le rayon de l'anneau, en unités monde (0 hors sumo). */
+  anneau: number
 }
 
 /** Le mode qu'annonce un morceau d'état, ou −1 si ce n'en est pas un. */
@@ -189,7 +194,7 @@ export function encodeEtat(
     v.setUint8(0, TRAME_ETAT)
     v.setUint8(1, VERSION_TRAME)
     v.setUint8(2, corps.length)
-    v.setUint8(3, jeu ? MODE_HOCKEY : MODE_LIBRE)
+    v.setUint8(3, jeu ? jeu.mode : MODE_LIBRE)
     v.setUint32(4, seq, true)
     v.setFloat32(8, tSim, true)
     v.setUint16(12, p.n, true)
@@ -224,6 +229,7 @@ export function encodeEtat(
       // le chrono et le décompte voyagent au dixième de seconde
       v.setUint16(o + 22, Math.round(borne(jeu.chrono, 0, 6000) * 10), true)
       v.setUint8(o + 24, Math.round(borne(jeu.decompte, 0, 25) * 10))
+      v.setUint16(o + 25, Math.round(borne(jeu.anneau, 0, 6000) * 10), true)
       o += OCTETS_JEU
     }
     for (let k = 0; k < nombre; k++) {
@@ -264,8 +270,8 @@ export function litEnteteEtat(octets: Uint8Array, bornes: Bornes): EnteteEtat | 
   if (v.getUint8(0) !== TRAME_ETAT || v.getUint8(1) !== VERSION_TRAME) return null
   const nbCorps = v.getUint8(2)
   const mode = v.getUint8(3)
-  if (mode !== MODE_LIBRE && mode !== MODE_HOCKEY) return null
-  const entete = ENTETE_FIXE + nbCorps * OCTETS_CORPS + (mode === MODE_HOCKEY ? OCTETS_JEU : 0)
+  if (mode !== MODE_LIBRE && mode !== MODE_HOCKEY && mode !== MODE_SUMO) return null
+  const entete = ENTETE_FIXE + nbCorps * OCTETS_CORPS + (mode !== MODE_LIBRE ? OCTETS_JEU : 0)
   if (octets.length < entete) return null
   const reste = octets.length - entete
   if (reste % OCTETS_PAR_PARTICULE !== 0) return null
@@ -299,11 +305,12 @@ export function litEnteteEtat(octets: Uint8Array, bornes: Bornes): EnteteEtat | 
     o += OCTETS_CORPS
   }
   let jeu: JeuTrame | null = null
-  if (mode === MODE_HOCKEY) {
+  if (mode !== MODE_LIBRE) {
     const tenu = v.getUint8(o + 16)
     const etat = v.getUint8(o + 20)
     const buteur = v.getUint8(o + 21)
     jeu = {
+      mode,
       paletX: v.getFloat32(o, true),
       paletY: v.getFloat32(o + 4, true),
       paletVx: v.getFloat32(o + 8, true),
@@ -317,6 +324,7 @@ export function litEnteteEtat(octets: Uint8Array, bornes: Bornes): EnteteEtat | 
       buteur: buteur === 255 ? -1 : buteur,
       chrono: v.getUint16(o + 22, true) / 10,
       decompte: v.getUint8(o + 24) / 10,
+      anneau: v.getUint16(o + 25, true) / 10,
     }
   }
   return { seq: v.getUint32(4, true), tSim: v.getFloat32(8, true), total, debut, nombre, corps, jeu }

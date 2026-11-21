@@ -10,9 +10,12 @@ import { DEFAULT_PARAMS, type SimParams } from '../sim/params'
 import { FixedLoop } from '../game/loop'
 import { FluidSimMulti, KIND_PLAYER, SANS_PROPRIO } from './solveurMulti'
 import { Hockey, TERRAIN } from './hockey'
+import type { Regle } from './regle'
+import { ARENE, Sumo } from './sumo'
 import {
   MODE_HOCKEY,
   MODE_LIBRE,
+  MODE_SUMO,
   attributs,
   decodeParticules,
   encodeEtat,
@@ -42,7 +45,7 @@ export const DEPARTS: readonly { x: number; y: number }[] = [
 ]
 /** La salle d'un mode : le hockey a son terrain, plus court. */
 export function salleDe(mode: number): Bornes {
-  return mode === MODE_HOCKEY ? TERRAIN : SALLE
+  return mode === MODE_HOCKEY ? TERRAIN : mode === MODE_SUMO ? ARENE : SALLE
 }
 /** Où naît le joueur j dans une salle : face à face, à mi-hauteur, au quart
  *  et aux trois quarts de la longueur. */
@@ -70,7 +73,10 @@ export class Hote {
   readonly commandes: Commande[]
   /** Le temps simulé depuis le début de la manche (s). */
   tSim = 0
-  /** Le mode de la partie, sa salle, et la règle du hockey s'il y a lieu. */
+  /** Le mode de la partie, sa salle, et la RÈGLE de son jeu (regle.ts) —
+   *  nulle en partie libre, où il n'y a rien à gagner. `hockey` est la même
+   *  règle, quand c'en est une de hockey. */
+  readonly regle: Regle | null
   readonly mode: number
   readonly salle: Bornes
   readonly hockey: Hockey | null
@@ -90,6 +96,7 @@ export class Hote {
     this.mode = mode
     this.salle = salleDe(mode)
     this.hockey = mode === MODE_HOCKEY ? new Hockey() : null
+    this.regle = this.hockey ?? (mode === MODE_SUMO ? new Sumo() : null)
     this.commandes = []
     for (let j = 0; j < joueurs; j++) {
       this.commandes.push({ pousse: false, ouvert: false, x: 0, y: 0 })
@@ -104,21 +111,21 @@ export class Hote {
     const sim = new FluidSimMulti(this.params, this.salle, CAPACITE, this.joueurs)
     for (let j = 0; j < this.joueurs; j++) {
       sim.courant = j
-      // au hockey, c'est la règle qui dit où l'on engage (un cercle de
-      // mise en jeu) : chacun face au palet, de son côté
-      const d = this.hockey ? this.hockey.depart(j) : departDe(this.salle, j)
+      // c'est la règle du jeu qui dit où l'on engage (au hockey, un cercle
+      // de mise en jeu : chacun face au palet, de son côté)
+      const d = this.regle ? this.regle.depart(j) : departDe(this.salle, j)
       sim.spawnDisc(d.x, d.y, VOLUME_DEPART, KIND_PLAYER)
     }
     sim.courant = 0
     sim.relabel()
-    this.hockey?.engage(sim)
+    this.regle?.engage(sim)
     return sim
   }
 
   /** Une manche neuve : les deux corps reviennent à leur départ. */
   recommence(): void {
     this.sim = this.naissance()
-    this.hockey?.recommence(this.sim)
+    this.regle?.recommence(this.sim)
     this.tSim = 0
     this.boucle.reset()
     for (const c of this.commandes) {
@@ -155,9 +162,10 @@ export class Hote {
         for (let j = 0; j < this.joueurs; j++) {
           const c = this.commandes[j]
           // ouvert ou fermé : c'est le pas qui pose les cloisons
-          this.sim.corps[j].ouvert = c.ouvert
+          // (au sumo on ne s'ouvre pas : la règle le dit)
+          this.sim.corps[j].ouvert = c.ouvert && this.regle?.sansOuverture !== true
           // pendant le décompte de l'engagement, personne ne bouge
-          const gele = this.hockey?.gele === true
+          const gele = this.regle?.gele === true
           this.dash(j, c, dt, gele)
           if (!c.pousse || gele) continue
           this.sim.courant = j
@@ -174,12 +182,12 @@ export class Hote {
           } else this.sim.eject(c.x, c.y, dt)
         }
         this.sim.courant = 0
-        this.hockey?.avant(this.sim)
+        this.regle?.avant(this.sim)
         this.sim.step(dt)
         this.tSim += dt
         // après un but et sa pause : tout le monde retourne à son départ,
         // le palet au centre
-        if (this.hockey?.apres(this.sim, this.commandes, dt) === 'engagement') this.sim = this.naissance()
+        if (this.regle?.apres(this.sim, this.commandes, dt) === 'engagement') this.sim = this.naissance()
       },
       budgetMs,
     )
@@ -269,9 +277,10 @@ export class Hote {
     }))
   }
 
-  /** L'état du hockey (le palet, le score), ou null en partie libre. */
+  /** L'état du jeu (le score, le palet du hockey, l'anneau du sumo), ou null
+   *  en partie libre. */
   jeu(): JeuTrame | null {
-    return this.hockey ? this.hockey.etat(this.sim) : null
+    return this.regle ? this.regle.etat(this.sim) : null
   }
 
   /** L'image courante, en morceaux prêts à partir. */

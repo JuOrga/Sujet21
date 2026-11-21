@@ -208,6 +208,15 @@ bouton **MULTI** sur l'accueil (`?dev`). Tout vit dans [`src/multi/`](src/multi/
   décompte avant de jouer. Un corps FERMÉ qui
   percute le porteur lui ARRACHE le palet — s'il arrive assez vite, et
   c'est lui qui doit foncer.
+- **Le mode SUMO** : un anneau, deux corps, on gagne la manche en poussant
+  l'autre dehors (son cœur hors de l'anneau), trois manches gagnantes.
+  L'anneau se resserre en trente secondes. On ne s'y ouvre pas. Il ne
+  demande rien de neuf au solveur : le rebond, l'écrasement, le jet et le
+  dash font le jeu.
+- **Ajouter un mode à l'arène**, c'est écrire une RÈGLE (`regle.ts`) : où
+  chacun commence, ce qu'on regarde après chaque pas, le score, l'état qui
+  part dans la trame — `hockey.ts` et `sumo.ts` en sont deux — et lui
+  dessiner son terrain dans `renduMulti.ts`.
 - **Le DASH** (Maj, le bouton à l'écran, B ou RB à la manette) : une brusque
   accélération dans le sens où une poussée enverrait le corps, rechargée
   en un peu plus de deux secondes. Il vaut dans les deux modes ; au hockey

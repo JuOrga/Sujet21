@@ -8,7 +8,7 @@ const corps = (x: number, y: number, plus: Partial<CorpsTrame> = {}): CorpsTrame
   compte: 900, prets: 0, base: 900, x, y, disperse: false, pousse: false, ouvert: false, viseeX: 0, viseeY: 0, ...plus,
 })
 const jeu = (plus: Partial<JeuTrame> = {}): JeuTrame => ({
-  paletActif: true, paletX: 1440, paletY: 810, paletVx: 0, paletVy: 0, tenuPar: -1, charge: 0, scores: [0, 0], phase: PHASE_JEU, buteur: -1, chrono: 180, decompte: 0, enOr: false, ...plus,
+  mode: 1, anneau: 0, paletActif: true, paletX: 1440, paletY: 810, paletVx: 0, paletVy: 0, tenuPar: -1, charge: 0, scores: [0, 0], phase: PHASE_JEU, buteur: -1, chrono: 180, decompte: 0, enOr: false, ...plus,
 })
 const hockey = (t: number, j: JeuTrame, c: CorpsTrame[] = [corps(720, 810), corps(2160, 810)]): Instantane => ({ t, corps: c, jeu: j, salle: TERRAIN, rayonPalet: RAYON_PALET })
 const libre = (t: number, c: CorpsTrame[]): Instantane => ({ t, corps: c, jeu: null, salle: SALLE, rayonPalet: 0 })

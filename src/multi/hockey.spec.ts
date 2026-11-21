@@ -827,7 +827,7 @@ describe('hockey — les parois, les cages, le score', () => {
 })
 
 describe('hockey — ce qui voyage', () => {
-  const JEU: JeuTrame = { paletActif: true, paletX: 1234.5, paletY: 678.25, paletVx: -910, paletVy: 42, tenuPar: 1, charge: 0.6, scores: [3, 4], phase: PHASE_BUT, buteur: 0, chrono: 123.4, decompte: 1.4, enOr: true }
+  const JEU: JeuTrame = { mode: MODE_HOCKEY, anneau: 0, paletActif: true, paletX: 1234.5, paletY: 678.25, paletVx: -910, paletVy: 42, tenuPar: 1, charge: 0.6, scores: [3, 4], phase: PHASE_BUT, buteur: 0, chrono: 123.4, decompte: 1.4, enOr: true }
 
   it('l’état du hockey fait l’aller-retour dans la trame', () => {
     const morceaux = encodeEtat(7, 1.5, TERRAIN, [], particulesVides(4), JEU)

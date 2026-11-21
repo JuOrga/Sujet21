@@ -18,8 +18,9 @@
 // à se retourner : c'est le temps que l'adversaire a pour venir bousculer.
 
 import { MAT_WALL } from '../game/level'
+import type { Evenement, Regle } from './regle'
 import { KIND_PLAYER, type FluidSimMulti } from './solveurMulti'
-import { PHASE_BUT, PHASE_DECOMPTE, PHASE_FINI, PHASE_JEU, type Bornes, type Commande, type JeuTrame } from './trame'
+import { MODE_HOCKEY, PHASE_BUT, PHASE_DECOMPTE, PHASE_FINI, PHASE_JEU, type Bornes, type Commande, type JeuTrame } from './trame'
 
 // LE TERRAIN est une PATINOIRE, sur le modèle des vraies (« prends vraiment
 // l'exemple de la forme d'un terrain de hockey : les bords du terrain
@@ -209,10 +210,11 @@ const rayonCorps = (n: number): number => 0.5222 * 6.6 * Math.sqrt(Math.max(0, n
 /** Le premier à ce score gagne. */
 export const BUTS_POUR_GAGNER = 5
 
-/** Ce que rend un pas de la règle : rien, ou ce qui vient d'arriver. */
-export type Evenement = null | 'but' | 'engagement' | 'fini'
+export type { Evenement } from './regle'
 
-export class Hockey {
+export class Hockey implements Regle {
+  /** Au hockey on s'ouvre : c'est ainsi qu'on prend le palet. */
+  readonly sansOuverture = false
   readonly scores: [number, number] = [0, 0]
   /** Qui tient le palet (−1 : personne), et depuis combien de temps. */
   tenuPar = -1
@@ -619,6 +621,8 @@ export class Hockey {
   etat(sim: FluidSimMulti): JeuTrame {
     const p = sim.palet
     return {
+      mode: MODE_HOCKEY,
+      anneau: 0,
       // pendant le décompte il est posé, donc visible, sans être en jeu
       paletActif: p.actif || this.phase === PHASE_DECOMPTE,
       paletX: p.x,

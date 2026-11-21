@@ -58,6 +58,8 @@ const POIDS_GOUTTE = 4
 
 /** Ce que le hockey ajoute à l'image : le palet et les cages. */
 export interface SceneHockey {
+  /** SUMO : l'anneau, ou null. */
+  anneau?: { x: number; y: number; rayon: number } | null
   /** Le rayon des coins de la patinoire. */
   coins: number
   /** Les cercles de mise en jeu des zones : leur distance à la ligne de but,
@@ -144,6 +146,7 @@ uniform vec4 uCage;       // hockey : ligne de but, profondeur, demi-ouverture, 
 uniform float uCageEp;    // hockey : l'épaisseur des parois d'une cage
 uniform float uCoins;     // hockey : le rayon des coins du terrain (0 : des angles droits)
 uniform vec3 uMiseEnJeu;  // hockey : les cercles de zone — distance à la ligne de but, écart à l'axe, rayon
+uniform vec3 uAnneau;     // sumo : le centre de l'anneau et son rayon (0 : pas d'anneau)
 uniform vec4 uPalet;      // hockey : x, y, rayon, 1 s'il est en jeu
 uniform vec4 uPorteur;    // hockey : qui le tient (−1 : personne), sa charge, sa visée (x, y)
 uniform vec2 uPaletV;     // hockey : la vitesse du palet (sa traînée)
@@ -235,6 +238,21 @@ void main() {
     float devant = step(ligne, duFond);
     fond += salle * devant * camp * 0.05 * (1.0 - smoothstep(demiOuv + 36.0, demiOuv + 40.0, zone));
     fond += salle * devant * camp * 0.3 * (1.0 - smoothstep(0.0, fin, abs(zone - demiOuv - 40.0)));
+  }
+
+  // ---- le sumo : l'anneau. Dedans, le jeu ; dehors, on a perdu — le sol y
+  // rougeoie, et le bord de l'anneau se voit de loin.
+  if (uAnneau.z > 0.0) {
+    float duCoeur = length(monde - uAnneau.xy);
+    float horsAnneau = smoothstep(uAnneau.z, uAnneau.z + uPixel * 2.0, duCoeur);
+    fond += salle * horsAnneau * vec3(0.11, 0.018, 0.03);
+    fond += salle * (1.0 - horsAnneau) * vec3(0.01, 0.02, 0.032);
+    float bordAnneau = 1.0 - smoothstep(3.0, 3.0 + uPixel * 2.0, abs(duCoeur - uAnneau.z));
+    fond += salle * bordAnneau * vec3(0.85, 0.62, 0.3);
+    // une lueur à l'intérieur du bord : on la voit se resserrer
+    fond += salle * (1.0 - horsAnneau) * exp(-(uAnneau.z - duCoeur) / 46.0) * vec3(0.16, 0.1, 0.03);
+    // la marque du centre, et les deux traits de départ
+    fond += salle * vec3(0.3, 0.22, 0.1) * (1.0 - smoothstep(0.0, uPixel * 2.0, abs(duCoeur - 60.0)));
   }
 
   // ---- l'eau
@@ -503,6 +521,7 @@ export class RenduMulti {
     gl.uniform4f(gl.getUniformLocation(this.progEcran, 'uCage'), cage?.ligne ?? 0, cage?.profondeur ?? 0, cage?.demiOuverture ?? 0, cage?.demiFond ?? 0)
     gl.uniform1f(gl.getUniformLocation(this.progEcran, 'uCageEp'), cage?.epaisseur ?? 0)
     gl.uniform1f(gl.getUniformLocation(this.progEcran, 'uCoins'), scene?.coins ?? 0)
+    gl.uniform3f(gl.getUniformLocation(this.progEcran, 'uAnneau'), scene?.anneau?.x ?? 0, scene?.anneau?.y ?? 0, scene?.anneau?.rayon ?? 0)
     gl.uniform3f(gl.getUniformLocation(this.progEcran, 'uMiseEnJeu'), scene?.miseEnJeu.decalage ?? 0, scene?.miseEnJeu.ecart ?? 0, scene?.miseEnJeu.rayon ?? 0)
     gl.uniform4f(gl.getUniformLocation(this.progEcran, 'uPalet'), palet?.x ?? 0, palet?.y ?? 0, palet?.rayon ?? 1, palet ? 1 : 0)
     gl.uniform2f(gl.getUniformLocation(this.progEcran, 'uPaletV'), palet?.vx ?? 0, palet?.vy ?? 0)
