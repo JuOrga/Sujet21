@@ -265,8 +265,16 @@ bouton **MULTI** sur l'accueil (`?dev`). Tout vit dans [`src/multi/`](src/multi/
 - **Quand ça ne marche pas** : l'écran écrit sous le message d'erreur un
   « détail pour le dépannage » (le relais joint, les instances vues, les
   coupures). C'est lui qu'il faut photographier.
+- **Les graphismes** (`renduMulti.ts`) : les corps portent l'habillage de
+  l'eau du jeu, en surface « miroitant mercure » — relief, éclats, fresnel,
+  étincelles, et un miroir d'un seul tenant où se reconnaissent, courbés,
+  les lignes du terrain, ses cages, l'anneau du sumo, les rampes et les
+  projecteurs du plafond. Chaque corps a son REGARD, tourné vers ce que le
+  joueur vise : on lit où l'autre va tirer. La glace est taillée en
+  facettes. C'est la recette du shader du jeu recopiée, pas son moteur :
+  la teinte est celle du joueur, et le décor miré est celui du multi.
 - **Ce qui manque** : les salles, la vapeur et le plasma (la glace est
-  là), et les graphismes du jeu — le multi a son rendu.
+  là).
 - **Le débit** : une image pèse 10,9 Ko (1 800 particules à six octets),
   vingt par seconde — 212 Ko/s mesurés à travers le relais en ligne, soit
   1,7 Mbit/s en envoi chez l'hôte, que le relais reçoit puis renvoie. Si la

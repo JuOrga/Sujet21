@@ -1024,7 +1024,7 @@ export function creeEcranMulti(quitte: () => void): EcranMulti {
     }
     while (eclats.length > 0 && maintenant / 1000 - eclats[0].ne >= DUREE_ECLAT) eclats.shift()
     const ondes: Eclat[] = eclats.map((e) => ({ x: e.x, y: e.y, age: maintenant / 1000 - e.ne, force: e.force }))
-    rendu.dessine(particules, cadre, salle, corps.map((c) => c.ouvert), maintenant / 1000, scene, ondes, corps.map((c) => c.glace === true))
+    rendu.dessine(particules, cadre, salle, corps, maintenant / 1000, scene, ondes)
     el<HTMLElement>('[data-tenir="dash"]').dataset.pret = corps[moi]?.dashPret === false ? '0' : '1'
     const boutonGlace = el<HTMLElement>('[data-tenir="glace"]')
     boutonGlace.hidden = jeu?.mode === MODE_SUMO

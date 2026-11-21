@@ -1,11 +1,21 @@
-// LE RENDU DU MULTI — deux volumes, deux couleurs, et rien d'autre.
+// LE RENDU DU MULTI — deux volumes, deux couleurs, et la matière du jeu.
 //
 // Le moteur de rendu du jeu (render/renderer.ts) dessine UN corps, sa
 // lumière, sa coque, ses décors : lui apprendre une couleur par joueur,
 // c'était le modifier, et il est partagé avec le jeu solo. Le multi a donc
-// son propre petit rendu — même principe que pour le solveur. Il est plus
-// DÉPOUILLÉ que le jeu, et c'est assumé pour un prototype : ce qu'on doit y
-// lire, c'est QUI est QUOI.
+// son propre rendu — même principe que pour le solveur. Ce qu'on doit y
+// lire d'abord, c'est QUI est QUOI.
+//
+// LES CORPS ONT L'HABILLAGE DU JEU. Ils ont d'abord été dessinés à plat (une
+// teinte, un liseré) ; le concepteur a retenu « les graphismes du jeu » pour
+// les corps (21/11). Le moteur du jeu ne se branche pas ici — 8 750 lignes
+// liées à UN corps, UNE salle et ses lampes — mais sa recette, si : le bloc
+// « habillage de l'eau » de son shader, en surface MIROITANT MERCURE, est
+// recopié couche par couche dans FS_ECRAN (relief flouté, éclats durs,
+// fresnel, étincelles, miroir d'un seul tenant, regard, gel à facettes).
+// Ce qui diffère est dit sur place : la teinte est celle du joueur, et ce
+// que la peau mire est le terrain du multi. Une correction faite là-bas
+// n'arrive pas ici — même prix que pour le solveur.
 //
 // DEUX PASSES :
 //  1. LE CHAMP. Chaque particule dépose une tache douce dans une texture,
@@ -49,6 +59,94 @@ const SEUIL = 3
  *  ni ce qu'il reste à ramasser. À 4, elle se dessine en point d'environ
  *  8 u de rayon. */
 const POIDS_GOUTTE = 4
+
+/** Ce que le rendu lit d'un corps : son état (la peau, la glace) et le point
+ *  qu'il vise — son regard s'y tourne. L'état d'un corps tel qu'il voyage
+ *  (trame.ts) en a tout ce qu'il faut. */
+export interface CorpsVu {
+  ouvert: boolean
+  glace?: boolean
+  viseeX: number
+  viseeY: number
+}
+
+/** Le nombre de canaux du champ : un par joueur. */
+const CANAUX = 4
+/** En dessous de ce compte, un corps n'a pas de cœur : ni miroir, ni regard
+ *  (c'est le seuil sous lequel le solveur le dit perdu). */
+const CORPS_MIN = 12
+
+/** LE CŒUR DE CHAQUE CORPS, lu sur les particules qu'on dessine : (x, y,
+ *  rayon, connu) par joueur, dans `sortie`. Le miroir du rendu est radial
+ *  autour de lui, et le regard s'y loge. On le relit ici plutôt que dans
+ *  l'état du corps : chez l'invité cet état arrive vingt fois par seconde,
+ *  alors que les particules sont prolongées à chaque image — un cœur en
+ *  retard sur son corps ferait glisser le reflet. Le rayon est celui du
+ *  disque de même étalement (√2 fois l'écart quadratique). */
+export function coeursDe(p: Particules, sortie: Float32Array): Float32Array {
+  sortie.fill(0, 0, CANAUX * 4)
+  const compte = [0, 0, 0, 0]
+  for (let i = 0; i < p.n; i++) {
+    const a = p.attr[i]
+    if ((a & ATTR_CORPS) === 0 || (a & ATTR_ORPHELINE) !== 0) continue
+    const j = a & ATTR_PROPRIO
+    sortie[j * 4] += p.x[i]
+    sortie[j * 4 + 1] += p.y[i]
+    compte[j]++
+  }
+  for (let j = 0; j < CANAUX; j++) {
+    if (compte[j] < CORPS_MIN) {
+      sortie[j * 4] = 0
+      sortie[j * 4 + 1] = 0
+      continue
+    }
+    sortie[j * 4] /= compte[j]
+    sortie[j * 4 + 1] /= compte[j]
+    sortie[j * 4 + 3] = 1
+  }
+  for (let i = 0; i < p.n; i++) {
+    const a = p.attr[i]
+    if ((a & ATTR_CORPS) === 0 || (a & ATTR_ORPHELINE) !== 0) continue
+    const j = a & ATTR_PROPRIO
+    if (compte[j] < CORPS_MIN) continue
+    const dx = p.x[i] - sortie[j * 4]
+    const dy = p.y[i] - sortie[j * 4 + 1]
+    sortie[j * 4 + 2] += dx * dx + dy * dy
+  }
+  for (let j = 0; j < CANAUX; j++) if (compte[j] >= CORPS_MIN) sortie[j * 4 + 2] = Math.sqrt((2 * sortie[j * 4 + 2]) / compte[j])
+  return sortie
+}
+
+/** Jusqu'où le regard s'écarte du cœur, en part du rayon : au-delà il
+ *  sortirait de la masse, et c'est sous la surface qu'il vit. */
+export const REGARD_PORTEE = 0.42
+/** La vivacité du regard (1/s) : il rejoint sa cible aux deux tiers en un
+ *  dixième de seconde — assez vite pour suivre un pointeur, assez lentement
+ *  pour ne pas sauter quand la visée change d'un coup. */
+const REGARD_VIF = 10
+
+/** OÙ REGARDE UN CORPS : vers le point visé, depuis son cœur, sans sortir de
+ *  sa masse. `etat` tient, à partir de `k`, l'ÉCART du regard au cœur (x, y)
+ *  et sa présence : c'est l'écart qu'on rapproche de sa cible du temps `dt`,
+ *  pas la position — le regard suit ainsi son corps d'un bloc, un corps
+ *  rapide ne le sème pas. Un corps sans cœur n'a pas de regard, et celui qui
+ *  vient de naître le pose d'emblée. */
+export function tourneRegard(etat: Float32Array, k: number, cx: number, cy: number, rayon: number, connu: boolean, viseeX: number, viseeY: number, dt: number): void {
+  if (!connu) {
+    etat[k + 2] = 0
+    return
+  }
+  const dx = viseeX - cx
+  const dy = viseeY - cy
+  const d = Math.hypot(dx, dy)
+  const portee = Math.min(d, REGARD_PORTEE * rayon)
+  const tx = d > 1e-6 ? (dx / d) * portee : 0
+  const ty = d > 1e-6 ? (dy / d) * portee : 0
+  const suit = etat[k + 2] === 0 ? 1 : 1 - Math.exp(-REGARD_VIF * Math.max(0, dt))
+  etat[k] += (tx - etat[k]) * suit
+  etat[k + 1] += (ty - etat[k + 1]) * suit
+  etat[k + 2] = 1
+}
 
 /** Ce que le hockey ajoute à l'image : le palet et les cages. */
 export interface SceneHockey {
@@ -146,17 +244,88 @@ uniform vec4 uPalet;      // hockey : x, y, rayon, 1 s'il est en jeu
 uniform vec4 uPorteur;    // hockey : qui le tient (−1 : personne), sa charge, sa visée (x, y)
 uniform vec2 uPaletV;     // hockey : la vitesse du palet (sa traînée)
 uniform vec4 uEclats[4];  // les chocs en cours : x, y, âge (s), force (0 : aucun)
+uniform vec4 uCoeurs[4];  // le CŒUR de chaque corps : x, y, son rayon, 1 s'il est connu
+uniform vec4 uRegards[4]; // son REGARD : x, y, sa présence (0 : aucun)
 out vec4 o;
 
-float grille(vec2 m, float pas) {
-  vec2 g = abs(fract(m / pas - 0.5) - 0.5) * pas;
-  return 1.0 - smoothstep(0.0, uPixel * 1.5, min(g.x, g.y));
+// ---- les bruits du jeu (render/renderer.ts), tels quels
+float hash21(vec2 p) {
+  p = fract(p * vec2(127.1, 311.7));
+  p += dot(p, p + 34.5);
+  return fract(p.x * p.y);
+}
+float vnoise(vec2 p) {
+  vec2 i = floor(p);
+  vec2 f = fract(p);
+  vec2 u = f * f * (3.0 - 2.0 * f);
+  float a = hash21(i);
+  float b = hash21(i + vec2(1.0, 0.0));
+  float c = hash21(i + vec2(0.0, 1.0));
+  float d = hash21(i + vec2(1.0, 1.0));
+  return mix(mix(a, b, u.x), mix(c, d, u.x), u.y);
+}
+// Un semis de points épars : au plus un par cellule, taille bornée en pixels
+// (sinon il scintille au dézoom), et fondu quand les cellules passent sous
+// quelques pixels (sinon : neige quadrillée).
+float semis(vec2 monde, float cellule, float densite) {
+  float zoom = 1.0 / uPixel;
+  float vis = smoothstep(4.0, 12.0, cellule * zoom);
+  if (vis <= 0.0) return 0.0;
+  vec2 g = floor(monde / cellule);
+  float h = hash21(g);
+  if (h > densite) return 0.0;
+  vec2 centre = (g + 0.5 + 0.7 * (vec2(hash21(g + 17.3), hash21(g + 39.7)) - 0.5)) * cellule;
+  float r = max(cellule * (0.015 + 0.035 * hash21(g + 5.1)), 1.2 / zoom);
+  return smoothstep(r * 2.5, r * 0.5, length(monde - centre)) * (0.4 + 0.6 * hash21(g + 8.9)) * vis;
 }
 
-void main() {
-  // le monde a son axe y vers le bas, la texture vers le haut
-  vec2 monde = uCentre + vec2(vUv.x * 2.0 - 1.0, 1.0 - vUv.y * 2.0) * uDemi;
+// LE CHAMP D'UN POINT : celui du groupe qui y gagne, diminué des autres
+// (voir main). Sert au relief (quatre prélèvements écartés) et à l'ombre
+// portée. textureLod : ces lectures se font dans des branches.
+float champTotal(vec2 uv) {
+  vec4 c = textureLod(uChamp, uv, 0.0) * uGain;
+  float ouvertC = dot(c, uOuvert);
+  vec4 f = c * (1.0 - uOuvert);
+  float gagne = max(ouvertC, max(max(f.r, f.g), max(f.b, f.a)));
+  return max(2.0 * gagne - (c.r + c.g + c.b + c.a), 0.0);
+}
 
+// LE PLAFOND de l'aréna, qu'on ne voit que MIRÉ dans les corps : des rampes
+// de lumière en bandeaux, le long de la salle. Elles sont fixes dans le
+// monde — un corps qui file les voit défiler sur sa peau, et c'est ce
+// défilement qui dit sa vitesse.
+vec3 plafond(vec2 p) {
+  float rang = abs(fract(p.y / 420.0) - 0.5) * 420.0;
+  float bande = 1.0 - smoothstep(14.0, 46.0, rang);
+  float coupe = smoothstep(0.07, 0.13, abs(fract(p.x / 640.0) - 0.5));
+  return vec3(0.55, 0.75, 0.95) * bande * coupe * 0.9 + vec3(0.02, 0.035, 0.05);
+}
+// Ses PROJECTEURS : six, au-dessus de la salle. Chacun se mire en un éclat
+// au point du reflet qui le regarde.
+vec3 projecteurs(vec2 p) {
+  vec2 c = (uSalle.xy + uSalle.zw) * 0.5;
+  vec2 d = uSalle.zw - uSalle.xy;
+  vec3 e = vec3(0.0);
+  for (int i = -1; i <= 1; i++) {
+    for (int j = -1; j <= 1; j += 2) {
+      float dl = distance(p, c + vec2(float(i) * d.x * 0.3, float(j) * d.y * 0.22));
+      e += vec3(1.0, 0.96, 0.88) * exp(-dl * dl / (2.0 * 60.0 * 60.0));
+    }
+  }
+  return e;
+}
+
+float grille(vec2 m, float pas, float px) {
+  vec2 g = abs(fract(m / pas - 0.5) - 0.5) * pas;
+  return 1.0 - smoothstep(0.0, px * 1.5, min(g.x, g.y));
+}
+
+// LE DÉCOR en un point du monde. C'est une fonction (et non plus le début de
+// main) parce que les corps le MIRENT : leur peau relit le terrain à
+// distance, le long de sa normale. « px » est la finesse du trait, en unités
+// monde : un pixel pour le sol, bien plus pour le reflet — miré au pixel, le
+// filet d'une cage se lisait comme du bruit et les lignes comme des cheveux.
+vec3 decor(vec2 monde, float px) {
   // ---- le fond : la nuit du jeu, un quadrillage pour LIRE le mouvement
   // (dans une salle vide, sans repère, un corps qui dérive semble immobile)
   vec3 fond = vec3(0.012, 0.027, 0.063);
@@ -171,10 +340,10 @@ void main() {
   // le quadrillage dit le mouvement dans une salle vide ; la patinoire a
   // ses lignes, qui le disent mieux
   float quadrille = uCage.x > 0.0 ? 0.35 : 1.0;
-  fond += salle * quadrille * grille(monde, 240.0) * vec3(0.022, 0.036, 0.05);
-  fond += salle * quadrille * grille(monde, 960.0) * vec3(0.03, 0.05, 0.068);
+  fond += salle * quadrille * grille(monde, 240.0, px) * vec3(0.022, 0.036, 0.05);
+  fond += salle * quadrille * grille(monde, 960.0, px) * vec3(0.03, 0.05, 0.068);
   // la paroi : un trait clair, et un halo vers l'intérieur
-  float trait = 1.0 - smoothstep(0.0, max(6.0, uPixel * 2.0), abs(mur));
+  float trait = 1.0 - smoothstep(0.0, max(6.0, px * 2.0), abs(mur));
   fond += trait * vec3(0.38, 0.55, 0.68);
   fond += salle * exp(-max(mur, 0.0) / 90.0) * vec3(0.03, 0.055, 0.075);
   // ---- le hockey : la patinoire. Ses lignes sont celles d'une vraie — la
@@ -190,8 +359,8 @@ void main() {
     // fond de SON côté du terrain, et l'écart à l'axe
     float duFond = mix(uSalle.z - monde.x, monde.x - uSalle.x, aGauche);
     float ecartAxe = abs(monde.y - centre.y);
-    float net = uPixel * 1.5;
-    float fin = uPixel * 2.0;
+    float net = px * 1.5;
+    float fin = px * 2.0;
     vec3 rouge = vec3(0.5, 0.16, 0.2);
     vec3 bleu = vec3(0.14, 0.3, 0.55);
     // la ligne rouge, son cercle et son point
@@ -223,7 +392,7 @@ void main() {
     float surCote = dot(duPoteau, lelong);
     // le filet, dans la cage
     float dedans = step(creux, duFond) * step(duFond, ligne) * step(aCote, 0.0);
-    fond += salle * dedans * camp * (0.07 + 0.2 * grille(monde, 20.0));
+    fond += salle * dedans * camp * (0.07 + 0.2 * grille(monde, 20.0, px));
     // ses parois : le fond, et les deux côtés
     float paroiFond = smoothstep(creux - ep - net, creux - ep, duFond) * (1.0 - smoothstep(creux, creux + net, duFond)) * (1.0 - smoothstep(demiFond + ep, demiFond + ep + net, ecartAxe));
     float paroiCote = smoothstep(-net, 0.0, aCote) * (1.0 - smoothstep(ep, ep + net, aCote)) * smoothstep(-6.0 - net, -6.0, surCote) * (1.0 - smoothstep(longueur + 6.0, longueur + 6.0 + net, surCote));
@@ -239,16 +408,23 @@ void main() {
   // rougeoie, et le bord de l'anneau se voit de loin.
   if (uAnneau.z > 0.0) {
     float duCoeur = length(monde - uAnneau.xy);
-    float horsAnneau = smoothstep(uAnneau.z, uAnneau.z + uPixel * 2.0, duCoeur);
+    float horsAnneau = smoothstep(uAnneau.z, uAnneau.z + px * 2.0, duCoeur);
     fond += salle * horsAnneau * vec3(0.11, 0.018, 0.03);
     fond += salle * (1.0 - horsAnneau) * vec3(0.01, 0.02, 0.032);
-    float bordAnneau = 1.0 - smoothstep(3.0, 3.0 + uPixel * 2.0, abs(duCoeur - uAnneau.z));
+    float bordAnneau = 1.0 - smoothstep(3.0, 3.0 + px * 2.0, abs(duCoeur - uAnneau.z));
     fond += salle * bordAnneau * vec3(0.85, 0.62, 0.3);
     // une lueur à l'intérieur du bord : on la voit se resserrer
     fond += salle * (1.0 - horsAnneau) * exp(-(uAnneau.z - duCoeur) / 46.0) * vec3(0.16, 0.1, 0.03);
     // la marque du centre, et les deux traits de départ
-    fond += salle * vec3(0.3, 0.22, 0.1) * (1.0 - smoothstep(0.0, uPixel * 2.0, abs(duCoeur - 60.0)));
+    fond += salle * vec3(0.3, 0.22, 0.1) * (1.0 - smoothstep(0.0, px * 2.0, abs(duCoeur - 60.0)));
   }
+  return fond;
+}
+
+void main() {
+  // le monde a son axe y vers le bas, la texture vers le haut
+  vec2 monde = uCentre + vec2(vUv.x * 2.0 - 1.0, 1.0 - vUv.y * 2.0) * uDemi;
+  vec3 fond = decor(monde, uPixel);
 
   // ---- l'eau
   vec4 ch = texture(uChamp, vUv) * uGain;
@@ -272,37 +448,179 @@ void main() {
   vec3 teinte = mix(teinteFermee, teinteOuverte, ouv);
   // EN GLACE : le canal qui tient ce pixel est-il gelé ?
   float gel = (1.0 - ouv) * (fermes.r >= champFerme ? uGlace.r : fermes.g >= champFerme ? uGlace.g : fermes.b >= champFerme ? uGlace.b : uGlace.a);
-  // l'épaisseur : le cœur est plus dense, le bord plus clair (le ménisque)
-  float coeur = clamp((total - uSeuil) / 9.0, 0.0, 1.0);
+  // LE MAÎTRE DU PIXEL : le canal le plus fort — c'est SON cœur, SON regard
+  int maitre = ch.r >= max(ch.g, max(ch.b, ch.a)) ? 0 : ch.g >= max(ch.b, ch.a) ? 1 : ch.b >= ch.a ? 2 : 3;
+  vec4 coeur = uCoeurs[maitre];
+  vec4 regard = uRegards[maitre];
+  float th = uSeuil;
   float menisque = 1.0 - smoothstep(uSeuil, uSeuil + 3.5, total);
-  // un faux relief : la pente du champ, ramenée à l'unité monde (elle ne
-  // dépend plus du zoom), sert de normale — le bord se bombe, le cœur est plat
-  vec2 pente = vec2(dFdx(total), dFdy(total)) / uPixel;
-  vec3 n = normalize(vec3(-pente * 2.6, 1.0));
-  vec3 lampe = normalize(vec3(-0.5, 0.62, 0.6));
-  float jour = max(dot(n, lampe), 0.0);
-  float eclat = pow(jour, 22.0);
-  vec3 couleur = teinte * mix(0.5, 0.82, coeur) * mix(0.72, 1.12, jour);
-  couleur += menisque * teinte * 0.22;
-  couleur += eclat * 0.4;
-  // OUVERT OU FERMÉ, lisible d'un coup d'œil. Un corps FERMÉ porte une peau :
-  // un liseré sombre et net au bord, la cloison qu'on ne traverse pas. Un
-  // corps OUVERT n'en a pas : son bord est clair et il respire.
-  float peau = 1.0 - smoothstep(uSeuil, uSeuil + 1.3, total);
-  couleur = mix(couleur, couleur * 0.3, peau * (1.0 - ouv) * 0.85);
-  // LA GLACE, lisible d'aussi loin : la teinte du joueur pâlit vers le blanc
-  // bleuté, la lumière se pose en paliers (des facettes, là où l'eau a un
-  // modelé doux), et la peau sombre devient une arête claire — on doit voir
-  // au premier regard que ce corps-là ne s'ouvrira pas et ne cédera pas.
-  if (gel > 0.5) {
-    vec3 givre = mix(teinte, vec3(0.86, 0.94, 1.0), 0.62);
-    float facette = floor(jour * 4.0 + 0.5) / 4.0;
-    vec3 glacee = givre * mix(0.62, 1.12, facette) + eclat * 0.55;
-    glacee = mix(glacee, vec3(0.97, 0.99, 1.0), peau * 0.9);
-    couleur = glacee;
-  }
   float souffle = 0.5 + 0.5 * sin(uTemps * 5.0);
-  couleur += menisque * ouv * (0.22 + 0.3 * souffle);
+  vec3 couleur = vec3(0.0);
+  // L'HABILLAGE DE L'EAU EST CELUI DU JEU (render/renderer.ts, le bloc
+  // « habillage de l'eau », surface MIROITANT MERCURE — son réglage par
+  // défaut), recopié couche par couche. Ce qui change : la teinte est celle
+  // du JOUEUR et non le bleu du Sujet, et ce que la peau mire n'est pas une
+  // salle de la station mais le terrain, son plafond et ses projecteurs.
+  // Il ne se calcule que là où il y a de l'eau.
+  if (eau > 0.001) {
+    vec3 water = teinte * 0.66;
+    // cœur plus dense légèrement plus sombre, liseré plus clair
+    float core = smoothstep(th * 1.8, th * 3.2, total);
+    water = mix(water, water * 0.75, core * 0.5);
+    float rim = 1.0 - smoothstep(th + bord, th * 1.9, total);
+    water += (teinte * 0.5 + vec3(0.04, 0.07, 0.09)) * rim * 0.55 * (1.0 - gel);
+    // le relief : une pseudo-normale sur le champ FLOUTÉ (quatre prélèvements
+    // écartés) — les dérivées par pixel liraient chaque particule comme une
+    // bille. La pente est ramenée à l'unité monde : elle ne dépend pas du zoom.
+    vec2 texel = 2.5 / vec2(textureSize(uChamp, 0));
+    float fL = champTotal(vUv - vec2(texel.x, 0.0));
+    float fR = champTotal(vUv + vec2(texel.x, 0.0));
+    float fB = champTotal(vUv - vec2(0.0, texel.y));
+    float fT = champTotal(vUv + vec2(0.0, texel.y));
+    vec2 grad = vec2(fR - fL, fT - fB) / (5.0 * uPixel);
+    vec3 nrm = normalize(vec3(-grad * 6.0, 1.0));
+    vec3 lampe = normalize(vec3(-0.35, 0.55, 0.75));
+    float diffuse = max(dot(nrm, lampe), 0.0);
+    float reflet = max(reflect(-lampe, nrm).z, 0.0);
+    float specular = pow(reflet, 12.0);
+    // le relief n'éclaire que la zone de surface : à l'intérieur, les
+    // fluctuations de densité ne sont pas du relief
+    float surfaceZone = 1.0 - smoothstep(th * 1.4, th * 2.6, total);
+    // un scintillement interne discret : l'eau vit même au repos
+    float shimmer = sin(monde.x * 0.11 + uTemps * 1.6) * sin(monde.y * 0.09 - uTemps * 1.2);
+    water *= 1.0 + 0.05 * shimmer * core;
+    water = mix(water, water * (0.55 + 0.75 * diffuse), surfaceZone * 0.55);
+    water += vec3(0.85, 0.95, 1.0) * specular * 0.35 * surfaceZone * (1.0 - gel);
+    // le miroir vivant : un éclat dur, un voile de fresnel aux incidences
+    // rasantes, et un semis d'étincelles qui GLISSE avec la courbure
+    float miroir = surfaceZone * (1.0 - gel);
+    float specDur = pow(reflet, 42.0);
+    float fres = pow(1.0 - clamp(nrm.z, 0.0, 1.0), 2.0);
+    // (sur le CORPS seulement : une goutte en vol est toute en surface et
+    // toute en pente — le semis n'y glisse plus, il s'y pose en points de
+    // trois pixels qui se lisent comme des défauts ; vu à la première capture)
+    float part = coeur.w > 0.5 ? length(monde - coeur.xy) / max(coeur.z, 1.0) : 9.0;
+    float proche = 1.0 - smoothstep(1.2, 1.7, part);
+    float etincelles = (1.0 - smoothstep(1.0, 1.15, part)) * semis(monde + nrm.xy * 55.0 + vec2(uTemps * 7.0, -uTemps * 4.0), 48.0, 0.10);
+    water += vec3(0.95, 0.99, 1.0) * specDur * 0.80 * miroir;
+    water += mix(vec3(0.50, 0.68, 0.85), teinte, 0.4) * fres * 0.40 * miroir;
+    water += vec3(0.90, 0.97, 1.0) * etincelles * (0.25 + specDur) * 0.55 * miroir;
+    // LE DÔME DU REGARD : là où l'œil se pose, le volume se soulève — une
+    // bosse locale incline le miroir, et le reflet se courbe autour d'elle
+    vec2 relOeil = monde - regard.xy;
+    float rOeil = length(relOeil);
+    float poulsOeil = 0.85 + 0.15 * sin(uTemps * 0.7);
+    float sigOeil = 34.0;
+    float domeOeil = regard.z * poulsOeil * (1.0 - gel) * exp(-rOeil * rOeil / (2.0 * sigOeil * sigOeil));
+    vec2 penteOeil = (relOeil / max(rOeil, 1.0)) * (rOeil / sigOeil) * domeOeil;
+    // LE MIROIR D'UN SEUL TENANT (mercure) : la normale est RADIALE depuis
+    // le cœur du corps et la portée croît du centre au bord — le cœur mire
+    // le plafond juste au-dessus, le bord balaie le terrain alentour : ses
+    // lignes, ses cages et ses rampes s'y reconnaissent, courbées comme sur
+    // une goutte de mercure. Une houle lente incline le tout d'un bloc.
+    vec3 gelMiroir = vec3(0.0);
+    float gelForce = 0.0;
+    if (coeur.w > 0.5) {
+      vec2 rad = monde - coeur.xy;
+      float rC = length(rad);
+      vec2 Nw = rad / max(rC, 1.0);
+      float houle = vnoise(monde * 0.006 + vec2(uTemps * 0.10, -uTemps * 0.07)) - 0.5;
+      float ca = cos(houle * 0.55);
+      float sa = sin(houle * 0.55);
+      Nw = vec2(Nw.x * ca - Nw.y * sa, Nw.x * sa + Nw.y * ca);
+      float profil = smoothstep(0.08, 1.0, part);
+      vec2 reflPos = monde + Nw * (30.0 * profil + 330.0 * profil * profil) + penteOeil * 170.0;
+      // l'image NUE, avant la teinte de l'eau : le gel la reprendra
+      // (le plancher de 0,10 : le terrain est presque noir, et sans lui le
+      // bord d'un corps, qui ne mire que du sol, se fondait dans le fond)
+      vec3 envNu = vec3(0.10) + decor(reflPos, max(uPixel * 3.0, 7.0)) * 2.6 + plafond(reflPos) * (1.0 - 0.55 * profil);
+      vec3 eclatsLampes = projecteurs(reflPos);
+      // (un miroir d'eau n'est pas du chrome : le reflet prend la teinte du
+      // joueur — c'est aussi ce qui garde à chacun SA couleur jusqu'au bord)
+      vec3 env = min(envNu * mix(vec3(0.6), teinte, 0.7), vec3(1.1));
+      env = min(env + eclatsLampes * 1.5, vec3(1.7));
+      // couverture continue : pleine au bord (incidence rasante), plus
+      // discrète au cœur — l'eau profonde montre sa propre couleur. Une
+      // goutte partie loin du corps ne mire rien : elle doit rester lisible.
+      float bordCorps = smoothstep(0.40, 0.98, part);
+      water = mix(water, env, (1.0 - gel) * proche * clamp(0.24 + 0.50 * bordCorps, 0.0, 0.74));
+      // le gel poli mire la salle du même reflet, mais GIVRÉ : désaturé (le
+      // blanc reste maître), les éclats des lampes plus francs
+      float lumR = dot(envNu, vec3(0.299, 0.587, 0.114));
+      vec3 givre = mix(vec3(lumR), envNu, 0.30) * vec3(0.94, 0.98, 1.04);
+      gelMiroir = min(givre * 0.80 + eclatsLampes * 1.25, vec3(1.6));
+      gelForce = proche * clamp(0.20 + 0.42 * bordCorps, 0.0, 0.60);
+    }
+    // LE REGARD : quelque chose vit sous la surface, voilé par l'épaisseur.
+    // Une pénombre large dessine sa silhouette ; au centre, un noyau clair
+    // pulse lentement ; et le dôme se modèle — le flanc tourné vers le haut
+    // prend la lumière, l'autre s'ombre. Ici il regarde OÙ LE JOUEUR VISE.
+    if (regard.z > 0.003) {
+      float masque = regard.z * (1.0 - gel);
+      float ombreOeil = exp(-rOeil * rOeil / (2.0 * 44.0 * 44.0));
+      water = mix(water, water * 0.80, ombreOeil * masque * 0.6);
+      float noyau = exp(-rOeil * rOeil / (2.0 * 27.0 * 27.0));
+      float pouls = 0.8 + 0.2 * sin(uTemps * 0.7);
+      water += (teinte * 0.55 + vec3(0.10, 0.14, 0.16)) * noyau * masque * pouls;
+      float ombrage = (-relOeil.y / max(rOeil, 1.0)) * (rOeil / sigOeil) * exp(-rOeil * rOeil / (2.0 * sigOeil * sigOeil));
+      water *= 1.0 + ombrage * 0.22 * masque * poulsOeil;
+    }
+    // LE GEL : la teinte pâlit vers la glace mate, et le bloc poli se taille
+    // en GRANDES facettes — un Voronoï ancré au cœur du bloc (il dérive avec
+    // lui), chaque cellule sa nuance, les arêtes en fins liserés de lumière.
+    // Le relief par goutte s'efface : figé, il se lisait comme une tôle
+    // ondulée. La teinte du joueur y reste, en fond.
+    if (gel > 0.5) {
+      float diffuseGel = mix(diffuse, 0.58, 0.85);
+      vec2 rel = (monde - coeur.xy) / 95.0;
+      vec2 ip = floor(rel);
+      vec2 fp = fract(rel);
+      float f1 = 8.0;
+      float f2 = 8.0;
+      vec2 idBest = vec2(0.0);
+      for (int gy = -1; gy <= 1; gy++) {
+        for (int gx = -1; gx <= 1; gx++) {
+          vec2 g = vec2(float(gx), float(gy));
+          vec2 cell = ip + g;
+          vec2 d = g + vec2(hash21(cell), hash21(cell + 41.7)) * 0.85 - fp;
+          float dd = dot(d, d);
+          if (dd < f1) {
+            f2 = f1;
+            f1 = dd;
+            idBest = cell;
+          } else if (dd < f2) {
+            f2 = dd;
+          }
+        }
+      }
+      float facette = hash21(idBest + 7.3) * 2.0 - 1.0;
+      float aretes = 1.0 - smoothstep(0.02, 0.16, f2 - f1);
+      vec3 iceCol = mix(vec3(0.60, 0.76, 0.88), teinte, 0.25) * (0.72 + 0.45 * diffuseGel);
+      iceCol = mix(iceCol, gelMiroir, gelForce);
+      iceCol *= 1.0 + 0.07 * facette;
+      iceCol += vec3(0.88, 0.95, 1.05) * aretes * 0.12;
+      water = mix(water, iceCol, 0.9);
+      // l'œil du gel : un cœur sombre figé sous la surface, cerné de givre
+      float coeurG = exp(-rOeil * rOeil / (2.0 * 20.0 * 20.0));
+      float givreG = exp(-pow((rOeil - 27.0) / 11.0, 2.0));
+      float poulsG = 0.92 + 0.08 * sin(uTemps * 0.45);
+      water = mix(water, water * 0.68, coeurG * regard.z * 0.8);
+      water += vec3(0.74, 0.90, 1.05) * givreG * regard.z * 0.34 * poulsG;
+    }
+    couleur = water;
+    // OUVERT OU FERMÉ, lisible d'un coup d'œil — cela, c'est le multi. Un
+    // corps FERMÉ porte une peau : un liseré sombre et net au bord, la
+    // cloison qu'on ne traverse pas (en glace : une arête claire). Un corps
+    // OUVERT n'en a pas : son bord est clair et il respire.
+    float peau = 1.0 - smoothstep(uSeuil, uSeuil + 1.3, total);
+    couleur = mix(couleur, couleur * 0.3, peau * (1.0 - ouv) * (1.0 - gel) * 0.85);
+    couleur = mix(couleur, vec3(0.97, 0.99, 1.0), peau * gel * 0.8);
+    couleur += menisque * ouv * (0.22 + 0.3 * souffle);
+  }
+  // L'OMBRE PORTÉE : le corps a une épaisseur, il la pose sur le sol, du
+  // côté opposé à la lampe (le champ relu un peu plus haut à gauche).
+  float ombreSol = smoothstep(th * 0.5, th * 1.8, champTotal(vUv + vec2(-16.0, 22.0) / (2.0 * uDemi)));
+  fond *= 1.0 - 0.42 * ombreSol;
   // un souffle de lumière autour du corps, dans sa teinte
   float halo = smoothstep(0.0, uSeuil, total) * (1.0 - eau);
   fond += halo * teinte * (0.14 + ouv * (0.2 + 0.25 * souffle));
@@ -407,6 +725,12 @@ export class RenduMulti {
   /** Le rang, dans la palette, de la couleur du joueur 0 puis du joueur 1. */
   couleurs: [number, number] = [0, 1]
   private readonly eclats = new Float32Array(ECLATS_MAX * 4)
+  private readonly coeurs = new Float32Array(CANAUX * 4)
+  /** L'écart du regard de chaque corps à son cœur (voir tourneRegard), et
+   *  ce qui part au shader : sa position dans le monde. */
+  private readonly ecarts = new Float32Array(CANAUX * 4)
+  private readonly regards = new Float32Array(CANAUX * 4)
+  private tempsRegard = -1
   private largeur = 0
   private hauteur = 0
   /** Le champ tient-il en demi-flottants ? Sinon huit bits, et le gain
@@ -477,10 +801,23 @@ export class RenduMulti {
     return h > 0 ? l / h : 16 / 9
   }
 
-  /** `ouverts[j]` : le joueur j est-il ouvert ? `glaces[j]` : est-il en
-   *  glace ? `temps` en secondes. */
-  dessine(p: Particules, cadre: Cadre, salle: Bornes, ouverts: readonly boolean[] = [], temps = 0, scene: SceneHockey | null = null, eclats: readonly Eclat[] = [], glaces: readonly boolean[] = []): void {
+  /** `corps[j]` : l'état du joueur j (ouvert, en glace, où il vise).
+   *  `temps` en secondes. */
+  dessine(p: Particules, cadre: Cadre, salle: Bornes, corps: readonly CorpsVu[] = [], temps = 0, scene: SceneHockey | null = null, eclats: readonly Eclat[] = []): void {
     const gl = this.gl
+    const ouverts = corps.map((c) => c.ouvert)
+    const glaces = corps.map((c) => c.glace === true)
+    // le cœur de chaque corps, et son regard, tourné vers ce qu'il vise
+    const coeurs = coeursDe(p, this.coeurs)
+    const dtRegard = this.tempsRegard < 0 ? 0 : Math.min(0.1, Math.max(0, temps - this.tempsRegard))
+    this.tempsRegard = temps
+    for (let j = 0; j < CANAUX; j++) {
+      const c = corps[j]
+      tourneRegard(this.ecarts, j * 4, coeurs[j * 4], coeurs[j * 4 + 1], coeurs[j * 4 + 2], c !== undefined && coeurs[j * 4 + 3] > 0, c?.viseeX ?? 0, c?.viseeY ?? 0, dtRegard)
+      this.regards[j * 4] = coeurs[j * 4] + this.ecarts[j * 4]
+      this.regards[j * 4 + 1] = coeurs[j * 4 + 1] + this.ecarts[j * 4 + 1]
+      this.regards[j * 4 + 2] = this.ecarts[j * 4 + 2]
+    }
     this.accorde()
     const n = Math.min(p.n, this.donnees.length / 3)
     const d = this.donnees
@@ -549,6 +886,8 @@ export class RenduMulti {
       e[k * 4 + 3] = eclats[k].force
     }
     gl.uniform4fv(gl.getUniformLocation(this.progEcran, 'uEclats'), e)
+    gl.uniform4fv(gl.getUniformLocation(this.progEcran, 'uCoeurs'), coeurs)
+    gl.uniform4fv(gl.getUniformLocation(this.progEcran, 'uRegards'), this.regards)
     gl.uniform4f(gl.getUniformLocation(this.progEcran, 'uPorteur'), scene?.porteur ?? -1, scene?.charge ?? 0, scene?.viseeX ?? 0, scene?.viseeY ?? 0)
     gl.bindVertexArray(this.vaoVide)
     gl.drawArrays(gl.TRIANGLES, 0, 3)
