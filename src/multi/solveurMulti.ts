@@ -26,10 +26,20 @@
 //    aucune matière étrangère, deux corps ne fusionnent que s'ils sont tous
 //    deux OUVERTS. Ce sont les gestes du jeu à deux.
 //
-// CE QUI DORT : la glace, la vapeur, le plasma, les éponges, les coupelles,
-// les rails, le sas. Leur code est là, il parle du joueur courant, et la
-// salle du multi ne l'éveille pas — aucune de ces mécaniques n'a été
-// pensée ni essayée à deux. Les réveiller est un chantier à part.
+// LA GLACE EST RÉVEILLÉE (le gel VOLONTAIRE seulement : les plaques froides
+// dorment encore). Ce qu'il a fallu pour qu'elle vaille à deux :
+//  - l'intention de gel est PAR CORPS (`corps[j].gel`), lue par propriétaire ;
+//  - deux corps gelés au contact restent DEUX blocs (icePass ne lie plus
+//    des particules de propriétaires différents) ;
+//  - un bloc a une MASSE : il reçoit le rebond des étrangères et leur
+//    pression (voir `gelRecuX`), au lieu de les repousser sans rien sentir ;
+//  - le palet du hockey le heurte en corps rigide (icePass, REBOND_GLACE_PALET).
+// À UN joueur rien n'a changé d'un bit : glace.spec.ts le tient.
+//
+// CE QUI DORT : la vapeur, le plasma, les plaques froides, les éponges, les
+// coupelles, les rails, le sas. Leur code est là, il parle du joueur
+// courant, et la salle du multi ne l'éveille pas — aucune de ces mécaniques
+// n'a été pensée ni essayée à deux. Les réveiller est un chantier à part.
 //
 // ---- le texte d'origine ----
 // Solveur de fluide 2D « Position Based Fluids » (Macklin & Müller 2013).
@@ -225,6 +235,8 @@ export interface EtatCorps {
   /** OUVERT : ce corps accepte la matière des autres (fusion, don).
    *  Fermé (le défaut), il la repousse. */
   ouvert: boolean
+  /** GEL : ce corps veut prendre en glace (la touche F du jeu, par corps). */
+  gel: boolean
   stats: PlayerStats
   rass: { actif: boolean; vu: boolean; resteX: number; resteY: number; uX: number; uY: number }
 }
@@ -239,6 +251,7 @@ function etatCorpsNeuf(): EtatCorps {
     criticalTimer: 0,
     ejectCarry: 0,
     ouvert: false,
+    gel: false,
     stats: { count: 0, centroidX: 0, centroidY: 0, velX: 0, velY: 0, rmsRadius: 1 },
     rass: { actif: false, vu: false, resteX: 0, resteY: 0, uX: 0, uY: 0 },
   }
@@ -482,6 +495,11 @@ export class FluidSimMulti {
    *  reçoit une particule de corps va au corps entier, de biais : le corps
    *  s'écrase sur le palet et le renvoie. */
   static RAIDEUR_PALET = 60000
+  /** Ce que la GLACE rend au palet d'un choc (1 : tout). L'eau l'amortit —
+   *  lancé à 700 u/s sur un corps au repos, il en repart à 35 ; un bloc de
+   *  glace est un mur qui a une masse : il le renvoie, et le frappe fort
+   *  quand c'est lui qui arrive. */
+  static REBOND_GLACE_PALET = 0.85
   /** L'épaisseur, en rayons de noyau, de la couche où le palet se fait
    *  sentir avant d'être touché. */
   static MARGE_PALET = 1
@@ -559,7 +577,15 @@ export class FluidSimMulti {
   // corps le temps de se regrouper — changer d'état ne disperse pas.
   gasLink: Float32Array
   // Gel volontaire (touche F) / vapeur volontaire (touche G)
-  freezeIntent = false
+  /** L'intention de gel du joueur COURANT. Dans le jeu c'était un champ
+   *  unique ; ici chaque corps a la sienne (`corps[j].gel`), et processCold
+   *  la lit par propriétaire : l'un peut geler pendant que l'autre coule. */
+  get freezeIntent(): boolean {
+    return this.corps[this.courant].gel
+  }
+  set freezeIntent(v: boolean) {
+    this.corps[this.courant].gel = v
+  }
   gasIntent = false
   // Refroidissement du vaisseau (§5), fixé par le jeu : 0 = tiède, 1 = glacial.
   // Étend les auras froides, durcit gel et dégel, affaiblit les radiateurs.
@@ -630,6 +656,22 @@ export class FluidSimMulti {
   // dominant de la phase palet. Tableau dédié : relabel() écrase `labels`
   // pour la détection du corps, il ne doit pas corrompre ce cache.
   private readonly iceLabels: Int32Array
+  // CE QUE LA GLACE REÇOIT DES AUTRES (le rebond d'un corps étranger, le
+  // palet), par particule, en vitesse. On ne l'ajoute PAS à la vitesse de la
+  // particule : la remise en forme rigide (icePass, 3) part de pos + v·dt,
+  // une particule poussée seule s'y décalerait de son bloc à chaque pas —
+  // le premier rang se tasserait sur le reste. icePass en fait la moyenne
+  // (l'élan du bloc) et le moment (sa rotation), puis remet à zéro.
+  private readonly gelRecuX: Float32Array
+  private readonly gelRecuY: Float32Array
+  // Le contact du PALET (hockey) avec chaque bloc : la somme des normales
+  // et des points de contact, leur nombre, et l'enfoncement le plus profond.
+  private readonly icePalNx: Float32Array
+  private readonly icePalNy: Float32Array
+  private readonly icePalPx: Float32Array
+  private readonly icePalPy: Float32Array
+  private readonly icePalCnt: Int32Array
+  private readonly icePalProf: Float32Array
   private iceComps = 0 // composantes du dernier étiquetage
   private iceLabelTtl = 0 // pas restants avant rafraîchissement de sécurité
   private iceDirty = true // un gel/dégel/retrait vient d'avoir lieu
@@ -778,6 +820,14 @@ export class FluidSimMulti {
     this.corps = []
     for (let j = 0; j < nb; j++) this.corps.push(etatCorpsNeuf())
     this.proprio = new Uint8Array(capacity).fill(SANS_PROPRIO)
+    this.gelRecuX = new Float32Array(capacity)
+    this.gelRecuY = new Float32Array(capacity)
+    this.icePalNx = new Float32Array(capacity)
+    this.icePalNy = new Float32Array(capacity)
+    this.icePalPx = new Float32Array(capacity)
+    this.icePalPy = new Float32Array(capacity)
+    this.icePalCnt = new Int32Array(capacity)
+    this.icePalProf = new Float32Array(capacity)
     this.cloison = new Uint8Array(capacity)
     this.lambdaE = new Float32Array(capacity)
     this.tiree = new Uint8Array(capacity)
@@ -2661,8 +2711,8 @@ export class FluidSimMulti {
       c.corps[j].baseVolume = this.corps[j].baseVolume
       c.corps[j].playerCount = this.corps[j].playerCount
       c.corps[j].ouvert = this.corps[j].ouvert
+      c.corps[j].gel = this.corps[j].gel
     }
-    c.freezeIntent = this.freezeIntent
     c.gasIntent = this.gasIntent
     c.dashBudget = this.dashBudget
     c.dashBudgetMax = this.dashBudgetMax
@@ -2817,7 +2867,10 @@ export class FluidSimMulti {
     const pairC = this.pairC
     // Sans liquide NI gaz, personne ne lira les listes de voisins (la glace
     // passe par la grille directement dans icePass) : la collecte se saute.
-    const besoinVoisins = !phasePalet || gazeux > 0
+    // (à plusieurs corps, si : deux blocs de glace se repoussent par le
+    // rebond des étrangères, qui lit ces listes — sans elles il lirait
+    // celles d'un pas ancien)
+    const besoinVoisins = !phasePalet || gazeux > 0 || this.corps.length > 1
     const reach = h * 1.15 // marge : les itérations déplacent un peu les particules
     // Moteur WASM : grille interne, voisins, densité et XSPH partent dans
     // les noyaux compilés (asm/noyaux.ts) — mêmes formules, même ordre
@@ -3048,6 +3101,15 @@ export class FluidSimMulti {
             }
             dx0 += ex
             dy0 += ey
+            // LA GLACE NE SE DÉPLACE PAS sous la pression (voir plus bas : sa
+            // correction n'est pas appliquée), mais l'étrangère en face, si —
+            // de l'exact opposé. Sans rien rendre au bloc, un choc glace/eau
+            // créait de l'élan (mesuré : ±4 % sur un choc à 300 u/s). Ce
+            // déplacement refusé lui revient donc en vitesse.
+            if (frozen[i] === 1) {
+              this.gelRecuX[i] += ex / dt
+              this.gelRecuY[i] += ey / dt
+            }
             continue
           }
           const ratio = pairW[e] * invWDq
@@ -3220,12 +3282,21 @@ export class FluidSimMulti {
         masse[j] = 0
         touche[j] = 0
       }
+      const gelRecuX = this.gelRecuX
+      const gelRecuY = this.gelRecuY
       for (let i = 0; i < n; i++) {
-        if (gaseous[i] === 1 || frozen[i] === 1) continue
+        if (gaseous[i] === 1) continue
+        // LA GLACE REBONDIT AUSSI. Elle était sautée ici (dans le jeu, rien
+        // ne lui est étranger) : un corps gelé ne sentait ni l'autre corps ni
+        // le palet, alors que l'autre, lui, était repoussé par elle — un mur
+        // sans masse. Elle reçoit maintenant sa part, consignée à part (voir
+        // gelRecuX) ; sa forme, elle, ne se travaille pas : `masse` ne compte
+        // que le liquide, et l'écrasement comme la peau la laissent.
+        const gel = frozen[i] === 1
         const pi = proprio[i]
         const ci = cloison[i]
         const duCorps = this.kind[i] === KIND_PLAYER && pi < nbCorps
-        if (duCorps) masse[pi]++
+        if (duCorps && !gel) masse[pi]++
         const xi = prdX[i]
         const yi = prdY[i]
         let fx = 0
@@ -3256,8 +3327,9 @@ export class FluidSimMulti {
               if (r < palet.rayon) palet.dessous[pi]++
             }
             // un corps ouvert (ou celui qui vient de lancer) le laisse passer ;
-            // une goutte libre, jamais : le jet POUSSE le palet
-            if (!(duCorps && ((palet.traverse >> pi) & 1) === 1)) {
+            // une goutte libre, jamais : le jet POUSSE le palet.
+            // (la glace, elle, le frappe d'un bloc : voir icePass)
+            if (!gel && !(duCorps && ((palet.traverse >> pi) & 1) === 1)) {
               let q = (porteeP - r) / margeP
               if (q > plafondP) q = plafondP
               const f = (raideurP * q) / r
@@ -3285,7 +3357,10 @@ export class FluidSimMulti {
           }
         }
         if (fx === 0 && fy === 0) continue
-        if (duCorps) {
+        if (gel) {
+          gelRecuX[i] += fx
+          gelRecuY[i] += fy
+        } else if (duCorps) {
           touche[pi]++
           // une particule de corps ne recule pas seule : son corps recule —
           // sauf une petite part, qu'elle garde (voir PART_PROPRE)
@@ -4551,7 +4626,8 @@ export class FluidSimMulti {
     const vaporizeTime = p.vaporizeTime * this.basculeFactor * (1 + 1.5 * chill)
     const condenseTime = p.condenseTime * (1 - 0.4 * chill)
     const cp = this.scratchCP
-    const intent = this.freezeIntent
+    const corps = this.corps
+    const nbCorps = corps.length
     // Ressenti thermique du liquide : l'eau qui givre s'engourdit, l'eau qui
     // chauffe frémit — la température se sent avant le changement d'état
     const time = this.stepIndex * dt
@@ -4633,8 +4709,12 @@ export class FluidSimMulti {
 
       // Givre : jamais sur la vapeur — le froid doit d'abord la condenser.
       // La chaleur empêche la prise, et dégèle bien plus vite qu'à l'air libre.
+      // l'intention est celle DU CORPS dont la particule fait partie : à un
+      // seul joueur c'est la même lecture qu'avant (estCorps), à deux chacun
+      // gèle pour soi
+      const pr = this.proprio[i]
       const wanted =
-        intent && this.estCorps(i) && this.gaseous[i] === 0
+        this.kind[i] === KIND_PLAYER && pr < nbCorps && corps[pr].gel && this.gaseous[i] === 0
       const canFrost = this.gaseous[i] === 0 && vap < 0.5 && heat <= 0
       const rate = canFrost
         ? Math.max(exposure * freeze, wanted ? freezeSelf : 0)
@@ -4671,7 +4751,7 @@ export class FluidSimMulti {
         if (
           fr > 0 &&
           p.frostSluggish > 0 &&
-          !(wanted && this.estCorps(i))
+          !wanted
         ) {
           const damp = Math.exp(-p.frostSluggish * fr * dt)
           this.velX[i] *= damp
@@ -4770,6 +4850,10 @@ export class FluidSimMulti {
     const labels = this.iceLabels
     const grid = this.grid
     const scratch = this.relabelScratch
+    const proprio = this.proprio
+    const separes = this.corps.length > 1
+    const gelRecuX = this.gelRecuX
+    const gelRecuY = this.gelRecuY
     // L'étiquetage des amas est en CACHE : il ne se refait que sur un
     // événement de structure (gel, dégel, retrait — voir iceDirty) ou au
     // plus tard toutes les 6 pas (50 ms), le temps de latence accepté pour
@@ -4796,6 +4880,9 @@ export class FluidSimMulti {
         for (let e = 0; e < end; e++) {
           const j = scratch[e]
           if (frozen[j] === 0) continue
+          // deux corps gelés qui se touchent restent DEUX blocs : sans cela
+          // ils se soudaient en un seul, à une seule vitesse, jusqu'au dégel
+          if (separes && proprio[i] !== proprio[j]) continue
           const dx = xi - prdX[j]
           const dy = yi - prdY[j]
           if (dx * dx + dy * dy <= linkR2) cb(j)
@@ -4829,13 +4916,29 @@ export class FluidSimMulti {
     this.icePushY.fill(0, 0, comps)
     this.icePushMax.fill(0, 0, comps)
     const { posX, posY } = this
+    // le palet du hockey : il ne touche que les blocs des corps qu'il ne
+    // traverse pas (celui qui vient de le lancer le laisse filer)
+    const palet = this.palet
+    const paletActif = palet.actif
+    const porteePalet = palet.rayon + p.particleSpacing * 0.5
+    const nbCorps = this.corps.length
+    if (paletActif) {
+      this.icePalNx.fill(0, 0, comps)
+      this.icePalNy.fill(0, 0, comps)
+      this.icePalPx.fill(0, 0, comps)
+      this.icePalPy.fill(0, 0, comps)
+      this.icePalCnt.fill(0, 0, comps)
+      this.icePalProf.fill(0, 0, comps)
+    }
 
     // 1. masse, centre de masse, vitesse moyenne, et point de contact moyen
     for (let i = 0; i < n; i++) {
       if (frozen[i] === 0) continue
       const c = labels[i]
-      this.iceVxSum[c] += velX[i]
-      this.iceVySum[c] += velY[i]
+      // (avec ce que la particule a reçu des autres corps et du palet : nul
+      // à un seul joueur, et la somme en est alors inchangée au bit près)
+      this.iceVxSum[c] += velX[i] + gelRecuX[i]
+      this.iceVySum[c] += velY[i] + gelRecuY[i]
       this.iceCxSum[c] += prdX[i]
       this.iceCySum[c] += prdY[i]
       this.iceCnt[c]++
@@ -4865,6 +4968,22 @@ export class FluidSimMulti {
         this.icePCnt[c]++
       }
       if (this.welded[i] === 1) this.iceWeld[c] = 1
+      if (paletActif) {
+        const pr = proprio[i]
+        if (pr < nbCorps && ((palet.traverse >> pr) & 1) === 1) continue
+        const dx = prdX[i] - palet.x
+        const dy = prdY[i] - palet.y
+        const d2 = dx * dx + dy * dy
+        if (d2 < porteePalet * porteePalet && d2 > 1e-9) {
+          const d = Math.sqrt(d2)
+          this.icePalNx[c] += dx / d
+          this.icePalNy[c] += dy / d
+          this.icePalPx[c] += prdX[i]
+          this.icePalPy[c] += prdY[i]
+          this.icePalCnt[c]++
+          if (porteePalet - d > this.icePalProf[c]) this.icePalProf[c] = porteePalet - d
+        }
+      }
     }
 
     // 2. moment cinétique et moment d'inertie, autour du centre de masse
@@ -4876,10 +4995,12 @@ export class FluidSimMulti {
       if (cnt === 0) continue
       const rx = prdX[i] - this.iceCxSum[c] / cnt
       const ry = prdY[i] - this.iceCySum[c] / cnt
-      const dvx = velX[i] - this.iceVxSum[c] / cnt
-      const dvy = velY[i] - this.iceVySum[c] / cnt
+      const dvx = velX[i] + gelRecuX[i] - this.iceVxSum[c] / cnt
+      const dvy = velY[i] + gelRecuY[i] - this.iceVySum[c] / cnt
       this.iceOmega[c] += rx * dvy - ry * dvx // moment cinétique, provisoirement
       this.iceInertia[c] += rx * rx + ry * ry
+      gelRecuX[i] = 0
+      gelRecuY[i] = 0
     }
 
     const rest = Math.min(
@@ -4958,6 +5079,37 @@ export class FluidSimMulti {
         vx *= damp
         vy *= damp
         omega *= damp
+      }
+      if (paletActif && this.icePalCnt[c] > 0 && this.iceWeld[c] === 0) {
+        // LE PALET CONTRE LE BLOC : le choc de deux corps rigides, l'un de
+        // `cnt` particules, l'autre de la masse du palet. La normale va du
+        // palet vers le bloc ; l'impulsion est partagée — ce que le bloc
+        // perd, le palet le reçoit (`recu`, en quantité de mouvement : la
+        // règle du hockey le divise par sa masse).
+        const nl = Math.hypot(this.icePalNx[c], this.icePalNy[c])
+        if (nl > 1e-6) {
+          const nx = this.icePalNx[c] / nl
+          const ny = this.icePalNy[c] / nl
+          const rx = this.icePalPx[c] / this.icePalCnt[c] - cx
+          const ry = this.icePalPy[c] / this.icePalCnt[c] - cy
+          const pvx = palet.vx + palet.recuX / palet.masse
+          const pvy = palet.vy + palet.recuY / palet.masse
+          const vn = (vx - omega * ry - pvx) * nx + (vy + omega * rx - pvy) * ny
+          if (vn < 0) {
+            const rn = rx * ny - ry * nx
+            const denom = 1 / cnt + 1 / palet.masse + (I > 1e-6 ? (rn * rn) / I : 0)
+            const j = (-(1 + FluidSimMulti.REBOND_GLACE_PALET) * vn) / denom
+            vx += (j * nx) / cnt
+            vy += (j * ny) / cnt
+            if (I > 1e-6) omega += (j * rn) / I
+            palet.recuX -= j * nx
+            palet.recuY -= j * ny
+          }
+          // rien n'entre dans la glace : c'est le palet, le plus léger des
+          // deux, qui ressort
+          palet.x -= nx * this.icePalProf[c]
+          palet.y -= ny * this.icePalProf[c]
+        }
       }
       if (omega > MAX_SPIN) omega = MAX_SPIN
       else if (omega < -MAX_SPIN) omega = -MAX_SPIN

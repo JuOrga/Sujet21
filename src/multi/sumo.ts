@@ -46,6 +46,12 @@ export class Sumo implements Regle {
   private pause = 0
   /** Au sumo on reste FERMÉ. */
   readonly sansOuverture = true
+  /** Ni glace : un bloc ne se pilote plus, et sur un anneau qui se resserre
+   *  c'est sortir tout seul — à essayer et à régler avant de l'ouvrir ici. */
+  readonly sansGlace = true
+  porte(): boolean {
+    return false
+  }
 
   get gele(): boolean {
     return this.phase === PHASE_DECOMPTE

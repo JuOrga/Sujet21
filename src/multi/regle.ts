@@ -18,6 +18,11 @@ export interface Regle {
   readonly gele: boolean
   /** Dans ce jeu on ne s'ouvre pas : les corps restent fermés. */
   readonly sansOuverture: boolean
+  /** Dans ce jeu on ne se prend pas en glace. */
+  readonly sansGlace: boolean
+  /** Le joueur j porte-t-il quelque chose qui l'empêche de geler ? (au
+   *  hockey, le palet : on le tient OUVERT, et la glace est fermée) */
+  porte(j: number): boolean
   /** Où se tient le joueur j à l'engagement. */
   depart(j: number): { x: number; y: number }
   /** Prépare une simulation neuve : ses parois, ses réglages, son décompte. */

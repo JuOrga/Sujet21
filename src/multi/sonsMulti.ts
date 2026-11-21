@@ -25,7 +25,7 @@ export interface Instantane {
   rayonPalet: number
 }
 
-export type TypeSon = 'paroi' | 'choc-palet' | 'prise' | 'lancer' | 'but' | 'engagement' | 'fin' | 'ouvre' | 'ferme' | 'contact' | 'dash' | 'tic'
+export type TypeSon = 'paroi' | 'choc-palet' | 'prise' | 'lancer' | 'but' | 'engagement' | 'fin' | 'ouvre' | 'ferme' | 'contact' | 'dash' | 'tic' | 'gel' | 'degel'
 
 export interface Son {
   type: TypeSon
@@ -74,6 +74,7 @@ export function entend(avant: Instantane | null, apres: Instantane, moi: number)
     const b = apres.corps[j]
     if (a.ouvert !== b.ouvert) sons.push({ type: b.ouvert ? 'ouvre' : 'ferme', force: j === moi ? 1 : 0.4, x: b.x, y: b.y, mien: j === moi })
     if (b.dash && !a.dash) sons.push({ type: 'dash', force: j === moi ? 1 : 0.6, x: b.x, y: b.y, mien: j === moi })
+    if ((a.glace === true) !== (b.glace === true)) sons.push({ type: b.glace ? 'gel' : 'degel', force: j === moi ? 1 : 0.6, x: b.x, y: b.y, mien: j === moi })
   }
   if (n >= 2 && apres.t > avant.t) {
     const [a0, a1] = [avant.corps[0], avant.corps[1]]
@@ -284,6 +285,15 @@ export class SonsMulti {
         // un coup de vent
         this.note(sortie, 'sine', 170, 520, 0.16, 0.16 * f)
         this.souffle(sortie, 900, 0.22, 0.3 * f)
+        break
+      case 'gel':
+        // un craquement de cristal : deux notes hautes qui se serrent
+        this.note(sortie, 'triangle', 1500, 2300, 0.07, 0.13 * f)
+        this.note(sortie, 'sine', 3100, 2500, 0.1, 0.08 * f, 0.04)
+        break
+      case 'degel':
+        // la goutte qui retombe
+        this.note(sortie, 'sine', 900, 320, 0.14, 0.11 * f)
         break
       case 'but':
         this.arpege(sortie, son.mien ? BUT_POUR : BUT_CONTRE, 0.11, 0.22)

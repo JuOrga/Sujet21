@@ -135,6 +135,7 @@ uniform float uSeuil;
 uniform float uGain;      // le champ est stocké divisé par ce gain (texture 8 bits)
 uniform float uPixel;     // la taille d'un pixel, en unités monde
 uniform vec4 uOuvert;     // 1 si le joueur de ce canal est OUVERT
+uniform vec4 uGlace;      // 1 si le joueur de ce canal est EN GLACE
 uniform float uTemps;     // secondes, pour le souffle d'un corps ouvert
 uniform vec4 uCage;       // hockey : ligne de but, profondeur, demi-ouverture, demi-fond (0 : pas de cage)
 uniform float uCageEp;    // hockey : l'épaisseur des parois d'une cage
@@ -269,6 +270,8 @@ void main() {
   // un corps fermé garde SA couleur, pure, jusqu'au bord
   vec3 teinteFermee = fermes.r >= champFerme ? uCouleurs[0] : fermes.g >= champFerme ? uCouleurs[1] : fermes.b >= champFerme ? uCouleurs[2] : uCouleurs[3];
   vec3 teinte = mix(teinteFermee, teinteOuverte, ouv);
+  // EN GLACE : le canal qui tient ce pixel est-il gelé ?
+  float gel = (1.0 - ouv) * (fermes.r >= champFerme ? uGlace.r : fermes.g >= champFerme ? uGlace.g : fermes.b >= champFerme ? uGlace.b : uGlace.a);
   // l'épaisseur : le cœur est plus dense, le bord plus clair (le ménisque)
   float coeur = clamp((total - uSeuil) / 9.0, 0.0, 1.0);
   float menisque = 1.0 - smoothstep(uSeuil, uSeuil + 3.5, total);
@@ -287,6 +290,17 @@ void main() {
   // corps OUVERT n'en a pas : son bord est clair et il respire.
   float peau = 1.0 - smoothstep(uSeuil, uSeuil + 1.3, total);
   couleur = mix(couleur, couleur * 0.3, peau * (1.0 - ouv) * 0.85);
+  // LA GLACE, lisible d'aussi loin : la teinte du joueur pâlit vers le blanc
+  // bleuté, la lumière se pose en paliers (des facettes, là où l'eau a un
+  // modelé doux), et la peau sombre devient une arête claire — on doit voir
+  // au premier regard que ce corps-là ne s'ouvrira pas et ne cédera pas.
+  if (gel > 0.5) {
+    vec3 givre = mix(teinte, vec3(0.86, 0.94, 1.0), 0.62);
+    float facette = floor(jour * 4.0 + 0.5) / 4.0;
+    vec3 glacee = givre * mix(0.62, 1.12, facette) + eclat * 0.55;
+    glacee = mix(glacee, vec3(0.97, 0.99, 1.0), peau * 0.9);
+    couleur = glacee;
+  }
   float souffle = 0.5 + 0.5 * sin(uTemps * 5.0);
   couleur += menisque * ouv * (0.22 + 0.3 * souffle);
   // un souffle de lumière autour du corps, dans sa teinte
@@ -463,8 +477,9 @@ export class RenduMulti {
     return h > 0 ? l / h : 16 / 9
   }
 
-  /** `ouverts[j]` : le joueur j est-il ouvert ? `temps` en secondes. */
-  dessine(p: Particules, cadre: Cadre, salle: Bornes, ouverts: readonly boolean[] = [], temps = 0, scene: SceneHockey | null = null, eclats: readonly Eclat[] = []): void {
+  /** `ouverts[j]` : le joueur j est-il ouvert ? `glaces[j]` : est-il en
+   *  glace ? `temps` en secondes. */
+  dessine(p: Particules, cadre: Cadre, salle: Bornes, ouverts: readonly boolean[] = [], temps = 0, scene: SceneHockey | null = null, eclats: readonly Eclat[] = [], glaces: readonly boolean[] = []): void {
     const gl = this.gl
     this.accorde()
     const n = Math.min(p.n, this.donnees.length / 3)
@@ -514,6 +529,7 @@ export class RenduMulti {
     gl.uniform1f(gl.getUniformLocation(this.progEcran, 'uGain'), 1 / this.gain)
     gl.uniform1f(gl.getUniformLocation(this.progEcran, 'uPixel'), 1 / pixelsParUnite)
     gl.uniform4f(gl.getUniformLocation(this.progEcran, 'uOuvert'), ouverts[0] ? 1 : 0, ouverts[1] ? 1 : 0, ouverts[2] ? 1 : 0, ouverts[3] ? 1 : 0)
+    gl.uniform4f(gl.getUniformLocation(this.progEcran, 'uGlace'), glaces[0] ? 1 : 0, glaces[1] ? 1 : 0, glaces[2] ? 1 : 0, glaces[3] ? 1 : 0)
     gl.uniform1f(gl.getUniformLocation(this.progEcran, 'uTemps'), temps % 1000)
     const palet = scene?.palet ?? null
     const cage = scene?.cage

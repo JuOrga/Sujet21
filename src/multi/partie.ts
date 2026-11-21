@@ -59,6 +59,19 @@ export function departDe(salle: Bornes, j: number): { x: number; y: number } {
 export const DASH_VITESSE = 420
 export const DASH_REPOS = 2.2
 const DASH_VU = 0.25
+/** LA GLACE : le corps se prend en un bloc rigide tant que son bouton est
+ *  tenu — GLACE_MAX secondes au plus —, puis elle se recharge. Un bloc ne
+ *  pousse plus et ne s'ouvre plus : il file tout droit (« geler, c'est
+ *  parier sur une trajectoire », dit le solveur du jeu), renvoie ce qui le
+ *  heurte au lieu de l'amortir, et frappe fort. Le dash, lui, part encore.
+ *  La prise et la fonte sont celles du jeu, en plus vif : 0,45 s pour geler
+ *  et plus d'une seconde pour fondre, c'était trop lent pour un réflexe. */
+export const GLACE_MAX = 2
+export const GLACE_REPOS = 3
+/** Le temps de prise (s), et celui de la fonte tel que le solveur le compte
+ *  (le bloc se libère à 45 % de ce temps : ~0,2 s). */
+const GLACE_PRISE = 0.12
+const GLACE_FONTE = 0.45
 /** La cadence d'envoi de l'état, en images par seconde. Le solveur tourne
  *  à 120 pas par seconde ; l'invité prolonge chaque image avec les vitesses
  *  jusqu'à la suivante. Vingt, et non plus trente : la partie passe par le
@@ -86,13 +99,19 @@ export class Hote {
   private readonly dashRepos: number[] = []
   private readonly dashVu: number[] = []
   private readonly dashTenu: boolean[] = []
+  // LA GLACE, par joueur : ce qui reste de sa durée (0 : il n'est pas en
+  // glace), ce qui reste avant qu'elle soit rechargée, et si son bouton
+  // était déjà tenu.
+  private readonly glaceReste: number[] = []
+  private readonly glaceRepos: number[] = []
+  private readonly glaceTenue: boolean[] = []
   private readonly boucle = new FixedLoop()
   private seq = 0
   private readonly tampon = particulesVides(CAPACITE)
 
   constructor(joueurs = 2, params: SimParams = { ...DEFAULT_PARAMS }, mode: number = MODE_LIBRE) {
     this.joueurs = joueurs
-    this.params = params
+    this.params = { ...params, freezeSelfTime: GLACE_PRISE, thawTime: GLACE_FONTE }
     this.mode = mode
     this.salle = salleDe(mode)
     this.hockey = mode === MODE_HOCKEY ? new Hockey() : null
@@ -103,6 +122,9 @@ export class Hote {
       this.dashRepos.push(0)
       this.dashVu.push(0)
       this.dashTenu.push(false)
+      this.glaceReste.push(0)
+      this.glaceRepos.push(0)
+      this.glaceTenue.push(false)
     }
     this.sim = this.naissance()
   }
@@ -119,6 +141,8 @@ export class Hote {
     sim.courant = 0
     sim.relabel()
     this.regle?.engage(sim)
+    // des corps neufs : personne n'est en glace (la recharge, elle, continue)
+    this.glaceReste.fill(0)
     return sim
   }
 
@@ -133,9 +157,11 @@ export class Hote {
       c.ouvert = false
       c.aller = false
       c.dash = false
+      c.glace = false
     }
     this.dashRepos.fill(0)
     this.dashVu.fill(0)
+    this.glaceRepos.fill(0)
   }
 
   /** Pose la commande d'un joueur. La visée est ramenée dans la salle : ce
@@ -147,6 +173,7 @@ export class Hote {
     cible.ouvert = c.ouvert
     cible.aller = c.aller === true
     cible.dash = c.dash === true
+    cible.glace = c.glace === true
     cible.x = Math.min(this.salle.maxX, Math.max(this.salle.minX, c.x))
     cible.y = Math.min(this.salle.maxY, Math.max(this.salle.minY, c.y))
   }
@@ -161,13 +188,16 @@ export class Hote {
       () => {
         for (let j = 0; j < this.joueurs; j++) {
           const c = this.commandes[j]
-          // ouvert ou fermé : c'est le pas qui pose les cloisons
-          // (au sumo on ne s'ouvre pas : la règle le dit)
-          this.sim.corps[j].ouvert = c.ouvert && this.regle?.sansOuverture !== true
           // pendant le décompte de l'engagement, personne ne bouge
           const gele = this.regle?.gele === true
+          const glace = this.glace(j, c, dt, gele)
+          // ouvert ou fermé : c'est le pas qui pose les cloisons
+          // (au sumo on ne s'ouvre pas : la règle le dit ; et la glace est
+          // fermée)
+          this.sim.corps[j].ouvert = c.ouvert && !glace && this.regle?.sansOuverture !== true
           this.dash(j, c, dt, gele)
-          if (!c.pousse || gele) continue
+          // un bloc de glace n'éjecte rien et ne se rassemble pas
+          if (!c.pousse || gele || glace) continue
           this.sim.courant = j
           // Le geste du jeu, tel quel : le pointeur posé SUR son corps le
           // RASSEMBLE là (rien ne part, rien ne se paie) ; ailleurs, il
@@ -191,6 +221,36 @@ export class Hote {
       },
       budgetMs,
     )
+  }
+
+  /** LA GLACE : l'APPUI la fait prendre (si elle est rechargée), elle tient
+   *  tant que le bouton est tenu et GLACE_MAX au plus, puis se recharge.
+   *  Rend vrai si le corps est en glace à ce pas. */
+  private glace(j: number, c: Commande, dt: number, gele: boolean): boolean {
+    if (this.glaceRepos[j] > 0) this.glaceRepos[j] -= dt
+    const tenue = c.glace === true
+    const appui = tenue && !this.glaceTenue[j]
+    this.glaceTenue[j] = tenue
+    const corps = this.sim.corps[j]
+    if (this.glaceReste[j] > 0) {
+      this.glaceReste[j] -= dt
+      if (!tenue || gele || this.glaceReste[j] <= 0) {
+        this.glaceReste[j] = 0
+        this.glaceRepos[j] = GLACE_REPOS
+      }
+    } else if (
+      appui &&
+      !gele &&
+      this.glaceRepos[j] <= 0 &&
+      this.regle?.sansGlace !== true &&
+      this.regle?.porte(j) !== true &&
+      !corps.dispersed &&
+      corps.playerCount >= 12
+    ) {
+      this.glaceReste[j] = GLACE_MAX
+    }
+    corps.gel = this.glaceReste[j] > 0
+    return corps.gel
   }
 
   /** LE DASH : une brusque accélération dans le sens où une poussée
@@ -272,6 +332,8 @@ export class Hote {
       ouvert: c.ouvert,
       dashPret: this.dashRepos[j] <= 0,
       dash: this.dashVu[j] > 0,
+      glace: this.glaceReste[j] > 0,
+      glacePrete: this.glaceRepos[j] <= 0 && this.glaceReste[j] <= 0,
       viseeX: this.commandes[j].x,
       viseeY: this.commandes[j].y,
     }))

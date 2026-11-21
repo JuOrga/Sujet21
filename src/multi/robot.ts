@@ -29,6 +29,14 @@ const FREIN = 2.4
 const TOLERANCE = 28
 /** L'erreur de visée d'un tir, en radians (± la moitié). */
 const ERREUR_TIR = 0.16
+/** LA FRAPPE DE GLACE : jusqu'où il la tente (u), l'alignement qu'il exige
+ *  entre lui, le palet et la cage (un cosinus), et le temps qu'il tient sa
+ *  glace (s) — un dash couvre ~350 u dans ce temps. */
+const FRAPPE_PORTEE = 360
+/** …et à quelle distance de la cage adverse, au plus, le palet doit être. */
+const FRAPPE_ZONE = 900
+const FRAPPE_ALIGNE = 0.92
+const FRAPPE_DUREE = 0.8
 
 export class Robot {
   private attente = 0
@@ -41,6 +49,9 @@ export class Robot {
   private tire = false
   private dash = false
   private dashDonne = false
+  /** LA FRAPPE DE GLACE : ce qui reste du coup en cours (s). Tant qu'il
+   *  dure, le robot tient sa glace et ne change pas de plan. */
+  private frappe = 0
 
   /** `hasard` rend un nombre dans [0, 1[ (les tests en donnent un fixe). */
   constructor(
@@ -57,10 +68,12 @@ export class Robot {
     const cy = moi.stats.centroidY
     if (!jeu || jeu.phase !== PHASE_JEU || moi.dispersed) {
       this.attente = 0
+      this.frappe = 0
       return { pousse: false, ouvert: false, x: cx, y: cy, aller: true, dash: false }
     }
     this.attente -= dt
-    if (this.attente <= 0) {
+    if (this.frappe > 0) this.frappe -= dt
+    if (this.attente <= 0 && this.frappe <= 0) {
       this.attente = REFLEXION
       this.dash = false
       if (jeu.mode === MODE_HOCKEY) this.penseHockey(h)
@@ -81,6 +94,9 @@ export class Robot {
       // il tient le palet : la visée EST le tir, il avance vers elle
       return { pousse: e > TOLERANCE, ouvert: this.ouvert, x: cx + (dx / d) * PORTEE, y: cy + (dy / d) * PORTEE, aller: true, dash }
     }
+    // en pleine frappe : il vise droit devant (le dash part vers la cible),
+    // sans corriger — un bloc de glace ne se pilote pas
+    if (this.frappe > 0) return { pousse: false, ouvert: false, x: cx + (dx / d) * PORTEE, y: cy + (dy / d) * PORTEE, aller: true, dash, glace: true }
     if (e <= TOLERANCE) return { pousse: false, ouvert: this.ouvert, x: cx + (dx / d) * PORTEE, y: cy + (dy / d) * PORTEE, aller: true, dash }
     return { pousse: true, ouvert: this.ouvert, x: cx + (ex / e) * PORTEE, y: cy + (ey / e) * PORTEE, aller: true, dash }
   }
@@ -133,6 +149,29 @@ export class Robot {
     const px = jeu.paletX + jeu.paletVx * 0.3
     const py = jeu.paletY + jeu.paletVy * 0.3
     const dPalet = Math.hypot(jeu.paletX - mx, jeu.paletY - my)
+    // LA FRAPPE DE GLACE : le palet presque posé, à portée de dash, et la
+    // cage adverse dans son prolongement — plutôt que de le prendre, de
+    // charger et de lancer (le temps de se le faire voler), il se gèle et
+    // le percute : le bloc l'envoie d'un coup.
+    const etat = h.corps()[this.joueur]
+    const allurePalet = Math.hypot(jeu.paletVx, jeu.paletVy)
+    // (dans la zone d'attaque seulement : du milieu du terrain le palet
+    // arriverait essoufflé — à l'engagement, il le prend comme avant)
+    const zone = Math.abs(cageX - jeu.paletX) < FRAPPE_ZONE
+    if (zone && etat.dashPret === true && etat.glacePrete === true && allurePalet < 220 && dPalet > 120 && dPalet < FRAPPE_PORTEE) {
+      const ux = (jeu.paletX - mx) / dPalet
+      const uy = (jeu.paletY - my) / dPalet
+      const bx = cageX - jeu.paletX
+      const by = milieuY - jeu.paletY
+      const b = Math.hypot(bx, by) || 1
+      if ((ux * bx + uy * by) / b > FRAPPE_ALIGNE) {
+        this.va(jeu.paletX + ux * 400, jeu.paletY + uy * 400, 460)
+        this.ouvert = false
+        this.dash = true
+        this.frappe = FRAPPE_DUREE
+        return
+      }
+    }
     this.va(px, py, 380)
     this.ouvert = dPalet < 300
   }

@@ -215,6 +215,9 @@ export type { Evenement } from './regle'
 export class Hockey implements Regle {
   /** Au hockey on s'ouvre : c'est ainsi qu'on prend le palet. */
   readonly sansOuverture = false
+  /** Et on s'y prend en glace : un bloc renvoie le palet au lieu de
+   *  l'amortir, et le frappe fort (solveurMulti.ts, REBOND_GLACE_PALET). */
+  readonly sansGlace = false
   readonly scores: [number, number] = [0, 0]
   /** Qui tient le palet (−1 : personne), et depuis combien de temps. */
   tenuPar = -1
@@ -293,6 +296,11 @@ export class Hockey implements Regle {
     this.lieu.x = (TERRAIN.minX + TERRAIN.maxX) / 2
     this.lieu.y = (TERRAIN.minY + TERRAIN.maxY) / 2
     this.engage(sim)
+  }
+
+  /** Celui qui tient le palet ne gèle pas : il le tient ouvert. */
+  porte(j: number): boolean {
+    return this.tenuPar === j
   }
 
   /** AVANT le pas du solveur : dire au palet quels corps il traverse. */

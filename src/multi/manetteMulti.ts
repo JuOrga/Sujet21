@@ -10,6 +10,7 @@
 //   A ou RT         pousser (le clic maintenu)
 //   LT ou LB        s'OUVRIR, tant qu'on tient (la barre d'espace)
 //   B ou RB         le DASH (la touche Maj)
+//   X ou Y          la GLACE, tant qu'on tient (la touche F)
 //   stick au repos + A   se rassembler
 //   Start           recommencer            Select   quitter la partie
 //
@@ -41,6 +42,8 @@ const RB = 5
 const LT = 6
 const RT = 7
 const B = 1
+const X = 2
+const Y = 3
 const SELECT = 8
 const START = 9
 const HAUT = 12
@@ -73,6 +76,8 @@ export interface EtatManette {
   ouvert: boolean
   /** Le bouton du dash est tenu (c'est l'hôte qui en lit l'appui). */
   dash: boolean
+  /** Le bouton de la glace est tenu. */
+  glace: boolean
   /** Start vient d'être pressé (un front : vrai une lecture seulement). */
   recommence: boolean
   /** Select vient d'être pressé : quitter la partie. */
@@ -84,7 +89,7 @@ export interface EtatManette {
 }
 
 export function nouvelEtatManette(): EtatManette {
-  return { connectee: false, dirX: 1, dirY: 0, force: 0, pousse: false, ouvert: false, dash: false, recommence: false, quitte: false, vie: false, startTenu: false, selectTenu: false }
+  return { connectee: false, dirX: 1, dirY: 0, force: 0, pousse: false, ouvert: false, dash: false, glace: false, recommence: false, quitte: false, vie: false, startTenu: false, selectTenu: false }
 }
 
 /** Relève la manette dans `e`. `pad` nul : débranchée, plus rien n'est tenu. */
@@ -98,6 +103,7 @@ export function litManette(pad: PadLu | null, e: EtatManette): void {
     e.pousse = false
     e.ouvert = false
     e.dash = false
+    e.glace = false
     e.startTenu = false
     e.selectTenu = false
     return
@@ -121,13 +127,14 @@ export function litManette(pad: PadLu | null, e: EtatManette): void {
   e.pousse = presse(A) || presse(RT)
   e.ouvert = presse(LT) || presse(LB)
   e.dash = presse(B) || presse(RB)
+  e.glace = presse(X) || presse(Y)
   const start = presse(START)
   e.recommence = start && !e.startTenu
   e.startTenu = start
   const select = presse(SELECT)
   e.quitte = select && !e.selectTenu
   e.selectTenu = select
-  if (e.pousse || e.ouvert || e.dash || start || select) e.vie = true
+  if (e.pousse || e.ouvert || e.dash || e.glace || start || select) e.vie = true
 }
 
 // ---- le salon ---------------------------------------------------------------
@@ -239,7 +246,7 @@ export function defileCaractere(alphabet: string, caractere: string, sens: numbe
  *  (cx, cy). Stick au repos et bouton de poussée tenu : on vise son propre
  *  cœur — c'est le geste du rassemblement. */
 export function commandeManette(e: EtatManette, cx: number, cy: number): Commande {
-  if (e.force === 0 && e.pousse) return { pousse: true, ouvert: e.ouvert, x: cx, y: cy, aller: true, dash: e.dash }
+  if (e.force === 0 && e.pousse) return { pousse: true, ouvert: e.ouvert, x: cx, y: cy, aller: true, dash: e.dash, glace: e.glace }
   const portee = PORTEE_MIN + (PORTEE_MAX - PORTEE_MIN) * e.force
   return {
     // sans inclinaison on ne pousse pas : la direction mémorisée ne sert
@@ -250,5 +257,6 @@ export function commandeManette(e: EtatManette, cx: number, cy: number): Command
     y: cy + e.dirY * portee,
     aller: true,
     dash: e.dash,
+    glace: e.glace,
   }
 }

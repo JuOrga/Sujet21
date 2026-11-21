@@ -237,9 +237,21 @@ bouton **MULTI** sur l'accueil (`?dev`). Tout vit dans [`src/multi/`](src/multi/
   accélération dans le sens où une poussée enverrait le corps, rechargée
   en un peu plus de deux secondes. Il vaut dans les deux modes ; au hockey
   il sert à prendre le palet au porteur.
+- **La GLACE** (F maintenu, le bouton à l'écran, X ou Y à la manette) : le
+  premier état de la matière devenu un pouvoir. Le corps se prend en un
+  bloc rigide tant qu'on tient — deux secondes au plus, puis trois de
+  recharge. Un bloc ne pousse plus et ne s'ouvre plus : il file tout droit,
+  et le dash part encore. Là où l'eau AMORTIT le palet, la glace le RENVOIE
+  (lancé à 700 u/s sur un corps au repos, il repart à 35 de l'eau et à 428
+  de la glace) et le FRAPPE (un bloc à 420 u/s l'envoie à 667, un corps
+  d'eau à 531). Celui qui tient le palet ne gèle pas. Elle vaut au hockey
+  et en mode libre ; pas au sumo, où elle reste à essayer. C'est le gel du
+  jeu, réveillé dans la copie du solveur — voir l'en-tête de
+  `solveurMulti.ts` et `glace.spec.ts`. L'ordinateur s'en sert pour frapper
+  le palet vers la cage quand il est posé devant elle.
 - **La manette** (`manetteMulti.ts`) : le stick gauche dit où l'on VA (le
   jet part à l'opposé, et le palet part du côté du stick), A ou RT pousse,
-  LT ou LB ouvre tant qu'on tient, Start recommence. Un réticule montre la
+  LT ou LB ouvre tant qu'on tient, B ou RB dashe, X ou Y gèle, Start recommence. Un réticule montre la
   visée. La manette et la souris se passent la main : la dernière à avoir
   bougé commande. Select quitte la partie. AU SALON, la croix ou le stick
   passent d'un bouton à l'autre, A valide, B revient ; pour rejoindre, le
@@ -253,8 +265,8 @@ bouton **MULTI** sur l'accueil (`?dev`). Tout vit dans [`src/multi/`](src/multi/
 - **Quand ça ne marche pas** : l'écran écrit sous le message d'erreur un
   « détail pour le dépannage » (le relais joint, les instances vues, les
   coupures). C'est lui qu'il faut photographier.
-- **Ce qui manque** : les salles, tout état autre que l'eau, et les
-  graphismes du jeu — le multi a son rendu.
+- **Ce qui manque** : les salles, la vapeur et le plasma (la glace est
+  là), et les graphismes du jeu — le multi a son rendu.
 - **Le débit** : une image pèse 10,9 Ko (1 800 particules à six octets),
   vingt par seconde — 212 Ko/s mesurés à travers le relais en ligne, soit
   1,7 Mbit/s en envoi chez l'hôte, que le relais reçoit puis renvoie. Si la

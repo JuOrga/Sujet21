@@ -133,6 +133,9 @@ const STYLE = `
 .mu-dash { position: absolute; right: 14px; bottom: 150px; display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 0.8em 1.3em !important; touch-action: none; user-select: none; }
 .mu-dash small { color: var(--dim, #7f9cb0); font-size: 0.7em; letter-spacing: 0.04em; }
 .mu-dash[data-pret="0"] { opacity: 0.35; }
+.mu-glace { bottom: 232px; }
+.mu-glace[hidden] { display: none; }
+.mu-glace[data-prise="1"] { color: #e8f6ff; border-color: #e8f6ff; box-shadow: 0 0 14px rgba(232, 246, 255, 0.55); }
 .mu-score em { font-style: normal; font-family: var(--font-mono, monospace); letter-spacing: 0.12em; color: var(--dim, #7f9cb0); }
 .mu-decompte { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); font-family: var(--font-display, sans-serif); font-size: calc(140px * var(--ui, 1)); pointer-events: none; opacity: 0.85; text-shadow: 0 0 40px rgba(143, 211, 255, 0.5); }
 .mu-decompte[hidden] { display: none; }
@@ -234,6 +237,7 @@ const GABARIT = `
     <button type="button" data-geste="recommencer">RECOMMENCER</button>
     <button type="button" data-geste="quitter-partie">QUITTER</button>
   </div>
+  <button type="button" class="mu-dash mu-glace" data-tenir="glace" data-pret="1" aria-label="Glace (à maintenir)">GLACE<small>à maintenir · F</small></button>
   <button type="button" class="mu-dash" data-tenir="dash" data-pret="1" aria-label="Dash">DASH<small>maj</small></button>
   <button type="button" class="mu-tenir" data-tenir="ouvrir" aria-label="S’ouvrir (à maintenir)">S’OUVRIR<small>à maintenir · espace</small></button>
   <div class="mu-aide" data-aide></div>
@@ -316,6 +320,8 @@ export function creeEcranMulti(quitte: () => void): EcranMulti {
   // LE DASH : son bouton, tenu au clavier (Maj), à l'écran ou à la manette —
   // c'est l'hôte qui en lit l'appui.
   const dash = { clavier: false, bouton: false, manette: false }
+  // LA GLACE : tenue de même (F, son bouton, X ou Y à la manette)
+  const glace = { clavier: false, bouton: false, manette: false }
   // LES ÉCLATS : l'onde qui part d'un choc, à l'écran (l'heure de sa naissance
   // en secondes). Ils naissent des mêmes événements que les sons.
   const eclats: { x: number; y: number; ne: number; force: number }[] = []
@@ -421,6 +427,15 @@ export function creeEcranMulti(quitte: () => void): EcranMulti {
     boutonDash.addEventListener('pointerup', () => (dash.bouton = false))
     boutonDash.addEventListener('pointercancel', () => (dash.bouton = false))
     boutonDash.addEventListener('contextmenu', (ev) => ev.preventDefault())
+    const boutonGlace = r.querySelector<HTMLButtonElement>('[data-tenir="glace"]')!
+    boutonGlace.addEventListener('pointerdown', (ev) => {
+      boutonGlace.setPointerCapture(ev.pointerId)
+      glace.bouton = true
+      ev.preventDefault()
+    })
+    boutonGlace.addEventListener('pointerup', () => (glace.bouton = false))
+    boutonGlace.addEventListener('pointercancel', () => (glace.bouton = false))
+    boutonGlace.addEventListener('contextmenu', (ev) => ev.preventDefault())
     // la fenêtre qui perd la main ne doit pas laisser un jet coincé ouvert
     window.addEventListener('blur', () => {
       pointeur.actif = false
@@ -429,6 +444,8 @@ export function creeEcranMulti(quitte: () => void): EcranMulti {
       ouvre.bouton = false
       dash.clavier = false
       dash.bouton = false
+      glace.clavier = false
+      glace.bouton = false
     })
     return r
   }
@@ -730,6 +747,8 @@ export function creeEcranMulti(quitte: () => void): EcranMulti {
     eclats.length = 0
     dash.clavier = false
     dash.bouton = false
+    glace.clavier = false
+    glace.bouton = false
     el<HTMLElement>('[data-score]').hidden = true
     el<HTMLButtonElement>('[data-geste="autre"]').hidden = r !== 'seul'
     ouvre.clavier = false
@@ -862,6 +881,7 @@ export function creeEcranMulti(quitte: () => void): EcranMulti {
     const aLaManette = manette.connectee && monCoeur.connu && mainManette > mainPointeur
     ouvre.manette = aLaManette && manette.ouvert
     dash.manette = aLaManette && manette.dash
+    glace.manette = aLaManette && manette.glace
     let commande: Commande
     if (aLaManette) {
       commande = commandeManette(manette, monCoeur.x, monCoeur.y)
@@ -878,11 +898,13 @@ export function creeEcranMulti(quitte: () => void): EcranMulti {
       commande = { pousse: pointeur.actif, ouvert: jeMOuvre(), x: vise.x, y: vise.y }
     }
     commande.dash = dash.clavier || dash.bouton || dash.manette
+    commande.glace = glace.clavier || glace.bouton || glace.manette
     // onglet à l'arrière-plan : on ne pousse ni ne s'ouvre à l'aveugle
     if (!dessine) {
       commande.pousse = false
       commande.ouvert = false
       commande.dash = false
+      commande.glace = false
     }
 
     let particules: Particules
@@ -945,7 +967,7 @@ export function creeEcranMulti(quitte: () => void): EcranMulti {
         // (un choc trop rapproché du précédent est tu : ni son, ni onde)
         if (!sons.joue(son, (son.x - cadre.cx) / cadre.demiL, maintenant)) continue
         // un choc, une onde ; un but, l'écran qui s'illumine à la couleur du buteur
-        if (son.type === 'paroi' || son.type === 'choc-palet' || son.type === 'contact' || son.type === 'dash' || son.type === 'lancer' || son.type === 'prise') {
+        if (son.type === 'paroi' || son.type === 'choc-palet' || son.type === 'contact' || son.type === 'dash' || son.type === 'gel' || son.type === 'lancer' || son.type === 'prise') {
           if (eclats.length >= ECLATS_MAX) eclats.shift()
           eclats.push({ x: son.x, y: son.y, ne: maintenant / 1000, force: Math.max(0.3, son.force) })
         } else if ((son.type === 'but' || son.type === 'fin') && jeu && jeu.buteur >= 0) {
@@ -1002,8 +1024,12 @@ export function creeEcranMulti(quitte: () => void): EcranMulti {
     }
     while (eclats.length > 0 && maintenant / 1000 - eclats[0].ne >= DUREE_ECLAT) eclats.shift()
     const ondes: Eclat[] = eclats.map((e) => ({ x: e.x, y: e.y, age: maintenant / 1000 - e.ne, force: e.force }))
-    rendu.dessine(particules, cadre, salle, corps.map((c) => c.ouvert), maintenant / 1000, scene, ondes)
-    el<HTMLElement>('[data-tenir="dash"]').dataset.pret = corps[moi]?.dashPret === false ? '0' : '1' 
+    rendu.dessine(particules, cadre, salle, corps.map((c) => c.ouvert), maintenant / 1000, scene, ondes, corps.map((c) => c.glace === true))
+    el<HTMLElement>('[data-tenir="dash"]').dataset.pret = corps[moi]?.dashPret === false ? '0' : '1'
+    const boutonGlace = el<HTMLElement>('[data-tenir="glace"]')
+    boutonGlace.hidden = jeu?.mode === MODE_SUMO
+    boutonGlace.dataset.prise = corps[moi]?.glace ? '1' : '0'
+    boutonGlace.dataset.pret = corps[moi]?.glacePrete === false && !corps[moi]?.glace ? '0' : '1'
     peintReticule('[data-reticule]', aLaManette, commande, moi)
     peintReticule('[data-reticule2]', commande2 !== null, commande2 ?? commande, 1)
     el<HTMLElement>('[data-tenir="ouvrir"]').hidden = jeu?.mode === MODE_SUMO
@@ -1152,9 +1178,9 @@ export function creeEcranMulti(quitte: () => void): EcranMulti {
       mode === MODE_SUMO
         ? 'Poussez l’autre HORS de l’anneau, qui se resserre : son cœur dehors, la manche est à vous. MAJ : un dash. On ne s’ouvre pas au sumo.'
         : mode === MODE_HOCKEY
-        ? 'ESPACE ou clic droit maintenu : vous OUVRIR pour avaler le palet ; relâchez, il part vers le pointeur, plus fort si vous l’avez tenu. Fermé, vous le renvoyez — et vous l’arrachez au porteur en le percutant. MAJ : un dash. Le palet dans la cage adverse : un but.'
-        : 'ESPACE ou clic droit maintenu : vous OUVRIR. Deux corps ouverts fusionnent ; un corps ouvert boit ce qu’on lui tire ; fermé, il repousse. MAJ : un dash.'
-    const pad = ' MANETTE : le stick gauche pour aller, A ou RT pour pousser, LT ou LB pour s’ouvrir, B ou RB pour dasher ; Start recommence, Select quitte.'
+        ? 'ESPACE ou clic droit maintenu : vous OUVRIR pour avaler le palet ; relâchez, il part vers le pointeur, plus fort si vous l’avez tenu. Fermé, vous le renvoyez — et vous l’arrachez au porteur en le percutant. MAJ : un dash. F maintenu : la GLACE — deux secondes en bloc, qui file tout droit, renvoie le palet et le frappe fort. Le palet dans la cage adverse : un but.'
+        : 'ESPACE ou clic droit maintenu : vous OUVRIR. Deux corps ouverts fusionnent ; un corps ouvert boit ce qu’on lui tire ; fermé, il repousse. MAJ : un dash. F maintenu : la GLACE, deux secondes en bloc.'
+    const pad = ` MANETTE : le stick gauche pour aller, A ou RT pour pousser, LT ou LB pour s’ouvrir, B ou RB pour dasher${mode === MODE_SUMO ? '' : ', X ou Y pour la glace'} ; Start recommence, Select quitte.`
     el<HTMLElement>('[data-aide]').textContent = commun + propre + pad + (role === 'hote' ? ' Votre machine simule la partie : ne fermez pas cet onglet.' : '')
   }
 
@@ -1286,7 +1312,9 @@ export function creeEcranMulti(quitte: () => void): EcranMulti {
       ev.preventDefault()
     }
     // MAJ, en jeu : le dash
-    if (page === 'jeu' && (ev.code === 'ShiftLeft' || ev.code === 'ShiftRight')) dash.clavier = ev.type === 'keydown' 
+    if (page === 'jeu' && (ev.code === 'ShiftLeft' || ev.code === 'ShiftRight')) dash.clavier = ev.type === 'keydown'
+    // F, en jeu : la glace, tant qu'elle est tenue (la touche du gel, dans le jeu)
+    if (page === 'jeu' && ev.code === 'KeyF') glace.clavier = ev.type === 'keydown'
   }
 
   const api: EcranMulti = {
