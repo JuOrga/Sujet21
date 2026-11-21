@@ -191,9 +191,10 @@ bouton **MULTI** sur l'accueil (`?dev`). Tout vit dans [`src/multi/`](src/multi/
   Deux corps fermés qui se percutent S'ÉCRASENT l'un contre l'autre,
   rebondissent et redeviennent ronds (« le rebond », « la peau tendue »).
 - **Le mode HOCKEY** (à choisir au salon, avant de créer la partie) : un
-  terrain plus court, un palet, et une cage par camp posée DANS le terrain
-  (trois parois, ouvertes vers le centre : on passe derrière, l'eau et le
-  palet y butent, et l'on ne marque que par devant). Fermé, le corps amortit
+  palet sur une PATINOIRE, aux proportions des vraies : coins arrondis,
+  ligne rouge, lignes bleues, cercles de mise en jeu, et une cage par camp
+  posée DANS le terrain — un trapèze ouvert vers le centre : on passe
+  derrière, l'eau et le palet y butent, et l'on ne marque que par devant. Fermé, le corps amortit
   le palet et le renvoie ; OUVERT, il l'avale dès qu'il le touche — et se refermer le LANCE
   vers le pointeur, d'autant plus fort qu'on l'a tenu (trois secondes au
   plus, après quoi il s'échappe). Le jet le pousse aussi. Le premier à cinq

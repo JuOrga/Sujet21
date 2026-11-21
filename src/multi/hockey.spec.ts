@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { DEFAULT_PARAMS } from '../sim/params'
-import { BUTS_POUR_GAGNER, CHARGE_PLEINE, DECOMPTE, DUREE_MATCH, EPAISSEUR_CAGE, Hockey, LIGNE_BUT, OUVERTURE_CAGE, PROFONDEUR_CAGE, RAYON_PALET, TENUE_MAX, TERRAIN, paroisCages } from './hockey'
+import { BUTS_POUR_GAGNER, CHARGE_PLEINE, DECOMPTE, DEMI_FOND, DEMI_OUVERTURE, DUREE_MATCH, EPAISSEUR_CAGE, Hockey, LIGNE_BUT, PROFONDEUR_CAGE, RAYON_COINS, RAYON_PALET, TENUE_MAX, TERRAIN, paroisCages, paroisCoins, type Paroi } from './hockey'
 import { Hote, Miroir, SALLE } from './partie'
 import { FluidSimMulti, KIND_PLAYER } from './solveurMulti'
 import { MODE_HOCKEY, MODE_LIBRE, PHASE_BUT, PHASE_DECOMPTE, PHASE_FINI, PHASE_JEU, encodeEtat, litEnteteEtat, modeTrame, particulesVides, type Commande, type JeuTrame } from './trame'
@@ -33,6 +33,13 @@ const vitesse = (h: Hote, j: number): { x: number; y: number } => {
   return { x: x / m, y: y / m }
 }
 
+/** De combien le point (x, y) est enfoncé dans une paroi (négatif : dehors). */
+const enfoncement = (b: Paroi, x: number, y: number): number => {
+  const rad = (b.angle * Math.PI) / 180
+  const lx = (x - b.cx) * Math.cos(rad) + (y - b.cy) * Math.sin(rad)
+  const ly = -(x - b.cx) * Math.sin(rad) + (y - b.cy) * Math.cos(rad)
+  return Math.min(b.demiL - Math.abs(lx), b.demiE - Math.abs(ly))
+}
 const MILIEU_X = (TERRAIN.minX + TERRAIN.maxX) / 2
 const MILIEU_Y = (TERRAIN.minY + TERRAIN.maxY) / 2
 /** Largeur sur hauteur du corps j : 1 pour un rond. */
@@ -505,24 +512,30 @@ describe('hockey — les parois, les cages, le score', () => {
     const { sim, jeu, avance } = petit()
     const p = sim.palet
     p.x = LIGNE_BUT - PROFONDEUR_CAGE / 2
-    p.y = MILIEU_Y - OUVERTURE_CAGE / 2 - 300
+    p.y = MILIEU_Y - DEMI_OUVERTURE - 300
     p.vy = 900
-    const vus = avance(60)
+    let plusBas = 0
+    const vus: string[] = []
+    for (let s = 0; s < 60; s++) {
+      vus.push(...avance(1))
+      plusBas = Math.max(plusBas, p.y)
+    }
     expect(vus).toEqual([])
     expect(jeu.scores).toEqual([0, 0])
-    expect(p.vy).toBeLessThan(0)
-    expect(p.y).toBeLessThan(MILIEU_Y - OUVERTURE_CAGE / 2)
+    // il n'est jamais entré : son centre est resté au-dessus du côté de la cage
+    expect(plusBas).toBeLessThan(MILIEU_Y - DEMI_FOND)
   })
 
   it('on PASSE DERRIÈRE la cage : le palet y file d’un bord à l’autre', () => {
     const { sim, avance } = petit()
     const p = sim.palet
+    // entre le fond du terrain et le dos de la cage, là où le bord est droit
     p.x = 140
-    p.y = 300
+    p.y = MILIEU_Y - DEMI_FOND - 60
     p.vy = 900
-    avance(150)
-    // il a traversé toute la hauteur de la cage par derrière, sans dévier
-    expect(p.y).toBeGreaterThan(MILIEU_Y + OUVERTURE_CAGE / 2 + 100)
+    avance(62)
+    // il a longé tout le dos de la cage, sans dévier
+    expect(p.y).toBeGreaterThan(MILIEU_Y + DEMI_FOND + 60)
     expect(p.x).toBeCloseTo(140, 3)
     expect(p.vy).toBeGreaterThan(0)
   })
@@ -543,20 +556,83 @@ describe('hockey — les parois, les cages, le score', () => {
         const x = sim.posX[i]
         const y = sim.posY[i]
         // de combien elle est enfoncée dans une paroi (0 : dehors)
-        for (const b of parois) {
-          const e = Math.min(x - b.minX, b.maxX - x, y - b.minY, b.maxY - y)
-          if (e > enfonce) enfonce = e
-        }
+        for (const b of parois) enfonce = Math.max(enfonce, enfoncement(b, x, y))
         // derrière le dos de la cage, dans son axe : il aurait fallu le traverser
-        if (x < LIGNE_BUT - PROFONDEUR_CAGE - EPAISSEUR_CAGE - 3 && Math.abs(y - MILIEU_Y) < OUVERTURE_CAGE / 2 - 20) derriere++
+        if (x < LIGNE_BUT - PROFONDEUR_CAGE - EPAISSEUR_CAGE - 3 && Math.abs(y - MILIEU_Y) < DEMI_FOND - 20) derriere++
       }
     }
     // une particule lancée à 500 u/s s'y enfonce à peine (mesuré : 3,3 u au
-    // pire, pour une paroi de 36 u)
+    // pire, pour une paroi de 30 u)
     expect(enfonce).toBeLessThan(8)
     expect(derriere).toBe(0)
     // le corps est bien entré dans la cage (c'est de l'eau, il s'y loge)
     expect(sim.corps[0].stats.centroidX).toBeLessThan(LIGNE_BUT + 60)
+  })
+
+  it('LES COINS SONT RONDS : le palet y suit le quart de cercle, sans jamais sortir', () => {
+    const { sim, avance } = petit()
+    const p = sim.palet
+    // lancé dans le coin du haut à gauche, en passant au-dessus de la cage
+    p.x = 700
+    p.y = 250
+    p.vx = -900
+    p.vy = -300
+    const centre = { x: TERRAIN.minX + RAYON_COINS, y: TERRAIN.minY + RAYON_COINS }
+    let auPlusLoin = 0
+    for (let s = 0; s < 120; s++) {
+      avance(1)
+      if (p.x < centre.x && p.y < centre.y) auPlusLoin = Math.max(auPlusLoin, Math.hypot(p.x - centre.x, p.y - centre.y))
+    }
+    // il a touché l'arrondi, et n'est jamais allé au-delà (un angle droit
+    // l'aurait laissé à 498 u du centre du coin)
+    expect(auPlusLoin).toBeGreaterThan(RAYON_COINS - RAYON_PALET - 5)
+    expect(auPlusLoin).toBeLessThanOrEqual(RAYON_COINS - RAYON_PALET + 1e-6)
+  })
+
+  it('l’eau aussi suit l’arrondi des coins', () => {
+    const h = enJeu()
+    const sim = h.sim
+    // le corps 0 est lancé dans le coin du haut à gauche
+    for (let i = 0; i < sim.count; i++) {
+      if (sim.kind[i] !== KIND_PLAYER || sim.proprio[i] !== 0) continue
+      sim.velX[i] -= 420
+      sim.velY[i] -= 420
+    }
+    const centre = { x: TERRAIN.minX + RAYON_COINS, y: TERRAIN.minY + RAYON_COINS }
+    let dehors = 0
+    let auPlusLoin = 0
+    for (let s = 0; s < 360; s++) {
+      pas(h, 1)
+      if (s % 10 !== 9) continue
+      for (let i = 0; i < sim.count; i++) {
+        if (sim.proprio[i] !== 0) continue
+        const x = sim.posX[i]
+        const y = sim.posY[i]
+        if (x >= centre.x || y >= centre.y) continue
+        const d = Math.hypot(x - centre.x, y - centre.y)
+        auPlusLoin = Math.max(auPlusLoin, d)
+        if (d > RAYON_COINS + 8) dehors++
+      }
+    }
+    // le corps est bien allé au fond du coin, et rien n'a passé l'arrondi
+    expect(auPlusLoin).toBeGreaterThan(RAYON_COINS - 30)
+    expect(dehors).toBe(0)
+  })
+
+  it('les parois des coins se rejoignent : pas de fente entre deux', () => {
+    const coins = paroisCoins()
+    expect(coins.length).toBe(24)
+    // tout point juste derrière l'arrondi est DANS une paroi
+    for (const [sx, sy] of [[-1, -1], [1, -1], [1, 1], [-1, 1]]) {
+      const cx = sx < 0 ? TERRAIN.minX + RAYON_COINS : TERRAIN.maxX - RAYON_COINS
+      const cy = sy < 0 ? TERRAIN.minY + RAYON_COINS : TERRAIN.maxY - RAYON_COINS
+      for (let k = 0; k <= 90; k++) {
+        const t = (k / 90) * (Math.PI / 2)
+        const x = cx + sx * (RAYON_COINS + 12) * Math.cos(t)
+        const y = cy + sy * (RAYON_COINS + 12) * Math.sin(t)
+        expect(Math.max(...coins.map((b) => enfoncement(b, x, y)))).toBeGreaterThan(0)
+      }
+    }
   })
 
   it('porté jusque dans la cage adverse, le palet compte aussi', () => {

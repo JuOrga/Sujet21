@@ -21,50 +21,117 @@ import { MAT_WALL } from '../game/level'
 import { KIND_PLAYER, type FluidSimMulti } from './solveurMulti'
 import { PHASE_BUT, PHASE_DECOMPTE, PHASE_FINI, PHASE_JEU, type Bornes, type Commande, type JeuTrame } from './trame'
 
-/** LE TERRAIN : plus petit que la salle libre (3840 × 2160). Se déplacer
- *  coûte de la matière ; sur un terrain trop long on arrive devant la cage
- *  avec la moitié de son corps. */
-export const TERRAIN: Bornes = { minX: 0, minY: 0, maxX: 2880, maxY: 1620 }
-// LES CAGES sont posées DANS le terrain, en retrait du fond : on passe
-// derrière, comme sur une vraie patinoire (« je pensais à un terrain de
-// hockey dans le sens où on peut passer derrière la cage », le concepteur,
-// 20/11). La première version ouvrait simplement la paroi du fond sur un
-// tiers de sa hauteur. Une cage, ce sont trois parois — un fond, deux côtés —
-// ouvertes vers le centre : le palet et l'eau y butent, et l'on n'y entre
-// que par devant.
-/** La distance de la ligne de but à la paroi du fond du terrain. */
-export const LIGNE_BUT = 470
-/** La profondeur d'une cage, de sa ligne de but à son fond. Derrière, il
- *  reste 284 u jusqu'au bord du terrain : un corps de 900 particules (~210 u
- *  de large) y passe. */
-export const PROFONDEUR_CAGE = 150
-/** La hauteur de son ouverture : deux corps de large. */
-export const OUVERTURE_CAGE = 420
-/** L'épaisseur de ses parois. Une goutte tirée fait 12 u par pas : à 36 u,
- *  elle ne les traverse pas. */
-export const EPAISSEUR_CAGE = 36
+// LE TERRAIN est une PATINOIRE, sur le modèle des vraies (« prends vraiment
+// l'exemple de la forme d'un terrain de hockey : les bords du terrain
+// arrondis, cage similaire », le concepteur, 21/11). Une patinoire fait
+// 200 pieds sur 85, ses coins sont des quarts de cercle de 28 pieds, la
+// cage est posée en retrait du fond et l'on passe derrière.
+//
+// Les PROPORTIONS du terrain sont les vraies (2,36 de long pour 1 de large,
+// des coins d'un tiers de la largeur). Les cages, non : à l'échelle elles
+// feraient 86 u d'ouverture, moins que le palet — elles gardent la FORME des
+// vraies (un trapèze, plus étroit au fond) à la taille de ce jeu, et il
+// reste derrière elles de quoi faire passer un corps.
 
-/** Les six parois des deux cages (trois chacune), en unités monde. */
-export function paroisCages(): Bornes[] {
-  const milieu = (TERRAIN.minY + TERRAIN.maxY) / 2
-  const haut = milieu - OUVERTURE_CAGE / 2
-  const bas = milieu + OUVERTURE_CAGE / 2
-  const fond = LIGNE_BUT - PROFONDEUR_CAGE
-  const e = EPAISSEUR_CAGE
-  // côté gauche : x compté depuis la paroi de gauche ; à droite, en miroir
-  const cote = (x0: number, x1: number): [number, number][] => [
-    [TERRAIN.minX + x0, TERRAIN.minX + x1],
-    [TERRAIN.maxX - x1, TERRAIN.maxX - x0],
-  ]
-  const parois: Bornes[] = []
-  for (const [minX, maxX] of cote(fond - e, fond)) parois.push({ minX, minY: haut - e, maxX, maxY: bas + e })
-  for (const [minX, maxX] of cote(fond, LIGNE_BUT)) {
-    parois.push({ minX, minY: haut - e, maxX, maxY: haut })
-    parois.push({ minX, minY: bas, maxX, maxY: bas + e })
+/** Le terrain : plus court que la salle libre (3840 × 2160) — se déplacer
+ *  coûte de la matière —, et de la longueur qu'il faut pour remplir l'écran
+ *  avec le score au-dessus et l'aide au-dessous. */
+export const TERRAIN: Bornes = { minX: 0, minY: 0, maxX: 2880, maxY: 1220 }
+/** Le rayon des coins : un tiers de la largeur, comme sur une patinoire. */
+export const RAYON_COINS = 400
+/** La distance de la ligne de but à la paroi du fond. */
+export const LIGNE_BUT = 440
+/** La profondeur d'une cage, de sa ligne de but à son fond. Derrière il
+ *  reste 270 u jusqu'au bord : un corps de 900 particules (~210 u de large)
+ *  y passe. */
+export const PROFONDEUR_CAGE = 140
+/** La demi-largeur de la cage à son ouverture, puis à son fond. */
+export const DEMI_OUVERTURE = 200
+export const DEMI_FOND = 130
+/** L'épaisseur de ses parois. Une goutte tirée fait 12 u par pas : à 30 u
+ *  elle ne les traverse pas. */
+export const EPAISSEUR_CAGE = 30
+
+/** UNE PAROI : un rectangle tourné. `angle` en degrés, dans le sens du
+ *  solveur (game/formes.ts) : l'axe long de la paroi pointe vers
+ *  (cos, sin) de l'angle, y vers le bas. */
+export interface Paroi {
+  cx: number
+  cy: number
+  demiL: number
+  demiE: number
+  angle: number
+}
+
+/** La paroi posée le long du segment A → B, du côté opposé au point
+ *  `dedans` : c'est ce côté-là qui est le jeu. */
+function paroiLeLong(ax: number, ay: number, bx: number, by: number, dedansX: number, dedansY: number, epaisseur: number, rallonge: number): Paroi {
+  const mx = (ax + bx) / 2
+  const my = (ay + by) / 2
+  const lx = bx - ax
+  const ly = by - ay
+  const l = Math.hypot(lx, ly)
+  // la normale, tournée vers le dehors
+  let nx = -ly / l
+  let ny = lx / l
+  if ((dedansX - mx) * nx + (dedansY - my) * ny > 0) {
+    nx = -nx
+    ny = -ny
+  }
+  return { cx: mx + (nx * epaisseur) / 2, cy: my + (ny * epaisseur) / 2, demiL: l / 2 + rallonge, demiE: epaisseur / 2, angle: (Math.atan2(ly, lx) * 180) / Math.PI }
+}
+
+/** Les parois des deux cages : pour chacune un fond et deux côtés penchés. */
+export function paroisCages(): Paroi[] {
+  const my = (TERRAIN.minY + TERRAIN.maxY) / 2
+  const parois: Paroi[] = []
+  for (const cote of [0, 1]) {
+    // x compté depuis le fond de SON côté du terrain, puis remis en monde
+    const x = (d: number): number => (cote === 0 ? TERRAIN.minX + d : TERRAIN.maxX - d)
+    const ligne = x(LIGNE_BUT)
+    const fond = x(LIGNE_BUT - PROFONDEUR_CAGE)
+    const coeur = x(LIGNE_BUT - PROFONDEUR_CAGE / 2)
+    parois.push(paroiLeLong(fond, my - DEMI_FOND, fond, my + DEMI_FOND, coeur, my, EPAISSEUR_CAGE, EPAISSEUR_CAGE))
+    for (const s of [-1, 1]) parois.push(paroiLeLong(ligne, my + s * DEMI_OUVERTURE, fond, my + s * DEMI_FOND, coeur, my, EPAISSEUR_CAGE, 6))
   }
   return parois
 }
+
+/** Les COINS du terrain, pour l'eau : chaque quart de cercle est fait de six
+ *  parois droites posées bout à bout (l'écart au vrai cercle est de 3,4 u).
+ *  Le palet, lui, suit le vrai cercle. */
+export function paroisCoins(): Paroi[] {
+  const SEGMENTS = 6
+  const EPAISSEUR = 90
+  const parois: Paroi[] = []
+  for (const [sx, sy] of [[-1, -1], [1, -1], [1, 1], [-1, 1]]) {
+    const cx = sx < 0 ? TERRAIN.minX + RAYON_COINS : TERRAIN.maxX - RAYON_COINS
+    const cy = sy < 0 ? TERRAIN.minY + RAYON_COINS : TERRAIN.maxY - RAYON_COINS
+    // du bord vertical au bord horizontal du coin
+    const point = (k: number): [number, number] => {
+      const t = ((k / SEGMENTS) * Math.PI) / 2
+      return [cx + sx * RAYON_COINS * Math.cos(t), cy + sy * RAYON_COINS * Math.sin(t)]
+    }
+    for (let k = 0; k < SEGMENTS; k++) {
+      const [ax, ay] = point(k)
+      const [bx, by] = point(k + 1)
+      parois.push(paroiLeLong(ax, ay, bx, by, cx, cy, EPAISSEUR, 14))
+    }
+  }
+  return parois
+}
+
 const PAROIS_CAGES = paroisCages()
+const PAROIS_EAU = [...PAROIS_CAGES, ...paroisCoins()]
+/** Une paroi telle que le solveur la reçoit. */
+const pourLeSolveur = (p: Paroi): { minX: number; minY: number; maxX: number; maxY: number; material: number; angle: number } => ({
+  minX: p.cx - p.demiL,
+  maxX: p.cx + p.demiL,
+  minY: p.cy - p.demiE,
+  maxY: p.cy + p.demiE,
+  material: MAT_WALL,
+  angle: p.angle,
+})
 /** Le rayon du palet : un corps de 900 particules fait ~105 u de rayon. */
 export const RAYON_PALET = 48
 /** Sa masse, en particules. Lourd, il ne se laisserait pas arrêter ; léger,
@@ -170,11 +237,8 @@ export class Hockey {
     // 720 u (mesuré : il donne au palet la même vitesse, 77 u/s, que le
     // délai soit entier ou réduit).
     sim.reabsorbFactor = DELAI_RETOUR
-    // les cages : des parois pour l'eau aussi
-    sim.setLevel(
-      PAROIS_CAGES.map((b) => ({ ...b, material: MAT_WALL })),
-      [],
-    )
+    // les cages et les coins arrondis : des parois pour l'eau aussi
+    sim.setLevel(PAROIS_EAU.map(pourLeSolveur), [])
     // posé, mais pas encore en jeu : il le sera à la fin du décompte
     p.actif = false
     p.rayon = RAYON_PALET
@@ -407,56 +471,82 @@ export class Hockey {
     }
   }
 
-  /** Les parois du terrain, les parois des cages, et le but. */
+  /** Le tour du terrain (ses coins sont ronds), les parois des cages, et
+   *  le but. */
   private parois(p: FluidSimMulti['palet']): Evenement {
     const r = p.rayon
-    // le tour du terrain : il n'a plus d'ouverture, les cages sont dedans
-    if (p.y - r < TERRAIN.minY) {
-      p.y = TERRAIN.minY + r
-      if (p.vy < 0) p.vy = -p.vy * RESTITUTION_PAROI
-    } else if (p.y + r > TERRAIN.maxY) {
-      p.y = TERRAIN.maxY - r
-      if (p.vy > 0) p.vy = -p.vy * RESTITUTION_PAROI
+    // ---- le tour : dans un coin, le palet suit le quart de cercle
+    const cx = p.x < TERRAIN.minX + RAYON_COINS ? TERRAIN.minX + RAYON_COINS : p.x > TERRAIN.maxX - RAYON_COINS ? TERRAIN.maxX - RAYON_COINS : NaN
+    const cy = p.y < TERRAIN.minY + RAYON_COINS ? TERRAIN.minY + RAYON_COINS : p.y > TERRAIN.maxY - RAYON_COINS ? TERRAIN.maxY - RAYON_COINS : NaN
+    if (cx === cx && cy === cy) {
+      const dx = p.x - cx
+      const dy = p.y - cy
+      const d = Math.hypot(dx, dy)
+      const libre = RAYON_COINS - r
+      if (d > libre) {
+        // la normale pointe vers le centre du coin
+        const nx = -dx / d
+        const ny = -dy / d
+        p.x = cx - nx * libre
+        p.y = cy - ny * libre
+        const vn = p.vx * nx + p.vy * ny
+        if (vn < 0) {
+          p.vx -= (1 + RESTITUTION_PAROI) * vn * nx
+          p.vy -= (1 + RESTITUTION_PAROI) * vn * ny
+        }
+      }
+    } else {
+      if (p.y - r < TERRAIN.minY) {
+        p.y = TERRAIN.minY + r
+        if (p.vy < 0) p.vy = -p.vy * RESTITUTION_PAROI
+      } else if (p.y + r > TERRAIN.maxY) {
+        p.y = TERRAIN.maxY - r
+        if (p.vy > 0) p.vy = -p.vy * RESTITUTION_PAROI
+      }
+      if (p.x - r < TERRAIN.minX) {
+        p.x = TERRAIN.minX + r
+        if (p.vx < 0) p.vx = -p.vx * RESTITUTION_PAROI
+      } else if (p.x + r > TERRAIN.maxX) {
+        p.x = TERRAIN.maxX - r
+        if (p.vx > 0) p.vx = -p.vx * RESTITUTION_PAROI
+      }
     }
-    if (p.x - r < TERRAIN.minX) {
-      p.x = TERRAIN.minX + r
-      if (p.vx < 0) p.vx = -p.vx * RESTITUTION_PAROI
-    } else if (p.x + r > TERRAIN.maxX) {
-      p.x = TERRAIN.maxX - r
-      if (p.vx > 0) p.vx = -p.vx * RESTITUTION_PAROI
-    }
-    // les parois des cages : un disque contre un rectangle
+    // ---- les parois des cages : un disque contre un rectangle tourné
     for (const b of PAROIS_CAGES) {
-      const qx = p.x < b.minX ? b.minX : p.x > b.maxX ? b.maxX : p.x
-      const qy = p.y < b.minY ? b.minY : p.y > b.maxY ? b.maxY : p.y
-      let nx = p.x - qx
-      let ny = p.y - qy
+      const rad = (b.angle * Math.PI) / 180
+      const ca = Math.cos(rad)
+      const sa = Math.sin(rad)
+      // le palet, vu de la paroi (son axe long sur x)
+      const lx = (p.x - b.cx) * ca + (p.y - b.cy) * sa
+      const ly = -(p.x - b.cx) * sa + (p.y - b.cy) * ca
+      const qx = lx < -b.demiL ? -b.demiL : lx > b.demiL ? b.demiL : lx
+      const qy = ly < -b.demiE ? -b.demiE : ly > b.demiE ? b.demiE : ly
+      let nx = lx - qx
+      let ny = ly - qy
       const d2 = nx * nx + ny * ny
       if (d2 >= r * r) continue
-      let d = Math.sqrt(d2)
+      let recul: number
+      const d = Math.sqrt(d2)
       if (d < 1e-6) {
         // son centre est DANS la paroi : il ressort par le plus court
-        const g = p.x - b.minX
-        const dr = b.maxX - p.x
-        const h = p.y - b.minY
-        const ba = b.maxY - p.y
-        const m = Math.min(g, dr, h, ba)
-        nx = m === g ? -1 : m === dr ? 1 : 0
-        ny = m === h ? -1 : m === ba ? 1 : 0
-        if (nx !== 0) ny = 0
-        p.x += nx * (m + r)
-        p.y += ny * (m + r)
-        d = 1
+        const versBord = b.demiE - Math.abs(ly)
+        nx = 0
+        ny = ly < 0 ? -1 : 1
+        recul = versBord + r
       } else {
         nx /= d
         ny /= d
-        p.x += nx * (r - d)
-        p.y += ny * (r - d)
+        recul = r - d
       }
-      const vn = p.vx * nx + p.vy * ny
+      // la normale, remise en monde
+      const wx = nx * ca - ny * sa
+      const wy = nx * sa + ny * ca
+      p.x += wx * recul
+      p.y += wy * recul
+      const vn = p.vx * wx + p.vy * wy
       if (vn < 0) {
-        p.vx -= (1 + RESTITUTION_PAROI) * vn * nx
-        p.vy -= (1 + RESTITUTION_PAROI) * vn * ny
+        p.vx -= (1 + RESTITUTION_PAROI) * vn * wx
+        p.vy -= (1 + RESTITUTION_PAROI) * vn * wy
       }
     }
     return this.dansUneCage(p)
@@ -466,12 +556,16 @@ export class Hockey {
    *  dedans. Les parois ne laissent entrer que par devant ; porté par un
    *  joueur, il compte aussi. Le joueur 0 garde la cage de GAUCHE. */
   private dansUneCage(p: FluidSimMulti['palet']): Evenement {
-    if (Math.abs(p.y - (TERRAIN.minY + TERRAIN.maxY) / 2) >= OUVERTURE_CAGE / 2) return null
-    const seuil = p.rayon * 0.5
-    const gauche = p.x - TERRAIN.minX
-    if (gauche < LIGNE_BUT - seuil && gauche > LIGNE_BUT - PROFONDEUR_CAGE) return this.but(p, 1)
-    const droite = TERRAIN.maxX - p.x
-    if (droite < LIGNE_BUT - seuil && droite > LIGNE_BUT - PROFONDEUR_CAGE) return this.but(p, 0)
+    const ecart = Math.abs(p.y - (TERRAIN.minY + TERRAIN.maxY) / 2)
+    for (const cote of [0, 1]) {
+      // la distance au fond de ce côté-là du terrain
+      const duFond = cote === 0 ? p.x - TERRAIN.minX : TERRAIN.maxX - p.x
+      const creux = LIGNE_BUT - PROFONDEUR_CAGE
+      if (duFond <= creux || duFond >= LIGNE_BUT - p.rayon * 0.5) continue
+      // la cage se resserre vers le fond
+      const large = DEMI_FOND + ((DEMI_OUVERTURE - DEMI_FOND) * (duFond - creux)) / PROFONDEUR_CAGE
+      if (ecart < large) return this.but(p, 1 - cote)
+    }
     return null
   }
 
