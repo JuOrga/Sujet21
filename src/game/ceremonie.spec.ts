@@ -185,7 +185,9 @@ describe('le mot de la note', () => {
 
 describe('le titre d’un tirage', () => {
   it('numérote le palier qu’on vient de franchir', () => {
-    expect(titreDuTirage(1, 1, false)).toBe('PALIER DE MAÎTRISE 1 — EMPORTEZ UN INSTRUMENT')
+    // l'origine seule : la consigne est devenue la question de l'étape (21/11)
+    expect(titreDuTirage(1, 1, false)).toBe('PALIER DE MAÎTRISE 1')
+    expect(titreDuTirage(0, 1, true)).toBe('SALLE SCELLÉE — TIRAGE GARANTI')
     // deux paliers d'un coup : le premier tirage est celui du palier 2, puis le 3
     expect(titreDuTirage(3, 2, false)).toContain('PALIER DE MAÎTRISE 2')
     expect(titreDuTirage(3, 1, false)).toContain('PALIER DE MAÎTRISE 3')
@@ -1170,12 +1172,16 @@ describe('la cérémonie — les portes et le plan, habillés', () => {
   })
 })
 
-// LE TIRAGE « EMPORTEZ UN INSTRUMENT » (étape 4). La colonne de maîtrise et
-// son tampon restaient au-dessus des cartes ; les cartes portaient un émoji,
-// un paragraphe et une étiquette de 7,5 px ; et le retournement montrait,
-// au banc, la FACE EN MIROIR au lieu du dos. Aucun focus n'était posé et
-// aucune garde ne tenait : le A martelé d'une rafale, arrivé après la garde
-// du palier, tombait sur une carte et la CHOISISSAIT (relecture de F4).
+// LE TIRAGE « CHOISISSEZ VOTRE INSTRUMENT » (étape 4). La colonne de maîtrise
+// et son tampon restaient au-dessus des cartes ; les cartes portaient un
+// émoji, un paragraphe et une étiquette de 7,5 px ; et le retournement
+// montrait, au banc, la FACE EN MIROIR au lieu du dos. Aucun focus n'était
+// posé et aucune garde ne tenait : le A martelé d'une rafale, arrivé après
+// la garde du palier, tombait sur une carte et la CHOISISSAIT (relecture de
+// F4). Le 13/11 la carte s'était réduite à une cartouche, la phrase rangée
+// dans l'infobulle ; le 21/11 le concepteur la redemande — « plus de détails
+// sur ce que ça fait », des cartes « un peu plus grandes », la consigne « en
+// plus visible / grand », et plus de texte « déjà donné sur l'écran d'avant ».
 describe('la cérémonie — le tirage', () => {
   const css = HTML.slice(HTML.indexOf('/* ==== LA CÉRÉMONIE DE FIN DE SALLE'), HTML.indexOf('/* ---- Le panneau du GÉNÉRATEUR'))
   it('le tirage n’est pas surplombé par la jauge et son tampon', () => {
@@ -1203,13 +1209,41 @@ describe('la cérémonie — le tirage', () => {
     expect(f).toContain("'ArrowLeft'")
     expect(f).toContain("'ArrowRight'")
   })
-  it('dit le texte complet en infobulle, pas en paragraphe', () => {
+  it('écrit sur la carte ce qu’elle fait — l’infobulle ne suffit ni au doigt ni à la manette', () => {
     const c = corps('carteHTML')
     expect(c).toMatch(/title="\$\{htmlSafe\(/)
     expect(c).toContain('descriptionInstrument(d)')
-    // la carte du tirage n'écrit ni la phrase ni l'étiquette de calibre
-    expect(c).toMatch(/const condensee = o\.variante === 'draft'/)
-    expect(c).toMatch(/condensee \? '' : `<span class="crt-txt">/)
+    // la phrase s'écrit dans TOUTES les variantes, tirage compris
+    expect(c).toMatch(/\n\s*`<span class="crt-txt">\$\{htmlSafe\(sansPonctuationOrpheline\(phrase\)\)\}<\/span>` \+/)
+    // … sans laisser un deux-points ouvrir une ligne : l'espace qui le
+    // précède est insécable (« plus loin⏎: les traînardes », vu le 21/11)
+    expect(corps('sansPonctuationOrpheline')).toMatch(/replace\(\/ \(\[:;!\?»\]\)\/g, '\\u00a0\$1'\)/)
+    expect(c).not.toContain('condensee')
+    // au tirage, la ligne de rang dit la famille, et le calibre seulement
+    // quand il sort de l'ordinaire
+    expect(c).toMatch(/o\.variante === 'draft'\s*\? fams\.map\([^\n]*\(cal === 'commun' \? '' :/)
+    // et la feuille lui donne une taille lisible, pas les 7,5 px de l'atelier
+    for (const s of ['.mb-pli .crt-rang', '.mb-pli .crt-txt']) {
+      const t = /font-size:\s*calc\((\d+(?:\.\d+)?)px/.exec(regle(s))
+      expect(t, s).not.toBeNull()
+      expect(Number(t![1]), s).toBeGreaterThanOrEqual(10)
+    }
+  })
+  it('pose la consigne en question, en grand, et retire ce que les écrans d’avant ont dit', () => {
+    const f = corps('mbMontreDraft')
+    expect(f).toContain("mbQuestion('CHOISISSEZ VOTRE INSTRUMENT')")
+    // le bandeau de la salle (régime, volume, bourse, mémoire) : le bilan
+    // et le palier viennent de le dire
+    expect(f).toContain('mbReleveHors()')
+    // la ligne de contexte garde l'origine du tirage et la bourse — on paie ici
+    expect(f).toMatch(/titreDuTirage\(.*\)\} · EN BOURSE : \$\{condensat\} cL/)
+    for (const t of [titreDuTirage(1, 1, false), titreDuTirage(0, 1, true)]) expect(t).not.toContain('EMPORTEZ')
+    // la fin ordinaire retrouve son bandeau, qu'un tirage l'ait précédée ou non
+    expect(corps('mbMontreFin')).toContain("mbEl('mb-releve').hidden = false")
+  })
+  it('agrandit la carte : 330 px, 300 sur un écran bas, à la mesure du contenu sur téléphone', () => {
+    expect(regle('.mb-pli .crt-draft')).toMatch(/min-height:\s*330px/)
+    expect(css).toMatch(/@media \(max-height: 820px\) and \(min-width: 761px\) \{[^}]*\}\s*\.mb-pli, \.mb-pli \.crt-draft \{ min-height: 300px; \}/)
   })
   it('sonne la carte élue de sa voix, et chaque carte posée de la sienne', () => {
     const f = corps('mbMontreDraft')

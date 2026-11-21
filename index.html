@@ -8619,16 +8619,25 @@
       }
       .mb-choix-titre::after { background: linear-gradient(90deg, var(--line), transparent); }
       .mb-cartes { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
-      /* ---- LE TIRAGE : trois CARTOUCHES D'INSTRUMENT (quatre avec le
-         Carnet du Semblable). Elles arrivent DOS VISIBLE et se retournent
-         une à une ; sous le pointeur, elles s'inclinent (--rx/--ry posés
-         par main.ts) ; l'élue s'embrase et grandit, les autres tombent.
-         La face est le composant `.crt` partagé avec l'atelier, taillé ici
-         au coin coupé du verbe : l'icône rendue, le nom, les effets, le
-         prix ; la phrase et le calibre passent dans l'infobulle (carteHTML). */
+      /* ---- LE TIRAGE : trois CARTES D'INSTRUMENT (quatre avec le Carnet du
+         Semblable). Elles arrivent DOS VISIBLE et se retournent une à une ;
+         sous le pointeur, elles s'inclinent (--rx/--ry posés par main.ts) ;
+         l'élue s'avance et grandit, les autres tombent. La face est le
+         composant `.crt` partagé avec l'atelier, taillé ici au coin coupé du
+         verbe.
+         ELLE DIT CE QU'ELLE FAIT (21/11). Elle était une cartouche de 210 px
+         — l'icône, le nom, les leviers, le prix — la phrase rangée dans une
+         infobulle que ni le doigt ni la manette n'ouvrent. « Un peu plus
+         grandes, avec plus de détails sur ce que ça fait, mais de belle
+         manière, sans que ça fasse lourd » (le concepteur) : une carte de
+         330 px qui se lit de haut en bas, en trois temps séparés par de
+         l'air et un seul filet — QUOI (l'icône, le nom, sa famille), CE QUE
+         ÇA CHANGE (la phrase, à l'encre), COMBIEN (les leviers chiffrés,
+         puis le prix). Le bandeau de la salle, retiré de cet écran, lui
+         rend la hauteur qu'elle prend. */
       .mb-cartes.mb-draft {
-        grid-template-columns: repeat(var(--n, 3), minmax(0, 1fr)); gap: 16px;
-        max-width: 1000px; width: 100%; margin: 0 auto; perspective: 1400px;
+        grid-template-columns: repeat(var(--n, 3), minmax(0, 1fr)); gap: 18px;
+        max-width: 1120px; width: 100%; margin: 0 auto; perspective: 1400px;
       }
       /* LE PLI porte la 3D et ses deux faces, la carte et son dos. Rien de
          ce qui l'APLATIT ne se pose sur lui tant qu'il peut tourner — ni
@@ -8637,7 +8646,7 @@
          tourne le tout, et c'est la face EN MIROIR qu'on voyait au lieu du
          dos (banc, 13/11). L'apparition et l'effacement passent aux faces. */
       .mb-pli {
-        position: relative; transform-style: preserve-3d; min-height: 210px;
+        position: relative; transform-style: preserve-3d; min-height: 330px;
         transform: rotateX(var(--rx, 0deg)) rotateY(var(--ry, 0deg));
         transition: transform 0.16s ease;
         animation: mb-retourne 0.8s cubic-bezier(0.3, 1, 0.3, 1) backwards;
@@ -8662,8 +8671,8 @@
       .mb-pli .crt-draft {
         --c: var(--mb-chanfrein);
         --crt-arete: color-mix(in srgb, var(--fam) 26%, transparent);
-        position: relative; width: 100%; height: 100%; min-height: 210px; box-sizing: border-box;
-        align-items: center; gap: 8px; padding: 16px 14px 12px; text-align: center;
+        position: relative; width: 100%; height: 100%; min-height: 330px; box-sizing: border-box;
+        align-items: center; gap: 12px; padding: 26px 22px 16px; text-align: center;
         border: 0; border-radius: 0; cursor: pointer; backface-visibility: hidden;
         clip-path: polygon(0 0, calc(100% - var(--c)) 0, 100% var(--c), 100% 100%, 0 100%);
         background:
@@ -8679,31 +8688,57 @@
       /* le liseré de tête et le halo sont ceux de l'atelier : ici la famille
          se lit au filet, et rien ne luit */
       .mb-pli .crt-draft::before, .mb-pli .crt-halo { display: none; }
-      /* l'icône rendue, nue ; une carte d'atelier y pose son émoji */
-      .mb-pli .crt-tete { flex-direction: column; align-items: center; gap: 8px; }
+      /* QUOI : l'icône rendue, nue (une carte d'atelier y pose son émoji),
+         le nom, et sa famille à la teinte du filet — c'est elle qui explique
+         la couleur de la carte */
+      .mb-pli .crt-tete { flex-direction: column; align-items: center; gap: 12px; }
       .mb-pli .crt-ico {
-        display: grid; place-items: center; width: 1.3em; height: 1.3em;
-        font-size: calc(54px * var(--ui)); filter: none;
+        display: grid; place-items: center; width: 1.2em; height: 1.2em;
+        font-size: calc(76px * var(--ui)); filter: none;
       }
-      .mb-pli .crt-titres { flex: none; align-items: center; }
+      .mb-pli .crt-titres { flex: none; align-items: center; gap: 6px; }
       .mb-pli .crt-nom {
-        font-family: var(--font-display); font-weight: 400; font-size: calc(12px * var(--ui));
-        line-height: 1.35; letter-spacing: 0.12em; text-transform: uppercase; color: var(--mb-encre);
+        font-family: var(--font-display); font-weight: 400; font-size: calc(14px * var(--ui));
+        line-height: 1.3; letter-spacing: 0.1em; text-transform: uppercase; color: var(--mb-encre);
       }
-      .mb-pli .crt-effets { align-self: stretch; text-align: left; }
-      /* les effets : la ligne et sa jauge, sans la pastille de couleur de
-         l'atelier ; le gain au vert de la maîtrise, la facture à l'ambre */
-      .mb-pli .eff { --e: var(--mb-menthe); padding: 2px 0 6px; border-radius: 0; background: none; }
+      .mb-pli .crt-rang {
+        font-size: calc(10px * var(--ui)); letter-spacing: 0.16em;
+        color: color-mix(in srgb, var(--fam) 62%, var(--dim));
+      }
+      /* CE QUE ÇA CHANGE : la phrase, à l'encre, en lignes équilibrées. Elle
+         prend la hauteur libre : d'une carte à l'autre, les leviers et le
+         prix tombent sur la même ligne, que la phrase fasse une ligne ou
+         quatre */
+      .mb-pli .crt-txt {
+        flex: 1 1 auto; align-self: center; max-width: 34ch;
+        font-size: calc(12.5px * var(--ui)); line-height: 1.6; color: var(--mb-texte);
+        text-wrap: balance;
+      }
+      /* COMBIEN : les leviers, sous le seul filet de la carte — la ligne et
+         sa jauge, sans la pastille de couleur de l'atelier ; le gain au vert
+         de la maîtrise, la facture à l'ambre */
+      .mb-pli .crt-effets {
+        align-self: stretch; text-align: left; gap: 7px; margin-top: 0;
+        padding-top: 14px; border-top: 1px solid var(--line);
+      }
+      .mb-pli .eff {
+        --e: var(--mb-menthe); padding: 0 0 7px; border-radius: 0; background: none;
+        font-size: calc(11.5px * var(--ui));
+      }
+      .mb-pli .eff i { color: var(--dim); }
+      .mb-pli .eff em { font-size: calc(12.5px * var(--ui)); }
       .mb-pli .eff-prix { --e: var(--mb-or); }
       .mb-pli .eff-jauge { left: 0; right: 0; height: 2px; border-radius: 0; }
       .mb-pli .crt-ctr { align-self: stretch; font-size: calc(10px * var(--ui)); letter-spacing: 0.16em; }
+      /* une contrepartie s'annonce déjà entre deux traits : ses leviers ne
+         posent pas le filet en plus, deux règles se suivaient à 20 px */
+      .mb-pli .crt-ctr + .crt-effets { padding-top: 2px; border-top: 0; }
       .mb-pli .crt-perso { font-size: calc(10px * var(--ui)); }
-      .mb-pli .crt-pied {
-        align-self: stretch; justify-content: center; padding-top: 8px;
-        border-top: 1px solid var(--line);
-      }
+      /* le prix : seul au pied, sans filet de plus (la jauge du dernier
+         levier le sépare déjà) */
+      .mb-pli .crt-pied { align-self: stretch; justify-content: center; margin-top: 0; padding-top: 6px; }
       .mb-pli .crt-prix {
-        font-family: var(--font-display); font-size: calc(13px * var(--ui)); letter-spacing: 0.12em;
+        font-family: var(--font-display); font-size: calc(14px * var(--ui)); letter-spacing: 0.12em;
         text-transform: uppercase; color: var(--mb-or);
       }
       .mb-pli .crt-prix.crt-offert { color: var(--mb-menthe); }
@@ -8730,8 +8765,10 @@
       .mb-pli-dos > i { opacity: 0.5; }
       /* L'ISOLEMENT sous le pointeur ou le focus : celle qu'on regarde
          s'incline et s'avance, sous le voile et les équerres de la visée ;
-         les autres s'effacent — leur FACE, pas leur pli (voir plus haut) */
-      .mb-cartes.mb-isole .mb-pli:not(.mb-vise) .crt-draft { opacity: 0.35; }
+         les autres reculent — leur FACE, pas leur pli (voir plus haut). Elles
+         reculent sans s'éteindre : à 0,35, la phrase des voisines ne se
+         lisait plus, alors qu'on vise une carte pour la COMPARER aux autres */
+      .mb-cartes.mb-isole .mb-pli:not(.mb-vise) .crt-draft { opacity: 0.6; }
       .mb-pli.mb-vise { z-index: 2; transform: rotateX(var(--rx, 0deg)) rotateY(var(--ry, 0deg)) translateY(-6px); }
       .mb-pli.mb-vise .crt-draft, .mb-pli .crt-draft:focus-visible, .mb-pli .crt-draft.pad-focus {
         outline: none;
@@ -8755,7 +8792,7 @@
         100% { transform: translateY(-6px) scale(1.04); }
       }
       @keyframes crt-refus {
-        0% { opacity: 0.3; transform: translateY(0); }
+        0% { opacity: 0.6; transform: translateY(0); }
         100% { opacity: 0; transform: translateY(18px) scale(0.94); }
       }
       /* la montée des plaques (portes, plan, tirage) */
@@ -9047,11 +9084,11 @@
       /* dans le titre replié, la question tient sur UNE ligne : elle s'y
          cassait en deux (« CHOISISSEZ LA SALLE SUIVANTE », vu en F3) — la
          bannière s'élargit, le titre se resserre un peu */
-      .mb-scene.mb-compact.mb-question .mb-banniere.mb-poutre { width: min(100%, 940px); min-height: 46px; }
+      .mb-scene.mb-compact.mb-question .mb-banniere.mb-poutre { width: min(100%, 940px); min-height: 52px; }
       /* en clair aussi, même en compact : la règle du titre replié
          (.mb-scene.mb-compact .mb-titre) l'éteindrait à l'encre sourde */
       .mb-scene.mb-compact.mb-question .mb-titre {
-        font-size: calc(clamp(16px, 1.8vw, 22px) * var(--ui)); letter-spacing: 0.08em; white-space: nowrap;
+        font-size: calc(clamp(17px, 2.2vw, 28px) * var(--ui)); letter-spacing: 0.08em; white-space: nowrap;
         color: var(--mb-encre);
       }
       /* ---- LE BILAN DU MODULE : le module traversé dit ce qu'il a rendu
@@ -9442,9 +9479,11 @@
           gap: 4px 12px; padding: 10px 14px 10px 12px; text-align: left;
         }
         .mb-pli .crt-tete { display: contents; }
-        .mb-pli .crt-ico { grid-column: 1; grid-row: 1 / span 4; font-size: calc(34px * var(--ui)); }
-        .mb-pli .crt-titres, .mb-pli .crt-ctr, .mb-pli .crt-effets, .mb-pli .crt-pied { grid-column: 2; }
-        .mb-pli .crt-titres { align-items: flex-start; }
+        .mb-pli .crt-ico { grid-column: 1; grid-row: 1 / span 5; align-self: start; font-size: calc(40px * var(--ui)); }
+        .mb-pli .crt-titres, .mb-pli .crt-txt, .mb-pli .crt-ctr, .mb-pli .crt-effets, .mb-pli .crt-pied { grid-column: 2; }
+        .mb-pli .crt-titres { align-items: flex-start; gap: 3px; }
+        .mb-pli .crt-txt { align-self: stretch; max-width: none; text-wrap: wrap; line-height: 1.45; }
+        .mb-pli .crt-effets { padding-top: 8px; }
         .mb-pli .crt-pied { justify-content: flex-start; padding-top: 4px; }
         /* les haltes : le héros au-dessus du récit, une offre par ligne */
         .mb-halte { --mb-heros-l: 120px; }
@@ -9466,7 +9505,7 @@
       /* ---- LE STEAM DECK (1280 × 800) : tout doit tenir sans ascenseur ---- */
       @media (max-height: 820px) and (min-width: 761px) {
         .mb-scene { gap: 10px; padding-top: 8px; }
-        .mb-pli, .mb-pli .crt-draft { min-height: 160px; }
+        .mb-pli, .mb-pli .crt-draft { min-height: 300px; }
         .mb-porte-vue canvas { max-height: 132px; object-fit: contain; }
         .mb-ev-vue { aspect-ratio: auto; height: 132px; }
         .mb-station-carte { max-height: 58vh; }
@@ -9489,7 +9528,11 @@
            scène pour 400 visibles à 844 × 390, sans cela) */
         .mb-pli, .mb-pli .crt-draft { min-height: 0; }
         .mb-pli .crt-draft { gap: 5px; padding: 10px 12px 8px; }
+        .mb-pli .crt-tete { gap: 4px; }
         .mb-pli .crt-ico { font-size: calc(32px * var(--ui)); }
+        .mb-pli .crt-nom { font-size: calc(12px * var(--ui)); }
+        .mb-pli .crt-txt { font-size: calc(11px * var(--ui)); line-height: 1.4; }
+        .mb-pli .crt-effets { padding-top: 6px; gap: 3px; }
       }
       /* ---- LES FINS DE PARTIE : la descente bouclée — le plus grand moment
          du jeu —, la défaite définitive et la reprise. Elles s'affichaient

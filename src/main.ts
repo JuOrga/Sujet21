@@ -13376,9 +13376,9 @@ function sansAnimation(): boolean {
 // vivant de la forge passent tous par `carteHTML`. Ce que le concepteur
 // fabrique a donc EXACTEMENT les mots, l'icône et les effets de ce que le
 // joueur tire — c'est ce qui fait de l'atelier autre chose qu'une maquette.
-// Le tirage en montre MOINS : une cartouche de la station (icône, nom,
-// effets, prix) ; la phrase et le calibre passent dans l'infobulle, que
-// toutes les variantes portent.
+// Le tirage en montre AUTANT, dans son propre dessin (une carte plus
+// grande, index.html, « LE TIRAGE ») : la phrase y est revenue le 21/11.
+// L'infobulle, que toutes les variantes portent, garde le texte complet.
 // Contenu en phrasing pur (span/b/em/i) : la carte du tirage est un
 // <button>, qui n'admet ni <p> ni <ul>.
 
@@ -13416,6 +13416,16 @@ function valeurEffetLisible(e: { levier: string; valeur: number }): string {
   }
   const pct = Math.round((e.valeur - 1) * 100)
   return `${pct > 0 ? '+' : '−'}${Math.abs(pct)} %`
+}
+
+/** LA PONCTUATION HAUTE NE PASSE PAS SEULE À LA LIGNE. Écrite sur la carte
+ * du tirage, en lignes équilibrées, la phrase « Le sas aspire de moitié plus
+ * loin : les traînardes rentrent seules. » se coupait AVANT son deux-points,
+ * qui ouvrait la ligne suivante (capture du 21/11). L'espace qui précède
+ * « : ; ! ? » » et celle qui suit « « » deviennent insécables — à
+ * l'affichage seulement : les textes du catalogue ne changent pas. */
+function sansPonctuationOrpheline(t: string): string {
+  return t.replace(/ ([:;!?»])/g, '\u00a0$1').replace(/« /g, '«\u00a0')
 }
 
 interface CarteOpts {
@@ -13471,11 +13481,19 @@ function carteHTML(d: InstrumentDef, o: CarteOpts): string {
     (d.perso ? ' crt-perso-c' : '')
   const balise = o.bouton ? 'button' : 'div'
   const phrase = descriptionInstrument(d)
-  // LE TIRAGE EST UNE CARTOUCHE, pas une fiche : on y choisit d'un coup
-  // d'œil (l'icône, le nom, ce que la carte donne et coûte, son prix).
-  // La phrase et l'étiquette du calibre (7,5 px) n'y sont plus écrites —
-  // elles restent dans l'infobulle ; l'atelier, lui, garde tout à plat
-  const condensee = o.variante === 'draft'
+  // LE TIRAGE DIT CE QUE LA CARTE FAIT. Il a été une cartouche (13/11) :
+  // l'icône, le nom, les leviers, le prix — la phrase passée dans
+  // l'infobulle, que ni le doigt ni la manette n'ouvrent : on choisissait
+  // sur « Seuil de dispersion −20 % » sans savoir ce que ça change. « Plus
+  // de détails sur ce que ça fait, mais de belle manière, sans que ça fasse
+  // lourd » (le concepteur, 21/11) : la phrase revient, sur une carte plus
+  // grande. Sa ligne de rang dit la FAMILLE (c'est elle qui teinte le
+  // filet) et ne dit le calibre que s'il sort de l'ordinaire : « Commun »,
+  // écrit sur quatre cartes sur cinq, n'apprenait rien.
+  const sousTitre =
+    o.variante === 'draft'
+      ? fams.map((f) => FAMILLE_COURT[f] ?? f).join(' + ') + (cal === 'commun' ? '' : ` · ${CALIBRE_MOT[cal]}`)
+      : rang
   return (
     `<${balise} class="${cls}" style="--fam:${t1};--fam2:${t2}" title="${htmlSafe(`${d.nom} — ${phrase} (${rang})`)}"${o.bouton ? ' type="button"' : ''}${o.attrs ?? ''}>` +
     `<span class="crt-halo"></span>` +
@@ -13483,9 +13501,9 @@ function carteHTML(d: InstrumentDef, o: CarteOpts): string {
     // l'atelier) rend son émoji, jamais un carré vide (iconesStation.ts)
     `<span class="crt-tete"><i class="crt-ico">${iconeInstrumentHTML(d)}</i>` +
     `<span class="crt-titres"><b class="crt-nom">${htmlSafe(d.nom)}</b>` +
-    (condensee ? '' : `<i class="crt-rang">${htmlSafe(rang)}</i>`) +
+    `<i class="crt-rang">${htmlSafe(sousTitre)}</i>` +
     `</span></span>` +
-    (condensee ? '' : `<span class="crt-txt">${htmlSafe(phrase)}</span>`) +
+    `<span class="crt-txt">${htmlSafe(sansPonctuationOrpheline(phrase))}</span>` +
     (ctr ? `<span class="crt-ctr">CONTREPARTIE</span>` : '') +
     `<span class="crt-effets">${effets}</span>` +
     (pied.length ? `<span class="crt-pied">${pied.join('')}</span>` : '') +
@@ -16434,13 +16452,23 @@ function mbMontreDraft(): void {
   // en partant (part) ; le tirage ne compte pas sur lui pour ça
   mbEl('mb-etal').hidden = true
   mbEl('mb-passer').hidden = true
-  // le titre dit d'où vient le tirage (ceremonie.ts, titreDuTirage) ; et la
-  // BOURSE se lit là où l'on paie : le bandeau ne porte plus de solde (il
-  // rappelle la salle), une carte payante se juge sur ce qu'on a
+  // la ligne de contexte dit d'où vient le tirage (ceremonie.ts,
+  // titreDuTirage) ; et la BOURSE se lit là où l'on paie : une carte payante
+  // se juge sur ce qu'on a
   mbEl('mb-choix-titre').textContent =
     `${titreDuTirage(paliersAtteints(run.xp), mbDraftsRestants, mbTirageGaranti)} · EN BOURSE : ${condensat} cL`
   const host = mbCartes()
   host.innerHTML = ''
+  // LA QUESTION, EN GRAND, ET RIEN D'AUTRE AU-DESSUS DES CARTES. L'écran
+  // gardait « SALLE FRANCHIE » éteint en titre, la consigne en petites
+  // capitales dans la ligne de contexte, et le bandeau de la salle (le
+  // régime, le volume et où il a été versé, la bourse, la mémoire) — tout
+  // ce que le bilan et le palier venaient de dire. « Supprime les textes
+  // dont les informations ont déjà été données sur l'écran d'avant », et la
+  // consigne « en plus visible / grand » (le concepteur, 21/11) : elle
+  // devient la question de l'étape, comme celle des salles
+  mbQuestion('CHOISISSEZ VOTRE INSTRUMENT')
+  mbReleveHors()
   // le CARNET DU SEMBLABLE ouvre une quatrième carte
   const cartes = tirageInstruments(
     Math.random,
@@ -18227,6 +18255,10 @@ function mbMontreFin(): void {
   // (« REPOS », posé en question) : la fin ordinaire reprend le sien
   mbEl('mb-titre').textContent = 'SALLE FRANCHIE'
   mbEl('mb-choix-titre').textContent = 'PAROI DU SAS OUVERTE'
+  // le bandeau de la salle revient : le tirage, s'il y en a eu un, l'a
+  // retiré pour laisser la scène à ses cartes — la fin ordinaire a le même
+  // visage qu'on y arrive par un tirage ou non
+  mbEl('mb-releve').hidden = false
   // la jauge d'étalonnage reste en scène, repliée sur une ligne
   mbJaugeMince()
   mbScene.classList.add('mb-compact')

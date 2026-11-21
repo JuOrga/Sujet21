@@ -352,6 +352,8 @@
     const xpF = RUN.xp + RUN.surplus
     $('mb-choix-titre').textContent = `${F.titreDuTirage(paliers(xpF), 2, true)} · EN BOURSE : ${RUN.condensat} cL`
     const host = cartes()
+    question('CHOISISSEZ VOTRE INSTRUMENT') // après le porte-cartes, comme main.ts
+    $('mb-releve').hidden = true // mbReleveHors : le bilan et le palier l'ont dit
     const tir = F.tirageInstruments(F.graine(5), [], 2, 3, 3, F.INSTRUMENTS)
     host.classList.add('mb-draft')
     host.style.setProperty('--n', String(Math.min(4, tir.length)))
