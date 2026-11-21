@@ -86,6 +86,7 @@ import {
   TABLEAU_HUB,
   TABLEAU_HUB_COMPACT,
 } from '../game/hub'
+import { TABLEAU_HUB_ROTONDE } from '../game/hubRotonde'
 import { REPARATIONS, ficheReparation, fichesReparations } from '../game/reparations'
 import {
   PUPITRES,
@@ -4479,6 +4480,10 @@ export class LevelEditor {
     const livres = [
       TABLEAU_HUB,
       TABLEAU_HUB_COMPACT,
+      // LA ROTONDE (code HUB3, game/hubRotonde.ts) : le plan rayonnant —
+      // même règle que le compact, sa copie recodée HUB devient le
+      // laboratoire joué
+      TABLEAU_HUB_ROTONDE,
       TABLEAU_ECONOMAT,
       ...TABLEAUX_ECOLE,
       ...TABLEAUX,

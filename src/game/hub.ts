@@ -27,6 +27,7 @@ import {
   type StructureDef,
 } from './level'
 import { STRUCT_CHAMBRE, STRUCT_COULOIR } from './structures'
+import { TABLEAU_HUB_ROTONDE } from './hubRotonde'
 
 function box(
   minX: number,
@@ -960,4 +961,29 @@ export const TABLEAU_HUB_COMPACT: LevelDef = {
     },
   ],
   ...metaEnDonnees(ZONES_HUB_COMPACT),
+}
+
+// ─── LE HUB À L'ESSAI : ?hub=… ───────────────────────────────────────────
+// Trois modules vivent dans le code (le grand, le compact, la rotonde —
+// game/hubRotonde.ts), et un seul se joue : l'entrée « HUB » de la
+// bibliothèque, à défaut le grand. Pour en JUGER un autre il fallait le
+// publier sous le code HUB — donc le montrer à tous les joueurs avant de
+// l'avoir essayé soi-même. `?hub=rotonde` (ou grand, compact) le joue sur ce
+// poste, le temps de la page, sans rien publier : le module passe DEVANT la
+// bibliothèque, avec ses réparations, ses sas et son éveil.
+
+/** Les modules livrés, par le nom qu'on leur donne dans l'adresse. */
+export const HUBS_LIVRES: Readonly<Record<string, LevelDef>> = {
+  grand: TABLEAU_HUB,
+  compact: TABLEAU_HUB_COMPACT,
+  rotonde: TABLEAU_HUB_ROTONDE,
+}
+
+/** Le hub que l'adresse demande (`location.search`), ou null — la
+ *  bibliothèque puis le code tranchent alors, comme toujours. Un nom
+ *  inconnu ne force rien : mieux vaut le hub de tout le monde qu'un écran
+ *  vide pour une faute de frappe. */
+export function hubParAdresse(recherche: string): LevelDef | null {
+  const nom = new URLSearchParams(recherche).get('hub')?.trim().toLowerCase() ?? ''
+  return Object.hasOwn(HUBS_LIVRES, nom) ? HUBS_LIVRES[nom] : null
 }

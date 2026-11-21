@@ -25,6 +25,7 @@ import { niveauExpanse } from './game/structures'
 import {
   TABLEAU_HUB,
   articleComptoir,
+  hubParAdresse,
   zonesDuHub,
   type ArticleHub,
 } from './game/hub'
@@ -1134,8 +1135,12 @@ function hubJoue(): LevelDef {
   return lv
 }
 
+// LE HUB À L'ESSAI (`?hub=rotonde`, game/hub.ts) passe devant la
+// bibliothèque : on juge un module sur ce poste avant de le publier pour
+// tous. Lu une fois — l'adresse ne change pas sous la partie.
+const HUB_ESSAI = hubParAdresse(location.search)
 function hubLevel(): LevelDef {
-  return libraryLevels.find((l) => l.code === 'HUB') ?? TABLEAU_HUB
+  return HUB_ESSAI ?? libraryLevels.find((l) => l.code === 'HUB') ?? TABLEAU_HUB
 }
 
 // LES SALLES DE MINI-JEU jouées : même règle — la copie de bibliothèque qui
