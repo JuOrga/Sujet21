@@ -21180,7 +21180,7 @@
     {
       "id": "nouveau-tableau-16",
       "auteur": "BOIZ",
-      "majAt": "2026-11-16T16:48:10.413Z",
+      "majAt": "2026-11-20T16:53:01.116Z",
       "codeAuteur": "BOIZ",
       "codeAt": "2026-10-08T14:15:40.788Z",
       "level": {
@@ -21189,223 +21189,302 @@
         "journal": "Entrée de journal du protocole : ce que le laboratoire a observé dans cette cuve.",
         "bounds": {
           "minX": -1200,
-          "minY": -750,
-          "maxX": 1200,
-          "maxY": 750
+          "minY": -395,
+          "maxX": 180,
+          "maxY": 415
         },
         "spawn": {
-          "x": -509,
-          "y": 9,
+          "x": -729,
+          "y": 25,
           "n": 900
         },
         "exit": {
-          "minX": 1040,
-          "minY": 0,
-          "maxX": 1180,
-          "maxY": 120
+          "minX": -1122,
+          "minY": -43,
+          "maxX": -982,
+          "maxY": 77
         },
         "boxes": [
           {
-            "minX": 312,
-            "minY": -52.467499999999994,
-            "maxX": 420.438,
-            "maxY": 55.467499999999994,
+            "minX": 52.26933333333335,
+            "minY": -34.87983333333334,
+            "maxX": 126,
+            "maxY": 58.62983333333334,
             "angle": -180,
             "forme": 4,
-            "p1": 140,
+            "p1": 125,
             "material": 0
           },
           {
-            "minX": 190,
-            "minY": -172.75,
-            "maxX": 332,
-            "maxY": 176.5,
-            "material": 0
-          },
-          {
-            "minX": -1198.5,
-            "minY": -690,
-            "maxX": 1201.5,
-            "maxY": -631,
+            "minX": -76,
+            "minY": -133,
+            "maxX": 66,
+            "maxY": 167,
             "material": 0
           },
           {
             "minX": -1200,
-            "minY": 634,
-            "maxX": 1201.5,
-            "maxY": 690,
+            "minY": -335.25,
+            "maxX": 180,
+            "maxY": -276.25,
             "material": 0
           },
           {
-            "minX": -271,
-            "minY": -172.75,
-            "maxX": 130,
-            "maxY": -113.25,
+            "minX": -1200,
+            "minY": 300,
+            "maxX": 180,
+            "maxY": 356,
             "material": 0
           },
           {
-            "minX": -271,
-            "minY": 117,
-            "maxX": 130,
-            "maxY": 176.5,
+            "minX": -537,
+            "minY": -142.75,
+            "maxX": -136,
+            "maxY": -83.25,
             "material": 0
           },
           {
-            "minX": -331,
-            "minY": 117,
-            "maxX": -271,
-            "maxY": 290,
+            "minX": -537,
+            "minY": 107.5,
+            "maxX": -136,
+            "maxY": 167,
             "material": 0
           },
           {
-            "minX": -271,
-            "minY": 230,
-            "maxX": 332,
-            "maxY": 290,
+            "minX": -597,
+            "minY": 107.5,
+            "maxX": -537,
+            "maxY": 240,
             "material": 0
           },
           {
-            "minX": 332,
-            "minY": 40,
-            "maxX": 392,
-            "maxY": 290,
+            "minX": -897,
+            "minY": 240,
+            "maxX": 66,
+            "maxY": 300,
             "material": 0
           },
           {
-            "minX": -331,
-            "minY": -286.25,
-            "maxX": -271,
-            "maxY": -113.25,
+            "minX": 66,
+            "minY": 50,
+            "maxX": 126,
+            "maxY": 300,
             "material": 0
           },
           {
-            "minX": -271,
-            "minY": -286.25,
-            "maxX": 332,
-            "maxY": -226.25,
+            "minX": -597,
+            "minY": -216.25,
+            "maxX": -537,
+            "maxY": -83.25,
             "material": 0
           },
           {
-            "minX": 332,
-            "minY": -286.25,
-            "maxX": 392,
-            "maxY": -36.25,
+            "minX": -897,
+            "minY": -276.25,
+            "maxX": 66,
+            "maxY": -216.25,
+            "material": 0
+          },
+          {
+            "minX": 66,
+            "minY": -276.25,
+            "maxX": 126,
+            "maxY": -26.25,
             "material": 0
           }
         ],
         "sponges": [],
         "labels": [
           {
-            "x": 1110,
-            "y": 0,
+            "x": -1060,
+            "y": 13,
             "text": "SAS",
             "tone": "sas"
+          },
+          {
+            "x": 33,
+            "y": 202,
+            "text": "T1",
+            "tone": "mur"
+          },
+          {
+            "x": 31,
+            "y": -179,
+            "text": "T2",
+            "tone": "mur"
+          },
+          {
+            "x": 152,
+            "y": 10,
+            "text": "T4",
+            "tone": "mur"
+          },
+          {
+            "x": 117,
+            "y": 16,
+            "text": "D3",
+            "tone": "mur"
+          },
+          {
+            "x": -875,
+            "y": 26,
+            "text": "D4",
+            "tone": "mur"
+          },
+          {
+            "x": 146,
+            "y": 387,
+            "text": "T3",
+            "tone": "mur"
+          },
+          {
+            "x": 141,
+            "y": -369,
+            "text": "T3",
+            "tone": "mur"
+          },
+          {
+            "x": -508,
+            "y": -370,
+            "text": "D2",
+            "tone": "mur"
+          },
+          {
+            "x": -458,
+            "y": 386,
+            "text": "D1",
+            "tone": "mur"
+          }
+        ],
+        "zones": [
+          {
+            "minX": -836,
+            "minY": -216.25,
+            "maxX": 66,
+            "maxY": 240,
+            "force": "eau"
           }
         ],
         "par": 3,
         "lasers": [
           {
-            "x": 333,
-            "y": 1,
+            "x": 63,
+            "y": 11,
             "angle": 0
           },
           {
-            "x": -256,
-            "y": 202,
-            "angle": 0
+            "x": -537,
+            "y": 239,
+            "angle": 351
           },
           {
-            "x": -257,
-            "y": -199,
+            "x": -540,
+            "y": -214,
+            "angle": 10
+          },
+          {
+            "x": -1186,
+            "y": -366,
             "angle": 0
           },
           {
             "x": -1185,
-            "y": -724,
-            "angle": 0
-          },
-          {
-            "x": -1184,
-            "y": 714,
+            "y": 387,
             "angle": 0
           }
         ],
         "cibles": [
           {
-            "x": 1171,
-            "y": 718,
+            "x": 144,
+            "y": 386,
             "r": 26,
             "mode": "maintien",
             "canal": 3
           },
           {
-            "x": 1169,
-            "y": -721,
+            "x": 142,
+            "y": -367,
             "r": 26,
             "mode": "maintien",
             "canal": 3
           },
           {
-            "x": 305,
+            "x": 34,
             "y": 203,
             "r": 26,
             "mode": "maintien",
             "canal": 1
           },
           {
-            "x": 304,
-            "y": -200,
+            "x": 35,
+            "y": -179,
             "r": 26,
             "mode": "maintien",
             "canal": 2
           },
           {
-            "x": 475,
-            "y": -2,
+            "x": 152,
+            "y": 10,
             "r": 26,
-            "canal": 2
+            "canal": 4
           }
         ],
         "portes": [
           {
-            "minX": -488,
-            "minY": 690,
-            "maxX": -428,
-            "maxY": 750,
+            "minX": -491,
+            "minY": 356,
+            "maxX": -431,
+            "maxY": 415,
             "canal": 1,
-            "regle": "et",
-            "repos": "ouverte"
+            "regle": "et"
           },
           {
-            "minX": -520,
-            "minY": -750,
-            "maxX": -460,
-            "maxY": -690,
+            "minX": -537,
+            "minY": -395,
+            "maxX": -477,
+            "maxY": -335.25,
             "canal": 2,
-            "regle": "et",
-            "repos": "ouverte"
+            "regle": "et"
           },
           {
-            "minX": 401,
-            "minY": -29.5,
-            "maxX": 419,
-            "maxY": 32.5,
+            "minX": 108,
+            "minY": -26.25,
+            "maxX": 126,
+            "maxY": 50,
             "canal": 3,
             "regle": "et"
           },
           {
-            "minX": 332,
-            "minY": 290,
-            "maxX": 392,
-            "maxY": 634,
-            "canal": 2
+            "minX": -897,
+            "minY": -216.25,
+            "maxX": -837,
+            "maxY": 240,
+            "canal": 4
+          }
+        ],
+        "chasses": [
+          {
+            "minX": -537,
+            "minY": 167,
+            "maxX": -136,
+            "maxY": 240,
+            "angle": 0,
+            "allure": 150
           },
           {
-            "minX": 332,
-            "minY": -631,
-            "maxX": 392,
-            "maxY": -286.25,
-            "canal": 2
+            "minX": -537,
+            "minY": -215.75,
+            "maxX": -136,
+            "maxY": -142.75,
+            "angle": 0,
+            "allure": 150
+          }
+        ],
+        "lumieres": [
+          {
+            "x": -386,
+            "y": 16,
+            "couleur": "#f48a8a"
           }
         ]
       }
