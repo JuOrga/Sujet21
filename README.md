@@ -217,6 +217,14 @@ bouton **MULTI** sur l'accueil (`?dev`). Tout vit dans [`src/multi/`](src/multi/
   chacun commence, ce qu'on regarde après chaque pas, le score, l'état qui
   part dans la trame — `hockey.ts` et `sumo.ts` en sont deux — et lui
   dessiner son terrain dans `renduMulti.ts`.
+- **Contre l'ordinateur** (`robot.ts`) : un adversaire pour jouer tout de
+  suite ou s'entraîner, au hockey et au sumo. Il joue avec les commandes
+  d'un joueur (pousser, s'ouvrir, dasher, viser), posées chez l'hôte comme
+  celles d'une manette ; il réfléchit huit fois par seconde et vise avec un
+  peu d'erreur.
+- **À deux sur cet écran** : avec deux manettes, chacun la sienne ; avec une
+  seule, elle est au second joueur et le premier garde souris et clavier.
+  Aucune liaison, aucun relais.
 - **Le profil** (`profil.ts`) : un nom (facultatif) et une couleur, choisis
   au salon et gardés dans le navigateur. Les deux joueurs se les échangent
   au début de la partie, par un message que le relais transmet tel quel ;

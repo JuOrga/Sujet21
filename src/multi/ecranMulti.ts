@@ -30,6 +30,7 @@ import {
   RAYON_COINS,
   RAYON_PALET,
 } from './hockey'
+import { Robot } from './robot'
 import { ARENE, MANCHES_POUR_GAGNER } from './sumo'
 import { commandeManette, defileCaractere, litManette, litMenu, nouvelEtatManette, nouvelEtatMenu, voisinMenu, type PadLu } from './manetteMulti'
 import { adresseRelais, creePartie, liaisonPossible, rejointPartie, type EtatLiaison, type Liaison, type Ordre } from './relais'
@@ -54,7 +55,9 @@ import {
   type Particules,
 } from './trame'
 
-type Role = 'hote' | 'invite' | 'seul'
+/** hote, invite : à deux par le réseau · robot : contre l'ordinateur · local :
+ *  à deux sur cet écran · seul : l'outil d'essai, on pilote un corps à la fois. */
+type Role = 'hote' | 'invite' | 'seul' | 'robot' | 'local'
 type Page = 'salon' | 'creation' | 'jonction' | 'jeu'
 
 export interface EcranMulti {
@@ -169,6 +172,10 @@ const GABARIT = `
     <button type="button" data-mode="2" data-choisi="0"><b>MODE SUMO</b><span>Un anneau qui se resserre. Poussez l’autre dehors : ${MANCHES_POUR_GAGNER} manches gagnantes.</span></button>
   </div>
   <div class="mu-choix">
+    <button type="button" data-geste="robot"><b>CONTRE L’ORDINATEUR</b><span>Pour jouer tout de suite, ou s’entraîner. (Hockey et sumo.)</span></button>
+    <button type="button" data-geste="local"><b>À DEUX SUR CET ÉCRAN</b><span>Une manette pour le second joueur — ou deux manettes.</span></button>
+  </div>
+  <div class="mu-choix">
     <button type="button" data-geste="creer"><b>CRÉER UNE PARTIE</b><span>Votre machine fait tourner la simulation : à choisir sur le PC le plus puissant.</span></button>
     <button type="button" data-geste="rejoindre"><b>REJOINDRE UNE PARTIE</b><span>Votre ami vous a donné un code de cinq caractères.</span></button>
   </div>
@@ -212,6 +219,7 @@ const GABARIT = `
   <canvas aria-label="La salle du multi"></canvas>
   <div class="mu-etiquette" data-etiquette hidden>VOUS</div>
   <div class="mu-reticule" data-reticule hidden></div>
+  <div class="mu-reticule" data-reticule2 hidden></div>
   <div class="mu-ath">
     <div class="mu-jauge" data-jauge="0"><i></i><div class="mu-barre"><u></u></div><b>100 %</b><small></small></div>
     <div class="mu-jauge" data-jauge="1"><i></i><div class="mu-barre"><u></u></div><b>100 %</b><small></small></div>
@@ -270,6 +278,11 @@ export function creeEcranMulti(quitte: () => void): EcranMulti {
   /** Le cœur du corps qu'on pilote, à la dernière image : la manette vise
    *  autour de lui. */
   const monCoeur = { x: 0, y: 0, connu: false }
+  // CONTRE L'ORDINATEUR : le robot tient le corps 1 (robot.ts).
+  let robot: Robot | null = null
+  // À DEUX SUR CET ÉCRAN : le second joueur a sa manette, et son réticule.
+  const manette2 = nouvelEtatManette()
+  const coeur2 = { x: 0, y: 0, connu: false }
   // LES SONS (sonsMulti.ts) : ce qu'on entend se déduit de ce qu'on affiche,
   // d'une image à la suivante.
   const sons = new SonsMulti()
@@ -294,8 +307,10 @@ export function creeEcranMulti(quitte: () => void): EcranMulti {
   }
   /** Le nom du joueur j, tel qu'on l'écrit à l'écran. */
   function nom(j: number): string {
-    if (j === moi) return monProfil.pseudo ? `${monProfil.pseudo.toUpperCase()} (VOUS)` : 'VOUS'
+    if (j === moi && role !== 'local') return monProfil.pseudo ? `${monProfil.pseudo.toUpperCase()} (VOUS)` : 'VOUS'
+    if (role === 'local') return j === 0 ? 'JOUEUR 1' : 'JOUEUR 2'
     if (role === 'seul') return 'L’AUTRE CORPS'
+    if (role === 'robot') return 'L’ORDINATEUR'
     return profilAutre?.pseudo ? profilAutre.pseudo.toUpperCase() : 'VOTRE AMI'
   }
   // LE DASH : son bouton, tenu au clavier (Maj), à l'écran ou à la manette —
@@ -529,6 +544,14 @@ export function creeEcranMulti(quitte: () => void): EcranMulti {
         role = 'seul'
         lancePartie('seul')
         return
+      case 'robot':
+        role = 'robot'
+        lancePartie('robot')
+        return
+      case 'local':
+        role = 'local'
+        lancePartie('local')
+        return
       case 'creer':
         await ouvreCreation()
         return
@@ -700,6 +723,7 @@ export function creeEcranMulti(quitte: () => void): EcranMulti {
     } else {
       hote = new Hote(2, undefined, modeChoisi)
     }
+    robot = r === 'robot' ? new Robot(1) : null
     accordeCouleurs()
     aideDuMode = -1
     instantane = null
@@ -826,7 +850,11 @@ export function creeEcranMulti(quitte: () => void): EcranMulti {
 
     // la commande de CE joueur, dans le monde
     const vise = ecranVersMonde(cadre, pointeur.fx, pointeur.fy)
-    litManette(padCourant(), manette)
+    // À DEUX SUR CET ÉCRAN : avec deux manettes, chacun la sienne ; avec une
+    // seule, elle est au second joueur et le premier garde souris et clavier
+    const pads = padsBranches()
+    const padDuSecond = role === 'local' ? (pads.length >= 2 ? pads[1] : (pads[0] ?? null)) : null
+    litManette(role === 'local' ? (pads.length >= 2 ? pads[0] : null) : (pads[0] ?? null), manette)
     if (manette.vie) {
       mainManette = maintenant
       sons.reveille()
@@ -861,6 +889,7 @@ export function creeEcranMulti(quitte: () => void): EcranMulti {
     let corps: CorpsTrame[]
     let jeu: JeuTrame | null
     let salle: Bornes
+    let commande2: Commande | null = null
     if (role === 'invite') {
       liaison?.envoieFlux(encodeCommande(++seqCommande, commande))
       particules = miroir!.vue(maintenant)
@@ -874,6 +903,15 @@ export function creeEcranMulti(quitte: () => void): EcranMulti {
       // de son interrupteur ; il vise où vise le pointeur (au hockey, c'est
       // par là qu'il lancerait le palet)
       if (role === 'seul') h.commande(1 - moi, { pousse: false, ouvert: autreOuvert, x: commande.x, y: commande.y })
+      // CONTRE L'ORDINATEUR : le robot joue le corps 1, avec les commandes
+      // d'un joueur
+      if (robot) h.commande(1, dessine ? robot.commande(h, dt) : { pousse: false, ouvert: false, x: 0, y: 0 })
+      // À DEUX SUR CET ÉCRAN : la manette du second joueur
+      if (role === 'local') {
+        litManette(padDuSecond, manette2)
+        commande2 = manette2.connectee && coeur2.connu && dessine ? commandeManette(manette2, coeur2.x, coeur2.y) : null
+        h.commande(1, commande2 ?? { pousse: false, ouvert: false, x: 0, y: 0 })
+      }
       h.avance(dt)
       if (role === 'hote' && liaison) {
         resteEnvoi -= dt
@@ -925,6 +963,12 @@ export function creeEcranMulti(quitte: () => void): EcranMulti {
       sons.silence()
     }
     const mien = corps[moi]
+    const second = corps[1]
+    coeur2.connu = !!second && !second.disperse
+    if (second) {
+      coeur2.x = second.x
+      coeur2.y = second.y
+    }
     monCoeur.connu = !!mien && !mien.disperse
     if (mien) {
       monCoeur.x = mien.x
@@ -960,7 +1004,8 @@ export function creeEcranMulti(quitte: () => void): EcranMulti {
     const ondes: Eclat[] = eclats.map((e) => ({ x: e.x, y: e.y, age: maintenant / 1000 - e.ne, force: e.force }))
     rendu.dessine(particules, cadre, salle, corps.map((c) => c.ouvert), maintenant / 1000, scene, ondes)
     el<HTMLElement>('[data-tenir="dash"]').dataset.pret = corps[moi]?.dashPret === false ? '0' : '1' 
-    peintReticule(aLaManette, commande)
+    peintReticule('[data-reticule]', aLaManette, commande, moi)
+    peintReticule('[data-reticule2]', commande2 !== null, commande2 ?? commande, 1)
     el<HTMLElement>('[data-tenir="ouvrir"]').hidden = jeu?.mode === MODE_SUMO
     peintAide(jeu ? jeu.mode : MODE_LIBRE)
     peintScore(jeu)
@@ -1069,17 +1114,21 @@ export function creeEcranMulti(quitte: () => void): EcranMulti {
   }
 
   /** La manette branchée sur cette machine, ou null. */
+  /** Les manettes branchées sur cette machine, les « standard » d'abord. */
+  function padsBranches(): PadLu[] {
+    const tous = typeof navigator !== 'undefined' && navigator.getGamepads ? [...navigator.getGamepads()] : []
+    const branchees = tous.filter((gp): gp is Gamepad => !!gp && gp.connected)
+    return [...branchees.filter((gp) => gp.mapping === 'standard'), ...branchees.filter((gp) => gp.mapping !== 'standard')]
+  }
+  /** La première d'entre elles (le salon se parcourt avec elle), ou null. */
   function padCourant(): PadLu | null {
-    const pads = typeof navigator !== 'undefined' && navigator.getGamepads ? navigator.getGamepads() : []
-    for (const gp of pads) if (gp?.connected && gp.mapping === 'standard') return gp
-    for (const gp of pads) if (gp?.connected) return gp
-    return null
+    return padsBranches()[0] ?? null
   }
 
   /** À la manette il n'y a pas de pointeur à l'écran : un réticule montre
-   *  où l'on va (et par où partirait le palet). */
-  function peintReticule(visible: boolean, commande: Commande): void {
-    const r = el<HTMLElement>('[data-reticule]')
+   *  où l'on va (et par où partirait le palet), à la couleur du joueur. */
+  function peintReticule(selecteur: string, visible: boolean, commande: Commande, joueur: number): void {
+    const r = el<HTMLElement>(selecteur)
     if (!visible) {
       if (!r.hidden) r.hidden = true
       return
@@ -1088,7 +1137,7 @@ export function creeEcranMulti(quitte: () => void): EcranMulti {
     r.hidden = false
     r.style.left = `${(e.fx * 100).toFixed(2)}%`
     r.style.top = `${(e.fy * 100).toFixed(2)}%`
-    r.style.color = teinte(moi)
+    r.style.color = teinte(joueur)
     r.dataset.pousse = commande.pousse ? '1' : '0'
   }
 
@@ -1135,7 +1184,7 @@ export function creeEcranMulti(quitte: () => void): EcranMulti {
     const quiMarque = jeu.buteur >= 0 ? nom(jeu.buteur) : ''
     const mot =
       jeu.phase === PHASE_FINI
-        ? jeu.buteur === moi
+        ? jeu.buteur === moi && role !== 'local'
           ? 'VOUS GAGNEZ'
           : `${quiMarque} GAGNE`
         : jeu.phase === PHASE_BUT
@@ -1148,7 +1197,7 @@ export function creeEcranMulti(quitte: () => void): EcranMulti {
     // LA FIN DU MATCH : le résultat en grand, et la revanche en un clic. Le
     // panneau se retire de lui-même quand la revanche commence.
     if (jeu.phase === PHASE_FINI && !finAffichee && el<HTMLElement>('[data-voile]').hidden) {
-      const titre = role === 'seul' ? 'FIN DU MATCH' : jeu.buteur === moi ? 'VICTOIRE' : 'DÉFAITE'
+      const titre = role === 'seul' ? 'FIN DU MATCH' : role === 'local' ? `${nom(jeu.buteur)} GAGNE` : jeu.buteur === moi ? 'VICTOIRE' : 'DÉFAITE'
       voile(`${nom(0)}  ${jeu.scores[0]} — ${jeu.scores[1]}  ${nom(1)}`, titre)
     } else if (jeu.phase !== PHASE_FINI && finAffichee) {
       el<HTMLElement>('[data-voile]').hidden = true
@@ -1176,7 +1225,11 @@ export function creeEcranMulti(quitte: () => void): EcranMulti {
 
     // le pouls et le débit, une fois par seconde
     const lien = el<HTMLElement>('[data-lien]')
-    if (role === 'seul') {
+    if (role === 'robot') {
+      lien.textContent = 'contre l’ordinateur'
+    } else if (role === 'local') {
+      lien.textContent = manette2.connectee ? 'à deux sur cet écran' : 'à deux sur cet écran — branchez une manette pour le joueur 2 (et appuyez sur un bouton)'
+    } else if (role === 'seul') {
       lien.textContent = 'essai seul — aucune liaison'
     } else if (liaison) {
       poulsReste -= dt
