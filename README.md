@@ -202,8 +202,10 @@ bouton **MULTI** sur l'accueil (`?dev`). Tout vit dans [`src/multi/`](src/multi/
   le contact du palet avec l'eau. Au hockey la matière tirée revient à son
   corps d'où qu'elle soit — on y pousse sans cesse.
   Un match dure trois minutes (le meilleur score gagne, et à égalité le
-  prochain but) ; chaque engagement commence par un décompte, et après un
-  but le palet est rendu à celui qui l'a encaissé. Un corps FERMÉ qui
+  prochain but). On engage sur les CERCLES : au centre pour commencer,
+  puis, après un but, sur un cercle de la zone de celui qui vient de
+  marquer — le palet sur son point, un joueur de chaque côté, et un
+  décompte avant de jouer. Un corps FERMÉ qui
   percute le porteur lui ARRACHE le palet — s'il arrive assez vite, et
   c'est lui qui doit foncer.
 - **Le DASH** (Maj, le bouton à l'écran, B ou RB à la manette) : une brusque

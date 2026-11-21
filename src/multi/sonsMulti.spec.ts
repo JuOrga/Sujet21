@@ -120,6 +120,20 @@ describe('sons du multi — ce qu’on entend', () => {
     expect(types(b, libre(1.04, [corps(900, 1000), corps(2900, 1200, { dash: true })]))).toEqual([])
   })
 
+  it('des chocs en rafale ne sonnent qu’une fois : le palet coincé ne mitraille pas', () => {
+    const s = new SonsMulti()
+    const choc = { type: 'choc-palet' as const, force: 1, x: 0, y: 0, mien: true }
+    expect(s.joue(choc, 0, 1000)).toBe(true)
+    expect(s.joue(choc, 0, 1016)).toBe(false)
+    expect(s.joue(choc, 0, 1100)).toBe(false)
+    expect(s.joue(choc, 0, 1150)).toBe(true)
+    // un autre type n'est pas retenu par celui-là, et un but ne l'est jamais
+    expect(s.joue({ ...choc, type: 'paroi' }, 0, 1151)).toBe(true)
+    expect(s.joue({ ...choc, type: 'but' }, 0, 1152)).toBe(true)
+    expect(s.joue({ ...choc, type: 'but' }, 0, 1153)).toBe(true)
+    expect(s.joues['choc-palet']).toBe(2)
+  })
+
   it('sans audio (un test, un vieux navigateur), jouer ne casse rien et se compte', () => {
     const s = new SonsMulti()
     s.reveille()

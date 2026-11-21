@@ -104,7 +104,9 @@ export class Hote {
     const sim = new FluidSimMulti(this.params, this.salle, CAPACITE, this.joueurs)
     for (let j = 0; j < this.joueurs; j++) {
       sim.courant = j
-      const d = departDe(this.salle, j)
+      // au hockey, c'est la règle qui dit où l'on engage (un cercle de
+      // mise en jeu) : chacun face au palet, de son côté
+      const d = this.hockey ? this.hockey.depart(j) : departDe(this.salle, j)
       sim.spawnDisc(d.x, d.y, VOLUME_DEPART, KIND_PLAYER)
     }
     sim.courant = 0

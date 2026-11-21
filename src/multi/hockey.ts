@@ -176,9 +176,23 @@ export const DECOMPTE = 2.1
 /** La durée d'un match. À la fin, le meilleur score gagne ; à égalité, le
  *  prochain but (le « but en or »). */
 export const DUREE_MATCH = 180
-/** Après un but, le palet est rendu à celui qui vient d'ENCAISSER : posé de
- *  son côté, à cette distance du centre. Au premier engagement, au centre. */
-const DECALAGE_ENGAGEMENT = 380
+// L'ENGAGEMENT se fait sur les CERCLES de la patinoire (« fais l'engagement
+// sur les cercles de mise en jeu », le concepteur, 21/11) : le palet posé au
+// point du cercle, un joueur de chaque côté, à égale distance — c'est le
+// premier arrivé qui l'a. Le match commence au cercle central. Après un but,
+// on engage sur un cercle de la zone de celui qui vient de MARQUER, près de
+// sa cage : celui qui a encaissé repart en attaque. (Avant, le palet lui
+// était simplement posé de son côté, à 380 u du centre.) Les deux cercles
+// d'une zone servent à tour de rôle.
+/** Un cercle de zone : sa distance à la ligne de but, son écart à l'axe du
+ *  terrain, et son rayon (le dessin les lit ici). */
+export const CERCLE_DECALAGE = 300
+export const CERCLE_ECART = 330
+export const RAYON_CERCLE = 150
+/** À l'engagement, chacun se tient à cette distance du palet, de son côté :
+ *  un corps de 900 particules (~105 u de rayon) et le palet (48 u) ne se
+ *  touchent pas, et il reste de quoi prendre son élan. */
+export const RECUL_ENGAGEMENT = 215
 /** LE VOL. Un corps FERMÉ qui percute le porteur lui fait lâcher le palet,
  *  s'il arrive assez vite (u/s, vitesse de rapprochement des deux cœurs).
  *  Sans cela il n'y avait rien à faire contre le porteur, qu'attendre. Une
@@ -218,8 +232,16 @@ export class Hockey {
   chrono = DUREE_MATCH
   decompte = 0
   enOr = false
-  /** À qui rendre le palet au prochain engagement (−1 : au centre). */
-  private pour = -1
+  /** Le point du prochain engagement (le centre, au début du match), et
+   *  lequel des deux cercles de la zone servira la fois suivante. */
+  private readonly lieu = { x: (TERRAIN.minX + TERRAIN.maxX) / 2, y: (TERRAIN.minY + TERRAIN.maxY) / 2 }
+  private enBas = false
+
+  /** Où se tient le joueur j à l'engagement : face au palet, de SON côté
+   *  (le joueur 0 à gauche). */
+  depart(j: number): { x: number; y: number } {
+    return { x: this.lieu.x + (j % 2 === 0 ? -RECUL_ENGAGEMENT : RECUL_ENGAGEMENT), y: this.lieu.y }
+  }
 
   /** Pendant le décompte, personne ne pousse. */
   get gele(): boolean {
@@ -243,8 +265,8 @@ export class Hockey {
     p.actif = false
     p.rayon = RAYON_PALET
     p.masse = MASSE_PALET
-    p.x = (TERRAIN.minX + TERRAIN.maxX) / 2 + (this.pour < 0 ? 0 : this.pour === 0 ? -DECALAGE_ENGAGEMENT : DECALAGE_ENGAGEMENT)
-    p.y = (TERRAIN.minY + TERRAIN.maxY) / 2
+    p.x = this.lieu.x
+    p.y = this.lieu.y
     p.vx = 0
     p.vy = 0
     p.traverse = 0
@@ -266,7 +288,8 @@ export class Hockey {
     this.buteur = -1
     this.chrono = DUREE_MATCH
     this.enOr = false
-    this.pour = -1
+    this.lieu.x = (TERRAIN.minX + TERRAIN.maxX) / 2
+    this.lieu.y = (TERRAIN.minY + TERRAIN.maxY) / 2
     this.engage(sim)
   }
 
@@ -577,8 +600,12 @@ export class Hockey {
     p.vy = 0
     this.tenuPar = -1
     this.sortDe = -1
-    // le palet sera rendu à celui qui encaisse
-    this.pour = 1 - buteur
+    // le prochain engagement : sur un cercle de la zone du BUTEUR (le
+    // joueur 0 défend à gauche), l'un puis l'autre
+    const duFond = LIGNE_BUT + CERCLE_DECALAGE
+    this.lieu.x = buteur === 0 ? TERRAIN.minX + duFond : TERRAIN.maxX - duFond
+    this.lieu.y = (TERRAIN.minY + TERRAIN.maxY) / 2 + (this.enBas ? CERCLE_ECART : -CERCLE_ECART)
+    this.enBas = !this.enBas
     if (this.enOr || this.scores[buteur] >= BUTS_POUR_GAGNER) {
       this.phase = PHASE_FINI
       return 'fini'

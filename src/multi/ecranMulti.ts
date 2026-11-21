@@ -17,7 +17,19 @@
 import { cadreSalle, cadreVoulu, ecranVersMonde, mondeVersEcran, suitCadre, type Cadre } from './cadrage'
 import { ALPHABET_CODE, litCodePartie, LONGUEUR_CODE } from './code'
 import { CADENCE_ETAT, CAPACITE, Hote, Miroir, SALLE } from './partie'
-import { BUTS_POUR_GAGNER, DEMI_FOND, DEMI_OUVERTURE, EPAISSEUR_CAGE, LIGNE_BUT, PROFONDEUR_CAGE, RAYON_COINS, RAYON_PALET } from './hockey'
+import {
+  BUTS_POUR_GAGNER,
+  CERCLE_DECALAGE,
+  CERCLE_ECART,
+  DEMI_FOND,
+  DEMI_OUVERTURE,
+  EPAISSEUR_CAGE,
+  LIGNE_BUT,
+  PROFONDEUR_CAGE,
+  RAYON_CERCLE,
+  RAYON_COINS,
+  RAYON_PALET,
+} from './hockey'
 import { commandeManette, defileCaractere, litManette, litMenu, nouvelEtatManette, nouvelEtatMenu, voisinMenu, type PadLu } from './manetteMulti'
 import { adresseRelais, creePartie, liaisonPossible, rejointPartie, type EtatLiaison, type Liaison, type Ordre } from './relais'
 import { DUREE_ECLAT, ECLATS_MAX, RenduMulti, couleurCss, type Eclat, type SceneHockey } from './renduMulti'
@@ -822,7 +834,8 @@ export function creeEcranMulti(quitte: () => void): EcranMulti {
     instantane = apres
     if (dessine) {
       for (const son of entendus) {
-        sons.joue(son, (son.x - cadre.cx) / cadre.demiL)
+        // (un choc trop rapproché du précédent est tu : ni son, ni onde)
+        if (!sons.joue(son, (son.x - cadre.cx) / cadre.demiL, maintenant)) continue
         // un choc, une onde ; un but, l'écran qui s'illumine à la couleur du buteur
         if (son.type === 'paroi' || son.type === 'choc-palet' || son.type === 'contact' || son.type === 'dash' || son.type === 'lancer' || son.type === 'prise') {
           if (eclats.length >= ECLATS_MAX) eclats.shift()
@@ -860,6 +873,7 @@ export function creeEcranMulti(quitte: () => void): EcranMulti {
       const porteur = corps[jeu.tenuPar]
       scene = {
         coins: RAYON_COINS,
+        miseEnJeu: { decalage: CERCLE_DECALAGE, ecart: CERCLE_ECART, rayon: RAYON_CERCLE },
         cage: { ligne: LIGNE_BUT, profondeur: PROFONDEUR_CAGE, demiOuverture: DEMI_OUVERTURE, demiFond: DEMI_FOND, epaisseur: EPAISSEUR_CAGE },
         palet: jeu.paletActif ? { x: jeu.paletX, y: jeu.paletY, rayon: RAYON_PALET, vx: jeu.paletVx, vy: jeu.paletVy } : null,
         porteur: porteur ? jeu.tenuPar : -1,

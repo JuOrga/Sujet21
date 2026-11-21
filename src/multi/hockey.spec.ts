@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { DEFAULT_PARAMS } from '../sim/params'
-import { BUTS_POUR_GAGNER, CHARGE_PLEINE, DECOMPTE, DEMI_FOND, DEMI_OUVERTURE, DUREE_MATCH, EPAISSEUR_CAGE, Hockey, LIGNE_BUT, PROFONDEUR_CAGE, RAYON_COINS, RAYON_PALET, TENUE_MAX, TERRAIN, paroisCages, paroisCoins, type Paroi } from './hockey'
+import { BUTS_POUR_GAGNER, CERCLE_DECALAGE, CERCLE_ECART, CHARGE_PLEINE, DECOMPTE, DEMI_FOND, DEMI_OUVERTURE, DUREE_MATCH, EPAISSEUR_CAGE, Hockey, LIGNE_BUT, PROFONDEUR_CAGE, RAYON_COINS, RAYON_PALET, RECUL_ENGAGEMENT, TENUE_MAX, TERRAIN, paroisCages, paroisCoins, type Paroi } from './hockey'
 import { Hote, Miroir, SALLE } from './partie'
 import { FluidSimMulti, KIND_PLAYER } from './solveurMulti'
 import { MODE_HOCKEY, MODE_LIBRE, PHASE_BUT, PHASE_DECOMPTE, PHASE_FINI, PHASE_JEU, encodeEtat, litEnteteEtat, modeTrame, particulesVides, type Commande, type JeuTrame } from './trame'
@@ -9,9 +9,14 @@ const pas = (h: Hote, n: number): void => {
   for (let s = 0; s < n; s++) h.avance(h.params.dt, 1e9)
 }
 /** Une partie de hockey dont le décompte de l'engagement est passé : les
- *  corps ont eu une demi-seconde pour se poser, le palet est en jeu. */
+ *  corps ont eu une demi-seconde pour se poser, le palet est en jeu. Les
+ *  corps sont ÉCARTÉS au quart et aux trois quarts du terrain (à
+ *  l'engagement ils sont tout contre le palet) : ces tests veulent de la
+ *  place entre le palet et les corps. */
 const enJeu = (): Hote => {
   const h = new Hote(2, undefined, MODE_HOCKEY)
+  const s = h.sim
+  for (let i = 0; i < s.count; i++) s.posX[i] += s.proprio[i] === 0 ? -505 : 505
   pas(h, 60)
   h.hockey!.decompte = 0
   pas(h, 1)
@@ -87,8 +92,11 @@ describe('hockey — le palet et l’eau', () => {
     expect(p.x).toBeCloseTo(MILIEU_X, 3)
     expect(p.y).toBeCloseTo(MILIEU_Y, 3)
     expect(Math.hypot(p.vx, p.vy)).toBeLessThan(1)
-    expect(h.sim.corps[0].stats.centroidX).toBeLessThan(MILIEU_X - 500)
-    expect(h.sim.corps[1].stats.centroidX).toBeGreaterThan(MILIEU_X + 500)
+    // chacun face au palet, de son côté du cercle central, sans le toucher
+    expect(h.sim.corps[0].stats.centroidX).toBeCloseTo(MILIEU_X - RECUL_ENGAGEMENT, -1)
+    expect(h.sim.corps[1].stats.centroidX).toBeCloseTo(MILIEU_X + RECUL_ENGAGEMENT, -1)
+    expect(h.sim.corps[0].stats.centroidY).toBeCloseTo(MILIEU_Y, -1)
+    expect(p.touche[0] + p.touche[1]).toBe(0)
     pas(h, 60)
     expect(h.jeu()!.chrono).toBeLessThan(DUREE_MATCH - 0.4)
   })
@@ -671,13 +679,13 @@ describe('hockey — les parois, les cages, le score', () => {
     expect(jeu.phase).toBe(PHASE_BUT)
     expect(jeu.buteur).toBe(1)
     expect(p.actif).toBe(false)
-    // la pause, puis l'engagement : le palet est RENDU à celui qui a
-    // encaissé (le joueur 0, à gauche), et le décompte part
+    // la pause, puis l'engagement : sur un cercle de la zone du BUTEUR (le
+    // joueur 1, à droite) — celui qui a encaissé repart en attaque
     expect(avance(200)).toEqual(['engagement'])
     expect(jeu.phase).toBe(PHASE_DECOMPTE)
     expect(p.actif).toBe(false)
-    expect(p.x).toBeLessThan(MILIEU_X - 300)
-    expect(p.x).toBeGreaterThan(MILIEU_X - 500)
+    expect(p.x).toBeCloseTo(TERRAIN.maxX - LIGNE_BUT - CERCLE_DECALAGE, 6)
+    expect(Math.abs(p.y - MILIEU_Y)).toBeCloseTo(CERCLE_ECART, 6)
     // le décompte fini, on rejoue
     expect(avance(Math.ceil(DECOMPTE * 120) + 2)).toEqual([])
     expect(jeu.phase).toBe(PHASE_JEU)
@@ -736,10 +744,41 @@ describe('hockey — les parois, les cages, le score', () => {
     pas(h, 200)
     expect(h.jeu()!.phase).toBe(PHASE_DECOMPTE)
     expect(h.sim.corps[0].playerCount).toBe(900)
-    expect(h.sim.corps[0].stats.centroidX).toBeCloseTo(TERRAIN.maxX * 0.25, -1)
-    // le palet rendu au joueur 0, qui vient d'encaisser
-    expect(h.sim.palet.x).toBeLessThan(MILIEU_X - 300)
+    // l'engagement est sur un cercle de la zone du buteur (le joueur 1, à
+    // droite) : le palet sur son point, un joueur de chaque côté
+    const cercle = TERRAIN.maxX - LIGNE_BUT - CERCLE_DECALAGE
+    expect(h.sim.palet.x).toBeCloseTo(cercle, 6)
+    expect(h.sim.corps[0].stats.centroidX).toBeCloseTo(cercle - RECUL_ENGAGEMENT, -1)
+    expect(h.sim.corps[1].stats.centroidX).toBeCloseTo(cercle + RECUL_ENGAGEMENT, -1)
+    expect(Math.abs(h.sim.corps[0].stats.centroidY - h.sim.palet.y)).toBeLessThan(5)
     expect(h.jeu()!.scores).toEqual([0, 1])
+  })
+
+  it('les deux cercles d’une zone servent à tour de rôle, et un match neuf repart du centre', () => {
+    const { sim, jeu, avance } = petit()
+    const lieux: number[] = []
+    for (let k = 0; k < 2; k++) {
+      // le joueur 0 marque à droite, deux fois
+      sim.palet.x = TERRAIN.maxX - 700
+      sim.palet.y = MILIEU_Y
+      sim.palet.vx = 900
+      sim.palet.vy = 0
+      avance(60)
+      avance(200)
+      expect(jeu.phase).toBe(PHASE_DECOMPTE)
+      // dans SA zone, à gauche
+      expect(sim.palet.x).toBeCloseTo(TERRAIN.minX + LIGNE_BUT + CERCLE_DECALAGE, 6)
+      lieux.push(sim.palet.y)
+      jeu.decompte = 0
+      avance(1)
+    }
+    expect(lieux[0]).toBeCloseTo(MILIEU_Y - CERCLE_ECART, 6)
+    expect(lieux[1]).toBeCloseTo(MILIEU_Y + CERCLE_ECART, 6)
+    jeu.recommence(sim)
+    expect(sim.palet.x).toBeCloseTo(MILIEU_X, 6)
+    expect(sim.palet.y).toBeCloseTo(MILIEU_Y, 6)
+    expect(jeu.depart(0)).toEqual({ x: MILIEU_X - RECUL_ENGAGEMENT, y: MILIEU_Y })
+    expect(jeu.depart(1)).toEqual({ x: MILIEU_X + RECUL_ENGAGEMENT, y: MILIEU_Y })
   })
 
   it('LE TEMPS : à la fin le meilleur score gagne', () => {

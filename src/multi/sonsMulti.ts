@@ -132,6 +132,9 @@ export function entend(avant: Instantane | null, apres: Instantane, moi: number)
 
 // ---- JOUER ------------------------------------------------------------------
 
+/** Deux chocs du même type ne sonnent pas à moins de cela l'un de l'autre (ms). */
+const ECART_CHOCS = 140
+
 /** Les notes d'un but : la montée pour celui qui marque, la descente pour
  *  celui qui encaisse (en hertz). */
 const BUT_POUR = [523.25, 659.25, 783.99]
@@ -151,6 +154,8 @@ export class SonsMulti {
   /** Les sons joués depuis l'ouverture, par type : la sonde d'essai les lit
    *  (un essai automatique n'a pas d'oreilles). */
   readonly joues: Partial<Record<TypeSon, number>> = {}
+  /** L'heure du dernier choc joué, par type (ms). */
+  private readonly derniers: Partial<Record<TypeSon, number>> = {}
 
   /** Le navigateur ne laisse sonner qu'après un geste : à appeler sur un
    *  clic, une touche, un bouton de manette. Sans danger à répétition. */
@@ -214,8 +219,21 @@ export class SonsMulti {
     if (charge >= 0) this.chargeOsc.frequency.setTargetAtTime(180 + 380 * charge, t, 0.05)
   }
 
-  /** Joue un son. `pan` : de −1 (à gauche de l'écran) à 1. */
-  joue(son: Son, pan = 0): void {
+  /** Joue un son. `pan` : de −1 (à gauche de l'écran) à 1. Rend false si
+   *  le son est TU : un choc qui suit de trop près le précédent du même
+   *  type. Le palet pris entre deux corps à l'engagement cognait à chaque
+   *  image — quinze chocs comptés en quelques secondes, à l'essai. */
+  joue(son: Son, pan = 0, maintenant = typeof performance !== 'undefined' ? performance.now() : 0): boolean {
+    if (son.type === 'choc-palet' || son.type === 'paroi' || son.type === 'contact') {
+      const dernier = this.derniers[son.type] ?? -Infinity
+      if (maintenant - dernier < ECART_CHOCS) return false
+      this.derniers[son.type] = maintenant
+    }
+    this.jouerVraiment(son, pan)
+    return true
+  }
+
+  private jouerVraiment(son: Son, pan: number): void {
     this.joues[son.type] = (this.joues[son.type] ?? 0) + 1
     const ctx = this.ctx
     if (!ctx || !this.maitre || ctx.state !== 'running') return

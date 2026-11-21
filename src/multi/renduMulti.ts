@@ -60,6 +60,9 @@ const POIDS_GOUTTE = 4
 export interface SceneHockey {
   /** Le rayon des coins de la patinoire. */
   coins: number
+  /** Les cercles de mise en jeu des zones : leur distance à la ligne de but,
+   *  leur écart à l'axe du terrain, leur rayon. */
+  miseEnJeu: { decalage: number; ecart: number; rayon: number }
   /** Les cages : la distance de la ligne de but au fond du terrain, leur
    *  profondeur, leur demi-largeur à l'ouverture puis au fond, l'épaisseur
    *  de leurs parois. */
@@ -140,6 +143,7 @@ uniform float uTemps;     // secondes, pour le souffle d'un corps ouvert
 uniform vec4 uCage;       // hockey : ligne de but, profondeur, demi-ouverture, demi-fond (0 : pas de cage)
 uniform float uCageEp;    // hockey : l'épaisseur des parois d'une cage
 uniform float uCoins;     // hockey : le rayon des coins du terrain (0 : des angles droits)
+uniform vec3 uMiseEnJeu;  // hockey : les cercles de zone — distance à la ligne de but, écart à l'axe, rayon
 uniform vec4 uPalet;      // hockey : x, y, rayon, 1 s'il est en jeu
 uniform vec4 uPorteur;    // hockey : qui le tient (−1 : personne), sa charge, sa visée (x, y)
 uniform vec2 uPaletV;     // hockey : la vitesse du palet (sa traînée)
@@ -204,8 +208,8 @@ void main() {
     float ligne = uCage.x;
     fond += salle * rouge * 0.42 * (1.0 - smoothstep(0.0, fin, abs(duFond - ligne)));
     // les cercles de mise en jeu, de part et d'autre de la cage
-    float miseEnJeu = length(vec2(duFond - ligne - 300.0, ecartAxe - 330.0));
-    fond += salle * rouge * 0.4 * (1.0 - smoothstep(0.0, fin, abs(miseEnJeu - 150.0)));
+    float miseEnJeu = length(vec2(duFond - ligne - uMiseEnJeu.x, ecartAxe - uMiseEnJeu.y));
+    fond += salle * rouge * 0.4 * (1.0 - smoothstep(0.0, fin, abs(miseEnJeu - uMiseEnJeu.z)));
     fond += salle * rouge * 0.5 * (1.0 - smoothstep(9.0, 9.0 + fin, miseEnJeu));
     // ---- la cage : un trapèze, plus étroit au fond
     float creux = uCage.x - uCage.y;
@@ -499,6 +503,7 @@ export class RenduMulti {
     gl.uniform4f(gl.getUniformLocation(this.progEcran, 'uCage'), cage?.ligne ?? 0, cage?.profondeur ?? 0, cage?.demiOuverture ?? 0, cage?.demiFond ?? 0)
     gl.uniform1f(gl.getUniformLocation(this.progEcran, 'uCageEp'), cage?.epaisseur ?? 0)
     gl.uniform1f(gl.getUniformLocation(this.progEcran, 'uCoins'), scene?.coins ?? 0)
+    gl.uniform3f(gl.getUniformLocation(this.progEcran, 'uMiseEnJeu'), scene?.miseEnJeu.decalage ?? 0, scene?.miseEnJeu.ecart ?? 0, scene?.miseEnJeu.rayon ?? 0)
     gl.uniform4f(gl.getUniformLocation(this.progEcran, 'uPalet'), palet?.x ?? 0, palet?.y ?? 0, palet?.rayon ?? 1, palet ? 1 : 0)
     gl.uniform2f(gl.getUniformLocation(this.progEcran, 'uPaletV'), palet?.vx ?? 0, palet?.vy ?? 0)
     const e = this.eclats
