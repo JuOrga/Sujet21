@@ -107,6 +107,50 @@ const FAMILLES = [
       return { compte: d.images.length, detail: `${d.images.length} entrée(s) — URL seulement, pas les pixels` }
     },
   },
+  // ---- ce qui manquait au 07/09 : tout ce qui se PUBLIE depuis la régie --
+  // Le journal, les réglages du codex et les cinq domaines de /api/reglages
+  // n'étaient sauvegardés nulle part : la carte publiée, les textes, le
+  // plan de la descente, les fins n'avaient que les quatre versions du
+  // magasin. Un `DELETE ?domaine=carte` les effaçait sans recours.
+  {
+    nom: 'récit et fins',
+    route: 'journal',
+    fichier: 'journal.json',
+    // `journal: null` = rien de publié, le livré joue : c'est un état
+    // légitime, pas une forme inattendue — on le sauvegarde tel quel
+    resume: (d) => {
+      if (d === null || typeof d !== 'object' || !('journal' in d)) return null
+      if (d.journal === null) return { compte: 0, detail: 'rien de publié — le journal livré joue' }
+      const j = d.journal
+      if (!Array.isArray(j?.recit) || !Array.isArray(j?.fins)) return null
+      return {
+        compte: j.recit.length + j.fins.length,
+        detail: `${j.recit.length} fragment(s), ${j.fins.length} fin(s) — par ${d.auteur || '?'}`,
+      }
+    },
+  },
+  {
+    nom: 'réglages du codex',
+    route: 'codex',
+    fichier: 'codex.json',
+    // comme les images : les VIDÉOS restent des URL de blobs, seuls la
+    // mémoire et la rareté de chaque fiche reviennent à l'identique
+    resume: (d) => {
+      if (!d?.fiches || typeof d.fiches !== 'object') return null
+      const n = Object.keys(d.fiches).length
+      return { compte: n, detail: `${n} fiche(s) réglée(s) — vidéos : URL seulement, pas les octets` }
+    },
+  },
+  ...['plan-voie', 'carte', 'recompenses', 'textes', 'sequences'].map((domaine) => ({
+    nom: `réglages · ${domaine}`,
+    route: `reglages?domaine=${domaine}`,
+    fichier: `reglages-${domaine}.json`,
+    resume: (d) => {
+      if (d === null || typeof d !== 'object' || d.domaine !== domaine || !('document' in d)) return null
+      if (d.document === null) return { compte: 0, detail: 'rien de publié — le livré joue' }
+      return { compte: 1, detail: `publié par ${d.auteur || '?'}${d.date ? ` le ${d.date}` : ''}` }
+    },
+  })),
   {
     nom: 'registres',
     route: 'records',
@@ -161,10 +205,10 @@ for (const f of FAMILLES) {
   try {
     const { doc, resume } = await litFamille(f)
     lues.push({ f, doc, resume })
-    console.log(`  ✓ ${f.nom.padEnd(20)} ${String(resume.compte).padStart(4)} — ${resume.detail}`)
+    console.log(`  ✓ ${f.nom.padEnd(24)} ${String(resume.compte).padStart(4)} — ${resume.detail}`)
   } catch (e) {
     ratees.push(e.message)
-    console.error(`  ✗ ${f.nom.padEnd(20)} ${e.message}`)
+    console.error(`  ✗ ${f.nom.padEnd(24)} ${e.message}`)
   }
 }
 
@@ -196,6 +240,10 @@ const manifeste = [
   '- **`images.json` ne porte pas les pixels.** Le catalogue garde les URL',
   '  des blobs. Si un blob est supprimé côté Vercel, l’URL sauvegardée est',
   '  morte — sauvegarder les binaires demanderait un autre dispositif.',
+  '- **`codex.json` ne porte pas les vidéos**, pour la même raison : la',
+  '  mémoire et la rareté de chaque fiche reviennent, la vidéo reste une URL.',
+  '- **Un domaine « rien de publié »** (`journal: null`, `document: null`)',
+  '  est sauvegardé tel quel : le livré joue, et la restauration le saute.',
   '- **Rien de ce qui est local au joueur** (progression, réglages, run en',
   '  cours) n’est ici : cela vit dans le `localStorage` de chaque poste.',
   '',

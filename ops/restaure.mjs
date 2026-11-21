@@ -18,11 +18,18 @@
 // écrit sur la bibliothèque partagée dès qu'on le lance par curiosité
 // n'aurait pas sa place dans un dépôt.
 //
-// PORTÉE. Tableaux et présets seulement : ce sont les deux familles dont
-// la sémantique d'écriture est un remplacement par clé, donc rejouable
-// sans risque. Les règles, fiches et cinématiques se sauvegardent aussi
-// (elles sont dans le dossier) mais se rendent à la main, depuis le jeu —
-// écrire ici une restauration que personne n'a essayée serait un piège.
+// PORTÉE. Les familles dont l'écriture est un REMPLACEMENT PAR CLÉ, donc
+// rejouable sans risque : les tableaux (par id) et les présets (par
+// titre) depuis l'origine ; et, depuis le 07/09, ce qui se publie depuis
+// la régie — le journal (un seul document), les cinq domaines de
+// /api/reglages (un document par domaine : plan de la descente, carte,
+// récompenses, textes, séquences) et les réglages du codex (par id de
+// fiche : mémoire et rareté ; la vidéo reste celle que le serveur a, on
+// ne peut pas renvoyer des octets qu'on n'a pas). Un domaine sauvegardé
+// « rien de publié » est SAUTÉ : le livré joue, on ne publie pas du vide.
+// Les règles, fiches et cinématiques se sauvegardent aussi (elles sont
+// dans le dossier) mais se rendent à la main, depuis le jeu — écrire ici
+// une restauration que personne n'a essayée serait un piège.
 //
 // CE QUI NE REVIENT PAS À L'IDENTIQUE : `majAt` prend la date de la
 // restauration (le serveur l'écrit lui-même). L'auteur, le code et sa
@@ -97,6 +104,44 @@ for (const p of presets.presets) {
 }
 if (presets.defaultTitle) {
   await poste('presets', { defaultTitle: presets.defaultTitle }, `défaut : ${presets.defaultTitle}`)
+}
+
+// ---- LE JOURNAL, LES RÉGLAGES, LE CODEX -------------------------------
+// Chacun est facultatif dans le dossier : une sauvegarde d'avant le 07/09
+// ne les a pas, et ce n'est pas une raison de ne pas rendre le reste.
+function litSiPresent(fichier) {
+  try {
+    return lit(fichier)
+  } catch {
+    console.log(`  ${fichier} absent du dossier — famille sautée`)
+    return null
+  }
+}
+
+const journal = litSiPresent('journal.json')
+if (journal) {
+  if (journal.journal === null) console.log('  récit et fins — rien de publié dans la sauvegarde, le livré joue : sauté')
+  else await poste('journal', { journal: journal.journal, auteur: journal.auteur ?? '' }, `récit et fins (${journal.auteur || '?'})`)
+}
+
+for (const domaine of ['plan-voie', 'carte', 'recompenses', 'textes', 'sequences']) {
+  const r = litSiPresent(`reglages-${domaine}.json`)
+  if (!r) continue
+  if (r.document === null) {
+    console.log(`  réglages · ${domaine} — rien de publié dans la sauvegarde : sauté`)
+    continue
+  }
+  await poste('reglages', { domaine, document: r.document, auteur: r.auteur ?? '' }, `réglages · ${domaine} (${r.auteur || '?'})`)
+}
+
+const codex = litSiPresent('codex.json')
+if (codex?.fiches && typeof codex.fiches === 'object') {
+  const ids = Object.keys(codex.fiches)
+  console.log(`  réglages du codex — ${ids.length} fiche(s) (mémoire et rareté ; la vidéo reste celle du serveur)`)
+  for (const id of ids) {
+    const f = codex.fiches[id]
+    await poste('codex', { id, memoire: f.memoire, rarete: f.rarete, auteur: f.auteur ?? '' }, id)
+  }
 }
 
 console.log(
