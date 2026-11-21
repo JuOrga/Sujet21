@@ -8,7 +8,10 @@ import {
   zonesDuHub,
   zonesPosees,
   ancreAbsente,
+  HUBS_LIVRES,
+  hubParAdresse,
 } from './hub'
+import { TABLEAU_HUB_ROTONDE } from './hubRotonde'
 import {
   dansBoite,
   MAT_CHAUD,
@@ -442,5 +445,36 @@ describe('le méta EN DONNÉES — les zones deviennent des plots posés', () =>
       )
       expect(tableau.bancMemoires).toEqual(zones.banc)
     }
+  })
+})
+
+// LE HUB À L'ESSAI : `?hub=rotonde` joue un module livré sur ce poste, sans
+// rien publier. Un nom inconnu ne force rien — la bibliothèque tranche.
+describe('hubParAdresse — juger un module avant de le publier', () => {
+  it('les trois modules livrés répondent à leur nom', () => {
+    expect(hubParAdresse('?hub=grand')).toBe(TABLEAU_HUB)
+    expect(hubParAdresse('?hub=compact')).toBe(TABLEAU_HUB_COMPACT)
+    expect(hubParAdresse('?hub=rotonde')).toBe(TABLEAU_HUB_ROTONDE)
+    expect(Object.keys(HUBS_LIVRES).sort()).toEqual(['compact', 'grand', 'rotonde'])
+  })
+
+  it('tolère la casse et les espaces, à côté d’autres paramètres', () => {
+    expect(hubParAdresse('?dev&hub=%20Rotonde%20&horsligne')).toBe(TABLEAU_HUB_ROTONDE)
+  })
+
+  it('sans paramètre, ou sur un nom inconnu : rien n’est forcé', () => {
+    expect(hubParAdresse('')).toBe(null)
+    expect(hubParAdresse('?tableau=3')).toBe(null)
+    expect(hubParAdresse('?hub=')).toBe(null)
+    expect(hubParAdresse('?hub=rotondee')).toBe(null)
+    // un nom hérité d'Object.prototype n'est pas un module
+    expect(hubParAdresse('?hub=constructor')).toBe(null)
+    expect(hubParAdresse('?hub=tostring')).toBe(null)
+  })
+
+  it('les trois portent un code de la famille du hub, tous différents', () => {
+    const codes = Object.values(HUBS_LIVRES).map((lv) => lv.code)
+    expect(new Set(codes).size).toBe(3)
+    for (const c of codes) expect(c).toMatch(/^HUB\d*$/)
   })
 })
