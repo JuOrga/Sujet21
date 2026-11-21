@@ -55,6 +55,9 @@ export type Role = 'hote' | 'invite'
 export type Ordre =
   | { t: 'salut'; version: number }
   | { t: 'recommence' }
+  /** Qui je suis : mon nom et ma couleur (profil.ts). Ce qui arrive est
+   *  remis au propre par celui qui le reçoit. */
+  | { t: 'profil'; pseudo: string; couleur: number }
   | { t: 'pouls'; id: number }
   | { t: 'echo'; id: number }
   | { t: 'adieu' }

@@ -217,6 +217,14 @@ bouton **MULTI** sur l'accueil (`?dev`). Tout vit dans [`src/multi/`](src/multi/
   chacun commence, ce qu'on regarde après chaque pas, le score, l'état qui
   part dans la trame — `hockey.ts` et `sumo.ts` en sont deux — et lui
   dessiner son terrain dans `renduMulti.ts`.
+- **Le profil** (`profil.ts`) : un nom (facultatif) et une couleur, choisis
+  au salon et gardés dans le navigateur. Les deux joueurs se les échangent
+  au début de la partie, par un message que le relais transmet tel quel ;
+  ce qui arrive de l'autre est remis au propre avant d'être montré. S'ils
+  ont choisi la même couleur, l'hôte la garde et l'invité prend la
+  suivante.
+- **La fin d'un match** : le résultat en grand, et REVANCHE — un clic de
+  l'un ou de l'autre relance le match.
 - **Le DASH** (Maj, le bouton à l'écran, B ou RB à la manette) : une brusque
   accélération dans le sens où une poussée enverrait le corps, rechargée
   en un peu plus de deux secondes. Il vaut dans les deux modes ; au hockey

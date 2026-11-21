@@ -25,18 +25,12 @@
 //     concepteur, 20/11). La physique les séparait, l'image les fondait.
 
 import type { Cadre } from './cadrage'
+import { PALETTE } from './profil'
 import { ATTR_CORPS, ATTR_ORPHELINE, ATTR_PROPRIO, type Bornes, type Particules } from './trame'
 
-/** Les couleurs des joueurs. Le bleu est celui du spécimen du jeu ; l'ambre
- *  s'en distingue aussi pour un œil daltonien (teinte ET clarté diffèrent). */
-export const COULEURS_JOUEURS: readonly [number, number, number][] = [
-  [0.39, 0.72, 0.9],
-  [0.96, 0.66, 0.28],
-  [0.25, 0.84, 0.61],
-  [0.71, 0.55, 0.95],
-]
-export function couleurCss(j: number): string {
-  const c = COULEURS_JOUEURS[j % COULEURS_JOUEURS.length]
+/** La couleur d'un rang de la palette (profil.ts), pour le CSS. */
+export function couleurCss(rang: number): string {
+  const c = PALETTE[((rang % PALETTE.length) + PALETTE.length) % PALETTE.length]
   return `rgb(${Math.round(c[0] * 255)}, ${Math.round(c[1] * 255)}, ${Math.round(c[2] * 255)})`
 }
 
@@ -396,6 +390,8 @@ export class RenduMulti {
   private readonly cible: WebGLFramebuffer
   private readonly texture: WebGLTexture
   private donnees: Float32Array
+  /** Le rang, dans la palette, de la couleur du joueur 0 puis du joueur 1. */
+  couleurs: [number, number] = [0, 1]
   private readonly eclats = new Float32Array(ECLATS_MAX * 4)
   private largeur = 0
   private hauteur = 0
@@ -510,7 +506,10 @@ export class RenduMulti {
     gl.uniform2f(gl.getUniformLocation(this.progEcran, 'uCentre'), cadre.cx, cadre.cy)
     gl.uniform2f(gl.getUniformLocation(this.progEcran, 'uDemi'), cadre.demiL, cadre.demiH)
     gl.uniform4f(gl.getUniformLocation(this.progEcran, 'uSalle'), salle.minX, salle.minY, salle.maxX, salle.maxY)
-    gl.uniform3fv(gl.getUniformLocation(this.progEcran, 'uCouleurs'), COULEURS_JOUEURS.flat())
+    // la couleur de chaque joueur : celle qu'il a choisie (les deux derniers
+    // canaux gardent des couleurs de la palette, pour la matière sans maître)
+    const teintes = [this.couleurs[0], this.couleurs[1], 2, 3].map((r) => PALETTE[r % PALETTE.length])
+    gl.uniform3fv(gl.getUniformLocation(this.progEcran, 'uCouleurs'), teintes.flat())
     gl.uniform1f(gl.getUniformLocation(this.progEcran, 'uSeuil'), SEUIL)
     gl.uniform1f(gl.getUniformLocation(this.progEcran, 'uGain'), 1 / this.gain)
     gl.uniform1f(gl.getUniformLocation(this.progEcran, 'uPixel'), 1 / pixelsParUnite)

@@ -33,6 +33,7 @@ import {
 import { ARENE, MANCHES_POUR_GAGNER } from './sumo'
 import { commandeManette, defileCaractere, litManette, litMenu, nouvelEtatManette, nouvelEtatMenu, voisinMenu, type PadLu } from './manetteMulti'
 import { adresseRelais, creePartie, liaisonPossible, rejointPartie, type EtatLiaison, type Liaison, type Ordre } from './relais'
+import { NOMS_COULEURS, PALETTE, PSEUDO_MAX, chargeProfil, couleursDeLaPartie, gardeProfil, litProfil, nettoiePseudo, type Profil } from './profil'
 import { DUREE_ECLAT, ECLATS_MAX, RenduMulti, couleurCss, type Eclat, type SceneHockey } from './renduMulti'
 import { SonsMulti, chiffreDecompte, entend, type Instantane } from './sonsMulti'
 import {
@@ -136,6 +137,13 @@ const STYLE = `
 .mu-flash[data-vif="1"] { animation: mu-flash 0.7s ease-out; }
 @keyframes mu-flash { from { opacity: 0.42; } to { opacity: 0; } }
 @media (prefers-reduced-motion: reduce) { .mu-flash[data-vif="1"] { animation: none; } }
+.mu-profil { display: flex; flex-wrap: wrap; gap: 14px 28px; align-items: center; margin-bottom: 14px; color: var(--dim, #7f9cb0); letter-spacing: 0.12em; font-size: 0.85em; }
+.mu-profil label, .mu-profil div { display: flex; align-items: center; gap: 10px; }
+.mu-profil input { width: 11em; padding: 0.5em 0.7em; background: rgba(8, 16, 26, 0.9); color: var(--ink, #d9ecf7); border: 1px solid var(--line, #24384a); font: inherit; letter-spacing: 0.06em; }
+.mu-pastille { width: 26px; height: 26px; padding: 0 !important; border-radius: 50% !important; background: var(--pastille) !important; border: 2px solid transparent !important; opacity: 0.55; }
+.mu-pastille[data-choisi="1"] { opacity: 1; border-color: var(--ink, #d9ecf7) !important; box-shadow: 0 0 10px var(--pastille); }
+.mu-voile h3 { margin: 0; font-family: var(--font-display, sans-serif); font-weight: 400; font-size: 2.4em; letter-spacing: 0.14em; }
+.mu-voile h3:empty { display: none; }
 .mu-modes { margin-bottom: 12px; grid-template-columns: 1fr 1fr 1fr; }
 .mu-modes button { padding: 0.9em 1em; opacity: 0.6; }
 .mu-modes button[data-choisi="1"] { opacity: 1; border-color: var(--accent, #8fd3ff); box-shadow: inset 0 0 0 1px var(--accent, #8fd3ff); }
@@ -151,6 +159,10 @@ const GABARIT = `
 <div class="mu-salon" data-page="salon">
   <h2 class="mu-titre">MULTI</h2>
   <p class="mu-sous">Prototype à deux, chacun chez soi. L’un crée la partie et donne son code, l’autre le tape. Aucun compte.</p>
+  <div class="mu-profil">
+    <label>VOTRE NOM<input type="text" data-champ="pseudo" maxlength="${PSEUDO_MAX}" autocomplete="off" autocorrect="off" spellcheck="false" placeholder="(facultatif)"></label>
+    <div role="group" aria-label="Votre couleur"><span>VOTRE COULEUR</span>${PALETTE.map((_, k) => `<button type="button" class="mu-pastille" data-couleur="${k}" aria-label="${NOMS_COULEURS[k]}" style="--pastille:${couleurCss(k)}"></button>`).join('')}</div>
+  </div>
   <div class="mu-choix mu-modes" role="group" aria-label="Le mode de jeu">
     <button type="button" data-mode="0" data-choisi="1"><b>MODE LIBRE</b><span>Une grande salle vide, pour essayer les gestes.</span></button>
     <button type="button" data-mode="1" data-choisi="0"><b>MODE HOCKEY</b><span>Un palet, deux cages. Le premier à ${BUTS_POUR_GAGNER} buts gagne.</span></button>
@@ -217,7 +229,7 @@ const GABARIT = `
   <button type="button" class="mu-dash" data-tenir="dash" data-pret="1" aria-label="Dash">DASH<small>maj</small></button>
   <button type="button" class="mu-tenir" data-tenir="ouvrir" aria-label="S’ouvrir (à maintenir)">S’OUVRIR<small>à maintenir · espace</small></button>
   <div class="mu-aide" data-aide></div>
-  <div class="mu-voile" data-voile hidden><div><p data-voile-mot></p><span class="mu-rang" style="justify-content:center"><button type="button" class="mu-fort" data-geste="retour-salon">REVENIR AU SALON</button></span></div></div>
+  <div class="mu-voile" data-voile hidden><div><h3 data-voile-titre></h3><p data-voile-mot></p><span class="mu-rang" style="justify-content:center"><button type="button" class="mu-fort" data-geste="recommencer" data-revanche hidden>REVANCHE</button><button type="button" class="mu-fort" data-geste="retour-salon">REVENIR AU SALON</button></span></div></div>
 </div>
 `
 
@@ -262,6 +274,30 @@ export function creeEcranMulti(quitte: () => void): EcranMulti {
   // d'une image à la suivante.
   const sons = new SonsMulti()
   let instantane: Instantane | null = null
+  // LES PROFILS (profil.ts) : le mien, gardé dans ce navigateur, et celui de
+  // l'autre, reçu au début de la partie. Tant qu'il n'est pas arrivé, l'autre
+  // n'a pas de nom et prend la couleur voisine de la mienne.
+  let monProfil: Profil = chargeProfil()
+  let profilAutre: Profil | null = null
+  /** Le rang, dans la palette, de la couleur du joueur 0 puis du joueur 1. */
+  let couleurs: [number, number] = [0, 1]
+  const teinte = (j: number): string => couleurCss(couleurs[j] ?? j)
+  /** Recalcule qui porte quelle couleur. L'hôte est le joueur 0. */
+  function accordeCouleurs(): void {
+    const autre: Profil = profilAutre ?? { pseudo: '', couleur: (monProfil.couleur + 1) % PALETTE.length }
+    couleurs = role === 'invite' ? couleursDeLaPartie(autre, monProfil) : couleursDeLaPartie(monProfil, autre)
+    if (rendu) rendu.couleurs = couleurs
+  }
+  /** Au salon : la pastille de ma couleur est marquée. */
+  function peintProfil(r: HTMLElement): void {
+    for (const e of r.querySelectorAll<HTMLElement>('button[data-couleur]')) e.dataset.choisi = Number(e.dataset.couleur) === monProfil.couleur ? '1' : '0'
+  }
+  /** Le nom du joueur j, tel qu'on l'écrit à l'écran. */
+  function nom(j: number): string {
+    if (j === moi) return monProfil.pseudo ? `${monProfil.pseudo.toUpperCase()} (VOUS)` : 'VOUS'
+    if (role === 'seul') return 'L’AUTRE CORPS'
+    return profilAutre?.pseudo ? profilAutre.pseudo.toUpperCase() : 'VOTRE AMI'
+  }
   // LE DASH : son bouton, tenu au clavier (Maj), à l'écran ou à la manette —
   // c'est l'hôte qui en lit l'appui.
   const dash = { clavier: false, bouton: false, manette: false }
@@ -316,6 +352,13 @@ export function creeEcranMulti(quitte: () => void): EcranMulti {
     r.addEventListener('click', (ev) => {
       // le navigateur ne laisse sonner qu'après un geste : le premier clic
       sons.reveille()
+      const pastille = (ev.target as HTMLElement).closest<HTMLButtonElement>('button[data-couleur]')
+      if (pastille) {
+        monProfil = litProfil({ pseudo: monProfil.pseudo, couleur: Number(pastille.dataset.couleur) })
+        gardeProfil(monProfil)
+        peintProfil(r)
+        return
+      }
       const m = (ev.target as HTMLElement).closest<HTMLButtonElement>('button[data-mode]')
       if (m) {
         // le mode vaut pour la partie qu'on CRÉE (ou qu'on essaie seul) ;
@@ -334,6 +377,13 @@ export function creeEcranMulti(quitte: () => void): EcranMulti {
       ev.preventDefault()
       void geste('valider-code')
     })
+    const champPseudo = r.querySelector<HTMLInputElement>('[data-champ="pseudo"]')!
+    champPseudo.value = monProfil.pseudo
+    champPseudo.addEventListener('input', () => {
+      monProfil = { pseudo: nettoiePseudo(champPseudo.value), couleur: monProfil.couleur }
+      gardeProfil(monProfil)
+    })
+    peintProfil(r)
     brancheToile(r.querySelector('canvas')!)
     const tenir = r.querySelector<HTMLButtonElement>('[data-tenir="ouvrir"]')!
     const tient = (oui: boolean): void => {
@@ -427,6 +477,7 @@ export function creeEcranMulti(quitte: () => void): EcranMulti {
       // la liaison reste « ouverte » à travers les reconnexions au relais :
       // on ne passe ici qu'UNE fois, et la partie n'est lancée qu'une fois
       l.envoieOrdre({ t: 'salut', version: VERSION_TRAME })
+      l.envoieOrdre({ t: 'profil', pseudo: monProfil.pseudo, couleur: monProfil.couleur })
       lancePartie(role)
     } else if (etat === 'echec') {
       if (page === 'creation' || page === 'jonction') {
@@ -442,6 +493,10 @@ export function creeEcranMulti(quitte: () => void): EcranMulti {
   function surOrdre(o: Ordre): void {
     if (o.t === 'salut') {
       if (o.version !== VERSION_TRAME) voile('Vous n’avez pas la même version du jeu. Rechargez la page tous les deux, puis recommencez.')
+    } else if (o.t === 'profil') {
+      // ce qui vient de l'autre est remis au propre avant d'être montré
+      profilAutre = litProfil(o)
+      accordeCouleurs()
     } else if (o.t === 'recommence') {
       if (role === 'hote') recommence()
       else marqueEtiquette()
@@ -455,6 +510,7 @@ export function creeEcranMulti(quitte: () => void): EcranMulti {
   }
 
   function fermeLiaison(): void {
+    profilAutre = null
     window.clearTimeout(minuteurLiaison)
     const l = liaison
     liaison = null
@@ -596,10 +652,18 @@ export function creeEcranMulti(quitte: () => void): EcranMulti {
 
   // ---- LA PARTIE ----------------------------------------------------------
 
-  function voile(texte: string): void {
+  /** Un message qui barre l'écran. Avec un `titre`, c'est la FIN d'un match :
+   *  le résultat en grand, et le bouton de la revanche. */
+  function voile(texte: string, titre = ''): void {
+    el<HTMLElement>('[data-voile-titre]').textContent = titre
     el<HTMLElement>('[data-voile-mot]').textContent = texte
+    el<HTMLElement>('[data-revanche]').hidden = titre === ''
     el<HTMLElement>('[data-voile]').hidden = false
+    finAffichee = titre !== ''
   }
+  /** Le voile montre-t-il la fin d'un match ? (Lui seul se retire tout seul,
+   *  quand la revanche commence ; un message d'erreur reste.) */
+  let finAffichee = false
 
   function peintAutre(): void {
     el<HTMLButtonElement>('[data-geste="autre"]').textContent = autreOuvert ? 'L’AUTRE : OUVERT' : 'L’AUTRE : FERMÉ'
@@ -621,6 +685,7 @@ export function creeEcranMulti(quitte: () => void): EcranMulti {
     role = r
     montre('jeu')
     el<HTMLElement>('[data-voile]').hidden = true
+    finAffichee = false
     el<HTMLButtonElement>('[data-geste="changer"]').hidden = r !== 'seul'
     moi = r === 'invite' ? 1 : 0
     try {
@@ -635,6 +700,7 @@ export function creeEcranMulti(quitte: () => void): EcranMulti {
     } else {
       hote = new Hote(2, undefined, modeChoisi)
     }
+    accordeCouleurs()
     aideDuMode = -1
     instantane = null
     eclats.length = 0
@@ -846,7 +912,7 @@ export function creeEcranMulti(quitte: () => void): EcranMulti {
           eclats.push({ x: son.x, y: son.y, ne: maintenant / 1000, force: Math.max(0.3, son.force) })
         } else if ((son.type === 'but' || son.type === 'fin') && jeu && jeu.buteur >= 0) {
           const flash = el<HTMLElement>('[data-flash]')
-          flash.style.background = couleurCss(jeu.buteur)
+          flash.style.background = teinte(jeu.buteur)
           flash.dataset.vif = '0'
           void flash.offsetWidth // relance l'animation
           flash.dataset.vif = '1'
@@ -1022,7 +1088,7 @@ export function creeEcranMulti(quitte: () => void): EcranMulti {
     r.hidden = false
     r.style.left = `${(e.fx * 100).toFixed(2)}%`
     r.style.top = `${(e.fy * 100).toFixed(2)}%`
-    r.style.color = couleurCss(moi)
+    r.style.color = teinte(moi)
     r.dataset.pousse = commande.pousse ? '1' : '0'
   }
 
@@ -1054,7 +1120,7 @@ export function creeEcranMulti(quitte: () => void): EcranMulti {
       const b = el<HTMLElement>(`[data-but="${j}"]`)
       const texte = String(jeu.scores[j])
       if (b.textContent !== texte) b.textContent = texte
-      b.style.color = couleurCss(j)
+      b.style.color = teinte(j)
     }
     // le chrono, ou le but en or ; et le grand chiffre du décompte
     const restant = Math.ceil(jeu.chrono)
@@ -1066,12 +1132,12 @@ export function creeEcranMulti(quitte: () => void): EcranMulti {
     const chiffre = jeu.phase === PHASE_DECOMPTE ? String(chiffreDecompte(jeu.decompte)) : ''
     grand.hidden = chiffre === ''
     if (grand.textContent !== chiffre) grand.textContent = chiffre
-    const quiMarque = jeu.buteur === moi ? 'VOUS' : role === 'seul' ? 'L’AUTRE CORPS' : 'VOTRE AMI'
+    const quiMarque = jeu.buteur >= 0 ? nom(jeu.buteur) : ''
     const mot =
       jeu.phase === PHASE_FINI
         ? jeu.buteur === moi
-          ? 'VOUS GAGNEZ — RECOMMENCER POUR REJOUER'
-          : `${quiMarque} GAGNE — RECOMMENCER POUR REJOUER`
+          ? 'VOUS GAGNEZ'
+          : `${quiMarque} GAGNE`
         : jeu.phase === PHASE_BUT
           ? sumo
             ? jeu.buteur < 0
@@ -1079,9 +1145,18 @@ export function creeEcranMulti(quitte: () => void): EcranMulti {
               : `MANCHE — ${quiMarque}`
             : `BUT — ${quiMarque}`
           : ''
+    // LA FIN DU MATCH : le résultat en grand, et la revanche en un clic. Le
+    // panneau se retire de lui-même quand la revanche commence.
+    if (jeu.phase === PHASE_FINI && !finAffichee && el<HTMLElement>('[data-voile]').hidden) {
+      const titre = role === 'seul' ? 'FIN DU MATCH' : jeu.buteur === moi ? 'VICTOIRE' : 'DÉFAITE'
+      voile(`${nom(0)}  ${jeu.scores[0]} — ${jeu.scores[1]}  ${nom(1)}`, titre)
+    } else if (jeu.phase !== PHASE_FINI && finAffichee) {
+      el<HTMLElement>('[data-voile]').hidden = true
+      finAffichee = false
+    }
     const e = el<HTMLElement>('[data-score-mot]')
     if (e.textContent !== mot) e.textContent = mot
-    e.style.color = jeu.phase === PHASE_JEU || jeu.phase === PHASE_DECOMPTE || jeu.buteur < 0 ? '' : couleurCss(jeu.buteur)
+    e.style.color = jeu.phase === PHASE_JEU || jeu.phase === PHASE_DECOMPTE || jeu.buteur < 0 ? '' : teinte(jeu.buteur)
   }
 
   function peintAth(corps: CorpsTrame[], maintenant: number, dt: number): void {
@@ -1089,13 +1164,13 @@ export function creeEcranMulti(quitte: () => void): EcranMulti {
       const boite = el<HTMLElement>(`[data-jauge="${j}"]`)
       const c = corps[j]
       const part = c && c.base > 0 ? Math.max(0, Math.min(1, (c.compte + c.prets) / c.base)) : 0
-      const couleur = couleurCss(j)
+      const couleur = teinte(j)
       ;(boite.querySelector('i') as HTMLElement).style.background = couleur
       const barre = boite.querySelector('u') as HTMLElement
       barre.style.background = couleur
       barre.style.width = `${(part * 100).toFixed(1)}%`
       boite.querySelector('b')!.textContent = c ? `${Math.round(part * 100)} %` : '—'
-      const qui = j === moi ? 'VOUS' : role === 'seul' ? 'L’AUTRE CORPS' : 'VOTRE AMI'
+      const qui = nom(j)
       boite.querySelector('small')!.textContent = c?.disperse ? `${qui} · DISPERSÉ` : c?.ouvert ? `${qui} · OUVERT` : qui
     }
 
@@ -1137,7 +1212,7 @@ export function creeEcranMulti(quitte: () => void): EcranMulti {
       etiquette.hidden = false
       etiquette.style.left = `${(e.fx * 100).toFixed(2)}%`
       etiquette.style.top = `${(e.fy * 100).toFixed(2)}%`
-      etiquette.style.color = couleurCss(moi)
+      etiquette.style.color = teinte(moi)
       etiquette.style.opacity = etiquetteJusqua - maintenant < 800 ? '0' : '1'
     } else {
       etiquette.hidden = true
