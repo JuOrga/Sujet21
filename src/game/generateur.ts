@@ -42,6 +42,7 @@ import {
   MAT_MEMBRANE,
   MAT_RIDEAU,
   MAT_MIROIR,
+  sansPhysique,
   type LevelDef,
   type ObstacleBox,
   type WorldLabel,
@@ -2244,6 +2245,13 @@ export function accessible(
   // en pose (459 tableaux sur 1500 graines), et c'est checkLevel qui refuse
   // ce départ — valideNiveau le relit, la graine est retirée avant livraison.
   for (const box of level.boxes) {
+    // LE VIDE ET LA BAIE VITRÉE NE SONT PAS DES PAROIS : le solveur ne les
+    // voit jamais (sansPhysique), le corps passe dessus comme sur le sol.
+    // La preuve les comptait pleins — une verrière en travers d'un passage
+    // murait le sas, et un départ posé sur une vitre (la cuve de la rotonde,
+    // game/hubRotonde.ts) était refusé d'emblée, alors que checkLevel, lui,
+    // les écartait déjà pour le dégagement du départ.
+    if (sansPhysique(box.material)) continue
     if (
       box.material === MAT_GRILLE ||
       box.material === MAT_MEMBRANE ||
