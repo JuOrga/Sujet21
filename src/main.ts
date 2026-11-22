@@ -229,7 +229,7 @@ import {
 } from './game/descente'
 import { FIGURE_FAMILLES, FIGURE_NOMS } from './game/figures'
 import { CIRCUITS } from './game/circuits'
-import type { LevierId } from './game/leviers'
+import type { EtatsOuverts, LevierId } from './game/leviers'
 import {
   brouillonRecompensesActif,
   catalogueRecompenses,
@@ -260,6 +260,7 @@ import {
   paliersAtteints,
   prochainPalier,
   tirageInstruments,
+  instrumentOuvert,
 } from './game/instruments'
 import {
   FAMILLE_NOMS,
@@ -16485,6 +16486,18 @@ function mbCartes(): HTMLElement {
  *  l'horloge du jeu. */
 let mbDraftOuvertA = -Infinity
 
+/** LES ÉTATS OUVERTS, ceux que la descente lit déjà pour ses salles : la
+ *  glace avec la solidification tissée, la vapeur avec la vaporisation —
+ *  verrous du scénario compris (cycle.ts, transfoTenue). */
+function etatsOuverts(): EtatsOuverts {
+  const acquis = records.eveilAcquis()
+  const verrous = records.verrousCycle()
+  return {
+    glace: transfoTenue('solidification', acquis, verrous),
+    vapeur: transfoTenue('vaporisation', acquis, verrous),
+  }
+}
+
 /** Un TIRAGE d'instruments (palier franchi) : trois cartes, on en emporte
  * une — certaines payantes en condensat, jamais toutes. */
 function mbMontreDraft(): void {
@@ -16513,7 +16526,8 @@ function mbMontreDraft(): void {
   // devient la question de l'étape, comme celle des salles
   mbQuestion('CHOISISSEZ VOTRE INSTRUMENT')
   mbReleveHors()
-  // le CARNET DU SEMBLABLE ouvre une quatrième carte
+  // le CARNET DU SEMBLABLE ouvre une quatrième carte ; une carte d'un état
+  // pas encore tissé ne se propose pas
   const cartes = tirageInstruments(
     Math.random,
     run.instruments,
@@ -16521,6 +16535,7 @@ function mbMontreDraft(): void {
     VIES_MAX,
     3 + lev('cartes'),
     catalogueRecompenses(),
+    etatsOuverts(),
   )
   const suite = (): void => {
     mbDraftsRestants -= 1
@@ -18124,9 +18139,11 @@ function appliqueEffets(effets: readonly EffetEvenement[]): string[] {
         break
       }
       case 'instrument': {
+        const ouverts = etatsOuverts()
         const vivier = catalogueRecompenses().filter((d) =>
           e.bon
             ? !d.contrepartie &&
+              instrumentOuvert(d, ouverts) &&
               !run.instruments.includes(d.id) &&
               (!d.effets.some((x) => x.levier === 'vies') || run.vies < VIES_MAX)
             : d.contrepartie === true && !run.instruments.includes(d.id),

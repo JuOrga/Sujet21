@@ -1289,6 +1289,17 @@ describe('la cérémonie — le tirage', () => {
     expect(visent.length).toBeGreaterThan(2) // la garde regarde bien quelque chose
     for (const r of visent) expect(r.corps, r.selecteurs.join(', ')).not.toMatch(aplatit)
   })
+  // la règle est dans instruments.ts (instrumentOuvert) ; encore faut-il
+  // que le tirage du jeu lui dise quels états sont ouverts — sans eux, le
+  // défaut « tout ouvert » rendait le tirage d'avant, en silence
+  it('dit au tirage quels états sont ouverts : ceux que la descente lit déjà', () => {
+    expect(corps('mbMontreDraft')).toMatch(/tirageInstruments\(\s*Math\.random,[\s\S]{0,160}catalogueRecompenses\(\),\s*etatsOuverts\(\),\s*\)/)
+    const e = corps('etatsOuverts')
+    expect(e).toContain("glace: transfoTenue('solidification', acquis, verrous)")
+    expect(e).toContain("vapeur: transfoTenue('vaporisation', acquis, verrous)")
+    // l'instrument qu'une salle événement offre suit la même règle
+    expect(MAIN).toMatch(/!d\.contrepartie &&\s*instrumentOuvert\(d, ouverts\)/)
+  })
   it('n’écrit plus d’étiquette sous 10 px', () => {
     for (const s of ['.mb-pli .crt-nom', '.mb-pli .crt-ctr', '.mb-pli .crt-perso', '.mb-pli .crt-prix']) {
       const t = /font-size:\s*calc\((\d+(?:\.\d+)?)px/.exec(regle(s))

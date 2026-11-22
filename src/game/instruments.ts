@@ -4,7 +4,7 @@
 // cartes sont PAYANTES en condensat : la première dépense de la monnaie
 // méta — le banc d'étalonnage (permanent) viendra ensuite.
 
-import type { Effet, LevierDef, LevierId } from './leviers'
+import type { Effet, EtatsOuverts, LevierDef, LevierId } from './leviers'
 import {
   forceEffet,
   levierDef,
@@ -322,6 +322,26 @@ export interface CarteTirage {
   prix: number
 }
 
+/** Tous les états ouverts : le tirage d'avant la règle, et celui d'un
+ *  joueur qui a tout tissé. */
+export const TOUS_ETATS_OUVERTS: EtatsOuverts = { glace: true, vapeur: true }
+
+/**
+ * UNE CARTE SERT-ELLE AVEC LES ÉTATS OUVERTS ? Chacun de ses leviers doit
+ * agir dans un état que le joueur a — sinon la carte ne fait rien (Patins
+ * de givre sans glace), ou pire, elle ne garde que son prix (Sur-régime
+ * sans vapeur : deux dashs qui ne partent jamais, deux litres de bonbonne
+ * perdus). « Ne pas proposer des récompenses qui concernent des états
+ * auxquels on n'a pas encore accès » (le concepteur, 22/11). Lu sur les
+ * LEVIERS : une carte fabriquée à l'atelier se range toute seule.
+ */
+export function instrumentOuvert(d: InstrumentDef, ouverts: EtatsOuverts): boolean {
+  return d.effets.every((e) => {
+    const etats = levierDef(e.levier)?.etats ?? []
+    return etats.length === 0 || etats.some((x) => ouverts[x])
+  })
+}
+
 export const PRIX_CARTE = 150 // cL — le tarif unique des cartes payantes
 
 /**
@@ -330,6 +350,7 @@ export const PRIX_CARTE = 150 // cL — le tarif unique des cartes payantes
  * — un instrument déjà emporté ne revient pas (sauf l'échantillon de
  *   secours, tant que la réserve n'est pas pleine) ;
  * — l'échantillon de secours ne paraît que si une vie manque ;
+ * — une carte d'un état pas encore ouvert ne paraît pas (instrumentOuvert) ;
  * — environ une carte sur trois est payante… mais jamais toutes : au moins
  *   une carte reste offerte (un joueur sans condensat choisit quand même).
  * `rand` est injecté : le tirage est pur et testable.
@@ -341,10 +362,12 @@ export function tirageInstruments(
   viesMax: number,
   nbCartes = 3,
   catalogue: InstrumentDef[] = INSTRUMENTS,
+  ouverts: EtatsOuverts = TOUS_ETATS_OUVERTS,
 ): CarteTirage[] {
   const pool = catalogue.filter((d) => {
     // une CONTREPARTIE ne se propose jamais : elle s'attrape, elle ne se choisit pas
     if (d.contrepartie) return false
+    if (!instrumentOuvert(d, ouverts)) return false
     // une carte qui donne une VIE ne paraît que s'il en manque une — peu
     // importe son nom : c'est son levier qui la range là
     if (d.effets.some((e) => e.levier === 'vies')) return vies < viesMax
