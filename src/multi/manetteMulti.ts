@@ -260,3 +260,100 @@ export function commandeManette(e: EtatManette, cx: number, cy: number): Command
     glace: e.glace,
   }
 }
+
+// ---- ce que le navigateur voit ------------------------------------------------
+//
+// LE DIAGNOSTIC. Le concepteur (22/11) : « j'ai essayé en écran partagé mais
+// aucune manette ne fonctionne alors que j'en ai deux connectées en
+// Bluetooth, une Xbox One et une PS4 ». Le mode à deux avait été essayé avec
+// des manettes SIMULÉES : ce qu'un vrai navigateur rend pour de vraies
+// manettes n'avait jamais été vu. Plusieurs causes donnent le même écran
+// mort, et l'écran ne permettait pas de les distinguer :
+//  - le navigateur ne montre une manette qu'après un APPUI sur l'un de ses
+//    boutons, la page au premier plan — avant, il n'en rend aucune ;
+//  - certains navigateurs ne donnent pas du tout accès aux manettes (une
+//    protection contre le pistage, par exemple) ;
+//  - une manette vue en disposition NON STANDARD n'a pas ses boutons aux
+//    places attendues : A n'est plus le bouton 0, les gâchettes peuvent être
+//    des axes — elle est là, et rien ne répond.
+// Le salon et la partie à deux disent donc ce que le navigateur voit : chaque
+// manette, sa disposition, et les boutons tenus en ce moment.
+
+/** Une manette telle que le navigateur la décrit. */
+export interface PadVu extends PadLu {
+  readonly id: string
+  readonly mapping: string
+}
+
+/** Les noms des boutons de la disposition standard, dans l'ordre. */
+const NOMS_BOUTONS = ['A', 'B', 'X', 'Y', 'LB', 'RB', 'LT', 'RT', 'Select', 'Start', 'L3', 'R3', '↑', '↓', '←', '→', 'Guide']
+
+/** Un nom lisible pour une manette, d'après ce que le navigateur en dit.
+ *  Chrome écrit « Xbox Wireless Controller (STANDARD GAMEPAD Vendor: 045e
+ *  Product: 02fd) », Firefox « 045e-02fd-Xbox Wireless Controller », Safari
+ *  le seul nom : on reconnaît le fabricant à son numéro (045e Microsoft,
+ *  054c Sony) ou à son nom, sinon on garde le nom, nettoyé. */
+export function nomManette(id: string): string {
+  const bas = id.toLowerCase()
+  if (/\b045e\b|xbox|xinput/.test(bas)) return 'manette Xbox'
+  if (/\b054c\b|dualshock|dualsense|playstation|ps4|ps5/.test(bas) || /^wireless controller\b/.test(bas)) return 'manette PlayStation'
+  const propre = id
+    .replace(/\s*\(.*\)\s*$/, '')
+    .replace(/^[0-9a-f]{4}-[0-9a-f]{4}-/i, '')
+    .trim()
+  if (!propre) return 'manette'
+  return propre.length > 28 ? propre.slice(0, 27) + '…' : propre
+}
+
+/** Ce qu'on tient en ce moment sur cette manette : les boutons (par leur nom
+ *  en disposition standard, par leur numéro sinon) et le stick incliné. */
+export function tenusSur(pad: PadVu): string[] {
+  const standard = pad.mapping === 'standard'
+  const tenus: string[] = []
+  for (let i = 0; i < pad.buttons.length; i++) {
+    const b = pad.buttons[i]
+    if (!b || !(b.pressed || b.value > 0.5)) continue
+    tenus.push(standard && i < NOMS_BOUTONS.length ? NOMS_BOUTONS[i] : `bouton ${i}`)
+  }
+  if (standard) {
+    if (Math.hypot(pad.axes[0] ?? 0, pad.axes[1] ?? 0) > MORT) tenus.push('stick')
+  } else {
+    // hors disposition standard, on ne sait pas quel axe est quel stick :
+    // on les nomme tous, c'est ce qui permettra de les replacer
+    for (let i = 0; i < pad.axes.length; i++) if (Math.abs(pad.axes[i] ?? 0) > 0.5) tenus.push(`axe ${i}`)
+  }
+  return tenus
+}
+
+/** Une manette décrite en une ligne : son nom, sa disposition si elle n'est
+ *  pas standard, et ce qu'on y tient. */
+export function decritManette(pad: PadVu): string {
+  const tenus = tenusSur(pad)
+  return nomManette(pad.id) + (pad.mapping === 'standard' ? '' : ' (disposition non standard : ses boutons peuvent ne pas répondre)') + (tenus.length > 0 ? ` — ${tenus.join(', ')}` : '')
+}
+
+/** La ligne du salon : ce que le navigateur voit. `pads` est null quand le
+ *  navigateur ne donne pas accès aux manettes. */
+export function ligneManettes(pads: readonly PadVu[] | null): string {
+  if (pads === null) return 'MANETTES : ce navigateur ne donne pas accès aux manettes.'
+  if (pads.length === 0) return 'MANETTES : aucune vue par le navigateur. Appuyez sur un bouton de chacune, cette page au premier plan — le navigateur ne les montre qu’après un appui.'
+  return `MANETTES : ${pads.map((p, k) => `${k + 1}. ${decritManette(p)}`).join(' · ')}`
+}
+
+/** À DEUX SUR CET ÉCRAN : la manette de chaque joueur. Deux manettes ou
+ *  plus : la première au joueur 1, la deuxième au joueur 2. Une seule : elle
+ *  est au joueur 2, le joueur 1 garde souris et clavier. */
+export function manettesDuLocal<P>(pads: readonly P[]): [P | null, P | null] {
+  if (pads.length >= 2) return [pads[0], pads[1]]
+  return [null, pads[0] ?? null]
+}
+
+/** La ligne d'état d'une partie à deux sur cet écran : qui joue avec quoi. */
+export function ligneLocale(pads: readonly PadVu[] | null): string {
+  if (pads === null) return 'à deux sur cet écran — ce navigateur ne donne pas accès aux manettes'
+  const [p1, p2] = manettesDuLocal(pads)
+  const j1 = p1 ? nomManette(p1.id) : 'souris et clavier'
+  const j2 = p2 ? nomManette(p2.id) : 'aucune manette vue — appuyez sur l’un de ses boutons'
+  const nonStandard = [p1, p2].some((p) => p && p.mapping !== 'standard') ? ' · disposition non standard : des boutons peuvent ne pas répondre' : ''
+  return `à deux sur cet écran — J1 : ${j1} · J2 : ${j2}${nonStandard}`
+}

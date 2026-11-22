@@ -32,7 +32,7 @@ import {
 } from './hockey'
 import { Robot } from './robot'
 import { ARENE, MANCHES_POUR_GAGNER } from './sumo'
-import { commandeManette, defileCaractere, litManette, litMenu, nouvelEtatManette, nouvelEtatMenu, voisinMenu, type PadLu } from './manetteMulti'
+import { commandeManette, defileCaractere, ligneLocale, ligneManettes, litManette, litMenu, manettesDuLocal, nouvelEtatManette, nouvelEtatMenu, voisinMenu, type PadLu, type PadVu } from './manetteMulti'
 import { adresseRelais, creePartie, liaisonPossible, rejointPartie, type EtatLiaison, type Liaison, type Ordre } from './relais'
 import { NOMS_COULEURS, PALETTE, PSEUDO_MAX, chargeProfil, couleursDeLaPartie, gardeProfil, litProfil, nettoiePseudo, type Profil } from './profil'
 import { DUREE_ECLAT, ECLATS_MAX, RenduMulti, couleurCss, type Eclat, type SceneHockey } from './renduMulti'
@@ -96,6 +96,7 @@ const STYLE = `
 .mu-etape form { display: flex; flex-direction: column; gap: 10px; margin: 0; }
 .mu-rang { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
 .mu-mot { min-height: 1.5em; line-height: 1.5; }
+.mu-manettes { min-height: 1.5em; line-height: 1.5; color: var(--dim, #7f9cb0); font-family: var(--font-mono, monospace); font-size: 0.85em; }
 .mu-mot[data-ton="alerte"] { color: var(--alert, #e0685c); }
 .mu-mot[data-ton="bon"] { color: var(--valid, #3fd69b); }
 .mu-detail { color: var(--dim, #7f9cb0); font-size: 0.78em; line-height: 1.5; margin: 0; word-break: break-word; user-select: all; }
@@ -186,6 +187,7 @@ const GABARIT = `
     <button type="button" class="mu-discret" data-geste="seul">ESSAYER SEUL</button>
     <button type="button" class="mu-discret" data-geste="quitter">RETOUR À L’ACCUEIL</button>
   </div>
+  <p class="mu-manettes" data-manettes aria-live="polite"></p>
   <p class="mu-mot" data-mot="salon"></p>
 </div>
 
@@ -872,8 +874,8 @@ export function creeEcranMulti(quitte: () => void): EcranMulti {
     // À DEUX SUR CET ÉCRAN : avec deux manettes, chacun la sienne ; avec une
     // seule, elle est au second joueur et le premier garde souris et clavier
     const pads = padsBranches()
-    const padDuSecond = role === 'local' ? (pads.length >= 2 ? pads[1] : (pads[0] ?? null)) : null
-    litManette(role === 'local' ? (pads.length >= 2 ? pads[0] : null) : (pads[0] ?? null), manette)
+    const [padDuPremier, padDuSecond] = role === 'local' ? manettesDuLocal(pads) : [pads[0] ?? null, null]
+    litManette(padDuPremier, manette)
     if (manette.vie) {
       mainManette = maintenant
       sons.reveille()
@@ -1092,6 +1094,12 @@ export function creeEcranMulti(quitte: () => void): EcranMulti {
   }
 
   function tourMenu(maintenant: number): void {
+    // au salon, ce que le navigateur voit des manettes (le diagnostic)
+    if (racine && page === 'salon') {
+      const ligne = el<HTMLElement>('[data-manettes]')
+      const texte = ligneManettes(padsVus())
+      if (ligne.textContent !== texte) ligne.textContent = texte
+    }
     const pad = padCourant()
     const g = litMenu(pad, menu, maintenant)
     if (!pad || !racine) return
@@ -1139,12 +1147,24 @@ export function creeEcranMulti(quitte: () => void): EcranMulti {
     }
   }
 
-  /** La manette branchée sur cette machine, ou null. */
-  /** Les manettes branchées sur cette machine, les « standard » d'abord. */
-  function padsBranches(): PadLu[] {
-    const tous = typeof navigator !== 'undefined' && navigator.getGamepads ? [...navigator.getGamepads()] : []
+  /** Les manettes que le navigateur montre, les « standard » d'abord — ou
+   *  null s'il ne donne pas accès aux manettes du tout (voir le diagnostic,
+   *  manetteMulti.ts). */
+  function padsVus(): PadVu[] | null {
+    if (typeof navigator === 'undefined' || typeof navigator.getGamepads !== 'function') return null
+    let tous: (Gamepad | null)[]
+    try {
+      tous = [...navigator.getGamepads()]
+    } catch {
+      // une politique du document peut interdire l'API : elle jette alors
+      return null
+    }
     const branchees = tous.filter((gp): gp is Gamepad => !!gp && gp.connected)
     return [...branchees.filter((gp) => gp.mapping === 'standard'), ...branchees.filter((gp) => gp.mapping !== 'standard')]
+  }
+  /** Les manettes branchées sur cette machine (aucune si l'API manque). */
+  function padsBranches(): PadVu[] {
+    return padsVus() ?? []
   }
   /** La première d'entre elles (le salon se parcourt avec elle), ou null. */
   function padCourant(): PadLu | null {
@@ -1254,7 +1274,8 @@ export function creeEcranMulti(quitte: () => void): EcranMulti {
     if (role === 'robot') {
       lien.textContent = 'contre l’ordinateur'
     } else if (role === 'local') {
-      lien.textContent = manette2.connectee ? 'à deux sur cet écran' : 'à deux sur cet écran — branchez une manette pour le joueur 2 (et appuyez sur un bouton)'
+      const texte = ligneLocale(padsVus())
+      if (lien.textContent !== texte) lien.textContent = texte
     } else if (role === 'seul') {
       lien.textContent = 'essai seul — aucune liaison'
     } else if (liaison) {

@@ -256,6 +256,12 @@ bouton **MULTI** sur l'accueil (`?dev`). Tout vit dans [`src/multi/`](src/multi/
   bougé commande. Select quitte la partie. AU SALON, la croix ou le stick
   passent d'un bouton à l'autre, A valide, B revient ; pour rejoindre, le
   code se compose à la croix (←→ la case, ↑↓ le caractère).
+  Le salon dit ce que le navigateur VOIT des manettes (« MANETTES : … ») :
+  chacune, sa disposition, et les boutons tenus. Un navigateur ne montre
+  une manette qu'après un appui sur l'un de ses boutons, la page au premier
+  plan ; une manette en disposition non standard est vue mais ses boutons
+  peuvent ne pas répondre. En partie à deux, la ligne d'état dit qui joue
+  avec quoi.
 - **Les sons** (`sonsMulti.ts`) : le jet, s'ouvrir et se refermer, le choc
   de deux corps, et au hockey le palet sur la paroi, contre un corps,
   avalé, lancé (une note monte tant qu'on le tient), le but, la fin. Tout

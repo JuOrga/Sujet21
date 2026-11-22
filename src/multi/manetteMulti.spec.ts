@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { commandeManette, defileCaractere, litManette, litMenu, nouvelEtatManette, nouvelEtatMenu, voisinMenu, type PadLu } from './manetteMulti'
+import { commandeManette, decritManette, defileCaractere, ligneLocale, ligneManettes, litManette, litMenu, manettesDuLocal, nomManette, nouvelEtatManette, nouvelEtatMenu, tenusSur, voisinMenu, type PadLu, type PadVu } from './manetteMulti'
 import { ALPHABET_CODE } from './code'
 import { Hote } from './partie'
 import { MODE_HOCKEY, decodeCommande, encodeCommande } from './trame'
@@ -237,5 +237,64 @@ describe('manette du multi — au salon', () => {
     // ni I ni O n'existent dans un code : H mène à J
     expect(defileCaractere(ALPHABET_CODE, 'H', 1)).toBe('J')
     expect(defileCaractere(ALPHABET_CODE, '?', 1)).toBe('A')
+  })
+})
+
+/** Une manette telle qu'un navigateur la décrit. */
+const vu = (id: string, mapping: string, ax: number, ay: number, ...tenus: number[]): PadVu => ({ ...pad(ax, ay, ...tenus), id, mapping })
+// les noms tels que les navigateurs les écrivent (Chrome, Firefox, Safari)
+const XBOX_CHROME = 'Xbox Wireless Controller (STANDARD GAMEPAD Vendor: 045e Product: 02fd)'
+const PS4_CHROME = 'Wireless Controller (STANDARD GAMEPAD Vendor: 054c Product: 09cc)'
+const XBOX_FIREFOX = '045e-02e0-Xbox Wireless Controller'
+const PS4_SAFARI = 'DUALSHOCK 4 Wireless Controller'
+
+describe('manette du multi — ce que le navigateur voit (le diagnostic)', () => {
+  it('reconnaît une Xbox et une PlayStation, sous les noms que leur donnent les navigateurs', () => {
+    expect(nomManette(XBOX_CHROME)).toBe('manette Xbox')
+    expect(nomManette(XBOX_FIREFOX)).toBe('manette Xbox')
+    expect(nomManette(PS4_CHROME)).toBe('manette PlayStation')
+    expect(nomManette('054c-05c4-Wireless Controller')).toBe('manette PlayStation')
+    expect(nomManette(PS4_SAFARI)).toBe('manette PlayStation')
+    expect(nomManette('DualSense Wireless Controller')).toBe('manette PlayStation')
+    // une autre : son nom, nettoyé, et pas trop long
+    expect(nomManette('0079-0006-Generic   USB  Joystick')).toBe('Generic   USB  Joystick')
+    expect(nomManette('8BitDo Pro 2 (Vendor: 2dc8 Product: 6006)')).toBe('8BitDo Pro 2')
+    expect(nomManette('Une manette au nom beaucoup trop long pour la ligne').length).toBeLessThanOrEqual(28)
+    expect(nomManette('')).toBe('manette')
+  })
+
+  it('dit ce qu’on tient : les boutons par leur nom, et le stick', () => {
+    expect(tenusSur(vu(XBOX_CHROME, 'standard', 0, 0))).toEqual([])
+    expect(tenusSur(vu(XBOX_CHROME, 'standard', 0.9, 0, A, RT))).toEqual(['A', 'RT', 'stick'])
+    // sous la zone morte, le stick ne compte pas
+    expect(tenusSur(vu(XBOX_CHROME, 'standard', 0.1, 0.1))).toEqual([])
+  })
+
+  it('hors disposition standard, on donne les NUMÉROS — c’est ce qui permettra de replacer les boutons', () => {
+    const p = vu('054c-09cc-Wireless Controller', '', 0, 0.8, 1, 7)
+    expect(tenusSur(p)).toEqual(['bouton 1', 'bouton 7', 'axe 1'])
+    expect(decritManette(p)).toContain('disposition non standard')
+    expect(decritManette(vu(PS4_CHROME, 'standard', 0, 0))).toBe('manette PlayStation')
+  })
+
+  it('au salon : rien d’accessible, rien de vu, ou chaque manette', () => {
+    expect(ligneManettes(null)).toContain('ne donne pas accès')
+    // aucune : on dit le geste qui les fait apparaître
+    expect(ligneManettes([])).toContain('Appuyez sur un bouton')
+    const deux = ligneManettes([vu(XBOX_CHROME, 'standard', 0, 0, A), vu(PS4_CHROME, 'standard', 0, 0)])
+    expect(deux).toBe('MANETTES : 1. manette Xbox — A · 2. manette PlayStation')
+  })
+
+  it('à deux sur cet écran : deux manettes, une à chacun ; une seule, au joueur 2', () => {
+    const x = vu(XBOX_CHROME, 'standard', 0, 0)
+    const p = vu(PS4_CHROME, 'standard', 0, 0)
+    expect(manettesDuLocal([x, p])).toEqual([x, p])
+    expect(manettesDuLocal([x])).toEqual([null, x])
+    expect(manettesDuLocal([])).toEqual([null, null])
+    expect(ligneLocale([x, p])).toBe('à deux sur cet écran — J1 : manette Xbox · J2 : manette PlayStation')
+    expect(ligneLocale([p])).toBe('à deux sur cet écran — J1 : souris et clavier · J2 : manette PlayStation')
+    expect(ligneLocale([])).toContain('J2 : aucune manette vue')
+    expect(ligneLocale(null)).toContain('ne donne pas accès')
+    expect(ligneLocale([x, vu('054c-09cc-Wireless Controller', '', 0, 0)])).toContain('disposition non standard')
   })
 })
