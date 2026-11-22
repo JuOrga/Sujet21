@@ -6361,6 +6361,12 @@ const FICHIER_DECAL: Record<DecalDef['kind'], string> = {
   'meta-marchand': 'meta-marchand',
   'sas-raccord': 'sas-raccord',
   'sas-raccord-v': 'sas-raccord-v',
+  // LA TRAPPE D'UNE PORTE OUVERTE : synthétisée (porteBlindee.ts)
+  'porte-trappe': 'porte-trappe',
+  'porte-trappe-v': 'porte-trappe-v',
+  'porte-trappe-bout': 'porte-trappe-bout',
+  'porte-trappe-bout-v': 'porte-trappe-bout-v',
+  'porte-trappe-bout-v-haut': 'porte-trappe-bout-v-haut',
   // LES STATIONS DU HUB : tant que l'image n'est pas livrée, le chargement
   // échoue sans bruit et la pièce posée ne se dessine pas (textureDecal)
   'hub-eclairage': 'hub-eclairage',

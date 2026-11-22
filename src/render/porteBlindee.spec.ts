@@ -17,6 +17,7 @@ import {
   partLevee,
   coupeDemiPlan,
   dansPolygone,
+  decalsDesPortes,
   tranchesFace,
   volumeProjete,
 } from './porteBlindee'
@@ -51,7 +52,7 @@ describe('la porte blindée — l’atlas', () => {
     const { W, HF, LT, LB, GOUTTIERE } = atelier()
     let x = GOUTTIERE
     const attendu: Record<string, { x: number; y: number; w: number; h: number }> = {}
-    for (const [nom, w, h] of [['dessus', LT, W], ['bout', LB, W], ['flanc', LT, HF], ['fente', LT, W]] as const) {
+    for (const [nom, w, h] of [['dessus', LT, W], ['bout', LB, W], ['flanc', LT, HF], ['trappe', LT, W], ['trappeBout', LB, W]] as const) {
       attendu[nom] = { x, y: GOUTTIERE, w, h }
       x += w + GOUTTIERE
     }
@@ -288,5 +289,69 @@ describe('la porte blindée — ce que les murs cachent, au pixel', () => {
     expect(main).toMatch(/projette: projetteRelief,/)
     // une coque est creuse : ses morceaux de paroi, pas sa silhouette
     expect(main).toMatch(/FORME_COQUE \? coquePieces\(box\)/)
+  })
+})
+
+describe('la porte blindée — ouverte, une trappe au sol, en décalques', () => {
+  // le gabarit : 40 × 340, debout — deux sabots de 24 et quatre carreaux de 73
+  it('la trappe couvre exactement la porte : quatre carreaux, deux sabots, rien qui dépasse', () => {
+    const d = decalsDesPortes([P])
+    expect(d.map((x) => x.kind)).toEqual([
+      'porte-trappe-v',
+      'porte-trappe-v',
+      'porte-trappe-v',
+      'porte-trappe-v',
+      'porte-trappe-bout-v',
+      'porte-trappe-bout-v-haut',
+    ])
+    for (const x of d) {
+      expect(x.x).toBe(880)
+      expect(x.w).toBe(40)
+      expect(x.fade).toBe(0.95)
+    }
+    // bout à bout, du bas (−170) au haut (170), à 0,3 près de recouvrement
+    const bas = Math.min(...d.map((x) => x.y - x.h / 2))
+    const haut = Math.max(...d.map((x) => x.y + x.h / 2))
+    expect(bas).toBeCloseTo(-170.3, 6)
+    expect(haut).toBeCloseTo(170.3, 6)
+    // le sabot du bas au bas, celui du haut (retourné) au haut
+    expect(d[4].y).toBeLessThan(d[5].y)
+  })
+
+  it('couchée, la même trappe sans quart de tour, le second sabot en miroir', () => {
+    const d = decalsDesPortes([{ minX: -170, minY: 0, maxX: 170, maxY: 40, canal: 1 }])
+    const sabots = d.filter((x) => x.kind === 'porte-trappe-bout')
+    expect(sabots).toHaveLength(2)
+    expect(sabots.find((x) => x.x < 0)?.flip).toBeUndefined()
+    expect(sabots.find((x) => x.x > 0)?.flip).toBe(true)
+    expect(d.filter((x) => x.kind === 'porte-trappe')).toHaveLength(4)
+    for (const x of d) {
+      expect(x.y).toBe(20)
+      expect(x.h).toBe(40)
+    }
+  })
+
+  it('le sens se lit sur les murs, comme en jeu : D1, presque carrée, reste debout entre ses murs', () => {
+    const D1: PorteDef = { minX: 600, minY: 300, maxX: 644, maxY: 340, canal: 1 }
+    const murs = (_x: number, y: number): boolean => y > 340 || y < 300
+    expect(decalsDesPortes([D1]).some((x) => x.kind === 'porte-trappe')).toBe(true)
+    expect(decalsDesPortes([D1], murs).every((x) => x.kind.includes('-v'))).toBe(true)
+  })
+
+  it('chaque sorte a son image livrée, à la taille de la pièce rendue', () => {
+    const tailles: Record<string, { l: number; h: number }> = {
+      'porte-trappe': { l: 320, h: 160 },
+      'porte-trappe-v': { l: 160, h: 320 },
+      'porte-trappe-bout': { l: 96, h: 160 },
+      'porte-trappe-bout-v': { l: 160, h: 96 },
+      'porte-trappe-bout-v-haut': { l: 160, h: 96 },
+    }
+    for (const [nom, t] of Object.entries(tailles)) expect(tailleWebp(nom)).toEqual(t)
+  })
+
+  it('le jeu pose la trappe sous le reste du décor, et la toile 2D ne repeint plus le sol', () => {
+    const main = readFileSync(join(process.cwd(), 'src/main.ts'), 'utf8')
+    expect(main).toMatch(/\[\.\.\.trappes, \.\.\.\(level\.decals \?\? \[\]\), \.\.\.meta\]/)
+    expect(main).toMatch(/solAuDecor: true,/)
   })
 })
