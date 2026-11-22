@@ -8621,7 +8621,7 @@
       .mb-cartes { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
       /* ---- LE TIRAGE : trois CARTES D'INSTRUMENT (quatre avec le Carnet du
          Semblable). Elles arrivent DOS VISIBLE et se retournent une à une ;
-         sous le pointeur, elles s'inclinent (--rx/--ry posés par main.ts) ;
+         visées, elles flottent et leur eau tremble (ondeVue.ts) ;
          l'élue s'avance et grandit, les autres tombent. La face est le
          composant `.crt` partagé avec l'atelier, taillé ici au coin coupé du
          verbe.
@@ -8645,10 +8645,13 @@
          « grouping properties ») : aplati, il peint ses faces à plat puis
          tourne le tout, et c'est la face EN MIROIR qu'on voyait au lieu du
          dos (banc, 13/11). L'apparition et l'effacement passent aux faces. */
+      /* LE PLI NE TRANSITE PAS : visé, il suit des RESSORTS (ondeVue.ts,
+         en transform inline) — une transition de 0,16 s, relancée à chaque
+         pointermove, le faisait courir après la souris par à-coups. Au
+         repos, la feuille reprend : à plat, ou flottant de 6 px s'il est
+         visé (la même valeur que le ressort, FLOTTE). */
       .mb-pli {
         position: relative; transform-style: preserve-3d; min-height: 330px;
-        transform: rotateX(var(--rx, 0deg)) rotateY(var(--ry, 0deg));
-        transition: transform 0.16s ease;
         animation: mb-retourne 0.8s cubic-bezier(0.3, 1, 0.3, 1) backwards;
         animation-delay: calc(0.15s + var(--i, 0) * 0.2s);
       }
@@ -8769,7 +8772,17 @@
          reculent sans s'éteindre : à 0,35, la phrase des voisines ne se
          lisait plus, alors qu'on vise une carte pour la COMPARER aux autres */
       .mb-cartes.mb-isole .mb-pli:not(.mb-vise) .crt-draft { opacity: 0.6; }
-      .mb-pli.mb-vise { z-index: 2; transform: rotateX(var(--rx, 0deg)) rotateY(var(--ry, 0deg)) translateY(-6px); }
+      .mb-pli.mb-vise { z-index: 2; transform: translateY(-6px); }
+      /* L'EAU DE LA CARTE : une toile de quelques dizaines de mailles,
+         étirée à la face (le lissage fait l'eau douce), SOUS le contenu —
+         la face taillée au chanfrein est son propre contexte d'empilement,
+         le z-index négatif la glisse entre son fond et son texte, qui ne
+         bouge pas d'un pixel. Transparente au calme : elle ne se voit que
+         quand l'eau bouge. */
+      .mb-pli .mb-onde {
+        position: absolute; inset: 0; z-index: -1; width: 100%; height: 100%;
+        pointer-events: none;
+      }
       .mb-pli.mb-vise .crt-draft, .mb-pli .crt-draft:focus-visible, .mb-pli .crt-draft.pad-focus {
         outline: none;
         background: var(--mb-visee), var(--mb-coque);
@@ -9684,6 +9697,9 @@
         .mb-anneau-franchit { filter: drop-shadow(0 0 8px rgba(242, 201, 142, 0.85)); }
         .mb-pli { transform: none; }
         .mb-pli.mb-vise { transform: translateY(-4px); }
+        /* l'eau ne tremble pas : ondeVue.ts ne la met jamais en mouvement,
+           et la toile ne tient même pas sa place */
+        .mb-pli .mb-onde { display: none; }
         .mb-cartes.mb-elu .mb-pli:not(.mb-elu-c), .mb-cartes.mb-elu .mb-porte:not(.mb-elue) { opacity: 0; }
         .mb-porte.mb-elue { opacity: 0; }
         .mb-palier-eclair[hidden] { display: none; }

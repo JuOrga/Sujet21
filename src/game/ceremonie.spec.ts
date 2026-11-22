@@ -23,6 +23,7 @@ import { LEVIER_FIN_MS } from './finDescente'
 // par tous les blocs qui gardent un écran.
 const HTML = readFileSync(new URL('../../index.html', import.meta.url), 'utf-8')
 const MAIN = readFileSync(new URL('../main.ts', import.meta.url), 'utf-8')
+const ONDE = readFileSync(new URL('./ondeVue.ts', import.meta.url), 'utf-8')
 const corps = (nom: string): string => {
   const debut = MAIN.indexOf(`\nfunction ${nom}(`)
   expect(debut, `la fonction ${nom} manque`).toBeGreaterThan(-1)
@@ -1288,6 +1289,41 @@ describe('la cérémonie — le tirage', () => {
       }))
     expect(visent.length).toBeGreaterThan(2) // la garde regarde bien quelque chose
     for (const r of visent) expect(r.corps, r.selecteurs.join(', ')).not.toMatch(aplatit)
+  })
+  // L'EAU DES CARTES (ondeVue.ts). L'inclinaison d'avant posait --rx/--ry à
+  // chaque pointermove, sous une transition de 0,16 s relancée à chaque
+  // fois, et se remettait à plat d'un coup : « ça fait buggé, pas fluide »
+  // (le concepteur, 22/11). La visée, d'où qu'elle vienne, met l'eau en
+  // mouvement ; le choix l'arrête.
+  it('donne à chaque carte son eau, visée au pointeur, au clavier et à la manette', () => {
+    const f = corps('mbMontreDraft')
+    expect(MAIN).not.toContain('mbIncline')
+    expect(f).toContain('ondes.set(pli, ondeCarte(btn, pli, sansAnimation))')
+    // l'eau s'installe AVANT les écouteurs de la visée : son pointerenter
+    // pose la goutte là où le pointeur entre
+    expect(f.indexOf('ondeCarte(btn')).toBeLessThan(f.indexOf("for (const ev of ['pointerenter', 'pad-vise'] as const)"))
+    // la visée (survol, focus, manette) passe par isole, qui réveille l'eau
+    expect(f).toMatch(/if \(c === pli\) ondes\.get\(c\)\?\.vise\(\)\s*\n\s*else ondes\.get\(c\)\?\.quitte\(\)/)
+    // la carte élue : l'eau se tait d'un coup
+    const clic = f.slice(f.indexOf("btn.addEventListener('click'"))
+    expect(clic.slice(0, 1200)).toContain('for (const o of ondes.values()) o.arrete()')
+  })
+  it('laisse le pli suivre ses ressorts : ni transition, ni variables d’inclinaison', () => {
+    expect(regle('.mb-pli')).not.toMatch(/transition:/)
+    expect(css).not.toMatch(/--r[xy]\b/)
+    // au repos, la feuille tient la flottaison que le ressort rejoint (FLOTTE)
+    expect(css).toMatch(/\.mb-pli\.mb-vise \{ z-index: 2; transform: translateY\(-6px\); \}/)
+    expect(ONDE).toMatch(/export const FLOTTE = -6\b/)
+    // la toile vit dans la FACE, sous son texte ; rien n'aplatit le pli
+    expect(regle('.mb-pli .mb-onde')).toMatch(/z-index:\s*-1/)
+    expect(ONDE).toContain('face.prepend(toile)')
+    expect(ONDE).not.toMatch(/pli\.style\.(?:opacity|filter|clipPath)|pli\.style\.setProperty\('(?:opacity|filter|clip-path)/)
+  })
+  it('se tait sous « moins d’animations » : ni eau, ni ressort', () => {
+    const moins = css.slice(css.lastIndexOf('prefers-reduced-motion: reduce'))
+    expect(moins).toMatch(/\.mb-pli \.mb-onde \{ display: none; \}/)
+    // relu à chaque geste : le réglage peut changer en cours de partie
+    expect(ONDE).toMatch(/if \(e\.arretee \|\| sansAnimation\(\)\) return/)
   })
   // la règle est dans instruments.ts (instrumentOuvert) ; encore faut-il
   // que le tirage du jeu lui dise quels états sont ouverts — sans eux, le

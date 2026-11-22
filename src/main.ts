@@ -230,6 +230,8 @@ import {
 import { FIGURE_FAMILLES, FIGURE_NOMS } from './game/figures'
 import { CIRCUITS } from './game/circuits'
 import type { EtatsOuverts, LevierId } from './game/leviers'
+import { ondeCarte } from './game/ondeVue'
+import type { OndeCarte } from './game/ondeVue'
 import {
   brouillonRecompensesActif,
   catalogueRecompenses,
@@ -15578,23 +15580,6 @@ const MB_OR = ['#f2c98e', '#f7dcb4', '#fbeed9', '#d9ecf7']
 const MB_MENTHE = ['#3fd69b', '#8fe6c4', '#a7ddf5', '#d9ecf7']
 const MB_EAU = ['#63b7e6', '#a7ddf5', '#d9ecf7', '#4fa8d8']
 
-/** L'INCLINAISON d'une carte sous le pointeur : elle suit la main, comme
- *  une carte qu'on tiendrait. Posée en variables CSS sur `cible`, lue par
- *  la feuille de style ; remise à plat quand le pointeur s'en va. */
-function mbIncline(surface: HTMLElement, cible: HTMLElement, amplitude = 9): void {
-  surface.addEventListener('pointermove', (e) => {
-    if (sansAnimation()) return
-    const r = surface.getBoundingClientRect()
-    const px = (e.clientX - r.left) / Math.max(1, r.width) - 0.5
-    const py = (e.clientY - r.top) / Math.max(1, r.height) - 0.5
-    cible.style.setProperty('--ry', `${(px * amplitude * 2).toFixed(1)}deg`)
-    cible.style.setProperty('--rx', `${(-py * amplitude * 2).toFixed(1)}deg`)
-  })
-  surface.addEventListener('pointerleave', () => {
-    cible.style.removeProperty('--rx')
-    cible.style.removeProperty('--ry')
-  })
-}
 // Le fil de la cérémonie : bilan (temps 1-3, sautables ; il ne passe
 // jamais seul, il attend un geste) → versement (le
 // surplus choisit sa destination) → draft (un tirage par palier franchi)
@@ -16558,9 +16543,20 @@ function mbMontreDraft(): void {
   // l'atelier) et son dos (`.mb-pli-dos`). Le survol isole et INCLINE
   // celle qu'on regarde ; au clavier ou à la manette, le focus fait le
   // même office que la souris — sauf le focus posé par le tirage lui-même.
+  // L'EAU DE CHAQUE CARTE (ondeVue.ts) : visée, elle reçoit une goutte et
+  // tremble, le pointeur y laisse son sillage, puis elle se calme. Elle
+  // remplace l'inclinaison qui sautait d'un pointermove à l'autre et se
+  // remettait à plat d'un coup (« ça fait buggé, pas fluide », 22/11)
+  const ondes = new Map<Element, OndeCarte>()
   const isole = (pli: HTMLElement | null): void => {
     host.classList.toggle('mb-isole', pli !== null)
-    for (const c of host.children) c.classList.toggle('mb-vise', c === pli)
+    for (const c of host.children) {
+      c.classList.toggle('mb-vise', c === pli)
+      // la visée qui ne vient pas du pointeur (clavier, manette) ; le
+      // pointeur, lui, pose sa goutte là où il entre (ondeVue.ts)
+      if (c === pli) ondes.get(c)?.vise()
+      else ondes.get(c)?.quitte()
+    }
   }
   let elu = false
   // les FLÈCHES passent d'une carte à l'autre (la manette a sa croix ; Tab
@@ -16600,13 +16596,16 @@ function mbMontreDraft(): void {
       btn.classList.add('mb-pauvre')
       btn.disabled = true
     }
+    // l'eau AVANT les écouteurs de la visée : son pointerenter passe le
+    // premier et pose la goutte là où le pointeur entre ; la visée qui suit
+    // (isole) trouve la carte déjà visée et n'en jette pas une seconde
+    ondes.set(pli, ondeCarte(btn, pli, sansAnimation))
     for (const ev of ['pointerenter', 'pad-vise'] as const)
       btn.addEventListener(ev, () => { if (!elu) isole(pli) })
     btn.addEventListener('focusin', () => { if (!elu && !mbFocusOuverture) isole(pli) })
     for (const ev of ['pointerleave', 'focusout', 'pad-quitte'] as const)
       btn.addEventListener(ev, () => { if (!elu) isole(null) })
     btn.addEventListener('keydown', fleches)
-    mbIncline(btn, pli)
     // la carte tombée sur sa face claque, une par une : la voix d'une
     // cartouche qui se pose (le sting reste au choix)
     mbTimers.push(window.setTimeout(() => {
@@ -16621,9 +16620,10 @@ function mbMontreDraft(): void {
       if (!depenseCondensat(carte.prix)) return
       elu = true
       // LA CARTE ÉLUE s'embrase, les autres se retirent — puis la suite
+      // l'eau se tait d'un coup : l'élan de l'élue est une animation, et la
+      // carte qui tremblait encore ne doit rien ajouter à la sienne
+      for (const o of ondes.values()) o.arrete()
       isole(null)
-      pli.style.removeProperty('--rx')
-      pli.style.removeProperty('--ry')
       host.classList.add('mb-elu')
       pli.classList.add('mb-elu-c')
       const fam = getComputedStyle(btn).getPropertyValue('--fam').trim() || '#63b7e6'

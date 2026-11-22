@@ -357,6 +357,7 @@
     const tir = F.tirageInstruments(F.graine(5), [], 2, 3, 3, F.INSTRUMENTS)
     host.classList.add('mb-draft')
     host.style.setProperty('--n', String(Math.min(4, tir.length)))
+    const ondes = []
     tir.forEach((c, i) => {
       const def = F.INSTRUMENTS.find((d) => d.id === c.id)
       const payable = c.prix === 0 || RUN.condensat >= c.prix
@@ -370,6 +371,21 @@
       btn.style.setProperty('--i', String(i))
       if (!payable) { btn.classList.add('mb-pauvre'); btn.disabled = true }
       host.appendChild(pli)
+      // l'eau de la carte et la visée, comme main.ts : le pointeur pose sa
+      // goutte, l'isolement suit
+      const onde = F.ondeCarte(btn, pli, () => matchMedia('(prefers-reduced-motion: reduce)').matches)
+      ondes.push(onde)
+      const isole = (vise) => {
+        host.classList.toggle('mb-isole', vise !== null)
+        ;[...host.children].forEach((c, k) => {
+          c.classList.toggle('mb-vise', c === vise)
+          if (c === vise) ondes[k].vise(); else ondes[k].quitte()
+        })
+      }
+      btn.addEventListener('pointerenter', () => isole(pli))
+      btn.addEventListener('focusin', () => isole(pli))
+      btn.addEventListener('pointerleave', () => isole(null))
+      btn.addEventListener('focusout', () => isole(null))
     })
     if (etat === 'elue') {
       host.classList.add('mb-elu')
