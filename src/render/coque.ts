@@ -21,6 +21,7 @@
 
 import type { Bounds } from '../sim/solver'
 import { MAT_VIDE } from '../game/level'
+import { HAUTEUR_BLOCS } from './hauteurs'
 
 /** Épaisseur de la coque, en unités monde. */
 export const COQUE_EPAISSEUR = 90
@@ -328,6 +329,73 @@ vec3 piedFlancCoque(vec2 w, vec2 c, float f, vec4 cuve, float cote) {
   float s = cote > 1.5 ? p.y - cuve.y : p.x - cuve.x;
   if (s < 0.0 || s > (cote > 1.5 ? cuve.w - cuve.y : cuve.z - cuve.x)) return vec3(0.0);
   return vec3(t, s, 1.0);
+}`
+
+// ——— LA FACE A SON MOTIF : UN BARDAGE ÉPURÉ ————————————————————————————
+// « Il faut un autre motif pour la partie verticale 2,5D de ces murs
+// d'enceinte : un motif différent de la partie du dessus, plus épuré » (le
+// concepteur, 22/11). La face reprenait la tôle du DESSUS — conduites,
+// boîtiers, montants, rivets — tassée sur sa hauteur : une bande de détail
+// écrasé où rien ne se lisait, et que rien ne séparait du dessus. On ne
+// voyait pas un mur qui monte, mais le couronnement qui se répétait.
+// La face porte désormais son propre motif, tracé dans le shader (net quel
+// que soit l'écrasement, sans image de plus) : de grands panneaux lisses,
+// une PLINTHE au pied, un BANDEAU sous le chant, et entre deux panneaux un
+// JOINT CREUX — un seul par montant du dessus, juste dessous : le mur et son
+// couronnement tombent d'aplomb, les deux parties se répondent sans se
+// copier.
+
+/** Où tombent les montants de la tôle du dessus, en fraction d'une
+ *  répétition de sa texture (hull.webp, 1079 × 400 : centres mesurés à 351,
+ *  688 et 1059 px). Le joint de la face se pose sous chacun. Ils ne sont pas
+ *  régulièrement espacés : l'image ne l'est pas. */
+export const FLANC_JOINTS = [0.3253, 0.6376, 0.9815] as const
+/** La hauteur de la face, en unités monde : celle dont la coque se dresse
+ *  (bornée à un mur haut, voir fractionSommet), t = 1 au sommet. */
+export const FLANC_HAUTEUR = HAUTEUR_BLOCS
+/** La plinthe au pied, le bandeau sous le chant, la largeur d'un joint —
+ *  en unités monde. */
+export const FLANC_PLINTHE = 15
+export const FLANC_BANDEAU = 17
+export const FLANC_JOINT = 2.6
+
+/** Le joint le plus proche du point `s` (le long de la paroi, depuis son
+ *  angle, comme pour la tôle du dessus) : [écart SIGNÉ au joint, en unités
+ *  monde (positif au-delà), numéro du panneau]. Les joints d'une répétition
+ *  ne suffisent pas : au début d'une répétition, le plus proche est souvent
+ *  le DERNIER de la précédente — un panneau chevauche la couture de la
+ *  texture. Le numéro change d'un à chaque joint, couture comprise. Le
+ *  jumeau GLSL (JOINT_FLANC_COQUE_GLSL) dit la même chose ; coque.spec.ts
+ *  tient les deux. */
+export function jointFlancCoque(s: number, rep: number): [number, number] {
+  const u = s / rep
+  const k = Math.floor(u)
+  const f = u - k
+  const n = FLANC_JOINTS.length
+  let ecart = Infinity
+  let panneau = n * k - 1
+  for (let j = -1; j <= n; j++) {
+    const fj = j < 0 ? FLANC_JOINTS[n - 1] - 1 : j === n ? FLANC_JOINTS[0] + 1 : FLANC_JOINTS[j]
+    if (Math.abs(f - fj) < Math.abs(ecart)) ecart = f - fj
+    if (j >= 0 && j < n && f >= fj) panneau++
+  }
+  return [ecart * rep, panneau]
+}
+
+const g4 = (v: number) => v.toFixed(4)
+export const JOINT_FLANC_COQUE_GLSL = `// (coque.ts : jointFlancCoque, son jumeau TypeScript)
+vec2 jointFlancCoque(float s, float rep) {
+  float u = s / rep;
+  float k = floor(u);
+  float f = u - k;
+  const vec3 J = vec3(${FLANC_JOINTS.map(g4).join(', ')});
+  float e = f - (J.z - 1.0);
+  if (abs(f - J.x) < abs(e)) e = f - J.x;
+  if (abs(f - J.y) < abs(e)) e = f - J.y;
+  if (abs(f - J.z) < abs(e)) e = f - J.z;
+  if (abs(f - J.x - 1.0) < abs(e)) e = f - J.x - 1.0;
+  float p = ${FLANC_JOINTS.length.toFixed(1)} * k - 1.0 + step(J.x, f) + step(J.y, f) + step(J.z, f);
+  return vec2(e * rep, p);
 }`
 
 // ——— L'OMBRE AU PIED DE LA COQUE ———————————————————————————————————————
