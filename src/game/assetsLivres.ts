@@ -96,6 +96,8 @@ const NOMS: Record<string, string> = {
   'meta-marchand.webp': 'Méta — le Sujet 12 (marchand)',
   'sas-raccord.webp': 'Sas de raccord (col vertical)',
   'sas-raccord-v.webp': 'Sas de raccord (quart de tour)',
+  // LES PORTES de l'éditeur — rendues dans Blender (tools/images/blender/porte_blindee.py)
+  'porte-blindee.webp': 'Porte blindée — dessus, sabot, face et fente au sol (atlas)',
   'meta-eclat.webp': 'Méta — éclat de mémoire',
   'meta-icones.webp': 'Méta — planche d’icônes (4×2)',
   // LA CÉRÉMONIE STATION — rendue dans Blender (docs/assets-ia.md § 36)
@@ -163,6 +165,7 @@ export function rubriqueDe(url: string): string {
     f.startsWith('hub-') ||
     f.startsWith('iris') ||
     f.startsWith('lampe-') ||
+    f.startsWith('porte-') ||
     f.startsWith('plafond')
   )
     return 'Machinerie & décalques'

@@ -2888,3 +2888,71 @@ puis `prepare.py chaudiere-atlas`. La conduite : `flanc_conduite.py`, puis
 `flanc_conduite()` et `lance(['flanc-conduite'], SORTIE, 384)` ; copier le PNG
 dans `masters/images/sources/`, lancer `tools/images/conduite_atlas.py` puis
 `prepare.py conduite-atlas`.
+
+## 39. LA PORTE BLINDÉE — la dalle escamotable des portes de l'éditeur ✅ LIVRÉ (22/11)
+
+> **Rendue dans Blender** (`tools/images/blender/porte_blindee.py`) : un seul
+> atlas, `porte-blindee.webp` (1076 × 288, 8 Ko, luminance 0,19, moins de 1 %
+> de pixels chauds — les deux veilleuses).
+
+**Avant** : chaque porte posée à l'éditeur (`level.portes`) se dessinait au
+trait, en **rouge** — une « barrière d'énergie », aplat translucide barré de
+lignes. Le rouge est réservé à l'alerte des cinématiques (charte §3), la
+station n'a pas d'hologramme (charte §1) : c'était le seul objet du tableau
+qui ne sortait pas de l'atelier. Le concepteur la voulait « comme le protocole
+porte de grange » (le verrouillage d'*Avengers: Endgame*), puis, en la voyant :
+« on la voit de haut avec la 2,5D, on voit une des faces » et « elle se rentre
+dans le sol […] on voit vraiment la porte s'enfoncer dans le sol et ça libère
+le passage ».
+
+**La porte est une dalle d'acier escamotable** : close, elle est debout, son
+dessus au sommet des murs qu'elle relie ; elle s'ouvre en **s'enfonçant dans
+le sol** ; ouverte, il ne reste que les deux lèvres de sa fente, au ras du sol,
+et rien entre elles — le fluide qui passe se voit. Ni montant ni cadre de part
+et d'autre.
+
+Quatre pièces, la longueur à l'horizontale (les rectangles sont un contrat
+avec `src/render/porteBlindee.ts`, que `porteBlindee.spec.ts` relit dans le
+script) :
+
+| pièce | vue | taille | ce qu'elle montre |
+| --- | --- | --- | --- |
+| `dessus` | d'en haut | 320 × 160 | la tranche haute de la dalle : deux tôles de chant, deux joints sarcelle, l'âme nervurée en travers, l'échine boulonnée — **pas** de chevrons : vu d'en haut, on ne voit que le haut d'une dalle épaisse |
+| `bout` | d'en haut | 96 × 160 | le sabot d'extrémité (en miroir à l'autre bout) : le joint de caoutchouc qui frotte le mur, le bloc boulonné, la veilleuse ambre |
+| `flanc` | élévation | 320 × 280 | la grande face que le relief 2,5D dévoile : la lèvre de tête, **la bande de chevrons** (elle sort du sol la première), deux panneaux, la nervure boulonnée, le joint du pied — 2 px par unité, un mur haut (140 u) |
+| `fente` | d'en haut | 320 × 160 | les deux lèvres de la fente au sol, peintes de chevrons au pochoir, le milieu détouré |
+
+**Le moteur** (`src/render/porteBlindee.ts`, appelé par `drawMecanismes` et
+par l'éditeur) répète le dessus et la face le long de la porte (un carreau de
+dessus ≈ deux épaisseurs, étiré pour finir au sabot ; un carreau de face = deux
+de dessus, ses joints sous les leurs). La face est **accrochée par le haut** :
+à mi-hauteur, on voit la moitié haute de l'image — le reste est dans le sol.
+
+- **Porte d'un coup** (le cas courant) : le solveur la veut pleine ou absente,
+  sans transition ; sa **levée** n'est qu'une image, 0,4 s du sol au sommet
+  (`DUREE_LEVEE`). Montante, elle arrête le corps dès qu'elle affleure, comme
+  une paroi qui sort du sol arrête une flaque.
+- **Rideau, éventail** : la part matérialisée (`portePolygone`) est debout,
+  le reste encore dans la fente — la porte **se déplie** depuis le sol le long
+  de son front. Ce que le solveur oppose au corps reste exactement ce qu'on
+  voit, en plan.
+- Relief éteint (et à l'éditeur), le pied et le sommet se confondent : une
+  porte basse est plus sombre (l'ombre de sa fente), c'est ce qui dit qu'elle
+  monte.
+- Les veilleuses battent pendant la course, veillent porte close ; le front
+  d'une porte qui se déplie est un trait blanc froid (`#d6e8f5`).
+
+Tant que l'atlas n'est pas chargé, la porte se dessine au vecteur dans les
+mêmes teintes.
+
+**Refaire** — sans fenêtre, avec le module `bpy` (`pip install bpy`, ~3 min sur
+4 cœurs) :
+
+```bash
+python tools/images/blender/porte_blindee.py --rend SORTIE 384
+python -I tools/images/blender/porte_blindee.py SORTIE masters/images/porte-blindee.png
+python3 tools/images/prepare.py porte-blindee
+```
+
+ou dans Blender : `DOSSIER = r'…/tools/images/blender'`, exécuter
+`porte_blindee.py`, puis `porte()` et `lance(NOMS, SORTIE, 384)`.
