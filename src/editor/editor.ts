@@ -4468,22 +4468,19 @@ export class LevelEditor {
     // Tableaux LIVRÉS : une copie s'ouvre comme brouillon — pour étudier la
     // construction des salles (miroirs, prisme, plasma…) ou en repartir.
     const selLivres = this.el<HTMLSelectElement>('ed-livres')
-    // le HUB en tête (code « HUB », le module Méduse en RUBAN) : publié
-    // dans la bibliothèque, il REMPLACE le laboratoire joué — sans jamais
-    // entrer dans la séquence. Il porte TOUT son méta en données (plots,
-    // banc, marchand, ancres de réparation et de sas) : la copie s'ouvre
-    // ici pièce par pièce. Le hub COMPACT (chantier, code HUB2) s'étudie
-    // et se copie aussi ; pour qu'il devienne LE laboratoire, renommer sa
-    // copie en HUB.
+    // LE HUB JOUÉ en tête : la ROTONDE (code HUB3 = CODE_HUB, depuis le
+    // 22/11). Publiée dans la bibliothèque sous ce code, sa copie REMPLACE
+    // le laboratoire joué — sans jamais entrer dans la séquence. Elle porte
+    // TOUT son méta en données (pupitres, banc, marchand, ancres) : la copie
+    // s'ouvre ici pièce par pièce. Le grand module (HUB) et le compact (HUB2)
+    // s'étudient et se copient aussi ; pour que l'un d'eux redevienne LE
+    // laboratoire, renommer sa copie en HUB3.
     // L'ÉCONOMAT suit la même règle que le HUB : publié sous le code « ECO »,
     // sa copie remplace la salle-boutique jouée — plots, marchand compris.
     const livres = [
+      TABLEAU_HUB_ROTONDE,
       TABLEAU_HUB,
       TABLEAU_HUB_COMPACT,
-      // LA ROTONDE (code HUB3, game/hubRotonde.ts) : le plan rayonnant —
-      // même règle que le compact, sa copie recodée HUB devient le
-      // laboratoire joué
-      TABLEAU_HUB_ROTONDE,
       TABLEAU_ECONOMAT,
       ...TABLEAUX_ECOLE,
       ...TABLEAUX,
@@ -5184,7 +5181,7 @@ export class LevelEditor {
               s.level.code === CODE_HUB
                 ? 'Le LABORATOIRE : ce tableau remplace le hub et ne compte pas dans la séquence'
                 : hub
-                  ? 'Un chantier de hub : hors séquence — publiez-le sous le code HUB pour qu’il devienne le laboratoire joué'
+                  ? `Un chantier de hub : hors séquence — publiez-le sous le code ${CODE_HUB} pour qu’il devienne le laboratoire joué`
                   : 'Ouvrir ce tableau'
             }">` +
             `<b>${s.level.code}</b> ${s.level.name}` +
@@ -5659,7 +5656,7 @@ export class LevelEditor {
       el.textContent =
         code.toUpperCase() === CODE_HUB
           ? 'Code réservé : ce tableau devient le LABORATOIRE (hors séquence).'
-          : 'Chantier de hub : hors séquence tant qu’il ne s’appelle pas HUB.'
+          : `Chantier de hub : hors séquence tant qu’il ne s’appelle pas ${CODE_HUB}.`
       return
     }
     const num = numeroTableau(this.level.name)

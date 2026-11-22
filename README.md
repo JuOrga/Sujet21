@@ -137,10 +137,11 @@ partis) ; `?editeur` et `?carte` dans l'URL restent des raccourcis.
 station, `?tableau=N` démarre à la salle N,
 `?spawn=x,y` place le corps. `?horsligne` coupe tout appel à l'API (la
 posture du build Steam : le contenu livré fait foi — `src/game/reseau.ts`).
-`?hub=rotonde` (ou `grand`, `compact`) joue l'un des trois modules d'accueil
-livrés à la place du hub publié, sur ce poste seulement et sans rien
-publier — pour juger un hub avant de le recoder `HUB` dans l'éditeur
-(`src/game/hub.ts`, `src/game/hubRotonde.ts`).
+Le hub joué est **la rotonde** (`src/game/hubRotonde.ts`, code `HUB3`) : une
+copie publiée sous `HUB3` la remplace, l'ancienne entrée `HUB` de la
+bibliothèque n'est plus jouée. `?hub=grand` (ou `compact`, `rotonde`) joue
+l'un des trois modules livrés à la place, sur ce poste seulement et sans
+rien publier (`src/game/hub.ts`).
 
 ## Qualité
 
