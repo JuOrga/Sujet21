@@ -1,0 +1,18 @@
+{
+  "name": "sujet21-relais",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Le relais du multi : un salon par code, deux joueurs, tout ce que l'un envoie arrive à l'autre.",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "express": "^4.21.2",
+    "ws": "^8.18.0"
+  }
+}

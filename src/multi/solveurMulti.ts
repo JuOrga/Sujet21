@@ -1,0 +1,5467 @@
+// LE SOLVEUR DU MULTI — une COPIE de src/sim/solver.ts, à plusieurs corps.
+//
+// Pourquoi une copie, et pas un paramètre de plus dans le solveur du jeu
+// (le concepteur, 19/11) : « je préfère ne pas toucher au solveur — tu ne
+// pourras jamais tout tester, et on se retrouverait avec un comportement
+// différent qu'on ne remarquerait pas tout de suite ». Le solveur du jeu
+// reste donc INTACT, octet pour octet ; celui-ci part de lui et diverge.
+// Le prix est connu : une correction faite là-bas n'arrive pas ici, et
+// inversement. Le test de parité (solveurMulti.spec.ts) tient la copie à
+// UN joueur sur les mêmes trajectoires que l'original, au bit près : si
+// l'on recopie un jour une correction, c'est lui qui dira si elle a pris.
+//
+// CE QUI CHANGE, et rien d'autre :
+//  - chaque particule porte un PROPRIÉTAIRE (`proprio`) : le joueur dont
+//    elle est le corps, ou dont elle est la goutte égarée ;
+//  - ce que le solveur du jeu tenait en champs uniques — le volume, la
+//    dispersion, le centre, le reste d'éjection — vit dans UN ÉTAT PAR
+//    CORPS (`corps[]`). Les mêmes noms (`playerCount`, `stats`…) lisent
+//    celui du JOUEUR COURANT (`courant`) : tout le code d'origine parle
+//    donc du corps courant sans qu'une ligne en soit réécrite ;
+//  - « est du corps » (`estCorps`) veut dire : du corps DU COURANT. Le
+//    corps d'un autre joueur est, pour le courant, de la matière qui presse
+//    et qu'on ne pilote pas ;
+//  - `relabel` attribue les amas à PLUSIEURS corps (voir sa note) ;
+//  - LES CLOISONS (voir `poseCloisons`) : un corps FERMÉ ne se mélange à
+//    aucune matière étrangère, deux corps ne fusionnent que s'ils sont tous
+//    deux OUVERTS. Ce sont les gestes du jeu à deux.
+//
+// LA GLACE EST RÉVEILLÉE (le gel VOLONTAIRE seulement : les plaques froides
+// dorment encore). Ce qu'il a fallu pour qu'elle vaille à deux :
+//  - l'intention de gel est PAR CORPS (`corps[j].gel`), lue par propriétaire ;
+//  - deux corps gelés au contact restent DEUX blocs (icePass ne lie plus
+//    des particules de propriétaires différents) ;
+//  - un bloc a une MASSE : il reçoit le rebond des étrangères et leur
+//    pression (voir `gelRecuX`), au lieu de les repousser sans rien sentir ;
+//  - le palet du hockey le heurte en corps rigide (icePass, REBOND_GLACE_PALET).
+// À UN joueur rien n'a changé d'un bit : glace.spec.ts le tient.
+//
+// CE QUI DORT : la vapeur, le plasma, les plaques froides, les éponges, les
+// coupelles, les rails, le sas. Leur code est là, il parle du joueur
+// courant, et la salle du multi ne l'éveille pas — aucune de ces mécaniques
+// n'a été pensée ni essayée à deux. Les réveiller est un chantier à part.
+//
+// ---- le texte d'origine ----
+// Solveur de fluide 2D « Position Based Fluids » (Macklin & Müller 2013).
+//
+// Choix structurants, dictés par le doc fonctionnel :
+// - contrainte de densité en égalité (pas seulement anti-compression) : en
+//   apesanteur, le déficit de densité en surface attire les particules vers
+//   l'intérieur — c'est la tension de surface qui tient le corps (§2.3) ;
+// - sCorr (correction tensile) empêche l'agglutination que cette égalité
+//   provoquerait, et son intensité est le curseur de cohésion (décision n°1) ;
+// - toutes les interactions internes sont antisymétriques par paires : la
+//   quantité de mouvement est conservée exactement, l'éjection comprise (§3.3).
+
+import type { SimParams } from '../sim/params'
+import type { NoyauxWasm } from '../sim/wasm'
+import { SpatialGrid } from '../sim/grid'
+import { makeKernels, computeRestDensity, type Kernels } from '../sim/kernels'
+import { labelComponents } from '../sim/components'
+import { accelerationPuits, type Accel } from '../game/puits'
+import type { PuitsDef } from '../game/level'
+import { boxContact, Sponge, type ClosestPoint } from '../sim/obstacles'
+import { FORME_SURCHAUFFEUR, type FormeBox } from '../game/formes'
+import { formePhysique } from '../game/conduite'
+import { VIDE_COURANT, VIDE_PORTEE } from '../game/vide'
+import {
+  MAT_CHAUD,
+  MAT_FROID,
+  MAT_GRILLE,
+  MAT_HYDROPHILE,
+  MAT_HYDROPHOBE,
+  MAT_MEMBRANE,
+  MAT_RIDEAU,
+  MAT_SURCHAUFFEUR,
+  dansBoite,
+  sansPhysique,
+  CHASSE_ALLURE_DEFAUT,
+  MAT_WALL,
+  type ObstacleBox,
+  type SpongeDef,
+} from '../game/level'
+
+export const KIND_FREE = 0
+
+/** L'état d'une coupelle dans le solveur (setCoupelles). */
+export interface CoupelleSim {
+  x: number
+  y: number
+  r: number
+  capacite: number
+  portee: number
+  courant: number
+  debit: number
+  bu: number
+  pleine: boolean
+  reserve: number
+}
+/** LE PLANCHER DU TIR DE GLACE : un éclat n'a jamais moins de particules, et le corps n'en garde jamais moins. */
+export const ECLAT_MIN = 3
+export const KIND_PLAYER = 1
+// Les bits du MILIEU rendus par milieuAt (le traceur laser les lit) :
+// la glace au contact, l'eau liquide (au sens de liquidAt), la vapeur.
+export const MILIEU_GLACE = 1
+export const MILIEU_EAU = 2
+export const MILIEU_VAPEUR = 4
+
+// Voisins retenus par particule et par pas (au-delà : ignorés — les zones
+// aussi denses sont déjà sur-contraintes)
+const MAX_NEIGHBORS = 48
+
+export interface Bounds {
+  minX: number
+  minY: number
+  maxX: number
+  maxY: number
+}
+
+export interface PlayerStats {
+  count: number
+  centroidX: number
+  centroidY: number
+  velX: number
+  velY: number
+  rmsRadius: number
+}
+
+// Rejet rapide d'une boîte : hors de portée « marge » ? Pour une boîte
+// OBLIQUE ou une FORME (toujours inscrite dans sa boîte englobante), on
+// rejette sur le cercle englobant — conservateur mais sûr.
+function horsBoite(
+  b: {
+    minX: number
+    minY: number
+    maxX: number
+    maxY: number
+    angle?: number
+    forme?: number
+  },
+  x: number,
+  y: number,
+  marge: number,
+): boolean {
+  if (b.angle) {
+    const r = Math.hypot(b.maxX - b.minX, b.maxY - b.minY) / 2 + marge
+    const cx = (b.minX + b.maxX) / 2
+    const cy = (b.minY + b.maxY) / 2
+    return Math.abs(x - cx) > r || Math.abs(y - cy) > r
+  }
+  return (
+    x < b.minX - marge ||
+    x > b.maxX + marge ||
+    y < b.minY - marge ||
+    y > b.maxY + marge
+  )
+}
+
+/** L'ÉTAT d'une particule tel que le RENDU l'encode, en un seul nombre :
+ *  givre en positif (0..1), vapeur en négatif (0..−1) — et le PLASMA pousse
+ *  la vapeur AU-DELÀ de −1, jusqu'à −2. Les décodages en bout de chaîne :
+ *  `gas = clamp(-état, 0, 1)` (saturé, donc inchangé par le plasma) et
+ *  `plasma = clamp(-état - 1, 0, 1)`. Une seule formule, partagée entre le
+ *  paquetage des sprites et les tests — pour que l'encodage ne puisse pas
+ *  dériver en silence de ce que les shaders décodent. */
+export function etatRendu(frost: number, vapor: number, ionise: number): number {
+  return frost - vapor * (1 + ionise)
+}
+
+// L'ALLURE DE LIVRAISON (u/s) : la vitesse à laquelle le champ pousse le
+// nuage hors de la bouche du tube, une fois arrivé au terminus. Le voyage se
+// fait à ~500 u/s ; on sort bien plus lentement — assez vite pour être
+// dehors avant que le joueur n'ait fini de relâcher la touche, assez
+// doucement pour que ce ne soit pas une éjection.
+const LIVRAISON_VITESSE = 150
+
+// LE CŒUR D'UNE LIGNE DE CHAMP, en part du rayon de capture. C'est
+// l'épaisseur sur laquelle la vapeur ORDINAIRE bute. Elle est JUSTE en
+// dessous du rayon où le faisceau s'ionise (plasmaRailRadius), et pas
+// davantage : repoussée jusqu'au rayon de capture, la vapeur ne pourrait
+// plus jamais allumer ce qu'elle veut franchir — c'est le verrou de #304,
+// qui avait rendu le conduit inatteignable en jeu. À 0,9, il reste 3 unités
+// de marge, et la paroi garde presque toute l'épaisseur qu'on lui dessine.
+// Exporté : le DESSIN de la paroi doit peindre l'épaisseur qui arrête pour
+// de bon, sans quoi le tube ment de nouveau sur sa taille — dans l'autre
+// sens cette fois (peint à 75, il n'arrêtait la vapeur qu'à 27).
+export const COEUR_PART = 0.9
+
+/** Le nombre de joueurs que la copie sait tenir. Un octet de propriétaire
+ *  en porterait 255 ; la salle, non. */
+export const JOUEURS_MAX = 4
+/** Le propriétaire d'une particule qui n'est à personne (semée par la
+ *  salle, ou jamais attribuée). */
+export const SANS_PROPRIO = 255
+/** LE PALET du hockey : un disque solide posé dans la salle. Le solveur n'en
+ *  connaît que le CONTACT avec l'eau — il repousse les particules, et note ce
+ *  qu'elles lui rendent. Sa course, les parois, les cages, qui le tient et
+ *  qui le lance : c'est la règle du jeu, et elle vit dans palet.ts. */
+export interface PaletSim {
+  actif: boolean
+  x: number
+  y: number
+  vx: number
+  vy: number
+  rayon: number
+  /** Sa masse, comptée en particules (une particule pèse 1). */
+  masse: number
+  /** Les corps qu'il TRAVERSE, un bit par joueur : un corps ouvert le laisse
+   *  entrer, et celui qui vient de le lancer le laisse sortir. */
+  traverse: number
+  /** La quantité de mouvement que l'eau lui a rendue pendant le pas. */
+  recuX: number
+  recuY: number
+  /** Par joueur : combien de particules de son corps sont sous le palet. */
+  readonly dessous: Int32Array
+  /** Par joueur : combien de particules de son corps le TOUCHENT (sous lui,
+   *  ou dans la couche où il se fait sentir). */
+  readonly touche: Int32Array
+}
+export function paletVide(): PaletSim {
+  return { actif: false, x: 0, y: 0, vx: 0, vy: 0, rayon: 48, masse: 120, traverse: 0, recuX: 0, recuY: 0, dessous: new Int32Array(JOUEURS_MAX), touche: new Int32Array(JOUEURS_MAX) }
+}
+/** Le nombre de cases par corps du tampon de forme (voir FluidSimMulti.forme). */
+const FORME = 12
+
+/** L'ÉTAT D'UN CORPS : tout ce que le solveur du jeu tenait en champs
+ *  uniques, parce qu'il n'y avait qu'un corps. */
+export interface EtatCorps {
+  baseVolume: number
+  playerCount: number
+  dispersed: boolean
+  belowCritical: boolean
+  enPretCount: number
+  criticalTimer: number
+  ejectCarry: number
+  /** OUVERT : ce corps accepte la matière des autres (fusion, don).
+   *  Fermé (le défaut), il la repousse. */
+  ouvert: boolean
+  /** GEL : ce corps veut prendre en glace (la touche F du jeu, par corps). */
+  gel: boolean
+  stats: PlayerStats
+  rass: { actif: boolean; vu: boolean; resteX: number; resteY: number; uX: number; uY: number }
+}
+
+function etatCorpsNeuf(): EtatCorps {
+  return {
+    baseVolume: 0,
+    playerCount: 0,
+    dispersed: false,
+    belowCritical: false,
+    enPretCount: 0,
+    criticalTimer: 0,
+    ejectCarry: 0,
+    ouvert: false,
+    gel: false,
+    stats: { count: 0, centroidX: 0, centroidY: 0, velX: 0, velY: 0, rmsRadius: 1 },
+    rass: { actif: false, vu: false, resteX: 0, resteY: 0, uX: 0, uY: 0 },
+  }
+}
+
+export class FluidSimMulti {
+  // ---- LES CORPS ----------------------------------------------------------
+  /** Un état par joueur. */
+  readonly corps: EtatCorps[]
+  /** Le joueur dont parlent `playerCount`, `stats`, `eject`, `spawnDisc`…
+   *  Se règle avant le geste : `sim.courant = 1 ; sim.eject(…)`. */
+  courant = 0
+  /** Le propriétaire de chaque particule : pour une particule de corps, le
+   *  joueur dont c'est le corps ; pour une goutte libre, celui qui l'a
+   *  perdue (elle lui revient à l'aimant, et à qui la touche au contact). */
+  readonly proprio: Uint8Array
+
+  get nbJoueurs(): number {
+    return this.corps.length
+  }
+  get baseVolume(): number {
+    return this.corps[this.courant].baseVolume
+  }
+  set baseVolume(v: number) {
+    this.corps[this.courant].baseVolume = v
+  }
+  get playerCount(): number {
+    return this.corps[this.courant].playerCount
+  }
+  set playerCount(v: number) {
+    this.corps[this.courant].playerCount = v
+  }
+  get dispersed(): boolean {
+    return this.corps[this.courant].dispersed
+  }
+  set dispersed(v: boolean) {
+    this.corps[this.courant].dispersed = v
+  }
+  get belowCritical(): boolean {
+    return this.corps[this.courant].belowCritical
+  }
+  set belowCritical(v: boolean) {
+    this.corps[this.courant].belowCritical = v
+  }
+  get enPretCount(): number {
+    return this.corps[this.courant].enPretCount
+  }
+  set enPretCount(v: number) {
+    this.corps[this.courant].enPretCount = v
+  }
+  get criticalTimer(): number {
+    return this.corps[this.courant].criticalTimer
+  }
+  set criticalTimer(v: number) {
+    this.corps[this.courant].criticalTimer = v
+  }
+  private get ejectCarry(): number {
+    return this.corps[this.courant].ejectCarry
+  }
+  private set ejectCarry(v: number) {
+    this.corps[this.courant].ejectCarry = v
+  }
+  get stats(): PlayerStats {
+    return this.corps[this.courant].stats
+  }
+  private get rass(): EtatCorps['rass'] {
+    return this.corps[this.courant].rass
+  }
+  // tampons de relabel, un par joueur : l'étiquette de l'amas qui EST son
+  // corps (−1 : aucun), la taille de cet amas en particules à lui, et le
+  // compte de ce qui lui revient
+  private readonly labelDe = new Int32Array(JOUEURS_MAX)
+  private readonly tailleDe = new Int32Array(JOUEURS_MAX)
+  private readonly compteDe = new Int32Array(JOUEURS_MAX)
+  // LES CLOISONS — pourquoi deux corps ne se mélangent pas tout seuls.
+  //
+  // Le solveur tient l'eau par sa densité : une particule en manque de
+  // voisines est tirée vers elles, c'est la tension de surface. Deux corps
+  // qui se touchent n'ont donc plus de surface à leur contact — ils ne font
+  // qu'un, qu'on le veuille ou non. Au premier essai à deux, c'était le
+  // défaut noté : « deux corps qui se touchent se mêlent sans qu'on l'ait
+  // choisi ».
+  //
+  // La règle du jeu à deux : la fusion est un PACTE. Une particule de corps
+  // FERMÉ ne compte pour voisine qu'une particule du même propriétaire ;
+  // toute autre matière lui est étrangère — elle ne presse pas, ne colle
+  // pas, ne se lie pas, et un écartement la tient à distance (voir le pas).
+  // Dès que les DEUX corps sont ouverts, la paire redevient de l'eau
+  // ordinaire : ils fusionnent. Une goutte libre n'a pas de cloison : elle
+  // se mêle à qui veut bien d'elle — tirée dans un corps ouvert elle est
+  // BUE (le don), tirée dans un corps fermé elle REBONDIT et le bouscule.
+  //
+  // `cloison[i]` vaut 1 pour une particule d'un corps fermé. Deux particules
+  // i et j sont ÉTRANGÈRES l'une à l'autre si elles n'ont pas le même
+  // propriétaire et que l'une des deux au moins porte une cloison.
+  private readonly cloison: Uint8Array
+  /** Le multiplicateur de la pression entre étrangères, par particule. */
+  private readonly lambdaE: Float32Array
+  // LA GOUTTE TIRÉE. Un corps ouvert boit ce qu'on lui TIRE — c'est le don,
+  // un geste. Il ne doit pas boire pour autant les MORCEAUX de l'autre : un
+  // corps bousculé se défait en fragments, et dans une fusion un peu
+  // brouillonne le plus gros avalait la moitié de l'autre (mesuré à l'écran :
+  // 851 particules avant de s'ouvrir, 332 cinq secondes après). La marque
+  // dit donc d'où vient une goutte libre : 1 si elle est partie d'un JET,
+  // 0 si elle s'est détachée. Seule une goutte tirée change de propriétaire ;
+  // un fragment reste à son corps, même au milieu de celui d'un autre, et
+  // lui revient dès qu'ils se retrouvent.
+  private readonly tiree: Uint8Array
+  // tampons du rebond : l'élan reçu par chaque corps, et son nombre de particules
+  private readonly rebondX = new Float32Array(JOUEURS_MAX)
+  private readonly rebondY = new Float32Array(JOUEURS_MAX)
+  private readonly rebondMasse = new Int32Array(JOUEURS_MAX)
+  private readonly rebondBiaisX = new Float64Array(JOUEURS_MAX)
+  private readonly rebondBiaisY = new Float64Array(JOUEURS_MAX)
+  /** Par corps : centre (x, y), moments (xx, yy, xy), somme des poids de
+   *  l'écrasement, et moments des vitesses (la vitesse de déformation) —
+   *  voir ECRASEMENT, TENSION_PEAU et AMORTI_PEAU. */
+  private readonly forme = new Float64Array(JOUEURS_MAX * FORME)
+  /** Par corps : combien de ses particules touchent de la matière étrangère. */
+  private readonly rebondTouche = new Int32Array(JOUEURS_MAX)
+  /** Y a-t-il une cloison quelque part ? Faux à un joueur : le solveur du
+   *  jeu n'a pas de cloisons, et la parité au bit près en dépend. */
+  private cloisons = false
+  // LE REBOND. La pression seule tient les étrangères à distance, mais elle
+  // ne REND rien : deux corps fermés qui se rencontrent s'écrasent l'un
+  // contre l'autre et repartent collés, à la même vitesse — mesuré, la
+  // restitution est nulle (80 u/s contre 0 → 44 et 36), et les corps
+  // s'aplatissent du simple au double. À l'écran cela se lit comme une
+  // fusion : « même sans s'ouvrir, les corps fusionnent à moitié » (le
+  // concepteur, 20/11, premier essai des gestes à deux appareils).
+  //
+  // Un corps fermé a donc une PEAU : chaque paire d'étrangères à portée se
+  // repousse comme un ressort, et ce que reçoit une particule de corps est
+  // réparti sur TOUT son corps — il recule d'un bloc au lieu de se creuser
+  // au point de contact. Un ressort rend ce qu'il prend : les corps
+  // rebondissent, et gardent leur forme. Une goutte libre, elle, encaisse
+  // seule : le jet tiré dans un corps fermé ricoche, et le pousse entier
+  // sans le labourer.
+  /** La raideur du ressort, en u/s² pour une paire à mi-portée. Il durcit
+   *  de près (force en portée / distance − 1) : deux corps lancés fort ne se
+   *  traversent pas. */
+  static RAIDEUR_REBOND = 20000
+  /** Sa portée, en rayons de noyau : là où deux étrangères se « sentent ». */
+  static PORTEE_REBOND = 1
+  /** Le plafond de la force d'une paire, en multiples de la raideur. */
+  static PLAFOND_REBOND = 6
+  // LA PRESSION, elle, ne joue plus que de TRÈS près (0,6 pas de
+  // particule). Elle ne rend rien de ce qu'elle prend : laissée à pleine
+  // portée, elle arrêtait les corps avant le ressort, et le rebond était
+  // nul — mesuré à 80 u/s : restitution 0,01 avec elle, 1,06 sans. Mais
+  // sans elle du tout, deux corps fondus qui se referment ne se démêlent
+  // plus : leurs particules sont entremêlées, le ressort s'annule en
+  // moyenne (il pousse les corps, pas les particules) — c'est la pression,
+  // particule par particule, qui rend à chacun sa place. À 0,6 pas elle
+  // démêle encore (89 u d'écart fondus, 390 u quatre secondes après s'être
+  // refermé) et laisse le ressort rendre : restitution 0,42 à 80 u/s, 0,37
+  // à 160, 0,25 à 320 (à un pas entier : 0,21 / 0,25 / 0,15).
+  static PORTEE_PRESSION = 0.6
+  /** La part du ressort que chaque particule de corps garde pour elle au
+   *  lieu de la verser au corps entier. Zéro, et ce n'est pas un oubli :
+   *  essayée à 0,2, 0,3 et 0,5, elle creusait le corps au point de contact
+   *  (restitution −0,1), et à 0,5 un jet d'une seconde déchirait le corps
+   *  fermé qu'il visait (447 particules sur 900 lui restaient). */
+  static PART_PROPRE = 0
+
+  // L'ÉCRASEMENT. Rendu à parts égales, le ressort faisait reculer le corps
+  // comme un bloc : deux corps fermés se renvoyaient sans changer de forme —
+  // « on dirait de la glace, ce n'est pas du tout réaliste » (le concepteur,
+  // 20/11, deuxième essai). Une goutte qui en heurte une autre S'ÉCRASE : sa
+  // face de contact s'arrête la première, l'arrière continue sur sa lancée.
+  // Le ressort est donc réparti de biais — davantage aux particules du côté
+  // du contact, moins à celles de l'arrière : la somme reste la même (le
+  // corps recule autant), mais il s'aplatit contre l'obstacle.
+  /** La pente de ce biais : le poids d'une particule va de 0 à 2 et passe
+   *  par 1 au centre du corps. À 0, c'est le bloc rigide d'avant. À 3, le
+   *  tiers du corps tourné vers le contact reçoit double, le tiers opposé
+   *  ne reçoit rien. Mesuré, corps de 900 lancé sur un autre au repos
+   *  (largeur sur hauteur au plus fort de l'écrasement, puis revenu à 1,00
+   *  en deux secondes) : 0,90 à 80 u/s, 0,83 à 160, 0,71 à 320. */
+  static ECRASEMENT = 3
+  // LA PEAU TENDUE. Écrasé, le corps doit revenir : l'eau du jeu ne se
+  // reforme pas seule, elle resterait en galette. Un corps FERMÉ est tendu
+  // par sa peau — un rappel vers la forme ronde, proportionnel à
+  // l'allongement, qui resserre le grand axe et regonfle le petit. Il ne
+  // change ni le volume, ni la quantité de mouvement, ni la rotation ; il
+  // fait trembler le corps après le choc, comme une goutte.
+  /** La raideur de ce rappel, en s⁻² (l'accélération d'une particule par
+   *  unité de distance au centre, pour un allongement de 100 %). */
+  static TENSION_PEAU = 12
+  /** Le rappel du BORD, en s⁻² : ce qui dépasse du rond que le corps
+   *  remplirait est ramené vers son centre. Le rappel d'allongement ne voit
+   *  qu'un ovale ; un corps qui vient de tirer garde une forme de boomerang
+   *  qui n'est allongée dans aucun sens (vu à l'écran, 20/11) — celui-ci la
+   *  résorbe. */
+  static RAPPEL_BORD = 12
+  /** Le rayon du rond qu'occupent n particules, en pas de particule par
+   *  racine de n (mesuré : 900 particules au repos font 103,4 u de rayon). */
+  static RAYON_ROND = 0.5222
+  /** L'allongement au-delà duquel le rappel ne grandit plus : un corps
+   *  étiré en ruban revient, il n'est pas rappelé d'un coup de fouet. */
+  static PLAFOND_PEAU = 0.6
+  /** Ce qui calme le tremblement, en s⁻¹ : la déformation qui va trop vite
+   *  est freinée. Sans lui le corps tremblait encore, d'autant, quatre
+   *  secondes après le choc ; à 2 il dépasse le rond une fois (1,05 à
+   *  160 u/s) et s'y pose. */
+  static AMORTI_PEAU = 2
+  /** La peau ne se tend pas sur un corps MÊLÉ à un autre. Deux corps fondus
+   *  dont l'un se referme sont encore l'un dans l'autre : tendu aussitôt, il
+   *  se ramassait en boule au milieu de l'autre et en était chassé comme un
+   *  pépin (mesuré : 500 u/s). La tension décroît donc avec la part du corps
+   *  au contact de matière étrangère, et s'annule à cette part-ci — au
+   *  contact simple, seule la couche du bord touche. */
+  static PEAU_MELEE = 0.15
+
+  /** AU HOCKEY, la matière tirée revient à son corps d'où qu'elle soit. Dans
+   *  le jeu, une goutte tombée hors du rayon de capture est perdue — « allez
+   *  la chercher » ; sur un terrain où l'on se déplace sans cesse, c'était
+   *  la ruine : mesuré à l'écran, un corps qui pousse pour rejoindre le
+   *  palet au centre y arrive avec 593 particules sur 900, et il lui en
+   *  reste 126 après une poursuite. Faux par défaut : rien ne change. */
+  rappelSansLimite = false
+  // LE RETOUR DES GOUTTES AU HOCKEY (voir applyStrayRecall). Le premier
+  // réglage visait une vitesse égale à la distance au cœur du corps : la
+  // goutte ralentissait de plus en plus en approchant, et mettait plusieurs
+  // secondes à rentrer — « les gouttes de propulsion doivent rejoindre plus
+  // rapidement le volume à qui elles appartiennent » (le concepteur, 20/11).
+  /** Le plafond de la vitesse de retour, vue du corps (u/s). */
+  static VITESSE_RETOUR = 1200
+  /** La vitesse visée par unité de distance à la surface du corps (s⁻¹). */
+  static GAIN_RETOUR = 5
+  /** Elle ne descend pas sous ce plancher : la goutte arrive, elle ne
+   *  traîne pas devant le corps (u/s). */
+  static PLANCHER_RETOUR = 160
+  /** La vivacité du demi-tour (s⁻¹) : à quelle allure la goutte prend la
+   *  vitesse visée. */
+  static VIRAGE_RETOUR = 10
+  /** Le palet du hockey (inactif hors de ce mode : rien ne change alors). */
+  readonly palet: PaletSim = paletVide()
+  /** La raideur du contact avec le palet, en u/s² pour une particule
+   *  enfoncée d'une marge entière. Comme le rebond entre corps, ce que
+   *  reçoit une particule de corps va au corps entier, de biais : le corps
+   *  s'écrase sur le palet et le renvoie. */
+  static RAIDEUR_PALET = 60000
+  /** Ce que la GLACE rend au palet d'un choc (1 : tout). L'eau l'amortit —
+   *  lancé à 700 u/s sur un corps au repos, il en repart à 35 ; un bloc de
+   *  glace est un mur qui a une masse : il le renvoie, et le frappe fort
+   *  quand c'est lui qui arrive. */
+  static REBOND_GLACE_PALET = 0.85
+  /** L'épaisseur, en rayons de noyau, de la couche où le palet se fait
+   *  sentir avant d'être touché. */
+  static MARGE_PALET = 1
+  /** Le plafond de la force, en marges enfoncées. */
+  static PLAFOND_PALET = 3
+
+  /** Pose les cloisons d'après l'état ouvert/fermé de chaque corps. */
+  private poseCloisons(): void {
+    const n = this.count
+    this.cloisons = false
+    if (this.corps.length < 2) return
+    for (let i = 0; i < n; i++) {
+      const pr = this.proprio[i]
+      const c = this.kind[i] === KIND_PLAYER && pr < this.corps.length && !this.corps[pr].ouvert ? 1 : 0
+      this.cloison[i] = c
+      if (c === 1) this.cloisons = true
+    }
+  }
+
+  /** Cette particule est-elle du corps DU JOUEUR COURANT ? */
+  private estCorps(i: number): boolean {
+    return this.kind[i] === KIND_PLAYER && this.proprio[i] === this.courant
+  }
+  /** La matière vivante d'un joueur, en litres — sans toucher au courant. */
+  litresDe(j: number): number {
+    const c = this.corps[j]
+    return (c.playerCount + c.enPretCount) * this.params.litersPerParticle
+  }
+  // -------------------------------------------------------------------------
+
+  readonly params: SimParams
+  readonly bounds: Bounds
+  readonly capacity: number
+  count = 0
+
+  posX: Float32Array
+  posY: Float32Array
+  prdX: Float32Array
+  prdY: Float32Array
+  velX: Float32Array
+  velY: Float32Array
+  lambda: Float32Array
+  dpX: Float32Array
+  dpY: Float32Array
+  dvX: Float32Array
+  dvY: Float32Array
+  density: Float32Array
+  kind: Uint8Array
+  cooldown: Float32Array
+  labels: Int32Array
+  // Glace (§6) : givre 0 → 1, puis gel. Un amas gelé est un bloc RIGIDE et
+  // BALISTIQUE : il garde son élan (vitesse commune à l'amas), pousse le
+  // liquide (masse infinie), rebondit sur les parois au lieu d'éclabousser,
+  // et ignore la chimie des surfaces. La glace prise au contact d'une plaque
+  // froide s'y soude (vitesse nulle) : c'est l'ancrage. Le dégel rend l'eau
+  // au corps, dans le mouvement où la glace se trouvait.
+  frost: Float32Array
+  frozen: Uint8Array
+  // Vapeur (§6, tableau 3) : hors du solveur de densité (elle ne presse pas
+  // et n'est pas pressée), elle s'étale par répulsion douce, flotte, passe
+  // les grilles, et se PILOTE en continu vers le pointeur — au prix d'une
+  // évaporation. Le froid la condense avant de gérer quoi que ce soit d'autre.
+  vapor: Float32Array
+  // Ionisation VISIBLE (0..1) : à quel point cette particule de vapeur est
+  // du PLASMA. Monte quand elle voyage dans la bande d'un rail au champ
+  // engagé, retombe en ~0,5 s hors du champ, s'éteint à la condensation.
+  // Ne pèse sur AUCUNE physique : c'est un état de RENDU (le nuage
+  // blanc-violet qui crépite), tenu ici parce que seul le solveur sait qui
+  // voyage dans la bande.
+  ionise: Float32Array
+  gaseous: Uint8Array
+  // Mémoire de lien du gaz : à 1 tant que la particule est gazeuse, décroît
+  // lentement après (gasLinkDecay). Le rayon d'adjacence des amas et le
+  // rappel de condensation la suivent : un nuage qui redevient eau reste UN
+  // corps le temps de se regrouper — changer d'état ne disperse pas.
+  gasLink: Float32Array
+  // Gel volontaire (touche F) / vapeur volontaire (touche G)
+  /** L'intention de gel du joueur COURANT. Dans le jeu c'était un champ
+   *  unique ; ici chaque corps a la sienne (`corps[j].gel`), et processCold
+   *  la lit par propriétaire : l'un peut geler pendant que l'autre coule. */
+  get freezeIntent(): boolean {
+    return this.corps[this.courant].gel
+  }
+  set freezeIntent(v: boolean) {
+    this.corps[this.courant].gel = v
+  }
+  gasIntent = false
+  // Refroidissement du vaisseau (§5), fixé par le jeu : 0 = tiède, 1 = glacial.
+  // Étend les auras froides, durcit gel et dégel, affaiblit les radiateurs.
+  chill = 0
+  // Vitesse normale du dernier choc de bloc de glace (consommé par l'audio)
+  iceImpact = 0
+  // Gouttes bues par les éponges depuis le début (consommé par l'audio)
+  spongeBites = 0
+  // Gouttes bues par les coupelles depuis le début (la gorgée s'entend)
+  coupelleBues = 0
+  // LIVRÉ PAR LE CHAMP : cette particule est sortie par la bouche d'un rail,
+  // et le champ ne la reprend plus à cette bouche. Sans ce cran d'arrêt, le
+  // nuage se garait sur le SEUIL de livraison : poussé dehors, relâché,
+  // repoussé dedans par sa propre expansion, repris — mesuré, il oscillait
+  // indéfiniment à 376 u (le seuil est à 375) et le champ ne se relâchait
+  // JAMAIS. Le drapeau tombe dès que la particule retrouve le corps du rail
+  // ailleurs qu'au terminus : un second voyage reste possible.
+  private readonly livreParChamp: Uint8Array
+  private readonly welded: Uint8Array // gelée au contact d'une plaque : soudée
+  // LE SOUFFLE EN VOL : vapeur chassée par un dash, qui ne vous appartient
+  // plus. Elle reste GAZ le temps du voyage (sinon elle se condense en l'air
+  // et le rappel de condensation la ramène au corps — « tout est récupéré
+  // immédiatement ») et perle sur la première paroi touchée. Un compte à
+  // rebours l'empêche de flotter indéfiniment : à bout de course, elle perle
+  // sur place.
+  private readonly souffle: Float32Array // > 0 : secondes de vol restantes
+  // MATIÈRE DU CORPS égarée : goutte éjectée, gerbe de péage, ou fragment
+  // que le remous d'un tir a détaché. Elle reste À VOUS : une fois son délai
+  // purgé, si elle traîne à portée du corps, elle est rappelée d'elle-même —
+  // la vie ne baisse pas pour une goutte qui n'est jamais vraiment partie.
+  // (Les gouttes SEMÉES par le tableau n'ont pas la marque : les
+  // collectables s'attrapent au contact, pas à l'aimant.)
+  // Valeurs : 0 = sans marque · 1 = du corps, SORTIE du halo (perdue, mais
+  // reprise si on repasse à portée) · 2 = du corps, DANS le halo (vivante).
+  // lue par le rendu (render/vie.ts) : la lueur d'une goutte perdue suit
+  // cette marque — publique en LECTURE, le solveur seul l'écrit
+  readonly duCorps: Uint8Array
+  private readonly iceVxSum: Float32Array
+  private readonly iceVySum: Float32Array
+  private readonly iceCnt: Int32Array
+  private readonly iceNxSum: Float32Array
+  private readonly iceNySum: Float32Array
+  private readonly iceWeld: Uint8Array
+  // Rotation des blocs : centre de masse, point de contact moyen, moment
+  // d'inertie et vitesse angulaire — un palet qui heurte de biais doit PIVOTER.
+  private readonly iceCxSum: Float32Array
+  private readonly iceCySum: Float32Array
+  private readonly icePxSum: Float32Array
+  private readonly icePySum: Float32Array
+  private readonly icePCnt: Int32Array
+  private readonly iceInertia: Float32Array
+  private readonly iceOmega: Float32Array
+  // Chimie du contact par bloc : nombre de particules touchant l'hydrophobe
+  // et l'hydrophile — le tableau des règles se joue à l'échelle du PALET.
+  private readonly icePhobe: Int32Array
+  private readonly icePhile: Int32Array
+  // Poussées de contact du pas (écart entre la position prédite et la
+  // prédiction rigide) : la somme, et la plus grande (vecteur et norme²).
+  // Voir la remise en forme rigide dans icePass.
+  private readonly icePushSumX: Float32Array
+  private readonly icePushSumY: Float32Array
+  private readonly icePushX: Float32Array
+  private readonly icePushY: Float32Array
+  private readonly icePushMax: Float32Array
+  // Étiquettes des amas de GLACE, en CACHE : la structure d'un bloc rigide
+  // ne change que sur un événement (gel, dégel, retrait) ou une fusion de
+  // blocs — refaire le parcours en profondeur à chaque pas était LE poste
+  // dominant de la phase palet. Tableau dédié : relabel() écrase `labels`
+  // pour la détection du corps, il ne doit pas corrompre ce cache.
+  private readonly iceLabels: Int32Array
+  // CE QUE LA GLACE REÇOIT DES AUTRES (le rebond d'un corps étranger, le
+  // palet), par particule, en vitesse. On ne l'ajoute PAS à la vitesse de la
+  // particule : la remise en forme rigide (icePass, 3) part de pos + v·dt,
+  // une particule poussée seule s'y décalerait de son bloc à chaque pas —
+  // le premier rang se tasserait sur le reste. icePass en fait la moyenne
+  // (l'élan du bloc) et le moment (sa rotation), puis remet à zéro.
+  private readonly gelRecuX: Float32Array
+  private readonly gelRecuY: Float32Array
+  // Le contact du PALET (hockey) avec chaque bloc : la somme des normales
+  // et des points de contact, leur nombre, et l'enfoncement le plus profond.
+  private readonly icePalNx: Float32Array
+  private readonly icePalNy: Float32Array
+  private readonly icePalPx: Float32Array
+  private readonly icePalPy: Float32Array
+  private readonly icePalCnt: Int32Array
+  private readonly icePalProf: Float32Array
+  private iceComps = 0 // composantes du dernier étiquetage
+  private iceLabelTtl = 0 // pas restants avant rafraîchissement de sécurité
+  private iceDirty = true // un gel/dégel/retrait vient d'avoir lieu
+  private readonly compScratch: Int32Array // compteur par composante (relabel)
+  private readonly relabelScratch: Int32Array // candidats voisins (relabel/icePass), collectés sans rappel
+  private readonly reorderPerm: Int32Array // permutation du re-tri spatial
+  private readonly reorderScratch: Float32Array // tampon de permutation (sert à tous les types)
+
+  boxes: ObstacleBox[] = []
+  sponges: Sponge[] = []
+  // LES COUPELLES (docs/coupelle.md) : des bouches d'aspiration qui boivent
+  // le liquide jusqu'à leur capacité. Le jeu fixe la capacité (le trait × la
+  // masse de référence) et le champ (portée, courant — champCoupelle), et lit
+  // `bu` et `pleine` pour le canal et le dessin. `reserve` : la part de débit
+  // pas encore bue (le débit est borné, voir boitCoupelle).
+  coupelles: CoupelleSim[] = []
+  contactTime: Float32Array // temps de contact continu avec l'éponge
+  // LES CONDUITS (rails marqués `conduit`) : des tubes qui ne se comportent
+  // pas pareil selon l'état. Rangés à part des boîtes parce qu'un tube est
+  // une CAPSULE (distance à une polyligne), pas un rectangle — le convertir
+  // en boîtes obliques aurait demandé de toucher au format des tableaux, au
+  // générateur et à l'éditeur pour une géométrie qu'on sait déjà mesurer.
+  // LES TUBES. Un par rail : tout rail a un corps, l'eau et la glace y
+  // butent. `raccourci` distingue le CONDUIT — celui qui, arc engagé, laisse
+  // en plus la vapeur ignorer le décor et franchir une paroi.
+  private conduits: {
+    pts: { x: number; y: number }[]
+    rayon: number
+    raccourci: boolean
+    rail: number
+    actif: boolean
+  }[] = []
+  // 1 = la particule est DANS un tube, à cet instant. Recalculé une fois par
+  // pas, avant la résolution des solides, et lu deux fois : la vapeur y
+  // ignore tout le décor (c'est le raccourci), l'eau et la glace s'en font
+  // expulser (c'est la paroi).
+  private readonly dansConduit: Uint8Array
+  // 1 = ce tube-là est OUVERT (arc engagé) : seul cas où la vapeur passe
+  private readonly conduitOuvert: Uint8Array
+  // 1 = le tube le plus proche porte un ARC. C'est lui qui décide du GAZ :
+  // seul le plasma — de la vapeur sur une ligne de champ allumée — franchit
+  // un rail. La vapeur ordinaire bute comme l'eau, sur un cœur plus mince.
+  private readonly conduitArc: Uint8Array
+  // l'axe du tube au point le plus proche : sert à repousser ce qui n'est
+  // pas gazeux, sans refaire la projection
+  private readonly conduitNX: Float32Array
+  private readonly conduitNY: Float32Array
+  private readonly conduitDist: Float32Array // distance à l'axe du tube
+  private readonly conduitRayon: Float32Array // rayon du tube retenu
+  private readonly conduitQX: Float32Array // le point de l'axe le plus proche
+  private readonly conduitQY: Float32Array
+  private contactMat: Int8Array // -1 aucun, sinon matériau du contact solide
+  private contactNX: Float32Array
+  private contactNY: Float32Array
+  private contactVn: Float32Array // vitesse normale entrante avant résolution
+  // CODEX : combinaisons matériau × état vues par le CORPS depuis le début
+  // du tableau (indice = matériau × 3 + état ; état 0 eau, 1 glace,
+  // 2 vapeur). Les « passages » (vapeur/évent, eau/membrane, glace/rideau)
+  // s'y consignent aussi — même indice, jamais de contact pour eux.
+  readonly codexContacts = new Uint8Array(30)
+
+  // Eau avalée par le sas : retirée de la simulation, mise en bonbonne à la
+  // sortie. Le sas boit — cette eau n'est pas perdue.
+  swallowed = 0
+  // Part avalée à l'état de glace : ouvre droit à la prime de collecte
+  swallowedIce = 0
+  // Matière avalée par le VIDE (game/vide.ts) : retirée elle aussi, mais
+  // PERDUE — le dehors ne rend rien, rien n'ira en bonbonne.
+  perdusVide = 0
+  // Report fractionnaire du débit de l'œil (applyAspirationVide)
+  private videCarry = 0
+  // Fraction du corps ACTIF (particules joueur) baignant dans une aura de
+  // chauffe — le déclencheur de la transformation à 95 % (main.ts). Mise à
+  // jour à chaque pas par processCold.
+  chauffeFrac = 0
+  // Fraction du corps actif dans une AURA FROIDE — le pack présence y lit
+  // le FRISSON (le tremblement bref du corps que le froid saisit)
+  froidFrac = 0
+
+  // Impulsions vapeur restantes. La RÉSERVE (dashBudgetMax) est celle du
+  // tableau : pleine au chargement. Se vaporiser DE SON PROPRE CHEF refait
+  // le plein — mais une transformation SUBIE (chaudière, zone qui impose la
+  // vapeur) ne rend rien, sinon la salle serait une ferme à dashs. Le
+  // SURCHAUFFEUR frôlé en gaz en rend UNE, une seule fois par appareil,
+  // sans jamais dépasser la réserve.
+  dashBudget = 0
+  dashBudgetMax = 3
+  // Bonus de rendement de recondensation (instrument « aimant à rosée ») —
+  // posé par le jeu au début de la run, remis à zéro avec la simulation
+  recondBonus = 0
+  // LES INSTRUMENTS EMBARQUÉS, côté simulation. Chacun est un facteur posé
+  // par le jeu au chargement du tableau et remis à neuf avec la simulation :
+  // un instrument ne touche JAMAIS au réglage du banc — il multiplie ici,
+  // pour cette run seulement, et le banc reste la référence.
+  exitRadiusFactor = 1 // « gueule ouverte » : portée d'aspiration du sas
+  reabsorbFactor = 1 // « peau tendue » : délai avant de récupérer une goutte
+  vaporTollFactor = 1 // « détendeur » : péage de la vaporisation
+  iceBounceFactor = 1 // « patins de givre » : restitution du palet
+  spongeGripFactor = 1 // « plastron » : prise de l'éponge
+  criticalFactor = 1 // « vanne de secours » : seuil de dispersion
+  basculeFactor = 1 // vitesse des bascules d'état volontaires
+  perteGazFactor = 1 // évaporation du nuage au repos
+  perteGrilleFactor = 1 // vapeur perdue dans les mailles d'un évent
+  priseSasGlaceFactor = 1 // prise du courant du sas sur un palet
+  glisseGlaceFactor = 1 // prise de l'hydrophile sur la glace
+  // Surchauffeurs déjà déchargés (indices de boîtes) — remis à neuf au
+  // chargement du tableau. Le rendu lit ce même état pour le manomètre.
+  readonly surchauffesVides = new Set<number>()
+  /** Compteur de chargements (setLevel) : qui garde des indices de
+   *  surchauffesVides d'une image à l'autre sait ainsi qu'ils ont changé de
+   *  salle — un Set vidé puis rempli d'autant ne se remarque pas à sa taille. */
+  generation = 0
+  private mouthX = 0
+  private mouthY = 0
+  private drainOn = false
+
+  private grid: SpatialGrid
+  private kernels: Kernels
+  private restDensity: number
+  private lastKernelRadius: number
+  private lastSpacing: number
+  private stepIndex = 0
+  private readonly stack: Int32Array
+  // Voisinages en listes plates, construits une fois par pas et réutilisés
+  // par toutes les itérations (et la viscosité) : les corrections par
+  // itération sont bornées à une fraction de h, le voisinage ne bouge pas
+  // significativement au sein d'un pas.
+  private readonly nbStart: Int32Array
+  private readonly nbList: Int32Array
+  // Données de paires calculées par la passe lambda et réutilisées telles
+  // quelles par la passe de déplacement (les positions ne bougent qu'après) :
+  // évite de refaire distances et noyaux deux fois par itération.
+  private readonly pairDx: Float32Array
+  private readonly pairDy: Float32Array
+  private readonly pairW: Float32Array
+  private readonly pairC: Float32Array
+  // Moteur WASM : les noyaux chauds compilés (grille interne, voisins,
+  // densité, XSPH) — branchés par main.ts quand public/noyaux.wasm charge.
+  // moteurWasm bascule à chaud (voile PARAMÈTRES) : à false, ou sans module,
+  // le pas s'exécute sur le moteur JavaScript historique, inchangé.
+  noyauxWasm: NoyauxWasm | null = null
+  moteurWasm = false
+
+  constructor(params: SimParams, bounds: Bounds, capacity = 4096, joueurs = 1) {
+    const nb = Math.max(1, Math.min(JOUEURS_MAX, Math.floor(joueurs)))
+    this.corps = []
+    for (let j = 0; j < nb; j++) this.corps.push(etatCorpsNeuf())
+    this.proprio = new Uint8Array(capacity).fill(SANS_PROPRIO)
+    this.gelRecuX = new Float32Array(capacity)
+    this.gelRecuY = new Float32Array(capacity)
+    this.icePalNx = new Float32Array(capacity)
+    this.icePalNy = new Float32Array(capacity)
+    this.icePalPx = new Float32Array(capacity)
+    this.icePalPy = new Float32Array(capacity)
+    this.icePalCnt = new Int32Array(capacity)
+    this.icePalProf = new Float32Array(capacity)
+    this.cloison = new Uint8Array(capacity)
+    this.lambdaE = new Float32Array(capacity)
+    this.tiree = new Uint8Array(capacity)
+    this.params = params
+    this.bounds = bounds
+    this.capacity = capacity
+
+    this.posX = new Float32Array(capacity)
+    this.posY = new Float32Array(capacity)
+    this.prdX = new Float32Array(capacity)
+    this.prdY = new Float32Array(capacity)
+    this.velX = new Float32Array(capacity)
+    this.velY = new Float32Array(capacity)
+    this.lambda = new Float32Array(capacity)
+    this.dpX = new Float32Array(capacity)
+    this.dpY = new Float32Array(capacity)
+    this.dvX = new Float32Array(capacity)
+    this.dvY = new Float32Array(capacity)
+    this.density = new Float32Array(capacity)
+    this.kind = new Uint8Array(capacity)
+    this.cooldown = new Float32Array(capacity)
+    this.labels = new Int32Array(capacity)
+    this.frost = new Float32Array(capacity)
+    this.frozen = new Uint8Array(capacity)
+    this.vapor = new Float32Array(capacity)
+    this.ionise = new Float32Array(capacity)
+    this.gasLink = new Float32Array(capacity)
+    this.gaseous = new Uint8Array(capacity)
+    this.livreParChamp = new Uint8Array(capacity)
+    this.welded = new Uint8Array(capacity)
+    this.souffle = new Float32Array(capacity)
+    this.duCorps = new Uint8Array(capacity)
+    this.iceVxSum = new Float32Array(capacity)
+    this.puitsAxSum = new Float32Array(capacity)
+    this.puitsAySum = new Float32Array(capacity)
+    this.puitsCnt = new Int32Array(capacity)
+    this.iceVySum = new Float32Array(capacity)
+    this.iceCnt = new Int32Array(capacity)
+    this.iceNxSum = new Float32Array(capacity)
+    this.iceNySum = new Float32Array(capacity)
+    this.iceWeld = new Uint8Array(capacity)
+    this.iceCxSum = new Float32Array(capacity)
+    this.iceCySum = new Float32Array(capacity)
+    this.icePxSum = new Float32Array(capacity)
+    this.icePySum = new Float32Array(capacity)
+    this.icePCnt = new Int32Array(capacity)
+    this.iceInertia = new Float32Array(capacity)
+    this.iceOmega = new Float32Array(capacity)
+    this.icePhobe = new Int32Array(capacity)
+    this.icePhile = new Int32Array(capacity)
+    this.icePushSumX = new Float32Array(capacity)
+    this.icePushSumY = new Float32Array(capacity)
+    this.icePushX = new Float32Array(capacity)
+    this.icePushY = new Float32Array(capacity)
+    this.icePushMax = new Float32Array(capacity)
+    this.iceLabels = new Int32Array(capacity)
+    this.compScratch = new Int32Array(capacity)
+    this.relabelScratch = new Int32Array(2048)
+    this.reorderPerm = new Int32Array(capacity)
+    this.reorderScratch = new Float32Array(capacity)
+    this.stack = new Int32Array(capacity)
+    this.nbStart = new Int32Array(capacity + 1)
+    this.nbList = new Int32Array(capacity * MAX_NEIGHBORS)
+    this.pairDx = new Float32Array(capacity * MAX_NEIGHBORS)
+    this.pairDy = new Float32Array(capacity * MAX_NEIGHBORS)
+    this.pairW = new Float32Array(capacity * MAX_NEIGHBORS)
+    this.pairC = new Float32Array(capacity * MAX_NEIGHBORS)
+    this.contactTime = new Float32Array(capacity)
+    this.dansConduit = new Uint8Array(capacity)
+    this.conduitOuvert = new Uint8Array(capacity)
+    this.conduitArc = new Uint8Array(capacity)
+    this.conduitNX = new Float32Array(capacity)
+    this.conduitNY = new Float32Array(capacity)
+    this.conduitDist = new Float32Array(capacity)
+    this.conduitRayon = new Float32Array(capacity)
+    this.conduitQX = new Float32Array(capacity)
+    this.conduitQY = new Float32Array(capacity)
+    this.contactMat = new Int8Array(capacity)
+    this.contactNX = new Float32Array(capacity)
+    this.contactNY = new Float32Array(capacity)
+    this.contactVn = new Float32Array(capacity)
+
+    this.lastKernelRadius = params.kernelRadius
+    this.lastSpacing = params.particleSpacing
+    this.kernels = makeKernels(params.kernelRadius)
+    this.restDensity = computeRestDensity(
+      params.kernelRadius,
+      params.particleSpacing,
+    )
+    this.grid = this.makeGrid()
+  }
+
+  private makeGrid(): SpatialGrid {
+    const h = this.params.kernelRadius
+    const margin = h * 4
+    return new SpatialGrid(
+      this.bounds.minX - margin,
+      this.bounds.minY - margin,
+      this.bounds.maxX + margin,
+      this.bounds.maxY + margin,
+      h,
+      this.capacity,
+    )
+  }
+
+  private refreshDerived(): void {
+    const p = this.params
+    if (
+      p.kernelRadius !== this.lastKernelRadius ||
+      p.particleSpacing !== this.lastSpacing
+    ) {
+      this.lastKernelRadius = p.kernelRadius
+      this.lastSpacing = p.particleSpacing
+      this.kernels = makeKernels(p.kernelRadius)
+      this.restDensity = computeRestDensity(p.kernelRadius, p.particleSpacing)
+      this.grid = this.makeGrid()
+    }
+  }
+
+  private hasCold = false
+  private hasHeat = false
+  private hasGrille = false
+  private hasSurchauffeur = false
+  private coldBoxes: ObstacleBox[] = []
+  private heatBoxes: ObstacleBox[] = []
+  private grilleBoxes: ObstacleBox[] = []
+  private chemBoxes: ObstacleBox[] = [] // parois neutres + hydrophile/phobe (bandes et amortis)
+  private baseChemBoxes: ObstacleBox[] = [] // les mêmes, DÉCOR SEUL (sans les portes)
+  private surchIdx: number[] = [] // indices des surchauffeurs dans boxes
+  // ce que le FRÔLEMENT de chaque surchauffeur mesure (parallèle à surchIdx) :
+  // son rectangle, pas son tube — voir surchauffeurFrole
+  private surchFrole: ObstacleBox[] = []
+  private heatCarry = 0
+  private gasIdleCarry = 0
+  private baseBoxes: ObstacleBox[] = []
+  private spongeDefs: SpongeDef[] = []
+  private grilleCarry = 0
+  // Recondensation (§7.3) : chaque particule de vapeur perdue alimente une
+  // réserve ; les plaques froides la rendent en rosée, avec perte.
+  vaporBank = 0
+  roseePerlee = 0 // gouttes de rosée effectivement perlées (trophée)
+  // Le REPÈRE DU GEL (pour le rendu) : centre et angle intégré de la plus
+  // grosse composante gelée — les facettes cristallines (et tout motif
+  // « collé au palet ») translatent ET tournent avec le bloc, au lieu de
+  // nager dans le volume. Remis à zéro au dégel complet.
+  gelCentreX = 0
+  gelCentreY = 0
+  gelAngle = 0
+  private recondCarry = 0
+  private recondYield = 0
+  private recondSeed = 1
+  // Règle de transformation : la dispersion se constate, elle ne se décrète
+  // pas — il faut rester sous le seuil critique dispersalGrace secondes
+  // d'affilée, le temps qu'un corps qui condense ou dégèle se regroupe.
+  // Publics : le HUD lit le danger pour afficher le compte à rebours.
+  // Le corps était-il, au dernier relabel, dans l'emprise du sas ? Public :
+  // main.ts ne rattrape en victoire qu'une dispersion née de cette emprise
+  // (un corps sous le seuil que le sas tenait, puis qui en est sorti).
+  dansEmprise = false
+  // GOUTTES EN PRÊT : tirées (délai de réabsorption en cours) mais encore
+  // DANS le volume du corps — même composante connexe. La règle de la vie :
+  // n'est perdu que ce qui SORT du volume. Tant que la goutte n'a pas
+  // traversé la surface, elle compte : la jauge ne bouge pas pour un tir
+  // qu'un mur renvoie, elle baisse à l'instant précis où la goutte sort.
+
+  setLevel(boxes: ObstacleBox[], sponges: SpongeDef[]): void {
+    // Le VIDE et la BAIE (ouvertures sur le dehors) sont du décor : sans
+    // ce tri, le solveur les prendrait pour des parois — tout matériau qu'il
+    // ne connaît pas bute. Le tri se fait ICI et non chez l'appelant, pour
+    // qu'aucun chemin (jeu, essai d'éditeur, banc) ne puisse l'oublier.
+    // La conduite d'ammoniac (plaque froide) se lit à la forme de sa
+    // silhouette dessinée, coins arrondis — plus à sa boîte (conduite.ts).
+    const physiques = boxes
+      .filter((b) => !sansPhysique(b.material))
+      .map((b) => formePhysique(b, boxes, this.bounds))
+    this.baseBoxes = physiques
+    this.boxes = physiques
+    this.spongeDefs = sponges // gardées pour la copie de prévision
+    this.sponges = sponges.map((d) => new Sponge(d))
+    this.refreshBoxCaches()
+    this.surchauffesVides.clear()
+    this.codexContacts.fill(0)
+    this.generation++
+  }
+
+  /** Ce surchauffeur (reconnu à sa BOÎTE, pas à un indice) a-t-il rendu son
+   *  dash ? Les indices de surchauffesVides comptent les boîtes du solveur,
+   *  sans le sas, le vide ni la baie : le rendu, qui numérote TOUTES les
+   *  boîtes du tableau, tombait à côté dès qu'une d'elles précédait le
+   *  surchauffeur (vu en revue, 27/09). */
+  surchauffeurVide(b: { minX: number; minY: number; maxX: number; maxY: number }): boolean {
+    for (const bi of this.surchauffesVides) {
+      const o = this.baseBoxes[bi]
+      if (o && o.minX === b.minX && o.minY === b.minY && o.maxX === b.maxX && o.maxY === b.maxY) return true
+    }
+    return false
+  }
+
+  // Listes de boîtes par famille, recalculées quand le niveau change (jamais
+  // par pas) : les passes d'aura et de chimie balayaient TOUTES les boîtes
+  // pour CHAQUE particule à CHAQUE pas — sur un tableau chargé, l'essentiel
+  // du parcours ne concernait pas le matériau cherché.
+  //
+  // ELLES SE CALCULENT SUR LE DÉCOR SEUL (baseBoxes), jamais sur les portes.
+  // Une porte est toujours une PAROI : elle n'entre que dans `chemBoxes`,
+  // et jamais dans le froid, le chaud, la grille ou le surchauffeur. C'est
+  // ce qui permet à setDoors de ne rien recalculer — voir sa note.
+  private refreshBoxCaches(): void {
+    const boxes = this.baseBoxes
+    this.hasCold = boxes.some((b) => b.material === MAT_FROID)
+    this.hasHeat = boxes.some((b) => b.material === MAT_CHAUD)
+    this.hasGrille = boxes.some((b) => b.material === MAT_GRILLE)
+    this.hasSurchauffeur = boxes.some((b) => b.material === MAT_SURCHAUFFEUR)
+    this.coldBoxes = boxes.filter((b) => b.material === MAT_FROID)
+    this.heatBoxes = boxes.filter((b) => b.material === MAT_CHAUD)
+    this.grilleBoxes = boxes.filter((b) => b.material === MAT_GRILLE)
+    this.baseChemBoxes = boxes.filter(
+      (b) =>
+        b.material === MAT_WALL ||
+        b.material === MAT_HYDROPHILE ||
+        b.material === MAT_HYDROPHOBE,
+    )
+    this.chemBoxes = this.baseChemBoxes
+    // Les indices du surchauffeur pointent dans `boxes` : les portes
+    // s'ajoutant TOUJOURS en fin de liste, ceux du décor restent justes.
+    this.surchIdx = []
+    this.surchFrole = []
+    for (let bi = 0; bi < boxes.length; bi++) {
+      const b = boxes[bi]
+      if (b.material !== MAT_SURCHAUFFEUR) continue
+      this.surchIdx.push(bi)
+      // un surchauffeur dessiné en borne (FORME_SURCHAUFFEUR) se frôle
+      // à son RECTANGLE : une fois par niveau, jamais par particule
+      this.surchFrole.push(
+        (b as FormeBox).forme === FORME_SURCHAUFFEUR
+          ? { minX: b.minX, minY: b.minY, maxX: b.maxX, maxY: b.maxY, material: b.material, ...(b.angle ? { angle: b.angle } : {}) }
+          : b,
+      )
+    }
+  }
+
+  // Portes asservies aux cibles laser : des parois qui vont et viennent.
+  // Recomposé sans toucher aux éponges (setLevel les reconstruirait et
+  // effacerait leur saturation en pleine partie).
+  //
+  // CES BOÎTES NE SORTENT PAS DU SOLVEUR. Le rendu ne reçoit pas sim.boxes
+  // mais renderBoxes (main.ts), bâti sur level.boxes : une porte n'entre
+  // jamais dans la carte de lumière, à aucune hauteur. Et c'est juste — une
+  // porte close se dessine en BARRIÈRE D'ÉNERGIE translucide, pas en
+  // bulkhead : un champ qu'on voit au travers n'a pas à coucher d'ombre.
+  // Essayé une fois (marquer la porte « pleine hauteur » pour qu'elle ombre
+  // comme un mur) : le drapeau n'atteignait rien, et il n'aurait pas dû.
+  //
+  // Une porte EN TRAIN DE SE FERMER arrive tronquée par la coupe de son
+  // front (porte.ts) : la paroi n'existe que derrière lui, et le contact
+  // pousse ce qu'il rencontre devant lui — d'où la propulsion.
+  // APPELÉ À CHAQUE SOUS-PAS tant qu'un front avance (main.ts) : il ne doit
+  // donc rien recalculer du décor. Il ne l'a jamais eu à faire — une porte
+  // est une PAROI, elle n'appartient qu'à `chemBoxes`, et les caches du
+  // décor sont posés une fois pour toutes par refreshBoxCaches. Avant ce
+  // partage, chaque appel refaisait quatre `some`, quatre `filter` et un
+  // parcours complet : 16 µs à 50 parois, 90 µs à 400 (mesuré le
+  // 15/09/2026), à multiplier par le nombre de sous-pas d'une image.
+  setDoors(portes: FormeBox[]): void {
+    if (portes.length === 0) {
+      this.boxes = this.baseBoxes
+      this.chemBoxes = this.baseChemBoxes
+      return
+    }
+    const murs = portes.map((p) => ({ ...p, material: MAT_WALL }))
+    this.boxes = [...this.baseBoxes, ...murs]
+    this.chemBoxes = [...this.baseChemBoxes, ...murs]
+  }
+
+  // Normale de la surface de glace en (x, y), pour le miroir laser. Deux
+  // rayons distincts : rHit décide s'il y a CONTACT (précis, à l'échelle
+  // d'une particule), rSmooth estime la NORMALE en moyennant sur une zone
+  // bien plus large — sans ce lissage, la normale épouse chaque bosse du
+  // bloc et le faisceau part dans tous les sens à chaque frémissement.
+  // Noyau doux (1 − d/r)², somme des directions (point − particule gelée) :
+  // c'est le gradient du champ, la facette moyenne de la surface.
+  iceNormalAt(
+    x: number,
+    y: number,
+    rHit: number,
+    rSmooth: number,
+  ): { nx: number; ny: number } | null {
+    let hit = false
+    const rHit2 = rHit * rHit
+    this.grid.forEachNeighbor(x, y, rHit, (j) => {
+      if (this.frozen[j] !== 1) return
+      const dx = x - this.posX[j]
+      const dy = y - this.posY[j]
+      if (dx * dx + dy * dy < rHit2) hit = true
+    })
+    if (!hit) return null
+    let sx = 0
+    let sy = 0
+    const rs = Math.max(rSmooth, rHit)
+    const rs2 = rs * rs
+    this.grid.forEachNeighbor(x, y, rs, (j) => {
+      if (this.frozen[j] !== 1) return
+      const dx = x - this.posX[j]
+      const dy = y - this.posY[j]
+      const d2 = dx * dx + dy * dy
+      if (d2 >= rs2) return
+      const t = 1 - Math.sqrt(d2) / rs
+      const w = t * t
+      sx += dx * w
+      sy += dy * w
+    })
+    const l = Math.hypot(sx, sy)
+    if (l < 1e-6) return { nx: 0, ny: 1 } // au cœur du bloc : normale arbitraire
+    return { nx: sx / l, ny: sy / l }
+  }
+
+  // Le point (x, y) baigne-t-il dans l'eau LIQUIDE ? Test de milieu du
+  // traceur laser (palier 2), appelé à chaque pas de marche. LISSÉ comme le
+  // miroir : au lieu d'un contact binaire au grain près (qui faisait
+  // clignoter le dioptre sur le clapot et dévier le rayon sur la moindre
+  // gouttelette), on somme un noyau (1 − d/r)² et on compare à la moitié du
+  // poids d'un intérieur plein — la surface effective est l'isoligne de
+  // densité, plane là où le corps est plan. Une goutte isolée ne pèse pas
+  // assez : elle ne réfracte plus. Glace et vapeur ne comptent pas.
+  liquidAt(x: number, y: number, r: number): boolean {
+    let somme = 0
+    const r2 = r * r
+    this.grid.forEachNeighbor(x, y, r, (j) => {
+      if (this.frozen[j] === 1 || this.gaseous[j] === 1) return
+      const dx = x - this.posX[j]
+      const dy = y - this.posY[j]
+      const d2 = dx * dx + dy * dy
+      if (d2 >= r2) return
+      const t = 1 - Math.sqrt(d2) / r
+      somme += t * t
+    })
+    // poids d'un intérieur plein (empilement hexagonal de pas h) : n·πr²/6
+    const h = this.params.particleSpacing
+    const plein = (Math.PI * r * r) / (3 * Math.sqrt(3) * h * h)
+    return somme > plein * 0.5
+  }
+
+  // LE MILIEU EN UN SEUL PASSAGE — la boucle chaude du traceur laser. À
+  // chaque pas de 5 u, le faisceau demandait trois fois les voisins du même
+  // point (glace au contact ? eau liquide ? vapeur ?) : trois parcours de
+  // grille et trois fermetures par pas, ~4 000 pas par image sur un tableau
+  // à sept émetteurs. Ici, UN parcours au plus grand des deux rayons répond
+  // aux trois questions, avec exactement les mêmes règles que iceNormalAt
+  // (contact dans rIce), liquidAt (noyau dans rEau, seuil du demi-plein) et
+  // gasAt (contact dans rIce). Bits : MILIEU_GLACE, MILIEU_EAU, MILIEU_VAPEUR.
+  milieuAt(x: number, y: number, rIce: number, rEau: number): number {
+    let glace = false
+    let vapeur = false
+    let somme = 0
+    const rIce2 = rIce * rIce
+    const rEau2 = rEau * rEau
+    this.grid.forEachNeighbor(x, y, Math.max(rIce, rEau), (j) => {
+      const dx = x - this.posX[j]
+      const dy = y - this.posY[j]
+      const d2 = dx * dx + dy * dy
+      if (this.frozen[j] === 1) {
+        if (d2 < rIce2) glace = true
+      } else if (this.gaseous[j] === 1) {
+        if (d2 < rIce2) vapeur = true
+      } else if (d2 < rEau2) {
+        const t = 1 - Math.sqrt(d2) / rEau
+        somme += t * t
+      }
+    })
+    const h = this.params.particleSpacing
+    const plein = (Math.PI * rEau * rEau) / (3 * Math.sqrt(3) * h * h)
+    return (
+      (glace ? MILIEU_GLACE : 0) |
+      (somme > plein * 0.5 ? MILIEU_EAU : 0) |
+      (vapeur ? MILIEU_VAPEUR : 0)
+    )
+  }
+
+  // Le point (x, y) baigne-t-il dans la VAPEUR du joueur ? Test d'ionisation
+  // du traceur laser (palier 3) : un faisceau qui traverse le nuage devient
+  // un arc de plasma, capturable par les rails magnétiques.
+  gasAt(x: number, y: number, r: number): boolean {
+    let hit = false
+    const r2 = r * r
+    this.grid.forEachNeighbor(x, y, r, (j) => {
+      if (this.gaseous[j] !== 1) return
+      const dx = x - this.posX[j]
+      const dy = y - this.posY[j]
+      if (dx * dx + dy * dy < r2) hit = true
+    })
+    return hit
+  }
+
+  // Convoyage magnétique (palier 3) : tant qu'un arc de plasma circule sur
+  // un rail, le champ y est actif — la VAPEUR prise dans la bande du rail
+  // est entraînée le long de la ligne, dans le sens du tracé, avec un
+  // recentrage doux pour prendre les virages. Le nuage voyage sur la ligne
+  // de champ ; l'eau et la glace, non ionisables, ne sentent rien.
+  // Renvoie le nombre de particules gazeuses encore DANS la bande : tant
+  // qu'il est non nul, un nuage voyage sur le rail — l'appelant s'en sert
+  // pour maintenir le champ jusqu'à l'arrivée, même rayon éteint.
+  railConvoy(
+    pts: { x: number; y: number }[],
+    band: number,
+    accel: number,
+    dt: number,
+  ): number {
+    if (accel <= 0 || band <= 0 || pts.length < 2) return 0
+    // Premier passage : qui est dans la bande, et où est le cœur convoyé —
+    // les retardataires hors bande seront RAPPELÉS vers lui, pour que le
+    // nuage reste UN nuage dans les virages (et quand seul un morceau est
+    // pris par le champ, il emmène le reste au lieu de s'en détacher).
+    let nBande = 0
+    let nTerminus = 0
+    let cxB = 0
+    let cyB = 0
+    const dansBande: boolean[] = []
+    const auTerminus: boolean[] = []
+    // LIVRÉ : sorti du tube par la bouche. Ni porté, ni rappelé — le champ
+    // n'a plus rien à lui dire. Sans cette troisième case, un nuage livré
+    // retombait dans la branche « retardataire » et se faisait tirer en
+    // arrière vers le cœur encore convoyé : mesuré, il repartait à 1524 u/s.
+    const livre: boolean[] = []
+    const uxA: number[] = []
+    const uyA: number[] = []
+    const qxA: number[] = []
+    const qyA: number[] = []
+    const fin = pts[pts.length - 1]
+    // L'AXE DE SORTIE : la direction du dernier tronçon. C'est par là que le
+    // convoyage pousse le nuage DEHORS, au lieu de le garer sur le terminus.
+    const avantFin = pts[pts.length - 2]
+    const lFin = Math.max(1e-6, Math.hypot(fin.x - avantFin.x, fin.y - avantFin.y))
+    const sx = (fin.x - avantFin.x) / lFin
+    const sy = (fin.y - avantFin.y) / lFin
+    for (let i = 0; i < this.count; i++) {
+      dansBande[i] = false
+      livre[i] = false
+      if (this.gaseous[i] !== 1) continue
+      const px = this.posX[i]
+      const py = this.posY[i]
+      // tronçon de la polyligne le plus proche
+      let best = Infinity
+      let ux = 0
+      let uy = 0
+      let qx = 0
+      let qy = 0
+      let sBest = -1
+      let qFinDist = 0
+      for (let s = 0; s + 1 < pts.length; s++) {
+        const a = pts[s]
+        const b = pts[s + 1]
+        const abx = b.x - a.x
+        const aby = b.y - a.y
+        const len2 = abx * abx + aby * aby
+        if (len2 < 1e-9) continue
+        const t = Math.max(
+          0,
+          Math.min(1, ((px - a.x) * abx + (py - a.y) * aby) / len2),
+        )
+        const cx = a.x + abx * t
+        const cy = a.y + aby * t
+        const d2 = (px - cx) * (px - cx) + (py - cy) * (py - cy)
+        if (d2 < best) {
+          best = d2
+          const inv = 1 / Math.sqrt(len2)
+          ux = abx * inv
+          uy = aby * inv
+          qx = cx
+          qy = cy
+          sBest = s
+          qFinDist = Math.hypot(b.x - cx, b.y - cy)
+        }
+      }
+      if (best > band * band) continue
+      // LE VIRAGE S'ANTICIPE. Au coude, le tronçon le plus proche pousse
+      // dans SON axe — donc TOUT DROIT, au-delà du virage : mesuré au banc,
+      // le nuage dépassait le coude et se stabilisait à ~94 u derrière lui
+      // (là où la poussée du tronçon et le rappel vers le coin s'annulent),
+      // hors bande — et le champ, vidé, lâchait. À moins d'une bande de la
+      // fin du tronçon, la poussée TOURNE donc progressivement vers l'axe
+      // du tronçon suivant : le nuage entame le virage avant le coin, comme
+      // une ligne de champ qui se courbe — elle n'a pas d'angle.
+      if (sBest >= 0 && sBest + 2 < pts.length && qFinDist < band) {
+        const a2 = pts[sBest + 1]
+        const b2 = pts[sBest + 2]
+        const l2 = Math.hypot(b2.x - a2.x, b2.y - a2.y)
+        if (l2 > 1e-6) {
+          const f = 1 - qFinDist / band
+          const mx = ux * (1 - f) + ((b2.x - a2.x) / l2) * f
+          const my = uy * (1 - f) + ((b2.y - a2.y) / l2) * f
+          const ml = Math.hypot(mx, my)
+          // deux tronçons à 180° s'annulent : on garde alors l'axe courant
+          if (ml > 1e-6) {
+            ux = mx / ml
+            uy = my / ml
+          }
+        }
+      }
+      dansBande[i] = true
+      // zone de terminus : le point porté est arrivé en bout de ligne — on
+      // n'y pousse plus, on y FREINE (sinon le nuage arrive comme un boulet
+      // et la condensation « explose »)
+      auTerminus[i] = Math.hypot(qx - fin.x, qy - fin.y) < band * 1.2
+      // LIVRÉ : SORTI DU TUBE, ET LÂCHÉ. Le champ tenait le nuage contre le
+      // terminus, DANS le tube : le joueur ne pouvait pas l'emmener
+      // ailleurs, et reprendre la main voulait dire l'y laisser se
+      // condenser — ce que la paroi punissait d'une expulsion (mesuré :
+      // 2861 u/s, le corps projeté à 680 u de son point de garage). Le
+      // convoyage ne gare donc plus : il LIVRE. Passé la bouche d'une
+      // longueur de bande — le rayon du tube, donc dehors pour de bon — le
+      // nuage sort du compte de la bande : le champ se relâche de lui-même,
+      // l'arc se désionise, et c'est une vapeur ordinaire, dirigeable, qui
+      // se condensera où le joueur voudra.
+      // revenue sur le corps du rail, loin de la bouche : le champ a de
+      // nouveau le droit de la prendre — un second voyage reste possible
+      if (!auTerminus[i]) this.livreParChamp[i] = 0
+      if (this.livreParChamp[i] === 1) {
+        dansBande[i] = false
+        livre[i] = true
+        continue
+      }
+      uxA[i] = ux
+      uyA[i] = uy
+      qxA[i] = qx
+      qyA[i] = qy
+      nBande++
+      if (auTerminus[i]) nTerminus++
+      cxB += px
+      cyB += py
+    }
+    if (nBande === 0) return 0
+    cxB /= nBande
+    cyB /= nBande
+    // LA LIVRAISON SE DÉCIDE POUR LE NUAGE, PAS PARTICULE PAR PARTICULE.
+    // Lâcher chaque particule dès qu'elle franchissait un seuil ne marchait
+    // pas : la tête relâchée faisait barrage, la queue s'entassait derrière,
+    // et le nuage se garait SUR le seuil — mesuré, il oscillait à 376 u
+    // pour un seuil à 375, et le champ ne se relâchait jamais. Quand le
+    // CŒUR du nuage a franchi la bouche, le champ lâche donc TOUT d'un
+    // coup : la vapeur, désionisée, s'en va sur son élan de livraison.
+    if (
+      nTerminus > nBande * 0.6 &&
+      (cxB - fin.x) * sx + (cyB - fin.y) * sy > band * 0.3
+    ) {
+      for (let i = 0; i < this.count; i++)
+        if (dansBande[i]) this.livreParChamp[i] = 1
+      return 0
+    }
+    for (let i = 0; i < this.count; i++) {
+      if (this.gaseous[i] !== 1) continue
+      // LIVRÉ : le champ ne le touche plus, en rien — et l'ionisation ne
+      // monte donc plus non plus. C'est voulu, et c'est ce qui se voit :
+      // sorti du tube, le nuage se DÉSIONISE (fadeIonise, ~0,5 s) et quitte
+      // le blanc-violet de l'arc pour redevenir une vapeur ordinaire, que le
+      // joueur dirige. L'arc l'a porté, il l'a rendu.
+      if (livre[i]) continue
+      const px = this.posX[i]
+      const py = this.posY[i]
+      if (dansBande[i]) {
+        // ce qui voyage dans la bande d'un champ engagé DEVIENT du plasma,
+        // en ~0,2 s : l'identité visuelle suit l'état physique, pas le
+        // pinceau. La retombée (fadeIonise) fait le chemin inverse.
+        this.ionise[i] = Math.min(1, this.ionise[i] + 6 * dt)
+      }
+      if (dansBande[i] && auTerminus[i]) {
+        // L'ARRIVÉE EST UNE LIVRAISON, PAS UN GARAGE. L'ancien terminus
+        // freinait et RAMENAIT le nuage sur le dernier point : il y restait
+        // collé, dans le tube, et la seule façon de reprendre la main était
+        // de le laisser s'y condenser — ce que la paroi punissait d'une
+        // expulsion. On règle donc la vitesse AXIALE sur une allure de
+        // livraison, et l'on amortit tout le reste : le nuage sort par la
+        // bouche, calmement, et se fait lâcher dès qu'il est dehors.
+        const vAxe = this.velX[i] * sx + this.velY[i] * sy
+        const k = Math.min(1, 6 * dt)
+        this.velX[i] += sx * (LIVRAISON_VITESSE - vAxe) * k
+        this.velY[i] += sy * (LIVRAISON_VITESSE - vAxe) * k
+        // le travers s'éteint : on sort droit, pas en crabe
+        const vx = this.velX[i] - (this.velX[i] * sx + this.velY[i] * sy) * sx
+        const vy = this.velY[i] - (this.velX[i] * sx + this.velY[i] * sy) * sy
+        const frein = 1 - Math.exp(-6 * dt)
+        this.velX[i] -= vx * frein
+        this.velY[i] -= vy * frein
+        // recentrage doux sur l'axe : on sort par la bouche, pas de biais
+        this.velX[i] += ((qxA[i] - px) / band) * accel * 0.3 * dt
+        this.velY[i] += ((qyA[i] - py) / band) * accel * 0.3 * dt
+      } else if (dansBande[i]) {
+        // LE CHAMP CONFINE, et c'est lui qui fait prendre les virages. Le
+        // rappel seul (0,8 × accel au bord de bande) ne courbe pas une
+        // trajectoire lancée : au premier coude, tout l'élan gagné sur la
+        // ligne droite pointe HORS du tracé — mesuré au banc (virage à 90°,
+        // bande 75) : le nuage ENTIER finissait à 380 u du rail, et le
+        // champ, vidé, lâchait pour de bon. On amortit donc la composante
+        // de vitesse EN TRAVERS de la ligne (le long, on n'y touche pas :
+        // c'est la vitesse du voyage) — une particule chargée s'enroule
+        // autour de sa ligne de champ, elle ne la quitte pas.
+        const ux = uxA[i]
+        const uy = uyA[i]
+        const va = this.velX[i] * ux + this.velY[i] * uy
+        const g = Math.exp(-this.params.plasmaConfin * dt)
+        this.velX[i] = va * ux + (this.velX[i] - va * ux) * g
+        this.velY[i] = va * uy + (this.velY[i] - va * uy) * g
+        // poussée le long du rail + rappel vers la ligne
+        this.velX[i] += (ux + ((qxA[i] - px) / band) * 0.8) * accel * dt
+        this.velY[i] += (uy + ((qyA[i] - py) / band) * 0.8) * accel * dt
+      } else {
+        // retardataire : rappelé vers le cœur convoyé — le nuage fait corps
+        const dx = cxB - px
+        const dy = cyB - py
+        const d = Math.hypot(dx, dy)
+        if (d > 1e-6 && d < band * 6) {
+          this.velX[i] += (dx / d) * accel * 0.7 * dt
+          this.velY[i] += (dy / d) * accel * 0.7 * dt
+        }
+      }
+    }
+    return nBande
+  }
+
+  // Normale de la surface d'EAU en (x, y), pour le dioptre du laser — la
+  // même recette que le miroir de glace : moyenne large au noyau (1 − d/r)²,
+  // parce qu'une surface de particules est encore plus agitée liquide que
+  // gelée. Appelée seulement au franchissement d'un dioptre.
+  liquidNormalAt(
+    x: number,
+    y: number,
+    rSmooth: number,
+  ): { nx: number; ny: number } {
+    let sx = 0
+    let sy = 0
+    const rs2 = rSmooth * rSmooth
+    this.grid.forEachNeighbor(x, y, rSmooth, (j) => {
+      if (this.frozen[j] === 1 || this.gaseous[j] === 1) return
+      const dx = x - this.posX[j]
+      const dy = y - this.posY[j]
+      const d2 = dx * dx + dy * dy
+      if (d2 >= rs2) return
+      const t = 1 - Math.sqrt(d2) / rSmooth
+      const w = t * t
+      sx += dx * w
+      sy += dy * w
+    })
+    const l = Math.hypot(sx, sy)
+    if (l < 1e-6) return { nx: 0, ny: 1 } // au cœur du corps : normale arbitraire
+    return { nx: sx / l, ny: sy / l }
+  }
+
+  // Exposition à la chaleur en (x, y) : 1 au contact d'une chaudière, 0 au
+  // bord de l'aura. Même géométrie que l'aura de gel des plaques froides.
+  private heatExposureAt(x: number, y: number): number {
+    if (!this.hasHeat) return 0
+    // le vaisseau refroidit : l'aura des chaudières se rétracte
+    const band =
+      this.params.heatBand * (1 - this.params.chillHeatFade * this.chill)
+    if (band <= 1) return 0
+    const rp = this.params.particleSpacing * 0.5
+    const cp = this.scratchCP
+    let heat = 0
+    for (const b of this.heatBoxes) {
+      // chaque chaudière règle la portée de sa propre aura (éditeur) :
+      // un gros bloc à petite aura, un petit bloc qui chauffe loin
+      const bandB = band * (b.aura ?? 1)
+      if (bandB <= 1) continue
+      if (horsBoite(b, x, y, bandB + rp)) continue
+      boxContact(x, y, b, cp)
+      const f = 1 - Math.max(0, cp.dist - rp) / bandB
+      if (f > heat) heat = Math.min(1, f)
+    }
+    return heat
+  }
+
+  // Le SURCHAUFFEUR le plus proche que ce point frôle ou touche (index de
+  // boîte), ou -1. « Frôler » : à moins de deux espacements de particule de
+  // la paroi — pas besoin de s'écraser dessus.
+  //
+  // LA DISTANCE SE MESURE AU RECTANGLE DU BLOC, pas au tube dessiné : le
+  // tube ne fait que 86 % de l'épaisseur du bloc, et mesuré depuis lui, le
+  // dash se prenait de 4 u plus près qu'avant (sur un bloc de 60) — un
+  // changement de dessin rendait l'aide plus dure à attraper. L'eau et la
+  // glace, elles, butent bien sur le tube (this.boxes).
+  private surchauffeurFrole(x: number, y: number): number {
+    const reach = this.params.particleSpacing * 2
+    const cp = this.scratchCP
+    for (let k = 0; k < this.surchIdx.length; k++) {
+      const b = this.surchFrole[k]
+      if (horsBoite(b, x, y, reach)) continue
+      boxContact(x, y, b, cp)
+      if (cp.dist <= reach) return this.surchIdx[k]
+    }
+    return -1
+  }
+
+  // Retrait par échange avec la dernière particule (absorption éponge).
+  removeParticle(i: number): void {
+    // le décompte va au PROPRIÉTAIRE de la particule, qui n'est pas
+    // forcément le joueur courant (une éponge ne demande pas qui parle)
+    const maitre = this.proprio[i] < this.corps.length ? this.corps[this.proprio[i]] : null
+    if (maitre && this.kind[i] === KIND_PLAYER) maitre.playerCount--
+    // une goutte en prêt avalée (éponge, balayage) quitte la vie sur-le-champ :
+    // sans ce décrément, liters() reste gonflé jusqu'au prochain relabel
+    if (maitre && this.duCorps[i] === 2)
+      maitre.enPretCount = Math.max(0, maitre.enPretCount - 1)
+    this.iceDirty = true // l'échange d'indices invalide le cache d'amas
+    const last = this.count - 1
+    if (i !== last) {
+      this.posX[i] = this.posX[last]
+      this.posY[i] = this.posY[last]
+      this.prdX[i] = this.prdX[last]
+      this.prdY[i] = this.prdY[last]
+      this.velX[i] = this.velX[last]
+      this.velY[i] = this.velY[last]
+      this.kind[i] = this.kind[last]
+      this.cooldown[i] = this.cooldown[last]
+      this.contactTime[i] = this.contactTime[last]
+      this.frost[i] = this.frost[last]
+      this.frozen[i] = this.frozen[last]
+      this.vapor[i] = this.vapor[last]
+      this.ionise[i] = this.ionise[last]
+      this.gaseous[i] = this.gaseous[last]
+      this.gasLink[i] = this.gasLink[last]
+      this.welded[i] = this.welded[last]
+      this.souffle[i] = this.souffle[last]
+      this.duCorps[i] = this.duCorps[last]
+      this.proprio[i] = this.proprio[last]
+      this.tiree[i] = this.tiree[last]
+    }
+    this.count = last
+  }
+
+  addParticle(x: number, y: number, kind: number): number {
+    if (this.count >= this.capacity) return -1
+    const i = this.count++
+    this.posX[i] = x
+    this.posY[i] = y
+    this.velX[i] = 0
+    this.velY[i] = 0
+    this.kind[i] = kind
+    this.cooldown[i] = 0
+    this.contactTime[i] = 0
+    this.frost[i] = 0
+    this.frozen[i] = 0
+    this.vapor[i] = 0
+    this.ionise[i] = 0
+    this.gaseous[i] = 0
+    this.gasLink[i] = 0
+    this.welded[i] = 0
+    this.souffle[i] = 0
+    this.duCorps[i] = 0
+    this.proprio[i] = kind === KIND_PLAYER ? this.courant : SANS_PROPRIO
+    this.tiree[i] = 0
+    if (kind === KIND_PLAYER) this.playerCount++
+    return i
+  }
+
+  /** UNE GOUTTE DU CORPS DÉJÀ EN VOL, posée telle quelle : libre, marquée
+   *  du corps (duCorps = 1, comme une goutte éjectée sortie du halo), à la
+   *  vitesse donnée. Elle compte dans le volume de référence (la jauge lit
+   *  playerCount / baseVolume) : posée À LA PLACE d'une particule du corps,
+   *  elle laisse la jauge pleine moins ce qui est dehors — exactement l'état
+   *  d'un corps qui vient de tirer. Le rappel des égarées la reprend si le
+   *  corps repasse à portée. Sert aux satellites de la cuve de l'accueil
+   *  (game/cuveAccueil.ts). Renvoie l'indice, ou −1 si la cuve est pleine. */
+  poseEgaree(x: number, y: number, vx: number, vy: number): number {
+    const i = this.addParticle(x, y, KIND_FREE)
+    if (i < 0) return -1
+    this.velX[i] = vx
+    this.velY[i] = vy
+    this.duCorps[i] = 1
+    this.proprio[i] = this.courant
+    this.baseVolume++
+    return i
+  }
+
+  // Disque de n particules sur réseau hexagonal, centré en (cx, cy).
+  spawnDisc(cx: number, cy: number, n: number, kind: number): void {
+    const s = this.params.particleSpacing
+    const rowH = s * Math.sqrt(3) * 0.5
+    const extent = Math.ceil(Math.sqrt(n)) + 2
+    const pts: { x: number; y: number; d2: number }[] = []
+    for (let row = -extent; row <= extent; row++) {
+      const y = row * rowH
+      const xOffset = (row & 1) !== 0 ? s * 0.5 : 0
+      for (let col = -extent; col <= extent; col++) {
+        const x = col * s + xOffset
+        pts.push({ x, y, d2: x * x + y * y })
+      }
+    }
+    pts.sort((a, b) => a.d2 - b.d2)
+    for (let i = 0; i < n && i < pts.length; i++) {
+      this.addParticle(cx + pts[i].x, cy + pts[i].y, kind)
+    }
+    if (kind === KIND_PLAYER) this.baseVolume += n
+    this.updatePlayerStats()
+  }
+
+  /** VERSER n particules AU CORPS : le même réseau hexagonal que spawnDisc,
+   * centré en (cx, cy), mais chaque position déjà PRISE est sautée — une
+   * particule existante à moins d'un pas, une paroi, une cellule d'éponge
+   * gorgée, le bord de la cuve. Sans ce tri, verser la bonbonne posait la
+   * matière EN PLEIN CŒUR du corps : la contrainte de densité expulsait
+   * tout d'un coup et le versement EXPLOSAIT le volume au lieu de le
+   * regonfler. La matière s'installe donc en couronne, dans les creux
+   * autour du corps, et part à sa vitesse moyenne (le versement suit le
+   * mouvement, il ne le freine pas). Renvoie le nombre réellement posé. */
+  verserAuCorps(cx: number, cy: number, n: number, kind: number): number {
+    const s = this.params.particleSpacing
+    const rowH = s * Math.sqrt(3) * 0.5
+    const seuil2 = (0.9 * s) ** 2
+    const rp = s * 0.5
+    const cp = this.scratchCP
+    this.updatePlayerStats()
+    const mvx = this.stats.velX
+    const mvy = this.stats.velY
+    const libre = (px: number, py: number): boolean => {
+      if (
+        px < this.bounds.minX + rp ||
+        px > this.bounds.maxX - rp ||
+        py < this.bounds.minY + rp ||
+        py > this.bounds.maxY - rp
+      ) {
+        return false
+      }
+      for (let i = 0; i < this.count; i++) {
+        const dx = this.posX[i] - px
+        if (dx * dx > seuil2) continue
+        const dy = this.posY[i] - py
+        if (dx * dx + dy * dy < seuil2) return false
+      }
+      for (const b of this.boxes) {
+        boxContact(px, py, b, cp)
+        if (cp.dist < rp) return false
+      }
+      for (const sp of this.sponges) {
+        if (!sp.contains(px, py)) continue
+        const cell = sp.cellIndexAt(px, py)
+        if (cell >= 0 && sp.isSolid(cell)) return false
+      }
+      return true
+    }
+    let poses = 0
+    // l'étendue GRANDIT tant qu'il reste à poser : le cœur du réseau est
+    // occupé par le corps lui-même, les places libres sont plus loin
+    let extent = Math.ceil(Math.sqrt(n)) + 2
+    for (let essai = 0; essai < 6 && poses < n; essai++) {
+      const pts: { x: number; y: number; d2: number }[] = []
+      for (let row = -extent; row <= extent; row++) {
+        const y = row * rowH
+        const xOffset = (row & 1) !== 0 ? s * 0.5 : 0
+        for (let col = -extent; col <= extent; col++) {
+          const x = col * s + xOffset
+          pts.push({ x, y, d2: x * x + y * y })
+        }
+      }
+      pts.sort((a, b) => a.d2 - b.d2)
+      for (const pt of pts) {
+        if (poses >= n) break
+        const px = cx + pt.x
+        const py = cy + pt.y
+        if (!libre(px, py)) continue
+        const idx = this.addParticle(px, py, kind)
+        if (idx < 0) break // capacité atteinte : on s'arrête là
+        this.velX[idx] = mvx
+        this.velY[idx] = mvy
+        poses++
+      }
+      extent = Math.ceil(extent * 1.4) + 1
+    }
+    // LE VOLUME DE DÉPART NE GRANDIT PAS QUAND ON LE REJOINT. Cette ligne
+    // faisait `baseVolume += poses`, et c'était un défaut à soi seul : la
+    // jauge de vie affiche `playerCount / baseVolume`, donc verser gonflait
+    // le NUMÉRATEUR et le DÉNOMINATEUR ensemble — le corps revenait à son
+    // plein pendant que la barre, elle, montrait de moins en moins. MESURÉ
+    // au hub, quatre versements d'affilée : base 900 → 967 → 1035 → 1104 →
+    // 1176, soit une jauge tombée à 76 % pour un corps pourtant PLEIN. Le
+    // seuil critique dessiné sur la jauge dérivait avec elle. Le volume de
+    // départ est celui du DÉPART : seul spawnDisc le pose.
+    this.updatePlayerStats()
+    return poses
+  }
+
+  // Le verbe unique (§3.3) : la matière part vers le point visé, le corps part
+  // à l'opposé. Conservation exacte : la réaction est répartie uniformément
+  // sur les particules restantes du corps.
+  eject(aimX: number, aimY: number, dt: number): void {
+    if (this.dispersed) return
+    const p = this.params
+    this.ejectCarry += p.ejectRate * dt
+    while (this.ejectCarry >= 1) {
+      this.ejectCarry -= 1
+      if (this.playerCount <= 1) {
+        this.dispersed = true
+        return
+      }
+      // L'ÉLECTION HISTORIQUE, restaurée à la demande du concepteur : la
+      // particule LA PLUS PROCHE DU DOIGT part vers le doigt. Un tir posé
+      // sur la flaque élit une particule au cœur de la masse et la propulse
+      // à travers elle : le volume est LABOURÉ, malaxé — c'est brutal, et
+      // c'est exactement le caractère voulu (« je préfère avec les
+      // déformations »). Une élection « propre depuis la surface » a été
+      // essayée puis retirée : elle assagissait le tir rapproché. Ce qui
+      // rendait l'ancienne règle infernale n'était pas sa physique mais son
+      // INVISIBILITÉ — depuis, les gouttes libres se dessinent (traînées),
+      // la vie compte le halo, et le rappel ramène les éclats restés à
+      // portée : le labour se voit et se paie au juste prix, rien de plus.
+      let best = -1
+      let bestD2 = Infinity
+      for (let i = 0; i < this.count; i++) {
+        if (
+          !this.estCorps(i) ||
+          this.frozen[i] === 1 ||
+          this.gaseous[i] === 1
+        )
+          continue
+        const dx = this.posX[i] - aimX
+        const dy = this.posY[i] - aimY
+        const d2 = dx * dx + dy * dy
+        if (d2 < bestD2) {
+          bestD2 = d2
+          best = i
+        }
+      }
+      if (best < 0) return // tout le corps est gelé : temps mort, rien à éjecter
+
+      let dirX = aimX - this.posX[best]
+      let dirY = aimY - this.posY[best]
+      let len = Math.hypot(dirX, dirY)
+      if (len < 1e-6) {
+        dirX = aimX - this.stats.centroidX
+        dirY = aimY - this.stats.centroidY
+        len = Math.hypot(dirX, dirY)
+        if (len < 1e-6) {
+          dirX = 1
+          dirY = 0
+          len = 1
+        }
+      }
+      dirX /= len
+      dirY /= len
+
+      const departX = this.posX[best]
+      const departY = this.posY[best]
+      const newVx = this.stats.velX + dirX * p.ejectSpeed
+      const newVy = this.stats.velY + dirY * p.ejectSpeed
+      const dvx = newVx - this.velX[best]
+      const dvy = newVy - this.velY[best]
+      this.velX[best] = newVx
+      this.velY[best] = newVy
+      // La gouttelette décolle hors de la couche de surface : sans ce
+      // décalage, elle traverse ses voisines à pleine vitesse au pas suivant
+      // et la projection PBF injecte de l'énergie dans le corps.
+      this.posX[best] += dirX * p.kernelRadius * 0.8
+      this.posY[best] += dirY * p.kernelRadius * 0.8
+      this.kind[best] = KIND_FREE
+      this.cooldown[best] = p.reabsorbCooldown * this.reabsorbFactor
+      // créditée VIVANTE à l'instant même du tir : elle part de la surface,
+      // donc du halo — la jauge ne cille pas d'une image, elle ne baissera
+      // qu'à la SORTIE réelle (constatée au relabel suivant)
+      this.duCorps[best] = 2
+      this.tiree[best] = 1 // partie d'un jet : elle peut être donnée
+      this.enPretCount++
+      this.playerCount--
+
+      // Entraînement du voisinage : le liquide voisin CONVERGE vers le point
+      // d'émission (radialement, comme l'entonnoir qui alimente une buse) —
+      // le corps se creuse sans recevoir de poussée dans le sens du jet.
+      // Pousser les voisines dans la direction de l'éjection annulerait
+      // localement le recul : la déformation de propulsion disparaîtrait.
+      let entrainX = 0
+      let entrainY = 0
+      if (p.ejectEntrain > 0 && this.playerCount > 0) {
+        const R = p.kernelRadius * 1.8
+        const R2 = R * R
+        for (let i = 0; i < this.count; i++) {
+          if (
+            !this.estCorps(i) ||
+            this.frozen[i] === 1 ||
+            this.gaseous[i] === 1
+          )
+            continue
+          const dx = departX - this.posX[i]
+          const dy = departY - this.posY[i]
+          const d2 = dx * dx + dy * dy
+          if (d2 >= R2 || d2 < 1e-6) continue
+          const d = Math.sqrt(d2)
+          const w = 1 - d / R
+          const a = (p.ejectSpeed * p.ejectEntrain * w) / d
+          const ax = dx * a
+          const ay = dy * a
+          this.velX[i] += ax
+          this.velY[i] += ay
+          entrainX += ax
+          entrainY += ay
+        }
+      }
+
+      // Réaction : conservation exacte, entraînement compris. Le recul est
+      // pondéré vers le point d'éjection (recoilLocality) — à 0 il est
+      // uniforme et le corps part d'un bloc comme un solide ; à 1 il est
+      // concentré à l'émission et se propage par pression : le côté éjection
+      // s'écrase d'abord, le corps se déforme en accélérant.
+      const locality = Math.min(1, Math.max(0, p.recoilLocality))
+      const localR = p.kernelRadius * 3
+      let wSum = 0
+      let liquid = 0
+      for (let i = 0; i < this.count; i++) {
+        if (
+          !this.estCorps(i) ||
+          this.frozen[i] === 1 ||
+          this.gaseous[i] === 1
+        )
+          continue
+        liquid++
+        let w = 1 - locality
+        const dx = this.posX[i] - departX
+        const dy = this.posY[i] - departY
+        const d = Math.hypot(dx, dy)
+        if (d < localR) w += locality * (1 - d / localR)
+        this.dvX[i] = w // scratch : poids de recul (dvX est libre hors step)
+        wSum += w
+      }
+      if (wSum < 1e-6) {
+        if (liquid === 0) continue // le reste du corps est gelé : la glace encaisse le recul
+        // corps entier hors du rayon local (improbable) : repli uniforme
+        wSum = liquid
+        for (let i = 0; i < this.count; i++) {
+          if (
+            this.estCorps(i) &&
+            this.frozen[i] === 0 &&
+            this.gaseous[i] === 0
+          ) {
+            this.dvX[i] = 1
+          }
+        }
+      }
+      const rx = -(dvx + entrainX) / wSum
+      const ry = -(dvy + entrainY) / wSum
+      for (let i = 0; i < this.count; i++) {
+        if (
+          this.estCorps(i) &&
+          this.frozen[i] === 0 &&
+          this.gaseous[i] === 0
+        ) {
+          this.velX[i] += rx * this.dvX[i]
+          this.velY[i] += ry * this.dvX[i]
+        }
+      }
+    }
+  }
+
+  // L'impulsion SANS direction (stick au neutre, doigt posé sur le corps)
+  // se retourne vers l'intérieur : le corps se RASSEMBLE au lieu d'éjecter.
+  // Rien ne part, rien ne se paie — chaque particule du corps est rappelée
+  // vers le point de rassemblement, sa fuite radiale est amortie, et les
+  // gouttes LIBRES du voisinage immédiat (hors délai de réabsorption) sont
+  // ramenées avec lui : le volume se REFORME, fragments compris. Le rappel
+  // est interne : la quantité de mouvement d'ensemble est préservée.
+  //
+  // LE POINT DE RASSEMBLEMENT (retour joueur : « peu importe où on clique,
+  // ça regroupe au centre ; je voudrais que ça se regroupe là où l'on
+  // clique »). Sans point (stick au neutre), c'est le centre, comme avant.
+  // Avec un point (le doigt posé sur le corps), le corps se reforme LÀ : un
+  // corps tout étiré qu'on touche à son bout se ramasse vers ce bout.
+  //
+  // Déplacer le centre de masse sans rien éjecter, c'est créer de l'élan à
+  // partir de rien — la physique l'interdit, l'économie du jeu aussi. D'où
+  // trois garde-fous :
+  //  - le glissement est un ALLER SANS RETOUR D'ÉLAN : une vitesse de
+  //    translation commune s'ajoute au corps le temps du trajet, puis se
+  //    retire exactement — à l'arrivée ou au relâchement. La dérive d'avant
+  //    le geste est celle d'après : se rassembler ne freine ni ne lance.
+  //  - le point est pris dans le REPÈRE DU CORPS (fixé au premier toucher,
+  //    puis emporté avec sa dérive) : tenir le doigt ne cloue pas le corps
+  //    dans le monde, sinon le geste deviendrait un frein gratuit.
+  //  - le trajet est raccourci du RAYON DU CORPS COMPACT : le corps reformé
+  //    ENGLOBE le point touché au lieu de s'y centrer. Un corps déjà ramassé
+  //    touché à son bord ne bouge donc pas — sans cela, toucher le bord en
+  //    boucle ferait ramper le corps d'un rayon par toucher, gratuitement.
+  //    Un corps étiré touché à son bout, lui, s'y ramasse : c'est le geste.
+
+  /** Le rayon du corps ramassé en disque compact (pavage hexagonal). */
+  private rayonCompact(): number {
+    const s = this.params.particleSpacing
+    return Math.sqrt((this.stats.count * s * s * Math.sqrt(3) * 0.5) / Math.PI)
+  }
+
+  /** Le point (monde) vers lequel le corps se rassemble en ce moment, ou
+   *  null hors rassemblement. Sert au rendu (l'onde part de là). */
+  pointDeRassemblement(): { x: number; y: number } | null {
+    if (!this.rass.actif) return null
+    return {
+      x: this.stats.centroidX + this.rass.resteX,
+      y: this.stats.centroidY + this.rass.resteY,
+    }
+  }
+
+  /** Le geste est relâché (ou interrompu) : la vitesse de translation prêtée
+   *  au corps lui est reprise — il garde la dérive qu'il avait avant. */
+  private finRassemble(): void {
+    const r = this.rass
+    if (r.uX !== 0 || r.uY !== 0) {
+      for (let i = 0; i < this.count; i++) {
+        if (!this.estCorps(i) || this.frozen[i] === 1 || this.gaseous[i] === 1) continue
+        this.velX[i] -= r.uX
+        this.velY[i] -= r.uY
+      }
+    }
+    r.actif = false
+    r.resteX = r.resteY = r.uX = r.uY = 0
+  }
+
+  rassemble(dt: number, versX?: number, versY?: number): void {
+    if (this.dispersed) return
+    const p = this.params
+    const r = this.rass
+    r.vu = true
+    if (!r.actif) {
+      r.actif = true
+      r.resteX = r.resteY = r.uX = r.uY = 0
+      if (versX !== undefined && versY !== undefined) {
+        const dx = versX - this.stats.centroidX
+        const dy = versY - this.stats.centroidY
+        const d = Math.hypot(dx, dy)
+        const rc = this.rayonCompact()
+        if (d > rc) {
+          r.resteX = (dx * (d - rc)) / d
+          r.resteY = (dy * (d - rc)) / d
+        }
+      }
+    }
+    // La translation : la vitesse visée décroît avec le trajet restant —
+    // freinage à accélération bornée (v² = a·d) au loin, approche
+    // exponentielle (taux regroupDamp) à la fin — et ne change jamais de
+    // plus de regroupAccel·dt d'un pas à l'autre : pas d'à-coup au toucher.
+    const reste = Math.hypot(r.resteX, r.resteY)
+    let wX = 0
+    let wY = 0
+    if (reste > 1e-6) {
+      const v = Math.min(Math.sqrt(p.regroupAccel * reste), p.regroupDamp * reste)
+      wX = (r.resteX / reste) * v
+      wY = (r.resteY / reste) * v
+    }
+    let duX = wX - r.uX
+    let duY = wY - r.uY
+    const du = Math.hypot(duX, duY)
+    const duMax = p.regroupAccel * dt
+    if (du > duMax) {
+      duX *= duMax / du
+      duY *= duMax / du
+    }
+    r.uX += duX
+    r.uY += duY
+    r.resteX -= r.uX * dt
+    r.resteY -= r.uY * dt
+    if (duX !== 0 || duY !== 0) {
+      for (let i = 0; i < this.count; i++) {
+        if (!this.estCorps(i) || this.frozen[i] === 1 || this.gaseous[i] === 1) continue
+        this.velX[i] += duX
+        this.velY[i] += duY
+      }
+    }
+    // le rappel vise le point de rassemblement : le centre de masse plus le
+    // trajet qu'il lui reste (sans point, le centre lui-même)
+    const cx = this.stats.centroidX + r.resteX
+    const cy = this.stats.centroidY + r.resteY
+    const rappel = p.regroupAccel * dt
+    const keep = Math.exp(-p.regroupDamp * dt)
+    // Rayon de capture des gouttes LIBRES : le voisinage immédiat du corps.
+    // Un fragment que la contraction vient de détacher est ramené au bercail ;
+    // une goutte d'éjection encore sous délai de réabsorption reste perdue —
+    // l'économie de la propulsion ne change pas.
+    const capture = Math.max(this.stats.rmsRadius * 2.5, p.kernelRadius * 6)
+    const capture2 = capture * capture
+    let sumX = 0
+    let sumY = 0
+    let n = 0
+    for (let i = 0; i < this.count; i++) {
+      this.dvX[i] = 0 // scratch : 1 = rappelée ce pas-ci (dvX est libre hors step)
+      if (this.frozen[i] === 1 || this.gaseous[i] === 1) continue
+      if (!this.estCorps(i)) {
+        if (this.kind[i] !== KIND_FREE || this.cooldown[i] > 0) continue
+        const fx = cx - this.posX[i]
+        const fy = cy - this.posY[i]
+        if (fx * fx + fy * fy > capture2) continue
+      }
+      this.dvX[i] = 1
+      n++
+      const dx = cx - this.posX[i]
+      const dy = cy - this.posY[i]
+      const d = Math.hypot(dx, dy)
+      if (d < 1e-6) continue
+      const ux = dx / d
+      const uy = dy / d
+      // rappel proportionné à l'éloignement : doux au cœur (le corps ne
+      // s'écrase pas sur lui-même), plein au-delà de trois rayons de noyau
+      const g = Math.min(1, d / (p.kernelRadius * 3))
+      let ivx = ux * rappel * g
+      let ivy = uy * rappel * g
+      // la composante de vitesse qui FUIT le centre est amortie : c'est elle
+      // qui étale le corps — la composante rentrante et l'élan commun restent
+      const vr = this.velX[i] * ux + this.velY[i] * uy // < 0 : s'éloigne
+      if (vr < 0) {
+        const cut = -vr * (1 - keep)
+        ivx += ux * cut
+        ivy += uy * cut
+      }
+      this.velX[i] += ivx
+      this.velY[i] += ivy
+      sumX += ivx
+      sumY += ivy
+    }
+    if (n === 0) return
+    const mx = sumX / n
+    const my = sumY / n
+    for (let i = 0; i < this.count; i++) {
+      if (this.dvX[i] !== 1) continue
+      this.velX[i] -= mx
+      this.velY[i] -= my
+    }
+  }
+
+  // L'IMPULSION DU TABLEAU : le corps naît LANCÉ, à une vitesse exacte —
+  // la seule autre façon de lui donner une vitesse précise en jeu est une
+  // chasse (un servo) ou le dash de vapeur. Posée sur toutes les particules
+  // du corps (le patron du dash), puis les statistiques à jour pour que la
+  // première image, et la ligne prédite, lisent déjà cette vitesse.
+  lanceCorps(vx: number, vy: number): void {
+    for (let i = 0; i < this.count; i++) {
+      if (!this.estCorps(i)) continue
+      this.velX[i] = vx
+      this.velY[i] = vy
+    }
+    this.updatePlayerStats()
+  }
+
+  // Le dash de vapeur (« air dash » à la Ori) : UNE impulsion qui envoie
+  // tout le nuage vers le point visé — pas de recul, pas d'éjection, pas de
+  // pilotage continu. Les impulsions sont COMPTÉES : la réserve est pleine
+  // au chargement du tableau, une vaporisation DÉCIDÉE refait le plein, et
+  // un surchauffeur frôlé en rend une. Renvoie 1 si le dash part, 0 sinon.
+  // La TRANSFORMATION en vapeur — touche, chaudière à 95 %, zone forcée :
+  // toute cause confondue — se paie à l'instant du basculement : une
+  // fraction du volume actif (vaporTollFrac, 20 %) part en gouttes éjectées
+  // à grande vitesse dans TOUTES les directions. C'est la même matière que
+  // la propulsion : récupérable, elle perlera aussi en rosée au froid. La
+  // quantité de mouvement d'ensemble est conservée exactement.
+  // `rendDashs` : une bascule DÉCIDÉE (touche G, bouton VAPEUR) refait le
+  // plein de la réserve — elle se paie en volume, c'est son prix. Une
+  // transformation SUBIE — chaudière, zone qui impose la vapeur — ne rend
+  // RIEN : sinon la salle vaudrait ferme à dashs (aller-retour devant la
+  // chaudière = réserve infinie, sans rien décider).
+  /** Le corps NAÎT nuage. Un tableau qui commence en vapeur n'a pas à
+   *  attendre la vaporisation progressive : sans cela, le compteur annonce
+   *  ses dashs pendant que le corps est encore liquide — et aucun ne part
+   *  (le dash exige de la vapeur). L'état est la condition de départ. */
+  naitEnVapeur(): void {
+    for (let i = 0; i < this.count; i++) {
+      if (!this.estCorps(i)) continue
+      this.vapor[i] = 1
+      this.gaseous[i] = 1
+      this.gasLink[i] = 1
+      this.frost[i] = 0
+      this.frozen[i] = 0
+    }
+  }
+
+  transfoVapeur(rendDashs = true): void {
+    if (this.dispersed) return
+    const p = this.params
+    if (rendDashs) this.dashBudget = this.dashBudgetMax
+    this.updatePlayerStats()
+    const toll = Math.floor(
+      this.playerCount * p.vaporTollFrac * this.vaporTollFactor,
+    )
+    if (toll <= 0) return
+    const cx = this.stats.centroidX
+    const cy = this.stats.centroidY
+    // la ponction se répartit dans tout le corps (une particule sur k) :
+    // la gerbe part en étoile, pas d'un seul flanc
+    const stride = Math.max(1, Math.floor(this.playerCount / toll))
+    const v = p.ejectSpeed * 0.85
+    let dvxSum = 0
+    let dvySum = 0
+    let pris = 0
+    let vus = 0
+    for (let i = 0; i < this.count && pris < toll; i++) {
+      if (!this.estCorps(i) || this.frozen[i] === 1) continue
+      vus++
+      if (vus % stride !== 0) continue
+      let ux = this.posX[i] - cx
+      let uy = this.posY[i] - cy
+      const d = Math.hypot(ux, uy)
+      if (d < 1e-6) {
+        const a = (i * 2.399963) % (Math.PI * 2) // angle d'or : gerbe régulière
+        ux = Math.cos(a)
+        uy = Math.sin(a)
+      } else {
+        ux /= d
+        uy /= d
+      }
+      const dvx = this.stats.velX + ux * v - this.velX[i]
+      const dvy = this.stats.velY + uy * v - this.velY[i]
+      this.velX[i] += dvx
+      this.velY[i] += dvy
+      // décoller hors de la couche de surface, comme l'éjection (§3.3)
+      this.posX[i] += ux * p.kernelRadius * 0.8
+      this.posY[i] += uy * p.kernelRadius * 0.8
+      this.kind[i] = KIND_FREE
+      this.cooldown[i] = p.reabsorbCooldown * this.reabsorbFactor
+      this.duCorps[i] = 2 // gerbe de péage : part du halo, vivante jusqu'à la sortie
+      this.enPretCount++
+      this.playerCount--
+      dvxSum += dvx
+      dvySum += dvy
+      pris++
+    }
+    // réaction répartie sur le corps restant : la gerbe est quasi symétrique,
+    // le solde est faible — on le rend quand même (conservation exacte)
+    if (pris > 0 && this.playerCount > 0) {
+      let libres = 0
+      for (let i = 0; i < this.count; i++) {
+        if (this.estCorps(i) && this.frozen[i] === 0) libres++
+      }
+      if (libres > 0) {
+        const rx = -dvxSum / libres
+        const ry = -dvySum / libres
+        for (let i = 0; i < this.count; i++) {
+          if (this.estCorps(i) && this.frozen[i] === 0) {
+            this.velX[i] += rx
+            this.velY[i] += ry
+          }
+        }
+      }
+    }
+  }
+
+  gasDash(aimX: number, aimY: number): number {
+    if (this.dispersed) return 0
+    const p = this.params
+    this.updatePlayerStats()
+    let dx = aimX - this.stats.centroidX
+    let dy = aimY - this.stats.centroidY
+    const d = Math.hypot(dx, dy)
+    if (d < 1e-3) return 0
+    dx /= d
+    dy /= d
+    // La distance du pointeur règle la puissance : pleine à gasDashRange,
+    // dégressive en deçà — viser près du corps donne un petit bond, viser
+    // loin donne le dash entier, et au-delà rien de plus.
+    const power = Math.min(1, d / Math.max(1, p.gasDashRange))
+    let gasCount = 0
+    for (let i = 0; i < this.count; i++) {
+      if (this.estCorps(i) && this.gaseous[i] === 1) gasCount++
+    }
+    if (gasCount < 3) return 0
+    // le dash se COMPTE, il ne se paie pas en volume : le prix a été payé à
+    // la transformation (péage de vaporisation)
+    if (this.dashBudget <= 0) {
+      return 0 // à sec : condenser et se retransformer, ou un surchauffeur
+    }
+    this.dashBudget--
+
+    // ——— LE SOUFFLE : on avance parce qu'on REJETTE ————————————————
+    // La queue du nuage (le plus loin DERRIÈRE, dans l'axe du dash) est
+    // chassée vers l'arrière et cesse de vous appartenir. Elle se disperse,
+    // et la vapeur qui n'est plus à vous perle sur la première paroi
+    // touchée : des gouttes à aller rechercher — ou à laisser derrière soi.
+    const part = Math.max(0, Math.min(0.5, p.gasDashExhaust))
+    // jamais au point de dissoudre le corps : un plancher de nuage reste
+    const chassables = Math.max(0, gasCount - 12)
+    const souffle = Math.min(chassables, Math.round(gasCount * part))
+    if (souffle > 0) {
+      // les candidats, triés par projection sur l'ARRIÈRE du dash
+      const queue: { i: number; d: number }[] = []
+      for (let i = 0; i < this.count; i++) {
+        if (!this.estCorps(i) || this.gaseous[i] !== 1) continue
+        const rx = this.posX[i] - this.stats.centroidX
+        const ry = this.posY[i] - this.stats.centroidY
+        queue.push({ i, d: -(rx * dx + ry * dy) }) // grand = bien en arrière
+      }
+      queue.sort((a, b) => b.d - a.d)
+      const vSouffle =
+        p.gasDashSpeed * power * Math.max(0, p.gasDashExhaustSpeed)
+      for (let k = 0; k < souffle && k < queue.length; k++) {
+        const i = queue[k].i
+        // évantail : le souffle s'ouvre au lieu de partir en trait
+        this.recondSeed = (this.recondSeed * 48271) % 2147483647
+        const ecart = (this.recondSeed / 2147483647 - 0.5) * 0.7
+        const co = Math.cos(ecart)
+        const si = Math.sin(ecart)
+        const ex = -dx * co - -dy * si
+        const ey = -dx * si + -dy * co
+        this.velX[i] = ex * vSouffle
+        this.velY[i] = ey * vSouffle
+        this.kind[i] = KIND_FREE
+        this.cooldown[i] = p.reabsorbCooldown * this.reabsorbFactor
+        this.duCorps[i] = 0 // chassé : ce souffle ne vous appartient plus
+        this.souffle[i] = 4 // 4 s de vol : le temps de traverser une salle
+        this.playerCount--
+      }
+      this.updatePlayerStats()
+    }
+
+    for (let i = 0; i < this.count; i++) {
+      if (!this.estCorps(i) || this.gaseous[i] !== 1) continue
+      this.velX[i] = dx * p.gasDashSpeed * power
+      this.velY[i] = dy * p.gasDashSpeed * power
+    }
+    return 1
+  }
+
+  // Vortex de regroupement (clic droit) : l'eau est entraînée vers un champ
+  // de courant en spirale rentrante. Un champ de vitesses cible (plutôt que
+  // des forces) garantit la convergence : une force tourbillonnaire pure
+  // ferait orbiter les gouttes jusqu'à les éjecter du rayon d'action.
+  // La rotation rallonge la spirale : plus de tourbillon = retour plus lent.
+  //
+  // `life` est la vie restante du vortex (1 → 0). Sur la fraction finale
+  // (vortexWindDown), le courant s'essouffle : le champ tend vers zéro mais
+  // l'entraînement reste — le vortex freine l'eau et la dépose immobile.
+  // Sans cette retombée, l'eau regroupée est lâchée en pleine giration et la
+  // force centrifuge fait éclater le corps dès que le champ disparaît.
+  applyVortex(cx: number, cy: number, dt: number, life = 1): void {
+    const p = this.params
+    const R = p.vortexRadius
+    const R2 = R * R
+    const fade = p.vortexWindDown > 0 ? Math.min(1, life / p.vortexWindDown) : 1
+    // La vitesse du courant se répartit entre rentrant et giratoire
+    const inv = 1 / Math.sqrt(1 + p.vortexSwirl * p.vortexSwirl)
+    const vIn = p.vortexPull * inv * fade
+    const vTan = p.vortexPull * p.vortexSwirl * inv * fade
+    // L'entraînement se renforce à mesure que le courant faiblit : l'eau suit
+    // le champ mourant sans retard et se fige au lieu de garder son élan.
+    const drag = p.vortexDrag / Math.max(0.15, fade)
+    const blend = 1 - Math.exp(-drag * dt)
+    for (let i = 0; i < this.count; i++) {
+      // Le sas aspire les trois états. La glace a plus d'inertie : le courant
+      // a moins de prise sur elle, mais il finit par l'emporter.
+      const grip = this.frozen[i] === 1 ? 0.45 : 1
+      const dx = cx - this.posX[i]
+      const dy = cy - this.posY[i]
+      const d2 = dx * dx + dy * dy
+      if (d2 >= R2 || d2 < 1e-6) continue
+      const d = Math.sqrt(d2)
+      const ux = dx / d
+      const uy = dy / d
+      const rim = Math.min(1, (1 - d / R) * 2) // fondu au bord du rayon d'action
+      const settle = Math.min(1, d / (R * 0.08)) // l'eau se pose au centre au lieu d'osciller
+      // Cœur en rotation « corps solide » (vortex de Rankine) : sans lui,
+      // l'eau trouve une orbite d'équilibre (r ≈ vTan²/(drag·vIn)) et tourne
+      // sans jamais entrer. Le cœur doit englober ce rayon d'équilibre.
+      const tanScale = Math.min(1, d / (R * 0.5))
+      const tx = (ux * vIn * settle - uy * vTan * tanScale) * rim
+      const ty = (uy * vIn * settle + ux * vTan * tanScale) * rim
+      this.velX[i] += (tx - this.velX[i]) * blend * grip
+      this.velY[i] += (ty - this.velY[i]) * blend * grip
+    }
+  }
+
+  // Le sas est une bouche d'aspiration : dans son rayon d'action, un courant
+  // permanent entraîne l'eau vers le trou, en spirale rentrante (entonnoir).
+  // Même modèle en champ de vitesses que le vortex — une force pure ferait
+  // orbiter l'eau autour de la bouche sans jamais y entrer. Contrairement au
+  // vortex, le courant se renforce à l'approche du trou, comme une vidange,
+  // et il n'y a pas de retombée : le trou avale, il ne dépose pas.
+  applyExitSuction(cx: number, cy: number, dt: number): void {
+    const p = this.params
+    const R = p.exitRadius * this.exitRadiusFactor
+    this.mouthX = cx
+    this.mouthY = cy
+    this.drainOn = R > 0 && p.exitPull > 0
+    if (!this.drainOn) return
+    const R2 = R * R
+    const inv = 1 / Math.sqrt(1 + p.exitSwirl * p.exitSwirl)
+    // Entraînement fixe : le courant du sas est permanent, l'eau le suit
+    // franchement sans qu'un curseur de plus soit nécessaire.
+    const blend = 1 - Math.exp(-4 * dt)
+    for (let i = 0; i < this.count; i++) {
+      const dx = cx - this.posX[i]
+      const dy = cy - this.posY[i]
+      const d2 = dx * dx + dy * dy
+      if (d2 >= R2 || d2 < 1e-6) continue
+      const d = Math.sqrt(d2)
+      const ux = dx / d
+      const uy = dy / d
+      const rim = Math.min(1, (1 - d / R) * 2) // fondu au bord du rayon d'action
+      if (this.frozen[i] === 1) {
+        // Le courant a prise sur la glace aussi — moins que sur l'eau (un
+        // bloc a de l'inertie : exitIceGrip), et sans giration : un palet
+        // n'orbite pas, il est hâlé vers la bouche. icePass moyenne ces
+        // tractions par particule en une poussée de bloc — le bloc entier
+        // dérive vers le sas au lieu d'attendre qu'on l'y jette.
+        const boost = 1 + 1.5 * (1 - d / R)
+        const vIn = p.exitPull * inv * boost * rim
+        const grip = 1 - Math.exp(-4 * p.exitIceGrip * this.priseSasGlaceFactor * dt)
+        this.velX[i] += (ux * vIn - this.velX[i]) * grip
+        this.velY[i] += (uy * vIn - this.velY[i]) * grip
+        continue
+      }
+      // La vidange accélère vers le trou — sur le courant rentrant seulement :
+      // amplifier aussi la giration élargirait l'orbite d'équilibre au-delà
+      // du cœur de Rankine et l'eau tournerait sans jamais entrer.
+      // Le second terme est la gorgée finale : tout près de la bouche, le
+      // courant plonge franchement — les dernières gouttes, même plaquées
+      // contre la paroi voisine, sont bues au lieu de tourner en rond.
+      const boost =
+        1 + 1.5 * (1 - d / R) + 1.5 * (1 - Math.min(1, d / (R * 0.3)))
+      const vIn = p.exitPull * inv * boost
+      const vTan = p.exitPull * p.exitSwirl * inv
+      // Cœur en rotation « corps solide » (Rankine), durci au carré : la
+      // giration s'efface à l'approche de la bouche, l'eau y tombe droit.
+      const t0 = Math.min(1, d / (R * 0.5))
+      const tanScale = t0 * t0
+      const tx = (ux * vIn - uy * vTan * tanScale) * rim
+      const ty = (uy * vIn + ux * vTan * tanScale) * rim
+      this.velX[i] += (tx - this.velX[i]) * blend
+      this.velY[i] += (ty - this.velY[i]) * blend
+    }
+
+    // Le trou avale : toute particule qui atteint l'œil est retirée de la
+    // simulation et comptée — elle sera mise en bonbonne à la sortie.
+    const swallowR = p.kernelRadius * 2.8
+    const swallowR2 = swallowR * swallowR
+    let i = 0
+    while (i < this.count) {
+      const dx = cx - this.posX[i]
+      const dy = cy - this.posY[i]
+      if (dx * dx + dy * dy < swallowR2) {
+        // Avalée gelée : le protocole paie une prime — récupérer un
+        // échantillon SOLIDE vaut mieux que le boire goutte à goutte.
+        if (this.frozen[i] === 1) this.swallowedIce++
+        this.removeParticle(i)
+        this.swallowed++
+        continue // l'indice i contient maintenant une autre particule
+      }
+      i++
+    }
+  }
+
+  // LE VIDE QUI ASPIRE (game/vide.ts) : une fois le corps pris, la brèche
+  // est une vidange sans retour. Même champ de vitesses que le sas — une
+  // force pure ferait orbiter l'eau — mais tout y est plus dur : la portée
+  // est plus large, le courant plus vif, la giration serrée (l'eau tourne
+  // une fois et plonge), et la glace n'y oppose presque pas d'inertie.
+  // `force` (0 … 1) fait monter le courant : on voit le liquide se tendre
+  // vers l'œil avant d'y être englouti. Ce qu'il avale est PERDU (perdusVide),
+  // pas bu : le corps fond, et la dispersion conclut à la défaite.
+  //
+  // `debit` (particules/s) borne ce que l'œil avale. Sans lui, le corps
+  // pris était posé SUR l'œil : 900 particules disparaissaient en 0,86 s
+  // (mesuré au Chromium) — un clignement, pas une aspiration. Borné, le
+  // liquide tourne, s'étire en entonnoir et plonge : on le VOIT partir.
+  applyAspirationVide(cx: number, cy: number, dt: number, force: number, debit = Infinity): void {
+    if (force <= 0) return
+    const R = VIDE_PORTEE
+    const R2 = R * R
+    const vIn0 = VIDE_COURANT * force
+    const vTan0 = vIn0 * 0.6
+    const blend = 1 - Math.exp(-6 * force * dt)
+    for (let i = 0; i < this.count; i++) {
+      const dx = cx - this.posX[i]
+      const dy = cy - this.posY[i]
+      const d2 = dx * dx + dy * dy
+      // le CORPS est emporté où qu'il soit — un fragment éjecté à l'instant
+      // ne sauve rien ; le reste de la salle ne sent la brèche qu'à portée
+      if ((d2 >= R2 && !this.estCorps(i)) || d2 < 1e-6) continue
+      const d = Math.sqrt(d2)
+      const ux = dx / d
+      const uy = dy / d
+      const pres = 1 - Math.min(1, d / R)
+      const vIn = vIn0 * (1 + 2 * pres)
+      const t0 = Math.min(1, d / (R * 0.4))
+      const vTan = vTan0 * t0 * t0
+      const tx = ux * vIn - uy * vTan
+      const ty = uy * vIn + ux * vTan
+      const grip = this.frozen[i] === 1 ? 0.7 : 1
+      this.velX[i] += (tx - this.velX[i]) * blend * grip
+      this.velY[i] += (ty - this.velY[i]) * blend * grip
+    }
+    // l'œil avale : retirée, comptée perdue — au débit permis
+    const swallowR = this.params.kernelRadius * 2.8
+    const swallowR2 = swallowR * swallowR
+    this.videCarry = Math.min(this.count, this.videCarry + debit * force * dt)
+    let i = 0
+    while (i < this.count && this.videCarry >= 1) {
+      const dx = cx - this.posX[i]
+      const dy = cy - this.posY[i]
+      if (dx * dx + dy * dy < swallowR2) {
+        this.removeParticle(i)
+        this.perdusVide++
+        this.videCarry--
+        continue // l'indice i contient maintenant une autre particule
+      }
+      i++
+    }
+    // Le corps englouti EST la dispersion, constatée ici : quand le vide a
+    // tout avalé, relabel sort d'emblée (count nul) et ne la déclarait
+    // jamais — la salle restait ouverte sur un écran vide, sans game over.
+    if (this.playerCount < 2) this.dispersed = true
+  }
+
+  // LA CHASSE : un courant de poussée rectiligne dans un rectangle — ce qui
+  // ÉJECTE le corps d'une salle. Même modèle en champ de vitesses que le
+  // sas et le vortex, et pour la même raison : une force pure s'ajouterait
+  // à l'élan du corps et le ferait rebondir contre le courant ; l'entraînement
+  // vers une vitesse cible l'emporte, quoi qu'il faisait avant. Contrairement
+  // à une porte qui se ferme (une paroi qui APPARAÎT, et coupe ce qu'elle
+  // trouve dedans), rien n'est jamais déchiré : tout ce qui est dans le
+  // rectangle part du même côté, à la même allure.
+  //
+  // La glace y a prise comme au sas — avec inertie (un bloc ne bondit pas) ;
+  // icePass moyenne les tractions par particule en une dérive de bloc. La
+  // vapeur suit comme l'eau : un nuage se balaie plus vite encore, mais le
+  // même coefficient suffit à le vider de la salle.
+  applyChasse(
+    c: {
+      minX: number
+      minY: number
+      maxX: number
+      maxY: number
+      angle: number
+      allure?: number
+    },
+    dt: number,
+  ): void {
+    const rad = (c.angle * Math.PI) / 180
+    const allure = c.allure ?? CHASSE_ALLURE_DEFAUT
+    const tx = Math.cos(rad) * allure
+    const ty = Math.sin(rad) * allure
+    const blend = 1 - Math.exp(-6 * dt)
+    const grip = 1 - Math.exp(-2.5 * dt)
+    for (let i = 0; i < this.count; i++) {
+      const x = this.posX[i]
+      const y = this.posY[i]
+      if (x < c.minX || x > c.maxX || y < c.minY || y > c.maxY) continue
+      const k = this.frozen[i] === 1 ? grip : blend
+      this.velX[i] += (tx - this.velX[i]) * k
+      this.velY[i] += (ty - this.velY[i]) * k
+    }
+  }
+
+  // LES PUITS DE GRAVITÉ : la seule ACCÉLÉRATION PURE du solveur. Les trois
+  // champs ci-dessus sont des servos de vitesse, faits pour converger — leurs
+  // notes disent qu'« une force pure ferait orbiter » ; un puits est fait
+  // pour ça. Appliqué AVANT le pas, comme les autres champs : l'impulsion
+  // entre dans la prédiction (prd = pos + vel·dt), la pression garde le corps
+  // d'un seul tenant, la re-dérivation des vitesses la conserve. Aucun filtre
+  // d'état : la glace la reçoit par la moyenne d'icePass (translation, et
+  // l'écart devient une marée en rotation) ; la vapeur la subit directement,
+  // mais gasDrag (1,3/s) la fait spiraler vers le cœur — un nuage n'orbite
+  // pas, il est capturé (docs/puits.md). La loi vit dans game/puits.ts, la
+  // même que celle du prédicteur : ce que la ligne dit est ce que le corps
+  // subit.
+  // ——— LE TIR DE GLACE (le mini-jeu des cibles, 17/09) ————————————————
+  // En glace, l'éjection est stérile (rien n'élit une particule gelée) : le
+  // tir est un AUTRE geste. Le corps entier doit être gelé ; les particules
+  // les plus EN AVANT dans la direction du doigt (une part glaceTir du corps
+  // restant, jamais moins de ECLAT_MIN, jamais en laissant moins de ECLAT_MIN
+  // au corps) cessent d'être à lui, sont poussées hors du rayon de liaison
+  // et partent à la vitesse du corps plus glaceTirVitesse × puissance —
+  // la puissance suit la distance du doigt, comme le dash (gasDashRange).
+  // L'éclat est un bloc rigide à part (icePass le tient), il reste glace
+  // (processCold), il ne se disperse pas et n'est pas rappelé. Le corps
+  // rétrécit ; à ECLAT_MIN particules, il ne tire plus — mais il a fallu
+  // trois cents tirs. Rend le nombre de particules parties.
+  lanceEclat(aimX: number, aimY: number): number {
+    const p = this.params
+    if (this.dispersed || p.glaceTir <= 0) return 0
+    this.updatePlayerStats()
+    let joueur = 0
+    let geles = 0
+    for (let i = 0; i < this.count; i++) {
+      if (!this.estCorps(i)) continue
+      joueur++
+      if (this.frozen[i] === 1) geles++
+    }
+    if (joueur === 0 || geles < joueur) return 0 // pas entièrement glace : rien
+    let dx = aimX - this.stats.centroidX
+    let dy = aimY - this.stats.centroidY
+    const d = Math.hypot(dx, dy)
+    if (d < 1e-3) return 0
+    dx /= d
+    dy /= d
+    const power = Math.min(1, d / Math.max(1, p.gasDashRange))
+    let n = Math.max(ECLAT_MIN, Math.round(joueur * p.glaceTir))
+    n = Math.min(n, joueur - ECLAT_MIN)
+    if (n < 1) return 0
+    const front: { i: number; s: number }[] = []
+    for (let i = 0; i < this.count; i++) {
+      if (!this.estCorps(i)) continue
+      const rx = this.posX[i] - this.stats.centroidX
+      const ry = this.posY[i] - this.stats.centroidY
+      front.push({ i, s: rx * dx + ry * dy })
+    }
+    front.sort((a, b) => b.s - a.s)
+    // hors du rayon de liaison, sinon icePass le recolle au pas suivant
+    const recul = p.linkRadiusFactor * p.kernelRadius * 2.2
+    const vx = this.stats.velX + dx * p.glaceTirVitesse * power
+    const vy = this.stats.velY + dy * p.glaceTirVitesse * power
+    for (let k = 0; k < n; k++) {
+      const i = front[k].i
+      this.kind[i] = KIND_FREE
+      this.playerCount--
+      this.cooldown[i] = 0
+      this.posX[i] += dx * recul
+      this.posY[i] += dy * recul
+      this.prdX[i] = this.posX[i]
+      this.prdY[i] = this.posY[i]
+      this.velX[i] = vx
+      this.velY[i] = vy
+    }
+    this.iceDirty = true
+    this.updatePlayerStats()
+    return n
+  }
+
+  /** LES TOUCHES : chaque ÉCLAT LIBRE (un bloc de glace qui n'est plus le
+   *  corps) dont une particule est dans une mire touche cette mire — le
+   *  bloc entier disparaît (un amas d'éclats agglomérés compte pour sa
+   *  taille entière) et la touche est rendue : quelle mire, combien de
+   *  particules, où. Les étiquettes de blocs sont celles du dernier
+   *  icePass ; à refaire (un gel, un tir), on attend le pas suivant. */
+  touchesMires(mires: readonly { x: number; y: number; r: number }[]): { mire: number; taille: number; x: number; y: number }[] {
+    const out: { mire: number; taille: number; x: number; y: number }[] = []
+    if (mires.length === 0 || this.iceDirty || this.iceComps === 0) return out
+    const n = this.count
+    const labels = this.iceLabels
+    const blocs = this.iceComps
+    const touche = new Int32Array(blocs).fill(-1)
+    const duCorps = new Uint8Array(blocs)
+    for (let i = 0; i < n; i++) {
+      if (this.frozen[i] !== 1) continue
+      const c = labels[i]
+      if (c < 0 || c >= blocs) continue
+      if (this.estCorps(i)) {
+        duCorps[c] = 1 // un bloc qui tient encore au corps n'est pas un éclat
+        continue
+      }
+      if (touche[c] >= 0) continue
+      for (let m = 0; m < mires.length; m++) {
+        const ddx = this.posX[i] - mires[m].x
+        const ddy = this.posY[i] - mires[m].y
+        if (ddx * ddx + ddy * ddy <= mires[m].r * mires[m].r) {
+          touche[c] = m
+          break
+        }
+      }
+    }
+    const taille = new Int32Array(blocs)
+    const sx = new Float64Array(blocs)
+    const sy = new Float64Array(blocs)
+    for (let i = 0; i < n; i++) {
+      if (this.frozen[i] !== 1 || this.estCorps(i)) continue
+      const c = labels[i]
+      if (c < 0 || c >= blocs || touche[c] < 0 || duCorps[c] === 1) continue
+      taille[c]++
+      sx[c] += this.posX[i]
+      sy[c] += this.posY[i]
+    }
+    for (let c = 0; c < blocs; c++) {
+      if (touche[c] < 0 || duCorps[c] === 1 || taille[c] === 0) continue
+      out.push({ mire: touche[c], taille: taille[c], x: sx[c] / taille[c], y: sy[c] / taille[c] })
+    }
+    if (out.length === 0) return out
+    // retirer les particules des blocs touchés, de la fin vers le début
+    // (removeParticle déplace la dernière : les indices suivants tiennent)
+    for (let i = n - 1; i >= 0; i--) {
+      if (this.frozen[i] !== 1 || this.estCorps(i)) continue
+      const c = labels[i]
+      if (c < 0 || c >= blocs || touche[c] < 0 || duCorps[c] === 1) continue
+      this.removeParticle(i)
+    }
+    return out
+  }
+
+  applyPuits(puits: readonly PuitsDef[], dt: number): void {
+    if (puits.length === 0) return
+    const acc = this.accPuits
+    const n = this.count
+    const { frozen, velX, velY, posX, posY } = this
+    // LA GLACE REÇOIT LA MOYENNE DE SON BLOC. Un bloc rigide subit la somme
+    // des forces sur son centre ; particule par particule, le cœur
+    // harmonique (a ∝ r) tirait plus fort sur le bord lointain que sur le
+    // bord proche, et la projection rigide d'icePass redresse les VITESSES,
+    // pas les positions (prd = pos + v·dt garde la poussée différentielle) :
+    // le bloc se tassait de 1 u/s — mesuré le 17/09, rms 73 → 55 en 20 s
+    // dans un cœur de 350 u à 600 u/s², 73 → 22 en douze tours de ronde.
+    // Une accélération uniforme par bloc, la moyenne de ses particules, le
+    // garde entier et fait de son centre un point-masse exact (le cœur est
+    // linéaire : la moyenne EST la valeur au centre). Les étiquettes de
+    // blocs sont celles du dernier icePass ; en attendant le premier (gel à
+    // l'instant), chaque particule reçoit la sienne.
+    const blocs = this.iceComps
+    let glace = false
+    if (!this.iceDirty && blocs > 0) {
+      for (let i = 0; i < n; i++) {
+        if (frozen[i] === 1) {
+          glace = true
+          break
+        }
+      }
+    }
+    if (glace) {
+      const ax = this.puitsAxSum
+      const ay = this.puitsAySum
+      const cnt = this.puitsCnt
+      ax.fill(0, 0, blocs)
+      ay.fill(0, 0, blocs)
+      cnt.fill(0, 0, blocs)
+      const labels = this.iceLabels
+      for (let i = 0; i < n; i++) {
+        acc.ax = 0
+        acc.ay = 0
+        const agit = accelerationPuits(puits, posX[i], posY[i], acc)
+        if (frozen[i] === 1) {
+          const c = labels[i]
+          if (c >= 0 && c < blocs) {
+            ax[c] += acc.ax
+            ay[c] += acc.ay
+            cnt[c]++
+            continue
+          }
+        }
+        if (!agit) continue
+        velX[i] += acc.ax * dt
+        velY[i] += acc.ay * dt
+      }
+      for (let i = 0; i < n; i++) {
+        if (frozen[i] !== 1) continue
+        const c = labels[i]
+        if (c < 0 || c >= blocs || cnt[c] === 0) continue
+        velX[i] += (ax[c] / cnt[c]) * dt
+        velY[i] += (ay[c] / cnt[c]) * dt
+      }
+      return
+    }
+    for (let i = 0; i < n; i++) {
+      acc.ax = 0
+      acc.ay = 0
+      if (!accelerationPuits(puits, posX[i], posY[i], acc)) continue
+      velX[i] += acc.ax * dt
+      velY[i] += acc.ay * dt
+    }
+  }
+  private readonly accPuits: Accel = { ax: 0, ay: 0 }
+  // les sommes par bloc de glace d'applyPuits (voir là-bas)
+  private readonly puitsAxSum: Float32Array
+  private readonly puitsAySum: Float32Array
+  private readonly puitsCnt: Int32Array
+
+  // LA COPIE DE PRÉVISION : un second solveur, sur le même tableau (parois,
+  // portes fermées, éponges et leur saturation), avec l'état exact de chaque
+  // particule à cet instant — LA LISTE DES TABLEAUX EST CELLE QUE
+  // reorderByCell PERMUTE : c'est l'état par particule complet, la seule
+  // source de vérité. Le jeu la fait avancer à part, par tranches, pour
+  // écrire la vraie trajectoire du corps (la prévision exacte). Jamais le
+  // moteur WASM : ses tampons sont un seul exemplaire partagé — la copie
+  // reste en JavaScript.
+  copiePourPrevision(): FluidSimMulti {
+    const c = new FluidSimMulti(this.params, this.bounds, this.capacity, this.corps.length)
+    c.setLevel(this.baseBoxes, this.spongeDefs)
+    c.coupelles = this.coupelles.map((k) => ({ ...k }))
+    if (this.boxes !== this.baseBoxes) c.setDoors(this.boxes.slice(this.baseBoxes.length))
+    for (let k = 0; k < this.sponges.length && k < c.sponges.length; k++) c.sponges[k].saturation.set(this.sponges[k].saturation)
+    const n = this.count
+    c.count = n
+    const flottants: [Float32Array, Float32Array][] = [
+      [this.posX, c.posX], [this.posY, c.posY], [this.prdX, c.prdX], [this.prdY, c.prdY],
+      [this.velX, c.velX], [this.velY, c.velY], [this.cooldown, c.cooldown], [this.frost, c.frost],
+      [this.vapor, c.vapor], [this.ionise, c.ionise], [this.gasLink, c.gasLink], [this.contactTime, c.contactTime],
+      [this.contactNX, c.contactNX], [this.contactNY, c.contactNY], [this.contactVn, c.contactVn], [this.souffle, c.souffle],
+    ]
+    for (const [a, b] of flottants) b.set(a.subarray(0, n))
+    const entiers: [Uint8Array | Int8Array | Int32Array, Uint8Array | Int8Array | Int32Array][] = [
+      [this.kind, c.kind], [this.frozen, c.frozen], [this.gaseous, c.gaseous], [this.welded, c.welded],
+      [this.duCorps, c.duCorps], [this.labels, c.labels], [this.iceLabels, c.iceLabels], [this.contactMat, c.contactMat],
+    ]
+    for (const [a, b] of entiers) b.set(a.subarray(0, n))
+    c.proprio.set(this.proprio.subarray(0, n))
+    c.tiree.set(this.tiree.subarray(0, n))
+    c.courant = this.courant
+    for (let j = 0; j < this.corps.length; j++) {
+      c.corps[j].baseVolume = this.corps[j].baseVolume
+      c.corps[j].playerCount = this.corps[j].playerCount
+      c.corps[j].ouvert = this.corps[j].ouvert
+      c.corps[j].gel = this.corps[j].gel
+    }
+    c.gasIntent = this.gasIntent
+    c.dashBudget = this.dashBudget
+    c.dashBudgetMax = this.dashBudgetMax
+    c.chill = this.chill
+    c.exitRadiusFactor = this.exitRadiusFactor
+    c.reabsorbFactor = this.reabsorbFactor
+    c.vaporTollFactor = this.vaporTollFactor
+    c.iceBounceFactor = this.iceBounceFactor
+    c.spongeGripFactor = this.spongeGripFactor
+    c.criticalFactor = this.criticalFactor
+    c.basculeFactor = this.basculeFactor
+    c.perteGazFactor = this.perteGazFactor
+    c.perteGrilleFactor = this.perteGrilleFactor
+    c.priseSasGlaceFactor = this.priseSasGlaceFactor
+    c.glisseGlaceFactor = this.glisseGlaceFactor
+    c.iceDirty = true
+    c.relabel()
+    return c
+  }
+
+  // Re-tri spatial périodique : après une séparation (gerbe, éclaboussure),
+  // des particules voisines dans l'ESPACE se retrouvent éparpillées dans les
+  // TABLEAUX — chaque accès de paire devient un défaut de cache et TOUTES
+  // les passes ralentissent d'un coup (mesuré : jusqu'à ×9 sur un pas, les
+  // fameux à-coups en retombée). Re-ranger les particules dans l'ordre des
+  // cellules restaure la localité. La physique est inchangée : seule la
+  // numérotation interne bouge, et aucun indice de particule ne vit d'une
+  // frame à l'autre hors de ces tableaux.
+  private reorderByCell(): void {
+    const n = this.count
+    const perm = this.reorderPerm
+    this.grid.build(this.posX, this.posY, n)
+    this.grid.copyOrder(perm)
+    const f = this.reorderScratch
+    const permuteF = (a: Float32Array): void => {
+      for (let i = 0; i < n; i++) f[i] = a[perm[i]]
+      a.set(f.subarray(0, n))
+    }
+    // le tampon flottant transporte aussi les entiers (valeurs petites :
+    // matériaux, drapeaux, étiquettes — toutes exactes en float32)
+    const permuteI = (a: Uint8Array | Int8Array | Int32Array): void => {
+      for (let i = 0; i < n; i++) f[i] = a[perm[i]]
+      for (let i = 0; i < n; i++) a[i] = f[i]
+    }
+    permuteF(this.posX)
+    permuteF(this.posY)
+    permuteF(this.prdX)
+    permuteF(this.prdY)
+    permuteF(this.velX)
+    permuteF(this.velY)
+    permuteF(this.cooldown)
+    permuteF(this.frost)
+    permuteF(this.vapor)
+    permuteF(this.ionise)
+    permuteF(this.gasLink)
+    permuteF(this.contactTime)
+    permuteF(this.contactNX)
+    permuteF(this.contactNY)
+    permuteF(this.contactVn)
+    permuteI(this.kind)
+    permuteI(this.frozen)
+    permuteI(this.gaseous)
+    permuteI(this.welded)
+    permuteF(this.souffle)
+    permuteI(this.duCorps)
+    permuteI(this.proprio)
+    permuteI(this.tiree)
+    permuteI(this.labels)
+    permuteI(this.iceLabels)
+    permuteI(this.contactMat)
+    this.iceDirty = true // par prudence : les indices viennent de bouger
+    // lambda, dp, dv, density, nb*, pair* : réécrits de zéro à chaque pas,
+    // avant toute lecture — inutile de les transporter
+  }
+
+  step(dt: number): void {
+    this.refreshDerived()
+    const p = this.params
+    const n = this.count
+    if (n === 0) return
+    // le geste de rassemblement relâché : la translation prêtée est reprise
+    // — pour chaque corps, puis on rend la parole à qui l'avait
+    const parlait = this.courant
+    for (let j = 0; j < this.corps.length; j++) {
+      this.courant = j
+      if (this.rass.actif && !this.rass.vu) this.finRassemble()
+      this.rass.vu = false
+    }
+    this.courant = parlait
+    // Le re-tri ne concerne que les vraies scènes (les rigs de test suivent
+    // des particules par indice) ; cadence 0,25 s — coût ~0,05 ms.
+    if (n >= 128 && this.stepIndex % 30 === 0) this.reorderByCell()
+
+    const {
+      posX,
+      posY,
+      prdX,
+      prdY,
+      velX,
+      velY,
+      lambda,
+      dpX,
+      dpY,
+      dvX,
+      dvY,
+      density,
+    } = this
+    const k = this.kernels
+    const h = k.h
+    const h2 = k.h2
+    const rho0 = this.restDensity
+    const invRho0 = 1 / rho0
+    const grid = this.grid
+
+    // 1. Prédiction (apesanteur : pas de force externe). La glace avance
+    // aussi : sa vitesse est celle de son bloc (assignée par icePass).
+    const frozen = this.frozen
+    for (let i = 0; i < n; i++) {
+      prdX[i] = posX[i] + velX[i] * dt
+      prdY[i] = posY[i] + velY[i] * dt
+    }
+
+    // Recensement des états : un corps SANS liquide n'a ni pression ni
+    // viscosité — les 3 itérations de densité, la collecte de voisins du
+    // solveur et le XSPH seraient du travail pour rien. C'est la PHASE
+    // PALET (fréquente dans les tableaux de glace) : la sauter divise le
+    // pas par ~3, à trajectoires STRICTEMENT identiques (les corrections ne
+    // s'appliquaient déjà jamais au gel, et lambda/densité du gel ne sont
+    // lus par personne) — et un téléphone qui calcule moins chauffe moins.
+    let liquides = 0
+    let gazeux = 0
+    for (let i = 0; i < n; i++) {
+      if (this.gaseous[i] === 1) gazeux++
+      else if (frozen[i] === 0) liquides++
+    }
+    const phasePalet = liquides === 0
+
+    // sCorr de référence : W(dq · h)
+    const dq = p.sCorrDq * h
+    const wDq = k.w(dq * dq)
+    const invWDq = wDq > 0 ? 1 / wDq : 0
+
+    // 1bis. Voisinages : UNE construction de grille par pas, listes plates
+    // réutilisées par toutes les itérations et la viscosité — c'est le gros
+    // du coût CPU du solveur sur petites machines.
+    grid.build(prdX, prdY, n)
+    const nbStart = this.nbStart
+    const nbList = this.nbList
+    const pairDx = this.pairDx
+    const pairDy = this.pairDy
+    const pairW = this.pairW
+    const pairC = this.pairC
+    // Sans liquide NI gaz, personne ne lira les listes de voisins (la glace
+    // passe par la grille directement dans icePass) : la collecte se saute.
+    // (à plusieurs corps, si : deux blocs de glace se repoussent par le
+    // rebond des étrangères, qui lit ces listes — sans elles il lirait
+    // celles d'un pas ancien)
+    const besoinVoisins = !phasePalet || gazeux > 0 || this.corps.length > 1
+    const reach = h * 1.15 // marge : les itérations déplacent un peu les particules
+    // Moteur WASM : grille interne, voisins, densité et XSPH partent dans
+    // les noyaux compilés (asm/noyaux.ts) — mêmes formules, même ordre
+    // d'opérations, vérifié par le test de parité. Le reste du pas (glace,
+    // gaz, matériaux, obstacles) continue en JS sur les mêmes tableaux.
+    // (les noyaux compilés sont ceux du jeu : ils ne connaissent pas les
+    // cloisons. À plusieurs joueurs le pas se fait donc en JS — mesuré à
+    // 4,6 ms pour 1 800 particules, contre 3,6 ms compilé.)
+    const wasm = this.moteurWasm && besoinVoisins && this.corps.length < 2 ? this.noyauxWasm : null
+    if (wasm) {
+      wasm.assure(this.capacity, grid.nx * grid.ny)
+      wasm.prdX.set(prdX.subarray(0, n))
+      wasm.prdY.set(prdY.subarray(0, n))
+      wasm.gas.set(this.gaseous.subarray(0, n))
+      wasm.fro.set(frozen.subarray(0, n))
+      wasm.buildGrid(n, grid.minX, grid.minY, grid.cellSize, grid.nx, grid.ny)
+      wasm.collectAll(
+        n,
+        reach,
+        grid.minX,
+        grid.minY,
+        grid.cellSize,
+        grid.nx,
+        grid.ny,
+      )
+    } else if (besoinVoisins) {
+      let cursor = 0
+      for (let i = 0; i < n; i++) {
+        nbStart[i] = cursor
+        cursor = grid.collect(
+          prdX,
+          prdY,
+          prdX[i],
+          prdY[i],
+          reach,
+          i,
+          nbList,
+          cursor,
+          MAX_NEIGHBORS,
+        )
+      }
+      nbStart[n] = cursor
+    }
+    // les cloisons du pas : qui est étranger à qui (rien à un seul joueur)
+    this.poseCloisons()
+    const cloisons = this.cloisons
+    const cloison = this.cloison
+    const proprio = this.proprio
+    const lambdaE = this.lambdaE
+    const serre = FluidSimMulti.PORTEE_PRESSION * p.particleSpacing
+    const serre2 = serre * serre
+    const selfRho = k.poly6Coeff * h2 * h2 * h2
+    // Exposant de cohésion : puissance entière déroulée quand c'est possible
+    // (Math.pow dans la boucle de paires coûte cher sur petites machines)
+    const sCorrNInt =
+      Math.abs(p.sCorrN - Math.round(p.sCorrN)) < 1e-9
+        ? Math.round(p.sCorrN)
+        : 0
+
+    // 2. Itérations de contrainte de densité. La vapeur est hors du solveur :
+    // elle ne compte pas dans la densité du liquide et n'est pas corrigée —
+    // un nuage n'appuie pas, et rien ne l'appuie.
+    const gaseous = this.gaseous
+    if (wasm && !phasePalet) {
+      wasm.densityIterations(
+        n,
+        p.solverIterations,
+        h,
+        h2,
+        k.poly6Coeff,
+        k.spikyGradCoeff,
+        selfRho,
+        invRho0,
+        p.epsilonLambda,
+        p.sCorrK,
+        p.sCorrN,
+        sCorrNInt,
+        invWDq,
+        p.maxDeltaPFactor * h,
+      )
+      prdX.set(wasm.prdX.subarray(0, n))
+      prdY.set(wasm.prdY.subarray(0, n))
+      density.set(wasm.density.subarray(0, n))
+    }
+    for (
+      let iter = 0;
+      iter < (phasePalet || wasm ? 0 : p.solverIterations);
+      iter++
+    ) {
+      for (let i = 0; i < n; i++) {
+        if (gaseous[i] === 1) {
+          density[i] = selfRho
+          lambda[i] = 0
+          continue
+        }
+        const xi = prdX[i]
+        const yi = prdY[i]
+        let rho = selfRho
+        let sumGradX = 0
+        let sumGradY = 0
+        let sumGrad2 = 0
+        // la part des étrangères (reste à zéro sans cloisons)
+        let rhoE = 0
+        let sumGradEX = 0
+        let sumGradEY = 0
+        let sumGradE2 = 0
+        const end = nbStart[i + 1]
+        for (let e = nbStart[i]; e < end; e++) {
+          const j = nbList[e]
+          if (gaseous[j] === 1) {
+            pairW[e] = 0
+            pairC[e] = 0
+            continue
+          }
+          // UNE ÉTRANGÈRE n'est pas de la même eau : elle ne compte pas dans
+          // la densité qui tient ce corps (pas de cohésion avec elle — chaque
+          // corps garde sa surface face à l'autre), mais elle PRESSE : on la
+          // note à part, et la passe suivante l'écarte dès que la place manque
+          if (cloisons && proprio[i] !== proprio[j] && (cloison[i] | cloison[j]) !== 0) {
+            const ex = xi - prdX[j]
+            const ey = yi - prdY[j]
+            const e2 = ex * ex + ey * ey
+            const er = Math.sqrt(e2)
+            // seulement de TRÈS près (voir PORTEE_PRESSION) : au-delà, c'est
+            // le rebond qui tient les étrangères à distance
+            if (e2 >= serre2 || er < 1e-6) {
+              pairW[e] = 0
+              pairC[e] = 0
+              continue
+            }
+            const et = h2 - e2
+            rhoE += k.poly6Coeff * et * et * et
+            const eg = h - er
+            const ec = (k.spikyGradCoeff * eg * eg) / er
+            pairDx[e] = ex
+            pairDy[e] = ey
+            pairW[e] = -1 // la marque d'une paire étrangère
+            pairC[e] = ec
+            const egx = ec * ex * invRho0
+            const egy = ec * ey * invRho0
+            sumGradEX += egx
+            sumGradEY += egy
+            sumGradE2 += egx * egx + egy * egy
+            continue
+          }
+          const dx = xi - prdX[j]
+          const dy = yi - prdY[j]
+          const r2 = dx * dx + dy * dy
+          if (r2 >= h2) {
+            pairW[e] = 0
+            pairC[e] = 0
+            continue
+          }
+          const t = h2 - r2
+          const w = k.poly6Coeff * t * t * t
+          rho += w
+          const r = Math.sqrt(r2)
+          if (r < 1e-6) {
+            pairW[e] = 0
+            pairC[e] = 0
+            continue
+          }
+          const tg = h - r
+          const c = (k.spikyGradCoeff * tg * tg) / r
+          // mémorisé pour la passe de déplacement de cette itération
+          pairDx[e] = dx
+          pairDy[e] = dy
+          pairW[e] = w
+          pairC[e] = c
+          const gx = c * dx * invRho0
+          const gy = c * dy * invRho0
+          sumGradX += gx
+          sumGradY += gy
+          sumGrad2 += gx * gx + gy * gy
+        }
+        density[i] = rho
+        const C = rho * invRho0 - 1
+        const denom =
+          sumGrad2 + sumGradX * sumGradX + sumGradY * sumGradY + p.epsilonLambda
+        lambda[i] = -C / denom
+        // LA PRESSION ENTRE ÉTRANGÈRES : la contrainte porte sur la densité de
+        // TOUT ce qui entoure la particule, et ne joue que dans un sens — trop
+        // serré, on s'écarte ; pas assez, on ne s'attire pas. C'est l'eau et
+        // l'huile : chacune tient par elle-même, aucune ne cède sa place.
+        if (cloisons) {
+          let le = 0
+          if (rhoE > 0) {
+            const Ct = (rho + rhoE) * invRho0 - 1
+            if (Ct > 0) {
+              const gx = sumGradX + sumGradEX
+              const gy = sumGradY + sumGradEY
+              le = -Ct / (sumGrad2 + sumGradE2 + gx * gx + gy * gy + p.epsilonLambda)
+            }
+          }
+          lambdaE[i] = le
+        }
+      }
+
+      // Plafond de correction PAR PAIRE : le terme est exactement opposé pour
+      // i et j, le plafonner préserve la conservation de la quantité de
+      // mouvement tout en bornant les projections catastrophiques quand une
+      // particule rapide frôle une voisine (r → 0 ⇒ correction → ∞).
+      const maxPairDp = p.maxDeltaPFactor * h
+      const maxPairDp2 = maxPairDp * maxPairDp
+      for (let i = 0; i < n; i++) {
+        if (gaseous[i] === 1) {
+          dpX[i] = 0
+          dpY[i] = 0
+          continue
+        }
+        const li = lambda[i]
+        let dx0 = 0
+        let dy0 = 0
+        const end = nbStart[i + 1]
+        for (let e = nbStart[i]; e < end; e++) {
+          const c = pairC[e]
+          if (c === 0) continue
+          if (pairW[e] < 0) {
+            // paire étrangère : la pression seule, plafonnée comme les autres
+            const se = (lambdaE[i] + lambdaE[nbList[e]]) * invRho0
+            let ex = se * c * pairDx[e]
+            let ey = se * c * pairDy[e]
+            const em = ex * ex + ey * ey
+            if (em > maxPairDp2) {
+              const sm = maxPairDp / Math.sqrt(em)
+              ex *= sm
+              ey *= sm
+            }
+            dx0 += ex
+            dy0 += ey
+            // LA GLACE NE SE DÉPLACE PAS sous la pression (voir plus bas : sa
+            // correction n'est pas appliquée), mais l'étrangère en face, si —
+            // de l'exact opposé. Sans rien rendre au bloc, un choc glace/eau
+            // créait de l'élan (mesuré : ±4 % sur un choc à 300 u/s). Ce
+            // déplacement refusé lui revient donc en vitesse.
+            if (frozen[i] === 1) {
+              this.gelRecuX[i] += ex / dt
+              this.gelRecuY[i] += ey / dt
+            }
+            continue
+          }
+          const ratio = pairW[e] * invWDq
+          let powed: number
+          if (sCorrNInt > 0) {
+            powed = ratio
+            for (let q = 1; q < sCorrNInt; q++) powed *= ratio
+          } else {
+            powed = Math.pow(ratio, p.sCorrN)
+          }
+          const sCorr = -p.sCorrK * powed
+          const scale = (li + lambda[nbList[e]] + sCorr) * invRho0
+          let px = scale * c * pairDx[e]
+          let py = scale * c * pairDy[e]
+          const m2 = px * px + py * py
+          if (m2 > maxPairDp2) {
+            const s = maxPairDp / Math.sqrt(m2)
+            px *= s
+            py *= s
+          }
+          dx0 += px
+          dy0 += py
+        }
+        dpX[i] = dx0
+        dpY[i] = dy0
+      }
+
+      for (let i = 0; i < n; i++) {
+        if (frozen[i] === 1) continue // masse infinie : la correction ne s'applique qu'au liquide
+        prdX[i] += dpX[i]
+        prdY[i] += dpY[i]
+      }
+    }
+
+    // 3. Obstacles solides (parois, cellules d'éponge saturées)
+    this.resolveObstacles(dt)
+
+    // 3bis. Bords du monde (contact enregistré pour la glace : elle rebondit)
+    const b = this.bounds
+    const inset = p.particleSpacing * 0.5
+    for (let i = 0; i < n; i++) {
+      let nx = 0
+      let ny = 0
+      if (prdX[i] < b.minX + inset) {
+        prdX[i] = b.minX + inset
+        nx = 1
+      } else if (prdX[i] > b.maxX - inset) {
+        prdX[i] = b.maxX - inset
+        nx = -1
+      }
+      if (prdY[i] < b.minY + inset) {
+        prdY[i] = b.minY + inset
+        ny = 1
+      } else if (prdY[i] > b.maxY - inset) {
+        prdY[i] = b.maxY - inset
+        ny = -1
+      }
+      if ((nx !== 0 || ny !== 0) && frozen[i] === 1) {
+        const inv = 1 / Math.hypot(nx, ny)
+        this.contactMat[i] = MAT_WALL
+        this.contactNX[i] = nx * inv
+        this.contactNY[i] = ny * inv
+      }
+    }
+
+    // 4. Vitesses puis viscosité XSPH (antisymétrique : conserve la quantité
+    //    de mouvement). La glace garde sa vitesse de bloc : la recalculer des
+    //    positions y injecterait les à-coups de résolution de contact.
+    const invDt = 1 / dt
+    const maxV = p.maxSpeed
+    const maxV2 = maxV * maxV
+    for (let i = 0; i < n; i++) {
+      if (frozen[i] === 1) continue
+      let vx = (prdX[i] - posX[i]) * invDt
+      let vy = (prdY[i] - posY[i]) * invDt
+      const v2 = vx * vx + vy * vy
+      if (v2 > maxV2) {
+        const s = maxV / Math.sqrt(v2)
+        vx *= s
+        vy *= s
+      }
+      velX[i] = vx
+      velY[i] = vy
+    }
+
+    // 4bis. Réponses matériaux : rebond hydrophobe, adhérence hydrophile,
+    // bandes d'influence (§6)
+    this.applyMaterialVelocities(dt)
+
+    if (p.xsphC > 0 && !phasePalet && wasm) {
+      // les obstacles et les bords ont bougé prd, les matériaux ont changé
+      // vel : on recopie l'état courant avant le noyau (comme le JS qui lit
+      // les tableaux à jour), et on relit les vitesses lissées
+      wasm.prdX.set(prdX.subarray(0, n))
+      wasm.prdY.set(prdY.subarray(0, n))
+      wasm.velX.set(velX.subarray(0, n))
+      wasm.velY.set(velY.subarray(0, n))
+      wasm.xsph(n, h2, k.poly6Coeff, p.xsphC, invRho0)
+      velX.set(wasm.velX.subarray(0, n))
+      velY.set(wasm.velY.subarray(0, n))
+    } else if (p.xsphC > 0 && !phasePalet) {
+      for (let i = 0; i < n; i++) {
+        if (frozen[i] === 1 || gaseous[i] === 1) {
+          dvX[i] = 0
+          dvY[i] = 0
+          continue
+        }
+        const xi = prdX[i]
+        const yi = prdY[i]
+        const vxi = velX[i]
+        const vyi = velY[i]
+        let ax = 0
+        let ay = 0
+        const end = nbStart[i + 1]
+        for (let e = nbStart[i]; e < end; e++) {
+          const j = nbList[e]
+          if (gaseous[j] === 1) continue
+          // deux étrangères glissent l'une sur l'autre : pas de viscosité
+          if (cloisons && proprio[i] !== proprio[j] && (cloison[i] | cloison[j]) !== 0) continue
+          const dx = xi - prdX[j]
+          const dy = yi - prdY[j]
+          const r2 = dx * dx + dy * dy
+          if (r2 >= h2) continue
+          const t = h2 - r2
+          const w = k.poly6Coeff * t * t * t
+          ax += (velX[j] - vxi) * w
+          ay += (velY[j] - vyi) * w
+        }
+        dvX[i] = ax * p.xsphC * invRho0
+        dvY[i] = ay * p.xsphC * invRho0
+      }
+      for (let i = 0; i < n; i++) {
+        velX[i] += dvX[i]
+        velY[i] += dvY[i]
+      }
+    }
+
+    // 4bis-b. LE REBOND des corps fermés (voir RAIDEUR_REBOND). Chaque paire
+    // d'étrangères à portée se repousse ; le terme est exactement opposé pour
+    // i et j, et ce qu'un corps reçoit par ses particules lui est rendu en
+    // entier, réparti : la quantité de mouvement d'ensemble est conservée.
+    const palet = this.palet
+    if (palet.actif) {
+      palet.recuX = 0
+      palet.recuY = 0
+      palet.dessous.fill(0)
+      palet.touche.fill(0)
+    }
+    if (cloisons || palet.actif) {
+      const paletActif = palet.actif
+      const margeP = FluidSimMulti.MARGE_PALET * h
+      const porteeP = palet.rayon + margeP
+      const porteeP2 = porteeP * porteeP
+      const raideurP = FluidSimMulti.RAIDEUR_PALET * dt
+      const plafondP = FluidSimMulti.PLAFOND_PALET
+      const portee = FluidSimMulti.PORTEE_REBOND * h
+      const portee2 = portee * portee
+      const raideur = FluidSimMulti.RAIDEUR_REBOND * dt
+      const plafondRebond = FluidSimMulti.PLAFOND_REBOND
+      const partPropre = FluidSimMulti.PART_PROPRE
+      const partCorps = 1 - partPropre
+      const nbCorps = this.corps.length
+      const recuX = this.rebondX
+      const recuY = this.rebondY
+      const masse = this.rebondMasse
+      const touche = this.rebondTouche
+      for (let j = 0; j < nbCorps; j++) {
+        recuX[j] = 0
+        recuY[j] = 0
+        masse[j] = 0
+        touche[j] = 0
+      }
+      const gelRecuX = this.gelRecuX
+      const gelRecuY = this.gelRecuY
+      for (let i = 0; i < n; i++) {
+        if (gaseous[i] === 1) continue
+        // LA GLACE REBONDIT AUSSI. Elle était sautée ici (dans le jeu, rien
+        // ne lui est étranger) : un corps gelé ne sentait ni l'autre corps ni
+        // le palet, alors que l'autre, lui, était repoussé par elle — un mur
+        // sans masse. Elle reçoit maintenant sa part, consignée à part (voir
+        // gelRecuX) ; sa forme, elle, ne se travaille pas : `masse` ne compte
+        // que le liquide, et l'écrasement comme la peau la laissent.
+        const gel = frozen[i] === 1
+        const pi = proprio[i]
+        const ci = cloison[i]
+        const duCorps = this.kind[i] === KIND_PLAYER && pi < nbCorps
+        if (duCorps && !gel) masse[pi]++
+        const xi = prdX[i]
+        const yi = prdY[i]
+        let fx = 0
+        let fy = 0
+        const end = nbStart[i + 1]
+        for (let e = nbStart[i]; e < end; e++) {
+          const j = nbList[e]
+          if (pi === proprio[j] || (ci | cloison[j]) === 0 || gaseous[j] === 1) continue
+          const dx = xi - prdX[j]
+          const dy = yi - prdY[j]
+          const r2 = dx * dx + dy * dy
+          if (r2 >= portee2 || r2 < 1e-12) continue
+          const r = Math.sqrt(r2)
+          let force = portee / r - 1
+          if (force > plafondRebond) force = plafondRebond
+          const f = (raideur * force) / r
+          fx += dx * f
+          fy += dy * f
+        }
+        if (paletActif) {
+          const dx = xi - palet.x
+          const dy = yi - palet.y
+          const r2 = dx * dx + dy * dy
+          if (r2 < porteeP2) {
+            const r = Math.sqrt(r2) + 1e-6
+            if (duCorps) {
+              palet.touche[pi]++
+              if (r < palet.rayon) palet.dessous[pi]++
+            }
+            // un corps ouvert (ou celui qui vient de lancer) le laisse passer ;
+            // une goutte libre, jamais : le jet POUSSE le palet.
+            // (la glace, elle, le frappe d'un bloc : voir icePass)
+            if (!gel && !(duCorps && ((palet.traverse >> pi) & 1) === 1)) {
+              let q = (porteeP - r) / margeP
+              if (q > plafondP) q = plafondP
+              const f = (raideurP * q) / r
+              fx += dx * f
+              fy += dy * f
+              palet.recuX -= dx * f
+              palet.recuY -= dy * f
+              if (r < palet.rayon) {
+                // LE NOYAU DUR : rien n'entre dans le palet. La particule est
+                // remise à sa surface, et ce qu'elle perd de vitesse vers lui
+                // lui est donné.
+                const nx = dx / r
+                const ny = dy / r
+                prdX[i] = palet.x + nx * palet.rayon
+                prdY[i] = palet.y + ny * palet.rayon
+                const vn = (velX[i] - palet.vx) * nx + (velY[i] - palet.vy) * ny
+                if (vn < 0) {
+                  velX[i] -= vn * nx
+                  velY[i] -= vn * ny
+                  palet.recuX += vn * nx
+                  palet.recuY += vn * ny
+                }
+              }
+            }
+          }
+        }
+        if (fx === 0 && fy === 0) continue
+        if (gel) {
+          gelRecuX[i] += fx
+          gelRecuY[i] += fy
+        } else if (duCorps) {
+          touche[pi]++
+          // une particule de corps ne recule pas seule : son corps recule —
+          // sauf une petite part, qu'elle garde (voir PART_PROPRE)
+          recuX[pi] += fx * partCorps
+          recuY[pi] += fy * partCorps
+          velX[i] += fx * partPropre
+          velY[i] += fy * partPropre
+        } else {
+          velX[i] += fx
+          velY[i] += fy
+        }
+      }
+      // la forme de chaque corps : son centre, puis ses moments
+      const forme = this.forme
+      forme.fill(0)
+      for (let i = 0; i < n; i++) {
+        const pi = proprio[i]
+        if (this.kind[i] !== KIND_PLAYER || pi >= nbCorps || gaseous[i] === 1 || frozen[i] === 1) continue
+        forme[pi * FORME] += prdX[i]
+        forme[pi * FORME + 1] += prdY[i]
+      }
+      const ecrasement = FluidSimMulti.ECRASEMENT
+      for (let j = 0; j < nbCorps; j++) {
+        if (masse[j] === 0) continue
+        forme[j * FORME] /= masse[j]
+        forme[j * FORME + 1] /= masse[j]
+        // la direction du recul, et le rayon du corps : l'écrasement se
+        // mesure le long de l'une, à l'échelle de l'autre
+        const norme = Math.hypot(recuX[j], recuY[j])
+        const rayon = Math.max(this.corps[j].stats.rmsRadius * Math.SQRT2, h)
+        this.rebondBiaisX[j] = norme > 0 ? (-ecrasement * recuX[j]) / (norme * rayon) : 0
+        this.rebondBiaisY[j] = norme > 0 ? (-ecrasement * recuY[j]) / (norme * rayon) : 0
+        forme[j * FORME + 10] = FluidSimMulti.RAYON_ROND * p.particleSpacing * Math.sqrt(masse[j])
+      }
+      for (let i = 0; i < n; i++) {
+        const pi = proprio[i]
+        if (this.kind[i] !== KIND_PLAYER || pi >= nbCorps || gaseous[i] === 1 || frozen[i] === 1) continue
+        const k = pi * FORME
+        const dx = prdX[i] - forme[k]
+        const dy = prdY[i] - forme[k + 1]
+        forme[k + 2] += dx * dx
+        forme[k + 3] += dy * dy
+        forme[k + 4] += dx * dy
+        // le poids de l'écrasement : 1 au centre, plus du côté du contact
+        // (à l'opposé du recul), moins à l'arrière — jamais négatif
+        let w = 1 + dx * this.rebondBiaisX[pi] + dy * this.rebondBiaisY[pi]
+        if (w < 0) w = 0
+        else if (w > 2) w = 2
+        forme[k + 5] += w
+        // la vitesse de déformation (la vitesse d'ensemble n'y compte pas :
+        // les écarts au centre se compensent)
+        forme[k + 6] += velX[i] * dx - velY[i] * dy
+        forme[k + 7] += velX[i] * dy + velY[i] * dx
+        // ce qui dépasse du rond : la somme des rappels, pour en retirer la
+        // moyenne (le corps ne doit pas avancer de s'être arrondi)
+        const d2 = dx * dx + dy * dy
+        const rond = forme[k + 10]
+        if (d2 > rond * rond) {
+          const d = Math.sqrt(d2)
+          const depasse = (d - rond) / d
+          forme[k + 8] += dx * depasse
+          forme[k + 9] += dy * depasse
+        }
+      }
+      // la peau tendue : par corps FERMÉ, la matrice du rappel vers le rond
+      const tension = FluidSimMulti.TENSION_PEAU * dt
+      const plafondPeau = FluidSimMulti.PLAFOND_PEAU
+      const amorti = FluidSimMulti.AMORTI_PEAU * dt
+      const bord = FluidSimMulti.RAPPEL_BORD * dt
+      const melee = FluidSimMulti.PEAU_MELEE
+      for (let j = 0; j < nbCorps; j++) {
+        const k = j * FORME
+        const c = this.corps[j]
+        const moyen = (forme[k + 2] + forme[k + 3]) / 2
+        if (masse[j] < 12 || c.ouvert || c.dispersed || moyen <= 0) {
+          forme[k + 2] = 0
+          forme[k + 3] = 0
+          forme[k + 4] = 0
+          forme[k + 11] = 0
+          continue
+        }
+        // l'allongement : (moments / moment moyen) − identité. Sa trace est
+        // nulle — ce qu'un axe perd, l'autre le gagne : le volume est gardé.
+        let axx = forme[k + 2] / moyen - 1
+        let axy = forme[k + 4] / moyen
+        const ampleur = Math.hypot(axx, axy)
+        if (ampleur > plafondPeau) {
+          axx *= plafondPeau / ampleur
+          axy *= plafondPeau / ampleur
+        }
+        // mêlé à un autre, le corps n'est pas tendu (voir PEAU_MELEE)
+        let tendu = 1 - touche[j] / (melee * masse[j])
+        if (tendu < 0) tendu = 0
+        // le frein : la part de la vitesse qui DÉFORME (sans gonfler ni
+        // tourner), ramenée au moment moyen
+        const exx = forme[k + 6] / (2 * moyen)
+        const exy = forme[k + 7] / (2 * moyen)
+        const mxx = -tension * tendu * axx - amorti * exx
+        forme[k + 2] = mxx
+        forme[k + 3] = -mxx
+        forme[k + 4] = -tension * tendu * axy - amorti * exy
+        forme[k + 11] = -bord * tendu
+        forme[k + 8] /= masse[j]
+        forme[k + 9] /= masse[j]
+      }
+      for (let i = 0; i < n; i++) {
+        const pi = proprio[i]
+        if (this.kind[i] !== KIND_PLAYER || pi >= nbCorps || gaseous[i] === 1 || frozen[i] === 1) continue
+        const k = pi * FORME
+        const dx = prdX[i] - forme[k]
+        const dy = prdY[i] - forme[k + 1]
+        // le rappel de la peau
+        let ax = forme[k + 2] * dx + forme[k + 4] * dy
+        let ay = forme[k + 4] * dx + forme[k + 3] * dy
+        // le rappel du bord, moyenne retirée
+        const coef = forme[k + 11]
+        if (coef !== 0) {
+          const d2 = dx * dx + dy * dy
+          const rond = forme[k + 10]
+          let bx = -forme[k + 8]
+          let by = -forme[k + 9]
+          if (d2 > rond * rond) {
+            const depasse = 1 - rond / Math.sqrt(d2)
+            bx += dx * depasse
+            by += dy * depasse
+          }
+          ax += coef * bx
+          ay += coef * by
+        }
+        // le recul du corps, réparti de biais
+        if (forme[k + 5] > 0 && (recuX[pi] !== 0 || recuY[pi] !== 0)) {
+          let w = 1 + dx * this.rebondBiaisX[pi] + dy * this.rebondBiaisY[pi]
+          if (w < 0) w = 0
+          else if (w > 2) w = 2
+          w /= forme[k + 5]
+          ax += recuX[pi] * w
+          ay += recuY[pi] * w
+        }
+        velX[i] += ax
+        velY[i] += ay
+      }
+    }
+
+    // 4ter. Blocs de glace : vitesse commune par amas, rebonds, soudures
+    this.icePass(dt)
+
+    // 4quater. Vapeur : expansion douce et flottement
+    this.applyGasDynamics(dt)
+    this.fadeIonise(dt)
+
+    // 5. Validation des positions, cooldowns, identité du corps
+    for (let i = 0; i < n; i++) {
+      posX[i] = prdX[i]
+      posY[i] = prdY[i]
+      if (this.cooldown[i] > 0) this.cooldown[i] -= dt
+    }
+
+    // 5bis. Froid : givre, gel volontaire (F), dégel
+    this.processCold(dt)
+
+    // 5bis-b. Règle de transformation : la condensation regroupe — les
+    // gouttelettes qui redeviennent eau sont rappelées vers le corps
+    this.applyCondenseRegroup(dt)
+
+    // 5bis-b2. Le retour des égarées : la matière du corps encore à portée
+    // revient d'elle-même une fois son délai purgé — chaque corps rappelle
+    // LES SIENNES (le rappel filtre sur le propriétaire)
+    for (let j = 0; j < this.corps.length; j++) {
+      this.courant = j
+      this.applyStrayRecall(dt)
+    }
+    this.courant = parlait
+
+    // 5bis-c. La vapeur n'est pas un état de croisière : être gaz s'évapore
+    // en continu, et les mailles d'une grille essorent le nuage au passage
+    this.processGasCosts(dt)
+
+    // 5bis-d. Recondensation (§7.3) : la vapeur perdue perle en rosée près
+    // des plaques froides — son propre corps, à aller rechercher
+    this.processRecondensation(dt)
+
+    // 5ter. Éponge : traînée, temps de contact, absorption (§6)
+    if (this.sponges.length > 0) this.processSponges(dt)
+
+    // 5ter-b. Coupelles : le liquide qui entre est bu, jusqu'au trait
+    if (this.coupelles.length > 0) this.processCoupelles(dt)
+
+    this.stepIndex++
+    if (this.stepIndex % Math.max(1, Math.round(p.componentEvery)) === 0) {
+      this.relabel()
+    }
+    // Le seuil de volume ne tue plus (refonte 2026) : il annonce la dernière
+    // impulsion, et c'est le jeu qui conclut, à l'arrêt du corps. Seule la
+    // perte de cohésion (moins de deux particules) reste une dispersion.
+    for (const c of this.corps) {
+      if (c.belowCritical && !c.dispersed) {
+        c.criticalTimer += dt
+      } else if (!c.belowCritical) {
+        c.criticalTimer = 0
+      }
+    }
+  }
+
+  // La vapeur se paie (§4 : chaque bouffée part définitivement) : tant que
+  // le corps est en gaz, sa traîne s'évapore — même immobile — et chaque
+  // particule prise dans la maille d'une grille risque d'y rester. La vapeur
+  // reste le passe-muraille du jeu, mais chaque passage a un prix.
+  private processGasCosts(dt: number): void {
+    const p = this.params
+    let anyPlayerGas = false
+    let inMesh = 0
+    for (let i = 0; i < this.count; i++) {
+      if (this.gaseous[i] !== 1) continue
+      if (this.estCorps(i)) {
+        anyPlayerGas = true
+        // SURCHAUFFEUR : seul le gaz interagit avec lui — le frôler ou le
+        // toucher rend UN dash, une seule fois par appareil (le manomètre
+        // tombe à zéro), JAMAIS au-delà de la réserve du tableau : réserve
+        // pleine, le serpentin reste chargé — il attend qu'un dash manque.
+        // La chaudière, elle, ne recharge rien : elle transforme.
+        if (this.hasSurchauffeur && this.dashBudget < this.dashBudgetMax) {
+          const bi = this.surchauffeurFrole(this.posX[i], this.posY[i])
+          if (bi >= 0 && !this.surchauffesVides.has(bi)) {
+            this.surchauffesVides.add(bi)
+            this.dashBudget++
+          }
+        }
+      }
+      if (this.hasGrille && this.grilleAt(this.posX[i], this.posY[i])) inMesh++
+    }
+    // péage de grille : proportionnel à la présence dans la maille
+    if (inMesh > 0)
+      this.grilleCarry += inMesh * p.grilleGasLoss * this.perteGrilleFactor * dt
+    else this.grilleCarry = 0
+    while (this.grilleCarry >= 1) {
+      this.grilleCarry -= 1
+      let pick = -1
+      for (let i = 0; i < this.count; i++) {
+        if (this.gaseous[i] !== 1) continue
+        if (this.grilleAt(this.posX[i], this.posY[i])) {
+          pick = i
+          break
+        }
+      }
+      if (
+        pick < 0 ||
+        (this.estCorps(pick) && this.playerCount <= 2)
+      )
+        break
+      this.removeParticle(pick)
+      this.vaporBank++
+    }
+    // évaporation d'état : la traîne du nuage (la plus loin du corps) se perd
+    if (anyPlayerGas)
+      this.gasIdleCarry += p.gasIdleLossRate * this.perteGazFactor * dt
+    else this.gasIdleCarry = 0
+    while (this.gasIdleCarry >= 1 && this.playerCount > 2) {
+      this.gasIdleCarry -= 1
+      let worst = -1
+      let worstD2 = -1
+      for (let i = 0; i < this.count; i++) {
+        if (!this.estCorps(i) || this.gaseous[i] !== 1) continue
+        const dx = this.posX[i] - this.stats.centroidX
+        const dy = this.posY[i] - this.stats.centroidY
+        const d2 = dx * dx + dy * dy
+        if (d2 > worstD2) {
+          worstD2 = d2
+          worst = i
+        }
+      }
+      if (worst < 0) break
+      this.removeParticle(worst)
+      this.vaporBank++
+    }
+  }
+
+  // La soupape du roguelike (§7.3) : sans eau à ramasser dans les niveaux,
+  // une erreur serait irrattrapable. La physique fournit le rattrapage — la
+  // vapeur perdue se recondense sur les parois froides, avec une perte
+  // importante, et d'autant mieux que le vaisseau refroidit. Ce n'est pas du
+  // butin : c'est son propre corps qu'on va rechercher, au prix d'un détour.
+  private processRecondensation(dt: number): void {
+    const p = this.params
+    if (this.coldBoxes.length === 0 || this.vaporBank < 1 || p.recondRate <= 0)
+      return
+    this.recondCarry += p.recondRate * dt
+    while (
+      this.recondCarry >= 1 &&
+      this.vaporBank >= 1 &&
+      this.count < this.capacity
+    ) {
+      this.recondCarry -= 1
+      this.vaporBank -= 1
+      // rendement : part récupérable, meilleure à vaisseau froid — et
+      // l'AIMANT À ROSÉE (instrument embarqué) le bonifie pour la run
+      this.recondYield += Math.min(
+        0.92,
+        p.recondFraction + 0.25 * this.chill + this.recondBonus,
+      )
+      if (this.recondYield < 1) continue
+      this.recondYield -= 1
+      // la rosée perle juste au-delà de l'aura de gel, répartie le long de la
+      // plaque — pseudo-aléa déterministe (LCG), la simulation reste rejouable
+      this.recondSeed = (this.recondSeed * 48271) % 2147483647
+      const r1 = this.recondSeed / 2147483647
+      this.recondSeed = (this.recondSeed * 48271) % 2147483647
+      const r2 = this.recondSeed / 2147483647
+      const b =
+        this.coldBoxes[
+          Math.floor(r1 * this.coldBoxes.length) % this.coldBoxes.length
+        ]
+      const dist =
+        p.coldBand * (1 + p.chillColdGrowth * this.chill) * 1.12 +
+        p.particleSpacing
+      let x: number
+      let y: number
+      if (b.angle || b.forme) {
+        // plaque oblique ou FORME : la rosée perle sur l'iso-distance du
+        // champ — on part du cercle englobant dans une direction tirée au
+        // sort, puis on marche le long du gradient (Newton sur le SDF)
+        const cx = (b.minX + b.maxX) / 2
+        const cy = (b.minY + b.maxY) / 2
+        const th = r2 * Math.PI * 2
+        const rayon = Math.hypot(b.maxX - b.minX, b.maxY - b.minY) / 2 + dist
+        x = cx + rayon * Math.cos(th)
+        y = cy + rayon * Math.sin(th)
+        const cp = this.scratchCP
+        for (let k = 0; k < 3; k++) {
+          boxContact(x, y, b, cp)
+          x += cp.nx * (dist - cp.dist)
+          y += cp.ny * (dist - cp.dist)
+        }
+      } else if (b.maxX - b.minX > b.maxY - b.minY) {
+        // plaque horizontale : rosée au-dessus ou en dessous
+        x = b.minX + r2 * (b.maxX - b.minX)
+        y = r1 > 0.5 ? b.maxY + dist : b.minY - dist
+      } else {
+        x = r1 > 0.5 ? b.maxX + dist : b.minX - dist
+        y = b.minY + r2 * (b.maxY - b.minY)
+      }
+      this.addParticle(x, y, KIND_FREE)
+      this.roseePerlee++
+    }
+  }
+
+  private grilleAt(x: number, y: number): boolean {
+    for (const b of this.grilleBoxes) {
+      if (dansBoite(b, x, y)) return true
+    }
+    return false
+  }
+
+  // Tant qu'une particule garde de la vapeur résiduelle (le corps est en
+  // train de redevenir liquide) et qu'on ne pilote pas le nuage, elle est
+  // rappelée vers le corps : redevenir eau ne disperse pas l'échantillon.
+  // Physiquement : la condensation nuclée — les gouttelettes retombent.
+  private applyCondenseRegroup(dt: number): void {
+    const p = this.params
+    if (p.condenseRegroup <= 0 || this.playerCount === 0) return // pas de corps : rien vers quoi retomber
+    const cx = this.stats.centroidX
+    const cy = this.stats.centroidY
+    for (let i = 0; i < this.count; i++) {
+      const v = Math.max(this.vapor[i], this.gasLink[i])
+      if (v <= 0.02 || this.frozen[i] === 1) continue
+      if (this.gasIntent && this.estCorps(i)) continue // le pilotage garde la main
+      // le souffle d'un dash n'est plus à vous : ni en vol, ni fraîchement
+      // perlé — sinon la propulsion en vapeur ne coûterait rien
+      if (
+        !this.estCorps(i) &&
+        (this.souffle[i] > 0 || this.cooldown[i] > 0)
+      )
+        continue
+      // dans l'aura d'une chaudière, une particule ne CONDENSE pas : elle
+      // BOUT. Sans cette garde, le bord du corps qui chauffait (vapeur
+      // montante) était happé vers le centre en continu — la chaudière
+      // semblait REPOUSSER le corps liquide, impossible de l'approcher
+      // pour se faire vaporiser.
+      if (
+        this.hasHeat &&
+        this.gaseous[i] === 0 &&
+        this.heatExposureAt(this.posX[i], this.posY[i]) > 0
+      )
+        continue
+      const dx = cx - this.posX[i]
+      const dy = cy - this.posY[i]
+      const d = Math.hypot(dx, dy)
+      if (d < 1e-3) continue
+      // Asservissement en vitesse (comme le vortex) : la vitesse d'approche
+      // cible décroît avec la distance — la pluie converge et se pose, sans
+      // jamais s'effondrer sur le corps (une force constante exploserait un
+      // nuage compact). Pente 1 : la goutte ralentit dès un rayon d'écran,
+      // au lieu de foncer plein plafond jusqu'au contact (« la charge »).
+      const ux = dx / d
+      const uy = dy / d
+      const vTarget = Math.min(p.condenseRegroup, d)
+      const vRadial = this.velX[i] * ux + this.velY[i] * uy
+      const k = Math.min(1, 6 * v * dt)
+      this.velX[i] += (vTarget - vRadial) * ux * k
+      this.velY[i] += (vTarget - vRadial) * uy * k
+    }
+  }
+
+  // Rayon de capture du corps : le voisinage où la matière égarée compte
+  // encore comme « à portée » — le même pour le rappel et pour le HUD (⟳),
+  // pour que la promesse d'affichage soit exactement la portée du retour.
+  private captureRadius(): number {
+    const p = this.params
+    return Math.max(this.stats.rmsRadius * 2.5, p.kernelRadius * 6)
+  }
+
+  // LE RETOUR DES ÉGARÉES. Une goutte d'éjection qui n'est jamais vraiment
+  // partie, une gerbe de péage retombée sur place, un fragment détaché par
+  // le remous d'un tir : cette matière est marquée DU CORPS. Son délai
+  // purgé, si elle traîne dans le rayon de capture, elle est rappelée
+  // d'elle-même — la réabsorption par simple connexité laissait des gouttes
+  // gésir à deux doigts du corps, jamais reprises, et la vie baissait pour
+  // une matière encore là. Les gouttes SEMÉES par le tableau n'ont pas la
+  // marque : les collectables s'attrapent au contact, comme avant. Pendant
+  // que le sas boit, le rappel s'efface devant lui.
+  private applyStrayRecall(dt: number): void {
+    const p = this.params
+    if (this.playerCount === 0 || this.drainOn) return
+    const cx = this.stats.centroidX
+    const cy = this.stats.centroidY
+    const capture = this.captureRadius()
+    const c2 = capture * capture
+    let impX = 0
+    let impY = 0
+    for (let i = 0; i < this.count; i++) {
+      if (this.duCorps[i] === 0 || this.estCorps(i)) continue
+      // la goutte d'un AUTRE ne vient pas à moi à l'aimant : elle ne
+      // m'appartiendra que si je vais la toucher (relabel)
+      if (this.proprio[i] !== this.courant || this.kind[i] === KIND_PLAYER) continue
+      if (this.cooldown[i] > 0 || this.frozen[i] === 1 || this.gaseous[i] === 1)
+        continue
+      const dx = cx - this.posX[i]
+      const dy = cy - this.posY[i]
+      const d2 = dx * dx + dy * dy
+      if (this.rappelSansLimite) {
+        // AU HOCKEY la goutte revient de PARTOUT, et vite — dans le jeu, hors
+        // du rayon de capture elle est perdue là où elle gît (« allez la
+        // chercher »). Deux écarts assumés à la règle du jeu, propres à ce
+        // mode :
+        //  - ce retour, le corps ne le PAIE pas (pas d'antisymétrie) : payé,
+        //    il y perdait le tiers de son élan dans les deux secondes suivant
+        //    la poussée (179 u/s tombés à 78), tiré en arrière par ses
+        //    propres gouttes — et rappeler le jet en vol l'empêchait
+        //    d'avancer (13 u/s après quatre secondes de poussée, contre 249) ;
+        //  - la vitesse de retour se règle sur la distance à la SURFACE du
+        //    corps, avec un plancher : la goutte file tant qu'elle est loin,
+        //    et se pose sans le bousculer.
+        const dl = Math.sqrt(d2)
+        if (dl < 1e-3) continue
+        const radiale = ((this.velX[i] - this.stats.velX) * dx + (this.velY[i] - this.stats.velY) * dy) / dl
+        const surface = dl - this.stats.rmsRadius * Math.SQRT2
+        let cible = FluidSimMulti.GAIN_RETOUR * surface
+        if (cible < FluidSimMulti.PLANCHER_RETOUR) cible = FluidSimMulti.PLANCHER_RETOUR
+        else if (cible > FluidSimMulti.VITESSE_RETOUR) cible = FluidSimMulti.VITESSE_RETOUR
+        const kl = Math.min(1, FluidSimMulti.VIRAGE_RETOUR * dt)
+        this.velX[i] += ((cible - radiale) * dx * kl) / dl
+        this.velY[i] += ((cible - radiale) * dy * kl) / dl
+        continue
+      }
+      if (d2 > c2) continue // trop loin : perdue là où elle gît — allez la chercher
+      const d = Math.sqrt(d2)
+      if (d < 1e-3) continue
+      // même asservissement en vitesse que le rappel de condensation : la
+      // goutte converge et se pose, sans être catapultée (même pente douce)
+      const ux = dx / d
+      const uy = dy / d
+      const vTarget = Math.min(p.condenseRegroup, d)
+      const vRadial = this.velX[i] * ux + this.velY[i] * uy
+      const k = Math.min(1, 5 * dt)
+      const ivx = (vTarget - vRadial) * ux * k
+      const ivy = (vTarget - vRadial) * uy * k
+      this.velX[i] += ivx
+      this.velY[i] += ivy
+      impX += ivx
+      impY += ivy
+    }
+    // Antisymétrie (§3.3) : le corps encaisse l'opposé de ce qu'il donne aux
+    // égarées — la quantité de mouvement d'ensemble est conservée exactement,
+    // le rappel n'est pas une propulsion gratuite.
+    if (impX !== 0 || impY !== 0) {
+      let libres = 0
+      for (let i = 0; i < this.count; i++) {
+        if (this.estCorps(i) && this.frozen[i] === 0) libres++
+      }
+      if (libres > 0) {
+        const rx = -impX / libres
+        const ry = -impY / libres
+        for (let i = 0; i < this.count; i++) {
+          if (!this.estCorps(i) || this.frozen[i] === 1) continue
+          this.velX[i] += rx
+          this.velY[i] += ry
+        }
+      }
+    }
+  }
+
+  /** Les tubes du tableau. Appelé au chargement, comme setLevel.
+   *
+   *  TOUT RAIL Y ENTRE désormais : depuis qu'un rail a un corps, la passe
+   *  travaille dès qu'un rail est posé, et non plus seulement pour un
+   *  conduit. Un tableau SANS rail ne paie toujours rien — la passe sort au
+   *  premier test. */
+  setConduits(
+    rails: { points: { x: number; y: number }[]; conduit?: boolean }[],
+    rayonRaccourci: number,
+    rayonRail: number,
+  ): void {
+    this.conduits = []
+    for (let i = 0; i < rails.length; i++) {
+      const r = rails[i]
+      if (r.points.length < 2) continue
+      // TOUT RAIL A UN CORPS. Une ligne de champ magnétique n'est pas un
+      // décalque : de la matière CONDENSÉE ne la traverse pas — l'eau et la
+      // glace butent dessus comme sur une paroi. Seul le gaz passe, parce
+      // que seul le gaz s'ionise ; c'est ce qui fait du rail une mécanique
+      // et non un dessin. Avant, un rail ordinaire n'avait AUCUNE physique
+      // et le corps le traversait sans rien sentir.
+      //
+      // Ce qui distingue le RACCOURCI (`conduit`), c'est autre chose : lui
+      // seul, une fois son arc engagé, laisse la vapeur ignorer le DÉCOR et
+      // franchir une paroi. Un rail ordinaire ne fait jamais traverser quoi
+      // que ce soit — il barre, voilà tout.
+      const raccourci = r.conduit === true
+      this.conduits.push({
+        pts: r.points,
+        // le corps d'un rail est SA BANDE DE CAPTURE, celle qu'on dessine :
+        // la portée du champ est son épaisseur. Le tube d'un raccourci, lui,
+        // épouse la bande de convoyage (railConvoy y travaille) — ce qui est
+        // porté est exactement ce qui est dedans.
+        rayon: raccourci ? rayonRaccourci : rayonRail,
+        raccourci,
+        rail: i,
+        actif: false,
+      })
+    }
+  }
+
+  /** QUELS TUBES SONT OUVERTS, à cet instant. Un conduit ne s'ouvre qu'au
+   *  PLASMA : il faut qu'un arc ionisé circule sur ce rail — donc que le
+   *  corps se soit vaporisé DANS le faisceau. La vapeur seule ne suffit
+   *  pas, et c'est ce qui fait du raccourci la récompense de l'énigme
+   *  plutôt que son contournement. Appelé une fois par image. */
+  setConduitsActifs(engages: ReadonlySet<number>): void {
+    for (const tube of this.conduits) tube.actif = engages.has(tube.rail)
+  }
+
+  /** Qui est dans un tube, et à quelle profondeur. Une passe par pas, avant
+   *  la résolution des solides — les deux usages (laisser filer la vapeur,
+   *  expulser le reste) lisent le même relevé. */
+  private majConduits(): void {
+    const n = this.count
+    if (this.conduits.length === 0) {
+      if (n > 0) this.dansConduit.fill(0, 0, n)
+      return
+    }
+    for (let i = 0; i < n; i++) {
+      this.dansConduit[i] = 0
+      const px = this.prdX[i]
+      const py = this.prdY[i]
+      // LE PLUS PERMISSIF PRIME. Deux tubes peuvent se croiser : prendre
+      // bêtement le plus proche ferait qu'un voisin moins permissif expulse
+      // un corps en pleine traversée. Le classement est établi plus bas, à
+      // trois crans (`rang`) ; la distance ne départage qu'à rang égal.
+      let best = Infinity
+      let bnx = 0
+      let bny = 0
+      let brayon = 0
+      let bouvert = 0
+      let barc = 0
+      let bRang = -1
+      let bqx = 0
+      let bqy = 0
+      for (const tube of this.conduits) {
+        const pts = tube.pts
+        // DEUX QUALITÉS, ET ELLES NE SE CONFONDENT PAS.
+        // · ARC : ce tube porte un arc ionisé. C'est lui qui laisse passer le
+        //   GAZ — le plasma traverse la ligne de champ, la vapeur ordinaire
+        //   non. Vrai pour tout rail, raccourci ou pas.
+        // · OUVERT : ce tube me laisse ignorer le DÉCOR et franchir une
+        //   paroi. Seul un RACCOURCI le fait, et seulement arc engagé. Un
+        //   rail ordinaire guide le faisceau, il n'ouvre aucun mur.
+        const arc = tube.actif ? 1 : 0
+        const ouvert = tube.actif && tube.raccourci ? 1 : 0
+        // LE PLUS PERMISSIF PRIME, ET DANS CET ORDRE. Deux tubes peuvent se
+        // croiser : prendre bêtement le plus proche ferait qu'un voisin
+        // moins permissif expulse un corps en pleine traversée. On classe
+        // donc — un RACCOURCI ouvert (2) devant un rail à l'arc (1) devant
+        // un tube éteint (0) — et l'on ne départage à la distance qu'à
+        // égalité de rang. Départager sur le seul `arc` perdait le rang du
+        // raccourci : un rail ORDINAIRE engagé, passant plus près, gagnait
+        // et effaçait le laissez-passer du décor. Mesuré sur un conduit
+        // doublé d'un rail ordinaire à 10 u : 34 traversées tombaient à 20.
+        const rang = ouvert * 2 + arc
+        if (rang < bRang) continue
+        for (let k = 0; k + 1 < pts.length; k++) {
+          const a = pts[k]
+          const b = pts[k + 1]
+          const abx = b.x - a.x
+          const aby = b.y - a.y
+          const len2 = abx * abx + aby * aby
+          if (len2 < 1e-9) continue
+          const t = Math.max(0, Math.min(1, ((px - a.x) * abx + (py - a.y) * aby) / len2))
+          const cx = a.x + abx * t
+          const cy = a.y + aby * t
+          const dx = px - cx
+          const dy = py - cy
+          const d2 = dx * dx + dy * dy
+          if (d2 > tube.rayon * tube.rayon) continue // hors de CE tube
+          // à rang égal, le plus proche l'emporte ; un rang supérieur
+          // détrône quelle que soit la distance
+          if (rang === bRang && d2 >= best) continue
+          best = d2
+          bRang = rang
+          barc = arc
+          bouvert = ouvert
+          bqx = cx
+          bqy = cy
+          const d = Math.sqrt(d2)
+          // sur l'axe même, la normale est indéfinie : on prend la
+          // perpendiculaire au tronçon, pour que l'expulsion ait un sens
+          if (d > 1e-6) {
+            bnx = dx / d
+            bny = dy / d
+          } else {
+            const inv = 1 / Math.sqrt(len2)
+            bnx = -aby * inv
+            bny = abx * inv
+          }
+          brayon = tube.rayon
+        }
+      }
+      if (brayon > 0) {
+        this.dansConduit[i] = 1
+        this.conduitOuvert[i] = bouvert
+        this.conduitArc[i] = barc
+        this.conduitNX[i] = bnx
+        this.conduitNY[i] = bny
+        this.conduitDist[i] = Math.sqrt(best)
+        this.conduitRayon[i] = brayon
+        this.conduitQX[i] = bqx
+        this.conduitQY[i] = bqy
+      }
+    }
+  }
+
+  /** LA PAROI DU TUBE — et ce qui la franchit : LE PLASMA, rien d'autre.
+   *
+   *  LE VERROU QU'IL A FALLU OUVRIR. Expulser aussi la VAPEUR rendait le
+   *  conduit inutilisable : pour lever le champ il faut ioniser le faisceau
+   *  DANS le tube (la capture se fait à `plasmaRailRadius`, 30 u de l'axe),
+   *  or un tube fermé qui repousse la vapeur la met hors d'atteinte — mesuré,
+   *  elle finissait à plus de deux mille unités. On ne pouvait donc JAMAIS
+   *  ouvrir un conduit en jouant ; seuls les tests, qui lèvent le champ à la
+   *  main, voyaient la mécanique fonctionner.
+   *
+   *  D'OÙ DEUX ÉPAISSEURS, ET C'EST TOUT L'ÉQUILIBRE. La vapeur ordinaire ne
+   *  traverse pas non plus une ligne de champ — seul le PLASMA le fait, et le
+   *  plasma c'est de la vapeur sur un rail dont l'arc est engagé. Mais si on
+   *  la repoussait au rayon de CAPTURE, elle ne pourrait plus jamais allumer
+   *  ce qu'elle veut franchir : le verrou de #304, à l'identique. Le gaz bute
+   *  donc sur un CŒUR plus mince que le rayon de capture (COEUR_PART), assez
+   *  pour barrer, assez peu pour qu'il reste toujours de la vapeur dans les
+   *  30 unités où le faisceau s'ionise.
+   *
+   *  L'eau et la glace, elles, butent sur toute l'épaisseur du tube : on ne
+   *  se faufile pas dans une ligne de champ en étant de la matière condensée. */
+  private expulseDesConduits(): void {
+    if (this.conduits.length === 0) return
+    for (let i = 0; i < this.count; i++) {
+      if (this.dansConduit[i] !== 1) continue
+      // LE PLASMA PASSE, ET LUI SEUL. Du gaz sur un tube dont l'arc est
+      // engagé est du plasma : la ligne de champ le porte, elle ne le
+      // repousse pas. Sans arc, c'est de la vapeur ordinaire — elle bute,
+      // mais sur le CŒUR seulement, pour qu'il lui reste de quoi venir
+      // allumer le rail depuis le rayon de capture (cf. l'en-tête).
+      let rayon = this.conduitRayon[i]
+      if (this.gaseous[i] === 1) {
+        if (this.conduitArc[i] === 1) continue
+        rayon = Math.min(rayon, this.params.plasmaRailRadius * COEUR_PART)
+      }
+      let prof = rayon - this.conduitDist[i]
+      if (prof <= 0) continue
+      const nx = this.conduitNX[i]
+      const ny = this.conduitNY[i]
+      // LE TUBE POUSSE, IL NE CATAPULTE PAS. Une particule qui se condense
+      // AU MILIEU du tube y est enfoncée de tout le rayon : replacée d'un
+      // coup sur la paroi, elle sortait du pas de temps avec rayon/dt en
+      // vitesse — mesuré 2861 u/s à l'arrivée d'un convoyage, et le corps
+      // projeté à 680 u de son point de garage. Ce n'est pas une paroi qui
+      // repousse, c'est une catapulte. Le déplacement est donc borné à ce
+      // que `plasmaSortie` autorise par seconde : le corps SORT du tube,
+      // en quelques images, à une vitesse qui reste celle d'un déplacement.
+      const maxPas = this.params.plasmaSortie * this.params.dt
+      if (prof > maxPas) prof = maxPas
+      this.prdX[i] += nx * prof
+      this.prdY[i] += ny * prof
+      // LE GAZ EST ARRÊTÉ, PAS CHASSÉ. La vitesse se lit (prd − pos)/dt :
+      // repousser la seule position prédite AJOUTE de la vitesse vers
+      // l'extérieur, et le répéter à chaque pas la pompe — mesuré, la vapeur
+      // pressée contre une ligne de champ finissait à 37,8 u de l'axe, hors
+      // des 30 où le faisceau s'ionise. Elle ne pouvait plus allumer ce
+      // qu'elle voulait franchir : le verrou de #304, revenu par une autre
+      // porte. On aligne donc la position d'ORIGINE sur la même hauteur
+      // normale : la composante rentrante tombe à zéro, la tangentielle est
+      // gardée intacte — le nuage longe la ligne, il ne la franchit ni n'en
+      // est soufflé. C'est ce que fait une paroi.
+      //
+      // La matière condensée, elle, garde sa poussée bornée : un rail ne se
+      // contente pas de l'arrêter, il la remet dehors.
+      if (this.gaseous[i] === 1) {
+        const qx = this.conduitQX[i]
+        const qy = this.conduitQY[i]
+        const dPos = (this.posX[i] - qx) * nx + (this.posY[i] - qy) * ny
+        const dPrd = (this.prdX[i] - qx) * nx + (this.prdY[i] - qy) * ny
+        const corr = dPrd - dPos
+        this.posX[i] += nx * corr
+        this.posY[i] += ny * corr
+      }
+      // LE CONTACT EST DÉCLARÉ, comme pour n'importe quel solide : sans lui
+      // la passe de glace ne reçoit aucune impulsion et un palet se DÉFORME
+      // dans le tube au lieu d'y rebondir.
+      const vn =
+        ((this.prdX[i] - this.posX[i]) * nx + (this.prdY[i] - this.posY[i]) * ny) /
+        Math.max(1e-6, this.params.dt)
+      this.contactMat[i] = MAT_WALL
+      this.contactNX[i] = nx
+      this.contactNY[i] = ny
+      this.contactVn[i] = Math.min(0, vn)
+      // expulsée, elle n'est plus dedans
+      this.dansConduit[i] = 0
+    }
+  }
+
+  private readonly scratchCP: ClosestPoint = { dist: 0, nx: 0, ny: 0 }
+
+  // Pousse les particules hors des solides et enregistre le contact (normale,
+  // vitesse normale entrante, matériau) pour la réponse en vitesse.
+  private resolveObstacles(dt: number): void {
+    const n = this.count
+    const p = this.params
+    const rp = p.particleSpacing * 0.5
+    const invDt = 1 / dt
+    const cp = this.scratchCP
+    this.contactMat.fill(-1, 0, n)
+    // LES TUBES D'ABORD : le relevé sert aux deux règles qui suivent, et
+    // l'expulsion doit avoir lieu AVANT que le décor ne se prononce (une
+    // particule d'eau chassée du tube doit pouvoir buter sur la paroi
+    // derrière, dans le même pas).
+    this.majConduits()
+    this.expulseDesConduits()
+    if (this.boxes.length === 0 && this.sponges.length === 0) return
+
+    for (let i = 0; i < n; i++) {
+      let x = this.prdX[i]
+      let y = this.prdY[i]
+
+      // LE RACCOURCI. Dans un conduit, la vapeur ne touche plus RIEN du
+      // décor : c'est ce qui lui fait traverser la paroi au lieu de la
+      // longer. Hors du tube, ou dans un autre état, le décor reprend tous
+      // ses droits — la particule vient d'ailleurs d'en être expulsée.
+      if (
+        this.dansConduit[i] === 1 &&
+        this.conduitOuvert[i] === 1 &&
+        this.gaseous[i] === 1
+      )
+        continue
+
+      for (const b of this.boxes) {
+        // Chaque état a sa porte : la grille laisse passer la VAPEUR, la
+        // membrane gorgée d'eau laisse suinter l'EAU, le rideau lamellaire
+        // s'écarte devant la GLACE — tout le reste bute.
+        if (b.material === MAT_GRILLE && this.gaseous[i] === 1) {
+          // CODEX : le passage EST l'interaction — consigné quand une
+          // particule du corps est réellement DANS la boîte (l'AABB suffit)
+          if (
+            this.codexContacts[MAT_GRILLE * 3 + 2] === 0 &&
+            this.estCorps(i) &&
+            x > b.minX &&
+            x < b.maxX &&
+            y > b.minY &&
+            y < b.maxY
+          )
+            this.codexContacts[MAT_GRILLE * 3 + 2] = 1
+          continue
+        }
+        if (
+          b.material === MAT_MEMBRANE &&
+          this.gaseous[i] !== 1 &&
+          this.frozen[i] !== 1
+        ) {
+          if (
+            this.codexContacts[MAT_MEMBRANE * 3] === 0 &&
+            this.estCorps(i) &&
+            x > b.minX &&
+            x < b.maxX &&
+            y > b.minY &&
+            y < b.maxY
+          )
+            this.codexContacts[MAT_MEMBRANE * 3] = 1
+          continue
+        }
+        if (b.material === MAT_RIDEAU && this.frozen[i] === 1) {
+          if (
+            this.codexContacts[MAT_RIDEAU * 3 + 1] === 0 &&
+            this.estCorps(i) &&
+            x > b.minX &&
+            x < b.maxX &&
+            y > b.minY &&
+            y < b.maxY
+          )
+            this.codexContacts[MAT_RIDEAU * 3 + 1] = 1
+          continue
+        }
+        if (horsBoite(b, x, y, rp)) continue
+        boxContact(x, y, b, cp)
+        const sep = cp.dist - rp
+        if (sep < 0) {
+          const vn =
+            ((x - this.posX[i]) * cp.nx + (y - this.posY[i]) * cp.ny) * invDt
+          x -= cp.nx * sep
+          y -= cp.ny * sep
+          this.contactMat[i] = b.material
+          this.contactNX[i] = cp.nx
+          this.contactNY[i] = cp.ny
+          this.contactVn[i] = vn
+        }
+      }
+
+      // Éponge : un feutre continu. La GLACE et la VAPEUR butent sur toutes
+      // ses cellules (le palet ne défonce pas le feutre, le nuage ne passe
+      // pas ses fibres) ; le LIQUIDE s'infiltre dans les cellules vivantes
+      // (qui l'absorbent) et ne bute que sur les cellules SATURÉES, devenues
+      // solides. La particule peut chevaucher jusqu'à 4 cellules.
+      const etatLiquide = this.frozen[i] !== 1 && this.gaseous[i] !== 1
+      for (const sp of this.sponges) {
+        const d = sp.def
+        if (
+          x < d.minX - rp ||
+          x >= sp.maxX + rp ||
+          y < d.minY - rp ||
+          y >= sp.maxY + rp
+        )
+          continue
+        const cx0 = Math.max(0, Math.floor((x - rp - d.minX) / d.cellSize))
+        const cy0 = Math.max(0, Math.floor((y - rp - d.minY) / d.cellSize))
+        const cx1 = Math.min(
+          d.cols - 1,
+          Math.floor((x + rp - d.minX) / d.cellSize),
+        )
+        const cy1 = Math.min(
+          d.rows - 1,
+          Math.floor((y + rp - d.minY) / d.cellSize),
+        )
+        for (let cy = cy0; cy <= cy1; cy++) {
+          for (let cx = cx0; cx <= cx1; cx++) {
+            const cell = cy * d.cols + cx
+            if (etatLiquide && !sp.isSolid(cell)) continue
+            const cb = sp.cellBounds(cell)
+            boxContact(x, y, cb, cp)
+            const sep = cp.dist - rp
+            if (sep < 0) {
+              x -= cp.nx * sep
+              y -= cp.ny * sep
+              this.contactMat[i] = 0 // comportement mur neutre
+              this.contactNX[i] = cp.nx
+              this.contactNY[i] = cp.ny
+              this.contactVn[i] = 0
+            }
+          }
+        }
+      }
+
+      this.prdX[i] = x
+      this.prdY[i] = y
+    }
+  }
+
+  // Rebond hydrophobe, adhérence hydrophile, et bandes d'influence sans
+  // contact : la répulsion dévie les trajectoires, l'adhésion aspire vers la
+  // surface (§6).
+  private applyMaterialVelocities(dt: number): void {
+    if (this.boxes.length === 0) return
+    const n = this.count
+    const p = this.params
+    const rp = p.particleSpacing * 0.5
+    const cp = this.scratchCP
+    const band = p.hydroBand
+    const wallBand = p.wallSplashBand
+    const bite = p.surfaceBite // mordant global : les surfaces pèsent plus
+    const philDamp = Math.exp(-p.hydrophileFriction * bite * dt)
+
+    for (let i = 0; i < n; i++) {
+      const gel = this.frozen[i] === 1
+      const gaz = this.gaseous[i] === 1
+      // La GLACE sent la chimie AU CONTACT (tableau des règles) : bumper
+      // hydrophobe, freinage hydrophile — mais c'est le PALET entier qui
+      // répond, pas la particule : la réponse vit dans icePass, où le bloc
+      // rigide encaisse ses chocs. (Une réponse par particule serait diluée
+      // par la moyenne de l'amas puis écrasée par l'impulsion rigide.)
+      if (gel) continue
+      const mat = this.contactMat[i]
+      // CODEX : chaque contact du corps consigne sa combinaison état × matériau
+      if (mat >= 0 && this.estCorps(i))
+        this.codexContacts[mat * 3 + (gaz ? 2 : 0)] = 1
+      // LA VAPEUR QUI N'EST PLUS À VOUS PERLE OÙ ELLE TOUCHE. Le souffle du
+      // dash (et toute vapeur détachée du corps) se condense à la première
+      // paroi : elle redevient goutte, s'y pose, et attend qu'on vienne la
+      // chercher. La vapeur DU CORPS traverse comme avant — le passe-muraille
+      // reste intact, c'est seulement l'échappement qui se dépose.
+      // (pas sur une MEMBRANE : elle est faite pour ARRÊTER la vapeur — y
+      // perler la ferait franchir sous forme de goutte, l'outil de
+      // conception perdrait son sens. Le souffle rebondit et perlera ailleurs.)
+      if (
+        gaz &&
+        mat >= 0 &&
+        mat !== MAT_MEMBRANE &&
+        !this.estCorps(i)
+      ) {
+        this.gaseous[i] = 0
+        this.souffle[i] = 0
+        this.duCorps[i] = 0 // la rosée du souffle s'attrape au contact, pas à l'aimant
+        this.vapor[i] = 0
+        // la trace « était vapeur » est effacée : sans cela le rappel de
+        // condensation (condenseRegroup) ramènerait la goutte vers le corps
+        // — c'est précisément ce qu'on veut empêcher, elle reste au mur
+        this.gasLink[i] = 0
+        // elle se pose : l'élan retombe, la goutte reste au mur
+        this.velX[i] *= 0.12
+        this.velY[i] *= 0.12
+        this.roseePerlee++
+        continue
+      }
+      if (gaz) {
+        // la vapeur ne colle ni ne rebondit — mais les bandes la travaillent
+        // légèrement (voir plus bas)
+      } else if (mat === MAT_HYDROPHOBE) {
+        const vnIn = this.contactVn[i]
+        if (vnIn < 0) {
+          const nx = this.contactNX[i]
+          const ny = this.contactNY[i]
+          const vn = this.velX[i] * nx + this.velY[i] * ny
+          const target = -vnIn * p.hydrophobeRestitution
+          this.velX[i] += (target - vn) * nx
+          this.velY[i] += (target - vn) * ny
+        }
+      } else if (mat === MAT_HYDROPHILE) {
+        const nx = this.contactNX[i]
+        const ny = this.contactNY[i]
+        let vn = this.velX[i] * nx + this.velY[i] * ny
+        let vtx = this.velX[i] - vn * nx
+        let vty = this.velY[i] - vn * ny
+        vtx *= philDamp
+        vty *= philDamp
+        if (vn > 0) vn *= 0.25 // décoller se paie
+        this.velX[i] = vtx + vn * nx
+        this.velY[i] = vty + vn * ny
+      }
+
+      const x = this.prdX[i]
+      const y = this.prdY[i]
+      // la vapeur sent les bandes en sourdine mais de LOIN : force réduite,
+      // portée étendue — le nuage s'infléchit bien avant la paroi, sans
+      // jamais être happé ni claqué
+      const poidsBande = gaz ? p.hydroGasWeight : 1
+      const porteeGaz = gaz ? p.hydroGasReach : 1
+      for (const b of this.chemBoxes) {
+        // Le mur neutre n'agit qu'au ras de la paroi ; la chimie porte loin,
+        // et encore plus loin pour la vapeur (en sourdine).
+        const reach = b.material === MAT_WALL ? wallBand : band * porteeGaz
+        if (horsBoite(b, x, y, reach + rp)) continue
+        boxContact(x, y, b, cp)
+        const sep = cp.dist - rp
+        if (sep > 0 && sep < reach) {
+          const f = 1 - sep / reach
+          if (b.material === MAT_WALL) {
+            if (gaz) continue // l'éclat d'impact est une affaire de liquide
+            // Mur neutre : l'éclat d'impact vient du rebond de pression qui
+            // projette les particules loin de la paroi. On amortit la vitesse
+            // sortante AU CONTACT — l'eau s'étale et épouse la forme au lieu
+            // de jaillir ; le glissement tangentiel reste libre.
+            // Amorti normalisé par le pas : appliqué tel quel, il se cumulait
+            // à chaque sous-pas (120 fois par seconde) et la paroi retenait
+            // le corps comme un aimant.
+            const vn = this.velX[i] * cp.nx + this.velY[i] * cp.ny
+            if (vn > 0) {
+              const damp = 1 - Math.exp(-p.wallSplashDamp * 60 * f * dt)
+              this.velX[i] -= cp.nx * vn * damp
+              this.velY[i] -= cp.ny * vn * damp
+            }
+            continue
+          }
+          const a =
+            (b.material === MAT_HYDROPHILE
+              ? -p.hydrophilePull
+              : p.hydrophobeRepel) *
+            f *
+            dt *
+            bite *
+            poidsBande
+          this.velX[i] += cp.nx * a
+          this.velY[i] += cp.ny * a
+        }
+      }
+    }
+  }
+
+  // Le contact éponge n'est pas mortel : il englue et absorbe après un temps
+  // de contact continu. Chaque cellule se sature ; gorgée, elle devient
+  // solide — on peut payer un passage en volume (§6). La GLACE et la VAPEUR
+  // ne traversent plus (le feutre les bloque, voir la collision) : seul le
+  // liquide s'y risque.
+  private processSponges(dt: number): void {
+    const p = this.params
+    const mordant = p.surfaceBite * this.spongeGripFactor
+    const drag = Math.exp(-p.spongeDrag * mordant * dt)
+    const absorbTime = p.spongeAbsorbTime / Math.max(0.1, mordant)
+    let i = 0
+    while (i < this.count) {
+      if (this.frozen[i] === 1) {
+        i++
+        continue // la glace n'est pas engluée : un bloc glisse sur l'éponge
+      }
+      if (this.gaseous[i] === 1) {
+        i++
+        continue // la vapeur bute sur le feutre : rien à essorer
+      }
+      let touching = false
+      let removed = false
+      const x = this.posX[i]
+      const y = this.posY[i]
+      for (const sp of this.sponges) {
+        if (!sp.contains(x, y)) continue
+        const cell = sp.cellIndexAt(x, y)
+        if (cell < 0 || sp.isSolid(cell)) continue
+        touching = true
+        this.velX[i] *= drag
+        this.velY[i] *= drag
+        this.contactTime[i] += dt
+        if (this.contactTime[i] >= absorbTime) {
+          sp.absorb(cell)
+          this.spongeBites++
+          this.removeParticle(i)
+          removed = true
+        }
+        break
+      }
+      if (removed) continue // l'indice i contient maintenant une autre particule
+      if (!touching) this.contactTime[i] = 0
+      i++
+    }
+  }
+
+  /** Pose les coupelles du tableau, vides. `capacite` : ce que chacune boit
+   *  avant d'être pleine, en particules (capaciteCoupelle) ; `portee`,
+   *  `courant` : son champ d'aspiration (champCoupelle) ; `debit` : ce
+   *  qu'elle boit au plus par seconde (COUPELLE_DEBIT) — tout dans coupelle.ts. */
+  setCoupelles(
+    defs: readonly { x: number; y: number; r: number; capacite: number; portee: number; courant: number; debit: number }[],
+  ): void {
+    this.coupelles = defs.map((d) => ({
+      x: d.x,
+      y: d.y,
+      r: d.r,
+      capacite: Math.max(1, Math.round(d.capacite)),
+      portee: Math.max(d.r, d.portee),
+      courant: Math.max(0, d.courant),
+      debit: Math.max(1, d.debit),
+      bu: 0,
+      pleine: false,
+      reserve: 0,
+    }))
+  }
+
+  // LA COUPELLE ASPIRE, PUIS BOIT. La première version avalait d'un coup
+  // tout ce qui entrait dans la bouche : à l'essai, le concepteur « ne se
+  // rend pas compte que cela aspire du liquide » — l'eau s'évanouissait, une
+  // jauge se remplissait. La leçon était déjà écrite au vide (« un
+  // clignement, pas une aspiration ») : il faut un courant qu'on voit tirer
+  // et un débit borné. Deux temps, donc :
+  //  · LE CHAMP : dans sa portée, un courant rentrant entraîne le liquide
+  //    vers le centre — le corps qui passe s'étire vers la bouche, la goutte
+  //    du jet y est happée. Pas de giration : sans elle, pas d'orbite
+  //    d'équilibre, l'eau entre droit (le piège que le cœur de Rankine du
+  //    sas a dû résoudre). Aucune traînée hors du champ, aucune adhérence.
+  //  · LA GORGÉE : dans la bouche, au plus `debit` particules par seconde,
+  //    les plus proches du centre d'abord — l'eau s'écoule dedans, on la
+  //    voit partir. La réserve tolère une courte rafale (un quart de seconde
+  //    de débit) : une goutte du jet qui traverse la bouche en quelques pas
+  //    est bue, pas manquée.
+  // UNE règle pour le corps et les gouttes libres : une coupelle qui
+  // épargnait le corps grignotait quand même les fragments que le remous
+  // détache. La glace et la vapeur n'y sont pas sensibles. Pleine, elle
+  // n'aspire plus et ne boit plus rien : on ne paie jamais plus que le trait,
+  // et elle n'a pas besoin de devenir une paroi (la version au couvercle
+  // solide faisait éclater le corps qui traversait encore, essai du 24/10).
+  private processCoupelles(dt: number): void {
+    for (const k of this.coupelles) {
+      if (k.pleine) continue
+      this.aspireCoupelle(k, dt)
+      this.boitCoupelle(k, dt)
+    }
+  }
+
+  private aspireCoupelle(k: CoupelleSim, dt: number): void {
+    if (k.courant <= 0) return
+    const R = k.portee
+    const R2 = R * R
+    const blend = 1 - Math.exp(-4 * dt)
+    for (let i = 0; i < this.count; i++) {
+      if (this.frozen[i] === 1 || this.gaseous[i] === 1) continue
+      const dx = k.x - this.posX[i]
+      const dy = k.y - this.posY[i]
+      const d2 = dx * dx + dy * dy
+      if (d2 >= R2 || d2 < 1e-6) continue
+      const d = Math.sqrt(d2)
+      const rim = Math.min(1, (1 - d / R) * 2) // fondu au bord de la portée
+      // le courant se renforce dans la bouche, et se pose au centre au lieu
+      // de le dépasser (sans ce frein, l'eau oscillait de part et d'autre)
+      const boost = d < k.r ? 1.6 : 1
+      const settle = Math.min(1, d / (k.r * 0.15))
+      const v = k.courant * boost * settle * rim
+      this.velX[i] += ((dx / d) * v - this.velX[i]) * blend * rim
+      this.velY[i] += ((dy / d) * v - this.velY[i]) * blend * rim
+    }
+  }
+
+  private boitCoupelle(k: CoupelleSim, dt: number): void {
+    const rafale = k.debit * 0.25
+    k.reserve = Math.min(rafale + 1, k.reserve + k.debit * dt)
+    const n = Math.min(Math.floor(k.reserve), k.capacite - k.bu)
+    if (n <= 0) return
+    const r2 = k.r * k.r
+    const prises: { i: number; d2: number }[] = []
+    for (let i = 0; i < this.count; i++) {
+      if (this.frozen[i] === 1 || this.gaseous[i] === 1) continue
+      const dx = this.posX[i] - k.x
+      const dy = this.posY[i] - k.y
+      const d2 = dx * dx + dy * dy
+      if (d2 <= r2) prises.push({ i, d2 })
+    }
+    if (prises.length === 0) return
+    prises.sort((a, b) => a.d2 - b.d2)
+    const bues = prises.slice(0, n).map((q) => q.i)
+    // retirer par indices DÉCROISSANTS : removeParticle échange avec la
+    // dernière particule, un indice plus petit reste donc valable
+    bues.sort((a, b) => b - a)
+    for (const i of bues) this.removeParticle(i)
+    k.bu += bues.length
+    k.reserve -= bues.length
+    this.coupelleBues += bues.length
+    if (k.bu >= k.capacite) k.pleine = true
+  }
+
+  /** Le plasma RETOMBE. Hors de la bande d'un champ engagé, l'ionisation
+   *  s'éteint en ~0,5 s (le nuage redevient vapeur ordinaire, sans à-coup) ;
+   *  une particule qui n'est plus gazeuse la perd immédiatement — sans cette
+   *  purge, une goutte condensée garderait son ionisation en silence et
+   *  renaîtrait violette à sa prochaine vaporisation, des tableaux plus
+   *  tard. Inconditionnelle et à part d'applyGasDynamics : celle-ci sort
+   *  au premier pas sans gaz, précisément le moment où il faut purger. */
+  private fadeIonise(dt: number): void {
+    const fade = Math.exp(-2.2 * dt)
+    const ionise = this.ionise
+    for (let i = 0; i < this.count; i++) {
+      if (ionise[i] === 0) continue
+      if (this.gaseous[i] !== 1 || ionise[i] < 1e-3) ionise[i] = 0
+      else ionise[i] *= fade
+    }
+  }
+
+  // La vapeur s'étale (répulsion douce entre particules de gaz, réutilise
+  // les voisinages du pas) et flotte (freinage propre). L'expansion s'arrête
+  // d'elle-même : au-delà de h, plus de répulsion — le nuage trouve son
+  // étendue sans jamais se déchirer (le rayon d'amas du gaz est plus grand).
+  private applyGasDynamics(dt: number): void {
+    const n = this.count
+    const gaseous = this.gaseous
+    let any = false
+    for (let i = 0; i < n; i++) {
+      if (gaseous[i] === 1) {
+        any = true
+        break
+      }
+    }
+    if (!any) return
+    const p = this.params
+    const k = this.kernels
+    const h = k.h
+    const h2 = k.h2
+    const drag = Math.exp(-p.gasDrag * dt)
+    const { prdX, prdY, velX, velY } = this
+    const nbStart = this.nbStart
+    const nbList = this.nbList
+    // Turbulence : deux octaves de tourbillons (rotationnel d'un potentiel,
+    // donc sans divergence — le nuage se tord en volutes sans se déchirer).
+    // Déterministe : fonction de la position et du temps de simulation.
+    const time = this.stepIndex * dt
+    const k1 = 0.011
+    const k2 = 0.023
+    const turb = p.gasTurb * dt
+    for (let i = 0; i < n; i++) {
+      if (gaseous[i] !== 1) continue
+      velX[i] *= drag
+      velY[i] *= drag
+      const xi = prdX[i]
+      const yi = prdY[i]
+      if (turb > 0) {
+        const c1x =
+          -Math.sin(xi * k1 + time * 0.8) * Math.sin(yi * k1 - time * 0.6)
+        const c1y =
+          -Math.cos(xi * k1 + time * 0.8) * Math.cos(yi * k1 - time * 0.6)
+        const c2x =
+          -Math.sin(xi * k2 - time * 1.3) * Math.sin(yi * k2 + time * 1.1)
+        const c2y =
+          -Math.cos(xi * k2 - time * 1.3) * Math.cos(yi * k2 + time * 1.1)
+        velX[i] += (c1x * 0.65 + c2x * 0.35) * turb
+        velY[i] += (c1y * 0.65 + c2y * 0.35) * turb
+      }
+      let ax = 0
+      let ay = 0
+      const end = nbStart[i + 1]
+      for (let e = nbStart[i]; e < end; e++) {
+        const j = nbList[e]
+        if (gaseous[j] !== 1) continue
+        const dx = xi - prdX[j]
+        const dy = yi - prdY[j]
+        const r2 = dx * dx + dy * dy
+        if (r2 >= h2 || r2 < 1e-6) continue
+        const r = Math.sqrt(r2)
+        const a = (p.gasExpand * (1 - r / h)) / r
+        ax += dx * a
+        ay += dy * a
+      }
+      velX[i] += ax * dt
+      velY[i] += ay * dt
+    }
+  }
+
+  // Le froid et la glace (§6). Deux chemins vers le gel : l'aura des plaques
+  // froides (givre ∝ proximité), et l'intention volontaire (touche F — le
+  // corps entier prend, vite). À 1, la particule gèle EN GARDANT sa vitesse :
+  // la glace est balistique. Gelée au contact d'une plaque, elle s'y soude
+  // (icePass annule la vitesse du bloc). Le dégel — intention levée ET à
+  // l'écart du froid — descend sous 0,55 avant de libérer : l'hystérésis
+  // évite le clignotement en bord d'aura.
+  private processCold(dt: number): void {
+    const p = this.params
+    // Refroidissement du vaisseau (§5) : les auras froides s'étendent, le gel
+    // prend plus vite, le dégel traîne, la vapeur volontaire se fait chère et
+    // la condensation ambiante s'accélère — le monde devient moins jouable.
+    const chill = this.chill
+    const band = p.coldBand * (1 + p.chillColdGrowth * chill)
+    const rp = p.particleSpacing * 0.5
+    const freeze =
+      (dt * p.surfaceBite) / Math.max(0.05, p.freezeTime * (1 - 0.5 * chill))
+    const freezeSelf = dt / Math.max(0.05, p.freezeSelfTime * this.basculeFactor)
+    const thaw = dt / Math.max(0.1, p.thawTime * (1 + chill))
+    const boilTime = p.boilTime * (1 + 2 * p.chillHeatFade * chill)
+    const vaporizeTime = p.vaporizeTime * this.basculeFactor * (1 + 1.5 * chill)
+    const condenseTime = p.condenseTime * (1 - 0.4 * chill)
+    const cp = this.scratchCP
+    const corps = this.corps
+    const nbCorps = corps.length
+    // Ressenti thermique du liquide : l'eau qui givre s'engourdit, l'eau qui
+    // chauffe frémit — la température se sent avant le changement d'état
+    const time = this.stepIndex * dt
+    const agit = p.heatAgitation * dt
+    const kAgit = 0.06
+    let joueursEnChauffe = 0
+    let joueursAuFroid = 0
+    for (let i = 0; i < this.count; i++) {
+      const x = this.posX[i]
+      const y = this.posY[i]
+      let exposure = 0
+      let minSep = Infinity
+      if (this.hasCold) {
+        for (const b of this.coldBoxes) {
+          if (horsBoite(b, x, y, band + rp)) continue
+          boxContact(x, y, b, cp)
+          const sep = cp.dist - rp
+          if (sep < minSep) minSep = sep
+          const f = 1 - Math.max(0, sep) / band
+          if (f > exposure) exposure = Math.min(1, f)
+        }
+      }
+      this.welded[i] = this.frozen[i] === 1 && minSep <= 1 ? 1 : 0
+
+      // Radiateur (tableau 4) : l'aura de chaleur, symétrique de l'aura de gel
+      const heat = this.heatExposureAt(x, y)
+      if (heat > 0 && this.estCorps(i)) joueursEnChauffe++
+      if (exposure > 0.05 && this.estCorps(i)) joueursAuFroid++
+
+      // Vapeur : le froid condense en priorité (vite), puis la chaleur
+      // vaporise qu'on le veuille ou non, sinon l'intention (G) vaporise et
+      // son absence condense. Hystérésis comme pour la glace.
+      // LE SOUFFLE EN VOL reste GAZ jusqu'à ce qu'il touche : sans cela il se
+      // condense en plein vol, et le rappel de condensation le ramène au
+      // corps — la propulsion redeviendrait gratuite. Son compte à rebours
+      // s'épuise : à bout de course, il perle sur place.
+      if (this.souffle[i] > 0) {
+        this.souffle[i] = Math.max(0, this.souffle[i] - dt)
+        if (this.souffle[i] > 0) {
+          this.vapor[i] = 1
+          this.gaseous[i] = 1
+          this.gasLink[i] = 1
+          continue
+        }
+      }
+      const wantGas =
+        this.gasIntent && this.estCorps(i) && this.frozen[i] === 0
+      let dv: number
+      if (exposure > 0) dv = -exposure * (dt / 0.25)
+      else if (heat > 0 && this.frozen[i] === 0)
+        dv = heat * (dt / Math.max(0.05, boilTime))
+      else if (wantGas) dv = dt / Math.max(0.05, vaporizeTime)
+      else dv = -dt / Math.max(0.05, condenseTime)
+      let vap = Math.min(1, Math.max(0, this.vapor[i] + dv))
+      // L'échauffement du CORPS par un bloc est un effet VISUEL : sans
+      // intention, une particule du joueur chauffe (frémit, fume) mais ne
+      // bascule plus seule — la transformation se décide au niveau du corps
+      // (95 % de la surface active dans la zone d'effet, voir main.ts).
+      if (
+        heat > 0 &&
+        !this.gasIntent &&
+        this.estCorps(i) &&
+        this.gaseous[i] === 0
+      ) {
+        vap = Math.min(vap, 0.98)
+      }
+      this.vapor[i] = vap
+      if (vap >= 1) this.gaseous[i] = 1
+      else if (this.gaseous[i] === 1 && vap <= 0.55) this.gaseous[i] = 0
+
+      // Mémoire de lien : pleine tant que gazeuse, s'éteint doucement après —
+      // le temps que le nuage condensé retombe sur le corps
+      if (this.gaseous[i] === 1) this.gasLink[i] = 1
+      else if (this.gasLink[i] > 0)
+        this.gasLink[i] = Math.max(
+          0,
+          this.gasLink[i] - dt / Math.max(0.2, p.gasLinkDecay),
+        )
+
+      // Givre : jamais sur la vapeur — le froid doit d'abord la condenser.
+      // La chaleur empêche la prise, et dégèle bien plus vite qu'à l'air libre.
+      // l'intention est celle DU CORPS dont la particule fait partie : à un
+      // seul joueur c'est la même lecture qu'avant (estCorps), à deux chacun
+      // gèle pour soi
+      const pr = this.proprio[i]
+      const wanted =
+        this.kind[i] === KIND_PLAYER && pr < nbCorps && corps[pr].gel && this.gaseous[i] === 0
+      const canFrost = this.gaseous[i] === 0 && vap < 0.5 && heat <= 0
+      const rate = canFrost
+        ? Math.max(exposure * freeze, wanted ? freezeSelf : 0)
+        : 0
+      if (rate > 0) {
+        this.frost[i] = Math.min(1, this.frost[i] + rate)
+        if (this.frost[i] >= 1 && this.frozen[i] === 0) {
+          this.frozen[i] = 1 // la vitesse est conservée
+          this.iceDirty = true // la structure des amas vient de changer
+        }
+      } else if (p.glaceTir > 0 && this.frozen[i] === 1 && !this.estCorps(i)) {
+        // UN ÉCLAT TIRÉ RESTE GLACE (le concepteur, 17/09 : « il reste en
+        // glace dans la salle ») : sans l'intention, qui ne vaut que pour le
+        // corps, il fondrait en thawTime — les éclats s'accumulent, rebondissent
+        // sur les bandes, s'agglomèrent, et peuvent encore toucher une mire
+      } else {
+        const melt =
+          heat > 0
+            ? Math.max(thaw, (heat * dt) / Math.max(0.05, p.heatThawTime))
+            : thaw
+        this.frost[i] = Math.max(0, this.frost[i] - melt)
+        if (this.frozen[i] === 1 && this.frost[i] <= 0.55) {
+          this.frozen[i] = 0
+          this.iceDirty = true // un bloc vient de perdre une particule
+        }
+      }
+
+      // La température se sent dans le liquide lui-même :
+      if (this.frozen[i] === 0 && this.gaseous[i] === 0) {
+        const fr = this.frost[i]
+        // l'eau qui givre s'engourdit — pâteuse, dure à propulser. Le gel
+        // VOLONTAIRE (F) y échappe : « geler, c'est parier sur une
+        // trajectoire » — l'élan choisi est conservé
+        if (
+          fr > 0 &&
+          p.frostSluggish > 0 &&
+          !wanted
+        ) {
+          const damp = Math.exp(-p.frostSluggish * fr * dt)
+          this.velX[i] *= damp
+          this.velY[i] *= damp
+        }
+        const warmth = Math.max(this.vapor[i], heat)
+        if (warmth > 0.05 && agit > 0) {
+          // l'eau qui chauffe frémit : un bouillonnement doux, déterministe.
+          // Le SIGNE ALTERNE d'une particule à l'autre : un bruit dont
+          // l'amplitude suit la chaleur dérive sinon vers le froid — le
+          // radiateur semblait REPOUSSER le corps. Alterné, la dérive
+          // collective s'annule, le bouillonnement reste.
+          const xi = this.posX[i]
+          const yi = this.posY[i]
+          const sg = (i & 1) === 0 ? 1 : -1
+          const jx =
+            -Math.sin(xi * kAgit + time * 5.1) *
+            Math.sin(yi * kAgit - time * 4.3)
+          const jy =
+            -Math.cos(xi * kAgit + time * 5.1) *
+            Math.cos(yi * kAgit - time * 4.3)
+          this.velX[i] += jx * agit * warmth * sg
+          this.velY[i] += jy * agit * warmth * sg
+        }
+      }
+    }
+
+    this.chauffeFrac =
+      this.playerCount > 0 ? joueursEnChauffe / this.playerCount : 0
+    this.froidFrac =
+      this.playerCount > 0 ? joueursAuFroid / this.playerCount : 0
+
+    // La vapeur qui s'attarde dans l'aura d'un radiateur s'évapore : perdue,
+    // pas mise en bonbonne. La plus exposée part en premier.
+    if (this.hasHeat) {
+      let anyHotGas = false
+      for (let i = 0; i < this.count; i++) {
+        if (
+          this.gaseous[i] === 1 &&
+          this.heatExposureAt(this.posX[i], this.posY[i]) > 0
+        ) {
+          anyHotGas = true
+          break
+        }
+      }
+      if (anyHotGas) {
+        this.heatCarry += p.heatLossRate * p.surfaceBite * dt
+        while (this.heatCarry >= 1) {
+          this.heatCarry -= 1
+          let best = -1
+          let bestHeat = 0
+          for (let i = 0; i < this.count; i++) {
+            if (this.gaseous[i] !== 1) continue
+            const h = this.heatExposureAt(this.posX[i], this.posY[i])
+            if (h > bestHeat) {
+              bestHeat = h
+              best = i
+            }
+          }
+          if (
+            best < 0 ||
+            (this.estCorps(best) && this.playerCount <= 2)
+          )
+            break
+          this.removeParticle(best)
+          this.vaporBank++
+        }
+      } else {
+        this.heatCarry = 0
+      }
+    }
+  }
+
+  // Les blocs de glace : chaque amas connexe de particules gelées est un
+  // corps rigide en translation — une seule vitesse pour tout l'amas (la
+  // moyenne), un rebond commun quand l'un de ses points touche une paroi,
+  // l'arrêt complet si l'un d'eux est soudé à une plaque froide.
+  private icePass(dt: number): void {
+    const n = this.count
+    const frozen = this.frozen
+    let any = false
+    for (let i = 0; i < n; i++) {
+      if (frozen[i] === 1) {
+        any = true
+        break
+      }
+    }
+    if (!any) {
+      this.gelAngle = 0 // plus de glace : le repère du gel repart de zéro
+      return
+    }
+    const p = this.params
+    const linkR = p.linkRadiusFactor * p.kernelRadius
+    const linkR2 = linkR * linkR
+    const { prdX, prdY, velX, velY } = this
+    const labels = this.iceLabels
+    const grid = this.grid
+    const scratch = this.relabelScratch
+    const proprio = this.proprio
+    const separes = this.corps.length > 1
+    const gelRecuX = this.gelRecuX
+    const gelRecuY = this.gelRecuY
+    // L'étiquetage des amas est en CACHE : il ne se refait que sur un
+    // événement de structure (gel, dégel, retrait — voir iceDirty) ou au
+    // plus tard toutes les 6 pas (50 ms), le temps de latence accepté pour
+    // qu'une FUSION de deux blocs qui se touchent soit constatée. Le bloc
+    // étant rigide, sa connexité ne change jamais entre deux événements —
+    // c'était LE poste dominant de la phase palet (~1,6 ms/pas à 900).
+    let comps: number
+    if (this.iceDirty || --this.iceLabelTtl <= 0) {
+      const forEachIce = (i: number, cb: (j: number) => void) => {
+        if (frozen[i] === 0) return // le liquide : singletons, hors des blocs
+        const xi = prdX[i]
+        const yi = prdY[i]
+        const end = grid.collect(
+          prdX,
+          prdY,
+          xi,
+          yi,
+          linkR,
+          i,
+          scratch,
+          0,
+          scratch.length,
+        )
+        for (let e = 0; e < end; e++) {
+          const j = scratch[e]
+          if (frozen[j] === 0) continue
+          // deux corps gelés qui se touchent restent DEUX blocs : sans cela
+          // ils se soudaient en un seul, à une seule vitesse, jusqu'au dégel
+          if (separes && proprio[i] !== proprio[j]) continue
+          const dx = xi - prdX[j]
+          const dy = yi - prdY[j]
+          if (dx * dx + dy * dy <= linkR2) cb(j)
+        }
+      }
+      comps = labelComponents(n, labels, forEachIce, this.stack)
+      this.iceComps = comps
+      this.iceDirty = false
+      this.iceLabelTtl = 6
+    } else {
+      comps = this.iceComps
+    }
+    this.iceVxSum.fill(0, 0, comps)
+    this.iceVySum.fill(0, 0, comps)
+    this.iceCnt.fill(0, 0, comps)
+    this.iceNxSum.fill(0, 0, comps)
+    this.iceNySum.fill(0, 0, comps)
+    this.iceWeld.fill(0, 0, comps)
+    this.iceCxSum.fill(0, 0, comps)
+    this.iceCySum.fill(0, 0, comps)
+    this.icePxSum.fill(0, 0, comps)
+    this.icePySum.fill(0, 0, comps)
+    this.icePCnt.fill(0, 0, comps)
+    this.iceInertia.fill(0, 0, comps)
+    this.iceOmega.fill(0, 0, comps)
+    this.icePhobe.fill(0, 0, comps)
+    this.icePhile.fill(0, 0, comps)
+    this.icePushSumX.fill(0, 0, comps)
+    this.icePushSumY.fill(0, 0, comps)
+    this.icePushX.fill(0, 0, comps)
+    this.icePushY.fill(0, 0, comps)
+    this.icePushMax.fill(0, 0, comps)
+    const { posX, posY } = this
+    // le palet du hockey : il ne touche que les blocs des corps qu'il ne
+    // traverse pas (celui qui vient de le lancer le laisse filer)
+    const palet = this.palet
+    const paletActif = palet.actif
+    const porteePalet = palet.rayon + p.particleSpacing * 0.5
+    const nbCorps = this.corps.length
+    if (paletActif) {
+      this.icePalNx.fill(0, 0, comps)
+      this.icePalNy.fill(0, 0, comps)
+      this.icePalPx.fill(0, 0, comps)
+      this.icePalPy.fill(0, 0, comps)
+      this.icePalCnt.fill(0, 0, comps)
+      this.icePalProf.fill(0, 0, comps)
+    }
+
+    // 1. masse, centre de masse, vitesse moyenne, et point de contact moyen
+    for (let i = 0; i < n; i++) {
+      if (frozen[i] === 0) continue
+      const c = labels[i]
+      // (avec ce que la particule a reçu des autres corps et du palet : nul
+      // à un seul joueur, et la somme en est alors inchangée au bit près)
+      this.iceVxSum[c] += velX[i] + gelRecuX[i]
+      this.iceVySum[c] += velY[i] + gelRecuY[i]
+      this.iceCxSum[c] += prdX[i]
+      this.iceCySum[c] += prdY[i]
+      this.iceCnt[c]++
+      // la poussée subie par cette particule (obstacles, bords, éponge) :
+      // tout ce qui l'a écartée de la prédiction rigide pos + v·dt
+      const pushX = prdX[i] - posX[i] - velX[i] * dt
+      const pushY = prdY[i] - posY[i] - velY[i] * dt
+      const push2 = pushX * pushX + pushY * pushY
+      this.icePushSumX[c] += pushX
+      this.icePushSumY[c] += pushY
+      if (push2 > this.icePushMax[c]) {
+        this.icePushMax[c] = push2
+        this.icePushX[c] = pushX
+        this.icePushY[c] = pushY
+      }
+      if (this.contactMat[i] >= 0) {
+        // CODEX : la glace consigne aussi ses contacts (matériau × état 1)
+        this.codexContacts[this.contactMat[i] * 3 + 1] = 1
+        if (this.contactMat[i] === MAT_HYDROPHOBE) this.icePhobe[c]++
+        else if (this.contactMat[i] === MAT_HYDROPHILE) this.icePhile[c]++
+        this.iceNxSum[c] += this.contactNX[i]
+        this.iceNySum[c] += this.contactNY[i]
+        // le point d'application compte autant que la direction : c'est son
+        // excentrement par rapport au centre qui fait tourner le palet
+        this.icePxSum[c] += prdX[i]
+        this.icePySum[c] += prdY[i]
+        this.icePCnt[c]++
+      }
+      if (this.welded[i] === 1) this.iceWeld[c] = 1
+      if (paletActif) {
+        const pr = proprio[i]
+        if (pr < nbCorps && ((palet.traverse >> pr) & 1) === 1) continue
+        const dx = prdX[i] - palet.x
+        const dy = prdY[i] - palet.y
+        const d2 = dx * dx + dy * dy
+        if (d2 < porteePalet * porteePalet && d2 > 1e-9) {
+          const d = Math.sqrt(d2)
+          this.icePalNx[c] += dx / d
+          this.icePalNy[c] += dy / d
+          this.icePalPx[c] += prdX[i]
+          this.icePalPy[c] += prdY[i]
+          this.icePalCnt[c]++
+          if (porteePalet - d > this.icePalProf[c]) this.icePalProf[c] = porteePalet - d
+        }
+      }
+    }
+
+    // 2. moment cinétique et moment d'inertie, autour du centre de masse
+    //    (masses unitaires : la masse d'un bloc est son nombre de particules)
+    for (let i = 0; i < n; i++) {
+      if (frozen[i] === 0) continue
+      const c = labels[i]
+      const cnt = this.iceCnt[c]
+      if (cnt === 0) continue
+      const rx = prdX[i] - this.iceCxSum[c] / cnt
+      const ry = prdY[i] - this.iceCySum[c] / cnt
+      const dvx = velX[i] + gelRecuX[i] - this.iceVxSum[c] / cnt
+      const dvy = velY[i] + gelRecuY[i] - this.iceVySum[c] / cnt
+      this.iceOmega[c] += rx * dvy - ry * dvx // moment cinétique, provisoirement
+      this.iceInertia[c] += rx * rx + ry * ry
+      gelRecuX[i] = 0
+      gelRecuY[i] = 0
+    }
+
+    const rest = Math.min(
+      1,
+      Math.max(0, p.iceRestitution * this.iceBounceFactor),
+    )
+    const MAX_SPIN = 14 // rad/s : au-delà, un palet devient illisible
+    for (let c = 0; c < comps; c++) {
+      const cnt = this.iceCnt[c]
+      if (cnt === 0) continue
+      let vx = this.iceVxSum[c] / cnt
+      let vy = this.iceVySum[c] / cnt
+      const cx = this.iceCxSum[c] / cnt
+      const cy = this.iceCySum[c] / cnt
+      const I = this.iceInertia[c]
+      let omega = I > 1e-6 ? this.iceOmega[c] / I : 0
+
+      if (this.iceWeld[c] === 1) {
+        vx = 0
+        vy = 0
+        omega = 0 // soudé à la plaque : plus de translation ni de rotation
+      } else if (this.icePCnt[c] > 0) {
+        // La chimie se lit à l'échelle du palet : la surface qui touche le
+        // plus de particules dicte la réponse du bloc (tableau des règles —
+        // bumper hydrophobe, mouillage hydrophile).
+        const surPhobe =
+          this.icePhobe[c] > 0 && this.icePhobe[c] >= this.icePhile[c]
+        const surPhile = !surPhobe && this.icePhile[c] > 0
+        const nl = Math.hypot(this.iceNxSum[c], this.iceNySum[c])
+        if (nl > 1e-6) {
+          const nx = this.iceNxSum[c] / nl
+          const ny = this.iceNySum[c] / nl
+          // bras de levier : du centre de masse au point de contact
+          const rx = this.icePxSum[c] / this.icePCnt[c] - cx
+          const ry = this.icePySum[c] / this.icePCnt[c] - cy
+          // vitesse du POINT DE CONTACT, rotation comprise
+          const vpx = vx - omega * ry
+          const vpy = vy + omega * rx
+          const vn = vpx * nx + vpy * ny
+          if (vn < 0) {
+            // impulsion de choc d'un corps rigide : le dénominateur mélange
+            // masse et inertie — un choc excentré transfère une part de
+            // l'élan en ROTATION au lieu de tout renvoyer en translation.
+            // Le bumper hydrophobe REND PLUS qu'il ne reçoit (restitution
+            // propre + plancher d'éjection) ; l'hydrophile absorbe le choc.
+            const rn = rx * ny - ry * nx
+            const denom = 1 / cnt + (I > 1e-6 ? (rn * rn) / I : 0)
+            let vnOut =
+              -vn *
+              (surPhobe ? p.hydrophobeIceRestitution : surPhile ? 0 : rest)
+            if (surPhobe && vnOut < p.hydrophobeIceKick)
+              vnOut = p.hydrophobeIceKick
+            const j = (vnOut - vn) / denom
+            vx += (j * nx) / cnt
+            vy += (j * ny) / cnt
+            if (I > 1e-6) omega += (j * rn) / I
+            if (-vn > this.iceImpact) this.iceImpact = -vn
+          }
+        }
+        if (surPhile) {
+          // le mouillage retient : le palet qui glisse sur l'hydrophile
+          // s'essouffle, translation et rotation comprises
+          const damp = Math.exp(
+            -p.hydrophileIceDrag * p.surfaceBite * this.glisseGlaceFactor * dt,
+          )
+          vx *= damp
+          vy *= damp
+          omega *= damp
+        }
+      }
+      if (p.iceSlideDrag > 0) {
+        // LA GLISSE FREINÉE : nulle en jeu (une dérive reste une trajectoire),
+        // montée par le mini-jeu du palet — une pierre de curling qui
+        // s'essouffle d'elle-même, pour qu'un lancer ait une longueur
+        const damp = Math.exp(-p.iceSlideDrag * dt)
+        vx *= damp
+        vy *= damp
+        omega *= damp
+      }
+      if (paletActif && this.icePalCnt[c] > 0 && this.iceWeld[c] === 0) {
+        // LE PALET CONTRE LE BLOC : le choc de deux corps rigides, l'un de
+        // `cnt` particules, l'autre de la masse du palet. La normale va du
+        // palet vers le bloc ; l'impulsion est partagée — ce que le bloc
+        // perd, le palet le reçoit (`recu`, en quantité de mouvement : la
+        // règle du hockey le divise par sa masse).
+        const nl = Math.hypot(this.icePalNx[c], this.icePalNy[c])
+        if (nl > 1e-6) {
+          const nx = this.icePalNx[c] / nl
+          const ny = this.icePalNy[c] / nl
+          const rx = this.icePalPx[c] / this.icePalCnt[c] - cx
+          const ry = this.icePalPy[c] / this.icePalCnt[c] - cy
+          const pvx = palet.vx + palet.recuX / palet.masse
+          const pvy = palet.vy + palet.recuY / palet.masse
+          const vn = (vx - omega * ry - pvx) * nx + (vy + omega * rx - pvy) * ny
+          if (vn < 0) {
+            const rn = rx * ny - ry * nx
+            const denom = 1 / cnt + 1 / palet.masse + (I > 1e-6 ? (rn * rn) / I : 0)
+            const j = (-(1 + FluidSimMulti.REBOND_GLACE_PALET) * vn) / denom
+            vx += (j * nx) / cnt
+            vy += (j * ny) / cnt
+            if (I > 1e-6) omega += (j * rn) / I
+            palet.recuX -= j * nx
+            palet.recuY -= j * ny
+          }
+          // rien n'entre dans la glace : c'est le palet, le plus léger des
+          // deux, qui ressort
+          palet.x -= nx * this.icePalProf[c]
+          palet.y -= ny * this.icePalProf[c]
+        }
+      }
+      if (omega > MAX_SPIN) omega = MAX_SPIN
+      else if (omega < -MAX_SPIN) omega = -MAX_SPIN
+
+      this.iceVxSum[c] = vx // réutilisés : mouvement final du bloc
+      this.iceVySum[c] = vy
+      // LE BLOC RESTE RIGIDE EN POSITION AUSSI. Les contacts ont poussé ses
+      // particules une à une (chacune hors de SA paroi, de SA profondeur) :
+      // à chaque choc, le premier rang se tassait sur le reste, et rien ne
+      // le redressait — la pression ignore le gel. Ici on retire ces
+      // poussées et on déplace le bloc D'UN SEUL TENANT, de la plus grande
+      // d'entre elles : la particule la plus enfoncée ressort, les autres
+      // suivent sans se rapprocher. Le centre suit le même chemin.
+      const cnt1 = 1 / cnt
+      this.iceCxSum[c] = cx - this.icePushSumX[c] * cnt1 + this.icePushX[c]
+      this.iceCySum[c] = cy - this.icePushSumY[c] * cnt1 + this.icePushY[c]
+      this.iceOmega[c] = omega
+    }
+
+    // Le repère du gel suit la PLUS GROSSE composante : translation par son
+    // centre, rotation intégrée pas à pas. Un bloc soudé (omega nul) fige
+    // aussi son repère — les facettes ne bougent plus d'un poil.
+    let cBest = -1
+    for (let c = 0; c < comps; c++)
+      if (
+        this.iceCnt[c] > 0 &&
+        (cBest < 0 || this.iceCnt[c] > this.iceCnt[cBest])
+      )
+        cBest = c
+    if (cBest >= 0) {
+      this.gelAngle += this.iceOmega[cBest] * dt
+      this.gelCentreX = this.iceCxSum[cBest]
+      this.gelCentreY = this.iceCySum[cBest]
+    } else {
+      this.gelAngle = 0
+    }
+
+    // 3. projection sur un mouvement de corps rigide : translation + rotation.
+    //    La rotation est EXACTE, pas tangente : la vitesse ω × r intégrée
+    //    sur un pas allonge le rayon de √(1 + (ω·dt)²) à chaque pas — un
+    //    palet à 8 rad/s enflait de moitié en 4 s, jusqu'à ce que ses
+    //    particules dépassent le rayon de liaison : il ÉCLATAIT (mesuré :
+    //    47 amas après quelques rebonds, puis dégel des éclats détachés du
+    //    corps). On vise donc la position tournée de ω·dt, sur le cercle.
+    for (let c = 0; c < comps; c++) {
+      const th = this.iceOmega[c] * dt
+      this.icePushSumX[c] = (Math.cos(th) - 1) / dt // réutilisés : la
+      this.icePushSumY[c] = Math.sin(th) / dt // rotation exacte du pas
+    }
+    for (let i = 0; i < n; i++) {
+      if (frozen[i] === 0) continue
+      const c = labels[i]
+      // remise en forme : la prédiction rigide, puis le déplacement du bloc
+      const px = posX[i] + velX[i] * dt + this.icePushX[c]
+      const py = posY[i] + velY[i] * dt + this.icePushY[c]
+      prdX[i] = px
+      prdY[i] = py
+      const rx = px - this.iceCxSum[c]
+      const ry = py - this.iceCySum[c]
+      const cm1 = this.icePushSumX[c]
+      const sn = this.icePushSumY[c]
+      velX[i] = this.iceVxSum[c] + cm1 * rx - sn * ry
+      velY[i] = this.iceVySum[c] + sn * rx + cm1 * ry
+    }
+  }
+
+  // Le corps du joueur est la composante connexe qui recouvre le mieux le
+  // corps précédent. Deux masses d'eau qui se touchent fusionnent — ce n'est
+  // pas une règle, c'est la connexité (§3.1). Une gouttelette détachée est
+  // perdue. Les particules fraîchement éjectées (cooldown > 0) ne sont pas
+  // réabsorbées immédiatement.
+  relabel(): void {
+    const n = this.count
+    if (n === 0) return
+    const p = this.params
+    const linkR = p.linkRadiusFactor * p.kernelRadius
+    const linkR2 = linkR * linkR
+    // Le nuage de vapeur est distendu : son rayon d'adjacence est élargi,
+    // sinon l'expansion du gaz compterait comme une dispersion. Le rayon
+    // suit la vapeur RÉSIDUELLE (continue), pas l'étiquette gazeuse : en
+    // condensant, le lien se resserre au rythme où le corps se regroupe,
+    // au lieu de tomber d'un coup — redevenir eau ne scinde pas l'amas.
+    const gasSpan = Math.max(1, p.gasLinkFactor) - 1
+    const { posX, posY, labels, gasLink } = this
+    // Rayon de recherche asservi à la vapeur RÉELLEMENT présente : le rayon
+    // par paire vaut linkR·(1 + span·max(gi, gj)) ≤ linkR·(1 + span·gmax) —
+    // chercher à gmax couvre donc exactement les mêmes liens. Sans vapeur
+    // (gmax = 0, le régime courant), on balaie 9 cellules par particule au
+    // lieu de ~60 : relabel était le pic CPU périodique de la frame.
+    let gmax = 0
+    for (let i = 0; i < n; i++) if (gasLink[i] > gmax) gmax = gasLink[i]
+    const gasLinkR = linkR * (1 + gasSpan * gmax)
+    const grid = this.grid
+    grid.build(posX, posY, n)
+
+    // Chemin sans rappel par voisin : les candidats sont collectés d'un bloc
+    // dans un tampon (grid.collect, zéro allocation), puis filtrés en place —
+    // le parcours en profondeur ne paie plus deux couches de fermetures par
+    // particule visitée (relabel était le pic CPU périodique de la frame).
+    // les cloisons valent aussi pour les amas : deux corps fermés au contact
+    // restent DEUX amas, et la goutte qui touche un corps fermé n'est pas à lui
+    this.poseCloisons()
+    const cloisons = this.cloisons
+    const cloison = this.cloison
+    const proprio = this.proprio
+    const scratch = this.relabelScratch
+    const forEachNeighbor = (i: number, cb: (j: number) => void) => {
+      const xi = posX[i]
+      const yi = posY[i]
+      const gi = gasLink[i]
+      const end = grid.collect(
+        posX,
+        posY,
+        xi,
+        yi,
+        gasLinkR,
+        i,
+        scratch,
+        0,
+        scratch.length,
+      )
+      for (let e = 0; e < end; e++) {
+        const j = scratch[e]
+        if (cloisons && proprio[i] !== proprio[j] && (cloison[i] | cloison[j]) !== 0) continue
+        const v = gi > gasLink[j] ? gi : gasLink[j]
+        if (v > 0) {
+          const dx = xi - posX[j]
+          const dy = yi - posY[j]
+          const lr = linkR * (1 + gasSpan * v)
+          if (dx * dx + dy * dy <= lr * lr) cb(j)
+        } else {
+          const dx = xi - posX[j]
+          const dy = yi - posY[j]
+          if (dx * dx + dy * dy <= linkR2) cb(j)
+        }
+      }
+    }
+    const componentCount = labelComponents(
+      n,
+      labels,
+      forEachNeighbor,
+      this.stack,
+    )
+
+    // ---- L'ATTRIBUTION À PLUSIEURS CORPS -----------------------------------
+    // Le solveur du jeu n'a qu'un corps : l'amas qui porte le plus de ses
+    // particules EST le corps, tout ce qu'il contient lui revient, le reste
+    // est libre. À plusieurs, la même règle par joueur, et une question de
+    // plus — à qui va la matière d'un amas ?
+    //  - l'amas n'est le corps de PERSONNE : ce qui était d'un corps s'en
+    //    détache (goutte égarée, marquée de son propriétaire) ;
+    //  - l'amas est le corps d'UN SEUL joueur : tout lui revient, y compris
+    //    la goutte perdue par un autre. C'est le DON (et le vol) : la matière
+    //    appartient à qui la touche ;
+    //  - l'amas est le corps de PLUSIEURS (deux corps qui se touchent ne
+    //    font qu'un amas) : chacun garde les siennes, et une goutte de
+    //    personne va au plus gros des deux.
+    // À un seul joueur, ces trois cas se replient exactement sur la règle
+    // d'origine — le test de parité le vérifie au bit près.
+    const nb = this.corps.length
+    const parlait = this.courant
+    const labelDe = this.labelDe
+    const tailleDe = this.tailleDe
+    const playerPerLabel = this.compScratch
+    for (let j = 0; j < nb; j++) {
+      // (tampon réutilisé : relabel tourne à chaque frame, une allocation ici
+      // devient une rafale de passages du ramasse-miettes)
+      playerPerLabel.fill(0, 0, componentCount)
+      for (let i = 0; i < n; i++) {
+        if (this.kind[i] === KIND_PLAYER && this.proprio[i] === j) playerPerLabel[labels[i]]++
+      }
+      let playerLabel = -1
+      let bestCount = 0
+      for (let c = 0; c < componentCount; c++) {
+        if (playerPerLabel[c] > bestCount) {
+          bestCount = playerPerLabel[c]
+          playerLabel = c
+        }
+      }
+      labelDe[j] = playerLabel
+      tailleDe[j] = bestCount
+      this.compteDe[j] = 0
+    }
+
+    for (let i = 0; i < n; i++) {
+      // à qui revient cette particule ? (−1 : à personne)
+      let cible = -1
+      if (this.cooldown[i] <= 0) {
+        const c = labels[i]
+        let pretendants = 0
+        let gros = -1
+        for (let j = 0; j < nb; j++) {
+          if (labelDe[j] !== c) continue
+          pretendants++
+          if (gros < 0 || tailleDe[j] > tailleDe[gros]) gros = j
+        }
+        if (pretendants === 1) cible = gros
+        else if (pretendants > 1) {
+          const pr = this.proprio[i]
+          cible = pr < nb && labelDe[pr] === c ? pr : gros
+        }
+      }
+      // Ce qu'un corps accepte d'un AUTRE : rien s'il est fermé (même par
+      // ricochet — une goutte étrangère collée à l'un de SES fragments
+      // reviendrait sinon avec lui), et, ouvert, seulement une goutte TIRÉE.
+      if (cible >= 0 && nb > 1 && this.proprio[i] !== cible && (!this.corps[cible].ouvert || this.tiree[i] === 0)) cible = -1
+      if (cible >= 0) {
+        this.kind[i] = KIND_PLAYER
+        this.proprio[i] = cible
+        this.tiree[i] = 0
+        this.duCorps[i] = 0 // reprise : la marque d'égarement s'efface
+        this.compteDe[cible]++
+      } else {
+        // un fragment que le remous vient de DÉTACHER reste du corps : sans
+        // la marque, la vie baisse pour une matière qui gît à deux doigts
+        // (il garde son propriétaire : c'est à lui qu'il reviendra à l'aimant)
+        if (this.kind[i] === KIND_PLAYER) this.duCorps[i] = 1
+        this.kind[i] = KIND_FREE
+      }
+    }
+
+    let emprise = false
+    for (let j = 0; j < nb; j++) {
+      this.courant = j
+      // Dans l'emprise du sas, la perte de cohésion n'est pas une dispersion :
+      // c'est le trou qui boit le corps — le jeu conclut en victoire, pas en
+      // défaite, même si le volume restant passe sous le seuil critique.
+      // Marge ×1,3 : une éclaboussure qui déborde brièvement du rayon pendant
+      // que le sas boit ne doit pas requalifier la fin en dispersion.
+      const inDrainGrip =
+        this.drainOn &&
+        Math.hypot(
+          this.stats.centroidX - this.mouthX,
+          this.stats.centroidY - this.mouthY,
+        ) <
+          this.params.exitRadius * this.exitRadiusFactor * 1.3
+      if (inDrainGrip) emprise = true
+
+      if (labelDe[j] < 0) {
+        this.playerCount = 0
+        this.enPretCount = 0
+        if (!inDrainGrip) this.dispersed = true
+        continue
+      }
+      const count = this.compteDe[j]
+      this.playerCount = count
+
+      // EN PRÊT : marquée du corps et encore dans le HALO du corps (le rayon
+      // de capture, celui du rappel). Tout ce qui reste dans le halo REVIENDRA
+      // (le rappel des égarées s'en charge) : le compter vivant est donc la
+      // stricte vérité — et la jauge ne cille plus au rythme des tirs. La
+      // sortie du halo se juge avec hystérésis (15 % plus loin que l'entrée) :
+      // une goutte qui danse à la frontière ne fait pas clignoter la vie.
+      this.updatePlayerStats()
+      const capture = this.captureRadius()
+      const cIn2 = capture * capture
+      const cOut = capture * 1.15
+      const cOut2 = cOut * cOut
+      const cx2 = this.stats.centroidX
+      const cy2 = this.stats.centroidY
+      // Pendant que le SAS BOIT, le halo s'éteint : le corps aspiré ne peut
+      // plus aller rechercher quoi que ce soit, et compter ses miettes
+      // vivantes empêchait la fin de run de conclure (la vie ne tombait
+      // jamais à zéro — le sursis se réarmait en boucle).
+      const haloActif = !this.drainOn
+      let prets = 0
+      for (let i = 0; i < n; i++) {
+        if (this.duCorps[i] === 0 || this.kind[i] !== KIND_FREE) continue
+        if (this.proprio[i] !== j) continue // le halo ne compte que LES SIENNES
+        if (this.frozen[i] === 1 || this.gaseous[i] === 1) {
+          this.duCorps[i] = 1 // gelée ou gazeuse : plus pilotable, plus vivante
+          continue
+        }
+        const dx = posX[i] - cx2
+        const dy = posY[i] - cy2
+        const d2 = dx * dx + dy * dy
+        const dedans =
+          haloActif && (this.duCorps[i] === 2 ? d2 <= cOut2 : d2 <= cIn2)
+        this.duCorps[i] = dedans ? 2 : 1
+        if (dedans) prets++
+      }
+      this.enPretCount = prets
+      // (les stats sont déjà à jour : recalculées juste avant la passe du halo)
+
+      if (inDrainGrip) {
+        this.belowCritical = false
+        continue
+      }
+      // Sous le seuil critique : constaté ici, tranché par le délai de grâce
+      // (dispersalGrace, dans step) — un corps en pleine transformation a le
+      // temps de se regrouper avant que le protocole ne conclue à la perte.
+      this.belowCritical =
+        (count + prets) * p.litersPerParticle <
+        p.criticalVolumeLiters * this.criticalFactor
+      if (count < 2) this.dispersed = true
+    }
+    this.dansEmprise = emprise
+    this.courant = parlait
+  }
+
+  updatePlayerStats(): void {
+    const n = this.count
+    let cx = 0
+    let cy = 0
+    let vx = 0
+    let vy = 0
+    let m = 0
+    for (let i = 0; i < n; i++) {
+      if (!this.estCorps(i)) continue
+      cx += this.posX[i]
+      cy += this.posY[i]
+      vx += this.velX[i]
+      vy += this.velY[i]
+      m++
+    }
+    if (m === 0) return
+    cx /= m
+    cy /= m
+    vx /= m
+    vy /= m
+    let r2sum = 0
+    for (let i = 0; i < n; i++) {
+      if (!this.estCorps(i)) continue
+      const dx = this.posX[i] - cx
+      const dy = this.posY[i] - cy
+      r2sum += dx * dx + dy * dy
+    }
+    this.stats.count = m
+    this.stats.centroidX = cx
+    this.stats.centroidY = cy
+    this.stats.velX = vx
+    this.stats.velY = vy
+    this.stats.rmsRadius = Math.sqrt(r2sum / m)
+  }
+
+  totalMomentum(): { px: number; py: number } {
+    let px = 0
+    let py = 0
+    for (let i = 0; i < this.count; i++) {
+      px += this.velX[i]
+      py += this.velY[i]
+    }
+    return { px, py }
+  }
+
+  // La matière VIVANTE : le corps, plus les gouttes en prêt encore dans le
+  // volume. La règle : n'est perdu que ce qui SORT.
+  aliveCount(): number {
+    return this.playerCount + this.enPretCount
+  }
+
+  liters(): number {
+    return this.aliveCount() * this.params.litersPerParticle
+  }
+}

@@ -287,6 +287,15 @@ FAMILLES: list[Famille] = [
         alpha=True, cote_max=1600, luma_max=0.60, poids_max_ko=350,
         note='pièce détourée, bord transparent',
     ),
+    # LE STADE DU HOCKEY du multi (blender/stade_hockey.py) : une vue de dessus
+    # posée sous la patinoire. Sa taille est un CONTRAT avec le shader
+    # (renduMulti.ts, STADE : 4 000 × 2 500 unités du monde). Sombre par
+    # nature (une arène de nuit, des néons) ; la foule porte toutes les
+    # couleurs, du chaud compris.
+    Famille(
+        'stade du multi', ('multi/stade-*',), taille=(2880, 1800), luma_max=0.2, chaud_max=0.2, qualite=80,
+        poids_max_ko=400, note='chargé à la première image d’un match de hockey, jamais avant — mesuré le 22/11 : 290 Ko',
+    ),
     Famille('emblème', ('badge',), taille=(512, 512), chaud_max=1.0, poids_max_ko=100),
     Famille('illustration', ('home', 'card-*'), cote_max=1800, luma_max=0.55, poids_max_ko=160),
     # les images des ÉCRANS, nommées par un id du jeu et rangées par dossier :
