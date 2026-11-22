@@ -29,9 +29,11 @@ const pause = (ms) => new Promise((r) => setTimeout(r, ms))
  *  (EN LIGNE, Vercel répartit les connexions entre plusieurs instances, et
  *  chacune a ses salons : deux joueurs ne se trouvent que sur la même. Les
  *  scènes à deux attendent donc d'être appariées, comme le jeu.) */
+const toutes = []
 function connexion(c, role, j) {
   const ws = new WebSocket(`${adresse}?code=${c}&role=${role}${j === undefined ? '' : '&jeton=' + j}`, { origin: ORIGINE })
   const etat = { ws, ferme: null, ouverte: false, instance: '', pair: false }
+  toutes.push(etat)
   ws.on('open', () => (etat.ouverte = true))
   ws.on('message', (d, binaire) => {
     if (binaire) return
@@ -79,9 +81,16 @@ async function paireSure() {
 }
 
 let echecs = 0
+let nonJoues = 0
 const verifie = (nom, ok, detail) => {
   console.log(`${ok ? 'OK   ' : 'ÉCHEC'} ${nom}${detail ? ' — ' + detail : ''}`)
   if (!ok) echecs++
+}
+/** Une scène que les conditions n'ont pas permis de jouer : ni réussie, ni
+ *  ratée — on le dit, plutôt que de la compter d'un côté ou de l'autre. */
+const nonJoue = (nom, pourquoi) => {
+  console.log(`NON JOUÉ ${nom} — ${pourquoi}`)
+  nonJoues++
 }
 
 // 1. un intrus avec le bon code ne prend la place de personne (s'il tombe
@@ -91,16 +100,21 @@ const verifie = (nom, ok, detail) => {
   const intrusInvite = connexion(c, 'invite', jeton())
   const intrusHote = connexion(c, 'hote', jeton())
   const ancien = connexion(c, 'invite') // un client d'avant les jetons
-  await attend(() => [intrusInvite, intrusHote, ancien].every((x) => x.ferme !== null || x.instance !== ''), 3000)
+  // une instance neuve peut mettre quelques secondes à naître
+  await attend(() => [intrusInvite, intrusHote, ancien].every((x) => x.ferme !== null || x.instance !== ''), 8000)
   await pause(500)
-  for (const [nom, x] of [['invité', intrusInvite], ['hôte', intrusHote], ['sans jeton', ancien]]) {
-    if (x.ferme === null && x.instance !== hote.instance) console.log(`(l'intrus ${nom} est tombé sur une autre instance, ${x.instance} : il n'a pas vu la partie)`)
+  for (const [nom, x] of [
+    ['un intrus sur la place de l’invité est écarté', intrusInvite],
+    ['un intrus sur la place de l’hôte est écarté', intrusHote],
+    ['un client sans jeton est écarté d’une place tenue', ancien],
+  ]) {
+    if (x.ferme === 4423) verifie(nom, true, 'fermé 4423')
+    else if (x.ferme === null && x.instance !== '' && x.instance !== hote.instance)
+      // ailleurs, il ne voit même pas la partie : écarté, mais la règle n'a pas joué
+      nonJoue(nom, `tombé sur une autre instance (${x.instance}) que la partie (${hote.instance})`)
+    else if (x.ferme === null && x.instance === '') nonJoue(nom, 'le relais ne lui a pas répondu en 8 s')
+    else verifie(nom, false, `fermé ${x.ferme}, instance ${x.instance}`)
   }
-  // refusé — ou ailleurs, sur une autre instance, sans avoir touché la partie
-  const ecarte = (x) => x.ferme === 4423 || (x.ferme === null && x.instance !== hote.instance)
-  verifie('un intrus sur la place de l’invité est écarté', ecarte(intrusInvite), `fermé ${intrusInvite.ferme}`)
-  verifie('un intrus sur la place de l’hôte est écarté', ecarte(intrusHote), `fermé ${intrusHote.ferme}`)
-  verifie('un client sans jeton est écarté d’une place tenue', ecarte(ancien), `fermé ${ancien.ferme}`)
   for (const x of [intrusInvite, intrusHote, ancien]) x.ws.close()
   verifie('les deux joueurs sont toujours là', hote.ferme === null && invite.ferme === null)
   hote.ws.close()
@@ -168,14 +182,35 @@ const verifie = (nom, ok, detail) => {
   invite.ws.on('message', (d, binaire) => binaire && (octets += d.length))
   const gros = Buffer.alloc(60 * 1024)
   const debut = Date.now()
+  // Ce que l'émetteur a vraiment poussé sur le réseau : ce qu'il a confié à
+  // ws, moins ce qui attend encore dans son tampon. EN LIGNE (22/11), le lien
+  // du runner vers Vercel n'a pas suivi les 2 Mo/s demandés : le relais n'a
+  // jamais reçu plus que son plafond, et n'avait donc rien à couper. On
+  // n'empile pas au-delà d'un Mo en attente, et on dit ce qui est parti.
+  let confies = 0
+  let emisFin = 0
   while (hote.ferme === null && Date.now() - debut < 9000) {
-    if (hote.ws.readyState === hote.ws.OPEN) hote.ws.send(gros, { binary: true })
+    if (hote.ws.readyState === hote.ws.OPEN && hote.ws.bufferedAmount < 1024 * 1024) {
+      hote.ws.send(gros, { binary: true })
+      confies += gros.length
+    }
+    emisFin = confies - hote.ws.bufferedAmount
     await pause(30)
   }
-  await pause(300)
   const duree = (Date.now() - debut) / 1000
-  verifie('un flot excessif est coupé', hote.ferme === 4429, `fermé ${hote.ferme} au bout de ${duree.toFixed(1)} s`)
-  verifie('et ce qui en passe reste sous le plafond', octets / duree <= 800 * 1024, `${Math.round(octets / duree / 1024)} Ko/s passés`)
+  await pause(300)
+  const emisParSeconde = emisFin / duree
+  const kos = (x) => `${Math.round(x / 1024)} Ko/s`
+  if (hote.ferme === 4429) verifie('un flot excessif est coupé', true, `fermé 4429 au bout de ${duree.toFixed(1)} s (${kos(emisParSeconde)} émis)`)
+  else if (emisParSeconde < 1.2 * 768 * 1024)
+    nonJoue('un flot excessif est coupé', `le lien n'a poussé que ${kos(emisParSeconde)}, pas assez au-dessus du plafond (768 Ko/s) pour le franchir`)
+  else verifie('un flot excessif est coupé', false, `fermé ${hote.ferme} au bout de ${duree.toFixed(1)} s, ${kos(emisParSeconde)} émis`)
+  // Le plafond vaut par SECONDE DU RELAIS, ouverte au premier message : une
+  // durée de 4,4 s en touche jusqu'à cinq. On borne donc le total (une moyenne
+  // sur la durée mesurée dépasse 768 Ko/s sans que le relais ait fauté : 810
+  // vus en local).
+  const secondesTouchees = Math.ceil(duree) + 1
+  verifie('et ce qui en passe reste sous le plafond', octets <= secondesTouchees * 768 * 1024, `${Math.round(octets / 1024)} Ko passés en ${duree.toFixed(1)} s (au plus ${secondesTouchees} × 768)`)
   invite.ws.close()
 }
 
@@ -183,6 +218,11 @@ const verifie = (nom, ok, detail) => {
 //    chaque instance compte pour elle seule (en ligne, les connexions se
 //    répartissent — la limite est alors plus large, on le dit)
 {
+  // les connexions des scènes d'avant doivent être closes, sinon le relais
+  // les compte encore (vu le 22/11 : deux refusées au lieu d'une)
+  for (const x of toutes) x.ws.close()
+  await attend(() => toutes.every((x) => x.ferme !== null), 5000)
+  await pause(200)
   const tenues = []
   for (let k = 0; k < 9; k++) tenues.push(connexion(code(), 'hote', jeton()))
   await attend(() => tenues.every((t) => t.instance !== '' || t.ferme !== null), 5000)
@@ -195,5 +235,6 @@ const verifie = (nom, ok, detail) => {
   for (const t of tenues) t.ws.close()
 }
 
+if (nonJoues > 0) console.log(`${nonJoues} scène(s) non jouée(s) ici : elles le sont en local.`)
 console.log(echecs === 0 ? 'PROTECTIONS BONNES.' : `${echecs} ÉCHEC(S).`)
 process.exit(echecs === 0 ? 0 : 1)
