@@ -265,6 +265,16 @@
     mai.btn.querySelector('.mb-cuve').insertAdjacentHTML('beforeend', F.anneauxHTML(col, b.xp, b.xp + b.surplus))
     sc.append(res.btn, goutte, mai.btn)
     host.appendChild(sc)
+    // le contour d'eau des cuves (main.ts, mbEauAuChoix), la réserve pleine exceptée
+    for (const btn of [res.btn, mai.btn]) if (!btn.disabled) eauAuChoix(btn)
+  }
+
+  /** main.ts, mbEauAuChoix : la toile dans le bouton, le contour à 5 px du
+   *  bord, le bouton qui penche et flotte ; la visée au focus aussi */
+  function eauAuChoix(btn) {
+    const o = F.ondeCarte(btn, btn, () => matchMedia('(prefers-reduced-motion: reduce)').matches, { retrait: 5, amplitude: 0.6, flotte: -4, perspective: 1200 })
+    btn.addEventListener('focusin', () => o.vise())
+    btn.addEventListener('focusout', () => o.quitte())
   }
 
   // ---- la maîtrise (main.ts mbPeintEtal) : le liquide dans la fenêtre
@@ -431,6 +441,7 @@
         btn.querySelector('.mb-porte-ligne').innerHTML = [`<i>DIFF ${p.diff}</i>`, p.prime ? `<i class="mb-porte-prime">PRIME ${p.prime}</i>` : '', p.figure ? `<i>FIGURE ${p.figure.toUpperCase()}</i>` : ''].join('')
       }
       host.appendChild(btn)
+      eauAuChoix(btn)
     })
   }
 

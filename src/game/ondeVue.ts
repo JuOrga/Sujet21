@@ -18,6 +18,14 @@
 // Le pli reste un pli : rien ici ne pose d'opacité, de filtre ni de
 // clip-path sur lui (index.html, « LE PLI porte la 3D ») ; la toile est un
 // enfant de plus, tourné vers l'avant, dos caché.
+//
+// LES AUTRES CHOIX DE LA CÉRÉMONIE (« applique cela au choix du surplus et
+// au choix de la salle », le concepteur, 22/11) : une cuve du versement, une
+// porte de salle. Ce sont des boutons taillés au chanfrein, sans pli : leur
+// clip-path rognerait une toile qui déborde. La toile vit alors DANS le
+// bouton, et le contour d'eau court à `retrait` px en dedans du bord (voir
+// OptionsOnde) ; le bouton porte lui-même l'inclinaison, avec sa propre
+// perspective.
 
 import {
   AMORTI,
@@ -35,7 +43,6 @@ import {
   longueurContour,
 } from './onde'
 import type { Noeud } from './onde'
-
 
 /** La place que la toile prend au-delà de la carte, de chaque côté (px) :
  *  plus que le plus grand écart de la rive (ECART_MAX) et que son trait. */
@@ -58,6 +65,27 @@ const PAS_S = 1 / 60
 
 /** Les paliers d'intensité des reflets : un tracé chacun. */
 const PALIERS = 4
+
+export interface OptionsOnde {
+  /** Le contour court à `retrait` px EN DEDANS du bord, et la toile vit
+   *  dans l'élément même (pli = face) : pour un bouton taillé au chanfrein,
+   *  dont le clip-path rognerait la moitié extérieure des vagues. 0 (le
+   *  tirage) : le contour suit le bord, la toile déborde dans le pli. */
+  retrait?: number
+  /** La flottaison de l'élément visé, en px (FLOTTE par défaut). */
+  flotte?: number
+  /** La feuille de style tient-elle cette flottaison au repos ? Oui pour
+   *  le tirage (`.mb-pli.mb-vise`) : le transform inline s'efface dès que
+   *  tout est posé. Non ailleurs : il reste tant que l'élément est visé. */
+  flotteTenue?: boolean
+  /** Une perspective propre (px), quand le parent n'en donne pas : sans
+   *  elle, une inclinaison ne se lit que comme un écrasement. */
+  perspective?: number
+  /** La part de la hauteur des vagues qu'on dessine (1 par défaut). Une
+   *  porte de salle n'a que 10 px de marge intérieure : à pleine hauteur,
+   *  un contour en retrait venait frôler son texte (banc, 22/11). */
+  amplitude?: number
+}
 
 export interface OndeCarte {
   /** La carte est visée — au clavier, à la manette, ou au pointeur qui
@@ -105,6 +133,13 @@ interface Etat {
   /** l'horloge de la houle, en secondes */
   temps: number
   arretee: boolean
+  /** voir OptionsOnde ; `marge` : la toile au-delà de l'élément */
+  retrait: number
+  marge: number
+  flotte: number
+  flotteTenue: boolean
+  perspective: number
+  amplitude: number
 }
 
 const actives = new Set<Etat>()
@@ -155,7 +190,7 @@ function avance(e: Etat, n: number): boolean {
       // reflue. C'est ce qui fait d'une carte qui penche un volume d'eau.
       const drx = e.rx.valeur - e.avant.rx
       const dry = e.ry.valeur - e.avant.ry
-      if (drx || dry) e.rive.penche(e.noeuds, e.l, e.h, dry * 0.9, -drx * 0.9)
+      if (drx || dry) e.rive.penche(e.noeuds, e.l - 2 * e.retrait, e.h - 2 * e.retrait, dry * 0.9, -drx * 0.9)
       const amorti = e.vise ? AMORTI : AMORTI_QUITTE
       for (let k = 0; k < SOUS_PAS; k++) crete = e.rive.pas(amorti)
     }
@@ -180,7 +215,13 @@ function posee(e: Etat): boolean {
 /** Posée, et à plat : exactement l'état que la feuille de style dessine
  *  (`.mb-pli`, et `.mb-pli.mb-vise` pour la flottaison). */
 function auRepos(e: Etat): boolean {
-  return posee(e) && e.rx.cible === 0 && e.ry.cible === 0 && e.gonfle.cible === 0
+  return (
+    posee(e) &&
+    e.rx.cible === 0 &&
+    e.ry.cible === 0 &&
+    e.gonfle.cible === 0 &&
+    (e.flotteTenue || e.lev.cible === 0)
+  )
 }
 
 /** Le pli, à la valeur de ses ressorts — sauf au repos, où la feuille de
@@ -192,6 +233,7 @@ function posePli(e: Etat): void {
   }
   const g = e.gonfle.valeur
   e.pli.style.transform =
+    (e.perspective ? `perspective(${e.perspective}px) ` : '') +
     `translateY(${e.lev.valeur.toFixed(2)}px) rotateX(${e.rx.valeur.toFixed(2)}deg) ` +
     `rotateY(${e.ry.valeur.toFixed(2)}deg) scale(${(1 + g).toFixed(4)}, ${(1 - g * 0.6).toFixed(4)})`
 }
@@ -216,13 +258,14 @@ function dessine(e: Etat): void {
   // (rien ne s'y dessine), et l'effacer à chaque image coûtait sa surface
   const W = e.toile.width
   const Hh = e.toile.height
-  const b = Math.ceil((MARGE + ECART_MAX + 4) * e.dpr)
+  const b = Math.ceil((e.marge + e.retrait + ECART_MAX + 4) * e.dpr)
   ctx.clearRect(0, 0, W, b)
   ctx.clearRect(0, Hh - b, W, b)
   ctx.clearRect(0, b, b, Hh - 2 * b)
   ctx.clearRect(W - b, b, b, Hh - 2 * b)
   if (p < 0.01) return
-  ctx.setTransform(e.dpr, 0, 0, e.dpr, MARGE * e.dpr, MARGE * e.dpr)
+  const o = (e.marge + e.retrait) * e.dpr
+  ctx.setTransform(e.dpr, 0, 0, e.dpr, o, o)
   const n = noeuds.length
   // les tampons de l'image, gardés d'une image à l'autre
   if (e.ds.length !== n) {
@@ -231,7 +274,7 @@ function dessine(e: Etat): void {
     e.lum = new Uint8Array(n)
   }
   const ds = e.ds
-  for (let i = 0; i < n; i++) ds[i] = rive.ecart(i) + houle(noeuds[i].s, e.longueur, e.temps) * p
+  for (let i = 0; i < n; i++) ds[i] = (rive.ecart(i) + houle(noeuds[i].s, e.longueur, e.temps) * p) * e.amplitude
   // LE RUBAN, tracé le long de sa ligne médiane — au repos il couvre les
   // deux premiers pixels de la carte, là où était le filet. Il était
   // REMPLI (deux bords décalés, pair-impair) : un rastériseur logiciel
@@ -334,11 +377,14 @@ function taille(e: Etat): void {
   e.l = l
   e.h = h
   e.dpr = dpr
-  e.noeuds = contourCarte(l, h, CHANFREIN, PAS_RIVE)
+  // en retrait, le coin coupé rétrécit avec le reste : un bord à 45°
+  // reculé de r raccourcit chaque côté du coin de r·(√2 − 1)
+  const r = e.retrait
+  e.noeuds = contourCarte(l - 2 * r, h - 2 * r, Math.max(0, CHANFREIN - r * (Math.SQRT2 - 1)), PAS_RIVE)
   e.longueur = longueurContour(e.noeuds)
   e.rive = new Rive(e.noeuds.length)
-  e.toile.width = Math.round((l + MARGE * 2) * dpr)
-  e.toile.height = Math.round((h + MARGE * 2) * dpr)
+  e.toile.width = Math.round((l + e.marge * 2) * dpr)
+  e.toile.height = Math.round((h + e.marge * 2) * dpr)
   e.ctx = e.toile.getContext('2d')
 }
 
@@ -348,8 +394,8 @@ function plusProche(e: Etat, x: number, y: number): { i: number; dist: number; u
   const r = e.cadre ?? e.face.getBoundingClientRect()
   const u = (x - r.left) / Math.max(1, r.width)
   const v = (y - r.top) / Math.max(1, r.height)
-  const px = u * e.l
-  const py = v * e.h
+  const px = u * e.l - e.retrait
+  const py = v * e.h - e.retrait
   let i = 0
   let dist = Infinity
   for (let k = 0; k < e.noeuds.length; k++) {
@@ -364,20 +410,23 @@ function plusProche(e: Etat, x: number, y: number): { i: number; dist: number; u
 
 /**
  * Donne à une carte son contour d'eau : `pli` reçoit la toile et les
- * ressorts, `face` est écoutée. `sansAnimation` est relu à chaque geste :
+ * ressorts, `face` est écoutée (un bouton sans pli : le même élément deux
+ * fois, avec un `retrait`). `sansAnimation` est relu à chaque geste :
  * « moins d'animations » coupe tout, même en cours de partie.
  */
 export function ondeCarte(
   face: HTMLElement,
   pli: HTMLElement,
   sansAnimation: () => boolean,
+  options: OptionsOnde = {},
 ): OndeCarte {
+  const retrait = Math.max(0, options.retrait ?? 0)
   const toile = document.createElement('canvas')
   // une toile sans taille : le contour ne la taille qu'au premier regard,
   // une carte jamais visée ne garde pas un tampon pour rien
   toile.width = 0
   toile.height = 0
-  toile.className = 'mb-rive'
+  toile.className = retrait ? 'mb-rive mb-rive-dedans' : 'mb-rive'
   toile.setAttribute('aria-hidden', 'true')
   pli.append(toile)
   const e: Etat = {
@@ -407,6 +456,12 @@ export function ondeCarte(
     lum: new Uint8Array(0),
     temps: 0,
     arretee: false,
+    retrait,
+    marge: retrait ? 0 : MARGE,
+    flotte: options.flotte ?? FLOTTE,
+    flotteTenue: options.flotteTenue ?? !retrait,
+    perspective: options.perspective ?? 0,
+    amplitude: options.amplitude ?? 1,
   }
 
   const vise = (cx?: number, cy?: number): void => {
@@ -415,7 +470,7 @@ export function ondeCarte(
     if (!e.rive) return
     const deja = e.vise
     e.vise = true
-    e.lev.cible = FLOTTE
+    e.lev.cible = e.flotte
     e.presence.cible = 1
     if (!deja) {
       // relevé carte encore au repos (ou presque) : le pointeur se lit
@@ -428,7 +483,7 @@ export function ondeCarte(
       const i =
         cx !== undefined && cy !== undefined
           ? plusProche(e, cx, cy).i
-          : Math.round((e.l - CHANFREIN) / 2 / PAS_RIVE)
+          : Math.round((e.l - 2 * e.retrait - CHANFREIN) / 2 / PAS_RIVE)
       e.rive.goutte(i, GOUTTE_PX / PAS_RIVE, -3.2)
       e.gonfle.vitesse += 0.32
       e.dernier = cx !== undefined && cy !== undefined ? { x: cx, y: cy } : null

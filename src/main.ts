@@ -16012,6 +16012,9 @@ function mbMontreVersement(): void {
     if (cote) scene.dataset.vers = cote
     else delete scene.dataset.vers
   }
+  // le contour d'eau des deux cuves — pas de la réserve pleine : on la
+  // voit, on ne la vise pas
+  for (const btn of [cb, cx]) if (!btn.disabled) mbEauAuChoix(btn, () => scene.dataset.verse !== undefined)
   for (const [btn, cote] of [[cb, 'g'], [cx, 'd']] as const) {
     for (const ev of ['pointerenter', 'pad-vise'] as const)
       btn.addEventListener(ev, () => { if (!btn.disabled) vise(cote) })
@@ -17724,6 +17727,42 @@ function mbJauges(): HTMLElement {
  *  pendant que les autres se referment, puis `choisit` retient la salle et
  *  le sas mène à la suivante. Un second clic pendant l'ouverture ne compte
  *  pas : la porte est déjà prise. */
+/** LES CONTOURS D'EAU des choix de la cérémonie, par élément : de quoi
+ *  les arrêter tous quand l'un d'eux est pris. */
+const mbOndes = new WeakMap<Element, OndeCarte>()
+
+/**
+ * LE CONTOUR D'EAU D'UN CHOIX taillé au chanfrein — une cuve du versement,
+ * une porte de salle : « applique cela au choix du surplus et au choix de
+ * la salle » (le concepteur, 22/11, après le contour d'eau du tirage).
+ * Le bouton n'a pas de pli : la toile vit dedans, le contour court à 5 px
+ * du bord (son clip-path rognerait ce qui déborde), et c'est lui qui penche
+ * et flotte, avec sa propre perspective (ondeVue.ts, OptionsOnde). La visée
+ * vient du pointeur (écouté par l'onde), du clavier (focusin — sauf le focus
+ * que l'étape pose elle-même à l'ouverture) et de la manette (pad-vise).
+ * Le choix fait (`choisi`), l'eau de toute la rangée se tait d'un coup :
+ * l'élan de l'élue et la chute des autres sont des animations.
+ */
+function mbEauAuChoix(btn: HTMLElement, choisi: () => boolean): OndeCarte {
+  // à 5 px du bord, des vagues à 60 % : le ruban reste dans les 10 px de
+  // marge d'une porte (à pleine hauteur, il frôlait le code de la salle),
+  // et ses crêtes ne touchent pas le bord qui les rognerait
+  const o = ondeCarte(btn, btn, sansAnimation, { retrait: 5, amplitude: 0.6, flotte: -4, perspective: 1200 })
+  mbOndes.set(btn, o)
+  btn.addEventListener('focusin', () => { if (!mbFocusOuverture) o.vise() })
+  btn.addEventListener('pad-vise', () => o.vise())
+  for (const ev of ['focusout', 'pad-quitte'] as const) btn.addEventListener(ev, () => o.quitte())
+  // après le tour de l'événement : le choix d'une cuve est décidé par
+  // l'écouteur de la scène, qui passe APRÈS celui du bouton
+  btn.addEventListener('click', () => {
+    window.setTimeout(() => {
+      if (!choisi()) return
+      for (const frere of btn.parentElement?.children ?? []) mbOndes.get(frere)?.arrete()
+    }, 0)
+  })
+  return o
+}
+
 function mbPorte(
   lv: LevelDef,
   i: number,
@@ -17791,6 +17830,7 @@ function mbPorte(
       avanceSalle()
     }, sansAnimation() ? 0 : 520)
   })
+  mbEauAuChoix(btn, () => btn.classList.contains('mb-elue'))
   return btn
 }
 
@@ -17899,6 +17939,7 @@ function mbPorteNoeud(
       if (miseEnBonbonne) ouvre()
     }, sansAnimation() ? 0 : 420)
   })
+  mbEauAuChoix(btn, () => btn.classList.contains('mb-elue'))
   return btn
 }
 

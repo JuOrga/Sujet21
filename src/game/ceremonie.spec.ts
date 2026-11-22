@@ -1329,9 +1329,32 @@ describe('la cérémonie — le tirage', () => {
     // rien n'aplatit le pli
     expect(ONDE).not.toMatch(/pli\.style\.(?:opacity|filter|clipPath)|pli\.style\.setProperty\('(?:opacity|filter|clip-path)/)
   })
+  // « applique cela au choix du surplus et au choix de la salle » (le
+  // concepteur, 22/11) : les cuves du versement et les portes de salle —
+  // celles d'une salle comme celles d'un nœud — prennent le même contour
+  // d'eau, en retrait du bord (leur clip-path rognerait ce qui déborde)
+  it('donne le contour d’eau aux cuves du versement et aux portes de salle', () => {
+    const aide = corps('mbEauAuChoix')
+    expect(aide).toMatch(/ondeCarte\(btn, btn, sansAnimation, \{ retrait: 5, amplitude: 0\.6, flotte: -4, perspective: 1200 \}\)/)
+    // la visée au clavier et à la manette ; pas le focus que l'étape pose elle-même
+    expect(aide).toMatch(/'focusin', \(\) => \{ if \(!mbFocusOuverture\) o\.vise\(\) \}/)
+    expect(aide).toContain("btn.addEventListener('pad-vise', () => o.vise())")
+    expect(aide).toContain("['focusout', 'pad-quitte']")
+    // le choix fait, l'eau de toute la rangée se tait
+    expect(aide).toMatch(/mbOndes\.get\(frere\)\?\.arrete\(\)/)
+    for (const f of ['mbPorte', 'mbPorteNoeud']) expect(corps(f), f).toContain("mbEauAuChoix(btn, () => btn.classList.contains('mb-elue'))")
+    // la réserve pleine se voit, elle ne se vise pas
+    expect(corps('mbMontreVersement')).toMatch(/for \(const btn of \[cb, cx\]\) if \(!btn\.disabled\) mbEauAuChoix\(btn, \(\) => scene\.dataset\.verse !== undefined\)/)
+    // la toile vit dans le bouton, par-dessus son contenu, sans prendre le pointeur
+    expect(ONDE).toContain("toile.className = retrait ? 'mb-rive mb-rive-dedans' : 'mb-rive'")
+    expect(regle('.mb-rive.mb-rive-dedans')).toMatch(/inset:\s*0/)
+    expect(regle('.mb-rive.mb-rive-dedans')).toMatch(/pointer-events:\s*none/)
+    // le tirage, lui, garde sa flottaison tenue par la feuille
+    expect(ONDE).toContain('flotteTenue: options.flotteTenue ?? !retrait')
+  })
   it('se tait sous « moins d’animations » : ni eau, ni ressort', () => {
     const moins = css.slice(css.lastIndexOf('prefers-reduced-motion: reduce'))
-    expect(moins).toMatch(/\.mb-pli \.mb-rive \{ display: none; \}/)
+    expect(moins).toMatch(/\.mb-pli \.mb-rive, \.mb-rive\.mb-rive-dedans \{ display: none; \}/)
     // relu à chaque geste : le réglage peut changer en cours de partie
     expect(ONDE).toMatch(/if \(e\.arretee \|\| sansAnimation\(\)\) return/)
   })

@@ -8789,6 +8789,16 @@
         background: var(--mb-visee), var(--mb-coque);
         box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--fam) 70%, transparent);
       }
+      /* LE CONTOUR D'EAU DES AUTRES CHOIX — une cuve du versement, une porte
+         de salle : boutons taillés au chanfrein, sans pli. La toile vit
+         DANS le bouton (son clip-path rognerait ce qui déborde) et le
+         contour court à 5 px du bord, ses vagues réduites (main.ts,
+         mbEauAuChoix) ; par-dessus le contenu, qu'il ne touche pas (le
+         bouton a 10 px et plus de marge intérieure). */
+      .mb-rive.mb-rive-dedans {
+        position: absolute; inset: 0; width: 100%; height: 100%; z-index: 3;
+        pointer-events: none;
+      }
       /* tant que l'eau tient le contour, le filet de la feuille s'efface
          (sa transition de 0,16 s fait le fondu) ; au départ du focus il
          revient pendant que l'eau s'éteint */
@@ -9705,7 +9715,7 @@
         .mb-pli.mb-vise { transform: translateY(-4px); }
         /* le contour ne devient pas de l'eau : ondeVue.ts ne le met jamais
            en mouvement, et la toile ne tient même pas sa place */
-        .mb-pli .mb-rive { display: none; }
+        .mb-pli .mb-rive, .mb-rive.mb-rive-dedans { display: none; }
         .mb-cartes.mb-elu .mb-pli:not(.mb-elu-c), .mb-cartes.mb-elu .mb-porte:not(.mb-elue) { opacity: 0; }
         .mb-porte.mb-elue { opacity: 0; }
         .mb-palier-eclair[hidden] { display: none; }
