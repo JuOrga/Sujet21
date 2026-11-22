@@ -97,3 +97,18 @@ export function ecranVersMonde(c: Cadre, fx: number, fy: number): { x: number; y
 export function mondeVersEcran(c: Cadre, x: number, y: number): { fx: number; fy: number } {
   return { fx: ((x - c.cx) / c.demiL + 1) / 2, fy: ((y - c.cy) / c.demiH + 1) / 2 }
 }
+
+/** LE TRAIT DE VISÉE de la souris : du bord du corps jusqu'au point visé.
+ *  Il part du BORD (et non du cœur : il couperait le corps et cacherait son
+ *  regard), et il n'y en a pas quand on vise sur son propre corps — c'est
+ *  alors le geste du rassemblement, il n'y a rien à viser. Rend les deux
+ *  bouts, en unités monde, ou null. */
+export function traitDeVisee(cx: number, cy: number, rayon: number, viseeX: number, viseeY: number): { x1: number; y1: number; x2: number; y2: number } | null {
+  const dx = viseeX - cx
+  const dy = viseeY - cy
+  const d = Math.hypot(dx, dy)
+  const depart = rayon * 1.05
+  // (un peu au-delà du bord : sous lui, le trait n'aurait que quelques pixels)
+  if (d < depart + rayon * 0.25) return null
+  return { x1: cx + (dx / d) * depart, y1: cy + (dy / d) * depart, x2: viseeX, y2: viseeY }
+}

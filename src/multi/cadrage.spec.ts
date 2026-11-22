@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { DEBORD_SALLE, DEMI_HAUTEUR_MIN, MARGE_CORPS, cadreSalle, cadreVoulu, ecranVersMonde, mondeVersEcran, suitCadre } from './cadrage'
+import { DEBORD_SALLE, DEMI_HAUTEUR_MIN, MARGE_CORPS, cadreSalle, cadreVoulu, ecranVersMonde, mondeVersEcran, suitCadre, traitDeVisee } from './cadrage'
 import { SALLE } from './partie'
 
 const ASPECT = 16 / 9
@@ -82,5 +82,26 @@ describe('le cadrage du multi', () => {
     const e = mondeVersEcran(c, m.x, m.y)
     expect(e.fx).toBeCloseTo(0.2, 9)
     expect(e.fy).toBeCloseTo(0.9, 9)
+  })
+})
+
+describe('le trait de visée de la souris', () => {
+  it('part du BORD du corps, dans la direction visée, et finit au point visé', () => {
+    const t = traitDeVisee(1000, 500, 100, 1600, 500)!
+    expect(t.x1).toBeCloseTo(1105, 6)
+    expect(t.y1).toBeCloseTo(500, 6)
+    expect(t.x2).toBe(1600)
+    expect(t.y2).toBe(500)
+    // en biais aussi : le départ est sur la droite du cœur au point visé
+    const b = traitDeVisee(0, 0, 100, 300, 400)!
+    expect(Math.hypot(b.x1, b.y1)).toBeCloseTo(105, 6)
+    expect(b.x1 / b.y1).toBeCloseTo(300 / 400, 6)
+  })
+
+  it('pas de trait quand on vise sur son corps (c’est le rassemblement) ni tout contre son bord', () => {
+    expect(traitDeVisee(1000, 500, 100, 1050, 520)).toBeNull()
+    expect(traitDeVisee(1000, 500, 100, 1000, 500)).toBeNull()
+    expect(traitDeVisee(1000, 500, 100, 1120, 500)).toBeNull()
+    expect(traitDeVisee(1000, 500, 100, 1140, 500)).not.toBeNull()
   })
 })

@@ -14,7 +14,7 @@
 //  - l'INVITÉ (celui qui rejoint) envoie sa commande et affiche ;
 //  - SEUL : les deux corps sur une machine, pour essayer sans personne.
 
-import { cadreSalle, cadreVoulu, ecranVersMonde, mondeVersEcran, suitCadre, type Cadre } from './cadrage'
+import { cadreSalle, cadreVoulu, ecranVersMonde, mondeVersEcran, suitCadre, traitDeVisee, type Cadre } from './cadrage'
 import { ALPHABET_CODE, litCodePartie, LONGUEUR_CODE } from './code'
 import { CADENCE_ETAT, CAPACITE, Hote, Miroir, SALLE } from './partie'
 import {
@@ -103,7 +103,7 @@ const STYLE = `
 .mu-mot[data-ton="bon"] { color: var(--valid, #3fd69b); }
 .mu-detail { color: var(--dim, #7f9cb0); font-size: 0.78em; line-height: 1.5; margin: 0; word-break: break-word; user-select: all; }
 .mu-jeu { position: absolute; inset: 0; }
-.mu-jeu canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; cursor: crosshair; }
+.mu-jeu canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; cursor: none; }
 .mu-ath { position: absolute; top: 14px; left: 14px; display: flex; flex-direction: column; gap: 8px; pointer-events: none; min-width: 230px; }
 .mu-jauge { display: grid; grid-template-columns: auto 1fr auto; gap: 8px; align-items: center; background: var(--panel, rgba(9,18,30,.82)); border: 1px solid var(--line, rgba(150,200,235,.16)); padding: 6px 10px; }
 .mu-jauge i { width: 12px; height: 12px; border-radius: 50%; display: block; }
@@ -128,6 +128,25 @@ const STYLE = `
 .mu-voile div { max-width: 520px; display: flex; flex-direction: column; gap: 14px; text-align: center; line-height: 1.5; }
 .mu-etiquette { position: absolute; transform: translate(-50%, -50%); pointer-events: none; font-family: var(--font-display, sans-serif); letter-spacing: 0.2em;
   font-size: calc(12px * var(--ui, 1)); text-shadow: 0 0 8px #000, 0 0 2px #000; transition: opacity 0.6s; }
+/* LE VISEUR DE LA SOURIS : il remplace la croix du navigateur au-dessus du
+   jeu — un trait fin noir et blanc, perdu sur la piste sombre et la foule du
+   stade (le concepteur, 22/11 : « je ne sais plus où il est, et ce n'est pas
+   pratique pour viser »). Un anneau à la couleur du joueur, cerné de noir
+   pour ressortir sur tout fond, quatre crans, un point au centre ; et un
+   trait en tirets qui le relie au bord du corps : on le retrouve en partant
+   de soi, et on lit d'un coup d'œil où part le jet. */
+.mu-viseur { position: absolute; width: 40px; height: 40px; margin: -20px 0 0 -20px; pointer-events: none; }
+.mu-viseur[hidden], .mu-trait[hidden] { display: none; }
+.mu-viseur svg { display: block; overflow: visible; }
+.mu-viseur .mu-anneau { fill: none; transition: fill 0.08s; }
+.mu-viseur[data-pousse="1"] .mu-anneau { fill: currentColor; fill-opacity: 0.28; }
+.mu-viseur[data-pousse="1"] { filter: drop-shadow(0 0 6px currentColor); }
+.mu-trait { position: absolute; inset: 0; pointer-events: none; }
+.mu-trait svg { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
+.mu-trait line { stroke-linecap: round; }
+.mu-trait .mu-trait-ombre { stroke: rgba(0, 0, 0, 0.45); stroke-width: 4; }
+.mu-trait .mu-trait-jour { stroke: currentColor; stroke-width: 2; stroke-dasharray: 7 8; opacity: 0.55; }
+.mu-trait[data-pousse="1"] .mu-trait-jour { opacity: 0.9; }
 .mu-reticule { position: absolute; width: 22px; height: 22px; margin: -11px 0 0 -11px; border: 2px solid currentColor; border-radius: 50%; pointer-events: none; opacity: 0.75; }
 .mu-reticule[hidden] { display: none; }
 .mu-reticule[data-pousse="1"] { opacity: 1; background: currentColor; box-shadow: 0 0 12px currentColor; }
@@ -233,6 +252,12 @@ const GABARIT = `
 <div class="mu-jeu" data-page="jeu" hidden>
   <canvas aria-label="La salle du multi"></canvas>
   <div class="mu-etiquette" data-etiquette hidden>VOUS</div>
+  <div class="mu-trait" data-trait hidden><svg><line class="mu-trait-ombre"/><line class="mu-trait-jour"/></svg></div>
+  <div class="mu-viseur" data-viseur hidden><svg viewBox="-20 -20 40 40" width="40" height="40">
+    <g stroke="rgba(0,0,0,0.6)" stroke-width="5" stroke-linecap="round" fill="none"><circle r="11"/><path d="M0 -19V-14M0 19V14M-19 0H-14M19 0H14"/></g>
+    <g stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle class="mu-anneau" r="11"/><path d="M0 -19V-14M0 19V14M-19 0H-14M19 0H14"/></g>
+    <circle r="2.4" fill="currentColor" stroke="rgba(0,0,0,0.6)" stroke-width="1.4"/>
+  </svg></div>
   <div class="mu-reticule" data-reticule hidden></div>
   <div class="mu-reticule" data-reticule2 hidden></div>
   <div class="mu-ath">
@@ -302,6 +327,9 @@ export function creeEcranMulti(quitte: () => void): EcranMulti {
   /** Le cœur de chaque corps, relu à CHAQUE IMAGE sur les particules qu'on
    *  dessine (voir plus bas, où on le pose). */
   const coeursVus = new Float32Array(16)
+  /** La souris est-elle au-dessus du jeu (et est-ce une souris : au doigt,
+   *  le doigt montre où il est) ? */
+  const souris = { dedans: false, estSouris: false }
   // LES SONS (sonsMulti.ts) : ce qu'on entend se déduit de ce qu'on affiche,
   // d'une image à la suivante.
   const sons = new SonsMulti()
@@ -816,6 +844,11 @@ export function creeEcranMulti(quitte: () => void): EcranMulti {
       pointeur.fx = (ev.clientX - b.left) / Math.max(1, b.width)
       pointeur.fy = (ev.clientY - b.top) / Math.max(1, b.height)
       mainPointeur = performance.now()
+      souris.dedans = true
+      souris.estSouris = ev.pointerType === 'mouse'
+      // le viseur suit la souris À L'ÉVÉNEMENT, sans attendre l'image : un
+      // viseur en retard d'une image sur la main se sent
+      placeViseur()
     }
     // Les boutons se lisent dans le masque de CHAQUE événement : presser le
     // clic droit pendant que le gauche est tenu n'envoie pas de « pointerdown »
@@ -838,6 +871,10 @@ export function creeEcranMulti(quitte: () => void): EcranMulti {
     toile.addEventListener('pointermove', lit)
     toile.addEventListener('pointerup', lit)
     toile.addEventListener('pointercancel', lache)
+    toile.addEventListener('pointerleave', () => {
+      souris.dedans = false
+      placeViseur()
+    })
     toile.addEventListener('contextmenu', (ev) => ev.preventDefault())
   }
 
@@ -1066,6 +1103,14 @@ export function creeEcranMulti(quitte: () => void): EcranMulti {
     // est partie avec celui de l'image d'avant : un réticule en retard d'une
     // image traînerait derrière un corps rapide)
     peintReticule('[data-reticule]', aLaManette, aLaManette ? commandeManette(manette, monCoeur.x, monCoeur.y) : commande, moi)
+    // le viseur de la souris et son trait, à la couleur du joueur ; pleins
+    // quand on pousse
+    placeViseur()
+    const viseur = el<HTMLElement>('[data-viseur]')
+    const trait = el<HTMLElement>('[data-trait]')
+    viseur.style.color = trait.style.color = teinte(moi)
+    viseur.dataset.pousse = trait.dataset.pousse = commande.pousse && !aLaManette ? '1' : '0'
+    peintTrait()
     peintReticule('[data-reticule2]', commande2 !== null, commande2 ? commandeManette(manette2, coeur2.x, coeur2.y) : commande, 1)
     el<HTMLElement>('[data-tenir="ouvrir"]').hidden = jeu?.mode === MODE_SUMO
     peintAide(jeu ? jeu.mode : MODE_LIBRE)
@@ -1202,6 +1247,42 @@ export function creeEcranMulti(quitte: () => void): EcranMulti {
   /** La première d'entre elles (le salon se parcourt avec elle), ou null. */
   function padCourant(): PadLu | null {
     return padsBranches()[0] ?? null
+  }
+
+  /** Le viseur de la souris : où est le pointeur. Montré seulement quand
+   *  c'est la souris qui a la main (la manette a son réticule). */
+  function placeViseur(): void {
+    if (!racine) return
+    const v = el<HTMLElement>('[data-viseur]')
+    const voir = page === 'jeu' && souris.dedans && souris.estSouris && !(manette.connectee && mainManette > mainPointeur)
+    if (!voir) {
+      if (!v.hidden) v.hidden = true
+      return
+    }
+    v.hidden = false
+    v.style.left = `${(pointeur.fx * 100).toFixed(3)}%`
+    v.style.top = `${(pointeur.fy * 100).toFixed(3)}%`
+  }
+  /** Le trait de visée : du bord de MON corps au viseur (voir traitDeVisee). */
+  function peintTrait(): void {
+    const t = el<HTMLElement>('[data-trait]')
+    const v = el<HTMLElement>('[data-viseur]')
+    const rayon = coeursVus[moi * 4 + 3] > 0 ? coeursVus[moi * 4 + 2] : 0
+    const vise = ecranVersMonde(cadre, pointeur.fx, pointeur.fy)
+    const seg = !v.hidden && monCoeur.connu && rayon > 0 ? traitDeVisee(monCoeur.x, monCoeur.y, rayon, vise.x, vise.y) : null
+    if (!seg) {
+      if (!t.hidden) t.hidden = true
+      return
+    }
+    const a = mondeVersEcran(cadre, seg.x1, seg.y1)
+    const b = mondeVersEcran(cadre, seg.x2, seg.y2)
+    t.hidden = false
+    for (const l of t.querySelectorAll('line')) {
+      l.setAttribute('x1', `${(a.fx * 100).toFixed(3)}%`)
+      l.setAttribute('y1', `${(a.fy * 100).toFixed(3)}%`)
+      l.setAttribute('x2', `${(b.fx * 100).toFixed(3)}%`)
+      l.setAttribute('y2', `${(b.fy * 100).toFixed(3)}%`)
+    }
   }
 
   /** À la manette il n'y a pas de pointeur à l'écran : un réticule montre
