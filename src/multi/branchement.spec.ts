@@ -1,7 +1,7 @@
 import { readFileSync, readdirSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 
-// LE MULTI RESTE À PART — les trois promesses faites au concepteur, tenues
+// LE MULTI RESTE À PART — les promesses faites au concepteur, tenues
 // par la lecture des sources (main.ts ne s'importe pas en test : il bâtit la
 // page en se chargeant).
 //
@@ -11,7 +11,9 @@ import { describe, expect, it } from 'vitest'
 //  2. Le jeu ne dépend pas du multi : aucun fichier hors de src/multi ne
 //     l'importe (sauf la porte de main.ts). Le prototype peut être supprimé
 //     d'un geste sans rien casser.
-//  3. Le bouton n'existe que pour les concepteurs.
+//  3. Il est OUVERT À TOUS (depuis le 22/11 ; il était derrière le mode
+//     concepteur tant qu'il n'était qu'un essai) : le bouton et le lien
+//     d'invitation ne demandent plus « ?dev ».
 
 const lit = (chemin: string): string => readFileSync(new URL(chemin, import.meta.url), 'utf-8')
 const MAIN = lit('../main.ts')
@@ -55,17 +57,22 @@ describe('le multi reste à part', () => {
     expect(corps.indexOf('if (multiOuvert) {')).toBeGreaterThan(0)
   })
 
-  it('le bouton n’existe que pour les concepteurs', () => {
+  it('le bouton est là pour tous : ni réservé au concepteur, ni rangé parmi ses outils', () => {
     const bouton = PAGE.match(/<button id="home-multi"[^>]*>/)
     expect(bouton).not.toBeNull()
-    expect(bouton![0]).toMatch(/\bdata-dev\b/)
+    expect(bouton![0]).not.toMatch(/\bdata-dev\b/)
+    expect(bouton![0]).not.toMatch(/acc-outil/)
+    expect(bouton![0]).not.toMatch(/\bhidden\b/)
   })
 
-  it('le lien d’invitation ne vaut qu’en mode concepteur, comme le bouton', () => {
-    // « ?multi=CODE » sans « ?dev » ne doit rien ouvrir : le prototype reste
-    // derrière le mode concepteur
+  it('le lien d’invitation ouvre la partie pour tous, sans « ?dev »', () => {
     const lien = MAIN.slice(MAIN.indexOf(".get('multi')"), MAIN.indexOf(".get('multi')") + 160)
-    expect(lien).toMatch(/classList\.contains\('concepteur'\)/)
-    expect(lien).toMatch(/ouvreMulti\(code\)/)
+    expect(lien).not.toMatch(/concepteur/)
+    expect(lien).toMatch(/if \(code\) ouvreMulti\(code\)/)
+    // et le lien que le multi fabrique ne l'écrit plus
+    const ecran = lit('./ecranMulti.ts')
+    const fabrique = ecran.slice(ecran.indexOf('function lienPartie('), ecran.indexOf('function lienPartie(') + 400)
+    expect(fabrique).not.toMatch(/'dev'/)
+    expect(fabrique).toMatch(/searchParams\.set\('multi'/)
   })
 })

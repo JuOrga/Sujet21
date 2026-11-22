@@ -152,13 +152,19 @@ recondensation, WASM), les règles de jeu (bonbonnes, condensat, économat,
 codex, trophées, cycle, récompenses, voie, générateur) et les écrans
 (commandes, cinématiques, planche, éditeur, bibliothèque partagée).
 
-## Le multi (prototype)
+## Le multi
 
-Un essai de partie à deux, chacun chez soi, derrière le mode concepteur :
-bouton **MULTI** sur l'accueil (`?dev`). Tout vit dans [`src/multi/`](src/multi/).
+Jouer à deux — contre l'ordinateur, à deux sur le même écran, ou chacun
+chez soi : bouton **MULTI** sur l'accueil, ouvert à tous (il a été derrière
+le mode concepteur tant qu'il n'était qu'un essai). Tout vit dans
+[`src/multi/`](src/multi/).
 
+- **Le salon** : un nom et une couleur ; le MODE (libre, hockey, sumo), une
+  ligne le décrit ; puis JOUER — contre l'ordinateur, à deux sur cet
+  écran, créer une partie en ligne, la rejoindre. En bas, s'entraîner seul
+  et le retour, et ce que le navigateur voit des manettes quand il en voit.
 - **Créer / rejoindre** : l'hôte reçoit un code de cinq caractères, l'ami le
-  tape — ou ouvre le lien `?dev&multi=CODE`, qui mène droit dans la partie.
+  tape — ou ouvre le lien `?multi=CODE`, qui mène droit dans la partie.
 - **Le relais** : toute la partie passe par un petit serveur à nous,
   [`relais/`](relais/), qui tient les deux connexions et remet à l'un ce
   qu'envoie l'autre. Trois essais de liaison directe entre deux maisons

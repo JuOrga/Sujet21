@@ -82,11 +82,6 @@ const STYLE = `
 #multi button.mu-discret { border-color: var(--line, rgba(150,200,235,.16)); color: var(--dim, #7f9cb0); }
 .mu-salon { margin: auto; width: min(680px, calc(100% - 36px)); display: flex; flex-direction: column; gap: 1.1em; padding: 24px 0; max-height: 100%; overflow-y: auto; }
 .mu-titre { font-family: var(--font-display, sans-serif); font-size: calc(22px * var(--ui, 1)); letter-spacing: 0.2em; margin: 0; }
-.mu-sous { color: var(--dim, #7f9cb0); margin: 0; line-height: 1.5; }
-.mu-choix { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-.mu-choix button { padding: 1.4em 1em; text-align: left; display: flex; flex-direction: column; gap: 0.5em; }
-.mu-choix button b { font-family: var(--font-display, sans-serif); font-weight: 400; letter-spacing: 0.14em; }
-.mu-choix button span { color: var(--dim, #7f9cb0); letter-spacing: 0; line-height: 1.4; }
 .mu-etape { border: 1px solid var(--line, rgba(150,200,235,.16)); padding: 14px; display: flex; flex-direction: column; gap: 10px; }
 .mu-etape h3 { margin: 0; font-size: 1em; font-weight: 400; letter-spacing: 0.1em; color: var(--glow, #a7ddf5); }
 .mu-etape p { margin: 0; color: var(--dim, #7f9cb0); line-height: 1.5; }
@@ -168,22 +163,45 @@ const STYLE = `
 .mu-flash[data-vif="1"] { animation: mu-flash 0.7s ease-out; }
 @keyframes mu-flash { from { opacity: 0.42; } to { opacity: 0; } }
 @media (prefers-reduced-motion: reduce) { .mu-flash[data-vif="1"] { animation: none; } }
-.mu-profil { display: flex; flex-wrap: wrap; gap: 14px 28px; align-items: center; margin-bottom: 14px; color: var(--dim, #7f9cb0); letter-spacing: 0.12em; font-size: 0.85em; }
-.mu-profil label, .mu-profil div { display: flex; align-items: center; gap: 10px; }
-.mu-profil input { width: 11em; padding: 0.5em 0.7em; background: rgba(8, 16, 26, 0.9); color: var(--ink, #d9ecf7); border: 1px solid var(--line, #24384a); font: inherit; letter-spacing: 0.06em; }
-.mu-pastille { width: 26px; height: 26px; padding: 0 !important; border-radius: 50% !important; background: var(--pastille) !important; border: 2px solid transparent !important; opacity: 0.55; }
+/* LE SALON, allégé (le concepteur, 22/11 : « le menu multi s'est alourdi ») :
+   il empilait une phrase d'introduction, le profil, trois grandes cartes de
+   mode et quatre grandes cartes d'action, chacune sa description. Il tient
+   maintenant en trois temps — qui l'on est (une ligne), à quoi l'on joue
+   (trois onglets, UNE ligne qui décrit le choix), comment l'on joue (quatre
+   lignes, une indication courte) — et le reste se fait discret. */
+.mu-accueil { gap: 1.6em; width: min(560px, calc(100% - 36px)); }
+.mu-entete { display: flex; align-items: center; justify-content: space-between; gap: 14px; flex-wrap: wrap; }
+.mu-profil { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.mu-profil div { display: flex; align-items: center; gap: 7px; }
+.mu-profil input { width: 9.5em; padding: 0.45em 0.7em; background: rgba(8, 16, 26, 0.9); color: var(--ink, #d9ecf7); border: 1px solid var(--line, #24384a); font: inherit; font-size: 0.85em; letter-spacing: 0.08em; }
+.mu-profil input::placeholder { color: var(--dim, #7f9cb0); opacity: 0.7; }
+.mu-bloc { display: flex; flex-direction: column; gap: 10px; }
+.mu-rubrique { display: block; margin: 0; font-size: 0.72em; letter-spacing: 0.24em; color: var(--dim, #7f9cb0); }
+/* (un message vide ne creuse pas le salon : il paraît quand il dit quelque chose) */
+.mu-accueil .mu-mot:empty { display: none; }
+.mu-desc { margin: 0; color: var(--dim, #7f9cb0); line-height: 1.5; min-height: 1.5em; }
+.mu-jouer { display: flex; flex-direction: column; gap: 8px; }
+#multi .mu-jouer button { display: flex; align-items: baseline; justify-content: space-between; gap: 14px; text-align: left; padding: 1em 1.1em; }
+.mu-jouer button b { font-family: var(--font-display, sans-serif); font-weight: 400; letter-spacing: 0.12em; }
+.mu-jouer button span { color: var(--dim, #7f9cb0); letter-spacing: 0.02em; font-size: 0.82em; white-space: nowrap; }
+.mu-pied { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.mu-pied .mu-manettes { flex: 1 1 100%; margin: 0; }
+.mu-manettes:empty { display: none; }
+.mu-pastille { width: 22px; height: 22px; padding: 0 !important; border-radius: 50% !important; background: var(--pastille) !important; border: 2px solid transparent !important; opacity: 0.55; }
 .mu-pastille[data-choisi="1"] { opacity: 1; border-color: var(--ink, #d9ecf7) !important; box-shadow: 0 0 10px var(--pastille); }
 .mu-voile h3 { margin: 0; font-family: var(--font-display, sans-serif); font-weight: 400; font-size: 2.4em; letter-spacing: 0.14em; }
 .mu-voile h3:empty { display: none; }
-.mu-modes { margin-bottom: 12px; grid-template-columns: 1fr 1fr 1fr; }
-.mu-modes button { padding: 0.9em 1em; opacity: 0.6; }
+.mu-modes { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 0; }
+#multi .mu-modes button { padding: 0.75em 0.5em; opacity: 0.6; font-family: var(--font-display, sans-serif); letter-spacing: 0.16em; }
+#multi .mu-modes button + button { border-left-width: 0; }
+#multi .mu-modes button[data-choisi="1"] { color: var(--ink, #d9ecf7); background: rgba(143, 211, 255, 0.22); }
 .mu-modes button[data-choisi="1"] { opacity: 1; border-color: var(--accent, #8fd3ff); box-shadow: inset 0 0 0 1px var(--accent, #8fd3ff); }
 .mu-score { position: absolute; top: 14px; left: 50%; transform: translateX(-50%); display: flex; flex-direction: column; align-items: center; gap: 4px; pointer-events: none; font-family: var(--font-display, sans-serif); background: rgba(3, 7, 14, 0.82); padding: 4px 18px 6px; }
 .mu-score[hidden] { display: none; }
 .mu-score div { display: flex; align-items: baseline; gap: 0.5em; font-size: 2.2em; letter-spacing: 0.06em; }
 .mu-score div span { color: var(--dim, #7f9cb0); font-size: 0.6em; }
 .mu-score small { letter-spacing: 0.18em; min-height: 1.2em; }
-@media (max-width: 560px) { .mu-choix { grid-template-columns: 1fr; } .mu-score { top: 150px; } }
+@media (max-width: 560px) { .mu-score { top: 150px; } #multi .mu-jouer button { flex-direction: column; gap: 4px; } }
 `
 
 /** Les poteaux du hockey, tels que l'écran les dessine et que les sons les
@@ -191,32 +209,38 @@ const STYLE = `
 const POTEAUX_VUS = POTEAUX.map((q) => ({ x: q.x, y: q.y, rayon: RAYON_POTEAU }))
 
 const GABARIT = `
-<div class="mu-salon" data-page="salon">
-  <h2 class="mu-titre">MULTI</h2>
-  <p class="mu-sous">Prototype à deux, chacun chez soi. L’un crée la partie et donne son code, l’autre le tape. Aucun compte.</p>
-  <div class="mu-profil">
-    <label>VOTRE NOM<input type="text" data-champ="pseudo" maxlength="${PSEUDO_MAX}" autocomplete="off" autocorrect="off" spellcheck="false" placeholder="(facultatif)"></label>
-    <div role="group" aria-label="Votre couleur"><span>VOTRE COULEUR</span>${PALETTE.map((_, k) => `<button type="button" class="mu-pastille" data-couleur="${k}" aria-label="${NOMS_COULEURS[k]}" style="--pastille:${couleurCss(k)}"></button>`).join('')}</div>
-  </div>
-  <div class="mu-choix mu-modes" role="group" aria-label="Le mode de jeu">
-    <button type="button" data-mode="0" data-choisi="1"><b>MODE LIBRE</b><span>Une grande salle vide, pour essayer les gestes.</span></button>
-    <button type="button" data-mode="1" data-choisi="0"><b>MODE HOCKEY</b><span>Un palet, deux cages. Le premier à ${BUTS_POUR_GAGNER} buts gagne.</span></button>
-    <button type="button" data-mode="2" data-choisi="0"><b>MODE SUMO</b><span>Un anneau qui se resserre. Poussez l’autre dehors : ${MANCHES_POUR_GAGNER} manches gagnantes.</span></button>
-  </div>
-  <div class="mu-choix">
-    <button type="button" data-geste="robot"><b>CONTRE L’ORDINATEUR</b><span>Pour jouer tout de suite, ou s’entraîner. (Hockey et sumo.)</span></button>
-    <button type="button" data-geste="local"><b>À DEUX SUR CET ÉCRAN</b><span>Une manette pour le second joueur — ou deux manettes.</span></button>
-  </div>
-  <div class="mu-choix">
-    <button type="button" data-geste="creer"><b>CRÉER UNE PARTIE</b><span>Votre machine fait tourner la simulation : à choisir sur le PC le plus puissant.</span></button>
-    <button type="button" data-geste="rejoindre"><b>REJOINDRE UNE PARTIE</b><span>Votre ami vous a donné un code de cinq caractères.</span></button>
-  </div>
-  <div class="mu-rang">
-    <button type="button" class="mu-discret" data-geste="seul">ESSAYER SEUL</button>
-    <button type="button" class="mu-discret" data-geste="quitter">RETOUR À L’ACCUEIL</button>
-  </div>
-  <p class="mu-manettes" data-manettes aria-live="polite"></p>
+<div class="mu-salon mu-accueil" data-page="salon">
+  <header class="mu-entete">
+    <h2 class="mu-titre">MULTI</h2>
+    <div class="mu-profil">
+      <input type="text" data-champ="pseudo" maxlength="${PSEUDO_MAX}" autocomplete="off" autocorrect="off" spellcheck="false" placeholder="VOTRE NOM" aria-label="Votre nom (facultatif)">
+      <div role="group" aria-label="Votre couleur">${PALETTE.map((_, k) => `<button type="button" class="mu-pastille" data-couleur="${k}" aria-label="${NOMS_COULEURS[k]}" style="--pastille:${couleurCss(k)}"></button>`).join('')}</div>
+    </div>
+  </header>
+  <section class="mu-bloc">
+    <span class="mu-rubrique">MODE</span>
+    <div class="mu-modes" role="group" aria-label="Le mode de jeu">
+      <button type="button" data-mode="1" data-choisi="1">HOCKEY</button>
+      <button type="button" data-mode="2" data-choisi="0">SUMO</button>
+      <button type="button" data-mode="0" data-choisi="0">LIBRE</button>
+    </div>
+    <p class="mu-desc" data-desc-mode></p>
+  </section>
+  <section class="mu-bloc">
+    <span class="mu-rubrique">JOUER</span>
+    <div class="mu-jouer">
+      <button type="button" data-geste="robot"><b>CONTRE L’ORDINATEUR</b><span data-note-robot>tout de suite</span></button>
+      <button type="button" data-geste="local"><b>À DEUX SUR CET ÉCRAN</b><span>une manette par joueur</span></button>
+      <button type="button" data-geste="creer"><b>CRÉER UNE PARTIE EN LIGNE</b><span>vous donnez un code</span></button>
+      <button type="button" data-geste="rejoindre"><b>REJOINDRE UNE PARTIE</b><span>vous tapez un code</span></button>
+    </div>
+  </section>
   <p class="mu-mot" data-mot="salon"></p>
+  <footer class="mu-pied">
+    <button type="button" class="mu-discret" data-geste="seul">S’ENTRAÎNER SEUL</button>
+    <button type="button" class="mu-discret" data-geste="quitter">RETOUR</button>
+    <p class="mu-manettes" data-manettes aria-live="polite"></p>
+  </footer>
 </div>
 
 <div class="mu-salon" data-page="creation" hidden>
@@ -296,7 +320,8 @@ export function creeEcranMulti(quitte: () => void): EcranMulti {
   let codePartie = ''
   let cadre: Cadre = cadreSalle(SALLE, 16 / 9)
   /** Le mode choisi au salon, pour la partie qu'on crée. */
-  let modeChoisi: number = MODE_LIBRE
+  // le hockey d'abord : c'est le jeu ; le mode libre est un bac à sable
+  let modeChoisi: number = MODE_HOCKEY
   let rafId = 0
   let dernier = 0
   let resteEnvoi = 0
@@ -348,6 +373,21 @@ export function creeEcranMulti(quitte: () => void): EcranMulti {
     const autre: Profil = profilAutre ?? { pseudo: '', couleur: (monProfil.couleur + 1) % PALETTE.length }
     couleurs = role === 'invite' ? couleursDeLaPartie(autre, monProfil) : couleursDeLaPartie(monProfil, autre)
     if (rendu) rendu.couleurs = couleurs
+  }
+  /** Au salon : le mode choisi est marqué, UNE ligne le décrit, et
+   *  l'ordinateur ne s'offre qu'où il sait jouer (au mode libre il n'y a
+   *  rien à gagner : il resterait immobile). */
+  function peintMode(r: HTMLElement): void {
+    for (const e of r.querySelectorAll<HTMLElement>('button[data-mode]')) e.dataset.choisi = Number(e.dataset.mode) === modeChoisi ? '1' : '0'
+    r.querySelector<HTMLElement>('[data-desc-mode]')!.textContent =
+      modeChoisi === MODE_HOCKEY
+        ? `Un palet, deux cages, quatre poteaux. Le premier à ${BUTS_POUR_GAGNER} buts gagne.`
+        : modeChoisi === MODE_SUMO
+          ? `Un anneau qui se resserre : poussez l’autre dehors. ${MANCHES_POUR_GAGNER} manches gagnantes.`
+          : 'Une grande salle vide, pour essayer les gestes. Rien à gagner.'
+    const robot = r.querySelector<HTMLButtonElement>('[data-geste="robot"]')!
+    robot.disabled = modeChoisi === MODE_LIBRE
+    r.querySelector<HTMLElement>('[data-note-robot]')!.textContent = modeChoisi === MODE_LIBRE ? 'au hockey et au sumo' : 'tout de suite'
   }
   /** Au salon : la pastille de ma couleur est marquée. */
   function peintProfil(r: HTMLElement): void {
@@ -430,7 +470,7 @@ export function creeEcranMulti(quitte: () => void): EcranMulti {
         // celui qui rejoint l'apprend de l'hôte
         const voulu = Number(m.dataset.mode)
         modeChoisi = voulu === MODE_HOCKEY || voulu === MODE_SUMO ? voulu : MODE_LIBRE
-        for (const e of r.querySelectorAll<HTMLElement>('button[data-mode]')) e.dataset.choisi = Number(e.dataset.mode) === modeChoisi ? '1' : '0'
+        peintMode(r)
         return
       }
       const b = (ev.target as HTMLElement).closest<HTMLButtonElement>('button[data-geste]')
@@ -449,6 +489,7 @@ export function creeEcranMulti(quitte: () => void): EcranMulti {
       gardeProfil(monProfil)
     })
     peintProfil(r)
+    peintMode(r)
     brancheToile(r.querySelector('canvas')!)
     const tenir = r.querySelector<HTMLButtonElement>('[data-tenir="ouvrir"]')!
     const tient = (oui: boolean): void => {
@@ -516,11 +557,9 @@ export function creeEcranMulti(quitte: () => void): EcranMulti {
     const u = new URL(location.href)
     u.search = ''
     u.hash = ''
-    u.searchParams.set('dev', '')
+    // (plus de « ?dev » : le multi est ouvert à tous)
     u.searchParams.set('multi', codePartie)
-    // « ?dev=&multi=X » → « ?dev&multi=X » : plus court, et c'est la forme
-    // que tout le dépôt écrit
-    return u.toString().replace('dev=&', 'dev&')
+    return u.toString()
   }
 
   // ---- LA LIAISON ---------------------------------------------------------
@@ -1182,7 +1221,10 @@ export function creeEcranMulti(quitte: () => void): EcranMulti {
     // au salon, ce que le navigateur voit des manettes (le diagnostic)
     if (racine && page === 'salon') {
       const ligne = el<HTMLElement>('[data-manettes]')
-      const texte = ligneManettes(padsVus())
+      // (aucune manette vue : rien — un joueur à la souris n'a pas à lire
+      // qu'il pourrait en brancher une ; « à deux sur cet écran » le dit)
+      const vus = padsVus()
+      const texte = vus !== null && vus.length === 0 ? '' : ligneManettes(vus)
       if (ligne.textContent !== texte) ligne.textContent = texte
     }
     const pad = padCourant()

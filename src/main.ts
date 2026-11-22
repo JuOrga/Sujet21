@@ -8734,8 +8734,8 @@ const regie = new Regie(regieEl, {
   fermer: () => regie.close(),
 })
 document.getElementById('home-regie')?.addEventListener('click', () => regie.open())
-// ---- LE MULTI (multi/ecranMulti.ts) : un prototype de partie à deux -------
-// Derrière le mode concepteur, et chargé à la demande comme l'atelier : tout
+// ---- LE MULTI (multi/ecranMulti.ts) : jouer à deux -------------------------
+// Ouvert à tous (depuis le 22/11), et chargé à la demande comme l'atelier : tout
 // son dossier (une copie du solveur, un rendu, la liaison) reste hors du
 // paquet de départ. Tant qu'il est ouvert, le jeu derrière lui ne simule ni
 // ne dessine (corpsImage rend la main) : la machine qui héberge une partie
@@ -8760,13 +8760,14 @@ const ouvreMulti = (code?: string): void => {
   })
 }
 document.getElementById('home-multi')?.addEventListener('click', () => ouvreMulti())
-// LE LIEN D'INVITATION : « ?dev&multi=CODE » mène droit dans la partie —
+// LE LIEN D'INVITATION : « ?multi=CODE » mène droit dans la partie —
 // l'ami n'a ni bouton à trouver ni code à taper (sur un téléphone, c'est la
-// différence entre rejoindre et renoncer). Le lien ne vaut qu'en mode
-// concepteur, comme le bouton : sans « ?dev », il ne fait rien.
+// différence entre rejoindre et renoncer). Comme le bouton, il vaut pour
+// tous (il demandait « ?dev » tant que le multi était réservé au
+// concepteur ; un vieux lien qui l'a gardé marche toujours).
 {
   const code = new URLSearchParams(location.search).get('multi')
-  if (code && document.body.classList.contains('concepteur')) ouvreMulti(code)
+  if (code) ouvreMulti(code)
 }
 // Sonde de test : la carte en cours d'édition
 ;(window as unknown as { __carte: () => unknown }).__carte = () =>
