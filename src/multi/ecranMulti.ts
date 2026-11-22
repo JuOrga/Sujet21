@@ -14,7 +14,7 @@
 //  - l'INVITÉ (celui qui rejoint) envoie sa commande et affiche ;
 //  - SEUL : les deux corps sur une machine, pour essayer sans personne.
 
-import { cadreSalle, cadreVoulu, ecranVersMonde, mondeVersEcran, suitCadre, traitDeVisee, type Cadre } from './cadrage'
+import { cadreSalle, cadreVoulu, ecranVersMonde, mondeVersEcran, presenceTrait, suitCadre, traitDeVisee, type Cadre } from './cadrage'
 import { ALPHABET_CODE, litCodePartie, LONGUEUR_CODE } from './code'
 import { CADENCE_ETAT, CAPACITE, Hote, Miroir, SALLE } from './partie'
 import {
@@ -146,7 +146,6 @@ const STYLE = `
 .mu-trait line { stroke-linecap: round; }
 .mu-trait .mu-trait-ombre { stroke: rgba(0, 0, 0, 0.45); stroke-width: 4; }
 .mu-trait .mu-trait-jour { stroke: currentColor; stroke-width: 2; stroke-dasharray: 7 8; opacity: 0.55; }
-.mu-trait[data-pousse="1"] .mu-trait-jour { opacity: 0.9; }
 .mu-reticule { position: absolute; width: 22px; height: 22px; margin: -11px 0 0 -11px; border: 2px solid currentColor; border-radius: 50%; pointer-events: none; opacity: 0.75; }
 .mu-reticule[hidden] { display: none; }
 .mu-reticule[data-pousse="1"] { opacity: 1; background: currentColor; box-shadow: 0 0 12px currentColor; }
@@ -330,6 +329,8 @@ export function creeEcranMulti(quitte: () => void): EcranMulti {
   /** La souris est-elle au-dessus du jeu (et est-ce une souris : au doigt,
    *  le doigt montre où il est) ? */
   const souris = { dedans: false, estSouris: false }
+  /** La présence du trait de visée, de 0 à 1 (presenceTrait, cadrage.ts). */
+  let traitVu = 1
   // LES SONS (sonsMulti.ts) : ce qu'on entend se déduit de ce qu'on affiche,
   // d'une image à la suivante.
   const sons = new SonsMulti()
@@ -1109,7 +1110,10 @@ export function creeEcranMulti(quitte: () => void): EcranMulti {
     const viseur = el<HTMLElement>('[data-viseur]')
     const trait = el<HTMLElement>('[data-trait]')
     viseur.style.color = trait.style.color = teinte(moi)
-    viseur.dataset.pousse = trait.dataset.pousse = commande.pousse && !aLaManette ? '1' : '0'
+    viseur.dataset.pousse = commande.pousse && !aLaManette ? '1' : '0'
+    // le trait s'efface pendant la poussée, et revient en fondu après
+    traitVu = presenceTrait(traitVu, commande.pousse && !aLaManette, dt)
+    trait.style.opacity = traitVu.toFixed(3)
     peintTrait()
     peintReticule('[data-reticule2]', commande2 !== null, commande2 ? commandeManette(manette2, coeur2.x, coeur2.y) : commande, 1)
     el<HTMLElement>('[data-tenir="ouvrir"]').hidden = jeu?.mode === MODE_SUMO
@@ -1269,7 +1273,7 @@ export function creeEcranMulti(quitte: () => void): EcranMulti {
     const v = el<HTMLElement>('[data-viseur]')
     const rayon = coeursVus[moi * 4 + 3] > 0 ? coeursVus[moi * 4 + 2] : 0
     const vise = ecranVersMonde(cadre, pointeur.fx, pointeur.fy)
-    const seg = !v.hidden && monCoeur.connu && rayon > 0 ? traitDeVisee(monCoeur.x, monCoeur.y, rayon, vise.x, vise.y) : null
+    const seg = !v.hidden && traitVu > 0 && monCoeur.connu && rayon > 0 ? traitDeVisee(monCoeur.x, monCoeur.y, rayon, vise.x, vise.y) : null
     if (!seg) {
       if (!t.hidden) t.hidden = true
       return

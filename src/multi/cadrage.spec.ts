@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { DEBORD_SALLE, DEMI_HAUTEUR_MIN, MARGE_CORPS, cadreSalle, cadreVoulu, ecranVersMonde, mondeVersEcran, suitCadre, traitDeVisee } from './cadrage'
+import { DEBORD_SALLE, DEMI_HAUTEUR_MIN, MARGE_CORPS, cadreSalle, cadreVoulu, ecranVersMonde, mondeVersEcran, suitCadre, traitDeVisee, presenceTrait, RETOUR_TRAIT } from './cadrage'
 import { SALLE } from './partie'
 
 const ASPECT = 16 / 9
@@ -103,5 +103,25 @@ describe('le trait de visée de la souris', () => {
     expect(traitDeVisee(1000, 500, 100, 1000, 500)).toBeNull()
     expect(traitDeVisee(1000, 500, 100, 1120, 500)).toBeNull()
     expect(traitDeVisee(1000, 500, 100, 1140, 500)).not.toBeNull()
+  })
+})
+
+describe('le trait de visée — quand il se montre', () => {
+  it('s’efface d’un coup quand on pousse (on se déplace : il pointerait derrière soi)', () => {
+    expect(presenceTrait(1, true, 0.016)).toBe(0)
+    expect(presenceTrait(0.4, true, 0.016)).toBe(0)
+  })
+
+  it('revient en fondu une fois la poussée relâchée, sans dépasser 1', () => {
+    let p = 0
+    let t = 0
+    while (p < 1 && t < 5) {
+      p = presenceTrait(p, false, 1 / 60)
+      t += 1 / 60
+    }
+    expect(t).toBeCloseTo(RETOUR_TRAIT, 1)
+    expect(presenceTrait(1, false, 1)).toBe(1)
+    // un coup de jet bref ne le fait pas clignoter : il repart de zéro
+    expect(presenceTrait(presenceTrait(1, true, 0.016), false, 0.05)).toBeLessThan(0.2)
   })
 })
