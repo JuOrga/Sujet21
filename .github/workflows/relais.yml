@@ -78,13 +78,29 @@ jobs:
           echo "déployé → $url"
           echo "URL=$url" >> "$GITHUB_ENV"
       - name: Lui donner son adresse fixe (l'alias, déplacé sur ce déploiement)
-        working-directory: relais
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
         run: |
           set -euo pipefail
-          # un nom déjà pris ailleurs fait échouer cette étape : le jeu
-          # garde alors l'ancien déploiement, on choisit un autre nom
-          npx vercel@59.6.2 alias set "${URL#https://}" sujet21-relais.vercel.app --scope "$VERCEL_ORG_ID" --token=${{ secrets.VERCEL_TOKEN }}
-          echo "ALIAS=sujet21-relais.vercel.app" >> "$GITHUB_ENV"
+          # Par l'API, et non par « vercel alias set » : la ligne de commande
+          # charge d'abord l'UTILISATEUR, et le jeton du dépôt, borné au
+          # projet, n'y a pas accès (« User not found », 404 — essayé le
+          # 22/11). L'API, elle, ne demande que le déploiement.
+          alias=sujet21-relais.vercel.app
+          hote="${URL#https://}"
+          id=$(curl -sS -H "Authorization: Bearer $VERCEL_TOKEN" \
+            "https://api.vercel.com/v13/deployments/$hote?teamId=$VERCEL_ORG_ID" | jq -r '.id')
+          echo "déploiement : $id"
+          reponse=$(curl -sS -X POST -H "Authorization: Bearer $VERCEL_TOKEN" -H 'Content-Type: application/json' \
+            -d "{\"alias\":\"$alias\"}" "https://api.vercel.com/v2/deployments/$id/aliases?teamId=$VERCEL_ORG_ID")
+          # un nom déjà pris ailleurs, ou un refus : l'étape échoue, et le
+          # jeu garde l'ancien déploiement — on choisit alors un autre nom
+          if ! echo "$reponse" | jq -e '.alias' >/dev/null; then
+            echo "alias refusé : $reponse"
+            exit 1
+          fi
+          echo "alias posé : $alias → $hote"
+          echo "ALIAS=$alias" >> "$GITHUB_ENV"
       - name: Essayer le relais en ligne
         working-directory: relais
         run: |
