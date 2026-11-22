@@ -28,11 +28,16 @@
 //                          │    S    │
 //                          └─────────┘
 //
+// LA CUVE A TROIS BOUCHES (22/11) — vers le sas, le comptoir et le bac —,
+// plus étroites que le corps : il s'étire pour passer, et part dans la
+// direction qu'il choisit. Aucune porte ne la ferme, aucune barrière ne
+// condamne une aile, aucun sceau le secteur 4 : rien ne bloque.
+//
 // LES TROIS RÈGLES DU PLAN, que hubRotonde.spec.ts garde :
 //
-//  1. L'AXE DU DÉPART EST LIBRE. La bouche de la cuve regarde le sas : de la
-//     naissance au lancement, une ligne droite, et AUCUN écran ne s'ouvre en
-//     chemin (seule la table de départ y passe : un toast, rien à fermer).
+//  1. L'AXE DU DÉPART EST LIBRE. La bouche est de la cuve regarde le sas : de
+//     la naissance au lancement, une ligne droite, et AUCUN écran ne s'ouvre
+//     en chemin (seule la table de départ y passe : un toast, rien à fermer).
 //  2. CE QUI OUVRE UN ÉCRAN SE VISE. Marchand, mémoires, avaries, plan,
 //     records : chacun est une console au fond d'une baie, d'un bras ou au
 //     dos de la cuve, hors des lignes qui relient la cuve aux quatre bras.
@@ -41,13 +46,14 @@
 //     Le banc est une console comme les autres. Sept coques au lieu de
 //     dix-sept, dix-neuf blocs au lieu de trente-huit.
 //
-// Ce module ne remplace rien : il s'AJOUTE (code « HUB3 »), comme le compact
-// en son temps. Le hub joué reste l'entrée « HUB » de la bibliothèque, à
-// défaut le grand module — la bascule est le geste du concepteur (ouvrir la
-// copie dans l'éditeur, la recoder HUB, publier). `?hub=rotonde` le joue
-// tout de suite, sans rien publier.
+// C'EST LE HUB JOUÉ (le concepteur, 22/11 : « je souhaite qu'il remplace le
+// vrai hub lorsque nous aurons livré en production ») : son code, HUB3, est
+// celui que le jeu cherche en bibliothèque (levelIO.CODE_HUB), et à défaut
+// c'est lui que le code fournit (hub.hubDeBibliotheque). L'ancienne entrée
+// « HUB » de la bibliothèque reste intacte, simplement plus jouée. Le grand
+// module et le compact se jouent encore par `?hub=grand` et `?hub=compact`.
 
-import { ARC_BOUT_DROIT, COQUE_EST, COQUE_NORD, COQUE_OUEST, COQUE_SUD, FORME_ARC, FORME_DISQUE } from './formes'
+import { ARC_BOUT_DROIT, COQUE_EST, COQUE_NORD, COQUE_OUEST, COQUE_SUD, FORME_ARC, FORME_DISQUE, arcRayons } from './formes'
 import {
   MAT_BAIE,
   MAT_CHAUD,
@@ -75,7 +81,7 @@ type Rect = { minX: number; minY: number; maxX: number; maxY: number }
 /** L'épaisseur de coque, partout la même. Un multiple de 8 : le format serre
  *  l'épaisseur par pas de 8 (coquePack) — posée à 60 comme dans le grand
  *  module, elle se dessine à 64 (mesuré : epaisseurDessinee), et tout ce qui
- *  se cale sur elle à la main (barrières, zones au ras des parois) tomberait
+ *  se cale sur elle à la main (zones au ras des parois) tomberait
  *  4 u à côté du mur réel. */
 export const EP_ROTONDE = 56
 
@@ -111,31 +117,73 @@ const BOUT_OUEST = -2050
  *  départ (120 u, levelIO) est tenue deux fois. */
 export const CUVE_RAYON = 300
 export const CUVE_EPAISSEUR = 44
-/** La demi-ouverture de la BOUCHE, en degrés : 38° ouvrent 315 u de corde
- *  au rayon intérieur — le corps sort sans se déchirer sur les montants. */
-export const CUVE_BOUCHE = 38
 
-/** L'anneau de la cuve : un arc dont la bouche regarde l'EST. L'arc du
- *  moteur s'étend de part et d'autre de +x et sa boîte est sa boîte
- *  englobante EXACTE (formes.ts, arcRayons) : pour une coupe franche de
- *  demi-ouverture O ≥ 90°, elle va de cos(O) à 1 sur l'axe. Tournée d'un
- *  demi-tour, c'est le DOS de l'arc qui regarde l'ouest. */
-function anneauCuve(): ObstacleBox {
+/** LES TROIS BOUCHES de la cuve, en degrés (0 = est, sens trigonométrique) :
+ *  le départ, le comptoir, le bac — on part de la cuve dans la direction
+ *  qu'on veut (le concepteur, 22/11 : « 3 ouvertures sur le cercle […] ceci
+ *  permet de partir dans la direction souhaitée »). Le DOS, à l'ouest,
+ *  reste plein : le banc des mémoires s'y adosse, et l'aile se rejoint par
+ *  le nord ou par le sud. */
+export const CUVE_BOUCHES: readonly number[] = [0, 90, -90]
+
+/** LA LARGEUR D'UNE BOUCHE, en corde au rayon intérieur — PLUS ÉTROITE QUE
+ *  LE CORPS (≈ 210 u de diamètre) : il s'y étire pour passer (« plus
+ *  petites, pour que le volume se déforme sans trop de perte
+ *  d'éjection »). Mesuré le 22/11 sur le vrai solveur, un corps de 900
+ *  particules sorti de la cuve vers chacun des trois bras, même pilote :
+ *  il en garde 660 sans anneau ; 602 à 617 par une bouche de 180 u (−7 %) ;
+ *  539 à 562 à 150 u (−16 %) ; 480 à 504 à 110 u (−26 %). 180 : le corps
+ *  se déforme, et la perte reste faible. */
+export const CUVE_PASSAGE = 180
+
+/** Un arc de l'anneau, centré sur la direction `centre` (degrés), de
+ *  demi-ouverture `demi`. L'arc du moteur s'étend de part et d'autre de +x et
+ *  sa boîte est sa boîte englobante EXACTE (formes.ts, arcRayons) : le centre
+ *  de l'anneau n'est donc PAS celui de la boîte. On calcule la boîte de
+ *  l'arc droit, puis on la place pour qu'après sa rotation (autour de SON
+ *  centre) le centre de l'anneau retombe sur l'origine. */
+function arcDeCuve(centre: number, demi: number): ObstacleBox {
   const R = CUVE_RAYON
-  const ouverture = 180 - CUVE_BOUCHE
-  const tips = -Math.cos((ouverture * Math.PI) / 180) // > 0 : les montants de la bouche
+  const reglage = { p0: CUVE_EPAISSEUR / R, p1: demi, p2: ARC_BOUT_DROIT }
+  // la boîte unité donne les extrêmes de l'arc droit, rayon extérieur 1
+  const u = arcRayons({ minX: 0, minY: 0, maxX: 1, maxY: 1, ...reglage })
+  const xmin = 1 - 1 / u.sx
+  const ymax = 1 / (2 * u.sy)
+  const w = (1 - xmin) * R
+  const h = 2 * ymax * R
+  // le centre de la boîte, sur l'axe de l'arc, à cette distance du centre
+  // de l'anneau — puis tourné avec lui
+  const d = ((1 + xmin) / 2) * R
+  const t = (centre * Math.PI) / 180
+  const cx = d * Math.cos(t)
+  const cy = d * Math.sin(t)
   return {
-    minX: -R,
-    minY: -R,
-    maxX: R * tips,
-    maxY: R,
+    minX: cx - w / 2,
+    minY: cy - h / 2,
+    maxX: cx + w / 2,
+    maxY: cy + h / 2,
     material: MAT_WALL,
     forme: FORME_ARC,
-    p0: CUVE_EPAISSEUR / R,
-    p1: ouverture,
-    p2: ARC_BOUT_DROIT,
-    angle: 180,
+    ...reglage,
+    ...(centre ? { angle: centre } : {}),
   }
+}
+
+/** L'ANNEAU DE LA CUVE, en autant d'arcs qu'il a de bouches : un arc entre
+ *  deux bouches voisines. Les coupes sont RADIALES (bouts droits) : la
+ *  bouche a la même ouverture angulaire à tous les rayons, et sa corde au
+ *  rayon intérieur vaut `passage`. */
+export function anneauCuve(passage = CUVE_PASSAGE, bouches: readonly number[] = CUVE_BOUCHES): ObstacleBox[] {
+  const ri = CUVE_RAYON - CUVE_EPAISSEUR
+  const demiBouche = (Math.asin(Math.min(1, passage / 2 / ri)) * 180) / Math.PI
+  const tri = [...bouches].map((b) => ((b % 360) + 360) % 360).sort((a, b) => a - b)
+  return tri.map((b, i) => {
+    const suivante = i + 1 < tri.length ? tri[i + 1] : tri[0] + 360
+    const milieu = (b + suivante) / 2
+    const demi = (suivante - b) / 2 - demiBouche
+    // l'angle d'une boîte se lit entre −180 et 180
+    return arcDeCuve(milieu > 180 ? milieu - 360 : milieu, demi)
+  })
 }
 
 /** Le milieu du bras de départ TEL QU'IL EST DESSINÉ : raccordé, il commence
@@ -191,10 +239,6 @@ const carre = (cx: number, cy: number, demiX: number, demiY = demiX): Rect => ({
   maxY: cy + demiY,
 })
 
-/** Une barrière d'énergie en travers d'un bras : elle déborde le passage de
- *  10 u de chaque côté, pour mordre dans les parois (aucun jour). */
-const DEMI_BARRIERE = PASSAGE_BRAS / 2 + 10
-
 /** Le sas : son rayon, et son centre — adossé au fond du bras. */
 export const SAS_RAYON = 150
 const SAS_X = BOUT_EST - EP_ROTONDE - SAS_RAYON - 4
@@ -210,9 +254,6 @@ export const ZONES_ROTONDE = {
   // les deux sorties gardées, DERRIÈRE leur matière
   sasVapeur: carre(DEPART_MILIEU, 690, 120, 80),
   sasGivre: carre(DEPART_MILIEU, -690, 120, 80),
-  // LA PORTE DE LA CUVE : la corde de la bouche (acte 0 : le sujet naît
-  // enfermé, la séquence ALERTE la crève)
-  porteCuve: { minX: 196, minY: -190, maxX: 240, maxY: 190 } as Rect,
   // les stations de réparation
   stations: {
     // nord-est et sud-est : les deux machines qui encadrent l'axe du départ
@@ -221,18 +262,12 @@ export const ZONES_ROTONDE = {
     'table-depart': { minX: 960, minY: -130, maxX: 1100, maxY: 130 } as Rect,
     // LE MUR DES RECORDS : la baie du nord-ouest, contre le pan coupé
     'mur-records': carre(-510, 510, 120, 90),
-    // devant l'aile et devant le bac : on paie au seuil, la barrière tombe
+    // devant l'aile et devant le bac, au seuil
     'aile-endormis': { minX: -800, minY: -100, maxX: -640, maxY: 100 } as Rect,
     'bac-sable': { minX: -100, minY: -800, maxX: 100, maxY: -640 } as Rect,
     // au fond de l'aile des endormis, devant la passerelle
     'passerelle-4': { minX: -1500, minY: -100, maxX: -1340, maxY: 100 } as Rect,
   } as Record<string, Rect>,
-  portesDegat: {
-    'aile-endormis': [{ minX: -916, minY: -DEMI_BARRIERE, maxX: -872, maxY: DEMI_BARRIERE }],
-    'bac-sable': [{ minX: -DEMI_BARRIERE, minY: -916, maxX: DEMI_BARRIERE, maxY: -872 }],
-    'passerelle-4': [{ minX: -1580, minY: -DEMI_BARRIERE, maxX: -1536, maxY: DEMI_BARRIERE }],
-  } as Record<string, Rect[]>,
-  sceau: { minX: -1650, minY: -DEMI_BARRIERE, maxX: -1606, maxY: DEMI_BARRIERE } as Rect,
   sasScelle: { minX: -1930, minY: -120, maxX: -1730, maxY: 120 } as Rect,
   // LE BANC DES MÉMOIRES : adossé au DOS de la cuve. Le corps posé contre
   // l'anneau a son centre à ≈ 405 u du milieu du module : dans la zone, à
@@ -253,16 +288,17 @@ export const ZONES_ROTONDE = {
   },
 }
 
+/** LES ANCRES DU MODULE. RIEN N'Y BLOQUE (le concepteur, 22/11 : « ne mets
+ *  pas de porte au cercle central, pas de blocage ») : ni porte de cuve à
+ *  l'acte 0, ni barrière d'énergie devant une aile en panne, ni sceau sur le
+ *  secteur 4. Les stations se réparent toujours — la panne se lit sur les
+ *  pièces, les lampes et les plaques —, mais aucune ne ferme un passage. */
 function ancresRotonde(): AncreMeta[] {
   const z = ZONES_ROTONDE
   const out: AncreMeta[] = []
   for (const [id, r] of Object.entries(z.stations)) out.push({ ...r, role: 'station', id })
-  for (const [id, rects] of Object.entries(z.portesDegat))
-    for (const r of rects) out.push({ ...r, role: 'degat', id })
   out.push({ ...z.tableDepart, role: 'table-depart' })
   out.push({ ...z.sasScelle, role: 'sas-scelle' })
-  out.push({ ...z.sceau, role: 'sceau' })
-  out.push({ ...z.porteCuve, role: 'porte-cuve' })
   out.push({ ...z.sasGivre, role: 'sas-givre' })
   out.push({ ...z.sasVapeur, role: 'sas-vapeur' })
   return out
@@ -314,7 +350,7 @@ export const TABLEAU_HUB_ROTONDE: LevelDef = {
       material: MAT_BAIE,
       forme: FORME_DISQUE,
     },
-    anneauCuve(),
+    ...anneauCuve(),
     // ═══ LE BAC D'ESSAI : toutes les surfaces, sans enjeu ══════════════
     // au fond, les quatre qui AGISSENT — la chaude et la froide aux deux
     // coins opposés, pour qu'on ne gèle pas en venant bouillir
@@ -340,7 +376,7 @@ export const TABLEAU_HUB_ROTONDE: LevelDef = {
     { x: SAS_X, y: 0, h: 400, intensite: 1.35, couleur: '#8fe6b0' },
     { x: 0, y: 1180, h: 520, intensite: 0.9, couleur: '#ffd9a8' },
     // un bandeau SANS CORPS (taille 0) : il court de la bouche de l'aile au
-    // secteur 4 — un luminaire dessiné se coucherait sous les barrières
+    // secteur 4 — un luminaire dessiné se coucherait en travers de l'aile
     {
       x: -1420,
       y: 0,
@@ -446,13 +482,6 @@ export const TABLEAU_HUB_ROTONDE: LevelDef = {
       cle: 'hub.secteur-scelle',
       tone: 'sas',
       rang: 'secteur',
-    },
-    {
-      x: -1830,
-      y: -180,
-      text: 'ACCÈS CONDAMNÉ|DEPUIS L’ACCIDENT',
-      cle: 'hub.acces-condamne',
-      tone: 'mur',
     },
     // ─── les surfaces du bac
     { x: -180, y: -1330, text: 'CHAUDIÈRE|ELLE VAPORISE', tone: 'chaud' },

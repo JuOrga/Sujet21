@@ -43,7 +43,9 @@ describe('le hub ne se joue que quand il est la salle jouée', () => {
   })
 
   it('l’alerte d’un éveil conclu en essai attend le hub au lieu de se perdre', () => {
-    expect(SRC).toMatch(/cuveClose: !eveilJoue\(\) \|\| alerteDifferee/)
+    // (l'acte 0 se lit par acteZeroPasse depuis que l'éveil est désactivé
+    // par défaut — main-narrationHub.spec.ts)
+    expect(SRC).toMatch(/cuveClose: !acteZeroPasse\(\) \|\| eveilEnCours \|\| alerteDifferee/)
     expect(SRC).toMatch(/if \(!salleHub\(\)\) alerteDifferee = true/)
     expect(SRC).toMatch(/if \(alerteDifferee && salleHub\(\)\) \{/)
   })

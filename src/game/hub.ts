@@ -965,18 +965,26 @@ export const TABLEAU_HUB_COMPACT: LevelDef = {
 
 // ─── LE HUB À L'ESSAI : ?hub=… ───────────────────────────────────────────
 // Trois modules vivent dans le code (le grand, le compact, la rotonde —
-// game/hubRotonde.ts), et un seul se joue : l'entrée « HUB » de la
-// bibliothèque, à défaut le grand. Pour en JUGER un autre il fallait le
-// publier sous le code HUB — donc le montrer à tous les joueurs avant de
-// l'avoir essayé soi-même. `?hub=rotonde` (ou grand, compact) le joue sur ce
-// poste, le temps de la page, sans rien publier : le module passe DEVANT la
-// bibliothèque, avec ses réparations, ses sas et son éveil.
+// game/hubRotonde.ts), et un seul se joue : l'entrée de code CODE_HUB (HUB3)
+// de la bibliothèque, à défaut la rotonde (hubDeBibliotheque). Pour en JUGER
+// un autre il faudrait le publier sous ce code — donc le montrer à tous les
+// joueurs avant de l'avoir essayé soi-même. `?hub=grand` (ou compact,
+// rotonde) le joue sur ce poste, le temps de la page, sans rien publier : le
+// module passe DEVANT la bibliothèque, avec ses réparations et ses sas.
 
 /** Les modules livrés, par le nom qu'on leur donne dans l'adresse. */
 export const HUBS_LIVRES: Readonly<Record<string, LevelDef>> = {
   grand: TABLEAU_HUB,
   compact: TABLEAU_HUB_COMPACT,
   rotonde: TABLEAU_HUB_ROTONDE,
+}
+
+/** LE HUB JOUÉ : l'entrée de la bibliothèque qui porte le code du
+ *  laboratoire (levelIO.CODE_HUB — passé en paramètre : levelIO importe ce
+ *  module), à défaut LA ROTONDE du code. Le grand module et le compact ne
+ *  se jouent plus que par `?hub=`. */
+export function hubDeBibliotheque(bibliotheque: readonly LevelDef[], code: string): LevelDef {
+  return bibliotheque.find((l) => l.code === code) ?? TABLEAU_HUB_ROTONDE
 }
 
 /** Le hub que l'adresse demande (`location.search`), ou null — la

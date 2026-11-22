@@ -5,9 +5,11 @@ import { MAX_LUMIERES } from '../render/renderer'
 import { FORME_ARC, dansForme } from './formes'
 import { accessible } from './generateur'
 import { TABLEAU_HUB, TABLEAU_HUB_COMPACT, ancreAbsente, zonesDuHub } from './hub'
+import type { ObstacleBox } from './level'
 import {
-  CUVE_BOUCHE,
+  CUVE_BOUCHES,
   CUVE_EPAISSEUR,
+  CUVE_PASSAGE,
   CUVE_RAYON,
   DEPART_MILIEU,
   PASSAGE_BRAS,
@@ -15,6 +17,7 @@ import {
   STRUCTURES_ROTONDE,
   TABLEAU_HUB_ROTONDE as ROTONDE,
   ZONES_ROTONDE,
+  anneauCuve,
 } from './hubRotonde'
 import {
   MAT_BAIE,
@@ -25,7 +28,7 @@ import {
   sansPhysique,
   type LevelDef,
 } from './level'
-import { checkLevel, estCodeHub, parseLevel, serializeLevel } from './levelIO'
+import { CODE_HUB, checkLevel, estCodeHub, parseLevel, serializeLevel } from './levelIO'
 import { decalsDuMeta } from './metaAssets'
 import { REPARATIONS, appliqueReparations } from './reparations'
 import { niveauExpanse } from './structures'
@@ -87,13 +90,14 @@ describe('la rotonde — un tableau valide, que la bibliothèque sait porter', (
     expect(accessible(ROTONDE, new Set())).toBe(true)
   })
 
-  it('porte un code de la famille du hub : jamais dans la séquence de l’expédition', () => {
+  it('porte LE code du laboratoire : c’est elle que le jeu cherche, hors séquence', () => {
     expect(ROTONDE.code).toBe('HUB3')
+    expect(ROTONDE.code).toBe(CODE_HUB)
     expect(estCodeHub(ROTONDE.code)).toBe(true)
   })
 
   it('survit au format : ce que l’éditeur publiera est ce que le code décrit', () => {
-    // la bascule passe par là — ouvrir la copie, la recoder HUB, publier.
+    // le remodelage passe par là — ouvrir la copie, publier sous HUB3.
     // Un champ que le format perdrait (une ancre, un pupitre, l'arc de la
     // cuve) ferait un hub publié différent du hub essayé.
     const relu = parseLevel(JSON.parse(serializeLevel(ROTONDE))).level!
@@ -197,17 +201,20 @@ describe('la rotonde — RAPIDE : tout est à une impulsion de la cuve', () => {
   })
 
   it('RÈGLE 2 — ce qui ouvre un écran se VISE : aucune console sur les lignes de la cuve aux bras', () => {
-    // les trajets de tous les jours, tracés au large de l'anneau : de la
-    // bouche de la cuve au seuil de chaque bras (l'aile se rejoint par le
-    // nord ou par le sud de la cuve)
-    const bouche = { x: CUVE_RAYON + 120, y: 0 }
+    // les trajets de tous les jours, tracés au large de l'anneau : de
+    // chaque bouche de la cuve au seuil du bras qu'elle regarde, et de la
+    // bouche nord ou sud jusqu'à l'aile — le dos de la cuve est plein : on
+    // sort de la bouche (un rayon de corps au-delà de la paroi) avant de
+    // virer vers l'ouest
+    const hors = CUVE_RAYON + 120
+    const vire = CUVE_RAYON + RAYON_CORPS + 155
     const seuil = 864 // la face intérieure du hall
     const lignes: [{ x: number; y: number }, { x: number; y: number }][] = [
-      [bouche, { x: seuil, y: 0 }],
-      [bouche, { x: 0, y: seuil }],
-      [bouche, { x: 0, y: -seuil }],
-      [{ x: 0, y: 560 }, { x: -seuil, y: 0 }],
-      [{ x: 0, y: -560 }, { x: -seuil, y: 0 }],
+      [{ x: hors, y: 0 }, { x: seuil, y: 0 }],
+      [{ x: 0, y: hors }, { x: 0, y: seuil }],
+      [{ x: 0, y: -hors }, { x: 0, y: -seuil }],
+      [{ x: 0, y: vire }, { x: -seuil, y: 0 }],
+      [{ x: 0, y: -vire }, { x: -seuil, y: 0 }],
     ]
     // le marchand est AU FOND de son bras : on y va exprès, il n'est sur le
     // chemin de rien — les trois consoles du hall et le banc, eux, bordent
@@ -255,36 +262,116 @@ describe('la rotonde — RAPIDE : tout est à une impulsion de la cuve', () => {
   }, 60000)
 })
 
-describe('la rotonde — la cuve : l’anneau du menu, une bouche vers le sas', () => {
-  const anneau = ROTONDE.boxes.find((b) => b.forme === FORME_ARC)!
+// LA CUVE À TROIS BOUCHES (le concepteur, 22/11 : « 3 ouvertures sur le
+// cercle, plus petites, pour que le volume se déforme sans trop de perte
+// d'éjection — ceci permet de partir dans la direction souhaitée » ; et
+// « ne mets pas de porte au cercle central »).
+describe('la rotonde — la cuve : trois bouches étroites, aucune porte', () => {
+  const arcs = ROTONDE.boxes.filter((b) => b.forme === FORME_ARC)
   const milieu = CUVE_RAYON - CUVE_EPAISSEUR / 2
-  const sur = (deg: number, r = milieu): boolean =>
-    dansForme(anneau, r * Math.cos((deg * Math.PI) / 180), r * Math.sin((deg * Math.PI) / 180))
+  const ri = CUVE_RAYON - CUVE_EPAISSEUR
+  const sur = (deg: number, r = milieu): boolean => {
+    const x = r * Math.cos((deg * Math.PI) / 180)
+    const y = r * Math.sin((deg * Math.PI) / 180)
+    return arcs.some((a) => dansForme(a, x, y))
+  }
+  /** la demi-ouverture angulaire d'une bouche, en degrés */
+  const demiBouche = (Math.asin(CUVE_PASSAGE / 2 / ri) * 180) / Math.PI
 
-  it('l’anneau est plein partout, sauf sur sa bouche — à l’est', () => {
-    for (let deg = CUVE_BOUCHE + 4; deg <= 360 - CUVE_BOUCHE - 4; deg += 4) expect(sur(deg), `${deg}°`).toBe(true)
-    for (let deg = -CUVE_BOUCHE + 4; deg <= CUVE_BOUCHE - 4; deg += 4) expect(sur(deg), `${deg}°`).toBe(false)
-    // c'est bien un anneau de l'épaisseur dite, centré sur le départ
-    expect(sur(180, CUVE_RAYON - CUVE_EPAISSEUR - 6)).toBe(false)
-    expect(sur(180, CUVE_RAYON + 6)).toBe(false)
-    expect(anneau.material).toBe(MAT_WALL)
+  it('trois arcs, et trois bouches : vers le sas, le comptoir et le bac', () => {
+    expect(arcs).toHaveLength(3)
+    expect([...CUVE_BOUCHES].sort((a, b) => a - b)).toEqual([-90, 0, 90])
+    for (const a of arcs) expect(a.material).toBe(MAT_WALL)
   })
 
-  it('la bouche laisse passer le corps, et la vitre passe sous la paroi', () => {
-    const corde = 2 * (CUVE_RAYON - CUVE_EPAISSEUR) * Math.sin((CUVE_BOUCHE * Math.PI) / 180)
-    expect(corde).toBeGreaterThan(2 * RAYON_CORPS + 80)
+  it('l’anneau est plein partout, sauf sur ses trois bouches — le dos plein pour le banc', () => {
+    // l'écart angulaire à la bouche la plus proche ; on ne juge pas la
+    // frontière elle-même (± 2°)
+    const ecart = (deg: number): number =>
+      Math.min(...CUVE_BOUCHES.map((b) => Math.abs(((deg - b + 540) % 360) - 180)))
+    for (let deg = -180; deg < 180; deg += 2) {
+      const e = ecart(deg)
+      if (e < demiBouche - 2) expect(sur(deg), `${deg}° (bouche)`).toBe(false)
+      else if (e > demiBouche + 2) expect(sur(deg), `${deg}°`).toBe(true)
+    }
+    // c'est bien un anneau de l'épaisseur dite, centré sur le départ
+    for (const deg of [45, 180, -135]) {
+      expect(sur(deg, ri - 6), `${deg}° dedans`).toBe(false)
+      expect(sur(deg, CUVE_RAYON + 6), `${deg}° dehors`).toBe(false)
+    }
+  })
+
+  it('chaque bouche est PLUS ÉTROITE que le corps : il s’étire pour passer', () => {
+    // la corde au rayon intérieur
+    const corde = 2 * ri * Math.sin((demiBouche * Math.PI) / 180)
+    expect(corde).toBeCloseTo(CUVE_PASSAGE, 6)
+    expect(corde).toBeLessThan(2 * RAYON_CORPS)
+    // …mais la preuve de traversée la franchit (marge du corps : 40 u)
+    for (const b of CUVE_BOUCHES) {
+      const a = (b * Math.PI) / 180
+      const zone = { minX: 0, minY: 0, maxX: 0, maxY: 0 }
+      const c = { x: 520 * Math.cos(a), y: 520 * Math.sin(a) }
+      Object.assign(zone, { minX: c.x - 40, maxX: c.x + 40, minY: c.y - 40, maxY: c.y + 40 })
+      const seule: LevelDef = { ...ROTONDE, structures: undefined, boxes: ROTONDE.boxes.slice(0, 1 + arcs.length), exit: zone, bounds: { minX: -700, minY: -700, maxX: 700, maxY: 700 } }
+      expect(accessible(seule, new Set()), `bouche ${b}`).toBe(true)
+    }
+  })
+
+  // LE VRAI CORPS, LE VRAI SOLVEUR : sortir de la cuve par chaque bouche,
+  // même pilote (il pousse vers sa cible tant qu'il n'a pas 300 u/s), et
+  // compter ce que le corps garde. Mesuré le 22/11 : 660 particules sans
+  // anneau ; 602 à 617 par une bouche de 180 u. Le seuil (580) laisse de la
+  // marge au solveur, pas au plan : s'il tombe, on remesure.
+  it('par chaque bouche, le corps sort en gardant presque tout (≥ 580 / 900)', () => {
+    const cuve: ObstacleBox[] = ROTONDE.boxes.slice(0, 1 + arcs.length)
+    for (const b of CUVE_BOUCHES) {
+      const s = new FluidSim({ ...DEFAULT_PARAMS }, { minX: -1400, minY: -1400, maxX: 1400, maxY: 1400 }, 4096)
+      s.setLevel(cuve, [])
+      s.spawnDisc(0, 0, 900, KIND_PLAYER)
+      const dt = s.params.dt
+      for (let t = 0; t < 0.5; t += dt) s.step(dt)
+      const a = (b * Math.PI) / 180
+      const but = { x: 900 * Math.cos(a), y: 900 * Math.sin(a) }
+      let sorti = false
+      for (let t = 0; t < 8 && !sorti; t += dt) {
+        s.updatePlayerStats()
+        const cx = s.stats.centroidX
+        const cy = s.stats.centroidY
+        if (Math.hypot(cx, cy) > CUVE_RAYON + 160) {
+          sorti = true
+          break
+        }
+        const dx = but.x - cx
+        const dy = but.y - cy
+        const d = Math.hypot(dx, dy) || 1
+        if ((s.stats.velX * dx + s.stats.velY * dy) / d < 300) s.eject(cx - (dx / d) * 500, cy - (dy / d) * 500, dt)
+        s.step(dt)
+      }
+      s.updatePlayerStats()
+      expect(sorti, `bouche ${b}`).toBe(true)
+      expect(s.playerCount, `bouche ${b}`).toBeGreaterThanOrEqual(580)
+    }
+  }, 60000)
+
+  it('la vitre passe sous la paroi', () => {
     const vitre = ROTONDE.boxes.find((b) => b.material === MAT_BAIE)!
     const rayonVitre = (vitre.maxX - vitre.minX) / 2
-    expect(rayonVitre).toBeGreaterThan(CUVE_RAYON - CUVE_EPAISSEUR)
+    expect(rayonVitre).toBeGreaterThan(ri)
     expect(rayonVitre).toBeLessThan(CUVE_RAYON)
   })
 
-  it('acte 0 — le sujet naît ENFERMÉ : la porte de la cuve la clôt, et elle est la première', () => {
-    const clos = appliqueReparations(ROTONDE, toutRepare, { cuveClose: true }, REPARATIONS)
-    // la séquence ALERTE crève la brèche d'index 0
-    expect(clos.portes![0]).toMatchObject(ZONES_ROTONDE.porteCuve)
-    expect(accessible(clos, new Set())).toBe(false)
-    expect(accessible(appliqueReparations(ROTONDE, toutRepare, {}, REPARATIONS), new Set())).toBe(true)
+  it('aucune porte : même à l’acte 0, la cuve reste ouverte', () => {
+    expect(ancreAbsente(zonesDuHub(ROTONDE)!.porteCuve)).toBe(true)
+    const clos = appliqueReparations(ROTONDE, [], { cuveClose: true }, REPARATIONS)
+    expect(clos.portes ?? []).toEqual([])
+    expect(accessible(clos, new Set())).toBe(true)
+  })
+
+  it('la largeur d’une bouche se règle : l’anneau se reconstruit autour', () => {
+    // une bouche plus large ouvre plus d'angle, sans changer le nombre d'arcs
+    const large = anneauCuve(260)
+    expect(large).toHaveLength(3)
+    expect(large[0].p1!).toBeLessThan(arcs[0].p1!)
   })
 })
 
@@ -377,16 +464,17 @@ describe('la rotonde — les trois routes : la matière garde les deux petites',
   })
 })
 
-describe('la rotonde — l’accident : les ancres posées, les ailes condamnées', () => {
+// RIEN NE BLOQUE (le concepteur, 22/11 : « pas de blocage »). Les stations
+// se réparent toujours, la panne se lit sur les pièces et les lampes, mais
+// aucune barrière ne ferme une aile, et aucun sceau le secteur 4.
+describe('la rotonde — l’accident : les stations se réparent, rien ne bloque', () => {
   const z = zonesDuHub(ROTONDE)!
 
-  it('chaque station du catalogue a son plot, chaque aile sa barrière', () => {
-    for (const r of REPARATIONS) {
-      expect(z.stations[r.id], r.id).toBeDefined()
-      if (r.porte) expect((z.portesDegat[r.id] ?? []).length, r.id).toBeGreaterThan(0)
-    }
-    for (const r of [z.tableDepart, z.sasScelle, z.sceau, z.porteCuve, z.sasGivre, z.sasVapeur])
-      expect(ancreAbsente(r)).toBe(false)
+  it('chaque station du catalogue a son plot ; ni barrière, ni sceau, ni porte de cuve', () => {
+    for (const r of REPARATIONS) expect(z.stations[r.id], r.id).toBeDefined()
+    expect(z.portesDegat).toEqual({})
+    for (const r of [z.sceau, z.porteCuve]) expect(ancreAbsente(r)).toBe(true)
+    for (const r of [z.tableDepart, z.sasScelle, z.sasGivre, z.sasVapeur]) expect(ancreAbsente(r)).toBe(false)
     expect(z.banc).toEqual(ZONES_ROTONDE.banc)
   })
 
@@ -408,46 +496,28 @@ describe('la rotonde — l’accident : les ancres posées, les ailes condamnée
     }
   })
 
-  it('en panne, le DÉPART reste ouvert — on ne condamne pas la sortie du jeu', () => {
-    const accidente = appliqueReparations(ROTONDE, [], {}, REPARATIONS)
-    expect(accessible(accidente, new Set())).toBe(true)
-    expect(accessible(vers(accidente, ZONES_ROTONDE.sasVapeur), new Set())).toBe(true)
-    expect(accessible(vers(accidente, ZONES_ROTONDE.sasGivre), new Set())).toBe(true)
-  })
-
-  it('le bac et l’aile sont CONDAMNÉS tant que leur station est en panne, ouverts ensuite', () => {
+  it('le pire cas — tout en panne, acte 0, l’arc du récit inachevé : tout se rejoint', () => {
+    const pire = appliqueReparations(ROTONDE, [], { cuveClose: true, finOuverte: false }, REPARATIONS)
+    expect(pire.portes ?? []).toEqual([])
+    const zr = ZONES_ROTONDE
     const fondBac: Rect = { minX: -60, minY: -1300, maxX: 60, maxY: -1200 }
     const fondAile: Rect = { minX: -1200, minY: -60, maxX: -1100, maxY: 60 }
-    for (const [id, zone] of [
-      ['bac-sable', fondBac],
-      ['aile-endormis', fondAile],
-    ] as const) {
-      const sans = appliqueReparations(ROTONDE, toutRepare.filter((x) => x !== id), {}, REPARATIONS)
-      expect(accessible(vers(sans, zone), new Set()), `${id} en panne`).toBe(false)
-      const avec = appliqueReparations(ROTONDE, toutRepare, {}, REPARATIONS)
-      expect(accessible(vers(avec, zone), new Set()), `${id} réparé`).toBe(true)
-    }
+    for (const [nom, zone] of [
+      ['sas', zr.sas],
+      ['vapeur', zr.sasVapeur],
+      ['givre', zr.sasGivre],
+      ['secteur 4', zr.sasScelle],
+      ['fond du bac', fondBac],
+      ['fond de l’aile', fondAile],
+      ...Object.entries(zr.stations),
+      ...Object.entries(zr.pupitres),
+    ] as [string, Rect][])
+      expect(accessible(vers(pire, zone), new Set()), nom).toBe(true)
   })
 
-  it('le secteur 4 : la passerelle PUIS le sceau — seule la fin de l’arc l’ouvre', () => {
-    const scelle = ZONES_ROTONDE.sasScelle
-    const sansPasserelle = appliqueReparations(ROTONDE, toutRepare.filter((x) => x !== 'passerelle-4'), { finOuverte: true }, REPARATIONS)
-    expect(accessible(vers(sansPasserelle, scelle), new Set())).toBe(false)
-    const sousSceau = appliqueReparations(ROTONDE, toutRepare, {}, REPARATIONS)
-    expect(accessible(vers(sousSceau, scelle), new Set())).toBe(false)
-    const ouvert = appliqueReparations(ROTONDE, toutRepare, { finOuverte: true }, REPARATIONS)
-    expect(accessible(vers(ouvert, scelle), new Set())).toBe(true)
-    // et l'ordre des prix est celui du plan : l'aile (50) se paie avant la
-    // passerelle (60), dont le plot est AU FOND de l'aile
-    const prix = (id: string): number => REPARATIONS.find((r) => r.id === id)!.prix
-    expect(prix('aile-endormis')).toBeLessThan(prix('passerelle-4'))
-    expect(ZONES_ROTONDE.stations['passerelle-4'].maxX).toBeLessThan(ZONES_ROTONDE.portesDegat['aile-endormis'][0].minX)
-  })
-
-  it('les plots où l’on PAIE sont devant leur barrière, jamais derrière', () => {
-    const accidente = appliqueReparations(ROTONDE, [], {}, REPARATIONS)
-    for (const id of ['eclairage', 'table-depart', 'mur-records', 'bac-sable', 'distillateur', 'aile-endormis'])
-      expect(accessible(vers(accidente, ZONES_ROTONDE.stations[id]), new Set()), id).toBe(true)
+  it('aucune pancarte ne promet une condamnation', () => {
+    const textes = ROTONDE.labels.map((l) => l.text).join(' · ')
+    expect(textes).not.toContain('CONDAMNÉ')
   })
 })
 
@@ -545,6 +615,5 @@ describe('la rotonde — les consoles et le décor des stations', () => {
     const cles = new Set(ROTONDE.labels.map((l) => l.cle).filter(Boolean))
     for (const r of REPARATIONS) for (const cle of r.labelsCaches) expect(cles.has(cle), cle).toBe(true)
     expect(cles.has('hub.secteur-scelle')).toBe(true)
-    expect(cles.has('hub.acces-condamne')).toBe(true)
   })
 })

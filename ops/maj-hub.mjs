@@ -1,3 +1,7 @@
+// ⚠ DEPUIS LE 22/11, LE HUB JOUÉ EST LA ROTONDE, de code HUB3 (levelIO.CODE_HUB) :
+// l'entrée « HUB » que ce script réécrit n'est plus jouée. Le script reste
+// pour l'historique ; ne pas le relancer en croyant mettre le hub à jour.
+//
 // MISE À JOUR DU HUB EN BIBLIOTHÈQUE — la bibliothèque partagée sert le
 // tableau de code 'HUB' AVANT le code (hubLevel) : tant que l'instantané
 // « le-module-meduse-compact » reste l'ancien, aucune refonte du hub
