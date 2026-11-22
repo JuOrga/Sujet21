@@ -1,0 +1,94 @@
+# LE RELAIS DU MULTI — déployé à la demande, jamais tout seul.
+#
+# relais/ est le serveur par qui passe une partie à deux (relais/index.js
+# dit pourquoi). Il ne change presque jamais ; il ne se déploie donc que sur
+# un geste :
+#
+#   git push -f origin <votre-branche>:relais-go     # la gâchette
+#
+# ou relais → Run workflow. Aucune poussée sur prod, dev ou une branche de
+# travail ne lance ce workflow : il coûte une minute d'Actions par
+# déploiement du relais, et rien le reste du temps.
+#
+# OÙ IL VIT. On voulait un projet Vercel à part (sujet21-relais). Le jeton
+# du dépôt ne peut pas en créer — « You don't have permission to create the
+# project », par la ligne de commande comme par l'API : il est borné au
+# projet du jeu, et c'est une borne qu'on ne contourne pas. Le relais est
+# donc déployé DANS le projet du jeu, comme un APERÇU qui ne contient que
+# lui : son dossier, son vercel.json (qui se déclare en Express), une seule
+# fonction — la limite des douze fonctions vaut par déploiement, pas par
+# projet. Le site en ligne n'est pas touché.
+#
+#   ⚠️ JAMAIS `--prod` ICI. Un déploiement de production depuis relais/
+#   remplacerait le JEU par le relais sur sujet21.vercel.app.
+#
+# Un aperçu reçoit une adresse NEUVE à chaque déploiement : c'est elle que
+# le jeu doit viser (src/multi/relais.ts, RELAIS_PUBLIC). Redéployer le
+# relais, c'est donc aussi mettre cette constante à jour. Le jour où le
+# multi sort du prototype, il lui faudra son projet et une adresse fixe.
+#
+# LE PIÈGE DE LA PREMIÈRE FOIS : pousser sur une gâchette qui n'existe pas
+# encore, avec des commits que le dépôt connaît déjà, ne lance rien —
+# GitHub ne voit aucun fichier modifié, et `paths-ignore` écarte l'exécution.
+# La gâchette existe désormais ; si on la recrée un jour, la poser d'abord
+# sur un commit ancien, puis sur le bon.
+#
+# Après le déploiement, l'essai (relais/essai.mjs) joue deux joueurs contre
+# le relais EN LIGNE, depuis ce serveur-ci — l'environnement d'analyse ne
+# le joint pas. Le résumé de l'exécution dit ce qu'il a vu.
+
+name: relais
+
+on:
+  push:
+    branches: [relais-go]
+    paths-ignore:
+      - 'docs/**'
+      - 'masters/**'
+      - 'ops/**'
+      - '**/*.md'
+  workflow_dispatch:
+
+concurrency:
+  group: relais
+  cancel-in-progress: true
+
+jobs:
+  deploie:
+    runs-on: ubuntu-latest
+    env:
+      VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+      VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Déployer le relais (un aperçu, jamais la production)
+        working-directory: relais
+        run: |
+          set -euo pipefail
+          # PAS de --prod : voir l'avertissement en tête de ce fichier
+          url=$(npx vercel@59.6.2 deploy --yes --token=${{ secrets.VERCEL_TOKEN }} | tail -1)
+          echo "déployé → $url"
+          echo "URL=$url" >> "$GITHUB_ENV"
+      - name: Essayer le relais en ligne
+        working-directory: relais
+        run: |
+          set -uo pipefail
+          domaine=$(echo "$URL" | sed 's#^https://##')
+          npm install --no-audit --no-fund >/dev/null 2>&1
+          {
+            echo "## Le relais"
+            echo
+            echo "### 👉 \`$domaine\`"
+            echo
+            echo "C'est l'adresse que le jeu doit viser : \`RELAIS_PUBLIC\` dans \`src/multi/relais.ts\`."
+            echo
+            echo '```'
+            echo "== pouls =="
+            curl -sS -m 20 "https://$domaine/" -w "\nHTTP %{http_code}\n" || true
+            echo "== essai à deux joueurs =="
+            node essai.mjs "wss://$domaine/ws" 8 2>&1 || true
+            echo '```'
+          } | tee -a "$GITHUB_STEP_SUMMARY"

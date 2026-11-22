@@ -8734,6 +8734,40 @@ const regie = new Regie(regieEl, {
   fermer: () => regie.close(),
 })
 document.getElementById('home-regie')?.addEventListener('click', () => regie.open())
+// ---- LE MULTI (multi/ecranMulti.ts) : un prototype de partie à deux -------
+// Derrière le mode concepteur, et chargé à la demande comme l'atelier : tout
+// son dossier (une copie du solveur, un rendu, la liaison) reste hors du
+// paquet de départ. Tant qu'il est ouvert, le jeu derrière lui ne simule ni
+// ne dessine (corpsImage rend la main) : la machine qui héberge une partie
+// a mieux à faire que d'animer une cuve que personne ne voit.
+let multiOuvert = false
+const chargeMulti = chargeUneFois('le multi', async () => {
+  const { creeEcranMulti } = await import('./multi/ecranMulti')
+  return creeEcranMulti(() => {
+    multiOuvert = false
+    // La manette du jeu n'est pas relevée tant que le multi couvre l'écran,
+    // mais elle n'a pas cessé de NOTER les appuis : sans cette relève à
+    // blanc, le A qui vient de valider « retour à l'accueil » dans le multi
+    // validerait aussi le bouton principal de l'accueil à l'image suivante.
+    manette.poll(performance.now() / 1000)
+  })
+})
+const ouvreMulti = (code?: string): void => {
+  void chargeMulti().then((ecran) => {
+    if (!ecran) return
+    multiOuvert = true
+    ecran.ouvre(code)
+  })
+}
+document.getElementById('home-multi')?.addEventListener('click', () => ouvreMulti())
+// LE LIEN D'INVITATION : « ?dev&multi=CODE » mène droit dans la partie —
+// l'ami n'a ni bouton à trouver ni code à taper (sur un téléphone, c'est la
+// différence entre rejoindre et renoncer). Le lien ne vaut qu'en mode
+// concepteur, comme le bouton : sans « ?dev », il ne fait rien.
+{
+  const code = new URLSearchParams(location.search).get('multi')
+  if (code && document.body.classList.contains('concepteur')) ouvreMulti(code)
+}
 // Sonde de test : la carte en cours d'édition
 ;(window as unknown as { __carte: () => unknown }).__carte = () =>
   editeurCarte?.carteCourante() ?? null
@@ -20395,6 +20429,14 @@ function corpsImage(now: number): boolean {
   // collecteur en tire le Hz réel du panneau (adaptatif sur mobile)
   if (tickPrecedent > 0) perf.tick(now - tickPrecedent)
   tickPrecedent = now
+  // LE MULTI COUVRE TOUT L'ÉCRAN : rien n'est simulé ni rendu derrière lui.
+  // L'horloge de l'image suit quand même : sans cela, la première image du
+  // retour porterait toute la durée de la partie à deux, et le rapport de
+  // performance y lirait une image de plusieurs minutes.
+  if (multiOuvert) {
+    lastTime = now
+    return false
+  }
   // Verrou de fréquence : l'image d'avance est SAUTÉE (rien n'est simulé ni
   // rendu — dtReal la rattrapera). Cadencement à DETTE CONSERVÉE : l'horloge
   // avance d'une période exacte, pas jusqu'à `now` — sinon le verrou cale
