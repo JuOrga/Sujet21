@@ -76,9 +76,10 @@ const GLACE_FONTE = 0.45
  *  faudrait une propulsion un peu plus efficace » (le concepteur, 22/11).
  *  Plus VITE, et non plus de gouttes : la même matière dépensée pousse plus
  *  fort. Mesuré, une seconde de poussée sur un corps de 900 : 54 u/s à
- *  1 400, 78 u/s ici — et 839 particules sur 900 au corps deux secondes plus
- *  tard dans les deux cas. Le jeu solo garde son jet. */
-export const JET_MULTI = 1900
+ *  1 400, 64 u/s ici — et ~840 particules sur 900 au corps deux secondes
+ *  plus tard dans les deux cas. Essayé d'abord à 1 900 (78 u/s) : le
+ *  concepteur l'a ramené à 1 700. Le jeu solo garde son jet. */
+export const JET_MULTI = 1700
 /** La cadence d'envoi de l'état, en images par seconde. Le solveur tourne
  *  à 120 pas par seconde ; l'invité prolonge chaque image avec les vitesses
  *  jusqu'à la suivante. Vingt, et non plus trente : la partie passe par le

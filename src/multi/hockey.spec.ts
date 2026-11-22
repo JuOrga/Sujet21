@@ -181,15 +181,15 @@ describe('hockey — le palet et l’eau', () => {
     }
     const libre = mesure(MODE_LIBRE)
     const hockey = mesure(MODE_HOCKEY)
-    // en partie libre la matière tirée est perdue (mesuré : 624 puis 620)
+    // en partie libre la matière tirée est perdue (mesuré : 615 puis 612)
     expect(libre.apres).toBeLessThan(700)
-    // au hockey le corps reste gros PENDANT la poussée (mesuré : 825 ; 628
+    // au hockey le corps reste gros PENDANT la poussée (mesuré : 816 ; 628
     // avec le premier réglage du retour, qui laissait les gouttes traîner)…
     expect(hockey.pendant).toBeGreaterThan(780)
-    // …et il est presque entier deux secondes après (mesuré : 896)
+    // …et il est presque entier deux secondes après (mesuré : 887)
     expect(hockey.apres).toBeGreaterThan(870)
-    // le retour n'est pas un frein ; il pousse un peu (mesuré : 404 u/s
-    // contre 362, les gouttes qui rentrent arrivent par l'arrière)
+    // le retour n'est pas un frein ; il pousse un peu (mesuré : 354 u/s
+    // contre 319, les gouttes qui rentrent arrivent par l'arrière)
     expect(hockey.vitesse).toBeGreaterThan(libre.vitesse * 0.9)
     expect(hockey.vitesse).toBeLessThan(libre.vitesse * 1.4)
   })

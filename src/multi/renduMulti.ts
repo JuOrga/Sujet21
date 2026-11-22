@@ -427,21 +427,23 @@ vec3 decor(vec2 monde, float px) {
     // l'ombre portée du fût, longue : il est haut
     float ombreQ = 1.0 - smoothstep(r * 1.1, r * 1.9, length(dq - vec2(12.0, 16.0)));
     fond *= 1.0 - 0.5 * ombreQ;
-    // la platine : un carré d'acier sombre, ses quatre boulons, et la bande
-    // jaune et noire tout autour
-    vec2 a = abs(dq);
-    float carre = max(a.x, a.y);
-    float platine = 1.0 - smoothstep(r * 1.6 - bordQ, r * 1.6 + bordQ, carre);
+    // l'EMBASE : un disque d'acier sombre, ses six boulons en cercle, et la
+    // bande jaune et noire en couronne. (Elle a d'abord été carrée : « il
+    // faut qu'ils soient ronds », le concepteur, 22/11 — le carré se lisait
+    // avant le fût.)
+    float embase = 1.0 - smoothstep(r * 1.6 - bordQ, r * 1.6 + bordQ, d);
     vec3 plat = vec3(0.16, 0.18, 0.21);
-    float bande = smoothstep(r * 1.3 - bordQ, r * 1.3 + bordQ, carre);
+    float bande = smoothstep(r * 1.3 - bordQ, r * 1.3 + bordQ, d);
+    float angleQ = atan(dq.y, dq.x) / 6.2831853;
     // (miré dans un corps, le trait est large : les rayures s'y fondent en
     // leur teinte moyenne — nettes, elles s'y lisaient comme des gribouillis)
-    float rayure = mix(step(0.5, fract((dq.x + dq.y) / (r * 0.55))), 0.5, clamp(px * 3.0 / (r * 0.55), 0.0, 1.0));
+    float rayure = mix(step(0.5, fract(angleQ * 14.0)), 0.5, clamp(px * 3.0 / (r * 0.55), 0.0, 1.0));
     plat = mix(plat, mix(vec3(0.07, 0.07, 0.08), vec3(0.86, 0.66, 0.12), rayure), bande);
-    vec2 boulon = a - vec2(r * 1.08);
-    float boulons = (1.0 - smoothstep(r * 0.11, r * 0.11 + bordQ, length(boulon))) * (1.0 - bande);
+    float secteur = (fract(angleQ * 6.0 + 0.5) - 0.5) / 6.0 * 6.2831853;
+    vec2 boulon = vec2(d * cos(secteur) - r * 1.15, d * sin(secteur));
+    float boulons = (1.0 - smoothstep(r * 0.09, r * 0.09 + bordQ, length(boulon))) * (1.0 - bande);
     plat = mix(plat, vec3(0.42, 0.45, 0.5), boulons);
-    fond = mix(fond, plat, platine);
+    fond = mix(fond, plat, embase);
     // la tête du fût
     float disqueQ = 1.0 - smoothstep(r - bordQ, r + bordQ, d);
     vec2 u = dq / r;

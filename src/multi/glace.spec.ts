@@ -246,7 +246,10 @@ describe('glace — le pouvoir, chez l’hôte', () => {
     pas(h, 120)
     const v1 = mesure(h.sim, 0)
     expect(v1.n).toBeGreaterThanOrEqual(v0.n)
-    expect(v1.vx).toBeCloseTo(v0.vx, 0)
+    // (à quelques u/s près : les gouttes du jet encore en route rejoignent le
+    // bloc avec leur élan — mesuré 0,6 u/s avec le jet du multi à 1 700 ;
+    // une seconde de vraie poussée en donnerait 64)
+    expect(Math.abs(v1.vx - v0.vx)).toBeLessThan(3)
     // le dash : d'un coup, dans le sens du mouvement
     h.commande(0, neutre({ x: c.centroidX - 400, y: c.centroidY, glace: true, dash: true }))
     pas(h, 3)
