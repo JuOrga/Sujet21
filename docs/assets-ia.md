@@ -2891,9 +2891,10 @@ dans `masters/images/sources/`, lancer `tools/images/conduite_atlas.py` puis
 
 ## 39. LA PORTE BLINDÉE — la dalle escamotable des portes de l'éditeur ✅ LIVRÉ (22/11)
 
-> **Rendue dans Blender** (`tools/images/blender/porte_blindee.py`) : un seul
-> atlas, `porte-blindee.webp` (1076 × 288, 8 Ko, luminance 0,19, 3 % de
-> pixels chauds — les deux liserés rouges).
+> **Rendue dans Blender** (`tools/images/blender/porte_blindee.py`) : un
+> atlas, `porte-blindee.webp` (1176 × 288, 9 Ko, luminance 0,19, 2 % de pixels
+> chauds — les deux liserés rouges), et la trappe de la porte ouverte en cinq
+> décalques de sol (`porte-trappe*.webp`, 1 à 3 Ko chacun).
 
 **Avant** : chaque porte posée à l'éditeur (`level.portes`) se dessinait au
 trait, en **rouge** — une « barrière d'énergie », aplat translucide barré de
@@ -2907,9 +2908,20 @@ le passage ».
 
 **La porte est une dalle d'acier escamotable** : close, elle est debout, son
 dessus au sommet des murs qu'elle relie ; elle s'ouvre en **s'enfonçant dans
-le sol** ; ouverte, il ne reste que les deux lèvres de sa fente, au ras du sol,
-et rien entre elles — le fluide qui passe se voit. Ni montant ni cadre de part
-et d'autre.
+le sol** ; ouverte, il ne reste que son dessus à fleur du sol — la **trappe**,
+liserés et veilleuses verts. Ni montant ni cadre de part et d'autre.
+
+**La trappe est un décalque de sol** (`decalsDesPortes`, posé sous le reste du
+décor par `decorAffiche`) : des carreaux bout à bout et un sabot à chaque bout,
+comme le dessus ; une porte debout prend les pièces tournées (`-v`, et
+`-v-haut` pour son sabot du haut : le miroir d'un décalque n'est
+qu'horizontal). Le moteur la peint SOUS le fluide — l'eau qui franchit la
+porte passe dessus — et sous le dessus des murs en relief. Le premier essai la
+peignait dans la toile 2D, par-dessus tout : deux lèvres de chevrons, le
+milieu vide pour que le fluide s'y voie — « quand c'est ouvert ce n'est pas
+très beau, il manque un asset pour porte ouverte » (le concepteur, 22/11). Elle
+est toujours posée : porte close, la dalle debout la recouvre. À l'éditeur
+(pas de décor de portes), la toile 2D la peint depuis l'atlas.
 
 Quatre pièces, la longueur à l'horizontale (les rectangles sont un contrat
 avec `src/render/porteBlindee.ts`, que `porteBlindee.spec.ts` relit dans le
@@ -2920,7 +2932,7 @@ script) :
 | `dessus` | d'en haut | 320 × 160 | la tranche haute de la dalle : deux tôles de chant, deux liserés rouges, l'âme nervurée en travers, l'échine boulonnée — **pas** de chevrons : vu d'en haut, on ne voit que le haut d'une dalle épaisse |
 | `bout` | d'en haut | 96 × 160 | le sabot d'extrémité (en miroir à l'autre bout) : le joint de caoutchouc qui frotte le mur, le bloc boulonné, la veilleuse — lentille éteinte, le moteur l'allume |
 | `flanc` | élévation | 320 × 280 | la grande face que le relief 2,5D dévoile : la lèvre de tête, **la bande de chevrons** (elle sort du sol la première), deux panneaux, la nervure boulonnée, le joint du pied — 2 px par unité, un mur haut (140 u) |
-| `fente` | d'en haut | 320 × 160 | les deux lèvres de la fente au sol, peintes de chevrons au pochoir, le milieu détouré |
+| `trappe`, `trappe-bout` | d'en haut | 320 × 160, 96 × 160 | **porte ouverte** : le dessus et le sabot de la dalle enfoncée à fleur du sol, liserés et veilleuse allumés en vert |
 
 **Le moteur** (`src/render/porteBlindee.ts`, appelé par `drawMecanismes` et
 par l'éditeur) répète le dessus et la face le long de la porte (un carreau de
@@ -2952,9 +2964,8 @@ de dessus, ses joints sous les leurs). La face est **accrochée par le haut** :
   d'abord peinte sur un calque, puis le **volume projeté** des solides
   voisins en est effacé — leur pied, leur dessus à leur hauteur, les
   quadrilatères que balaie chaque arête, par la même homothétie que le
-  shader (`volumeProjete`, `surCalque`). Au sol (fente, liserés verts,
-  veilleuses), tout solide masque ; pour une face, seule la part des solides
-  DEVANT son plan (`coupeDemiPlan`) — un mur plus bas que la porte n'en cache
+  shader (`volumeProjete`, `surCalque`). Pour une face, seule la part des
+  solides DEVANT son plan compte (`coupeDemiPlan`) — un mur plus bas que la porte n'en cache
   donc que le bas, ce qui dépasse se voit. Les bouts se peignent aussi :
   contre un mur aussi haut, ils disparaissent. Quatre captures du concepteur
   (22/11) y ont mené : la face peinte par-dessus le mur collé à elle ; puis,
@@ -2980,8 +2991,10 @@ mêmes teintes.
 ```bash
 python tools/images/blender/porte_blindee.py --rend SORTIE 384
 python -I tools/images/blender/porte_blindee.py SORTIE masters/images/porte-blindee.png
-python3 tools/images/prepare.py porte-blindee
+python3 tools/images/prepare.py porte-blindee porte-trappe porte-trappe-v porte-trappe-bout porte-trappe-bout-v porte-trappe-bout-v-haut
 ```
+
+(l'assemblage écrit aussi les décalques de la trappe dans `masters/images/`)
 
 ou dans Blender : `DOSSIER = r'…/tools/images/blender'`, exécuter
 `porte_blindee.py`, puis `porte()` et `lance(NOMS, SORTIE, 384)`.

@@ -299,6 +299,13 @@ export const DECAL_NOMS: Record<DecalDef['kind'], string> = {
   'meta-marchand': 'Méta — le Sujet 12',
   'sas-raccord': 'Sas de raccord',
   'sas-raccord-v': 'Sas de raccord (quart de tour)',
+  // la trappe d'une porte ouverte : synthétisée depuis les portes posées
+  // (porteBlindee.ts), jamais dans la palette
+  'porte-trappe': 'Porte — trappe',
+  'porte-trappe-v': 'Porte — trappe (quart de tour)',
+  'porte-trappe-bout': 'Porte — sabot de trappe',
+  'porte-trappe-bout-v': 'Porte — sabot de trappe (quart de tour)',
+  'porte-trappe-bout-v-haut': 'Porte — sabot de trappe (quart de tour, haut)',
   'hub-eclairage': 'Hub — réseau d’éclairage',
   'hub-table-depart': 'Hub — table de départ',
   'hub-mur-records': 'Hub — mur des records',
