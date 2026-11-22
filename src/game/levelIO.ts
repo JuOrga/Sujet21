@@ -139,8 +139,19 @@ function str(v: unknown, fallback = ''): string {
 }
 
 /** Le CODE DU HUB, en majuscules : le tableau qui porte ce code remplace le
- *  laboratoire et ne compte pas dans la séquence de l'expédition. */
-export const CODE_HUB = 'HUB'
+ *  laboratoire et ne compte pas dans la séquence de l'expédition.
+ *
+ *  HUB3 ET NON PLUS HUB, depuis la rotonde (game/hubRotonde.ts, le
+ *  concepteur, 22/11 : « je souhaite qu'il remplace le vrai hub lorsque
+ *  nous aurons livré en production »). La bibliothèque partagée porte une
+ *  entrée de code HUB — le module compact, semé par ops/maj-hub.mjs, peut-
+ *  être retouché à l'éditeur — et cette entrée PRIME sur le code : changer
+ *  le seul hub par défaut n'aurait rien changé en production. Changer le
+ *  code cherché, si : à la livraison, le jeu cherche HUB3, n'en trouve pas,
+ *  et joue la rotonde du code. L'entrée HUB reste intacte en bibliothèque
+ *  (rien d'effacé, rien de réécrit) ; elle n'est simplement plus jouée. Pour
+ *  remodeler la rotonde : ouvrir sa copie, publier sous HUB3. */
+export const CODE_HUB = 'HUB3'
 
 /** Canonise le code : « hub », « Hub », «  HUB  » désignent tous le hub —
  * et ses chantiers (« hub2 »…) s'écrivent en majuscules eux aussi. */
@@ -962,6 +973,7 @@ export function parseLevel(input: unknown): {
   }
   if (structures.length > 0) level.structures = structures
   if (o.coque === 'structures') level.coque = 'structures'
+  if (o.raccords === 'aucun') level.raccords = 'aucun'
 
   // LES ANCRES MÉTA du module : rôle dans la liste fermée, id de station
   // au catalogue des réparations (un rôle ou un id inconnu est écarté —
@@ -1154,6 +1166,7 @@ export function serializeLevel(level: LevelDef): string {
   if (level.plots?.length) out.plots = level.plots
   if (level.structures?.length) out.structures = level.structures
   if (level.coque === 'structures') out.coque = 'structures'
+  if (level.raccords === 'aucun') out.raccords = 'aucun'
   if (level.ancres?.length) out.ancres = level.ancres
   if (level.bancMemoires) out.bancMemoires = level.bancMemoires
   if (level.pupitres?.length) out.pupitres = level.pupitres

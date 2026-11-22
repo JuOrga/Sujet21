@@ -23,8 +23,9 @@ import { CaptureCodex } from './game/captureCodex'
 import { CADENCES_TAMPON, tamponDisponible, type CadenceTampon } from './game/tamponCapture'
 import { niveauExpanse } from './game/structures'
 import {
-  TABLEAU_HUB,
   articleComptoir,
+  hubDeBibliotheque,
+  hubParAdresse,
   zonesDuHub,
   type ArticleHub,
 } from './game/hub'
@@ -61,6 +62,7 @@ import {
   codeCanon,
   decodeCode21,
   decodeCodeAtelier,
+  CODE_HUB,
   estCodeHub,
   type CodeAtelier,
 } from './game/levelIO'
@@ -1127,7 +1129,10 @@ function finOuverte(): boolean {
 }
 function hubJoue(): LevelDef {
   const base = hubLevel()
-  const opts = { cuveClose: !eveilJoue() || alerteDifferee, finOuverte: finOuverte() }
+  const opts = {
+    cuveClose: !acteZeroPasse() || eveilEnCours || alerteDifferee,
+    finOuverte: finOuverte(),
+  }
   const cle = `${opts.cuveClose ? 'cuve|' : ''}${opts.finOuverte ? 'fin|' : ''}${records.reparationsFaites().sort().join('+')}`
   if (hubMemo && hubMemo.base === base && hubMemo.cle === cle) return hubMemo.lv
   const lv = appliqueReparations(base, records.reparationsFaites(), opts)
@@ -1135,8 +1140,14 @@ function hubJoue(): LevelDef {
   return lv
 }
 
+// LE HUB À L'ESSAI (`?hub=rotonde`, game/hub.ts) passe devant la
+// bibliothèque : on juge un module sur ce poste avant de le publier pour
+// tous. Lu une fois — l'adresse ne change pas sous la partie.
+const HUB_ESSAI = hubParAdresse(location.search)
 function hubLevel(): LevelDef {
-  return libraryLevels.find((l) => l.code === 'HUB') ?? TABLEAU_HUB
+  // la rotonde depuis le 22/11 (CODE_HUB, levelIO.ts) : l'entrée HUB3 de la
+  // bibliothèque, sinon celle du code
+  return HUB_ESSAI ?? hubDeBibliotheque(libraryLevels, CODE_HUB)
 }
 
 // LES SALLES DE MINI-JEU jouées : même règle — la copie de bibliothèque qui
@@ -1218,6 +1229,11 @@ function salleHub(): boolean {
 // reste close jusque-là. Sans cette attente, l'éveil gravé la rendait
 // introuvable : le joueur ne voyait jamais la brèche.
 let alerteDifferee = false
+// UN ÉVEIL EST EN COURS : la cuve des hubs qui en ont une reste close tant
+// qu'il dure. Un drapeau et non `eveil.etape` : hubJoue se lit dès le
+// premier applyLevel du chargement, des milliers de lignes avant que
+// `eveil` soit déclaré. Levé par lanceEveil, baissé quand l'éveil conclut.
+let eveilEnCours = false
 // Le tableau COMMENCE-t-il en vapeur (départ posé dans une zone qui
 // l'impose) ? Alors la vapeur est l'ÉTAT INITIAL, pas une bascule : elle ne
 // se paie pas. Le drapeau se consomme au premier basculement de l'image.
@@ -2480,6 +2496,30 @@ function eveilJoue(): boolean {
 // lancement. Le code et les cartes restent entiers au cas où — remettre
 // ce drapeau à true les rendrait au premier plan.
 const CARTES_GESTES: boolean = false
+// LE TUTO ET LA NARRATION DU HUB, MIS DE CÔTÉ À LEUR TOUR (le concepteur,
+// 22/11 : « désactive la narration du hub […] tuto désactivé par défaut »).
+// Même règle que les cartes gestuelles : le code reste entier, un drapeau
+// le rend.
+//  · EVEIL_PAR_DEFAUT : l'ÉVEIL (cryostase, cartes, ralenti — la prise en
+//    main scénarisée) ne se lance plus tout seul, ni à l'entrée au hub, ni à
+//    la reprise, ni au premier essai. Le bouton « rejouer l'éveil » du
+//    protocole le lance toujours : désactivé PAR DÉFAUT, pas supprimé.
+//  · NARRATION_HUB : les moments du scénario joués au hub se taisent — en
+//    arrivant (« premier lancement », « avant le hub ») comme en partant
+//    (« lancement de la run », la cinématique du départ : « coupe aussi la
+//    cinématique de départ », 22/11). L'ALERTE (la brèche de la cuve) suit
+//    l'éveil : sans éveil, pas d'alerte. Les PANNES, elles, jouent : ailes
+//    condamnées, stations à réparer — ce n'est pas de la narration, c'est
+//    la progression.
+const EVEIL_PAR_DEFAUT: boolean = false
+const NARRATION_HUB: boolean = false
+/** L'ACTE 0 EST-IL DERRIÈRE LE JOUEUR ? L'éveil joué, ou l'éveil qui ne se
+ *  joue plus de lui-même. Sans la seconde branche, un nouveau venu restait
+ *  avant l'acte 0 POUR TOUJOURS : la cuve des anciens hubs restait close, et
+ *  le récit (fragments, fins) ne se livrait jamais — il attend l'acte 0. */
+function acteZeroPasse(): boolean {
+  return eveilJoue() || !EVEIL_PAR_DEFAUT
+}
 function majOnboard(): void {
   const etapes = Array.from(
     onboardEl.querySelectorAll<HTMLElement>('.ob-etape'),
@@ -5174,8 +5214,11 @@ document.getElementById('proto-rejouer')?.addEventListener('click', () => {
   hasPlayed = true
   majAccueil()
   homeRestartBtn.hidden = false
+  // l'éveil AVANT le restart : le hub reconstruit le voit en cours
+  // (eveilEnCours) et ferme sa cuve — l'éveil étant désactivé par défaut,
+  // le seul « pas encore joué » ne suffit plus à la fermer
+  lanceEveil(true)
   restart()
-  lanceEveil()
 })
 // Réinitialiser l'opérateur : destructif, donc DEUX clics — le premier arme
 // le bouton (libellé rouge explicite), le second efface nom + registres
@@ -5413,7 +5456,8 @@ function entrerHub(): void {
   // LE SCÉNARIO : l'ouverture froide (une seule fois dans la vie du
   // joueur) puis l'arrivée au hub — elles s'enchaînent si les deux
   // s'appliquent. C'est ici que vit le fil narratif du roguelike.
-  void joueMoment('premier-lancement').then(() => joueMoment('avant-hub'))
+  if (NARRATION_HUB)
+    void joueMoment('premier-lancement').then(() => joueMoment('avant-hub'))
 }
 // L'AVIS DU JOUEUR SUR UNE SALLE (game/avisSalles.ts) : le CARNET du poste
 // — mes avis, et ceux qui attendent le magasin. La rangée du bilan
@@ -18875,7 +18919,7 @@ function restart(): void {
   input.freezeIntent = false
   input.gasIntent = false
   // un éveil en cours reprend du début : la cryostase ressaisit l'échantillon
-  if (eveil.etape !== 'off') lanceEveil()
+  if (eveil.etape !== 'off') lanceEveil(true)
   // chaque début de salle grave la progression de l'expédition principale
   sauveRun()
   applyLevel()
@@ -20041,8 +20085,12 @@ const eveil = {
 }
 // Sonde de test : suivre l'éveil depuis la console (comme __sim, __cam)
 ;(window as unknown as { __eveil: typeof eveil }).__eveil = eveil
-function lanceEveil(): void {
+function lanceEveil(force = false): void {
+  // désactivé par défaut : seul un geste explicite (le bouton du protocole,
+  // ou un éveil déjà en cours qu'un R relance) le joue
+  if (!force && !EVEIL_PAR_DEFAUT) return
   if (coffre.stockage.getItem(CLE_EVEIL)) return
+  eveilEnCours = true
   // relance propre (restart en plein éveil) : tout voile retombe d'abord
   for (const carte of [eveil1El, eveil2El]) {
     carte.hidden = true
@@ -20089,6 +20137,7 @@ function avanceEveil(): void {
     carteEveil(eveil2El, false)
     eveil.cible = 1
     eveil.etape = 'off'
+    eveilEnCours = false
     try {
       coffre.stockage.setItem(CLE_EVEIL, '1')
     } catch {
@@ -21567,11 +21616,15 @@ function corpsImage(now: number): boolean {
     audio.collect()
     bande.ponctuation('sting-collecte', 0.85)
     // LE SCÉNARIO : la cinématique du départ, s'il y en a une — la run
-    // attend qu'elle finisse (la simulation est en pause pendant ce temps)
-    void joueMoment('lancement-run').then(() => {
+    // attend qu'elle finisse (la simulation est en pause pendant ce temps).
+    // Elle se tait avec la narration du hub (NARRATION_HUB) : on part tout
+    // de suite.
+    const partir = (): void => {
       effaceRun()
       newExpedition(true)
-    })
+    }
+    if (NARRATION_HUB) void joueMoment('lancement-run').then(partir)
+    else partir()
   } else if (!tableauDone && !sim.dispersed && estMiniJeu(level) && level.minijeu && (majPalet(), majRafales(), majOrbites(), majCibles(), minijeuResultat)) {
     // LE MINI-JEU A CONCLU : la lame du couperet a pesé, le palet a fait
     // ses lancers (ou le joueur a conclu). Rien ne se consigne aux registres
@@ -21784,7 +21837,7 @@ function corpsImage(now: number): boolean {
       // RÉCIT et FINS), le toast est celui des fiches. Jamais depuis
       // l'outil, un ESSAI d'éditeur, ni avant l'acte 0 : le récit ne se
       // livre qu'aux vraies descentes.
-      if (!sasOutil && eveilJoue() && !testLevel) {
+      if (!sasOutil && acteZeroPasse() && !testLevel) {
         const journal = journalCourant()
         const fragment = prochainFragment(journal, records.decouvertesVues())
         if (fragment) {

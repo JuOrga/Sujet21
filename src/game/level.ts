@@ -972,6 +972,12 @@ export interface LevelDef {
   // paroi autour des bornes — 'structures' les tait, et le dehors devient
   // le vide spatial autour des modules posés.
   coque?: 'cuve' | 'structures'
+  // LES SAS DE RACCORD : à chaque jonction de couloir, le moteur pose un col
+  // d'amarrage peint (metaAssets.decalsDuMeta) pour masquer la couture entre
+  // deux coques. Absent : posés, comme toujours. 'aucun' : la jonction reste
+  // nue — le concepteur n'en veut pas dans la rotonde (22/11 : « supprimer
+  // les éléments graphiques entre les pièces, je n'aime pas du tout »).
+  raccords?: 'aucun'
   // LES ANCRES MÉTA du module : stations de réparation, portes de dégât,
   // table de départ, secteur scellé, porte de cuve, sas gardés. Absentes,
   // la géométrie du hub tranche encore (les vieux instantanés) — présentes,

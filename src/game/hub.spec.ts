@@ -8,7 +8,11 @@ import {
   zonesDuHub,
   zonesPosees,
   ancreAbsente,
+  HUBS_LIVRES,
+  hubDeBibliotheque,
+  hubParAdresse,
 } from './hub'
+import { TABLEAU_HUB_ROTONDE } from './hubRotonde'
 import {
   dansBoite,
   MAT_CHAUD,
@@ -18,7 +22,7 @@ import {
   MAT_SURCHAUFFEUR,
   MAT_WALL,
 } from './level'
-import { checkLevel } from './levelIO'
+import { CODE_HUB, checkLevel } from './levelIO'
 import { MAX_LUMIERES } from '../render/renderer'
 import { niveauExpanse } from './structures'
 import { accessible } from './generateur'
@@ -442,5 +446,59 @@ describe('le méta EN DONNÉES — les zones deviennent des plots posés', () =>
       )
       expect(tableau.bancMemoires).toEqual(zones.banc)
     }
+  })
+})
+
+// LE HUB À L'ESSAI : `?hub=rotonde` joue un module livré sur ce poste, sans
+// rien publier. Un nom inconnu ne force rien — la bibliothèque tranche.
+describe('hubParAdresse — juger un module avant de le publier', () => {
+  it('les trois modules livrés répondent à leur nom', () => {
+    expect(hubParAdresse('?hub=grand')).toBe(TABLEAU_HUB)
+    expect(hubParAdresse('?hub=compact')).toBe(TABLEAU_HUB_COMPACT)
+    expect(hubParAdresse('?hub=rotonde')).toBe(TABLEAU_HUB_ROTONDE)
+    expect(Object.keys(HUBS_LIVRES).sort()).toEqual(['compact', 'grand', 'rotonde'])
+  })
+
+  it('tolère la casse et les espaces, à côté d’autres paramètres', () => {
+    expect(hubParAdresse('?dev&hub=%20Rotonde%20&horsligne')).toBe(TABLEAU_HUB_ROTONDE)
+  })
+
+  it('sans paramètre, ou sur un nom inconnu : rien n’est forcé', () => {
+    expect(hubParAdresse('')).toBe(null)
+    expect(hubParAdresse('?tableau=3')).toBe(null)
+    expect(hubParAdresse('?hub=')).toBe(null)
+    expect(hubParAdresse('?hub=rotondee')).toBe(null)
+    // un nom hérité d'Object.prototype n'est pas un module
+    expect(hubParAdresse('?hub=constructor')).toBe(null)
+    expect(hubParAdresse('?hub=tostring')).toBe(null)
+  })
+
+  it('les trois portent un code de la famille du hub, tous différents', () => {
+    const codes = Object.values(HUBS_LIVRES).map((lv) => lv.code)
+    expect(new Set(codes).size).toBe(3)
+    for (const c of codes) expect(c).toMatch(/^HUB\d*$/)
+  })
+})
+
+// LA ROTONDE REMPLACE LE HUB À LA LIVRAISON (le concepteur, 22/11). La
+// bibliothèque porte une entrée de code HUB (le compact, semé par script,
+// peut-être retouché) qui primait sur le code : il fallait changer le code
+// CHERCHÉ, pas seulement le hub par défaut.
+describe('le hub joué — la rotonde, sauf copie publiée sous son code', () => {
+  const copie = (code: string, name: string) => ({ ...TABLEAU_HUB_COMPACT, code, name })
+
+  it('le code du laboratoire est celui de la rotonde', () => {
+    expect(CODE_HUB).toBe('HUB3')
+    expect(TABLEAU_HUB_ROTONDE.code).toBe(CODE_HUB)
+  })
+
+  it('l’ancienne entrée « HUB » de la bibliothèque ne masque plus la rotonde', () => {
+    expect(hubDeBibliotheque([copie('HUB', 'ancien hub publié')], CODE_HUB)).toBe(TABLEAU_HUB_ROTONDE)
+    expect(hubDeBibliotheque([], CODE_HUB)).toBe(TABLEAU_HUB_ROTONDE)
+  })
+
+  it('une copie publiée sous HUB3 prime : le concepteur remodèle la rotonde', () => {
+    const remodelee = copie('HUB3', 'rotonde retouchée')
+    expect(hubDeBibliotheque([copie('HUB', 'ancien'), remodelee], CODE_HUB)).toBe(remodelee)
   })
 })
