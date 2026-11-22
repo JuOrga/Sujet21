@@ -536,11 +536,19 @@ describe('la cérémonie — le choix de la salle tient dans l’écran', () => 
     expect(garde, 'la garde avant la visée').toBeLessThan(choisit.indexOf('garde.clic('))
   })
 
-  it('la mini-carte plafonne sa hauteur, sa fiche ne prend aucune place', () => {
+  it('la mini-carte plafonne sa hauteur', () => {
     expect(regle('.mv-svg')).toMatch(/max-height:\s*22vh/)
-    expect(regle('.mv-fiche')).toMatch(/position:\s*absolute/)
-    // au repos, la fiche se tait : plus de consigne par défaut
     expect(corps('mbMontreSallesVoie')).not.toContain('visez une porte')
+  })
+  // « du texte qui apparaît au centre de la page quand on sélectionne un
+  // tableau, il faut l'enlever » (le concepteur, 22/11) : la fiche de la
+  // mini-carte (« VOIE DU HAUT · tableau du pool · ferme 10 cases ») est
+  // partie ; la carte éteint toujours ce qu'une porte ferme
+  it('ne pose plus de fiche sous la mini-carte quand on vise une porte ou une case', () => {
+    expect(MAIN).not.toContain('ficheVoies')
+    expect(MAIN).not.toContain('mv-fiche')
+    expect(HTML).not.toContain('.mv-fiche')
+    expect(corps('mbMontreSallesVoie')).toContain("classList.add('mv-perdu')")
   })
 })
 
@@ -1351,6 +1359,36 @@ describe('la cérémonie — le tirage', () => {
     expect(regle('.mb-rive.mb-rive-dedans')).toMatch(/pointer-events:\s*none/)
     // le tirage, lui, garde sa flottaison tenue par la feuille
     expect(ONDE).toContain('flotteTenue: options.flotteTenue ?? !retrait')
+  })
+  // « applique aussi cet effet aux différents boutons, passer, continuer et
+  // avis », puis « également aux boutons dans les salles mystères,
+  // rencontre etc. » (le concepteur, 22/11)
+  it('donne l’eau aux boutons : le verbe de chaque étape, les crans de l’avis, les offres des haltes', () => {
+    const aide = corps('mbEauAuBouton')
+    // la visée que la feuille dessine : le focus VISIBLE, pas le focus posé
+    // par programme sur le verbe à chaque bilan
+    expect(aide).toContain("btn.matches(':focus-visible')")
+    expect(aide).toContain("btn.addEventListener('pad-vise', () => o.vise())")
+    // le verbe est un aplat : son bord ondule
+    expect(MAIN).toMatch(/const MB_EAU_VERBE: OptionsOnde = \{\s*mode: 'bord'/)
+    expect(MAIN).toContain("mbEauAuBouton(mbEl('mb-passer'), MB_EAU_VERBE)")
+    for (const cls of ['mb-levier mb-module-levier', 'mb-levier mb-fin-levier', 'mb-levier mb-halte-levier'])
+      expect(MAIN, cls).toContain(`btn.className = '${cls}'\n  mbEauAuBouton(btn, MB_EAU_VERBE)`)
+    expect(MAIN.match(/mbEauAuBouton\(btn, MB_EAU_VERBE\)/g)?.length).toBe(6)
+    // les offres : repos, don, rencontre, palet
+    expect(MAIN.match(/mb-offre[^\n]*\n\s*mbEauAuBouton\(btn, MB_EAU_OFFRE\)/g)?.length).toBe(4)
+    for (const f of ['mbMontreRepos', 'mbMontreDon', 'mbPeintEvenement', 'mbMontreChoixPalet'])
+      expect(corps(f), f).toContain('mbEauAuBouton(btn, MB_EAU_OFFRE)')
+    // les crans de l'avis, refaits à chaque bilan
+    expect(corps('mbAvisOuvre')).toMatch(/for \(const cran of mbEl\('mb-avis-crans'\)\.children\)\s*mbEauAuBouton\(/)
+    expect(css).toMatch(/\.mb-avis-cran\.mb-liquide \{ border-color: transparent; \}/)
+    // ils portent la toile : relatifs
+    for (const s of ['.mb-passer', '.mb-avis-cran', '.mb-halte-levier', '.mb-module-levier', '.mb-fin-levier'])
+      expect(regle(s), s).toMatch(/position:\s*relative/)
+    // un bouton désactivé se voit, il ne se vise pas ; un bouton caché sous
+    // la visée lâche la boucle
+    expect(ONDE).toContain('(face as HTMLButtonElement).disabled) return')
+    expect(ONDE).toContain('e.pli.getClientRects().length === 0')
   })
   it('se tait sous « moins d’animations » : ni eau, ni ressort', () => {
     const moins = css.slice(css.lastIndexOf('prefers-reduced-motion: reduce'))

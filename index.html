@@ -8374,7 +8374,8 @@
          dès l'ouverture. Il était sourd, couleur acier, pour ne pas disputer
          l'écran à la bonbonne sous ses lueurs : sur une scène à plat, il est
          le seul aplat — le verbe se lit, comme à l'accueil. */
-      .mb-passer { align-self: center; flex: none; }
+      /* (relatif : il porte la toile de son bord d'eau, ondeVue.ts) */
+      .mb-passer { position: relative; align-self: center; flex: none; }
       .mb-passer[hidden] { display: none; }
       /* L'AVIS SUR LA SALLE : une rangée sourde sous le levier — cinq crans
          d'acier, le mot du cran à droite. Elle ne dispute rien à la
@@ -8391,7 +8392,7 @@
       .mb-avis-titre { font-family: var(--font-display); white-space: nowrap; }
       .mb-avis-crans { display: inline-flex; gap: 6px; }
       .mb-avis-cran {
-        width: 36px; height: 36px; padding: 0; border-radius: 0; cursor: pointer;
+        position: relative; width: 36px; height: 36px; padding: 0; border-radius: 0; cursor: pointer;
         font-family: var(--font-display); font-size: calc(12px * var(--ui)); font-variant-numeric: tabular-nums;
         color: var(--mb-legende); background: none;
         border: 1px solid var(--line-strong);
@@ -8804,6 +8805,8 @@
          revient pendant que l'eau s'éteint */
       .mb-pli.mb-liquide .crt-draft, .mb-pli.mb-liquide .crt-draft:focus-visible,
       .mb-pli.mb-liquide .crt-draft.pad-focus { box-shadow: none; }
+      /* un cran d'avis : son filet d'acier s'efface sous le filet d'eau */
+      .mb-avis-cran.mb-liquide { border-color: transparent; }
       .mb-pli .crt-draft.mb-pauvre { opacity: 0.4; cursor: not-allowed; }
       /* LE CHOIX : l'élue s'avance et grandit, les autres tombent (le pli
          peut alors s'aplatir : chacun est sur sa face) */
@@ -8953,7 +8956,8 @@
         letter-spacing: 0.12em; color: var(--mb-encre);
       }
       .mb-halte-rien { margin: 0; font-size: calc(12px * var(--ui)); color: var(--mb-legende); }
-      .mb-halte-levier { grid-column: 1 / -1; justify-self: center; margin-top: 4px; }
+      /* (relatifs, les verbes : ils portent la toile de leur bord d'eau) */
+      .mb-halte-levier { position: relative; grid-column: 1 / -1; justify-self: center; margin-top: 4px; }
       /* les teintes des jauges et des offres qui ne sont pas des gains */
       .mb-cartouche-reserve { --mb-liseret: var(--mb-bleu); }
       .mb-cartouche-secours { --mb-liseret: var(--glow); }
@@ -9202,7 +9206,7 @@
         flex: 0 1 calc(236px * var(--ui));
         animation-delay: calc(0.95s + var(--i, 0) * 0.08s);
       }
-      .mb-module-levier { grid-column: 1 / -1; justify-self: center; margin-top: 4px; }
+      .mb-module-levier { position: relative; grid-column: 1 / -1; justify-self: center; margin-top: 4px; }
       /* ---- LES PORTES : le choix de la prochaine salle. Chaque salle est
          une porte — son plan en vitrine, son code, son nom ; visée, elle
          prend le voile et les équerres, et son verbe paraît ; élue, elle
@@ -9371,18 +9375,6 @@
       /* LE SAS : la sortie du module */
       .mv-sas rect { fill: var(--mb-coque-claire); stroke: #8aa6bc; stroke-width: 1.5; }
       .mv-sas path { fill: none; stroke: var(--ink); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
-      /* LA FICHE de la mini-carte : une ligne, EN SURIMPRESSION au pied de
-         la carte (sur les titres « SALLE n »), et seulement à la visée. Une
-         ligne réservée sous la carte coûtait sa hauteur à chaque écran, et
-         sa consigne par défaut se lisait comme une information de plus */
-      .mv-fiche {
-        position: absolute; left: 50%; bottom: 2px; transform: translateX(-50%);
-        margin: 0; max-width: 100%; padding: 2px 10px;
-        background: rgba(3, 7, 16, 0.94);
-        font-size: calc(11px * var(--ui)); letter-spacing: 0.06em; pointer-events: none;
-        color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-align: center;
-      }
-      .mv-fiche[hidden] { display: none; }
       /* au doigt : la porte armée attend un second toucher — elle garde la
          visée, un filet en plus, et son verbe dit « TOUCHEZ ENCORE » */
       .mb-porte.mb-armee { background: var(--mb-visee); box-shadow: inset 0 0 0 1px var(--specimen); }
@@ -9662,7 +9654,7 @@
       /* le verbe paraît à 1,2 s (LEVIER_FIN_MS, finDescente.ts), pendant que
          les cartouches claquent ; il a le focus dès l'ouverture mais ne
          répond qu'une fois paru (levierFinPret) */
-      .mb-fin-levier { grid-column: 1 / -1; justify-self: center; min-width: min(360px, 100%); animation-delay: 1.2s; }
+      .mb-fin-levier { position: relative; grid-column: 1 / -1; justify-self: center; min-width: min(360px, 100%); animation-delay: 1.2s; }
       @media (max-width: 760px) {
         /* un téléphone debout : la bande 16:9 remonte au-dessus du relevé,
            qui s'empile sur trois rangs */

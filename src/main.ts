@@ -123,11 +123,10 @@ import {
   NOMS_PRIME,
   PRIMES,
   cheminDePorte,
-  ditNoeud,
   fermeParPorte,
   REPERES_VOIE,
 } from './game/voiesModule'
-import { armeAuToucher, ARMEE, viseePuisEntree } from './game/porteArmee'
+import { armeAuToucher, viseePuisEntree } from './game/porteArmee'
 import { CLE_MANQUES, inventairePool, litManques, noteManque, type Manque } from './game/manques'
 import {
   arriveRafales,
@@ -231,7 +230,7 @@ import { FIGURE_FAMILLES, FIGURE_NOMS } from './game/figures'
 import { CIRCUITS } from './game/circuits'
 import type { EtatsOuverts, LevierId } from './game/leviers'
 import { ondeCarte } from './game/ondeVue'
-import type { OndeCarte } from './game/ondeVue'
+import type { OndeCarte, OptionsOnde } from './game/ondeVue'
 import {
   brouillonRecompensesActif,
   catalogueRecompenses,
@@ -15127,6 +15126,7 @@ function mbMontreChoixPalet(dernier: Lancer): void {
     const btn = document.createElement('button')
     btn.type = 'button'
     btn.className = 'mb-cartouche mb-offre'
+    mbEauAuBouton(btn, MB_EAU_OFFRE)
     btn.style.setProperty('--i', String(i))
     btn.innerHTML = offreHTML({ icone, nom, detail })
     btn.addEventListener('click', () => {
@@ -16218,6 +16218,7 @@ function mbMontreBilanModule(): void {
   const btn = document.createElement('button')
   btn.type = 'button'
   btn.className = 'mb-levier mb-module-levier'
+  mbEauAuBouton(btn, MB_EAU_VERBE)
   btn.textContent = 'CHOISIR LA COURSIVE SUIVANTE ▸'
   btn.addEventListener('click', () => {
     if (btn.disabled || gesteTropTot(performance.now(), ouvertA)) return
@@ -17096,6 +17097,7 @@ function mbMontreRepos(m: ModuleCarte, suite: () => void = () => mbMontreCarte('
     const btn = document.createElement('button')
     btn.type = 'button'
     btn.className = `mb-cartouche mb-offre mb-cartouche-${iconeDuGlyphe(o.icone) ?? 'offre'}` + (o.possible ? '' : ' mb-pauvre')
+    mbEauAuBouton(btn, MB_EAU_OFFRE)
     btn.disabled = !o.possible
     btn.style.setProperty('--i', String(i))
     btn.innerHTML = offreHTML({ glyphe: o.icone, nom: o.nom, detail: o.detail })
@@ -17140,6 +17142,7 @@ function mbMontreDon(m: ModuleCarte, suite: () => void = () => mbMontreCarte('su
   const btn = document.createElement('button')
   btn.type = 'button'
   btn.className = `mb-cartouche mb-offre mb-cartouche-${iconeDuGlyphe(o.icone) ?? 'offre'}`
+  mbEauAuBouton(btn, MB_EAU_OFFRE)
   btn.innerHTML = offreHTML({ glyphe: o.icone, nom: o.nom, detail: o.detail })
   const ouvertA = performance.now()
   let elu = false
@@ -17495,7 +17498,6 @@ function propositionsVoie(seq: LevelDef[]): CarteVoie[] | null {
 }
 
 /** La ligne de fiche de la mini-carte du choix en cours (rien sans elle). */
-let ficheVoies: (t: string | null) => void = () => {}
 
 function mbMontreSallesVoie(cartes: CarteVoie[]): void {
   mbEtape = 'salles'
@@ -17550,36 +17552,14 @@ function mbMontreSallesVoie(cartes: CarteVoie[]): void {
       trace: carteRun.trace,
       portes: cartes.map((c) => c.voie).filter((v): v is number => v !== undefined),
     })
-    // LA FICHE DE LA MINI-CARTE : ce qu'est la case ou la porte visée —
-    // l'infobulle native ne paraissait ni à la manette ni au doigt. Elle ne
-    // paraît QUE visée, posée en surimpression au pied de la carte : elle ne
-    // prend aucune hauteur (la carte ne « saute » pas), et la consigne par
-    // défaut qui l'occupait au repos est partie avec l'épure
-    const fiche = document.createElement('p')
-    fiche.className = 'mv-fiche'
-    voies.appendChild(fiche)
+    // LA FICHE DE LA MINI-CARTE est partie : une ligne qui paraissait au
+    // milieu de l'écran, au pied de la carte, à chaque porte ou case visée
+    // (« VOIE DU HAUT · tableau du pool · ferme 10 cases ») — « du texte qui
+    // apparaît au centre de la page quand on sélectionne un tableau, il
+    // faut l'enlever » (le concepteur, 22/11). La carte dit déjà ce qu'une
+    // porte ferme : elle l'éteint (allume, plus bas)
     host.appendChild(voies)
-    ficheVoies = (t: string | null): void => {
-      fiche.textContent = t ?? ''
-      fiche.hidden = !t
-    }
-    ficheVoies(null)
-    // survoler une case de la grille la décrit aussi
-    const svg = voies.querySelector('.mv-svg')
-    svg?.addEventListener('pointerover', (e) => {
-      const g = (e.target as Element).closest('.mv-noeud')
-      const nd = g ? mini.rangs[Number(g.getAttribute('data-rang'))]?.[Number(g.getAttribute('data-voie'))] : undefined
-      const rep = nd ? REPERES_VOIE[nd.voie] : undefined
-      if (nd && rep) ficheVoies(`SALLE ${nd.rang + 1} · ${rep.signe} VOIE DU ${rep.nom} · ${ditNoeud(nd)}`)
-    })
-    svg?.addEventListener('pointerleave', () => {
-      // au doigt, quitter la grille ne vaut pas quitter la porte armée :
-      // sa fiche revient (revue de la PR, 25/09)
-      const armee = host.querySelector(`.${ARMEE}`)
-      if (armee) armee.dispatchEvent(new Event('pad-vise'))
-      else ficheVoies(null)
-    })
-  } else ficheVoies = () => {}
+  }
   // LES MANQUES DU POOL se notent quand le choix se prend, une fois : ce
   // sont les trous que ce choix a réellement présentés au joueur
   let manquesNotes = false
@@ -17642,11 +17622,7 @@ function mbMontreSallesVoie(cartes: CarteVoie[]): void {
         if (!svg) return
         for (const el of svg.querySelectorAll('.mv-perdu, .mv-entree, .mv-vise'))
           el.classList.remove('mv-perdu', 'mv-entree', 'mv-vise')
-        if (!oui) {
-          // une porte armée au doigt garde son aperçu
-          if (!porte.classList.contains(ARMEE)) ficheVoies(null)
-          return
-        }
+        if (!oui) return
         const vient = derniereVoie(carteRun)
         const perdu = fermeParPorte(mini, carteRun.niveau, voie, portes, vient)
         for (const k of perdu.noeuds) {
@@ -17658,14 +17634,6 @@ function mbMontreSallesVoie(cartes: CarteVoie[]): void {
         if (entree) svg.querySelector(`.mv-lien[data-lien="${entree}"]`)?.classList.add('mv-entree')
         svg.querySelector(`.mv-noeud[data-rang="${carteRun.niveau}"][data-voie="${voie}"]`)?.classList.add('mv-vise')
         svg.querySelector(`.mv-repere[data-voie="${voie}"]`)?.classList.add('mv-vise')
-        const nd = mini.rangs[carteRun.niveau]?.[voie]
-        const rep = REPERES_VOIE[voie]
-        const n = perdu.noeuds.length
-        if (nd && rep)
-          ficheVoies(
-            `${rep.signe} VOIE DU ${rep.nom} · ${ditNoeud(nd)} · ` +
-              (n > 0 ? `ferme ${n} case${n > 1 ? 's' : ''} (éteinte${n > 1 ? 's' : ''})` : 'ne ferme rien'),
-          )
       }
       for (const ev of ['pointerenter', 'focusin', 'pad-vise'] as const) porte.addEventListener(ev, () => allume(true))
       for (const ev of ['pointerleave', 'focusout', 'pad-quitte'] as const) porte.addEventListener(ev, () => allume(false))
@@ -18023,6 +17991,7 @@ function mbMontreResultatMiniJeu(r: NonNullable<typeof minijeuResultat>, suite: 
   const btn = document.createElement('button')
   btn.type = 'button'
   btn.className = 'mb-levier mb-halte-levier'
+  mbEauAuBouton(btn, MB_EAU_VERBE)
   btn.textContent = 'REPRENDRE LA DESCENTE ▸'
   btn.addEventListener('click', () => {
     if (btn.disabled || gesteTropTot(performance.now(), ouvertA)) return
@@ -18112,6 +18081,7 @@ function mbMontreCache(m: ModuleCarte): void {
   const btn = document.createElement('button')
   btn.type = 'button'
   btn.className = 'mb-levier mb-halte-levier'
+  mbEauAuBouton(btn, MB_EAU_VERBE)
   btn.textContent = 'REPRENDRE LA DESCENTE ▸'
   btn.addEventListener('click', () => {
     if (btn.disabled || gesteTropTot(performance.now(), ouvertA)) return
@@ -18283,6 +18253,7 @@ function mbPeintEvenement(ev: EvenementDef, alea: () => number): void {
     const btn = document.createElement('button')
     btn.type = 'button'
     btn.className = 'mb-cartouche mb-offre' + (possible ? '' : ' mb-pauvre')
+    mbEauAuBouton(btn, MB_EAU_OFFRE)
     btn.disabled = !possible
     btn.style.setProperty('--i', String(i))
     // le détail ne se lit que d'une offre déjà prise ; une offre hors de
@@ -18341,6 +18312,7 @@ function mbTranche(ev: EvenementDef, choix: ChoixEvenement, alea: () => number):
   const btn = document.createElement('button')
   btn.type = 'button'
   btn.className = 'mb-levier mb-halte-levier'
+  mbEauAuBouton(btn, MB_EAU_VERBE)
   btn.textContent = 'REPRENDRE LA DESCENTE ▸'
   btn.addEventListener('click', () => {
     if (btn.disabled || gesteTropTot(performance.now(), ouvertA)) return
@@ -18373,6 +18345,7 @@ function mbMontreFin(): void {
   const btn = document.createElement('button')
   btn.type = 'button'
   btn.className = 'mb-levier mb-halte-levier'
+  mbEauAuBouton(btn, MB_EAU_VERBE)
   btn.textContent = 'SALLE SUIVANTE ▸'
   btn.addEventListener('click', () => {
     if (btn.disabled || gesteTropTot(performance.now(), ouvertA)) return
@@ -18481,6 +18454,7 @@ function mbMontreFinDescente(issue: IssueDescente, r: ReleveDescente, suite: () 
   const btn = document.createElement('button')
   btn.type = 'button'
   btn.className = 'mb-levier mb-fin-levier'
+  mbEauAuBouton(btn, MB_EAU_VERBE)
   btn.textContent = levierFin(issue, levelIndex + 1)
   btn.addEventListener('click', () => {
     if (btn.disabled) return
@@ -18712,6 +18686,50 @@ function mbSauteBilan(): void {
 }
 mbEl('mb-passer').addEventListener('click', mbSauteBilan)
 
+/**
+ * LE CONTOUR D'EAU D'UN BOUTON de la cérémonie — le verbe PASSER /
+ * CONTINUER, les crans de l'avis : « applique aussi cet effet aux
+ * différents boutons » (le concepteur, 22/11). La visée est celle que la
+ * feuille dessine déjà pour eux : le survol (écouté par l'onde), le focus
+ * VISIBLE (le clavier) et la manette — pas un focus posé par programme, que
+ * le verbe reçoit à chaque bilan pour qu'Entrée et A le trouvent : l'eau
+ * aurait ondulé sous chaque bilan sans qu'on vise rien.
+ */
+function mbEauAuBouton(btn: HTMLElement, options: OptionsOnde): OndeCarte {
+  const o = ondeCarte(btn, btn, sansAnimation, options)
+  btn.addEventListener('focusin', () => { if (btn.matches(':focus-visible')) o.vise() })
+  btn.addEventListener('pad-vise', () => o.vise())
+  for (const ev of ['focusout', 'pad-quitte'] as const) btn.addEventListener(ev, () => o.quitte())
+  return o
+}
+// LE VERBE de chaque étape (PASSER / CONTINUER, celui d'une cache, d'un
+// mini-jeu, d'une rencontre, du module, de la fin) est un APLAT : un filet
+// bleu sur du bleu ne se verrait pas — c'est son bord qui ondule
+// (ondeVue.ts, mode « bord »), au coin coupé du verbe (12 px)
+const MB_EAU_VERBE: OptionsOnde = {
+  mode: 'bord',
+  retrait: 4,
+  amplitude: 0.5,
+  pas: 4,
+  chanfrein: 12,
+  flotte: -2,
+  inclinaison: 4,
+  perspective: 600,
+}
+// LES OFFRES d'une halte (repos, don, choix d'une rencontre, palet) : des
+// cartouches sans filet ni chanfrein, qui prennent le voile à la visée —
+// le filet d'eau, à 4 px du bord (leur marge intérieure en fait 10 et plus)
+const MB_EAU_OFFRE: OptionsOnde = {
+  retrait: 4,
+  amplitude: 0.6,
+  pas: 6,
+  chanfrein: 0,
+  flotte: -3,
+  inclinaison: 4,
+  perspective: 900,
+}
+mbEauAuBouton(mbEl('mb-passer'), MB_EAU_VERBE)
+
 // ---- L'AVIS DU JOUEUR SUR LA SALLE (game/avisSalles.ts) ----
 // Cinq crans sous le levier du bilan, puis PAS D'AVIS : un clic, un
 // toucher, une touche (1 à 5, 0 pour pas d'avis), ou la croix puis A. PAS
@@ -18752,6 +18770,19 @@ function mbAvisOuvre(code: string | null): void {
     ).join('') +
     `<button type="button" class="mb-avis-cran mb-avis-sans" data-avis="0" aria-pressed="true" ` +
     `title="ne pas juger cette salle (touche 0)">PAS D’AVIS</button>`
+  // LES CRANS : des carrés de 36 px sans chanfrein — un nœud tous les 3 px
+  // (à 8 px, 18 nœuds pour un cran : une onde en escalier), le filet à
+  // 2,5 px du bord, des vagues basses : le chiffre est au milieu
+  for (const cran of mbEl('mb-avis-crans').children)
+    mbEauAuBouton(cran as HTMLElement, {
+      retrait: 2.5,
+      amplitude: 0.45,
+      pas: 3,
+      chanfrein: 0,
+      flotte: -2,
+      inclinaison: 6,
+      perspective: 400,
+    })
   mbAvisPeint()
 }
 function mbAvisVote(cran: AvisSalle | 0): void {

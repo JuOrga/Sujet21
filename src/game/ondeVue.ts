@@ -85,6 +85,20 @@ export interface OptionsOnde {
    *  porte de salle n'a que 10 px de marge intérieure : à pleine hauteur,
    *  un contour en retrait venait frôler son texte (banc, 22/11). */
   amplitude?: number
+  /** « filet » (défaut) : un ruban d'eau court le long du contour. « bord » :
+   *  pour un APLAT (le verbe PASSER / CONTINUER, plein au bleu du
+   *  spécimen) — un ruban du même bleu y serait invisible : c'est le bord
+   *  de l'aplat lui-même qui ondule, une bande de la couleur du fond le
+   *  mordant en vagues (au plus `retrait` px), un reflet pâle sur sa
+   *  nouvelle lisière. */
+  mode?: 'filet' | 'bord'
+  /** Un nœud de rive tous les `pas` px (PAS_RIVE par défaut) : un cran
+   *  d'avis de 36 px n'aurait que 18 nœuds à 8 px — une onde en escalier. */
+  pas?: number
+  /** Le coin coupé de l'élément, en px (celui des cartes par défaut). */
+  chanfrein?: number
+  /** L'inclinaison au bord, en degrés (INCLINAISON par défaut). */
+  inclinaison?: number
 }
 
 export interface OndeCarte {
@@ -140,6 +154,12 @@ interface Etat {
   flotteTenue: boolean
   perspective: number
   amplitude: number
+  mode: 'filet' | 'bord'
+  pas: number
+  chanfrein: number
+  inclinaison: number
+  /** la couleur du fond derrière un aplat (mode « bord ») */
+  fond: string
 }
 
 const actives = new Set<Etat>()
@@ -170,6 +190,15 @@ function image(t: number): void {
       actives.delete(e)
       continue
     }
+    // CACHÉ SOUS LA VISÉE : le verbe pressé disparaît sous le pointeur
+    // (hidden), sans pointerleave — la houle aurait tourné à vide, image
+    // après image, sur une toile que personne ne voit
+    if (e.pli.getClientRects().length === 0) {
+      e.vise = false
+      repos(e)
+      actives.delete(e)
+      continue
+    }
     if (avance(e, pas)) actives.delete(e)
   }
   boucle = actives.size ? requestAnimationFrame(image) : 0
@@ -190,7 +219,7 @@ function avance(e: Etat, n: number): boolean {
       // reflue. C'est ce qui fait d'une carte qui penche un volume d'eau.
       const drx = e.rx.valeur - e.avant.rx
       const dry = e.ry.valeur - e.avant.ry
-      if (drx || dry) e.rive.penche(e.noeuds, e.l - 2 * e.retrait, e.h - 2 * e.retrait, dry * 0.9, -drx * 0.9)
+      if (drx || dry) e.rive.penche(e.noeuds, e.l, e.h, dry * 0.9, -drx * 0.9)
       const amorti = e.vise ? AMORTI : AMORTI_QUITTE
       for (let k = 0; k < SOUS_PAS; k++) crete = e.rive.pas(amorti)
     }
@@ -258,13 +287,13 @@ function dessine(e: Etat): void {
   // (rien ne s'y dessine), et l'effacer à chaque image coûtait sa surface
   const W = e.toile.width
   const Hh = e.toile.height
-  const b = Math.ceil((e.marge + e.retrait + ECART_MAX + 4) * e.dpr)
+  const b = Math.min(Math.ceil((e.marge + e.retrait + ECART_MAX + 4) * e.dpr), Math.floor(Math.min(W, Hh) / 2))
   ctx.clearRect(0, 0, W, b)
   ctx.clearRect(0, Hh - b, W, b)
   ctx.clearRect(0, b, b, Hh - 2 * b)
   ctx.clearRect(W - b, b, b, Hh - 2 * b)
   if (p < 0.01) return
-  const o = (e.marge + e.retrait) * e.dpr
+  const o = (e.marge + (e.mode === 'filet' ? e.retrait : 0)) * e.dpr
   ctx.setTransform(e.dpr, 0, 0, e.dpr, o, o)
   const n = noeuds.length
   // les tampons de l'image, gardés d'une image à l'autre
@@ -275,6 +304,10 @@ function dessine(e: Etat): void {
   }
   const ds = e.ds
   for (let i = 0; i < n; i++) ds[i] = (rive.ecart(i) + houle(noeuds[i].s, e.longueur, e.temps) * p) * e.amplitude
+  if (e.mode === 'bord') {
+    dessineBord(e, ctx, p)
+    return
+  }
   // LE RUBAN, tracé le long de sa ligne médiane — au repos il couvre les
   // deux premiers pixels de la carte, là où était le filet. Il était
   // REMPLI (deux bords décalés, pair-impair) : un rastériseur logiciel
@@ -354,6 +387,60 @@ function dessine(e: Etat): void {
   }
 }
 
+/**
+ * LE BORD D'UN APLAT QUI ONDULE (mode « bord »). Une bande de la couleur
+ * du fond mord l'aplat depuis son bord, d'une profondeur qui suit la vague
+ * (de 0 à `retrait` px) : c'est la lisière de l'aplat qui se déplace, comme
+ * le bord d'une flaque. Un reflet pâle court sur cette lisière là où la
+ * vague fait face à la lumière.
+ */
+function dessineBord(e: Etat, ctx: CanvasRenderingContext2D, p: number): void {
+  const { noeuds, ds, lum } = e
+  const n = noeuds.length
+  const r = e.retrait
+  // la profondeur de la morsure, nœud par nœud : à mi-course au repos,
+  // la vague la creuse ou la comble, jamais au-delà du retrait
+  const pt = (i: number): [number, number] => {
+    const q = noeuds[i]
+    const c = -Math.max(0, Math.min(r, (r * 0.5 + ds[i]) * p))
+    return [q.x + q.nx * c, q.y + q.ny * c]
+  }
+  ctx.beginPath()
+  ctx.rect(-1, -1, e.l + 2, e.h + 2)
+  for (let i = 0; i < n; i++) {
+    const [x, y] = pt(i)
+    if (i) ctx.lineTo(x, y)
+    else ctx.moveTo(x, y)
+  }
+  ctx.closePath()
+  ctx.fillStyle = e.fond
+  ctx.fill('evenodd')
+  for (let i = 0; i < n; i++) {
+    const q = noeuds[i]
+    const pente = ds[i === n - 1 ? 0 : i + 1] - ds[i === 0 ? n - 1 : i - 1]
+    const face = q.nx * 0.78 - q.ny * 0.62
+    const l = Math.max(0, Math.min(1, -pente * Math.sign(face || 1) * 5 + 0.25))
+    lum[i] = Math.min(PALIERS, Math.ceil(l * PALIERS - 0.2))
+  }
+  ctx.lineWidth = 1
+  ctx.lineCap = 'round'
+  for (let palier = 1; palier <= PALIERS; palier++) {
+    let trace = false
+    ctx.beginPath()
+    for (let i = 0; i < n; i++) {
+      if (lum[i] !== palier) continue
+      const [x0, y0] = pt(i)
+      const [x1, y1] = pt(i === n - 1 ? 0 : i + 1)
+      ctx.moveTo(x0, y0)
+      ctx.lineTo(x1, y1)
+      trace = true
+    }
+    if (!trace) continue
+    ctx.strokeStyle = `rgba(233, 246, 255, ${((palier / PALIERS) * 0.85 * p).toFixed(3)})`
+    ctx.stroke()
+  }
+}
+
 /** Tout est posé : le pli rend la main à la feuille de style, la toile
  *  s'efface — la carte calme est exactement la carte d'avant l'effet. */
 function repos(e: Etat): void {
@@ -379,13 +466,18 @@ function taille(e: Etat): void {
   e.dpr = dpr
   // en retrait, le coin coupé rétrécit avec le reste : un bord à 45°
   // reculé de r raccourcit chaque côté du coin de r·(√2 − 1)
-  const r = e.retrait
-  e.noeuds = contourCarte(l - 2 * r, h - 2 * r, Math.max(0, CHANFREIN - r * (Math.SQRT2 - 1)), PAS_RIVE)
+  // (le mode « bord » suit le bord même de l'aplat : sa morsure est
+  // dessinée vers l'intérieur)
+  const r = e.mode === 'filet' ? e.retrait : 0
+  e.noeuds = contourCarte(l - 2 * r, h - 2 * r, Math.max(0, e.chanfrein - r * (Math.SQRT2 - 1)), e.pas)
   e.longueur = longueurContour(e.noeuds)
   e.rive = new Rive(e.noeuds.length)
   e.toile.width = Math.round((l + e.marge * 2) * dpr)
   e.toile.height = Math.round((h + e.marge * 2) * dpr)
   e.ctx = e.toile.getContext('2d')
+  // le fond derrière un aplat : l'encre de l'aplat, qui est celle du vide
+  // (index.html, --mb-coque-noire : var(--void))
+  if (e.mode === 'bord') e.fond = getComputedStyle(e.face).getPropertyValue('--mb-coque-noire').trim() || '#03070f'
 }
 
 /** Le nœud du contour le plus proche d'un point de l'écran, et sa distance
@@ -394,8 +486,9 @@ function plusProche(e: Etat, x: number, y: number): { i: number; dist: number; u
   const r = e.cadre ?? e.face.getBoundingClientRect()
   const u = (x - r.left) / Math.max(1, r.width)
   const v = (y - r.top) / Math.max(1, r.height)
-  const px = u * e.l - e.retrait
-  const py = v * e.h - e.retrait
+  const dedans = e.mode === 'filet' ? e.retrait : 0
+  const px = u * e.l - dedans
+  const py = v * e.h - dedans
   let i = 0
   let dist = Infinity
   for (let k = 0; k < e.noeuds.length; k++) {
@@ -462,10 +555,20 @@ export function ondeCarte(
     flotteTenue: options.flotteTenue ?? !retrait,
     perspective: options.perspective ?? 0,
     amplitude: options.amplitude ?? 1,
+    mode: options.mode ?? 'filet',
+    pas: options.pas ?? PAS_RIVE,
+    chanfrein: options.chanfrein ?? CHANFREIN,
+    inclinaison: options.inclinaison ?? INCLINAISON,
+    fond: '#03070f',
   }
 
   const vise = (cx?: number, cy?: number): void => {
-    if (e.arretee || sansAnimation()) return
+    // un bouton désactivé (une offre trop chère, la réserve pleine) se voit,
+    // il ne se vise pas
+    if (e.arretee || sansAnimation() || (face as HTMLButtonElement).disabled) return
+    // un textContent posé sur l'élément (le verbe qui passe de PASSER à
+    // CONTINUER) en retire la toile : elle revient à la visée
+    if (toile.parentNode !== pli) pli.append(toile)
     taille(e)
     if (!e.rive) return
     const deja = e.vise
@@ -483,8 +586,10 @@ export function ondeCarte(
       const i =
         cx !== undefined && cy !== undefined
           ? plusProche(e, cx, cy).i
-          : Math.round((e.l - 2 * e.retrait - CHANFREIN) / 2 / PAS_RIVE)
-      e.rive.goutte(i, GOUTTE_PX / PAS_RIVE, -3.2)
+          : Math.round((e.l - 2 * (e.mode === 'filet' ? e.retrait : 0) - e.chanfrein) / 2 / e.pas)
+      // la goutte garde sa largeur en PIXELS, bornée au quart du tour (sur
+      // un cran de 36 px, 48 px de demi-largeur noyaient tout le contour)
+      e.rive.goutte(i, Math.min(GOUTTE_PX, e.longueur / 8) / e.pas, -3.2)
       e.gonfle.vitesse += 0.32
       e.dernier = cx !== undefined && cy !== undefined ? { x: cx, y: cy } : null
       // le filet de la feuille s'efface : c'est l'eau qui le tient
@@ -520,8 +625,8 @@ export function ondeCarte(
     if (!e.vise) vise(ev.clientX, ev.clientY)
     if (!e.rive) return
     const p = plusProche(e, ev.clientX, ev.clientY)
-    e.ry.cible = (Math.max(0, Math.min(1, p.u)) - 0.5) * 2 * INCLINAISON
-    e.rx.cible = -(Math.max(0, Math.min(1, p.v)) - 0.5) * 2 * INCLINAISON
+    e.ry.cible = (Math.max(0, Math.min(1, p.u)) - 0.5) * 2 * e.inclinaison
+    e.rx.cible = -(Math.max(0, Math.min(1, p.v)) - 0.5) * 2 * e.inclinaison
     const d = e.dernier
     e.dernier = { x: ev.clientX, y: ev.clientY }
     // à moins de 28 px d'un bord, le geste soulève l'eau : vers le bord, il
@@ -531,7 +636,7 @@ export function ondeCarte(
       const q = e.noeuds[p.i]
       const vn = (ev.clientX - d.x) * q.nx + (ev.clientY - d.y) * q.ny
       const f = Math.max(-1.2, Math.min(1.2, vn * 0.12)) * (1 - p.dist / 28)
-      if (f) e.rive.goutte(p.i, SILLAGE_PX / PAS_RIVE, f)
+      if (f) e.rive.goutte(p.i, Math.min(SILLAGE_PX, e.longueur / 12) / e.pas, f)
     }
     demarre(e)
   })

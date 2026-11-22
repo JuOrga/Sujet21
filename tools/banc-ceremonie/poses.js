@@ -416,7 +416,7 @@
     const host = cartes()
     question('CHOISISSEZ LA SALLE SUIVANTE') // après le porte-cartes, comme main.ts
     host.classList.add('mb-trio')
-    host.innerHTML = `<div class="mb-voies">${F.miniCarte()}<p class="mv-fiche" hidden></p></div>`
+    host.innerHTML = `<div class="mb-voies">${F.miniCarte()}</div>`
     const REP = [['▲', 'HAUT'], ['●', 'MILIEU'], ['▼', 'BAS']]
     const portes = [
       { mec: 0, diff: 3, v: 'K3F9', figure: 'le serpentin' },
