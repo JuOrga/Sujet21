@@ -8374,7 +8374,8 @@
          dès l'ouverture. Il était sourd, couleur acier, pour ne pas disputer
          l'écran à la bonbonne sous ses lueurs : sur une scène à plat, il est
          le seul aplat — le verbe se lit, comme à l'accueil. */
-      .mb-passer { align-self: center; flex: none; }
+      /* (relatif : il porte la toile de son bord d'eau, ondeVue.ts) */
+      .mb-passer { position: relative; align-self: center; flex: none; }
       .mb-passer[hidden] { display: none; }
       /* L'AVIS SUR LA SALLE : une rangée sourde sous le levier — cinq crans
          d'acier, le mot du cran à droite. Elle ne dispute rien à la
@@ -8391,7 +8392,7 @@
       .mb-avis-titre { font-family: var(--font-display); white-space: nowrap; }
       .mb-avis-crans { display: inline-flex; gap: 6px; }
       .mb-avis-cran {
-        width: 36px; height: 36px; padding: 0; border-radius: 0; cursor: pointer;
+        position: relative; width: 36px; height: 36px; padding: 0; border-radius: 0; cursor: pointer;
         font-family: var(--font-display); font-size: calc(12px * var(--ui)); font-variant-numeric: tabular-nums;
         color: var(--mb-legende); background: none;
         border: 1px solid var(--line-strong);
@@ -8621,7 +8622,7 @@
       .mb-cartes { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
       /* ---- LE TIRAGE : trois CARTES D'INSTRUMENT (quatre avec le Carnet du
          Semblable). Elles arrivent DOS VISIBLE et se retournent une à une ;
-         sous le pointeur, elles s'inclinent (--rx/--ry posés par main.ts) ;
+         visées, elles flottent et leur contour devient de l'eau (ondeVue.ts) ;
          l'élue s'avance et grandit, les autres tombent. La face est le
          composant `.crt` partagé avec l'atelier, taillé ici au coin coupé du
          verbe.
@@ -8645,10 +8646,13 @@
          « grouping properties ») : aplati, il peint ses faces à plat puis
          tourne le tout, et c'est la face EN MIROIR qu'on voyait au lieu du
          dos (banc, 13/11). L'apparition et l'effacement passent aux faces. */
+      /* LE PLI NE TRANSITE PAS : visé, il suit des RESSORTS (ondeVue.ts,
+         en transform inline) — une transition de 0,16 s, relancée à chaque
+         pointermove, le faisait courir après la souris par à-coups. Au
+         repos, la feuille reprend : à plat, ou flottant de 6 px s'il est
+         visé (la même valeur que le ressort, FLOTTE). */
       .mb-pli {
         position: relative; transform-style: preserve-3d; min-height: 330px;
-        transform: rotateX(var(--rx, 0deg)) rotateY(var(--ry, 0deg));
-        transition: transform 0.16s ease;
         animation: mb-retourne 0.8s cubic-bezier(0.3, 1, 0.3, 1) backwards;
         animation-delay: calc(0.15s + var(--i, 0) * 0.2s);
       }
@@ -8769,12 +8773,40 @@
          reculent sans s'éteindre : à 0,35, la phrase des voisines ne se
          lisait plus, alors qu'on vise une carte pour la COMPARER aux autres */
       .mb-cartes.mb-isole .mb-pli:not(.mb-vise) .crt-draft { opacity: 0.6; }
-      .mb-pli.mb-vise { z-index: 2; transform: rotateX(var(--rx, 0deg)) rotateY(var(--ry, 0deg)) translateY(-6px); }
+      .mb-pli.mb-vise { z-index: 2; transform: translateY(-6px); }
+      /* LE CONTOUR D'EAU (ondeVue.ts) : sous le focus, les quatre traits de
+         la carte — et son coin coupé — deviennent un filet d'eau qui ondule.
+         La toile est un enfant du PLI, pas de la face : la face, taillée au
+         chanfrein, rognerait l'eau qui déborde du bord ; elle dépasse donc
+         la carte de 10 px (MARGE), tournée vers l'avant, dos caché comme
+         les deux faces. Elle ne dessine que le contour : le texte n'est
+         jamais sous elle. */
+      .mb-pli .mb-rive {
+        position: absolute; inset: -10px; width: calc(100% + 20px); height: calc(100% + 20px);
+        pointer-events: none; backface-visibility: hidden; transform: translateZ(1px);
+      }
       .mb-pli.mb-vise .crt-draft, .mb-pli .crt-draft:focus-visible, .mb-pli .crt-draft.pad-focus {
         outline: none;
         background: var(--mb-visee), var(--mb-coque);
         box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--fam) 70%, transparent);
       }
+      /* LE CONTOUR D'EAU DES AUTRES CHOIX — une cuve du versement, une porte
+         de salle : boutons taillés au chanfrein, sans pli. La toile vit
+         DANS le bouton (son clip-path rognerait ce qui déborde) et le
+         contour court à 5 px du bord, ses vagues réduites (main.ts,
+         mbEauAuChoix) ; par-dessus le contenu, qu'il ne touche pas (le
+         bouton a 10 px et plus de marge intérieure). */
+      .mb-rive.mb-rive-dedans {
+        position: absolute; inset: 0; width: 100%; height: 100%; z-index: 3;
+        pointer-events: none;
+      }
+      /* tant que l'eau tient le contour, le filet de la feuille s'efface
+         (sa transition de 0,16 s fait le fondu) ; au départ du focus il
+         revient pendant que l'eau s'éteint */
+      .mb-pli.mb-liquide .crt-draft, .mb-pli.mb-liquide .crt-draft:focus-visible,
+      .mb-pli.mb-liquide .crt-draft.pad-focus { box-shadow: none; }
+      /* un cran d'avis : son filet d'acier s'efface sous le filet d'eau */
+      .mb-avis-cran.mb-liquide { border-color: transparent; }
       .mb-pli .crt-draft.mb-pauvre { opacity: 0.4; cursor: not-allowed; }
       /* LE CHOIX : l'élue s'avance et grandit, les autres tombent (le pli
          peut alors s'aplatir : chacun est sur sa face) */
@@ -8924,7 +8956,8 @@
         letter-spacing: 0.12em; color: var(--mb-encre);
       }
       .mb-halte-rien { margin: 0; font-size: calc(12px * var(--ui)); color: var(--mb-legende); }
-      .mb-halte-levier { grid-column: 1 / -1; justify-self: center; margin-top: 4px; }
+      /* (relatifs, les verbes : ils portent la toile de leur bord d'eau) */
+      .mb-halte-levier { position: relative; grid-column: 1 / -1; justify-self: center; margin-top: 4px; }
       /* les teintes des jauges et des offres qui ne sont pas des gains */
       .mb-cartouche-reserve { --mb-liseret: var(--mb-bleu); }
       .mb-cartouche-secours { --mb-liseret: var(--glow); }
@@ -9173,7 +9206,7 @@
         flex: 0 1 calc(236px * var(--ui));
         animation-delay: calc(0.95s + var(--i, 0) * 0.08s);
       }
-      .mb-module-levier { grid-column: 1 / -1; justify-self: center; margin-top: 4px; }
+      .mb-module-levier { position: relative; grid-column: 1 / -1; justify-self: center; margin-top: 4px; }
       /* ---- LES PORTES : le choix de la prochaine salle. Chaque salle est
          une porte — son plan en vitrine, son code, son nom ; visée, elle
          prend le voile et les équerres, et son verbe paraît ; élue, elle
@@ -9342,18 +9375,6 @@
       /* LE SAS : la sortie du module */
       .mv-sas rect { fill: var(--mb-coque-claire); stroke: #8aa6bc; stroke-width: 1.5; }
       .mv-sas path { fill: none; stroke: var(--ink); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
-      /* LA FICHE de la mini-carte : une ligne, EN SURIMPRESSION au pied de
-         la carte (sur les titres « SALLE n »), et seulement à la visée. Une
-         ligne réservée sous la carte coûtait sa hauteur à chaque écran, et
-         sa consigne par défaut se lisait comme une information de plus */
-      .mv-fiche {
-        position: absolute; left: 50%; bottom: 2px; transform: translateX(-50%);
-        margin: 0; max-width: 100%; padding: 2px 10px;
-        background: rgba(3, 7, 16, 0.94);
-        font-size: calc(11px * var(--ui)); letter-spacing: 0.06em; pointer-events: none;
-        color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-align: center;
-      }
-      .mv-fiche[hidden] { display: none; }
       /* au doigt : la porte armée attend un second toucher — elle garde la
          visée, un filet en plus, et son verbe dit « TOUCHEZ ENCORE » */
       .mb-porte.mb-armee { background: var(--mb-visee); box-shadow: inset 0 0 0 1px var(--specimen); }
@@ -9633,7 +9654,7 @@
       /* le verbe paraît à 1,2 s (LEVIER_FIN_MS, finDescente.ts), pendant que
          les cartouches claquent ; il a le focus dès l'ouverture mais ne
          répond qu'une fois paru (levierFinPret) */
-      .mb-fin-levier { grid-column: 1 / -1; justify-self: center; min-width: min(360px, 100%); animation-delay: 1.2s; }
+      .mb-fin-levier { position: relative; grid-column: 1 / -1; justify-self: center; min-width: min(360px, 100%); animation-delay: 1.2s; }
       @media (max-width: 760px) {
         /* un téléphone debout : la bande 16:9 remonte au-dessus du relevé,
            qui s'empile sur trois rangs */
@@ -9684,6 +9705,9 @@
         .mb-anneau-franchit { filter: drop-shadow(0 0 8px rgba(242, 201, 142, 0.85)); }
         .mb-pli { transform: none; }
         .mb-pli.mb-vise { transform: translateY(-4px); }
+        /* le contour ne devient pas de l'eau : ondeVue.ts ne le met jamais
+           en mouvement, et la toile ne tient même pas sa place */
+        .mb-pli .mb-rive, .mb-rive.mb-rive-dedans { display: none; }
         .mb-cartes.mb-elu .mb-pli:not(.mb-elu-c), .mb-cartes.mb-elu .mb-porte:not(.mb-elue) { opacity: 0; }
         .mb-porte.mb-elue { opacity: 0; }
         .mb-palier-eclair[hidden] { display: none; }

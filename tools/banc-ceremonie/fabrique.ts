@@ -27,6 +27,7 @@ import { offresRepos, offreDon } from '../../src/game/descenteCarte'
 import { tireEvenement, offresDe, detailOffre, resoutChoix, ditEffet } from '../../src/game/evenements'
 void W
 import { Feu } from '../../src/game/ceremonieFx'
+import { ondeCarte } from '../../src/game/ondeVue'
 
 const htmlSafe = (t: string): string => t.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
 
@@ -123,6 +124,8 @@ const FAB = {
   iconeCeremonieHTML, sceauHTML, cuveHTML, colonneMaitrise, couleeColonne, niveauColonne, anneauxHTML,
   SCENES_FIN, finDescenteHTML, levierFin, releveDescente, titresFin, fmtL,
   iconeDuGlyphe, offreHTML, plaqueHTML, puceHTML, iconeInstrumentHTML,
+  /** l'eau d'une carte du tirage (main.ts, mbMontreDraft) */
+  ondeCarte,
   /** dessine le plan d'une salle générée dans un canvas de porte */
   plan(canvas: HTMLCanvasElement, mecanique: 0 | 1 | 2 | 3, diff: number, variante: string): string {
     const lv = genereNiveauAtelier({ moment: 2, mecanique, difficulte: diff } as never, variante)

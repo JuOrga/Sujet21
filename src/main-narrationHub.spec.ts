@@ -18,6 +18,12 @@ describe('le hub sans narration, l’éveil sans lancement automatique', () => {
     expect(SRC).toMatch(/function lanceEveil\(force = false\): void \{\n[^\n]*\n[^\n]*\n\s*if \(!force && !EVEIL_PAR_DEFAUT\) return/)
   })
 
+  it('pas de cryostase au chargement : le corps du menu n’est gelé que si l’éveil se joue', () => {
+    const gels = SRC.split('\n').filter((l) => /getItem\(CLE_EVEIL\)\) input\.freezeIntent = true/.test(l))
+    expect(gels).toHaveLength(1)
+    expect(gels[0]).toMatch(/^if \(EVEIL_PAR_DEFAUT && !coffre\.stockage\.getItem\(CLE_EVEIL\)\)/)
+  })
+
   it('le bouton « rejouer l’éveil » et le R en plein éveil le forcent', () => {
     const bouton = SRC.match(/getElementById\('proto-rejouer'\)[\s\S]*?\n\}\)/)?.[0] ?? ''
     expect(bouton).toMatch(/lanceEveil\(true\)/)
