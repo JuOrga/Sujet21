@@ -10,10 +10,13 @@ describe('la médaille repliée et le voile des offres (index.html)', () => {
   // la médaille ronde est devenue un SCEAU octogonal (cérémonie « station ») :
   // l'anneau qui tournait n'existe plus, mais le repli reste un bandeau
   // immobile — un sceau qui retomberait ou pencherait à chaque repli
-  // balaierait le titre comme l'ellipse le faisait
+  // balaierait le titre comme l'ellipse le faisait. Depuis que la cérémonie
+  // a repris la charte de l'accueil (21/11), le sceau se pose DROIT partout :
+  // l'inclinaison nulle n'est plus un cas du repli, c'est la règle du sceau
   it('repliée, la marque du rang ne tourne ni ne retombe (ellipse qui balayait le titre)', () => {
     expect(html).toMatch(/\.mb-scene\.mb-compact \.mb-rang \{[^}]*animation: none/)
-    expect(html).toMatch(/\.mb-scene\.mb-compact \.mb-rang \{[^}]*--mb-sceau-incl: 0deg/)
+    expect(html).toMatch(/\n      \.mb-sceau \{[^}]*--mb-sceau-incl: 0deg/)
+    expect(html).not.toMatch(/--mb-sceau-incl: -?[1-9]/)
   })
 
   // l'offre de rencontre est devenue une cartouche (cérémonie « station ») :

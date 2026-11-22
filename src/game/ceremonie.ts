@@ -146,16 +146,18 @@ export function motDeNote(note: number): string {
   return 'la salle est derrière'
 }
 
-/** LE TITRE D'UN TIRAGE D'INSTRUMENTS. Une file de tirages mêle deux
- *  origines : un par PALIER de maîtrise franchi, et — en dernier — celui
- *  qu'une salle SCELLÉE garantit. Le second se comptait comme un palier :
- *  sans palier franchi, l'écran annonçait « PALIER DE MAÎTRISE 0 », et avec
- *  un palier, il le numérotait un cran trop bas.
+/** D'OÙ VIENT UN TIRAGE D'INSTRUMENTS : la ligne de contexte de l'écran.
+ *  Une file de tirages mêle deux origines : un par PALIER de maîtrise
+ *  franchi, et — en dernier — celui qu'une salle SCELLÉE garantit. Le
+ *  second se comptait comme un palier : sans palier franchi, l'écran
+ *  annonçait « PALIER DE MAÎTRISE 0 », et avec un palier, il le numérotait
+ *  un cran trop bas. La consigne (« — EMPORTEZ UN INSTRUMENT ») n'y est
+ *  plus : elle est la QUESTION de l'étape, en grand (main.ts, mbMontreDraft).
  *  `paliers` : les paliers atteints, tirages non encore pris compris ;
  *  `restants` : les tirages encore à prendre, celui-ci compris. */
 export function titreDuTirage(paliers: number, restants: number, garanti: boolean): string {
   const paliersRestants = restants - (garanti ? 1 : 0)
   return paliersRestants > 0
-    ? `PALIER DE MAÎTRISE ${paliers - paliersRestants + 1} — EMPORTEZ UN INSTRUMENT`
-    : 'SALLE SCELLÉE : TIRAGE GARANTI — EMPORTEZ UN INSTRUMENT'
+    ? `PALIER DE MAÎTRISE ${paliers - paliersRestants + 1}`
+    : 'SALLE SCELLÉE — TIRAGE GARANTI'
 }
