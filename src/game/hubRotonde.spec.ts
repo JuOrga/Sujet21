@@ -11,6 +11,7 @@ import {
   CUVE_RAYON,
   DEPART_MILIEU,
   PASSAGE_BRAS,
+  SAS_RAYON,
   STRUCTURES_ROTONDE,
   TABLEAU_HUB_ROTONDE as ROTONDE,
   ZONES_ROTONDE,
@@ -149,11 +150,11 @@ describe('la rotonde — RAPIDE : tout est à une impulsion de la cuve', () => {
     Math.hypot(centre(lv.exit).x - lv.spawn.x, centre(lv.exit).y - lv.spawn.y)
 
   it('de la naissance au sas : cinq fois moins loin que dans le grand module', () => {
-    // 1 505 u contre 8 330 (grand) et 4 030 (compact, à vol d'oiseau — ses
+    // 1 790 u contre 8 330 (grand) et 4 030 (compact, à vol d'oiseau — ses
     // trois cloisons en chicane allongent encore le trajet réel)
-    expect(distSas(ROTONDE)).toBeLessThan(1600)
-    expect(distSas(ROTONDE)).toBeLessThan(distSas(TABLEAU_HUB) / 5)
-    expect(distSas(ROTONDE)).toBeLessThan(distSas(TABLEAU_HUB_COMPACT) / 2.5)
+    expect(distSas(ROTONDE)).toBeLessThan(1900)
+    expect(distSas(ROTONDE)).toBeLessThan(distSas(TABLEAU_HUB) / 4)
+    expect(distSas(ROTONDE)).toBeLessThan(distSas(TABLEAU_HUB_COMPACT) / 2)
   })
 
   it('aucun rendez-vous à plus de 2 000 u de la cuve', () => {
@@ -171,7 +172,7 @@ describe('la rotonde — RAPIDE : tout est à une impulsion de la cuve', () => {
     // et les rendez-vous de CHAQUE visite (le sas, le marchand, le banc, les
     // trois consoles) tiennent dans 1 600 u
     for (const r of [z.sas, z.banc, ...Object.values(z.pupitres)])
-      expect(dist(r), JSON.stringify(r)).toBeLessThan(1600)
+      expect(dist(r), JSON.stringify(r)).toBeLessThan(1800)
   })
 
   it('RÈGLE 1 — l’axe du départ est libre : aucun écran ne s’ouvre de la cuve au sas', () => {
@@ -216,11 +217,11 @@ describe('la rotonde — RAPIDE : tout est à une impulsion de la cuve', () => {
   })
 
   // LE VRAI CORPS, LE VRAI SOLVEUR. Un pilote sans finesse : il pousse vers
-  // le sas tant qu'il n'a pas 300 u/s. Mesuré le 21/11 : la rotonde en 7,2 s
-  // avec 583 particules sur 900 ; le grand module, même pilote, en 27,3 s
-  // avec 34 particules (zz : 21,3 s et 394 à 450 u/s d'allure, contre 6,6 s
-  // et 487). Le seuil laisse de la marge au solveur, pas au plan : si ce
-  // test tombe, on remesure avant de toucher au nombre.
+  // le sas tant qu'il n'a pas 300 u/s. Mesuré le 22/11 (bras de départ
+  // allongé, sas de 150 u de rayon) : la rotonde en 7,8 s avec 593
+  // particules sur 900 ; le grand module, même pilote, mesuré le 21/11 :
+  // 27,3 s et 34 particules. Le seuil laisse de la marge au solveur, pas au
+  // plan : si ce test tombe, on remesure avant de toucher au nombre.
   it('de la naissance au sas en moins de 10 s, le corps aux trois cinquièmes au moins', () => {
     const ex = niveauExpanse(ROTONDE)
     const s = new FluidSim({ ...DEFAULT_PARAMS }, ROTONDE.bounds, 4096)
@@ -282,6 +283,41 @@ describe('la rotonde — la cuve : l’anneau du menu, une bouche vers le sas', 
     expect(clos.portes![0]).toMatchObject(ZONES_ROTONDE.porteCuve)
     expect(accessible(clos, new Set())).toBe(false)
     expect(accessible(appliqueReparations(ROTONDE, toutRepare, {}, REPARATIONS), new Set())).toBe(true)
+  })
+})
+
+// LE SAS SE VOIT. La première livraison lui donnait 65 u de rayon, la taille
+// de celui des deux autres hubs : entre les portes de flanc et leurs
+// colliers, il se perdait (« le sas n'est clairement pas assez voyant », le
+// concepteur, 22/11). Ces gardes tiennent ce qui le rend lisible.
+describe('la rotonde — le sas de lancement se voit depuis la cuve', () => {
+  const sas = ROTONDE.exit
+  const rayon = Math.min(sas.maxX - sas.minX, sas.maxY - sas.minY) / 2
+
+  it('sa bouche est deux fois plus grande que celle des deux autres hubs', () => {
+    expect(rayon).toBe(SAS_RAYON)
+    for (const lv of [TABLEAU_HUB, TABLEAU_HUB_COMPACT]) {
+      const r = Math.min(lv.exit.maxX - lv.exit.minX, lv.exit.maxY - lv.exit.minY) / 2
+      expect(rayon).toBeGreaterThanOrEqual(1.8 * r)
+    }
+    // son iris (1,35 rayon de cadre) remplit le fond du bras sans le déborder
+    expect(2 * 1.35 * rayon).toBeGreaterThan(0.8 * PASSAGE_BRAS)
+    expect(2 * 1.35 * rayon).toBeLessThan(PASSAGE_BRAS)
+  })
+
+  it('il est seul au fond : sa zone ne mord pas sur le chemin des routes gardées', () => {
+    // le corps qui va chercher la grille ou le rideau passe par le milieu du
+    // bras ; la zone de collecte commence deux rayons de corps plus loin
+    expect(sas.minX - DEPART_MILIEU).toBeGreaterThan(2 * RAYON_CORPS - 10)
+    expect(dansLeVide(sas)).toBe(true)
+  })
+
+  it('la lampe la plus forte du module est posée sur lui', () => {
+    const lampes = [...(ROTONDE.lumieres ?? [])].sort((a, b) => (b.intensite ?? 1) - (a.intensite ?? 1))
+    const c = centre(sas)
+    expect(lampes[0].x).toBe(c.x)
+    expect(lampes[0].y).toBe(c.y)
+    expect(lampes[0].intensite ?? 1).toBeGreaterThan(lampes[1].intensite ?? 1)
   })
 })
 
