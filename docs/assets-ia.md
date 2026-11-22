@@ -2892,8 +2892,8 @@ dans `masters/images/sources/`, lancer `tools/images/conduite_atlas.py` puis
 ## 39. LA PORTE BLINDÉE — la dalle escamotable des portes de l'éditeur ✅ LIVRÉ (22/11)
 
 > **Rendue dans Blender** (`tools/images/blender/porte_blindee.py`) : un seul
-> atlas, `porte-blindee.webp` (1076 × 288, 8 Ko, luminance 0,19, moins de 1 %
-> de pixels chauds — les deux veilleuses).
+> atlas, `porte-blindee.webp` (1076 × 288, 8 Ko, luminance 0,19, 3 % de
+> pixels chauds — les deux liserés rouges).
 
 **Avant** : chaque porte posée à l'éditeur (`level.portes`) se dessinait au
 trait, en **rouge** — une « barrière d'énergie », aplat translucide barré de
@@ -2917,8 +2917,8 @@ script) :
 
 | pièce | vue | taille | ce qu'elle montre |
 | --- | --- | --- | --- |
-| `dessus` | d'en haut | 320 × 160 | la tranche haute de la dalle : deux tôles de chant, deux joints sarcelle, l'âme nervurée en travers, l'échine boulonnée — **pas** de chevrons : vu d'en haut, on ne voit que le haut d'une dalle épaisse |
-| `bout` | d'en haut | 96 × 160 | le sabot d'extrémité (en miroir à l'autre bout) : le joint de caoutchouc qui frotte le mur, le bloc boulonné, la veilleuse ambre |
+| `dessus` | d'en haut | 320 × 160 | la tranche haute de la dalle : deux tôles de chant, deux liserés rouges, l'âme nervurée en travers, l'échine boulonnée — **pas** de chevrons : vu d'en haut, on ne voit que le haut d'une dalle épaisse |
+| `bout` | d'en haut | 96 × 160 | le sabot d'extrémité (en miroir à l'autre bout) : le joint de caoutchouc qui frotte le mur, le bloc boulonné, la veilleuse — lentille éteinte, le moteur l'allume |
 | `flanc` | élévation | 320 × 280 | la grande face que le relief 2,5D dévoile : la lèvre de tête, **la bande de chevrons** (elle sort du sol la première), deux panneaux, la nervure boulonnée, le joint du pied — 2 px par unité, un mur haut (140 u) |
 | `fente` | d'en haut | 320 × 160 | les deux lèvres de la fente au sol, peintes de chevrons au pochoir, le milieu détouré |
 
@@ -2939,8 +2939,18 @@ de dessus, ses joints sous les leurs). La face est **accrochée par le haut** :
 - Relief éteint (et à l'éditeur), le pied et le sommet se confondent : une
   porte basse est plus sombre (l'ombre de sa fente), c'est ce qui dit qu'elle
   monte.
-- Les veilleuses battent pendant la course, veillent porte close ; le front
-  d'une porte qui se déplie est un trait blanc froid (`#d6e8f5`).
+- **Le code couleur des lasers** (le concepteur, 22/11 : « que le code couleur
+  rappelle les lasers […] joli mais remarquable ») : une porte obéit aux
+  faisceaux, elle en porte le rouge — les deux liserés du dessus, et les deux
+  veilleuses, qui battent pendant la course et veillent porte close. Porte
+  ouverte, les veilleuses affleurent au bout de la fente, **vertes**. C'est
+  l'exception écrite à la charte (§3 : le rouge réservé à l'alerte, le vert à
+  la serre) : sur une porte, ces deux couleurs sont un état de jeu.
+- Relief allumé, **la face ne se peint pas là où un mur la touche** : le
+  dessus de ce mur passe devant (`tranchesVisibles` sonde le sol juste devant
+  chaque morceau de face). Avant, la face d'une porte collée à un mur se
+  peignait par-dessus lui (capture du concepteur, 22/11).
+- Le front d'une porte qui se déplie est un trait blanc froid (`#d6e8f5`).
 
 Tant que l'atlas n'est pas chargé, la porte se dessine au vecteur dans les
 mêmes teintes.

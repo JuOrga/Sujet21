@@ -9806,6 +9806,8 @@ function drawMecanismes(vw: number, vh: number, dpr: number): void {
         // chaque porte bat à sa phase : deux portes voisines ne clignotent
         // pas comme une guirlande
         temps: elapsed + i * 0.37,
+        // le mur qui touche une face la cache : son dessus passe devant
+        solide: (x, y) => hauteurEn(x, y) >= 0,
       },
       atlasPorte,
     )

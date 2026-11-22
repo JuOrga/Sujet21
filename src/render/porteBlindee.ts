@@ -17,7 +17,12 @@
 //   · elle s'ouvre en s'ENFONÇANT : le dessus redescend vers le sol, la face
 //     rentre — accrochée par le haut, on en voit de moins en moins ;
 //   · ouverte, il ne reste que les deux lèvres de la fente, au ras du sol, et
-//     rien entre elles : le fluide qui passe dessus se voit.
+//     rien entre elles : le fluide qui passe dessus se voit ;
+//   · elle porte le code couleur des LASERS qui la commandent : liserés et
+//     veilleuses rouges, veilleuses vertes une fois ouverte ;
+//   · relief allumé, sa face ne se peint pas là où un mur la touche : le
+//     dessus de ce mur passe devant (« la face peinte par-dessus le mur
+//     collé à elle », capture du concepteur, 22/11).
 //
 // CE QUE LE SOLVEUR OPPOSE AU CORPS RESTE CE QU'ON VOIT, en plan : une porte
 // qui se matérialise (rideau, éventail) lève exactement la part de
@@ -56,6 +61,49 @@ const VEILLEUSE_X = 30
  *  qui s'ouvre (libre pour le solveur dès l'image où son canal tombe) ne
  *  laisse pas le corps la traverser longtemps à l'œil. */
 export const DUREE_LEVEE = 0.4
+
+// LE CODE COULEUR DES LASERS (« que le code couleur rappelle les lasers »,
+// le concepteur, 22/11) : les liserés du dessus et les veilleuses prennent le
+// rouge du halo des faisceaux (main.ts) ; porte ouverte, les veilleuses
+// passent au VERT. Le cœur est plus clair que le halo, comme celui du
+// faisceau.
+export const ROUGE_LASER = { coeur: '255,190,175', halo: '255,72,58' } as const
+export const VERT_OUVERT = { coeur: '205,255,220', halo: '70,225,130' } as const
+
+/** L'état que disent les veilleuses : vert ouverte (rien n'est levé), rouge
+ *  qui bat pendant la course, rouge qui veille porte close. */
+export function etatVeilleuses(close: boolean, levee: boolean): 'ouverte' | 'course' | 'close' {
+  if (close) return 'close'
+  return levee ? 'course' : 'ouverte'
+}
+
+/** Les tranches d'une face (a → b, le contour en sens trigonométrique) qui
+ *  se VOIENT : coupée en morceaux d'au plus `pas`, chaque morceau est caché
+ *  quand un solide le touche, juste devant lui (`solide`, sondé à
+ *  `devant` unités le long de la normale sortante, en son milieu) — le
+ *  dessus de ce mur passe devant la face. Sans sonde, tout se voit. */
+export function tranchesVisibles(
+  a: Point,
+  b: Point,
+  pas: number,
+  solide?: (x: number, y: number) => boolean,
+  devant = 3,
+): [Point, Point][] {
+  const long = Math.hypot(b.x - a.x, b.y - a.y)
+  if (!(long > 1e-6)) return []
+  const n = Math.max(1, Math.ceil(long / Math.max(pas, 1e-6)))
+  // la normale sortante d'une arête parcourue dans le sens trigonométrique
+  const nx = (b.y - a.y) / long
+  const ny = (a.x - b.x) / long
+  const out: [Point, Point][] = []
+  for (let i = 0; i < n; i++) {
+    const q0 = { x: a.x + (b.x - a.x) * (i / n), y: a.y + (b.y - a.y) * (i / n) }
+    const q1 = { x: a.x + (b.x - a.x) * ((i + 1) / n), y: a.y + (b.y - a.y) * ((i + 1) / n) }
+    if (solide && solide((q0.x + q1.x) / 2 + nx * devant, (q0.y + q1.y) / 2 + ny * devant)) continue
+    out.push([q0, q1])
+  }
+  return out
+}
 
 /** La levée à l'image suivante : elle court vers `cible` (1 debout, 0 au ras
  *  du sol) à vitesse constante. */
@@ -133,6 +181,10 @@ export interface VuePorte {
   oeil: Point | null
   /** l'horloge (s), pour les veilleuses */
   temps: number
+  /** relief allumé : y a-t-il un solide en (x, y) ? Une face qui touche un
+   *  mur est cachée par lui — son dessus passe devant (absent : rien ne
+   *  cache rien) */
+  solide?: (x: number, y: number) => boolean
 }
 
 type Pieces = { dessus: HTMLCanvasElement; bout: HTMLCanvasElement; flanc: HTMLCanvasElement; fente: HTMLCanvasElement }
@@ -234,6 +286,16 @@ export function dessinePorte(
     }
     g.restore()
   }
+  const xl = (dec.bout * VEILLEUSE_X) / PORTE_ATLAS.bout.w
+  const etat = etatVeilleuses(close, contour.length >= 3 && h > 0)
+  if (etat === 'ouverte') {
+    // la dalle est dans le sol : ses veilleuses affleurent, VERTES, aux deux
+    // bouts de la fente — le passage est libre
+    g.save()
+    poseRepere(g, vue.pied, o, es, et, L, E)
+    for (const s of [xl, L - xl]) veilleuse(g, s, E, VERT_OUVERT, 0.55 + 0.1 * Math.sin(vue.temps * 2.2), true)
+    g.restore()
+  }
   if (contour.length < 3 || !(h > 0)) return
 
   // le haut de ce qui est levé : entre le sol et le sommet des murs, à la
@@ -250,7 +312,7 @@ export function dessinePorte(
   // descendent du haut au sol (facesTranche : ni les bouts collés aux murs,
   // ni les faces de dos) — le front d'une porte qui se déplie en est un
   if (vue.oeil) {
-    for (const { a, b } of facesTranche(contour, p, vue.oeil.x, vue.oeil.y)) dessineFace(g, a, b, vue.pied, haut, h, cadre, dec, pc)
+    for (const { a, b } of facesTranche(contour, p, vue.oeil.x, vue.oeil.y)) dessineFace(g, a, b, vue.pied, haut, h, cadre, dec, pc, vue.solide)
   }
 
   // 3. LE DESSUS, rogné à la part levée
@@ -284,24 +346,16 @@ export function dessinePorte(
     g.fillStyle = `rgba(3,7,16,${(0.6 * (1 - h)).toFixed(3)})`
     g.fillRect(0, 0, L, E)
   }
-  // LES VEILLEUSES : ambre (la seule couleur chaude que la charte admet sur
-  // un mécanisme) — elles battent pendant la course, veillent porte close
-  const xl = (dec.bout * VEILLEUSE_X) / PORTE_ATLAS.bout.w
-  const enCourse = !close
-  const force = enCourse ? (Math.sin(vue.temps * 14) > 0 ? 0.75 : 0.2) : 0.32 + 0.08 * Math.sin(vue.temps * 2.2)
-  for (const s of [xl, L - xl]) {
-    if (!pc) {
-      g.fillStyle = '#e8951f'
-      g.fillRect(s - E * 0.04, E * 0.4, E * 0.08, E * 0.2)
-    }
-    const r = E * 0.5
-    const halo = g.createRadialGradient(s, E / 2, 0, s, E / 2, r)
-    halo.addColorStop(0, `rgba(242,201,142,${force.toFixed(3)})`)
-    halo.addColorStop(0.35, `rgba(232,149,31,${(force * 0.45).toFixed(3)})`)
-    halo.addColorStop(1, 'rgba(232,149,31,0)')
-    g.fillStyle = halo
-    g.fillRect(s - r, E / 2 - r, 2 * r, 2 * r)
+  // LES LISERÉS : rouges dans l'atlas ; un halo du même rouge les tient
+  // lisibles quand la porte ne fait que quelques pixels d'épaisseur
+  for (const t of [LISERE_T * E, (1 - LISERE_T) * E]) {
+    g.fillStyle = `rgba(${ROUGE_LASER.halo},${(0.22 * h).toFixed(3)})`
+    g.fillRect(0, t - E * 0.05, L, E * 0.1)
   }
+  // LES VEILLEUSES : rouges — elles battent pendant la course, veillent
+  // porte close
+  const force = etat === 'course' ? (Math.sin(vue.temps * 14) > 0 ? 1 : 0.25) : 0.75 + 0.15 * Math.sin(vue.temps * 2.2)
+  for (const s of [xl, L - xl]) veilleuse(g, s, E, ROUGE_LASER, force, !pc)
   g.restore()
 
   // 4. LE FRONT d'une porte qui se déplie : le joint qui pousse, d'un blanc
@@ -318,6 +372,36 @@ export function dessinePorte(
     g.stroke()
     g.restore()
   }
+}
+
+// le milieu du liseré, en fraction de l'épaisseur — PEAU + JOINT / 2 du script
+const LISERE_T = (12 + 6 / 2) / 160
+
+/** Une veilleuse allumée, dans le repère de la dalle (s le long, t en
+ *  travers) : la lentille et son halo, à la couleur de l'état. `boitier` :
+ *  son boîtier se dessine aussi (au sol, ou sans l'atlas). */
+function veilleuse(
+  g: CanvasRenderingContext2D,
+  s: number,
+  E: number,
+  c: { coeur: string; halo: string },
+  force: number,
+  boitier: boolean,
+): void {
+  if (boitier) {
+    g.fillStyle = 'rgba(20,24,30,0.92)'
+    g.fillRect(s - E * 0.07, E * 0.34, E * 0.14, E * 0.32)
+  }
+  const r = E * 0.55
+  const halo = g.createRadialGradient(s, E / 2, 0, s, E / 2, r)
+  halo.addColorStop(0, `rgba(${c.halo},${(0.55 * force).toFixed(3)})`)
+  halo.addColorStop(0.4, `rgba(${c.halo},${(0.18 * force).toFixed(3)})`)
+  halo.addColorStop(1, `rgba(${c.halo},0)`)
+  g.fillStyle = halo
+  g.fillRect(s - r, E / 2 - r, 2 * r, 2 * r)
+  // la lentille : 8 × 24 px sur 160 dans l'atlas
+  g.fillStyle = `rgba(${c.coeur},${Math.min(1, 0.35 + 0.65 * force).toFixed(3)})`
+  g.fillRect(s - E * 0.025, E * 0.425, E * 0.05, E * 0.15)
 }
 
 function coins(p: PorteDef): Point[] {
@@ -347,6 +431,7 @@ function dessineFace(
   cadre: ReturnType<typeof cadrePorte>,
   dec: ReturnType<typeof decoupePorte>,
   pc: Pieces | null,
+  solide?: (x: number, y: number) => boolean,
 ): void {
   const long = Math.hypot(b.x - a.x, b.y - a.y)
   if (!(long > 1e-6)) return
@@ -364,11 +449,12 @@ function dessineFace(
       : ((q.x - o.x) * et.x + (q.y - o.y) * et.y) * k
   const m = pc && motif(g, pc.flanc)
   const hv = PORTE_ATLAS.flanc.h * h // la part visible de l'image, depuis son haut
-  const n = Math.max(1, Math.ceil(long / E))
+  // (en morceaux d'au plus une demi-épaisseur : le mur qui touche la face
+  // la cache au morceau près)
+  const tranches = tranchesVisibles(a, b, E / 2, solide)
+  if (tranches.length === 0) return
   g.save()
-  for (let i = 0; i < n; i++) {
-    const q0 = { x: a.x + (b.x - a.x) * (i / n), y: a.y + (b.y - a.y) * (i / n) }
-    const q1 = { x: a.x + (b.x - a.x) * ((i + 1) / n), y: a.y + (b.y - a.y) * ((i + 1) / n) }
+  for (const [q0, q1] of tranches) {
     const f0 = pied(q0.x, q0.y)
     const f1 = pied(q1.x, q1.y)
     const h0 = haut(q0.x, q0.y)
@@ -402,27 +488,30 @@ function dessineFace(
     }
     g.fill()
   }
-  // l'ombre du pied, et sa ligne : la dalle sort du sol
-  const fa = pied(a.x, a.y)
-  const fb = pied(b.x, b.y)
-  const ha = haut(a.x, a.y)
-  const hb = haut(b.x, b.y)
-  const ombre = g.createLinearGradient((fa.sx + fb.sx) / 2, (fa.sy + fb.sy) / 2, (ha.sx + hb.sx) / 2, (ha.sy + hb.sy) / 2)
-  ombre.addColorStop(0, 'rgba(3,7,16,0.55)')
-  ombre.addColorStop(0.6, 'rgba(3,7,16,0)')
-  g.beginPath()
-  g.moveTo(fa.sx, fa.sy)
-  g.lineTo(fb.sx, fb.sy)
-  g.lineTo(hb.sx, hb.sy)
-  g.lineTo(ha.sx, ha.sy)
-  g.closePath()
-  g.fillStyle = ombre
-  g.fill()
-  g.strokeStyle = 'rgba(3,7,16,0.7)'
-  g.lineWidth = 1
-  g.beginPath()
-  g.moveTo(fa.sx, fa.sy)
-  g.lineTo(fb.sx, fb.sy)
-  g.stroke()
+  // l'ombre du pied, et sa ligne : la dalle sort du sol — sur les seules
+  // tranches qui se voient
+  for (const [q0, q1] of tranches) {
+    const fa = pied(q0.x, q0.y)
+    const fb = pied(q1.x, q1.y)
+    const ha = haut(q0.x, q0.y)
+    const hb = haut(q1.x, q1.y)
+    const ombre = g.createLinearGradient((fa.sx + fb.sx) / 2, (fa.sy + fb.sy) / 2, (ha.sx + hb.sx) / 2, (ha.sy + hb.sy) / 2)
+    ombre.addColorStop(0, 'rgba(3,7,16,0.55)')
+    ombre.addColorStop(0.6, 'rgba(3,7,16,0)')
+    g.beginPath()
+    g.moveTo(fa.sx, fa.sy)
+    g.lineTo(fb.sx, fb.sy)
+    g.lineTo(hb.sx, hb.sy)
+    g.lineTo(ha.sx, ha.sy)
+    g.closePath()
+    g.fillStyle = ombre
+    g.fill()
+    g.strokeStyle = 'rgba(3,7,16,0.7)'
+    g.lineWidth = 1
+    g.beginPath()
+    g.moveTo(fa.sx, fa.sy)
+    g.lineTo(fb.sx, fb.sy)
+    g.stroke()
+  }
   g.restore()
 }

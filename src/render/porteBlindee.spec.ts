@@ -9,9 +9,11 @@ import {
   PORTE_ATLAS_TAILLE,
   cadrePorte,
   decoupePorte,
+  etatVeilleuses,
   hauteurDeLevee,
   leveeSuivante,
   partLevee,
+  tranchesVisibles,
 } from './porteBlindee'
 
 // le gabarit courant du dépôt : 40 × 340, debout entre deux murs
@@ -143,5 +145,51 @@ describe('la porte blindée — elle sort du sol', () => {
       expect(h).toBeGreaterThanOrEqual(avant)
       avant = h
     }
+  })
+})
+
+describe('la porte blindée — la face et le mur qui la touche', () => {
+  // la face ouest d'une porte debout (x = 860, de y = 170 à −170 : le
+  // contour en sens trigonométrique la parcourt vers le bas), sa normale
+  // sortante vers −x
+  const a = { x: 860, y: 170 }
+  const b = { x: 860, y: -170 }
+
+  it('rien devant elle : toute la face se voit', () => {
+    const t = tranchesVisibles(a, b, 20)
+    expect(t).toHaveLength(17)
+    expect(t[0][0]).toEqual(a)
+    expect(t[t.length - 1][1]).toEqual(b)
+  })
+
+  it('un mur collé devant toute la face : elle est cachée — le dessus du mur passe devant (capture du concepteur, 22/11)', () => {
+    const mur = (x: number): boolean => x < 860 && x > 700
+    expect(tranchesVisibles(a, b, 20, mur)).toEqual([])
+  })
+
+  it('un mur collé sur la moitié haute : seule la moitié basse se peint, au morceau près', () => {
+    const mur = (x: number, y: number): boolean => x < 860 && y > 0
+    const t = tranchesVisibles(a, b, 20, mur)
+    expect(t.length).toBeGreaterThan(0)
+    for (const [q0, q1] of t) expect(Math.max(q0.y, q1.y)).toBeLessThanOrEqual(0 + 20)
+    expect(Math.min(...t.map(([, q1]) => q1.y))).toBe(-170)
+  })
+
+  it('un mur DERRIÈRE la porte (du côté de son dos) ne cache pas la face', () => {
+    const mur = (x: number): boolean => x > 860
+    expect(tranchesVisibles(a, b, 20, mur)).toHaveLength(17)
+  })
+
+  it('le jeu donne la sonde des solides à la porte', () => {
+    const main = readFileSync(join(process.cwd(), 'src/main.ts'), 'utf8')
+    expect(main).toMatch(/solide: \(x, y\) => hauteurEn\(x, y\) >= 0,/)
+  })
+})
+
+describe('la porte blindée — le code couleur des lasers', () => {
+  it('ouverte, ses veilleuses sont vertes ; en course, rouges qui battent ; close, rouges', () => {
+    expect(etatVeilleuses(false, false)).toBe('ouverte')
+    expect(etatVeilleuses(false, true)).toBe('course')
+    expect(etatVeilleuses(true, true)).toBe('close')
   })
 })

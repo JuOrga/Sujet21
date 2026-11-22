@@ -23,14 +23,15 @@ grandit depuis le sol pendant que la porte monte.
 
 QUATRE PIÈCES, la longueur à l'horizontale :
   · `dessus` (320 × 160, vu d'en haut) — la tranche haute de la dalle : les
-    deux tôles de blindage vues de chant le long des bords, un joint sarcelle
-    entre chacune et l'âme, l'âme nervurée en travers, l'échine boulonnée au
+    deux tôles de blindage vues de chant le long des bords, un liseré ROUGE
+    (le rouge des faisceaux) entre chacune et l'âme, l'âme nervurée en travers, l'échine boulonnée au
     milieu. 160 px = l'épaisseur ; le carreau se RÉPÈTE le long de la porte,
     le joint de plaque à cheval sur ses deux bords (la copie de chaque côté
     le referme) ;
   · `bout` (96 × 160, vu d'en haut) — le sabot d'extrémité, posé aux deux
     bouts (le second en miroir) : le joint de caoutchouc à x = 0, qui frotte
-    contre le mur quand la dalle monte, le bloc boulonné, la veilleuse ;
+    contre le mur quand la dalle monte, le bloc boulonné, la veilleuse —
+    sa lentille éteinte : le moteur l'allume rouge (close) ou verte (ouverte) ;
   · `flanc` (320 × 280, en ÉLÉVATION, le haut en haut) — la grande face, la
     tranche du relief : la lèvre de tête, LA BANDE DE CHEVRONS juste
     dessous (c'est elle qui sort du sol la première), deux panneaux de
@@ -91,7 +92,7 @@ HAUTEURS = {'dessus': W, 'bout': W, 'flanc': HF, 'fente': W}
 # LA COUPE DE LA DALLE, en travers (px ; z = 0 et 160 : les deux faces) — la
 # même pour le dessus et le sabot
 PEAU = 12          # la tôle de blindage, vue de chant, le long de chaque face
-JOINT = 5          # le joint sarcelle entre la tôle et l'âme
+JOINT = 6          # le liseré rouge entre la tôle et l'âme
 ECHINE = (62, 98)  # l'échine boulonnée, au milieu
 
 
@@ -156,9 +157,15 @@ def matieres_porte():
     mats['peint'] = mat_brosse('porte-peint', (0x6a, 0x72, 0x7b), (0x9e, 0xa7, 0xb0), 93, brosse=0.12)
     mats['joint'] = mat_simple('porte-joint', (0x12, 0x14, 0x17), rug=0.85)
     mats['ecrou'] = mat_simple('porte-ecrou', (0x5a, 0x63, 0x6c), rug=0.38, metal=0.6)
-    # le joint de tête : le sarcelle de la charte, terni — un filet, pas un
-    # néon (l'iris le porte à 1,6 ; posé sur un objet plus petit, 1,1)
-    mats['sarcelle'] = mat_simple('porte-sarcelle', (0x14, 0x3a, 0x4c), rug=0.3, emission=(0x63, 0xb7, 0xe6), force=1.1)
+    # LES LISERÉS : le ROUGE DES FAISCEAUX (main.ts, le halo du laser :
+    # 255, 60–90, 50–70) — une porte obéit aux lasers, elle en porte la
+    # couleur (« que le code couleur rappelle les lasers […] joli mais
+    # remarquable », le concepteur, 22/11). Le premier essai était sarcelle :
+    # la porte se fondait dans le décor
+    mats['liseret'] = mat_simple('porte-liseret', (0x4a, 0x10, 0x0c), rug=0.3, emission=(0xff, 0x4e, 0x3c), force=1.6)
+    # la lentille des veilleuses, ÉTEINTE : c'est le moteur qui l'allume, rouge
+    # porte close, verte porte ouverte (porteBlindee.ts)
+    mats['lentille'] = mat_simple('porte-lentille', (0x1c, 0x21, 0x28), rug=0.12, metal=0.2)
     return mats
 
 
@@ -166,12 +173,12 @@ BISEAU_PORTE = dict(BISEAU_SAS, blindage=0.0025, peint=0.0012, joint=0.0015, ecr
 
 
 def lampe(at, x, z, y):
-    """la veilleuse du sabot : un boîtier vissé, la lentille ambre couchée en
-    travers de la porte — petite : la porte fait 40 unités d'épaisseur en
-    jeu, la veilleuse doit y tenir à 6"""
+    """la veilleuse du sabot : un boîtier vissé, la lentille couchée en
+    travers de la porte, éteinte — petite : la porte fait 40 unités
+    d'épaisseur en jeu, la veilleuse doit y tenir à 6"""
     at.boite('acier', x - u(9), x + u(9), z - u(22), z + u(22), y - 0.006, y, -0.3)
-    at.boite('cerne', x - u(6), x + u(6), z - u(16), z + u(16), y - 0.008, y - 0.006, 0)
-    at.boite('veilleuse', x - u(4), x + u(4), z - u(12), z + u(12), y - 0.010, y - 0.008, 0)
+    at.boite('creux', x - u(6), x + u(6), z - u(16), z + u(16), y - 0.008, y - 0.006, 0)
+    at.boite('lentille', x - u(4), x + u(4), z - u(12), z + u(12), y - 0.010, y - 0.008, 0)
     for dz in (-u(19), u(19)):
         at.dome('rivet', x, z + dz, 0.0022, y - 0.0065, 0)
 
@@ -189,10 +196,10 @@ def dessus(sc, mats):
     # une arête claire au biseau — la lèvre de tête du flanc, vue d'en haut
     for a, b in ((0, PEAU), (W - PEAU, W)):
         at.boite('bride', j, L - j, u(a), u(b), -0.052, -0.012, 0.2)
-    # le joint entre chaque tôle et l'âme : un filet sarcelle au fond d'une
-    # fente
+    # le joint entre chaque tôle et l'âme : un liseré rouge au fond d'une
+    # fente — la couleur des faisceaux qui commandent la porte
     for a in (PEAU, W - PEAU - JOINT):
-        at.boite('sarcelle', j, L - j, u(a + 1), u(a + JOINT - 1), -0.031, -0.012, 0)
+        at.boite('liseret', j, L - j, u(a + 1), u(a + JOINT - 1), -0.031, -0.012, 0)
     # l'âme, plus bas que les tôles, nervurée EN TRAVERS : ce qui dit, vu d'en
     # haut, l'épaisseur d'une dalle (des raidisseurs, pas une plaque peinte)
     za, zb = PEAU + JOINT, W - PEAU - JOINT
