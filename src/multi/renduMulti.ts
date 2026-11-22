@@ -178,6 +178,10 @@ export interface SceneHockey {
   charge: number
   viseeX: number
   viseeY: number
+  /** Dessiner le trait de visée du porteur (vrai par défaut). Faux quand le
+   *  porteur, c'est moi, à la souris : l'écran trace le sien, jusqu'au
+   *  viseur — deux traits l'un sur l'autre se brouillaient. */
+  traitPorteur?: boolean
 }
 
 /** Un ÉCLAT : l'onde qui part d'un choc. `age` en secondes, `force` de 0 à 1. */
@@ -255,6 +259,7 @@ uniform vec3 uMiseEnJeu;  // hockey : les cercles de zone — distance à la lig
 uniform vec3 uAnneau;     // sumo : le centre de l'anneau et son rayon (0 : pas d'anneau)
 uniform vec4 uPalet;      // hockey : x, y, rayon, 1 s'il est en jeu
 uniform vec4 uPorteur;    // hockey : qui le tient (−1 : personne), sa charge, sa visée (x, y)
+uniform float uTraitPorteur; // 1 : dessiner son trait de visée (0 : l'écran trace le sien)
 uniform vec2 uPaletV;     // hockey : la vitesse du palet (sa traînée)
 uniform vec4 uEclats[4];  // les chocs en cours : x, y, âge (s), force (0 : aucun)
 uniform vec4 uCoeurs[4];  // le CŒUR de chaque corps : x, y, son rayon, 1 s'il est connu
@@ -750,7 +755,7 @@ void main() {
       // que la charge est haute
       vec2 vers = uPorteur.zw - uPalet.xy;
       float lv = length(vers);
-      if (lv > 1.0) {
+      if (lv > 1.0 && uTraitPorteur > 0.5) {
         vec2 u = vers / lv;
         float le = dot(dp, u);
         float ecartAxe = abs(dp.x * u.y - dp.y * u.x);
@@ -1032,6 +1037,7 @@ export class RenduMulti {
     }
     gl.uniform3fv(gl.getUniformLocation(this.progEcran, 'uPoteaux'), poteaux)
     gl.uniform4f(gl.getUniformLocation(this.progEcran, 'uPorteur'), scene?.porteur ?? -1, scene?.charge ?? 0, scene?.viseeX ?? 0, scene?.viseeY ?? 0)
+    gl.uniform1f(gl.getUniformLocation(this.progEcran, 'uTraitPorteur'), scene?.traitPorteur === false ? 0 : 1)
     gl.bindVertexArray(this.vaoVide)
     gl.drawArrays(gl.TRIANGLES, 0, 3)
     gl.bindVertexArray(null)

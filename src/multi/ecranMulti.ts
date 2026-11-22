@@ -330,7 +330,7 @@ export function creeEcranMulti(quitte: () => void): EcranMulti {
    *  le doigt montre où il est) ? */
   const souris = { dedans: false, estSouris: false }
   /** La présence du trait de visée, de 0 à 1 (presenceTrait, cadrage.ts). */
-  let traitVu = 1
+  let traitVu = 0
   // LES SONS (sonsMulti.ts) : ce qu'on entend se déduit de ce qu'on affiche,
   // d'une image à la suivante.
   const sons = new SonsMulti()
@@ -1090,6 +1090,8 @@ export function creeEcranMulti(quitte: () => void): EcranMulti {
         charge: jeu.charge,
         viseeX: porteur?.viseeX ?? 0,
         viseeY: porteur?.viseeY ?? 0,
+        // c'est moi qui le tiens, à la souris : mon trait le remplace
+        traitPorteur: !(jeu.tenuPar === moi && souris.dedans && souris.estSouris && !aLaManette),
       }
     }
     while (eclats.length > 0 && maintenant / 1000 - eclats[0].ne >= DUREE_ECLAT) eclats.shift()
@@ -1111,8 +1113,9 @@ export function creeEcranMulti(quitte: () => void): EcranMulti {
     const trait = el<HTMLElement>('[data-trait]')
     viseur.style.color = trait.style.color = teinte(moi)
     viseur.dataset.pousse = commande.pousse && !aLaManette ? '1' : '0'
-    // le trait s'efface pendant la poussée, et revient en fondu après
-    traitVu = presenceTrait(traitVu, commande.pousse && !aLaManette, dt)
+    // le trait ne paraît que quand je tiens le palet (le tir se vise)
+    const jeTiens = jeu?.mode === MODE_HOCKEY && jeu.tenuPar === moi
+    traitVu = presenceTrait(traitVu, !jeTiens || aLaManette, dt)
     trait.style.opacity = traitVu.toFixed(3)
     peintTrait()
     peintReticule('[data-reticule2]', commande2 !== null, commande2 ? commandeManette(manette2, coeur2.x, coeur2.y) : commande, 1)

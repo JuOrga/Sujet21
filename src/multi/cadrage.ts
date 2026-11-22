@@ -113,18 +113,19 @@ export function traitDeVisee(cx: number, cy: number, rayon: number, viseeX: numb
   return { x1: cx + (dx / d) * depart, y1: cy + (dy / d) * depart, x2: viseeX, y2: viseeY }
 }
 
-/** Le temps (s) que met le trait de visée à revenir une fois la poussée
- *  relâchée : assez pour ne pas clignoter entre deux coups de jet. */
+/** Le temps (s) que met le trait de visée à paraître. */
 export const RETOUR_TRAIT = 0.35
 
-/** LA PRÉSENCE DU TRAIT de visée, de 0 à 1. Il s'efface pendant la poussée
- *  et revient en fondu quand on la relâche. Toujours montré, il gênait (le
- *  concepteur, 22/11 : « quand on vise c'est bien, mais quand on se déplace
- *  c'est bizarre, la ligne ») : pousser, c'est se déplacer — le jet part à
- *  l'opposé de la route, le trait pointait donc DERRIÈRE soi, et balayait
- *  l'écran au rythme du corps. Viser, c'est le pointeur qu'on place, corps
- *  au repos ou porté par son élan : là, il sert. */
-export function presenceTrait(avant: number, pousse: boolean, dt: number): number {
-  if (pousse) return 0
+/** LA PRÉSENCE DU TRAIT de visée, de 0 à 1 : il paraît en fondu quand il a
+ *  lieu d'être, et s'efface d'un coup sinon. Il n'a lieu d'être que quand on
+ *  TIENT LE PALET (le concepteur, 22/11 : « la ligne doit être présente
+ *  seulement quand on a le palet »). Toujours montré, il gênait : « quand on
+ *  vise c'est bien, mais quand on se déplace c'est bizarre » — pousser,
+ *  c'est se déplacer, et le jet part à l'opposé de la route : le trait
+ *  pointait derrière soi et balayait l'écran au rythme du corps. Effacé
+ *  seulement pendant la poussée, il restait de trop : viser, au hockey,
+ *  c'est viser le TIR. */
+export function presenceTrait(avant: number, cache: boolean, dt: number): number {
+  if (cache) return 0
   return Math.min(1, avant + Math.max(0, dt) / RETOUR_TRAIT)
 }

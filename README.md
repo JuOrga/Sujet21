@@ -272,13 +272,12 @@ bouton **MULTI** sur l'accueil (`?dev`). Tout vit dans [`src/multi/`](src/multi/
 - **Le VISEUR de la souris** : au-dessus du jeu, la croix du navigateur est
   remplacée par un viseur à la couleur du joueur, cerné de noir (il ressort
   sur la piste comme sur la foule du stade), qui suit la souris à
-  l'événement ; un trait en tirets le relie au bord de son corps — on le
-  retrouve en partant de soi, et il dit où part le jet (et le palet au
-  lancer). Le trait s'efface PENDANT la poussée — on se déplace, il
-  pointerait derrière soi — et revient en fondu au relâché ; le viseur, lui,
-  reste, plein et lumineux quand on pousse. Tout s'efface quand la manette a
-  la main ; pas de trait quand on vise sur son propre corps (le
-  rassemblement).
+  l'événement, plein et lumineux quand on pousse. Quand on TIENT LE PALET,
+  un trait en tirets le relie au bord de son corps : c'est la ligne du tir
+  (elle remplace alors, pour soi, les tirets que le jeu trace depuis le
+  palet ; l'adversaire voit toujours ceux-là, et la charge se lit à
+  l'anneau du palet). Sans le palet, pas de trait : en se déplaçant il
+  pointait derrière soi. Tout s'efface quand la manette a la main.
 - **La manette** (`manetteMulti.ts`) : le stick gauche dit où l'on VA (le
   jet part à l'opposé, et le palet part du côté du stick), A ou RT pousse,
   LT ou LB ouvre tant qu'on tient, B ou RB dashe, X ou Y gèle, Start recommence. Un réticule montre la

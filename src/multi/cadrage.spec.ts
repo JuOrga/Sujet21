@@ -107,12 +107,12 @@ describe('le trait de visée de la souris', () => {
 })
 
 describe('le trait de visée — quand il se montre', () => {
-  it('s’efface d’un coup quand on pousse (on se déplace : il pointerait derrière soi)', () => {
+  it('s’efface d’un coup quand il n’a pas lieu d’être (on ne tient pas le palet)', () => {
     expect(presenceTrait(1, true, 0.016)).toBe(0)
     expect(presenceTrait(0.4, true, 0.016)).toBe(0)
   })
 
-  it('revient en fondu une fois la poussée relâchée, sans dépasser 1', () => {
+  it('paraît en fondu quand on prend le palet, sans dépasser 1', () => {
     let p = 0
     let t = 0
     while (p < 1 && t < 5) {
@@ -121,7 +121,7 @@ describe('le trait de visée — quand il se montre', () => {
     }
     expect(t).toBeCloseTo(RETOUR_TRAIT, 1)
     expect(presenceTrait(1, false, 1)).toBe(1)
-    // un coup de jet bref ne le fait pas clignoter : il repart de zéro
+    // un palet tenu un instant ne le fait pas éclater d'un coup : il repart de zéro
     expect(presenceTrait(presenceTrait(1, true, 0.016), false, 0.05)).toBeLessThan(0.2)
   })
 })
