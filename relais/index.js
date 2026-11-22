@@ -37,6 +37,8 @@ import { WebSocketServer } from 'ws'
 
 /** Le nom de cette instance : deux joueurs qui ne lisent pas le même nom ne
  *  sont pas sur la même machine, et ne peuvent pas se voir. */
+import { CONNEXIONS_PAR_ADRESSE, JETON, admet, adresseDe, debit, occupe, quitte, salonNeuf } from './places.js'
+
 const INSTANCE = randomBytes(3).toString('hex')
 const NEE = Date.now()
 
@@ -74,23 +76,28 @@ const dit = (ws, message) => {
   if (ws && ws.readyState === ws.OPEN) ws.send(JSON.stringify(message))
 }
 
-function installe(ws, code, role) {
+function installe(ws, code, role, jeton) {
   let salon = salons.get(code)
   if (!salon) {
     if (salons.size >= SALONS_MAX) {
       ws.close(4503, 'relais plein')
       return
     }
-    salon = { hote: null, invite: null }
+    salon = salonNeuf()
     salons.set(code, salon)
   }
-  // Une place déjà tenue : c'est le même joueur qui revient (sa connexion
-  // vient d'être coupée par la durée maximale) — le nouveau prend la place,
-  // l'ancien est congédié. Un inconnu qui taperait le code d'une partie en
-  // cours prendrait la place de l'invité : pour un prototype entre amis,
-  // c'est admis ; un vrai mode demandera un jeton par joueur.
+  // Une place tenue — ou quittée à l'instant — n'est rendue qu'au MÊME
+  // jeton : c'est le même joueur qui revient (sa connexion vient d'être
+  // coupée par la durée maximale), il reprend sa place et l'ancienne
+  // connexion est congédiée. Un autre jeton est refusé (places.js dit
+  // pourquoi : avant, le code seul suffisait à chasser un joueur).
+  if (!admet(salon, role, jeton, Date.now())) {
+    ws.close(4423, 'place prise')
+    if (!salon.hote && !salon.invite) salons.delete(code)
+    return
+  }
   const ancien = salon[role]
-  salon[role] = ws
+  occupe(salon, role, ws, jeton)
   if (ancien && ancien !== ws) ancien.close(4409, 'remplacé')
   const autre = () => (role === 'hote' ? salon.invite : salon.hote)
 
@@ -100,7 +107,13 @@ function installe(ws, code, role) {
     dit(autre(), { r: 'pair' })
   }
 
+  const flot = debit()
   ws.on('message', (donnee, binaire) => {
+    // le plafond de débit (places.js) : au-delà on jette, et qui persiste
+    // est coupé
+    const verdict = flot.compte(donnee.length ?? 0, Date.now())
+    if (verdict === 'coupe') return ws.close(4429, 'trop de débit')
+    if (verdict === 'jette') return
     const vers = autre()
     if (!vers || vers.readyState !== vers.OPEN) return
     if (binaire && vers.bufferedAmount > FILE_MAX) return
@@ -108,7 +121,7 @@ function installe(ws, code, role) {
   })
   ws.on('close', () => {
     if (salon[role] !== ws) return // remplacé : la place est déjà reprise
-    salon[role] = null
+    quitte(salon, role, Date.now())
     dit(autre(), { r: 'seul' })
     if (!salon.hote && !salon.invite) salons.delete(code)
   })
@@ -128,15 +141,30 @@ const wss = new WebSocketServer({
   maxPayload: TRAME_MAX,
   verifyClient: ({ origin }) => origineAdmise(origin),
 })
+/** adresse → connexions ouvertes (places.js, CONNEXIONS_PAR_ADRESSE) */
+const parAdresse = new Map()
 wss.on('connection', (ws, req) => {
   const q = new URL(req.url ?? '/', 'http://relais').searchParams
   const code = (q.get('code') ?? '').toUpperCase()
   const role = q.get('role')
-  if (!CODE.test(code) || (role !== 'hote' && role !== 'invite')) {
+  const jeton = (q.get('jeton') ?? '').toLowerCase()
+  if (!CODE.test(code) || (role !== 'hote' && role !== 'invite') || !JETON.test(jeton)) {
     ws.close(4400, 'code ou rôle invalide')
     return
   }
-  installe(ws, code, role)
+  const adresse = adresseDe(req.headers, req.socket.remoteAddress ?? '')
+  const tenues = parAdresse.get(adresse) ?? 0
+  if (tenues >= CONNEXIONS_PAR_ADRESSE) {
+    ws.close(4429, 'trop de connexions')
+    return
+  }
+  parAdresse.set(adresse, tenues + 1)
+  ws.on('close', () => {
+    const reste = (parAdresse.get(adresse) ?? 1) - 1
+    if (reste > 0) parAdresse.set(adresse, reste)
+    else parAdresse.delete(adresse)
+  })
+  installe(ws, code, role, jeton)
 })
 
 // en local : `PORT=9100 node index.js` écoute ; sur Vercel, c'est la

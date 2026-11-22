@@ -171,5 +171,15 @@ Ce n'est pas un projet à part — un nom déplacé d'un déploiement du projet
 du jeu au suivant. Si Vercel efface un jour l'ancien déploiement, l'alias
 part avec lui : un redéploiement par la gâchette le repose.
 
+**Les protections** (`relais/places.js`, depuis l'ouverture à tous) : une
+place ne se prend plus avec le seul code — chaque joueur présente un jeton
+tiré par son navigateur, et une place tenue (ou quittée depuis moins de
+20 s) n'est rendue qu'au même jeton ; une connexion a un plafond de débit
+(768 Ko/s ; au-delà on jette, et qui persiste cinq secondes est coupé) ;
+une même adresse tient huit connexions au plus. `relais/essai-places.mjs`
+les joue toutes, en local comme en ligne (le workflow le lance après
+l'essai à deux joueurs).
+
 En local : `cd relais && npm install && PORT=9100 node index.js`, puis le
-jeu avec `?relais=ws://127.0.0.1:9100/ws`.
+jeu avec `?relais=ws://127.0.0.1:9100/ws` (et `node essai-places.mjs`
+pour les protections).

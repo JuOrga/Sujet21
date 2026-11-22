@@ -120,5 +120,7 @@ jobs:
             curl -sS -m 20 "https://$domaine/" -w "\nHTTP %{http_code}\n" || true
             echo "== essai à deux joueurs =="
             node essai.mjs "wss://$domaine/ws" 8 2>&1 || true
+            echo "== les protections (relais/places.js) =="
+            node essai-places.mjs "wss://$domaine/ws" 2>&1 || true
             echo '```'
           } | tee -a "$GITHUB_STEP_SUMMARY"

@@ -174,7 +174,10 @@ le mode concepteur tant qu'il n'était qu'un essai). Tout vit dans
   gâchette `relais-go`, qui pose sur chaque déploiement son adresse FIXE,
   `sujet21-relais.vercel.app` (un alias), et l'essaie aussitôt en ligne
   depuis le serveur de GitHub. Le jeu vise l'alias : redéployer le relais
-  ne demande plus de toucher au jeu.
+  ne demande plus de toucher au jeu. Ses PROTECTIONS (`relais/places.js`) :
+  une place ne se prend pas avec le seul code (un jeton par joueur), le
+  débit d'une connexion est plafonné, une même adresse tient peu de
+  connexions.
 - **Qui simule** : la machine qui CRÉE la partie. L'autre envoie sa commande
   et affiche ce qu'il reçoit (rejouer les mêmes gestes sur deux machines ne
   donne pas le même film — `src/game/fantome.ts`). La partie continue quand

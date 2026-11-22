@@ -20,6 +20,14 @@
 
 import { tireCode } from './code'
 
+/** Un jeton de place : 16 octets tirés au hasard, en hexadécimal (le format
+ *  que le relais attend, relais/places.js). */
+export function jetonNeuf(): string {
+  const octets = new Uint8Array(16)
+  crypto.getRandomValues(octets)
+  return Array.from(octets, (o) => o.toString(16).padStart(2, '0')).join('')
+}
+
 /** L'adresse du relais en ligne : un ALIAS fixe. Le relais vit dans le
  *  projet Vercel du jeu comme un aperçu à part, et un aperçu reçoit une
  *  adresse neuve à chaque déploiement — le jeu devait la recopier ici à
@@ -110,6 +118,10 @@ class LiaisonRelais implements Liaison {
   private coupures = 0
   private derniereCoupure = ''
   private ensemble = false
+  /** MON JETON : tiré au hasard une fois, présenté à chaque reconnexion —
+   *  le relais ne rend une place qu'au jeton qui la tenait (relais/places.js :
+   *  avant, le code seul suffisait à chasser un joueur). */
+  private readonly jeton = jetonNeuf()
 
   constructor(
     private readonly adresse: string,
@@ -123,7 +135,7 @@ class LiaisonRelais implements Liaison {
     if (this.voulueFermee) return
     let ws: WebSocket
     try {
-      ws = new WebSocket(`${this.adresse}?code=${this.code}&role=${this.role}`)
+      ws = new WebSocket(`${this.adresse}?code=${this.code}&role=${this.role}&jeton=${this.jeton}`)
     } catch {
       this.finit('echec', 'Le relais est injoignable depuis ce navigateur.')
       return
@@ -156,6 +168,8 @@ class LiaisonRelais implements Liaison {
       this.derniereCoupure = `code ${ev.code}${ev.wasClean ? '' : ' (coupure sèche)'}${ev.reason ? ' « ' + ev.reason.slice(0, 60) + ' »' : ''} à ${Math.round(performance.now() - this.ne)} ms`
       // des refus motivés : revenir ne changerait rien
       if (ev.code === 4409) return this.finit(this.etat === 'ouverte' ? 'coupee' : 'echec', 'Quelqu’un d’autre a pris cette place dans la partie.')
+      if (ev.code === 4423) return this.finit(this.etat === 'ouverte' ? 'coupee' : 'echec', 'Cette partie a déjà ses deux joueurs.')
+      if (ev.code === 4429) return this.finit(this.etat === 'ouverte' ? 'coupee' : 'echec', 'Le relais a coupé la liaison : trop de connexions ou de données venues d’ici.')
       if (ev.code === 4400) return this.finit('echec', 'Le relais a refusé ce code.')
       if (ev.code === 4503) return this.finit('echec', 'Le relais est plein. Réessayez dans un instant.')
       // tout le reste — durée maximale de la fonction, réseau qui hoquette —
