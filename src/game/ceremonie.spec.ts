@@ -23,6 +23,7 @@ import { LEVIER_FIN_MS } from './finDescente'
 // par tous les blocs qui gardent un écran.
 const HTML = readFileSync(new URL('../../index.html', import.meta.url), 'utf-8')
 const MAIN = readFileSync(new URL('../main.ts', import.meta.url), 'utf-8')
+const ONDE = readFileSync(new URL('./ondeVue.ts', import.meta.url), 'utf-8')
 const corps = (nom: string): string => {
   const debut = MAIN.indexOf(`\nfunction ${nom}(`)
   expect(debut, `la fonction ${nom} manque`).toBeGreaterThan(-1)
@@ -535,11 +536,19 @@ describe('la cérémonie — le choix de la salle tient dans l’écran', () => 
     expect(garde, 'la garde avant la visée').toBeLessThan(choisit.indexOf('garde.clic('))
   })
 
-  it('la mini-carte plafonne sa hauteur, sa fiche ne prend aucune place', () => {
+  it('la mini-carte plafonne sa hauteur', () => {
     expect(regle('.mv-svg')).toMatch(/max-height:\s*22vh/)
-    expect(regle('.mv-fiche')).toMatch(/position:\s*absolute/)
-    // au repos, la fiche se tait : plus de consigne par défaut
     expect(corps('mbMontreSallesVoie')).not.toContain('visez une porte')
+  })
+  // « du texte qui apparaît au centre de la page quand on sélectionne un
+  // tableau, il faut l'enlever » (le concepteur, 22/11) : la fiche de la
+  // mini-carte (« VOIE DU HAUT · tableau du pool · ferme 10 cases ») est
+  // partie ; la carte éteint toujours ce qu'une porte ferme
+  it('ne pose plus de fiche sous la mini-carte quand on vise une porte ou une case', () => {
+    expect(MAIN).not.toContain('ficheVoies')
+    expect(MAIN).not.toContain('mv-fiche')
+    expect(HTML).not.toContain('.mv-fiche')
+    expect(corps('mbMontreSallesVoie')).toContain("classList.add('mv-perdu')")
   })
 })
 
@@ -1288,6 +1297,115 @@ describe('la cérémonie — le tirage', () => {
       }))
     expect(visent.length).toBeGreaterThan(2) // la garde regarde bien quelque chose
     for (const r of visent) expect(r.corps, r.selecteurs.join(', ')).not.toMatch(aplatit)
+  })
+  // L'EAU DES CARTES (ondeVue.ts). L'inclinaison d'avant posait --rx/--ry à
+  // chaque pointermove, sous une transition de 0,16 s relancée à chaque
+  // fois, et se remettait à plat d'un coup : « ça fait buggé, pas fluide »
+  // (le concepteur, 22/11). La visée, d'où qu'elle vienne, met l'eau en
+  // mouvement ; le choix l'arrête.
+  it('donne à chaque carte son eau, visée au pointeur, au clavier et à la manette', () => {
+    const f = corps('mbMontreDraft')
+    expect(MAIN).not.toContain('mbIncline')
+    expect(f).toContain('ondes.set(pli, ondeCarte(btn, pli, sansAnimation))')
+    // l'eau s'installe AVANT les écouteurs de la visée : son pointerenter
+    // pose la goutte là où le pointeur entre
+    expect(f.indexOf('ondeCarte(btn')).toBeLessThan(f.indexOf("for (const ev of ['pointerenter', 'pad-vise'] as const)"))
+    // la visée (survol, focus, manette) passe par isole, qui réveille l'eau
+    expect(f).toMatch(/if \(c === pli\) ondes\.get\(c\)\?\.vise\(\)\s*\n\s*else ondes\.get\(c\)\?\.quitte\(\)/)
+    // la carte élue : l'eau se tait d'un coup
+    const clic = f.slice(f.indexOf("btn.addEventListener('click'"))
+    expect(clic.slice(0, 1200)).toContain('for (const o of ondes.values()) o.arrete()')
+  })
+  it('laisse le pli suivre ses ressorts : ni transition, ni variables d’inclinaison', () => {
+    expect(regle('.mb-pli')).not.toMatch(/transition:/)
+    expect(css).not.toMatch(/--r[xy]\b/)
+    // au repos, la feuille tient la flottaison que le ressort rejoint (FLOTTE)
+    expect(css).toMatch(/\.mb-pli\.mb-vise \{ z-index: 2; transform: translateY\(-6px\); \}/)
+    expect(ONDE).toMatch(/export const FLOTTE = -6\b/)
+    // LE CONTOUR D'EAU : « pas du volume d'eau dans le cœur de la carte,
+    // plutôt sur les bordures » (le concepteur, 22/11). La toile est un
+    // enfant du pli (la face, au chanfrein, rognerait l'eau qui déborde),
+    // tournée vers l'avant, dos caché ; tant qu'elle tient le contour, le
+    // filet de la feuille s'efface — et le voile de la visée reste
+    expect(ONDE).toContain('pli.append(toile)')
+    expect(ONDE).not.toMatch(/face\.(?:prepend|append)\(toile\)/)
+    expect(regle('.mb-pli .mb-rive')).toMatch(/backface-visibility:\s*hidden/)
+    expect(regle('.mb-pli .mb-rive')).toMatch(/pointer-events:\s*none/)
+    expect(css).toMatch(/\.mb-pli\.mb-liquide \.crt-draft\.pad-focus \{ box-shadow: none; \}/)
+    expect(css.indexOf('.mb-pli.mb-liquide .crt-draft')).toBeGreaterThan(css.indexOf('.mb-pli.mb-vise .crt-draft, .mb-pli .crt-draft:focus-visible'))
+    expect(regle('.mb-pli.mb-vise .crt-draft, .mb-pli .crt-draft:focus-visible, .mb-pli .crt-draft.pad-focus')).toContain('background: var(--mb-visee), var(--mb-coque)')
+    // rien n'aplatit le pli
+    expect(ONDE).not.toMatch(/pli\.style\.(?:opacity|filter|clipPath)|pli\.style\.setProperty\('(?:opacity|filter|clip-path)/)
+  })
+  // « applique cela au choix du surplus et au choix de la salle » (le
+  // concepteur, 22/11) : les cuves du versement et les portes de salle —
+  // celles d'une salle comme celles d'un nœud — prennent le même contour
+  // d'eau, en retrait du bord (leur clip-path rognerait ce qui déborde)
+  it('donne le contour d’eau aux cuves du versement et aux portes de salle', () => {
+    const aide = corps('mbEauAuChoix')
+    expect(aide).toMatch(/ondeCarte\(btn, btn, sansAnimation, \{ retrait: 5, amplitude: 0\.6, flotte: -4, perspective: 1200 \}\)/)
+    // la visée au clavier et à la manette ; pas le focus que l'étape pose elle-même
+    expect(aide).toMatch(/'focusin', \(\) => \{ if \(!mbFocusOuverture\) o\.vise\(\) \}/)
+    expect(aide).toContain("btn.addEventListener('pad-vise', () => o.vise())")
+    expect(aide).toContain("['focusout', 'pad-quitte']")
+    // le choix fait, l'eau de toute la rangée se tait
+    expect(aide).toMatch(/mbOndes\.get\(frere\)\?\.arrete\(\)/)
+    for (const f of ['mbPorte', 'mbPorteNoeud']) expect(corps(f), f).toContain("mbEauAuChoix(btn, () => btn.classList.contains('mb-elue'))")
+    // la réserve pleine se voit, elle ne se vise pas
+    expect(corps('mbMontreVersement')).toMatch(/for \(const btn of \[cb, cx\]\) if \(!btn\.disabled\) mbEauAuChoix\(btn, \(\) => scene\.dataset\.verse !== undefined\)/)
+    // la toile vit dans le bouton, par-dessus son contenu, sans prendre le pointeur
+    expect(ONDE).toContain("toile.className = retrait ? 'mb-rive mb-rive-dedans' : 'mb-rive'")
+    expect(regle('.mb-rive.mb-rive-dedans')).toMatch(/inset:\s*0/)
+    expect(regle('.mb-rive.mb-rive-dedans')).toMatch(/pointer-events:\s*none/)
+    // le tirage, lui, garde sa flottaison tenue par la feuille
+    expect(ONDE).toContain('flotteTenue: options.flotteTenue ?? !retrait')
+  })
+  // « applique aussi cet effet aux différents boutons, passer, continuer et
+  // avis », puis « également aux boutons dans les salles mystères,
+  // rencontre etc. » (le concepteur, 22/11)
+  it('donne l’eau aux boutons : le verbe de chaque étape, les crans de l’avis, les offres des haltes', () => {
+    const aide = corps('mbEauAuBouton')
+    // la visée que la feuille dessine : le focus VISIBLE, pas le focus posé
+    // par programme sur le verbe à chaque bilan
+    expect(aide).toContain("btn.matches(':focus-visible')")
+    expect(aide).toContain("btn.addEventListener('pad-vise', () => o.vise())")
+    // le verbe est un aplat : son bord ondule
+    expect(MAIN).toMatch(/const MB_EAU_VERBE: OptionsOnde = \{\s*mode: 'bord'/)
+    expect(MAIN).toContain("mbEauAuBouton(mbEl('mb-passer'), MB_EAU_VERBE)")
+    for (const cls of ['mb-levier mb-module-levier', 'mb-levier mb-fin-levier', 'mb-levier mb-halte-levier'])
+      expect(MAIN, cls).toContain(`btn.className = '${cls}'\n  mbEauAuBouton(btn, MB_EAU_VERBE)`)
+    expect(MAIN.match(/mbEauAuBouton\(btn, MB_EAU_VERBE\)/g)?.length).toBe(6)
+    // les offres : repos, don, rencontre, palet
+    expect(MAIN.match(/mb-offre[^\n]*\n\s*mbEauAuBouton\(btn, MB_EAU_OFFRE\)/g)?.length).toBe(4)
+    for (const f of ['mbMontreRepos', 'mbMontreDon', 'mbPeintEvenement', 'mbMontreChoixPalet'])
+      expect(corps(f), f).toContain('mbEauAuBouton(btn, MB_EAU_OFFRE)')
+    // les crans de l'avis, refaits à chaque bilan
+    expect(corps('mbAvisOuvre')).toMatch(/for \(const cran of mbEl\('mb-avis-crans'\)\.children\)\s*mbEauAuBouton\(/)
+    expect(css).toMatch(/\.mb-avis-cran\.mb-liquide \{ border-color: transparent; \}/)
+    // ils portent la toile : relatifs
+    for (const s of ['.mb-passer', '.mb-avis-cran', '.mb-halte-levier', '.mb-module-levier', '.mb-fin-levier'])
+      expect(regle(s), s).toMatch(/position:\s*relative/)
+    // un bouton désactivé se voit, il ne se vise pas ; un bouton caché sous
+    // la visée lâche la boucle
+    expect(ONDE).toContain('(face as HTMLButtonElement).disabled) return')
+    expect(ONDE).toContain('e.pli.getClientRects().length === 0')
+  })
+  it('se tait sous « moins d’animations » : ni eau, ni ressort', () => {
+    const moins = css.slice(css.lastIndexOf('prefers-reduced-motion: reduce'))
+    expect(moins).toMatch(/\.mb-pli \.mb-rive, \.mb-rive\.mb-rive-dedans \{ display: none; \}/)
+    // relu à chaque geste : le réglage peut changer en cours de partie
+    expect(ONDE).toMatch(/if \(e\.arretee \|\| sansAnimation\(\)\) return/)
+  })
+  // la règle est dans instruments.ts (instrumentOuvert) ; encore faut-il
+  // que le tirage du jeu lui dise quels états sont ouverts — sans eux, le
+  // défaut « tout ouvert » rendait le tirage d'avant, en silence
+  it('dit au tirage quels états sont ouverts : ceux que la descente lit déjà', () => {
+    expect(corps('mbMontreDraft')).toMatch(/tirageInstruments\(\s*Math\.random,[\s\S]{0,160}catalogueRecompenses\(\),\s*etatsOuverts\(\),\s*\)/)
+    const e = corps('etatsOuverts')
+    expect(e).toContain("glace: transfoTenue('solidification', acquis, verrous)")
+    expect(e).toContain("vapeur: transfoTenue('vaporisation', acquis, verrous)")
+    // l'instrument qu'une salle événement offre suit la même règle
+    expect(MAIN).toMatch(/!d\.contrepartie &&\s*instrumentOuvert\(d, ouverts\)/)
   })
   it('n’écrit plus d’étiquette sous 10 px', () => {
     for (const s of ['.mb-pli .crt-nom', '.mb-pli .crt-ctr', '.mb-pli .crt-perso', '.mb-pli .crt-prix']) {
