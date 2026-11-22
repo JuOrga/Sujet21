@@ -2943,13 +2943,20 @@ de dessus, ses joints sous les leurs). La face est **accrochée par le haut** :
   rappelle les lasers […] joli mais remarquable ») : une porte obéit aux
   faisceaux, elle en porte le rouge — les deux liserés du dessus, et les deux
   veilleuses, qui battent pendant la course et veillent porte close. Porte
-  ouverte, les veilleuses affleurent au bout de la fente, **vertes**. C'est
+  ouverte, les deux liserés restent au ras du sol et les veilleuses
+  affleurent au bout de la fente, le tout **en vert**. C'est
   l'exception écrite à la charte (§3 : le rouge réservé à l'alerte, le vert à
   la serre) : sur une porte, ces deux couleurs sont un état de jeu.
 - Relief allumé, **la face ne se peint pas là où un mur la touche** : le
   dessus de ce mur passe devant (`tranchesVisibles` sonde le sol juste devant
   chaque morceau de face). Avant, la face d'une porte collée à un mur se
   peignait par-dessus lui (capture du concepteur, 22/11).
+- **La dalle va d'un mur à l'autre** (`sensPorte`) : ses sabots se posent
+  contre les murs qu'elle relie, ses grandes faces regardent le passage. Le
+  sens se lit sur les murs qui la bordent, pas sur sa longueur — une petite
+  porte presque carrée qui ferme un couloir étroit se couchait en travers,
+  et perdait sa face en relief (D1, D2 de la capture du 22/11). À l'éditeur,
+  sans sonde des murs, le plus long côté décide.
 - Le front d'une porte qui se déplie est un trait blanc froid (`#d6e8f5`).
 
 Tant que l'atlas n'est pas chargé, la porte se dessine au vecteur dans les

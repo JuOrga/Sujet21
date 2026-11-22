@@ -710,14 +710,18 @@ type RectMonde = { minX: number; minY: number; maxX: number; maxY: number }
  *  sommet a glissé au-delà de son pied. LES BOUTS sont exclus — les deux
  *  petits côtés du rectangle `p`, collés aux murs que la porte relie : leur
  *  tranche se peindrait sur ces murs. Le FRONT d'une porte qui se ferme, au
- *  milieu du passage, est une face libre : il garde la sienne. */
+ *  milieu du passage, est une face libre : il garde la sienne.
+ *  `couchee` : le sens de la porte, quand on le sait mieux que par sa
+ *  longueur — une porte presque carrée qui ferme un couloir étroit va d'un
+ *  mur à l'autre par son PETIT côté (porteBlindee.ts : sensPorte) ; par
+ *  défaut, le plus long côté. */
 export function facesTranche(
   contour: readonly PointMonde[],
   p: RectMonde,
   cx: number,
   cy: number,
+  couchee: boolean = p.maxX - p.minX >= p.maxY - p.minY,
 ): { a: PointMonde; b: PointMonde }[] {
-  const couchee = p.maxX - p.minX >= p.maxY - p.minY
   const eps = 1e-6
   const surBout = (a: PointMonde, b: PointMonde): boolean =>
     couchee

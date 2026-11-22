@@ -3,6 +3,7 @@ import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import type { PorteDef } from '../game/level'
 import { portePolygone } from '../game/porte'
+import { facesTranche } from './reliefParois'
 import {
   DUREE_LEVEE,
   PORTE_ATLAS,
@@ -11,6 +12,7 @@ import {
   decoupePorte,
   etatVeilleuses,
   hauteurDeLevee,
+  sensPorte,
   leveeSuivante,
   partLevee,
   tranchesVisibles,
@@ -191,5 +193,40 @@ describe('la porte blindée — le code couleur des lasers', () => {
     expect(etatVeilleuses(false, false)).toBe('ouverte')
     expect(etatVeilleuses(false, true)).toBe('course')
     expect(etatVeilleuses(true, true)).toBe('close')
+  })
+})
+
+describe('la porte blindée — elle va d’un mur à l’autre', () => {
+  // D1 de la capture du 22/11 : une porte presque carrée, un peu plus LARGE
+  // que haute, qui ferme un couloir horizontal étroit — les murs sont
+  // au-dessus et au-dessous d'elle, le couloir à gauche et à droite
+  const D1: PorteDef = { minX: 600, minY: 300, maxX: 644, maxY: 340, canal: 1 }
+  const murs = (_x: number, y: number): boolean => y > 340 || y < 300
+
+  it('par sa seule longueur elle se couchait en travers du couloir ; ses murs la remettent debout', () => {
+    expect(sensPorte(D1)).toBe(true)
+    expect(sensPorte(D1, murs)).toBe(false)
+  })
+
+  it('debout, ses faces libres sont celles qui donnent sur le couloir : celle que regarde l’œil se peint', () => {
+    const c = [
+      { x: 600, y: 300 },
+      { x: 644, y: 300 },
+      { x: 644, y: 340 },
+      { x: 600, y: 340 },
+    ]
+    // l'œil à gauche, à hauteur du couloir
+    const avant = facesTranche(c, D1, 200, 320)
+    const apres = facesTranche(c, D1, 200, 320, sensPorte(D1, murs))
+    expect(avant).toEqual([]) // la face gauche passait pour un bout contre un mur
+    expect(apres).toEqual([{ a: { x: 600, y: 340 }, b: { x: 600, y: 300 } }])
+    // et rien ne la cache : le couloir est libre devant elle
+    expect(tranchesVisibles(apres[0].a, apres[0].b, 20, murs).length).toBeGreaterThan(0)
+  })
+
+  it('sans sonde (l’éditeur), ou des murs de tous côtés, le plus long côté décide', () => {
+    expect(sensPorte(P)).toBe(false)
+    expect(sensPorte(D1, () => true)).toBe(true)
+    expect(sensPorte(D1, () => false)).toBe(true)
   })
 })

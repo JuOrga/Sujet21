@@ -779,7 +779,8 @@ describe("la tranche d'une porte", () => {
     // sort du sol, sa face va du pied au haut de ce qui est levé
     const src = lire('./porteBlindee.ts')
     const corps = src.slice(src.indexOf('export function dessinePorte('))
-    const face = corps.indexOf('facesTranche(contour, p, vue.oeil.x, vue.oeil.y)')
+    // (le sens vient des murs, sensPorte : 22/11)
+    const face = corps.indexOf('facesTranche(contour, p, vue.oeil.x, vue.oeil.y, couchee)')
     expect(face).toBeGreaterThan(0)
     expect(corps.slice(face, face + 200)).toMatch(/dessineFace\(g, a, b, vue\.pied, haut,/)
     // relief éteint, pas de face : l'œil n'est donné que relief allumé

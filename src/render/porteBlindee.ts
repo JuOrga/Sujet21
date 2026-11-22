@@ -123,8 +123,12 @@ export function hauteurDeLevee(leve: number): number {
  *  (0..longueur), t en travers (0..epaisseur), orienté comme l'image — t
  *  croît vers le BAS de l'atlas. Couchée, le haut de l'image regarde le haut
  *  de l'écran (la lumière de l'atelier tombe d'en haut, comme sur le sas) ;
- *  debout, l'image tourne d'un quart de tour, sa tête à gauche. */
-export function cadrePorte(p: PorteDef): {
+ *  debout, l'image tourne d'un quart de tour, sa tête à gauche. `couchee`
+ *  impose le sens (sensPorte) ; par défaut, le plus long côté. */
+export function cadrePorte(
+  p: PorteDef,
+  couchee: boolean = p.maxX - p.minX >= p.maxY - p.minY,
+): {
   o: Point
   es: Point
   et: Point
@@ -134,10 +138,29 @@ export function cadrePorte(p: PorteDef): {
 } {
   const lx = p.maxX - p.minX
   const ly = p.maxY - p.minY
-  const couchee = lx >= ly
   return couchee
     ? { o: { x: p.minX, y: p.maxY }, es: { x: 1, y: 0 }, et: { x: 0, y: -1 }, longueur: lx, epaisseur: ly, couchee }
     : { o: { x: p.minX, y: p.minY }, es: { x: 0, y: 1 }, et: { x: 1, y: 0 }, longueur: ly, epaisseur: lx, couchee }
+}
+
+/** LE SENS DE LA DALLE : elle va d'un mur à l'autre. Les sabots se posent
+ *  contre les deux murs qu'elle relie, les grandes faces regardent le
+ *  passage. Deviné par la seule longueur, une porte presque carrée qui ferme
+ *  un couloir étroit se couchait en travers : ses « bouts » donnaient sur le
+ *  couloir et sa face, collée au mur, était cachée — D1 et D2 n'avaient plus
+ *  de face en relief (capture du concepteur, 22/11). Avec la sonde des
+ *  solides, on regarde de quel côté sont les murs ; sans elle (l'éditeur),
+ *  ou quand les deux côtés ou aucun n'en ont, le plus long côté. `true` :
+ *  couchée, ses bouts à gauche et à droite. */
+export function sensPorte(p: PorteDef, solide?: (x: number, y: number) => boolean, devant = 3): boolean {
+  const parLongueur = p.maxX - p.minX >= p.maxY - p.minY
+  if (!solide) return parLongueur
+  const cx = (p.minX + p.maxX) / 2
+  const cy = (p.minY + p.maxY) / 2
+  const gaucheDroite = solide(p.minX - devant, cy) && solide(p.maxX + devant, cy)
+  const hautBas = solide(cx, p.maxY + devant) && solide(cx, p.minY - devant)
+  if (gaucheDroite !== hautBas) return gaucheDroite
+  return parLongueur
 }
 
 /** LE DÉCOUPAGE le long de la dalle : un sabot `bout` à chaque extrémité
@@ -259,7 +282,8 @@ export function dessinePorte(
   vue: VuePorte,
   img: HTMLImageElement | null,
 ): void {
-  const cadre = cadrePorte(p)
+  const couchee = sensPorte(p, vue.oeil ? vue.solide : undefined)
+  const cadre = cadrePorte(p, couchee)
   const { o, es, et, longueur: L, epaisseur: E } = cadre
   if (!(L > 0) || !(E > 0)) return
   const dec = decoupePorte(L, E)
@@ -293,6 +317,9 @@ export function dessinePorte(
     // bouts de la fente — le passage est libre
     g.save()
     poseRepere(g, vue.pied, o, es, et, L, E)
+    // et ses deux liserés restent, VERTS, au ras du sol (« quand elles sont
+    // ouvertes les deux lignes doivent rester et passer en vert », 22/11)
+    for (const t of [LISERE_T * E, (1 - LISERE_T) * E]) liseres(g, t, L, E, VERT_OUVERT, 1)
     for (const s of [xl, L - xl]) veilleuse(g, s, E, VERT_OUVERT, 0.55 + 0.1 * Math.sin(vue.temps * 2.2), true)
     g.restore()
   }
@@ -312,7 +339,7 @@ export function dessinePorte(
   // descendent du haut au sol (facesTranche : ni les bouts collés aux murs,
   // ni les faces de dos) — le front d'une porte qui se déplie en est un
   if (vue.oeil) {
-    for (const { a, b } of facesTranche(contour, p, vue.oeil.x, vue.oeil.y)) dessineFace(g, a, b, vue.pied, haut, h, cadre, dec, pc, vue.solide)
+    for (const { a, b } of facesTranche(contour, p, vue.oeil.x, vue.oeil.y, couchee)) dessineFace(g, a, b, vue.pied, haut, h, cadre, dec, pc, vue.solide)
   }
 
   // 3. LE DESSUS, rogné à la part levée
@@ -376,6 +403,24 @@ export function dessinePorte(
 
 // le milieu du liseré, en fraction de l'épaisseur — PEAU + JOINT / 2 du script
 const LISERE_T = (12 + 6 / 2) / 160
+
+/** Un liseré tracé (au sol, porte ouverte) : un halo et un cœur clair,
+ *  comme un faisceau couché, le long de toute la dalle. */
+function liseres(
+  g: CanvasRenderingContext2D,
+  t: number,
+  L: number,
+  E: number,
+  c: { coeur: string; halo: string },
+  force: number,
+): void {
+  g.fillStyle = `rgba(${c.halo},${(0.28 * force).toFixed(3)})`
+  g.fillRect(0, t - E * 0.06, L, E * 0.12)
+  g.fillStyle = `rgba(${c.halo},${(0.85 * force).toFixed(3)})`
+  g.fillRect(0, t - E * 0.018, L, E * 0.036)
+  g.fillStyle = `rgba(${c.coeur},${(0.7 * force).toFixed(3)})`
+  g.fillRect(0, t - E * 0.007, L, E * 0.014)
+}
 
 /** Une veilleuse allumée, dans le repère de la dalle (s le long, t en
  *  travers) : la lentille et son halo, à la couleur de l'état. `boitier` :
