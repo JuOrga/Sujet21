@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { REGARD_PORTEE, coeursDe, tourneRegard } from './renduMulti'
-import { attributs, particulesVides, type Particules } from './trame'
+import { Hote } from './partie'
+import { MODE_LIBRE, attributs, particulesVides, type Particules } from './trame'
 
 // Le rendu lui-même est un shader : il se juge à l'œil, dans un navigateur.
 // Ce qui le NOURRIT se teste ici — le cœur de chaque corps, autour duquel le
@@ -111,5 +112,37 @@ describe('rendu du multi — le regard', () => {
     expect(e[0]).toBeCloseTo(0, 3)
     expect(e[1]).toBeCloseTo(-REGARD_PORTEE * 80, 3)
     expect(e[2]).toBe(1)
+  })
+})
+
+describe('rendu du multi — ce qui suit le corps à chaque image', () => {
+  it('le centre des particules bouge à CHAQUE pas ; l’état du corps, un pas sur cinq', () => {
+    // C'est pourquoi le réticule de la manette (ecranMulti.ts) s'accroche au
+    // centre des particules : accroché à l'état du corps, il avançait par
+    // sauts (le concepteur, 22/11 : « il saccade, alors que le reste est
+    // fluide »). Si ce test tombe parce que l'état devient frais à chaque
+    // pas, l'accroche aux particules reste juste, elle n'est plus nécessaire.
+    const h = new Hote(2, undefined, MODE_LIBRE)
+    const c = h.sim.corps[0].stats
+    h.commande(0, { pousse: true, ouvert: false, x: c.centroidX - 400, y: c.centroidY })
+    for (let s = 0; s < 60; s++) h.avance(h.params.dt, 1e9)
+    const sortie = new Float32Array(16)
+    let etatBouge = 0
+    let particulesBougent = 0
+    let etat = h.corps()[0].x
+    let vu = coeursDe(h.vue(), sortie)[0]
+    for (let s = 0; s < 20; s++) {
+      h.avance(h.params.dt, 1e9)
+      const e = h.corps()[0].x
+      const v = coeursDe(h.vue(), sortie)[0]
+      if (e !== etat) etatBouge++
+      if (v !== vu) particulesBougent++
+      etat = e
+      vu = v
+    }
+    expect(particulesBougent).toBe(20)
+    expect(etatBouge).toBeLessThanOrEqual(5)
+    // et les deux disent le même corps (à la goutte près)
+    expect(Math.abs(vu - etat)).toBeLessThan(10)
   })
 })

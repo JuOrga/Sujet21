@@ -35,7 +35,7 @@ import { ARENE, MANCHES_POUR_GAGNER } from './sumo'
 import { commandeManette, defileCaractere, ligneLocale, ligneManettes, litManette, litMenu, manettesDuLocal, nouvelEtatManette, nouvelEtatMenu, voisinMenu, type PadLu, type PadVu } from './manetteMulti'
 import { adresseRelais, creePartie, liaisonPossible, rejointPartie, type EtatLiaison, type Liaison, type Ordre } from './relais'
 import { NOMS_COULEURS, PALETTE, PSEUDO_MAX, chargeProfil, couleursDeLaPartie, gardeProfil, litProfil, nettoiePseudo, type Profil } from './profil'
-import { DUREE_ECLAT, ECLATS_MAX, RenduMulti, couleurCss, type Eclat, type SceneHockey } from './renduMulti'
+import { DUREE_ECLAT, ECLATS_MAX, RenduMulti, coeursDe, couleurCss, type Eclat, type SceneHockey } from './renduMulti'
 import { SonsMulti, chiffreDecompte, entend, type Instantane } from './sonsMulti'
 import {
   MODE_HOCKEY,
@@ -289,6 +289,9 @@ export function creeEcranMulti(quitte: () => void): EcranMulti {
   // À DEUX SUR CET ÉCRAN : le second joueur a sa manette, et son réticule.
   const manette2 = nouvelEtatManette()
   const coeur2 = { x: 0, y: 0, connu: false }
+  /** Le cœur de chaque corps, relu à CHAQUE IMAGE sur les particules qu'on
+   *  dessine (voir plus bas, où on le pose). */
+  const coeursVus = new Float32Array(16)
   // LES SONS (sonsMulti.ts) : ce qu'on entend se déduit de ce qu'on affiche,
   // d'une image à la suivante.
   const sons = new SonsMulti()
@@ -986,18 +989,26 @@ export function creeEcranMulti(quitte: () => void): EcranMulti {
     } else {
       sons.silence()
     }
-    const mien = corps[moi]
-    const second = corps[1]
-    coeur2.connu = !!second && !second.disperse
-    if (second) {
-      coeur2.x = second.x
-      coeur2.y = second.y
+    // LE CŒUR QUE LA MANETTE VISE : celui des particules qu'on dessine, et
+    // non celui de l'état du corps. Le réticule était accroché à l'état
+    // (le concepteur, 22/11 : « le curseur de direction n'est pas fluide, il
+    // saccade, alors que le reste est fluide ») : l'hôte ne recalcule ce
+    // centre qu'un pas sur cinq (le recensement des corps, 24 fois par
+    // seconde), l'invité ne le reçoit que vingt fois par seconde, et l'écran
+    // en peint soixante — le corps glissait, le réticule avançait par sauts
+    // (mesuré : 179 u/s en moyenne, de 0 à 674 d'une image à l'autre). Les
+    // particules, elles, bougent à chaque image (chez l'invité, prolongées
+    // par leur vitesse) : leur centre aussi.
+    coeursDe(particules, coeursVus)
+    const poseCoeur = (cible: { x: number; y: number; connu: boolean }, c: CorpsTrame | undefined, j: number): void => {
+      cible.connu = !!c && !c.disperse
+      if (!c) return
+      const vu = coeursVus[j * 4 + 3] > 0
+      cible.x = vu ? coeursVus[j * 4] : c.x
+      cible.y = vu ? coeursVus[j * 4 + 1] : c.y
     }
-    monCoeur.connu = !!mien && !mien.disperse
-    if (mien) {
-      monCoeur.x = mien.x
-      monCoeur.y = mien.y
-    }
+    poseCoeur(coeur2, corps[1], 1)
+    poseCoeur(monCoeur, corps[moi], moi)
     if (!dessine) return
     // AU HOCKEY on voit tout le terrain, toujours : il faut lire les deux
     // cages et le palet d'un coup d'œil, pas seulement les deux corps
@@ -1032,8 +1043,11 @@ export function creeEcranMulti(quitte: () => void): EcranMulti {
     boutonGlace.hidden = jeu?.mode === MODE_SUMO
     boutonGlace.dataset.prise = corps[moi]?.glace ? '1' : '0'
     boutonGlace.dataset.pret = corps[moi]?.glacePrete === false && !corps[moi]?.glace ? '0' : '1'
-    peintReticule('[data-reticule]', aLaManette, commande, moi)
-    peintReticule('[data-reticule2]', commande2 !== null, commande2 ?? commande, 1)
+    // le réticule se peint autour du cœur de CETTE image (la commande, elle,
+    // est partie avec celui de l'image d'avant : un réticule en retard d'une
+    // image traînerait derrière un corps rapide)
+    peintReticule('[data-reticule]', aLaManette, aLaManette ? commandeManette(manette, monCoeur.x, monCoeur.y) : commande, moi)
+    peintReticule('[data-reticule2]', commande2 !== null, commande2 ? commandeManette(manette2, coeur2.x, coeur2.y) : commande, 1)
     el<HTMLElement>('[data-tenir="ouvrir"]').hidden = jeu?.mode === MODE_SUMO
     peintAide(jeu ? jeu.mode : MODE_LIBRE)
     peintScore(jeu)
@@ -1181,8 +1195,10 @@ export function creeEcranMulti(quitte: () => void): EcranMulti {
     }
     const e = mondeVersEcran(cadre, commande.x, commande.y)
     r.hidden = false
-    r.style.left = `${(e.fx * 100).toFixed(2)}%`
-    r.style.top = `${(e.fy * 100).toFixed(2)}%`
+    // au millième de pour cent : au centième, sur un terrain de 3 000 u, le
+    // réticule avançait par crans d'un demi-pixel monde
+    r.style.left = `${(e.fx * 100).toFixed(3)}%`
+    r.style.top = `${(e.fy * 100).toFixed(3)}%`
     r.style.color = teinte(joueur)
     r.dataset.pousse = commande.pousse ? '1' : '0'
   }
@@ -1381,6 +1397,7 @@ export function creeEcranMulti(quitte: () => void): EcranMulti {
     jeu: role === 'invite' ? (miroir?.jeu(performance.now()) ?? null) : (hote?.jeu() ?? null),
     sons: { ...sons.joues },
     cadre: { ...cadre },
+    coeur: { x: monCoeur.x, y: monCoeur.y },
     images: miroir ? { recues: miroir.recues, perdues: miroir.perdues } : null,
     particules: role === 'invite' ? (miroir?.vue(performance.now()).n ?? 0) : (hote?.sim.count ?? 0),
     tSim: role === 'invite' ? (miroir?.tSim ?? 0) : (hote?.tSim ?? 0),
