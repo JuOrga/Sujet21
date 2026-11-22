@@ -215,6 +215,16 @@ bouton **MULTI** sur l'accueil (`?dev`). Tout vit dans [`src/multi/`](src/multi/
   sans rien perdre, et d'un coup sec même s'il arrive mollement ; pour
   l'eau et la glace ce sont des parois — l'eau s'y fend et passe, un bloc
   de glace y ricoche. Le métal tinte.
+- **Le STADE du hockey** : la patinoire est dans une arène de science-fiction,
+  façon Rocket League — rambarde et champ de force au néon, coursive,
+  gradins pleins (la foule, ses téléphones allumés, ses escaliers), une
+  couronne magenta, deux écrans géants, des pylônes de projecteurs, et le
+  vide spatial au-delà. C'est UNE image vue de dessus, rendue dans Blender
+  (`tools/images/blender/stade_hockey.py`, en module Python : `bpy`), puis
+  préparée par `tools/images/prepare.py` (290 Ko). Le shader la pose sous
+  la piste et y dessine par-dessus les lignes, les cages et les poteaux ;
+  les corps la mirent. Elle n'est chargée qu'à la première image d'un match
+  de hockey. Le cadrage du hockey s'est élargi pour la montrer.
 - **Le mode SUMO** : un anneau, deux corps, on gagne la manche en poussant
   l'autre dehors (son cœur hors de l'anneau), trois manches gagnantes.
   L'anneau se resserre en trente secondes. On ne s'y ouvre pas. Il ne

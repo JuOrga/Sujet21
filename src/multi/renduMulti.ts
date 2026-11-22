@@ -51,6 +51,14 @@ export function couleurCss(rang: number): string {
  *  suivait chaque particule du bord, et à l'échelle de la salle (un pas de
  *  particule ≈ 3 pixels) cela se lisait comme du bruit. */
 const RAYON_TACHE = 26
+
+/** LE STADE DU HOCKEY : une image rendue dans Blender
+ *  (tools/images/blender/stade_hockey.py), et le rectangle du MONDE qu'elle
+ *  couvre — un CONTRAT avec ce script : la piste y tombe pile sous la
+ *  patinoire (TERRAIN, hockey.ts). Elle n'est chargée qu'à la première
+ *  image d'un match de hockey : ni l'accueil du jeu, ni le salon du multi
+ *  ne la paient. */
+export const STADE = { url: '/assets/multi/stade-hockey.webp', minX: -560, minY: -640, largeur: 4000, hauteur: 2500 } as const
 /** Le seuil du champ : dessous, le vide ; dessus, l'eau. À ~14 au cœur et
  *  ~7 sur un bord droit, 3 pose le contour juste au ras des particules. */
 const SEUIL = 3
@@ -227,6 +235,9 @@ const FS_ECRAN = `#version 300 es
 precision highp float;
 in vec2 vUv;
 uniform sampler2D uChamp;
+uniform sampler2D uStade;   // hockey : l'image du stade (tools/images/blender/stade_hockey.py)
+uniform vec4 uStadeRect;    // le rectangle du monde qu'elle couvre : x, y, largeur, hauteur
+uniform float uStadePret;   // 1 quand elle est chargée (avant : le dessin d'origine)
 uniform vec2 uCentre;
 uniform vec2 uDemi;
 uniform vec4 uSalle;      // minX, minY, maxX, maxY
@@ -329,9 +340,27 @@ float grille(vec2 m, float pas, float px) {
 // monde : un pixel pour le sol, bien plus pour le reflet — miré au pixel, le
 // filet d'une cage se lisait comme du bruit et les lignes comme des cheveux.
 vec3 decor(vec2 monde, float px) {
-  // ---- le fond : la nuit du jeu, un quadrillage pour LIRE le mouvement
-  // (dans une salle vide, sans repère, un corps qui dérive semble immobile)
+  // ---- LE STADE (hockey) : l'image rendue dans Blender, posée sous le
+  // terrain — ses gradins, sa rambarde, ses néons. Les lignes, les cages et
+  // les poteaux restent dessinés ici, par-dessus. Lue à la finesse du trait
+  // (textureLod : ce décor se lit aussi dans des branches, pour le miroir) :
+  // nette sur le sol, floue dans le reflet d'un corps.
+  bool stade = uStadePret > 0.5 && uCage.x > 0.0;
   vec3 fond = vec3(0.012, 0.027, 0.063);
+  if (stade) {
+    vec2 st = (monde - uStadeRect.xy) / uStadeRect.zw;
+    float texels = px * float(textureSize(uStade, 0).x) / uStadeRect.z;
+    vec3 image = textureLod(uStade, st, log2(max(texels, 1.0))).rgb;
+    // hors de l'image (un écran très haut, en portrait) : le vide
+    float dedansImage = step(0.0, st.x) * step(st.x, 1.0) * step(0.0, st.y) * step(st.y, 1.0);
+    fond = mix(vec3(0.002, 0.003, 0.008), image, dedansImage);
+    // la piste un ton plus bas : ses dalles ne doivent pas disputer leurs
+    // joints aux lignes du jeu (les bleues surtout)
+    vec2 demiPiste = (uSalle.zw - uSalle.xy) * 0.5;
+    vec2 versCoinPiste = abs(monde - (uSalle.xy + uSalle.zw) * 0.5) - demiPiste + uCoins;
+    float surPiste = step(length(max(versCoinPiste, 0.0)) + min(max(versCoinPiste.x, versCoinPiste.y), 0.0), uCoins);
+    fond *= 1.0 - 0.35 * surPiste;
+  }
   // la salle : un rectangle, ou — au hockey — une patinoire aux coins ronds.
   // « mur » est la distance à la paroi, positive DEDANS (uCoins nul : un
   // rectangle exactement).
@@ -339,6 +368,8 @@ vec3 decor(vec2 monde, float px) {
   vec2 versCoin = abs(monde - (uSalle.xy + uSalle.zw) * 0.5) - demiSalle + uCoins;
   float mur = uCoins - length(max(versCoin, 0.0)) - min(max(versCoin.x, versCoin.y), 0.0);
   float salle = step(0.0, mur);
+  // (avec le stade, la piste a ses dalles, et la rambarde est dans l'image)
+  if (!stade) {
   fond += salle * vec3(0.012, 0.022, 0.034);
   // le quadrillage dit le mouvement dans une salle vide ; la patinoire a
   // ses lignes, qui le disent mieux
@@ -349,6 +380,7 @@ vec3 decor(vec2 monde, float px) {
   float trait = 1.0 - smoothstep(0.0, max(6.0, px * 2.0), abs(mur));
   fond += trait * vec3(0.38, 0.55, 0.68);
   fond += salle * exp(-max(mur, 0.0) / 90.0) * vec3(0.03, 0.055, 0.075);
+  }
   // ---- le hockey : la patinoire. Ses lignes sont celles d'une vraie — la
   // ligne rouge et son cercle au centre, les deux lignes bleues, les lignes
   // de but d'un bord à l'autre, les cercles de mise en jeu — et ses cages
@@ -794,6 +826,9 @@ export class RenduMulti {
   /** Le champ tient-il en demi-flottants ? Sinon huit bits, et le gain
    *  ramène la somme sous 1 (le relief s'y écrase un peu, la couleur tient). */
   private readonly flottant: boolean
+  /** L'image du stade : sa texture, et où en est son chargement. */
+  private readonly texStade: WebGLTexture
+  private stade: 'absent' | 'en-cours' | 'pret' = 'absent'
   private readonly gain: number
 
   constructor(canvas: HTMLCanvasElement, capacite: number) {
@@ -811,7 +846,13 @@ export class RenduMulti {
     const tampon = gl.createBuffer()
     const cible = gl.createFramebuffer()
     const texture = gl.createTexture()
-    if (!vao || !vaoVide || !tampon || !cible || !texture) throw new Error('rendu du multi : mémoire graphique refusée')
+    const texStade = gl.createTexture()
+    if (!vao || !vaoVide || !tampon || !cible || !texture || !texStade) throw new Error('rendu du multi : mémoire graphique refusée')
+    this.texStade = texStade
+    // un pixel noir en attendant l'image : une texture vide liée au shader
+    // vaut un avertissement par image dans certains navigateurs
+    gl.bindTexture(gl.TEXTURE_2D, texStade)
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array([0, 0, 0, 255]))
     this.vao = vao
     this.vaoVide = vaoVide
     this.tampon = tampon
@@ -830,6 +871,32 @@ export class RenduMulti {
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR)
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE)
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE)
+  }
+
+  /** Lance le chargement de l'image du stade, une fois. Tant qu'elle n'est
+   *  pas là — ou si elle manque —, le terrain garde son dessin d'origine. */
+  private chargeStade(): void {
+    if (this.stade !== 'absent' || typeof Image === 'undefined') return
+    this.stade = 'en-cours'
+    const image = new Image()
+    image.decoding = 'async'
+    image.onload = () => {
+      const gl = this.gl
+      if (gl.isContextLost()) return
+      gl.bindTexture(gl.TEXTURE_2D, this.texStade)
+      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, image)
+      // des mipmaps : le reflet dans les corps la lit floue, à la finesse
+      // de son trait (voir decor dans le shader)
+      gl.generateMipmap(gl.TEXTURE_2D)
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR)
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR)
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE)
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE)
+      this.stade = 'pret'
+    }
+    // une image qui manque ne casse rien : on garde le dessin d'origine
+    image.onerror = () => undefined
+    image.src = STADE.url
   }
 
   /** Accorde la toile à sa boîte. Rend true si la taille a changé. */
@@ -913,6 +980,15 @@ export class RenduMulti {
     gl.activeTexture(gl.TEXTURE0)
     gl.bindTexture(gl.TEXTURE_2D, this.texture)
     gl.uniform1i(gl.getUniformLocation(this.progEcran, 'uChamp'), 0)
+    // le stade : au hockey seulement (la scène a des cages)
+    const hockey = (scene?.cage.ligne ?? 0) > 0
+    if (hockey) this.chargeStade()
+    gl.activeTexture(gl.TEXTURE1)
+    gl.bindTexture(gl.TEXTURE_2D, this.texStade)
+    gl.uniform1i(gl.getUniformLocation(this.progEcran, 'uStade'), 1)
+    gl.uniform4f(gl.getUniformLocation(this.progEcran, 'uStadeRect'), STADE.minX, STADE.minY, STADE.largeur, STADE.hauteur)
+    gl.uniform1f(gl.getUniformLocation(this.progEcran, 'uStadePret'), hockey && this.stade === 'pret' ? 1 : 0)
+    gl.activeTexture(gl.TEXTURE0)
     gl.uniform2f(gl.getUniformLocation(this.progEcran, 'uCentre'), cadre.cx, cadre.cy)
     gl.uniform2f(gl.getUniformLocation(this.progEcran, 'uDemi'), cadre.demiL, cadre.demiH)
     gl.uniform4f(gl.getUniformLocation(this.progEcran, 'uSalle'), salle.minX, salle.minY, salle.maxX, salle.maxY)
@@ -971,6 +1047,7 @@ export class RenduMulti {
     gl.deleteVertexArray(this.vaoVide)
     gl.deleteFramebuffer(this.cible)
     gl.deleteTexture(this.texture)
+    gl.deleteTexture(this.texStade)
     gl.getExtension('WEBGL_lose_context')?.loseContext()
   }
 }

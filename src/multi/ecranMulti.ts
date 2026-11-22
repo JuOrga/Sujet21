@@ -111,14 +111,18 @@ const STYLE = `
 .mu-jauge .mu-barre u { position: absolute; left: 0; top: 0; bottom: 0; display: block; }
 .mu-jauge small { grid-column: 2 / 4; color: var(--dim, #7f9cb0); font-size: 0.8em; letter-spacing: 0.06em; }
 .mu-jauge b { font-weight: 400; font-variant-numeric: tabular-nums; }
-.mu-lien { color: var(--dim, #7f9cb0); font-size: 0.8em; padding: 0 2px; font-variant-numeric: tabular-nums; }
+/* (le stade du hockey met une foule sous ces textes : ils ont un fond) */
+.mu-lien { color: var(--dim, #7f9cb0); font-size: 0.8em; padding: 2px 6px; font-variant-numeric: tabular-nums; background: rgba(3, 7, 14, 0.82); justify-self: start; }
 .mu-actions { position: absolute; top: 14px; right: 14px; display: flex; gap: 8px; }
-.mu-actions button { background: var(--panel, rgba(9,18,30,.82)); padding: 0.5em 0.9em; font-size: 0.85em; }
+.mu-actions button { padding: 0.5em 0.9em; font-size: 0.85em; }
+/* les boutons posés sur le jeu : un fond plein (la foule du stade passait au
+   travers du fond commun des boutons) */
+#multi .mu-actions button, #multi .mu-dash, #multi .mu-tenir { background: rgba(3, 7, 14, 0.88); }
 .mu-tenir { position: absolute; right: 14px; bottom: 64px; display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 1em 1.3em !important;
   background: var(--panel, rgba(9,18,30,.82)) !important; touch-action: none; user-select: none; -webkit-user-select: none; }
 .mu-tenir small { color: var(--dim, #7f9cb0); font-size: 0.7em; letter-spacing: 0.04em; }
 .mu-tenir[data-tenu="1"] { background: rgba(167, 221, 245, 0.28) !important; border-color: var(--glow, #a7ddf5) !important; }
-.mu-aide { position: absolute; left: 0; right: 150px; bottom: 16px; text-align: center; color: var(--dim, #7f9cb0); pointer-events: none; font-size: 0.85em; padding: 0 16px; }
+.mu-aide { position: absolute; left: 16px; right: 166px; bottom: 16px; text-align: center; color: var(--dim, #7f9cb0); pointer-events: none; font-size: 0.85em; padding: 6px 16px; background: rgba(3, 7, 14, 0.82); }
 .mu-voile { position: absolute; inset: 0; background: rgba(2, 6, 12, 0.78); display: flex; align-items: center; justify-content: center; padding: 18px; }
 .mu-voile[hidden] { display: none; }
 .mu-voile div { max-width: 520px; display: flex; flex-direction: column; gap: 14px; text-align: center; line-height: 1.5; }
@@ -156,7 +160,7 @@ const STYLE = `
 .mu-modes { margin-bottom: 12px; grid-template-columns: 1fr 1fr 1fr; }
 .mu-modes button { padding: 0.9em 1em; opacity: 0.6; }
 .mu-modes button[data-choisi="1"] { opacity: 1; border-color: var(--accent, #8fd3ff); box-shadow: inset 0 0 0 1px var(--accent, #8fd3ff); }
-.mu-score { position: absolute; top: 14px; left: 50%; transform: translateX(-50%); display: flex; flex-direction: column; align-items: center; gap: 4px; pointer-events: none; font-family: var(--font-display, sans-serif); }
+.mu-score { position: absolute; top: 14px; left: 50%; transform: translateX(-50%); display: flex; flex-direction: column; align-items: center; gap: 4px; pointer-events: none; font-family: var(--font-display, sans-serif); background: rgba(3, 7, 14, 0.82); padding: 4px 18px 6px; }
 .mu-score[hidden] { display: none; }
 .mu-score div { display: flex; align-items: baseline; gap: 0.5em; font-size: 2.2em; letter-spacing: 0.06em; }
 .mu-score div span { color: var(--dim, #7f9cb0); font-size: 0.6em; }
@@ -1021,7 +1025,14 @@ export function creeEcranMulti(quitte: () => void): EcranMulti {
     // cages et le palet d'un coup d'œil, pas seulement les deux corps
     // …avec de la place au-dessus pour le score et les jauges, et dessous
     // pour l'aide : ils mordaient sur le terrain
-    const terrainEtMarges: Bornes = { minX: salle.minX, minY: salle.minY - 150, maxX: salle.maxX, maxY: salle.maxY + 90 }
+    // (au HOCKEY, plus large encore : le terrain est dans un STADE, et c'est
+    // l'arène autour — sa rambarde, ses gradins — qui le dit ; à 150 u au-
+    // dessus, on n'en voyait que la rambarde et un rang de spectateurs. La
+    // piste y perd 9 % de sa taille à l'écran.)
+    const stade = jeu?.mode === MODE_HOCKEY
+    const terrainEtMarges: Bornes = stade
+      ? { minX: salle.minX - 150, minY: salle.minY - 300, maxX: salle.maxX + 150, maxY: salle.maxY + 260 }
+      : { minX: salle.minX, minY: salle.minY - 150, maxX: salle.maxX, maxY: salle.maxY + 90 }
     const voulu = jeu ? cadreSalle(terrainEtMarges, rendu.aspect()) : corps.length > 0 ? cadreVoulu(corps, salle, rendu.aspect()) : cadre
     cadre = suitCadre(cadre, voulu, dt)
     let scene: SceneHockey | null = null

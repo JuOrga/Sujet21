@@ -41,6 +41,7 @@ export const RUBRIQUES = [
   'Cérémonie station',
   'Avaries — stations',
   'Codex — aperçus',
+  'Multi',
   'Serre & cultures',
   'Coque & fonds',
   'Objets & emblèmes',
@@ -146,6 +147,8 @@ export function rubriqueDe(url: string): string {
   // le dossier fait foi, sinon elles tombaient dans « Autres »
   if (url.includes('/avaries/')) return 'Avaries — stations'
   if (url.includes('/codex/')) return 'Codex — aperçus'
+  // les images du MULTI (le stade du hockey) : leur dossier fait foi
+  if (url.includes('/multi/')) return 'Multi'
   if (/^(wall|paroi|phile|phobe|conduite|chaudiere|filtres|sponge|legende-surfaces)/.test(f))
     return 'Surfaces & matériaux'
   if (f.startsWith('zone-')) return 'Zones d’état'

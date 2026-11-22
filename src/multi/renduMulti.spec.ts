@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest'
-import { REGARD_PORTEE, coeursDe, tourneRegard } from './renduMulti'
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
+import { RAYON_COINS, TERRAIN } from './hockey'
+import { REGARD_PORTEE, STADE, coeursDe, tourneRegard } from './renduMulti'
 import { Hote } from './partie'
 import { MODE_LIBRE, attributs, particulesVides, type Particules } from './trame'
 
@@ -144,5 +147,55 @@ describe('rendu du multi — ce qui suit le corps à chaque image', () => {
     expect(etatBouge).toBeLessThanOrEqual(5)
     // et les deux disent le même corps (à la goutte près)
     expect(Math.abs(vu - etat)).toBeLessThan(10)
+  })
+})
+
+describe('rendu du multi — le stade du hockey', () => {
+  // L'image du stade est rendue dans Blender (tools/images/blender/
+  // stade_hockey.py) et posée sous la patinoire par le shader. Si l'un des
+  // deux bouge sans l'autre, la rambarde peinte ne tombe plus sur le bord du
+  // terrain : on le lit dans le script lui-même.
+  const script = readFileSync(join(__dirname, '../../tools/images/blender/stade_hockey.py'), 'utf-8')
+  const nombres = (motif: RegExp): number[] => {
+    const m = script.match(motif)
+    if (!m) throw new Error('introuvable dans le script : ' + motif)
+    return m[1].split(',').map((x) => Number(x.trim()))
+  }
+
+  it('le script modélise la piste du jeu (1 unité Blender = 100 unités du monde)', () => {
+    const [largeur, hauteur] = nombres(/^LARGEUR, HAUTEUR = ([^#\n]+)/m)
+    expect(largeur * 100).toBeCloseTo(TERRAIN.maxX - TERRAIN.minX, 6)
+    expect(hauteur * 100).toBeCloseTo(TERRAIN.maxY - TERRAIN.minY, 6)
+    const [rayon] = nombres(/^RAYON_COINS = ([^#\n]+)/m)
+    expect(rayon * 100).toBeCloseTo(RAYON_COINS, 6)
+  })
+
+  it('l’image couvre le rectangle que le shader croit (le y de Blender est l’opposé de celui du jeu)', () => {
+    const [xMin, xMax, yMin, yMax] = nombres(/^CADRE = \(([^)]+)\)/m)
+    expect(xMin * 100).toBeCloseTo(STADE.minX, 6)
+    expect((xMax - xMin) * 100).toBeCloseTo(STADE.largeur, 6)
+    // le haut de l'image (y Blender le plus grand) est le y du jeu le plus petit
+    expect(-yMax * 100).toBeCloseTo(STADE.minY, 6)
+    expect((yMax - yMin) * 100).toBeCloseTo(STADE.hauteur, 6)
+    // et la patinoire est dedans, avec de quoi voir les gradins autour
+    expect(STADE.minX).toBeLessThan(TERRAIN.minX - 400)
+    expect(STADE.minY).toBeLessThan(TERRAIN.minY - 400)
+    expect(STADE.minX + STADE.largeur).toBeGreaterThan(TERRAIN.maxX + 400)
+    expect(STADE.minY + STADE.hauteur).toBeGreaterThan(TERRAIN.maxY + 400)
+  })
+
+  it('l’image livrée a les proportions du rectangle', () => {
+    // l'en-tête d'un WebP (VP8 avec perte) : la largeur et la hauteur, sur
+    // 14 bits, aux octets 26 à 29
+    const octets = readFileSync(join(__dirname, '../../public', STADE.url))
+    expect(octets.subarray(0, 4).toString('ascii')).toBe('RIFF')
+    expect(octets.subarray(8, 12).toString('ascii')).toBe('WEBP')
+    expect(octets.subarray(12, 16).toString('ascii')).toBe('VP8 ')
+    const largeur = octets.readUInt16LE(26) & 0x3fff
+    const hauteur = octets.readUInt16LE(28) & 0x3fff
+    expect(largeur / hauteur).toBeCloseTo(STADE.largeur / STADE.hauteur, 2)
+    // assez fine pour l'écran : au moins 0,7 pixel par unité du monde (une
+    // patinoire de 2 880 u occupe ~1 900 pixels d'un écran de 1080)
+    expect(largeur / STADE.largeur).toBeGreaterThanOrEqual(0.7)
   })
 })
