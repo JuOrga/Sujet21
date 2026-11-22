@@ -72,6 +72,13 @@ export const GLACE_REPOS = 3
  *  (le bloc se libère à 45 % de ce temps : ~0,2 s). */
 const GLACE_PRISE = 0.12
 const GLACE_FONTE = 0.45
+/** LE JET DU MULTI part plus vite que celui du jeu (1 400 u/s) : « il
+ *  faudrait une propulsion un peu plus efficace » (le concepteur, 22/11).
+ *  Plus VITE, et non plus de gouttes : la même matière dépensée pousse plus
+ *  fort. Mesuré, une seconde de poussée sur un corps de 900 : 54 u/s à
+ *  1 400, 78 u/s ici — et 839 particules sur 900 au corps deux secondes plus
+ *  tard dans les deux cas. Le jeu solo garde son jet. */
+export const JET_MULTI = 1900
 /** La cadence d'envoi de l'état, en images par seconde. Le solveur tourne
  *  à 120 pas par seconde ; l'invité prolonge chaque image avec les vitesses
  *  jusqu'à la suivante. Vingt, et non plus trente : la partie passe par le
@@ -111,7 +118,7 @@ export class Hote {
 
   constructor(joueurs = 2, params: SimParams = { ...DEFAULT_PARAMS }, mode: number = MODE_LIBRE) {
     this.joueurs = joueurs
-    this.params = { ...params, freezeSelfTime: GLACE_PRISE, thawTime: GLACE_FONTE }
+    this.params = { ...params, freezeSelfTime: GLACE_PRISE, thawTime: GLACE_FONTE, ejectSpeed: JET_MULTI }
     this.mode = mode
     this.salle = salleDe(mode)
     this.hockey = mode === MODE_HOCKEY ? new Hockey() : null

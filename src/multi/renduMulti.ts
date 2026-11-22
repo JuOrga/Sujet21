@@ -162,6 +162,8 @@ export interface SceneHockey {
    *  de leurs parois. */
   cage: { ligne: number; profondeur: number; demiOuverture: number; demiFond: number; epaisseur: number }
   palet: { x: number; y: number; rayon: number; vx: number; vy: number } | null
+  /** HOCKEY : les poteaux de métal (quatre au plus). */
+  poteaux?: readonly { x: number; y: number; rayon: number }[]
   /** Le joueur qui tient le palet (−1 : personne), sa charge (0 à 1) et le
    *  point qu'il vise : le lancer partira vers là. */
   porteur: number
@@ -246,6 +248,7 @@ uniform vec2 uPaletV;     // hockey : la vitesse du palet (sa traînée)
 uniform vec4 uEclats[4];  // les chocs en cours : x, y, âge (s), force (0 : aucun)
 uniform vec4 uCoeurs[4];  // le CŒUR de chaque corps : x, y, son rayon, 1 s'il est connu
 uniform vec4 uRegards[4]; // son REGARD : x, y, sa présence (0 : aucun)
+uniform vec3 uPoteaux[4]; // hockey : les poteaux, x, y, rayon (0 : aucun)
 out vec4 o;
 
 // ---- les bruits du jeu (render/renderer.ts), tels quels
@@ -402,6 +405,58 @@ vec3 decor(vec2 monde, float px) {
     float devant = step(ligne, duFond);
     fond += salle * devant * camp * 0.05 * (1.0 - smoothstep(demiOuv + 36.0, demiOuv + 40.0, zone));
     fond += salle * devant * camp * 0.3 * (1.0 - smoothstep(0.0, fin, abs(zone - demiOuv - 40.0)));
+  }
+
+  // ---- les poteaux de métal (hockey), vus de DESSUS. Un premier dessin —
+  // un disque gris au reflet rond — se lisait comme une bille, presque une
+  // goutte à ramasser (le concepteur, 22/11 : « on dirait plutôt des
+  // éléments destinés au volume, pas des poutres métalliques »). Un poteau
+  // vu d'en haut, c'est la TÊTE d'un fût : plate, usinée en cercles, une vis
+  // à six pans au centre, un biseau qui prend la lumière d'un seul côté — et
+  // il est SCELLÉ au sol par une platine boulonnée, cerclée d'une bande de
+  // signalisation. La platine n'est qu'un dessin : seul le fût (le rayon du
+  // poteau) arrête l'eau et le palet. Ils sont DANS le décor : la peau des
+  // corps les mire aussi.
+  for (int k = 0; k < 4; k++) {
+    vec3 q = uPoteaux[k];
+    if (q.z <= 0.0) continue;
+    float r = q.z;
+    vec2 dq = monde - q.xy;
+    float d = length(dq);
+    float bordQ = max(px, 1.0);
+    // l'ombre portée du fût, longue : il est haut
+    float ombreQ = 1.0 - smoothstep(r * 1.1, r * 1.9, length(dq - vec2(12.0, 16.0)));
+    fond *= 1.0 - 0.5 * ombreQ;
+    // la platine : un carré d'acier sombre, ses quatre boulons, et la bande
+    // jaune et noire tout autour
+    vec2 a = abs(dq);
+    float carre = max(a.x, a.y);
+    float platine = 1.0 - smoothstep(r * 1.6 - bordQ, r * 1.6 + bordQ, carre);
+    vec3 plat = vec3(0.16, 0.18, 0.21);
+    float bande = smoothstep(r * 1.3 - bordQ, r * 1.3 + bordQ, carre);
+    // (miré dans un corps, le trait est large : les rayures s'y fondent en
+    // leur teinte moyenne — nettes, elles s'y lisaient comme des gribouillis)
+    float rayure = mix(step(0.5, fract((dq.x + dq.y) / (r * 0.55))), 0.5, clamp(px * 3.0 / (r * 0.55), 0.0, 1.0));
+    plat = mix(plat, mix(vec3(0.07, 0.07, 0.08), vec3(0.86, 0.66, 0.12), rayure), bande);
+    vec2 boulon = a - vec2(r * 1.08);
+    float boulons = (1.0 - smoothstep(r * 0.11, r * 0.11 + bordQ, length(boulon))) * (1.0 - bande);
+    plat = mix(plat, vec3(0.42, 0.45, 0.5), boulons);
+    fond = mix(fond, plat, platine);
+    // la tête du fût
+    float disqueQ = 1.0 - smoothstep(r - bordQ, r + bordQ, d);
+    vec2 u = dq / r;
+    float lu = length(u);
+    vec3 acier = vec3(0.56, 0.6, 0.65) * (0.93 + 0.07 * sin(d * 1.8));
+    // le biseau : clair du côté de la lampe (en haut à gauche), sombre en face
+    float cote = dot(u / max(lu, 1e-3), vec2(-0.6, -0.8));
+    float biseau = smoothstep(0.74, 0.84, lu);
+    acier = mix(acier, vec3(0.3, 0.33, 0.37) + vec3(0.62, 0.6, 0.56) * max(cote, 0.0), biseau);
+    // la vis à six pans, et son creux
+    vec2 h = abs(u);
+    float hexa = max(h.x * 0.866 + h.y * 0.5, h.y);
+    acier = mix(acier, vec3(0.3, 0.33, 0.37), 1.0 - smoothstep(0.3, 0.33, hexa));
+    acier = mix(acier, vec3(0.08, 0.09, 0.1), 1.0 - smoothstep(0.13, 0.16, hexa));
+    fond = mix(fond, acier, disqueQ);
   }
 
   // ---- le sumo : l'anneau. Dedans, le jeu ; dehors, on a perdu — le sol y
@@ -730,6 +785,7 @@ export class RenduMulti {
    *  ce qui part au shader : sa position dans le monde. */
   private readonly ecarts = new Float32Array(CANAUX * 4)
   private readonly regards = new Float32Array(CANAUX * 4)
+  private readonly poteaux = new Float32Array(4 * 3)
   private tempsRegard = -1
   private largeur = 0
   private hauteur = 0
@@ -888,6 +944,15 @@ export class RenduMulti {
     gl.uniform4fv(gl.getUniformLocation(this.progEcran, 'uEclats'), e)
     gl.uniform4fv(gl.getUniformLocation(this.progEcran, 'uCoeurs'), coeurs)
     gl.uniform4fv(gl.getUniformLocation(this.progEcran, 'uRegards'), this.regards)
+    const poteaux = this.poteaux
+    poteaux.fill(0)
+    for (let k = 0; k < Math.min(4, scene?.poteaux?.length ?? 0); k++) {
+      const q = scene!.poteaux![k]
+      poteaux[k * 3] = q.x
+      poteaux[k * 3 + 1] = q.y
+      poteaux[k * 3 + 2] = q.rayon
+    }
+    gl.uniform3fv(gl.getUniformLocation(this.progEcran, 'uPoteaux'), poteaux)
     gl.uniform4f(gl.getUniformLocation(this.progEcran, 'uPorteur'), scene?.porteur ?? -1, scene?.charge ?? 0, scene?.viseeX ?? 0, scene?.viseeY ?? 0)
     gl.bindVertexArray(this.vaoVide)
     gl.drawArrays(gl.TRIANGLES, 0, 3)

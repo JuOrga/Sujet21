@@ -17,6 +17,7 @@
 // apprendre. Et comme on avance en tirant derrière soi, viser la cage oblige
 // à se retourner : c'est le temps que l'adversaire a pour venir bousculer.
 
+import { FORME_DISQUE } from '../game/formes'
 import { MAT_WALL } from '../game/level'
 import type { Evenement, Regle } from './regle'
 import { KIND_PLAYER, type FluidSimMulti } from './solveurMulti'
@@ -140,6 +141,44 @@ export const RAYON_PALET = 48
 export const MASSE_PALET = 120
 /** Ce que le palet garde de sa vitesse en touchant une paroi. */
 const RESTITUTION_PAROI = 0.85
+
+// LES POTEAUX (le concepteur, 22/11) : « quatre poteaux métalliques, quatre
+// ronds en paroi, deux fois plus petits que le palet, répartis équitablement,
+// majoritairement sur le centre du terrain ; une matière qui fait rebondir le
+// palet ». Ils sont posés en carré autour du cercle central, dans la zone
+// neutre (entre les lignes bleues, à 430 u du centre) : le couloir du milieu
+// reste libre — on tire encore droit d'une cage à l'autre —, mais tout ce
+// qui part en biais peut ricocher. Aucun ne gêne un engagement : au centre,
+// les corps sont à 215 u du palet, sur l'axe ; aux cercles de zone, à 740 u
+// du fond, loin de la zone neutre.
+//
+// Pour l'EAU et la GLACE, le concepteur ne savait pas : ce sont des parois,
+// comme la bande et les cages. L'eau les contourne, un corps fermé s'y
+// écrase et rebondit, un bloc de glace y ricoche (solveur, icePass). Seul le
+// palet les sent autrement : le métal le renvoie sans rien lui prendre, et
+// d'un coup sec même s'il arrive mollement.
+/** Le rayon d'un poteau : la moitié de celui du palet (48 u). */
+export const RAYON_POTEAU = 24
+/** L'écart d'un poteau au centre du terrain, en x comme en y. */
+export const ECART_POTEAU = 260
+/** Les quatre poteaux, en carré autour du centre. */
+export const POTEAUX: readonly { x: number; y: number }[] = [-1, 1].flatMap((sx) =>
+  [-1, 1].map((sy) => ({ x: (TERRAIN.minX + TERRAIN.maxX) / 2 + sx * ECART_POTEAU, y: (TERRAIN.minY + TERRAIN.maxY) / 2 + sy * ECART_POTEAU })),
+)
+/** Ce que le palet garde de sa vitesse en touchant un poteau : tout. */
+const RESTITUTION_POTEAU = 1
+/** …et il en repart toujours au moins à cette vitesse (u/s) : le poteau est
+ *  un ressort, pas un mur — un palet qui l'effleure à peine est renvoyé. */
+const COUP_POTEAU = 320
+/** Un poteau tel que le solveur le reçoit : un disque de paroi. */
+const POTEAUX_EAU = POTEAUX.map((p) => ({
+  minX: p.x - RAYON_POTEAU,
+  maxX: p.x + RAYON_POTEAU,
+  minY: p.y - RAYON_POTEAU,
+  maxY: p.y + RAYON_POTEAU,
+  material: MAT_WALL,
+  forme: FORME_DISQUE,
+}))
 /** Le frottement de la glace, en s⁻¹ : lancé à 1 000 u/s, il en garde la
  *  moitié au bout de trois secondes et demie. */
 const FROTTEMENT = 0.2
@@ -264,8 +303,8 @@ export class Hockey implements Regle {
     // 720 u (mesuré : il donne au palet la même vitesse, 77 u/s, que le
     // délai soit entier ou réduit).
     sim.reabsorbFactor = DELAI_RETOUR
-    // les cages et les coins arrondis : des parois pour l'eau aussi
-    sim.setLevel(PAROIS_EAU.map(pourLeSolveur), [])
+    // les cages, les coins arrondis et les poteaux : des parois pour l'eau aussi
+    sim.setLevel([...PAROIS_EAU.map(pourLeSolveur), ...POTEAUX_EAU], [])
     // posé, mais pas encore en jeu : il le sera à la fin du décompte
     p.actif = false
     p.rayon = RAYON_PALET
@@ -580,6 +619,26 @@ export class Hockey implements Regle {
       if (vn < 0) {
         p.vx -= (1 + RESTITUTION_PAROI) * vn * wx
         p.vy -= (1 + RESTITUTION_PAROI) * vn * wy
+      }
+    }
+    // ---- les poteaux : un disque contre un disque, et le métal renvoie
+    for (const q of POTEAUX) {
+      const dx = p.x - q.x
+      const dy = p.y - q.y
+      const contact = r + RAYON_POTEAU
+      const d2 = dx * dx + dy * dy
+      if (d2 >= contact * contact) continue
+      const d = Math.sqrt(d2)
+      // (centre sur le centre : il ressort vers le haut, peu importe)
+      const nx = d > 1e-6 ? dx / d : 0
+      const ny = d > 1e-6 ? dy / d : -1
+      p.x = q.x + nx * contact
+      p.y = q.y + ny * contact
+      const vn = p.vx * nx + p.vy * ny
+      if (vn < 0) {
+        const sortie = Math.max(-vn * RESTITUTION_POTEAU, COUP_POTEAU)
+        p.vx += (sortie - vn) * nx
+        p.vy += (sortie - vn) * ny
       }
     }
     return this.dansUneCage(p)

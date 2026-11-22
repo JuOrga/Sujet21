@@ -23,9 +23,12 @@ export interface Instantane {
   salle: Bornes
   /** Le rayon du palet (0 hors hockey). */
   rayonPalet: number
+  /** Les poteaux du hockey, s'il y en a : un choc du palet près de l'un
+   *  d'eux est un choc sur le métal. */
+  poteaux?: readonly { x: number; y: number; rayon: number }[]
 }
 
-export type TypeSon = 'paroi' | 'choc-palet' | 'prise' | 'lancer' | 'but' | 'engagement' | 'fin' | 'ouvre' | 'ferme' | 'contact' | 'dash' | 'tic' | 'gel' | 'degel'
+export type TypeSon = 'paroi' | 'choc-palet' | 'prise' | 'lancer' | 'but' | 'engagement' | 'fin' | 'ouvre' | 'ferme' | 'contact' | 'dash' | 'tic' | 'gel' | 'degel' | 'poteau'
 
 export interface Son {
   type: TypeSon
@@ -119,7 +122,12 @@ export function entend(avant: Instantane | null, apres: Instantane, moi: number)
         const s = apres.salle
         const surUnCote = (jb.paletX - s.minX < r || s.maxX - jb.paletX < r) && ja.paletVx * jb.paletVx < 0
         const surUnBord = (jb.paletY - s.minY < r || s.maxY - jb.paletY < r) && ja.paletVy * jb.paletVy < 0
-        if (surUnCote || surUnBord) {
+        // contre un poteau (hockey) : le métal sonne
+        const poteau = (apres.poteaux ?? []).some((q) => Math.hypot(jb.paletX - q.x, jb.paletY - q.y) < q.rayon + apres.rayonPalet + 40)
+        if (poteau) {
+          const vitesse = Math.hypot(jb.paletVx, jb.paletVy)
+          sons.push({ type: 'poteau', force: Math.min(1, vitesse / 1000), x: jb.paletX, y: jb.paletY, mien: true })
+        } else if (surUnCote || surUnBord) {
           const vitesse = Math.hypot(ja.paletVx, ja.paletVy)
           sons.push({ type: 'paroi', force: Math.min(1, vitesse / 1200), x: jb.paletX, y: jb.paletY, mien: true })
         } else {
@@ -225,7 +233,7 @@ export class SonsMulti {
    *  type. Le palet pris entre deux corps à l'engagement cognait à chaque
    *  image — quinze chocs comptés en quelques secondes, à l'essai. */
   joue(son: Son, pan = 0, maintenant = typeof performance !== 'undefined' ? performance.now() : 0): boolean {
-    if (son.type === 'choc-palet' || son.type === 'paroi' || son.type === 'contact') {
+    if (son.type === 'choc-palet' || son.type === 'paroi' || son.type === 'contact' || son.type === 'poteau') {
       const dernier = this.derniers[son.type] ?? -Infinity
       if (maintenant - dernier < ECART_CHOCS) return false
       this.derniers[son.type] = maintenant
@@ -247,6 +255,13 @@ export class SonsMulti {
         // sec et clair : le palet sur la bande
         this.note(sortie, 'triangle', 950, 480, 0.07, 0.22 * f)
         this.souffle(sortie, 2600, 0.05, 0.16 * f)
+        break
+      case 'poteau':
+        // un tintement de métal : deux notes aiguës, presque pures, qui
+        // durent un peu — on reconnaît le poteau sans le regarder
+        this.note(sortie, 'sine', 1760, 1720, 0.32, 0.18 * f)
+        this.note(sortie, 'sine', 2630, 2600, 0.22, 0.09 * f)
+        this.note(sortie, 'triangle', 880, 860, 0.12, 0.1 * f)
         break
       case 'choc-palet':
         // mat et mouillé : le palet dans l'eau

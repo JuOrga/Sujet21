@@ -208,6 +208,13 @@ bouton **MULTI** sur l'accueil (`?dev`). Tout vit dans [`src/multi/`](src/multi/
   décompte avant de jouer. Un corps FERMÉ qui
   percute le porteur lui ARRACHE le palet — s'il arrive assez vite, et
   c'est lui qui doit foncer.
+  QUATRE POTEAUX d'acier, deux fois plus petits que le palet (un fût vissé
+  sur une platine cerclée de jaune et noir), en carré
+  autour du cercle central (entre les lignes bleues) : le couloir de l'axe
+  reste libre, tout ce qui part en biais peut ricocher. Le palet y rebondit
+  sans rien perdre, et d'un coup sec même s'il arrive mollement ; pour
+  l'eau et la glace ce sont des parois — l'eau s'y fend et passe, un bloc
+  de glace y ricoche. Le métal tinte.
 - **Le mode SUMO** : un anneau, deux corps, on gagne la manche en poussant
   l'autre dehors (son cœur hors de l'anneau), trois manches gagnantes.
   L'anneau se resserre en trente secondes. On ne s'y ouvre pas. Il ne
@@ -233,6 +240,9 @@ bouton **MULTI** sur l'accueil (`?dev`). Tout vit dans [`src/multi/`](src/multi/
   suivante.
 - **La fin d'un match** : le résultat en grand, et REVANCHE — un clic de
   l'un ou de l'autre relance le match.
+- **Le JET** du multi part à 1 900 u/s (1 400 dans le jeu) : la même
+  matière pousse plus fort — une seconde de poussée donne 78 u/s à un
+  corps de 900, contre 54.
 - **Le DASH** (Maj, le bouton à l'écran, B ou RB à la manette) : une brusque
   accélération dans le sens où une poussée enverrait le corps, rechargée
   en un peu plus de deux secondes. Il vaut dans les deux modes ; au hockey

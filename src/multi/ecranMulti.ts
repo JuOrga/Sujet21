@@ -25,10 +25,12 @@ import {
   DEMI_OUVERTURE,
   EPAISSEUR_CAGE,
   LIGNE_BUT,
+  POTEAUX,
   PROFONDEUR_CAGE,
   RAYON_CERCLE,
   RAYON_COINS,
   RAYON_PALET,
+  RAYON_POTEAU,
 } from './hockey'
 import { Robot } from './robot'
 import { ARENE, MANCHES_POUR_GAGNER } from './sumo'
@@ -161,6 +163,10 @@ const STYLE = `
 .mu-score small { letter-spacing: 0.18em; min-height: 1.2em; }
 @media (max-width: 560px) { .mu-choix { grid-template-columns: 1fr; } .mu-score { top: 150px; } }
 `
+
+/** Les poteaux du hockey, tels que l'écran les dessine et que les sons les
+ *  écoutent. */
+const POTEAUX_VUS = POTEAUX.map((q) => ({ x: q.x, y: q.y, rayon: RAYON_POTEAU }))
 
 const GABARIT = `
 <div class="mu-salon" data-page="salon">
@@ -964,6 +970,7 @@ export function creeEcranMulti(quitte: () => void): EcranMulti {
       jeu,
       salle,
       rayonPalet: jeu ? RAYON_PALET : 0,
+      poteaux: jeu?.mode === MODE_HOCKEY ? POTEAUX_VUS : undefined,
     }
     const entendus = entend(instantane, apres, moi)
     instantane = apres
@@ -1029,6 +1036,7 @@ export function creeEcranMulti(quitte: () => void): EcranMulti {
         // l'anneau : au sumo seulement
         anneau: jeu.mode === MODE_SUMO ? { x: (ARENE.minX + ARENE.maxX) / 2, y: (ARENE.minY + ARENE.maxY) / 2, rayon: jeu.anneau } : null,
         palet: jeu.paletActif ? { x: jeu.paletX, y: jeu.paletY, rayon: RAYON_PALET, vx: jeu.paletVx, vy: jeu.paletVy } : null,
+        poteaux: hockey ? POTEAUX_VUS : [],
         porteur: porteur ? jeu.tenuPar : -1,
         charge: jeu.charge,
         viseeX: porteur?.viseeX ?? 0,
