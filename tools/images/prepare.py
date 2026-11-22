@@ -260,6 +260,16 @@ FAMILLES: list[Famille] = [
         note='la chaudière (moitié haute) et le surchauffeur (moitié basse), assemblés par tools/images/chaudiere_atlas.py — leurs cadres sont un contrat avec le shader',
     ),
     Famille(
+        # (22/11) les portes de l'éditeur, rendues dans Blender
+        # (blender/porte_blindee.py) : quatre pièces côte à côte, que le
+        # moteur découpe au pixel près (render/porteBlindee.ts) — jamais
+        # redimensionné. Mesuré : luminance 0,19, 3 % de chauds (les deux
+        # liserés rouges, la couleur des lasers qui commandent la porte), 8 Ko
+        'atlas de la porte blindée', ('porte-blindee',), alpha=True, cote_max=2048,
+        luma_max=0.40, poids_max_ko=60,
+        note='dessus, bout, flanc, fente — gouttières de 4 px ; les rectangles sont un contrat avec src/render/porteBlindee.ts',
+    ),
+    Famille(
         'décalque',
         # hub-* : les pièces des stations du hub (blender/hub_stations.py) —
         # sans motif, elles tombaient dans « (inconnue) », sans mesure d'alpha
