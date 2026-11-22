@@ -15,8 +15,10 @@ import {
   sensPorte,
   leveeSuivante,
   partLevee,
-  partsVisiblesAuSol,
-  tranchesVisibles,
+  coupeDemiPlan,
+  dansPolygone,
+  tranchesFace,
+  volumeProjete,
 } from './porteBlindee'
 
 // le gabarit courant du dépôt : 40 × 340, debout entre deux murs
@@ -151,60 +153,6 @@ describe('la porte blindée — elle sort du sol', () => {
   })
 })
 
-describe('la porte blindée — la face et le mur qui la touche', () => {
-  // la face ouest d'une porte debout (x = 860, de y = 170 à −170 : le
-  // contour en sens trigonométrique la parcourt vers le bas), sa normale
-  // sortante vers −x
-  const a = { x: 860, y: 170 }
-  const b = { x: 860, y: -170 }
-
-  it('rien devant elle : toute la face se voit', () => {
-    const t = tranchesVisibles(a, b, 20)
-    expect(t).toHaveLength(17)
-    expect(t[0][0]).toEqual(a)
-    expect(t[t.length - 1][1]).toEqual(b)
-  })
-
-  it('un mur collé devant, AUSSI HAUT que la porte : la face est cachée — son dessus passe devant (capture du concepteur, 22/11)', () => {
-    const mur = (x: number): number => (x < 860 && x > 700 ? 140 : -1)
-    expect(tranchesVisibles(a, b, 20, mur, 140)).toEqual([])
-  })
-
-  it('un mur collé devant, PLUS BAS que la porte : la face dépasse au-dessus de lui, et ce qui dépasse se peint (D1, 22/11)', () => {
-    // la bande de triangles sous D1 est plus basse que le mur extérieur qui
-    // donne sa hauteur à la porte : cachée tout entière, la face laissait un
-    // couvercle flotter sur du vide
-    const bande = (x: number): number => (x < 860 && x > 700 ? 90 : -1)
-    const t = tranchesVisibles(a, b, 20, bande, 140)
-    expect(t).toHaveLength(17)
-    for (const [, , z] of t) expect(z).toBe(90)
-    // la même porte à mi-levée (70 de haut) : encore sous le dessus du mur
-    expect(tranchesVisibles(a, b, 20, bande, 70)).toEqual([])
-  })
-
-  it('un mur collé sur la moitié haute : la moitié basse se voit jusqu’au sol', () => {
-    const mur = (x: number, y: number): number => (x < 860 && y > 0 ? 140 : -1)
-    const t = tranchesVisibles(a, b, 20, mur, 140)
-    expect(t.length).toBeGreaterThan(0)
-    for (const [q0, q1, z] of t) {
-      expect(Math.max(q0.y, q1.y)).toBeLessThanOrEqual(20)
-      expect(z).toBe(0)
-    }
-    expect(Math.min(...t.map(([, q1]) => q1.y))).toBe(-170)
-  })
-
-  it('un mur DERRIÈRE la porte (du côté de son dos) ne cache pas la face', () => {
-    const mur = (x: number): number => (x > 860 ? 140 : -1)
-    expect(tranchesVisibles(a, b, 20, mur, 140)).toHaveLength(17)
-  })
-
-  it('le jeu donne à la porte la hauteur des solides, et la sienne', () => {
-    const main = readFileSync(join(process.cwd(), 'src/main.ts'), 'utf8')
-    expect(main).toMatch(/hauteurSolide: hauteurEn,/)
-    expect(main).toMatch(/hauteurPorte: hauteurPorte\(p\),/)
-  })
-})
-
 describe('la porte blindée — le code couleur des lasers', () => {
   it('ouverte, ses veilleuses sont vertes ; en course, rouges qui battent ; close, rouges', () => {
     expect(etatVeilleuses(false, false)).toBe('ouverte')
@@ -219,15 +167,13 @@ describe('la porte blindée — elle va d’un mur à l’autre', () => {
   // au-dessus et au-dessous d'elle, le couloir à gauche et à droite
   const D1: PorteDef = { minX: 600, minY: 300, maxX: 644, maxY: 340, canal: 1 }
   const murs = (_x: number, y: number): boolean => y > 340 || y < 300
-  // la bande sous D1 (90) plus basse que le mur extérieur au-dessus (140)
-  const hauteurs = (_x: number, y: number): number => (y > 340 ? 140 : y < 300 ? 90 : -1)
 
   it('par sa seule longueur elle se couchait en travers du couloir ; ses murs la remettent debout', () => {
     expect(sensPorte(D1)).toBe(true)
     expect(sensPorte(D1, murs)).toBe(false)
   })
 
-  it('debout, ses faces libres sont celles qui donnent sur le couloir : celle que regarde l’œil se peint', () => {
+  it('debout, ses faces libres sont celles qui donnent sur le couloir', () => {
     const c = [
       { x: 600, y: 300 },
       { x: 644, y: 300 },
@@ -239,11 +185,9 @@ describe('la porte blindée — elle va d’un mur à l’autre', () => {
     const apres = facesTranche(c, D1, 200, 320, sensPorte(D1, murs))
     expect(avant).toEqual([]) // la face gauche passait pour un bout contre un mur
     expect(apres).toEqual([{ a: { x: 600, y: 340 }, b: { x: 600, y: 300 } }])
-    // et rien ne la cache : le couloir est libre devant elle
-    expect(tranchesVisibles(apres[0].a, apres[0].b, 20, hauteurs, 140).length).toBeGreaterThan(0)
   })
 
-  it('l’œil en dessous : le bout posé sur la bande plus basse dépasse, il se peint au-dessus d’elle', () => {
+  it('l’œil en dessous : avec les occultants, le bout posé sur la bande est une face à peindre (le masque dira ce qui dépasse)', () => {
     const c = [
       { x: 600, y: 300 },
       { x: 644, y: 300 },
@@ -255,9 +199,6 @@ describe('la porte blindée — elle va d’un mur à l’autre', () => {
     expect(facesTranche(c, D1, 620, -400, sens)).toEqual([])
     const faces = facesTranche(c, D1, 620, -400, sens, true)
     expect(faces).toEqual([{ a: { x: 600, y: 300 }, b: { x: 644, y: 300 } }])
-    const t = tranchesVisibles(faces[0].a, faces[0].b, 20, hauteurs, 140)
-    expect(t.length).toBeGreaterThan(0)
-    for (const [, , z] of t) expect(z).toBe(90)
   })
 
   it('sans sonde (l’éditeur), ou des murs de tous côtés, le plus long côté décide', () => {
@@ -267,54 +208,85 @@ describe('la porte blindée — elle va d’un mur à l’autre', () => {
   })
 })
 
-describe('la porte blindée — la ligne de visée', () => {
-  // la scène de D1 : un couloir horizontal (y 300..344), le mur extérieur
-  // haut au-dessus (140), la bande plus basse dessous (90) ; la porte ferme
-  // le couloir, l'œil est en dessous. Relief : f(h) = 0,08 · h / 140.
-  const hauteurs = (_x: number, y: number): number => (y > 344 ? 140 : y < 300 && y > 240 ? 90 : -1)
-  const visee = (oeil: { x: number; y: number }) => ({ oeil, fraction: (h: number) => (0.08 * Math.min(h, 140)) / 140 })
 
-  it('la face qui regarde l’œil, posée sur la bande : cachée jusqu’à 90, la porte dépasse au-dessus', () => {
-    const t = tranchesVisibles({ x: 600, y: 300 }, { x: 644, y: 300 }, 11, hauteurs, 140, 3, visee({ x: 620, y: -400 }))
+describe('la porte blindée — ce que les murs cachent, au pixel', () => {
+  // la scène de D1 (22/11) : un couloir horizontal (y 300..340) que ferme
+  // la porte, le mur extérieur haut au-dessus (140), la bande de triangles
+  // plus basse dessous (90), l'œil en dessous. La projection du relief : une
+  // homothétie autour du point sous l'œil, f(h) = 0,08 · h / 140 — celle du
+  // shader, à l'échelle près.
+  const oeil = { x: 620, y: -400 }
+  const f = (h: number): number => (0.08 * Math.min(h, 140)) / 140
+  const projette = (x: number, y: number, h: number) => ({
+    sx: oeil.x + (x - oeil.x) / (1 - f(h)),
+    sy: oeil.y + (y - oeil.y) / (1 - f(h)),
+  })
+  const rect = (x0: number, y0: number, x1: number, y1: number) => [
+    { x: x0, y: y0 },
+    { x: x1, y: y0 },
+    { x: x1, y: y1 },
+    { x: x0, y: y1 },
+  ]
+  const bande = { contours: [rect(400, 240, 900, 300)], hauteur: 90 }
+  const exterieur = { contours: [rect(400, 340, 900, 420)], hauteur: 140 }
+  const couvre = (polys: { sx: number; sy: number }[][], q: { sx: number; sy: number }): boolean =>
+    polys.some((p) => dansPolygone(p.map((v) => ({ x: v.sx, y: v.sy })), q.sx, q.sy))
+  const volume = (o: { contours: { x: number; y: number }[][]; hauteur: number }, demiPlan?: { a: { x: number; y: number }; n: { x: number; y: number } }) =>
+    o.contours.flatMap((c) => volumeProjete(demiPlan ? coupeDemiPlan(c, demiPlan.a, demiPlan.n) : c, o.hauteur, projette))
+
+  it('au sol, porte ouverte : le ruban vert collé à la bande passe sous son dessus, plus loin il se voit — sans marche ni retard', () => {
+    const v = volume(bande)
+    // le dessus de la bande glisse jusqu'à y ≈ 337,9 : un point du sol à
+    // 302 est dessous, un à 339 ne l'est plus
+    expect(couvre(v, projette(622, 302, 0))).toBe(true)
+    expect(couvre(v, projette(622, 337, 0))).toBe(true)
+    expect(couvre(v, projette(622, 339, 0))).toBe(false)
+  })
+
+  it('la face qui regarde l’œil, sur la bande plus basse : cachée jusqu’à 90, elle dépasse au-dessus (D1, 22/11)', () => {
+    const v = volume(bande, { a: { x: 600, y: 300 }, n: { x: 0, y: -1 } })
+    expect(couvre(v, projette(622, 300, 60))).toBe(true)
+    expect(couvre(v, projette(622, 300, 85))).toBe(true)
+    expect(couvre(v, projette(622, 300, 100))).toBe(false)
+    expect(couvre(v, projette(622, 300, 140))).toBe(false)
+  })
+
+  it('un solide DERRIÈRE le plan de la face ne la cache pas : le mur extérieur est rogné tout entier', () => {
+    expect(coupeDemiPlan(exterieur.contours[0], { x: 600, y: 300 }, { x: 0, y: -1 })).toEqual([])
+    expect(coupeDemiPlan(bande.contours[0], { x: 600, y: 300 }, { x: 0, y: -1 })).toHaveLength(4)
+  })
+
+  it('une face latérale qui longe le couloir passe derrière la bande à son bout, pas au fond du couloir', () => {
+    // la face est (x = 644), l'œil en bas à droite ; seule la part de la
+    // bande devant son plan (x ≥ 644) compte
+    const oeil2 = { x: 900, y: -400 }
+    const p2 = (x: number, y: number, h: number) => ({
+      sx: oeil2.x + (x - oeil2.x) / (1 - f(h)),
+      sy: oeil2.y + (y - oeil2.y) / (1 - f(h)),
+    })
+    const v = bande.contours.flatMap((c) => volumeProjete(coupeDemiPlan(c, { x: 644, y: 300 }, { x: 1, y: 0 }), 90, p2))
+    expect(couvre(v, p2(644, 305, 40))).toBe(true)
+    expect(couvre(v, p2(644, 338, 40))).toBe(false)
+  })
+
+  it('le volume d’un contour : son pied, son dessus, et un quadrilatère par arête', () => {
+    const v = volumeProjete(rect(0, 0, 10, 10), 90, projette)
+    expect(v).toHaveLength(6)
+    expect(volumeProjete([{ x: 0, y: 0 }, { x: 1, y: 1 }], 90, projette)).toEqual([])
+  })
+
+  it('les tranches d’une face la couvrent bout à bout', () => {
+    const t = tranchesFace({ x: 0, y: 0 }, { x: 0, y: 100 }, 30)
     expect(t).toHaveLength(4)
-    for (const [, , z] of t) expect(z).toBe(90)
+    expect(t[0][0]).toEqual({ x: 0, y: 0 })
+    expect(t[3][1]).toEqual({ x: 0, y: 100 })
   })
 
-  it('une face latérale qui longe le couloir passe derrière la bande à son bout, pas plus loin', () => {
-    // la face est, de y = 300 à 344 (sens trigonométrique), l'œil en bas à droite
-    const t = tranchesVisibles({ x: 644, y: 300 }, { x: 644, y: 344 }, 11, hauteurs, 140, 3, visee({ x: 900, y: -400 }))
-    expect(t).toHaveLength(4)
-    expect(t[0][2]).toBe(90) // contre la bande : son dessus passe devant
-    expect(t[t.length - 1][2]).toBe(0) // au fond du couloir, rien devant
-    // sondée droit devant elle (vers l'est, le couloir), la face semblait libre partout
-    for (const [, , z] of tranchesVisibles({ x: 644, y: 300 }, { x: 644, y: 344 }, 11, hauteurs, 140)) expect(z).toBe(0)
-  })
-
-  it('un mur au loin, au-delà de r · f(H), ne cache rien', () => {
-    const loin = (_x: number, y: number): number => (y < 100 && y > 60 ? 140 : -1)
-    // r ≈ 700, f(140) = 0,08 : au-delà de 56 unités, plus rien ne couvre
-    for (const [, , z] of tranchesVisibles({ x: 600, y: 300 }, { x: 644, y: 300 }, 11, loin, 140, 3, visee({ x: 620, y: -400 }))) expect(z).toBe(0)
-  })
-})
-
-describe('la porte blindée — ouverte, le sol passe sous les murs voisins', () => {
-  // la porte du gabarit, debout entre deux murs hauts (au-dessus de 170 et
-  // au-dessous de −170), l'œil loin en dessous : relief allumé, le dessus du
-  // mur du bas s'avance sur le sol de la fente — le ruban vert y passait
-  // par-dessus (le concepteur, 22/11)
-  const murs = (_x: number, y: number): number => (y > 170 || y < -170 ? 140 : -1)
-  const visee = { oeil: { x: 880, y: -700 }, fraction: (h: number) => (0.08 * Math.min(h, 140)) / 140 }
-
-  it('le bout tourné vers l’œil, derrière le mur du bas, est rogné ; le reste se voit jusqu’au mur du haut', () => {
-    const parts = partsVisiblesAuSol(cadrePorte(P), 10, murs, visee)
-    expect(parts).toHaveLength(1)
-    // r ≈ 530 au bout du bas, f(140) = 0,08 : ~42 unités sous le dessus du mur
-    expect(parts[0][0]).toBeGreaterThanOrEqual(35)
-    expect(parts[0][0]).toBeLessThanOrEqual(50)
-    expect(parts[0][1]).toBe(340)
-  })
-
-  it('sans sonde (l’éditeur, relief éteint), toute la fente se voit', () => {
-    expect(partsVisiblesAuSol(cadrePorte(P), 10)).toEqual([[0, 340]])
+  it('le jeu donne à la porte les solides voisins et la projection du relief', () => {
+    const main = readFileSync(join(process.cwd(), 'src/main.ts'), 'utf8')
+    expect(main).toMatch(/occultants: fPortes > 0 \? occultantsPres\(p\) : undefined,/)
+    expect(main).toMatch(/projette: projetteRelief,/)
+    // une coque est creuse : ses morceaux de paroi, pas sa silhouette
+    expect(main).toMatch(/FORME_COQUE \? coquePieces\(box\)/)
   })
 })

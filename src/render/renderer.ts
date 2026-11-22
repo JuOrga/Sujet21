@@ -8589,6 +8589,34 @@ export class Renderer {
    *  sur un mur — une coupelle doit prendre le MÊME sommet que le décalque
    *  de son logement, donc la même recherche. Elle lit les boîtes de la
    *  dernière image peinte. */
+  /** LES SOLIDES DRESSÉS près d'un rectangle du monde (marge comprise) : la
+   *  boîte et sa hauteur, dans l'image en cours — la toile 2D des portes en
+   *  efface le volume projeté (porteBlindee.ts : un mur devant une porte la
+   *  cache). Les mêmes boîtes et les mêmes hauteurs que le relief du shader. */
+  solidesPres(
+    minX: number,
+    minY: number,
+    maxX: number,
+    maxY: number,
+    marge: number,
+  ): { box: ObstacleBox; hauteur: number }[] {
+    const out: { box: ObstacleBox; hauteur: number }[] = []
+    for (let k = 0; k < this.nBoitesImage; k++) {
+      const i = this.rangsScratch[k]
+      const bx = this.boitesImage[i]
+      if (RANG_DE_MATIERE[bx.material] === undefined) continue
+      const h = this.hauteursBoites[i] ?? 0
+      if (!(h > 0)) continue
+      // (le cercle qui contient la boîte : elle peut être tournée)
+      const cx = (bx.minX + bx.maxX) / 2
+      const cy = (bx.minY + bx.maxY) / 2
+      const r = Math.hypot(bx.maxX - bx.minX, bx.maxY - bx.minY) / 2
+      if (cx + r < minX - marge || cx - r > maxX + marge || cy + r < minY - marge || cy - r > maxY + marge) continue
+      out.push({ box: bx, hauteur: h })
+    }
+    return out
+  }
+
   hauteurSousDecal(x: number, y: number): number {
     for (let k = this.nBoitesImage - 1; k >= 0; k--) {
       const i = this.rangsScratch[k]

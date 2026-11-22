@@ -780,9 +780,12 @@ describe("la tranche d'une porte", () => {
     const src = lire('./porteBlindee.ts')
     const corps = src.slice(src.indexOf('export function dessinePorte('))
     // (le sens vient des murs, sensPorte : 22/11)
-    const face = corps.indexOf('facesTranche(contour, p, vue.oeil.x, vue.oeil.y, couchee, !!hs)')
+    // (22/11, le soir) chaque face se peint sur un calque, puis le volume des
+    // murs devant son plan en est effacé (surCalque, effaceVolumes)
+    const face = corps.indexOf('facesTranche(contour, p, vue.oeil.x, vue.oeil.y, couchee, masquer)')
     expect(face).toBeGreaterThan(0)
-    expect(corps.slice(face, face + 200)).toMatch(/dessineFace\(g, a, b, vue\.pied, haut,/)
+    expect(corps.slice(face, face + 900)).toMatch(/dessineFace\(c, a, b, vue\.pied, haut,/)
+    expect(corps.slice(face, face + 900)).toMatch(/effaceVolumes\(c, occ, projette, \{ a, n \}\)/)
     // relief éteint, pas de face : l'œil n'est donné que relief allumé
     expect(corps).toMatch(/if \(vue\.oeil\) \{[\s\S]{0,1600}for \(const \{ a, b \} of facesTranche/)
     expect(main).toMatch(/oeil: fPortes > 0 \? \{ x: camera\.x, y: camera\.y \} : null/)

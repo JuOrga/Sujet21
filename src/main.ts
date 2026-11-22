@@ -270,7 +270,7 @@ import {
   valeurLevier,
   valeurProposee,
 } from './game/leviers'
-import { dansForme, type FormeBox } from './game/formes'
+import { FORME_COQUE, FORME_RECT, coquePieces, dansForme, formeOutline, type FormeBox } from './game/formes'
 import {
   dessineDissolutionParoi,
   dessineDissolutionParoiSobre,
@@ -352,7 +352,7 @@ import { chargePiecesModule2d, peintCelluleSeule, peintModule2d, type Pieces } f
 import { MAX_BOXES, Renderer } from './render/renderer'
 import { HAUTEUR_BLOCS } from './render/hauteurs'
 import { fractionSommet, hauteurAppui, pointDuSommet, pointPose } from './render/reliefParois'
-import { PORTE_BLINDEE_URL, dessinePorte, leveeSuivante } from './render/porteBlindee'
+import { PORTE_BLINDEE_URL, dessinePorte, leveeSuivante, type Occultant } from './render/porteBlindee'
 import { remetReglagesParDefaut } from './game/remiseReglages'
 import { Motes, VIE_STRIDE, remplitVie, toucheLeCorps } from './render/vie'
 import { panDepuis } from './game/ouie'
@@ -9664,6 +9664,19 @@ function drawRecharges(vw: number, vh: number, dpr: number, maintenant: number):
   g.restore()
 }
 
+// LES CONTOURS AU SOL d'un solide qui peut cacher une porte, gardés par
+// boîte (une boîte de décor ne change pas de forme d'une image à l'autre ;
+// l'éditeur en recrée une neuve quand il la déplace). Une COQUE est creuse :
+// ses morceaux de paroi, pas sa silhouette, qui couvrirait la salle entière.
+const contoursParBoite = new WeakMap<ObstacleBox, { x: number; y: number }[][]>()
+function contoursOccultant(box: ObstacleBox): { x: number; y: number }[][] {
+  const connu = contoursParBoite.get(box)
+  if (connu) return connu
+  const c = (box.forme ?? FORME_RECT) === FORME_COQUE ? coquePieces(box) : [formeOutline(box, 32)]
+  contoursParBoite.set(box, c)
+  return c
+}
+
 // LA LEVÉE MONTRÉE de chaque porte d'un coup (0 au ras du sol, 1 debout),
 // pour le tableau `leveesTableau` — une image seulement, voir drawMecanismes
 let leveesPortes: number[] = []
@@ -9737,10 +9750,25 @@ function drawMecanismes(vw: number, vh: number, dpr: number): void {
   const fMurHaut = fractionSommet(RELIEF_K[reliefChoix], camera.zoom, HAUTEUR_BLOCS)
   let fPortes = fMurHaut
   const hauteurEn = (x: number, y: number): number => renderer.hauteurSousDecal(x, y)
-  // la hauteur des murs qu'une porte relie (celle que son sommet représente)
-  const hauteurPorte = (r: { minX: number; minY: number; maxX: number; maxY: number }): number => {
-    const h = hauteurAppui(r, hauteurEn)
-    return h < 0 ? HAUTEUR_BLOCS : Math.min(h, HAUTEUR_BLOCS)
+  // CE QUI PEUT CACHER UNE PORTE (render/porteBlindee.ts) : les solides
+  // dressés assez près d'elle — au-delà de r·f(mur haut), r sa distance à
+  // l'œil, le dessus d'un mur ne l'atteint plus —, leurs contours au sol et
+  // leur hauteur ; et la projection du relief, celle du shader
+  const projetteRelief = (x: number, y: number, h: number): { sx: number; sy: number } => {
+    const q = S(x, y)
+    const f = h > 0 ? fractionSommet(RELIEF_K[reliefChoix], camera.zoom, h) : 0
+    if (f <= 0) return q
+    const [sx, sy] = pointDuSommet(q.sx, q.sy, vw * 0.5, vh * 0.5, f)
+    return { sx, sy }
+  }
+  const occultantsPres = (r: { minX: number; minY: number; maxX: number; maxY: number }): Occultant[] => {
+    const d = Math.hypot((r.minX + r.maxX) / 2 - camera.x, (r.minY + r.maxY) / 2 - camera.y)
+    const portee = Math.hypot(r.maxX - r.minX, r.maxY - r.minY) / 2
+    const marge = ((d + portee) * fMurHaut) / Math.max(1e-6, 1 - fMurHaut) + 8
+    return renderer.solidesPres(r.minX, r.minY, r.maxX, r.maxY, marge).map(({ box, hauteur }) => ({
+      contours: contoursOccultant(box),
+      hauteur,
+    }))
   }
   const fractionAppui = (r: { minX: number; minY: number; maxX: number; maxY: number }): number => {
     if (fMurHaut <= 0) return 0 // relief éteint : ni sonde ni calcul
@@ -9811,10 +9839,10 @@ function drawMecanismes(vw: number, vh: number, dpr: number): void {
         // chaque porte bat à sa phase : deux portes voisines ne clignotent
         // pas comme une guirlande
         temps: elapsed + i * 0.37,
-        // le mur qui touche une face la cache jusqu'à SA hauteur : son dessus
-        // passe devant, ce qui le dépasse se voit
-        hauteurSolide: hauteurEn,
-        hauteurPorte: hauteurPorte(p),
+        // les solides qui peuvent la cacher, et leur projection : leur
+        // volume est effacé de ce qui est derrière lui
+        occultants: fPortes > 0 ? occultantsPres(p) : undefined,
+        projette: projetteRelief,
       },
       atlasPorte,
     )

@@ -38,11 +38,7 @@
 
 import type { PorteDef } from '../game/level'
 import { portePolygone, type Point } from '../game/porte'
-import { HAUTEUR_BLOCS } from './hauteurs'
 import { facesTranche } from './reliefParois'
-
-// la hauteur d'un mur haut, celle du sommet quand la porte n'en dit pas plus
-const HAUTEUR_MUR = HAUTEUR_BLOCS
 
 export const PORTE_BLINDEE_URL = '/assets/porte-blindee.webp'
 
@@ -81,118 +77,180 @@ export function etatVeilleuses(close: boolean, levee: boolean): 'ouverte' | 'cou
   return levee ? 'course' : 'ouverte'
 }
 
-/** Les tranches d'une face (a → b, le contour en sens trigonométrique), et
- *  pour chacune la HAUTEUR jusqu'où elle est cachée : coupée en morceaux
- *  d'au plus `pas`, on sonde le sol juste devant chaque morceau (`devant`
- *  unités le long de la normale sortante, en son milieu). Un mur collé là
- *  cache la face jusqu'à SA hauteur — son dessus passe devant —, pas
- *  au-delà : une porte plus haute que lui dépasse, et ce qui dépasse se voit
- *  (D1 du 22/11 : la bande de triangles sous elle est plus basse que le mur
- *  extérieur qui lui donne sa hauteur ; cachée tout entière, sa face laissait
- *  un couvercle flotter sur du vide). Un morceau caché jusqu'en haut
- *  (`hMax`, la hauteur montrée de la porte) ne se peint pas. Sans sonde,
- *  rien ne cache rien.
- *
- *  LA LIGNE DE VISÉE (`visee`) : le relief est une homothétie autour du
- *  point sous l'œil — le haut d'un solide de hauteur H glisse loin de lui de
- *  la fraction f(H), proportionnelle à H. Le dessus d'un solide qui se
- *  dresse ENTRE la face et l'œil, à moins de r·f(H) d'elle (r : la distance
- *  de la face à l'œil), recouvre donc la face jusqu'à H. On sonde le long
- *  de cette ligne, pas seulement droit devant : une face latérale qui longe
- *  un couloir passe derrière la bande en angle à son bout (le banc du 22/11 :
- *  sondée droit devant, elle se peignait par-dessus). */
-export function tranchesVisibles(
-  a: Point,
-  b: Point,
-  pas: number,
-  hauteurDevant?: (x: number, y: number) => number,
-  hMax = Infinity,
-  devant = 3,
-  visee?: Visee,
-): [Point, Point, number][] {
+/** Les tranches d'une face (a → b) : des morceaux d'au plus `pas`. Le haut
+ *  d'une face a glissé plus loin du centre de l'écran que son pied, la face
+ *  est un trapèze : chaque morceau aura son propre repère affine. */
+export function tranchesFace(a: Point, b: Point, pas: number): [Point, Point][] {
   const long = Math.hypot(b.x - a.x, b.y - a.y)
   if (!(long > 1e-6)) return []
   const n = Math.max(1, Math.ceil(long / Math.max(pas, 1e-6)))
-  // la normale sortante d'une arête parcourue dans le sens trigonométrique
-  const nx = (b.y - a.y) / long
-  const ny = (a.x - b.x) / long
-  const out: [Point, Point, number][] = []
+  const out: [Point, Point][] = []
   for (let i = 0; i < n; i++) {
-    const q0 = { x: a.x + (b.x - a.x) * (i / n), y: a.y + (b.y - a.y) * (i / n) }
-    const q1 = { x: a.x + (b.x - a.x) * ((i + 1) / n), y: a.y + (b.y - a.y) * ((i + 1) / n) }
-    const mx = (q0.x + q1.x) / 2
-    const my = (q0.y + q1.y) / 2
-    let z = 0
-    if (hauteurDevant && visee) {
-      z = hauteurCachee(mx, my, hauteurDevant, visee, devant)
-    } else if (hauteurDevant) {
-      z = Math.max(0, hauteurDevant(mx + nx * devant, my + ny * devant))
+    out.push([
+      { x: a.x + (b.x - a.x) * (i / n), y: a.y + (b.y - a.y) * (i / n) },
+      { x: a.x + (b.x - a.x) * ((i + 1) / n), y: a.y + (b.y - a.y) * ((i + 1) / n) },
+    ])
+  }
+  return out
+}
+
+// ---- CE QUE LES MURS CACHENT ------------------------------------------------
+// La porte se dessine dans la toile 2D, PAR-DESSUS le rendu WebGL : sans
+// rien de plus, elle passerait devant tout. Relief allumé, un mur devant elle
+// doit la cacher — sa face, son dessus. Deux essais par sondes (des points du
+// décor tâtés le long de la ligne de visée) cachaient par marches, en
+// retard sur la caméra : « je la vois par-dessus la paroi une seconde puis
+// elle disparaît […] cela me fait penser à une rustine » (le concepteur,
+// 22/11). Le masque est maintenant EXACT à l'écran : le volume de chaque
+// solide voisin, projeté par la même homothétie que le moteur — son pied,
+// son dessus à sa hauteur, les quadrilatères que balaie chaque arête —, est
+// effacé du calque où la porte vient d'être peinte.
+
+/** Un solide qui peut cacher la porte : ses contours au sol (monde) et sa
+ *  hauteur. */
+export interface Occultant {
+  contours: Point[][]
+  hauteur: number
+}
+
+/** Le point (x, y) du monde, à la hauteur h, à l'écran — l'homothétie du
+ *  relief autour du point sous l'œil (h = 0 : le sol). */
+export type Projette = (x: number, y: number, h: number) => { sx: number; sy: number }
+
+/** Le polygone rogné au demi-plan (q − a)·n ≥ 0 (Sutherland–Hodgman) : la
+ *  part d'un solide qui est DEVANT une face — derrière son plan, il ne peut
+ *  pas la cacher. */
+export function coupeDemiPlan(pts: readonly Point[], a: Point, n: Point): Point[] {
+  const d = pts.map((q) => (q.x - a.x) * n.x + (q.y - a.y) * n.y)
+  const out: Point[] = []
+  for (let i = 0; i < pts.length; i++) {
+    const j = (i + 1) % pts.length
+    if (d[i] >= 0) out.push(pts[i])
+    if (d[i] >= 0 !== d[j] >= 0) {
+      const t = d[i] / (d[i] - d[j])
+      out.push({ x: pts[i].x + (pts[j].x - pts[i].x) * t, y: pts[i].y + (pts[j].y - pts[i].y) * t })
     }
-    if (z >= hMax) continue
-    out.push([q0, q1, z])
+  }
+  return out.length >= 3 ? out : []
+}
+
+/** LE VOLUME D'UN SOLIDE À L'ÉCRAN : les polygones dont la réunion couvre ce
+ *  que ce solide cache — son pied, son dessus (à sa hauteur), et pour chaque
+ *  arête le quadrilatère qu'elle balaie du pied au dessus (ses flancs). Exact
+ *  pour tout contour, convexe ou non. */
+export function volumeProjete(
+  contour: readonly Point[],
+  hauteur: number,
+  projette: Projette,
+): { sx: number; sy: number }[][] {
+  if (contour.length < 3) return []
+  const pied = contour.map((q) => projette(q.x, q.y, 0))
+  const haut = contour.map((q) => projette(q.x, q.y, hauteur))
+  const out = [pied, haut]
+  for (let i = 0; i < contour.length; i++) {
+    const j = (i + 1) % contour.length
+    out.push([pied[i], pied[j], haut[j], haut[i]])
   }
   return out
 }
 
-// le pas de la sonde le long de la ligne de visée (unités) : un mur fait
-// au moins 20 unités d'épaisseur, il ne passe pas entre deux sondes
-const PAS_VISEE = 6
-
-export type Visee = { oeil: Point; fraction: (h: number) => number }
-
-/** Jusqu'à quelle HAUTEUR le point (x, y) est caché à l'œil : le dessus d'un
- *  solide de hauteur H posé sur la ligne qui va de lui à l'œil, à moins de
- *  r·f(H) (r : sa distance à l'œil), passe devant lui jusqu'à H. 0 : rien
- *  ne le cache, même au ras du sol. */
-export function hauteurCachee(
-  x: number,
-  y: number,
-  hauteurDevant: (x: number, y: number) => number,
-  visee: Visee,
-  devant = 3,
-): number {
-  const r = Math.hypot(visee.oeil.x - x, visee.oeil.y - y)
-  if (!(r > 1e-6)) return 0
-  const ux = (visee.oeil.x - x) / r
-  const uy = (visee.oeil.y - y) / r
-  // au-delà de r·f(mur le plus haut), plus rien ne peut couvrir le point
-  const dMax = Math.min(r, r * visee.fraction(HAUTEUR_BLOCS))
-  let z = 0
-  for (let d = devant; d <= dMax; d += PAS_VISEE) {
-    const hd = hauteurDevant(x + ux * d, y + uy * d)
-    if (hd > z && d <= r * visee.fraction(hd)) z = hd
+/** Le point est-il dans le polygone (pair–impair) ? */
+export function dansPolygone(pts: readonly Point[], x: number, y: number): boolean {
+  let dedans = false
+  for (let i = 0, j = pts.length - 1; i < pts.length; j = i++) {
+    const a = pts[i]
+    const b = pts[j]
+    if (a.y > y !== b.y > y && x < ((b.x - a.x) * (y - a.y)) / (b.y - a.y) + a.x) dedans = !dedans
   }
-  return z
+  return dedans
 }
 
-/** LES PARTS DE LA FENTE QUI SE VOIENT, en abscisse s le long de la dalle :
- *  porte ouverte, tout est au ras du sol — la fente, ses deux liserés verts,
- *  ses veilleuses —, et le dessus d'un mur voisin qui s'avance en relief
- *  passe DEVANT eux (« le ruban vert n'est pas caché par la paroi avec le
- *  relief », le concepteur, 22/11). On sonde la ligne médiane de la dalle,
- *  par pas d'au plus `pas` ; un morceau caché, même à peine, est rogné. */
-export function partsVisiblesAuSol(
-  cadre: { o: Point; es: Point; et: Point; longueur: number; epaisseur: number },
-  pas: number,
-  hauteurDevant?: (x: number, y: number) => number,
-  visee?: Visee,
-): [number, number][] {
-  const { o, es, et, longueur: L, epaisseur: E } = cadre
-  if (!hauteurDevant || !visee) return [[0, L]]
-  const n = Math.max(1, Math.ceil(L / Math.max(pas, 1e-6)))
-  const out: [number, number][] = []
-  for (let i = 0; i < n; i++) {
-    const s0 = (L * i) / n
-    const s1 = (L * (i + 1)) / n
-    const sm = (s0 + s1) / 2
-    const x = o.x + es.x * sm + et.x * (E / 2)
-    const y = o.y + es.y * sm + et.y * (E / 2)
-    if (hauteurCachee(x, y, hauteurDevant, visee) > 0) continue
-    const dernier = out[out.length - 1]
-    if (dernier && Math.abs(dernier[1] - s0) < 1e-9) dernier[1] = s1
-    else out.push([s0, s1])
+// le calque où la porte se peint avant que les murs n'y soient effacés
+let calque: HTMLCanvasElement | null = null
+
+/** Peint `dessine` sur un calque, en efface ce que `masque` couvre, et pose
+ *  le résultat sur `g` — dans le rectangle écran (unités de `g`) donné. */
+function surCalque(
+  g: CanvasRenderingContext2D,
+  rect: { x0: number; y0: number; x1: number; y1: number },
+  dessine: (c: CanvasRenderingContext2D) => void,
+  masque: (c: CanvasRenderingContext2D) => void,
+): void {
+  if (typeof document === 'undefined') return
+  const W = g.canvas.width
+  const H = g.canvas.height
+  if (!calque) calque = document.createElement('canvas')
+  if (calque.width !== W || calque.height !== H) {
+    calque.width = W
+    calque.height = H
   }
-  return out
+  const c = calque.getContext('2d')
+  if (!c) return
+  const m = g.getTransform()
+  // le rectangle en pixels de la toile (la toile des effets n'a qu'une
+  // échelle et une translation)
+  const bx0 = Math.max(0, Math.floor(m.a * rect.x0 + m.e) - 2)
+  const by0 = Math.max(0, Math.floor(m.d * rect.y0 + m.f) - 2)
+  const bx1 = Math.min(W, Math.ceil(m.a * rect.x1 + m.e) + 2)
+  const by1 = Math.min(H, Math.ceil(m.d * rect.y1 + m.f) + 2)
+  if (bx1 <= bx0 || by1 <= by0) return
+  c.setTransform(1, 0, 0, 1, 0, 0)
+  c.clearRect(bx0, by0, bx1 - bx0, by1 - by0)
+  c.setTransform(m)
+  c.save()
+  dessine(c)
+  c.restore()
+  c.save()
+  c.globalCompositeOperation = 'destination-out'
+  masque(c)
+  c.restore()
+  g.save()
+  g.setTransform(1, 0, 0, 1, 0, 0)
+  g.drawImage(calque, bx0, by0, bx1 - bx0, by1 - by0, bx0, by0, bx1 - bx0, by1 - by0)
+  g.restore()
+}
+
+/** Efface le volume des occultants (rognés au demi-plan, s'il y en a un). */
+function effaceVolumes(
+  c: CanvasRenderingContext2D,
+  occ: readonly Occultant[],
+  projette: Projette,
+  demiPlan?: { a: Point; n: Point },
+): void {
+  c.fillStyle = '#000'
+  c.strokeStyle = '#000'
+  // un trait d'un pixel le long de chaque polygone : pas de fente entre deux
+  // quadrilatères voisins au filtrage
+  c.lineWidth = 1
+  for (const o of occ) {
+    for (const brut of o.contours) {
+      const contour = demiPlan ? coupeDemiPlan(brut, demiPlan.a, demiPlan.n) : brut
+      for (const poly of volumeProjete(contour, o.hauteur, projette)) {
+        c.beginPath()
+        for (let k = 0; k < poly.length; k++) {
+          if (k === 0) c.moveTo(poly[k].sx, poly[k].sy)
+          else c.lineTo(poly[k].sx, poly[k].sy)
+        }
+        c.closePath()
+        c.fill()
+        c.stroke()
+      }
+    }
+  }
+}
+
+function rectEcran(pts: readonly { sx: number; sy: number }[], marge: number): { x0: number; y0: number; x1: number; y1: number } {
+  let x0 = Infinity
+  let y0 = Infinity
+  let x1 = -Infinity
+  let y1 = -Infinity
+  for (const q of pts) {
+    x0 = Math.min(x0, q.sx)
+    y0 = Math.min(y0, q.sy)
+    x1 = Math.max(x1, q.sx)
+    y1 = Math.max(y1, q.sy)
+  }
+  return { x0: x0 - marge, y0: y0 - marge, x1: x1 + marge, y1: y1 + marge }
 }
 
 /** La levée à l'image suivante : elle court vers `cible` (1 debout, 0 au ras
@@ -294,13 +352,13 @@ export interface VuePorte {
   oeil: Point | null
   /** l'horloge (s), pour les veilleuses */
   temps: number
-  /** relief allumé : la hauteur du solide en (x, y), −1 au sol. Elle dit
-   *  de quel côté sont les murs (sensPorte), et jusqu'où un mur collé à une
-   *  face la cache (tranchesVisibles). Absente : rien ne cache rien */
-  hauteurSolide?: (x: number, y: number) => number
-  /** la hauteur (unités de jeu) que `sommet` représente — celle des murs
-   *  que la porte relie ; absente : un mur haut */
-  hauteurPorte?: number
+  /** relief allumé : les solides voisins qui peuvent cacher la porte. Ils
+   *  disent aussi de quel côté sont les murs (sensPorte). Absents : rien ne
+   *  cache rien */
+  occultants?: readonly Occultant[]
+  /** relief allumé : un point du monde, à une hauteur, à l'écran — la
+   *  projection des occultants */
+  projette?: Projette
 }
 
 type Pieces = { dessus: HTMLCanvasElement; bout: HTMLCanvasElement; flanc: HTMLCanvasElement; fente: HTMLCanvasElement }
@@ -375,8 +433,13 @@ export function dessinePorte(
   vue: VuePorte,
   img: HTMLImageElement | null,
 ): void {
-  const hs = vue.oeil ? vue.hauteurSolide : undefined
-  const couchee = sensPorte(p, hs && ((x, y) => hs(x, y) >= 0))
+  const occ = vue.oeil && vue.projette ? vue.occultants : undefined
+  const projette = vue.projette
+  const masquer = !!(occ && projette && occ.length > 0)
+  const couchee = sensPorte(
+    p,
+    occ && ((x, y) => occ.some((o) => o.contours.some((c) => dansPolygone(c, x, y)))),
+  )
   const cadre = cadrePorte(p, couchee)
   const { o, es, et, longueur: L, epaisseur: E } = cadre
   if (!(L > 0) || !(E > 0)) return
@@ -384,63 +447,46 @@ export function dessinePorte(
   const pc = img ? pieces(img) : null
   const { contour, front, hauteur: h, close } = partLevee(p, avance, leve)
 
-  // LA LIGNE DE VISÉE, relief allumé et murs sondés : la fraction du sommet
-  // de la porte, lue sur la vue elle-même — sous l'œil, le sommet d'un point
-  // s'écarte de 1 / (1 − f) —, et f proportionnelle à la hauteur, jusqu'à
-  // celle d'un mur haut
-  const hp = vue.hauteurPorte ?? HAUTEUR_MUR
-  let visee: Visee | undefined
-  if (vue.oeil && hs) {
-    const c0 = vue.pied(vue.oeil.x, vue.oeil.y)
-    const q = coins(p)[0]
-    const dp = Math.hypot(vue.pied(q.x, q.y).sx - c0.sx, vue.pied(q.x, q.y).sy - c0.sy)
-    const ds = Math.hypot(vue.sommet(q.x, q.y).sx - c0.sx, vue.sommet(q.x, q.y).sy - c0.sy)
-    const fS = ds > 1e-6 ? Math.max(0, 1 - dp / ds) : 0
-    const hRef = Math.min(Math.max(hp, 1e-6), HAUTEUR_BLOCS)
-    visee = { oeil: vue.oeil, fraction: (hh: number) => (fS * Math.min(Math.max(hh, 0), HAUTEUR_BLOCS)) / hRef }
-  }
-
   // 1. LA FENTE, au ras du sol : tout ce qu'on voit d'une porte ouverte, et
-  // ce qui reste du passage tant qu'elle n'est pas toute sortie — rognée là
-  // où le dessus d'un mur voisin passe devant le sol (partsVisiblesAuSol)
+  // ce qui reste du passage tant qu'elle n'est pas toute sortie. Porte
+  // ouverte, ses deux liserés restent, VERTS (« quand elles sont ouvertes les
+  // deux lignes doivent rester et passer en vert », 22/11), et ses
+  // veilleuses affleurent, vertes elles aussi. Relief allumé, tout mur voisin
+  // passe devant le sol : son volume est effacé (surCalque)
   const xl = (dec.bout * VEILLEUSE_X) / PORTE_ATLAS.bout.w
   const etat = etatVeilleuses(close, contour.length >= 3 && h > 0)
-  const auSol = close ? [] : partsVisiblesAuSol(cadre, E / 4, hs, visee)
-  const rogneAuSol = (): void => {
-    poseRepere(g, vue.pied, o, es, et, L, E)
-    g.beginPath()
-    // (un rien de recouvrement entre deux parts : pas de fente au filtrage)
-    for (const [s0, s1] of auSol) g.rect(s0 - 0.3, -E, s1 - s0 + 0.6, 3 * E)
-    g.clip()
-  }
-  if (!close && auSol.length > 0) {
-    g.save()
-    const m = pc && motif(g, pc.fente)
-    if (m) {
-      rogneAuSol()
-      m.setTransform({ a: dec.carreau / PORTE_ATLAS.fente.w, b: 0, c: 0, d: E / PORTE_ATLAS.fente.h, e: dec.bout, f: 0 })
-      g.globalAlpha = 0.9
-      g.fillStyle = m
-      g.fillRect(0, 0, L, E)
-    } else {
-      cheminEcran(g, coins(p), vue.pied)
-      g.strokeStyle = 'rgba(154,163,171,0.55)'
-      g.setLineDash([5, 7])
-      g.lineWidth = 1.5
-      g.stroke()
+  if (!close) {
+    const sol = (c: CanvasRenderingContext2D): void => {
+      c.save()
+      const m = pc && motif(c, pc.fente)
+      if (m) {
+        poseRepere(c, vue.pied, o, es, et, L, E)
+        m.setTransform({ a: dec.carreau / PORTE_ATLAS.fente.w, b: 0, c: 0, d: E / PORTE_ATLAS.fente.h, e: dec.bout, f: 0 })
+        c.globalAlpha = 0.9
+        c.fillStyle = m
+        c.fillRect(0, 0, L, E)
+      } else {
+        cheminEcran(c, coins(p), vue.pied)
+        c.strokeStyle = 'rgba(154,163,171,0.55)'
+        c.setLineDash([5, 7])
+        c.lineWidth = 1.5
+        c.stroke()
+      }
+      c.restore()
+      if (etat === 'ouverte') {
+        c.save()
+        poseRepere(c, vue.pied, o, es, et, L, E)
+        for (const t of [LISERE_T * E, (1 - LISERE_T) * E]) liseres(c, t, L, E, VERT_OUVERT, 1)
+        for (const s of [xl, L - xl]) veilleuse(c, s, E, VERT_OUVERT, 0.55 + 0.1 * Math.sin(vue.temps * 2.2), true)
+        c.restore()
+      }
     }
-    g.restore()
-  }
-  if (etat === 'ouverte' && auSol.length > 0) {
-    // la dalle est dans le sol : ses veilleuses affleurent, VERTES, aux deux
-    // bouts de la fente — le passage est libre
-    g.save()
-    rogneAuSol()
-    // et ses deux liserés restent, VERTS, au ras du sol (« quand elles sont
-    // ouvertes les deux lignes doivent rester et passer en vert », 22/11)
-    for (const t of [LISERE_T * E, (1 - LISERE_T) * E]) liseres(g, t, L, E, VERT_OUVERT, 1)
-    for (const s of [xl, L - xl]) veilleuse(g, s, E, VERT_OUVERT, 0.55 + 0.1 * Math.sin(vue.temps * 2.2), true)
-    g.restore()
+    if (masquer && occ && projette) {
+      const pts = coins(p).map((q) => vue.pied(q.x, q.y))
+      // (la marge : le halo des veilleuses déborde de la dalle)
+      const k = Math.hypot(pts[1].sx - pts[0].sx, pts[1].sy - pts[0].sy) / Math.max(1e-6, p.maxX - p.minX)
+      surCalque(g, rectEcran(pts, E * k + 4), sol, (c) => effaceVolumes(c, occ, projette))
+    } else sol(g)
   }
   if (contour.length < 3 || !(h > 0)) return
 
@@ -454,14 +500,24 @@ export function dessinePorte(
     return { sx: a.sx + (b.sx - a.sx) * h, sy: a.sy + (b.sy - a.sy) * h }
   }
 
-  // 2. LA FACE, relief allumé : les côtés libres tournés vers l'œil
-  // descendent du haut au sol (facesTranche : ni les bouts collés aux murs,
-  // ni les faces de dos) — le front d'une porte qui se déplie en est un
+  // 2. LA FACE, relief allumé : les côtés tournés vers l'œil descendent du
+  // haut au sol — le front d'une porte qui se déplie en est un. Avec les
+  // occultants, les bouts aussi (facesTranche, garderBouts) : chaque face est
+  // peinte entière, puis le volume des solides DEVANT son plan en est effacé
+  // — contre un mur aussi haut qu'elle, un bout disparaît ; contre un plus
+  // bas, il dépasse (D1 du 22/11 : la bande de triangles sous elle est plus
+  // basse que le mur extérieur qui lui donne sa hauteur)
   if (vue.oeil) {
-    // avec la sonde des murs, les bouts aussi : contre un mur aussi haut
-    // qu'elle, un bout est caché tout entier ; contre un plus bas, il dépasse
-    for (const { a, b } of facesTranche(contour, p, vue.oeil.x, vue.oeil.y, couchee, !!hs))
-      dessineFace(g, a, b, vue.pied, haut, h, cadre, dec, pc, hs, hp, visee)
+    for (const { a, b } of facesTranche(contour, p, vue.oeil.x, vue.oeil.y, couchee, masquer)) {
+      const face = (c: CanvasRenderingContext2D): void => dessineFace(c, a, b, vue.pied, haut, h, cadre, dec, pc)
+      if (masquer && occ && projette) {
+        const long = Math.hypot(b.x - a.x, b.y - a.y) || 1
+        // la normale sortante (contour en sens trigonométrique)
+        const n = { x: (b.y - a.y) / long, y: (a.x - b.x) / long }
+        const pts = [vue.pied(a.x, a.y), vue.pied(b.x, b.y), haut(a.x, a.y), haut(b.x, b.y)]
+        surCalque(g, rectEcran(pts, 2), face, (c) => effaceVolumes(c, occ, projette, { a, n }))
+      } else face(g)
+    }
   }
 
   // 3. LE DESSUS, rogné à la part levée
@@ -598,9 +654,6 @@ function dessineFace(
   cadre: ReturnType<typeof cadrePorte>,
   dec: ReturnType<typeof decoupePorte>,
   pc: Pieces | null,
-  hauteurDevant?: (x: number, y: number) => number,
-  hauteurPorte = HAUTEUR_MUR,
-  visee?: Visee,
 ): void {
   const long = Math.hypot(b.x - a.x, b.y - a.y)
   if (!(long > 1e-6)) return
@@ -618,38 +671,23 @@ function dessineFace(
       : ((q.x - o.x) * et.x + (q.y - o.y) * et.y) * k
   const m = pc && motif(g, pc.flanc)
   const hv = PORTE_ATLAS.flanc.h * h // la part visible de l'image, depuis son haut
-  // (en morceaux d'au plus une demi-épaisseur : le mur qui touche la face
-  // la cache au morceau près, jusqu'à sa propre hauteur)
-  const hMontree = h * hauteurPorte
-  const tranches = tranchesVisibles(a, b, E / 4, hauteurDevant, hMontree, 3, visee)
-  if (tranches.length === 0) return
-  // le bas VISIBLE d'un morceau : le sol, ou le dessus du mur collé devant
-  const bas = (q: Point, z: number): { sx: number; sy: number } => {
-    const f = pied(q.x, q.y)
-    if (!(z > 0)) return f
-    const t = Math.min(1, z / hMontree)
-    const c = haut(q.x, q.y)
-    return { sx: f.sx + (c.sx - f.sx) * t, sy: f.sy + (c.sy - f.sy) * t }
-  }
+  const tranches = tranchesFace(a, b, E / 2)
   g.save()
-  for (const [q0, q1, z] of tranches) {
-    // f0 : le pied, où l'image s'arrête ; b0, b1 : là où la face cesse de
-    // se voir (le sol, ou le dessus du mur devant)
+  for (const [q0, q1] of tranches) {
     const f0 = pied(q0.x, q0.y)
-    const b0 = bas(q0, z)
-    const b1 = bas(q1, z)
+    const f1 = pied(q1.x, q1.y)
     const h0 = haut(q0.x, q0.y)
     const h1 = haut(q1.x, q1.y)
-    if (Math.hypot(h0.sx - b0.sx, h0.sy - b0.sy) < 0.5) continue
+    if (Math.hypot(h0.sx - f0.sx, h0.sy - f0.sy) < 0.5) continue
     // la morsure : un pixel de plus le long de la face, de chaque côté
-    const lx = b1.sx - b0.sx
-    const ly = b1.sy - b0.sy
+    const lx = f1.sx - f0.sx
+    const ly = f1.sy - f0.sy
     const ll = Math.hypot(lx, ly) || 1
     const mx = (lx / ll) * 0.6
     const my = (ly / ll) * 0.6
     g.beginPath()
-    g.moveTo(b0.sx - mx, b0.sy - my)
-    g.lineTo(b1.sx + mx, b1.sy + my)
+    g.moveTo(f0.sx - mx, f0.sy - my)
+    g.lineTo(f1.sx + mx, f1.sy + my)
     g.lineTo(h1.sx + mx, h1.sy + my)
     g.lineTo(h0.sx - mx, h0.sy - my)
     g.closePath()
@@ -669,42 +707,27 @@ function dessineFace(
     }
     g.fill()
   }
-  // l'ombre du pied, et sa ligne : la dalle sort du sol — sur les seules
-  // tranches qui se voient jusqu'au sol (derrière un mur, le pied est caché :
-  // seule la ligne où son dessus coupe la face, plus légère)
-  for (const [q0, q1, z] of tranches) {
-    if (z > 0) {
-      const ca = bas(q0, z)
-      const cb = bas(q1, z)
-      g.strokeStyle = 'rgba(3,7,16,0.45)'
-      g.lineWidth = 1
-      g.beginPath()
-      g.moveTo(ca.sx, ca.sy)
-      g.lineTo(cb.sx, cb.sy)
-      g.stroke()
-      continue
-    }
-    const fa = pied(q0.x, q0.y)
-    const fb = pied(q1.x, q1.y)
-    const ha = haut(q0.x, q0.y)
-    const hb = haut(q1.x, q1.y)
-    const ombre = g.createLinearGradient((fa.sx + fb.sx) / 2, (fa.sy + fb.sy) / 2, (ha.sx + hb.sx) / 2, (ha.sy + hb.sy) / 2)
-    ombre.addColorStop(0, 'rgba(3,7,16,0.55)')
-    ombre.addColorStop(0.6, 'rgba(3,7,16,0)')
-    g.beginPath()
-    g.moveTo(fa.sx, fa.sy)
-    g.lineTo(fb.sx, fb.sy)
-    g.lineTo(hb.sx, hb.sy)
-    g.lineTo(ha.sx, ha.sy)
-    g.closePath()
-    g.fillStyle = ombre
-    g.fill()
-    g.strokeStyle = 'rgba(3,7,16,0.7)'
-    g.lineWidth = 1
-    g.beginPath()
-    g.moveTo(fa.sx, fa.sy)
-    g.lineTo(fb.sx, fb.sy)
-    g.stroke()
-  }
+  // l'ombre du pied, et sa ligne : la dalle sort du sol
+  const fa = pied(a.x, a.y)
+  const fb = pied(b.x, b.y)
+  const ha = haut(a.x, a.y)
+  const hb = haut(b.x, b.y)
+  const ombre = g.createLinearGradient((fa.sx + fb.sx) / 2, (fa.sy + fb.sy) / 2, (ha.sx + hb.sx) / 2, (ha.sy + hb.sy) / 2)
+  ombre.addColorStop(0, 'rgba(3,7,16,0.55)')
+  ombre.addColorStop(0.6, 'rgba(3,7,16,0)')
+  g.beginPath()
+  g.moveTo(fa.sx, fa.sy)
+  g.lineTo(fb.sx, fb.sy)
+  g.lineTo(hb.sx, hb.sy)
+  g.lineTo(ha.sx, ha.sy)
+  g.closePath()
+  g.fillStyle = ombre
+  g.fill()
+  g.strokeStyle = 'rgba(3,7,16,0.7)'
+  g.lineWidth = 1
+  g.beginPath()
+  g.moveTo(fa.sx, fa.sy)
+  g.lineTo(fb.sx, fb.sy)
+  g.stroke()
   g.restore()
 }

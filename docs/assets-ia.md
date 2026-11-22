@@ -2947,22 +2947,22 @@ de dessus, ses joints sous les leurs). La face est **accrochée par le haut** :
   affleurent au bout de la fente, le tout **en vert**. C'est
   l'exception écrite à la charte (§3 : le rouge réservé à l'alerte, le vert à
   la serre) : sur une porte, ces deux couleurs sont un état de jeu.
-- Relief allumé, **un mur devant la face la cache jusqu'à SA hauteur** : son
-  dessus passe devant, ce qui le dépasse se voit. `tranchesVisibles` sonde,
-  pour chaque morceau de face, la ligne qui va de lui vers l'œil : un solide
-  de hauteur H posé à moins de r·f(H) (r : la distance à l'œil, f : le
-  glissement du relief à cette hauteur) le couvre jusqu'à H. Trois étapes,
-  trois captures du concepteur (22/11) : d'abord la face peinte par-dessus le
-  mur collé à elle ; puis, cachée dès qu'un mur la touchait, la face de D1
-  disparaissait alors que la bande sous elle est plus basse que la porte —
-  « on voit dessous le dessus des petites portes » ; maintenant elle dépasse
-  au-dessus de la bande. Les bouts aussi se peignent, cachés de même par les
-  murs contre lesquels ils s'appuient.
-- **Ouverte, le sol passe sous les murs voisins** (`partsVisiblesAuSol`) : la
-  fente, ses deux liserés verts et ses veilleuses sont au ras du sol, et le
-  dessus d'un mur voisin qui s'avance en relief passe devant eux — la même
-  ligne de visée, à hauteur nulle. Avant, le ruban vert se peignait
-  par-dessus la paroi (le concepteur, 22/11).
+- Relief allumé, **les murs cachent la porte, au pixel près** : la porte se
+  peint dans la toile 2D, par-dessus le rendu WebGL. Chaque partie est donc
+  d'abord peinte sur un calque, puis le **volume projeté** des solides
+  voisins en est effacé — leur pied, leur dessus à leur hauteur, les
+  quadrilatères que balaie chaque arête, par la même homothétie que le
+  shader (`volumeProjete`, `surCalque`). Au sol (fente, liserés verts,
+  veilleuses), tout solide masque ; pour une face, seule la part des solides
+  DEVANT son plan (`coupeDemiPlan`) — un mur plus bas que la porte n'en cache
+  donc que le bas, ce qui dépasse se voit. Les bouts se peignent aussi :
+  contre un mur aussi haut, ils disparaissent. Quatre captures du concepteur
+  (22/11) y ont mené : la face peinte par-dessus le mur collé à elle ; puis,
+  cachée tout entière, D1 n'avait plus de face (« on voit dessous le dessus
+  des petites portes ») ; puis des sondes le long de la ligne de visée, qui
+  cachaient par marches et en retard sur la caméra (« je la vois par-dessus
+  la paroi une seconde puis elle disparaît […] cela me fait penser à une
+  rustine ») ; enfin le masque exact.
 - **La dalle va d'un mur à l'autre** (`sensPorte`) : ses sabots se posent
   contre les murs qu'elle relie, ses grandes faces regardent le passage. Le
   sens se lit sur les murs qui la bordent, pas sur sa longueur — une petite
