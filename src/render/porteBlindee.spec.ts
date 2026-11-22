@@ -15,6 +15,7 @@ import {
   sensPorte,
   leveeSuivante,
   partLevee,
+  partsVisiblesAuSol,
   tranchesVisibles,
 } from './porteBlindee'
 
@@ -293,5 +294,27 @@ describe('la porte blindée — la ligne de visée', () => {
     const loin = (_x: number, y: number): number => (y < 100 && y > 60 ? 140 : -1)
     // r ≈ 700, f(140) = 0,08 : au-delà de 56 unités, plus rien ne couvre
     for (const [, , z] of tranchesVisibles({ x: 600, y: 300 }, { x: 644, y: 300 }, 11, loin, 140, 3, visee({ x: 620, y: -400 }))) expect(z).toBe(0)
+  })
+})
+
+describe('la porte blindée — ouverte, le sol passe sous les murs voisins', () => {
+  // la porte du gabarit, debout entre deux murs hauts (au-dessus de 170 et
+  // au-dessous de −170), l'œil loin en dessous : relief allumé, le dessus du
+  // mur du bas s'avance sur le sol de la fente — le ruban vert y passait
+  // par-dessus (le concepteur, 22/11)
+  const murs = (_x: number, y: number): number => (y > 170 || y < -170 ? 140 : -1)
+  const visee = { oeil: { x: 880, y: -700 }, fraction: (h: number) => (0.08 * Math.min(h, 140)) / 140 }
+
+  it('le bout tourné vers l’œil, derrière le mur du bas, est rogné ; le reste se voit jusqu’au mur du haut', () => {
+    const parts = partsVisiblesAuSol(cadrePorte(P), 10, murs, visee)
+    expect(parts).toHaveLength(1)
+    // r ≈ 530 au bout du bas, f(140) = 0,08 : ~42 unités sous le dessus du mur
+    expect(parts[0][0]).toBeGreaterThanOrEqual(35)
+    expect(parts[0][0]).toBeLessThanOrEqual(50)
+    expect(parts[0][1]).toBe(340)
+  })
+
+  it('sans sonde (l’éditeur, relief éteint), toute la fente se voit', () => {
+    expect(partsVisiblesAuSol(cadrePorte(P), 10)).toEqual([[0, 340]])
   })
 })

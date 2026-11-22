@@ -2958,6 +2958,11 @@ de dessus, ses joints sous les leurs). La face est **accrochée par le haut** :
   « on voit dessous le dessus des petites portes » ; maintenant elle dépasse
   au-dessus de la bande. Les bouts aussi se peignent, cachés de même par les
   murs contre lesquels ils s'appuient.
+- **Ouverte, le sol passe sous les murs voisins** (`partsVisiblesAuSol`) : la
+  fente, ses deux liserés verts et ses veilleuses sont au ras du sol, et le
+  dessus d'un mur voisin qui s'avance en relief passe devant eux — la même
+  ligne de visée, à hauteur nulle. Avant, le ruban vert se peignait
+  par-dessus la paroi (le concepteur, 22/11).
 - **La dalle va d'un mur à l'autre** (`sensPorte`) : ses sabots se posent
   contre les murs qu'elle relie, ses grandes faces regardent le passage. Le
   sens se lit sur les murs qui la bordent, pas sur sa longueur — une petite

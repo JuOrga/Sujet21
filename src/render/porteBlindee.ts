@@ -108,7 +108,7 @@ export function tranchesVisibles(
   hauteurDevant?: (x: number, y: number) => number,
   hMax = Infinity,
   devant = 3,
-  visee?: { oeil: Point; fraction: (h: number) => number },
+  visee?: Visee,
 ): [Point, Point, number][] {
   const long = Math.hypot(b.x - a.x, b.y - a.y)
   if (!(long > 1e-6)) return []
@@ -124,17 +124,7 @@ export function tranchesVisibles(
     const my = (q0.y + q1.y) / 2
     let z = 0
     if (hauteurDevant && visee) {
-      const r = Math.hypot(visee.oeil.x - mx, visee.oeil.y - my)
-      if (r > 1e-6) {
-        const ux = (visee.oeil.x - mx) / r
-        const uy = (visee.oeil.y - my) / r
-        // au-delà de r·f(mur le plus haut), plus rien ne peut couvrir la face
-        const dMax = Math.min(r, r * visee.fraction(HAUTEUR_BLOCS))
-        for (let d = devant; d <= dMax; d += PAS_VISEE) {
-          const hd = hauteurDevant(mx + ux * d, my + uy * d)
-          if (hd > z && d <= r * visee.fraction(hd)) z = hd
-        }
-      }
+      z = hauteurCachee(mx, my, hauteurDevant, visee, devant)
     } else if (hauteurDevant) {
       z = Math.max(0, hauteurDevant(mx + nx * devant, my + ny * devant))
     }
@@ -147,6 +137,63 @@ export function tranchesVisibles(
 // le pas de la sonde le long de la ligne de visée (unités) : un mur fait
 // au moins 20 unités d'épaisseur, il ne passe pas entre deux sondes
 const PAS_VISEE = 6
+
+export type Visee = { oeil: Point; fraction: (h: number) => number }
+
+/** Jusqu'à quelle HAUTEUR le point (x, y) est caché à l'œil : le dessus d'un
+ *  solide de hauteur H posé sur la ligne qui va de lui à l'œil, à moins de
+ *  r·f(H) (r : sa distance à l'œil), passe devant lui jusqu'à H. 0 : rien
+ *  ne le cache, même au ras du sol. */
+export function hauteurCachee(
+  x: number,
+  y: number,
+  hauteurDevant: (x: number, y: number) => number,
+  visee: Visee,
+  devant = 3,
+): number {
+  const r = Math.hypot(visee.oeil.x - x, visee.oeil.y - y)
+  if (!(r > 1e-6)) return 0
+  const ux = (visee.oeil.x - x) / r
+  const uy = (visee.oeil.y - y) / r
+  // au-delà de r·f(mur le plus haut), plus rien ne peut couvrir le point
+  const dMax = Math.min(r, r * visee.fraction(HAUTEUR_BLOCS))
+  let z = 0
+  for (let d = devant; d <= dMax; d += PAS_VISEE) {
+    const hd = hauteurDevant(x + ux * d, y + uy * d)
+    if (hd > z && d <= r * visee.fraction(hd)) z = hd
+  }
+  return z
+}
+
+/** LES PARTS DE LA FENTE QUI SE VOIENT, en abscisse s le long de la dalle :
+ *  porte ouverte, tout est au ras du sol — la fente, ses deux liserés verts,
+ *  ses veilleuses —, et le dessus d'un mur voisin qui s'avance en relief
+ *  passe DEVANT eux (« le ruban vert n'est pas caché par la paroi avec le
+ *  relief », le concepteur, 22/11). On sonde la ligne médiane de la dalle,
+ *  par pas d'au plus `pas` ; un morceau caché, même à peine, est rogné. */
+export function partsVisiblesAuSol(
+  cadre: { o: Point; es: Point; et: Point; longueur: number; epaisseur: number },
+  pas: number,
+  hauteurDevant?: (x: number, y: number) => number,
+  visee?: Visee,
+): [number, number][] {
+  const { o, es, et, longueur: L, epaisseur: E } = cadre
+  if (!hauteurDevant || !visee) return [[0, L]]
+  const n = Math.max(1, Math.ceil(L / Math.max(pas, 1e-6)))
+  const out: [number, number][] = []
+  for (let i = 0; i < n; i++) {
+    const s0 = (L * i) / n
+    const s1 = (L * (i + 1)) / n
+    const sm = (s0 + s1) / 2
+    const x = o.x + es.x * sm + et.x * (E / 2)
+    const y = o.y + es.y * sm + et.y * (E / 2)
+    if (hauteurCachee(x, y, hauteurDevant, visee) > 0) continue
+    const dernier = out[out.length - 1]
+    if (dernier && Math.abs(dernier[1] - s0) < 1e-9) dernier[1] = s1
+    else out.push([s0, s1])
+  }
+  return out
+}
 
 /** La levée à l'image suivante : elle court vers `cible` (1 debout, 0 au ras
  *  du sol) à vitesse constante. */
@@ -337,13 +384,40 @@ export function dessinePorte(
   const pc = img ? pieces(img) : null
   const { contour, front, hauteur: h, close } = partLevee(p, avance, leve)
 
+  // LA LIGNE DE VISÉE, relief allumé et murs sondés : la fraction du sommet
+  // de la porte, lue sur la vue elle-même — sous l'œil, le sommet d'un point
+  // s'écarte de 1 / (1 − f) —, et f proportionnelle à la hauteur, jusqu'à
+  // celle d'un mur haut
+  const hp = vue.hauteurPorte ?? HAUTEUR_MUR
+  let visee: Visee | undefined
+  if (vue.oeil && hs) {
+    const c0 = vue.pied(vue.oeil.x, vue.oeil.y)
+    const q = coins(p)[0]
+    const dp = Math.hypot(vue.pied(q.x, q.y).sx - c0.sx, vue.pied(q.x, q.y).sy - c0.sy)
+    const ds = Math.hypot(vue.sommet(q.x, q.y).sx - c0.sx, vue.sommet(q.x, q.y).sy - c0.sy)
+    const fS = ds > 1e-6 ? Math.max(0, 1 - dp / ds) : 0
+    const hRef = Math.min(Math.max(hp, 1e-6), HAUTEUR_BLOCS)
+    visee = { oeil: vue.oeil, fraction: (hh: number) => (fS * Math.min(Math.max(hh, 0), HAUTEUR_BLOCS)) / hRef }
+  }
+
   // 1. LA FENTE, au ras du sol : tout ce qu'on voit d'une porte ouverte, et
-  // ce qui reste du passage tant qu'elle n'est pas toute sortie
-  if (!close) {
+  // ce qui reste du passage tant qu'elle n'est pas toute sortie — rognée là
+  // où le dessus d'un mur voisin passe devant le sol (partsVisiblesAuSol)
+  const xl = (dec.bout * VEILLEUSE_X) / PORTE_ATLAS.bout.w
+  const etat = etatVeilleuses(close, contour.length >= 3 && h > 0)
+  const auSol = close ? [] : partsVisiblesAuSol(cadre, E / 4, hs, visee)
+  const rogneAuSol = (): void => {
+    poseRepere(g, vue.pied, o, es, et, L, E)
+    g.beginPath()
+    // (un rien de recouvrement entre deux parts : pas de fente au filtrage)
+    for (const [s0, s1] of auSol) g.rect(s0 - 0.3, -E, s1 - s0 + 0.6, 3 * E)
+    g.clip()
+  }
+  if (!close && auSol.length > 0) {
     g.save()
     const m = pc && motif(g, pc.fente)
     if (m) {
-      poseRepere(g, vue.pied, o, es, et, L, E)
+      rogneAuSol()
       m.setTransform({ a: dec.carreau / PORTE_ATLAS.fente.w, b: 0, c: 0, d: E / PORTE_ATLAS.fente.h, e: dec.bout, f: 0 })
       g.globalAlpha = 0.9
       g.fillStyle = m
@@ -357,13 +431,11 @@ export function dessinePorte(
     }
     g.restore()
   }
-  const xl = (dec.bout * VEILLEUSE_X) / PORTE_ATLAS.bout.w
-  const etat = etatVeilleuses(close, contour.length >= 3 && h > 0)
-  if (etat === 'ouverte') {
+  if (etat === 'ouverte' && auSol.length > 0) {
     // la dalle est dans le sol : ses veilleuses affleurent, VERTES, aux deux
     // bouts de la fente — le passage est libre
     g.save()
-    poseRepere(g, vue.pied, o, es, et, L, E)
+    rogneAuSol()
     // et ses deux liserés restent, VERTS, au ras du sol (« quand elles sont
     // ouvertes les deux lignes doivent rester et passer en vert », 22/11)
     for (const t of [LISERE_T * E, (1 - LISERE_T) * E]) liseres(g, t, L, E, VERT_OUVERT, 1)
@@ -388,17 +460,6 @@ export function dessinePorte(
   if (vue.oeil) {
     // avec la sonde des murs, les bouts aussi : contre un mur aussi haut
     // qu'elle, un bout est caché tout entier ; contre un plus bas, il dépasse
-    const hp = vue.hauteurPorte ?? HAUTEUR_MUR
-    // la fraction du sommet de la porte, lue sur la vue elle-même : sous
-    // l'œil, le sommet d'un point s'écarte de 1 / (1 − f) — et f est
-    // proportionnelle à la hauteur, jusqu'à celle d'un mur haut
-    const c0 = vue.pied(vue.oeil.x, vue.oeil.y)
-    const q = contour[0]
-    const dp = Math.hypot(vue.pied(q.x, q.y).sx - c0.sx, vue.pied(q.x, q.y).sy - c0.sy)
-    const ds = Math.hypot(vue.sommet(q.x, q.y).sx - c0.sx, vue.sommet(q.x, q.y).sy - c0.sy)
-    const fS = ds > 1e-6 ? Math.max(0, 1 - dp / ds) : 0
-    const hRef = Math.min(Math.max(hp, 1e-6), HAUTEUR_BLOCS)
-    const visee = { oeil: vue.oeil, fraction: (hh: number) => (fS * Math.min(Math.max(hh, 0), HAUTEUR_BLOCS)) / hRef }
     for (const { a, b } of facesTranche(contour, p, vue.oeil.x, vue.oeil.y, couchee, !!hs))
       dessineFace(g, a, b, vue.pied, haut, h, cadre, dec, pc, hs, hp, visee)
   }
@@ -539,7 +600,7 @@ function dessineFace(
   pc: Pieces | null,
   hauteurDevant?: (x: number, y: number) => number,
   hauteurPorte = HAUTEUR_MUR,
-  visee?: { oeil: Point; fraction: (h: number) => number },
+  visee?: Visee,
 ): void {
   const long = Math.hypot(b.x - a.x, b.y - a.y)
   if (!(long > 1e-6)) return
