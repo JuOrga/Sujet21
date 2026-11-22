@@ -195,7 +195,7 @@
       `</div>` +
       `<div style="display:flex;gap:16px;align-items:stretch">` +
         `<div class="mb-coupe" style="width:180px;height:90px;display:grid;place-items:center">.mb-coupe</div>` +
-        `<div class="mb-coupe-diag" style="width:180px;height:90px;display:grid;place-items:center">.mb-coupe-diag</div>` +
+        `<div class="mb-coupe" style="width:180px;height:90px;display:grid;place-items:center">.mb-coupe</div>` +
         `<div style="display:flex;flex-direction:column;gap:10px;justify-content:center">` +
           `<button type="button" class="mb-levier">PASSER ▸</button>` +
           `<button type="button" class="mb-levier pad-focus">VISÉ (MANETTE)</button>` +
@@ -214,7 +214,7 @@
     host.innerHTML = ''
     scene.classList.add('mb-compact')
     $('mb-releve').hidden = true
-    $('mb-titre').textContent = 'OÙ VERSER LE SURPLUS ?'
+    question('OÙ VERSER LE SURPLUS ?') // en clair, comme main.ts (mbMontreVersement)
     $('mb-choix').hidden = false
     $('mb-choix-titre').textContent = `SALLE FRANCHIE · ${RUN.code} · ${F.rangDeSalle(RUN.pct).nom}`
     const b = RUN, cap = RUN.cap
@@ -232,7 +232,7 @@
     const cuve = (o, html, i, niveau, apres, chiffre, pied, titre) => {
       const btn = document.createElement('button')
       btn.type = 'button'
-      btn.className = `mb-dest mb-coupe-diag mb-dest-${o}`
+      btn.className = `mb-dest mb-coupe mb-dest-${o}`
       btn.style.setProperty('--i', String(i))
       btn.title = titre
       btn.innerHTML = `<b class="mb-dest-nom">${o === 'reserve' ? 'RÉSERVE' : 'MAÎTRISE'}</b>` +
@@ -352,6 +352,8 @@
     const xpF = RUN.xp + RUN.surplus
     $('mb-choix-titre').textContent = `${F.titreDuTirage(paliers(xpF), 2, true)} · EN BOURSE : ${RUN.condensat} cL`
     const host = cartes()
+    question('CHOISISSEZ VOTRE INSTRUMENT') // après le porte-cartes, comme main.ts
+    $('mb-releve').hidden = true // mbReleveHors : le bilan et le palier l'ont dit
     const tir = F.tirageInstruments(F.graine(5), [], 2, 3, 3, F.INSTRUMENTS)
     host.classList.add('mb-draft')
     host.style.setProperty('--n', String(Math.min(4, tir.length)))
@@ -538,7 +540,7 @@
     const nom = F.ORBES[0].nom
     const h = halte(host, 'cache', true)
     h.insertAdjacentHTML('beforeend',
-      `<div class="mb-ev-recit mb-ev-issue mb-coupe-diag"><em>SOUTES</em><p>${esc(`L’orbe d’essence de conscience — ${nom}. Il vous suit.`)}</p></div>` +
+      `<div class="mb-ev-recit mb-ev-issue mb-coupe"><em>SOUTES</em><p>${esc(`L’orbe d’essence de conscience — ${nom}. Il vous suit.`)}</p></div>` +
       `<div class="mb-halte-puces">${F.plaqueHTML({ cle: 'orbe', icone: 'orbe', valeur: nom, nom: 'ORBE D’ESSENCE' }, 0)}</div>`)
     levier(h, 'REPRENDRE LA DESCENTE ▸')
   }
@@ -572,12 +574,12 @@
       // inconnu de plus : le banc montre les trois sortes de puce
       const lignes = [...issue.effets.map(ligneEffet).filter(Boolean), ligneEffet({ quoi: 'instrument', bon: true }), '🧪 un glyphe que la table ne connaît pas']
       h.insertAdjacentHTML('beforeend',
-        `<div class="mb-ev-recit mb-ev-issue mb-coupe-diag"><em>${esc(choix.libelle)} — ${esc(choix.detail)}</em><p>${esc(issue.texte)}</p></div>` +
+        `<div class="mb-ev-recit mb-ev-issue mb-coupe"><em>${esc(choix.libelle)} — ${esc(choix.detail)}</em><p>${esc(issue.texte)}</p></div>` +
         `<ul class="mb-halte-puces">${lignes.map((l, i) => F.puceHTML(l, i, instrument)).join('')}</ul>`)
       levier(h, 'REPRENDRE LA DESCENTE ▸')
       return
     }
-    const rc = document.createElement('div'); rc.className = 'mb-ev-recit mb-coupe-diag'
+    const rc = document.createElement('div'); rc.className = 'mb-ev-recit mb-coupe'
     rc.innerHTML = `<em>${esc(ev.lieu)}</em><p>${esc(ev.texte)}</p>`
     h.appendChild(rc)
     const r = rangee(h)

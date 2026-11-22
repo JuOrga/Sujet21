@@ -68,14 +68,16 @@ function carteHTML(d: any, o: { variante: string; tenue?: boolean; prix?: number
   const cls = `crt crt-${o.variante} cal-${cal}` + (ctr ? ' a-contrepartie' : '') + (d.perso ? ' crt-perso-c' : '')
   const balise = o.bouton ? 'button' : 'div'
   const phrase = descriptionInstrument(d)
-  const condensee = o.variante === 'draft'
+  const sousTitre = o.variante === 'draft'
+    ? fams.map((f) => FAMILLE_COURT[f] ?? f).join(' + ') + (cal === 'commun' ? '' : ` · ${CALIBRE_MOT[cal]}`)
+    : rang
   return `<${balise} class="${cls}" style="--fam:${t1};--fam2:${t2}" title="${htmlSafe(`${d.nom} — ${phrase} (${rang})`)}"${o.bouton ? ' type="button"' : ''}${o.attrs ?? ''}>` +
     `<span class="crt-halo"></span>` +
     `<span class="crt-tete"><i class="crt-ico">${iconeInstrumentHTML(d)}</i>` +
     `<span class="crt-titres"><b class="crt-nom">${htmlSafe(d.nom)}</b>` +
-    (condensee ? '' : `<i class="crt-rang">${htmlSafe(rang)}</i>`) +
+    `<i class="crt-rang">${htmlSafe(sousTitre)}</i>` +
     `</span></span>` +
-    (condensee ? '' : `<span class="crt-txt">${htmlSafe(phrase)}</span>`) +
+    `<span class="crt-txt">${htmlSafe(phrase.replace(/ ([:;!?»])/g, '\u00a0$1').replace(/« /g, '«\u00a0'))}</span>` +
     (ctr ? `<span class="crt-ctr">CONTREPARTIE</span>` : '') +
     `<span class="crt-effets">${effets}</span>` +
     (pied.length ? `<span class="crt-pied">${pied.join('')}</span>` : '') +
