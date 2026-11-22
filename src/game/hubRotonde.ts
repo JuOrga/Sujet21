@@ -300,6 +300,12 @@ export const TABLEAU_HUB_ROTONDE: LevelDef = {
   exit: ZONES_ROTONDE.sas,
   structures: STRUCTURES_ROTONDE,
   coque: 'structures',
+  // PAS DE SAS DE RACCORD aux jonctions : les bras s'ouvrent sur toute leur
+  // largeur, le hall et ses bras se lisent d'un seul tenant. Les cols
+  // peints que le moteur pose à chaque couloir (metaAssets.decalsDuMeta)
+  // découpaient le plan en pièces — « je n'aime pas du tout » (le
+  // concepteur, 22/11, sur l'aperçu).
+  raccords: 'aucun',
   boxes: [
     // LA VITRE sous l'échantillon, comme au menu : un fond, qui passe sous
     // la paroi de l'anneau pour qu'aucun jour ne reste entre les deux
