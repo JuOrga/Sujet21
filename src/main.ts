@@ -9737,6 +9737,11 @@ function drawMecanismes(vw: number, vh: number, dpr: number): void {
   const fMurHaut = fractionSommet(RELIEF_K[reliefChoix], camera.zoom, HAUTEUR_BLOCS)
   let fPortes = fMurHaut
   const hauteurEn = (x: number, y: number): number => renderer.hauteurSousDecal(x, y)
+  // la hauteur des murs qu'une porte relie (celle que son sommet représente)
+  const hauteurPorte = (r: { minX: number; minY: number; maxX: number; maxY: number }): number => {
+    const h = hauteurAppui(r, hauteurEn)
+    return h < 0 ? HAUTEUR_BLOCS : Math.min(h, HAUTEUR_BLOCS)
+  }
   const fractionAppui = (r: { minX: number; minY: number; maxX: number; maxY: number }): number => {
     if (fMurHaut <= 0) return 0 // relief éteint : ni sonde ni calcul
     const h = hauteurAppui(r, hauteurEn)
@@ -9806,8 +9811,10 @@ function drawMecanismes(vw: number, vh: number, dpr: number): void {
         // chaque porte bat à sa phase : deux portes voisines ne clignotent
         // pas comme une guirlande
         temps: elapsed + i * 0.37,
-        // le mur qui touche une face la cache : son dessus passe devant
-        solide: (x, y) => hauteurEn(x, y) >= 0,
+        // le mur qui touche une face la cache jusqu'à SA hauteur : son dessus
+        // passe devant, ce qui le dépasse se voit
+        hauteurSolide: hauteurEn,
+        hauteurPorte: hauteurPorte(p),
       },
       atlasPorte,
     )

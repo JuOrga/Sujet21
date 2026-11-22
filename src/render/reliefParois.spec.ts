@@ -780,11 +780,11 @@ describe("la tranche d'une porte", () => {
     const src = lire('./porteBlindee.ts')
     const corps = src.slice(src.indexOf('export function dessinePorte('))
     // (le sens vient des murs, sensPorte : 22/11)
-    const face = corps.indexOf('facesTranche(contour, p, vue.oeil.x, vue.oeil.y, couchee)')
+    const face = corps.indexOf('facesTranche(contour, p, vue.oeil.x, vue.oeil.y, couchee, !!hs)')
     expect(face).toBeGreaterThan(0)
     expect(corps.slice(face, face + 200)).toMatch(/dessineFace\(g, a, b, vue\.pied, haut,/)
     // relief éteint, pas de face : l'œil n'est donné que relief allumé
-    expect(corps).toMatch(/if \(vue\.oeil\) \{\n\s*for \(const \{ a, b \} of facesTranche/)
+    expect(corps).toMatch(/if \(vue\.oeil\) \{[\s\S]{0,1600}for \(const \{ a, b \} of facesTranche/)
     expect(main).toMatch(/oeil: fPortes > 0 \? \{ x: camera\.x, y: camera\.y \} : null/)
     // avant le dessus, qui la recouvre
     expect(face).toBeLessThan(corps.indexOf('// 3. LE DESSUS'))

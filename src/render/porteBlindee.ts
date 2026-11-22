@@ -38,7 +38,11 @@
 
 import type { PorteDef } from '../game/level'
 import { portePolygone, type Point } from '../game/porte'
+import { HAUTEUR_BLOCS } from './hauteurs'
 import { facesTranche } from './reliefParois'
+
+// la hauteur d'un mur haut, celle du sommet quand la porte n'en dit pas plus
+const HAUTEUR_MUR = HAUTEUR_BLOCS
 
 export const PORTE_BLINDEE_URL = '/assets/porte-blindee.webp'
 
@@ -77,33 +81,72 @@ export function etatVeilleuses(close: boolean, levee: boolean): 'ouverte' | 'cou
   return levee ? 'course' : 'ouverte'
 }
 
-/** Les tranches d'une face (a → b, le contour en sens trigonométrique) qui
- *  se VOIENT : coupée en morceaux d'au plus `pas`, chaque morceau est caché
- *  quand un solide le touche, juste devant lui (`solide`, sondé à
- *  `devant` unités le long de la normale sortante, en son milieu) — le
- *  dessus de ce mur passe devant la face. Sans sonde, tout se voit. */
+/** Les tranches d'une face (a → b, le contour en sens trigonométrique), et
+ *  pour chacune la HAUTEUR jusqu'où elle est cachée : coupée en morceaux
+ *  d'au plus `pas`, on sonde le sol juste devant chaque morceau (`devant`
+ *  unités le long de la normale sortante, en son milieu). Un mur collé là
+ *  cache la face jusqu'à SA hauteur — son dessus passe devant —, pas
+ *  au-delà : une porte plus haute que lui dépasse, et ce qui dépasse se voit
+ *  (D1 du 22/11 : la bande de triangles sous elle est plus basse que le mur
+ *  extérieur qui lui donne sa hauteur ; cachée tout entière, sa face laissait
+ *  un couvercle flotter sur du vide). Un morceau caché jusqu'en haut
+ *  (`hMax`, la hauteur montrée de la porte) ne se peint pas. Sans sonde,
+ *  rien ne cache rien.
+ *
+ *  LA LIGNE DE VISÉE (`visee`) : le relief est une homothétie autour du
+ *  point sous l'œil — le haut d'un solide de hauteur H glisse loin de lui de
+ *  la fraction f(H), proportionnelle à H. Le dessus d'un solide qui se
+ *  dresse ENTRE la face et l'œil, à moins de r·f(H) d'elle (r : la distance
+ *  de la face à l'œil), recouvre donc la face jusqu'à H. On sonde le long
+ *  de cette ligne, pas seulement droit devant : une face latérale qui longe
+ *  un couloir passe derrière la bande en angle à son bout (le banc du 22/11 :
+ *  sondée droit devant, elle se peignait par-dessus). */
 export function tranchesVisibles(
   a: Point,
   b: Point,
   pas: number,
-  solide?: (x: number, y: number) => boolean,
+  hauteurDevant?: (x: number, y: number) => number,
+  hMax = Infinity,
   devant = 3,
-): [Point, Point][] {
+  visee?: { oeil: Point; fraction: (h: number) => number },
+): [Point, Point, number][] {
   const long = Math.hypot(b.x - a.x, b.y - a.y)
   if (!(long > 1e-6)) return []
   const n = Math.max(1, Math.ceil(long / Math.max(pas, 1e-6)))
   // la normale sortante d'une arête parcourue dans le sens trigonométrique
   const nx = (b.y - a.y) / long
   const ny = (a.x - b.x) / long
-  const out: [Point, Point][] = []
+  const out: [Point, Point, number][] = []
   for (let i = 0; i < n; i++) {
     const q0 = { x: a.x + (b.x - a.x) * (i / n), y: a.y + (b.y - a.y) * (i / n) }
     const q1 = { x: a.x + (b.x - a.x) * ((i + 1) / n), y: a.y + (b.y - a.y) * ((i + 1) / n) }
-    if (solide && solide((q0.x + q1.x) / 2 + nx * devant, (q0.y + q1.y) / 2 + ny * devant)) continue
-    out.push([q0, q1])
+    const mx = (q0.x + q1.x) / 2
+    const my = (q0.y + q1.y) / 2
+    let z = 0
+    if (hauteurDevant && visee) {
+      const r = Math.hypot(visee.oeil.x - mx, visee.oeil.y - my)
+      if (r > 1e-6) {
+        const ux = (visee.oeil.x - mx) / r
+        const uy = (visee.oeil.y - my) / r
+        // au-delà de r·f(mur le plus haut), plus rien ne peut couvrir la face
+        const dMax = Math.min(r, r * visee.fraction(HAUTEUR_BLOCS))
+        for (let d = devant; d <= dMax; d += PAS_VISEE) {
+          const hd = hauteurDevant(mx + ux * d, my + uy * d)
+          if (hd > z && d <= r * visee.fraction(hd)) z = hd
+        }
+      }
+    } else if (hauteurDevant) {
+      z = Math.max(0, hauteurDevant(mx + nx * devant, my + ny * devant))
+    }
+    if (z >= hMax) continue
+    out.push([q0, q1, z])
   }
   return out
 }
+
+// le pas de la sonde le long de la ligne de visée (unités) : un mur fait
+// au moins 20 unités d'épaisseur, il ne passe pas entre deux sondes
+const PAS_VISEE = 6
 
 /** La levée à l'image suivante : elle court vers `cible` (1 debout, 0 au ras
  *  du sol) à vitesse constante. */
@@ -204,10 +247,13 @@ export interface VuePorte {
   oeil: Point | null
   /** l'horloge (s), pour les veilleuses */
   temps: number
-  /** relief allumé : y a-t-il un solide en (x, y) ? Une face qui touche un
-   *  mur est cachée par lui — son dessus passe devant (absent : rien ne
-   *  cache rien) */
-  solide?: (x: number, y: number) => boolean
+  /** relief allumé : la hauteur du solide en (x, y), −1 au sol. Elle dit
+   *  de quel côté sont les murs (sensPorte), et jusqu'où un mur collé à une
+   *  face la cache (tranchesVisibles). Absente : rien ne cache rien */
+  hauteurSolide?: (x: number, y: number) => number
+  /** la hauteur (unités de jeu) que `sommet` représente — celle des murs
+   *  que la porte relie ; absente : un mur haut */
+  hauteurPorte?: number
 }
 
 type Pieces = { dessus: HTMLCanvasElement; bout: HTMLCanvasElement; flanc: HTMLCanvasElement; fente: HTMLCanvasElement }
@@ -282,7 +328,8 @@ export function dessinePorte(
   vue: VuePorte,
   img: HTMLImageElement | null,
 ): void {
-  const couchee = sensPorte(p, vue.oeil ? vue.solide : undefined)
+  const hs = vue.oeil ? vue.hauteurSolide : undefined
+  const couchee = sensPorte(p, hs && ((x, y) => hs(x, y) >= 0))
   const cadre = cadrePorte(p, couchee)
   const { o, es, et, longueur: L, epaisseur: E } = cadre
   if (!(L > 0) || !(E > 0)) return
@@ -339,7 +386,21 @@ export function dessinePorte(
   // descendent du haut au sol (facesTranche : ni les bouts collés aux murs,
   // ni les faces de dos) — le front d'une porte qui se déplie en est un
   if (vue.oeil) {
-    for (const { a, b } of facesTranche(contour, p, vue.oeil.x, vue.oeil.y, couchee)) dessineFace(g, a, b, vue.pied, haut, h, cadre, dec, pc, vue.solide)
+    // avec la sonde des murs, les bouts aussi : contre un mur aussi haut
+    // qu'elle, un bout est caché tout entier ; contre un plus bas, il dépasse
+    const hp = vue.hauteurPorte ?? HAUTEUR_MUR
+    // la fraction du sommet de la porte, lue sur la vue elle-même : sous
+    // l'œil, le sommet d'un point s'écarte de 1 / (1 − f) — et f est
+    // proportionnelle à la hauteur, jusqu'à celle d'un mur haut
+    const c0 = vue.pied(vue.oeil.x, vue.oeil.y)
+    const q = contour[0]
+    const dp = Math.hypot(vue.pied(q.x, q.y).sx - c0.sx, vue.pied(q.x, q.y).sy - c0.sy)
+    const ds = Math.hypot(vue.sommet(q.x, q.y).sx - c0.sx, vue.sommet(q.x, q.y).sy - c0.sy)
+    const fS = ds > 1e-6 ? Math.max(0, 1 - dp / ds) : 0
+    const hRef = Math.min(Math.max(hp, 1e-6), HAUTEUR_BLOCS)
+    const visee = { oeil: vue.oeil, fraction: (hh: number) => (fS * Math.min(Math.max(hh, 0), HAUTEUR_BLOCS)) / hRef }
+    for (const { a, b } of facesTranche(contour, p, vue.oeil.x, vue.oeil.y, couchee, !!hs))
+      dessineFace(g, a, b, vue.pied, haut, h, cadre, dec, pc, hs, hp, visee)
   }
 
   // 3. LE DESSUS, rogné à la part levée
@@ -476,7 +537,9 @@ function dessineFace(
   cadre: ReturnType<typeof cadrePorte>,
   dec: ReturnType<typeof decoupePorte>,
   pc: Pieces | null,
-  solide?: (x: number, y: number) => boolean,
+  hauteurDevant?: (x: number, y: number) => number,
+  hauteurPorte = HAUTEUR_MUR,
+  visee?: { oeil: Point; fraction: (h: number) => number },
 ): void {
   const long = Math.hypot(b.x - a.x, b.y - a.y)
   if (!(long > 1e-6)) return
@@ -495,25 +558,37 @@ function dessineFace(
   const m = pc && motif(g, pc.flanc)
   const hv = PORTE_ATLAS.flanc.h * h // la part visible de l'image, depuis son haut
   // (en morceaux d'au plus une demi-épaisseur : le mur qui touche la face
-  // la cache au morceau près)
-  const tranches = tranchesVisibles(a, b, E / 2, solide)
+  // la cache au morceau près, jusqu'à sa propre hauteur)
+  const hMontree = h * hauteurPorte
+  const tranches = tranchesVisibles(a, b, E / 4, hauteurDevant, hMontree, 3, visee)
   if (tranches.length === 0) return
+  // le bas VISIBLE d'un morceau : le sol, ou le dessus du mur collé devant
+  const bas = (q: Point, z: number): { sx: number; sy: number } => {
+    const f = pied(q.x, q.y)
+    if (!(z > 0)) return f
+    const t = Math.min(1, z / hMontree)
+    const c = haut(q.x, q.y)
+    return { sx: f.sx + (c.sx - f.sx) * t, sy: f.sy + (c.sy - f.sy) * t }
+  }
   g.save()
-  for (const [q0, q1] of tranches) {
+  for (const [q0, q1, z] of tranches) {
+    // f0 : le pied, où l'image s'arrête ; b0, b1 : là où la face cesse de
+    // se voir (le sol, ou le dessus du mur devant)
     const f0 = pied(q0.x, q0.y)
-    const f1 = pied(q1.x, q1.y)
+    const b0 = bas(q0, z)
+    const b1 = bas(q1, z)
     const h0 = haut(q0.x, q0.y)
     const h1 = haut(q1.x, q1.y)
-    if (Math.hypot(h0.sx - f0.sx, h0.sy - f0.sy) < 0.5) continue
+    if (Math.hypot(h0.sx - b0.sx, h0.sy - b0.sy) < 0.5) continue
     // la morsure : un pixel de plus le long de la face, de chaque côté
-    const lx = f1.sx - f0.sx
-    const ly = f1.sy - f0.sy
+    const lx = b1.sx - b0.sx
+    const ly = b1.sy - b0.sy
     const ll = Math.hypot(lx, ly) || 1
     const mx = (lx / ll) * 0.6
     const my = (ly / ll) * 0.6
     g.beginPath()
-    g.moveTo(f0.sx - mx, f0.sy - my)
-    g.lineTo(f1.sx + mx, f1.sy + my)
+    g.moveTo(b0.sx - mx, b0.sy - my)
+    g.lineTo(b1.sx + mx, b1.sy + my)
     g.lineTo(h1.sx + mx, h1.sy + my)
     g.lineTo(h0.sx - mx, h0.sy - my)
     g.closePath()
@@ -534,8 +609,20 @@ function dessineFace(
     g.fill()
   }
   // l'ombre du pied, et sa ligne : la dalle sort du sol — sur les seules
-  // tranches qui se voient
-  for (const [q0, q1] of tranches) {
+  // tranches qui se voient jusqu'au sol (derrière un mur, le pied est caché :
+  // seule la ligne où son dessus coupe la face, plus légère)
+  for (const [q0, q1, z] of tranches) {
+    if (z > 0) {
+      const ca = bas(q0, z)
+      const cb = bas(q1, z)
+      g.strokeStyle = 'rgba(3,7,16,0.45)'
+      g.lineWidth = 1
+      g.beginPath()
+      g.moveTo(ca.sx, ca.sy)
+      g.lineTo(cb.sx, cb.sy)
+      g.stroke()
+      continue
+    }
     const fa = pied(q0.x, q0.y)
     const fb = pied(q1.x, q1.y)
     const ha = haut(q0.x, q0.y)

@@ -2947,10 +2947,17 @@ de dessus, ses joints sous les leurs). La face est **accrochée par le haut** :
   affleurent au bout de la fente, le tout **en vert**. C'est
   l'exception écrite à la charte (§3 : le rouge réservé à l'alerte, le vert à
   la serre) : sur une porte, ces deux couleurs sont un état de jeu.
-- Relief allumé, **la face ne se peint pas là où un mur la touche** : le
-  dessus de ce mur passe devant (`tranchesVisibles` sonde le sol juste devant
-  chaque morceau de face). Avant, la face d'une porte collée à un mur se
-  peignait par-dessus lui (capture du concepteur, 22/11).
+- Relief allumé, **un mur devant la face la cache jusqu'à SA hauteur** : son
+  dessus passe devant, ce qui le dépasse se voit. `tranchesVisibles` sonde,
+  pour chaque morceau de face, la ligne qui va de lui vers l'œil : un solide
+  de hauteur H posé à moins de r·f(H) (r : la distance à l'œil, f : le
+  glissement du relief à cette hauteur) le couvre jusqu'à H. Trois étapes,
+  trois captures du concepteur (22/11) : d'abord la face peinte par-dessus le
+  mur collé à elle ; puis, cachée dès qu'un mur la touchait, la face de D1
+  disparaissait alors que la bande sous elle est plus basse que la porte —
+  « on voit dessous le dessus des petites portes » ; maintenant elle dépasse
+  au-dessus de la bande. Les bouts aussi se peignent, cachés de même par les
+  murs contre lesquels ils s'appuient.
 - **La dalle va d'un mur à l'autre** (`sensPorte`) : ses sabots se posent
   contre les murs qu'elle relie, ses grandes faces regardent le passage. Le
   sens se lit sur les murs qui la bordent, pas sur sa longueur — une petite

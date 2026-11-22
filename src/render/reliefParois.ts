@@ -714,13 +714,16 @@ type RectMonde = { minX: number; minY: number; maxX: number; maxY: number }
  *  `couchee` : le sens de la porte, quand on le sait mieux que par sa
  *  longueur — une porte presque carrée qui ferme un couloir étroit va d'un
  *  mur à l'autre par son PETIT côté (porteBlindee.ts : sensPorte) ; par
- *  défaut, le plus long côté. */
+ *  défaut, le plus long côté. `garderBouts` : les bouts aussi, quand
+ *  l'appelant sait mesurer ce que les murs en cachent (porteBlindee.ts :
+ *  contre un mur plus bas qu'elle, le bout d'une porte dépasse). */
 export function facesTranche(
   contour: readonly PointMonde[],
   p: RectMonde,
   cx: number,
   cy: number,
   couchee: boolean = p.maxX - p.minX >= p.maxY - p.minY,
+  garderBouts = false,
 ): { a: PointMonde; b: PointMonde }[] {
   const eps = 1e-6
   const surBout = (a: PointMonde, b: PointMonde): boolean =>
@@ -731,7 +734,7 @@ export function facesTranche(
   for (let k = 0; k < contour.length; k++) {
     const a = contour[k]
     const b = contour[(k + 1) % contour.length]
-    if (surBout(a, b)) continue
+    if (!garderBouts && surBout(a, b)) continue
     // la normale sortante d'une arête parcourue dans le sens trigonométrique
     const nx = b.y - a.y
     const ny = a.x - b.x
