@@ -94,7 +94,16 @@ export const PASSAGE_BRAS = 2 * (BRAS - EP_ROTONDE)
  *  sud, le départ à l'est, l'aile — plus longue, elle porte le secteur 4 —
  *  à l'ouest. */
 const BOUT_NS = 1500
-const BOUT_EST = 1640
+// L'EST EST PLUS LONG QUE LE NORD ET LE SUD, et c'est pour le sas. À 1 640
+// (la première livraison), la bouche du sas — 65 u de rayon, la taille de
+// celle des deux autres hubs — se perdait entre les deux portes de flanc et
+// leurs colliers de raccord : « le sas n'est clairement pas assez voyant »
+// (le concepteur, 22/11, sur l'aperçu). La grossir sur place aurait mis sa
+// zone de collecte sur le chemin des deux routes gardées : on serait parti
+// en descente écrite en allant chercher la grille. Le bras s'allonge donc
+// de 360 u : les portes de flanc restent en son milieu, et le sas prend
+// tout le fond, seul.
+const BOUT_EST = 2000
 const BOUT_OUEST = -2050
 
 /** LA CUVE : l'anneau du menu, à l'échelle du hall. 256 u de rayon libre —
@@ -186,10 +195,16 @@ const carre = (cx: number, cy: number, demiX: number, demiY = demiX): Rect => ({
  *  10 u de chaque côté, pour mordre dans les parois (aucun jour). */
 const DEMI_BARRIERE = PASSAGE_BRAS / 2 + 10
 
+/** Le sas : son rayon, et son centre — adossé au fond du bras. */
+export const SAS_RAYON = 150
+const SAS_X = BOUT_EST - EP_ROTONDE - SAS_RAYON - 4
+
 /** Les zones de la rotonde, nommées — le test les relit une à une. */
 export const ZONES_ROTONDE = {
-  // LE SAS DE LANCEMENT, au bout du bras de départ
-  sas: { minX: 1440, minY: -130, maxX: 1570, maxY: 130 } as Rect,
+  // LE SAS DE LANCEMENT, au fond du bras de départ : 150 u de rayon — son
+  // iris (1,35 rayon de cadre, renderer.ts) couvre 405 u des 480 du bras.
+  // C'est la pièce la plus grosse du module après la cuve, dans son axe.
+  sas: carre(SAS_X, 0, SAS_RAYON),
   // LA TABLE DE DÉPART : le seuil du bras — on la franchit pour partir
   tableDepart: { minX: 960, minY: -130, maxX: 1100, maxY: 130 } as Rect,
   // les deux sorties gardées, DERRIÈRE leur matière
@@ -279,7 +294,7 @@ export const TABLEAU_HUB_ROTONDE: LevelDef = {
   par: 3,
   ambiante: 0.5,
   plafond: 'hub',
-  bounds: { minX: -2150, minY: -1600, maxX: 1740, maxY: 1600 },
+  bounds: { minX: -2150, minY: -1600, maxX: 2100, maxY: 1600 },
   // il naît au centre du module, dans la cuve
   spawn: { x: 0, y: 0, n: 900 },
   exit: ZONES_ROTONDE.sas,
@@ -314,7 +329,9 @@ export const TABLEAU_HUB_ROTONDE: LevelDef = {
   // du hall, qui tombe droit dans sa bouche.
   lumieres: [
     { x: 0, y: 0, h: 900, taille: 0 },
-    { x: 1250, y: 0, h: 560, intensite: 0.95, couleur: '#8fe6b0' },
+    // la lampe du départ est posée SUR le sas, basse et poussée : c'est le
+    // point le plus clair du module, on le voit depuis la cuve
+    { x: SAS_X, y: 0, h: 400, intensite: 1.35, couleur: '#8fe6b0' },
     { x: 0, y: 1180, h: 520, intensite: 0.9, couleur: '#ffd9a8' },
     // un bandeau SANS CORPS (taille 0) : il court de la bouche de l'aile au
     // secteur 4 — un luminaire dessiné se coucherait sous les barrières
@@ -356,7 +373,7 @@ export const TABLEAU_HUB_ROTONDE: LevelDef = {
   labels: [
     // ─── le hall et ses quatre bras : la légende du plan
     { x: 0, y: 150, text: 'MODULE MÉDUSE|LA CUVE', tone: 'mur', rang: 'secteur' },
-    { x: 1250, y: 150, text: 'PROTOCOLE 21|SAS DE LANCEMENT', tone: 'sas', rang: 'secteur' },
+    { x: SAS_X, y: 205, text: 'PROTOCOLE 21|SAS DE LANCEMENT', tone: 'sas', rang: 'secteur' },
     { x: 0, y: 1400, text: 'LE COMPTOIR|TOUT SE PAIE EN MÉMOIRE', tone: 'chaud', rang: 'secteur' },
     {
       x: 0,
