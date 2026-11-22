@@ -8936,10 +8936,13 @@ if (new URLSearchParams(location.search).has('carte')) {
   hasPlayed = true
   void openEditeurCarte()
 }
-// CRYOSTASE : tant que l'éveil n'a pas été joué, l'échantillon attend GELÉ
-// dès le premier pixel — même en dérive derrière la fiche. Le premier
-// contact visuel avec le sujet 21, c'est un bloc de glace.
-if (!coffre.stockage.getItem(CLE_EVEIL)) input.freezeIntent = true
+// CRYOSTASE : tant que l'éveil n'a pas été joué, l'échantillon attendait
+// GELÉ dès le premier pixel — même en dérive derrière la fiche. Elle ne vaut
+// plus que si l'éveil se joue de lui-même (EVEIL_PAR_DEFAUT) : sans lui, le
+// corps de la cuve du menu se figeait (888 particules sur 900 en 25 s,
+// mesuré le 22/11) sans qu'aucune carte vienne jamais dire comment redevenir
+// liquide — « supprime le fait d'être congelé au début » (le concepteur).
+if (EVEIL_PAR_DEFAUT && !coffre.stockage.getItem(CLE_EVEIL)) input.freezeIntent = true
 
 // ---- Manette (Steam Deck, Xbox, DualSense) ----
 // Elle pilote le même pointeur que le doigt : un curseur en orbite autour du
