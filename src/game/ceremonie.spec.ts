@@ -1390,6 +1390,23 @@ describe('la cérémonie — le tirage', () => {
     expect(ONDE).toContain('(face as HTMLButtonElement).disabled) return')
     expect(ONDE).toContain('e.pli.getClientRects().length === 0')
   })
+  // « applique aussi l'effet au menu principal » (le concepteur, 22/11) :
+  // le verbe COMMENCER (un aplat : son bord), les lieux et les
+  // pictogrammes (le filet) ; RECOMMENCER et QUITTER, des mots sans cadre,
+  // restent nus
+  it('donne l’eau aux boutons du menu principal', () => {
+    expect(MAIN).toContain("mbEauAuBouton(document.getElementById('start')!, { ...MB_EAU_VERBE, chanfrein: 14 })")
+    expect(MAIN).toMatch(/for \(const lieu of document\.querySelectorAll<HTMLElement>\('#home \.acc-lieu'\)\)\s*mbEauAuBouton\(lieu,/)
+    expect(MAIN).toMatch(/for \(const picto of document\.querySelectorAll<HTMLElement>\('#home \.acc-reglages button'\)\)\s*mbEauAuBouton\(picto,/)
+    expect(MAIN).not.toMatch(/mbEauAuBouton\([^)]*(?:home-restart|start-abandon)/)
+    // ils portent la toile ; le filet d'acier du pictogramme s'efface sous l'eau
+    expect(HTML).toMatch(/#start \{[^}]*position: relative/)
+    expect(HTML).toMatch(/\.acc-reglages button \{[^}]*position: relative/)
+    expect(HTML).toMatch(/\.acc-lieu \{[^}]*position: relative/)
+    expect(HTML).toContain('.acc-reglages button.mb-liquide { border-color: transparent; }')
+    // le fond qui mord l'aplat : le vide, sous son nom du menu
+    expect(ONDE).toContain("st.getPropertyValue('--void')")
+  })
   it('se tait sous « moins d’animations » : ni eau, ni ressort', () => {
     const moins = css.slice(css.lastIndexOf('prefers-reduced-motion: reduce'))
     expect(moins).toMatch(/\.mb-pli \.mb-rive, \.mb-rive\.mb-rive-dedans \{ display: none; \}/)

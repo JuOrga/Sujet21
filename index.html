@@ -248,6 +248,7 @@
       /* LE VERBE : le seul aplat de couleur, taillé d'un chanfrein */
       #start {
         appearance: none;
+        position: relative; /* il porte la toile de son bord d'eau (ondeVue.ts) */
         display: flex;
         align-items: center;
         justify-content: space-between;
@@ -371,6 +372,7 @@
       .acc-reglages { display: flex; gap: 4px; margin-left: 4px; }
       .acc-reglages button {
         appearance: none;
+        position: relative; /* il porte la toile de son filet d'eau */
         display: grid;
         place-items: center;
         width: 40px;
@@ -393,6 +395,8 @@
       }
       .acc-reglages button:hover,
       .acc-reglages button:focus-visible { border-color: var(--line-strong); color: var(--glow); }
+      /* son filet d'acier s'efface sous le filet d'eau */
+      .acc-reglages button.mb-liquide { border-color: transparent; }
 
       /* LA SCÈNE : l'écusson, la version, le litrage qui suit le corps */
       #accueil-scene {

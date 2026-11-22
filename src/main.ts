@@ -18761,6 +18761,18 @@ const MB_EAU_OFFRE: OptionsOnde = {
 }
 mbEauAuBouton(mbEl('mb-passer'), MB_EAU_VERBE)
 
+// LE MENU PRINCIPAL : « applique aussi l'effet au menu principal » (le
+// concepteur, 22/11). Il parle la même langue que la cérémonie : COMMENCER
+// est l'aplat du verbe (son bord ondule, au chanfrein de 14 px du menu) ;
+// les lieux prennent un voile et deux équerres à la visée, les
+// pictogrammes un filet — le filet d'eau. RECOMMENCER et QUITTER sont des
+// mots sans cadre ni marge : un contour les traverserait, ils restent nus
+mbEauAuBouton(document.getElementById('start')!, { ...MB_EAU_VERBE, chanfrein: 14 })
+for (const lieu of document.querySelectorAll<HTMLElement>('#home .acc-lieu'))
+  mbEauAuBouton(lieu, { retrait: 3, amplitude: 0.45, pas: 4, chanfrein: 0, flotte: -2, inclinaison: 3, perspective: 900 })
+for (const picto of document.querySelectorAll<HTMLElement>('#home .acc-reglages button'))
+  mbEauAuBouton(picto, { retrait: 2.5, amplitude: 0.45, pas: 3, chanfrein: 0, flotte: -2, inclinaison: 6, perspective: 400 })
+
 // ---- L'AVIS DU JOUEUR SUR LA SALLE (game/avisSalles.ts) ----
 // Cinq crans sous le levier du bilan, puis PAS D'AVIS : un clic, un
 // toucher, une touche (1 à 5, 0 pour pas d'avis), ou la croix puis A. PAS

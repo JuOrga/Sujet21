@@ -475,9 +475,12 @@ function taille(e: Etat): void {
   e.toile.width = Math.round((l + e.marge * 2) * dpr)
   e.toile.height = Math.round((h + e.marge * 2) * dpr)
   e.ctx = e.toile.getContext('2d')
-  // le fond derrière un aplat : l'encre de l'aplat, qui est celle du vide
-  // (index.html, --mb-coque-noire : var(--void))
-  if (e.mode === 'bord') e.fond = getComputedStyle(e.face).getPropertyValue('--mb-coque-noire').trim() || '#03070f'
+  // le fond derrière un aplat : le vide (index.html, --void) — sous son nom
+  // de la cérémonie (--mb-coque-noire) ou sous le sien (le menu principal)
+  if (e.mode === 'bord') {
+    const st = getComputedStyle(e.face)
+    e.fond = st.getPropertyValue('--mb-coque-noire').trim() || st.getPropertyValue('--void').trim() || '#030710'
+  }
 }
 
 /** Le nœud du contour le plus proche d'un point de l'écran, et sa distance
@@ -559,7 +562,7 @@ export function ondeCarte(
     pas: options.pas ?? PAS_RIVE,
     chanfrein: options.chanfrein ?? CHANFREIN,
     inclinaison: options.inclinaison ?? INCLINAISON,
-    fond: '#03070f',
+    fond: '#030710',
   }
 
   const vise = (cx?: number, cy?: number): void => {
