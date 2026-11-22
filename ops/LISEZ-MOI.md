@@ -144,3 +144,49 @@ restauration que personne n'a essayée serait un piège.
 
 Ceux-là **écrivent** vers l'API. Une sauvegarde fraîche avant de les lancer
 est une bonne habitude — c'est maintenant à un `git push` près.
+
+## Le relais du multi
+
+`relais/` est le serveur par qui passe une partie à deux. Il vit dans le
+projet Vercel du jeu, comme un déploiement à part qui ne contient que lui —
+on voulait un projet à lui, le jeton du dépôt ne peut pas en créer. Il se
+déploie par sa gâchette, et seulement par elle :
+
+```bash
+git push -f origin <votre-branche>:relais-go
+```
+
+Le workflow `relais` le déploie en APERÇU (jamais `--prod` depuis ce
+dossier : cela remplacerait le jeu par le relais), puis lance
+`relais/essai.mjs` contre le relais en ligne : deux connexions, comme deux
+joueurs, des images de la taille des vraies pendant huit secondes. Le
+résumé de l'exécution dit si la paire s'est faite, si les deux étaient sur
+la même instance, combien d'images sont arrivées et en combien de temps.
+
+**Une adresse fixe : `sujet21-relais.vercel.app`.** Chaque déploiement du
+relais reçoit une adresse neuve ; le workflow y pose ensuite cet ALIAS, et
+l'essai passe par lui. Le jeu vise l'alias (`src/multi/relais.ts`,
+`RELAIS_PUBLIC`) : redéployer le relais ne demande plus de toucher au jeu.
+Ce n'est pas un projet à part — un nom déplacé d'un déploiement du projet
+du jeu au suivant. Si Vercel efface un jour l'ancien déploiement, l'alias
+part avec lui : un redéploiement par la gâchette le repose.
+
+**Les protections** (`relais/places.js`, depuis l'ouverture à tous) : une
+place ne se prend plus avec le seul code — chaque joueur présente un jeton
+tiré par son navigateur, et une place tenue (ou quittée depuis moins de
+20 s) n'est rendue qu'au même jeton ; une connexion a un plafond de débit
+(768 Ko/s ; au-delà on jette, et qui persiste cinq secondes est coupé) ;
+une même adresse tient huit connexions au plus. `relais/essai-places.mjs`
+les joue toutes, en local comme en ligne (le workflow le lance après
+l'essai à deux joueurs).
+
+⚠️ **Tout cela vaut PAR INSTANCE.** En ligne, Vercel répartit les connexions
+entre plusieurs instances du relais, et rien n'est partagé entre elles :
+les salons (c'est pourquoi deux joueurs doivent tomber sur la même — le jeu
+réessaie), et les comptes par adresse (huit par instance, donc davantage en
+tout). Les protections freinent un abus ; elles ne remplacent pas un vrai
+pare-feu, que seul le tableau de bord Vercel offre.
+
+En local : `cd relais && npm install && PORT=9100 node index.js`, puis le
+jeu avec `?relais=ws://127.0.0.1:9100/ws` (et `node essai-places.mjs`
+pour les protections).

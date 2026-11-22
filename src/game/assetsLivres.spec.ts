@@ -50,6 +50,10 @@ describe('catalogue des images livrées', () => {
 })
 
 describe('catalogue — les images des écrans se rangent par leur dossier', () => {
+  it('le stade du hockey du multi a sa rubrique (son dossier fait foi)', () => {
+    expect(rubriqueDe('/assets/multi/stade-hockey.webp')).toBe('Multi')
+  })
+
   it('une illustration du tableau des avaries a sa rubrique et le nom de sa station', () => {
     // nommée par l’id de la station : aucun préfixe ne la distingue, le dossier si
     expect(rubriqueDe('/assets/avaries/eclairage.webp')).toBe('Avaries — stations')
