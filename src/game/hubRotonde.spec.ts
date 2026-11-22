@@ -26,6 +26,7 @@ import {
   type LevelDef,
 } from './level'
 import { checkLevel, estCodeHub, parseLevel, serializeLevel } from './levelIO'
+import { decalsDuMeta } from './metaAssets'
 import { REPARATIONS, appliqueReparations } from './reparations'
 import { niveauExpanse } from './structures'
 
@@ -106,6 +107,7 @@ describe('la rotonde — un tableau valide, que la bibliothèque sait porter', (
     expect(relu.decals).toEqual(ROTONDE.decals)
     expect(relu.labels).toEqual(ROTONDE.labels)
     expect(relu.coque).toBe('structures')
+    expect(relu.raccords).toBe('aucun')
     expect(relu.spawn).toEqual(ROTONDE.spawn)
     expect(relu.exit).toEqual(ROTONDE.exit)
   })
@@ -318,6 +320,23 @@ describe('la rotonde — le sas de lancement se voit depuis la cuve', () => {
     expect(lampes[0].x).toBe(c.x)
     expect(lampes[0].y).toBe(c.y)
     expect(lampes[0].intensite ?? 1).toBeGreaterThan(lampes[1].intensite ?? 1)
+  })
+})
+
+// LES JONCTIONS NUES. Le moteur peint un col d'amarrage à chaque couloir
+// raccordé (six dans la rotonde) ; le concepteur n'en veut pas ici (22/11).
+describe('la rotonde — aucun sas de raccord entre les pièces', () => {
+  it('le tableau refuse les raccords : aucun col peint aux jonctions', () => {
+    const kinds = decalsDuMeta(ROTONDE).map((d) => d.kind)
+    expect(kinds).not.toContain('sas-raccord')
+    expect(kinds).not.toContain('sas-raccord-v')
+    // le témoin : les jonctions existent bien, c'est le réglage qui les tait
+    const avec = decalsDuMeta({ ...ROTONDE, raccords: undefined }).filter((d) => d.kind.startsWith('sas-raccord'))
+    expect(avec.length).toBeGreaterThan(0)
+  })
+
+  it('le grand module garde les siens', () => {
+    expect(decalsDuMeta(TABLEAU_HUB).some((d) => d.kind.startsWith('sas-raccord'))).toBe(true)
   })
 })
 

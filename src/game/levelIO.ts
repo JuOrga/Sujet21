@@ -962,6 +962,7 @@ export function parseLevel(input: unknown): {
   }
   if (structures.length > 0) level.structures = structures
   if (o.coque === 'structures') level.coque = 'structures'
+  if (o.raccords === 'aucun') level.raccords = 'aucun'
 
   // LES ANCRES MÉTA du module : rôle dans la liste fermée, id de station
   // au catalogue des réparations (un rôle ou un id inconnu est écarté —
@@ -1154,6 +1155,7 @@ export function serializeLevel(level: LevelDef): string {
   if (level.plots?.length) out.plots = level.plots
   if (level.structures?.length) out.structures = level.structures
   if (level.coque === 'structures') out.coque = 'structures'
+  if (level.raccords === 'aucun') out.raccords = 'aucun'
   if (level.ancres?.length) out.ancres = level.ancres
   if (level.bancMemoires) out.bancMemoires = level.bancMemoires
   if (level.pupitres?.length) out.pupitres = level.pupitres

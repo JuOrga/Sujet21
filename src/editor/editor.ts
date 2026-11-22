@@ -4714,6 +4714,18 @@ export class LevelEditor {
     this.el('ed-plafond').addEventListener('change', () => this.histoire())
     // LE SOL DES MODULES : le fond de cuve ne se peint qu'à l'intérieur des
     // coques, et la bordure de la toile se tait — le dehors devient le vide
+    // LES SAS DE RACCORD : le col peint à chaque jonction de couloir —
+    // décoché, les jonctions restent nues (la rotonde, 22/11)
+    this.el('ed-raccords').addEventListener('change', () => {
+      const on = (this.el('ed-raccords') as HTMLInputElement).checked
+      if (on) delete this.level.raccords
+      else this.level.raccords = 'aucun'
+      this.commit(
+        on
+          ? 'Sas de raccord : un col d’amarrage masque chaque jonction de couloir.'
+          : 'Sas de raccord retirés : les jonctions de couloir restent nues.',
+      )
+    })
     this.el('ed-sol-modules').addEventListener('change', () => {
       const on = (this.el('ed-sol-modules') as HTMLInputElement).checked
       if (on) this.level.coque = 'structures'
@@ -5599,6 +5611,8 @@ export class LevelEditor {
       this.level.plafond ?? ''
     ;(this.el('ed-sol-modules') as HTMLInputElement).checked =
       this.level.coque === 'structures'
+    ;(this.el('ed-raccords') as HTMLInputElement).checked =
+      this.level.raccords !== 'aucun'
     ;(this.el('ed-brume') as HTMLInputElement).value =
       this.level.brume === undefined || this.level.brume === 0
         ? ''
