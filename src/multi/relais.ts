@@ -20,14 +20,14 @@
 
 import { tireCode } from './code'
 
-/** L'adresse du relais en ligne. C'est celle d'UN DÉPLOIEMENT : le relais
- *  vit dans le projet Vercel du jeu comme un aperçu à part, et un aperçu
- *  reçoit une adresse neuve à chaque fois. Redéployer le relais (la gâchette
- *  relais-go) demande donc de mettre cette ligne à jour — l'adresse est en
- *  tête du résumé de l'exécution. Déployé le 19/11/2026, essayé depuis le
- *  serveur de GitHub : paire faite sur une même instance, 318 morceaux
- *  d'image envoyés, 318 reçus, 93 ms de trajet médian. */
-const RELAIS_PUBLIC = 'wss://sujet21-lc200nkp5-julianamets-projects.vercel.app/ws'
+/** L'adresse du relais en ligne : un ALIAS fixe. Le relais vit dans le
+ *  projet Vercel du jeu comme un aperçu à part, et un aperçu reçoit une
+ *  adresse neuve à chaque déploiement — le jeu devait la recopier ici à
+ *  chaque fois. Depuis que le multi est ouvert à tous (22/11), le workflow
+ *  du relais pose ce nom sur chaque nouveau déploiement
+ *  (.github/workflows/relais.yml) : redéployer le relais ne change plus
+ *  rien ici. */
+const RELAIS_PUBLIC = 'wss://sujet21-relais.vercel.app/ws'
 /** Le temps laissé au relais pour nous installer. */
 const DELAI_INSTALLATION_MS = 10_000
 /** Au-delà de ce silence, la partie est perdue : on a essayé de revenir, ou

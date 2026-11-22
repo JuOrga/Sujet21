@@ -163,11 +163,13 @@ joueurs, des images de la taille des vraies pendant huit secondes. Le
 résumé de l'exécution dit si la paire s'est faite, si les deux étaient sur
 la même instance, combien d'images sont arrivées et en combien de temps.
 
-**Un déploiement, une adresse.** Chaque déploiement du relais reçoit une
-adresse neuve, affichée en tête du résumé. Le jeu la porte dans
-`src/multi/relais.ts` (`RELAIS_PUBLIC`) : redéployer le relais, c'est aussi
-mettre cette ligne à jour, sans quoi le jeu vise l'ancien — qui continue de
-marcher tant que Vercel garde le déploiement.
+**Une adresse fixe : `sujet21-relais.vercel.app`.** Chaque déploiement du
+relais reçoit une adresse neuve ; le workflow y pose ensuite cet ALIAS, et
+l'essai passe par lui. Le jeu vise l'alias (`src/multi/relais.ts`,
+`RELAIS_PUBLIC`) : redéployer le relais ne demande plus de toucher au jeu.
+Ce n'est pas un projet à part — un nom déplacé d'un déploiement du projet
+du jeu au suivant. Si Vercel efface un jour l'ancien déploiement, l'alias
+part avec lui : un redéploiement par la gâchette le repose.
 
 En local : `cd relais && npm install && PORT=9100 node index.js`, puis le
 jeu avec `?relais=ws://127.0.0.1:9100/ws`.

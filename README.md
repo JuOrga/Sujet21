@@ -171,9 +171,10 @@ le mode concepteur tant qu'il n'était qu'un essai). Tout vit dans
   avaient échoué — `relais/index.js` les raconte. Il vit dans le projet
   Vercel du jeu, comme un déploiement à part qui ne contient que lui (le
   jeton du dépôt ne peut pas créer de projet). Il se déploie par la
-  gâchette `relais-go`, qui l'essaie aussitôt en ligne depuis le serveur de
-  GitHub ; son adresse change à chaque déploiement, et le jeu la porte dans
-  `src/multi/relais.ts`.
+  gâchette `relais-go`, qui pose sur chaque déploiement son adresse FIXE,
+  `sujet21-relais.vercel.app` (un alias), et l'essaie aussitôt en ligne
+  depuis le serveur de GitHub. Le jeu vise l'alias : redéployer le relais
+  ne demande plus de toucher au jeu.
 - **Qui simule** : la machine qui CRÉE la partie. L'autre envoie sa commande
   et affiche ce qu'il reçoit (rejouer les mêmes gestes sur deux machines ne
   donne pas le même film — `src/game/fantome.ts`). La partie continue quand

@@ -117,7 +117,6 @@ const STYLE = `
   background: var(--panel, rgba(9,18,30,.82)) !important; touch-action: none; user-select: none; -webkit-user-select: none; }
 .mu-tenir small { color: var(--dim, #7f9cb0); font-size: 0.7em; letter-spacing: 0.04em; }
 .mu-tenir[data-tenu="1"] { background: rgba(167, 221, 245, 0.28) !important; border-color: var(--glow, #a7ddf5) !important; }
-.mu-aide { position: absolute; left: 16px; right: 166px; bottom: 16px; text-align: center; color: var(--dim, #7f9cb0); pointer-events: none; font-size: 0.85em; padding: 6px 16px; background: rgba(3, 7, 14, 0.82); }
 .mu-voile { position: absolute; inset: 0; background: rgba(2, 6, 12, 0.78); display: flex; align-items: center; justify-content: center; padding: 18px; }
 .mu-voile[hidden] { display: none; }
 .mu-voile div { max-width: 520px; display: flex; flex-direction: column; gap: 14px; text-align: center; line-height: 1.5; }
@@ -300,7 +299,6 @@ const GABARIT = `
   <button type="button" class="mu-dash mu-glace" data-tenir="glace" data-pret="1" aria-label="Glace (à maintenir)">GLACE<small>à maintenir · F</small></button>
   <button type="button" class="mu-dash" data-tenir="dash" data-pret="1" aria-label="Dash">DASH<small>maj</small></button>
   <button type="button" class="mu-tenir" data-tenir="ouvrir" aria-label="S’ouvrir (à maintenir)">S’OUVRIR<small>à maintenir · espace</small></button>
-  <div class="mu-aide" data-aide></div>
   <div class="mu-voile" data-voile hidden><div><h3 data-voile-titre></h3><p data-voile-mot></p><span class="mu-rang" style="justify-content:center"><button type="button" class="mu-fort" data-geste="recommencer" data-revanche hidden>REVANCHE</button><button type="button" class="mu-fort" data-geste="retour-salon">REVENIR AU SALON</button></span></div></div>
 </div>
 `
@@ -825,7 +823,6 @@ export function creeEcranMulti(quitte: () => void): EcranMulti {
     }
     robot = r === 'robot' ? new Robot(1) : null
     accordeCouleurs()
-    aideDuMode = -1
     instantane = null
     eclats.length = 0
     dash.clavier = false
@@ -1159,7 +1156,6 @@ export function creeEcranMulti(quitte: () => void): EcranMulti {
     peintTrait()
     peintReticule('[data-reticule2]', commande2 !== null, commande2 ? commandeManette(manette2, coeur2.x, coeur2.y) : commande, 1)
     el<HTMLElement>('[data-tenir="ouvrir"]').hidden = jeu?.mode === MODE_SUMO
-    peintAide(jeu ? jeu.mode : MODE_LIBRE)
     peintScore(jeu)
     peintAth(corps, maintenant, dt)
     el<HTMLElement>('[data-tenir="ouvrir"]').dataset.tenu = jeMOuvre() ? '1' : '0'
@@ -1352,22 +1348,10 @@ export function creeEcranMulti(quitte: () => void): EcranMulti {
     r.dataset.pousse = commande.pousse ? '1' : '0'
   }
 
-  /** L'aide du bas d'écran suit le mode — que l'invité n'apprend qu'à la
-   *  première image reçue. */
-  let aideDuMode = -1
-  function peintAide(mode: number): void {
-    if (mode === aideDuMode) return
-    aideDuMode = mode
-    const commun = 'Clic maintenu : la matière part vers le pointeur, le corps à l’opposé — sur votre corps, il se rassemble. '
-    const propre =
-      mode === MODE_SUMO
-        ? 'Poussez l’autre HORS de l’anneau, qui se resserre : son cœur dehors, la manche est à vous. MAJ : un dash. On ne s’ouvre pas au sumo.'
-        : mode === MODE_HOCKEY
-        ? 'ESPACE ou clic droit maintenu : vous OUVRIR pour avaler le palet ; relâchez, il part vers le pointeur, plus fort si vous l’avez tenu. Fermé, vous le renvoyez — et vous l’arrachez au porteur en le percutant. MAJ : un dash. F maintenu : la GLACE — deux secondes en bloc, qui file tout droit, renvoie le palet et le frappe fort. Le palet dans la cage adverse : un but.'
-        : 'ESPACE ou clic droit maintenu : vous OUVRIR. Deux corps ouverts fusionnent ; un corps ouvert boit ce qu’on lui tire ; fermé, il repousse. MAJ : un dash. F maintenu : la GLACE, deux secondes en bloc.'
-    const pad = ` MANETTE : le stick gauche pour aller, A ou RT pour pousser, LT ou LB pour s’ouvrir, B ou RB pour dasher${mode === MODE_SUMO ? '' : ', X ou Y pour la glace'} ; Start recommence, Select quitte.`
-    el<HTMLElement>('[data-aide]').textContent = commun + propre + pad + (role === 'hote' ? ' Votre machine simule la partie : ne fermez pas cet onglet.' : '')
-  }
+  // (L'AIDE du bas d'écran est partie le 22/11 — « supprime tout le texte
+  // en bas », le concepteur : cinq lignes qui couvraient la patinoire et la
+  // foule du stade. Les touches se lisent sur les boutons à l'écran : GLACE
+  // « F », DASH « maj », S'OUVRIR « espace ».)
 
   function peintScore(jeu: JeuTrame | null): void {
     const boite = el<HTMLElement>('[data-score]')

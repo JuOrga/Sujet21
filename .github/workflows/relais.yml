@@ -22,10 +22,15 @@
 #   ⚠️ JAMAIS `--prod` ICI. Un déploiement de production depuis relais/
 #   remplacerait le JEU par le relais sur sujet21.vercel.app.
 #
-# Un aperçu reçoit une adresse NEUVE à chaque déploiement : c'est elle que
-# le jeu doit viser (src/multi/relais.ts, RELAIS_PUBLIC). Redéployer le
-# relais, c'est donc aussi mettre cette constante à jour. Le jour où le
-# multi sort du prototype, il lui faudra son projet et une adresse fixe.
+# UNE ADRESSE FIXE : sujet21-relais.vercel.app. Un aperçu reçoit une
+# adresse NEUVE à chaque déploiement ; le jeu devait la recopier à chaque
+# fois (src/multi/relais.ts, RELAIS_PUBLIC). Depuis que le multi est ouvert
+# à tous (22/11), chaque déploiement du relais reçoit cet ALIAS — toujours
+# le même : le jeu vise l'alias, redéployer le relais ne change plus rien
+# côté jeu. Ce n'est pas un projet à part (le jeton ne peut toujours pas en
+# créer) : un nom posé sur un déploiement du projet du jeu, que l'on
+# déplace sur le suivant. Ce n'est pas non plus la production : le jeu, sur
+# sujet21.vercel.app, n'est pas touché.
 #
 # LE PIÈGE DE LA PREMIÈRE FOIS : pousser sur une gâchette qui n'existe pas
 # encore, avec des commits que le dépôt connaît déjà, ne lance rien —
@@ -72,18 +77,27 @@ jobs:
           url=$(npx vercel@59.6.2 deploy --yes --token=${{ secrets.VERCEL_TOKEN }} | tail -1)
           echo "déployé → $url"
           echo "URL=$url" >> "$GITHUB_ENV"
+      - name: Lui donner son adresse fixe (l'alias, déplacé sur ce déploiement)
+        working-directory: relais
+        run: |
+          set -euo pipefail
+          # un nom déjà pris ailleurs fait échouer cette étape : le jeu
+          # garde alors l'ancien déploiement, on choisit un autre nom
+          npx vercel@59.6.2 alias set "${URL#https://}" sujet21-relais.vercel.app --scope "$VERCEL_ORG_ID" --token=${{ secrets.VERCEL_TOKEN }}
+          echo "ALIAS=sujet21-relais.vercel.app" >> "$GITHUB_ENV"
       - name: Essayer le relais en ligne
         working-directory: relais
         run: |
           set -uo pipefail
-          domaine=$(echo "$URL" | sed 's#^https://##')
+          # l'essai passe par l'ALIAS : c'est lui que le jeu vise
+          domaine="$ALIAS"
           npm install --no-audit --no-fund >/dev/null 2>&1
           {
             echo "## Le relais"
             echo
             echo "### 👉 \`$domaine\`"
             echo
-            echo "C'est l'adresse que le jeu doit viser : \`RELAIS_PUBLIC\` dans \`src/multi/relais.ts\`."
+            echo "L'adresse fixe que le jeu vise (\`RELAIS_PUBLIC\`, \`src/multi/relais.ts\`), posée sur le déploiement \`$URL\`."
             echo
             echo '```'
             echo "== pouls =="
