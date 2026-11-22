@@ -102,6 +102,7 @@ import {
 } from '../game/formes'
 import { aPieces, cleBoite, formesPhysiques } from '../game/conduite'
 import { contourAura, porteesAura, type ContourPieces } from './aura'
+import { dessinePorte } from '../render/porteBlindee'
 import {
   deplaceDans,
   ditLeDeplacement,
@@ -8180,19 +8181,19 @@ export class LevelEditor {
       const q = portes[i]
       const p = this.toScreen(q.minX, q.maxY)
       const r = this.toScreen(q.maxX, q.minY)
-      // OUVERTE AU REPOS : un cadre pointillé, sans aplat — comme une porte
-      // ouverte en jeu ; elle se fermera quand son canal l'alimentera
+      // LA PORTE BLINDÉE, comme en jeu (render/porteBlindee.ts) : la dalle
+      // debout ; OUVERTE AU REPOS, enfoncée — sa fente seule au ras du sol,
+      // elle en sortira quand son canal l'alimentera. Le cadre ambre pâle la
+      // désigne (le rouge d'avant est réservé à l'alerte des cinématiques)
       const ouverte = q.repos === 'ouverte'
-      if (!ouverte) {
-        g.fillStyle = 'rgba(255,90,90,0.16)'
-        g.fillRect(p.sx, p.sy, r.sx - p.sx, r.sy - p.sy)
-      }
-      g.strokeStyle = '#ff5a5a'
+      const vers = (x: number, y: number): { sx: number; sy: number } => this.toScreen(x, y)
+      dessinePorte(g, q, ouverte ? 0 : 1, ouverte ? 0 : 1, { sommet: vers, pied: vers, oeil: null, temps: 0 }, this.img('porte-blindee'))
+      g.strokeStyle = '#f2c98e'
       g.lineWidth = 1.5
       if (ouverte) g.setLineDash([6, 4])
       g.strokeRect(p.sx, p.sy, r.sx - p.sx, r.sy - p.sy)
       g.setLineDash([])
-      g.fillStyle = '#ff9a8a'
+      g.fillStyle = '#f2c98e'
       g.font = '600 10px ui-monospace, monospace'
       const regle = q.regle === 'et' ? ' (ET)' : q.regle === 'ouex' ? ' (OUEX)' : ''
       g.fillText(
@@ -8219,7 +8220,7 @@ export class LevelEditor {
           else hi = mid
         }
         const { contour, front } = portePolygone(q, (lo + hi) / 2)
-        g.fillStyle = 'rgba(255,90,90,0.22)'
+        g.fillStyle = 'rgba(99,183,230,0.22)'
         g.beginPath()
         for (let k = 0; k < contour.length; k++) {
           const c = this.toScreen(contour[k].x, contour[k].y)
@@ -8231,7 +8232,7 @@ export class LevelEditor {
         if (front.length === 2) {
           const f0 = this.toScreen(front[0].x, front[0].y)
           const f1 = this.toScreen(front[1].x, front[1].y)
-          g.strokeStyle = '#ffd2c8'
+          g.strokeStyle = '#d6e8f5'
           g.lineWidth = 2.5
           g.beginPath()
           g.moveTo(f0.sx, f0.sy)

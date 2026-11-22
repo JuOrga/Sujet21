@@ -185,7 +185,7 @@ export interface ZonesHub {
   /** LE SECTEUR SCELLÉ : l'alcôve de la 4e sortie — condamnée jusqu'à la
    * fin de l'arc du récit. */
   sasScelle: RectHub
-  /** Les PORTES DE DÉGÂT : les barrières d'énergie qui condamnent une
+  /** Les PORTES DE DÉGÂT : les portes blindées qui condamnent une
    * aile tant que sa station n'est pas réparée (id de station → SES
    * barrières — une aile peut avoir deux bouches, un couloir peut être
    * doublé). Elles passent par level.portes (canal négatif :
