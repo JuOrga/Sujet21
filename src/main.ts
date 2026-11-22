@@ -16543,17 +16543,19 @@ function mbMontreDraft(): void {
   // l'atelier) et son dos (`.mb-pli-dos`). Le survol isole et INCLINE
   // celle qu'on regarde ; au clavier ou à la manette, le focus fait le
   // même office que la souris — sauf le focus posé par le tirage lui-même.
-  // L'EAU DE CHAQUE CARTE (ondeVue.ts) : visée, elle reçoit une goutte et
-  // tremble, le pointeur y laisse son sillage, puis elle se calme. Elle
-  // remplace l'inclinaison qui sautait d'un pointermove à l'autre et se
-  // remettait à plat d'un coup (« ça fait buggé, pas fluide », 22/11)
+  // LE CONTOUR D'EAU DE CHAQUE CARTE (ondeVue.ts) : visée, ses quatre
+  // traits deviennent un filet d'eau — une goutte y tombe et fait le tour
+  // de la carte, une houle le garde vivant tant qu'elle a le focus — et la
+  // carte flotte sur des ressorts. Il remplace l'inclinaison qui sautait
+  // d'un pointermove à l'autre et se remettait à plat d'un coup (« ça fait
+  // buggé, pas fluide », le concepteur, 22/11)
   const ondes = new Map<Element, OndeCarte>()
   const isole = (pli: HTMLElement | null): void => {
     host.classList.toggle('mb-isole', pli !== null)
     for (const c of host.children) {
       c.classList.toggle('mb-vise', c === pli)
       // la visée qui ne vient pas du pointeur (clavier, manette) ; le
-      // pointeur, lui, pose sa goutte là où il entre (ondeVue.ts)
+      // pointeur, lui, pose sa goutte là où il franchit le bord (ondeVue.ts)
       if (c === pli) ondes.get(c)?.vise()
       else ondes.get(c)?.quitte()
     }
@@ -16597,7 +16599,7 @@ function mbMontreDraft(): void {
       btn.disabled = true
     }
     // l'eau AVANT les écouteurs de la visée : son pointerenter passe le
-    // premier et pose la goutte là où le pointeur entre ; la visée qui suit
+    // premier et pose la goutte là où le pointeur franchit le bord ; la visée qui suit
     // (isole) trouve la carte déjà visée et n'en jette pas une seconde
     ondes.set(pli, ondeCarte(btn, pli, sansAnimation))
     for (const ev of ['pointerenter', 'pad-vise'] as const)
@@ -16620,8 +16622,8 @@ function mbMontreDraft(): void {
       if (!depenseCondensat(carte.prix)) return
       elu = true
       // LA CARTE ÉLUE s'embrase, les autres se retirent — puis la suite
-      // l'eau se tait d'un coup : l'élan de l'élue est une animation, et la
-      // carte qui tremblait encore ne doit rien ajouter à la sienne
+      // l'eau se tait d'un coup : l'élan de l'élue est une animation, et le
+      // contour qui ondulait encore ne doit rien ajouter à la sienne
       for (const o of ondes.values()) o.arrete()
       isole(null)
       host.classList.add('mb-elu')

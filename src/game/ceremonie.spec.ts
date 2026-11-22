@@ -1314,14 +1314,24 @@ describe('la cérémonie — le tirage', () => {
     // au repos, la feuille tient la flottaison que le ressort rejoint (FLOTTE)
     expect(css).toMatch(/\.mb-pli\.mb-vise \{ z-index: 2; transform: translateY\(-6px\); \}/)
     expect(ONDE).toMatch(/export const FLOTTE = -6\b/)
-    // la toile vit dans la FACE, sous son texte ; rien n'aplatit le pli
-    expect(regle('.mb-pli .mb-onde')).toMatch(/z-index:\s*-1/)
-    expect(ONDE).toContain('face.prepend(toile)')
+    // LE CONTOUR D'EAU : « pas du volume d'eau dans le cœur de la carte,
+    // plutôt sur les bordures » (le concepteur, 22/11). La toile est un
+    // enfant du pli (la face, au chanfrein, rognerait l'eau qui déborde),
+    // tournée vers l'avant, dos caché ; tant qu'elle tient le contour, le
+    // filet de la feuille s'efface — et le voile de la visée reste
+    expect(ONDE).toContain('pli.append(toile)')
+    expect(ONDE).not.toMatch(/face\.(?:prepend|append)\(toile\)/)
+    expect(regle('.mb-pli .mb-rive')).toMatch(/backface-visibility:\s*hidden/)
+    expect(regle('.mb-pli .mb-rive')).toMatch(/pointer-events:\s*none/)
+    expect(css).toMatch(/\.mb-pli\.mb-liquide \.crt-draft\.pad-focus \{ box-shadow: none; \}/)
+    expect(css.indexOf('.mb-pli.mb-liquide .crt-draft')).toBeGreaterThan(css.indexOf('.mb-pli.mb-vise .crt-draft, .mb-pli .crt-draft:focus-visible'))
+    expect(regle('.mb-pli.mb-vise .crt-draft, .mb-pli .crt-draft:focus-visible, .mb-pli .crt-draft.pad-focus')).toContain('background: var(--mb-visee), var(--mb-coque)')
+    // rien n'aplatit le pli
     expect(ONDE).not.toMatch(/pli\.style\.(?:opacity|filter|clipPath)|pli\.style\.setProperty\('(?:opacity|filter|clip-path)/)
   })
   it('se tait sous « moins d’animations » : ni eau, ni ressort', () => {
     const moins = css.slice(css.lastIndexOf('prefers-reduced-motion: reduce'))
-    expect(moins).toMatch(/\.mb-pli \.mb-onde \{ display: none; \}/)
+    expect(moins).toMatch(/\.mb-pli \.mb-rive \{ display: none; \}/)
     // relu à chaque geste : le réglage peut changer en cours de partie
     expect(ONDE).toMatch(/if \(e\.arretee \|\| sansAnimation\(\)\) return/)
   })

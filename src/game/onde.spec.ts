@@ -1,178 +1,195 @@
 import { describe, expect, it } from 'vitest'
-import { AMORTI, AMORTI_QUITTE, ENCRE_MAX, Nappe, Ressort, SEUIL_CALME, SOUS_PAS, SOUS_TEXTE } from './onde'
+import {
+  AMORTI,
+  AMORTI_QUITTE,
+  ECART_MAX,
+  GOUTTE_PX,
+  PAS_RIVE,
+  Ressort,
+  Rive,
+  SEUIL_CALME,
+  SOUS_PAS,
+  contourCarte,
+  houle,
+  longueurContour,
+} from './onde'
 
-// L'EAU D'UNE CARTE DU TIRAGE (onde.ts, ondeVue.ts). L'effet d'avant
-// sautait d'un événement à l'autre et se remettait à plat d'un coup : « ça
-// fait buggé, pas fluide, pas beau » (le concepteur, 22/11). Ces gardes
-// tiennent ce qui le rend fluide (une physique stable, qui se calme d'elle-
-// même), lisible (une encre plafonnée sous le texte) et tenable à 60 i/s.
+// LE CONTOUR D'EAU D'UNE CARTE DU TIRAGE (onde.ts, ondeVue.ts). L'effet
+// d'avant sautait d'un événement à l'autre et se remettait à plat d'un
+// coup : « ça fait buggé, pas fluide, pas beau » ; puis l'eau est passée du
+// cœur de la carte à son bord : « plutôt sur les bordures, les quatre
+// traits qui délimitent une carte » (le concepteur, 22/11). Ces gardes
+// tiennent ce qui le rend fluide (une onde stable, qui fait le tour de la
+// carte et se calme d'elle-même) et tenable à 60 i/s.
 
-// la nappe de la plus grande carte du tirage, à 4 px la maille (ondeVue.ts,
-// MAILLE_PX) : 361 × 389 px au banc, en 1280 × 800
-const W = 90
-const H = 97
+// la plus grande carte du tirage au banc (1280 × 800) : 361 × 389 px, le
+// coin haut droit coupé de 14 px, un nœud tous les PAS_RIVE px
+const L = 361
+const H = 389
+const C = 14
+const contour = contourCarte(L, H, C)
+const N = contour.length
 /** les pas d'onde pour `s` secondes à 60 images par seconde */
 const pasPour = (s: number): number => Math.round(s * 60 * SOUS_PAS)
+/** le nœud au milieu du bord haut, là où tombe la goutte du clavier */
+const HAUT = Math.round((L - C) / 2 / PAS_RIVE)
+/** la goutte d'entrée, en nœuds */
+const R = GOUTTE_PX / PAS_RIVE
 
-describe('la nappe — une onde qui se calme', () => {
-  it('une goutte franche tremble encore à une demi-seconde, et se tait avant deux', () => {
-    const n = new Nappe(W, H)
-    n.goutte(W / 2, H * 0.36, 5.5, 1.4)
+describe('le contour — les quatre traits et le coin coupé', () => {
+  it('fait le tour de la carte, coin coupé compris', () => {
+    const attendu = 2 * L + 2 * H - 2 * C + Math.hypot(C, C)
+    expect(longueurContour(contour)).toBeCloseTo(attendu, 3)
+    // un nœud tous les PAS_RIVE px environ
+    expect(N).toBeGreaterThan(attendu / (PAS_RIVE * 1.1))
+    expect(N).toBeLessThan(attendu / (PAS_RIVE * 0.9))
+  })
+
+  it('porte en chaque nœud une normale unitaire, tournée vers le dehors', () => {
+    for (const q of contour) {
+      expect(Math.hypot(q.nx, q.ny)).toBeCloseTo(1, 6)
+      // vers le dehors : elle s'éloigne du centre de la carte
+      expect((q.x - L / 2) * q.nx + (q.y - H / 2) * q.ny).toBeGreaterThan(0)
+    }
+    // le bord haut regarde en haut, le bord gauche à gauche
+    expect(contour[HAUT].ny).toBeCloseTo(-1, 6)
+    const gauche = contour.find((q) => q.x === 0 && q.y > H / 2 && q.y < H - 1)!
+    expect(gauche.nx).toBeCloseTo(-1, 6)
+  })
+
+  it('tourne ses angles : la normale d’un coin est la moyenne de ses deux côtés', () => {
+    const coin = contour[0] // le coin haut gauche
+    expect(coin.nx).toBeCloseTo(-Math.SQRT1_2, 6)
+    expect(coin.ny).toBeCloseTo(-Math.SQRT1_2, 6)
+  })
+})
+
+describe('la rive — une onde qui fait le tour et se calme', () => {
+  it('une goutte posée au milieu du bord haut fait le tour, et ses deux fronts se croisent en bas', () => {
+    const r = new Rive(N)
+    r.goutte(HAUT, R, -3.2)
+    // le nœud opposé, au milieu du bord bas
+    const bas = contour.reduce((m, q, i) => (q.y === H && Math.abs(q.x - L / 2) < Math.abs(contour[m].x - L / 2) ? i : m), 0)
+    let max = 0
+    for (let i = 0; i < pasPour(1.2); i++) {
+      r.pas()
+      max = Math.max(max, Math.abs(r.ecart(bas)))
+    }
+    expect(max).toBeGreaterThan(0.3) // la vague y est arrivée
+  })
+
+  it('une goutte franche tremble encore à une demi-seconde, ne se voit plus à deux, se tait avant trois', () => {
+    const r = new Rive(N)
+    r.goutte(HAUT, R, -3.2)
     let crete = 1
     let i = 0
     let mi = 0
-    for (; i < pasPour(5) && crete >= SEUIL_CALME; i++) {
-      crete = n.pas()
+    let visible = 0
+    for (; i < pasPour(6) && crete >= SEUIL_CALME; i++) {
+      crete = r.pas()
       if (i === pasPour(0.5)) mi = crete
+      // sous 0,2 px, le ruban ne change plus d'épaisseur à l'œil
+      if (crete >= 0.2) visible = i
     }
-    const duree = i / (60 * SOUS_PAS)
-    // à mi-chemin, la carte tremble encore : on la voit onduler
-    expect(mi).toBeGreaterThan(SEUIL_CALME * 4)
-    // et elle se tait tout à fait (la boucle d'images s'arrête) avant deux
-    // secondes — à l'œil, bien avant : sous un centième de crête, l'éclat
-    // ne pose plus que quelques niveaux d'encre (mesuré : 1,84 s au seuil)
-    expect(duree).toBeGreaterThan(0.6)
-    expect(duree).toBeLessThan(2)
+    expect(mi).toBeGreaterThan(0.4) // on la voit onduler
+    expect(visible / (60 * SOUS_PAS)).toBeLessThan(2)
+    expect(i / (60 * SOUS_PAS)).toBeLessThan(3) // la boucle d'images, elle, s'arrête
   })
 
   it('une carte quittée se tait au moins deux fois plus vite que la carte visée', () => {
     const silence = (amorti: number): number => {
-      const n = new Nappe(W, H)
-      n.goutte(W / 2, H * 0.36, 5.5, 1.4)
+      const r = new Rive(N)
+      r.goutte(HAUT, R, -3.2)
       let i = 0
-      while (i < pasPour(5) && n.pas(amorti) >= SEUIL_CALME) i++
+      while (i < pasPour(6) && r.pas(amorti) >= SEUIL_CALME) i++
       return i / (60 * SOUS_PAS)
     }
-    expect(silence(AMORTI_QUITTE)).toBeLessThan(silence(AMORTI) / 2 + 0.05)
-    expect(silence(AMORTI_QUITTE)).toBeGreaterThan(0.4) // elle se calme, elle ne s'éteint pas d'un coup
+    expect(silence(AMORTI_QUITTE)).toBeLessThan(silence(AMORTI) / 2)
+    expect(silence(AMORTI_QUITTE)).toBeGreaterThan(0.2) // elle se calme, elle ne s'éteint pas d'un coup
   })
 
-  it('reste stable : aucune crête ne grandit, même sous un sillage rageur', () => {
-    const n = new Nappe(W, H)
+  it('ne déborde jamais de ECART_MAX, même sous un geste rageur', () => {
+    const r = new Rive(N)
     let max = 0
     for (let t = 0; t < 600; t++) {
-      // un pointeur qui fait des allers-retours à pleine vitesse
-      const x = W / 2 + Math.sin(t / 3) * W * 0.4
-      n.goutte(x, H / 2, 3.5, -0.2)
-      const c = n.pas()
-      if (t > 300) max = Math.max(max, c)
-      expect(Number.isFinite(c)).toBe(true)
+      r.goutte((t * 7) % N, 8, t % 2 ? 1.2 : -1.2)
+      max = Math.max(max, r.pas())
     }
-    // le régime établi est borné : la cuve ne déborde pas
-    expect(max).toBeLessThan(3)
+    expect(Number.isFinite(max)).toBe(true)
+    expect(max).toBeLessThanOrEqual(ECART_MAX)
   })
 
-  it('renvoie l’onde sur ses bords : la carte est une cuve, la vague revient', () => {
-    const n = new Nappe(W, H)
-    n.goutte(10, H / 2, 5, 1)
-    // le front file vers la droite, touche le bord, et revient : au centre,
-    // on le voit passer deux fois
-    let passages = 0
-    let haut = false
-    for (let i = 0; i < pasPour(1.2); i++) {
-      n.pas()
-      const v = Math.abs(n.hauteur(W / 2, H / 2)) > 0.01
-      if (v && !haut) passages++
-      haut = v
+  it('éteint les vaguelettes serrées bien avant les longues vagues (la viscosité)', () => {
+    // un damier d'un nœud — le « trait tremblé » vu au banc — contre une
+    // vague de 40 nœuds, de même hauteur
+    const serree = new Rive(N)
+    const longue = new Rive(N)
+    for (let i = 0; i < N; i++) {
+      serree.goutte(i, 1, i % 2 ? 0.5 : -0.5)
+      longue.goutte(i, 1, 0.5 * Math.sin((2 * Math.PI * i) / 40))
     }
-    expect(passages).toBeGreaterThanOrEqual(2)
+    let s = 0
+    let l = 0
+    for (let i = 0; i < 30; i++) {
+      s = serree.pas()
+      l = longue.pas()
+    }
+    expect(s).toBeLessThan(l / 5)
   })
 
-  it('l’amortissement reste celui d’un liquide, pas d’une gelée', () => {
-    expect(AMORTI).toBeGreaterThan(0.95)
-    expect(AMORTI).toBeLessThan(1)
-  })
-
-  it('aplanit() rend la nappe à plat, d’un coup', () => {
-    const n = new Nappe(W, H)
-    n.goutte(W / 2, H / 2, 5, 1)
-    n.pas()
-    n.aplanit()
-    expect(n.pas()).toBe(0)
+  it('aplanit() rend la rive à plat, d’un coup', () => {
+    const r = new Rive(N)
+    r.goutte(HAUT, R, -3.2)
+    r.pas()
+    r.aplanit()
+    expect(r.pas()).toBe(0)
   })
 })
 
-describe('l’ombrage — lisible sous le texte', () => {
-  it('ne pose jamais plus que ENCRE_MAX, même sous la plus forte vague', () => {
-    const n = new Nappe(W, H)
-    for (let k = 0; k < 12; k++) n.goutte(10 + k * 6, 20 + k * 5, 3, k % 2 ? 4 : -4)
-    const rgba = new Uint8ClampedArray(W * H * 4)
-    let maxA = 0
-    for (let i = 0; i < 40; i++) {
-      n.pas()
-      n.ombre(rgba)
-      for (let o = 3; o < rgba.length; o += 4) if (rgba[o] > maxA) maxA = rgba[o]
+describe('la houle — un contour au repos reste de l’eau', () => {
+  const longueur = longueurContour(contour)
+  it('ne casse pas là où la boucle se referme', () => {
+    for (const t of [0, 0.7, 3.1]) expect(houle(0, longueur, t)).toBeCloseTo(houle(longueur, longueur, t), 6)
+  })
+  it('reste douce : sous le pixel et demi, et lente', () => {
+    let max = 0
+    let pente = 0
+    let saut = 0
+    for (let s = 0; s < longueur; s += 1) {
+      const v = houle(s, longueur, 1.3)
+      max = Math.max(max, Math.abs(v))
+      // le long du contour, pas de pli : une pente douce, en px par px
+      // (comptée au pixel, elle ne dépend pas de la maille de la rive)
+      pente = Math.max(pente, Math.abs(houle(s + 1, longueur, 1.3) - v))
+      // d'une image à la suivante, pas de saccade
+      saut = Math.max(saut, Math.abs(houle(s, longueur, 1.3 + 1 / 60) - v))
     }
-    expect(maxA).toBeGreaterThan(255 * ENCRE_MAX * 0.8) // elle se voit
-    expect(maxA).toBeLessThanOrEqual(Math.ceil(255 * ENCRE_MAX))
-  })
-
-  it('sous une ligne de texte, le masque retient l’éclat à SOUS_TEXTE du plafond', () => {
-    const n = new Nappe(W, H)
-    // une bande de texte au milieu de la carte
-    n.masque = new Float32Array(W * H).fill(1)
-    for (let j = 40; j < 60; j++) for (let i = 0; i < W; i++) n.masque[j * W + i] = SOUS_TEXTE
-    for (let k = 0; k < 12; k++) n.goutte(10 + k * 6, 30 + k * 3, 3, k % 2 ? 4 : -4)
-    const rgba = new Uint8ClampedArray(W * H * 4)
-    let dessous = 0
-    let ailleurs = 0
-    for (let i = 0; i < 40; i++) {
-      n.pas()
-      n.ombre(rgba)
-      for (let j = 0; j < H; j++) {
-        for (let x = 0; x < W; x++) {
-          const o = (j * W + x) * 4
-          if (rgba[o] < 60) continue // l'ombre n'est pas retenue : elle aide le texte clair
-          if (j >= 40 && j < 60) dessous = Math.max(dessous, rgba[o + 3])
-          else ailleurs = Math.max(ailleurs, rgba[o + 3])
-        }
-      }
-    }
-    expect(ailleurs).toBeGreaterThan(255 * ENCRE_MAX * 0.8) // l'eau reste vive hors du texte
-    expect(dessous).toBeLessThanOrEqual(Math.ceil(255 * ENCRE_MAX * SOUS_TEXTE))
-  })
-
-  it('sous le texte, au plus fort de l’éclat : 4,5:1 pour la légende, 7:1 pour le texte', () => {
-    // le plus clair : le reflet pâle (217, 236, 247) à ENCRE_MAX × SOUS_TEXTE
-    // sur la coque d'une carte visée (--panel-solid #0a1420 sous le voile
-    // du spécimen à 9 %), sous l'encre du texte (--ink #d9ecf7) et celle des
-    // légendes (--dim #7f9cb0, déjà à 5,6:1 au repos)
-    const lin = (c: number): number => { const v = c / 255; return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4 }
-    const lum = (r: number, g: number, b: number): number => 0.2126 * lin(r) + 0.7152 * lin(g) + 0.0722 * lin(b)
-    const coque = [10 + 0.09 * 89, 20 + 0.09 * 163, 32 + 0.09 * 198]
-    const a = ENCRE_MAX * SOUS_TEXTE
-    const fond = lum(...([217, 236, 247].map((c, k) => c * a + coque[k] * (1 - a)) as [number, number, number]))
-    const contraste = (l: number): number => (l + 0.05) / (fond + 0.05)
-    expect(contraste(lum(0xd9, 0xec, 0xf7))).toBeGreaterThan(7)
-    expect(contraste(lum(0x7f, 0x9c, 0xb0))).toBeGreaterThan(4.5)
-  })
-
-  it('une nappe calme ne peint rien : la carte au repos est la carte d’avant', () => {
-    const n = new Nappe(W, H)
-    const rgba = new Uint8ClampedArray(W * H * 4)
-    n.ombre(rgba)
-    expect(rgba.every((v, i) => i % 4 !== 3 || v === 0)).toBe(true)
+    expect(max).toBeLessThan(1.5)
+    expect(max).toBeGreaterThan(0.4) // elle se voit
+    expect(pente).toBeLessThan(0.05)
+    expect(saut).toBeLessThan(0.05)
   })
 })
 
 describe('le coût d’une image', () => {
-  it('trois pas d’onde et l’ombrage tiennent bien sous 2 ms par carte', () => {
+  it('les pas d’onde et la houle de tout le contour tiennent bien sous 0,2 ms', () => {
     // le budget d'une image à 60 i/s est de 16,7 ms ; le Steam Deck et un
-    // téléphone vont trois à cinq fois moins vite que la machine des tests :
-    // à moins de 2 ms ici, deux cartes qui tremblent ensemble (la quittée
-    // et la visée) restent loin du budget
-    const n = new Nappe(W, H)
-    const rgba = new Uint8ClampedArray(W * H * 4)
-    n.goutte(W / 2, H / 2, 5, 1.4)
-    for (let i = 0; i < 30; i++) { for (let k = 0; k < SOUS_PAS; k++) n.pas(); n.ombre(rgba) }
-    const t0 = performance.now()
-    const N = 200
-    for (let i = 0; i < N; i++) {
-      for (let k = 0; k < SOUS_PAS; k++) n.pas()
-      n.ombre(rgba)
+    // téléphone vont trois à cinq fois moins vite que la machine des tests
+    const r = new Rive(N)
+    const longueur = longueurContour(contour)
+    r.goutte(HAUT, R, -3.2)
+    let puits = 0
+    const image = (t: number): void => {
+      for (let k = 0; k < SOUS_PAS; k++) r.pas()
+      for (const q of contour) puits += houle(q.s, longueur, t)
     }
-    const ms = (performance.now() - t0) / N
-    expect(ms).toBeLessThan(2)
+    for (let i = 0; i < 50; i++) image(i / 60)
+    const t0 = performance.now()
+    const M = 400
+    for (let i = 0; i < M; i++) image(i / 60)
+    const ms = (performance.now() - t0) / M
+    expect(Number.isFinite(puits)).toBe(true)
+    expect(ms).toBeLessThan(0.2)
   })
 })
 

@@ -8621,7 +8621,7 @@
       .mb-cartes { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
       /* ---- LE TIRAGE : trois CARTES D'INSTRUMENT (quatre avec le Carnet du
          Semblable). Elles arrivent DOS VISIBLE et se retournent une à une ;
-         visées, elles flottent et leur eau tremble (ondeVue.ts) ;
+         visées, elles flottent et leur contour devient de l'eau (ondeVue.ts) ;
          l'élue s'avance et grandit, les autres tombent. La face est le
          composant `.crt` partagé avec l'atelier, taillé ici au coin coupé du
          verbe.
@@ -8773,21 +8773,27 @@
          lisait plus, alors qu'on vise une carte pour la COMPARER aux autres */
       .mb-cartes.mb-isole .mb-pli:not(.mb-vise) .crt-draft { opacity: 0.6; }
       .mb-pli.mb-vise { z-index: 2; transform: translateY(-6px); }
-      /* L'EAU DE LA CARTE : une toile de quelques dizaines de mailles,
-         étirée à la face (le lissage fait l'eau douce), SOUS le contenu —
-         la face taillée au chanfrein est son propre contexte d'empilement,
-         le z-index négatif la glisse entre son fond et son texte, qui ne
-         bouge pas d'un pixel. Transparente au calme : elle ne se voit que
-         quand l'eau bouge. */
-      .mb-pli .mb-onde {
-        position: absolute; inset: 0; z-index: -1; width: 100%; height: 100%;
-        pointer-events: none;
+      /* LE CONTOUR D'EAU (ondeVue.ts) : sous le focus, les quatre traits de
+         la carte — et son coin coupé — deviennent un filet d'eau qui ondule.
+         La toile est un enfant du PLI, pas de la face : la face, taillée au
+         chanfrein, rognerait l'eau qui déborde du bord ; elle dépasse donc
+         la carte de 10 px (MARGE), tournée vers l'avant, dos caché comme
+         les deux faces. Elle ne dessine que le contour : le texte n'est
+         jamais sous elle. */
+      .mb-pli .mb-rive {
+        position: absolute; inset: -10px; width: calc(100% + 20px); height: calc(100% + 20px);
+        pointer-events: none; backface-visibility: hidden; transform: translateZ(1px);
       }
       .mb-pli.mb-vise .crt-draft, .mb-pli .crt-draft:focus-visible, .mb-pli .crt-draft.pad-focus {
         outline: none;
         background: var(--mb-visee), var(--mb-coque);
         box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--fam) 70%, transparent);
       }
+      /* tant que l'eau tient le contour, le filet de la feuille s'efface
+         (sa transition de 0,16 s fait le fondu) ; au départ du focus il
+         revient pendant que l'eau s'éteint */
+      .mb-pli.mb-liquide .crt-draft, .mb-pli.mb-liquide .crt-draft:focus-visible,
+      .mb-pli.mb-liquide .crt-draft.pad-focus { box-shadow: none; }
       .mb-pli .crt-draft.mb-pauvre { opacity: 0.4; cursor: not-allowed; }
       /* LE CHOIX : l'élue s'avance et grandit, les autres tombent (le pli
          peut alors s'aplatir : chacun est sur sa face) */
@@ -9697,9 +9703,9 @@
         .mb-anneau-franchit { filter: drop-shadow(0 0 8px rgba(242, 201, 142, 0.85)); }
         .mb-pli { transform: none; }
         .mb-pli.mb-vise { transform: translateY(-4px); }
-        /* l'eau ne tremble pas : ondeVue.ts ne la met jamais en mouvement,
-           et la toile ne tient même pas sa place */
-        .mb-pli .mb-onde { display: none; }
+        /* le contour ne devient pas de l'eau : ondeVue.ts ne le met jamais
+           en mouvement, et la toile ne tient même pas sa place */
+        .mb-pli .mb-rive { display: none; }
         .mb-cartes.mb-elu .mb-pli:not(.mb-elu-c), .mb-cartes.mb-elu .mb-porte:not(.mb-elue) { opacity: 0; }
         .mb-porte.mb-elue { opacity: 0; }
         .mb-palier-eclair[hidden] { display: none; }

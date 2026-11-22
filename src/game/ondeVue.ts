@@ -1,35 +1,49 @@
-// L'ONDE D'UNE CARTE, À L'ÉCRAN — la toile, le pointeur, la boucle.
+// LA RIVE D'UNE CARTE, À L'ÉCRAN — la toile, le pointeur, la boucle.
 //
 // La physique est dans onde.ts. Ici :
-//   — LA TOILE : une petite toile (une maille de ~6 px de carte par pixel),
-//     posée SOUS le contenu de la face, étirée à sa taille par le
-//     navigateur — le lissage bilinéaire fait l'eau douce, et le texte, au-
-//     dessus, ne bouge pas d'un pixel : il reste lisible pendant tout
-//     l'effet. Une déformation du texte (filtre feDisplacementMap) a été
-//     écartée pour ça, et parce qu'un filtre SVG sur du HTML se repeint au
-//     processeur à chaque image ;
+//   — LA TOILE : posée dans le PLI, par-dessus la face et un peu au-delà
+//     (MARGE px de chaque côté) — le filet d'eau peut déborder du bord de la
+//     carte, ce que la face, taillée au chanfrein, rognerait. Elle ne dessine
+//     QUE le contour : le texte de la carte n'est jamais touché. Tant qu'elle
+//     dessine, le filet de la feuille de style s'efface (`.mb-liquide`) ;
+//     au départ du focus il revient pendant que l'eau s'éteint ;
 //   — LE PLI : inclinaison, flottaison et gonflement suivent des ressorts
 //     amortis, posés en `transform` inline — l'animation du retournement et
 //     celle de l'élue l'emportent sur lui (une animation passe devant le
 //     style inline) : il ne les gêne pas. Au repos, le transform inline
 //     s'efface et la feuille de style reprend la main, à la même valeur ;
-//   — LA BOUCLE : une seule pour toutes les cartes qui bougent, coupée dès
-//     que tout s'est tu — aucune image n'est calculée pour une carte calme.
+//   — LA BOUCLE : une seule pour toutes les cartes qui bougent ; elle tourne
+//     tant qu'une carte a le focus (la houle) ou qu'une rive tremble encore,
+//     et s'arrête dès que tout s'est tu.
 // Le pli reste un pli : rien ici ne pose d'opacité, de filtre ni de
-// clip-path sur lui (index.html, « LE PLI porte la 3D ») ; la toile vit
-// dans la FACE.
+// clip-path sur lui (index.html, « LE PLI porte la 3D ») ; la toile est un
+// enfant de plus, tourné vers l'avant, dos caché.
 
-import { AMORTI, AMORTI_QUITTE, Nappe, Ressort, SEUIL_CALME, SOUS_PAS, SOUS_TEXTE } from './onde'
+import {
+  AMORTI,
+  AMORTI_QUITTE,
+  ECART_MAX,
+  GOUTTE_PX,
+  PAS_RIVE,
+  Ressort,
+  Rive,
+  SEUIL_CALME,
+  SILLAGE_PX,
+  SOUS_PAS,
+  contourCarte,
+  houle,
+  longueurContour,
+} from './onde'
+import type { Noeud } from './onde'
 
-/** La taille d'une maille, en pixels de carte. À 6 px, une goutte fraîche
- *  sortait en escalier (trois mailles de rayon) ; à 4 px elle est ronde dès
- *  sa première image, pour ~9 000 mailles sur la plus grande carte
- *  (360 × 390) — onde.spec.ts mesure le coût d'une image. */
-export const MAILLE_PX = 4
 
-/** Le rayon de la goutte d'entrée et celui du sillage, en pixels de carte. */
-const GOUTTE_PX = 22
-const SILLAGE_PX = 14
+/** La place que la toile prend au-delà de la carte, de chaque côté (px) :
+ *  plus que le plus grand écart de la rive (ECART_MAX) et que son trait. */
+export const MARGE = 10
+
+/** Le chanfrein de la carte (index.html, --mb-chanfrein) : le contour d'eau
+ *  suit le coin coupé du verbe de l'accueil. */
+const CHANFREIN = 14
 
 /** L'inclinaison au bord de la carte, en degrés : la moitié de l'ancienne
  *  (9°), qui faisait plonger le coin opposé — la carte ne se tient plus à
@@ -42,11 +56,14 @@ export const FLOTTE = -6
 
 const PAS_S = 1 / 60
 
+/** Les paliers d'intensité des reflets : un tracé chacun. */
+const PALIERS = 4
+
 export interface OndeCarte {
   /** La carte est visée — au clavier, à la manette, ou au pointeur qui
-   *  entre. Sans point d'entrée, la goutte tombe au tiers haut. */
+   *  entre. Sans point d'entrée, la goutte tombe au milieu du bord haut. */
   vise(clientX?: number, clientY?: number): void
-  /** Plus visée : elle se repose, la nappe s'éteint d'elle-même. */
+  /** Plus visée : elle se repose, l'eau du contour s'éteint. */
   quitte(): void
   /** Tout s'arrête et s'efface, sans un pas de plus (la carte élue, le
    *  tirage qui se referme). */
@@ -58,20 +75,35 @@ interface Etat {
   pli: HTMLElement
   toile: HTMLCanvasElement
   ctx: CanvasRenderingContext2D | null
-  image: ImageData | null
-  nappe: Nappe | null
+  /** le contour au repos, taillé à la face au premier regard */
+  noeuds: Noeud[]
+  longueur: number
+  l: number
+  h: number
+  dpr: number
+  rive: Rive | null
   rx: Ressort
   ry: Ressort
   lev: Ressort
   gonfle: Ressort
+  /** la présence de l'eau : 1 sous le focus, 0 au repos — la houle et le
+   *  trait s'y mesurent, l'eau paraît et s'éteint sans claquer */
+  presence: Ressort
   vise: boolean
   dernier: { x: number; y: number } | null
   /** LE CADRE de la face, relevé à la visée. Le relire à chaque
    *  pointermove forçait une mise en page (le pli venait de changer de
-   *  transform) : la moitié du temps d'une image, processeur bridé ×6 */
+   *  transform) */
   cadre: DOMRect | null
   /** l'inclinaison au pas d'avant : sa variation chasse l'eau */
   avant: { rx: number; ry: number }
+  /** l'écart et la largeur du ruban, nœud par nœud (les tampons du dessin) */
+  ds: Float32Array
+  larg: Float32Array
+  /** le palier de reflet de chaque segment (0 : aucun) */
+  lum: Uint8Array
+  /** l'horloge de la houle, en secondes */
+  temps: number
   arretee: boolean
 }
 
@@ -108,40 +140,41 @@ function image(t: number): void {
   boucle = actives.size ? requestAnimationFrame(image) : 0
 }
 
-/** Avance une carte de `n` pas et la peint ; vrai quand elle s'est tue. */
+/** Avance une carte de `n` pas et la dessine ; vrai quand elle s'est tue. */
 function avance(e: Etat, n: number): boolean {
+  // un écran à 120 Hz : une image sur deux n'avance aucun pas — rien n'a
+  // bougé, on ne redessine pas
+  if (n === 0) return false
   let crete = 0
   for (let i = 0; i < n; i++) {
-    for (const r of [e.rx, e.ry, e.lev, e.gonfle]) r.pas(PAS_S)
-    if (e.nappe) {
-      // L'EAU SUIT LA CARTE : ce que l'inclinaison gagne en un pas, la
-      // nappe le prend en pente — elle s'amasse au bord qui descend et
+    for (const r of [e.rx, e.ry, e.lev, e.gonfle, e.presence]) r.pas(PAS_S)
+    e.temps += PAS_S
+    if (e.rive) {
+      // L'EAU SUIT LA CARTE : ce que l'inclinaison gagne en un pas, le
+      // contour le prend en pente — l'eau s'amasse au bord qui descend et
       // reflue. C'est ce qui fait d'une carte qui penche un volume d'eau.
       const drx = e.rx.valeur - e.avant.rx
       const dry = e.ry.valeur - e.avant.ry
-      if (drx || dry) e.nappe.penche(dry * 0.05, -drx * 0.05)
+      if (drx || dry) e.rive.penche(e.noeuds, e.l, e.h, dry * 0.9, -drx * 0.9)
       const amorti = e.vise ? AMORTI : AMORTI_QUITTE
-      for (let k = 0; k < SOUS_PAS; k++) crete = e.nappe.pas(amorti)
+      for (let k = 0; k < SOUS_PAS; k++) crete = e.rive.pas(amorti)
     }
     e.avant.rx = e.rx.valeur
     e.avant.ry = e.ry.valeur
   }
-  // un écran à 120 Hz : une image sur deux n'avance aucun pas — rien n'a
-  // bougé, on ne repeint pas la même nappe
-  if (n === 0) return false
   posePli(e)
-  peinsEau(e, crete >= SEUIL_CALME)
-  if (!posee(e) || crete >= SEUIL_CALME) return false
-  // tout s'est tu : la boucle lâche la carte. Au repos (ni visée penchée, ni
-  // élan), le pli rend la main à la feuille de style ; une carte qui reste
-  // penchée sous un pointeur immobile garde son inclinaison, sans calcul
-  if (auRepos(e)) repos(e)
+  dessine(e)
+  if (e.vise || !posee(e) || crete >= SEUIL_CALME) return false
+  // tout s'est tu, et plus rien n'a le focus : la boucle lâche la carte
+  repos(e)
   return true
 }
 
 /** Les ressorts ont rejoint leur cible et s'y tiennent. */
 function posee(e: Etat): boolean {
-  return e.rx.pose() && e.ry.pose() && e.lev.pose(0.05) && e.gonfle.pose(0.0005)
+  return (
+    e.rx.pose() && e.ry.pose() && e.lev.pose(0.05) && e.gonfle.pose(0.0005) && e.presence.pose(0.01)
+  )
 }
 
 /** Posée, et à plat : exactement l'état que la feuille de style dessine
@@ -163,100 +196,176 @@ function posePli(e: Etat): void {
     `rotateY(${e.ry.valeur.toFixed(2)}deg) scale(${(1 + g).toFixed(4)}, ${(1 - g * 0.6).toFixed(4)})`
 }
 
-function peinsEau(e: Etat, eau: boolean): void {
-  if (!e.ctx || !e.image || !e.nappe) return
-  if (!eau) {
-    e.ctx.clearRect(0, 0, e.toile.width, e.toile.height)
-    return
+/**
+ * LE FILET D'EAU. Le contour, déplacé nœud par nœud par la rive et la
+ * houle, se dessine en RUBAN : un trait d'eau au bleu du spécimen (le bleu
+ * de l'eau, celui de tout choix qu'on prend), plus épais là où la vague
+ * bombe — l'eau s'y amasse — et plus fin dans les creux. Par-dessus, des
+ * REFLETS pâles, là où la pente de la vague fait face à la lumière (en haut
+ * à gauche, comme le jeu) : ce sont eux qui font lire de l'eau plutôt qu'un
+ * fil qui tremble. Un premier essai traçait un trait fin à la teinte de la
+ * famille : au banc, un fil doré tremblé, rien qui rappelle l'eau. Aucun
+ * halo : la charte ne fait rien luire.
+ */
+function dessine(e: Etat): void {
+  const { ctx, rive, noeuds } = e
+  if (!ctx || !rive) return
+  const p = Math.max(0, Math.min(1, e.presence.valeur))
+  ctx.setTransform(1, 0, 0, 1, 0, 0)
+  // n'efface que la BANDE du contour : l'intérieur de la toile reste vide
+  // (rien ne s'y dessine), et l'effacer à chaque image coûtait sa surface
+  const W = e.toile.width
+  const Hh = e.toile.height
+  const b = Math.ceil((MARGE + ECART_MAX + 4) * e.dpr)
+  ctx.clearRect(0, 0, W, b)
+  ctx.clearRect(0, Hh - b, W, b)
+  ctx.clearRect(0, b, b, Hh - 2 * b)
+  ctx.clearRect(W - b, b, b, Hh - 2 * b)
+  if (p < 0.01) return
+  ctx.setTransform(e.dpr, 0, 0, e.dpr, MARGE * e.dpr, MARGE * e.dpr)
+  const n = noeuds.length
+  // les tampons de l'image, gardés d'une image à l'autre
+  if (e.ds.length !== n) {
+    e.ds = new Float32Array(n)
+    e.larg = new Float32Array(n)
+    e.lum = new Uint8Array(n)
   }
-  e.nappe.ombre(e.image.data)
-  e.ctx.putImageData(e.image, 0, 0)
+  const ds = e.ds
+  for (let i = 0; i < n; i++) ds[i] = rive.ecart(i) + houle(noeuds[i].s, e.longueur, e.temps) * p
+  // LE RUBAN, tracé le long de sa ligne médiane — au repos il couvre les
+  // deux premiers pixels de la carte, là où était le filet. Il était
+  // REMPLI (deux bords décalés, pair-impair) : un rastériseur logiciel
+  // balayait alors tout le rectangle de la carte pour un ruban de 2 px.
+  // Des traits ne coûtent que le long du chemin
+  const ext = (i: number, w: number): [number, number] => {
+    const q = noeuds[i]
+    const c = ds[i] - 1 + w / 2
+    return [q.x + q.nx * c, q.y + q.ny * c]
+  }
+  const larg = e.larg
+  for (let i = 0; i < n; i++) larg[i] = (1.3 + 1.1 * p + 0.8 * Math.max(0, ds[i])) * p
+  ctx.lineJoin = 'round'
+  ctx.lineCap = 'round'
+  ctx.strokeStyle = `rgba(99, 183, 230, ${(0.85 * p).toFixed(3)})`
+  // le corps : tout le contour, d'un trait
+  ctx.beginPath()
+  for (let i = 0; i < n; i++) {
+    const [x, y] = ext(i, 0)
+    if (i) ctx.lineTo(x, y)
+    else ctx.moveTo(x, y)
+  }
+  ctx.closePath()
+  ctx.lineWidth = (1.3 + 1.1 * p) * p
+  ctx.stroke()
+  // les RENFLEMENTS : là où la vague bombe, l'eau s'amasse — deux paliers
+  // d'épaisseur de plus, un trait chacun, sur les seuls segments concernés
+  for (const [seuil, plus] of [[0.6, 0.8], [1.4, 1.6]] as const) {
+    let trace = false
+    ctx.beginPath()
+    for (let i = 0; i < n; i++) {
+      const j = i === n - 1 ? 0 : i + 1
+      if (ds[i] < seuil && ds[j] < seuil) continue
+      const [x0, y0] = ext(i, 0)
+      const [x1, y1] = ext(j, 0)
+      ctx.moveTo(x0, y0)
+      ctx.lineTo(x1, y1)
+      trace = true
+    }
+    if (!trace) continue
+    ctx.lineWidth = (1.3 + 1.1 * p + plus) * p
+    ctx.stroke()
+  }
+  // LES REFLETS, sur la crête du ruban, rangés en quatre paliers
+  // d'intensité : un tracé par palier. Tracés segment par segment (un
+  // stroke() chacun, ~375 par carte et par image), ils coûtaient le double
+  // de l'ancien effet au banc, processeur bridé ×6 — le dessin, pas le calcul
+  // la lumière de chaque segment, une fois : la pente de la vague le long
+  // du contour, et le côté qu'elle tend à la lumière — sur le bord haut, la
+  // vague qui monte vers la droite s'éclaire ; sur le bord bas, l'inverse.
+  // Une pente se compte en dixièmes de pixel par nœud : le gain est fort
+  const lum = e.lum
+  for (let i = 0; i < n; i++) {
+    const q = noeuds[i]
+    const pente = ds[i === n - 1 ? 0 : i + 1] - ds[i === 0 ? n - 1 : i - 1]
+    const face = q.nx * 0.78 - q.ny * 0.62
+    const l = Math.max(0, Math.min(1, pente * Math.sign(face || 1) * 5 + Math.max(0, ds[i] - 0.4) * 0.5))
+    lum[i] = Math.min(PALIERS, Math.ceil(l * PALIERS - 0.2))
+  }
+  ctx.lineWidth = 1
+  ctx.lineCap = 'round'
+  for (let palier = 1; palier <= PALIERS; palier++) {
+    let trace = false
+    ctx.beginPath()
+    for (let i = 0; i < n; i++) {
+      if (lum[i] !== palier) continue
+      const j = i === n - 1 ? 0 : i + 1
+      const [x0, y0] = ext(i, larg[i] * 0.5)
+      const [x1, y1] = ext(j, larg[j] * 0.5)
+      ctx.moveTo(x0, y0)
+      ctx.lineTo(x1, y1)
+      trace = true
+    }
+    if (!trace) continue
+    ctx.strokeStyle = `rgba(233, 246, 255, ${((palier / PALIERS) * 0.9 * p).toFixed(3)})`
+    ctx.stroke()
+  }
 }
 
 /** Tout est posé : le pli rend la main à la feuille de style, la toile
  *  s'efface — la carte calme est exactement la carte d'avant l'effet. */
 function repos(e: Etat): void {
-  for (const r of [e.rx, e.ry, e.lev, e.gonfle]) r.fige()
+  for (const r of [e.rx, e.ry, e.lev, e.gonfle, e.presence]) r.fige()
   e.pli.style.removeProperty('transform')
+  e.pli.classList.remove('mb-liquide')
+  e.ctx?.setTransform(1, 0, 0, 1, 0, 0)
   e.ctx?.clearRect(0, 0, e.toile.width, e.toile.height)
-  e.nappe?.aplanit()
+  e.rive?.aplanit()
 }
 
-/** La nappe, taillée à la face (au premier regard : la carte est posée). */
+/** Le contour et la toile, taillés à la face (au premier regard : la carte
+ *  est posée). Mesurés en offsetWidth / offsetHeight (la mise en page), pas
+ *  au rectangle de l'écran : la carte peut déjà pencher. */
 function taille(e: Etat): void {
-  const w = Math.max(3, Math.round(e.face.offsetWidth / MAILLE_PX))
-  const h = Math.max(3, Math.round(e.face.offsetHeight / MAILLE_PX))
-  if (e.nappe && e.nappe.w === w && e.nappe.h === h) return
-  e.nappe = new Nappe(w, h)
-  e.nappe.masque = masqueTexte(e.face, w, h)
-  e.toile.width = w
-  e.toile.height = h
+  const l = e.face.offsetWidth
+  const h = e.face.offsetHeight
+  if (!l || !h) return
+  const dpr = Math.min(2, Math.max(1, window.devicePixelRatio || 1))
+  if (e.rive && e.l === l && e.h === h && e.dpr === dpr) return
+  e.l = l
+  e.h = h
+  e.dpr = dpr
+  e.noeuds = contourCarte(l, h, CHANFREIN, PAS_RIVE)
+  e.longueur = longueurContour(e.noeuds)
+  e.rive = new Rive(e.noeuds.length)
+  e.toile.width = Math.round((l + MARGE * 2) * dpr)
+  e.toile.height = Math.round((h + MARGE * 2) * dpr)
   e.ctx = e.toile.getContext('2d')
-  e.image = e.ctx ? e.ctx.createImageData(w, h) : null
 }
 
-/** Ce qui porte du TEXTE sur la face : le nom, la famille, la phrase, les
- *  leviers, la contrepartie, le prix. */
-const TEXTES = '.crt-nom, .crt-rang, .crt-txt, .eff, .crt-ctr, .crt-perso, .crt-prix'
-
-/** LE MASQUE DU TEXTE : sous chaque bloc de texte (élargi d'une marge), la
- *  nappe ne garde que SOUS_TEXTE de son éclat ; un flou d'une maille adoucit
- *  la lisière, que la marge absorbe — sous les lettres, le plafond tient.
- *  Les positions se lisent en offsetLeft / offsetTop (la mise en page), pas
- *  au rectangle de l'écran : la carte peut déjà pencher quand on la mesure. */
-function masqueTexte(face: HTMLElement, w: number, h: number): Float32Array {
-  const m = new Float32Array(w * h).fill(1)
-  const marge = MAILLE_PX * 1.5
-  for (const el of face.querySelectorAll<HTMLElement>(TEXTES)) {
-    let x = 0
-    let y = 0
-    let n: HTMLElement | null = el
-    while (n && n !== face) {
-      x += n.offsetLeft
-      y += n.offsetTop
-      n = n.offsetParent as HTMLElement | null
-    }
-    if (n !== face || !el.offsetWidth) continue
-    const i0 = Math.max(0, Math.floor((x - marge) / MAILLE_PX))
-    const i1 = Math.min(w - 1, Math.ceil((x + el.offsetWidth + marge) / MAILLE_PX))
-    const j0 = Math.max(0, Math.floor((y - marge) / MAILLE_PX))
-    const j1 = Math.min(h - 1, Math.ceil((y + el.offsetHeight + marge) / MAILLE_PX))
-    for (let j = j0; j <= j1; j++) for (let i = i0; i <= i1; i++) m[j * w + i] = SOUS_TEXTE
-  }
-  // le flou d'une maille : la lisière du masque ne se dessine pas en marche
-  const f = new Float32Array(m)
-  for (let j = 0; j < h; j++) {
-    for (let i = 0; i < w; i++) {
-      let s = 0
-      let c = 0
-      for (let dj = -1; dj <= 1; dj++) {
-        for (let di = -1; di <= 1; di++) {
-          const ii = i + di
-          const jj = j + dj
-          if (ii < 0 || jj < 0 || ii >= w || jj >= h) continue
-          s += m[jj * w + ii]
-          c++
-        }
-      }
-      f[j * w + i] = s / c
-    }
-  }
-  return f
-}
-
-/** Un point de l'écran, en mailles de la nappe. */
-function enMailles(e: Etat, x: number, y: number): { x: number; y: number; u: number; v: number } {
+/** Le nœud du contour le plus proche d'un point de l'écran, et sa distance
+ *  (px de carte). */
+function plusProche(e: Etat, x: number, y: number): { i: number; dist: number; u: number; v: number } {
   const r = e.cadre ?? e.face.getBoundingClientRect()
   const u = (x - r.left) / Math.max(1, r.width)
   const v = (y - r.top) / Math.max(1, r.height)
-  const n = e.nappe
-  return { x: u * (n ? n.w - 1 : 0), y: v * (n ? n.h - 1 : 0), u, v }
+  const px = u * e.l
+  const py = v * e.h
+  let i = 0
+  let dist = Infinity
+  for (let k = 0; k < e.noeuds.length; k++) {
+    const d = Math.hypot(e.noeuds[k].x - px, e.noeuds[k].y - py)
+    if (d < dist) {
+      dist = d
+      i = k
+    }
+  }
+  return { i, dist, u, v }
 }
 
 /**
- * Donne à une carte son eau : `face` reçoit la toile (sous son contenu),
- * `pli` les ressorts. `sansAnimation` est relu à chaque geste : « moins
- * d'animations » coupe tout, même en cours de partie.
+ * Donne à une carte son contour d'eau : `pli` reçoit la toile et les
+ * ressorts, `face` est écoutée. `sansAnimation` est relu à chaque geste :
+ * « moins d'animations » coupe tout, même en cours de partie.
  */
 export function ondeCarte(
   face: HTMLElement,
@@ -264,58 +373,67 @@ export function ondeCarte(
   sansAnimation: () => boolean,
 ): OndeCarte {
   const toile = document.createElement('canvas')
-  // une toile sans taille : la nappe ne la taille qu'au premier regard,
-  // une carte jamais visée ne garde pas un tampon de 300 × 150 pour rien
+  // une toile sans taille : le contour ne la taille qu'au premier regard,
+  // une carte jamais visée ne garde pas un tampon pour rien
   toile.width = 0
   toile.height = 0
-  toile.className = 'mb-onde'
+  toile.className = 'mb-rive'
   toile.setAttribute('aria-hidden', 'true')
-  face.prepend(toile)
+  pli.append(toile)
   const e: Etat = {
     face,
     pli,
     toile,
     ctx: null,
-    image: null,
-    nappe: null,
+    noeuds: [],
+    longueur: 0,
+    l: 0,
+    h: 0,
+    dpr: 1,
+    rive: null,
     rx: new Ressort(0, 150, 13),
     ry: new Ressort(0, 150, 13),
     lev: new Ressort(0, 210, 16),
     // le gonflement est plus vif et moins amorti : la carte tremble deux
     // ou trois fois, comme une goutte posée, puis se tient
     gonfle: new Ressort(0, 420, 11),
+    presence: new Ressort(0, 90, 19),
     vise: false,
     dernier: null,
     cadre: null,
     avant: { rx: 0, ry: 0 },
+    ds: new Float32Array(0),
+    larg: new Float32Array(0),
+    lum: new Uint8Array(0),
+    temps: 0,
     arretee: false,
   }
 
   const vise = (cx?: number, cy?: number): void => {
     if (e.arretee || sansAnimation()) return
     taille(e)
+    if (!e.rive) return
     const deja = e.vise
-    // relevé carte encore au repos (ou presque) : le pointeur se lit contre
-    // la carte posée, pas contre son ombre penchée
-    if (!deja) e.cadre = e.face.getBoundingClientRect()
     e.vise = true
     e.lev.cible = FLOTTE
+    e.presence.cible = 1
     if (!deja) {
-      // L'ENTRÉE : une goutte tombe dans la carte — là où le pointeur
-      // entre, au tiers haut sinon (le clavier, la manette) — et la carte
-      // gonfle d'un coup, puis se tient
-      const p = cx !== undefined && cy !== undefined ? enMailles(e, cx, cy) : null
-      const n = e.nappe!
-      // le pointeur entre par un BORD : la goutte posée là n'y faisait qu'un
-      // demi-anneau, aussitôt renvoyé. Elle tombe au tiers du chemin vers
-      // le cœur de la carte — l'anneau se voit entier, et part du bon côté
-      const cx0 = (n.w - 1) / 2
-      const cy0 = (n.h - 1) * 0.36
-      const x = p ? p.x + (cx0 - p.x) * 0.35 : cx0
-      const y = p ? p.y + (cy0 - p.y) * 0.35 : cy0
-      n.goutte(x, y, GOUTTE_PX / MAILLE_PX, p ? 1.1 : 1.4)
+      // relevé carte encore au repos (ou presque) : le pointeur se lit
+      // contre la carte posée, pas contre son ombre penchée
+      e.cadre = e.face.getBoundingClientRect()
+      // L'ENTRÉE : une goutte tombe sur le contour — là où le pointeur le
+      // franchit, au milieu du bord haut sinon (le clavier, la manette) ;
+      // elle part dans les deux sens et fait le tour de la carte. Et la
+      // carte gonfle d'un coup, puis se tient
+      const i =
+        cx !== undefined && cy !== undefined
+          ? plusProche(e, cx, cy).i
+          : Math.round((e.l - CHANFREIN) / 2 / PAS_RIVE)
+      e.rive.goutte(i, GOUTTE_PX / PAS_RIVE, -3.2)
       e.gonfle.vitesse += 0.32
-      e.dernier = p ? { x: cx!, y: cy! } : null
+      e.dernier = cx !== undefined && cy !== undefined ? { x: cx, y: cy } : null
+      // le filet de la feuille s'efface : c'est l'eau qui le tient
+      e.pli.classList.add('mb-liquide')
     }
     // le pli prend la main TOUT DE SUITE : la feuille de style pose déjà la
     // flottaison de `.mb-vise`, une image sans lui la montrerait sautée
@@ -331,35 +449,34 @@ export function ondeCarte(
     e.rx.cible = 0
     e.ry.cible = 0
     e.lev.cible = 0
+    e.presence.cible = 0
+    // le filet de la feuille revient (il transite) pendant que l'eau s'éteint
+    e.pli.classList.remove('mb-liquide')
     posePli(e)
     demarre(e)
   }
 
   // LE POINTEUR : il incline la carte (une cible, que les ressorts
-  // rejoignent — plus aucune valeur ne saute d'un événement à l'autre) et
-  // laisse dans l'eau un sillage à sa vitesse
+  // rejoignent — plus aucune valeur ne saute d'un événement à l'autre) ;
+  // près d'un bord, il entraîne l'eau du contour à sa vitesse
   face.addEventListener('pointerenter', (ev) => vise(ev.clientX, ev.clientY))
   face.addEventListener('pointermove', (ev) => {
     if (e.arretee || sansAnimation()) return
     if (!e.vise) vise(ev.clientX, ev.clientY)
-    const n = e.nappe
-    if (!n) return
-    const p = enMailles(e, ev.clientX, ev.clientY)
+    if (!e.rive) return
+    const p = plusProche(e, ev.clientX, ev.clientY)
     e.ry.cible = (Math.max(0, Math.min(1, p.u)) - 0.5) * 2 * INCLINAISON
     e.rx.cible = -(Math.max(0, Math.min(1, p.v)) - 0.5) * 2 * INCLINAISON
     const d = e.dernier
     e.dernier = { x: ev.clientX, y: ev.clientY }
-    if (d) {
-      const q = enMailles(e, d.x, d.y)
-      const dist = Math.hypot(p.x - q.x, p.y - q.y)
-      // une goutte par maille et demie parcourue ; la force suit la vitesse, bornée :
-      // un geste rageur ne fait pas déborder la cuve
-      const k = Math.min(10, Math.ceil(dist / 1.5))
-      const f = Math.min(0.2, 0.04 + dist * 0.016)
-      for (let i = 1; i <= k; i++) {
-        const t = i / k
-        n.goutte(q.x + (p.x - q.x) * t, q.y + (p.y - q.y) * t, SILLAGE_PX / MAILLE_PX, -f / Math.sqrt(k))
-      }
+    // à moins de 28 px d'un bord, le geste soulève l'eau : vers le bord, il
+    // la pousse au-dehors ; en s'en éloignant, il la tire au-dedans. Borné :
+    // un geste rageur ne fait pas déborder la rive
+    if (d && p.dist < 28) {
+      const q = e.noeuds[p.i]
+      const vn = (ev.clientX - d.x) * q.nx + (ev.clientY - d.y) * q.ny
+      const f = Math.max(-1.2, Math.min(1.2, vn * 0.12)) * (1 - p.dist / 28)
+      if (f) e.rive.goutte(p.i, SILLAGE_PX / PAS_RIVE, f)
     }
     demarre(e)
   })
