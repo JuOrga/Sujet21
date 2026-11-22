@@ -28,10 +28,11 @@
 //                          │    S    │
 //                          └─────────┘
 //
-// LA CUVE A TROIS BOUCHES (22/11) — vers le sas, le comptoir et le bac —,
-// plus étroites que le corps : il s'étire pour passer, et part dans la
-// direction qu'il choisit. Aucune porte ne la ferme, aucune barrière ne
-// condamne une aile, aucun sceau le secteur 4 : rien ne bloque.
+// LA CUVE A TROIS BOUCHES (22/11), à un tiers de tour l'une de l'autre, celle
+// de l'est dans l'axe du sas, plus étroites que le corps : il s'étire pour
+// passer, et part dans la direction qu'il choisit. Aucune porte ne la ferme.
+// Le reste joue comme une vraie run : les ailes en panne sont condamnées
+// jusqu'à leur réparation, le secteur 4 jusqu'à la fin de l'arc.
 //
 // LES TROIS RÈGLES DU PLAN, que hubRotonde.spec.ts garde :
 //
@@ -112,19 +113,30 @@ const BOUT_NS = 1500
 const BOUT_EST = 2000
 const BOUT_OUEST = -2050
 
-/** LA CUVE : l'anneau du menu, à l'échelle du hall. 256 u de rayon libre —
- *  le corps (≈ 105 u) y dérive sans toucher, et la règle de dégagement du
- *  départ (120 u, levelIO) est tenue deux fois. */
-export const CUVE_RAYON = 300
+/** LE HUBLOT sous l'échantillon : un disque vitré (MAT_BAIE), dont le moteur
+ *  dessine la MONTURE — l'anneau de métal rivé — sur le pourtour INTÉRIEUR
+ *  du disque (renderer.ts, « BAIE VITRÉE ») : le métal s'arrête au rayon
+ *  même de la vitre. */
+export const VITRE_RAYON = 278
 export const CUVE_EPAISSEUR = 44
+/** LA CUVE : sa paroi AFFLEURE l'anneau de métal du hublot — elle commence
+ *  au rayon de la vitre, sans le couvrir. D'abord la vitre passait sous la
+ *  paroi, comme dans la vitrine du menu, et les trois arcs reposaient sur
+ *  la monture : « ce n'est pas logique, elles doivent être légèrement
+ *  reculées pour être fixées sur la paroi du fond, pas le hublot et sa
+ *  structure » (le concepteur, 22/11). 278 u de rayon libre : le corps
+ *  (≈ 105 u) y dérive sans toucher, et la règle de dégagement du départ
+ *  (120 u, levelIO) est tenue deux fois. */
+export const CUVE_RAYON = VITRE_RAYON + CUVE_EPAISSEUR
 
-/** LES TROIS BOUCHES de la cuve, en degrés (0 = est, sens trigonométrique) :
- *  le départ, le comptoir, le bac — on part de la cuve dans la direction
- *  qu'on veut (le concepteur, 22/11 : « 3 ouvertures sur le cercle […] ceci
- *  permet de partir dans la direction souhaitée »). Le DOS, à l'ouest,
- *  reste plein : le banc des mémoires s'y adosse, et l'aile se rejoint par
- *  le nord ou par le sud. */
-export const CUVE_BOUCHES: readonly number[] = [0, 90, -90]
+/** LES TROIS BOUCHES de la cuve, en degrés (0 = est, sens trigonométrique),
+ *  À ÉQUIDISTANCE — un tiers de tour entre deux —, celle de droite dans
+ *  l'axe du sas (le concepteur, 22/11 : « 3 ouvertures sur le cercle […]
+ *  ceci permet de partir dans la direction souhaitée » ; puis « mets-les à
+ *  équidistance, avec l'ouverture de droite alignée avec le sas » — la
+ *  première version les posait à l'est, au nord et au sud). Le DOS, à
+ *  l'ouest, reste plein : le banc des mémoires s'y adosse. */
+export const CUVE_BOUCHES: readonly number[] = [0, 120, -120]
 
 /** LA LARGEUR D'UNE BOUCHE, en corde au rayon intérieur — PLUS ÉTROITE QUE
  *  LE CORPS (≈ 210 u de diamètre) : il s'y étire pour passer (« plus
@@ -239,6 +251,10 @@ const carre = (cx: number, cy: number, demiX: number, demiY = demiX): Rect => ({
   maxY: cy + demiY,
 })
 
+/** Une barrière d'énergie en travers d'un bras : elle déborde le passage de
+ *  10 u de chaque côté, pour mordre dans les parois (aucun jour). */
+const DEMI_BARRIERE = PASSAGE_BRAS / 2 + 10
+
 /** Le sas : son rayon, et son centre — adossé au fond du bras. */
 export const SAS_RAYON = 150
 const SAS_X = BOUT_EST - EP_ROTONDE - SAS_RAYON - 4
@@ -260,45 +276,60 @@ export const ZONES_ROTONDE = {
     eclairage: carre(520, 520, 90),
     distillateur: carre(520, -520, 90),
     'table-depart': { minX: 960, minY: -130, maxX: 1100, maxY: 130 } as Rect,
-    // LE MUR DES RECORDS : la baie du nord-ouest, contre le pan coupé
-    'mur-records': carre(-510, 510, 120, 90),
-    // devant l'aile et devant le bac, au seuil
+    // LE MUR DES RECORDS : la baie du nord-ouest, poussée vers l'ouest — la
+    // bouche à 120° de la cuve regarde ce pan coupé : le corps qui en sort
+    // tout droit doit passer à côté, sans payer
+    'mur-records': carre(-700, 400, 100, 70),
+    // devant l'aile et devant le bac : on paie au seuil, la barrière tombe
     'aile-endormis': { minX: -800, minY: -100, maxX: -640, maxY: 100 } as Rect,
     'bac-sable': { minX: -100, minY: -800, maxX: 100, maxY: -640 } as Rect,
     // au fond de l'aile des endormis, devant la passerelle
     'passerelle-4': { minX: -1500, minY: -100, maxX: -1340, maxY: 100 } as Rect,
   } as Record<string, Rect>,
+  portesDegat: {
+    'aile-endormis': [{ minX: -916, minY: -DEMI_BARRIERE, maxX: -872, maxY: DEMI_BARRIERE }],
+    'bac-sable': [{ minX: -DEMI_BARRIERE, minY: -916, maxX: DEMI_BARRIERE, maxY: -872 }],
+    'passerelle-4': [{ minX: -1580, minY: -DEMI_BARRIERE, maxX: -1536, maxY: DEMI_BARRIERE }],
+  } as Record<string, Rect[]>,
+  sceau: { minX: -1650, minY: -DEMI_BARRIERE, maxX: -1606, maxY: DEMI_BARRIERE } as Rect,
   sasScelle: { minX: -1930, minY: -120, maxX: -1730, maxY: 120 } as Rect,
   // LE BANC DES MÉMOIRES : adossé au DOS de la cuve. Le corps posé contre
-  // l'anneau a son centre à ≈ 405 u du milieu du module : dans la zone, à
-  // 85 u de son bord côté cuve.
+  // l'anneau a son centre à un rayon de corps de la paroi : dans la zone, à
+  // une centaine d'unités de son bord côté cuve.
   //
   // Le banc et le mur des records ont échangé leurs places à la relecture du
   // module EN PANNE : la plaque « EN PANNE » d'une station se pose au centre
   // de son plot, et celle du mur, au dos de la cuve, tombait sur la même
   // ligne que celle de l'aile des endormis, à 330 u — l'une masquait
   // l'autre. Le banc n'est pas une station : il n'a pas de plaque.
-  banc: { minX: -500, minY: -90, maxX: -320, maxY: 90 } as Rect,
+  banc: { minX: -(CUVE_RAYON + 180), minY: -90, maxX: -(CUVE_RAYON + 4), maxY: 90 } as Rect,
   // les consoles
   pupitres: {
     marchand: { minX: -230, minY: 1230, maxX: -10, maxY: 1340 } as Rect,
-    reparations: carre(-590, -430, 90, 50),
-    station: carre(-430, -590, 90, 50),
-    records: carre(-510, 510, 90, 50),
+    // le centre de contrôle, au pan coupé du sud-ouest : la bouche à −120°
+    // le regarde, ses deux consoles s'écartent de part et d'autre de l'axe
+    reparations: carre(-720, -420, 80, 45),
+    station: carre(-560, -560, 80, 45),
+    records: carre(-700, 400, 70, 40),
   },
 }
 
-/** LES ANCRES DU MODULE. RIEN N'Y BLOQUE (le concepteur, 22/11 : « ne mets
- *  pas de porte au cercle central, pas de blocage ») : ni porte de cuve à
- *  l'acte 0, ni barrière d'énergie devant une aile en panne, ni sceau sur le
- *  secteur 4. Les stations se réparent toujours — la panne se lit sur les
- *  pièces, les lampes et les plaques —, mais aucune ne ferme un passage. */
+/** LES ANCRES DU MODULE — comme une vraie run : les ailes en panne sont
+ *  CONDAMNÉES par leur barrière jusqu'à la réparation, le secteur 4 par son
+ *  sceau jusqu'à la fin de l'arc. Seule la PORTE DE LA CUVE n'existe pas : à
+ *  l'acte 0, le sujet naissait enfermé et attendait l'alerte et sa brèche —
+ *  « ne mets pas de porte au cercle central […] c'était juste la porte avec
+ *  le temps d'attente et la cinématique ; le reste doit rester comme une
+ *  vraie run, éléments à débloquer » (le concepteur, 22/11). */
 function ancresRotonde(): AncreMeta[] {
   const z = ZONES_ROTONDE
   const out: AncreMeta[] = []
   for (const [id, r] of Object.entries(z.stations)) out.push({ ...r, role: 'station', id })
+  for (const [id, rects] of Object.entries(z.portesDegat))
+    for (const r of rects) out.push({ ...r, role: 'degat', id })
   out.push({ ...z.tableDepart, role: 'table-depart' })
   out.push({ ...z.sasScelle, role: 'sas-scelle' })
+  out.push({ ...z.sceau, role: 'sceau' })
   out.push({ ...z.sasGivre, role: 'sas-givre' })
   out.push({ ...z.sasVapeur, role: 'sas-vapeur' })
   return out
@@ -343,10 +374,10 @@ export const TABLEAU_HUB_ROTONDE: LevelDef = {
   // concepteur, 22/11, sur l'aperçu).
   raccords: 'aucun',
   boxes: [
-    // LA VITRE sous l'échantillon, comme au menu : un fond, qui passe sous
-    // la paroi de l'anneau pour qu'aucun jour ne reste entre les deux
+    // LE HUBLOT sous l'échantillon : un fond. Son anneau de métal finit à
+    // son bord, et la paroi de la cuve commence là (CUVE_RAYON)
     {
-      ...carre(0, 0, CUVE_RAYON - CUVE_EPAISSEUR / 2),
+      ...carre(0, 0, VITRE_RAYON),
       material: MAT_BAIE,
       forme: FORME_DISQUE,
     },
@@ -406,8 +437,8 @@ export const TABLEAU_HUB_ROTONDE: LevelDef = {
     { x: 0, y: -1150, w: 230, h: 230, kind: 'hub-bac-sable', fade: 0.7 },
     // le mur des records : sa pièce contre le pan coupé, son écran sous la
     // console — éteint avec lui
-    { x: -510, y: 606, w: 260, h: 74, kind: 'hub-mur-records', fade: 0.9 },
-    { x: -510, y: 432, w: 180, h: 40, kind: 'ecran-on', fade: 0.95 },
+    { x: -700, y: 520, w: 220, h: 62, kind: 'hub-mur-records', fade: 0.9 },
+    { x: -700, y: 340, w: 140, h: 36, kind: 'ecran-on', fade: 0.95 },
     // la machinerie du comptoir
     { x: -150, y: 1010, w: 150, h: 110, kind: 'tuyaux', fade: 0.8 },
     { x: 150, y: 1010, w: 150, h: 110, kind: 'vanne', fade: 0.8 },
@@ -451,8 +482,8 @@ export const TABLEAU_HUB_ROTONDE: LevelDef = {
     },
     { x: DEPART_MILIEU, y: -400, text: 'RIDEAU|SEULE LA GLACE L’ÉCARTE', tone: 'froid' },
     // ─── les baies du hall
-    { x: -560, y: 170, text: 'LE BANC DES MÉMOIRES|TISSER LES LIENS', tone: 'froid' },
-    { x: -620, y: -620, text: 'CENTRE DE CONTRÔLE|LA CONDUITE DE L’ÉTAGE', tone: 'mur' },
+    { x: -(CUVE_RAYON + 92), y: 160, text: 'LE BANC DES MÉMOIRES|TISSER LES LIENS', tone: 'froid' },
+    { x: -620, y: -660, text: 'CENTRE DE CONTRÔLE|LA CONDUITE DE L’ÉTAGE', tone: 'mur' },
     {
       x: 520,
       y: -660,
@@ -461,8 +492,8 @@ export const TABLEAU_HUB_ROTONDE: LevelDef = {
       tone: 'grille',
     },
     {
-      x: -510,
-      y: 700,
+      x: -690,
+      y: 600,
       text: 'LE MUR DES RECORDS|BANC OPTIQUE DES CALIBRATIONS',
       cle: 'hub.mur-records',
       tone: 'froid',
@@ -482,6 +513,13 @@ export const TABLEAU_HUB_ROTONDE: LevelDef = {
       cle: 'hub.secteur-scelle',
       tone: 'sas',
       rang: 'secteur',
+    },
+    {
+      x: -1830,
+      y: -180,
+      text: 'ACCÈS CONDAMNÉ|DEPUIS L’ACCIDENT',
+      cle: 'hub.acces-condamne',
+      tone: 'mur',
     },
     // ─── les surfaces du bac
     { x: -180, y: -1330, text: 'CHAUDIÈRE|ELLE VAPORISE', tone: 'chaud' },

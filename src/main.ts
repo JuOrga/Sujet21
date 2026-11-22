@@ -2503,9 +2503,13 @@ const CARTES_GESTES: boolean = false
 //    main scénarisée) ne se lance plus tout seul, ni à l'entrée au hub, ni à
 //    la reprise, ni au premier essai. Le bouton « rejouer l'éveil » du
 //    protocole le lance toujours : désactivé PAR DÉFAUT, pas supprimé.
-//  · NARRATION_HUB : les moments du scénario joués en arrivant au hub
-//    (« premier lancement », « avant le hub ») se taisent. L'ALERTE (la
-//    brèche de la cuve) suit l'éveil : sans éveil, pas d'alerte.
+//  · NARRATION_HUB : les moments du scénario joués au hub se taisent — en
+//    arrivant (« premier lancement », « avant le hub ») comme en partant
+//    (« lancement de la run », la cinématique du départ : « coupe aussi la
+//    cinématique de départ », 22/11). L'ALERTE (la brèche de la cuve) suit
+//    l'éveil : sans éveil, pas d'alerte. Les PANNES, elles, jouent : ailes
+//    condamnées, stations à réparer — ce n'est pas de la narration, c'est
+//    la progression.
 const EVEIL_PAR_DEFAUT: boolean = false
 const NARRATION_HUB: boolean = false
 /** L'ACTE 0 EST-IL DERRIÈRE LE JOUEUR ? L'éveil joué, ou l'éveil qui ne se
@@ -21626,11 +21630,15 @@ function corpsImage(now: number): boolean {
     audio.collect()
     bande.ponctuation('sting-collecte', 0.85)
     // LE SCÉNARIO : la cinématique du départ, s'il y en a une — la run
-    // attend qu'elle finisse (la simulation est en pause pendant ce temps)
-    void joueMoment('lancement-run').then(() => {
+    // attend qu'elle finisse (la simulation est en pause pendant ce temps).
+    // Elle se tait avec la narration du hub (NARRATION_HUB) : on part tout
+    // de suite.
+    const partir = (): void => {
       effaceRun()
       newExpedition(true)
-    })
+    }
+    if (NARRATION_HUB) void joueMoment('lancement-run').then(partir)
+    else partir()
   } else if (!tableauDone && !sim.dispersed && estMiniJeu(level) && level.minijeu && (majPalet(), majRafales(), majOrbites(), majCibles(), minijeuResultat)) {
     // LE MINI-JEU A CONCLU : la lame du couperet a pesé, le palet a fait
     // ses lancers (ou le joueur a conclu). Rien ne se consigne aux registres

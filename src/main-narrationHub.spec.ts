@@ -30,6 +30,10 @@ describe('le hub sans narration, l’éveil sans lancement automatique', () => {
     expect(SRC.split('\n')[appel - 1]).toMatch(/if \(NARRATION_HUB\)/)
   })
 
+  it('la cinématique du départ se tait avec elle : la run part tout de suite', () => {
+    expect(SRC).toMatch(/if \(NARRATION_HUB\) void joueMoment\('lancement-run'\)\.then\(partir\)\n\s*else partir\(\)/)
+  })
+
   it('sans éveil, l’acte 0 n’attend plus : la cuve s’ouvre, le récit se livre', () => {
     expect(SRC).toMatch(/return eveilJoue\(\) \|\| !EVEIL_PAR_DEFAUT/)
     expect(SRC).toMatch(/cuveClose: !acteZeroPasse\(\) \|\| eveilEnCours \|\| alerteDifferee/)
