@@ -86,6 +86,7 @@ import {
   TABLEAU_HUB,
   TABLEAU_HUB_COMPACT,
 } from '../game/hub'
+import { TABLEAU_HUB_ROTONDE } from '../game/hubRotonde'
 import { REPARATIONS, ficheReparation, fichesReparations } from '../game/reparations'
 import {
   PUPITRES,
@@ -4467,16 +4468,17 @@ export class LevelEditor {
     // Tableaux LIVRÉS : une copie s'ouvre comme brouillon — pour étudier la
     // construction des salles (miroirs, prisme, plasma…) ou en repartir.
     const selLivres = this.el<HTMLSelectElement>('ed-livres')
-    // le HUB en tête (code « HUB », le module Méduse en RUBAN) : publié
-    // dans la bibliothèque, il REMPLACE le laboratoire joué — sans jamais
-    // entrer dans la séquence. Il porte TOUT son méta en données (plots,
-    // banc, marchand, ancres de réparation et de sas) : la copie s'ouvre
-    // ici pièce par pièce. Le hub COMPACT (chantier, code HUB2) s'étudie
-    // et se copie aussi ; pour qu'il devienne LE laboratoire, renommer sa
-    // copie en HUB.
+    // LE HUB JOUÉ en tête : la ROTONDE (code HUB3 = CODE_HUB, depuis le
+    // 22/11). Publiée dans la bibliothèque sous ce code, sa copie REMPLACE
+    // le laboratoire joué — sans jamais entrer dans la séquence. Elle porte
+    // TOUT son méta en données (pupitres, banc, marchand, ancres) : la copie
+    // s'ouvre ici pièce par pièce. Le grand module (HUB) et le compact (HUB2)
+    // s'étudient et se copient aussi ; pour que l'un d'eux redevienne LE
+    // laboratoire, renommer sa copie en HUB3.
     // L'ÉCONOMAT suit la même règle que le HUB : publié sous le code « ECO »,
     // sa copie remplace la salle-boutique jouée — plots, marchand compris.
     const livres = [
+      TABLEAU_HUB_ROTONDE,
       TABLEAU_HUB,
       TABLEAU_HUB_COMPACT,
       TABLEAU_ECONOMAT,
@@ -4709,6 +4711,18 @@ export class LevelEditor {
     this.el('ed-plafond').addEventListener('change', () => this.histoire())
     // LE SOL DES MODULES : le fond de cuve ne se peint qu'à l'intérieur des
     // coques, et la bordure de la toile se tait — le dehors devient le vide
+    // LES SAS DE RACCORD : le col peint à chaque jonction de couloir —
+    // décoché, les jonctions restent nues (la rotonde, 22/11)
+    this.el('ed-raccords').addEventListener('change', () => {
+      const on = (this.el('ed-raccords') as HTMLInputElement).checked
+      if (on) delete this.level.raccords
+      else this.level.raccords = 'aucun'
+      this.commit(
+        on
+          ? 'Sas de raccord : un col d’amarrage masque chaque jonction de couloir.'
+          : 'Sas de raccord retirés : les jonctions de couloir restent nues.',
+      )
+    })
     this.el('ed-sol-modules').addEventListener('change', () => {
       const on = (this.el('ed-sol-modules') as HTMLInputElement).checked
       if (on) this.level.coque = 'structures'
@@ -5167,7 +5181,7 @@ export class LevelEditor {
               s.level.code === CODE_HUB
                 ? 'Le LABORATOIRE : ce tableau remplace le hub et ne compte pas dans la séquence'
                 : hub
-                  ? 'Un chantier de hub : hors séquence — publiez-le sous le code HUB pour qu’il devienne le laboratoire joué'
+                  ? `Un chantier de hub : hors séquence — publiez-le sous le code ${CODE_HUB} pour qu’il devienne le laboratoire joué`
                   : 'Ouvrir ce tableau'
             }">` +
             `<b>${s.level.code}</b> ${s.level.name}` +
@@ -5594,6 +5608,8 @@ export class LevelEditor {
       this.level.plafond ?? ''
     ;(this.el('ed-sol-modules') as HTMLInputElement).checked =
       this.level.coque === 'structures'
+    ;(this.el('ed-raccords') as HTMLInputElement).checked =
+      this.level.raccords !== 'aucun'
     ;(this.el('ed-brume') as HTMLInputElement).value =
       this.level.brume === undefined || this.level.brume === 0
         ? ''
@@ -5640,7 +5656,7 @@ export class LevelEditor {
       el.textContent =
         code.toUpperCase() === CODE_HUB
           ? 'Code réservé : ce tableau devient le LABORATOIRE (hors séquence).'
-          : 'Chantier de hub : hors séquence tant qu’il ne s’appelle pas HUB.'
+          : `Chantier de hub : hors séquence tant qu’il ne s’appelle pas ${CODE_HUB}.`
       return
     }
     const num = numeroTableau(this.level.name)
