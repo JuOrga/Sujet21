@@ -51,8 +51,13 @@ import {
   COQUE_REP,
   COQUE_SOMMETS,
   COTE_FLANC,
+  FLANC_BANDEAU,
   FLANC_COQUE_GLSL,
+  FLANC_HAUTEUR,
+  FLANC_JOINT,
+  FLANC_PLINTHE,
   FLANC_SOMMETS,
+  JOINT_FLANC_COQUE_GLSL,
   MAX_VIDES_COQUE,
   OMBRE_PIED_COQUE_GLSL,
   OMBRE_PIED_PORTEE,
@@ -5695,6 +5700,7 @@ uniform float uSommet; // la part dont le dessus fuit le centre (voir HULL_VS)
 out vec4 outColor;
 ${LUMIERE_SCENE_GLSL}
 ${FLANC_COQUE_GLSL}
+${JOINT_FLANC_COQUE_GLSL}
 
 float boxSdf(vec2 world, vec4 b) {
   vec2 c = (b.xy + b.zw) * 0.5;
@@ -6078,26 +6084,54 @@ void main() {
   if (vCote.x > 4.5) {
     // LA FACE INTÉRIEURE DE LA PAROI (relief allumé) : un mur qui monte de la
     // cuve, vu de biais. Le pied de ce point d'écran et sa hauteur vue
-    // (piedFlancCoque) ; la tôle de la coque — c'est déjà une paroi de
-    // machinerie vue de face, ses conduites et ses panneaux — couchée sur la
-    // hauteur, tassée comme l'est toute tranche. Ce qu'un solide de la cuve
-    // dresse devant elle (un mur collé à la paroi, dont le dessus déborde)
-    // l'emporte : la profondeur de la composition (0 sous un sommet) la
-    // retient, voir drawHull.
+    // (piedFlancCoque). Ce qu'un solide de la cuve dresse devant elle (un mur
+    // collé à la paroi, dont le dessus déborde) l'emporte : la profondeur de
+    // la composition (0 sous un sommet) la retient, voir drawHull.
     float cote = vCote.x - ${COTE_FLANC.toFixed(1)};
     vec2 dO = cote < 0.5 ? vec2(0.0, 1.0) : cote < 1.5 ? vec2(0.0, -1.0)
             : cote < 2.5 ? vec2(-1.0, 0.0) : vec2(1.0, 0.0);
+    vec2 dA = cote < 1.5 ? vec2(1.0, 0.0) : vec2(0.0, 1.0);
     vec3 fl = piedFlancCoque(vWorld, uCenter, uSommet, uCuve, cote);
-    // la tôle, sur la hauteur : du dessus du tube lumineux (pied) au bas du
-    // matelas (sommet) — le tube et le matelas sont ceux du DESSUS
-    vec2 uvF = vec2(fl.y / uRep, mix(0.14, 0.80, fl.x));
-    vec3 tole = textureGrad(uTexHull, uvF, dFdx(uvF), dFdy(uvF)).rgb;
+    // SON MOTIF À ELLE, un bardage épuré (coque.ts : jointFlancCoque) — plus
+    // la tôle du dessus tassée sur la hauteur, où conduites et boîtiers
+    // s'écrasaient en une bande illisible. On le trace en (le long, hauteur
+    // depuis le pied), en unités monde. La largeur d'un pixel se lit AVANT
+    // tout discard ; au bord de la face, un voisin hors d'elle (fl nul) la
+    // ferait exploser : bornée.
+    float h = fl.x * ${FLANC_HAUTEUR.toFixed(1)};
+    float lpS = clamp(fwidth(fl.y), 0.02, 6.0);
+    float lpH = clamp(fwidth(h), 0.02, 24.0);
     if (fl.z < 0.5) discard;
     vec2 pied = cote < 1.5 ? vec2(uCuve.x + fl.y, cote < 0.5 ? uCuve.w : uCuve.y)
                            : vec2(cote < 2.5 ? uCuve.x : uCuve.z, uCuve.y + fl.y);
     // un vide à cheval sur la paroi la coupe sur toute sa hauteur
     float garde = smoothstep(0.0, px, videSdf(pied));
     if (garde <= 0.0) discard;
+    vec2 jt = jointFlancCoque(fl.y, uRep);
+    // les panneaux : une tôle lisse, d'un ton à peine différent de l'un à
+    // l'autre — de quoi voir qu'ils sont posés, pas de quoi faire un damier
+    vec3 tole = vec3(0.150, 0.174, 0.205) * (0.94 + 0.12 * hash11(jt.y * 1.618 + 0.37));
+    // la plinthe au pied, plus sombre ; le bandeau sous le chant, plus
+    // clair : tous deux continus, les joints s'arrêtent sur eux
+    float hP = ${FLANC_PLINTHE.toFixed(1)};
+    float hB = ${(FLANC_HAUTEUR - FLANC_BANDEAU).toFixed(1)};
+    float plinthe = 1.0 - smoothstep(hP - lpH, hP + lpH, h);
+    float bandeau = smoothstep(hB - lpH, hB + lpH, h);
+    tole = mix(tole, vec3(0.112, 0.128, 0.150), plinthe);
+    tole = mix(tole, vec3(0.182, 0.204, 0.234), bandeau);
+    float panneaux = (1.0 - plinthe) * (1.0 - bandeau);
+    // le joint creux sous chaque montant du dessus : un trait sombre, et son
+    // bord qui regarde la lumière (le long de la paroi) accroche un fil clair.
+    // Plus fin qu'un pixel, le trait pâlit au lieu de scintiller.
+    float wj = ${(FLANC_JOINT * 0.5).toFixed(2)};
+    float joint = (1.0 - smoothstep(wj - lpS, wj + lpS, abs(jt.x))) * min(1.0, wj / lpS) * panneaux;
+    float lA = dot(uLumiereCoque, dA);
+    float bord = (1.0 - smoothstep(0.0, max(lpS, 0.7), abs(jt.x + sign(lA) * wj))) * abs(lA) * panneaux;
+    tole *= 1.0 - 0.62 * joint;
+    tole += vec3(0.085, 0.100, 0.118) * bord * min(1.0, 1.4 / lpS);
+    // l'arête de la plinthe accroche un fil ; une rainure sépare le bandeau
+    tole += vec3(0.060, 0.072, 0.086) * (1.0 - smoothstep(0.0, max(lpH, 0.8), abs(h - hP)));
+    tole *= 1.0 - 0.45 * (1.0 - smoothstep(0.0, max(lpH, 0.9), abs(h - hB)));
     // sombre au pied, franche en haut, le chant clair sous le dessus — la
     // lecture des tranches de la composition ; et elle regarde la lumière
     // (sa normale est −dO : elle fait face à la cuve)
@@ -6327,6 +6361,12 @@ const FICHIER_DECAL: Record<DecalDef['kind'], string> = {
   'meta-marchand': 'meta-marchand',
   'sas-raccord': 'sas-raccord',
   'sas-raccord-v': 'sas-raccord-v',
+  // LA TRAPPE D'UNE PORTE OUVERTE : synthétisée (porteBlindee.ts)
+  'porte-trappe': 'porte-trappe',
+  'porte-trappe-v': 'porte-trappe-v',
+  'porte-trappe-bout': 'porte-trappe-bout',
+  'porte-trappe-bout-v': 'porte-trappe-bout-v',
+  'porte-trappe-bout-v-haut': 'porte-trappe-bout-v-haut',
   // LES STATIONS DU HUB : tant que l'image n'est pas livrée, le chargement
   // échoue sans bruit et la pièce posée ne se dessine pas (textureDecal)
   'hub-eclairage': 'hub-eclairage',
@@ -8589,6 +8629,34 @@ export class Renderer {
    *  sur un mur — une coupelle doit prendre le MÊME sommet que le décalque
    *  de son logement, donc la même recherche. Elle lit les boîtes de la
    *  dernière image peinte. */
+  /** LES SOLIDES DRESSÉS près d'un rectangle du monde (marge comprise) : la
+   *  boîte et sa hauteur, dans l'image en cours — la toile 2D des portes en
+   *  efface le volume projeté (porteBlindee.ts : un mur devant une porte la
+   *  cache). Les mêmes boîtes et les mêmes hauteurs que le relief du shader. */
+  solidesPres(
+    minX: number,
+    minY: number,
+    maxX: number,
+    maxY: number,
+    marge: number,
+  ): { box: ObstacleBox; hauteur: number }[] {
+    const out: { box: ObstacleBox; hauteur: number }[] = []
+    for (let k = 0; k < this.nBoitesImage; k++) {
+      const i = this.rangsScratch[k]
+      const bx = this.boitesImage[i]
+      if (RANG_DE_MATIERE[bx.material] === undefined) continue
+      const h = this.hauteursBoites[i] ?? 0
+      if (!(h > 0)) continue
+      // (le cercle qui contient la boîte : elle peut être tournée)
+      const cx = (bx.minX + bx.maxX) / 2
+      const cy = (bx.minY + bx.maxY) / 2
+      const r = Math.hypot(bx.maxX - bx.minX, bx.maxY - bx.minY) / 2
+      if (cx + r < minX - marge || cx - r > maxX + marge || cy + r < minY - marge || cy - r > maxY + marge) continue
+      out.push({ box: bx, hauteur: h })
+    }
+    return out
+  }
+
   hauteurSousDecal(x: number, y: number): number {
     for (let k = this.nBoitesImage - 1; k >= 0; k--) {
       const i = this.rangsScratch[k]

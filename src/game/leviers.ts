@@ -39,6 +39,18 @@ export type LevierId =
   // le protocole
   | 'cartes'
 
+/** Un ÉTAT que le corps n'a pas d'office : le liquide est toujours là, la
+ *  glace demande la SOLIDIFICATION tissée, la vapeur la VAPORISATION — la
+ *  même règle que la descente pour ses salles (voie.ts, mecaniquesPermises ;
+ *  figures.ts, exigeGlace / exigeVapeur). */
+export type EtatRequis = 'glace' | 'vapeur'
+
+/** Les états auxquels le joueur a accès, à l'heure du tirage. */
+export interface EtatsOuverts {
+  glace: boolean
+  vapeur: boolean
+}
+
 /** Un effet : un levier, une valeur. C'est toute la grammaire. */
 export interface Effet {
   levier: LevierId
@@ -57,6 +69,13 @@ export interface LevierDef {
   pas: number
   /** Sens du gain : +1 si monter la valeur AVANTAGE le joueur, -1 sinon. */
   bon: 1 | -1
+  /** LES ÉTATS OÙ LE LEVIER AGIT, lus dans la simulation et pas dans la
+   *  famille : `[]` s'il sert dans tout état ; sinon il ne fait RIEN tant
+   *  qu'aucun de ces états n'est ouvert (la bascule sert à se figer comme à
+   *  se vaporiser : l'un des deux suffit). Le tirage s'en sert pour ne pas
+   *  proposer une carte d'un état verrouillé (le concepteur, 22/11). Le
+   *  champ est obligatoire : un levier neuf doit le dire, pas le deviner. */
+  etats: readonly EtatRequis[]
   /** La carte se raconte toute seule : la phrase est écrite depuis la valeur. */
   phrase: (v: number) => string
 }
@@ -78,6 +97,7 @@ export const LEVIERS: LevierDef[] = [
     max: 2,
     pas: 1,
     bon: 1,
+    etats: [],
     phrase: (v) =>
       `${v} échantillon${v > 1 ? 's' : ''} de secours de plus : ${v > 1 ? 'des dispersions pardonnées' : 'une dispersion pardonnée'}.`,
   },
@@ -90,6 +110,7 @@ export const LEVIERS: LevierDef[] = [
     max: 1.4,
     pas: 0.05,
     bon: -1,
+    etats: [],
     phrase: (v) =>
       v <= 1
         ? `Le corps tient plus bas : le seuil de dispersion baisse de ${moins(v)} %.`
@@ -104,6 +125,7 @@ export const LEVIERS: LevierDef[] = [
     max: 2,
     pas: 0.05,
     bon: -1,
+    etats: [],
     phrase: (v) =>
       v <= 1
         ? `Les gouttes éjectées redeviennent réabsorbables ${Math.round((1 / v) * 10) / 10}× plus tôt.`
@@ -118,6 +140,7 @@ export const LEVIERS: LevierDef[] = [
     max: 1.8,
     pas: 0.05,
     bon: -1,
+    etats: [],
     phrase: (v) =>
       v <= 1
         ? `L’éponge a moins de prise : elle boit ${moins(v)} % moins vite.`
@@ -137,6 +160,9 @@ export const LEVIERS: LevierDef[] = [
     max: 3,
     pas: 1,
     bon: 1,
+    // le dash EST un geste de vapeur : solver.ts, gasDash, ne part pas
+    // sous trois particules gazeuses, et la réserve se rend à la vaporisation
+    etats: ['vapeur'],
     phrase: (v) =>
       v > 0
         ? `${v} dash${v > 1 ? 's' : ''} de plus dans la réserve de chaque tableau.`
@@ -151,6 +177,8 @@ export const LEVIERS: LevierDef[] = [
     max: 1.8,
     pas: 0.05,
     bon: -1,
+    // le péage se paie à la vaporisation (solver.ts, transfoVapeur)
+    etats: ['vapeur'],
     phrase: (v) =>
       v <= 1
         ? `Se vaporiser coûte ${moins(v)} % de gouttes en moins.`
@@ -165,6 +193,9 @@ export const LEVIERS: LevierDef[] = [
     max: 1.8,
     pas: 0.05,
     bon: -1,
+    // se figer (freezeSelfTime) OU se vaporiser (vaporizeTime) : l'un des
+    // deux états ouvert, et la carte sert
+    etats: ['glace', 'vapeur'],
     phrase: (v) =>
       v <= 1
         ? `Se figer ou se vaporiser prend ${moins(v)} % de temps en moins.`
@@ -179,6 +210,8 @@ export const LEVIERS: LevierDef[] = [
     max: 2,
     pas: 0.05,
     bon: -1,
+    // l'évaporation ne mord que le nuage (solver.ts, gasIdleLossRate)
+    etats: ['vapeur'],
     phrase: (v) =>
       v <= 1
         ? `Le nuage s’évapore ${moins(v)} % moins vite au repos.`
@@ -193,6 +226,8 @@ export const LEVIERS: LevierDef[] = [
     max: 2,
     pas: 0.05,
     bon: -1,
+    // une maille d'évent ne prélève que la vapeur qui la traverse
+    etats: ['vapeur'],
     phrase: (v) =>
       v <= 1
         ? `Traverser une maille coûte ${moins(v)} % de vapeur en moins.`
@@ -207,6 +242,8 @@ export const LEVIERS: LevierDef[] = [
     max: 1.6,
     pas: 0.05,
     bon: 1,
+    // la restitution du palet (iceRestitution) : la glace seule rebondit
+    etats: ['glace'],
     phrase: (v) =>
       v >= 1
         ? `Le palet de glace rebondit ${plus(v)} % plus vif.`
@@ -221,6 +258,8 @@ export const LEVIERS: LevierDef[] = [
     max: 2,
     pas: 0.05,
     bon: -1,
+    // la prise de l'hydrophile sur la glace (hydrophileIceDrag)
+    etats: ['glace'],
     phrase: (v) =>
       v <= 1
         ? `L’hydrophile retient ${moins(v)} % moins le palet : la glace garde sa ligne.`
@@ -235,6 +274,10 @@ export const LEVIERS: LevierDef[] = [
     max: 1.6,
     pas: 0.05,
     bon: -1,
+    // la visée qui ralentit est celle du DASH (main.ts, dashAiming exige
+    // l'intention gazeuse) ; celle du tir de glace ne s'ouvre qu'avec un
+    // Éclateur, lui-même rangé à la glace
+    etats: ['vapeur'],
     phrase: (v) =>
       v <= 1
         ? `La visée du dash ralentit le temps ${Math.round((1 / v) * 10) / 10}× plus : on choisit sa ligne.`
@@ -249,6 +292,9 @@ export const LEVIERS: LevierDef[] = [
     max: 2,
     pas: 0.05,
     bon: 1,
+    // le froid de la COQUE monte pour tout le monde, liquide compris : les
+    // plaques froides gèlent le corps qui s'y frotte
+    etats: [],
     phrase: (v) =>
       v >= 1
         ? `Le froid du vaisseau mord ${moins(1 / v)} % moins vite.`
@@ -263,6 +309,9 @@ export const LEVIERS: LevierDef[] = [
     max: 0.6,
     pas: 0.05,
     bon: 1,
+    // la rosée rend la vapeur PERDUE (vaporBank) : les mailles, l'évaporation,
+    // la chaleur — trois pertes de nuage, aucune du liquide
+    etats: ['vapeur'],
     phrase: (v) =>
       `La rosée recondensée rend ${Math.round(v * 100)} points de rendement en plus.`,
   },
@@ -283,6 +332,7 @@ export const LEVIERS: LevierDef[] = [
     max: 0.3,
     pas: 0.05,
     bon: 1,
+    etats: ['glace'],
     phrase: (v) =>
       `En glace, viser ralentit le temps et relâcher détache un éclat de ${Math.round(v * 100)} % du corps.`,
   },
@@ -295,6 +345,7 @@ export const LEVIERS: LevierDef[] = [
     max: 2,
     pas: 0.05,
     bon: 1,
+    etats: ['glace'],
     phrase: (v) =>
       v >= 1
         ? `L’éclat de glace part ${plus(v)} % plus vite.`
@@ -311,6 +362,7 @@ export const LEVIERS: LevierDef[] = [
     max: 2.5,
     pas: 0.1,
     bon: 1,
+    etats: [],
     phrase: (v) =>
       v >= 1
         ? `Le sas aspire ${plus(v)} % plus loin : les traînardes rentrent seules.`
@@ -325,6 +377,8 @@ export const LEVIERS: LevierDef[] = [
     max: 3,
     pas: 0.1,
     bon: 1,
+    // le courant du sas sur un palet (exitIceGrip)
+    etats: ['glace'],
     phrase: (v) =>
       v >= 1
         ? `Le sas happe la glace ${plus(v)} % plus fort : un palet ne file plus devant la bouche.`
@@ -339,6 +393,8 @@ export const LEVIERS: LevierDef[] = [
     max: 3,
     pas: 0.1,
     bon: 1,
+    // la prime compte les particules GELÉES avalées (swallowedIce)
+    etats: ['glace'],
     phrase: (v) =>
       v >= 1
         ? `La prime de glace vaut ${plus(v)} % de plus au sas.`
@@ -353,6 +409,7 @@ export const LEVIERS: LevierDef[] = [
     max: 2,
     pas: 0.05,
     bon: 1,
+    etats: [],
     phrase: (v) =>
       v >= 1
         ? `${plus(v)} % de condensat en plus sur tout ce qui passe le sas.`
@@ -367,6 +424,7 @@ export const LEVIERS: LevierDef[] = [
     max: 6,
     pas: 1,
     bon: 1,
+    etats: [],
     phrase: (v) =>
       v > 0
         ? `La bonbonne emporte ${v} litre${v > 1 ? 's' : ''} de plus.`
@@ -383,6 +441,7 @@ export const LEVIERS: LevierDef[] = [
     max: 2,
     pas: 1,
     bon: 1,
+    etats: [],
     phrase: (v) =>
       `${v} carte${v > 1 ? 's' : ''} de plus à chaque tirage de fin de salle.`,
   },

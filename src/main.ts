@@ -23,8 +23,9 @@ import { CaptureCodex } from './game/captureCodex'
 import { CADENCES_TAMPON, tamponDisponible, type CadenceTampon } from './game/tamponCapture'
 import { niveauExpanse } from './game/structures'
 import {
-  TABLEAU_HUB,
   articleComptoir,
+  hubDeBibliotheque,
+  hubParAdresse,
   zonesDuHub,
   type ArticleHub,
 } from './game/hub'
@@ -61,6 +62,7 @@ import {
   codeCanon,
   decodeCode21,
   decodeCodeAtelier,
+  CODE_HUB,
   estCodeHub,
   type CodeAtelier,
 } from './game/levelIO'
@@ -121,11 +123,10 @@ import {
   NOMS_PRIME,
   PRIMES,
   cheminDePorte,
-  ditNoeud,
   fermeParPorte,
   REPERES_VOIE,
 } from './game/voiesModule'
-import { armeAuToucher, ARMEE, viseePuisEntree } from './game/porteArmee'
+import { armeAuToucher, viseePuisEntree } from './game/porteArmee'
 import { CLE_MANQUES, inventairePool, litManques, noteManque, type Manque } from './game/manques'
 import {
   arriveRafales,
@@ -227,7 +228,9 @@ import {
 } from './game/descente'
 import { FIGURE_FAMILLES, FIGURE_NOMS } from './game/figures'
 import { CIRCUITS } from './game/circuits'
-import type { LevierId } from './game/leviers'
+import type { EtatsOuverts, LevierId } from './game/leviers'
+import { ondeCarte } from './game/ondeVue'
+import type { OndeCarte, OptionsOnde } from './game/ondeVue'
 import {
   brouillonRecompensesActif,
   catalogueRecompenses,
@@ -258,6 +261,7 @@ import {
   paliersAtteints,
   prochainPalier,
   tirageInstruments,
+  instrumentOuvert,
 } from './game/instruments'
 import {
   FAMILLE_NOMS,
@@ -270,7 +274,7 @@ import {
   valeurLevier,
   valeurProposee,
 } from './game/leviers'
-import { dansForme, type FormeBox } from './game/formes'
+import { FORME_COQUE, FORME_RECT, coquePieces, dansForme, formeOutline, type FormeBox } from './game/formes'
 import {
   dessineDissolutionParoi,
   dessineDissolutionParoiSobre,
@@ -351,7 +355,8 @@ import {
 import { chargePiecesModule2d, peintCelluleSeule, peintModule2d, type Pieces } from './render/module2dCanvas'
 import { MAX_BOXES, Renderer } from './render/renderer'
 import { HAUTEUR_BLOCS } from './render/hauteurs'
-import { facesTranche, fractionSommet, hauteurAppui, pointDuSommet, pointPose } from './render/reliefParois'
+import { fractionSommet, hauteurAppui, pointDuSommet, pointPose } from './render/reliefParois'
+import { PORTE_BLINDEE_URL, decalsDesPortes, dessinePorte, leveeSuivante, type Occultant } from './render/porteBlindee'
 import { remetReglagesParDefaut } from './game/remiseReglages'
 import { Motes, VIE_STRIDE, remplitVie, toucheLeCorps } from './render/vie'
 import { panDepuis } from './game/ouie'
@@ -388,7 +393,7 @@ import {
 } from './game/level'
 import type { LevelEditor } from './editor/editor'
 import type { EditeurCarte } from './editor/editeurCarte'
-import { porteAvance, porteBoite, portePolygone } from './game/porte'
+import { porteAvance, porteBoite } from './game/porte'
 import { EcranCodex } from './game/ecranCodex'
 import { EcranMarchand } from './game/ecranMarchand'
 import { EcranAvaries } from './game/ecranAvaries'
@@ -1126,7 +1131,10 @@ function finOuverte(): boolean {
 }
 function hubJoue(): LevelDef {
   const base = hubLevel()
-  const opts = { cuveClose: !eveilJoue() || alerteDifferee, finOuverte: finOuverte() }
+  const opts = {
+    cuveClose: !acteZeroPasse() || eveilEnCours || alerteDifferee,
+    finOuverte: finOuverte(),
+  }
   const cle = `${opts.cuveClose ? 'cuve|' : ''}${opts.finOuverte ? 'fin|' : ''}${records.reparationsFaites().sort().join('+')}`
   if (hubMemo && hubMemo.base === base && hubMemo.cle === cle) return hubMemo.lv
   const lv = appliqueReparations(base, records.reparationsFaites(), opts)
@@ -1134,8 +1142,14 @@ function hubJoue(): LevelDef {
   return lv
 }
 
+// LE HUB À L'ESSAI (`?hub=rotonde`, game/hub.ts) passe devant la
+// bibliothèque : on juge un module sur ce poste avant de le publier pour
+// tous. Lu une fois — l'adresse ne change pas sous la partie.
+const HUB_ESSAI = hubParAdresse(location.search)
 function hubLevel(): LevelDef {
-  return libraryLevels.find((l) => l.code === 'HUB') ?? TABLEAU_HUB
+  // la rotonde depuis le 22/11 (CODE_HUB, levelIO.ts) : l'entrée HUB3 de la
+  // bibliothèque, sinon celle du code
+  return HUB_ESSAI ?? hubDeBibliotheque(libraryLevels, CODE_HUB)
 }
 
 // LES SALLES DE MINI-JEU jouées : même règle — la copie de bibliothèque qui
@@ -1217,6 +1231,11 @@ function salleHub(): boolean {
 // reste close jusque-là. Sans cette attente, l'éveil gravé la rendait
 // introuvable : le joueur ne voyait jamais la brèche.
 let alerteDifferee = false
+// UN ÉVEIL EST EN COURS : la cuve des hubs qui en ont une reste close tant
+// qu'il dure. Un drapeau et non `eveil.etape` : hubJoue se lit dès le
+// premier applyLevel du chargement, des milliers de lignes avant que
+// `eveil` soit déclaré. Levé par lanceEveil, baissé quand l'éveil conclut.
+let eveilEnCours = false
 // Le tableau COMMENCE-t-il en vapeur (départ posé dans une zone qui
 // l'impose) ? Alors la vapeur est l'ÉTAT INITIAL, pas une bascule : elle ne
 // se paie pas. Le drapeau se consomme au premier basculement de l'image.
@@ -2479,6 +2498,30 @@ function eveilJoue(): boolean {
 // lancement. Le code et les cartes restent entiers au cas où — remettre
 // ce drapeau à true les rendrait au premier plan.
 const CARTES_GESTES: boolean = false
+// LE TUTO ET LA NARRATION DU HUB, MIS DE CÔTÉ À LEUR TOUR (le concepteur,
+// 22/11 : « désactive la narration du hub […] tuto désactivé par défaut »).
+// Même règle que les cartes gestuelles : le code reste entier, un drapeau
+// le rend.
+//  · EVEIL_PAR_DEFAUT : l'ÉVEIL (cryostase, cartes, ralenti — la prise en
+//    main scénarisée) ne se lance plus tout seul, ni à l'entrée au hub, ni à
+//    la reprise, ni au premier essai. Le bouton « rejouer l'éveil » du
+//    protocole le lance toujours : désactivé PAR DÉFAUT, pas supprimé.
+//  · NARRATION_HUB : les moments du scénario joués au hub se taisent — en
+//    arrivant (« premier lancement », « avant le hub ») comme en partant
+//    (« lancement de la run », la cinématique du départ : « coupe aussi la
+//    cinématique de départ », 22/11). L'ALERTE (la brèche de la cuve) suit
+//    l'éveil : sans éveil, pas d'alerte. Les PANNES, elles, jouent : ailes
+//    condamnées, stations à réparer — ce n'est pas de la narration, c'est
+//    la progression.
+const EVEIL_PAR_DEFAUT: boolean = false
+const NARRATION_HUB: boolean = false
+/** L'ACTE 0 EST-IL DERRIÈRE LE JOUEUR ? L'éveil joué, ou l'éveil qui ne se
+ *  joue plus de lui-même. Sans la seconde branche, un nouveau venu restait
+ *  avant l'acte 0 POUR TOUJOURS : la cuve des anciens hubs restait close, et
+ *  le récit (fragments, fins) ne se livrait jamais — il attend l'acte 0. */
+function acteZeroPasse(): boolean {
+  return eveilJoue() || !EVEIL_PAR_DEFAUT
+}
 function majOnboard(): void {
   const etapes = Array.from(
     onboardEl.querySelectorAll<HTMLElement>('.ob-etape'),
@@ -5173,8 +5216,11 @@ document.getElementById('proto-rejouer')?.addEventListener('click', () => {
   hasPlayed = true
   majAccueil()
   homeRestartBtn.hidden = false
+  // l'éveil AVANT le restart : le hub reconstruit le voit en cours
+  // (eveilEnCours) et ferme sa cuve — l'éveil étant désactivé par défaut,
+  // le seul « pas encore joué » ne suffit plus à la fermer
+  lanceEveil(true)
   restart()
-  lanceEveil()
 })
 // Réinitialiser l'opérateur : destructif, donc DEUX clics — le premier arme
 // le bouton (libellé rouge explicite), le second efface nom + registres
@@ -5412,7 +5458,8 @@ function entrerHub(): void {
   // LE SCÉNARIO : l'ouverture froide (une seule fois dans la vie du
   // joueur) puis l'arrivée au hub — elles s'enchaînent si les deux
   // s'appliquent. C'est ici que vit le fil narratif du roguelike.
-  void joueMoment('premier-lancement').then(() => joueMoment('avant-hub'))
+  if (NARRATION_HUB)
+    void joueMoment('premier-lancement').then(() => joueMoment('avant-hub'))
 }
 // L'AVIS DU JOUEUR SUR UNE SALLE (game/avisSalles.ts) : le CARNET du poste
 // — mes avis, et ceux qui attendent le magasin. La rangée du bilan
@@ -8926,10 +8973,13 @@ if (new URLSearchParams(location.search).has('carte')) {
   hasPlayed = true
   void openEditeurCarte()
 }
-// CRYOSTASE : tant que l'éveil n'a pas été joué, l'échantillon attend GELÉ
-// dès le premier pixel — même en dérive derrière la fiche. Le premier
-// contact visuel avec le sujet 21, c'est un bloc de glace.
-if (!coffre.stockage.getItem(CLE_EVEIL)) input.freezeIntent = true
+// CRYOSTASE : tant que l'éveil n'a pas été joué, l'échantillon attendait
+// GELÉ dès le premier pixel — même en dérive derrière la fiche. Elle ne vaut
+// plus que si l'éveil se joue de lui-même (EVEIL_PAR_DEFAUT) : sans lui, le
+// corps de la cuve du menu se figeait (888 particules sur 900 en 25 s,
+// mesuré le 22/11) sans qu'aucune carte vienne jamais dire comment redevenir
+// liquide — « supprime le fait d'être congelé au début » (le concepteur).
+if (EVEIL_PAR_DEFAUT && !coffre.stockage.getItem(CLE_EVEIL)) input.freezeIntent = true
 
 // ---- Manette (Steam Deck, Xbox, DualSense) ----
 // Elle pilote le même pointeur que le doigt : un curseur en orbite autour du
@@ -9489,9 +9539,14 @@ function decorAffiche(): DecalDef[] {
   if (decorMemoTableau !== level) {
     decorMemoTableau = level
     const meta = decalsDuMeta(level)
+    // LA TRAPPE DES PORTES (render/porteBlindee.ts) : posée SOUS les autres
+    // décalques — c'est le sol —, le sens de chaque dalle lu sur les murs
+    // qui la bordent, comme en jeu
+    const boites = level.boxes
+    const trappes = decalsDesPortes(level.portes ?? [], (x, y) => boites.some((b) => dansForme(b, x, y)))
     decorMemoListe =
-      meta.length > 0
-        ? [...(level.decals ?? []), ...meta]
+      meta.length > 0 || trappes.length > 0
+        ? [...trappes, ...(level.decals ?? []), ...meta]
         : (level.decals ?? [])
   }
   return decorMemoListe
@@ -9698,6 +9753,25 @@ function drawRecharges(vw: number, vh: number, dpr: number, maintenant: number):
   g.restore()
 }
 
+// LES CONTOURS AU SOL d'un solide qui peut cacher une porte, gardés par
+// boîte (une boîte de décor ne change pas de forme d'une image à l'autre ;
+// l'éditeur en recrée une neuve quand il la déplace). Une COQUE est creuse :
+// ses morceaux de paroi, pas sa silhouette, qui couvrirait la salle entière.
+const contoursParBoite = new WeakMap<ObstacleBox, { x: number; y: number }[][]>()
+function contoursOccultant(box: ObstacleBox): { x: number; y: number }[][] {
+  const connu = contoursParBoite.get(box)
+  if (connu) return connu
+  const c = (box.forme ?? FORME_RECT) === FORME_COQUE ? coquePieces(box) : [formeOutline(box, 32)]
+  contoursParBoite.set(box, c)
+  return c
+}
+
+// LA LEVÉE MONTRÉE de chaque porte d'un coup (0 au ras du sol, 1 debout),
+// pour le tableau `leveesTableau` — une image seulement, voir drawMecanismes
+let leveesPortes: number[] = []
+let leveesTableau: LevelDef | null = null
+let leveesHorloge = -1
+
 // La superposition des mécanismes : faisceaux, émetteurs, cibles, portes —
 // dessinée en 2D par-dessus la cuve, avec la même caméra que le rendu WebGL.
 function drawMecanismes(vw: number, vh: number, dpr: number): void {
@@ -9742,9 +9816,10 @@ function drawMecanismes(vw: number, vh: number, dpr: number): void {
   })
   const z = camera.zoom
 
-  // portes : barrières d'énergie — pleines quand closes, un cadre quand
-  // ouvertes, et entre les deux la PART MATÉRIALISÉE seule, bordée par son
-  // front : ce que le solveur oppose au corps est exactement ce qu'on voit
+  // portes : des dalles blindées qui sortent du sol (render/porteBlindee.ts)
+  // — debout quand closes, leur fente au ras du sol quand ouvertes, et entre
+  // les deux la PART MATÉRIALISÉE seule, levée, bordée par son front : ce
+  // que le solveur oppose au corps est exactement ce qu'on voit
   //
   // RELIEF ALLUMÉ, ELLES SONT POSÉES SUR LE SOMMET DES MURS. Le dessus des
   // cloisons fuit le centre de l'écran (reliefParois.ts) ; dessinées au pied,
@@ -9764,6 +9839,26 @@ function drawMecanismes(vw: number, vh: number, dpr: number): void {
   const fMurHaut = fractionSommet(RELIEF_K[reliefChoix], camera.zoom, HAUTEUR_BLOCS)
   let fPortes = fMurHaut
   const hauteurEn = (x: number, y: number): number => renderer.hauteurSousDecal(x, y)
+  // CE QUI PEUT CACHER UNE PORTE (render/porteBlindee.ts) : les solides
+  // dressés assez près d'elle — au-delà de r·f(mur haut), r sa distance à
+  // l'œil, le dessus d'un mur ne l'atteint plus —, leurs contours au sol et
+  // leur hauteur ; et la projection du relief, celle du shader
+  const projetteRelief = (x: number, y: number, h: number): { sx: number; sy: number } => {
+    const q = S(x, y)
+    const f = h > 0 ? fractionSommet(RELIEF_K[reliefChoix], camera.zoom, h) : 0
+    if (f <= 0) return q
+    const [sx, sy] = pointDuSommet(q.sx, q.sy, vw * 0.5, vh * 0.5, f)
+    return { sx, sy }
+  }
+  const occultantsPres = (r: { minX: number; minY: number; maxX: number; maxY: number }): Occultant[] => {
+    const d = Math.hypot((r.minX + r.maxX) / 2 - camera.x, (r.minY + r.maxY) / 2 - camera.y)
+    const portee = Math.hypot(r.maxX - r.minX, r.maxY - r.minY) / 2
+    const marge = ((d + portee) * fMurHaut) / Math.max(1e-6, 1 - fMurHaut) + 8
+    return renderer.solidesPres(r.minX, r.minY, r.maxX, r.maxY, marge).map(({ box, hauteur }) => ({
+      contours: contoursOccultant(box),
+      hauteur,
+    }))
+  }
   const fractionAppui = (r: { minX: number; minY: number; maxX: number; maxY: number }): number => {
     if (fMurHaut <= 0) return 0 // relief éteint : ni sonde ni calcul
     const h = hauteurAppui(r, hauteurEn)
@@ -9792,109 +9887,56 @@ function drawMecanismes(vw: number, vh: number, dpr: number): void {
     )
     return { sx, sy }
   }
+  const atlasPorte = sprite(PORTE_BLINDEE_URL)
+  // LA LEVÉE des portes d'un coup (render/porteBlindee.ts) : une image
+  // seulement — le solveur, lui, a déjà la porte pleine ou absente. Tant que
+  // les portes ne sont pas POSÉES (posePortes), et à chaque nouveau tableau,
+  // elle prend l'état d'un coup : une porte ouverte dès le départ ne
+  // s'enfonce pas sous les yeux du joueur.
+  const dtLevee = leveesHorloge < 0 ? 0 : Math.min(0.1, Math.max(0, elapsed - leveesHorloge))
+  leveesHorloge = elapsed
+  const leveeCible = (i: number): number =>
+    (laserEtat.portesAvance[i] ?? (laserEtat.portesOuvertes[i] ? 0 : 1)) > 0 ? 1 : 0
+  if (leveesTableau !== level || leveesPortes.length !== portes.length || !laserEtat.portesPose) {
+    leveesTableau = level
+    leveesPortes = portes.map((_, i) => leveeCible(i))
+  }
+  for (let i = 0; i < portes.length; i++) leveesPortes[i] = leveeSuivante(leveesPortes[i], leveeCible(i), dtLevee)
   for (let i = 0; i < portes.length; i++) {
     const p = portes[i]
     // sous un voile de cachette : la porte se tait (elle flotterait
     // au-dessus d'une paroi factice et vendrait le secret)
     if (dansCacheVoilee((p.minX + p.maxX) / 2, (p.minY + p.maxY) / 2)) continue
     fPortes = fractionAppui(p)
-    const a = auSommet(p.minX, p.maxY)
-    const b = auSommet(p.maxX, p.minY)
     const avance =
       laserEtat.portesAvance[i] ?? (laserEtat.portesOuvertes[i] ? 0 : 1)
-    if (avance < 1) {
-      // le cadre de ce qui reste à combler (ou de tout, porte ouverte)
-      g.strokeStyle = 'rgba(90,220,170,0.45)'
-      g.setLineDash([5, 7])
-      g.lineWidth = 1.5
-      g.strokeRect(a.sx, a.sy, b.sx - a.sx, b.sy - a.sy)
-      g.setLineDash([])
-    }
-    if (avance > 0) {
-      const { contour, front } = portePolygone(p, avance)
-      const puls = 0.75 + 0.25 * Math.sin(elapsed * 3.1 + i)
-      // LA TRANCHE : relief allumé, la barrière a la hauteur des murs qu'elle
-      // relie. Posée sur leur sommet, elle tombait juste mais restait une
-      // plaque peinte au niveau des toits — « on ne voit pas de hauteur »
-      // (le concepteur, 16/11). Ses faces libres tournées vers l'œil
-      // descendent au pied (facesTranche : ni les bouts collés aux murs, ni
-      // les faces de dos) : un voile plus dense en haut, qui s'éteint en
-      // touchant le sol, et la ligne du pied. Peinte avant le dessus, qui la
-      // recouvre. Relief éteint, le pied et le sommet se confondent : rien.
-      if (fPortes > 0) {
-        for (const { a: qa, b: qb } of facesTranche(contour, p, camera.x, camera.y)) {
-          const pa = auPied(qa.x, qa.y)
-          const pb = auPied(qb.x, qb.y)
-          const ha = auSommet(qa.x, qa.y)
-          const hb = auSommet(qb.x, qb.y)
-          const voile = g.createLinearGradient(
-            (pa.sx + pb.sx) / 2,
-            (pa.sy + pb.sy) / 2,
-            (ha.sx + hb.sx) / 2,
-            (ha.sy + hb.sy) / 2,
-          )
-          voile.addColorStop(0, `rgba(255,72,72,${(0.08 * puls).toFixed(3)})`)
-          voile.addColorStop(1, `rgba(255,72,72,${(0.36 * puls).toFixed(3)})`)
-          g.beginPath()
-          g.moveTo(pa.sx, pa.sy)
-          g.lineTo(pb.sx, pb.sy)
-          g.lineTo(hb.sx, hb.sy)
-          g.lineTo(ha.sx, ha.sy)
-          g.closePath()
-          g.fillStyle = voile
-          g.fill()
-          g.strokeStyle = `rgba(255,96,96,${(0.4 * puls).toFixed(3)})`
-          g.lineWidth = 1
-          g.beginPath()
-          g.moveTo(pa.sx, pa.sy)
-          g.lineTo(pb.sx, pb.sy)
-          g.stroke()
-        }
-      }
-      g.save()
-      g.beginPath()
-      for (let k = 0; k < contour.length; k++) {
-        const q = auSommet(contour[k].x, contour[k].y)
-        if (k === 0) g.moveTo(q.sx, q.sy)
-        else g.lineTo(q.sx, q.sy)
-      }
-      g.closePath()
-      g.fillStyle = `rgba(255,72,72,${(0.16 * puls).toFixed(3)})`
-      g.fill()
-      g.strokeStyle = `rgba(255,96,96,${(0.85 * puls).toFixed(3)})`
-      g.lineWidth = 2
-      g.stroke()
-      // barreaux d'énergie, rognés à la part matérialisée
-      g.clip()
-      g.strokeStyle = `rgba(255,110,110,${(0.35 * puls).toFixed(3)})`
-      g.lineWidth = 1
-      g.beginPath()
-      const pas = Math.max(10, 16 * z)
-      if (b.sx - a.sx > b.sy - a.sy) {
-        for (let x = a.sx + pas; x < b.sx; x += pas) {
-          g.moveTo(x, a.sy)
-          g.lineTo(x, b.sy)
-        }
-      } else {
-        for (let y = a.sy + pas; y < b.sy; y += pas) {
-          g.moveTo(a.sx, y)
-          g.lineTo(b.sx, y)
-        }
-      }
-      g.stroke()
-      g.restore()
-      // le FRONT : la ligne vive qui avance — c'est elle qui pousse
-      if (front.length === 2) {
-        const f0 = auSommet(front[0].x, front[0].y)
-        const f1 = auSommet(front[1].x, front[1].y)
-        g.strokeStyle = 'rgba(255,200,190,0.95)'
-        g.lineWidth = 3
-        g.beginPath()
-        g.moveTo(f0.sx, f0.sy)
-        g.lineTo(f1.sx, f1.sy)
-        g.stroke()
-      }
-    }
+    // LA PORTE BLINDÉE (render/porteBlindee.ts) : une dalle d'acier qui sort
+    // du sol — levée sur la part matérialisée, ce que le solveur oppose au
+    // corps —, la fente au ras du sol tant qu'elle n'est pas toute sortie,
+    // et relief allumé, sa FACE tournée vers l'œil descend du haut au pied
+    // (« on ne voit pas de hauteur », le concepteur, 16/11). Relief éteint,
+    // pied et sommet se confondent.
+    dessinePorte(
+      g,
+      p,
+      avance,
+      leveesPortes[i],
+      {
+        sommet: auSommet,
+        pied: auPied,
+        oeil: fPortes > 0 ? { x: camera.x, y: camera.y } : null,
+        // chaque porte bat à sa phase : deux portes voisines ne clignotent
+        // pas comme une guirlande
+        temps: elapsed + i * 0.37,
+        // les solides qui peuvent la cacher, et leur projection : leur
+        // volume est effacé de ce qui est derrière lui
+        occultants: fPortes > 0 ? occultantsPres(p) : undefined,
+        projette: projetteRelief,
+        // la trappe est au décor (decorAffiche) : sous le fluide, sous les murs
+        solAuDecor: true,
+      },
+      atlasPorte,
+    )
   }
 
   // LE COUPERET : le trait au sol (une ligne vive à travers le col), le
@@ -13411,9 +13453,9 @@ function sansAnimation(): boolean {
 // vivant de la forge passent tous par `carteHTML`. Ce que le concepteur
 // fabrique a donc EXACTEMENT les mots, l'icône et les effets de ce que le
 // joueur tire — c'est ce qui fait de l'atelier autre chose qu'une maquette.
-// Le tirage en montre MOINS : une cartouche de la station (icône, nom,
-// effets, prix) ; la phrase et le calibre passent dans l'infobulle, que
-// toutes les variantes portent.
+// Le tirage en montre AUTANT, dans son propre dessin (une carte plus
+// grande, index.html, « LE TIRAGE ») : la phrase y est revenue le 21/11.
+// L'infobulle, que toutes les variantes portent, garde le texte complet.
 // Contenu en phrasing pur (span/b/em/i) : la carte du tirage est un
 // <button>, qui n'admet ni <p> ni <ul>.
 
@@ -13451,6 +13493,16 @@ function valeurEffetLisible(e: { levier: string; valeur: number }): string {
   }
   const pct = Math.round((e.valeur - 1) * 100)
   return `${pct > 0 ? '+' : '−'}${Math.abs(pct)} %`
+}
+
+/** LA PONCTUATION HAUTE NE PASSE PAS SEULE À LA LIGNE. Écrite sur la carte
+ * du tirage, en lignes équilibrées, la phrase « Le sas aspire de moitié plus
+ * loin : les traînardes rentrent seules. » se coupait AVANT son deux-points,
+ * qui ouvrait la ligne suivante (capture du 21/11). L'espace qui précède
+ * « : ; ! ? » » et celle qui suit « « » deviennent insécables — à
+ * l'affichage seulement : les textes du catalogue ne changent pas. */
+function sansPonctuationOrpheline(t: string): string {
+  return t.replace(/ ([:;!?»])/g, '\u00a0$1').replace(/« /g, '«\u00a0')
 }
 
 interface CarteOpts {
@@ -13506,11 +13558,19 @@ function carteHTML(d: InstrumentDef, o: CarteOpts): string {
     (d.perso ? ' crt-perso-c' : '')
   const balise = o.bouton ? 'button' : 'div'
   const phrase = descriptionInstrument(d)
-  // LE TIRAGE EST UNE CARTOUCHE, pas une fiche : on y choisit d'un coup
-  // d'œil (l'icône, le nom, ce que la carte donne et coûte, son prix).
-  // La phrase et l'étiquette du calibre (7,5 px) n'y sont plus écrites —
-  // elles restent dans l'infobulle ; l'atelier, lui, garde tout à plat
-  const condensee = o.variante === 'draft'
+  // LE TIRAGE DIT CE QUE LA CARTE FAIT. Il a été une cartouche (13/11) :
+  // l'icône, le nom, les leviers, le prix — la phrase passée dans
+  // l'infobulle, que ni le doigt ni la manette n'ouvrent : on choisissait
+  // sur « Seuil de dispersion −20 % » sans savoir ce que ça change. « Plus
+  // de détails sur ce que ça fait, mais de belle manière, sans que ça fasse
+  // lourd » (le concepteur, 21/11) : la phrase revient, sur une carte plus
+  // grande. Sa ligne de rang dit la FAMILLE (c'est elle qui teinte le
+  // filet) et ne dit le calibre que s'il sort de l'ordinaire : « Commun »,
+  // écrit sur quatre cartes sur cinq, n'apprenait rien.
+  const sousTitre =
+    o.variante === 'draft'
+      ? fams.map((f) => FAMILLE_COURT[f] ?? f).join(' + ') + (cal === 'commun' ? '' : ` · ${CALIBRE_MOT[cal]}`)
+      : rang
   return (
     `<${balise} class="${cls}" style="--fam:${t1};--fam2:${t2}" title="${htmlSafe(`${d.nom} — ${phrase} (${rang})`)}"${o.bouton ? ' type="button"' : ''}${o.attrs ?? ''}>` +
     `<span class="crt-halo"></span>` +
@@ -13518,9 +13578,9 @@ function carteHTML(d: InstrumentDef, o: CarteOpts): string {
     // l'atelier) rend son émoji, jamais un carré vide (iconesStation.ts)
     `<span class="crt-tete"><i class="crt-ico">${iconeInstrumentHTML(d)}</i>` +
     `<span class="crt-titres"><b class="crt-nom">${htmlSafe(d.nom)}</b>` +
-    (condensee ? '' : `<i class="crt-rang">${htmlSafe(rang)}</i>`) +
+    `<i class="crt-rang">${htmlSafe(sousTitre)}</i>` +
     `</span></span>` +
-    (condensee ? '' : `<span class="crt-txt">${htmlSafe(phrase)}</span>`) +
+    `<span class="crt-txt">${htmlSafe(sansPonctuationOrpheline(phrase))}</span>` +
     (ctr ? `<span class="crt-ctr">CONTREPARTIE</span>` : '') +
     `<span class="crt-effets">${effets}</span>` +
     (pied.length ? `<span class="crt-pied">${pied.join('')}</span>` : '') +
@@ -15097,13 +15157,14 @@ function mbMontreChoixPalet(dernier: Lancer): void {
     const btn = document.createElement('button')
     btn.type = 'button'
     btn.className = 'mb-cartouche mb-offre'
+    mbEauAuBouton(btn, MB_EAU_OFFRE)
     btn.style.setProperty('--i', String(i))
     btn.innerHTML = offreHTML({ icone, nom, detail })
     btn.addEventListener('click', () => {
       if (elu || gesteTropTot(performance.now(), ouvertA)) return
       elu = true
       mbFlash()
-      mbEclate(btn, { n: 50, teintes: MB_MENTHE, vitesse: 420, gravite: 400, forme: 'etincelle', duree: 0.8, taille: 4 })
+      mbEclate(btn, { n: 50, teintes: MB_EAU, vitesse: 420, gravite: 400, forme: 'etincelle', duree: 0.8, taille: 4 })
       sonCeremonie('levier')
       // le flash et le feu vivent dans le voile : le fermer dans le même
       // tour les cachait avant leur première image. On ferme 260 ms plus
@@ -15540,29 +15601,16 @@ function mbSecousse(force = 0.6): void {
   mbScene.classList.add('mb-secousse')
 }
 
-// les teintes des rafales : l'or du record, la menthe du palier, le bleu
-// de l'eau, et la teinte d'une carte ou d'un rang quand elle est connue
-const MB_OR = ['#ffd977', '#ffe9a8', '#fff4d6', '#f2c98e']
-const MB_MENTHE = ['#6dffb8', '#a9ffd6', '#8fd8c8', '#eaf6ff']
-const MB_EAU = ['#63b7e6', '#a7ddf5', '#eaf6ff', '#4fa8d8']
+// les teintes des rafales, à la charte de l'accueil comme le reste de la
+// cérémonie (index.html, « le poste d'observation continue ») : l'ambre de
+// ce qui se gagne (le record, le palier), le vert de la seule maîtrise, et
+// le bleu du spécimen — celui de l'eau, et de tout choix qu'on prend. Le
+// feu jetait de l'or vif et de la menthe fluo sur un écran qui n'en porte
+// plus ; la teinte d'une carte ou d'un rang s'y ajoute quand elle est connue
+const MB_OR = ['#f2c98e', '#f7dcb4', '#fbeed9', '#d9ecf7']
+const MB_MENTHE = ['#3fd69b', '#8fe6c4', '#a7ddf5', '#d9ecf7']
+const MB_EAU = ['#63b7e6', '#a7ddf5', '#d9ecf7', '#4fa8d8']
 
-/** L'INCLINAISON d'une carte sous le pointeur : elle suit la main, comme
- *  une carte qu'on tiendrait. Posée en variables CSS sur `cible`, lue par
- *  la feuille de style ; remise à plat quand le pointeur s'en va. */
-function mbIncline(surface: HTMLElement, cible: HTMLElement, amplitude = 9): void {
-  surface.addEventListener('pointermove', (e) => {
-    if (sansAnimation()) return
-    const r = surface.getBoundingClientRect()
-    const px = (e.clientX - r.left) / Math.max(1, r.width) - 0.5
-    const py = (e.clientY - r.top) / Math.max(1, r.height) - 0.5
-    cible.style.setProperty('--ry', `${(px * amplitude * 2).toFixed(1)}deg`)
-    cible.style.setProperty('--rx', `${(-py * amplitude * 2).toFixed(1)}deg`)
-  })
-  surface.addEventListener('pointerleave', () => {
-    cible.style.removeProperty('--rx')
-    cible.style.removeProperty('--ry')
-  })
-}
 // Le fil de la cérémonie : bilan (temps 1-3, sautables ; il ne passe
 // jamais seul, il attend un geste) → versement (le
 // surplus choisit sa destination) → draft (un tirage par palier franchi)
@@ -15827,13 +15875,15 @@ function mbMontreVersement(): void {
   if (!b) return
   const host = mbCartes()
   host.innerHTML = ''
-  // le bilan est lu : la poutre se replie et pose la question, une ligne
-  // rappelle la salle — rien d'autre au-dessus des cuves. La question
-  // garde le titre replié, comme celle des salles : grossie (mb-question),
-  // elle se cassait sur deux lignes dans la poutre
+  // le bilan est lu : le titre se replie et pose la question, une ligne
+  // rappelle la salle — rien d'autre au-dessus des cuves. La question se
+  // lit EN CLAIR, comme celle des salles (mbQuestion) : elle gardait le
+  // titre replié, éteint, parce que grossie elle se cassait sur deux lignes
+  // entre les bandes de la poutre — les bandes sont parties (21/11), et une
+  // question posée au joueur ne se lit plus en gris
   mbScene.classList.add('mb-compact')
   mbEl('mb-releve').hidden = true
-  mbEl('mb-titre').textContent = 'OÙ VERSER LE SURPLUS ?'
+  mbQuestion('OÙ VERSER LE SURPLUS ?')
   mbEl('mb-choix').hidden = false
   mbEl('mb-choix-titre').textContent = `SALLE FRANCHIE · ${level.code} · ${rangDeSalle(b.pct).nom}`
   const cap = capBonbonne()
@@ -15872,7 +15922,7 @@ function mbMontreVersement(): void {
   ): { btn: HTMLButtonElement; liquide: HTMLElement | null } => {
     const btn = document.createElement('button')
     btn.type = 'button'
-    btn.className = `mb-dest mb-coupe-diag mb-dest-${o}`
+    btn.className = `mb-dest mb-coupe mb-dest-${o}`
     btn.style.setProperty('--i', String(i))
     btn.title = titre
     btn.innerHTML =
@@ -15993,6 +16043,9 @@ function mbMontreVersement(): void {
     if (cote) scene.dataset.vers = cote
     else delete scene.dataset.vers
   }
+  // le contour d'eau des deux cuves — pas de la réserve pleine : on la
+  // voit, on ne la vise pas
+  for (const btn of [cb, cx]) if (!btn.disabled) mbEauAuChoix(btn, () => scene.dataset.verse !== undefined)
   for (const [btn, cote] of [[cb, 'g'], [cx, 'd']] as const) {
     for (const ev of ['pointerenter', 'pad-vise'] as const)
       btn.addEventListener(ev, () => { if (!btn.disabled) vise(cote) })
@@ -16196,6 +16249,7 @@ function mbMontreBilanModule(): void {
   const btn = document.createElement('button')
   btn.type = 'button'
   btn.className = 'mb-levier mb-module-levier'
+  mbEauAuBouton(btn, MB_EAU_VERBE)
   btn.textContent = 'CHOISIR LA COURSIVE SUIVANTE ▸'
   btn.addEventListener('click', () => {
     if (btn.disabled || gesteTropTot(performance.now(), ouvertA)) return
@@ -16452,6 +16506,18 @@ function mbCartes(): HTMLElement {
  *  l'horloge du jeu. */
 let mbDraftOuvertA = -Infinity
 
+/** LES ÉTATS OUVERTS, ceux que la descente lit déjà pour ses salles : la
+ *  glace avec la solidification tissée, la vapeur avec la vaporisation —
+ *  verrous du scénario compris (cycle.ts, transfoTenue). */
+function etatsOuverts(): EtatsOuverts {
+  const acquis = records.eveilAcquis()
+  const verrous = records.verrousCycle()
+  return {
+    glace: transfoTenue('solidification', acquis, verrous),
+    vapeur: transfoTenue('vaporisation', acquis, verrous),
+  }
+}
+
 /** Un TIRAGE d'instruments (palier franchi) : trois cartes, on en emporte
  * une — certaines payantes en condensat, jamais toutes. */
 function mbMontreDraft(): void {
@@ -16463,14 +16529,25 @@ function mbMontreDraft(): void {
   // en partant (part) ; le tirage ne compte pas sur lui pour ça
   mbEl('mb-etal').hidden = true
   mbEl('mb-passer').hidden = true
-  // le titre dit d'où vient le tirage (ceremonie.ts, titreDuTirage) ; et la
-  // BOURSE se lit là où l'on paie : le bandeau ne porte plus de solde (il
-  // rappelle la salle), une carte payante se juge sur ce qu'on a
+  // la ligne de contexte dit d'où vient le tirage (ceremonie.ts,
+  // titreDuTirage) ; et la BOURSE se lit là où l'on paie : une carte payante
+  // se juge sur ce qu'on a
   mbEl('mb-choix-titre').textContent =
     `${titreDuTirage(paliersAtteints(run.xp), mbDraftsRestants, mbTirageGaranti)} · EN BOURSE : ${condensat} cL`
   const host = mbCartes()
   host.innerHTML = ''
-  // le CARNET DU SEMBLABLE ouvre une quatrième carte
+  // LA QUESTION, EN GRAND, ET RIEN D'AUTRE AU-DESSUS DES CARTES. L'écran
+  // gardait « SALLE FRANCHIE » éteint en titre, la consigne en petites
+  // capitales dans la ligne de contexte, et le bandeau de la salle (le
+  // régime, le volume et où il a été versé, la bourse, la mémoire) — tout
+  // ce que le bilan et le palier venaient de dire. « Supprime les textes
+  // dont les informations ont déjà été données sur l'écran d'avant », et la
+  // consigne « en plus visible / grand » (le concepteur, 21/11) : elle
+  // devient la question de l'étape, comme celle des salles
+  mbQuestion('CHOISISSEZ VOTRE INSTRUMENT')
+  mbReleveHors()
+  // le CARNET DU SEMBLABLE ouvre une quatrième carte ; une carte d'un état
+  // pas encore tissé ne se propose pas
   const cartes = tirageInstruments(
     Math.random,
     run.instruments,
@@ -16478,6 +16555,7 @@ function mbMontreDraft(): void {
     VIES_MAX,
     3 + lev('cartes'),
     catalogueRecompenses(),
+    etatsOuverts(),
   )
   const suite = (): void => {
     mbDraftsRestants -= 1
@@ -16500,9 +16578,22 @@ function mbMontreDraft(): void {
   // l'atelier) et son dos (`.mb-pli-dos`). Le survol isole et INCLINE
   // celle qu'on regarde ; au clavier ou à la manette, le focus fait le
   // même office que la souris — sauf le focus posé par le tirage lui-même.
+  // LE CONTOUR D'EAU DE CHAQUE CARTE (ondeVue.ts) : visée, ses quatre
+  // traits deviennent un filet d'eau — une goutte y tombe et fait le tour
+  // de la carte, une houle le garde vivant tant qu'elle a le focus — et la
+  // carte flotte sur des ressorts. Il remplace l'inclinaison qui sautait
+  // d'un pointermove à l'autre et se remettait à plat d'un coup (« ça fait
+  // buggé, pas fluide », le concepteur, 22/11)
+  const ondes = new Map<Element, OndeCarte>()
   const isole = (pli: HTMLElement | null): void => {
     host.classList.toggle('mb-isole', pli !== null)
-    for (const c of host.children) c.classList.toggle('mb-vise', c === pli)
+    for (const c of host.children) {
+      c.classList.toggle('mb-vise', c === pli)
+      // la visée qui ne vient pas du pointeur (clavier, manette) ; le
+      // pointeur, lui, pose sa goutte là où il franchit le bord (ondeVue.ts)
+      if (c === pli) ondes.get(c)?.vise()
+      else ondes.get(c)?.quitte()
+    }
   }
   let elu = false
   // les FLÈCHES passent d'une carte à l'autre (la manette a sa croix ; Tab
@@ -16532,8 +16623,8 @@ function mbMontreDraft(): void {
         bouton: true,
         prix: carte.prix,
       }) +
-      // LE DOS, une vraie face peinte à 180° : la tôle de la station et
-      // l'icône du tirage
+      // LE DOS, une vraie face peinte à 180° : le même corps que la face,
+      // et l'icône du tirage, éteinte
       `<span class="mb-pli-dos" aria-hidden="true">${iconeCeremonieHTML('tirage')}</span>`
     const btn = pli.firstElementChild as HTMLButtonElement
     btn.style.setProperty('--i', String(i))
@@ -16542,13 +16633,16 @@ function mbMontreDraft(): void {
       btn.classList.add('mb-pauvre')
       btn.disabled = true
     }
+    // l'eau AVANT les écouteurs de la visée : son pointerenter passe le
+    // premier et pose la goutte là où le pointeur franchit le bord ; la visée qui suit
+    // (isole) trouve la carte déjà visée et n'en jette pas une seconde
+    ondes.set(pli, ondeCarte(btn, pli, sansAnimation))
     for (const ev of ['pointerenter', 'pad-vise'] as const)
       btn.addEventListener(ev, () => { if (!elu) isole(pli) })
     btn.addEventListener('focusin', () => { if (!elu && !mbFocusOuverture) isole(pli) })
     for (const ev of ['pointerleave', 'focusout', 'pad-quitte'] as const)
       btn.addEventListener(ev, () => { if (!elu) isole(null) })
     btn.addEventListener('keydown', fleches)
-    mbIncline(btn, pli)
     // la carte tombée sur sa face claque, une par une : la voix d'une
     // cartouche qui se pose (le sting reste au choix)
     mbTimers.push(window.setTimeout(() => {
@@ -16563,13 +16657,14 @@ function mbMontreDraft(): void {
       if (!depenseCondensat(carte.prix)) return
       elu = true
       // LA CARTE ÉLUE s'embrase, les autres se retirent — puis la suite
+      // l'eau se tait d'un coup : l'élan de l'élue est une animation, et le
+      // contour qui ondulait encore ne doit rien ajouter à la sienne
+      for (const o of ondes.values()) o.arrete()
       isole(null)
-      pli.style.removeProperty('--rx')
-      pli.style.removeProperty('--ry')
       host.classList.add('mb-elu')
       pli.classList.add('mb-elu-c')
-      const fam = getComputedStyle(btn).getPropertyValue('--fam').trim() || '#6dffb8'
-      mbEclate(btn, { n: 70, teintes: [fam, '#eaf6ff', ...MB_MENTHE], vitesse: 420, gravite: 520, forme: 'confetti', duree: 1.4, taille: 6 })
+      const fam = getComputedStyle(btn).getPropertyValue('--fam').trim() || '#63b7e6'
+      mbEclate(btn, { n: 70, teintes: [fam, ...MB_EAU], vitesse: 420, gravite: 520, forme: 'confetti', duree: 1.4, taille: 6 })
       mbEclate(btn, { n: 40, teintes: [fam, '#ffffff'], vitesse: 600, gravite: 200, forme: 'etincelle', duree: 0.7, taille: 4 })
       mbSecousse(0.5)
       // le levier « vies » se consomme À L'INSTANT (une vie n'est pas un
@@ -16708,7 +16803,7 @@ function mbMontreCarte(raison: 'depart' | 'suite'): void {
   const orbes = orbesAcquis()
   const choix = choixModules(carte, carteRun, orbes)
   const scene = document.createElement('div')
-  // taillé au chanfrein, comme les modules qu'il dessine (.mb-coupe)
+  // un vrai cadre (.mb-coupe) : le coin coupé du verbe, et un filet
   scene.className = 'mb-station-carte mb-coupe'
   // LE CADRE DE L'ÉCRAN ÉPOUSE CELUI DU PLAN (dessinCarte, cadreCarte) : la
   // feuille le tenait à 1600 / 804, la taille d'une scène qui en fait 2100
@@ -17033,6 +17128,7 @@ function mbMontreRepos(m: ModuleCarte, suite: () => void = () => mbMontreCarte('
     const btn = document.createElement('button')
     btn.type = 'button'
     btn.className = `mb-cartouche mb-offre mb-cartouche-${iconeDuGlyphe(o.icone) ?? 'offre'}` + (o.possible ? '' : ' mb-pauvre')
+    mbEauAuBouton(btn, MB_EAU_OFFRE)
     btn.disabled = !o.possible
     btn.style.setProperty('--i', String(i))
     btn.innerHTML = offreHTML({ glyphe: o.icone, nom: o.nom, detail: o.detail })
@@ -17046,7 +17142,7 @@ function mbMontreRepos(m: ModuleCarte, suite: () => void = () => mbMontreCarte('
       majBoutonsRun()
       sauveRun() // la halte prise s'écrit : une reprise ne la rejoue pas
       mbFlash()
-      mbEclate(btn, { n: 50, teintes: MB_MENTHE, vitesse: 420, gravite: 400, forme: 'etincelle', duree: 0.8, taille: 4 })
+      mbEclate(btn, { n: 50, teintes: MB_EAU, vitesse: 420, gravite: 400, forme: 'etincelle', duree: 0.8, taille: 4 })
       sonCeremonie('levier')
       suite()
     })
@@ -17077,6 +17173,7 @@ function mbMontreDon(m: ModuleCarte, suite: () => void = () => mbMontreCarte('su
   const btn = document.createElement('button')
   btn.type = 'button'
   btn.className = `mb-cartouche mb-offre mb-cartouche-${iconeDuGlyphe(o.icone) ?? 'offre'}`
+  mbEauAuBouton(btn, MB_EAU_OFFRE)
   btn.innerHTML = offreHTML({ glyphe: o.icone, nom: o.nom, detail: o.detail })
   const ouvertA = performance.now()
   let elu = false
@@ -17089,7 +17186,7 @@ function mbMontreDon(m: ModuleCarte, suite: () => void = () => mbMontreCarte('su
     majBoutonsRun()
     sauveRun()
     mbFlash()
-    mbEclate(btn, { n: 50, teintes: MB_MENTHE, vitesse: 420, gravite: 400, forme: 'etincelle', duree: 0.8, taille: 4 })
+    mbEclate(btn, { n: 50, teintes: MB_EAU, vitesse: 420, gravite: 400, forme: 'etincelle', duree: 0.8, taille: 4 })
     sonCeremonie('levier')
     suite()
   })
@@ -17432,7 +17529,6 @@ function propositionsVoie(seq: LevelDef[]): CarteVoie[] | null {
 }
 
 /** La ligne de fiche de la mini-carte du choix en cours (rien sans elle). */
-let ficheVoies: (t: string | null) => void = () => {}
 
 function mbMontreSallesVoie(cartes: CarteVoie[]): void {
   mbEtape = 'salles'
@@ -17487,36 +17583,14 @@ function mbMontreSallesVoie(cartes: CarteVoie[]): void {
       trace: carteRun.trace,
       portes: cartes.map((c) => c.voie).filter((v): v is number => v !== undefined),
     })
-    // LA FICHE DE LA MINI-CARTE : ce qu'est la case ou la porte visée —
-    // l'infobulle native ne paraissait ni à la manette ni au doigt. Elle ne
-    // paraît QUE visée, posée en surimpression au pied de la carte : elle ne
-    // prend aucune hauteur (la carte ne « saute » pas), et la consigne par
-    // défaut qui l'occupait au repos est partie avec l'épure
-    const fiche = document.createElement('p')
-    fiche.className = 'mv-fiche'
-    voies.appendChild(fiche)
+    // LA FICHE DE LA MINI-CARTE est partie : une ligne qui paraissait au
+    // milieu de l'écran, au pied de la carte, à chaque porte ou case visée
+    // (« VOIE DU HAUT · tableau du pool · ferme 10 cases ») — « du texte qui
+    // apparaît au centre de la page quand on sélectionne un tableau, il
+    // faut l'enlever » (le concepteur, 22/11). La carte dit déjà ce qu'une
+    // porte ferme : elle l'éteint (allume, plus bas)
     host.appendChild(voies)
-    ficheVoies = (t: string | null): void => {
-      fiche.textContent = t ?? ''
-      fiche.hidden = !t
-    }
-    ficheVoies(null)
-    // survoler une case de la grille la décrit aussi
-    const svg = voies.querySelector('.mv-svg')
-    svg?.addEventListener('pointerover', (e) => {
-      const g = (e.target as Element).closest('.mv-noeud')
-      const nd = g ? mini.rangs[Number(g.getAttribute('data-rang'))]?.[Number(g.getAttribute('data-voie'))] : undefined
-      const rep = nd ? REPERES_VOIE[nd.voie] : undefined
-      if (nd && rep) ficheVoies(`SALLE ${nd.rang + 1} · ${rep.signe} VOIE DU ${rep.nom} · ${ditNoeud(nd)}`)
-    })
-    svg?.addEventListener('pointerleave', () => {
-      // au doigt, quitter la grille ne vaut pas quitter la porte armée :
-      // sa fiche revient (revue de la PR, 25/09)
-      const armee = host.querySelector(`.${ARMEE}`)
-      if (armee) armee.dispatchEvent(new Event('pad-vise'))
-      else ficheVoies(null)
-    })
-  } else ficheVoies = () => {}
+  }
   // LES MANQUES DU POOL se notent quand le choix se prend, une fois : ce
   // sont les trous que ce choix a réellement présentés au joueur
   let manquesNotes = false
@@ -17579,11 +17653,7 @@ function mbMontreSallesVoie(cartes: CarteVoie[]): void {
         if (!svg) return
         for (const el of svg.querySelectorAll('.mv-perdu, .mv-entree, .mv-vise'))
           el.classList.remove('mv-perdu', 'mv-entree', 'mv-vise')
-        if (!oui) {
-          // une porte armée au doigt garde son aperçu
-          if (!porte.classList.contains(ARMEE)) ficheVoies(null)
-          return
-        }
+        if (!oui) return
         const vient = derniereVoie(carteRun)
         const perdu = fermeParPorte(mini, carteRun.niveau, voie, portes, vient)
         for (const k of perdu.noeuds) {
@@ -17595,14 +17665,6 @@ function mbMontreSallesVoie(cartes: CarteVoie[]): void {
         if (entree) svg.querySelector(`.mv-lien[data-lien="${entree}"]`)?.classList.add('mv-entree')
         svg.querySelector(`.mv-noeud[data-rang="${carteRun.niveau}"][data-voie="${voie}"]`)?.classList.add('mv-vise')
         svg.querySelector(`.mv-repere[data-voie="${voie}"]`)?.classList.add('mv-vise')
-        const nd = mini.rangs[carteRun.niveau]?.[voie]
-        const rep = REPERES_VOIE[voie]
-        const n = perdu.noeuds.length
-        if (nd && rep)
-          ficheVoies(
-            `${rep.signe} VOIE DU ${rep.nom} · ${ditNoeud(nd)} · ` +
-              (n > 0 ? `ferme ${n} case${n > 1 ? 's' : ''} (éteinte${n > 1 ? 's' : ''})` : 'ne ferme rien'),
-          )
       }
       for (const ev of ['pointerenter', 'focusin', 'pad-vise'] as const) porte.addEventListener(ev, () => allume(true))
       for (const ev of ['pointerleave', 'focusout', 'pad-quitte'] as const) porte.addEventListener(ev, () => allume(false))
@@ -17664,6 +17726,42 @@ function mbJauges(): HTMLElement {
  *  pendant que les autres se referment, puis `choisit` retient la salle et
  *  le sas mène à la suivante. Un second clic pendant l'ouverture ne compte
  *  pas : la porte est déjà prise. */
+/** LES CONTOURS D'EAU des choix de la cérémonie, par élément : de quoi
+ *  les arrêter tous quand l'un d'eux est pris. */
+const mbOndes = new WeakMap<Element, OndeCarte>()
+
+/**
+ * LE CONTOUR D'EAU D'UN CHOIX taillé au chanfrein — une cuve du versement,
+ * une porte de salle : « applique cela au choix du surplus et au choix de
+ * la salle » (le concepteur, 22/11, après le contour d'eau du tirage).
+ * Le bouton n'a pas de pli : la toile vit dedans, le contour court à 5 px
+ * du bord (son clip-path rognerait ce qui déborde), et c'est lui qui penche
+ * et flotte, avec sa propre perspective (ondeVue.ts, OptionsOnde). La visée
+ * vient du pointeur (écouté par l'onde), du clavier (focusin — sauf le focus
+ * que l'étape pose elle-même à l'ouverture) et de la manette (pad-vise).
+ * Le choix fait (`choisi`), l'eau de toute la rangée se tait d'un coup :
+ * l'élan de l'élue et la chute des autres sont des animations.
+ */
+function mbEauAuChoix(btn: HTMLElement, choisi: () => boolean): OndeCarte {
+  // à 5 px du bord, des vagues à 60 % : le ruban reste dans les 10 px de
+  // marge d'une porte (à pleine hauteur, il frôlait le code de la salle),
+  // et ses crêtes ne touchent pas le bord qui les rognerait
+  const o = ondeCarte(btn, btn, sansAnimation, { retrait: 5, amplitude: 0.6, flotte: -4, perspective: 1200 })
+  mbOndes.set(btn, o)
+  btn.addEventListener('focusin', () => { if (!mbFocusOuverture) o.vise() })
+  btn.addEventListener('pad-vise', () => o.vise())
+  for (const ev of ['focusout', 'pad-quitte'] as const) btn.addEventListener(ev, () => o.quitte())
+  // après le tour de l'événement : le choix d'une cuve est décidé par
+  // l'écouteur de la scène, qui passe APRÈS celui du bouton
+  btn.addEventListener('click', () => {
+    window.setTimeout(() => {
+      if (!choisi()) return
+      for (const frere of btn.parentElement?.children ?? []) mbOndes.get(frere)?.arrete()
+    }, 0)
+  })
+  return o
+}
+
 function mbPorte(
   lv: LevelDef,
   i: number,
@@ -17678,7 +17776,7 @@ function mbPorte(
 ): HTMLButtonElement {
   const btn = document.createElement('button')
   btn.type = 'button'
-  // taillée au chanfrein, comme un module de la station (.mb-coupe)
+  // le cadre de la cérémonie (.mb-coupe) : rien au repos, la visée le révèle
   btn.className = 'mb-porte mb-coupe'
   btn.style.setProperty('--i', String(i))
   // l'infobulle garde tout ce que la porte ne dit plus en ligne : le
@@ -17695,9 +17793,10 @@ function mbPorte(
     o.figure ? `<i>FIGURE ${htmlSafe(o.figure.toUpperCase())}</i>` : '',
   ].join('')
   btn.innerHTML =
-    // ENTRER est un levier, celui qu'on tire pour passer (porteArmee.ts y
-    // écrit « TOUCHEZ ENCORE » au doigt) — au pied de la vitrine : dans
-    // l'angle du haut, il couvrait le repère de la voie
+    // ENTRER est le verbe de la porte (.mb-levier) : il ne paraît qu'à la
+    // visée — et sur la porte armée au doigt, où porteArmee.ts y écrit
+    // « TOUCHEZ ENCORE ». Au pied de la vitrine : dans l'angle du haut, il
+    // couvrait le repère de la voie
     `<span class="mb-porte-vue">${mbNumeroPorte(i, o.voie)}<canvas width="440" height="252"></canvas>` +
     `<span class="mb-porte-entrer mb-levier">ENTRER ▸</span></span>` +
     `<b>${htmlSafe(lv.code)}</b><small>${htmlSafe(lv.name)}</small>` +
@@ -17722,7 +17821,7 @@ function mbPorte(
     bande.ponctuation('sting-collecte', 0.7)
     mbFlash()
     mbSecousse(0.7)
-    mbEclate(btn, { n: 80, teintes: MB_MENTHE, vitesse: 520, gravite: 260, forme: 'etincelle', duree: 0.9, taille: 4 })
+    mbEclate(btn, { n: 80, teintes: MB_EAU, vitesse: 520, gravite: 260, forme: 'etincelle', duree: 0.9, taille: 4 })
     // la porte s'ouvre en 550 ms, puis on passe ; sans animation, tout de suite
     window.setTimeout(() => {
       if (!miseEnBonbonne) return
@@ -17730,6 +17829,7 @@ function mbPorte(
       avanceSalle()
     }, sansAnimation() ? 0 : 520)
   })
+  mbEauAuChoix(btn, () => btn.classList.contains('mb-elue'))
   return btn
 }
 
@@ -17838,6 +17938,7 @@ function mbPorteNoeud(
       if (miseEnBonbonne) ouvre()
     }, sansAnimation() ? 0 : 420)
   })
+  mbEauAuChoix(btn, () => btn.classList.contains('mb-elue'))
   return btn
 }
 
@@ -17921,12 +18022,13 @@ function mbMontreResultatMiniJeu(r: NonNullable<typeof minijeuResultat>, suite: 
   const btn = document.createElement('button')
   btn.type = 'button'
   btn.className = 'mb-levier mb-halte-levier'
+  mbEauAuBouton(btn, MB_EAU_VERBE)
   btn.textContent = 'REPRENDRE LA DESCENTE ▸'
   btn.addEventListener('click', () => {
     if (btn.disabled || gesteTropTot(performance.now(), ouvertA)) return
     btn.disabled = true
     mbFlash()
-    mbEclate(btn, { n: 50, teintes: MB_MENTHE, vitesse: 420, gravite: 400, forme: 'etincelle', duree: 0.8, taille: 4 })
+    mbEclate(btn, { n: 50, teintes: MB_EAU, vitesse: 420, gravite: 400, forme: 'etincelle', duree: 0.8, taille: 4 })
     sonCeremonie('levier')
     // le sting reste au verdict juste : c'est un record du trait
     if (res.verdict === 'juste') bande.ponctuation('sting-record', 0.6)
@@ -17996,7 +18098,7 @@ function mbMontreCache(m: ModuleCarte): void {
   halte.className = 'mb-halte mb-halte-a-recit'
   halte.innerHTML =
     `<div class="mb-halte-heros">${iconeCeremonieHTML('cache')}</div>` +
-    `<div class="mb-ev-recit mb-ev-issue mb-coupe-diag"><em>${htmlSafe(m.nom)}</em><p>${htmlSafe(texte)}</p></div>` +
+    `<div class="mb-ev-recit mb-ev-issue mb-coupe"><em>${htmlSafe(m.nom)}</em><p>${htmlSafe(texte)}</p></div>` +
     (prise && !dejaTenu
       ? `<div class="mb-halte-puces">${plaqueHTML({ cle: 'orbe', icone: 'orbe', valeur: nomOrbe, nom: 'ORBE D’ESSENCE' }, 0)}</div>`
       : '')
@@ -18010,12 +18112,13 @@ function mbMontreCache(m: ModuleCarte): void {
   const btn = document.createElement('button')
   btn.type = 'button'
   btn.className = 'mb-levier mb-halte-levier'
+  mbEauAuBouton(btn, MB_EAU_VERBE)
   btn.textContent = 'REPRENDRE LA DESCENTE ▸'
   btn.addEventListener('click', () => {
     if (btn.disabled || gesteTropTot(performance.now(), ouvertA)) return
     btn.disabled = true
     mbFlash()
-    mbEclate(btn, { n: 50, teintes: MB_MENTHE, vitesse: 420, gravite: 400, forme: 'etincelle', duree: 0.8, taille: 4 })
+    mbEclate(btn, { n: 50, teintes: MB_EAU, vitesse: 420, gravite: 400, forme: 'etincelle', duree: 0.8, taille: 4 })
     sonCeremonie('levier')
     mbApresHalte()
   })
@@ -18080,9 +18183,11 @@ function appliqueEffets(effets: readonly EffetEvenement[]): string[] {
         break
       }
       case 'instrument': {
+        const ouverts = etatsOuverts()
         const vivier = catalogueRecompenses().filter((d) =>
           e.bon
             ? !d.contrepartie &&
+              instrumentOuvert(d, ouverts) &&
               !run.instruments.includes(d.id) &&
               (!d.effets.some((x) => x.levier === 'vies') || run.vies < VIES_MAX)
             : d.contrepartie === true && !run.instruments.includes(d.id),
@@ -18166,7 +18271,7 @@ function mbPeintEvenement(ev: EvenementDef, alea: () => number): void {
   halte.className = 'mb-halte mb-halte-a-recit'
   halte.innerHTML = `<div class="mb-halte-heros">${iconeCeremonieHTML('rencontre')}</div>`
   const recit = document.createElement('div')
-  recit.className = 'mb-ev-recit mb-coupe-diag'
+  recit.className = 'mb-ev-recit mb-coupe'
   recit.innerHTML = `<em>${htmlSafe(ev.lieu)}</em><p>${htmlSafe(ev.texte)}</p>`
   halte.appendChild(recit)
   const rangee = document.createElement('div')
@@ -18179,6 +18284,7 @@ function mbPeintEvenement(ev: EvenementDef, alea: () => number): void {
     const btn = document.createElement('button')
     btn.type = 'button'
     btn.className = 'mb-cartouche mb-offre' + (possible ? '' : ' mb-pauvre')
+    mbEauAuBouton(btn, MB_EAU_OFFRE)
     btn.disabled = !possible
     btn.style.setProperty('--i', String(i))
     // le détail ne se lit que d'une offre déjà prise ; une offre hors de
@@ -18196,7 +18302,7 @@ function mbPeintEvenement(ev: EvenementDef, alea: () => number): void {
     btn.addEventListener('click', () => {
       if (elu || gesteTropTot(performance.now(), ouvertA)) return
       elu = true
-      mbEclate(btn, { n: 50, teintes: MB_MENTHE, vitesse: 420, gravite: 400, forme: 'etincelle', duree: 0.8, taille: 4 })
+      mbEclate(btn, { n: 50, teintes: MB_EAU, vitesse: 420, gravite: 400, forme: 'etincelle', duree: 0.8, taille: 4 })
       sonCeremonie('levier')
       mbTranche(ev, choix, alea) // le flash part avec l'issue
     })
@@ -18230,13 +18336,14 @@ function mbTranche(ev: EvenementDef, choix: ChoixEvenement, alea: () => number):
   halte.className = 'mb-halte mb-halte-a-recit'
   halte.innerHTML =
     `<div class="mb-halte-heros">${iconeCeremonieHTML('rencontre')}</div>` +
-    `<div class="mb-ev-recit mb-ev-issue mb-coupe-diag"><em>${htmlSafe(choix.libelle)} — ${htmlSafe(choix.detail)}</em><p>${htmlSafe(issue.texte)}</p></div>` +
+    `<div class="mb-ev-recit mb-ev-issue mb-coupe"><em>${htmlSafe(choix.libelle)} — ${htmlSafe(choix.detail)}</em><p>${htmlSafe(issue.texte)}</p></div>` +
     `<ul class="mb-halte-puces">${dites.map((l, i) => puceHTML(l, i, instrument)).join('')}</ul>`
   host.appendChild(halte)
   const ouvertA = performance.now()
   const btn = document.createElement('button')
   btn.type = 'button'
   btn.className = 'mb-levier mb-halte-levier'
+  mbEauAuBouton(btn, MB_EAU_VERBE)
   btn.textContent = 'REPRENDRE LA DESCENTE ▸'
   btn.addEventListener('click', () => {
     if (btn.disabled || gesteTropTot(performance.now(), ouvertA)) return
@@ -18255,6 +18362,10 @@ function mbMontreFin(): void {
   // (« REPOS », posé en question) : la fin ordinaire reprend le sien
   mbEl('mb-titre').textContent = 'SALLE FRANCHIE'
   mbEl('mb-choix-titre').textContent = 'PAROI DU SAS OUVERTE'
+  // le bandeau de la salle revient : le tirage, s'il y en a eu un, l'a
+  // retiré pour laisser la scène à ses cartes — la fin ordinaire a le même
+  // visage qu'on y arrive par un tirage ou non
+  mbEl('mb-releve').hidden = false
   // la jauge d'étalonnage reste en scène, repliée sur une ligne
   mbJaugeMince()
   mbScene.classList.add('mb-compact')
@@ -18265,13 +18376,14 @@ function mbMontreFin(): void {
   const btn = document.createElement('button')
   btn.type = 'button'
   btn.className = 'mb-levier mb-halte-levier'
+  mbEauAuBouton(btn, MB_EAU_VERBE)
   btn.textContent = 'SALLE SUIVANTE ▸'
   btn.addEventListener('click', () => {
     if (btn.disabled || gesteTropTot(performance.now(), ouvertA)) return
     btn.disabled = true
     sonCeremonie('levier')
     mbFlash()
-    mbEclate(btn, { n: 50, teintes: MB_MENTHE, vitesse: 420, gravite: 400, forme: 'etincelle', duree: 0.8, taille: 4 })
+    mbEclate(btn, { n: 50, teintes: MB_EAU, vitesse: 420, gravite: 400, forme: 'etincelle', duree: 0.8, taille: 4 })
     window.setTimeout(() => {
       if (!miseEnBonbonne) return
       fermeMiseEnBonbonne()
@@ -18373,6 +18485,7 @@ function mbMontreFinDescente(issue: IssueDescente, r: ReleveDescente, suite: () 
   const btn = document.createElement('button')
   btn.type = 'button'
   btn.className = 'mb-levier mb-fin-levier'
+  mbEauAuBouton(btn, MB_EAU_VERBE)
   btn.textContent = levierFin(issue, levelIndex + 1)
   btn.addEventListener('click', () => {
     if (btn.disabled) return
@@ -18505,7 +18618,7 @@ function montreMiseEnBonbonne(b: BilanSalle): void {
     if (verdict.etoiles >= 4) bande.ponctuation('sting-record', 0.7)
     mbEclate(rang, {
       n: 40 + verdict.etoiles * 16,
-      teintes: [verdict.teinte, '#eaf6ff', ...MB_MENTHE],
+      teintes: [verdict.teinte, ...MB_EAU],
       vitesse: 480,
       gravite: 420,
       forme: 'etincelle',
@@ -18564,7 +18677,7 @@ function montreMiseEnBonbonne(b: BilanSalle): void {
     if (!g) return
     apres(TEMPS_BILAN.condensat + 170 * i, () => {
       c.classList.add('mb-on')
-      const teinte = getComputedStyle(c).getPropertyValue('--mb-liseret').trim() || '#6dffb8'
+      const teinte = getComputedStyle(c).getPropertyValue('--mb-liseret').trim() || '#63b7e6'
       mbEclate(c.querySelector('.mb-cartouche-alv'), { n: 22, teintes: [teinte, '#eaf6ff'], vitesse: 220, gravite: 420, duree: 0.8, taille: 3 })
       sonCeremonie('cartouche', g.cle === 'orbe' || g.cle === 'tirage' ? 1 : 0.7)
       const val = c.querySelector('.mb-cartouche-val')
@@ -18604,6 +18717,50 @@ function mbSauteBilan(): void {
 }
 mbEl('mb-passer').addEventListener('click', mbSauteBilan)
 
+/**
+ * LE CONTOUR D'EAU D'UN BOUTON de la cérémonie — le verbe PASSER /
+ * CONTINUER, les crans de l'avis : « applique aussi cet effet aux
+ * différents boutons » (le concepteur, 22/11). La visée est celle que la
+ * feuille dessine déjà pour eux : le survol (écouté par l'onde), le focus
+ * VISIBLE (le clavier) et la manette — pas un focus posé par programme, que
+ * le verbe reçoit à chaque bilan pour qu'Entrée et A le trouvent : l'eau
+ * aurait ondulé sous chaque bilan sans qu'on vise rien.
+ */
+function mbEauAuBouton(btn: HTMLElement, options: OptionsOnde): OndeCarte {
+  const o = ondeCarte(btn, btn, sansAnimation, options)
+  btn.addEventListener('focusin', () => { if (btn.matches(':focus-visible')) o.vise() })
+  btn.addEventListener('pad-vise', () => o.vise())
+  for (const ev of ['focusout', 'pad-quitte'] as const) btn.addEventListener(ev, () => o.quitte())
+  return o
+}
+// LE VERBE de chaque étape (PASSER / CONTINUER, celui d'une cache, d'un
+// mini-jeu, d'une rencontre, du module, de la fin) est un APLAT : un filet
+// bleu sur du bleu ne se verrait pas — c'est son bord qui ondule
+// (ondeVue.ts, mode « bord »), au coin coupé du verbe (12 px)
+const MB_EAU_VERBE: OptionsOnde = {
+  mode: 'bord',
+  retrait: 4,
+  amplitude: 0.5,
+  pas: 4,
+  chanfrein: 12,
+  flotte: -2,
+  inclinaison: 4,
+  perspective: 600,
+}
+// LES OFFRES d'une halte (repos, don, choix d'une rencontre, palet) : des
+// cartouches sans filet ni chanfrein, qui prennent le voile à la visée —
+// le filet d'eau, à 4 px du bord (leur marge intérieure en fait 10 et plus)
+const MB_EAU_OFFRE: OptionsOnde = {
+  retrait: 4,
+  amplitude: 0.6,
+  pas: 6,
+  chanfrein: 0,
+  flotte: -3,
+  inclinaison: 4,
+  perspective: 900,
+}
+mbEauAuBouton(mbEl('mb-passer'), MB_EAU_VERBE)
+
 // ---- L'AVIS DU JOUEUR SUR LA SALLE (game/avisSalles.ts) ----
 // Cinq crans sous le levier du bilan, puis PAS D'AVIS : un clic, un
 // toucher, une touche (1 à 5, 0 pour pas d'avis), ou la croix puis A. PAS
@@ -18619,7 +18776,7 @@ function mbAvisPeint(): void {
   for (const cran of Array.from(mbEl('mb-avis-crans').children)) {
     const n = Number((cran as HTMLElement).dataset.avis)
     // la jauge : tous les crans jusqu'au mien s'allument ; PAS D'AVIS (0)
-    // s'enfonce seul, sans la menthe — il ne dit rien de la salle
+    // s'enfonce seul, sans l'aplat — il ne dit rien de la salle
     cran.classList.toggle('mb-on', n > 0 && n <= mien)
     cran.setAttribute('aria-pressed', n === mien ? 'true' : 'false')
   }
@@ -18644,6 +18801,19 @@ function mbAvisOuvre(code: string | null): void {
     ).join('') +
     `<button type="button" class="mb-avis-cran mb-avis-sans" data-avis="0" aria-pressed="true" ` +
     `title="ne pas juger cette salle (touche 0)">PAS D’AVIS</button>`
+  // LES CRANS : des carrés de 36 px sans chanfrein — un nœud tous les 3 px
+  // (à 8 px, 18 nœuds pour un cran : une onde en escalier), le filet à
+  // 2,5 px du bord, des vagues basses : le chiffre est au milieu
+  for (const cran of mbEl('mb-avis-crans').children)
+    mbEauAuBouton(cran as HTMLElement, {
+      retrait: 2.5,
+      amplitude: 0.45,
+      pas: 3,
+      chanfrein: 0,
+      flotte: -2,
+      inclinaison: 6,
+      perspective: 400,
+    })
   mbAvisPeint()
 }
 function mbAvisVote(cran: AvisSalle | 0): void {
@@ -18885,7 +19055,7 @@ function restart(): void {
   input.freezeIntent = false
   input.gasIntent = false
   // un éveil en cours reprend du début : la cryostase ressaisit l'échantillon
-  if (eveil.etape !== 'off') lanceEveil()
+  if (eveil.etape !== 'off') lanceEveil(true)
   // chaque début de salle grave la progression de l'expédition principale
   sauveRun()
   applyLevel()
@@ -20051,8 +20221,12 @@ const eveil = {
 }
 // Sonde de test : suivre l'éveil depuis la console (comme __sim, __cam)
 ;(window as unknown as { __eveil: typeof eveil }).__eveil = eveil
-function lanceEveil(): void {
+function lanceEveil(force = false): void {
+  // désactivé par défaut : seul un geste explicite (le bouton du protocole,
+  // ou un éveil déjà en cours qu'un R relance) le joue
+  if (!force && !EVEIL_PAR_DEFAUT) return
   if (coffre.stockage.getItem(CLE_EVEIL)) return
+  eveilEnCours = true
   // relance propre (restart en plein éveil) : tout voile retombe d'abord
   for (const carte of [eveil1El, eveil2El]) {
     carte.hidden = true
@@ -20099,6 +20273,7 @@ function avanceEveil(): void {
     carteEveil(eveil2El, false)
     eveil.cible = 1
     eveil.etape = 'off'
+    eveilEnCours = false
     try {
       coffre.stockage.setItem(CLE_EVEIL, '1')
     } catch {
@@ -21585,11 +21760,15 @@ function corpsImage(now: number): boolean {
     audio.collect()
     bande.ponctuation('sting-collecte', 0.85)
     // LE SCÉNARIO : la cinématique du départ, s'il y en a une — la run
-    // attend qu'elle finisse (la simulation est en pause pendant ce temps)
-    void joueMoment('lancement-run').then(() => {
+    // attend qu'elle finisse (la simulation est en pause pendant ce temps).
+    // Elle se tait avec la narration du hub (NARRATION_HUB) : on part tout
+    // de suite.
+    const partir = (): void => {
       effaceRun()
       newExpedition(true)
-    })
+    }
+    if (NARRATION_HUB) void joueMoment('lancement-run').then(partir)
+    else partir()
   } else if (!tableauDone && !sim.dispersed && estMiniJeu(level) && level.minijeu && (majPalet(), majRafales(), majOrbites(), majCibles(), minijeuResultat)) {
     // LE MINI-JEU A CONCLU : la lame du couperet a pesé, le palet a fait
     // ses lancers (ou le joueur a conclu). Rien ne se consigne aux registres
@@ -21802,7 +21981,7 @@ function corpsImage(now: number): boolean {
       // RÉCIT et FINS), le toast est celui des fiches. Jamais depuis
       // l'outil, un ESSAI d'éditeur, ni avant l'acte 0 : le récit ne se
       // livre qu'aux vraies descentes.
-      if (!sasOutil && eveilJoue() && !testLevel) {
+      if (!sasOutil && acteZeroPasse() && !testLevel) {
         const journal = journalCourant()
         const fragment = prochainFragment(journal, records.decouvertesVues())
         if (fragment) {

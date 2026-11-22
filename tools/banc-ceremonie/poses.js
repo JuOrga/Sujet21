@@ -195,7 +195,7 @@
       `</div>` +
       `<div style="display:flex;gap:16px;align-items:stretch">` +
         `<div class="mb-coupe" style="width:180px;height:90px;display:grid;place-items:center">.mb-coupe</div>` +
-        `<div class="mb-coupe-diag" style="width:180px;height:90px;display:grid;place-items:center">.mb-coupe-diag</div>` +
+        `<div class="mb-coupe" style="width:180px;height:90px;display:grid;place-items:center">.mb-coupe</div>` +
         `<div style="display:flex;flex-direction:column;gap:10px;justify-content:center">` +
           `<button type="button" class="mb-levier">PASSER ▸</button>` +
           `<button type="button" class="mb-levier pad-focus">VISÉ (MANETTE)</button>` +
@@ -214,7 +214,7 @@
     host.innerHTML = ''
     scene.classList.add('mb-compact')
     $('mb-releve').hidden = true
-    $('mb-titre').textContent = 'OÙ VERSER LE SURPLUS ?'
+    question('OÙ VERSER LE SURPLUS ?') // en clair, comme main.ts (mbMontreVersement)
     $('mb-choix').hidden = false
     $('mb-choix-titre').textContent = `SALLE FRANCHIE · ${RUN.code} · ${F.rangDeSalle(RUN.pct).nom}`
     const b = RUN, cap = RUN.cap
@@ -232,7 +232,7 @@
     const cuve = (o, html, i, niveau, apres, chiffre, pied, titre) => {
       const btn = document.createElement('button')
       btn.type = 'button'
-      btn.className = `mb-dest mb-coupe-diag mb-dest-${o}`
+      btn.className = `mb-dest mb-coupe mb-dest-${o}`
       btn.style.setProperty('--i', String(i))
       btn.title = titre
       btn.innerHTML = `<b class="mb-dest-nom">${o === 'reserve' ? 'RÉSERVE' : 'MAÎTRISE'}</b>` +
@@ -265,6 +265,16 @@
     mai.btn.querySelector('.mb-cuve').insertAdjacentHTML('beforeend', F.anneauxHTML(col, b.xp, b.xp + b.surplus))
     sc.append(res.btn, goutte, mai.btn)
     host.appendChild(sc)
+    // le contour d'eau des cuves (main.ts, mbEauAuChoix), la réserve pleine exceptée
+    for (const btn of [res.btn, mai.btn]) if (!btn.disabled) eauAuChoix(btn)
+  }
+
+  /** main.ts, mbEauAuChoix : la toile dans le bouton, le contour à 5 px du
+   *  bord, le bouton qui penche et flotte ; la visée au focus aussi */
+  function eauAuChoix(btn) {
+    const o = F.ondeCarte(btn, btn, () => matchMedia('(prefers-reduced-motion: reduce)').matches, { retrait: 5, amplitude: 0.6, flotte: -4, perspective: 1200 })
+    btn.addEventListener('focusin', () => o.vise())
+    btn.addEventListener('focusout', () => o.quitte())
   }
 
   // ---- la maîtrise (main.ts mbPeintEtal) : le liquide dans la fenêtre
@@ -352,9 +362,12 @@
     const xpF = RUN.xp + RUN.surplus
     $('mb-choix-titre').textContent = `${F.titreDuTirage(paliers(xpF), 2, true)} · EN BOURSE : ${RUN.condensat} cL`
     const host = cartes()
+    question('CHOISISSEZ VOTRE INSTRUMENT') // après le porte-cartes, comme main.ts
+    $('mb-releve').hidden = true // mbReleveHors : le bilan et le palier l'ont dit
     const tir = F.tirageInstruments(F.graine(5), [], 2, 3, 3, F.INSTRUMENTS)
     host.classList.add('mb-draft')
     host.style.setProperty('--n', String(Math.min(4, tir.length)))
+    const ondes = []
     tir.forEach((c, i) => {
       const def = F.INSTRUMENTS.find((d) => d.id === c.id)
       const payable = c.prix === 0 || RUN.condensat >= c.prix
@@ -368,6 +381,21 @@
       btn.style.setProperty('--i', String(i))
       if (!payable) { btn.classList.add('mb-pauvre'); btn.disabled = true }
       host.appendChild(pli)
+      // l'eau de la carte et la visée, comme main.ts : le pointeur pose sa
+      // goutte, l'isolement suit
+      const onde = F.ondeCarte(btn, pli, () => matchMedia('(prefers-reduced-motion: reduce)').matches)
+      ondes.push(onde)
+      const isole = (vise) => {
+        host.classList.toggle('mb-isole', vise !== null)
+        ;[...host.children].forEach((c, k) => {
+          c.classList.toggle('mb-vise', c === vise)
+          if (c === vise) ondes[k].vise(); else ondes[k].quitte()
+        })
+      }
+      btn.addEventListener('pointerenter', () => isole(pli))
+      btn.addEventListener('focusin', () => isole(pli))
+      btn.addEventListener('pointerleave', () => isole(null))
+      btn.addEventListener('focusout', () => isole(null))
     })
     if (etat === 'elue') {
       host.classList.add('mb-elu')
@@ -388,7 +416,7 @@
     const host = cartes()
     question('CHOISISSEZ LA SALLE SUIVANTE') // après le porte-cartes, comme main.ts
     host.classList.add('mb-trio')
-    host.innerHTML = `<div class="mb-voies">${F.miniCarte()}<p class="mv-fiche" hidden></p></div>`
+    host.innerHTML = `<div class="mb-voies">${F.miniCarte()}</div>`
     const REP = [['▲', 'HAUT'], ['●', 'MILIEU'], ['▼', 'BAS']]
     const portes = [
       { mec: 0, diff: 3, v: 'K3F9', figure: 'le serpentin' },
@@ -413,6 +441,7 @@
         btn.querySelector('.mb-porte-ligne').innerHTML = [`<i>DIFF ${p.diff}</i>`, p.prime ? `<i class="mb-porte-prime">PRIME ${p.prime}</i>` : '', p.figure ? `<i>FIGURE ${p.figure.toUpperCase()}</i>` : ''].join('')
       }
       host.appendChild(btn)
+      eauAuChoix(btn)
     })
   }
 
@@ -538,7 +567,7 @@
     const nom = F.ORBES[0].nom
     const h = halte(host, 'cache', true)
     h.insertAdjacentHTML('beforeend',
-      `<div class="mb-ev-recit mb-ev-issue mb-coupe-diag"><em>SOUTES</em><p>${esc(`L’orbe d’essence de conscience — ${nom}. Il vous suit.`)}</p></div>` +
+      `<div class="mb-ev-recit mb-ev-issue mb-coupe"><em>SOUTES</em><p>${esc(`L’orbe d’essence de conscience — ${nom}. Il vous suit.`)}</p></div>` +
       `<div class="mb-halte-puces">${F.plaqueHTML({ cle: 'orbe', icone: 'orbe', valeur: nom, nom: 'ORBE D’ESSENCE' }, 0)}</div>`)
     levier(h, 'REPRENDRE LA DESCENTE ▸')
   }
@@ -572,12 +601,12 @@
       // inconnu de plus : le banc montre les trois sortes de puce
       const lignes = [...issue.effets.map(ligneEffet).filter(Boolean), ligneEffet({ quoi: 'instrument', bon: true }), '🧪 un glyphe que la table ne connaît pas']
       h.insertAdjacentHTML('beforeend',
-        `<div class="mb-ev-recit mb-ev-issue mb-coupe-diag"><em>${esc(choix.libelle)} — ${esc(choix.detail)}</em><p>${esc(issue.texte)}</p></div>` +
+        `<div class="mb-ev-recit mb-ev-issue mb-coupe"><em>${esc(choix.libelle)} — ${esc(choix.detail)}</em><p>${esc(issue.texte)}</p></div>` +
         `<ul class="mb-halte-puces">${lignes.map((l, i) => F.puceHTML(l, i, instrument)).join('')}</ul>`)
       levier(h, 'REPRENDRE LA DESCENTE ▸')
       return
     }
-    const rc = document.createElement('div'); rc.className = 'mb-ev-recit mb-coupe-diag'
+    const rc = document.createElement('div'); rc.className = 'mb-ev-recit mb-coupe'
     rc.innerHTML = `<em>${esc(ev.lieu)}</em><p>${esc(ev.texte)}</p>`
     h.appendChild(rc)
     const r = rangee(h)

@@ -27,6 +27,7 @@ import {
   type StructureDef,
 } from './level'
 import { STRUCT_CHAMBRE, STRUCT_COULOIR } from './structures'
+import { TABLEAU_HUB_ROTONDE } from './hubRotonde'
 
 function box(
   minX: number,
@@ -184,7 +185,7 @@ export interface ZonesHub {
   /** LE SECTEUR SCELLÉ : l'alcôve de la 4e sortie — condamnée jusqu'à la
    * fin de l'arc du récit. */
   sasScelle: RectHub
-  /** Les PORTES DE DÉGÂT : les barrières d'énergie qui condamnent une
+  /** Les PORTES DE DÉGÂT : les portes blindées qui condamnent une
    * aile tant que sa station n'est pas réparée (id de station → SES
    * barrières — une aile peut avoir deux bouches, un couloir peut être
    * doublé). Elles passent par level.portes (canal négatif :
@@ -960,4 +961,37 @@ export const TABLEAU_HUB_COMPACT: LevelDef = {
     },
   ],
   ...metaEnDonnees(ZONES_HUB_COMPACT),
+}
+
+// ─── LE HUB À L'ESSAI : ?hub=… ───────────────────────────────────────────
+// Trois modules vivent dans le code (le grand, le compact, la rotonde —
+// game/hubRotonde.ts), et un seul se joue : l'entrée de code CODE_HUB (HUB3)
+// de la bibliothèque, à défaut la rotonde (hubDeBibliotheque). Pour en JUGER
+// un autre il faudrait le publier sous ce code — donc le montrer à tous les
+// joueurs avant de l'avoir essayé soi-même. `?hub=grand` (ou compact,
+// rotonde) le joue sur ce poste, le temps de la page, sans rien publier : le
+// module passe DEVANT la bibliothèque, avec ses réparations et ses sas.
+
+/** Les modules livrés, par le nom qu'on leur donne dans l'adresse. */
+export const HUBS_LIVRES: Readonly<Record<string, LevelDef>> = {
+  grand: TABLEAU_HUB,
+  compact: TABLEAU_HUB_COMPACT,
+  rotonde: TABLEAU_HUB_ROTONDE,
+}
+
+/** LE HUB JOUÉ : l'entrée de la bibliothèque qui porte le code du
+ *  laboratoire (levelIO.CODE_HUB — passé en paramètre : levelIO importe ce
+ *  module), à défaut LA ROTONDE du code. Le grand module et le compact ne
+ *  se jouent plus que par `?hub=`. */
+export function hubDeBibliotheque(bibliotheque: readonly LevelDef[], code: string): LevelDef {
+  return bibliotheque.find((l) => l.code === code) ?? TABLEAU_HUB_ROTONDE
+}
+
+/** Le hub que l'adresse demande (`location.search`), ou null — la
+ *  bibliothèque puis le code tranchent alors, comme toujours. Un nom
+ *  inconnu ne force rien : mieux vaut le hub de tout le monde qu'un écran
+ *  vide pour une faute de frappe. */
+export function hubParAdresse(recherche: string): LevelDef | null {
+  const nom = new URLSearchParams(recherche).get('hub')?.trim().toLowerCase() ?? ''
+  return Object.hasOwn(HUBS_LIVRES, nom) ? HUBS_LIVRES[nom] : null
 }

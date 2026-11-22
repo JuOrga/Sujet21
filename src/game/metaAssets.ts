@@ -118,7 +118,9 @@ export function decalsDuMeta(level: LevelDef): DecalDef[] {
   // LES SAS DE RACCORD : un par jonction de couloir. Ils se posent SUR la
   // couture entre deux coques — c'est leur seul rôle, et c'est pour cela
   // qu'ils sont plus opaques que le décor ordinaire.
-  for (const j of jonctionsDesStructures(level.structures)) {
+  // (sauf si le tableau les refuse : la jonction reste alors nue)
+  const jonctions = level.raccords === 'aucun' ? [] : jonctionsDesStructures(level.structures)
+  for (const j of jonctions) {
     // Le sas se dimensionne sur le PASSAGE, jamais sur le mur repris : ce
     // qui doit coïncider, c'est l'ouverture DESSINÉE et la porte PERCÉE.
     // (L'ancien calage cherchait le rapport dans un cadre tiré de la paroi

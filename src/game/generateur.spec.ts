@@ -17,7 +17,8 @@ import {
   valideNiveau,
 } from './generateur'
 import { checkLevel } from './levelIO'
-import { MAT_CHAUD, MAT_FROID, MAT_GRILLE, MAT_RIDEAU } from './level'
+import { MAT_BAIE, MAT_CHAUD, MAT_FROID, MAT_GRILLE, MAT_RIDEAU, MAT_VIDE, MAT_WALL, type LevelDef } from './level'
+import { FORME_DISQUE } from './formes'
 
 describe('generateur — une graine, une salle PROUVÉE', () => {
   it('est déterministe : même graine, même salle — au caractère près', () => {
@@ -626,5 +627,39 @@ describe('le CLIMAT des dangers — la température de la carte fait la salle', 
     const avant = genereNiveau(4242, null, { ...OPTIONS_DEFAUT, dangers: 3 })
     const auto = genereNiveau(4242, null, { ...OPTIONS_DEFAUT, dangers: 3, climat: 0 })
     expect(auto).toEqual(avant)
+  })
+})
+
+// LE VIDE ET LA BAIE VITRÉE NE SONT PAS DES PAROIS. Le solveur ne les voit
+// jamais (sansPhysique) : le corps passe dessus comme sur le sol. La preuve
+// de traversée, elle, les comptait pleins — une verrière en travers d'un
+// passage murait le sas, et le départ de la rotonde (posé sur la vitre de sa
+// cuve, game/hubRotonde.ts) était refusé avant même le premier pas.
+describe('accessible — une ouverture sur le dehors ne mure rien', () => {
+  const salle = (boxes: LevelDef['boxes']): LevelDef => ({
+    name: 'essai',
+    code: 'T-FOND',
+    journal: '',
+    bounds: { minX: 0, minY: 0, maxX: 1200, maxY: 400 },
+    spawn: { x: 150, y: 200, n: 400 },
+    exit: { minX: 1050, minY: 150, maxX: 1150, maxY: 250 },
+    boxes,
+    sponges: [],
+    labels: [],
+  })
+  const travers = { minX: 560, minY: 0, maxX: 640, maxY: 400 }
+
+  it('une paroi en travers mure le sas — le témoin', () => {
+    expect(accessible(salle([{ ...travers, material: MAT_WALL }]), new Set())).toBe(false)
+  })
+
+  it('une baie vitrée ou un vide en travers : on passe dessus', () => {
+    for (const material of [MAT_BAIE, MAT_VIDE])
+      expect(accessible(salle([{ ...travers, material }]), new Set()), `matériau ${material}`).toBe(true)
+  })
+
+  it('un départ posé SUR une vitre en disque n’est pas refusé', () => {
+    const vitre = { minX: 0, minY: 50, maxX: 300, maxY: 350, material: MAT_BAIE, forme: FORME_DISQUE }
+    expect(accessible(salle([vitre]), new Set())).toBe(true)
   })
 })

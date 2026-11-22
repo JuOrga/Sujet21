@@ -17,7 +17,8 @@
 // empaqueter fabrique.ts en fabrique.js (esbuild --bundle --format=iife,
 // ./node_modules/.bin/esbuild si présent). Le dépôt n'a pas Playwright :
 // le banc emprunte celui d'un autre projet de la machine (chemin ci-dessous).
-const { chromium } = require('/home/julian/projets/PasMoi/node_modules/playwright-core')
+// (ici, l'environnement d'analyse a Playwright d'office : BANC_PLAYWRIGHT=playwright)
+const { chromium } = require(process.env.BANC_PLAYWRIGHT || '/home/julian/projets/PasMoi/node_modules/playwright-core')
 const fs = require('fs')
 const path = require('path')
 const port = process.argv[2] || '5291'
@@ -38,8 +39,11 @@ const FAB = fs.readFileSync(path.join(__dirname, 'fabrique.js'), 'utf-8')
   .replace(/\bimport_meta(\d*)\.glob\(/g, '(() => ({}))(')
 const POSES = fs.readFileSync(path.join(__dirname, 'poses.js'), 'utf-8')
 
-const MENTHE = ['#6dffb8', '#a9ffd6', '#8fd8c8', '#eaf6ff']
-const OR = ['#ffd977', '#ffe9a8', '#fff4d6', '#f2c98e']
+// les teintes des rafales, celles de main.ts (MB_MENTHE, MB_OR, MB_EAU) :
+// le vert de la maîtrise, l'ambre de ce qui se gagne, le bleu d'un choix pris
+const MENTHE = ['#3fd69b', '#8fe6c4', '#a7ddf5', '#d9ecf7']
+const OR = ['#f2c98e', '#f7dcb4', '#fbeed9', '#d9ecf7']
+const EAU = ['#63b7e6', '#a7ddf5', '#d9ecf7', '#4fa8d8']
 
 // [fichier, pose, argument, préparation figée (dans la page), attente ms, survol]
 const PRISES = [
@@ -75,12 +79,12 @@ const PRISES = [
 
 // les instants figés : chaque règle donne l'âge (ms) des animations ciblées,
 // et le feu reprend les rafales que main.ts jette à cet instant
-function prepare(quoi, M, O) {
+function prepare(quoi, M, O, E) {
   const P = window.POSE
   const $ = (s) => document.querySelector(s)
   if (quoi === 'chute') {
     P.fige([['.mb-rang, .mb-rang *', 200], ['.mb-flash', 200], ['.mb-scene', 200]], 900)
-    P.feu([{ el: $('#mb-rang'), age: 0.2, r: { n: 120, teintes: ['#ffd977', '#eaf6ff', ...M], vitesse: 480, gravite: 420, forme: 'etincelle', duree: 1, taille: 4 } }])
+    P.feu([{ el: $('#mb-rang'), age: 0.2, r: { n: 120, teintes: ['#ffd977', ...E], vitesse: 480, gravite: 420, forme: 'etincelle', duree: 1, taille: 4 } }])
   } else if (quoi === 'palier') {
     P.fige([['.mb-palier-eclair, .mb-palier-eclair *', 350], ['.mb-flash', 350], ['.mb-anneau-casse', 350], ['.mb-etal-palier', 350], ['.mb-scene', 350]], 1500)
     P.feu([
@@ -91,7 +95,9 @@ function prepare(quoi, M, O) {
     P.fige([['.mb-pli, .mb-pli *', 550]], 1500)
   } else if (quoi === 'vise') {
     const h = $('#mb-cartes'); h.classList.add('mb-isole')
-    const pli = h.children[0]; pli.classList.add('mb-vise'); pli.style.setProperty('--ry', '-5deg'); pli.style.setProperty('--rx', '3deg')
+    // la carte survolée (le survol de la prise l'a visée pour de vrai :
+    // son eau tremble encore, 400 ms après la goutte d'entrée)
+    const pli = h.children[0]; pli.classList.add('mb-vise')
   } else if (quoi === 'elue') {
     // le choix arrive cartes posées : seuls l'élan de l'élue, la chute des
     // autres et la secousse ont 250 ms ; l'apparition des faces et l'éclat
@@ -99,9 +105,9 @@ function prepare(quoi, M, O) {
     // délai, était invisible)
     P.fige([['.mb-pli', 250], ['.mb-scene', 250]], 2600)
     const b = $('.mb-elu-c .crt-draft')
-    const fam = getComputedStyle(b).getPropertyValue('--fam').trim() || '#6dffb8'
+    const fam = getComputedStyle(b).getPropertyValue('--fam').trim() || '#63b7e6'
     P.feu([
-      { el: b, age: 0.25, r: { n: 70, teintes: [fam, '#eaf6ff', ...M], vitesse: 420, gravite: 520, forme: 'confetti', duree: 1.4, taille: 6 } },
+      { el: b, age: 0.25, r: { n: 70, teintes: [fam, ...E], vitesse: 420, gravite: 520, forme: 'confetti', duree: 1.4, taille: 6 } },
       { el: b, age: 0.25, r: { n: 40, teintes: [fam, '#ffffff'], vitesse: 600, gravite: 200, forme: 'etincelle', duree: 0.7, taille: 4 } },
     ])
   } else if (quoi === 'porte') {
@@ -110,7 +116,7 @@ function prepare(quoi, M, O) {
     document.getElementById('mb-flash').classList.add('mb-on')
     document.getElementById('mb-scene').classList.add('mb-secousse')
     P.fige([['.mb-porte', 260], ['.mb-flash', 260], ['.mb-scene', 260]], null)
-    P.feu([{ el: p, age: 0.26, r: { n: 80, teintes: M, vitesse: 520, gravite: 260, forme: 'etincelle', duree: 0.9, taille: 4 } }])
+    P.feu([{ el: p, age: 0.26, r: { n: 80, teintes: E, vitesse: 520, gravite: 260, forme: 'etincelle', duree: 0.9, taille: 4 } }])
   } else if (quoi === 'sceau') {
     // à 350 ms le sceau du module tombe encore : le choc, le flash et le feu
     // partent à son impact (main.ts, MB_SCEAU_MODULE_MS = 440) — pas de feu
@@ -190,7 +196,7 @@ function mesure() {
     }
     if (prep) {
       await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => r())))
-      await page.evaluate(prepare.toString().replace(/^function prepare/, '(function prepare') + ')(' + JSON.stringify(prep) + ',' + JSON.stringify(MENTHE) + ',' + JSON.stringify(OR) + ')')
+      await page.evaluate(prepare.toString().replace(/^function prepare/, '(function prepare') + ')(' + JSON.stringify(prep) + ',' + JSON.stringify(MENTHE) + ',' + JSON.stringify(OR) + ',' + JSON.stringify(EAU) + ')')
       await page.waitForTimeout(80)
     }
     const m = await page.evaluate(mesure)

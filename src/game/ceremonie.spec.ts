@@ -23,6 +23,7 @@ import { LEVIER_FIN_MS } from './finDescente'
 // par tous les blocs qui gardent un écran.
 const HTML = readFileSync(new URL('../../index.html', import.meta.url), 'utf-8')
 const MAIN = readFileSync(new URL('../main.ts', import.meta.url), 'utf-8')
+const ONDE = readFileSync(new URL('./ondeVue.ts', import.meta.url), 'utf-8')
 const corps = (nom: string): string => {
   const debut = MAIN.indexOf(`\nfunction ${nom}(`)
   expect(debut, `la fonction ${nom} manque`).toBeGreaterThan(-1)
@@ -185,7 +186,9 @@ describe('le mot de la note', () => {
 
 describe('le titre d’un tirage', () => {
   it('numérote le palier qu’on vient de franchir', () => {
-    expect(titreDuTirage(1, 1, false)).toBe('PALIER DE MAÎTRISE 1 — EMPORTEZ UN INSTRUMENT')
+    // l'origine seule : la consigne est devenue la question de l'étape (21/11)
+    expect(titreDuTirage(1, 1, false)).toBe('PALIER DE MAÎTRISE 1')
+    expect(titreDuTirage(0, 1, true)).toBe('SALLE SCELLÉE — TIRAGE GARANTI')
     // deux paliers d'un coup : le premier tirage est celui du palier 2, puis le 3
     expect(titreDuTirage(3, 2, false)).toContain('PALIER DE MAÎTRISE 2')
     expect(titreDuTirage(3, 1, false)).toContain('PALIER DE MAÎTRISE 3')
@@ -405,9 +408,11 @@ describe('la cérémonie — pas de sélecteur mort', () => {
   // qu'une fois : la règle groupée qui les donnait aussi était écrasée
   it('la question en compact ne s’écrit qu’à un endroit, couleur comprise', () => {
     expect(HTML).not.toMatch(/\.mb-scene\.mb-question \.mb-titre,\s*\n\s*\.mb-scene\.mb-compact\.mb-question \.mb-titre/)
-    // sa couleur et son halo l'emportent sur la poutre repliée (sarcelle, sans halo)
+    // sa couleur l'emporte sur le titre replié (l'encre sourde). Son halo
+    // menthe, lui, est parti avec le costume de station : à la charte de
+    // l'accueil, aucun texte ne luit (21/11)
     expect(regle('.mb-scene.mb-compact.mb-question .mb-titre')).toMatch(/color:\s*var\(--mb-encre\)/)
-    expect(regle('.mb-scene.mb-compact.mb-question .mb-titre')).toMatch(/text-shadow:\s*0 0 22px/)
+    expect(regle('.mb-scene.mb-compact.mb-question .mb-titre')).not.toContain('text-shadow')
   })
 })
 
@@ -438,10 +443,15 @@ describe('la cérémonie — les règles que la cascade perdait', () => {
     expect(media('--mb-coeur-l: 260px')).toContain('min-width: 1001px')
     expect(media('--mb-sceau-l: 136px')).toContain('min-width: 1001px')
   })
-  it('resserre la poutre repliée sur écran étroit aussi', () => {
+  it('ne règle plus des bandes que le titre n’a plus', () => {
     // la bannière repliée (56 px de bande, 4 classes) l'emportait sur la
-    // réduction à 36 px (1 classe) : la poutre débordait sur un téléphone
-    expect(blocMedia('(max-width: 760px)')).toMatch(/\.mb-scene\.mb-compact \.mb-banniere\.mb-poutre[^{]*\{[^}]*--mb-bande: 36px/)
+    // réduction à 36 px (1 classe) : la poutre débordait sur un téléphone.
+    // Le titre n'est plus une poutre (21/11) : sans bandes de danger à
+    // rentrer, plus aucune règle ne doit en régler la largeur — sept le
+    // faisaient, d'un écran à l'autre
+    expect(css).not.toContain('--mb-bande')
+    // et le titre de la question retourne toujours à la ligne sur un téléphone
+    expect(blocMedia('(max-width: 760px)')).toMatch(/\.mb-scene\.mb-compact\.mb-question \.mb-titre \{ white-space: normal; \}/)
   })
   it('donne sa teinte de liseré à chaque gain de la récolte', () => {
     const RECOLTE = readFileSync(new URL('./recolte.ts', import.meta.url), 'utf-8')
@@ -526,28 +536,81 @@ describe('la cérémonie — le choix de la salle tient dans l’écran', () => 
     expect(garde, 'la garde avant la visée').toBeLessThan(choisit.indexOf('garde.clic('))
   })
 
-  it('la mini-carte plafonne sa hauteur, sa fiche ne prend aucune place', () => {
+  it('la mini-carte plafonne sa hauteur', () => {
     expect(regle('.mv-svg')).toMatch(/max-height:\s*22vh/)
-    expect(regle('.mv-fiche')).toMatch(/position:\s*absolute/)
-    // au repos, la fiche se tait : plus de consigne par défaut
     expect(corps('mbMontreSallesVoie')).not.toContain('visez une porte')
+  })
+  // « du texte qui apparaît au centre de la page quand on sélectionne un
+  // tableau, il faut l'enlever » (le concepteur, 22/11) : la fiche de la
+  // mini-carte (« VOIE DU HAUT · tableau du pool · ferme 10 cases ») est
+  // partie ; la carte éteint toujours ce qu'une porte ferme
+  it('ne pose plus de fiche sous la mini-carte quand on vise une porte ou une case', () => {
+    expect(MAIN).not.toContain('ficheVoies')
+    expect(MAIN).not.toContain('mv-fiche')
+    expect(HTML).not.toContain('.mv-fiche')
+    expect(corps('mbMontreSallesVoie')).toContain("classList.add('mv-perdu')")
   })
 })
 
-// LE VOCABULAIRE DE LA STATION. « Tout est rectangulaire, carré… ça ne fait
+// LE VOCABULAIRE DE LA CÉRÉMONIE. « Tout est rectangulaire, carré… ça ne fait
 // pas encore assez jeu vidéo » (le concepteur, 13/11) : la cérémonie était
-// faite de rectangles arrondis et de pilules. Ses primitives (chanfreins,
-// poutre, cartouche, sceau, manomètre, levier) posent les coins coupés une
-// fois pour toutes ; ces gardes tiennent qu'aucune ne retombe dans
-// l'arrondi, et que chaque mise en scène qu'elles apportent a son repli
-// « moins d'animations ».
+// faite de rectangles arrondis et de pilules, et ses primitives (cadre,
+// titre, cartouche, sceau, manomètre, verbe) s'étaient taillées en station —
+// huit coins coupés, poutre rivetée, bandes de danger, leviers à reflet,
+// lueurs menthe. Puis l'accueil a été refait, et « ce n'est plus cohérent
+// avec la DA du nouveau menu principal » (le concepteur, 21/11) : les mêmes
+// primitives reprennent SA charte. Ces gardes tiennent qu'aucune ne retombe
+// dans l'arrondi NI dans le costume de station, et que chaque mise en scène
+// a son repli « moins d'animations ».
 describe('la cérémonie — le vocabulaire de la station', () => {
   const css = HTML.slice(HTML.indexOf('/* ==== LA CÉRÉMONIE DE FIN DE SALLE'), HTML.indexOf('/* ---- Le panneau du GÉNÉRATEUR'))
   const regle = (s: string): string => { const d = css.indexOf(`\n      ${s} {`); expect(d, s).toBeGreaterThan(-1); return css.slice(d, css.indexOf('}', d)) }
-  it('taille ses cadres au chanfrein, pas à l’arrondi', () => {
-    for (const s of ['.mb-coupe', '.mb-coupe-diag', '.mb-cartouche', '.mb-levier', '.mb-sceau', '.mb-poutre'])
-      expect(regle(s), s).toMatch(/clip-path:\s*polygon\(/)
+  it('taille ses cadres au coin coupé du verbe de l’accueil, pas à l’arrondi', () => {
+    // UN coin, en haut à droite — celui de #start
+    const coin = /clip-path:\s*polygon\(0 0, calc\(100% - var\(--mb-c\)\) 0, 100% var\(--mb-c\), 100% 100%, 0 100%\)/
+    for (const s of ['.mb-coupe', '.mb-levier', '.mb-porte']) expect(regle(s), s).toMatch(coin)
+    expect(HTML).toMatch(/#start \{[^}]*clip-path:\s*polygon\(0 0, calc\(100% - 14px\) 0, 100% 14px, 100% 100%, 0 100%\)/)
+    expect(regle('#mb-veil')).toMatch(/--mb-chanfrein:\s*14px/)
+    // le sceau reste un octogone : c'est un objet, pas un cadre
+    expect(regle('.mb-sceau')).toMatch(/clip-path:\s*polygon\(/)
     expect(regle('.mb-levier')).not.toMatch(/border-radius:\s*999/)
+    // les deux cadres (huit coins, deux coins en diagonale) n'en font plus qu'un
+    expect(css).not.toMatch(/^\s*\.mb-coupe-diag\b/m) // plus aucune règle (un commentaire en garde la mémoire)
+    expect(MAIN).not.toContain('mb-coupe-diag')
+  })
+  it('ne garde rien du costume de station', () => {
+    // les bandes de danger et les rivets de la poutre, le reflet du levier,
+    // la grille et le balayage du fond, la ligne de lecture des portes,
+    // l'orbe qui battait, la plaque qui respirait
+    for (const mort of ['--mb-bande', '--mb-ocre', 'repeating-linear-gradient', 'mb-levier-reflet', 'mb-derive', 'mb-balaye', 'mb-scan', 'mb-goutte-bat', 'mb-dest-respire', 'crt-eclat'])
+      expect(css, mort).not.toContain(mort)
+    expect(css).not.toMatch(/\.mb-fond::(?:before|after)/)
+    expect(css).not.toMatch(/\.mb-(?:poutre|levier)::(?:before|after)/)
+  })
+  it('ne fait luire aucun texte : une ombre ne sert qu’à lire sur une image', () => {
+    const ombres = [...css.matchAll(/text-shadow:\s*([^;]+);/g)].map((m) => m[1].trim())
+    expect(ombres.length).toBeGreaterThan(0) // la garde regarde bien quelque chose
+    for (const o of ombres) expect(o === 'none' || /^0 1px \dpx rgba\(0, 0, 0, 0\.\d+\)$/.test(o), o).toBe(true)
+  })
+  it('n’a qu’un aplat, le verbe, à la teinte et à l’encre de COMMENCER', () => {
+    expect(regle('.mb-levier')).toMatch(/--mb-levier-teinte:\s*var\(--specimen\)/)
+    expect(regle('.mb-levier')).toMatch(/background:\s*var\(--mb-levier-teinte\)/)
+    expect(regle('.mb-levier')).toMatch(/color:\s*var\(--mb-coque-noire\)/)
+    expect(regle('#mb-veil')).toMatch(/--mb-coque-noire:\s*var\(--void\)/)
+    // visé, il s'éclaircit comme lui (le chanfrein rogne le liseré)
+    expect(css).toMatch(/\.mb-levier:hover, \.mb-levier:focus-visible, \.mb-levier\.pad-focus \{ background: var\(--glow\); outline: none; \}/)
+    // le verbe du bilan n'est plus éteint en acier
+    expect(regle('.mb-passer')).not.toContain('--mb-levier-teinte')
+  })
+  it('pose sur chaque choix la visée des lieux de l’accueil : un voile, deux équerres', () => {
+    const visee = regle('#mb-veil').match(/--mb-visee:([^;]+);/)?.[1] ?? ''
+    expect(visee.match(/left top/g)?.length).toBe(2) // l'équerre du haut à gauche
+    expect(visee.match(/right bottom/g)?.length).toBe(2) // celle du bas à droite
+    expect(visee).toContain('var(--mb-voile)')
+    for (const s of ['.mb-porte', '.mb-dest', '.mb-offre'])
+      expect(css, s).toMatch(new RegExp(`\\${s}[^{}]*\\.pad-focus \\{[^}]*background:\\s*var\\(--mb-visee\\)`))
+    // la carte du tirage garde son corps SOUS la visée
+    expect(css).toMatch(/\.mb-pli \.crt-draft\.pad-focus \{[^}]*background:\s*var\(--mb-visee\), var\(--mb-coque\)/)
   })
   it('donne un repli « moins d’animations » à chaque primitive animée', () => {
     const moins = css.slice(css.lastIndexOf('prefers-reduced-motion: reduce'))
@@ -664,13 +727,11 @@ describe('la cérémonie — le bilan « SALLE FRANCHIE »', () => {
     // la sonde de la console n'a plus de raison d'être : la voix sert
     expect(MAIN).not.toContain('__sonCeremonie')
   })
-  // les constats de la relecture du vocabulaire : un nom de rang trop long
-  // descendait sous 10 px, et la poutre gardait 143 px de bande par côté
-  // sur un écran de téléphone
-  it('borne le mot du sceau à 10 px et resserre les bandes de la poutre sur petit écran', () => {
+  // le constat de la relecture du vocabulaire : un nom de rang trop long
+  // descendait sous 10 px. (L'autre constat — 143 px de bande par côté de
+  // la poutre sur un téléphone — est parti avec les bandes, le 21/11.)
+  it('borne le mot du sceau à 10 px', () => {
     expect(regle('.mb-sceau-mot')).toMatch(/font-size:\s*max\(calc\(10px \* var\(--ui\)\)/)
-    const petit = HTML.slice(HTML.indexOf('@media (max-width: 760px) {', HTML.indexOf('/* ==== LA CÉRÉMONIE DE FIN DE SALLE')))
-    expect(petit.slice(0, petit.indexOf('\n      }\n'))).toMatch(/\.mb-poutre \{ --mb-bande:/)
   })
 })
 
@@ -1025,11 +1086,11 @@ describe('la cérémonie — les haltes', () => {
       expect(Number(t![1]), s).toBeGreaterThanOrEqual(10)
     }
   })
-  // le bouton d'une offre est taillé : le clip-path rogne l'outline, le
-  // focus (clavier et manette) se dessine DANS la forme
+  // le focus d'une offre (clavier et manette) se dessine DANS la forme :
+  // le voile et les équerres, pas un liseré autour
   it('dessine la visée d’une offre dans sa forme', () => {
     expect(corps('mbMontreRepos')).toContain('mb-cartouche mb-offre')
-    expect(HTML).toMatch(/\.mb-offre:focus-visible, \.mb-offre\.pad-focus \{[^}]*outline: none;[^}]*box-shadow: inset/)
+    expect(HTML).toMatch(/\.mb-offre:focus-visible, \.mb-offre\.pad-focus \{[^}]*outline: none;[^}]*background: var\(--mb-visee\)/)
   })
 })
 
@@ -1089,8 +1150,12 @@ describe('la cérémonie — les portes et le plan, habillés', () => {
   // la manette se dessinaient DEHORS, et auraient disparu
   it('dessine la porte armée et la visée de la manette dans sa forme', () => {
     expect(regle('.mb-porte.mb-armee')).not.toMatch(/outline:\s*2px/)
-    expect(regle('.mb-porte.mb-armee')).toMatch(/box-shadow:\s*inset/)
-    expect(HTML).toMatch(/\.mb-porte\.pad-focus[^{]*\{[^}]*box-shadow:\s*inset/)
+    // armée, elle garde la visée, un filet en plus — et son verbe paraît
+    // (c'est lui qui dit « TOUCHEZ ENCORE » : caché au repos depuis le 21/11,
+    // il ne doit pas le rester au doigt, où rien ne survole)
+    expect(regle('.mb-porte.mb-armee')).toMatch(/background:\s*var\(--mb-visee\);\s*box-shadow:\s*inset/)
+    expect(HTML).toMatch(/\.mb-porte\.pad-focus[^{]*\{[^}]*background:\s*var\(--mb-visee\)/)
+    expect(HTML).toMatch(/\.mb-porte\.mb-armee \.mb-porte-entrer \{ opacity: 1; \}/)
   })
   it('taille le plan de la station comme un module', () => {
     expect(corps('mbMontreCarte')).toContain("'mb-station-carte mb-coupe'")
@@ -1116,12 +1181,16 @@ describe('la cérémonie — les portes et le plan, habillés', () => {
   })
 })
 
-// LE TIRAGE « EMPORTEZ UN INSTRUMENT » (étape 4). La colonne de maîtrise et
-// son tampon restaient au-dessus des cartes ; les cartes portaient un émoji,
-// un paragraphe et une étiquette de 7,5 px ; et le retournement montrait,
-// au banc, la FACE EN MIROIR au lieu du dos. Aucun focus n'était posé et
-// aucune garde ne tenait : le A martelé d'une rafale, arrivé après la garde
-// du palier, tombait sur une carte et la CHOISISSAIT (relecture de F4).
+// LE TIRAGE « CHOISISSEZ VOTRE INSTRUMENT » (étape 4). La colonne de maîtrise
+// et son tampon restaient au-dessus des cartes ; les cartes portaient un
+// émoji, un paragraphe et une étiquette de 7,5 px ; et le retournement
+// montrait, au banc, la FACE EN MIROIR au lieu du dos. Aucun focus n'était
+// posé et aucune garde ne tenait : le A martelé d'une rafale, arrivé après
+// la garde du palier, tombait sur une carte et la CHOISISSAIT (relecture de
+// F4). Le 13/11 la carte s'était réduite à une cartouche, la phrase rangée
+// dans l'infobulle ; le 21/11 le concepteur la redemande — « plus de détails
+// sur ce que ça fait », des cartes « un peu plus grandes », la consigne « en
+// plus visible / grand », et plus de texte « déjà donné sur l'écran d'avant ».
 describe('la cérémonie — le tirage', () => {
   const css = HTML.slice(HTML.indexOf('/* ==== LA CÉRÉMONIE DE FIN DE SALLE'), HTML.indexOf('/* ---- Le panneau du GÉNÉRATEUR'))
   it('le tirage n’est pas surplombé par la jauge et son tampon', () => {
@@ -1149,13 +1218,41 @@ describe('la cérémonie — le tirage', () => {
     expect(f).toContain("'ArrowLeft'")
     expect(f).toContain("'ArrowRight'")
   })
-  it('dit le texte complet en infobulle, pas en paragraphe', () => {
+  it('écrit sur la carte ce qu’elle fait — l’infobulle ne suffit ni au doigt ni à la manette', () => {
     const c = corps('carteHTML')
     expect(c).toMatch(/title="\$\{htmlSafe\(/)
     expect(c).toContain('descriptionInstrument(d)')
-    // la carte du tirage n'écrit ni la phrase ni l'étiquette de calibre
-    expect(c).toMatch(/const condensee = o\.variante === 'draft'/)
-    expect(c).toMatch(/condensee \? '' : `<span class="crt-txt">/)
+    // la phrase s'écrit dans TOUTES les variantes, tirage compris
+    expect(c).toMatch(/\n\s*`<span class="crt-txt">\$\{htmlSafe\(sansPonctuationOrpheline\(phrase\)\)\}<\/span>` \+/)
+    // … sans laisser un deux-points ouvrir une ligne : l'espace qui le
+    // précède est insécable (« plus loin⏎: les traînardes », vu le 21/11)
+    expect(corps('sansPonctuationOrpheline')).toMatch(/replace\(\/ \(\[:;!\?»\]\)\/g, '\\u00a0\$1'\)/)
+    expect(c).not.toContain('condensee')
+    // au tirage, la ligne de rang dit la famille, et le calibre seulement
+    // quand il sort de l'ordinaire
+    expect(c).toMatch(/o\.variante === 'draft'\s*\? fams\.map\([^\n]*\(cal === 'commun' \? '' :/)
+    // et la feuille lui donne une taille lisible, pas les 7,5 px de l'atelier
+    for (const s of ['.mb-pli .crt-rang', '.mb-pli .crt-txt']) {
+      const t = /font-size:\s*calc\((\d+(?:\.\d+)?)px/.exec(regle(s))
+      expect(t, s).not.toBeNull()
+      expect(Number(t![1]), s).toBeGreaterThanOrEqual(10)
+    }
+  })
+  it('pose la consigne en question, en grand, et retire ce que les écrans d’avant ont dit', () => {
+    const f = corps('mbMontreDraft')
+    expect(f).toContain("mbQuestion('CHOISISSEZ VOTRE INSTRUMENT')")
+    // le bandeau de la salle (régime, volume, bourse, mémoire) : le bilan
+    // et le palier viennent de le dire
+    expect(f).toContain('mbReleveHors()')
+    // la ligne de contexte garde l'origine du tirage et la bourse — on paie ici
+    expect(f).toMatch(/titreDuTirage\(.*\)\} · EN BOURSE : \$\{condensat\} cL/)
+    for (const t of [titreDuTirage(1, 1, false), titreDuTirage(0, 1, true)]) expect(t).not.toContain('EMPORTEZ')
+    // la fin ordinaire retrouve son bandeau, qu'un tirage l'ait précédée ou non
+    expect(corps('mbMontreFin')).toContain("mbEl('mb-releve').hidden = false")
+  })
+  it('agrandit la carte : 330 px, 300 sur un écran bas, à la mesure du contenu sur téléphone', () => {
+    expect(regle('.mb-pli .crt-draft')).toMatch(/min-height:\s*330px/)
+    expect(css).toMatch(/@media \(max-height: 820px\) and \(min-width: 761px\) \{[^}]*\}\s*\.mb-pli, \.mb-pli \.crt-draft \{ min-height: 300px; \}/)
   })
   it('sonne la carte élue de sa voix, et chaque carte posée de la sienne', () => {
     const f = corps('mbMontreDraft')
@@ -1201,6 +1298,115 @@ describe('la cérémonie — le tirage', () => {
     expect(visent.length).toBeGreaterThan(2) // la garde regarde bien quelque chose
     for (const r of visent) expect(r.corps, r.selecteurs.join(', ')).not.toMatch(aplatit)
   })
+  // L'EAU DES CARTES (ondeVue.ts). L'inclinaison d'avant posait --rx/--ry à
+  // chaque pointermove, sous une transition de 0,16 s relancée à chaque
+  // fois, et se remettait à plat d'un coup : « ça fait buggé, pas fluide »
+  // (le concepteur, 22/11). La visée, d'où qu'elle vienne, met l'eau en
+  // mouvement ; le choix l'arrête.
+  it('donne à chaque carte son eau, visée au pointeur, au clavier et à la manette', () => {
+    const f = corps('mbMontreDraft')
+    expect(MAIN).not.toContain('mbIncline')
+    expect(f).toContain('ondes.set(pli, ondeCarte(btn, pli, sansAnimation))')
+    // l'eau s'installe AVANT les écouteurs de la visée : son pointerenter
+    // pose la goutte là où le pointeur entre
+    expect(f.indexOf('ondeCarte(btn')).toBeLessThan(f.indexOf("for (const ev of ['pointerenter', 'pad-vise'] as const)"))
+    // la visée (survol, focus, manette) passe par isole, qui réveille l'eau
+    expect(f).toMatch(/if \(c === pli\) ondes\.get\(c\)\?\.vise\(\)\s*\n\s*else ondes\.get\(c\)\?\.quitte\(\)/)
+    // la carte élue : l'eau se tait d'un coup
+    const clic = f.slice(f.indexOf("btn.addEventListener('click'"))
+    expect(clic.slice(0, 1200)).toContain('for (const o of ondes.values()) o.arrete()')
+  })
+  it('laisse le pli suivre ses ressorts : ni transition, ni variables d’inclinaison', () => {
+    expect(regle('.mb-pli')).not.toMatch(/transition:/)
+    expect(css).not.toMatch(/--r[xy]\b/)
+    // au repos, la feuille tient la flottaison que le ressort rejoint (FLOTTE)
+    expect(css).toMatch(/\.mb-pli\.mb-vise \{ z-index: 2; transform: translateY\(-6px\); \}/)
+    expect(ONDE).toMatch(/export const FLOTTE = -6\b/)
+    // LE CONTOUR D'EAU : « pas du volume d'eau dans le cœur de la carte,
+    // plutôt sur les bordures » (le concepteur, 22/11). La toile est un
+    // enfant du pli (la face, au chanfrein, rognerait l'eau qui déborde),
+    // tournée vers l'avant, dos caché ; tant qu'elle tient le contour, le
+    // filet de la feuille s'efface — et le voile de la visée reste
+    expect(ONDE).toContain('pli.append(toile)')
+    expect(ONDE).not.toMatch(/face\.(?:prepend|append)\(toile\)/)
+    expect(regle('.mb-pli .mb-rive')).toMatch(/backface-visibility:\s*hidden/)
+    expect(regle('.mb-pli .mb-rive')).toMatch(/pointer-events:\s*none/)
+    expect(css).toMatch(/\.mb-pli\.mb-liquide \.crt-draft\.pad-focus \{ box-shadow: none; \}/)
+    expect(css.indexOf('.mb-pli.mb-liquide .crt-draft')).toBeGreaterThan(css.indexOf('.mb-pli.mb-vise .crt-draft, .mb-pli .crt-draft:focus-visible'))
+    expect(regle('.mb-pli.mb-vise .crt-draft, .mb-pli .crt-draft:focus-visible, .mb-pli .crt-draft.pad-focus')).toContain('background: var(--mb-visee), var(--mb-coque)')
+    // rien n'aplatit le pli
+    expect(ONDE).not.toMatch(/pli\.style\.(?:opacity|filter|clipPath)|pli\.style\.setProperty\('(?:opacity|filter|clip-path)/)
+  })
+  // « applique cela au choix du surplus et au choix de la salle » (le
+  // concepteur, 22/11) : les cuves du versement et les portes de salle —
+  // celles d'une salle comme celles d'un nœud — prennent le même contour
+  // d'eau, en retrait du bord (leur clip-path rognerait ce qui déborde)
+  it('donne le contour d’eau aux cuves du versement et aux portes de salle', () => {
+    const aide = corps('mbEauAuChoix')
+    expect(aide).toMatch(/ondeCarte\(btn, btn, sansAnimation, \{ retrait: 5, amplitude: 0\.6, flotte: -4, perspective: 1200 \}\)/)
+    // la visée au clavier et à la manette ; pas le focus que l'étape pose elle-même
+    expect(aide).toMatch(/'focusin', \(\) => \{ if \(!mbFocusOuverture\) o\.vise\(\) \}/)
+    expect(aide).toContain("btn.addEventListener('pad-vise', () => o.vise())")
+    expect(aide).toContain("['focusout', 'pad-quitte']")
+    // le choix fait, l'eau de toute la rangée se tait
+    expect(aide).toMatch(/mbOndes\.get\(frere\)\?\.arrete\(\)/)
+    for (const f of ['mbPorte', 'mbPorteNoeud']) expect(corps(f), f).toContain("mbEauAuChoix(btn, () => btn.classList.contains('mb-elue'))")
+    // la réserve pleine se voit, elle ne se vise pas
+    expect(corps('mbMontreVersement')).toMatch(/for \(const btn of \[cb, cx\]\) if \(!btn\.disabled\) mbEauAuChoix\(btn, \(\) => scene\.dataset\.verse !== undefined\)/)
+    // la toile vit dans le bouton, par-dessus son contenu, sans prendre le pointeur
+    expect(ONDE).toContain("toile.className = retrait ? 'mb-rive mb-rive-dedans' : 'mb-rive'")
+    expect(regle('.mb-rive.mb-rive-dedans')).toMatch(/inset:\s*0/)
+    expect(regle('.mb-rive.mb-rive-dedans')).toMatch(/pointer-events:\s*none/)
+    // le tirage, lui, garde sa flottaison tenue par la feuille
+    expect(ONDE).toContain('flotteTenue: options.flotteTenue ?? !retrait')
+  })
+  // « applique aussi cet effet aux différents boutons, passer, continuer et
+  // avis », puis « également aux boutons dans les salles mystères,
+  // rencontre etc. » (le concepteur, 22/11)
+  it('donne l’eau aux boutons : le verbe de chaque étape, les crans de l’avis, les offres des haltes', () => {
+    const aide = corps('mbEauAuBouton')
+    // la visée que la feuille dessine : le focus VISIBLE, pas le focus posé
+    // par programme sur le verbe à chaque bilan
+    expect(aide).toContain("btn.matches(':focus-visible')")
+    expect(aide).toContain("btn.addEventListener('pad-vise', () => o.vise())")
+    // le verbe est un aplat : son bord ondule
+    expect(MAIN).toMatch(/const MB_EAU_VERBE: OptionsOnde = \{\s*mode: 'bord'/)
+    expect(MAIN).toContain("mbEauAuBouton(mbEl('mb-passer'), MB_EAU_VERBE)")
+    for (const cls of ['mb-levier mb-module-levier', 'mb-levier mb-fin-levier', 'mb-levier mb-halte-levier'])
+      expect(MAIN, cls).toContain(`btn.className = '${cls}'\n  mbEauAuBouton(btn, MB_EAU_VERBE)`)
+    expect(MAIN.match(/mbEauAuBouton\(btn, MB_EAU_VERBE\)/g)?.length).toBe(6)
+    // les offres : repos, don, rencontre, palet
+    expect(MAIN.match(/mb-offre[^\n]*\n\s*mbEauAuBouton\(btn, MB_EAU_OFFRE\)/g)?.length).toBe(4)
+    for (const f of ['mbMontreRepos', 'mbMontreDon', 'mbPeintEvenement', 'mbMontreChoixPalet'])
+      expect(corps(f), f).toContain('mbEauAuBouton(btn, MB_EAU_OFFRE)')
+    // les crans de l'avis, refaits à chaque bilan
+    expect(corps('mbAvisOuvre')).toMatch(/for \(const cran of mbEl\('mb-avis-crans'\)\.children\)\s*mbEauAuBouton\(/)
+    expect(css).toMatch(/\.mb-avis-cran\.mb-liquide \{ border-color: transparent; \}/)
+    // ils portent la toile : relatifs
+    for (const s of ['.mb-passer', '.mb-avis-cran', '.mb-halte-levier', '.mb-module-levier', '.mb-fin-levier'])
+      expect(regle(s), s).toMatch(/position:\s*relative/)
+    // un bouton désactivé se voit, il ne se vise pas ; un bouton caché sous
+    // la visée lâche la boucle
+    expect(ONDE).toContain('(face as HTMLButtonElement).disabled) return')
+    expect(ONDE).toContain('e.pli.getClientRects().length === 0')
+  })
+  it('se tait sous « moins d’animations » : ni eau, ni ressort', () => {
+    const moins = css.slice(css.lastIndexOf('prefers-reduced-motion: reduce'))
+    expect(moins).toMatch(/\.mb-pli \.mb-rive, \.mb-rive\.mb-rive-dedans \{ display: none; \}/)
+    // relu à chaque geste : le réglage peut changer en cours de partie
+    expect(ONDE).toMatch(/if \(e\.arretee \|\| sansAnimation\(\)\) return/)
+  })
+  // la règle est dans instruments.ts (instrumentOuvert) ; encore faut-il
+  // que le tirage du jeu lui dise quels états sont ouverts — sans eux, le
+  // défaut « tout ouvert » rendait le tirage d'avant, en silence
+  it('dit au tirage quels états sont ouverts : ceux que la descente lit déjà', () => {
+    expect(corps('mbMontreDraft')).toMatch(/tirageInstruments\(\s*Math\.random,[\s\S]{0,160}catalogueRecompenses\(\),\s*etatsOuverts\(\),\s*\)/)
+    const e = corps('etatsOuverts')
+    expect(e).toContain("glace: transfoTenue('solidification', acquis, verrous)")
+    expect(e).toContain("vapeur: transfoTenue('vaporisation', acquis, verrous)")
+    // l'instrument qu'une salle événement offre suit la même règle
+    expect(MAIN).toMatch(/!d\.contrepartie &&\s*instrumentOuvert\(d, ouverts\)/)
+  })
   it('n’écrit plus d’étiquette sous 10 px', () => {
     for (const s of ['.mb-pli .crt-nom', '.mb-pli .crt-ctr', '.mb-pli .crt-perso', '.mb-pli .crt-prix']) {
       const t = /font-size:\s*calc\((\d+(?:\.\d+)?)px/.exec(regle(s))
@@ -1232,14 +1438,13 @@ describe('la cérémonie — la question se pose après le porte-cartes', () => 
     expect(vues).toBeGreaterThan(8) // la garde regarde bien quelque chose
     expect(fautives).toEqual([])
   })
-  // en grand, la question cassait sur deux lignes dans la poutre repliée
-  // (F3, « CHOISISSEZ LA SALLE SUIVANTE ») : la poutre s'élargit, le titre
-  // tient sur une ligne ; sur téléphone il retourne à la ligne et la
-  // bande reste resserrée
-  it('tient la question sur une ligne dans la poutre repliée', () => {
+  // en grand, la question cassait sur deux lignes dans le titre replié
+  // (F3, « CHOISISSEZ LA SALLE SUIVANTE ») : la bannière s'élargit, le
+  // titre tient sur une ligne ; sur téléphone il retourne à la ligne
+  it('tient la question sur une ligne dans le titre replié', () => {
     expect(regle('.mb-scene.mb-compact.mb-question .mb-banniere.mb-poutre')).toMatch(/width:\s*min\(100%,/)
     expect(HTML).toMatch(/\.mb-scene\.mb-compact\.mb-question \.mb-titre \{[^}]*white-space:\s*nowrap/)
     const petit = HTML.slice(HTML.indexOf('@media (max-width: 760px) {', HTML.indexOf('/* ==== LA CÉRÉMONIE DE FIN DE SALLE')))
-    expect(petit.slice(0, petit.indexOf('\n      }\n'))).toMatch(/\.mb-scene\.mb-compact\.mb-question \.mb-banniere\.mb-poutre \{[^}]*--mb-bande: 36px/)
+    expect(petit.slice(0, petit.indexOf('\n      }\n'))).toMatch(/\.mb-scene\.mb-compact\.mb-question \.mb-titre \{ white-space: normal; \}/)
   })
 })
