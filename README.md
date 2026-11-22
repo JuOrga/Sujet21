@@ -156,6 +156,9 @@ codex, trophées, cycle, récompenses, voie, générateur) et les écrans
 
 - **Le boss.** La Pompe de reprise n'est qu'une esquisse écrite
   ([`docs/boss-pompe.md`](docs/boss-pompe.md)) : rien n'est implémenté.
+- **Les substances.** D'autres liquides que le corps absorbe et qui le
+  changent : une esquisse à trancher, huit décisions ouvertes
+  ([`docs/substances.md`](docs/substances.md)) ; rien n'est implémenté.
 - **L'étiquetage des tableaux par biome** : le champ existe (planche,
   éditeur de tableaux), mais aucune salle n'est encore étiquetée — toutes
   sont universelles, tout module les pioche
