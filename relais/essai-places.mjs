@@ -31,7 +31,14 @@ const pause = (ms) => new Promise((r) => setTimeout(r, ms))
  *  scènes à deux attendent donc d'être appariées, comme le jeu.) */
 const toutes = []
 function connexion(c, role, j) {
-  const ws = new WebSocket(`${adresse}?code=${c}&role=${role}${j === undefined ? '' : '&jeton=' + j}`, { origin: ORIGINE })
+  const ws = new WebSocket(`${adresse}?code=${c}&role=${role}${j === undefined ? '' : '&jeton=' + j}`, {
+    origin: ORIGINE,
+    // Le code de fermeture n'arrive à 'close' qu'une fois la liaison TCP
+    // finie, et ws l'attend jusqu'à 30 s. En ligne (22/11), derrière le
+    // mandataire de Vercel, cette fin a traîné : le 4409 de la reconnexion
+    // était reçu, mais pas annoncé dans les 3 s de l'essai.
+    closeTimeout: 1000,
+  })
   const etat = { ws, ferme: null, ouverte: false, instance: '', pair: false }
   toutes.push(etat)
   ws.on('open', () => (etat.ouverte = true))
