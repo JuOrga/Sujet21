@@ -62,7 +62,7 @@ const EFFETS: { champ: 'assombrit' | 'eteintEcrans' | 'porte'; mot: string; aide
   {
     champ: 'porte',
     mot: 'une porte condamne l’aile',
-    aide: 'les rectangles de dégât de la station deviennent des barrières d’énergie qu’aucun faisceau n’ouvre',
+    aide: 'les rectangles de dégât de la station deviennent des portes blindées qu’aucun faisceau n’ouvre',
   },
 ]
 

@@ -351,7 +351,8 @@ import {
 import { chargePiecesModule2d, peintCelluleSeule, peintModule2d, type Pieces } from './render/module2dCanvas'
 import { MAX_BOXES, Renderer } from './render/renderer'
 import { HAUTEUR_BLOCS } from './render/hauteurs'
-import { facesTranche, fractionSommet, hauteurAppui, pointDuSommet, pointPose } from './render/reliefParois'
+import { fractionSommet, hauteurAppui, pointDuSommet, pointPose } from './render/reliefParois'
+import { PORTE_BLINDEE_URL, dessinePorte, leveeSuivante } from './render/porteBlindee'
 import { remetReglagesParDefaut } from './game/remiseReglages'
 import { Motes, VIE_STRIDE, remplitVie, toucheLeCorps } from './render/vie'
 import { panDepuis } from './game/ouie'
@@ -388,7 +389,7 @@ import {
 } from './game/level'
 import type { LevelEditor } from './editor/editor'
 import type { EditeurCarte } from './editor/editeurCarte'
-import { porteAvance, porteBoite, portePolygone } from './game/porte'
+import { porteAvance, porteBoite } from './game/porte'
 import { EcranCodex } from './game/ecranCodex'
 import { EcranMarchand } from './game/ecranMarchand'
 import { EcranAvaries } from './game/ecranAvaries'
@@ -9663,6 +9664,12 @@ function drawRecharges(vw: number, vh: number, dpr: number, maintenant: number):
   g.restore()
 }
 
+// LA LEVÉE MONTRÉE de chaque porte d'un coup (0 au ras du sol, 1 debout),
+// pour le tableau `leveesTableau` — une image seulement, voir drawMecanismes
+let leveesPortes: number[] = []
+let leveesTableau: LevelDef | null = null
+let leveesHorloge = -1
+
 // La superposition des mécanismes : faisceaux, émetteurs, cibles, portes —
 // dessinée en 2D par-dessus la cuve, avec la même caméra que le rendu WebGL.
 function drawMecanismes(vw: number, vh: number, dpr: number): void {
@@ -9707,9 +9714,10 @@ function drawMecanismes(vw: number, vh: number, dpr: number): void {
   })
   const z = camera.zoom
 
-  // portes : barrières d'énergie — pleines quand closes, un cadre quand
-  // ouvertes, et entre les deux la PART MATÉRIALISÉE seule, bordée par son
-  // front : ce que le solveur oppose au corps est exactement ce qu'on voit
+  // portes : des dalles blindées qui sortent du sol (render/porteBlindee.ts)
+  // — debout quand closes, leur fente au ras du sol quand ouvertes, et entre
+  // les deux la PART MATÉRIALISÉE seule, levée, bordée par son front : ce
+  // que le solveur oppose au corps est exactement ce qu'on voit
   //
   // RELIEF ALLUMÉ, ELLES SONT POSÉES SUR LE SOMMET DES MURS. Le dessus des
   // cloisons fuit le centre de l'écran (reliefParois.ts) ; dessinées au pied,
@@ -9757,109 +9765,50 @@ function drawMecanismes(vw: number, vh: number, dpr: number): void {
     )
     return { sx, sy }
   }
+  const atlasPorte = sprite(PORTE_BLINDEE_URL)
+  // LA LEVÉE des portes d'un coup (render/porteBlindee.ts) : une image
+  // seulement — le solveur, lui, a déjà la porte pleine ou absente. Tant que
+  // les portes ne sont pas POSÉES (posePortes), et à chaque nouveau tableau,
+  // elle prend l'état d'un coup : une porte ouverte dès le départ ne
+  // s'enfonce pas sous les yeux du joueur.
+  const dtLevee = leveesHorloge < 0 ? 0 : Math.min(0.1, Math.max(0, elapsed - leveesHorloge))
+  leveesHorloge = elapsed
+  const leveeCible = (i: number): number =>
+    (laserEtat.portesAvance[i] ?? (laserEtat.portesOuvertes[i] ? 0 : 1)) > 0 ? 1 : 0
+  if (leveesTableau !== level || leveesPortes.length !== portes.length || !laserEtat.portesPose) {
+    leveesTableau = level
+    leveesPortes = portes.map((_, i) => leveeCible(i))
+  }
+  for (let i = 0; i < portes.length; i++) leveesPortes[i] = leveeSuivante(leveesPortes[i], leveeCible(i), dtLevee)
   for (let i = 0; i < portes.length; i++) {
     const p = portes[i]
     // sous un voile de cachette : la porte se tait (elle flotterait
     // au-dessus d'une paroi factice et vendrait le secret)
     if (dansCacheVoilee((p.minX + p.maxX) / 2, (p.minY + p.maxY) / 2)) continue
     fPortes = fractionAppui(p)
-    const a = auSommet(p.minX, p.maxY)
-    const b = auSommet(p.maxX, p.minY)
     const avance =
       laserEtat.portesAvance[i] ?? (laserEtat.portesOuvertes[i] ? 0 : 1)
-    if (avance < 1) {
-      // le cadre de ce qui reste à combler (ou de tout, porte ouverte)
-      g.strokeStyle = 'rgba(90,220,170,0.45)'
-      g.setLineDash([5, 7])
-      g.lineWidth = 1.5
-      g.strokeRect(a.sx, a.sy, b.sx - a.sx, b.sy - a.sy)
-      g.setLineDash([])
-    }
-    if (avance > 0) {
-      const { contour, front } = portePolygone(p, avance)
-      const puls = 0.75 + 0.25 * Math.sin(elapsed * 3.1 + i)
-      // LA TRANCHE : relief allumé, la barrière a la hauteur des murs qu'elle
-      // relie. Posée sur leur sommet, elle tombait juste mais restait une
-      // plaque peinte au niveau des toits — « on ne voit pas de hauteur »
-      // (le concepteur, 16/11). Ses faces libres tournées vers l'œil
-      // descendent au pied (facesTranche : ni les bouts collés aux murs, ni
-      // les faces de dos) : un voile plus dense en haut, qui s'éteint en
-      // touchant le sol, et la ligne du pied. Peinte avant le dessus, qui la
-      // recouvre. Relief éteint, le pied et le sommet se confondent : rien.
-      if (fPortes > 0) {
-        for (const { a: qa, b: qb } of facesTranche(contour, p, camera.x, camera.y)) {
-          const pa = auPied(qa.x, qa.y)
-          const pb = auPied(qb.x, qb.y)
-          const ha = auSommet(qa.x, qa.y)
-          const hb = auSommet(qb.x, qb.y)
-          const voile = g.createLinearGradient(
-            (pa.sx + pb.sx) / 2,
-            (pa.sy + pb.sy) / 2,
-            (ha.sx + hb.sx) / 2,
-            (ha.sy + hb.sy) / 2,
-          )
-          voile.addColorStop(0, `rgba(255,72,72,${(0.08 * puls).toFixed(3)})`)
-          voile.addColorStop(1, `rgba(255,72,72,${(0.36 * puls).toFixed(3)})`)
-          g.beginPath()
-          g.moveTo(pa.sx, pa.sy)
-          g.lineTo(pb.sx, pb.sy)
-          g.lineTo(hb.sx, hb.sy)
-          g.lineTo(ha.sx, ha.sy)
-          g.closePath()
-          g.fillStyle = voile
-          g.fill()
-          g.strokeStyle = `rgba(255,96,96,${(0.4 * puls).toFixed(3)})`
-          g.lineWidth = 1
-          g.beginPath()
-          g.moveTo(pa.sx, pa.sy)
-          g.lineTo(pb.sx, pb.sy)
-          g.stroke()
-        }
-      }
-      g.save()
-      g.beginPath()
-      for (let k = 0; k < contour.length; k++) {
-        const q = auSommet(contour[k].x, contour[k].y)
-        if (k === 0) g.moveTo(q.sx, q.sy)
-        else g.lineTo(q.sx, q.sy)
-      }
-      g.closePath()
-      g.fillStyle = `rgba(255,72,72,${(0.16 * puls).toFixed(3)})`
-      g.fill()
-      g.strokeStyle = `rgba(255,96,96,${(0.85 * puls).toFixed(3)})`
-      g.lineWidth = 2
-      g.stroke()
-      // barreaux d'énergie, rognés à la part matérialisée
-      g.clip()
-      g.strokeStyle = `rgba(255,110,110,${(0.35 * puls).toFixed(3)})`
-      g.lineWidth = 1
-      g.beginPath()
-      const pas = Math.max(10, 16 * z)
-      if (b.sx - a.sx > b.sy - a.sy) {
-        for (let x = a.sx + pas; x < b.sx; x += pas) {
-          g.moveTo(x, a.sy)
-          g.lineTo(x, b.sy)
-        }
-      } else {
-        for (let y = a.sy + pas; y < b.sy; y += pas) {
-          g.moveTo(a.sx, y)
-          g.lineTo(b.sx, y)
-        }
-      }
-      g.stroke()
-      g.restore()
-      // le FRONT : la ligne vive qui avance — c'est elle qui pousse
-      if (front.length === 2) {
-        const f0 = auSommet(front[0].x, front[0].y)
-        const f1 = auSommet(front[1].x, front[1].y)
-        g.strokeStyle = 'rgba(255,200,190,0.95)'
-        g.lineWidth = 3
-        g.beginPath()
-        g.moveTo(f0.sx, f0.sy)
-        g.lineTo(f1.sx, f1.sy)
-        g.stroke()
-      }
-    }
+    // LA PORTE BLINDÉE (render/porteBlindee.ts) : une dalle d'acier qui sort
+    // du sol — levée sur la part matérialisée, ce que le solveur oppose au
+    // corps —, la fente au ras du sol tant qu'elle n'est pas toute sortie,
+    // et relief allumé, sa FACE tournée vers l'œil descend du haut au pied
+    // (« on ne voit pas de hauteur », le concepteur, 16/11). Relief éteint,
+    // pied et sommet se confondent.
+    dessinePorte(
+      g,
+      p,
+      avance,
+      leveesPortes[i],
+      {
+        sommet: auSommet,
+        pied: auPied,
+        oeil: fPortes > 0 ? { x: camera.x, y: camera.y } : null,
+        // chaque porte bat à sa phase : deux portes voisines ne clignotent
+        // pas comme une guirlande
+        temps: elapsed + i * 0.37,
+      },
+      atlasPorte,
+    )
   }
 
   // LE COUPERET : le trait au sol (une ligne vive à travers le col), le

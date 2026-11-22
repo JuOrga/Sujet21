@@ -514,23 +514,25 @@ describe('le relief est fort par défaut', () => {
   })
 })
 
-// LES PORTES D'ÉNERGIE SUIVENT LE SOMMET DES MURS (retour du concepteur,
-// 15/11, aperçu d'ensemble) : relief allumé, les barres rouges du hub
-// restaient au PIED des cloisons quand leur dessus fuyait le centre de
-// l'écran — « les portes ne sont plus placées correctement » ; relief éteint,
-// elles l'étaient. Elles se dessinent à part, en 2D (la toile des effets de
+// LES PORTES SUIVENT LE SOMMET DES MURS (retour du concepteur, 15/11,
+// aperçu d'ensemble) : relief allumé, les barres rouges du hub restaient au
+// PIED des cloisons quand leur dessus fuyait le centre de l'écran — « les
+// portes ne sont plus placées correctement » ; relief éteint, elles
+// l'étaient. Elles se dessinent à part, en 2D (la toile des effets de
 // main.ts) : elles passent donc elles-mêmes sur le sommet, comme les
-// décalques d'un mur (drawDecals).
-describe("les portes d'énergie suivent le sommet des murs", () => {
-  const a = main.indexOf("// portes : barrières d'énergie")
+// décalques d'un mur (drawDecals). Depuis le 22/11 ce sont des dalles
+// blindées qui sortent du sol (render/porteBlindee.ts) : la boucle leur
+// donne le sommet des murs ET le sol, la dalle monte de l'un à l'autre.
+describe('les portes suivent le sommet des murs', () => {
+  const a = main.indexOf('// portes : des dalles blindées')
   const portes = a < 0 ? '' : main.slice(a, main.indexOf('// LE COUPERET', a))
 
-  it("la boucle des portes ne pose plus son dessus au pied : il passe par le sommet (la tranche nomme le pied, auPied)", () => {
-    // la boucle seule : auSommet, lui, part de S
+  it('la boucle des portes donne à la dalle le sommet (auSommet) et le sol (auPied), et ne pose rien elle-même au pied', () => {
     const boucle = portes.slice(Math.max(0, portes.indexOf('for (let i = 0; i < portes.length')))
-    expect(boucle).toContain('portePolygone(')
+    expect(boucle).toContain('dessinePorte(')
+    expect(boucle).toMatch(/sommet: auSommet,/)
+    expect(boucle).toMatch(/pied: auPied,/)
     expect(boucle).not.toMatch(/[^A-Za-z]S\(/)
-    expect(boucle.split('auSommet(').length - 1).toBeGreaterThanOrEqual(4)
   })
 
   it("le sommet est celui d'un mur haut, au relief choisi et au zoom de la caméra", () => {
@@ -727,7 +729,7 @@ describe('la face que montre un point de la tranche', () => {
 // plaque peinte au niveau des toits. Ses faces LIBRES tournées vers l'œil
 // descendent maintenant du sommet au pied ; les deux bouts, collés aux murs
 // qu'elle relie, n'en ont pas (ils se peindraient sur les murs).
-describe("la tranche d'une porte d'énergie", () => {
+describe("la tranche d'une porte", () => {
   // une porte couchée, 200 × 20, au-dessus et à droite du centre de l'écran
   const P = { minX: 100, minY: 300, maxX: 300, maxY: 320 }
   const C = [
@@ -772,17 +774,19 @@ describe("la tranche d'une porte d'énergie", () => {
     expect(facesTranche(M, P, 900, 310).map(nom)).toEqual(['200,300>200,320'])
   })
 
-  it("la boucle des portes peint la tranche du pied au sommet, sous le dessus", () => {
-    const a = main.indexOf("// portes : barrières d'énergie")
-    const portes = a < 0 ? '' : main.slice(a, main.indexOf('// LE COUPERET', a))
-    const tranche = portes.indexOf('facesTranche(contour, p, camera.x, camera.y)')
-    expect(tranche).toBeGreaterThan(0)
-    expect(portes.slice(tranche, tranche + 900)).toMatch(/auPied\(/)
-    expect(portes.slice(tranche, tranche + 900)).toMatch(/auSommet\(/)
-    // relief éteint, pas de tranche : le pied et le sommet se confondent
-    expect(portes).toMatch(/if \(fPortes > 0\)[^\n]*\n?[^\n]*facesTranche|fPortes > 0 \? facesTranche/)
+  it("la porte peint sa face du pied au haut, sous le dessus — relief allumé seulement", () => {
+    // (22/11) le dessin est passé dans render/porteBlindee.ts : la dalle
+    // sort du sol, sa face va du pied au haut de ce qui est levé
+    const src = lire('./porteBlindee.ts')
+    const corps = src.slice(src.indexOf('export function dessinePorte('))
+    const face = corps.indexOf('facesTranche(contour, p, vue.oeil.x, vue.oeil.y)')
+    expect(face).toBeGreaterThan(0)
+    expect(corps.slice(face, face + 200)).toMatch(/dessineFace\(g, a, b, vue\.pied, haut,/)
+    // relief éteint, pas de face : l'œil n'est donné que relief allumé
+    expect(corps).toMatch(/if \(vue\.oeil\) \{\n\s*for \(const \{ a, b \} of facesTranche/)
+    expect(main).toMatch(/oeil: fPortes > 0 \? \{ x: camera\.x, y: camera\.y \} : null/)
     // avant le dessus, qui la recouvre
-    expect(tranche).toBeLessThan(portes.indexOf("g.fillStyle = `rgba(255,72,72,"))
+    expect(face).toBeLessThan(corps.indexOf('// 3. LE DESSUS'))
   })
 })
 
@@ -1395,7 +1399,7 @@ describe("une porte ou une chasse prend le sommet des solides qui la bordent", (
     expect(main).toContain('const h = hauteurAppui(r, hauteurEn)')
     // relief éteint : pas de sonde
     expect(main).toMatch(/if \(fMurHaut <= 0\) return 0/)
-    expect(main).toMatch(/fPortes = fractionAppui\(p\)\n\s*const a = auSommet\(p\.minX, p\.maxY\)/)
+    expect(main).toMatch(/fPortes = fractionAppui\(p\)\n\s*const avance =/)
     expect(main).toMatch(/fPortes = fractionAppui\(c\)\n\s*const a = auSommet\(c\.minX, c\.maxY\)/)
   })
 })
