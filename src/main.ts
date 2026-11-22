@@ -354,7 +354,7 @@ import { chargePiecesModule2d, peintCelluleSeule, peintModule2d, type Pieces } f
 import { MAX_BOXES, Renderer } from './render/renderer'
 import { HAUTEUR_BLOCS } from './render/hauteurs'
 import { fractionSommet, hauteurAppui, pointDuSommet, pointPose } from './render/reliefParois'
-import { PORTE_BLINDEE_URL, dessinePorte, leveeSuivante, type Occultant } from './render/porteBlindee'
+import { PORTE_BLINDEE_URL, decalsDesPortes, dessinePorte, leveeSuivante, type Occultant } from './render/porteBlindee'
 import { remetReglagesParDefaut } from './game/remiseReglages'
 import { Motes, VIE_STRIDE, remplitVie, toucheLeCorps } from './render/vie'
 import { panDepuis } from './game/ouie'
@@ -9499,9 +9499,14 @@ function decorAffiche(): DecalDef[] {
   if (decorMemoTableau !== level) {
     decorMemoTableau = level
     const meta = decalsDuMeta(level)
+    // LA TRAPPE DES PORTES (render/porteBlindee.ts) : posée SOUS les autres
+    // décalques — c'est le sol —, le sens de chaque dalle lu sur les murs
+    // qui la bordent, comme en jeu
+    const boites = level.boxes
+    const trappes = decalsDesPortes(level.portes ?? [], (x, y) => boites.some((b) => dansForme(b, x, y)))
     decorMemoListe =
-      meta.length > 0
-        ? [...(level.decals ?? []), ...meta]
+      meta.length > 0 || trappes.length > 0
+        ? [...trappes, ...(level.decals ?? []), ...meta]
         : (level.decals ?? [])
   }
   return decorMemoListe
@@ -9887,6 +9892,8 @@ function drawMecanismes(vw: number, vh: number, dpr: number): void {
         // volume est effacé de ce qui est derrière lui
         occultants: fPortes > 0 ? occultantsPres(p) : undefined,
         projette: projetteRelief,
+        // la trappe est au décor (decorAffiche) : sous le fluide, sous les murs
+        solAuDecor: true,
       },
       atlasPorte,
     )

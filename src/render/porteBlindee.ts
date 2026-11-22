@@ -16,7 +16,7 @@
 //     sol (la bande de chevrons en haut, les panneaux dessous) ;
 //   · elle s'ouvre en s'ENFONÇANT : le dessus redescend vers le sol, la face
 //     rentre — accrochée par le haut, on en voit de moins en moins ;
-//   · ouverte, il ne reste que les deux lèvres de la fente, au ras du sol, et
+//   · ouverte, il ne reste que son dessus à fleur du sol — la TRAPPE, ses
 //     rien entre elles : le fluide qui passe dessus se voit ;
 //   · elle porte le code couleur des LASERS qui la commandent : liserés et
 //     veilleuses rouges, veilleuses vertes une fois ouverte ;
@@ -36,7 +36,7 @@
 // chargé, réseau coupé), la porte se dessine au vecteur, dans les mêmes
 // teintes.
 
-import type { PorteDef } from '../game/level'
+import type { DecalDef, PorteDef } from '../game/level'
 import { portePolygone, type Point } from '../game/porte'
 import { facesTranche } from './reliefParois'
 
@@ -44,15 +44,16 @@ export const PORTE_BLINDEE_URL = '/assets/porte-blindee.webp'
 
 /** Les pièces de l'atlas, en px — UN CONTRAT avec atlas_rects() de
  *  tools/images/blender/porte_blindee.py (vérifié par porteBlindee.spec.ts).
- *  La longueur est à l'horizontale ; dessus, bout et fente sont vus d'en
+ *  La longueur est à l'horizontale ; dessus, bout et trappe sont vus d'en
  *  haut (160 px = l'épaisseur), le flanc en élévation (280 px = un mur). */
 export const PORTE_ATLAS = {
   dessus: { x: 4, y: 4, w: 320, h: 160 },
   bout: { x: 328, y: 4, w: 96, h: 160 },
   flanc: { x: 428, y: 4, w: 320, h: 280 },
-  fente: { x: 752, y: 4, w: 320, h: 160 },
+  trappe: { x: 752, y: 4, w: 320, h: 160 },
+  trappeBout: { x: 1076, y: 4, w: 96, h: 160 },
 } as const
-export const PORTE_ATLAS_TAILLE = { w: 1076, h: 288 } as const
+export const PORTE_ATLAS_TAILLE = { w: 1176, h: 288 } as const
 // la lentille de la veilleuse, dans la pièce `bout` (px) — VEILLEUSE_X du script
 const VEILLEUSE_X = 30
 
@@ -323,6 +324,65 @@ export function decoupePorte(longueur: number, epaisseur: number): { bout: numbe
   return { bout, n, carreau: reste > 0 ? reste / n : epaisseur * 2 }
 }
 
+// ---- LA TRAPPE EN DÉCALQUES DE SOL ------------------------------------------
+// Porte ouverte, il ne reste que le dessus de la dalle enfoncée, à fleur du
+// sol, liserés et veilleuses verts. Le premier essai le peignait dans la
+// toile 2D — deux lèvres de chevrons, le milieu vide pour que le fluide s'y
+// voie : « quand c'est ouvert ce n'est pas très beau » (le concepteur,
+// 22/11). Une trappe pleine, peinte PAR-DESSUS le fluide, l'aurait caché ; en
+// décalque de sol, le moteur la peint SOUS lui — l'eau qui franchit la porte
+// passe dessus — et sous le dessus des murs en relief, comme tout le décor.
+// Toujours posée : porte close, la dalle debout la recouvre.
+
+// l'opacité de la trappe (DecalDef.fade : 0,55 par défaut, un décor discret)
+const FONDU_TRAPPE = 0.95
+// un rien de recouvrement entre deux carreaux voisins : pas de fente au
+// filtrage (unités)
+const RECOUVREMENT_TRAPPE = 0.6
+
+/** Les décalques de la trappe de chaque porte : des carreaux posés bout à
+ *  bout le long de la dalle, un sabot à chaque bout — exactement comme le
+ *  dessus (decoupePorte). Un décalque n'est jamais tourné : une porte debout
+ *  prend les pièces déjà tournées (`-v`), et son sabot du haut la pièce
+ *  retournée (`-v-haut`) — le miroir d'un décalque n'est qu'horizontal.
+ *  `solide` : de quel côté sont les murs (sensPorte). */
+export function decalsDesPortes(
+  portes: readonly PorteDef[],
+  solide?: (x: number, y: number) => boolean,
+): DecalDef[] {
+  const out: DecalDef[] = []
+  for (const p of portes) {
+    const couchee = sensPorte(p, solide)
+    const { o, es, et, longueur: L, epaisseur: E } = cadrePorte(p, couchee)
+    if (!(L > 0) || !(E > 0)) continue
+    const dec = decoupePorte(L, E)
+    const pose = (s0: number, s1: number, kind: DecalDef['kind'], flip?: boolean): void => {
+      const sm = (s0 + s1) / 2
+      const long = s1 - s0 + RECOUVREMENT_TRAPPE
+      out.push({
+        x: o.x + es.x * sm + et.x * (E / 2),
+        y: o.y + es.y * sm + et.y * (E / 2),
+        w: couchee ? long : E,
+        h: couchee ? E : long,
+        kind,
+        ...(flip ? { flip } : {}),
+        fade: FONDU_TRAPPE,
+      })
+    }
+    for (let k = 0; k < dec.n; k++) {
+      pose(dec.bout + k * dec.carreau, dec.bout + (k + 1) * dec.carreau, couchee ? 'porte-trappe' : 'porte-trappe-v')
+    }
+    if (couchee) {
+      pose(0, dec.bout, 'porte-trappe-bout')
+      pose(L - dec.bout, L, 'porte-trappe-bout', true)
+    } else {
+      pose(0, dec.bout, 'porte-trappe-bout-v')
+      pose(L - dec.bout, L, 'porte-trappe-bout-v-haut')
+    }
+  }
+  return out
+}
+
 /** CE QUI EST DEBOUT, et à quelle hauteur : le polygone levé (monde) et sa
  *  hauteur montrée, 0..1. Rideau et éventail lèvent la part matérialisée,
  *  pleine hauteur ; une porte d'un coup lève tout son rectangle, à la
@@ -345,7 +405,7 @@ export type VersEcran = (x: number, y: number) => { sx: number; sy: number }
 export interface VuePorte {
   /** le sommet des murs à l'écran : le dessus d'une porte levée */
   sommet: VersEcran
-  /** le sol à l'écran : la fente, et le pied de la face */
+  /** le sol à l'écran : la trappe, et le pied de la face */
   pied: VersEcran
   /** relief allumé : le point du monde sous l'œil (la caméra) — la face se
    *  peint, tournée vers lui (facesTranche) ; null : à plat */
@@ -359,9 +419,19 @@ export interface VuePorte {
   /** relief allumé : un point du monde, à une hauteur, à l'écran — la
    *  projection des occultants */
   projette?: Projette
+  /** en jeu : la TRAPPE est au décor (decalsDesPortes) — sous le fluide et
+   *  sous les murs, rendue par le moteur ; la toile 2D ne peint plus le sol.
+   *  Absent (l'éditeur) : la toile la peint */
+  solAuDecor?: boolean
 }
 
-type Pieces = { dessus: HTMLCanvasElement; bout: HTMLCanvasElement; flanc: HTMLCanvasElement; fente: HTMLCanvasElement }
+type Pieces = {
+  dessus: HTMLCanvasElement
+  bout: HTMLCanvasElement
+  flanc: HTMLCanvasElement
+  trappe: HTMLCanvasElement
+  trappeBout: HTMLCanvasElement
+}
 const piecesParImage = new WeakMap<HTMLImageElement, Pieces>()
 
 /** Chaque pièce dans sa toile, recopiée à l'échelle 1 : un motif répété se
@@ -383,7 +453,8 @@ function pieces(img: HTMLImageElement): Pieces | null {
     dessus: coupe(PORTE_ATLAS.dessus),
     bout: coupe(PORTE_ATLAS.bout),
     flanc: coupe(PORTE_ATLAS.flanc),
-    fente: coupe(PORTE_ATLAS.fente),
+    trappe: coupe(PORTE_ATLAS.trappe),
+    trappeBout: coupe(PORTE_ATLAS.trappeBout),
   }
   piecesParImage.set(img, p)
   return p
@@ -447,46 +518,25 @@ export function dessinePorte(
   const pc = img ? pieces(img) : null
   const { contour, front, hauteur: h, close } = partLevee(p, avance, leve)
 
-  // 1. LA FENTE, au ras du sol : tout ce qu'on voit d'une porte ouverte, et
-  // ce qui reste du passage tant qu'elle n'est pas toute sortie. Porte
-  // ouverte, ses deux liserés restent, VERTS (« quand elles sont ouvertes les
-  // deux lignes doivent rester et passer en vert », 22/11), et ses
-  // veilleuses affleurent, vertes elles aussi. Relief allumé, tout mur voisin
-  // passe devant le sol : son volume est effacé (surCalque)
+  // 1. LA TRAPPE, au ras du sol : la dalle enfoncée, à fleur, ses liserés et
+  // ses veilleuses VERTS — tout ce qu'on voit d'une porte ouverte, et ce qui
+  // reste du passage tant qu'elle n'est pas toute sortie. En jeu, c'est un
+  // décalque de sol (decalsDesPortes) : le moteur la peint sous le fluide et
+  // sous le dessus des murs. Ici, pour l'éditeur (et sans atlas, un pointillé)
   const xl = (dec.bout * VEILLEUSE_X) / PORTE_ATLAS.bout.w
   const etat = etatVeilleuses(close, contour.length >= 3 && h > 0)
-  if (!close) {
-    const sol = (c: CanvasRenderingContext2D): void => {
-      c.save()
-      const m = pc && motif(c, pc.fente)
-      if (m) {
-        poseRepere(c, vue.pied, o, es, et, L, E)
-        m.setTransform({ a: dec.carreau / PORTE_ATLAS.fente.w, b: 0, c: 0, d: E / PORTE_ATLAS.fente.h, e: dec.bout, f: 0 })
-        c.globalAlpha = 0.9
-        c.fillStyle = m
-        c.fillRect(0, 0, L, E)
-      } else {
-        cheminEcran(c, coins(p), vue.pied)
-        c.strokeStyle = 'rgba(154,163,171,0.55)'
-        c.setLineDash([5, 7])
-        c.lineWidth = 1.5
-        c.stroke()
-      }
-      c.restore()
-      if (etat === 'ouverte') {
-        c.save()
-        poseRepere(c, vue.pied, o, es, et, L, E)
-        for (const t of [LISERE_T * E, (1 - LISERE_T) * E]) liseres(c, t, L, E, VERT_OUVERT, 1)
-        for (const s of [xl, L - xl]) veilleuse(c, s, E, VERT_OUVERT, 0.55 + 0.1 * Math.sin(vue.temps * 2.2), true)
-        c.restore()
-      }
+  if (!close && !vue.solAuDecor) {
+    g.save()
+    if (pc) {
+      dessineDalle(g, vue.pied, cadre, dec, pc.trappe, pc.trappeBout, PORTE_ATLAS.trappe)
+    } else {
+      cheminEcran(g, coins(p), vue.pied)
+      g.strokeStyle = 'rgba(70,225,130,0.55)'
+      g.setLineDash([5, 7])
+      g.lineWidth = 1.5
+      g.stroke()
     }
-    if (masquer && occ && projette) {
-      const pts = coins(p).map((q) => vue.pied(q.x, q.y))
-      // (la marge : le halo des veilleuses déborde de la dalle)
-      const k = Math.hypot(pts[1].sx - pts[0].sx, pts[1].sy - pts[0].sy) / Math.max(1e-6, p.maxX - p.minX)
-      surCalque(g, rectEcran(pts, E * k + 4), sol, (c) => effaceVolumes(c, occ, projette))
-    } else sol(g)
+    g.restore()
   }
   if (contour.length < 3 || !(h > 0)) return
 
@@ -531,21 +581,9 @@ export function dessinePorte(
     g.stroke()
   }
   g.clip()
+  if (pc) dessineDalle(g, haut, cadre, dec, pc.dessus, pc.bout, PORTE_ATLAS.dessus)
   poseRepere(g, haut, o, es, et, L, E)
-  const m = pc && motif(g, pc.dessus)
-  if (pc && m) {
-    m.setTransform({ a: dec.carreau / PORTE_ATLAS.dessus.w, b: 0, c: 0, d: E / PORTE_ATLAS.dessus.h, e: dec.bout, f: 0 })
-    g.fillStyle = m
-    // la dalle entière d'abord, les sabots par-dessus : pas de fente entre eux
-    g.fillRect(0, 0, L, E)
-    g.drawImage(pc.bout, 0, 0, dec.bout, E)
-    g.save()
-    g.translate(L, 0)
-    g.scale(-1, 1)
-    g.drawImage(pc.bout, 0, 0, dec.bout, E)
-    g.restore()
-  }
-  // plus elle est basse, plus elle est dans l'ombre de sa fente — à plat
+  // plus elle est basse, plus elle est dans l'ombre de sa trappe — à plat
   // (relief éteint, l'éditeur), c'est ce qui dit qu'elle monte
   if (h < 1) {
     g.fillStyle = `rgba(3,7,16,${(0.6 * (1 - h)).toFixed(3)})`
@@ -582,24 +620,6 @@ export function dessinePorte(
 // le milieu du liseré, en fraction de l'épaisseur — PEAU + JOINT / 2 du script
 const LISERE_T = (12 + 6 / 2) / 160
 
-/** Un liseré tracé (au sol, porte ouverte) : un halo et un cœur clair,
- *  comme un faisceau couché, le long de toute la dalle. */
-function liseres(
-  g: CanvasRenderingContext2D,
-  t: number,
-  L: number,
-  E: number,
-  c: { coeur: string; halo: string },
-  force: number,
-): void {
-  g.fillStyle = `rgba(${c.halo},${(0.28 * force).toFixed(3)})`
-  g.fillRect(0, t - E * 0.06, L, E * 0.12)
-  g.fillStyle = `rgba(${c.halo},${(0.85 * force).toFixed(3)})`
-  g.fillRect(0, t - E * 0.018, L, E * 0.036)
-  g.fillStyle = `rgba(${c.coeur},${(0.7 * force).toFixed(3)})`
-  g.fillRect(0, t - E * 0.007, L, E * 0.014)
-}
-
 /** Une veilleuse allumée, dans le repère de la dalle (s le long, t en
  *  travers) : la lentille et son halo, à la couleur de l'état. `boitier` :
  *  son boîtier se dessine aussi (au sol, ou sans l'atlas). */
@@ -625,6 +645,33 @@ function veilleuse(
   // la lentille : 8 × 24 px sur 160 dans l'atlas
   g.fillStyle = `rgba(${c.coeur},${Math.min(1, 0.35 + 0.65 * force).toFixed(3)})`
   g.fillRect(s - E * 0.025, E * 0.425, E * 0.05, E * 0.15)
+}
+
+/** Une dalle vue d'en haut — le dessus, ou la trappe : le carreau répété le
+ *  long de la porte, un sabot à chaque bout (le second en miroir). */
+function dessineDalle(
+  g: CanvasRenderingContext2D,
+  vers: VersEcran,
+  cadre: ReturnType<typeof cadrePorte>,
+  dec: ReturnType<typeof decoupePorte>,
+  carreau: HTMLCanvasElement,
+  sabot: HTMLCanvasElement,
+  piece: { w: number; h: number },
+): void {
+  const { o, es, et, longueur: L, epaisseur: E } = cadre
+  const m = motif(g, carreau)
+  if (!m) return
+  g.save()
+  poseRepere(g, vers, o, es, et, L, E)
+  m.setTransform({ a: dec.carreau / piece.w, b: 0, c: 0, d: E / piece.h, e: dec.bout, f: 0 })
+  g.fillStyle = m
+  // la dalle entière d'abord, les sabots par-dessus : pas de fente entre eux
+  g.fillRect(0, 0, L, E)
+  g.drawImage(sabot, 0, 0, dec.bout, E)
+  g.translate(L, 0)
+  g.scale(-1, 1)
+  g.drawImage(sabot, 0, 0, dec.bout, E)
+  g.restore()
 }
 
 function coins(p: PorteDef): Point[] {

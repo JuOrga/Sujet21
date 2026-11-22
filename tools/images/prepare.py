@@ -264,10 +264,20 @@ FAMILLES: list[Famille] = [
         # (blender/porte_blindee.py) : quatre pièces côte à côte, que le
         # moteur découpe au pixel près (render/porteBlindee.ts) — jamais
         # redimensionné. Mesuré : luminance 0,19, 3 % de chauds (les deux
-        # liserés rouges, la couleur des lasers qui commandent la porte), 8 Ko
+        # liserés rouges, la couleur des lasers qui commandent la porte)
         'atlas de la porte blindée', ('porte-blindee',), alpha=True, cote_max=2048,
         luma_max=0.40, poids_max_ko=60,
-        note='dessus, bout, flanc, fente — gouttières de 4 px ; les rectangles sont un contrat avec src/render/porteBlindee.ts',
+        note='dessus, bout, flanc, trappe, trappe-bout — gouttières de 4 px ; les rectangles sont un contrat avec src/render/porteBlindee.ts',
+    ),
+    Famille(
+        # (22/11) la porte OUVERTE, en décalques de sol (blender/
+        # porte_blindee.py, decalques()) : le dessus et le sabot de la dalle
+        # enfoncée, liserés et veilleuse verts, et leurs quarts de tour. Des
+        # carreaux OPAQUES posés bout à bout par le moteur (porteBlindee.ts :
+        # decalsDesPortes) — pas de bord détouré à mesurer, jamais
+        # redimensionnés
+        'trappe de porte', ('porte-trappe*',), cote_max=512, luma_max=0.40, poids_max_ko=30,
+        note='carreaux opaques bout à bout, à leur taille de rendu',
     ),
     Famille(
         'décalque',

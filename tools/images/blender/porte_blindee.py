@@ -11,7 +11,7 @@ blindés scellent la salle d'un coup. Ici : une DALLE D'ACIER ESCAMOTABLE,
 qui SORT DU SOL pour fermer le passage et s'y ENFONCE pour l'ouvrir (« on
 voit vraiment la porte s'enfoncer dans le sol et ça libère le passage », le
 concepteur, 22/11) — ni montant ni cadre de part et d'autre : ouverte, il ne
-reste que la fente au ras du sol.
+reste que son dessus, à fleur du sol.
 
 LA VUE EST CELLE DU JEU : de DESSUS, et relief allumé (la 2,5D, le réglage
 par défaut), une des deux grandes faces descend du sommet au pied. Le
@@ -40,10 +40,15 @@ QUATRE PIÈCES, la longueur à l'horizontale :
     un mur haut fait 140 unités (280 px) ; le carreau couvre DEUX carreaux
     du dessus (son joint du milieu tombe sous le leur). Le moteur l'accroche
     par le HAUT : une porte à moitié sortie montre la moitié haute de sa face ;
-  · `fente` (320 × 160, vue d'en haut) — les deux lèvres de la fente au sol,
-    DÉTOURÉES, peintes de chevrons au pochoir : ce qu'on voit d'une porte
-    ouverte (avant : un cadre pointillé vert, couleur de la serre). Le
-    milieu est vide : le fluide qui franchit la porte ouverte s'y voit.
+  · `trappe` et `trappe-bout` (vus d'en haut) — PORTE OUVERTE : le dessus
+    et le sabot de la dalle enfoncée à fleur du sol, ses liserés et sa
+    veilleuse allumés en VERT. Le premier essai ne laissait au sol que deux
+    lèvres peintes de chevrons, le milieu vide : « quand c'est ouvert ce
+    n'est pas très beau […] il manque un asset pour porte ouverte » (le
+    concepteur, 22/11). Elles sont dans l'atlas (l'éditeur) ET livrées en
+    DÉCALQUES DE SOL (decalques()) : le moteur les pose sous le fluide —
+    l'eau qui franchit la porte ouverte passe dessus et les recouvre — et
+    sous le dessus des murs en relief, comme tout le décor.
 
 Le moteur (src/render/porteBlindee.ts) découpe l'atlas aux rectangles de
 `atlas_rects()` — un contrat : les mêmes nombres y sont recopiés, et
@@ -60,7 +65,9 @@ ou sans fenêtre, avec le module bpy (pip install bpy) — ~3 min sur 4 cœurs :
     python tools/images/blender/porte_blindee.py --rend SORTIE [échantillons]
 puis, hors de Blender, l'assemblage de l'atlas :
     python -I tools/images/blender/porte_blindee.py SORTIE masters/images/porte-blindee.png
-    python3 tools/images/prepare.py porte-blindee
+    (écrit aussi les décalques de la trappe, masters/images/porte-trappe*.png)
+    python3 tools/images/prepare.py porte-blindee porte-trappe porte-trappe-v \
+        porte-trappe-bout porte-trappe-bout-v porte-trappe-bout-v-haut
 """
 import math, os, sys
 
@@ -74,10 +81,10 @@ if DANS_BLENDER:
     exec(compile(open(_src, encoding='utf-8').read(), _src, 'exec'), globals())
 
 PREFIXE = 'porte-'
-NOMS = ['dessus', 'bout', 'flanc', 'fente']
+NOMS = ['dessus', 'bout', 'flanc', 'trappe', 'trappe-bout']
 W = 160    # px : l'épaisseur de la porte, dans les pièces vues d'en haut
 HF = 280   # px : la hauteur du flanc — un mur haut (140 unités), à 2 px l'unité
-LT = 320   # px : le carreau répété du dessus, du flanc et de la fente
+LT = 320   # px : le carreau répété du dessus, du flanc et de la trappe
 LB = 96    # px : le sabot d'extrémité
 VEILLEUSE_X = 30   # px : la veilleuse dans le sabot (porteBlindee.ts la fait battre)
 J = 3      # px : le demi-joint de plaque, à chaque bout du carreau
@@ -86,8 +93,8 @@ J = 3      # px : le demi-joint de plaque, à chaque bout du carreau
 # l'échelle 1 dans sa propre toile : rien ne bave d'une pièce à l'autre, et
 # le bord de l'atlas reste vide, comme prepare.py l'exige d'un détourage).
 GOUTTIERE = 4
-LARGEURS = {'dessus': LT, 'bout': LB, 'flanc': LT, 'fente': LT}
-HAUTEURS = {'dessus': W, 'bout': W, 'flanc': HF, 'fente': W}
+LARGEURS = {'dessus': LT, 'bout': LB, 'flanc': LT, 'trappe': LT, 'trappe-bout': LB}
+HAUTEURS = {'dessus': W, 'bout': W, 'flanc': HF, 'trappe': W, 'trappe-bout': W}
 
 # LA COUPE DE LA DALLE, en travers (px ; z = 0 et 160 : les deux faces) — la
 # même pour le dessus et le sabot
@@ -166,26 +173,33 @@ def matieres_porte():
     # la lentille des veilleuses, ÉTEINTE : c'est le moteur qui l'allume, rouge
     # porte close, verte porte ouverte (porteBlindee.ts)
     mats['lentille'] = mat_simple('porte-lentille', (0x1c, 0x21, 0x28), rug=0.12, metal=0.2)
+    # PORTE OUVERTE, la dalle enfoncée à fleur du sol : ses liserés et ses
+    # veilleuses passent au VERT (« quand elles sont ouvertes les deux lignes
+    # doivent rester et passer en vert », 22/11) — le vert de VERT_OUVERT
+    # (porteBlindee.ts)
+    mats['vert'] = mat_simple('porte-vert', (0x0e, 0x3a, 0x22), rug=0.3, emission=(0x46, 0xe1, 0x82), force=1.6)
+    mats['lentille-verte'] = mat_simple('porte-lentille-verte', (0x10, 0x40, 0x26), rug=0.15, emission=(0x5a, 0xf0, 0x96), force=2.0)
     return mats
 
 
 BISEAU_PORTE = dict(BISEAU_SAS, blindage=0.0025, peint=0.0012, joint=0.0015, ecrou=0.0008) if DANS_BLENDER else {}
 
 
-def lampe(at, x, z, y):
+def lampe(at, x, z, y, lentille='lentille'):
     """la veilleuse du sabot : un boîtier vissé, la lentille couchée en
     travers de la porte, éteinte — petite : la porte fait 40 unités
     d'épaisseur en jeu, la veilleuse doit y tenir à 6"""
     at.boite('acier', x - u(9), x + u(9), z - u(22), z + u(22), y - 0.006, y, -0.3)
     at.boite('creux', x - u(6), x + u(6), z - u(16), z + u(16), y - 0.008, y - 0.006, 0)
-    at.boite('lentille', x - u(4), x + u(4), z - u(12), z + u(12), y - 0.010, y - 0.008, 0)
+    at.boite(lentille, x - u(4), x + u(4), z - u(12), z + u(12), y - 0.010, y - 0.008, 0)
     for dz in (-u(19), u(19)):
         at.dome('rivet', x, z + dz, 0.0022, y - 0.0065, 0)
 
 
 # ------------------------------------------------------------------ les pièces
-def dessus(sc, mats):
-    nom = 'dessus'
+def dessus(sc, mats, nom='dessus', liseret='liseret'):
+    """le dessus de la dalle ; `trappe` : le même, porte OUVERTE — enfoncée à
+    fleur du sol, ses liserés verts. Le moteur la pose en décalque de sol"""
     P = parent(sc, nom)
     M = sous(P, nom + '-motif')
     at = Atelier()
@@ -199,7 +213,7 @@ def dessus(sc, mats):
     # le joint entre chaque tôle et l'âme : un liseré rouge au fond d'une
     # fente — la couleur des faisceaux qui commandent la porte
     for a in (PEAU, W - PEAU - JOINT):
-        at.boite('liseret', j, L - j, u(a + 1), u(a + JOINT - 1), -0.031, -0.012, 0)
+        at.boite(liseret, j, L - j, u(a + 1), u(a + JOINT - 1), -0.031, -0.012, 0)
     # l'âme, plus bas que les tôles, nervurée EN TRAVERS : ce qui dit, vu d'en
     # haut, l'épaisseur d'une dalle (des raidisseurs, pas une plaque peinte)
     za, zb = PEAU + JOINT, W - PEAU - JOINT
@@ -216,13 +230,13 @@ def dessus(sc, mats):
         x = j + (L - 2 * j) * (k + 0.5) / 8
         for z in (70, 90):
             at.cylindre('ecrou', x, u(z), u(3.4), -0.0575, -0.054, 0, seg=6)
-    at.objets(M, mats, BISEAU_PORTE, False, 'porte-dessus')
+    at.objets(M, mats, BISEAU_PORTE, False, 'porte-' + nom)
     copies(P, M, [(-L, 0), (L, 0)])
     declare(nom, P, 0, L, 0, u(W), mx=MARGE, alpha=True)
 
 
-def bout(sc, mats):
-    nom = 'bout'
+def bout(sc, mats, nom='bout', lentille='lentille'):
+    """le sabot ; `trappe-bout` : le même, porte ouverte, sa veilleuse verte"""
     P = parent(sc, nom)
     at = Atelier()
     B, j = u(LB), u(J)
@@ -242,8 +256,8 @@ def bout(sc, mats):
     for x in (u(22), B - u(12)):
         for z in (22, W - 22):
             at.cylindre('ecrou', x, u(z), u(4.5), -0.0555, -0.052, 0, seg=6)
-    lampe(at, u(VEILLEUSE_X), u(W / 2), -0.052)
-    at.objets(P, mats, BISEAU_PORTE, False, 'porte-bout')
+    lampe(at, u(VEILLEUSE_X), u(W / 2), -0.052, lentille)
+    at.objets(P, mats, BISEAU_PORTE, False, 'porte-' + nom)
     declare(nom, P, 0, B, 0, u(W), alpha=True)
 
 
@@ -284,27 +298,6 @@ def flanc(sc, mats):
     declare(nom, P, 0, L, 0, u(HF), mx=MARGE, alpha=True)
 
 
-def fente(sc, mats):
-    """les deux lèvres de la fente au sol, d'où sort la dalle : à plat, peintes
-    de chevrons au pochoir en sens contraires ; leur pas (32 px) divise le
-    carreau, le motif se suit. Le milieu reste VIDE (détouré) : porte
-    ouverte, le fluide qui passe dessus doit se voir"""
-    nom = 'fente'
-    P = parent(sc, nom)
-    M = sous(P, nom + '-motif')
-    at = Atelier()
-    L = u(LT)
-    for a, b, sens in ((0, 22, 1), (138, 160, -1)):
-        at.boite('blindage', 0, L, u(a), u(b), -0.010, 0.0, 0)
-        chevrons(at, 'peint', 0, L, u(a + 3), u(b - 3), sens, u(32), u(13), -0.0106, -0.0099)
-    # le bord intérieur des lèvres : une cornière, l'ombre de la fente
-    for a, b in ((22, 27), (133, 138)):
-        at.boite('acier', 0, L, u(a), u(b), -0.006, 0.0, 0)
-    at.objets(M, mats, BISEAU_PORTE, False, 'porte-fente')
-    copies(P, M, [(-L, 0), (L, 0)])
-    declare(nom, P, 0, L, 0, u(W), mx=MARGE, alpha=True)
-
-
 def porte():
     vide_scene()
     PIECES.clear()
@@ -313,14 +306,15 @@ def porte():
     dessus(sc, mats)
     bout(sc, mats)
     flanc(sc, mats)
-    fente(sc, mats)
+    dessus(sc, mats, 'trappe', 'vert')
+    bout(sc, mats, 'trappe-bout', 'lentille-verte')
     lumiere_camera(sc)
     sc.cycles.device = 'GPU'
 
 
 # -------------------------------------------------------- hors de Blender
 def assemble(dossier, sortie):
-    """les quatre rendus détourés (dossier/alpha/porte-<nom>.png) en un atlas,
+    """les rendus détourés (dossier/alpha/porte-<nom>.png) en un atlas,
     avec pillow ; imprime ce que prepare.py mesurera"""
     import numpy as np
     from PIL import Image
@@ -338,6 +332,27 @@ def assemble(dossier, sortie):
         print(f'{n:<8} {w}×{h}  luminance {lum:.3f}  couvert {al.mean():.0%}')
     atlas.save(sortie)
     print('atlas', f'{lw}×{lh}', '→', sortie)
+    decalques(dossier, os.path.dirname(os.path.abspath(sortie)))
+
+
+def decalques(dossier, sortie):
+    """LA TRAPPE EN DÉCALQUES DE SOL (porte ouverte) : le moteur les pose
+    sous le fluide et sous le dessus des murs, comme tout le décor
+    (porteBlindee.ts : decalsDesPortes). Un décalque n'est jamais tourné :
+    une porte debout prend des pièces déjà tournées d'un quart de tour (sens
+    trigonométrique : la longueur monte, la tête de l'image à gauche, comme
+    cadrePorte), et son sabot du haut, la même retournée — le miroir d'un
+    décalque n'est qu'horizontal."""
+    import numpy as np
+    from PIL import Image
+    tuile = np.asarray(Image.open(os.path.join(dossier, 'alpha', f'{PREFIXE}trappe.png')).convert('RGB'))
+    sabot = np.asarray(Image.open(os.path.join(dossier, 'alpha', f'{PREFIXE}trappe-bout.png')).convert('RGB'))
+    for nom, a in (('porte-trappe', tuile), ('porte-trappe-v', np.rot90(tuile)),
+                   ('porte-trappe-bout', sabot), ('porte-trappe-bout-v', np.rot90(sabot)),
+                   ('porte-trappe-bout-v-haut', np.flipud(np.rot90(sabot)))):
+        chemin = os.path.join(sortie, nom + '.png')
+        Image.fromarray(np.ascontiguousarray(a)).save(chemin)
+        print('décalque', f'{a.shape[1]}×{a.shape[0]}', '→', chemin)
 
 
 def rend_sans_fenetre(sortie, echantillons):

@@ -383,6 +383,14 @@ export interface DecalDef {
     // arrive à l'horizontale) et son quart de tour.
     | 'sas-raccord'
     | 'sas-raccord-v'
+    // LA TRAPPE D'UNE PORTE OUVERTE (render/porteBlindee.ts : decalsDesPortes) :
+    // la dalle enfoncée à fleur du sol, en carreaux et en sabots, couchée ou
+    // debout — synthétisée depuis level.portes, jamais posée à la main
+    | 'porte-trappe'
+    | 'porte-trappe-v'
+    | 'porte-trappe-bout'
+    | 'porte-trappe-bout-v'
+    | 'porte-trappe-bout-v-haut'
     // LES STATIONS DU HUB : la machinerie des cinq stations de réparation,
     // posées PAR L'ADMIN dans l'éditeur (groupe Décor), jamais synthétisées
     // ni gravées dans le code — le hub va changer, la mise en scène lui
