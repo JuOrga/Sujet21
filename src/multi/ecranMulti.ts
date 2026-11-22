@@ -158,6 +158,14 @@ const STYLE = `
 .mu-score div { display: flex; align-items: baseline; gap: 0.5em; font-size: 2.2em; letter-spacing: 0.06em; }
 .mu-score div span { color: var(--dim, #7f9cb0); font-size: 0.6em; }
 .mu-score small { letter-spacing: 0.18em; min-height: 1.2em; }
+/* En essai seul, la rangée du haut porte quatre boutons (L'AUTRE, CHANGER DE
+   CORPS en plus) : partie de la droite, elle s'étend jusqu'au milieu dès qu'on
+   passe sous ~1400 px de large et couvrait le score — le tiret et le second
+   chiffre disparaissaient derrière « L'AUTRE : FERMÉ » à 1280 × 720. Le score
+   descend donc sous la rangée (14 px + un bouton de 40 px + 8 px). :where()
+   garde la spécificité de .mu-score seul, pour que la règle des écrans
+   étroits ci-dessous, qui le pose plus bas encore, l'emporte toujours. */
+:where(.mu-jeu[data-seul="1"]) .mu-score { top: 62px; }
 @media (max-width: 560px) { .mu-choix { grid-template-columns: 1fr; } .mu-score { top: 150px; } }
 `
 
@@ -727,6 +735,8 @@ export function creeEcranMulti(quitte: () => void): EcranMulti {
     el<HTMLElement>('[data-voile]').hidden = true
     finAffichee = false
     el<HTMLButtonElement>('[data-geste="changer"]').hidden = r !== 'seul'
+    // La rangée du haut s'élargit en essai seul : le score se pousse dessous (voir .mu-score).
+    el<HTMLElement>('[data-page="jeu"]').dataset.seul = r === 'seul' ? '1' : '0'
     moi = r === 'invite' ? 1 : 0
     try {
       rendu = new RenduMulti(el<HTMLCanvasElement>('canvas'), CAPACITE)
