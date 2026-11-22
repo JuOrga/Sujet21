@@ -12,11 +12,15 @@ import {
   COTE_FLANC,
   COTE_HAUT,
   FLANC_COQUE_GLSL,
+  FLANC_HAUTEUR,
+  FLANC_JOINTS,
   FLANC_SOMMETS,
+  JOINT_FLANC_COQUE_GLSL,
   MAX_VIDES_COQUE,
   OMBRE_PIED_COQUE_GLSL,
   OMBRE_PIED_FORCE,
   OMBRE_PIED_PORTEE,
+  jointFlancCoque,
   ombrePiedCoque,
   piedFlancCoque,
   remplitBandesCoque,
@@ -401,6 +405,75 @@ describe('La coque a une hauteur : relief allumé, elle se dresse', () => {
     expect(draw.slice(i)).toMatch(/^gl\.drawArrays\(gl\.TRIANGLES, debutFlancs, FLANC_SOMMETS\)\s*this\.passeSousSommets\(false\)/)
     // relief éteint : ni écrite ni dessinée
     expect(draw).toContain('if (sommetCoque > 0) remplitFlancsCoque(b, this.hullScratch, debutFlancs)')
+  })
+})
+
+// « Il faut un autre motif pour la partie verticale 2,5D de ces murs
+// d'enceinte, plus épuré » (le concepteur, 22/11) : la face reprenait la tôle
+// du dessus, tassée sur sa hauteur.
+describe('La face de la coque a son propre motif : un bardage épuré', () => {
+  const source = readFileSync(fileURLToPath(new URL('./renderer.ts', import.meta.url)), 'utf8')
+  const fs = source.slice(source.indexOf('const HULL_FS'), source.indexOf('// Décalques de décor'))
+  const face = fs.slice(fs.indexOf('if (vCote.x > 4.5) {'), fs.indexOf('if (vCote.x > 3.5) {'))
+  // la répétition de la tôle du dessus : hull.webp, 1079 × 400, sur 90 u
+  // d'épaisseur (renderer.ts : hullRep)
+  const rep = (COQUE_EPAISSEUR * 1079) / 400
+
+  it('la face ne lit plus la tôle du dessus : elle trace son bardage', () => {
+    expect(face.length).toBeGreaterThan(0)
+    expect(face).not.toContain('uTexHull')
+    expect(fs).toContain('${JOINT_FLANC_COQUE_GLSL}')
+    expect(face).toContain('vec2 jt = jointFlancCoque(fl.y, uRep);')
+    // sur la hauteur d'un mur haut, celle dont la coque se dresse
+    expect(FLANC_HAUTEUR).toBe(HAUTEUR_BLOCS)
+    expect(face).toContain('float h = fl.x * ${FLANC_HAUTEUR.toFixed(1)};')
+  })
+
+  it('un joint sous chaque montant du dessus, d’une répétition à l’autre', () => {
+    for (let k = 0; k < 4; k++) {
+      for (const j of FLANC_JOINTS) expect(Math.abs(jointFlancCoque((k + j) * rep, rep)[0])).toBeLessThan(1e-6)
+    }
+    // les montants mesurés sur l'image (centres à 351, 688 et 1059 px)
+    expect(FLANC_JOINTS.map((j) => Math.round(j * 1079))).toEqual([351, 688, 1059])
+  })
+
+  it('au début d’une répétition, le joint le plus proche est le dernier de la précédente', () => {
+    // à 1 % d'une répétition, le dernier montant de la précédente (98,15 %)
+    // est à 2,85 % — pas le premier de celle-ci, à 31,5 %
+    const [e] = jointFlancCoque(2.01 * rep, rep)
+    expect(e).toBeCloseTo((0.01 + 1 - FLANC_JOINTS[2]) * rep, 6)
+    // l'écart est signé : négatif avant le joint, positif après
+    expect(jointFlancCoque((1 + FLANC_JOINTS[0]) * rep - 3, rep)[0]).toBeCloseTo(-3, 6)
+    expect(jointFlancCoque((1 + FLANC_JOINTS[0]) * rep + 3, rep)[0]).toBeCloseTo(3, 6)
+  })
+
+  it('le numéro du panneau change d’un à chaque joint, couture de la texture comprise', () => {
+    let avant = jointFlancCoque(0, rep)[1]
+    let changements = 0
+    for (let s = 0.5; s < 4 * rep; s += 0.5) {
+      const p = jointFlancCoque(s, rep)[1]
+      if (p !== avant) {
+        expect(p).toBe(avant + 1)
+        // il change au joint, pas à la couture de la répétition
+        expect(Math.abs(jointFlancCoque(s, rep)[0])).toBeLessThan(0.5)
+        changements++
+      }
+      avant = p
+    }
+    expect(changements).toBe(4 * FLANC_JOINTS.length)
+  })
+
+  it('le jumeau GLSL dit la même chose', () => {
+    const J = FLANC_JOINTS.map((j) => j.toFixed(4)).join(', ')
+    expect(JOINT_FLANC_COQUE_GLSL).toContain('vec2 jointFlancCoque(float s, float rep)')
+    expect(JOINT_FLANC_COQUE_GLSL).toContain(`const vec3 J = vec3(${J});`)
+    // les candidats, dans l'ordre du TypeScript : le dernier de la
+    // répétition précédente, les trois, le premier de la suivante
+    expect(JOINT_FLANC_COQUE_GLSL).toContain('float e = f - (J.z - 1.0);')
+    expect(JOINT_FLANC_COQUE_GLSL).toContain('if (abs(f - J.x - 1.0) < abs(e)) e = f - J.x - 1.0;')
+    expect(JOINT_FLANC_COQUE_GLSL).toContain(
+      'float p = 3.0 * k - 1.0 + step(J.x, f) + step(J.y, f) + step(J.z, f);',
+    )
   })
 })
 
