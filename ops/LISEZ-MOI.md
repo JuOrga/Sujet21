@@ -180,6 +180,13 @@ une même adresse tient huit connexions au plus. `relais/essai-places.mjs`
 les joue toutes, en local comme en ligne (le workflow le lance après
 l'essai à deux joueurs).
 
+⚠️ **Tout cela vaut PAR INSTANCE.** En ligne, Vercel répartit les connexions
+entre plusieurs instances du relais, et rien n'est partagé entre elles :
+les salons (c'est pourquoi deux joueurs doivent tomber sur la même — le jeu
+réessaie), et les comptes par adresse (huit par instance, donc davantage en
+tout). Les protections freinent un abus ; elles ne remplacent pas un vrai
+pare-feu, que seul le tableau de bord Vercel offre.
+
 En local : `cd relais && npm install && PORT=9100 node index.js`, puis le
 jeu avec `?relais=ws://127.0.0.1:9100/ws` (et `node essai-places.mjs`
 pour les protections).

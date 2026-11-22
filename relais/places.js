@@ -43,7 +43,10 @@ export const DEBIT_MAX = 768 * 1024
 export const PATIENCE_DEBIT = 5
 
 /** Les connexions qu'une même adresse peut tenir à la fois (deux joueurs
- *  sur le même réseau, chacun avec une reconnexion en vol, et de la marge). */
+ *  sur le même réseau, chacun avec une reconnexion en vol, et de la marge).
+ *  PAR INSTANCE : en ligne, chaque instance du relais compte pour elle seule
+ *  (rien n'est partagé entre elles), la borne réelle est donc plus large —
+ *  elle freine un abus, elle ne l'arrête pas. */
 export const CONNEXIONS_PAR_ADRESSE = 8
 
 /** Un salon neuf : deux places vides, sans jeton. */
