@@ -17,7 +17,8 @@
 // empaqueter fabrique.ts en fabrique.js (esbuild --bundle --format=iife,
 // ./node_modules/.bin/esbuild si présent). Le dépôt n'a pas Playwright :
 // le banc emprunte celui d'un autre projet de la machine (chemin ci-dessous).
-const { chromium } = require('/home/julian/projets/PasMoi/node_modules/playwright-core')
+// (ici, l'environnement d'analyse a Playwright d'office : BANC_PLAYWRIGHT=playwright)
+const { chromium } = require(process.env.BANC_PLAYWRIGHT || '/home/julian/projets/PasMoi/node_modules/playwright-core')
 const fs = require('fs')
 const path = require('path')
 const port = process.argv[2] || '5291'
@@ -94,7 +95,9 @@ function prepare(quoi, M, O, E) {
     P.fige([['.mb-pli, .mb-pli *', 550]], 1500)
   } else if (quoi === 'vise') {
     const h = $('#mb-cartes'); h.classList.add('mb-isole')
-    const pli = h.children[0]; pli.classList.add('mb-vise'); pli.style.setProperty('--ry', '-5deg'); pli.style.setProperty('--rx', '3deg')
+    // la carte survolée (le survol de la prise l'a visée pour de vrai :
+    // son eau tremble encore, 400 ms après la goutte d'entrée)
+    const pli = h.children[0]; pli.classList.add('mb-vise')
   } else if (quoi === 'elue') {
     // le choix arrive cartes posées : seuls l'élan de l'élue, la chute des
     // autres et la secousse ont 250 ms ; l'apparition des faces et l'éclat
