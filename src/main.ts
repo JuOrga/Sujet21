@@ -358,6 +358,7 @@ import { HAUTEUR_BLOCS } from './render/hauteurs'
 import { fractionSommet, hauteurAppui, pointDuSommet, pointPose } from './render/reliefParois'
 import { PORTE_BLINDEE_URL, decalsDesPortes, dessinePorte, leveeSuivante, type Occultant } from './render/porteBlindee'
 import { remetReglagesParDefaut } from './game/remiseReglages'
+import { recommencerConclut } from './game/gesteRecommencer'
 import { Motes, VIE_STRIDE, remplitVie, toucheLeCorps } from './render/vie'
 import { panDepuis } from './game/ouie'
 import { dangerDevant, directionDeMarche, saccade, type Saccade } from './game/regard'
@@ -19525,8 +19526,17 @@ function resetAction(): void {
     retourAuLabo()
     return
   }
-  if (sim.dispersed) {
-    // R pressé avant la fin du battement : l'écran paraît tout de suite
+  // R pressé avant que l'écran ne paraisse — pendant le battement de
+  // l'agonie, OU pendant la dérive du corps figé : l'écran paraît tout de
+  // suite. Le corps figé était oublié : R rejouait la salle sans prendre de
+  // secours, et la dernière vie se rejouait à volonté (gesteRecommencer.ts)
+  if (
+    recommencerConclut({
+      disperse: sim.dispersed,
+      epuise: endgame.spent,
+      continuerOffert: continuerOffert(),
+    })
+  ) {
     afficheDispersion()
     return
   }
