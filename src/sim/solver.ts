@@ -17,7 +17,7 @@ import { labelComponents } from './components'
 import { accelerationPuits, type Accel } from '../game/puits'
 import type { PuitsDef } from '../game/level'
 import { boxContact, Sponge, type ClosestPoint } from './obstacles'
-import { FORME_SURCHAUFFEUR, type FormeBox } from '../game/formes'
+import { FORME_SURCHAUFFEUR, creuxDeCoque, type FormeBox } from '../game/formes'
 import { formePhysique } from '../game/conduite'
 import { VIDE_COURANT, VIDE_PORTEE } from '../game/vide'
 import {
@@ -109,6 +109,54 @@ function horsBoite(
     y < b.minY - marge ||
     y > b.maxY + marge
   )
+}
+
+/** La forme est-elle à plus de `marge` du point ? La boîte englobante
+ *  d'abord, puis le creux des coques (formes.ts, creuxDeCoque) : une coque
+ *  est une pièce, sa boîte ne rejette rien de ce qui s'y trouve. À
+ *  réserver aux boucles qui se taisent au-delà de la marge — le résultat
+ *  y est identique, seul le calcul évité change. */
+function horsForme(b: FormeBox, x: number, y: number, marge: number): boolean {
+  return horsBoite(b, x, y, marge) || creuxDeCoque(b, x, y, marge)
+}
+
+/** LES BORNES DE REJET de chaque boîte, rangées à plat (minX, minY, maxX,
+ *  maxY par boîte) : la boîte elle-même, ou le carré du cercle qui la
+ *  contient quand elle tourne — exactement ce que horsBoite teste.
+ *
+ *  POURQUOI À PLAT. La boucle des obstacles lisait les propriétés de
+ *  chaque boîte pour chaque goutte ; or les boîtes n'ont pas toutes la
+ *  même silhouette d'objet (forme, angle, coupe, pièces…), et un accès
+ *  qui voit trop de silhouettes devient lent. MESURÉ dans la rotonde (20
+ *  boîtes, contre 3 à 7 dans une salle) : ~65 ns par couple goutte ×
+ *  boîte, pour la plupart des boîtes situées à l'autre bout de l'étage.
+ *  Un tableau de nombres se lit au même prix pour toutes. Refait à chaque
+ *  passage, pas mis en cache : vingt boîtes ne coûtent rien, et une boîte
+ *  modifiée en place (l'éditeur) ne peut pas laisser de bornes périmées. */
+function remplisBornes(
+  boxes: readonly FormeBox[],
+  out: Float64Array<ArrayBuffer>,
+): Float64Array<ArrayBuffer> {
+  const bornes = out.length >= boxes.length * 4 ? out : new Float64Array(boxes.length * 8)
+  for (let k = 0; k < boxes.length; k++) {
+    const b = boxes[k]
+    const o = k * 4
+    if (b.angle) {
+      const r = Math.hypot(b.maxX - b.minX, b.maxY - b.minY) / 2
+      const cx = (b.minX + b.maxX) / 2
+      const cy = (b.minY + b.maxY) / 2
+      bornes[o] = cx - r
+      bornes[o + 1] = cy - r
+      bornes[o + 2] = cx + r
+      bornes[o + 3] = cy + r
+    } else {
+      bornes[o] = b.minX
+      bornes[o + 1] = b.minY
+      bornes[o + 2] = b.maxX
+      bornes[o + 3] = b.maxY
+    }
+  }
+  return bornes
 }
 
 /** L'ÉTAT d'une particule tel que le RENDU l'encode, en un seul nombre :
@@ -1220,6 +1268,25 @@ export class FluidSim {
     this.updatePlayerStats()
     const mvx = this.stats.velX
     const mvy = this.stats.velY
+    // UN CASIER DES PARTICULES, le temps du versement. Chaque place
+    // candidate se comparait à TOUTES les particules : des milliers de
+    // places (l'étendue grandit tant que la couronne n'est pas trouvée,
+    // et le cœur du réseau est occupé par le corps) fois un millier de
+    // particules. MESURÉ dans la rotonde : ~1 ms par dose en moyenne,
+    // jusqu'à 12 ms quand le corps est plaqué contre une paroi — et le
+    // versement automatique du hub en verse une toutes les 0,75 s tant
+    // qu'il renfloue : de quoi faire sauter une image à chaque dose. Une case
+    // fait un espacement, plus que le seuil d'occupation (0,9 s) : les
+    // neuf cases autour d'une place suffisent, et la réponse est la même.
+    const casier = new Map<number, number[]>()
+    const cle = (gx: number, gy: number): number => (gx + 32768) * 65536 + (gy + 32768)
+    const range = (i: number): void => {
+      const k = cle(Math.floor(this.posX[i] / s), Math.floor(this.posY[i] / s))
+      const c = casier.get(k)
+      if (c) c.push(i)
+      else casier.set(k, [i])
+    }
+    for (let i = 0; i < this.count; i++) range(i)
     const libre = (px: number, py: number): boolean => {
       if (
         px < this.bounds.minX + rp ||
@@ -1229,13 +1296,21 @@ export class FluidSim {
       ) {
         return false
       }
-      for (let i = 0; i < this.count; i++) {
-        const dx = this.posX[i] - px
-        if (dx * dx > seuil2) continue
-        const dy = this.posY[i] - py
-        if (dx * dx + dy * dy < seuil2) return false
+      const gx = Math.floor(px / s)
+      const gy = Math.floor(py / s)
+      for (let oy = -1; oy <= 1; oy++) {
+        for (let ox = -1; ox <= 1; ox++) {
+          const c = casier.get(cle(gx + ox, gy + oy))
+          if (!c) continue
+          for (const i of c) {
+            const dx = this.posX[i] - px
+            const dy = this.posY[i] - py
+            if (dx * dx + dy * dy < seuil2) return false
+          }
+        }
       }
       for (const b of this.boxes) {
+        if (horsForme(b, px, py, rp)) continue
         boxContact(px, py, b, cp)
         if (cp.dist < rp) return false
       }
@@ -1268,6 +1343,7 @@ export class FluidSim {
         if (!libre(px, py)) continue
         const idx = this.addParticle(px, py, kind)
         if (idx < 0) break // capacité atteinte : on s'arrête là
+        range(idx) // la place est prise pour les suivantes
         this.velX[idx] = mvx
         this.velY[idx] = mvy
         poses++
@@ -3288,6 +3364,10 @@ export class FluidSim {
   }
 
   private readonly scratchCP: ClosestPoint = { dist: 0, nx: 0, ny: 0 }
+  // les bornes à plat des boîtes (remplisBornes) : une par boucle, pour
+  // qu'aucune ne lise les bornes que l'autre vient d'écrire
+  private bornesObstacles = new Float64Array(64)
+  private bornesChimie = new Float64Array(64)
 
   // Pousse les particules hors des solides et enregistre le contact (normale,
   // vitesse normale entrante, matériau) pour la réponse en vitesse.
@@ -3305,6 +3385,9 @@ export class FluidSim {
     this.majConduits()
     this.expulseDesConduits()
     if (this.boxes.length === 0 && this.sponges.length === 0) return
+    const boxes = this.boxes
+    const nb = boxes.length
+    const bornes = (this.bornesObstacles = remplisBornes(boxes, this.bornesObstacles))
 
     for (let i = 0; i < n; i++) {
       let x = this.prdX[i]
@@ -3321,7 +3404,19 @@ export class FluidSim {
       )
         continue
 
-      for (const b of this.boxes) {
+      for (let k = 0; k < nb; k++) {
+        // le tri grossier, à plat : une boîte à plus d'un rayon de goutte ne
+        // fait rien ici — ni contact, ni passage de porte, ni codex (ceux-ci
+        // ne se consignent que DANS la boîte)
+        const o = k * 4
+        if (
+          x < bornes[o] - rp ||
+          x > bornes[o + 2] + rp ||
+          y < bornes[o + 1] - rp ||
+          y > bornes[o + 3] + rp
+        )
+          continue
+        const b = boxes[k]
         // Chaque état a sa porte : la grille laisse passer la VAPEUR, la
         // membrane gorgée d'eau laisse suinter l'EAU, le rideau lamellaire
         // s'écarte devant la GLACE — tout le reste bute.
@@ -3367,7 +3462,7 @@ export class FluidSim {
             this.codexContacts[MAT_RIDEAU * 3 + 1] = 1
           continue
         }
-        if (horsBoite(b, x, y, rp)) continue
+        if (horsForme(b, x, y, rp)) continue
         boxContact(x, y, b, cp)
         const sep = cp.dist - rp
         if (sep < 0) {
@@ -3442,6 +3537,9 @@ export class FluidSim {
     const cp = this.scratchCP
     const band = p.hydroBand
     const wallBand = p.wallSplashBand
+    const chem = this.chemBoxes
+    const nc = chem.length
+    const bornes = (this.bornesChimie = remplisBornes(chem, this.bornesChimie))
     const bite = p.surfaceBite // mordant global : les surfaces pèsent plus
     const philDamp = Math.exp(-p.hydrophileFriction * bite * dt)
 
@@ -3519,11 +3617,23 @@ export class FluidSim {
       // jamais être happé ni claqué
       const poidsBande = gaz ? p.hydroGasWeight : 1
       const porteeGaz = gaz ? p.hydroGasReach : 1
-      for (const b of this.chemBoxes) {
+      // la plus longue des deux portées : le tri à plat ne doit écarter que
+      // ce que le tri exact, plus bas, écarterait aussi
+      const margeMax = Math.max(wallBand, band * porteeGaz) + rp
+      for (let k = 0; k < nc; k++) {
+        const o = k * 4
+        if (
+          x < bornes[o] - margeMax ||
+          x > bornes[o + 2] + margeMax ||
+          y < bornes[o + 1] - margeMax ||
+          y > bornes[o + 3] + margeMax
+        )
+          continue
+        const b = chem[k]
         // Le mur neutre n'agit qu'au ras de la paroi ; la chimie porte loin,
         // et encore plus loin pour la vapeur (en sourdine).
         const reach = b.material === MAT_WALL ? wallBand : band * porteeGaz
-        if (horsBoite(b, x, y, reach + rp)) continue
+        if (horsForme(b, x, y, reach + rp)) continue
         boxContact(x, y, b, cp)
         const sep = cp.dist - rp
         if (sep > 0 && sep < reach) {
