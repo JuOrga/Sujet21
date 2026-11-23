@@ -1028,6 +1028,8 @@ function createSim(level: LevelDef): FluidSim {
   sim.perteGrilleFactor = lev('perteGrille')
   sim.priseSasGlaceFactor = lev('priseSasGlace')
   sim.glisseGlaceFactor = lev('glisseGlace')
+  sim.jetVitesseFactor = lev('vitesseJet')
+  sim.jetDebitFactor = lev('debitJet')
   const naitVapeur =
     zoneForceAt(level, level.spawn.x, level.spawn.y) === 'vapeur'
   sim.dashBudget = sim.dashBudgetMax

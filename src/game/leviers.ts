@@ -17,6 +17,8 @@ export type LevierId =
   | 'seuilDispersion'
   | 'reabsorption'
   | 'priseEponge'
+  | 'vitesseJet'
+  | 'debitJet'
   // les états
   | 'dashs'
   | 'peageVapeur'
@@ -145,6 +147,55 @@ export const LEVIERS: LevierDef[] = [
       v <= 1
         ? `L’éponge a moins de prise : elle boit ${moins(v)} % moins vite.`
         : `L’éponge mord : elle boit ${plus(v)} % plus vite.`,
+  },
+
+  // LE JET. Le verbe unique (doc §3.3) n'avait aucun levier : toutes les
+  // cartes tournaient autour du geste sans jamais le toucher. Deux leviers,
+  // et ils ne disent PAS la même chose :
+  //  - la VITESSE est le rendement. Chaque goutte emporte ejectSpeed × sa
+  //    masse : plus vite, la même eau pousse plus fort, et chaque salle
+  //    coûte moins de volume. Mesuré par le multi (22/11, jet de 1 400 à
+  //    1 700 u/s, ×1,21) : une seconde de poussée sur un corps de 900 passe
+  //    de 54 à 64 u/s, pour la même matière éjectée.
+  //  - le DÉBIT est la nervosité. Plus de gouttes par seconde : on accélère
+  //    plus vite, chaque goutte poussant pareil — et la sur-éjection guette
+  //    plus tôt, le doigt tenu vide le corps plus vite. Il rend tout de même
+  //    un peu de volume : la moitié du prix d'une poussée, ce sont les éclats
+  //    que le remous arrache au corps, et une poussée plus courte en arrache
+  //    moins (sim/jetCartes.spec.ts : 120 u/s coûtent 124 particules au lieu
+  //    de 138 à ×1,4 ; 119 avec la Tuyère à ×1,2). Le plafond (×1,6, soit 51
+  //    gouttes/s) reste sous le débit d'une coupelle (COUPELLE_DEBIT, 90) :
+  //    tirer dans une outre ne la fait jamais déborder.
+  {
+    id: 'vitesseJet',
+    nom: 'Vitesse du jet',
+    famille: 'corps',
+    mode: 'mult',
+    min: 0.7,
+    max: 1.4,
+    pas: 0.05,
+    bon: 1,
+    // le jet est le geste du LIQUIDE, toujours là (solver.ts, eject)
+    etats: [],
+    phrase: (v) =>
+      v >= 1
+        ? `Le jet part ${plus(v)} % plus vite : la même eau pousse plus fort.`
+        : `Le jet part ${moins(v)} % moins vite : chaque goutte pousse moins.`,
+  },
+  {
+    id: 'debitJet',
+    nom: 'Débit du jet',
+    famille: 'corps',
+    mode: 'mult',
+    min: 0.6,
+    max: 1.6,
+    pas: 0.05,
+    bon: 1,
+    etats: [],
+    phrase: (v) =>
+      v >= 1
+        ? `Le jet débite ${plus(v)} % de gouttes en plus : on accélère plus vite, on se vide aussi plus vite.`
+        : `Le jet débite ${moins(v)} % de gouttes en moins : la poussée s’alanguit.`,
   },
 
   // ——— les états ————————————————————————————————————————————

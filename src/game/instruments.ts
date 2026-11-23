@@ -87,6 +87,22 @@ export const INSTRUMENTS: InstrumentDef[] = [
     icone: '🛡️',
     effets: [{ levier: 'priseEponge', valeur: 0.75 }],
   },
+  // le JET : la tuyère paie en rendement (chaque goutte pousse plus), le
+  // surpresseur en nervosité (plus de gouttes par seconde, même rendement)
+  {
+    id: 'tuyere',
+    nom: 'Tuyère',
+    desc: 'Le jet part 20 % plus vite : la même eau pousse plus fort, chaque traversée coûte moins de volume.',
+    icone: '🚀',
+    effets: [{ levier: 'vitesseJet', valeur: 1.2 }],
+  },
+  {
+    id: 'surpresseur',
+    nom: 'Surpresseur',
+    desc: 'Le jet débite 40 % de gouttes en plus : on démarre et l’on freine d’un coup — mais l’on se vide aussi plus vite.',
+    icone: '🔩',
+    effets: [{ levier: 'debitJet', valeur: 1.4 }],
+  },
 
   // ——— Les états ————————————————————————————————————————————
   {

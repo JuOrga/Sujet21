@@ -61,6 +61,15 @@ export const ORDRE_INSTRUMENTS: readonly string[] = [
   'bonbonne-percee', 'fuite-prioritaire', 'vapeur-eventee',
 ]
 
+/** LES CARTES QUI ATTENDENT LEUR DESSIN : livrées après la planche, elles
+ *  n'ont pas encore de case et se montrent par leur emoji. La planche se
+ *  rend dans Blender, sur le poste du concepteur (docs/assets-ia.md, 36d) —
+ *  pas depuis une session d'analyse. Une carte n'entre ici QUE nommée : le
+ *  test exige toujours une case de toutes les autres. Quand la planche est
+ *  refaite, la carte passe dans ORDRE_INSTRUMENTS (à la suite, la case 32
+ *  est libre ; au-delà, une cinquième rangée) et sort de cette liste. */
+export const INSTRUMENTS_SANS_CASE: readonly string[] = ['tuyere', 'surpresseur']
+
 /** La case d'un instrument, ou null s'il n'en a pas (carte « perso », ou
  *  instrument ajouté plus tard : on retombe alors sur son emoji). */
 export function caseInstrument(id: string): number | null {
