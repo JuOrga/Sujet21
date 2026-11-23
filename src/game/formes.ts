@@ -1236,6 +1236,62 @@ function coqueContactAxe(
   }
 }
 
+/** LE POINT EST-IL AU FOND DU CREUX D'UNE COQUE, à plus de `marge` de toute
+ *  paroi ? Le rejet rapide que la boîte englobante ne sait pas faire.
+ *
+ *  POURQUOI. Une coque est une pièce : sa boîte englobante, c'est la pièce
+ *  ENTIÈRE. Le rejet par boîte (horsBoite) laissait donc passer chaque
+ *  goutte qui s'y trouve, et chacune payait le champ complet — cinq
+ *  évaluations (la distance, puis quatre pour le gradient), chacune avec
+ *  deux octogones et les fentes des portes : 0,4 à 0,9 µs, contre 0,05 pour
+ *  un rectangle. MESURÉ dans la rotonde, où le corps vit DANS les coques
+ *  (900 gouttes, moteur WASM branché) : un pas physique à ~4,5 ms contre
+ *  ~1,5 ms dans une salle — et comme la
+ *  boucle abandonne le temps qu'elle n'a pas pu simuler dans son budget, le
+ *  hub tournait au RALENTI sur une machine juste, là où les salles
+ *  tenaient la cadence.
+ *
+ *  POURQUOI C'EST EXACT, et pas une approximation. Le champ de la coque est
+ *  un max() : max(octogone, −creux, −fentes). Il vaut donc AU MOINS
+ *  −creux. Si −creux dépasse la marge, le champ complet la dépasse aussi,
+ *  et l'appelant n'en aurait rien fait (contact, bande, aura : tous se
+ *  taisent au-delà de leur marge). La coupe, appliquée ensuite, ne peut
+ *  qu'augmenter la distance. Rien ne change dans le résultat — seulement
+ *  ce qu'on évite de calculer. */
+export function creuxDeCoque(
+  b: FormeBox,
+  x: number,
+  y: number,
+  marge: number,
+): boolean {
+  if (b.forme !== FORME_COQUE) return false
+  const cx = (b.minX + b.maxX) / 2
+  const cy = (b.minY + b.maxY) / 2
+  const hx = Math.max(1e-6, (b.maxX - b.minX) / 2)
+  const hy = Math.max(1e-6, (b.maxY - b.minY) / 2)
+  let px = x - cx
+  let py = y - cy
+  // le même repère local que formeContact : la rotation inverse
+  if (b.angle) {
+    const rad = (b.angle * Math.PI) / 180
+    const ca = Math.cos(rad)
+    const sa = Math.sin(rad)
+    const lx = px * ca + py * sa
+    py = -px * sa + py * ca
+    px = lx
+  }
+  const r = coqueUnpack(b)
+  const petit = Math.min(hx, hy)
+  const c = Math.max(0, Math.min(petit * 0.9, r.chanfrein * petit))
+  const t = Math.max(1, Math.min(petit, r.ep))
+  const hix = hx - t
+  const hiy = hy - t
+  // pleine (épaisse au point de se refermer) : pas de creux où se cacher
+  if (hix <= 0 || hiy <= 0) return false
+  const ci = Math.max(0, c - t * (Math.SQRT2 - 1))
+  return -octoSdf(px, py, hix, hiy, ci) > marge
+}
+
 /** LES MORCEAUX d'une coque, en polygones MONDE : de quoi la TRACER (à
  * l'éditeur) sans repasser par le champ. Huit pans au plus — quatre côtés
  * coupés par leur porte, quatre chanfreins — chacun un quadrilatère. */
