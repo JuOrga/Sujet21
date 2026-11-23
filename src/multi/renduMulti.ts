@@ -35,13 +35,17 @@
 //     concepteur, 20/11). La physique les séparait, l'image les fondait.
 
 import type { Cadre } from './cadrage'
-import { PALETTE } from './profil'
+import { PALETTE, teintesDeLaPartie, type Teinte } from './profil'
 import { ATTR_CORPS, ATTR_ORPHELINE, ATTR_PROPRIO, type Bornes, type Particules } from './trame'
+
+/** Une teinte (profil.ts), pour le CSS. */
+export function teinteCss(c: Teinte): string {
+  return `rgb(${Math.round(c[0] * 255)}, ${Math.round(c[1] * 255)}, ${Math.round(c[2] * 255)})`
+}
 
 /** La couleur d'un rang de la palette (profil.ts), pour le CSS. */
 export function couleurCss(rang: number): string {
-  const c = PALETTE[((rang % PALETTE.length) + PALETTE.length) % PALETTE.length]
-  return `rgb(${Math.round(c[0] * 255)}, ${Math.round(c[1] * 255)}, ${Math.round(c[2] * 255)})`
+  return teinteCss(PALETTE[((rang % PALETTE.length) + PALETTE.length) % PALETTE.length])
 }
 
 /** Le rayon d'une tache, en unités monde : quatre pas de particule. Au
@@ -172,6 +176,12 @@ export interface SceneHockey {
   palet: { x: number; y: number; rayon: number; vx: number; vy: number } | null
   /** HOCKEY : les poteaux de métal (quatre au plus). */
   poteaux?: readonly { x: number; y: number; rayon: number }[]
+  /** HOCKEY : la distance des lignes bleues à la ligne rouge, et le rayon du
+   *  rond central (430 et 200 au duel ; la grande piste les agrandit). */
+  lignes?: { bleue: number; rond: number }
+  /** HOCKEY : l'agrandissement de la piste — l'image du stade, faite pour la
+   *  piste du duel, est agrandie d'autant : sa rambarde reste au bord. */
+  echelle?: number
   /** Le joueur qui tient le palet (−1 : personne), sa charge (0 à 1) et le
    *  point qu'il vise : le lancer partira vers là. */
   porteur: number
@@ -256,6 +266,7 @@ uniform vec4 uCage;       // hockey : ligne de but, profondeur, demi-ouverture, 
 uniform float uCageEp;    // hockey : l'épaisseur des parois d'une cage
 uniform float uCoins;     // hockey : le rayon des coins du terrain (0 : des angles droits)
 uniform vec3 uMiseEnJeu;  // hockey : les cercles de zone — distance à la ligne de but, écart à l'axe, rayon
+uniform vec2 uLignes;     // hockey : les lignes bleues (distance à la rouge), le rayon du rond central
 uniform vec3 uAnneau;     // sumo : le centre de l'anneau et son rayon (0 : pas d'anneau)
 uniform vec4 uPalet;      // hockey : x, y, rayon, 1 s'il est en jeu
 uniform vec4 uPorteur;    // hockey : qui le tient (−1 : personne), sa charge, sa visée (x, y)
@@ -407,10 +418,10 @@ vec3 decor(vec2 monde, float px) {
     float axe = abs(monde.x - centre.x);
     fond += salle * rouge * 0.5 * (1.0 - smoothstep(2.0, 2.0 + fin, axe));
     float duCentre = length(monde - centre);
-    fond += salle * bleu * 0.55 * (1.0 - smoothstep(0.0, fin, abs(duCentre - 200.0)));
+    fond += salle * bleu * 0.55 * (1.0 - smoothstep(0.0, fin, abs(duCentre - uLignes.y)));
     fond += salle * bleu * 0.7 * (1.0 - smoothstep(10.0, 10.0 + fin, duCentre));
     // les lignes bleues
-    fond += salle * bleu * 0.75 * (1.0 - smoothstep(3.0, 3.0 + fin, abs(axe - 430.0)));
+    fond += salle * bleu * 0.75 * (1.0 - smoothstep(3.0, 3.0 + fin, abs(axe - uLignes.x)));
     // la ligne de but, d'un bord à l'autre
     float ligne = uCage.x;
     fond += salle * rouge * 0.42 * (1.0 - smoothstep(0.0, fin, abs(duFond - ligne)));
@@ -817,7 +828,8 @@ export class RenduMulti {
   private readonly texture: WebGLTexture
   private donnees: Float32Array
   /** Le rang, dans la palette, de la couleur du joueur 0 puis du joueur 1. */
-  couleurs: [number, number] = [0, 1]
+  /** La teinte de chaque canal (profil.ts, teintesDeLaPartie). */
+  teintes: Teinte[] = teintesDeLaPartie([0, 1], 2)
   private readonly eclats = new Float32Array(ECLATS_MAX * 4)
   private readonly coeurs = new Float32Array(CANAUX * 4)
   /** L'écart du regard de chaque corps à son cœur (voir tourneRegard), et
@@ -991,16 +1003,20 @@ export class RenduMulti {
     gl.activeTexture(gl.TEXTURE1)
     gl.bindTexture(gl.TEXTURE_2D, this.texStade)
     gl.uniform1i(gl.getUniformLocation(this.progEcran, 'uStade'), 1)
-    gl.uniform4f(gl.getUniformLocation(this.progEcran, 'uStadeRect'), STADE.minX, STADE.minY, STADE.largeur, STADE.hauteur)
+    // (la piste agrandie l'est depuis son coin, l'origine du monde : l'image
+    // aussi — sa rambarde suit le bord)
+    const k = scene?.echelle ?? 1
+    gl.uniform4f(gl.getUniformLocation(this.progEcran, 'uStadeRect'), STADE.minX * k, STADE.minY * k, STADE.largeur * k, STADE.hauteur * k)
     gl.uniform1f(gl.getUniformLocation(this.progEcran, 'uStadePret'), hockey && this.stade === 'pret' ? 1 : 0)
     gl.activeTexture(gl.TEXTURE0)
     gl.uniform2f(gl.getUniformLocation(this.progEcran, 'uCentre'), cadre.cx, cadre.cy)
     gl.uniform2f(gl.getUniformLocation(this.progEcran, 'uDemi'), cadre.demiL, cadre.demiH)
     gl.uniform4f(gl.getUniformLocation(this.progEcran, 'uSalle'), salle.minX, salle.minY, salle.maxX, salle.maxY)
-    // la couleur de chaque joueur : celle qu'il a choisie (les deux derniers
-    // canaux gardent des couleurs de la palette, pour la matière sans maître)
-    const teintes = [this.couleurs[0], this.couleurs[1], 2, 3].map((r) => PALETTE[r % PALETTE.length])
-    gl.uniform3fv(gl.getUniformLocation(this.progEcran, 'uCouleurs'), teintes.flat())
+    // la couleur de chaque joueur : celle qu'il a choisie ; à quatre, celle de
+    // son équipe, éclaircie pour l'équipier (profil.ts). (La matière sans
+    // maître se peint au canal 3 : au hockey il n'y en a jamais — tous les
+    // corps naissent à quelqu'un, et le solveur ne les en dépossède pas.)
+    gl.uniform3fv(gl.getUniformLocation(this.progEcran, 'uCouleurs'), this.teintes.flat())
     gl.uniform1f(gl.getUniformLocation(this.progEcran, 'uSeuil'), SEUIL)
     gl.uniform1f(gl.getUniformLocation(this.progEcran, 'uGain'), 1 / this.gain)
     gl.uniform1f(gl.getUniformLocation(this.progEcran, 'uPixel'), 1 / pixelsParUnite)
@@ -1014,6 +1030,7 @@ export class RenduMulti {
     gl.uniform1f(gl.getUniformLocation(this.progEcran, 'uCoins'), scene?.coins ?? 0)
     gl.uniform3f(gl.getUniformLocation(this.progEcran, 'uAnneau'), scene?.anneau?.x ?? 0, scene?.anneau?.y ?? 0, scene?.anneau?.rayon ?? 0)
     gl.uniform3f(gl.getUniformLocation(this.progEcran, 'uMiseEnJeu'), scene?.miseEnJeu.decalage ?? 0, scene?.miseEnJeu.ecart ?? 0, scene?.miseEnJeu.rayon ?? 0)
+    gl.uniform2f(gl.getUniformLocation(this.progEcran, 'uLignes'), scene?.lignes?.bleue ?? 430, scene?.lignes?.rond ?? 200)
     gl.uniform4f(gl.getUniformLocation(this.progEcran, 'uPalet'), palet?.x ?? 0, palet?.y ?? 0, palet?.rayon ?? 1, palet ? 1 : 0)
     gl.uniform2f(gl.getUniformLocation(this.progEcran, 'uPaletV'), palet?.vx ?? 0, palet?.vy ?? 0)
     const e = this.eclats

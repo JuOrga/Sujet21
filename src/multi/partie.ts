@@ -9,7 +9,7 @@
 import { DEFAULT_PARAMS, type SimParams } from '../sim/params'
 import { FixedLoop } from '../game/loop'
 import { FluidSimMulti, KIND_PLAYER, SANS_PROPRIO } from './solveurMulti'
-import { Hockey, TERRAIN } from './hockey'
+import { Hockey, patinoireDe } from './hockey'
 import type { Regle } from './regle'
 import { ARENE, Sumo } from './sumo'
 import {
@@ -17,6 +17,7 @@ import {
   MODE_LIBRE,
   MODE_SUMO,
   attributs,
+  corpsTrame,
   decodeParticules,
   encodeEtat,
   litEnteteEtat,
@@ -37,15 +38,24 @@ export const SALLE: Bornes = { minX: 0, minY: 0, maxX: 3840, maxY: 2160 }
 /** Le corps de départ : celui du jeu (900 particules), pour que le jet, le
  *  recul et la cohésion soient ceux qu'on connaît. */
 export const VOLUME_DEPART = 900
+/** LE 2 CONTRE 2 : des corps plus petits, pour que l'hôte simule à quatre
+ *  à peu près ce qu'il simule à deux (hockey.ts, ECHELLE_EQUIPES, dit la
+ *  mesure). */
+export const VOLUME_EQUIPES = 500
+/** Le volume de chaque corps dans une partie de `joueurs` joueurs. */
+export function volumeDe(joueurs: number): number {
+  return joueurs > 2 ? VOLUME_EQUIPES : VOLUME_DEPART
+}
 export const CAPACITE = 4096
 /** Où naît chaque joueur : face à face, à mi-hauteur. */
 export const DEPARTS: readonly { x: number; y: number }[] = [
   { x: SALLE.minX + (SALLE.maxX - SALLE.minX) * 0.25, y: (SALLE.minY + SALLE.maxY) / 2 },
   { x: SALLE.minX + (SALLE.maxX - SALLE.minX) * 0.75, y: (SALLE.minY + SALLE.maxY) / 2 },
 ]
-/** La salle d'un mode : le hockey a son terrain, plus court. */
-export function salleDe(mode: number): Bornes {
-  return mode === MODE_HOCKEY ? TERRAIN : mode === MODE_SUMO ? ARENE : SALLE
+/** La salle d'un mode : le hockey a son terrain, plus court — et plus
+ *  grand quand on y joue à quatre. */
+export function salleDe(mode: number, joueurs = 2): Bornes {
+  return mode === MODE_HOCKEY ? patinoireDe(joueurs).terrain : mode === MODE_SUMO ? ARENE : SALLE
 }
 /** Où naît le joueur j dans une salle : face à face, à mi-hauteur, au quart
  *  et aux trois quarts de la longueur. */
@@ -121,8 +131,8 @@ export class Hote {
     this.joueurs = joueurs
     this.params = { ...params, freezeSelfTime: GLACE_PRISE, thawTime: GLACE_FONTE, ejectSpeed: JET_MULTI }
     this.mode = mode
-    this.salle = salleDe(mode)
-    this.hockey = mode === MODE_HOCKEY ? new Hockey() : null
+    this.salle = salleDe(mode, joueurs)
+    this.hockey = mode === MODE_HOCKEY ? new Hockey(patinoireDe(joueurs)) : null
     this.regle = this.hockey ?? (mode === MODE_SUMO ? new Sumo() : null)
     this.commandes = []
     for (let j = 0; j < joueurs; j++) {
@@ -144,7 +154,7 @@ export class Hote {
       // c'est la règle du jeu qui dit où l'on engage (au hockey, un cercle
       // de mise en jeu : chacun face au palet, de son côté)
       const d = this.regle ? this.regle.depart(j) : departDe(this.salle, j)
-      sim.spawnDisc(d.x, d.y, VOLUME_DEPART, KIND_PLAYER)
+      sim.spawnDisc(d.x, d.y, volumeDe(this.joueurs), KIND_PLAYER)
     }
     sim.courant = 0
     sim.relabel()
@@ -154,7 +164,12 @@ export class Hote {
     return sim
   }
 
-  /** Une manche neuve : les deux corps reviennent à leur départ. */
+  /** Le nombre de joueurs de la partie (2, ou 4 en équipes). */
+  get nbJoueurs(): number {
+    return this.joueurs
+  }
+
+  /** Une manche neuve : les corps reviennent à leur départ. */
   recommence(): void {
     this.sim = this.naissance()
     this.regle?.recommence(this.sim)
@@ -368,6 +383,7 @@ export class Miroir {
   /** Le mode et la salle : c'est l'hôte qui les annonce, dans chaque image. */
   mode: number = MODE_LIBRE
   salle: Bornes = SALLE
+  private nbCorps = 2
   /** L'état du hockey de la dernière image complète, ou null. */
   private jeuRecu: JeuTrame | null = null
   private jeuEnCours: JeuTrame | null = null
@@ -394,9 +410,13 @@ export class Miroir {
   recoit(octets: Uint8Array, maintenant: number): boolean {
     const mode = modeTrame(octets)
     if (mode < 0) return false
-    if (mode !== this.mode) {
+    // la salle se lit au mode ET au nombre de corps : au hockey à quatre, la
+    // piste est plus grande, et les positions y sont rapportées
+    const nb = corpsTrame(octets)
+    if (mode !== this.mode || nb !== this.nbCorps) {
       this.mode = mode
-      this.salle = salleDe(mode)
+      this.nbCorps = nb
+      this.salle = salleDe(mode, nb)
     }
     const e = litEnteteEtat(octets, this.salle)
     if (!e) return false

@@ -26,7 +26,7 @@ export const TRAME_ETAT = 1
 export const TRAME_COMMANDE = 2
 /** La version du format : l'invité refuse une trame d'une autre version
  *  plutôt que de dessiner n'importe quoi. */
-export const VERSION_TRAME = 6
+export const VERSION_TRAME = 7
 
 /** Les particules par morceau d'état. Un canal de données porte au moins
  *  16 Ko par message sur tous les navigateurs ; 1 024 particules à six
@@ -119,13 +119,19 @@ export function particulesVides(capacite: number): Particules {
 
 const OCTETS_CORPS = 18
 const ENTETE_FIXE = 16
-const OCTETS_JEU = 27
+const OCTETS_JEU = 28
 
 /** Le mode de la partie, tel qu'il voyage (octet 3 de l'en-tête). L'invité
  *  l'apprend de l'hôte : c'est lui qui dit dans quelle salle on joue. */
 export const MODE_LIBRE = 0
 export const MODE_HOCKEY = 1
 export const MODE_SUMO = 2
+
+/** L'ÉQUIPE du joueur j : 0 défend la cage de gauche, 1 celle de droite. Au
+ *  duel c'est le joueur lui-même ; à quatre (le 2 contre 2 du hockey), 0 et
+ *  2 contre 1 et 3 — l'hôte et son équipier contre l'invité et le sien. Les
+ *  scores, le buteur et la couleur des cages sont ceux des équipes. */
+export const equipe = (j: number): number => j % 2
 
 /** Les phases d'une partie de hockey. */
 export const PHASE_JEU = 0
@@ -136,7 +142,7 @@ export const PHASE_FINI = 2
 export const PHASE_DECOMPTE = 3
 
 /** L'état du HOCKEY : le palet, qui le tient, et le score. Il est répété
- *  dans chaque morceau, comme l'état des corps — 22 octets. */
+ *  dans chaque morceau, comme l'état des corps — 28 octets. */
 export interface JeuTrame {
   /** Le jeu qu'on joue (MODE_HOCKEY, MODE_SUMO) : il décide de la salle. */
   mode: number
@@ -151,8 +157,12 @@ export interface JeuTrame {
   charge: number
   scores: [number, number]
   phase: number
-  /** Le dernier buteur (ou le vainqueur au temps), ou −1. */
+  /** La dernière ÉQUIPE à marquer (ou la gagnante au temps), ou −1. Au
+   *  duel, l'équipe EST le joueur. */
   buteur: number
+  /** HOCKEY : le JOUEUR qui a marqué le dernier but — le dernier à avoir eu
+   *  le palet, d'une équipe ou de l'autre (contre son camp) —, ou −1. */
+  marqueur?: number
   /** Le temps de jeu qui reste, en secondes. */
   chrono: number
   /** Ce qui reste du décompte de l'engagement, en secondes (0 hors décompte). */
@@ -161,6 +171,12 @@ export interface JeuTrame {
   enOr: boolean
   /** SUMO : le rayon de l'anneau, en unités monde (0 hors sumo). */
   anneau: number
+}
+
+/** Le nombre de corps qu'annonce un morceau d'état (sa validité se lit avec
+ *  modeTrame) : au hockey, à plus de deux on joue sur la grande piste. */
+export function corpsTrame(octets: Uint8Array): number {
+  return octets.length > 2 ? octets[2] : 0
 }
 
 /** Le mode qu'annonce un morceau d'état, ou −1 si ce n'en est pas un. */
@@ -234,6 +250,7 @@ export function encodeEtat(
       v.setUint16(o + 22, Math.round(borne(jeu.chrono, 0, 6000) * 10), true)
       v.setUint8(o + 24, Math.round(borne(jeu.decompte, 0, 25) * 10))
       v.setUint16(o + 25, Math.round(borne(jeu.anneau, 0, 6000) * 10), true)
+      v.setUint8(o + 27, (jeu.marqueur ?? -1) < 0 ? 255 : (jeu.marqueur as number))
       o += OCTETS_JEU
     }
     for (let k = 0; k < nombre; k++) {
@@ -315,6 +332,7 @@ export function litEnteteEtat(octets: Uint8Array, bornes: Bornes): EnteteEtat | 
     const tenu = v.getUint8(o + 16)
     const etat = v.getUint8(o + 20)
     const buteur = v.getUint8(o + 21)
+    const marqueur = v.getUint8(o + 27)
     jeu = {
       mode,
       paletX: v.getFloat32(o, true),
@@ -331,6 +349,7 @@ export function litEnteteEtat(octets: Uint8Array, bornes: Bornes): EnteteEtat | 
       chrono: v.getUint16(o + 22, true) / 10,
       decompte: v.getUint8(o + 24) / 10,
       anneau: v.getUint16(o + 25, true) / 10,
+      marqueur: marqueur === 255 ? -1 : marqueur,
     }
   }
   return { seq: v.getUint32(4, true), tSim: v.getFloat32(8, true), total, debut, nombre, corps, jeu }
