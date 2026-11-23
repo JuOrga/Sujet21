@@ -198,10 +198,12 @@ FAMILLES: list[Famille] = [
     ),
     Famille(
         # mesuré le 13/11 (qualité 82) : 167 Ko, luminance 0,29, 1 % de chauds
-        # (le volant de la vanne de secours, la zone du sur-régime)
+        # (le volant de la vanne de secours, la zone du sur-régime) ; le 23/11,
+        # passée à 8 × 5 pour la Tuyère et le Surpresseur : 178 Ko, mêmes
+        # luminance et chauds
         'planche des instruments', ('instruments-icones',), alpha=True, cote_max=4096,
         poids_max_ko=250,
-        note='8×4 cases de 256² — l’ordre est ORDRE_INSTRUMENTS (src/game/iconesStation.ts)',
+        note='8×5 cases de 256² — l’ordre est ORDRE_INSTRUMENTS (src/game/iconesStation.ts)',
     ),
     Famille(
         # mesuré le 13/11 (qualité 82) : les dos 20 à 21 Ko, les verres 33 Ko

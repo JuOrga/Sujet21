@@ -416,6 +416,12 @@ export class FluidSim {
   perteGrilleFactor = 1 // vapeur perdue dans les mailles d'un évent
   priseSasGlaceFactor = 1 // prise du courant du sas sur un palet
   glisseGlaceFactor = 1 // prise de l'hydrophile sur la glace
+  // LE JET LUI-MÊME (« tuyère », « surpresseur ») : le geste unique n'avait
+  // aucune carte. La VITESSE change ce que pousse chaque goutte — le
+  // rendement en volume ; le DÉBIT change combien partent par seconde — la
+  // nervosité, à rendement égal.
+  jetVitesseFactor = 1
+  jetDebitFactor = 1
   // Surchauffeurs déjà déchargés (indices de boîtes) — remis à neuf au
   // chargement du tableau. Le rendu lit ce même état pour le manomètre.
   readonly surchauffesVides = new Set<number>()
@@ -1369,7 +1375,11 @@ export class FluidSim {
   eject(aimX: number, aimY: number, dt: number): void {
     if (this.dispersed) return
     const p = this.params
-    this.ejectCarry += p.ejectRate * dt
+    this.ejectCarry += p.ejectRate * this.jetDebitFactor * dt
+    // la vitesse du jet, carte comprise : la goutte, l'entraînement du
+    // voisinage et donc le recul en découlent tous — la conservation reste
+    // exacte, seul ce que chaque goutte emporte change
+    const vJet = p.ejectSpeed * this.jetVitesseFactor
     while (this.ejectCarry >= 1) {
       this.ejectCarry -= 1
       if (this.playerCount <= 1) {
@@ -1424,8 +1434,8 @@ export class FluidSim {
 
       const departX = this.posX[best]
       const departY = this.posY[best]
-      const newVx = this.stats.velX + dirX * p.ejectSpeed
-      const newVy = this.stats.velY + dirY * p.ejectSpeed
+      const newVx = this.stats.velX + dirX * vJet
+      const newVy = this.stats.velY + dirY * vJet
       const dvx = newVx - this.velX[best]
       const dvy = newVy - this.velY[best]
       this.velX[best] = newVx
@@ -1467,7 +1477,7 @@ export class FluidSim {
           if (d2 >= R2 || d2 < 1e-6) continue
           const d = Math.sqrt(d2)
           const w = 1 - d / R
-          const a = (p.ejectSpeed * p.ejectEntrain * w) / d
+          const a = (vJet * p.ejectEntrain * w) / d
           const ax = dx * a
           const ay = dy * a
           this.velX[i] += ax
@@ -2385,6 +2395,8 @@ export class FluidSim {
     c.perteGrilleFactor = this.perteGrilleFactor
     c.priseSasGlaceFactor = this.priseSasGlaceFactor
     c.glisseGlaceFactor = this.glisseGlaceFactor
+    c.jetVitesseFactor = this.jetVitesseFactor
+    c.jetDebitFactor = this.jetDebitFactor
     c.iceDirty = true
     c.relabel()
     return c
