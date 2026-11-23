@@ -59,7 +59,10 @@ COLONNES_SCEAUX, RANGEES_SCEAUX = 3, 2
 CUVES = ['bonbonne', 'reserve', 'maitrise']
 ANNEAUX = ['intact', 'brise']
 # l'ORDRE des instruments : recopié de ORDRE_INSTRUMENTS (iconesStation.ts),
-# 8 × 4 cases de 256² — 24 instruments, 7 contreparties, la case 32 vide
+# 8 × 5 cases de 256² — les 31 cases du 13/11 (24 instruments, 7
+# contreparties), puis les cartes venues après, À LA SUITE : une carte
+# insérée dans le catalogue ne déplace aucun dessin. Les 7 dernières cases
+# restent vides pour les prochaines
 INSTRUMENTS = [
     'echantillon-secours', 'gaine-isolante', 'buse-calibree', 'aimant-rosee',
     'chambre-froide', 'peau-tendue', 'vanne-de-secours', 'plastron',
@@ -69,8 +72,10 @@ INSTRUMENTS = [
     'sur-regime', 'ration-de-survie', 'oeilleres', 'carnet-du-semblable',
     'fuite-lente', 'residu-collant', 'gaine-fendue', 'buse-encrassee',
     'bonbonne-percee', 'fuite-prioritaire', 'vapeur-eventee',
+    # les cartes du jet (23/11)
+    'tuyere', 'surpresseur',
 ]
-COLONNES_INSTR, RANGEES_INSTR, CASE_INSTR = 8, 4, 256
+COLONNES_INSTR, RANGEES_INSTR, CASE_INSTR = 8, 5, 256
 
 if DANS_BLENDER:
     import bpy, bmesh
@@ -1326,6 +1331,10 @@ if DANS_BLENDER:
         # le matelas de la gaine : la toile aluminisée de l'atelier (4a4f55)
         # sortait en boudin noir à 24 px
         mats['isolant'] = mat_simple('instr-isolant', (0x74, 0x7a, 0x80), rug=0.7, metal=0.2)
+        # le col de la tuyère : le sarcelle du voyant, mais assez fort pour
+        # ÉCLAIRER l'acier du divergent — c'est ce reflet qui fait la gorge
+        # (au voyant ordinaire, cloche inclinée de 32°, un reflet à peine vert)
+        mats['col'] = mat_simple('instr-col', (0x10, 0x40, 0x40), rug=0.3, emission=(0x5a, 0xf0, 0xe0), force=5.0)
         return mats
 
     def i_echantillon(at):
@@ -1695,6 +1704,66 @@ if DANS_BLENDER:
         for (x, z, r) in ((0.06, 0.13, 0.022), (0.09, 0.16, 0.03), (0.13, 0.19, 0.038), (0.03, 0.18, 0.02)):
             at.sphere('vapeur', (x, -0.02, z), r)
 
+    # ---- les cartes du jet (23/11), à la suite de la planche
+    def i_tuyere(at):
+        """la tuyère : une cloche de fusée, col étroit et divergent évasé, sa
+        chambre au-dessus, la lueur au fond du col. Debout, ouverte vers le
+        bas et vue d'en dessous : c'est l'ouverture et sa lueur qui la
+        disent — la buse calibrée, elle, est un cône couché qui souffle"""
+        # la chambre et le convergent, pleins jusqu'au col
+        at.tour('acier', [(0, 0.2), (0.064, 0.2), (0.072, 0.19), (0.072, 0.1), (0.05, 0.072), (0.036, 0.062), (0, 0.062)], var=0.2)
+        at.tore('clair', 0.073, 0.01, T(0, 0, 0.185), segr=8)
+        # le divergent, une coque mince : le profil extérieur descend, le
+        # profil intérieur remonte (une cloche : vite ouverte sous le col,
+        # presque droite à la sortie)
+        n = 14
+        ext = [(0.036 + 0.006 + 0.142 * (1 - (1 - k / n) ** 1.7), 0.064 - 0.24 * k / n) for k in range(n + 1)]
+        inte = [(r - 0.009, z) for r, z in reversed(ext)]
+        at.tour('acier', ext + inte, seg=64, ferme=True, var=0.1)
+        # deux cerclages de refroidissement, et la lèvre claire de la sortie
+        for k in (4, 9):
+            r, z = ext[k]
+            at.tore('sombre', r + 0.002, 0.007, T(0, 0, z), segr=8)
+        at.tore('clair', ext[-1][0] - 0.004, 0.008, T(0, 0, ext[-1][1]), segr=8)
+        # la lueur : le col qui luit, et c'est ELLE qui éclaire l'acier du
+        # divergent — du vif au fond vers le sourd à la lèvre. Une cloche peu
+        # profonde, inclinée à 42° : le col affleure derrière la lèvre. (À
+        # 24° et 38°, il restait caché ; à 50°, la cloche perdait son profil
+        # et passait pour un abat-jour ; un tapis cyan peint dedans pour
+        # compenser sortait en disque plat)
+        at.tour('col', [(0, 0.062), (0.04, 0.062), (0.04, 0.056), (0, 0.05)])
+        bord = [(r - 0.0095, z) for r, z in ext[0:4]]
+        at.tour('col', bord + [(r - 0.0012, z) for r, z in reversed(bord)], seg=64, ferme=True)
+        # l'arrivée des ergols, deux conduites sur la chambre
+        for s_ in (-1, 1):
+            at.tube('sombre', (s_ * 0.06, 0, 0.17), (s_ * 0.13, 0, 0.13), 0.014)
+            at.tube('sombre', (s_ * 0.13, 0, 0.13), (s_ * 0.13, 0, 0.02), 0.014)
+
+    def i_surpresseur(at):
+        """le surpresseur : un corps de pompe trapu à ailettes, une entrée
+        mince, une sortie LARGE à brides, et le voyant qui dit qu'il tourne.
+        Ni volant (la vanne de secours), ni cadran (le détendeur) : la
+        différence de calibre entre l'entrée et la sortie porte l'effet"""
+        at.tour('acier', [(0, -0.13), (0.105, -0.13), (0.112, -0.12), (0.112, 0.06), (0.104, 0.07), (0, 0.07)], var=0.2)
+        at.tour('clair', [(0, 0.068), (0.09, 0.068), (0.09, 0.085), (0.06, 0.1), (0, 0.102)], seg=48)
+        for z in (-0.095, -0.065, -0.035):
+            at.tore('sombre', 0.114, 0.008, T(0, 0, z), segr=8)
+        # le socle
+        at.boite('sombre', -0.15, 0.15, -0.16, -0.13, -0.09, 0.09)
+        # l'entrée : mince, à gauche, une petite bride
+        at.tube('acier', (-0.105, 0, -0.08), (-0.2, 0, -0.08), 0.02, seg=24)
+        at.tube('clair', (-0.205, 0, -0.08), (-0.185, 0, -0.08), 0.032, seg=24)
+        # la sortie : large, à droite, plus haut, sa grosse bride boulonnée
+        at.tube('acier', (0.1, 0, 0.0), (0.19, 0, 0.0), 0.05, seg=40)
+        at.tube('clair', (0.18, 0, 0.0), (0.21, 0, 0.0), 0.08, seg=40)
+        for k in range(6):
+            a = 2 * math.pi * (k + 0.5) / 6
+            at.sphere('sombre', (0.212, 0.064 * math.cos(a), 0.064 * math.sin(a)), 0.011, u=12, v=8)
+        # le voyant, serti dans la face (sur une plaque, premier essai, il
+        # brouillait le corps à 24 px)
+        at.tore('clair', 0.026, 0.007, T(-0.02, -0.108, 0.02) @ RX(90), segr=8)
+        at.sphere('voyant', (-0.02, -0.105, 0.02), 0.022)
+
     FABRIQUES_INSTR = {
         'echantillon-secours': (i_echantillon, 8, 18), 'gaine-isolante': (i_gaine, 14, -22),
         'buse-calibree': (i_buse, 0, -12), 'aimant-rosee': (i_aimant, 6, 12),
@@ -1712,6 +1781,8 @@ if DANS_BLENDER:
         'gaine-fendue': (c_gaine_fendue, 14, -22), 'buse-encrassee': (c_buse_encrassee, 0, -12),
         'bonbonne-percee': (c_bonbonne_percee, 10, 0), 'fuite-prioritaire': (c_fuite_prioritaire, 0, 0),
         'vapeur-eventee': (c_vapeur_eventee, 10, 0),
+        # (inclinée vers l'arrière : on voit sous la cloche, dans la lueur)
+        'tuyere': (i_tuyere, -42, 0), 'surpresseur': (i_surpresseur, 16, 0),
     }
 
     def instruments():
@@ -1736,8 +1807,9 @@ PLANCHES = {
 
 def assemble(planche_nom, dossier, sortie, controle=None):
     """les rendus détourés (alpha/<préfixe><nom>.png) réduits à la case de
-    la planche et assemblés ; et, si demandé, une planche de contrôle à 32 et
-    64 px sur le fond du voile, pour juger la lisibilité"""
+    la planche et assemblés ; et, si demandé, une planche de contrôle sur le
+    fond du voile, pour juger la lisibilité — à 32 et 64 px, et à 24 et 32
+    pour les instruments, qui s'affichent plus petit (ATH, cartes de tirage)"""
     from PIL import Image
     noms, colonnes, rangees, prefixe, case = PLANCHES[planche_nom]
     planche = Image.new('RGBA', (colonnes * case, rangees * case), (0, 0, 0, 0))
@@ -1756,7 +1828,7 @@ def assemble(planche_nom, dossier, sortie, controle=None):
         ctl = Image.new('RGBA', (colonnes * pas * 2, rangees * pas), fond)
         for i, im in enumerate(cases):
             x, y = (i % colonnes) * pas * 2, (i // colonnes) * pas
-            for k, cote in enumerate((32, 64)):
+            for k, cote in enumerate((24, 32) if planche_nom == 'instruments' else (32, 64)):
                 petit = im.convert('RGBa').resize((cote, cote), Image.LANCZOS).convert('RGBA')
                 ctl.alpha_composite(petit, (x + 8 + k * 44, y + (pas - cote) // 2))
         ctl.save(controle)

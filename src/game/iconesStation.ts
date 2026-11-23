@@ -41,14 +41,17 @@ export function iconeCeremonieHTML(id: IconeCeremonie, titre?: string): string {
   return `<i class="ico-ceremonie" style="--ic-x:${col};--ic-y:${rang}"${nom}></i>`
 }
 
-export const ICONES_INSTRUMENTS_URL = '/assets/instruments-icones.webp' // 8 × 4 cases de 256²
+export const ICONES_INSTRUMENTS_URL = '/assets/instruments-icones.webp' // 8 × 5 cases de 256²
 export const ICONES_INSTRUMENTS_COLONNES = 8
-export const ICONES_INSTRUMENTS_RANGEES = 4
+export const ICONES_INSTRUMENTS_RANGEES = 5
 
-/** L'ordre des cases : INSTRUMENTS puis CONTREPARTIES, tel que le catalogue les
- *  range au 13/11. Écrit EN TOUTES LETTRES, sans dériver du catalogue : une
- *  case ne doit pas changer de dessin parce qu'un instrument s'insère au
- *  milieu — la planche est un fichier, le catalogue bouge. */
+/** L'ordre des cases : les 31 premières sont INSTRUMENTS puis CONTREPARTIES,
+ *  tels que le catalogue les rangeait au 13/11 ; les cartes venues après
+ *  s'ajoutent À LA SUITE, quelle que soit leur place dans le catalogue (la
+ *  Tuyère et le Surpresseur y sont au milieu, ici en cases 32 et 33). Écrit
+ *  EN TOUTES LETTRES, sans dériver du catalogue : une case ne doit pas
+ *  changer de dessin parce qu'un instrument s'insère au milieu — la planche
+ *  est un fichier, le catalogue bouge. */
 export const ORDRE_INSTRUMENTS: readonly string[] = [
   'echantillon-secours', 'gaine-isolante', 'buse-calibree', 'aimant-rosee',
   'chambre-froide', 'peau-tendue', 'vanne-de-secours', 'plastron',
@@ -59,7 +62,19 @@ export const ORDRE_INSTRUMENTS: readonly string[] = [
   // les sept contreparties
   'fuite-lente', 'residu-collant', 'gaine-fendue', 'buse-encrassee',
   'bonbonne-percee', 'fuite-prioritaire', 'vapeur-eventee',
+  // les cartes du jet (23/11), à la suite
+  'tuyere', 'surpresseur',
 ]
+
+/** LES CARTES QUI ATTENDENT LEUR DESSIN : livrées après la planche, elles
+ *  n'ont pas encore de case et se montrent par leur emoji. La planche se
+ *  rend dans Blender, sur le poste du concepteur (docs/assets-ia.md, 36d) —
+ *  pas depuis une session d'analyse. Une carte n'entre ici QUE nommée : le
+ *  test exige toujours une case de toutes les autres. Quand la planche est
+ *  refaite, la carte passe dans ORDRE_INSTRUMENTS (à la suite : les cases
+ *  34 à 40 sont libres ; au-delà, une sixième rangée) et sort de cette
+ *  liste. Vide depuis le 23/11 (la Tuyère et le Surpresseur ont leur case). */
+export const INSTRUMENTS_SANS_CASE: readonly string[] = []
 
 /** La case d'un instrument, ou null s'il n'en a pas (carte « perso », ou
  *  instrument ajouté plus tard : on retombe alors sur son emoji). */

@@ -117,6 +117,8 @@ describe('Instruments — pas de carte d’un état verrouillé', () => {
     'peau-tendue': 'tout',
     'vanne-de-secours': 'tout',
     plastron: 'tout',
+    tuyere: 'tout', // le jet est le geste du liquide, toujours là
+    surpresseur: 'tout',
     detendeur: 'vapeur',
     'patins-de-givre': 'glace',
     'lentille-de-visee': 'vapeur',

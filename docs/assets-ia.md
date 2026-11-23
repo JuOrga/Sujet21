@@ -2567,10 +2567,15 @@ des icônes.
 
 ### 36d. Les instruments — `instruments-icones.webp` ✅ LIVRÉ (13/11)
 
-**2048×1024 · transparente · 8 × 4 cases de 256²**, dans l'ordre de
-`ORDRE_INSTRUMENTS` (`src/game/iconesStation.ts`) : 24 instruments, puis les
-7 contreparties, la case 32 vide. L'ordre est recopié dans la liste
-`INSTRUMENTS` de `ceremonie.py`, et le test d'ordre la compare au TS.
+**2048×1280 · transparente · 8 × 5 cases de 256²** (8 × 4 jusqu'au 23/11),
+dans l'ordre de `ORDRE_INSTRUMENTS` (`src/game/iconesStation.ts`) : les 31
+cases du 13/11 — 24 instruments, puis les 7 contreparties, dans l'ordre du
+catalogue d'alors —, puis les cartes venues après, **à la suite** : la
+Tuyère (case 32) et le Surpresseur (case 33), bien qu'elles s'insèrent au
+milieu du catalogue. Une carte nouvelle ne déplace aucun dessin ; les cases
+34 à 40 attendent les prochaines (`INSTRUMENTS_SANS_CASE` garde leur emoji
+d'ici là). L'ordre est recopié dans la liste `INSTRUMENTS` de
+`ceremonie.py`, et le test d'ordre la compare au TS.
 
 **Chaque instrument est un objet de l'atelier qui dit son effet** (le nom et
 la description de `instruments.ts`) : l'échantillon de secours, une
@@ -2588,7 +2593,12 @@ chambre étanche, une porte ronde à crabots, sa vapeur au hublot ; le tamis
 fin ; les semelles polies ; l'éclateur, une charge et ses éclats ; le croc
 du sas ; le sur-régime, un compte-tours collé dans sa zone qui luit ; la
 ration de survie, une conserve ; les œillères, deux verres et leurs volets ;
-le carnet du Semblable, un carnet relié à l'octogone. **Les contreparties
+le carnet du Semblable, un carnet relié à l'octogone ; la tuyère, une
+cloche de fusée debout, col étroit et divergent évasé, vue d'en dessous :
+la lueur du col affleure derrière la lèvre et éclaire la gorge en sarcelle
+(la buse calibrée, elle, est un cône couché qui souffle) ; le surpresseur,
+un corps de pompe trapu à ailettes, une entrée mince, une sortie large à
+grosse bride boulonnée et un voyant serti — ni volant, ni cadran. **Les contreparties
 sont du même acier, abîmé** : une gourde percée qui goutte, une plaque prise
 dans un gras noir, la gaine fendue d'où sort le givre, la buse encrassée, la
 bonbonne percée qui fuit, une antenne encrassée qui vous traque, une
@@ -2596,11 +2606,16 @@ bonbonne de gaz à la vanne cassée.
 
 **Pour l'affichage PETIT** (cartes de tirage, ATH, journal, canvas du module)
 : peu de pièces, une silhouette franche, et chaque objet agrandi jusqu'à
-remplir sa case (`DEMI_INSTR`). Jugé sur une planche réduite à 24 et 32 px.
+remplir sa case (`DEMI_INSTR`). Jugé sur une planche réduite à 24 et 32 px
+(la planche de contrôle de l'assemblage, à ces deux tailles depuis le 23/11).
 Ce que ce jugement a changé : l'acier encrassé des contreparties (premier
 essai à `2e3234`) et le matelas de la gaine sortaient noirs à 24 px —
 éclaircis ; l'antenne montrait son dos ; la maille du tamis, trop fine, se
-lisait en grisaille. Même acier, même lumière, mêmes accents (sarcelle et
+lisait en grisaille. La tuyère (23/11) : inclinée de 24° puis 38°, son col
+restait caché derrière la lèvre — une cloche éteinte ; un tapis cyan peint
+dedans sortait en disque plat ; à 50°, elle perdait son profil et passait
+pour un abat-jour. Retenu : 42°, une cloche moins profonde, et un col assez
+lumineux (`col`, 5× le voyant) pour éclairer l'acier lui-même. Même acier, même lumière, mêmes accents (sarcelle et
 cyan pour ce qui luit, l'or seulement pour la zone du sur-régime) que la
 planche de cérémonie.
 
@@ -2617,6 +2632,15 @@ python3 tools/images/prepare.py instruments-icones
 **Mesuré à la livraison** : luminance 0,29, 1 % de pixels chauds, bord
 vide, **167 Ko** (qualité 82) ; au moins 14 px transparents autour de chaque
 objet dans sa case de 256.
+
+**Mesuré au passage à 8 × 5 (23/11)** : luminance 0,29, 1 % de chauds, bord
+vide, **178 Ko** (181 828 octets, qualité 82) ; 14 px de marge au moins dans
+les 33 cases, les cases 34 à 40 vides. Les rendus du 13/11 n'existaient plus
+(`masters/` ne voyage pas) : les 33 cases ont été rendues à nouveau, et les
+31 anciennes comparées à la planche livrée — alpha identique au pixel près,
+couleurs à 1,9/255 en moyenne avant compression, quand la compression q82
+seule en coûte 1,75 ; d'un webp livré à l'autre, 1,1/255 en moyenne, 1,9
+au pire (le tamis fin, sa maille) — le grain de la compression, pas un dessin qui bouge.
 
 ### 36e. Les deux scènes de fin — `fin-capsule.webp`, `fin-fiole-brisee.webp` ✅ LIVRÉ (13/11)
 
