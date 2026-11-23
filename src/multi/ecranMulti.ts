@@ -19,25 +19,23 @@ import { ALPHABET_CODE, litCodePartie, LONGUEUR_CODE } from './code'
 import { CADENCE_ETAT, CAPACITE, Hote, Miroir, SALLE } from './partie'
 import {
   BUTS_POUR_GAGNER,
-  CERCLE_DECALAGE,
-  CERCLE_ECART,
   DEMI_FOND,
   DEMI_OUVERTURE,
   EPAISSEUR_CAGE,
-  LIGNE_BUT,
-  POTEAUX,
   PROFONDEUR_CAGE,
   RAYON_CERCLE,
-  RAYON_COINS,
   RAYON_PALET,
   RAYON_POTEAU,
+  patinoireDe,
+  poteauxDe,
+  type Patinoire,
 } from './hockey'
 import { Robot } from './robot'
 import { ARENE, MANCHES_POUR_GAGNER } from './sumo'
 import { commandeManette, defileCaractere, ligneLocale, ligneManettes, litManette, litMenu, manettesDuLocal, nouvelEtatManette, nouvelEtatMenu, voisinMenu, type PadLu, type PadVu } from './manetteMulti'
 import { adresseRelais, creePartie, liaisonPossible, rejointPartie, type EtatLiaison, type Liaison, type Ordre } from './relais'
-import { NOMS_COULEURS, PALETTE, PSEUDO_MAX, chargeProfil, couleursDeLaPartie, gardeProfil, litProfil, nettoiePseudo, type Profil } from './profil'
-import { DUREE_ECLAT, ECLATS_MAX, RenduMulti, coeursDe, couleurCss, type Eclat, type SceneHockey } from './renduMulti'
+import { NOMS_COULEURS, PALETTE, PSEUDO_MAX, chargeProfil, couleursDeLaPartie, gardeProfil, litProfil, nettoiePseudo, teintesDeLaPartie, type Profil, type Teinte } from './profil'
+import { DUREE_ECLAT, ECLATS_MAX, RenduMulti, coeursDe, couleurCss, teinteCss, type Eclat, type SceneHockey } from './renduMulti'
 import { SonsMulti, chiffreDecompte, entend, type Instantane } from './sonsMulti'
 import {
   MODE_HOCKEY,
@@ -50,6 +48,7 @@ import {
   VERSION_TRAME,
   decodeCommande,
   encodeCommande,
+  equipe,
   type Bornes,
   type Commande,
   type CorpsTrame,
@@ -191,6 +190,10 @@ const STYLE = `
 .mu-voile h3 { margin: 0; font-family: var(--font-display, sans-serif); font-weight: 400; font-size: 2.4em; letter-spacing: 0.14em; }
 .mu-voile h3:empty { display: none; }
 .mu-modes { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 0; }
+/* LE FORMAT du hockey : sous les modes, deux onglets, plus discrets */
+.mu-modes.mu-formats { grid-template-columns: 1fr 1fr; margin-top: -2px; }
+#multi .mu-formats button { padding: 0.55em 0.5em; font-size: 0.82em; }
+.mu-formats[hidden] { display: none; }
 #multi .mu-modes button { padding: 0.75em 0.5em; opacity: 0.6; font-family: var(--font-display, sans-serif); letter-spacing: 0.16em; }
 #multi .mu-modes button + button { border-left-width: 0; }
 #multi .mu-modes button[data-choisi="1"] { color: var(--ink, #d9ecf7); background: rgba(143, 211, 255, 0.22); }
@@ -204,8 +207,32 @@ const STYLE = `
 `
 
 /** Les poteaux du hockey, tels que l'écran les dessine et que les sons les
- *  écoutent. */
-const POTEAUX_VUS = POTEAUX.map((q) => ({ x: q.x, y: q.y, rayon: RAYON_POTEAU }))
+ *  écoutent — ceux de la piste du duel, puis de la grande. */
+const POTEAUX_VUS = new Map<Patinoire, { x: number; y: number; rayon: number }[]>()
+function poteauxVus(pat: Patinoire): { x: number; y: number; rayon: number }[] {
+  let vus = POTEAUX_VUS.get(pat)
+  if (!vus) {
+    vus = poteauxDe(pat).map((q) => ({ x: q.x, y: q.y, rayon: RAYON_POTEAU }))
+    POTEAUX_VUS.set(pat, vus)
+  }
+  return vus
+}
+/** Le FORMAT du hockey, gardé dans ce navigateur d'une visite à l'autre. */
+const CLE_FORMAT = 'sujet21-multi-format'
+function chargeEquipes(): boolean {
+  try {
+    return localStorage.getItem(CLE_FORMAT) === '2c2'
+  } catch {
+    return false
+  }
+}
+function gardeEquipes(oui: boolean): void {
+  try {
+    localStorage.setItem(CLE_FORMAT, oui ? '2c2' : '1c1')
+  } catch {
+    // sans gravité : le choix vaudra pour cette visite
+  }
+}
 
 const GABARIT = `
 <div class="mu-salon mu-accueil" data-page="salon">
@@ -223,14 +250,18 @@ const GABARIT = `
       <button type="button" data-mode="2" data-choisi="0">SUMO</button>
       <button type="button" data-mode="0" data-choisi="0">LIBRE</button>
     </div>
+    <div class="mu-modes mu-formats" role="group" aria-label="Le format du hockey" data-formats>
+      <button type="button" data-format="1c1" data-choisi="1">1 CONTRE 1</button>
+      <button type="button" data-format="2c2" data-choisi="0">2 CONTRE 2</button>
+    </div>
     <p class="mu-desc" data-desc-mode></p>
   </section>
   <section class="mu-bloc">
     <span class="mu-rubrique">JOUER</span>
     <div class="mu-jouer">
       <button type="button" data-geste="robot"><b>CONTRE L’ORDINATEUR</b><span data-note-robot>tout de suite</span></button>
-      <button type="button" data-geste="local"><b>À DEUX SUR CET ÉCRAN</b><span>une manette par joueur</span></button>
-      <button type="button" data-geste="creer"><b>CRÉER UNE PARTIE EN LIGNE</b><span>vous donnez un code</span></button>
+      <button type="button" data-geste="local"><b>À DEUX SUR CET ÉCRAN</b><span data-note-local>une manette par joueur</span></button>
+      <button type="button" data-geste="creer"><b>CRÉER UNE PARTIE EN LIGNE</b><span data-note-creer>vous donnez un code</span></button>
       <button type="button" data-geste="rejoindre"><b>REJOINDRE UNE PARTIE</b><span>vous tapez un code</span></button>
     </div>
   </section>
@@ -285,6 +316,8 @@ const GABARIT = `
   <div class="mu-ath">
     <div class="mu-jauge" data-jauge="0"><i></i><div class="mu-barre"><u></u></div><b>100 %</b><small></small></div>
     <div class="mu-jauge" data-jauge="1"><i></i><div class="mu-barre"><u></u></div><b>100 %</b><small></small></div>
+    <div class="mu-jauge" data-jauge="2" hidden><i></i><div class="mu-barre"><u></u></div><b>100 %</b><small></small></div>
+    <div class="mu-jauge" data-jauge="3" hidden><i></i><div class="mu-barre"><u></u></div><b>100 %</b><small></small></div>
     <div class="mu-lien" data-lien></div>
   </div>
   <div class="mu-flash" data-flash></div>
@@ -320,6 +353,8 @@ export function creeEcranMulti(quitte: () => void): EcranMulti {
   /** Le mode choisi au salon, pour la partie qu'on crée. */
   // le hockey d'abord : c'est le jeu ; le mode libre est un bac à sable
   let modeChoisi: number = MODE_HOCKEY
+  /** LE 2 CONTRE 2 (hockey) : chaque humain a un robot pour équipier. */
+  let equipesChoisies = chargeEquipes()
   let rafId = 0
   let dernier = 0
   let resteEnvoi = 0
@@ -341,8 +376,10 @@ export function creeEcranMulti(quitte: () => void): EcranMulti {
   /** Le cœur du corps qu'on pilote, à la dernière image : la manette vise
    *  autour de lui. */
   const monCoeur = { x: 0, y: 0, connu: false }
-  // CONTRE L'ORDINATEUR : le robot tient le corps 1 (robot.ts).
-  let robot: Robot | null = null
+  // LES ROBOTS (robot.ts). CONTRE L'ORDINATEUR, l'un tient le corps 1 ; au
+  // 2 CONTRE 2, ils tiennent aussi les équipiers (corps 2 et 3) — sauf ceux
+  // qu'un humain pilote.
+  let robots: Robot[] = []
   // À DEUX SUR CET ÉCRAN : le second joueur a sa manette, et son réticule.
   const manette2 = nouvelEtatManette()
   const coeur2 = { x: 0, y: 0, connu: false }
@@ -365,27 +402,43 @@ export function creeEcranMulti(quitte: () => void): EcranMulti {
   let profilAutre: Profil | null = null
   /** Le rang, dans la palette, de la couleur du joueur 0 puis du joueur 1. */
   let couleurs: [number, number] = [0, 1]
-  const teinte = (j: number): string => couleurCss(couleurs[j] ?? j)
-  /** Recalcule qui porte quelle couleur. L'hôte est le joueur 0. */
+  /** Le nombre de corps de la partie : 2, ou 4 au 2 contre 2. L'invité
+   *  l'apprend des images de l'hôte. */
+  let nbCorps = 2
+  let teintes: Teinte[] = teintesDeLaPartie(couleurs, 2)
+  const teinte = (j: number): string => (teintes[j] ? teinteCss(teintes[j]) : couleurCss(j))
+  /** Recalcule qui porte quelle couleur. L'hôte est le joueur 0 ; au 2 contre
+   *  2, chaque équipier porte la couleur de son équipe, éclaircie. */
   function accordeCouleurs(): void {
     const autre: Profil = profilAutre ?? { pseudo: '', couleur: (monProfil.couleur + 1) % PALETTE.length }
     couleurs = role === 'invite' ? couleursDeLaPartie(autre, monProfil) : couleursDeLaPartie(monProfil, autre)
-    if (rendu) rendu.couleurs = couleurs
+    teintes = teintesDeLaPartie(couleurs, nbCorps)
+    if (rendu) rendu.teintes = teintes
   }
+  /** Joue-t-on en équipes ? (quatre corps) */
+  const aQuatre = (): boolean => nbCorps > 2
   /** Au salon : le mode choisi est marqué, UNE ligne le décrit, et
    *  l'ordinateur ne s'offre qu'où il sait jouer (au mode libre il n'y a
    *  rien à gagner : il resterait immobile). */
   function peintMode(r: HTMLElement): void {
     for (const e of r.querySelectorAll<HTMLElement>('button[data-mode]')) e.dataset.choisi = Number(e.dataset.mode) === modeChoisi ? '1' : '0'
+    // le format ne vaut qu'au hockey
+    const equipes = modeChoisi === MODE_HOCKEY && equipesChoisies
+    r.querySelector<HTMLElement>('[data-formats]')!.hidden = modeChoisi !== MODE_HOCKEY
+    for (const e of r.querySelectorAll<HTMLElement>('button[data-format]')) e.dataset.choisi = (e.dataset.format === '2c2') === equipesChoisies ? '1' : '0'
+    r.querySelector<HTMLElement>('[data-note-local]')!.textContent = equipes ? 'chacun avec un robot' : 'une manette par joueur'
+    r.querySelector<HTMLElement>('[data-note-creer]')!.textContent = equipes ? 'chacun avec un robot · un code' : 'vous donnez un code'
     r.querySelector<HTMLElement>('[data-desc-mode]')!.textContent =
       modeChoisi === MODE_HOCKEY
-        ? `Un palet, deux cages, quatre poteaux. Le premier à ${BUTS_POUR_GAGNER} buts gagne.`
+        ? equipes
+          ? `Deux contre deux sur une piste plus grande : chacun a un robot pour équipier. Le premier à ${BUTS_POUR_GAGNER} buts gagne.`
+          : `Un palet, deux cages, quatre poteaux. Le premier à ${BUTS_POUR_GAGNER} buts gagne.`
         : modeChoisi === MODE_SUMO
           ? `Un anneau qui se resserre : poussez l’autre dehors. ${MANCHES_POUR_GAGNER} manches gagnantes.`
           : 'Une grande salle vide, pour essayer les gestes. Rien à gagner.'
     const robot = r.querySelector<HTMLButtonElement>('[data-geste="robot"]')!
     robot.disabled = modeChoisi === MODE_LIBRE
-    r.querySelector<HTMLElement>('[data-note-robot]')!.textContent = modeChoisi === MODE_LIBRE ? 'au hockey et au sumo' : 'tout de suite'
+    r.querySelector<HTMLElement>('[data-note-robot]')!.textContent = modeChoisi === MODE_LIBRE ? 'au hockey et au sumo' : equipes ? 'vous et un robot contre deux' : 'tout de suite'
   }
   /** Au salon : la pastille de ma couleur est marquée. */
   function peintProfil(r: HTMLElement): void {
@@ -394,10 +447,25 @@ export function creeEcranMulti(quitte: () => void): EcranMulti {
   /** Le nom du joueur j, tel qu'on l'écrit à l'écran. */
   function nom(j: number): string {
     if (j === moi && role !== 'local') return monProfil.pseudo ? `${monProfil.pseudo.toUpperCase()} (VOUS)` : 'VOUS'
+    // au 2 contre 2, les corps 2 et 3 sont des robots, équipiers des joueurs 0 et 1
+    if (j >= 2) {
+      if (role === 'local') return j === 2 ? 'ROBOT DU J1' : 'ROBOT DU J2'
+      if (equipe(j) === equipe(moi)) return 'VOTRE ÉQUIPIER'
+      return role === 'robot' ? 'ORDINATEUR 2' : 'SON ÉQUIPIER'
+    }
     if (role === 'local') return j === 0 ? 'JOUEUR 1' : 'JOUEUR 2'
     if (role === 'seul') return 'L’AUTRE CORPS'
-    if (role === 'robot') return 'L’ORDINATEUR'
+    if (role === 'robot') return aQuatre() ? 'ORDINATEUR 1' : 'L’ORDINATEUR'
     return profilAutre?.pseudo ? profilAutre.pseudo.toUpperCase() : 'VOTRE AMI'
+  }
+  /** Le nom d'une ÉQUIPE : au duel, celui de son joueur ; à quatre, l'équipe
+   *  du joueur humain qui la mène. */
+  function nomEquipe(t: number): string {
+    if (!aQuatre()) return nom(t)
+    if (role === 'local') return t === 0 ? 'ÉQUIPE J1' : 'ÉQUIPE J2'
+    if (t === equipe(moi)) return 'VOTRE ÉQUIPE'
+    if (role === 'robot') return 'L’ORDINATEUR'
+    return `L’ÉQUIPE DE ${nom(t)}`
   }
   // LE DASH : son bouton, tenu au clavier (Maj), à l'écran ou à la manette —
   // c'est l'hôte qui en lit l'appui.
@@ -468,6 +536,13 @@ export function creeEcranMulti(quitte: () => void): EcranMulti {
         // celui qui rejoint l'apprend de l'hôte
         const voulu = Number(m.dataset.mode)
         modeChoisi = voulu === MODE_HOCKEY || voulu === MODE_SUMO ? voulu : MODE_LIBRE
+        peintMode(r)
+        return
+      }
+      const f = (ev.target as HTMLElement).closest<HTMLButtonElement>('button[data-format]')
+      if (f) {
+        equipesChoisies = f.dataset.format === '2c2'
+        gardeEquipes(equipesChoisies)
         peintMode(r)
         return
       }
@@ -816,12 +891,20 @@ export function creeEcranMulti(quitte: () => void): EcranMulti {
       voile('L’affichage n’a pas pu démarrer sur cette machine (WebGL2 indisponible).')
       return
     }
+    // LE 2 CONTRE 2 : au hockey, si on l'a choisi — sauf seul, où l'on
+    // pilote les corps un à un. L'invité, lui, l'apprend de l'hôte.
+    const quatre = modeChoisi === MODE_HOCKEY && equipesChoisies && r !== 'seul' && r !== 'invite'
     if (r === 'invite') {
       miroir = new Miroir()
+      nbCorps = 2
     } else {
-      hote = new Hote(2, undefined, modeChoisi)
+      hote = new Hote(quatre ? 4 : 2, undefined, modeChoisi)
+      nbCorps = hote.nbJoueurs
     }
-    robot = r === 'robot' ? new Robot(1) : null
+    // les robots : l'adversaire contre l'ordinateur, et à quatre les équipiers
+    robots = []
+    if (r === 'robot') robots.push(new Robot(1))
+    if (quatre) robots.push(new Robot(2), new Robot(3))
     accordeCouleurs()
     instantane = null
     eclats.length = 0
@@ -1005,6 +1088,11 @@ export function creeEcranMulti(quitte: () => void): EcranMulti {
       liaison?.envoieFlux(encodeCommande(++seqCommande, commande))
       particules = miroir!.vue(maintenant)
       corps = miroir!.corps
+      // le 2 contre 2 se lit au nombre de corps : les couleurs suivent
+      if (corps.length > 0 && corps.length !== nbCorps) {
+        nbCorps = corps.length
+        accordeCouleurs()
+      }
       jeu = miroir!.jeu(maintenant)
       salle = miroir!.salle
     } else {
@@ -1014,9 +1102,9 @@ export function creeEcranMulti(quitte: () => void): EcranMulti {
       // de son interrupteur ; il vise où vise le pointeur (au hockey, c'est
       // par là qu'il lancerait le palet)
       if (role === 'seul') h.commande(1 - moi, { pousse: false, ouvert: autreOuvert, x: commande.x, y: commande.y })
-      // CONTRE L'ORDINATEUR : le robot joue le corps 1, avec les commandes
-      // d'un joueur
-      if (robot) h.commande(1, dessine ? robot.commande(h, dt) : { pousse: false, ouvert: false, x: 0, y: 0 })
+      // LES ROBOTS jouent leur corps avec les commandes d'un joueur : contre
+      // l'ordinateur le corps 1, au 2 contre 2 les équipiers
+      for (const rb of robots) h.commande(rb.joueur, dessine ? rb.commande(h, dt) : { pousse: false, ouvert: false, x: 0, y: 0 })
       // À DEUX SUR CET ÉCRAN : la manette du second joueur
       if (role === 'local') {
         litManette(padDuSecond, manette2)
@@ -1048,7 +1136,7 @@ export function creeEcranMulti(quitte: () => void): EcranMulti {
       jeu,
       salle,
       rayonPalet: jeu ? RAYON_PALET : 0,
-      poteaux: jeu?.mode === MODE_HOCKEY ? POTEAUX_VUS : undefined,
+      poteaux: jeu?.mode === MODE_HOCKEY ? poteauxVus(patinoireDe(corps.length)) : undefined,
     }
     const entendus = entend(instantane, apres, moi)
     instantane = apres
@@ -1104,8 +1192,12 @@ export function creeEcranMulti(quitte: () => void): EcranMulti {
     // dessus, on n'en voyait que la rambarde et un rang de spectateurs. La
     // piste y perd 9 % de sa taille à l'écran.)
     const stade = jeu?.mode === MODE_HOCKEY
+    // (la piste du 2 contre 2 est plus grande : ses marges aussi, que le
+    // stade garde sa place autour d'elle)
+    const pat = patinoireDe(corps.length)
+    const k = pat.echelle
     const terrainEtMarges: Bornes = stade
-      ? { minX: salle.minX - 150, minY: salle.minY - 300, maxX: salle.maxX + 150, maxY: salle.maxY + 260 }
+      ? { minX: salle.minX - 150 * k, minY: salle.minY - 300 * k, maxX: salle.maxX + 150 * k, maxY: salle.maxY + 260 * k }
       : { minX: salle.minX, minY: salle.minY - 150, maxX: salle.maxX, maxY: salle.maxY + 90 }
     const voulu = jeu ? cadreSalle(terrainEtMarges, rendu.aspect()) : corps.length > 0 ? cadreVoulu(corps, salle, rendu.aspect()) : cadre
     cadre = suitCadre(cadre, voulu, dt)
@@ -1115,13 +1207,15 @@ export function creeEcranMulti(quitte: () => void): EcranMulti {
       const porteur = corps[jeu.tenuPar]
       scene = {
         // la patinoire, ses cercles et ses cages : au hockey seulement
-        coins: hockey ? RAYON_COINS : 0,
-        miseEnJeu: { decalage: CERCLE_DECALAGE, ecart: CERCLE_ECART, rayon: RAYON_CERCLE },
-        cage: { ligne: hockey ? LIGNE_BUT : 0, profondeur: PROFONDEUR_CAGE, demiOuverture: DEMI_OUVERTURE, demiFond: DEMI_FOND, epaisseur: EPAISSEUR_CAGE },
+        coins: hockey ? pat.coins : 0,
+        miseEnJeu: { decalage: pat.cercleDecalage, ecart: pat.cercleEcart, rayon: RAYON_CERCLE },
+        cage: { ligne: hockey ? pat.ligneBut : 0, profondeur: PROFONDEUR_CAGE, demiOuverture: DEMI_OUVERTURE, demiFond: DEMI_FOND, epaisseur: EPAISSEUR_CAGE },
+        lignes: { bleue: pat.ligneBleue, rond: pat.rondCentral },
+        echelle: pat.echelle,
         // l'anneau : au sumo seulement
         anneau: jeu.mode === MODE_SUMO ? { x: (ARENE.minX + ARENE.maxX) / 2, y: (ARENE.minY + ARENE.maxY) / 2, rayon: jeu.anneau } : null,
         palet: jeu.paletActif ? { x: jeu.paletX, y: jeu.paletY, rayon: RAYON_PALET, vx: jeu.paletVx, vy: jeu.paletVy } : null,
-        poteaux: hockey ? POTEAUX_VUS : [],
+        poteaux: hockey ? poteauxVus(pat) : [],
         porteur: porteur ? jeu.tenuPar : -1,
         charge: jeu.charge,
         viseeX: porteur?.viseeX ?? 0,
@@ -1376,12 +1470,19 @@ export function creeEcranMulti(quitte: () => void): EcranMulti {
     const chiffre = jeu.phase === PHASE_DECOMPTE ? String(chiffreDecompte(jeu.decompte)) : ''
     grand.hidden = chiffre === ''
     if (grand.textContent !== chiffre) grand.textContent = chiffre
-    const quiMarque = jeu.buteur >= 0 ? nom(jeu.buteur) : ''
+    // QUI MARQUE : au duel, le joueur (c'est son équipe) ; à quatre, celui
+    // qui a eu le palet le dernier — ou son équipe, si personne ne l'a eu
+    const m = jeu.marqueur ?? -1
+    const quiMarque =
+      jeu.buteur < 0 ? '' : !aQuatre() ? nom(jeu.buteur) : m < 0 ? nomEquipe(jeu.buteur) : equipe(m) !== jeu.buteur ? `${nom(m)} — CONTRE SON CAMP` : nom(m)
+    const gagnant = jeu.buteur >= 0 ? nomEquipe(jeu.buteur) : ''
     const mot =
       jeu.phase === PHASE_FINI
-        ? jeu.buteur === moi && role !== 'local'
-          ? 'VOUS GAGNEZ'
-          : `${quiMarque} GAGNE`
+        ? jeu.buteur === equipe(moi) && role !== 'local'
+          ? aQuatre()
+            ? 'VOTRE ÉQUIPE GAGNE'
+            : 'VOUS GAGNEZ'
+          : `${gagnant} GAGNE`
         : jeu.phase === PHASE_BUT
           ? sumo
             ? jeu.buteur < 0
@@ -1392,8 +1493,8 @@ export function creeEcranMulti(quitte: () => void): EcranMulti {
     // LA FIN DU MATCH : le résultat en grand, et la revanche en un clic. Le
     // panneau se retire de lui-même quand la revanche commence.
     if (jeu.phase === PHASE_FINI && !finAffichee && el<HTMLElement>('[data-voile]').hidden) {
-      const titre = role === 'seul' ? 'FIN DU MATCH' : role === 'local' ? `${nom(jeu.buteur)} GAGNE` : jeu.buteur === moi ? 'VICTOIRE' : 'DÉFAITE'
-      voile(`${nom(0)}  ${jeu.scores[0]} — ${jeu.scores[1]}  ${nom(1)}`, titre)
+      const titre = role === 'seul' ? 'FIN DU MATCH' : role === 'local' ? `${gagnant} GAGNE` : jeu.buteur === equipe(moi) ? 'VICTOIRE' : 'DÉFAITE'
+      voile(`${nomEquipe(0)}  ${jeu.scores[0]} — ${jeu.scores[1]}  ${nomEquipe(1)}`, titre)
     } else if (jeu.phase !== PHASE_FINI && finAffichee) {
       el<HTMLElement>('[data-voile]').hidden = true
       finAffichee = false
@@ -1404,8 +1505,12 @@ export function creeEcranMulti(quitte: () => void): EcranMulti {
   }
 
   function peintAth(corps: CorpsTrame[], maintenant: number, dt: number): void {
-    for (let j = 0; j < 2; j++) {
+    for (let j = 0; j < 4; j++) {
       const boite = el<HTMLElement>(`[data-jauge="${j}"]`)
+      // les jauges 2 et 3 : au 2 contre 2 seulement
+      const montree = j < 2 || j < corps.length
+      if (boite.hidden === montree) boite.hidden = !montree
+      if (!montree) continue
       const c = corps[j]
       const part = c && c.base > 0 ? Math.max(0, Math.min(1, (c.compte + c.prets) / c.base)) : 0
       const couleur = teinte(j)

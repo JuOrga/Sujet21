@@ -12,7 +12,7 @@
 //     qu'un joueur qui a coupé le son du jeu ne soit pas surpris ici.
 
 import { loadAudioPrefs } from '../game/audio'
-import { PHASE_DECOMPTE, PHASE_FINI, PHASE_JEU, type Bornes, type CorpsTrame, type JeuTrame } from './trame'
+import { PHASE_DECOMPTE, PHASE_FINI, PHASE_JEU, equipe, type Bornes, type CorpsTrame, type JeuTrame } from './trame'
 
 /** Ce qu'on regarde du jeu, à un instant. */
 export interface Instantane {
@@ -79,11 +79,13 @@ export function entend(avant: Instantane | null, apres: Instantane, moi: number)
     if (b.dash && !a.dash) sons.push({ type: 'dash', force: j === moi ? 1 : 0.6, x: b.x, y: b.y, mien: j === moi })
     if ((a.glace === true) !== (b.glace === true)) sons.push({ type: b.glace ? 'gel' : 'degel', force: j === moi ? 1 : 0.6, x: b.x, y: b.y, mien: j === moi })
   }
-  if (n >= 2 && apres.t > avant.t) {
-    const [a0, a1] = [avant.corps[0], avant.corps[1]]
-    const [b0, b1] = [apres.corps[0], apres.corps[1]]
-    const fondus = b0.ouvert && b1.ouvert
-    if (!fondus && !b0.disperse && !b1.disperse) {
+  // (chaque paire de corps : à quatre, il y en a six)
+  for (let i = 0; i < n && apres.t > avant.t; i++) {
+    for (let k = i + 1; k < n; k++) {
+      const [a0, a1] = [avant.corps[i], avant.corps[k]]
+      const [b0, b1] = [apres.corps[i], apres.corps[k]]
+      const fondus = b0.ouvert && b1.ouvert
+      if (fondus || b0.disperse || b1.disperse) continue
       const touche = rayonCorps(b0.compte) + rayonCorps(b1.compte) + 14
       const dAvant = Math.hypot(a1.x - a0.x, a1.y - a0.y)
       const dApres = Math.hypot(b1.x - b0.x, b1.y - b0.y)
@@ -101,10 +103,10 @@ export function entend(avant: Instantane | null, apres: Instantane, moi: number)
   if (ja && jb) {
     const marques = jb.scores[0] + jb.scores[1] - ja.scores[0] - ja.scores[1]
     if (marques > 0) {
-      sons.push({ type: jb.phase === PHASE_FINI ? 'fin' : 'but', force: 1, x: milieu, y: milieuY, mien: jb.buteur === moi })
+      sons.push({ type: jb.phase === PHASE_FINI ? 'fin' : 'but', force: 1, x: milieu, y: milieuY, mien: jb.buteur === equipe(moi) })
     } else if (jb.phase === PHASE_FINI && ja.phase !== PHASE_FINI) {
       // la fin au temps, sans but
-      sons.push({ type: 'fin', force: 1, x: milieu, y: milieuY, mien: jb.buteur === moi })
+      sons.push({ type: 'fin', force: 1, x: milieu, y: milieuY, mien: jb.buteur === equipe(moi) })
     } else if (chiffre(jb) > 0 && chiffre(jb) !== chiffre(ja)) {
       sons.push({ type: 'tic', force: 1, x: milieu, y: milieuY, mien: true })
     } else if (ja.phase !== PHASE_JEU && jb.phase === PHASE_JEU) {
