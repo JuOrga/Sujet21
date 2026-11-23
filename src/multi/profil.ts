@@ -63,6 +63,30 @@ export function couleursDeLaPartie(hote: Profil, invite: Profil): [number, numbe
   return [h, i]
 }
 
+/** Une teinte (rouge, vert, bleu, de 0 à 1). */
+export type Teinte = readonly [number, number, number]
+
+/** LA TEINTE DE L'ÉQUIPIER, au 2 contre 2 : celle de son équipe, éclaircie
+ *  de cette part vers le blanc. Deux couleurs de la palette auraient brouillé
+ *  les camps ; la même aurait confondu les deux équipiers — on lit le camp à
+ *  la famille, et qui est qui au ton. */
+export const ECLAIRCI_EQUIPIER = 0.45
+export function teinteEquipier(c: Teinte): Teinte {
+  return [c[0] + (1 - c[0]) * ECLAIRCI_EQUIPIER, c[1] + (1 - c[1]) * ECLAIRCI_EQUIPIER, c[2] + (1 - c[2]) * ECLAIRCI_EQUIPIER]
+}
+
+/** Les teintes des quatre canaux du rendu, pour une partie de `joueurs`
+ *  joueurs dont les deux premiers portent `couleurs` (des rangs de la
+ *  palette). À quatre, les joueurs 2 et 3 sont les équipiers des joueurs 0
+ *  et 1 ; à deux, les canaux restants gardent des couleurs de la palette
+ *  (il n'y a personne dessus). */
+export function teintesDeLaPartie(couleurs: readonly [number, number], joueurs: number): Teinte[] {
+  const rang = (r: number): Teinte => PALETTE[((r % PALETTE.length) + PALETTE.length) % PALETTE.length]
+  const a = rang(couleurs[0])
+  const b = rang(couleurs[1])
+  return joueurs > 2 ? [a, b, teinteEquipier(a), teinteEquipier(b)] : [a, b, rang(2), rang(3)]
+}
+
 const CLE = 'sujet21-multi-profil'
 
 /** Le profil gardé dans ce navigateur (neutre s'il n'y en a pas, ou si le

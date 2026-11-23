@@ -21,7 +21,7 @@ import { FORME_DISQUE } from '../game/formes'
 import { MAT_WALL } from '../game/level'
 import type { Evenement, Regle } from './regle'
 import { KIND_PLAYER, type FluidSimMulti } from './solveurMulti'
-import { MODE_HOCKEY, PHASE_BUT, PHASE_DECOMPTE, PHASE_FINI, PHASE_JEU, type Bornes, type Commande, type JeuTrame } from './trame'
+import { MODE_HOCKEY, PHASE_BUT, PHASE_DECOMPTE, PHASE_FINI, PHASE_JEU, equipe, type Bornes, type Commande, type JeuTrame } from './trame'
 
 // LE TERRAIN est une PATINOIRE, sur le modèle des vraies (« prends vraiment
 // l'exemple de la forme d'un terrain de hockey : les bords du terrain
@@ -84,15 +84,16 @@ function paroiLeLong(ax: number, ay: number, bx: number, by: number, dedansX: nu
 }
 
 /** Les parois des deux cages : pour chacune un fond et deux côtés penchés. */
-export function paroisCages(): Paroi[] {
-  const my = (TERRAIN.minY + TERRAIN.maxY) / 2
+export function paroisCages(pat: Patinoire = PATINOIRE_DUEL): Paroi[] {
+  const t = pat.terrain
+  const my = (t.minY + t.maxY) / 2
   const parois: Paroi[] = []
   for (const cote of [0, 1]) {
     // x compté depuis le fond de SON côté du terrain, puis remis en monde
-    const x = (d: number): number => (cote === 0 ? TERRAIN.minX + d : TERRAIN.maxX - d)
-    const ligne = x(LIGNE_BUT)
-    const fond = x(LIGNE_BUT - PROFONDEUR_CAGE)
-    const coeur = x(LIGNE_BUT - PROFONDEUR_CAGE / 2)
+    const x = (d: number): number => (cote === 0 ? t.minX + d : t.maxX - d)
+    const ligne = x(pat.ligneBut)
+    const fond = x(pat.ligneBut - PROFONDEUR_CAGE)
+    const coeur = x(pat.ligneBut - PROFONDEUR_CAGE / 2)
     parois.push(paroiLeLong(fond, my - DEMI_FOND, fond, my + DEMI_FOND, coeur, my, EPAISSEUR_CAGE, EPAISSEUR_CAGE))
     for (const s of [-1, 1]) parois.push(paroiLeLong(ligne, my + s * DEMI_OUVERTURE, fond, my + s * DEMI_FOND, coeur, my, EPAISSEUR_CAGE, 6))
   }
@@ -102,17 +103,19 @@ export function paroisCages(): Paroi[] {
 /** Les COINS du terrain, pour l'eau : chaque quart de cercle est fait de six
  *  parois droites posées bout à bout (l'écart au vrai cercle est de 3,4 u).
  *  Le palet, lui, suit le vrai cercle. */
-export function paroisCoins(): Paroi[] {
+export function paroisCoins(pat: Patinoire = PATINOIRE_DUEL): Paroi[] {
   const SEGMENTS = 6
   const EPAISSEUR = 90
+  const t = pat.terrain
+  const r = pat.coins
   const parois: Paroi[] = []
   for (const [sx, sy] of [[-1, -1], [1, -1], [1, 1], [-1, 1]]) {
-    const cx = sx < 0 ? TERRAIN.minX + RAYON_COINS : TERRAIN.maxX - RAYON_COINS
-    const cy = sy < 0 ? TERRAIN.minY + RAYON_COINS : TERRAIN.maxY - RAYON_COINS
+    const cx = sx < 0 ? t.minX + r : t.maxX - r
+    const cy = sy < 0 ? t.minY + r : t.maxY - r
     // du bord vertical au bord horizontal du coin
     const point = (k: number): [number, number] => {
-      const t = ((k / SEGMENTS) * Math.PI) / 2
-      return [cx + sx * RAYON_COINS * Math.cos(t), cy + sy * RAYON_COINS * Math.sin(t)]
+      const a = ((k / SEGMENTS) * Math.PI) / 2
+      return [cx + sx * r * Math.cos(a), cy + sy * r * Math.sin(a)]
     }
     for (let k = 0; k < SEGMENTS; k++) {
       const [ax, ay] = point(k)
@@ -123,8 +126,6 @@ export function paroisCoins(): Paroi[] {
   return parois
 }
 
-const PAROIS_CAGES = paroisCages()
-const PAROIS_EAU = [...PAROIS_CAGES, ...paroisCoins()]
 /** Une paroi telle que le solveur la reçoit. */
 const pourLeSolveur = (p: Paroi): { minX: number; minY: number; maxX: number; maxY: number; material: number; angle: number } => ({
   minX: p.cx - p.demiL,
@@ -161,24 +162,25 @@ const RESTITUTION_PAROI = 0.85
 export const RAYON_POTEAU = 24
 /** L'écart d'un poteau au centre du terrain, en x comme en y. */
 export const ECART_POTEAU = 260
-/** Les quatre poteaux, en carré autour du centre. */
-export const POTEAUX: readonly { x: number; y: number }[] = [-1, 1].flatMap((sx) =>
-  [-1, 1].map((sy) => ({ x: (TERRAIN.minX + TERRAIN.maxX) / 2 + sx * ECART_POTEAU, y: (TERRAIN.minY + TERRAIN.maxY) / 2 + sy * ECART_POTEAU })),
-)
+/** Les quatre poteaux d'une patinoire, en carré autour du centre. */
+export function poteauxDe(pat: Patinoire): readonly { x: number; y: number }[] {
+  const t = pat.terrain
+  return [-1, 1].flatMap((sx) => [-1, 1].map((sy) => ({ x: (t.minX + t.maxX) / 2 + sx * pat.ecartPoteau, y: (t.minY + t.maxY) / 2 + sy * pat.ecartPoteau })))
+}
 /** Ce que le palet garde de sa vitesse en touchant un poteau : tout. */
 const RESTITUTION_POTEAU = 1
 /** …et il en repart toujours au moins à cette vitesse (u/s) : le poteau est
  *  un ressort, pas un mur — un palet qui l'effleure à peine est renvoyé. */
 const COUP_POTEAU = 320
 /** Un poteau tel que le solveur le reçoit : un disque de paroi. */
-const POTEAUX_EAU = POTEAUX.map((p) => ({
+const poteauPourLeSolveur = (p: { x: number; y: number }): { minX: number; minY: number; maxX: number; maxY: number; material: number; forme: number } => ({
   minX: p.x - RAYON_POTEAU,
   maxX: p.x + RAYON_POTEAU,
   minY: p.y - RAYON_POTEAU,
   maxY: p.y + RAYON_POTEAU,
   material: MAT_WALL,
   forme: FORME_DISQUE,
-}))
+})
 /** Le frottement de la glace, en s⁻¹ : lancé à 1 000 u/s, il en garde la
  *  moitié au bout de trois secondes et demie. */
 const FROTTEMENT = 0.2
@@ -249,6 +251,70 @@ const rayonCorps = (n: number): number => 0.5222 * 6.6 * Math.sqrt(Math.max(0, n
 /** Le premier à ce score gagne. */
 export const BUTS_POUR_GAGNER = 5
 
+// LA PATINOIRE — la piste, ses lignes et ce qui y est posé : tout ce qui
+// change quand on l'AGRANDIT pour le 2 contre 2 (le concepteur, 23/11 :
+// « peut-être agrandir le terrain »). Les cages, le palet et les cercles de
+// mise en jeu gardent leur taille : ils sont à l'échelle du palet, pas de la
+// piste. Les constantes plus haut sont celles du duel, la patinoire d'origine.
+export interface Patinoire {
+  terrain: Bornes
+  coins: number
+  /** la distance de la ligne de but à la paroi du fond */
+  ligneBut: number
+  /** l'écart des poteaux au centre, en x comme en y */
+  ecartPoteau: number
+  /** les cercles de mise en jeu : distance à la ligne de but, écart à l'axe */
+  cercleDecalage: number
+  cercleEcart: number
+  /** le dessin : la distance des lignes bleues à la ligne rouge, et le rayon
+   *  du rond central */
+  ligneBleue: number
+  rondCentral: number
+  /** l'agrandissement par rapport au duel (l'image du stade le suit) */
+  echelle: number
+}
+
+/** La patinoire du duel, agrandie de `echelle` — ses proportions restent
+ *  celles d'une vraie. */
+export function patinoire(echelle: number): Patinoire {
+  const k = (v: number): number => Math.round(v * echelle)
+  return {
+    terrain: { minX: TERRAIN.minX, minY: TERRAIN.minY, maxX: k(TERRAIN.maxX), maxY: k(TERRAIN.maxY) },
+    coins: k(RAYON_COINS),
+    ligneBut: k(LIGNE_BUT),
+    ecartPoteau: k(ECART_POTEAU),
+    cercleDecalage: k(CERCLE_DECALAGE),
+    cercleEcart: k(CERCLE_ECART),
+    ligneBleue: k(430),
+    rondCentral: k(200),
+    echelle,
+  }
+}
+/** (son terrain EST TERRAIN, le même objet : on compare des salles) */
+export const PATINOIRE_DUEL: Patinoire = { ...patinoire(1), terrain: TERRAIN }
+/** LE 2 CONTRE 2 : la piste plus grande de 15 %, et des corps de 500
+ *  particules au lieu de 900 (partie.ts, VOLUME_EQUIPES). Quatre corps de
+ *  900 auraient doublé le travail de l'hôte — mesuré : 26,7 ms par pas
+ *  contre 12,9 ms au duel, sur la même machine —, le solveur à plusieurs
+ *  tournant en JS (solveurMulti.ts) : l'hôte ne tenait plus le temps réel.
+ *  À 4 × 500, c'est 2 000 particules, à peine plus que les 1 800 du duel ;
+ *  et chacun a PLUS de place qu'au duel : 1,32 fois la piste pour 1,11 fois
+ *  la matière. */
+export const ECHELLE_EQUIPES = 1.15
+export const PATINOIRE_EQUIPES: Patinoire = patinoire(ECHELLE_EQUIPES)
+/** La patinoire d'une partie de `joueurs` joueurs : à plus de deux, on joue
+ *  en équipes, sur la grande. */
+export function patinoireDe(joueurs: number): Patinoire {
+  return joueurs > 2 ? PATINOIRE_EQUIPES : PATINOIRE_DUEL
+}
+/** Les poteaux du duel (le dessin et les tests les lisent). */
+export const POTEAUX: readonly { x: number; y: number }[] = poteauxDe(PATINOIRE_DUEL)
+export { equipe }
+/** À l'engagement, l'équipier se tient à cet écart de l'axe, en part de la
+ *  largeur de la piste (435 u sur la grande) : loin des poteaux, des cages
+ *  et de la mêlée. */
+const ECART_EQUIPIER = 0.31
+
 export type { Evenement } from './regle'
 
 export class Hockey implements Regle {
@@ -271,6 +337,11 @@ export class Hockey implements Regle {
    *  combien de temps encore. */
   private auRepos = -1
   private repos = 0
+  /** Le dernier joueur à avoir eu le palet — celui qui marque, s'il entre
+   *  (−1 : personne depuis l'engagement). Au duel c'est l'équipe ; à quatre,
+   *  c'est ce qui dit QUI a marqué, et un but contre son camp. */
+  marqueur = -1
+  private dernierPorteur = -1
   /** Le temps de jeu qui reste (s), ce qui reste du décompte, et si l'on
    *  joue le but en or. */
   chrono = DUREE_MATCH
@@ -278,13 +349,35 @@ export class Hockey implements Regle {
   enOr = false
   /** Le point du prochain engagement (le centre, au début du match), et
    *  lequel des deux cercles de la zone servira la fois suivante. */
-  private readonly lieu = { x: (TERRAIN.minX + TERRAIN.maxX) / 2, y: (TERRAIN.minY + TERRAIN.maxY) / 2 }
+  private readonly lieu: { x: number; y: number }
   private enBas = false
+  /** Les parois de la piste pour l'eau, et les poteaux pour le palet. */
+  private readonly paroisCages: Paroi[]
+  private readonly paroisEau: ReturnType<typeof pourLeSolveur>[]
+  readonly poteaux: readonly { x: number; y: number }[]
+
+  /** `pat` : la piste — celle du duel, ou la grande du 2 contre 2. */
+  constructor(readonly pat: Patinoire = PATINOIRE_DUEL) {
+    const t = pat.terrain
+    this.lieu = { x: (t.minX + t.maxX) / 2, y: (t.minY + t.maxY) / 2 }
+    this.paroisCages = paroisCages(pat)
+    this.paroisEau = [...this.paroisCages, ...paroisCoins(pat)].map(pourLeSolveur)
+    this.poteaux = poteauxDe(pat)
+  }
 
   /** Où se tient le joueur j à l'engagement : face au palet, de SON côté
-   *  (le joueur 0 à gauche). */
+   *  (l'équipe 0 à gauche). À quatre, l'ÉQUIPIER (joueurs 2 et 3) se tient
+   *  de son côté aussi, mais loin de l'axe : sur le cercle d'en face quand
+   *  on engage dans une zone, en haut ou en bas au centre — chaque équipe
+   *  du sien, que personne ne parte avec l'avantage. */
   depart(j: number): { x: number; y: number } {
-    return { x: this.lieu.x + (j % 2 === 0 ? -RECUL_ENGAGEMENT : RECUL_ENGAGEMENT), y: this.lieu.y }
+    const x = this.lieu.x + (equipe(j) === 0 ? -RECUL_ENGAGEMENT : RECUL_ENGAGEMENT)
+    if (j < 2) return { x, y: this.lieu.y }
+    const t = this.pat.terrain
+    const milieu = (t.minY + t.maxY) / 2
+    const ecart = ECART_EQUIPIER * (t.maxY - t.minY)
+    const y = Math.abs(this.lieu.y - milieu) > 1 ? 2 * milieu - this.lieu.y : milieu + (equipe(j) === 0 ? -ecart : ecart)
+    return { x, y }
   }
 
   /** Pendant le décompte, personne ne pousse. */
@@ -304,7 +397,7 @@ export class Hockey implements Regle {
     // délai soit entier ou réduit).
     sim.reabsorbFactor = DELAI_RETOUR
     // les cages, les coins arrondis et les poteaux : des parois pour l'eau aussi
-    sim.setLevel([...PAROIS_EAU.map(pourLeSolveur), ...POTEAUX_EAU], [])
+    sim.setLevel([...this.paroisEau, ...this.poteaux.map(poteauPourLeSolveur)], [])
     // posé, mais pas encore en jeu : il le sera à la fin du décompte
     p.actif = false
     p.rayon = RAYON_PALET
@@ -321,6 +414,7 @@ export class Hockey implements Regle {
     this.sortDe = -1
     this.auRepos = -1
     this.repos = 0
+    this.dernierPorteur = -1
     this.phase = PHASE_DECOMPTE
     this.decompte = DECOMPTE
   }
@@ -330,10 +424,11 @@ export class Hockey implements Regle {
     this.scores[0] = 0
     this.scores[1] = 0
     this.buteur = -1
+    this.marqueur = -1
     this.chrono = DUREE_MATCH
     this.enOr = false
-    this.lieu.x = (TERRAIN.minX + TERRAIN.maxX) / 2
-    this.lieu.y = (TERRAIN.minY + TERRAIN.maxY) / 2
+    this.lieu.x = (this.pat.terrain.minX + this.pat.terrain.maxX) / 2
+    this.lieu.y = (this.pat.terrain.minY + this.pat.terrain.maxY) / 2
     this.engage(sim)
   }
 
@@ -450,11 +545,13 @@ export class Hockey implements Regle {
   }
 
   /** Qui fait lâcher le palet au porteur j : un corps FERMÉ au contact, qui
-   *  arrive assez vite. −1 si personne. */
+   *  arrive assez vite. −1 si personne. Jamais son ÉQUIPIER : à quatre, deux
+   *  équipiers se bousculent sans cesse, et le palet ne doit pas sauter de
+   *  l'un à l'autre faute d'avoir été visé. */
   private voleur(sim: FluidSimMulti, j: number): number {
     const c = sim.corps[j]
     for (let k = 0; k < sim.corps.length; k++) {
-      if (k === j) continue
+      if (k === j || equipe(k) === equipe(j)) continue
       const a = sim.corps[k]
       if (a.ouvert || a.dispersed || a.playerCount < 12) continue
       const dx = c.stats.centroidX - a.stats.centroidX
@@ -499,6 +596,7 @@ export class Hockey implements Regle {
     const part = p.masse / (n + p.masse)
     this.pousse(sim, j, (p.vx - c.stats.velX) * part, (p.vy - c.stats.velY) * part)
     this.tenuPar = j
+    this.dernierPorteur = j
     this.tenuDepuis = 0
     this.sortDe = -1
   }
@@ -512,7 +610,7 @@ export class Hockey implements Regle {
     let d = Math.hypot(dx, dy)
     if (d < 1) {
       // pas de visée : droit vers la cage adverse
-      dx = j === 0 ? 1 : -1
+      dx = equipe(j) === 0 ? 1 : -1
       dy = 0
       d = 1
     }
@@ -547,6 +645,8 @@ export class Hockey implements Regle {
    *  le but. */
   private parois(p: FluidSimMulti['palet']): Evenement {
     const r = p.rayon
+    const TERRAIN = this.pat.terrain
+    const RAYON_COINS = this.pat.coins
     // ---- le tour : dans un coin, le palet suit le quart de cercle
     const cx = p.x < TERRAIN.minX + RAYON_COINS ? TERRAIN.minX + RAYON_COINS : p.x > TERRAIN.maxX - RAYON_COINS ? TERRAIN.maxX - RAYON_COINS : NaN
     const cy = p.y < TERRAIN.minY + RAYON_COINS ? TERRAIN.minY + RAYON_COINS : p.y > TERRAIN.maxY - RAYON_COINS ? TERRAIN.maxY - RAYON_COINS : NaN
@@ -584,7 +684,7 @@ export class Hockey implements Regle {
       }
     }
     // ---- les parois des cages : un disque contre un rectangle tourné
-    for (const b of PAROIS_CAGES) {
+    for (const b of this.paroisCages) {
       const rad = (b.angle * Math.PI) / 180
       const ca = Math.cos(rad)
       const sa = Math.sin(rad)
@@ -622,7 +722,7 @@ export class Hockey implements Regle {
       }
     }
     // ---- les poteaux : un disque contre un disque, et le métal renvoie
-    for (const q of POTEAUX) {
+    for (const q of this.poteaux) {
       const dx = p.x - q.x
       const dy = p.y - q.y
       const contact = r + RAYON_POTEAU
@@ -648,6 +748,8 @@ export class Hockey implements Regle {
    *  dedans. Les parois ne laissent entrer que par devant ; porté par un
    *  joueur, il compte aussi. Le joueur 0 garde la cage de GAUCHE. */
   private dansUneCage(p: FluidSimMulti['palet']): Evenement {
+    const TERRAIN = this.pat.terrain
+    const LIGNE_BUT = this.pat.ligneBut
     const ecart = Math.abs(p.y - (TERRAIN.minY + TERRAIN.maxY) / 2)
     for (const cote of [0, 1]) {
       // la distance au fond de ce côté-là du terrain
@@ -664,6 +766,7 @@ export class Hockey implements Regle {
   private but(p: FluidSimMulti['palet'], buteur: number): Evenement {
     this.scores[buteur]++
     this.buteur = buteur
+    this.marqueur = this.dernierPorteur
     p.actif = false
     p.vx = 0
     p.vy = 0
@@ -671,9 +774,10 @@ export class Hockey implements Regle {
     this.sortDe = -1
     // le prochain engagement : sur un cercle de la zone du BUTEUR (le
     // joueur 0 défend à gauche), l'un puis l'autre
-    const duFond = LIGNE_BUT + CERCLE_DECALAGE
-    this.lieu.x = buteur === 0 ? TERRAIN.minX + duFond : TERRAIN.maxX - duFond
-    this.lieu.y = (TERRAIN.minY + TERRAIN.maxY) / 2 + (this.enBas ? CERCLE_ECART : -CERCLE_ECART)
+    const t = this.pat.terrain
+    const duFond = this.pat.ligneBut + this.pat.cercleDecalage
+    this.lieu.x = buteur === 0 ? t.minX + duFond : t.maxX - duFond
+    this.lieu.y = (t.minY + t.maxY) / 2 + (this.enBas ? this.pat.cercleEcart : -this.pat.cercleEcart)
     this.enBas = !this.enBas
     if (this.enOr || this.scores[buteur] >= BUTS_POUR_GAGNER) {
       this.phase = PHASE_FINI
@@ -701,6 +805,7 @@ export class Hockey implements Regle {
       scores: [this.scores[0], this.scores[1]],
       phase: this.phase,
       buteur: this.buteur,
+      marqueur: this.marqueur,
       chrono: this.chrono,
       decompte: this.phase === PHASE_DECOMPTE ? this.decompte : 0,
       enOr: this.enOr,
