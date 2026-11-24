@@ -203,6 +203,28 @@ describe('la barre de l’atelier : des familles, pas une liste à faire défile
     expect(regle).toContain('overflow-x: auto')
   })
 
+  it('la ligne ne déborde pas la salle : la colonne de la scène est BORNÉE', () => {
+    // une colonne implicite (« auto ») s'élargissait à la ligne entière :
+    // 1 388 px pour une salle de 958, rien à faire défiler (aperçu du 24/11)
+    const HTML = readFileSync(new URL('../../index.html', import.meta.url), 'utf-8')
+    const regle = /#editor\.ed-joueur #ed-stage \{([^}]*)\}/.exec(HTML)?.[1] ?? ''
+    expect(regle).toContain('grid-template-columns: minmax(0, 1fr)')
+    expect(/#editor \.ed-dock-outils \{([^}]*)\}/.exec(HTML)?.[1]).toContain('min-width: 0')
+    expect(HTML).toContain('#editor.ed-joueur #ed-dock { min-width: 0; }')
+  })
+
+  it('la ligne se fait défiler à la souris : flèches, glisser, molette', () => {
+    const ED = readFileSync(new URL('./editor.ts', import.meta.url), 'utf-8')
+    const DEF = readFileSync(new URL('./defileLigne.ts', import.meta.url), 'utf-8')
+    expect(ED).toContain('data-fleche="-1"')
+    expect(ED).toContain('data-fleche="1"')
+    expect(ED).toContain('defileLigne(dock, ligne)')
+    expect(DEF).toContain("'wheel'")
+    expect(DEF).toContain("'pointermove'")
+    // le clic qui suit un glisser est avalé : on ne choisit pas un outil en tirant
+    expect(DEF).toMatch(/addEventListener\('click', \(e\) => e\.stopPropagation\(\), \{ capture: true, once: true \}\)/)
+  })
+
   it('au profil joueur, la palette latérale cède la place à la barre sous la salle', () => {
     const HTML = readFileSync(new URL('../../index.html', import.meta.url), 'utf-8')
     // la barre vit DANS la scène, sous le canevas
