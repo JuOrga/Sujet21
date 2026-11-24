@@ -10225,12 +10225,13 @@
              premier lancement : il n'attend rien de la partie solo. Son écran
              vit entier dans src/multi/ecranMulti.ts. -->
         <button id="home-multi" type="button" class="acc-lieu" title="Jouer à deux : contre l’ordinateur, à deux sur cet écran, ou chacun chez soi"><span>MULTI</span><i class="acc-voyant" hidden></i><small></small></button>
-        <!-- L'ATELIER : bâtir sa propre salle et la partager (lot 5 du plan,
-             docs/atelier-joueur.md). Derrière le mode concepteur tant que
-             l'écran CRÉATIONS (lot 6) et la limite de débit (lot 8) manquent :
-             une salle publiée n'aurait nulle part où se jouer. -->
-        <button id="home-creations" type="button" data-dev class="acc-lieu acc-outil" title="Les salles bâties et partagées par les joueurs, jouées hors de l’expédition, avec leurs records"><span>CRÉATIONS</span></button>
-        <button id="home-atelier" type="button" data-dev class="acc-lieu acc-outil" title="L’atelier : bâtir sa propre salle, l’essayer, et la partager en atteignant sa sortie"><span>ATELIER</span></button>
+        <!-- LES SALLES DES JOUEURS (docs/atelier-joueur.md) : CRÉATIONS, celles
+             que les joueurs ont partagées, jouées hors de l'expédition avec
+             leurs records ; ATELIER, bâtir la sienne. Des lieux comme les
+             autres depuis le 24/11 — ils étaient derrière le mode concepteur,
+             sous l'allure grise des outils de la régie. -->
+        <button id="home-creations" type="button" class="acc-lieu" title="Les salles bâties et partagées par les joueurs, jouées hors de l’expédition, avec leurs records"><span>CRÉATIONS</span><i class="acc-voyant" hidden></i><small></small></button>
+        <button id="home-atelier" type="button" class="acc-lieu" title="L’atelier : bâtir sa propre salle, l’essayer, et la partager en atteignant sa sortie"><span>ATELIER</span><i class="acc-voyant" hidden></i><small></small></button>
         <button id="home-sauvegardes" type="button" class="acc-lieu" title="Les trois emplacements : chacun est une partie entière. Le nom d’opérateur s’y change"><span>SAUVEGARDES</span><i class="acc-voyant" hidden></i><small></small></button>
         <!-- LES OUTILS DU CONCEPTEUR ont une seule porte : LA RÉGIE (ses
              sections : carte, descente, planche, récit et fins, montage,
