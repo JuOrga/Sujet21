@@ -11,6 +11,24 @@ le runner GitHub l'atteint.
 
 ---
 
+## La clé concepteur — toute écriture la demande
+
+Depuis le 24/11/2026, l'API refuse toute écriture dans ce que tout le
+monde joue sans une **clé concepteur** (`api/_cle.ts`). Les scripts qui
+écrivent (`seed-levels`, `seed-inspires`, `maj-hub`, `rend-rescape`,
+`restaure`) la lisent dans la variable `CLE_CONCEPTEUR` ; leurs
+workflows la tirent du secret GitHub du même nom. Sans elle, le serveur
+répond 401, et le script s'arrête sur ce code.
+
+```bash
+CLE_CONCEPTEUR=… CONFIRME=oui node ops/restaure.mjs sauvegardes
+```
+
+La sauvegarde, elle, ne fait que lire : elle n'en a pas besoin. Le détail
+est dans [`docs/atelier-joueur.md`](../docs/atelier-joueur.md) §3.
+
+---
+
 ## Sauvegarder les documents partagés
 
 `sauvegarde.mjs` · workflow `sauvegarde` · branche `sauvegardes`
