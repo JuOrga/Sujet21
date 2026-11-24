@@ -225,6 +225,7 @@ import { appelle } from '../game/reseau'
 import { issueChargement, questionChargement, tableauOuvert } from './chargement'
 import { Historique, type Pas } from './historique'
 import { iconeOutil } from './iconesAtelier'
+import { aideDe } from './aidesAtelier'
 import { defileLigne } from './defileLigne'
 import { CLE_ATELIER_META, CLE_ATELIER_SALLE, CLE_ATELIER_SALLES } from '../game/clesAtelier'
 import {
@@ -593,26 +594,17 @@ const BARRE_CONCEPTEUR = [
   'ed-montage', 'ed-images', 'ed-fiches', 'ed-planche',
 ]
 
-/** Les outils transverses de la barre de l'atelier : leur nom et ce qu'ils
- *  font, dans l'ordre de OUTILS_TRANSVERSES. */
-const TRANSVERSES_DOCK: readonly { outil: string; nom: string; phrase: string }[] = [
-  {
-    outil: 'select',
-    nom: 'Sélection',
-    phrase:
-      'Sélection : cliquez un élément pour le régler, glissez-le pour le déplacer. Maj + clic en ajoute un autre — à plusieurs, le panneau propose d’aligner et de répartir.',
-  },
-  {
-    outil: 'gomme',
-    nom: 'Gomme',
-    phrase: 'Gomme : tracez une zone, tout ce qu’elle couvre disparaît. Une paroi à cheval est rognée.',
-  },
-  {
-    outil: 'cut',
-    nom: 'Superposer',
-    phrase:
-      'Superposer deux parois qui se chevauchent : cliquez celle du dessus, puis celle du dessous — seule leur partie commune est rongée.',
-  },
+/** Le temps d'arrêt sur un outil de la barre avant que son aide s'ouvre
+ *  (le concepteur, 24/11 : « après 1 à 2 secondes ») — assez pour qu'un
+ *  simple passage de la souris ne fasse rien clignoter. */
+export const DELAI_AIDE_MS = 1200
+
+/** Les outils transverses de la barre de l'atelier, dans l'ordre de
+ *  OUTILS_TRANSVERSES ; ce qu'ils font est dans leur aide (aidesAtelier.ts). */
+const TRANSVERSES_DOCK: readonly { outil: string; nom: string }[] = [
+  { outil: 'select', nom: 'Sélection' },
+  { outil: 'gomme', nom: 'Gomme' },
+  { outil: 'cut', nom: 'Superposer' },
 ]
 
 export class LevelEditor {
@@ -771,6 +763,8 @@ export class LevelEditor {
   // l'outil que la barre a vu au dernier tracé : la famille ne le suit
   // que quand il CHANGE (familleDuDock)
   private outilVuDock = ''
+  /** La minuterie de la bulle d'aide de la barre (0 : aucune). */
+  private minuterieAide = 0
   // la clé locale de la salle ouverte dans l'atelier (MES SALLES)
   private cleSalle = ''
   // LA DERNIÈRE PUBLICATION tentée, et ce qu'elle a donné : l'encart la
@@ -4852,7 +4846,7 @@ export class LevelEditor {
       `<span class="ed-dock-transverses">` +
       TRANSVERSES_DOCK.map(
         (t) =>
-          `<button type="button" class="ed-dock-fam ed-dock-trans${t.outil === 'select' ? ' ed-dock-choisir' : ''}" data-dock-outil="${t.outil}" aria-pressed="${courant === t.outil}" title="${esc(t.phrase)}">${iconeOutil(t.outil)}<span>${esc(t.nom)}</span></button>`,
+          `<button type="button" class="ed-dock-fam ed-dock-trans${t.outil === 'select' ? ' ed-dock-choisir' : ''}" data-dock-outil="${t.outil}" aria-pressed="${courant === t.outil}" aria-label="${esc(t.nom)}">${iconeOutil(t.outil)}<span>${esc(t.nom)}</span></button>`,
       ).join('') +
       `</span>` +
       FAMILLES_JOUEUR.map(
@@ -4866,13 +4860,14 @@ export class LevelEditor {
       fam.outils
         .map(
           (o) =>
-            `<button type="button" class="ed-dock-outil" data-dock-outil="${o.outil}" aria-pressed="${o.outil === courant}" title="${esc(o.phrase)}">` +
+            `<button type="button" class="ed-dock-outil" data-dock-outil="${o.outil}" aria-pressed="${o.outil === courant}">` +
             `${iconeOutil(o.outil)}<span><b>${esc(o.nom)}</b><small>${esc(o.phrase)}</small></span></button>`,
         )
         .join('') +
       `</div>` +
       `<button type="button" class="ed-dock-fleche" data-fleche="1" aria-label="Outils suivants">›</button>` +
-      `</div>`
+      `</div>` +
+      `<div class="ed-dock-aide" id="ed-dock-aide" role="tooltip" hidden></div>`
     // UNE SEULE LIGNE d'outils, qui défile de côté : au doigt et au trackpad
     // naturellement, et à la molette (verticale) que l'on convertit ici
     const ligne = dock.querySelector<HTMLElement>('.ed-dock-outils')
@@ -4885,6 +4880,7 @@ export class LevelEditor {
         this.peintDock()
       })
     }
+    this.brancheAides(dock)
     for (const b of Array.from(dock.querySelectorAll<HTMLElement>('[data-dock-outil]'))) {
       b.addEventListener('click', () => {
         const cle = b.dataset.dockOutil ?? 'select'
@@ -4894,6 +4890,57 @@ export class LevelEditor {
         this.peintDock()
       })
     }
+  }
+
+  /** LA BULLE D'AIDE de la barre : après DELAI_AIDE_MS sur un outil (la
+   *  souris immobile dessus, ou le focus au clavier), ce qu'il faut en
+   *  savoir — le geste, et ce qu'il fait au corps (aidesAtelier.ts). Un
+   *  passage rapide ne montre rien : la barre se parcourt sans bulles qui
+   *  clignotent. Au doigt, pas de survol : la bulle ne s'ouvre pas, le
+   *  nom et la phrase de l'outil restent lisibles sur le bouton. */
+  private brancheAides(dock: HTMLElement): void {
+    window.clearTimeout(this.minuterieAide)
+    const bulle = dock.querySelector<HTMLElement>('#ed-dock-aide')
+    if (!bulle) return
+    const esc = (t: string): string => t.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    const cache = (): void => {
+      window.clearTimeout(this.minuterieAide)
+      bulle.hidden = true
+      for (const b of Array.from(dock.querySelectorAll('[aria-describedby="ed-dock-aide"]'))) {
+        b.removeAttribute('aria-describedby')
+      }
+    }
+    const montre = (b: HTMLElement): void => {
+      const outil = b.dataset.dockOutil ?? ''
+      const aide = aideDe(outil)
+      if (!aide) return
+      const nom = b.querySelector('b')?.textContent ?? b.textContent?.trim() ?? ''
+      bulle.innerHTML =
+        `<strong>${esc(nom)}</strong><p>${esc(aide.geste)}</p>` +
+        `<ul>${aide.aSavoir.map((x) => `<li>${esc(x)}</li>`).join('')}</ul>`
+      bulle.hidden = false
+      b.setAttribute('aria-describedby', 'ed-dock-aide')
+      // au-dessus du bouton, sans déborder la barre ni à gauche ni à droite
+      const d = dock.getBoundingClientRect()
+      const r = b.getBoundingClientRect()
+      const largeur = bulle.offsetWidth
+      const gauche = Math.max(8, Math.min(r.left - d.left + r.width / 2 - largeur / 2, d.width - largeur - 8))
+      bulle.style.left = `${Math.round(gauche)}px`
+    }
+    const arme = (b: HTMLElement): void => {
+      cache()
+      this.minuterieAide = window.setTimeout(() => montre(b), DELAI_AIDE_MS)
+    }
+    for (const b of Array.from(dock.querySelectorAll<HTMLElement>('[data-dock-outil]'))) {
+      b.addEventListener('pointerenter', (e) => {
+        if (e.pointerType !== 'touch') arme(b)
+      })
+      b.addEventListener('pointerleave', cache)
+      b.addEventListener('pointerdown', cache)
+      b.addEventListener('focus', () => arme(b))
+      b.addEventListener('blur', cache)
+    }
+    dock.querySelector('.ed-dock-outils')?.addEventListener('scroll', cache, { passive: true })
   }
 
   private toolKey(t: Tool): string {
