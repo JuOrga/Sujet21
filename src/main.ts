@@ -498,7 +498,9 @@ import {
 } from './game/ceremonie'
 import { cartoucheHTML, iconeDuGlyphe, offreHTML, plaqueHTML, puceHTML } from './game/cartouches'
 import { fmtDuree, fmtL, fmtTime } from './game/formats'
-import { publieCreation, raisonCreation } from './game/netCreations'
+import { deposeRecordCreation, publieCreation, raisonCreation } from './game/netCreations'
+import { EcranCreations } from './game/ecranCreations'
+import { bilanPartie } from './game/creationsVue'
 import { cuveHTML, sceauHTML, SCENES_FIN } from './game/ceremonieObjets'
 import {
   finDescenteHTML,
@@ -6003,8 +6005,9 @@ function startTest(etapes: (LevelDef | CinematiqueDef)[]): void {
   testQueue = etapes.slice()
   fromEditor = false
   // tout nouveau départ désarme le retour-planche : seule la carte ⏵ le
-  // ré-arme, juste après cet appel
+  // ré-arme, juste après cet appel (et de même le retour aux créations)
   fromPlanche = false
+  fromCreation = null
   document.getElementById('planche-retour')?.setAttribute('hidden', '')
   ouvreEssai()
   hasPlayed = true
@@ -6378,6 +6381,10 @@ let plancheBusy = false
 // REVIENT là où on en était — bouton « revenir à la planche » en jeu, et
 // retour automatique à la conclusion de l'essai (le miroir de fromEditor).
 let fromPlanche = false
+// LA SALLE D'UN JOUEUR jouée depuis l'écran CRÉATIONS : son identifiant et
+// l'empreinte de la version jouée (un record ne compte que pour elle) —
+// la sortie atteinte y dépose la partie, le retour ramène à l'écran
+let fromCreation: { id: string; empreinte: string } | null = null
 let plancheScroll = 0
 function retournePlanche(): void {
   fromPlanche = false
@@ -8858,6 +8865,41 @@ const ouvreMulti = (code?: string): void => {
   })
 }
 document.getElementById('home-multi')?.addEventListener('click', () => ouvreMulti())
+// LES CRÉATIONS DES JOUEURS (game/ecranCreations.ts) : jouées hors de
+// l'expédition, par le même chemin que les essais de la planche
+const creationsEl = document.getElementById('creations') as HTMLDivElement
+const ecranCreations = new EcranCreations(creationsEl, {
+  jouer: (lvl, c) => {
+    ecranCreations.close()
+    startTest([lvl])
+    // startTest peut rendre la main à la fiche (nom d'opérateur manquant) :
+    // le retour ne s'arme que si la partie a vraiment démarré
+    if (document.body.classList.contains('playing')) fromCreation = c
+  },
+  creer: () => {
+    ecranCreations.close()
+    hasPlayed = true
+    void openEditor('joueur')
+  },
+  fermer: () => ecranCreations.close(),
+  operateur: () => records.operator(),
+})
+document.getElementById('home-creations')?.addEventListener('click', () => ecranCreations.open())
+
+/** La sortie atteinte dans une création : la partie part dans ses records
+ *  (api/_creations.ts), et l'écran de fin dit ce qu'elle y vaut. */
+async function recordDepuisCreation(
+  c: { id: string; empreinte: string },
+  litres: number,
+  temps: number,
+): Promise<void> {
+  const r = await deposeRecordCreation(c.id, c.empreinte, records.operator() || 'ANONYME', litres, temps)
+  // l'écran de fin a pu être refermé entre-temps : on ne le rouvre pas
+  if (!overlay.classList.contains('visible')) return
+  const b = bilanPartie(r ? r.ameliore : null, r ? r.records : null, litres, temps)
+  showOverlay(b.titre, echappeHtml(b.texte), r ? 'success' : 'danger', 'RETOUR AUX CRÉATIONS')
+}
+
 // L'ATELIER DU JOUEUR : l'éditeur, au profil joueur (editor/profilJoueur.ts)
 document.getElementById('home-atelier')?.addEventListener('click', () => {
   hasPlayed = true
@@ -11800,6 +11842,7 @@ function lanceRejeu(code: string, cat: CategorieFantome, defDonnee?: FantomeDef)
   testQueue = []
   fromEditor = false
   fromPlanche = false
+  fromCreation = null
   document.getElementById('planche-retour')?.setAttribute('hidden', '')
   run.bonbonneLiters = 0
   run.runTime = 0
@@ -19527,6 +19570,13 @@ function resetAction(): void {
         retournePlanche() // l'essai vient de la planche : on y retourne
         return
       }
+      if (fromCreation) {
+        // la salle venait de l'écran CRÉATIONS : on y retourne, records relus
+        fromCreation = null
+        openHome() // fige la partie, comme le retour au menu
+        ecranCreations.open()
+        return
+      }
       // la file d'essai continue : le sas mène à la salle suivante —
       // en jouant d'abord les cinématiques qui la précèdent
       if (testQueue.length > 0) {
@@ -21878,6 +21928,11 @@ function corpsImage(now: number): boolean {
     const refRecords = bestsLibre
       ? ` Records de la salle : 💧 ${fmtL(bestsLibre.volume.liters)} · ⏱ ${fmtTime(bestsLibre.chrono.time)}.`
       : ''
+    if (fromCreation && testLevel) {
+      // une CRÉATION : la partie entre (peut-être) dans ses records — jamais
+      // dans les registres ni le palmarès officiel
+      void recordDepuisCreation(fromCreation, surplus, run.tableauTime)
+    }
     if (fromEditor && editor?.profil === 'joueur' && testLevel) {
       // L'ATELIER : la sortie atteinte est la PREUVE de traversée — la salle
       // se partage (ou se republie) avec cette partie pour premier record
