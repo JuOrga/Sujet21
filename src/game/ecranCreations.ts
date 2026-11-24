@@ -157,7 +157,7 @@ export class EcranCreations {
         : this.erreurListe
           ? `<p class="cr-vide">${esc(this.erreurListe)}</p>`
           : visibles.length === 0
-            ? `<p class="cr-vide">${this.onglet === 'miennes' ? 'Vous n’avez encore rien partagé depuis ce poste. Une salle se partage quand vous atteignez sa sortie dans l’atelier.' : 'Aucune création pour l’instant : soyez le premier.'}</p>`
+            ? `<p class="cr-vide">${this.onglet === 'miennes' ? 'Vous n’avez encore rien partagé depuis ce poste. Une salle se partage quand vous atteignez sa sortie dans l’éditeur (COMMUNAUTÉ › ÉDITEUR).' : 'Aucune création pour l’instant : soyez le premier.'}</p>`
             : visibles
                 .map(
                   (c) =>
@@ -168,7 +168,7 @@ export class EcranCreations {
                 .join('')
     this.host.innerHTML =
       `<div class="cr-boite">` +
-      `<header class="cr-tete"><h2>CRÉATIONS</h2>` +
+      `<header class="cr-tete"><h2>CRÉATIONS DE LA COMMUNAUTÉ</h2>` +
       `<div class="cr-onglets" role="tablist" aria-label="Quelles créations">` +
       ONGLETS_CREATIONS.map(
         (o) => `<button type="button" role="tab" data-onglet="${o.id}" aria-selected="${o.id === this.onglet}">${o.nom}</button>`,
@@ -209,7 +209,7 @@ export class EcranCreations {
       classement('RECORDS — CHRONO', 'chrono') +
       `<p class="cr-note">Jouée hors expédition : ni mémoire, ni orbe, ni trophée. Seul le record compte.</p>` +
       (miennes.includes(c.id)
-        ? (level ? `<button type="button" id="cr-modifier">Modifier dans l’atelier</button>` : '') +
+        ? (level ? `<button type="button" id="cr-modifier">Modifier dans l’éditeur</button>` : '') +
           `<button type="button" id="cr-retirer">Retirer ma salle</button>`
         : '')
     )
