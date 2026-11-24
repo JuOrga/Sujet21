@@ -94,6 +94,12 @@ describe('le câblage de l’écran (main.ts, index.html)', () => {
     expect(MAIN).toMatch(/startTest\(\[lvl\]\)[\s\S]{0,300}fromCreation = c/)
   })
 
+  it('une salle à soi se rouvre dans l’atelier', () => {
+    const ECRAN = readFileSync(new URL('./ecranCreations.ts', import.meta.url), 'utf-8')
+    expect(ECRAN).toContain('id="cr-modifier"')
+    expect(MAIN).toMatch(/modifier: \(lvl, id\) => \{[\s\S]{0,200}openEditor\('joueur'\)\.then\(\(ed\) => ed\?\.ouvreCreation\(id, lvl\)\)/)
+  })
+
   it('la sortie atteinte dépose le record ; le retour ramène à l’écran', () => {
     expect(MAIN).toMatch(/if \(fromCreation && testLevel\) \{[\s\S]{0,200}recordDepuisCreation\(fromCreation, surplus, run\.tableauTime\)/)
     expect(MAIN).toMatch(/if \(fromCreation\) \{[\s\S]{0,200}ecranCreations\.open\(\)/)

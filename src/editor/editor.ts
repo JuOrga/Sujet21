@@ -227,6 +227,14 @@ import { Historique, type Pas } from './historique'
 import { iconeOutil } from './iconesAtelier'
 import { defileLigne } from './defileLigne'
 import {
+  etatDeSalle,
+  lisSalles,
+  nouvelleCleSalle,
+  rangeSalle,
+  retireSalle,
+  salleDeLaCreation,
+} from './sallesAtelier'
+import {
   FAMILLES_JOUEUR,
   cleDOutil,
   commandesDe,
@@ -256,6 +264,10 @@ const AIDES_KEY = 'projet21.editeur.aides.v1'
 // l'inverse. Son « openId » est l'identifiant de la CRÉATION publiée.
 const ATELIER_KEY = 'projet21.atelier.v1'
 const ATELIER_META_KEY = 'projet21.atelier.meta.v1'
+// MES SALLES (sallesAtelier.ts) : toutes les salles de l'atelier, la salle
+// ouverte y étant rangée à chaque geste — « Nouvelle salle » n'écrase plus
+// rien, et une salle publiée se retrouve pour la retoucher
+const ATELIER_SALLES_KEY = 'projet21.atelier.salles.v1'
 
 // Couleurs des matériaux : celles de la légende du jeu, pour qu'on reconnaisse
 // une surface d'un écran à l'autre.
@@ -729,6 +741,11 @@ export class LevelEditor {
   // l'outil que la barre a vu au dernier tracé : la famille ne le suit
   // que quand il CHANGE (familleDuDock)
   private outilVuDock = ''
+  // la clé locale de la salle ouverte dans l'atelier (MES SALLES)
+  private cleSalle = ''
+  // LA DERNIÈRE PUBLICATION tentée, et ce qu'elle a donné : l'encart la
+  // garde, même si l'écran de fin a été refermé avant la réponse
+  private dernierePub: { ok: boolean; message: string } | null = null
 
   constructor(host: HTMLElement, hooks: EditorHooks) {
     this.host = host
@@ -855,6 +872,8 @@ export class LevelEditor {
     this.level = joueur ? salleJoueurVierge() : blankLevel()
     this.openId = ''
     this.base = ''
+    this.cleSalle = ''
+    this.dernierePub = null
     this.restore()
     this.sel = null
     this.multi = []
@@ -888,6 +907,112 @@ export class LevelEditor {
     this.peintEtatSalle()
   }
 
+  /** Ouvre une salle de MES SALLES : la salle en cours est rangée d'abord,
+   *  et l'historique repart (on n'annule pas d'une salle à l'autre). */
+  private ouvreSalle(cle: string): void {
+    this.persist()
+    const s = lisSalles(localStorage.getItem(ATELIER_SALLES_KEY)).find((x) => x.cle === cle)
+    if (!s) return
+    let level: LevelDef | null = null
+    try {
+      level = parseLevel(JSON.parse(s.salle)).level
+    } catch {
+      level = null
+    }
+    if (!level) {
+      this.status('Cette salle ne se relit plus.')
+      return
+    }
+    this.chargeSalle(level, s.cle, s.creationId, s.base)
+    this.status(`« ${level.name} » ouverte.`)
+  }
+
+  private chargeSalle(level: LevelDef, cle: string, creationId: string, base: string): void {
+    this.level = level
+    this.cleSalle = cle
+    this.openId = creationId
+    this.base = base
+    this.sel = null
+    this.multi = []
+    this.relierVers = null
+    this.dernierePub = null
+    this.historique = new Historique(this.etat())
+    this.majBoutonsHistoire()
+    this.persist()
+    this.fitView()
+    this.syncForm()
+    this.validate()
+    this.peintEtatSalle()
+    this.draw()
+  }
+
+  /** Ouvre dans l'atelier une salle PUBLIÉE (depuis l'écran CRÉATIONS) :
+   *  sa copie locale si ce poste l'a, sinon la version en ligne, rangée
+   *  dans MES SALLES. */
+  ouvreCreation(creationId: string, enLigne: LevelDef): void {
+    if (!this.joueur) return
+    const deja = salleDeLaCreation(lisSalles(localStorage.getItem(ATELIER_SALLES_KEY)), creationId)
+    if (deja) {
+      this.ouvreSalle(deja.cle)
+      return
+    }
+    this.persist()
+    this.chargeSalle(structuredClone(enLigne), nouvelleCleSalle(), creationId, serializeLevel(enLigne))
+  }
+
+  /** Ce qu'a donné la dernière publication — gardé dans l'encart, même si
+   *  l'écran de fin s'est refermé avant la réponse du serveur. */
+  notePublication(ok: boolean, message: string): void {
+    this.dernierePub = { ok, message }
+    this.peintEtatSalle()
+  }
+
+  /** MES SALLES : la liste, la salle ouverte en tête de lecture. */
+  private peintMesSalles(): void {
+    const el = this.host.querySelector<HTMLElement>('#ed-mes-salles')
+    if (!el) return
+    if (!this.joueur) {
+      el.innerHTML = ''
+      return
+    }
+    const esc = (t: string): string =>
+      t.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
+    const liste = lisSalles(localStorage.getItem(ATELIER_SALLES_KEY))
+    const mots = { brouillon: 'brouillon', publiee: 'publiée', retouchee: 'publiée · retouches en attente' }
+    el.innerHTML =
+      `<span class="ed-ms-titre">MES SALLES <small>(${liste.length})</small></span>` +
+      (liste.length === 0
+        ? '<p class="ed-empty">Vos salles se rangent ici, sur ce poste.</p>'
+        : `<ul>` +
+          liste
+            .map(
+              (x) =>
+                `<li${x.cle === this.cleSalle ? ' class="on"' : ''}>` +
+                `<button type="button" class="ed-ms-ouvrir" data-salle="${esc(x.cle)}"${x.cle === this.cleSalle ? ' aria-current="true"' : ''}>` +
+                `<b>${esc(x.nom || 'Sans nom')}</b><small>${mots[etatDeSalle(x)]}</small></button>` +
+                (x.cle === this.cleSalle
+                  ? ''
+                  : `<button type="button" class="ed-ms-retirer" data-retirer="${esc(x.cle)}" aria-label="Retirer « ${esc(x.nom)} » de mes salles" title="Retirer de mes salles (une salle publiée reste en ligne)">✕</button>`) +
+                `</li>`,
+            )
+            .join('') +
+          `</ul>`)
+    for (const b of Array.from(el.querySelectorAll<HTMLElement>('[data-salle]'))) {
+      b.addEventListener('click', () => {
+        if (b.dataset.salle && b.dataset.salle !== this.cleSalle) this.ouvreSalle(b.dataset.salle)
+      })
+    }
+    for (const b of Array.from(el.querySelectorAll<HTMLElement>('[data-retirer]'))) {
+      b.addEventListener('click', () => {
+        const cle = b.dataset.retirer ?? ''
+        const x = liste.find((y) => y.cle === cle)
+        if (!x || !confirm(`Retirer « ${x.nom} » de vos salles ?${x.creationId ? ' Elle reste en ligne, dans CRÉATIONS.' : ' Ce brouillon sera perdu.'}`)) return
+        localStorage.setItem(ATELIER_SALLES_KEY, JSON.stringify(retireSalle(liste, cle)))
+        this.peintMesSalles()
+      })
+    }
+  }
+
   /** L'ENCART « VOTRE SALLE » : où en est la salle — toujours enregistrée
    *  sur ce poste (à chaque geste, sans bouton), puis pas encore partagée,
    *  partagée et à jour, ou partagée avec des retouches qui attendent. Il
@@ -910,7 +1035,11 @@ export class LevelEditor {
       partage =
         '<p class="attente">Publiée, mais vos retouches ne le sont pas encore.</p><p>Pour les publier : <b>ESSAYER ET PUBLIER</b>, puis atteindre la sortie. Ses records repartiront de votre partie.</p>'
     }
-    el.innerHTML = enregistree + partage
+    const pub = this.dernierePub
+      ? `<p class="${this.dernierePub.ok ? 'ok' : 'attente'}">${this.dernierePub.message.replace(/&/g, '&amp;').replace(/</g, '&lt;')}</p>`
+      : ''
+    el.innerHTML = enregistree + pub + partage
+    this.peintMesSalles()
   }
 
   /** Montre ou cache ce que le profil réserve. Rien n'est retiré du DOM :
@@ -948,7 +1077,8 @@ export class LevelEditor {
           enfant.classList.contains('k') ||
           enfant.querySelector('#ed-name') ||
           enfant.id === 'ed-journal' ||
-          enfant.id === 'ed-etat-salle'
+          enfant.id === 'ed-etat-salle' ||
+          enfant.id === 'ed-mes-salles'
         cache(enfant, j && !utile)
       }
       const titre = g.querySelector(':scope > .k')
@@ -1015,11 +1145,33 @@ export class LevelEditor {
       localStorage.setItem(this.joueur ? ATELIER_KEY : STORE_KEY, serializeLevel(this.level))
       localStorage.setItem(
         this.joueur ? ATELIER_META_KEY : META_KEY,
-        JSON.stringify({ openId: this.openId, base: this.base }),
+        JSON.stringify(
+          this.joueur
+            ? { openId: this.openId, base: this.base, cle: this.cleSalle }
+            : { openId: this.openId, base: this.base },
+        ),
       )
+      if (this.joueur) this.rangeSalleOuverte()
     } catch {
       // stockage indisponible : l'édition continue, sans reprise après coup
     }
+  }
+
+  /** Range la salle ouverte dans MES SALLES (l'atelier seulement). */
+  private rangeSalleOuverte(): void {
+    if (!this.cleSalle) this.cleSalle = nouvelleCleSalle()
+    const liste = lisSalles(localStorage.getItem(ATELIER_SALLES_KEY))
+    const salle = serializeLevel(this.level)
+    const avant = liste.find((x) => x.cle === this.cleSalle)
+    // la date ne bouge que si la salle a changé : la liste reste dans
+    // l'ordre des vraies retouches, pas des ouvertures
+    const majLe = avant && avant.salle === salle ? avant.majLe : new Date().toISOString()
+    localStorage.setItem(
+      ATELIER_SALLES_KEY,
+      JSON.stringify(
+        rangeSalle(liste, { cle: this.cleSalle, nom: this.level.name, salle, creationId: this.openId, base: this.base, majLe }),
+      ),
+    )
   }
 
   private restore(): void {
@@ -1031,9 +1183,11 @@ export class LevelEditor {
       const meta = JSON.parse(localStorage.getItem(this.joueur ? ATELIER_META_KEY : META_KEY) ?? '{}') as {
         openId?: string
         base?: string
+        cle?: string
       }
       this.openId = typeof meta.openId === 'string' ? meta.openId : ''
       this.base = typeof meta.base === 'string' ? meta.base : ''
+      if (this.joueur) this.cleSalle = typeof meta.cle === 'string' ? meta.cle : ''
     } catch {
       // brouillon illisible : on repart d'un tableau vierge
     }
@@ -5122,22 +5276,29 @@ export class LevelEditor {
     this.el('ed-zin').addEventListener('click', () => zoomPar(1.3))
     this.el('ed-zout').addEventListener('click', () => zoomPar(1 / 1.3))
     this.el('ed-new').addEventListener('click', () => {
-      if (
-        !confirm(
-          this.joueur
-            ? 'Commencer une nouvelle salle ? Celle en cours sera perdue sur ce poste (si elle est partagée, elle reste en ligne).'
-            : 'Repartir d’un tableau vierge ? Le brouillon en cours sera perdu.',
-        )
-      )
+      // l'atelier range la salle en cours dans MES SALLES : rien ne se perd,
+      // aucune question à poser
+      if (this.joueur) {
+        this.persist()
+        this.cleSalle = nouvelleCleSalle()
+        this.dernierePub = null
+      } else if (!confirm('Repartir d’un tableau vierge ? Le brouillon en cours sera perdu.')) {
         return
+      }
       this.level = this.joueur ? salleJoueurVierge() : blankLevel()
       this.openId = ''
       this.base = ''
       this.sel = null
+      // une salle neuve, un historique neuf : « annuler » ne ramène pas la
+      // salle d'avant sous la clé de la nouvelle
+      if (this.joueur) {
+        this.historique = new Historique(this.etat())
+        this.majBoutonsHistoire()
+      }
       this.fitView()
       this.syncForm()
       this.renderLibrary()
-      this.commit('Tableau vierge.')
+      this.commit(this.joueur ? 'Nouvelle salle — la précédente est rangée dans MES SALLES.' : 'Tableau vierge.')
     })
     // ---- Le panneau du GÉNÉRATEUR : les réglages voyagent dans le code ----
     this.el('ed-gen').addEventListener('click', () => {

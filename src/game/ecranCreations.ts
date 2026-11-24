@@ -34,6 +34,8 @@ export interface HooksCreations {
   jouer(level: LevelDef, creation: { id: string; empreinte: string }): void
   /** Ouvrir l'atelier pour en bâtir une. */
   creer(): void
+  /** Rouvrir dans l'atelier une salle publiée depuis ce poste. */
+  modifier(level: LevelDef, creationId: string): void
   fermer(): void
   /** Le nom d'opérateur du poste : sa ligne de record se surligne. */
   operateur(): string
@@ -126,6 +128,10 @@ export class EcranCreations {
       this.hooks.jouer(this.detail.level, { id: c.id, empreinte: c.empreinte })
       return
     }
+    if (b.id === 'cr-modifier' && this.detail?.level) {
+      this.hooks.modifier(this.detail.level, this.detail.creation.id)
+      return
+    }
     if (b.id === 'cr-retirer' && this.detail) {
       const c = this.detail.creation
       if (!confirm(`Retirer « ${c.nom} » des créations ? Elle ne sera plus jouable en ligne (elle reste dans votre atelier).`)) return
@@ -202,7 +208,10 @@ export class EcranCreations {
       classement('RECORDS — VOLUME', 'volume') +
       classement('RECORDS — CHRONO', 'chrono') +
       `<p class="cr-note">Jouée hors expédition : ni mémoire, ni orbe, ni trophée. Seul le record compte.</p>` +
-      (miennes.includes(c.id) ? `<button type="button" id="cr-retirer">Retirer ma salle</button>` : '')
+      (miennes.includes(c.id)
+        ? (level ? `<button type="button" id="cr-modifier">Modifier dans l’atelier</button>` : '') +
+          `<button type="button" id="cr-retirer">Retirer ma salle</button>`
+        : '')
     )
   }
 }
