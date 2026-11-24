@@ -46,7 +46,7 @@ if (!ecrire) {
 
 const r = await fetch(API, {
   method: 'POST',
-  headers: { 'Content-Type': 'application/json' },
+  headers: { 'Content-Type': 'application/json', 'x-cle-concepteur': process.env.CLE_CONCEPTEUR ?? '' },
   body: JSON.stringify({ level, id: '', auteur: rescape.auteur }),
 })
 if (!r.ok) throw new Error(`POST → ${r.status} ${await r.text()}`)

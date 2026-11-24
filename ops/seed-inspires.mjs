@@ -26,7 +26,7 @@ for (const s of seeds) {
   }
   const r = await fetch(API, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', 'x-cle-concepteur': process.env.CLE_CONCEPTEUR ?? '' },
     body: JSON.stringify({ level: s.level, id: '', auteur: 'Claude' }),
   })
   if (!r.ok) throw new Error(`POST ${code} → ${r.status}`)

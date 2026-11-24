@@ -56,7 +56,7 @@ async function poste(route, corps, quoi) {
   }
   const r = await fetch(`${BASE}/${route}`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', 'x-cle-concepteur': process.env.CLE_CONCEPTEUR ?? '' },
     body: JSON.stringify(corps),
   })
   const texte = await r.text()

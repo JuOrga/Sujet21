@@ -15,3 +15,6 @@ jobs:
       - uses: actions/checkout@v4
       - name: Remplacer l'instantané du hub
         run: node ops/maj-hub.mjs
+        # l'API refuse toute écriture sans clé concepteur (api/_cle.ts)
+        env:
+          CLE_CONCEPTEUR: ${{ secrets.CLE_CONCEPTEUR }}
