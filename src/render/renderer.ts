@@ -3233,6 +3233,15 @@ void main() {
   // par-dessus le dessus du voisin ; dans l'angle de deux blocs, le second
   // passait devant (le concepteur, 16/11). −1 : rien de plus haut que le sol.
   float zVis = -1.0;
+  // ET SANS LA BOÎTE QUI LA DONNE (zVisAutres, reliefParois.ts) : la plus
+  // haute surface des AUTRES boîtes. Les éléments à pièces (chaudière,
+  // surchauffeur, conduite) en ont besoin — leur boîte englobante est plus
+  // grosse que leurs pièces, sa propre hauteur vue les cacherait à
+  // elles-mêmes ; et ce qui se pose au sol (ombre de contact, halo) ne doit
+  // se taire que sous un AUTRE solide. La plus haute et sa boîte, puis la
+  // suivante : deux nombres, pas une seconde boucle.
+  int iVis = -1;
+  float zVis2 = -1.0;
   for (int bi = 0; bi < min(uBoxCount, MAX_BOXES); bi++) {
     // seules comptent les boîtes dont la portée, élargie, atteint ce pixel
     if (horsPortee(bi, world, uPorteeCouv)) continue;
@@ -3250,7 +3259,14 @@ void main() {
     }
     if (uRelief > 0.0) {
       float hb = hauteurBoite(bi);
-      zVis = max(zVis, dc < -edgeW ? hb : hauteurTranche(bi, world, relDisp * facteurRelief(hb), hb));
+      float zb = dc < -edgeW ? hb : hauteurTranche(bi, world, relDisp * facteurRelief(hb), hb);
+      if (zb > zVis) {
+        zVis2 = zVis;
+        zVis = zb;
+        iVis = bi;
+      } else {
+        zVis2 = max(zVis2, zb);
+      }
     }
   }
   // LA LUMIÈRE SUR LE DESSUS DES SOLIDES, à la hauteur du toit qu'on
@@ -3380,6 +3396,15 @@ void main() {
     // — une plaque froide À FORME, elle, est un solide comme un autre — et
     // la chaudière rectangulaire de même : mêmes pièces, même règle)
     bool aPieces = ((mat > 3.5 && mat < 4.5) || (mat > 5.5 && mat < 6.5) || (mat > 8.5 && mat < 9.5)) && dec.y < 0.5;
+    // LA PLUS HAUTE SURFACE DES AUTRES en ce pixel (relief allumé ; −1 : le
+    // sol), et LE SOL EST-IL VU ? Ce qui se pose au sol autour de cette boîte
+    // — ombre de contact, ombre courte, halo, pied des pièces — ne se peint
+    // que si aucun autre solide ne se dresse devant. Le défaut (le concepteur,
+    // 24/11, l'angle d'un coin et d'un mur) : le pied d'une boîte ENTERRÉE
+    // dans ses voisines traçait son ombre de contact en travers de leurs
+    // tranches — des arêtes sombres dans l'angle, là où rien ne touche le sol.
+    float zAutres = bi == iVis ? zVis2 : zVis;
+    float solVu = uRelief > 0.0 ? 1.0 - step(0.0, zAutres) : 1.0;
     // ——— RELIEF 2.5D (tous les solides, sauf la bouche du sas) ————————
     // dV / wbV : la géométrie du SOMMET (déplacé) — le remplissage et les
     // habillages la suivent ; wS, le même point dans le monde (sans le pivot
@@ -3501,7 +3526,7 @@ void main() {
     float ombreCourte = 0.0;
     float contact = 0.0;
     if (solide && !aPieces) {
-      float sol = step(0.0, d) * libre * (1.0 - solPropre);
+      float sol = step(0.0, d) * libre * (1.0 - solPropre) * solVu;
       // CE QUI REÇOIT l'ombre : le sol (0), ou le toit du voisin qui couvre
       // ce pixel — elle ne s'y couche que sur ce que cette boîte le dépasse
       // (volume.ts : longueurOmbreSur). Sous un voisin aussi haut ou plus
@@ -3951,7 +3976,7 @@ void main() {
       float fill = 1.0 - smoothstep(-edgeW, 0.0, dV);
       vec2 bmin = uBoxes[bi].xy;
       vec2 bsize = max(uBoxes[bi].zw - bmin, vec2(1.0));
-      float surSol = (iCouv == bi || dCouv > 0.0) ? 1.0 : 0.0;
+      float surSol = (iCouv == bi || dCouv > 0.0) ? solVu : 0.0;
       float zS = uBoxAux[bi].z; // charge + 2 · (sens + 4 · bouts)
       float charge = surchCharge(zS);
       bool serp = dec.y < 0.5;
@@ -3992,6 +4017,7 @@ void main() {
         vec2 rLP = wb - wbV;
         vec2 nP;
         vec2 fp = flancPieces(1, wb, rLP, uBoxes[bi], zS, dG, surchSdf(wbV, uBoxes[bi], zS), nP);
+        fp.x *= devantTranche(zAutres, fp.y, hauteurBoite(bi));
         if (fp.x > 0.003) {
           vec2 nW = vec2(bca * nP.x - bsa * nP.y, bsa * nP.x + bca * nP.y);
           float pouls = 0.9 + 0.1 * sin(uTime * 3.1);
@@ -4078,7 +4104,7 @@ void main() {
       float fill = 1.0 - smoothstep(-edgeW, 0.0, dV);
       vec2 bmin = uBoxes[bi].xy;
       vec2 bsize = max(uBoxes[bi].zw - bmin, vec2(1.0));
-      float surSol = (iCouv == bi || dCouv > 0.0) ? 1.0 : 0.0;
+      float surSol = (iCouv == bi || dCouv > 0.0) ? solVu : 0.0;
       float codeC = uBoxAux[bi].z; // sens + 4 · bouts dans un mur
       // une chaudière À FORME (disque, capsule…) garde sa forme : sa chaleur
       // se mesure depuis elle, et elle se peint découpée à elle
@@ -4123,6 +4149,7 @@ void main() {
         vec2 rLP = wb - wbV;
         vec2 nP;
         vec2 fp = flancPieces(0, wb, rLP, uBoxes[bi], codeC, dG, chaudiereSdf(wbV, uBoxes[bi], codeC), nP);
+        fp.x *= devantTranche(zAutres, fp.y, hauteurBoite(bi));
         if (fp.x > 0.003) {
           vec2 nW = vec2(bca * nP.x - bsa * nP.y, bsa * nP.x + bca * nP.y);
           float pouls = 0.85 + 0.15 * sin(uTime * 1.6 + 0.8);
@@ -4185,7 +4212,7 @@ void main() {
       vec2 bsize = max(uBoxes[bi].zw - bmin, vec2(1.0));
       // ce qui se pose sur le SOL (givre, ombre, brume) ne se peint jamais
       // sur un AUTRE solide (la brume délavait la conduite voisine)
-      float surSol = (iCouv == bi || dCouv > 0.0) ? 1.0 : 0.0;
+      float surSol = (iCouv == bi || dCouv > 0.0) ? solVu : 0.0;
       float sensC = uBoxAux[bi].z; // sens + 4 · bouts dans un mur (aux.z d'une plaque froide)
       // UNE PLAQUE FROIDE QUI A UNE FORME (disque, capsule…) la garde dans la
       // physique (formePhysique) : son gel se mesure depuis ELLE, pas depuis
@@ -4240,6 +4267,7 @@ void main() {
         vec2 rLP = wb - wbV;
         vec2 nP;
         vec2 fp = flancPieces(2, wb, rLP, uBoxes[bi], sensC, dG, conduiteSdf(wbV, uBoxes[bi], sensC), nP);
+        fp.x *= devantTranche(zAutres, fp.y, hauteurBoite(bi));
         if (fp.x > 0.003) {
           vec2 nW = vec2(bca * nP.x - bsa * nP.y, bsa * nP.x + bca * nP.y);
           // rien n'y luit : la glace n'a pas de lueur propre
