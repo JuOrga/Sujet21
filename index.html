@@ -7087,7 +7087,17 @@
         grid-template-columns: 1fr min(calc(322px * var(--ui)), 34vw);
       }
       #editor.ed-joueur > .ed-side:not(.ed-side--right) { display: none; }
-      #editor.ed-joueur #ed-stage { display: grid; grid-template-rows: minmax(0, 1fr) auto; }
+      /* LA COLONNE BORNÉE (minmax(0, 1fr)), et pas une colonne implicite :
+         une colonne « auto » s'élargit à la ligne d'outils ENTIÈRE — la
+         barre débordait la salle (1 388 px pour 958, mesuré), la salle la
+         coupait, et la ligne n'avait jamais rien à faire défiler (le
+         concepteur, 24/11 : « je ne peux pas scroller en horizontal »). */
+      #editor.ed-joueur #ed-stage {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr);
+        grid-template-rows: minmax(0, 1fr) auto;
+      }
+      #editor.ed-joueur #ed-dock { min-width: 0; }
       #editor.ed-joueur #ed-canvas { min-height: 0; }
       #editor.ed-joueur #ed-coords,
       #editor.ed-joueur #ed-hint { top: 8px; bottom: auto; }
@@ -7106,10 +7116,15 @@
       /* UNE SEULE LIGNE d'outils, qui défile de côté (le concepteur, 24/11 :
          « les choix restent sur une seule ligne ») — chaque outil a son
          pictogramme (editor/iconesAtelier.ts), son nom, sa phrase. */
+      #editor .ed-dock-rang { display: flex; align-items: stretch; gap: 6px; min-width: 0; }
       #editor .ed-dock-outils {
+        flex: 1 1 auto; min-width: 0;
         display: flex; flex-wrap: nowrap; gap: 8px; overflow-x: auto; overflow-y: hidden;
-        scroll-snap-type: x proximity; overscroll-behavior-x: contain; padding-bottom: 4px;
+        scroll-snap-type: x proximity; overscroll-behavior-x: contain; padding-bottom: 6px;
+        scrollbar-width: thin; scrollbar-color: var(--glow) transparent;
       }
+      #editor .ed-dock-fleche { flex: 0 0 36px; min-height: 0; padding: 0; font-size: 22px; }
+      #editor .ed-dock-fleche:disabled { opacity: .25; cursor: default; }
       #editor .ed-dock-outil {
         flex: 0 0 auto; width: 188px; scroll-snap-align: start;
         display: flex; gap: 10px; align-items: center; text-align: left;

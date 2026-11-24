@@ -225,6 +225,7 @@ import { appelle } from '../game/reseau'
 import { issueChargement, questionChargement, tableauOuvert } from './chargement'
 import { Historique, type Pas } from './historique'
 import { iconeOutil } from './iconesAtelier'
+import { defileLigne } from './defileLigne'
 import {
   FAMILLES_JOUEUR,
   cleDOutil,
@@ -4624,6 +4625,8 @@ export class LevelEditor {
           `<button type="button" role="tab" class="ed-dock-fam" aria-selected="${f.id === fam.id}" data-dock-famille="${f.id}" title="${esc(f.phrase)}">${esc(f.nom)}</button>`,
       ).join('') +
       `</div>` +
+      `<div class="ed-dock-rang">` +
+      `<button type="button" class="ed-dock-fleche" data-fleche="-1" aria-label="Outils précédents">‹</button>` +
       `<div class="ed-dock-outils" role="tabpanel" aria-label="${esc(fam.nom)}">` +
       fam.outils
         .map(
@@ -4632,21 +4635,15 @@ export class LevelEditor {
             `${iconeOutil(o.outil)}<span><b>${esc(o.nom)}</b><small>${esc(o.phrase)}</small></span></button>`,
         )
         .join('') +
+      `</div>` +
+      `<button type="button" class="ed-dock-fleche" data-fleche="1" aria-label="Outils suivants">›</button>` +
       `</div>`
     // UNE SEULE LIGNE d'outils, qui défile de côté : au doigt et au trackpad
     // naturellement, et à la molette (verticale) que l'on convertit ici
     const ligne = dock.querySelector<HTMLElement>('.ed-dock-outils')
-    ligne?.addEventListener(
-      'wheel',
-      (e) => {
-        if (Math.abs(e.deltaY) <= Math.abs(e.deltaX) || ligne.scrollWidth <= ligne.clientWidth) return
-        ligne.scrollLeft += e.deltaY
-        e.preventDefault()
-      },
-      { passive: false },
-    )
     // l'outil en main reste en vue quand la ligne est plus longue que l'écran
     ligne?.querySelector<HTMLElement>('[aria-pressed="true"]')?.scrollIntoView({ block: 'nearest', inline: 'nearest' })
+    if (ligne) defileLigne(dock, ligne)
     for (const b of Array.from(dock.querySelectorAll<HTMLElement>('[data-dock-famille]'))) {
       b.addEventListener('click', () => {
         this.familleDock = b.dataset.dockFamille ?? 'batir'
