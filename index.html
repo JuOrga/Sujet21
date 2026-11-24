@@ -7134,6 +7134,13 @@
       #editor .ed-dock-outil svg,
       #editor .ed-dock-choisir svg { flex: 0 0 32px; }
       #editor .ed-dock-choisir { display: inline-flex; align-items: center; gap: 6px; }
+      /* SÉLECTION, mise en évidence quand on n'y est PAS (le concepteur,
+         24/11) : un outil en main, c'est elle qui appelle — le chemin du
+         retour pour choisir, déplacer, régler. En sélection, elle se tait. */
+      #editor .ed-dock-choisir[aria-pressed='false'] {
+        border-color: var(--glow); color: var(--glow); box-shadow: inset 0 0 0 1px var(--glow), 0 0 12px rgba(99, 183, 230, .35);
+      }
+      #editor .ed-dock-choisir[aria-pressed='true'] { opacity: .7; }
       #editor .ed-dock-choisir svg { width: 20px; height: 20px; }
       #editor .ed-dock-outil b { display: block; font-size: 13px; font-weight: 600; }
       #editor .ed-dock-outil small {
@@ -10316,6 +10323,9 @@
         <label class="ed-f" style="width:auto" title="ALIGNEMENT AUTOMATIQUE : en déplaçant une pièce, elle se colle aux bords, aux centres et aux écarts égaux de ses voisines (traits pointillés). Décochez pour poser exactement où vous lâchez — ou tenez ALT le temps d'un geste. Le réglage est retenu d'une séance à l'autre."><span>Alignement</span>
           <input type="checkbox" id="ed-align" checked style="width:auto" /></label>
         <button type="button" id="ed-prevision" title="LA PRÉVISION EXACTE : le vrai solveur court sur ce tableau, sans écran — le corps né au départ, lancé par l'impulsion, sous les puits — et écrit en trait plein la trajectoire de son centre sur douze secondes. Quelques secondes de calcul, par tranches ; la ligne pointillée, elle, est un point-masse. Seuls les puits et les parois jouent : ni sas, ni chasses, ni vortex.">Prévision exacte</button>
+        <!-- L'ATELIER (profil joueur) : essayer SANS publier — masqué au
+             profil concepteur, où « Essayer » suffit -->
+        <button type="button" id="ed-essai-seul" data-hors-profil>Essayer</button>
         <button type="button" id="ed-play" class="primary">Essayer</button>
         <button type="button" id="ed-quit">↩ Accueil</button>
       </div>

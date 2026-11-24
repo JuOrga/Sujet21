@@ -636,3 +636,17 @@ export function verdictsJoueur(verdicts: readonly { niveau: 'erreur' | 'avertiss
   }
   return out
 }
+
+/** LA FAMILLE OUVERTE DANS LA BARRE. Elle suit l'outil en main quand
+ *  l'outil CHANGE (pris autrement que par la barre : une annulation, un
+ *  profil rouvert) — et seulement alors. Avant, elle le suivait à chaque
+ *  rafraîchissement : l'hydrophobe en main, cliquer « Forces » rouvrait
+ *  aussitôt « Matières », et il fallait repasser par « Choisir » (sans
+ *  famille) pour changer d'élément (le concepteur, 24/11). */
+export function familleDuDock(
+  etat: { famille: string; outilVu: string },
+  outilCourant: string,
+): { famille: string; outilVu: string } {
+  if (outilCourant === etat.outilVu) return etat
+  return { famille: familleDeLOutil(outilCourant) ?? etat.famille, outilVu: outilCourant }
+}

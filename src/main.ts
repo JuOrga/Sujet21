@@ -6085,6 +6085,9 @@ document
 // « Essayer » vient-il de l'éditeur ? Si oui, on doit pouvoir y retourner
 // d'un geste, à tout instant — y compris depuis l'écran de fin d'essai.
 let fromEditor = false
+// L'ESSAI DE L'ATELIER publie-t-il la salle à la sortie atteinte ? (le bouton
+// « ESSAYER ET PUBLIER » oui, « ESSAYER » non — un essai pour soi)
+let essaiPublie = false
 
 // ---- LE CHARGEMENT DE L'ATELIER ------------------------------------------
 // Les outils du concepteur — l'éditeur de tableaux, l'éditeur de la carte,
@@ -6174,9 +6177,11 @@ const chargeEditeur = chargeUneFois('l’éditeur de tableaux', async () => {
     const ed = new LevelEditor(el('editor'), {
       // les portées dessinées (aspiration du sas, auras, rails) suivent le banc
       params: () => params,
-      play: (lvl) => {
+      play: (lvl, opts) => {
         testLevel = lvl
         fromEditor = true
+        // l'atelier : « ESSAYER ET PUBLIER » publie à la sortie, « ESSAYER » non
+        essaiPublie = opts?.publier === true
         ouvreEssai()
         hasPlayed = true
         ed.close()
@@ -21878,7 +21883,7 @@ function corpsImage(now: number): boolean {
     const refRecords = bestsLibre
       ? ` Records de la salle : 💧 ${fmtL(bestsLibre.volume.liters)} · ⏱ ${fmtTime(bestsLibre.chrono.time)}.`
       : ''
-    if (fromEditor && editor?.profil === 'joueur' && testLevel) {
+    if (fromEditor && editor?.profil === 'joueur' && testLevel && essaiPublie) {
       // L'ATELIER : la sortie atteinte est la PREUVE de traversée — la salle
       // se partage (ou se republie) avec cette partie pour premier record
       void partageDepuisAtelier(editor, testLevel, surplus, run.tableauTime)
@@ -21886,11 +21891,17 @@ function corpsImage(now: number): boolean {
     showOverlay(
       fromEditor ? 'TABLEAU FRANCHI' : `ESSAI ${level.code} CONCLU`,
       fromEditor
-        ? `${surplus.toFixed(2)} L collectés en ${fmtTime(run.tableauTime)} — le tableau se termine. Retour à l’éditeur pour l’ajuster.`
+        ? editor?.profil === 'joueur'
+          ? essaiPublie
+            ? `${surplus.toFixed(2)} L collectés en ${fmtTime(run.tableauTime)} — publication de la salle…`
+            : `${surplus.toFixed(2)} L collectés en ${fmtTime(run.tableauTime)} — essai pour vous : la salle n’est pas publiée. « ESSAYER ET PUBLIER » la partage.`
+          : `${surplus.toFixed(2)} L collectés en ${fmtTime(run.tableauTime)} — le tableau se termine. Retour à l’éditeur pour l’ajuster.`
         : `${surplus.toFixed(2)} L collectés en ${fmtTime(run.tableauTime)} — essai hors expédition : les registres ne bougent pas.${refRecords}`,
       'success',
       fromEditor
-        ? 'RETOUR À L’ÉDITEUR'
+        ? editor?.profil === 'joueur'
+          ? 'RETOUR À L’ATELIER'
+          : 'RETOUR À L’ÉDITEUR'
         : testQueue.length > 0
           ? 'SALLE SUIVANTE'
           : 'RETOUR AU PROTOCOLE',
