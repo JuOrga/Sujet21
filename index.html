@@ -7073,6 +7073,24 @@
          déjà — mais RIEN ne le disait. Ombres de défilement (CSS pur) :
          un voile paraît en haut ou en bas seulement quand il reste quelque
          chose à voir de ce côté. On sait qu'il y a une suite. */
+      /* L'ATELIER DU JOUEUR (editor.ts, profil « joueur ») : le même éditeur.
+         Ce que le profil réserve est masqué par une classe, jamais retiré
+         (bindUi et syncForm le lisent sans garde, et le concepteur le
+         retrouve intact) ; les réglages sont des paliers en boutons. */
+      #editor .ed-hors-profil { display: none !important; }
+      #editor .ed-pal-tete { display: flex; flex-direction: column; gap: 4px; margin-bottom: 12px; }
+      #editor .ed-pal-tete small { font-size: 11px; letter-spacing: .06em; text-transform: uppercase; opacity: .75; }
+      #editor .ed-pal-tete b { font-size: 15px; }
+      #editor .ed-pal-tete p { margin: 0; line-height: 1.45; }
+      #editor .ed-pal { border: 0; margin: 0 0 12px; padding: 0; min-width: 0; }
+      #editor .ed-pal legend { font-size: 12px; opacity: .8; margin-bottom: 6px; padding: 0; }
+      #editor .ed-pal-choix { display: flex; gap: 6px; }
+      #editor .ed-pal-btn { flex: 1 1 0; min-width: 0; min-height: 44px; line-height: 1.25; white-space: normal; }
+      #editor .ed-pal-btn.on { background: var(--glow); color: #030710; border-color: var(--glow); font-weight: 600; }
+      #editor .ed-pal-liens { display: flex; flex-direction: column; gap: 6px; border-top: 1px solid var(--line); padding-top: 10px; margin-bottom: 12px; }
+      #editor .ed-pal-liens > span { font-size: 12px; opacity: .8; }
+      #editor .ed-pal-liens p { margin: 0; }
+      #editor.ed-joueur .ed-tool { min-height: 44px; }
       .ed-side {
         border-right: 1px solid var(--line);
         overflow-y: auto;
@@ -10051,6 +10069,11 @@
              premier lancement : il n'attend rien de la partie solo. Son écran
              vit entier dans src/multi/ecranMulti.ts. -->
         <button id="home-multi" type="button" class="acc-lieu" title="Jouer à deux : contre l’ordinateur, à deux sur cet écran, ou chacun chez soi"><span>MULTI</span><i class="acc-voyant" hidden></i><small></small></button>
+        <!-- L'ATELIER : bâtir sa propre salle et la partager (lot 5 du plan,
+             docs/atelier-joueur.md). Derrière le mode concepteur tant que
+             l'écran CRÉATIONS (lot 6) et la limite de débit (lot 8) manquent :
+             une salle publiée n'aurait nulle part où se jouer. -->
+        <button id="home-atelier" type="button" data-dev class="acc-lieu acc-outil" title="L’atelier : bâtir sa propre salle, l’essayer, et la partager en atteignant sa sortie"><span>ATELIER</span></button>
         <button id="home-sauvegardes" type="button" class="acc-lieu" title="Les trois emplacements : chacun est une partie entière. Le nom d’opérateur s’y change"><span>SAUVEGARDES</span><i class="acc-voyant" hidden></i><small></small></button>
         <!-- LES OUTILS DU CONCEPTEUR ont une seule porte : LA RÉGIE (ses
              sections : carte, descente, planche, récit et fins, montage,

@@ -13,6 +13,8 @@
 // les extrêmes sont à régler au banc, en jouant.
 
 import { MATERIAUX_PERMIS, MODES_PASTILLE, SCHEMAS } from '../../api/_creation'
+import { canalDeCible } from '../game/laser'
+import type { LevelDef } from '../game/level'
 
 // ---- LA PALETTE ----------------------------------------------------------------
 
@@ -313,4 +315,218 @@ export function ecartsDuProfil(): string[] {
     }
   }
   return ecarts
+}
+
+// ---- L'ÉLÉMENT CHOISI DANS L'ATELIER ------------------------------------------
+// L'éditeur désigne sa sélection par une SORTE au singulier (« porte »,
+// « box ») et un rang ; la liste blanche et les paliers parlent en
+// collections (« portes », « boxes »). Ces fonctions font le pont, sans
+// DOM : le banc les tient.
+
+/** Une sélection de l'éditeur, réduite à ce que l'atelier en lit. */
+export interface SelectionJoueur {
+  kind: string
+  index?: number
+}
+
+/** La collection de LevelDef que désigne une sorte de sélection. */
+export const COLLECTION_DE_SORTE: Readonly<Record<string, string>> = {
+  box: 'boxes',
+  structure: 'structures',
+  sponge: 'sponges',
+  label: 'labels',
+  laser: 'lasers',
+  cible: 'cibles',
+  puits: 'puits',
+  mire: 'mires',
+  coupelle: 'coupelles',
+  porte: 'portes',
+  chasse: 'chasses',
+  rail: 'rails',
+  lumiere: 'lumieres',
+  decal: 'decals',
+  spawn: 'spawn',
+  exit: 'exit',
+}
+
+const OUTIL_DE_SORTE: Readonly<Record<string, string>> = {
+  sponge: 'sponge',
+  label: 'label',
+  laser: 'laser',
+  cible: 'cible',
+  puits: 'puits',
+  mire: 'mire',
+  coupelle: 'coupelle',
+  porte: 'porte',
+  chasse: 'chasse',
+  rail: 'rail',
+  spawn: 'spawn',
+  exit: 'exit',
+}
+
+const TOUS_LES_OUTILS: ReadonlyMap<string, OutilJoueur & { famille: string }> = new Map(
+  FAMILLES_JOUEUR.flatMap((f) => f.outils.map((x) => [x.outil, { ...x, famille: f.nom }] as const)),
+)
+
+function element(level: LevelDef, s: SelectionJoueur): Record<string, unknown> | null {
+  if (s.kind === 'spawn') return level.spawn as unknown as Record<string, unknown>
+  if (s.kind === 'exit') return level.exit as unknown as Record<string, unknown>
+  const liste = (level as unknown as Record<string, unknown>)[COLLECTION_DE_SORTE[s.kind] ?? '']
+  if (!Array.isArray(liste) || s.index === undefined) return null
+  return (liste[s.index] as Record<string, unknown> | undefined) ?? null
+}
+
+/** L'outil du joueur qui correspond à l'élément choisi — son nom, sa
+ *  phrase et sa famille, pour l'en-tête du panneau. `null` : un élément
+ *  hors du profil (une salle reprise d'ailleurs). */
+export function outilDeSelection(
+  level: LevelDef,
+  s: SelectionJoueur,
+): (OutilJoueur & { famille: string }) | null {
+  const el = element(level, s)
+  if (!el) return null
+  let outil = OUTIL_DE_SORTE[s.kind]
+  if (s.kind === 'box') outil = `box:${String(el.material)}`
+  else if (s.kind === 'structure') outil = `struct:${String(el.type)}`
+  else if (s.kind === 'lumiere') outil = el.forme === 'bandeau' ? 'bande' : 'lumiere'
+  else if (s.kind === 'decal') outil = `decal:${String(el.kind)}`
+  return (outil && TOUS_LES_OUTILS.get(outil)) || null
+}
+
+/** Les réglages qu'offre l'élément choisi (au plus trois). */
+export function reglagesDeSelection(s: SelectionJoueur): ReglageJoueur[] {
+  return REGLAGES_JOUEUR[COLLECTION_DE_SORTE[s.kind] ?? ''] ?? []
+}
+
+/** Le palier où se trouve l'élément pour un réglage. Le départ est à part :
+ *  sa taille est `spawn.n`, son élan la vitesse de `spawn.impulsion`. */
+export function lisPalier(level: LevelDef, s: SelectionJoueur, r: ReglageJoueur): number | null {
+  if (s.kind === 'spawn' && r.id === 'elan') {
+    const v = level.spawn.impulsion?.vitesse ?? 0
+    const i = r.paliers.findIndex((p) => p.champs.vitesse === v)
+    return i >= 0 ? i : null
+  }
+  const el = element(level, s)
+  return el ? palierCourant(el, r) : null
+}
+
+/** Pose un palier sur l'élément choisi. Rend une COPIE du tableau (le
+ *  tableau d'origine n'est pas touché), ou `null` si l'élément n'existe
+ *  pas. L'élan du départ garde sa DIRECTION (réglée à la flèche) ; à
+ *  vitesse nulle, l'impulsion disparaît — le corps naît immobile. */
+export function posePalier(level: LevelDef, s: SelectionJoueur, reglageId: string, i: number): LevelDef | null {
+  const r = reglagesDeSelection(s).find((x) => x.id === reglageId)
+  const palier = r?.paliers[i]
+  if (!palier) return null
+  const copie = structuredClone(level)
+  if (s.kind === 'spawn') {
+    if (reglageId === 'elan') {
+      const vitesse = palier.champs.vitesse as number
+      if (vitesse > 0) copie.spawn.impulsion = { angle: copie.spawn.impulsion?.angle ?? 0, vitesse }
+      else delete copie.spawn.impulsion
+    } else {
+      Object.assign(copie.spawn, palier.champs)
+    }
+    return copie
+  }
+  const liste = (copie as unknown as Record<string, unknown[]>)[COLLECTION_DE_SORTE[s.kind] ?? '']
+  if (!Array.isArray(liste) || s.index === undefined || !liste[s.index]) return null
+  liste[s.index] = appliquePalier(liste[s.index] as object, palier)
+  return copie
+}
+
+// ---- RELIER : la commande et ce qu'elle ouvre ----------------------------------
+// Dans l'éditeur du concepteur, une porte vise un numéro de canal recopié à
+// la main. Dans l'atelier, on RELIE : la porte (ou la chasse) choisie, puis
+// la pastille ou la coupelle qui la commandera. Sous le moteur, chaque lien
+// reste un canal — le format des salles ne change pas.
+
+/** Les canaux en usage dans la salle (pastilles, coupelles, portes, chasses). */
+function canauxPris(level: LevelDef): Set<number> {
+  const pris = new Set<number>()
+  const cibles = level.cibles ?? []
+  cibles.forEach((_, i) => pris.add(canalDeCible(cibles, i)))
+  for (const x of [...(level.coupelles ?? []), ...(level.portes ?? []), ...(level.chasses ?? [])]) {
+    if (typeof x.canal === 'number') pris.add(x.canal)
+  }
+  return pris
+}
+
+function canalLibre(level: LevelDef): number {
+  const pris = canauxPris(level)
+  let n = 1
+  while (pris.has(n)) n++
+  return n
+}
+
+/** Le canal d'une commande (pastille ou coupelle), ou `null`. */
+export function canalDeCommande(level: LevelDef, s: SelectionJoueur): number | null {
+  if (s.index === undefined) return null
+  if (s.kind === 'cible' && level.cibles?.[s.index]) return canalDeCible(level.cibles, s.index)
+  if (s.kind === 'coupelle' && level.coupelles?.[s.index]) return level.coupelles[s.index].canal
+  return null
+}
+
+/** Les commandes qui pilotent une porte ou une chasse : celles qui partagent
+ *  son canal. */
+export function commandesDe(level: LevelDef, s: SelectionJoueur): SelectionJoueur[] {
+  const cible = element(level, s)
+  const canal = cible?.canal
+  if (typeof canal !== 'number') return []
+  const out: SelectionJoueur[] = []
+  ;(level.cibles ?? []).forEach((_, i) => {
+    if (canalDeCible(level.cibles!, i) === canal) out.push({ kind: 'cible', index: i })
+  })
+  ;(level.coupelles ?? []).forEach((c, i) => {
+    if (c.canal === canal) out.push({ kind: 'coupelle', index: i })
+  })
+  return out
+}
+
+export type Liaison = { ok: true; level: LevelDef; message: string } | { ok: false; message: string }
+
+/** RELIE une commande à une porte ou une chasse. Si la porte n'a encore
+ *  aucune commande, elle adopte le canal de celle-ci ; sinon, la commande
+ *  REJOINT le canal de la porte — ses autres commandes restent branchées.
+ *  Rend une copie du tableau. */
+export function relie(level: LevelDef, cible: SelectionJoueur, commande: SelectionJoueur): Liaison {
+  if (cible.kind !== 'porte' && cible.kind !== 'chasse') {
+    return { ok: false, message: 'On relie une commande à une porte ou à une chasse.' }
+  }
+  const canalCommande = canalDeCommande(level, commande)
+  if (canalCommande === null) {
+    return { ok: false, message: 'Cliquez une pastille ou une coupelle : ce sont elles qui commandent.' }
+  }
+  const copie = structuredClone(level)
+  const col = cible.kind === 'porte' ? copie.portes : copie.chasses
+  const visee = col?.[cible.index ?? -1]
+  if (!visee) return { ok: false, message: 'La porte n’existe plus.' }
+  const nom = cible.kind === 'porte' ? 'La porte' : 'La chasse'
+  if (commandesDe(level, cible).some((c) => c.kind === commande.kind && c.index === commande.index)) {
+    return { ok: false, message: `${nom} est déjà reliée à cette commande.` }
+  }
+  if (typeof visee.canal !== 'number' || commandesDe(level, cible).length === 0) {
+    visee.canal = canalCommande
+  } else if (commande.kind === 'cible') {
+    copie.cibles![commande.index!].canal = visee.canal
+  } else {
+    copie.coupelles![commande.index!].canal = visee.canal
+  }
+  return { ok: true, level: copie, message: `${nom} est reliée : elle obéit à cette commande.` }
+}
+
+/** COUPE les liens d'une porte ou d'une chasse : elle prend un canal que
+ *  rien n'allume. Une porte fermée au repos le restera ; une chasse
+ *  redevient permanente. */
+export function coupeLiens(level: LevelDef, cible: SelectionJoueur): LevelDef | null {
+  const copie = structuredClone(level)
+  if (cible.kind === 'porte' && copie.portes?.[cible.index ?? -1]) {
+    copie.portes[cible.index!].canal = canalLibre(level)
+    return copie
+  }
+  if (cible.kind === 'chasse' && copie.chasses?.[cible.index ?? -1]) {
+    delete copie.chasses[cible.index!].canal
+    return copie
+  }
+  return null
 }

@@ -224,6 +224,16 @@ import {
 import { appelle } from '../game/reseau'
 import { issueChargement, questionChargement, tableauOuvert } from './chargement'
 import { Historique, type Pas } from './historique'
+import {
+  commandesDe,
+  coupeLiens,
+  lisPalier,
+  outilDeSelection,
+  outilPermis,
+  posePalier,
+  reglagesDeSelection,
+  relie,
+} from './profilJoueur'
 
 const STORE_KEY = 'projet21.editeur.v1'
 // À côté du brouillon : le LIEN avec la bibliothèque — quelle entrée est
@@ -234,6 +244,12 @@ const META_KEY = 'projet21.editeur.meta.v1'
 // les aides au placement (aimant de grille, alignement auto) : un réglage
 // de la MAIN, pas du tableau — il suit le concepteur d'une séance à l'autre
 const AIDES_KEY = 'projet21.editeur.aides.v1'
+// L'ATELIER DU JOUEUR a son brouillon À PART : celui du concepteur porte
+// des éléments réservés (boutique, ancres…) et un lien avec la
+// bibliothèque officielle — rien de cela ne doit passer chez le joueur, ni
+// l'inverse. Son « openId » est l'identifiant de la CRÉATION publiée.
+const ATELIER_KEY = 'projet21.atelier.v1'
+const ATELIER_META_KEY = 'projet21.atelier.meta.v1'
 
 // Couleurs des matériaux : celles de la légende du jeu, pour qu'on reconnaisse
 // une surface d'un écran à l'autre.
@@ -525,6 +541,30 @@ function blankLevel(): LevelDef {
   }
 }
 
+/** La salle vierge de l'atelier : une cuve, un départ, une sortie — rien
+ *  de ce que la liste blanche retirerait (ni code, ni par, ni zones). */
+function salleJoueurVierge(): LevelDef {
+  return {
+    name: 'Ma salle',
+    code: 'J-BROUILLON',
+    journal: '',
+    bounds: { minX: -1200, minY: -750, maxX: 1200, maxY: 750 },
+    spawn: { x: -950, y: 0, n: 900 },
+    exit: { minX: 1040, minY: -120, maxX: 1180, maxY: 120 },
+    boxes: [],
+    sponges: [],
+    labels: [{ x: 1110, y: 0, text: 'SAS', tone: 'sas' }],
+  }
+}
+
+/** Les boutons de la barre que l'atelier du joueur ne montre pas : la
+ *  bibliothèque officielle, le générateur, les échanges de fichiers, les
+ *  outils de mise en scène. ESSAYER, annuler, zoomer, la grille restent. */
+const BARRE_CONCEPTEUR = [
+  'ed-gen', 'ed-save', 'ed-save-as', 'ed-import', 'ed-copy', 'ed-export',
+  'ed-montage', 'ed-images', 'ed-fiches', 'ed-planche', 'ed-align',
+]
+
 export class LevelEditor {
   /** La police des étiquettes — une seule définition : le TRACÉ et la ZONE
    * CLIQUABLE doivent se mesurer dans la même, sinon elles divergent en
@@ -668,6 +708,14 @@ export class LevelEditor {
   // c'est qu'aucun travail local n'attend — la bibliothèque peut rattraper
   private base = ''
   private busy = false
+  // L'ATELIER DU JOUEUR (profilJoueur.ts) : le même éditeur, un autre
+  // visage — palette réduite, paliers au lieu de nombres, brouillon à part,
+  // aucune bibliothèque officielle. Une seule instance : le DOM de
+  // l'éditeur n'en supporte qu'une, le profil se choisit à l'ouverture.
+  private joueur = false
+  // RELIER : la porte (ou la chasse) qui attend sa commande — le prochain
+  // clic sur la carte la désigne
+  private relierVers: Sel = null
 
   constructor(host: HTMLElement, hooks: EditorHooks) {
     this.host = host
@@ -776,8 +824,103 @@ export class LevelEditor {
     this.fitView()
     this.syncForm()
     this.draw()
+    if (this.joueur) return // ni bibliothèque officielle, ni fiches du concepteur
     void this.refreshLibrary()
     void this.chargeSurcharges()
+  }
+
+  /** LE PROFIL : le concepteur (tout l'éditeur) ou le joueur (l'atelier).
+   *  Basculer range le brouillon du profil quitté sous SA clé, reprend celui
+   *  de l'autre, et repart d'un historique neuf — on n'annule pas d'un
+   *  profil à l'autre. */
+  setProfil(profil: 'concepteur' | 'joueur'): void {
+    const joueur = profil === 'joueur'
+    if (joueur === this.joueur) return
+    this.persist()
+    this.joueur = joueur
+    this.level = joueur ? salleJoueurVierge() : blankLevel()
+    this.openId = ''
+    this.base = ''
+    this.restore()
+    this.sel = null
+    this.multi = []
+    this.relierVers = null
+    this.setTool({ kind: 'select' })
+    this.historique = new Historique(this.etat())
+    this.majBoutonsHistoire()
+    this.appliqueProfilDom()
+  }
+
+  /** Le profil courant — main.ts route l'essai et sa conclusion selon lui. */
+  get profil(): 'concepteur' | 'joueur' {
+    return this.joueur ? 'joueur' : 'concepteur'
+  }
+
+  /** L'identifiant de la création publiée depuis ce brouillon (vide : pas
+   *  encore publiée). Rangé comme l'entrée ouverte du concepteur. */
+  get creationId(): string {
+    return this.joueur ? this.openId : ''
+  }
+
+  /** Note l'identifiant que le serveur a donné à la salle publiée : les
+   *  prochaines publications la RETOUCHENT au lieu d'en créer une autre. */
+  noteCreation(id: string): void {
+    if (!this.joueur) return
+    this.openId = id
+    this.persist()
+  }
+
+  /** Montre ou cache ce que le profil réserve. Rien n'est retiré du DOM :
+   *  bindUi, syncForm et validate lisent ces éléments sans garde — on les
+   *  masque par une classe, et le profil concepteur les retrouve intacts. */
+  private appliqueProfilDom(): void {
+    const j = this.joueur
+    this.host.classList.toggle('ed-joueur', j)
+    const cache = (el: Element | null, oui: boolean): void => {
+      el?.classList.toggle('ed-hors-profil', oui)
+    }
+    for (const b of Array.from(this.host.querySelectorAll<HTMLElement>('.ed-tool[data-tool]'))) {
+      cache(b, j && !outilPermis(b.dataset.tool ?? ''))
+    }
+    // un groupe de palette dont tous les outils sont cachés se cache aussi
+    for (const g of Array.from(this.host.querySelectorAll('.ed-side:not(.ed-side--right) .ed-group'))) {
+      const outils = Array.from(g.querySelectorAll('.ed-tool'))
+      cache(g, j && outils.length > 0 && outils.every((o) => o.classList.contains('ed-hors-profil')))
+    }
+    for (const id of BARRE_CONCEPTEUR) cache(this.host.querySelector(`#${id}`), j)
+    // le panneau de droite : la sélection, le contrôle et, du « Tableau »,
+    // le nom et la description seulement
+    const droite = this.host.querySelector('.ed-side--right')
+    for (const g of Array.from(droite?.querySelectorAll(':scope > .ed-group') ?? [])) {
+      const garde = g.querySelector('#ed-props, #ed-check, #ed-name')
+      cache(g, j && !garde)
+      if (!g.querySelector('#ed-name')) continue
+      for (const enfant of Array.from(g.children)) {
+        const utile =
+          enfant.classList.contains('k') || enfant.querySelector('#ed-name') || enfant.id === 'ed-journal'
+        cache(enfant, j && !utile)
+      }
+      const titre = g.querySelector(':scope > .k')
+      if (titre) {
+        titre.textContent = j ? 'Votre salle' : 'Tableau'
+      }
+      const desc = g.querySelector('#ed-journal') as HTMLTextAreaElement | null
+      if (desc) {
+        desc.placeholder = j
+          ? 'Une description pour les autres joueurs (280 signes, modérée).'
+          : 'Entrée du journal de bord…'
+        desc.maxLength = j ? 280 : -1
+      }
+      const nom = g.querySelector('#ed-name') as HTMLInputElement | null
+      if (nom) nom.maxLength = j ? 40 : -1
+    }
+    // les libellés que l'atelier renomme : l'original se garde pour le retour
+    for (const [id, libelle] of [['ed-play', '▶ ESSAYER'], ['ed-new', 'Nouvelle salle']] as const) {
+      const b = this.host.querySelector<HTMLElement>(`#${id}`)
+      if (!b) continue
+      b.dataset.libelle ??= b.textContent ?? ''
+      b.textContent = j ? libelle : b.dataset.libelle
+    }
   }
 
   close(): void {
@@ -814,9 +957,9 @@ export class LevelEditor {
   // ——— Persistance locale ————————————————————————————————
   private persist(): void {
     try {
-      localStorage.setItem(STORE_KEY, serializeLevel(this.level))
+      localStorage.setItem(this.joueur ? ATELIER_KEY : STORE_KEY, serializeLevel(this.level))
       localStorage.setItem(
-        META_KEY,
+        this.joueur ? ATELIER_META_KEY : META_KEY,
         JSON.stringify({ openId: this.openId, base: this.base }),
       )
     } catch {
@@ -826,11 +969,11 @@ export class LevelEditor {
 
   private restore(): void {
     try {
-      const raw = localStorage.getItem(STORE_KEY)
+      const raw = localStorage.getItem(this.joueur ? ATELIER_KEY : STORE_KEY)
       if (!raw) return
       const { level } = parseLevel(JSON.parse(raw))
       if (level) this.level = level
-      const meta = JSON.parse(localStorage.getItem(META_KEY) ?? '{}') as {
+      const meta = JSON.parse(localStorage.getItem(this.joueur ? ATELIER_META_KEY : META_KEY) ?? '{}') as {
         openId?: string
         base?: string
       }
@@ -2372,6 +2515,23 @@ export class LevelEditor {
         this.guides = []
         this.pinceEcart = this.ecartDoigts()
         this.pinceCentre = this.centreDoigts()
+        this.draw()
+        return
+      }
+
+      // RELIER (atelier) : le clic désigne la commande de la porte choisie
+      if (this.relierVers && e.button === 0 && this.tool.kind === 'select') {
+        const vers = this.relierVers
+        this.relierVers = null
+        const r = relie(this.level, vers, this.pick(w.x, w.y) ?? { kind: 'rien' })
+        if (r.ok) {
+          this.level = r.level
+          this.sel = vers
+          this.commit(r.message)
+        } else {
+          this.status(r.message)
+          this.syncProps()
+        }
         this.draw()
         return
       }
@@ -4358,6 +4518,13 @@ export class LevelEditor {
   }
 
   private commit(hint: string): void {
+    // L'ATELIER : des mires sans le tir de glace, rien ne pourrait les
+    // toucher (levelIO le signale) — la salle impose alors l'Éclateur, la
+    // seule carte qu'une création peut imposer (api/_creation.ts)
+    if (this.joueur) {
+      if ((this.level.mires?.length ?? 0) > 0) this.level.cartes = ['eclateur']
+      else delete this.level.cartes
+    }
     this.histoire() // un instantané si (et seulement si) le tableau a changé
     this.hint = hint
     this.previsionExacte = null // le tableau a changé : la ligne exacte ne vaut plus
@@ -4411,6 +4578,11 @@ export class LevelEditor {
     for (const b of Array.from(this.host.querySelectorAll('.ed-tool'))) {
       b.addEventListener('click', () => {
         const key = (b as HTMLElement).dataset.tool ?? 'select'
+        // L'ATELIER DU JOUEUR : c'est la SEULE porte des outils (aucun
+        // raccourci clavier n'en choisit) — un outil hors du profil n'entre
+        // pas, même si son bouton réapparaissait
+        if (this.joueur && !outilPermis(key)) return
+        this.relierVers = null
         if (key.startsWith('box:')) {
           // choisir une SURFACE fixe la matière courante — les moules
           // (disque, capsule…) s'y couleront ensuite
@@ -4830,11 +5002,13 @@ export class LevelEditor {
     this.el('ed-new').addEventListener('click', () => {
       if (
         !confirm(
-          'Repartir d’un tableau vierge ? Le brouillon en cours sera perdu.',
+          this.joueur
+            ? 'Commencer une nouvelle salle ? Celle en cours sera perdue sur ce poste (si elle est partagée, elle reste en ligne).'
+            : 'Repartir d’un tableau vierge ? Le brouillon en cours sera perdu.',
         )
       )
         return
-      this.level = blankLevel()
+      this.level = this.joueur ? salleJoueurVierge() : blankLevel()
       this.openId = ''
       this.base = ''
       this.sel = null
@@ -5029,7 +5203,9 @@ export class LevelEditor {
     this.renderLibrary(lib === null)
     // le brouillon restauré peut dater d'une autre session : on le confronte
     // à la bibliothèque fraîchement chargée
-    if (lib) this.rattrapeBibliotheque()
+    // (l'atelier du joueur n'a pas d'entrée de bibliothèque : son « openId »
+    // est une création, le rattrapage le confondrait)
+    if (lib && !this.joueur) this.rattrapeBibliotheque()
   }
 
   /** Les tableaux LIVRÉS absents de la bibliothèque : tant qu'ils n'y sont
@@ -5688,6 +5864,98 @@ export class LevelEditor {
   }
 
   /** Panneau de propriétés de l'objet sélectionné. */
+  /** LE PANNEAU DE L'ATELIER : ce qu'est l'élément choisi (son nom, sa
+   *  phrase), ses paliers en boutons, ses liens, et la corbeille. Chaque
+   *  geste passe par commit : historique, brouillon, vérification. */
+  private peintPaliers(host: HTMLElement, s: Sel): void {
+    const esc = (t: string): string =>
+      t.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
+    if (!s) {
+      host.innerHTML =
+        '<p class="ed-empty">Rien de choisi. Prenez un élément dans la palette, à gauche, puis cliquez ou glissez dans la salle. Cliquez un élément posé pour le régler ; glissez-le pour le déplacer.</p>'
+      return
+    }
+    const sj = { kind: s.kind, index: 'index' in s ? s.index : undefined }
+    const outil = outilDeSelection(this.level, sj)
+    const reglages = reglagesDeSelection(sj)
+    const parties: string[] = [
+      `<div class="ed-pal-tete"><small>${esc(outil?.famille ?? '')}</small><b>${esc(outil?.nom ?? 'Élément')}</b>` +
+        (outil ? `<p>${esc(outil.phrase)}</p>` : '<p>Un élément que l’atelier ne règle pas : déplacez-le, ou mettez-le à la corbeille.</p>') +
+        `</div>`,
+    ]
+    for (const r of reglages) {
+      const courant = lisPalier(this.level, sj, r)
+      parties.push(
+        `<fieldset class="ed-pal"><legend>${esc(r.nom)}</legend><div class="ed-pal-choix">` +
+          r.paliers
+            .map(
+              (p, i) =>
+                `<button type="button" class="ed-pal-btn${i === courant ? ' on' : ''}" aria-pressed="${i === courant}" data-reglage="${r.id}" data-palier="${i}">${esc(p.label)}</button>`,
+            )
+            .join('') +
+          `</div></fieldset>`,
+      )
+    }
+    if (s.kind === 'label') {
+      const texte = this.level.labels[s.index]?.text ?? ''
+      parties.push(
+        `<label class="ed-f"><span>Texte (40 signes)</span><input id="pj-texte" maxlength="40" value="${esc(texte)}" /></label>`,
+      )
+    }
+    const nomCommande = (c: { kind: string; index?: number }): string =>
+      `${c.kind === 'cible' ? 'Pastille' : 'Coupelle'} nº ${(c.index ?? 0) + 1}`
+    if (s.kind === 'porte' || s.kind === 'chasse') {
+      const cmds = commandesDe(this.level, sj)
+      parties.push(
+        `<div class="ed-pal-liens"><span>COMMANDÉE PAR</span>` +
+          (cmds.length
+            ? cmds.map((c) => `<p>${nomCommande(c)}</p>`).join('')
+            : `<p class="ed-empty">Aucune commande : ${s.kind === 'porte' ? 'elle reste dans son état de repos' : 'elle souffle en permanence'}.</p>`) +
+          `<button type="button" class="ed-btn" id="pj-relier">${this.relierVers ? 'Cliquez une pastille ou une coupelle…' : 'Relier une commande'}</button>` +
+          (cmds.length ? `<button type="button" class="ed-btn" id="pj-couper">Couper les liens</button>` : '') +
+          `</div>`,
+      )
+    }
+    if (s.kind === 'cible' || s.kind === 'coupelle') {
+      parties.push(
+        `<p class="ed-empty">Pour qu’elle ouvre quelque chose : choisissez la porte (ou la chasse), puis « Relier une commande », puis cliquez celle-ci.</p>`,
+      )
+    }
+    if (s.kind !== 'exit' && s.kind !== 'spawn') {
+      parties.push(`<button type="button" class="ed-danger" id="p-del">Supprimer (Ctrl+Z pour annuler)</button>`)
+    }
+    host.innerHTML = parties.join('')
+
+    for (const b of Array.from(host.querySelectorAll<HTMLButtonElement>('[data-reglage]'))) {
+      b.addEventListener('click', () => {
+        const i = Number(b.dataset.palier)
+        const r = reglages.find((x) => x.id === b.dataset.reglage)
+        const neuf = posePalier(this.level, sj, b.dataset.reglage ?? '', i)
+        if (!neuf || !r) return
+        this.level = neuf
+        this.commit(`${r.nom} : ${r.paliers[i].label}.`)
+      })
+    }
+    host.querySelector('#pj-texte')?.addEventListener('change', (e) => {
+      if (s.kind !== 'label' || !this.level.labels[s.index]) return
+      // la règle de l'éditeur : des MAJUSCULES, 40 signes
+      this.level.labels[s.index].text = (e.target as HTMLInputElement).value.toUpperCase().slice(0, 40)
+      this.commit('Texte changé.')
+    })
+    host.querySelector('#pj-relier')?.addEventListener('click', () => {
+      this.relierVers = s
+      this.status('Cliquez la pastille ou la coupelle qui la commandera.')
+      this.syncProps()
+    })
+    host.querySelector('#pj-couper')?.addEventListener('click', () => {
+      const neuf = coupeLiens(this.level, sj)
+      if (!neuf) return
+      this.level = neuf
+      this.commit('Liens coupés.')
+    })
+    host.querySelector('#p-del')?.addEventListener('click', () => this.deleteSel())
+  }
+
   private syncProps(): void {
     const host = this.el('ed-props')
     // sélection multiple : le panneau devient l'atelier d'ALIGNEMENT
@@ -5748,6 +6016,14 @@ export class LevelEditor {
       return
     }
     const s = this.sel
+    // L'ATELIER DU JOUEUR : des paliers nommés, jamais de champ numérique —
+    // et SURTOUT pas le branchement générique plus bas (readProps relit
+    // chaque champ par son id ; un id absent se lit 0 et corromprait
+    // l'élément)
+    if (this.joueur) {
+      this.peintPaliers(host, s)
+      return
+    }
     if (!s) {
       host.innerHTML =
         '<p class="ed-empty">Rien de sélectionné. Cliquez un élément (Maj + clic : sélection multiple), ou glissez dans le vide pour tracer un CADRE qui retient tout ce qu’il entoure. Ctrl+C / Ctrl+V copie et colle sous la souris. Ou choisissez un outil et glissez pour tracer un élément.</p>' +

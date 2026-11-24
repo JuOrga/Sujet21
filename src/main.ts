@@ -498,6 +498,7 @@ import {
 } from './game/ceremonie'
 import { cartoucheHTML, iconeDuGlyphe, offreHTML, plaqueHTML, puceHTML } from './game/cartouches'
 import { fmtDuree, fmtL, fmtTime } from './game/formats'
+import { publieCreation, raisonCreation } from './game/netCreations'
 import { cuveHTML, sceauHTML, SCENES_FIN } from './game/ceremonieObjets'
 import {
   finDescenteHTML,
@@ -6781,7 +6782,7 @@ function renderPlanche(): void {
       e.stopPropagation()
       // la planche ne se replie qu'une fois l'éditeur LÀ : un chargement
       // manqué la laisse ouverte, avec sa bibliothèque et son défilement
-      void openEditor().then((ed) => {
+      void openEditor('concepteur').then((ed) => {
         if (!ed) return
         plancheEl.hidden = true
         sallesEl.hidden = true
@@ -8493,9 +8494,13 @@ fetchLibrary().then((lib) => {
 // écraser le travail en cours par le tableau qu'on vient d'essayer.
 // Il se charge au premier appel : l'écran ne bascule qu'une fois l'outil
 // là — un échec de chargement laisse le jeu exactement où il était.
-async function openEditor(): Promise<LevelEditor | null> {
+/** Ouvre l'éditeur. Avec un profil, il y bascule (concepteur : tout
+ *  l'éditeur ; joueur : l'atelier) ; sans, il garde le sien — c'est le
+ *  retour d'un essai, qui doit rendre l'atelier à l'atelier. */
+async function openEditor(profil?: 'concepteur' | 'joueur'): Promise<LevelEditor | null> {
   const ed = await chargeEditeur()
   if (!ed) return null
+  if (profil) ed.setProfil(profil)
   overlay.classList.remove('visible')
   if (mbFinOuverte()) fermeMiseEnBonbonne() // la scène de fin remplace l'overlay
   document.body.classList.remove('playing')
@@ -8505,6 +8510,50 @@ async function openEditor(): Promise<LevelEditor | null> {
   ed.open()
   return ed
 }
+// ---- L'ATELIER DU JOUEUR : la sortie atteinte partage la salle -------------
+// La partie qui vient d'atteindre la sortie est la PREUVE que la salle se
+// traverse : elle part avec la salle et en devient le premier record
+// (api/_creations.ts). Le serveur trie la salle par la liste blanche
+// (api/_creation.ts) et la range. La première fois, il lui donne un
+// identifiant, que le brouillon de l'atelier retient : les essais réussis
+// suivants RETOUCHENT la même salle au lieu d'en créer une autre — et une
+// salle retouchée repart avec des records vierges.
+const echappeHtml = (t: string): string =>
+  t.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
+
+async function partageDepuisAtelier(
+  ed: LevelEditor,
+  salle: LevelDef,
+  litres: number,
+  temps: number,
+): Promise<void> {
+  const auteur = records.operator() || 'ANONYME'
+  const deja = ed.creationId
+  const p = await publieCreation(salle, auteur, { litres, temps }, deja || undefined)
+  // l'overlay de fin a pu être refermé entre-temps (R, retour à l'atelier) :
+  // on ne le rouvre pas par-dessus autre chose
+  if (!overlay.classList.contains('visible')) return
+  if (p) {
+    ed.noteCreation(p.id)
+    showOverlay(
+      deja ? 'SALLE REPUBLIÉE' : 'SALLE PARTAGÉE',
+      `« ${echappeHtml(salle.name)} » est en ligne, sous le nom ${echappeHtml(auteur)}. ` +
+        `${fmtL(litres)} en ${fmtTime(temps)} : ${deja ? 'si la salle a changé, ses records repartent de cette partie' : 'le premier record de la salle'}. ` +
+        `Chaque essai réussi republie vos retouches.`,
+      'success',
+      'RETOUR À L’ATELIER',
+    )
+  } else {
+    showOverlay(
+      'SORTIE ATTEINTE',
+      `La salle n’a pas pu être partagée : ${echappeHtml(raisonCreation() || 'le serveur est injoignable')}. ` +
+        `Elle reste enregistrée sur ce poste ; un prochain essai réussi réessaiera.`,
+      'danger',
+      'RETOUR À L’ATELIER',
+    )
+  }
+}
+
 // ---- L'ÉDITEUR DE LA CARTE DE LA STATION (editor/editeurCarte.ts) ----
 // Même porte que l'éditeur de tableaux : mode concepteur, ou ?carte dans
 // l'URL. Il couvre l'écran et fige la partie derrière lui.
@@ -8710,7 +8759,7 @@ const regie = new Regie(regieEl, {
         'L’éditeur de tableaux : les surfaces, les mécanismes, les zones, le biome et le code atelier d’une salle — publiée dans la bibliothèque partagée, elle entre dans la planche et dans la pioche.',
       domaines: [],
       ouvre: () => {
-        void openEditor().then((ed) => ed && regie.close())
+        void openEditor('concepteur').then((ed) => ed && regie.close())
       },
     },
     {
@@ -8809,6 +8858,11 @@ const ouvreMulti = (code?: string): void => {
   })
 }
 document.getElementById('home-multi')?.addEventListener('click', () => ouvreMulti())
+// L'ATELIER DU JOUEUR : l'éditeur, au profil joueur (editor/profilJoueur.ts)
+document.getElementById('home-atelier')?.addEventListener('click', () => {
+  hasPlayed = true
+  void openEditor('joueur')
+})
 // LE LIEN D'INVITATION : « ?multi=CODE » mène droit dans la partie —
 // l'ami n'a ni bouton à trouver ni code à taper (sur un téléphone, c'est la
 // différence entre rejoindre et renoncer). Comme le bouton, il vaut pour
@@ -8969,7 +9023,7 @@ const input = new Input()
 // module au premier lancement (TDZ) et laissait une page à moitié câblée.
 if (new URLSearchParams(location.search).has('editeur')) {
   hasPlayed = true
-  void openEditor()
+  void openEditor('concepteur')
 }
 if (new URLSearchParams(location.search).has('carte')) {
   hasPlayed = true
@@ -21824,6 +21878,11 @@ function corpsImage(now: number): boolean {
     const refRecords = bestsLibre
       ? ` Records de la salle : 💧 ${fmtL(bestsLibre.volume.liters)} · ⏱ ${fmtTime(bestsLibre.chrono.time)}.`
       : ''
+    if (fromEditor && editor?.profil === 'joueur' && testLevel) {
+      // L'ATELIER : la sortie atteinte est la PREUVE de traversée — la salle
+      // se partage (ou se republie) avec cette partie pour premier record
+      void partageDepuisAtelier(editor, testLevel, surplus, run.tableauTime)
+    }
     showOverlay(
       fromEditor ? 'TABLEAU FRANCHI' : `ESSAI ${level.code} CONCLU`,
       fromEditor
