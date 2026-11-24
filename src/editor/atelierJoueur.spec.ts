@@ -13,9 +13,12 @@ import { nettoieCreation } from '../../api/_creation'
 import type { LevelDef } from '../game/level'
 import { parseLevel } from '../game/levelIO'
 import {
+  FAMILLES_JOUEUR,
   canalDeCommande,
+  cleDOutil,
   commandesDe,
   coupeLiens,
+  familleDeLOutil,
   lisPalier,
   outilDeSelection,
   posePalier,
@@ -159,6 +162,34 @@ describe('relier une commande à une porte, sans numéro', () => {
     if (!v.ok) throw new Error(v.raison)
     const { level } = parseLevel({ ...v.salle, code: 'J-TEST' })
     expect(level!.portes![0].canal).toBe(level!.coupelles![0].canal)
+  })
+})
+
+describe('la barre de l’atelier : des familles, pas une liste à faire défiler', () => {
+  it('chaque famille tient en une rangée : sept outils au plus', () => {
+    for (const f of FAMILLES_JOUEUR) expect(f.outils.length, f.nom).toBeLessThanOrEqual(7)
+  })
+
+  it('l’outil en main se retrouve dans la barre, et ouvre sa famille', () => {
+    expect(cleDOutil({ kind: 'box', material: 2 })).toBe('box:2')
+    expect(cleDOutil({ kind: 'box', material: 0, forme: 1 })).toBe('forme:1')
+    expect(cleDOutil({ kind: 'structure', type: 1 })).toBe('struct:1')
+    expect(cleDOutil({ kind: 'decal', sorte: 'tuyaux' })).toBe('decal:tuyaux')
+    expect(cleDOutil({ kind: 'bande' })).toBe('bande')
+    expect(cleDOutil({ kind: 'select' })).toBe('select')
+    expect(familleDeLOutil('puits')).toBe('forces')
+    expect(familleDeLOutil('box:6')).toBe('chaleur')
+    expect(familleDeLOutil('select')).toBeNull()
+    // chaque outil de la barre a sa famille
+    for (const f of FAMILLES_JOUEUR) for (const o of f.outils) expect(familleDeLOutil(o.outil)).toBe(f.id)
+  })
+
+  it('au profil joueur, la palette latérale cède la place à la barre sous la salle', () => {
+    const HTML = readFileSync(new URL('../../index.html', import.meta.url), 'utf-8')
+    // la barre vit DANS la scène, sous le canevas
+    expect(HTML).toMatch(/<div id="ed-stage">[\s\S]*?<nav id="ed-dock"[\s\S]*?<\/div>/)
+    expect(HTML).toMatch(/#editor\.ed-joueur > \.ed-side:not\(\.ed-side--right\) \{ display: none; \}/)
+    expect(HTML).toMatch(/#editor\.ed-joueur #ed-dock \{/)
   })
 })
 
