@@ -7078,6 +7078,40 @@
          (bindUi et syncForm le lisent sans garde, et le concepteur le
          retrouve intact) ; les réglages sont des paliers en boutons. */
       #editor .ed-hors-profil { display: none !important; }
+      /* LA BARRE DE L'ATELIER : la palette latérale (une longue liste à
+         faire défiler) cède la place à une barre sous la salle — six
+         onglets de familles, puis les 3 à 7 outils de la famille choisie,
+         chacun avec sa phrase. La salle gagne la largeur de la colonne. */
+      #ed-dock { display: none; }
+      #editor.ed-joueur {
+        grid-template-columns: 1fr min(calc(322px * var(--ui)), 34vw);
+      }
+      #editor.ed-joueur > .ed-side:not(.ed-side--right) { display: none; }
+      #editor.ed-joueur #ed-stage { display: grid; grid-template-rows: minmax(0, 1fr) auto; }
+      #editor.ed-joueur #ed-canvas { min-height: 0; }
+      #editor.ed-joueur #ed-coords,
+      #editor.ed-joueur #ed-hint { top: 8px; bottom: auto; }
+      #editor.ed-joueur #ed-dock {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        padding: 10px 12px 12px;
+        border-top: 1px solid var(--line);
+        background: var(--void);
+      }
+      #editor .ed-dock-familles { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+      #editor .ed-dock-familles .ed-dock-choisir { margin-right: 10px; }
+      #editor .ed-dock-fam { min-height: 40px; padding: 0 14px; }
+      #editor .ed-dock-fam[aria-selected='true'] { background: var(--glow); color: #030710; border-color: var(--glow); font-weight: 600; }
+      #editor .ed-dock-outils { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 180px), 1fr)); gap: 6px; }
+      #editor .ed-dock-outil {
+        display: flex; gap: 10px; align-items: flex-start; text-align: left;
+        min-height: 52px; padding: 8px 10px; white-space: normal; line-height: 1.3;
+      }
+      #editor .ed-dock-outil[aria-pressed='true'] { border-color: var(--glow); box-shadow: inset 0 0 0 1px var(--glow); }
+      #editor .ed-dock-outil i { flex: 0 0 22px; height: 22px; border-radius: 4px; border: 1px solid var(--line); }
+      #editor .ed-dock-outil b { display: block; font-size: 13px; font-weight: 600; }
+      #editor .ed-dock-outil small { display: block; font-size: 11px; opacity: .78; margin-top: 2px; }
       #editor .ed-pal-tete { display: flex; flex-direction: column; gap: 4px; margin-bottom: 12px; }
       #editor .ed-pal-tete small { font-size: 11px; letter-spacing: .06em; text-transform: uppercase; opacity: .75; }
       #editor .ed-pal-tete b { font-size: 15px; }
@@ -7697,6 +7731,8 @@
           border-left: none;
           border-top: 1px solid var(--line);
         }
+        #editor.ed-joueur { grid-template-columns: 1fr; }
+        #editor .ed-dock-outil small { display: none; }
       }
 
       @media (prefers-reduced-motion: reduce) {
@@ -10343,6 +10379,10 @@
         <canvas id="ed-canvas"></canvas>
         <div id="ed-coords">x 0 · y 0</div>
         <div id="ed-hint"></div>
+        <!-- LA BARRE DE L'ATELIER (profil joueur) : les familles en onglets,
+             et les seuls outils de la famille choisie — au lieu de la grande
+             palette latérale à faire défiler. Peinte par editor.ts. -->
+        <nav id="ed-dock" aria-label="Les éléments de l’atelier"></nav>
       </div>
 
       <!-- Le panneau du GÉNÉRATEUR : les réglages voyagent dans le code (~) -->

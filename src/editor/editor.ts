@@ -225,8 +225,11 @@ import { appelle } from '../game/reseau'
 import { issueChargement, questionChargement, tableauOuvert } from './chargement'
 import { Historique, type Pas } from './historique'
 import {
+  FAMILLES_JOUEUR,
+  cleDOutil,
   commandesDe,
   coupeLiens,
+  familleDeLOutil,
   lisPalier,
   outilDeSelection,
   outilPermis,
@@ -716,6 +719,8 @@ export class LevelEditor {
   // RELIER : la porte (ou la chasse) qui attend sa commande — le prochain
   // clic sur la carte la désigne
   private relierVers: Sel = null
+  // LA BARRE DE L'ATELIER : la famille dont les outils sont montrés
+  private familleDock = 'batir'
 
   constructor(host: HTMLElement, hooks: EditorHooks) {
     this.host = host
@@ -914,6 +919,7 @@ export class LevelEditor {
       const nom = g.querySelector('#ed-name') as HTMLInputElement | null
       if (nom) nom.maxLength = j ? 40 : -1
     }
+    this.peintDock()
     // les libellés que l'atelier renomme : l'original se garde pour le retour
     for (const [id, libelle] of [['ed-play', '▶ ESSAYER'], ['ed-new', 'Nouvelle salle']] as const) {
       const b = this.host.querySelector<HTMLElement>(`#${id}`)
@@ -4548,6 +4554,65 @@ export class LevelEditor {
       )
     }
     this.canvas.style.cursor = t.kind === 'select' ? 'default' : 'crosshair'
+    if (this.joueur) this.peintDock()
+  }
+
+  /** LA BARRE DE L'ATELIER, sous la salle : « Choisir / déplacer », les six
+   *  familles en onglets, puis les seuls outils de la famille ouverte, avec
+   *  leur phrase. Un outil de la barre CLIQUE le bouton caché de la palette
+   *  d'origine : même porte (le filtre du profil), même logique de pose. */
+  private peintDock(): void {
+    const dock = this.host.querySelector<HTMLElement>('#ed-dock')
+    if (!dock) return
+    if (!this.joueur) {
+      dock.innerHTML = ''
+      return
+    }
+    const esc = (t: string): string =>
+      t.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
+    const courant = cleDOutil(this.tool as Parameters<typeof cleDOutil>[0])
+    // l'outil en main ouvre sa famille (pris autrement que par la barre)
+    this.familleDock = familleDeLOutil(courant) ?? this.familleDock
+    const fam = FAMILLES_JOUEUR.find((f) => f.id === this.familleDock) ?? FAMILLES_JOUEUR[0]
+    const teinte = (outil: string): string => {
+      const m = /^box:(\d+)$/.exec(outil)
+      if (m) return MAT_COLORS[Number(m[1])] ?? '#4a6b80'
+      if (outil === 'spawn') return '#63b7e6'
+      if (outil === 'exit') return '#3fd69b'
+      return 'transparent'
+    }
+    dock.innerHTML =
+      `<div class="ed-dock-familles" role="tablist" aria-label="Familles">` +
+      `<button type="button" class="ed-dock-fam ed-dock-choisir" data-dock-outil="select" aria-pressed="${courant === 'select'}">Choisir / déplacer</button>` +
+      FAMILLES_JOUEUR.map(
+        (f) =>
+          `<button type="button" role="tab" class="ed-dock-fam" aria-selected="${f.id === fam.id}" data-dock-famille="${f.id}" title="${esc(f.phrase)}">${esc(f.nom)}</button>`,
+      ).join('') +
+      `</div>` +
+      `<div class="ed-dock-outils" role="tabpanel" aria-label="${esc(fam.nom)}">` +
+      fam.outils
+        .map(
+          (o) =>
+            `<button type="button" class="ed-dock-outil" data-dock-outil="${o.outil}" aria-pressed="${o.outil === courant}">` +
+            `<i style="background:${teinte(o.outil)}"></i><span><b>${esc(o.nom)}</b><small>${esc(o.phrase)}</small></span></button>`,
+        )
+        .join('') +
+      `</div>`
+    for (const b of Array.from(dock.querySelectorAll<HTMLElement>('[data-dock-famille]'))) {
+      b.addEventListener('click', () => {
+        this.familleDock = b.dataset.dockFamille ?? 'batir'
+        this.peintDock()
+      })
+    }
+    for (const b of Array.from(dock.querySelectorAll<HTMLElement>('[data-dock-outil]'))) {
+      b.addEventListener('click', () => {
+        const cle = b.dataset.dockOutil ?? 'select'
+        // le bouton d'origine, caché : sa logique de pose est la seule
+        const origine = this.host.querySelector<HTMLElement>(`.ed-tool[data-tool="${cle}"]`)
+        origine?.click()
+        this.peintDock()
+      })
+    }
   }
 
   private toolKey(t: Tool): string {

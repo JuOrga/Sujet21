@@ -530,3 +530,38 @@ export function coupeLiens(level: LevelDef, cible: SelectionJoueur): LevelDef | 
   }
   return null
 }
+
+// ---- LA BARRE DE L'ATELIER -------------------------------------------------------
+
+/** La clé de palette (data-tool) de l'outil en main : la barre de
+ *  l'atelier s'en sert pour surligner le bon bouton. */
+export function cleDOutil(t: {
+  kind: string
+  material?: number
+  forme?: number
+  sorte?: string
+  type?: number
+  force?: string
+  monnaie?: string
+}): string {
+  switch (t.kind) {
+    case 'box':
+      return t.forme ? `forme:${t.forme}` : `box:${t.material ?? 0}`
+    case 'decal':
+      return `decal:${t.sorte ?? ''}`
+    case 'structure':
+      return `struct:${t.type ?? 0}`
+    case 'zone':
+      return `zone:${t.force ?? ''}`
+    case 'plot':
+      return `plot:${t.monnaie ?? ''}`
+    default:
+      return t.kind
+  }
+}
+
+/** La famille où se range un outil — la barre s'y ouvre quand l'outil
+ *  est pris ailleurs (un raccourci, l'annulation). */
+export function familleDeLOutil(outil: string): string | null {
+  return FAMILLES_JOUEUR.find((f) => f.outils.some((x) => x.outil === outil))?.id ?? null
+}
