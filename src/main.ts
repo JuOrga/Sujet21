@@ -8900,6 +8900,13 @@ const ecranCreations = new EcranCreations(creationsEl, {
     hasPlayed = true
     void openEditor('joueur')
   },
+  // une salle publiée depuis ce poste se rouvre dans l'atelier : sa copie
+  // de MES SALLES, sinon la version en ligne
+  modifier: (lvl, id) => {
+    ecranCreations.close()
+    hasPlayed = true
+    void openEditor('joueur').then((ed) => ed?.ouvreCreation(id, lvl))
+  },
   fermer: () => ecranCreations.close(),
   operateur: () => records.operator(),
 })
