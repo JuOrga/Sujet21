@@ -224,6 +224,7 @@ import {
 import { appelle } from '../game/reseau'
 import { issueChargement, questionChargement, tableauOuvert } from './chargement'
 import { Historique, type Pas } from './historique'
+import { iconeOutil } from './iconesAtelier'
 import {
   FAMILLES_JOUEUR,
   cleDOutil,
@@ -828,6 +829,7 @@ export class LevelEditor {
     this.host.classList.add('visible')
     this.fitView()
     this.syncForm()
+    this.peintEtatSalle()
     this.draw()
     if (this.joueur) return // ni bibliothèque officielle, ni fiches du concepteur
     void this.refreshLibrary()
@@ -869,10 +871,39 @@ export class LevelEditor {
 
   /** Note l'identifiant que le serveur a donné à la salle publiée : les
    *  prochaines publications la RETOUCHENT au lieu d'en créer une autre. */
-  noteCreation(id: string): void {
+  noteCreation(id: string, publiee: LevelDef): void {
     if (!this.joueur) return
     this.openId = id
+    // ce qui est EN LIGNE : l'encart « Votre salle » compare le brouillon à
+    // cette version pour dire si des retouches attendent d'être partagées
+    this.base = serializeLevel(publiee)
     this.persist()
+    this.peintEtatSalle()
+  }
+
+  /** L'ENCART « VOTRE SALLE » : où en est la salle — toujours enregistrée
+   *  sur ce poste (à chaque geste, sans bouton), puis pas encore partagée,
+   *  partagée et à jour, ou partagée avec des retouches qui attendent. Il
+   *  répond à la question « comment je publie ? » là où elle se pose. */
+  private peintEtatSalle(): void {
+    const el = this.host.querySelector<HTMLElement>('#ed-etat-salle')
+    if (!el) return
+    if (!this.joueur) {
+      el.innerHTML = ''
+      return
+    }
+    const enregistree = '<p class="ok">Enregistrée sur ce poste — automatiquement, à chaque geste.</p>'
+    let partage: string
+    if (!this.openId) {
+      partage =
+        '<p class="attente">Pas encore partagée.</p><p>Pour la partager : <b>ESSAYER ET PARTAGER</b>, puis atteindre la sortie. Une salle se partage quand vous avez prouvé qu’elle se traverse.</p>'
+    } else if (this.base === serializeLevel(this.level)) {
+      partage = '<p class="ok">Partagée : elle est dans l’écran CRÉATIONS, à jour.</p>'
+    } else {
+      partage =
+        '<p class="attente">Partagée, mais vos retouches ne le sont pas encore.</p><p>Pour les partager : <b>ESSAYER ET PARTAGER</b>, puis atteindre la sortie. Ses records repartiront de votre partie.</p>'
+    }
+    el.innerHTML = enregistree + partage
   }
 
   /** Montre ou cache ce que le profil réserve. Rien n'est retiré du DOM :
@@ -902,7 +933,10 @@ export class LevelEditor {
       if (!g.querySelector('#ed-name')) continue
       for (const enfant of Array.from(g.children)) {
         const utile =
-          enfant.classList.contains('k') || enfant.querySelector('#ed-name') || enfant.id === 'ed-journal'
+          enfant.classList.contains('k') ||
+          enfant.querySelector('#ed-name') ||
+          enfant.id === 'ed-journal' ||
+          enfant.id === 'ed-etat-salle'
         cache(enfant, j && !utile)
       }
       const titre = g.querySelector(':scope > .k')
@@ -920,8 +954,9 @@ export class LevelEditor {
       if (nom) nom.maxLength = j ? 40 : -1
     }
     this.peintDock()
+    this.peintEtatSalle()
     // les libellés que l'atelier renomme : l'original se garde pour le retour
-    for (const [id, libelle] of [['ed-play', '▶ ESSAYER'], ['ed-new', 'Nouvelle salle']] as const) {
+    for (const [id, libelle] of [['ed-play', '▶ ESSAYER ET PARTAGER'], ['ed-new', 'Nouvelle salle']] as const) {
       const b = this.host.querySelector<HTMLElement>(`#${id}`)
       if (!b) continue
       b.dataset.libelle ??= b.textContent ?? ''
@@ -4537,6 +4572,7 @@ export class LevelEditor {
     this.persist()
     this.syncProps()
     this.validate()
+    this.peintEtatSalle()
     this.draw()
   }
 
@@ -4574,16 +4610,9 @@ export class LevelEditor {
     // l'outil en main ouvre sa famille (pris autrement que par la barre)
     this.familleDock = familleDeLOutil(courant) ?? this.familleDock
     const fam = FAMILLES_JOUEUR.find((f) => f.id === this.familleDock) ?? FAMILLES_JOUEUR[0]
-    const teinte = (outil: string): string => {
-      const m = /^box:(\d+)$/.exec(outil)
-      if (m) return MAT_COLORS[Number(m[1])] ?? '#4a6b80'
-      if (outil === 'spawn') return '#63b7e6'
-      if (outil === 'exit') return '#3fd69b'
-      return 'transparent'
-    }
     dock.innerHTML =
       `<div class="ed-dock-familles" role="tablist" aria-label="Familles">` +
-      `<button type="button" class="ed-dock-fam ed-dock-choisir" data-dock-outil="select" aria-pressed="${courant === 'select'}">Choisir / déplacer</button>` +
+      `<button type="button" class="ed-dock-fam ed-dock-choisir" data-dock-outil="select" aria-pressed="${courant === 'select'}">${iconeOutil('select')}<span>Choisir / déplacer</span></button>` +
       FAMILLES_JOUEUR.map(
         (f) =>
           `<button type="button" role="tab" class="ed-dock-fam" aria-selected="${f.id === fam.id}" data-dock-famille="${f.id}" title="${esc(f.phrase)}">${esc(f.nom)}</button>`,
@@ -4593,11 +4622,25 @@ export class LevelEditor {
       fam.outils
         .map(
           (o) =>
-            `<button type="button" class="ed-dock-outil" data-dock-outil="${o.outil}" aria-pressed="${o.outil === courant}">` +
-            `<i style="background:${teinte(o.outil)}"></i><span><b>${esc(o.nom)}</b><small>${esc(o.phrase)}</small></span></button>`,
+            `<button type="button" class="ed-dock-outil" data-dock-outil="${o.outil}" aria-pressed="${o.outil === courant}" title="${esc(o.phrase)}">` +
+            `${iconeOutil(o.outil)}<span><b>${esc(o.nom)}</b><small>${esc(o.phrase)}</small></span></button>`,
         )
         .join('') +
       `</div>`
+    // UNE SEULE LIGNE d'outils, qui défile de côté : au doigt et au trackpad
+    // naturellement, et à la molette (verticale) que l'on convertit ici
+    const ligne = dock.querySelector<HTMLElement>('.ed-dock-outils')
+    ligne?.addEventListener(
+      'wheel',
+      (e) => {
+        if (Math.abs(e.deltaY) <= Math.abs(e.deltaX) || ligne.scrollWidth <= ligne.clientWidth) return
+        ligne.scrollLeft += e.deltaY
+        e.preventDefault()
+      },
+      { passive: false },
+    )
+    // l'outil en main reste en vue quand la ligne est plus longue que l'écran
+    ligne?.querySelector<HTMLElement>('[aria-pressed="true"]')?.scrollIntoView({ block: 'nearest', inline: 'nearest' })
     for (const b of Array.from(dock.querySelectorAll<HTMLElement>('[data-dock-famille]'))) {
       b.addEventListener('click', () => {
         this.familleDock = b.dataset.dockFamille ?? 'batir'
