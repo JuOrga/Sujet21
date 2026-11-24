@@ -7149,7 +7149,16 @@
         background: var(--void);
       }
       #editor .ed-dock-familles { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
-      #editor .ed-dock-familles .ed-dock-choisir { margin-right: 10px; }
+      /* LES OUTILS TRANSVERSES (Sélection, Gomme, Superposer) : toujours à
+         portée, à gauche des familles, séparés d'elles par un filet */
+      #editor .ed-dock-transverses {
+        display: inline-flex; gap: 6px; margin-right: 6px; padding-right: 12px; border-right: 1px solid var(--line);
+      }
+      #editor .ed-dock-trans { display: inline-flex; align-items: center; gap: 6px; }
+      #editor .ed-dock-trans svg { width: 20px; height: 20px; flex: 0 0 20px; }
+      #editor .ed-dock-trans:not(.ed-dock-choisir)[aria-pressed='true'] {
+        background: var(--glow); color: #030710; border-color: var(--glow); font-weight: 600;
+      }
       #editor .ed-dock-fam { min-height: 40px; padding: 0 14px; }
       #editor .ed-dock-fam[aria-selected='true'] { background: var(--glow); color: #030710; border-color: var(--glow); font-weight: 600; }
       /* UNE SEULE LIGNE d'outils, qui défile de côté (le concepteur, 24/11 :

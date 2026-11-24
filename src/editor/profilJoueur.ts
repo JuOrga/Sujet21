@@ -1,5 +1,5 @@
 // LE PROFIL DU JOUEUR : tout ce que l'atelier offre à un joueur, et rien
-// d'autre. La palette en six familles et les réglages en paliers nommés
+// d'autre. La palette en familles et les réglages en paliers nommés
 // sont ceux des maquettes validées le 24/11/2026 (docs/atelier-joueur.md,
 // lot 4 bis) ; ce qui peut entrer dans une salle est la liste blanche
 // PARTAGÉE avec le serveur (api/_creation.ts) — une seule liste, deux
@@ -42,52 +42,57 @@ const o = (outil: string, nom: string, phrase: string, collection: string): Outi
   collection,
 })
 
-/** Les six familles, rangées par intention et non par type technique. */
+/** Les familles, rangées par ce que l'élément FAIT au corps. Une première
+ *  barre en six familles (24/11) mêlait les parois dans trois d'entre elles
+ *  (Bâtir, Matières, Chaleur) et les lampes au décor ; le concepteur, le
+ *  même jour : « toutes les parois devraient être ensemble, les zones
+ *  d'effet également », et la lumière à part. La chambre et le couloir
+ *  (les coques du concepteur) sont sortis de l'atelier : une salle de
+ *  joueur se bâtit en parois. */
 export const FAMILLES_JOUEUR: FamilleJoueur[] = [
   {
-    id: 'batir',
-    nom: 'Bâtir',
-    phrase: 'Les murs de la salle, le départ du corps et la sortie.',
+    id: 'depart',
+    nom: 'Départ & sortie',
+    phrase: 'Où naît le corps d’eau, et le sas qu’il doit atteindre.',
     outils: [
-      o('box:0', 'Paroi', 'Le mur : rien ne le traverse.', 'boxes'),
-      o('struct:0', 'Chambre', 'Une pièce fermée, à relier par ses côtés.', 'structures'),
-      o('struct:1', 'Couloir', 'Un tube ouvert entre deux pièces.', 'structures'),
       o('spawn', 'Départ', 'Là où le corps d’eau apparaît.', 'spawn'),
       o('exit', 'Sortie', 'Le sas à atteindre.', 'exit'),
     ],
   },
   {
-    id: 'matieres',
-    nom: 'Matières',
-    phrase: 'Des parois qui trient : ce qui passe, ce qui colle, ce qui rebondit.',
+    id: 'parois',
+    nom: 'Parois',
+    phrase: 'Tous les murs : le simple, ceux qui trient, ceux qui chauffent ou gèlent — et leurs formes.',
     outils: [
+      o('box:0', 'Paroi', 'Le mur : rien ne le traverse.', 'boxes'),
       o('box:2', 'Hydrophobe', 'Repousse l’eau ; la glace y rebondit.', 'boxes'),
       o('box:1', 'Hydrophile', 'Retient ce qui la touche.', 'boxes'),
       o('box:7', 'Membrane', 'Seule l’eau passe.', 'boxes'),
       o('box:5', 'Évent', 'Seule la vapeur passe.', 'boxes'),
       o('box:8', 'Rideau', 'Seule la glace passe.', 'boxes'),
-      o('sponge', 'Éponge', 'Boit le liquide qui s’attarde.', 'sponges'),
-      o('box:11', 'Vide', 'Le dehors : qui s’y attarde est aspiré.', 'boxes'),
-    ],
-  },
-  {
-    id: 'chaleur',
-    nom: 'Chaleur',
-    phrase: 'Geler, faire bouillir : changer l’état du corps.',
-    outils: [
       o('box:4', 'Hublot froid', 'Une aura de gel.', 'boxes'),
       o('box:6', 'Chaudière', 'Vaporise l’eau, dégèle la glace.', 'boxes'),
       o('box:9', 'Surchauffeur', 'Rend un élan à la vapeur, une fois.', 'boxes'),
+      // LES MOULES : une forme coulée dans la DERNIÈRE paroi choisie — le
+      // disque en chaudière, la rampe en hydrophobe
+      o('forme:1', 'Disque', 'Une paroi ronde, dans la dernière matière choisie.', 'boxes'),
+      o('forme:2', 'Capsule', 'Une pilule aux bouts ronds, même matière.', 'boxes'),
+      o('forme:3', 'Rampe', 'Un coin en pente : la moitié d’un rectangle.', 'boxes'),
+      o('forme:4', 'Arc', 'Une conduite courbe ; l’ouverture se règle.', 'boxes'),
     ],
   },
   {
-    id: 'forces',
-    nom: 'Forces',
-    phrase: 'Ce qui attire, pousse ou guide le corps.',
+    id: 'zones',
+    nom: 'Zones d’effet',
+    phrase: 'Des régions qui agissent sur le corps : imposer un état, attirer, pousser, boire.',
     outils: [
+      o('zone:eau', 'Zone liquide', 'Qui y entre redevient eau, et le reste.', 'zones'),
+      o('zone:glace', 'Zone glace', 'Qui y entre gèle, et le reste.', 'zones'),
+      o('zone:vapeur', 'Zone vapeur', 'Qui y entre s’évapore, et le reste.', 'zones'),
       o('puits', 'Puits de gravité', 'Attire le corps : on peut y orbiter.', 'puits'),
       o('chasse', 'Chasse', 'Un courant qui pousse sans déchirer.', 'chasses'),
-      o('rail', 'Rail', 'Guide l’arc du plasma.', 'rails'),
+      o('sponge', 'Éponge', 'Boit le liquide qui s’attarde.', 'sponges'),
+      o('box:11', 'Vide', 'Le dehors : qui s’y attarde est aspiré.', 'boxes'),
     ],
   },
   {
@@ -100,16 +105,24 @@ export const FAMILLES_JOUEUR: FamilleJoueur[] = [
       o('coupelle', 'Coupelle', 'Boit jusqu’à son trait, puis commande.', 'coupelles'),
       o('porte', 'Porte', 'S’ouvre quand ses commandes s’allument.', 'portes'),
       o('mire', 'Mire', 'Une cible à points pour les éclats de glace.', 'mires'),
+      o('rail', 'Rail', 'Guide l’arc du plasma.', 'rails'),
+    ],
+  },
+  {
+    id: 'lumiere',
+    nom: 'Lumière',
+    phrase: 'L’éclairage de la salle. Sans effet sur le corps.',
+    outils: [
+      o('lumiere', 'Lampe', 'Éclaire la salle (4 au plus).', 'lumieres'),
+      o('bande', 'Bandeau lumineux', 'Une ligne de lumière.', 'lumieres'),
     ],
   },
   {
     id: 'decor',
     nom: 'Décor',
-    phrase: 'Lumières, décors et textes. Sans effet sur le corps.',
+    phrase: 'Textes, fonds et décors. Sans effet sur le corps.',
     outils: [
       o('label', 'Texte', 'Un mot sur un mur (40 signes).', 'labels'),
-      o('lumiere', 'Lampe', 'Éclaire la salle (4 au plus).', 'lumieres'),
-      o('bande', 'Bandeau lumineux', 'Une ligne de lumière.', 'lumieres'),
       o('box:12', 'Baie vitrée', 'Le dehors derrière une vitre.', 'boxes'),
       o('decal:tuyaux', 'Tuyaux', 'Un décor de tuyauterie.', 'decals'),
       o('decal:serre-ble-nain', 'Blé nain', 'Un bac de la serre.', 'decals'),
@@ -117,8 +130,11 @@ export const FAMILLES_JOUEUR: FamilleJoueur[] = [
   },
 ]
 
-/** Les outils transverses, hors familles : choisir et déplacer. */
-export const OUTILS_TRANSVERSES = ['select'] as const
+/** Les outils transverses, hors familles, toujours à portée : choisir et
+ *  déplacer, effacer à la GOMME, et la SUPERPOSITION (deux parois qui se
+ *  chevauchent : celle du dessus ronge l'autre). Le concepteur, 24/11 :
+ *  « il manque tous les outils à disposition dans l'éditeur ». */
+export const OUTILS_TRANSVERSES = ['select', 'gomme', 'cut'] as const
 
 /** Tous les identifiants d'outils permis au joueur. */
 export const OUTILS_PERMIS: ReadonlySet<string> = new Set([
@@ -345,6 +361,7 @@ export const COLLECTION_DE_SORTE: Readonly<Record<string, string>> = {
   rail: 'rails',
   lumiere: 'lumieres',
   decal: 'decals',
+  zone: 'zones',
   spawn: 'spawn',
   exit: 'exit',
 }
@@ -390,6 +407,7 @@ export function outilDeSelection(
   else if (s.kind === 'structure') outil = `struct:${String(el.type)}`
   else if (s.kind === 'lumiere') outil = el.forme === 'bandeau' ? 'bande' : 'lumiere'
   else if (s.kind === 'decal') outil = `decal:${String(el.kind)}`
+  else if (s.kind === 'zone') outil = `zone:${String(el.force)}`
   return (outil && TOUS_LES_OUTILS.get(outil)) || null
 }
 

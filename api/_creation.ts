@@ -64,6 +64,9 @@ export const PLAFONDS = {
   coupelles: 8,
   rails: 12,
   lumieres: 4,
+  // les zones d'état : 3 au plus dans les salles livrées (« L'école des
+  // zones », ops/seed-levels.json, mesuré le 24/11/2026)
+  zones: 16,
 } as const
 
 /** Les points d'un rail : au moins 2, au plus 32. */
@@ -139,6 +142,10 @@ export const SCHEMAS: Record<string, Schema> = {
     requis: { ...POINT },
     options: { h: 'n', portee: 'n', intensite: 'n', taille: 'n', forme: ['bandeau'], longueur: 'n', angle: 'n' }, // couleur : à part
   },
+  // LES ZONES D'ÉTAT (imposer l'eau, la glace, la vapeur) : la forme seule.
+  // Le libellé, la cinématique et la séquence qu'elles portent chez le
+  // concepteur sont de la mise en scène de la run — retirés
+  zones: { requis: { ...RECT, force: ['libre', 'eau', 'glace', 'vapeur'] }, options: {} },
 }
 
 /** Les collections d'une création, dans l'ordre de LevelDef. */
@@ -149,7 +156,7 @@ export const COLLECTIONS = Object.keys(SCHEMAS)
  *  condensats, cachettes), la physique du tableau (`reglages`, `par`,
  *  `dashBudget`, `etats`, `exige`), la mise en scène (`cineAvant`,
  *  `cineApres`, `sequence`, `ambiance`, `figure`, `plafond`), la place dans
- *  la station (`biome`, `raccourciVers`, `minijeu`, `zones`) et le `code`
+ *  la station (`biome`, `raccourciVers`, `minijeu`) et le `code`
  *  (le serveur l'attribue) — est retiré. */
 export const CHAMPS_GARDES = [
   'name', 'journal', 'bounds', 'spawn', 'exit', 'coque', 'raccords', 'ambiante', 'brume', 'cartes',
