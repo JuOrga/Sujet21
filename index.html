@@ -6786,6 +6786,45 @@
         background: radial-gradient(ellipse 60% 50% at 50% 0%, rgba(255, 179, 92, 0.1), transparent 60%), radial-gradient(ellipse 40% 40% at 90% 100%, rgba(224, 104, 92, 0.07), transparent 60%), rgba(2, 5, 10, 0.94);
       }
       #reparations[hidden] { display: none; }
+      /* L'ÉCRAN CRÉATIONS (game/ecranCreations.ts) : la liste à gauche, la
+         salle choisie à droite — vignette, JOUER, ses deux classements. */
+      #creations {
+        position: fixed; inset: 0; z-index: 40; display: flex; align-items: center; justify-content: center; padding: 18px;
+        background: rgba(2, 5, 10, 0.94); color: var(--ink); font-family: var(--font-mono);
+      }
+      #creations[hidden] { display: none; }
+      .cr-boite {
+        width: min(1240px, 100%); height: min(860px, 100%); display: grid; grid-template-rows: auto minmax(0, 1fr);
+        border: 1px solid var(--line); border-radius: 14px; overflow: hidden; background: #0a1420;
+      }
+      .cr-tete { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 20px; padding: 14px 20px; border-bottom: 1px solid var(--line); }
+      .cr-tete h2 { margin: 0; font-family: var(--font-display, sans-serif); font-size: 20px; font-weight: 400; letter-spacing: .05em; }
+      .cr-onglets { display: flex; gap: 16px; }
+      .cr-onglets button { background: none; border: 0; border-bottom: 2px solid transparent; border-radius: 0; color: inherit; opacity: .7; min-height: 44px; padding: 0 4px; font: inherit; cursor: pointer; }
+      .cr-onglets button[aria-selected='true'] { opacity: 1; border-bottom-color: var(--glow); }
+      .cr-ressort { flex: 1; }
+      .cr-tete button { min-height: 44px; }
+      .cr-corps { display: grid; grid-template-columns: minmax(0, 1fr) min(400px, 40%); min-height: 0; }
+      .cr-liste { padding: 18px 20px; display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 12px; align-content: start; overflow: auto; }
+      .cr-carte { display: flex; flex-direction: column; gap: 5px; text-align: left; padding: 14px 16px; min-height: 96px; border: 1px solid var(--line); border-radius: 10px; background: #10151c; color: inherit; font: inherit; cursor: pointer; }
+      .cr-carte:hover { border-color: #9aa3ab; }
+      .cr-carte.on { border-color: var(--glow); box-shadow: inset 0 0 0 1px var(--glow); }
+      .cr-carte b { font-size: 15px; font-weight: 600; }
+      .cr-carte span, .cr-carte small { font-size: 12px; opacity: .8; }
+      .cr-detail { border-left: 1px solid var(--line); padding: 18px 20px; display: flex; flex-direction: column; gap: 10px; overflow: auto; }
+      .cr-detail canvas { width: 100%; height: auto; border-radius: 8px; border: 1px solid var(--line); }
+      .cr-detail h3 { margin: 6px 0 0; font-size: 12px; font-weight: 400; opacity: .75; letter-spacing: .05em; }
+      .cr-detail h3.cr-nom { font-size: 18px; opacity: 1; letter-spacing: 0; }
+      .cr-detail p { margin: 0; line-height: 1.5; }
+      .cr-detail #cr-jouer { min-height: 52px; font-weight: 600; }
+      .cr-records { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+      .cr-records li { display: grid; grid-template-columns: 24px 1fr auto; gap: 10px; font-size: 14px; }
+      .cr-records li.moi { color: var(--glow); }
+      .cr-note, .cr-vide { font-size: 13px; opacity: .8; }
+      @media (max-width: 900px) {
+        .cr-corps { grid-template-columns: 1fr; grid-template-rows: minmax(0, 1fr) auto; }
+        .cr-detail { border-left: 0; border-top: 1px solid var(--line); max-height: 55vh; }
+      }
       .av-boite {
         width: min(1240px, 100%); height: min(860px, 100%); display: grid; grid-template-rows: auto minmax(0, 1fr) auto;
         border: 1px solid rgba(255, 179, 92, 0.22); border-radius: 14px; overflow: hidden;
@@ -10109,6 +10148,7 @@
              docs/atelier-joueur.md). Derrière le mode concepteur tant que
              l'écran CRÉATIONS (lot 6) et la limite de débit (lot 8) manquent :
              une salle publiée n'aurait nulle part où se jouer. -->
+        <button id="home-creations" type="button" data-dev class="acc-lieu acc-outil" title="Les salles bâties et partagées par les joueurs, jouées hors de l’expédition, avec leurs records"><span>CRÉATIONS</span></button>
         <button id="home-atelier" type="button" data-dev class="acc-lieu acc-outil" title="L’atelier : bâtir sa propre salle, l’essayer, et la partager en atteignant sa sortie"><span>ATELIER</span></button>
         <button id="home-sauvegardes" type="button" class="acc-lieu" title="Les trois emplacements : chacun est une partie entière. Le nom d’opérateur s’y change"><span>SAUVEGARDES</span><i class="acc-voyant" hidden></i><small></small></button>
         <!-- LES OUTILS DU CONCEPTEUR ont une seule porte : LA RÉGIE (ses
@@ -11097,6 +11137,8 @@
          stations du module — ouvert au menu par aucun bouton, c'est un
          PUPITRE qui l'appelle. Le gabarit est peint par l'écran. -->
     <div id="reparations" hidden aria-label="Tableau des avaries"></div>
+    <!-- LES CRÉATIONS DES JOUEURS (game/ecranCreations.ts, lot 6) -->
+    <div id="creations" hidden role="dialog" aria-label="Les créations des joueurs"></div>
     <!-- Le voile SAUVEGARDES : les trois emplacements du coffre (game/coffre.ts) -->
     <div id="sauvegardes" hidden aria-label="Sauvegardes">
       <div class="salles-boite">
