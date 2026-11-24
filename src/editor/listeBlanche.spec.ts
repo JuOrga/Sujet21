@@ -104,7 +104,6 @@ describe('ce qui est réservé au concepteur est retiré', () => {
       biome: 'serre',
       raccourciVers: '21-Z',
       minijeu: { sorte: 'palet' },
-      zones: [{ minX: 0, minY: 0, maxX: 10, maxY: 10, force: 'glace' }],
       caches: [{ x: 0, y: 0 }],
       condensats: [{ x: 0, y: 0 }],
       fiole: { x: 0, y: 0 },
@@ -120,6 +119,18 @@ describe('ce qui est réservé au concepteur est retiré', () => {
       expect(salle).not.toHaveProperty(champ)
       expect(retouches.some((r) => r.includes(`« ${champ} »`))).toBe(true)
     }
+  })
+
+  it('une zone d’état garde sa forme et son état — pas la mise en scène de la run', () => {
+    const { salle } = nettoyee(
+      petiteSalle({
+        zones: [
+          { minX: 0, minY: 0, maxX: 100, maxY: 80, force: 'glace', label: 'FROID', cine: 'INTRO', sequence: 'ALERTE' },
+          { minX: 0, minY: 0, maxX: 10, maxY: 10, force: 'plasma' },
+        ],
+      }),
+    )
+    expect(salle.zones).toEqual([{ minX: 0, minY: 0, maxX: 100, maxY: 80, force: 'glace' }])
   })
 
   it('une carte imposée autre que l’Éclateur', () => {
@@ -247,14 +258,21 @@ describe('le profil du joueur tient avec la liste blanche', () => {
   })
 
   it('aucun outil du concepteur ne s’est glissé dans la palette du joueur', () => {
-    for (const outil of ['plot:condensat', 'plot:memoire', 'banc', 'pupitre', 'ancre', 'marchand', 'eclat', 'fiole', 'condensat', 'cache', 'zone:glace', 'gomme']) {
+    for (const outil of ['plot:condensat', 'plot:memoire', 'banc', 'pupitre', 'ancre', 'marchand', 'eclat', 'fiole', 'condensat', 'cache', 'zone:libre', 'struct:0', 'struct:1']) {
       expect(outilPermis(outil), outil).toBe(false)
     }
     expect(materiauDeLOutil(`box:${MAT_EXIT}`)).toBeNull()
   })
 
   it('six familles, au plus trois réglages par élément', () => {
-    expect(FAMILLES_JOUEUR.map((f) => f.nom)).toEqual(['Bâtir', 'Matières', 'Chaleur', 'Forces', 'Mécanismes', 'Décor'])
+    expect(FAMILLES_JOUEUR.map((f) => f.nom)).toEqual([
+      'Départ & sortie',
+      'Parois',
+      'Zones d’effet',
+      'Mécanismes',
+      'Lumière',
+      'Décor',
+    ])
     for (const reglages of Object.values(REGLAGES_JOUEUR)) expect(reglages.length).toBeLessThanOrEqual(3)
   })
 })

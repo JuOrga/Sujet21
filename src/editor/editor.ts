@@ -585,10 +585,34 @@ function salleJoueurVierge(): LevelDef {
 
 /** Les boutons de la barre que l'atelier du joueur ne montre pas : la
  *  bibliothèque officielle, le générateur, les échanges de fichiers, les
- *  outils de mise en scène. ESSAYER, annuler, zoomer, la grille restent. */
+ *  outils de mise en scène. ESSAYER, annuler, zoomer, la grille, l'aimant
+ *  et l'ALIGNEMENT restent — l'alignement y était caché par erreur (le
+ *  concepteur, 24/11 : « il manque […] l'aide à l'alignement »). */
 const BARRE_CONCEPTEUR = [
   'ed-gen', 'ed-save', 'ed-save-as', 'ed-import', 'ed-copy', 'ed-export',
-  'ed-montage', 'ed-images', 'ed-fiches', 'ed-planche', 'ed-align',
+  'ed-montage', 'ed-images', 'ed-fiches', 'ed-planche',
+]
+
+/** Les outils transverses de la barre de l'atelier : leur nom et ce qu'ils
+ *  font, dans l'ordre de OUTILS_TRANSVERSES. */
+const TRANSVERSES_DOCK: readonly { outil: string; nom: string; phrase: string }[] = [
+  {
+    outil: 'select',
+    nom: 'Sélection',
+    phrase:
+      'Sélection : cliquez un élément pour le régler, glissez-le pour le déplacer. Maj + clic en ajoute un autre — à plusieurs, le panneau propose d’aligner et de répartir.',
+  },
+  {
+    outil: 'gomme',
+    nom: 'Gomme',
+    phrase: 'Gomme : tracez une zone, tout ce qu’elle couvre disparaît. Une paroi à cheval est rognée.',
+  },
+  {
+    outil: 'cut',
+    nom: 'Superposer',
+    phrase:
+      'Superposer deux parois qui se chevauchent : cliquez celle du dessus, puis celle du dessous — seule leur partie commune est rongée.',
+  },
 ]
 
 export class LevelEditor {
@@ -743,7 +767,7 @@ export class LevelEditor {
   // clic sur la carte la désigne
   private relierVers: Sel = null
   // LA BARRE DE L'ATELIER : la famille dont les outils sont montrés
-  private familleDock = 'batir'
+  private familleDock = FAMILLES_JOUEUR[0].id
   // l'outil que la barre a vu au dernier tracé : la famille ne le suit
   // que quand il CHANGE (familleDuDock)
   private outilVuDock = ''
@@ -4802,8 +4826,8 @@ export class LevelEditor {
     if (this.joueur) this.peintDock()
   }
 
-  /** LA BARRE DE L'ATELIER, sous la salle : « Sélection », les six
-   *  familles en onglets, puis les seuls outils de la famille ouverte, avec
+  /** LA BARRE DE L'ATELIER, sous la salle : les outils transverses
+   *  (Sélection, Gomme, Superposer), les familles en onglets, puis les seuls outils de la famille ouverte, avec
    *  leur phrase. Un outil de la barre CLIQUE le bouton caché de la palette
    *  d'origine : même porte (le filtre du profil), même logique de pose. */
   private peintDock(): void {
@@ -4825,7 +4849,12 @@ export class LevelEditor {
     const fam = FAMILLES_JOUEUR.find((f) => f.id === this.familleDock) ?? FAMILLES_JOUEUR[0]
     dock.innerHTML =
       `<div class="ed-dock-familles" role="tablist" aria-label="Familles">` +
-      `<button type="button" class="ed-dock-fam ed-dock-choisir" data-dock-outil="select" aria-pressed="${courant === 'select'}" title="Sélection : choisir un élément posé pour le régler, le glisser pour le déplacer">${iconeOutil('select')}<span>Sélection</span></button>` +
+      `<span class="ed-dock-transverses">` +
+      TRANSVERSES_DOCK.map(
+        (t) =>
+          `<button type="button" class="ed-dock-fam ed-dock-trans${t.outil === 'select' ? ' ed-dock-choisir' : ''}" data-dock-outil="${t.outil}" aria-pressed="${courant === t.outil}" title="${esc(t.phrase)}">${iconeOutil(t.outil)}<span>${esc(t.nom)}</span></button>`,
+      ).join('') +
+      `</span>` +
       FAMILLES_JOUEUR.map(
         (f) =>
           `<button type="button" role="tab" class="ed-dock-fam" aria-selected="${f.id === fam.id}" data-dock-famille="${f.id}" title="${esc(f.phrase)}">${esc(f.nom)}</button>`,
@@ -4852,7 +4881,7 @@ export class LevelEditor {
     if (ligne) defileLigne(dock, ligne)
     for (const b of Array.from(dock.querySelectorAll<HTMLElement>('[data-dock-famille]'))) {
       b.addEventListener('click', () => {
-        this.familleDock = b.dataset.dockFamille ?? 'batir'
+        this.familleDock = b.dataset.dockFamille ?? FAMILLES_JOUEUR[0].id
         this.peintDock()
       })
     }
@@ -6249,7 +6278,10 @@ export class LevelEditor {
       )
     }
     if (s.kind !== 'exit' && s.kind !== 'spawn') {
-      parties.push(`<button type="button" class="ed-danger" id="p-del">Supprimer (Ctrl+Z pour annuler)</button>`)
+      parties.push(
+        `<button type="button" class="ed-btn" id="pj-dupliquer">Dupliquer (D)</button>` +
+          `<button type="button" class="ed-danger" id="p-del">Supprimer (Ctrl+Z pour annuler)</button>`,
+      )
     }
     host.innerHTML = parties.join('')
 
@@ -6280,6 +6312,7 @@ export class LevelEditor {
       this.level = neuf
       this.commit('Liens coupés.')
     })
+    host.querySelector('#pj-dupliquer')?.addEventListener('click', () => this.duplicateSel())
     host.querySelector('#p-del')?.addEventListener('click', () => this.deleteSel())
   }
 
