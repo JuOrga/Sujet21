@@ -14,18 +14,20 @@ Ces contraintes ne sont pas des préférences. Le plan en découle.
    POST ou DELETE. Le mode concepteur ne cachait que des boutons. Avant
    d'ouvrir quoi que ce soit aux joueurs, il fallait poser une serrure.
    C'est le **lot 1**, déjà fait (§3).
-2. **Les douze fonctions Vercel sont prises.** Le plan Hobby en compte
-   douze et `api/` en a douze. `api/reglages.ts` héberge déjà les avis des
-   joueurs faute de place. Un endpoint `creations` de plus casserait le
-   déploiement : il faut d'abord **libérer une place** (lot 2).
-3. **Vercel Blob compte ses écritures.** Le plan Hobby donne 2 000
-   opérations avancées par mois. Une écriture du magasin
-   (`api/_magasin.ts`) en coûte **3** (2 put + 1 list), soit de l'ordre de
-   **660 écritures par mois pour tout le site**, concepteurs compris. Les
-   fantômes (`api/fantomes.ts`) le rappellent : leur écriture est rare
-   *exprès*. Des créations publiées « automatiquement », plus leurs
-   records, ne tiennent pas dans ce régime. **Le magasin des créations est
-   la décision structurante du chantier** (lot 3).
+2. **Les douze fonctions Vercel sont prises — sur le plan Hobby.** Le
+   dépôt a été pensé pour le plan Hobby, qui plafonne à douze fonctions par
+   déploiement ; `api/` en a douze, et `api/reglages.ts` héberge déjà les
+   avis des joueurs faute de place. **Le plan Pro n'a pas ce plafond**
+   (« Functions created per deployment : ∞ » dans la page des limites de
+   Vercel). Si le projet est bien sur Pro, le lot 2 tombe.
+3. **Vercel Blob compte ses écritures.** Sur Hobby : 2 000 opérations
+   avancées par mois, et une écriture du magasin (`api/_magasin.ts`) en
+   coûte **3** (2 put + 1 list), soit de l'ordre de 660 écritures par mois
+   pour tout le site. **Sur Pro, l'usage au-delà de l'inclus se paie à la
+   demande** — au tarif relevé le 24/11/2026, de l'ordre de 5 $ le million
+   d'opérations avancées, à revérifier sur la page de tarifs au moment de
+   livrer. À ce prix, des milliers de publications par mois coûtent des
+   centimes : **Blob suffit au magasin des créations** (lot 3).
 4. **Rien ne vérifie avant `prod`.** Une PR vers `dev` ne déclenche rien.
    Chaque lot arrive avec ses tests et passe `type-check` / `test` /
    `build` en local.
@@ -114,9 +116,11 @@ compose la run lui-même. C'est un autre chantier, à ouvrir seulement si
 
 Chaque lot : une branche issue de `dev`, une PR vers `dev`.
 
-### Lot 2 — libérer une fonction
+### Lot 2 — libérer une fonction (seulement si le projet reste sur Hobby)
 
-Fusionner deux endpoints concepteur peu sollicités en un seul. Par
+À confirmer d'abord : Vercel › Settings › Billing de l'équipe qui porte
+le projet `sujet21` (« julianamet's projects »). Sur Pro, ce lot n'a pas
+lieu d'être. Sur Hobby, il consiste à fusionner deux endpoints concepteur peu sollicités en un seul. Par
 exemple, `presets` et `regles` deviennent deux domaines d'un endpoint
 commun, comme `reglages` l'a fait pour huit domaines. Le contrat côté
 client ne change pas : seuls `src/bench/presets.ts` et les appels
@@ -124,23 +128,31 @@ client ne change pas : seuls `src/bench/presets.ts` et les appels
 une migration des documents existants (relecture de l'ancien préfixe) et
 la mise à jour de `ops/sauvegarde.mjs`.
 
-### Lot 3 — le magasin des créations (DÉCISION À PRENDRE)
+### Lot 3 — le magasin des créations : Blob, sur Pro (décidé le 24/11)
 
-Blob ne tient pas le régime (§1.3). Trois voies :
+Le concepteur a un abonnement Pro : Blob se paie à l'usage au-delà de
+l'inclus, et le coût d'un partage automatique devient négligeable (§1.3).
+On reste donc sur **Blob**, sans dépendance nouvelle. Ce qui change,
+c'est la FORME du magasin, pas son prix :
 
-| Voie | Pour | Contre |
-| --- | --- | --- |
-| **Une base gratuite** branchée par le Marketplace Vercel (Redis ou Postgres) | écritures nombreuses et bon marché ; index, tri, compteurs natifs | une dépendance de plus ; quota gratuit à **mesurer** avant de choisir |
-| **Blob, en lots** : les créations s'accumulent et s'écrivent par paquets | rien de neuf | publication différée, pas « automatique » ; records quasi impossibles |
-| **Hors ligne d'abord** : chaque création vit sur son poste, et se partage par fichier ou lien | coût nul | ce n'est pas le partage automatique demandé |
+- **Un document par création** (`creations/<id>/`), et ses records à
+  côté. Le modèle actuel — un seul gros document réécrit en entier, « le
+  dernier écrivain gagne » — perdrait des publications dès que deux
+  joueurs écrivent à la même seconde.
+- **Un index léger** (`creations/index/` : id, nom, auteur, date, état,
+  empreinte), relu en UNE lecture par l'écran CRÉATIONS. Il s'écrit en
+  **écriture conditionnelle** (`ifMatch` sur l'ETag, disponible dans
+  `@vercel/blob` 2.7.0 installé) : si un autre l'a modifié entre-temps,
+  on relit et on réapplique, au lieu d'écraser.
+- **Pas de `list()` sur le chemin chaud** : c'est une opération avancée,
+  et le magasin a déjà appris à s'en passer (le pointeur de
+  `_magasin.ts`).
+- **Un plafond de dépense** : régler le *Spend Management* de l'équipe
+  Vercel sur un montant que l'on accepte, pour qu'un abus ne se transforme
+  pas en facture. Le débit par adresse (lot 8) en est la première
+  défense.
 
-**Recommandation : une base gratuite**, choisie après avoir relevé sur
-leurs pages, au moment du choix, les quotas réels (commandes ou lignes
-par mois, stockage). Le budget visé se calcule : nombre de créations
-publiées par mois plus nombre de records déposés, contre le quota. Blob
-reste le magasin des documents officiels. Le jour du build Steam, le
-**Workshop** prend le relais pour le partage (le contenu y est hébergé
-gratuitement).
+Le jour du build Steam, le **Workshop** prend le relais pour le partage.
 
 ### Lot 4 — le profil du joueur (liste blanche)
 
@@ -153,7 +165,7 @@ Un module pur, `src/editor/profilJoueur.ts`, et son jumeau côté serveur,
 | parois et structures de coque, matériaux (hydrophobe, hydrophile, membrane, grille, rideau, plaques chaudes et froides, surchauffeur, vide, baie, miroir) | les plots de boutique, le marchand, le banc des mémoires, les pupitres |
 | éponges, lasers, pastilles, portes, chasses, puits, coupelles, rails, mires et cibles | les ancres méta, les éclats, la fiole, les condensats, les caches à orbe |
 | lumières, décalques de décor | les codes réservés (`HUB3`…), les cinématiques et séquences, le journal de bord du protocole |
-| un **nom** et une **courte description** (texte borné) | la publication officielle |
+| un **nom**, une **courte description** et des **étiquettes dans la salle** (textes bornés, modérés — lot 8) | la publication officielle |
 
 Le serveur **retire** tout champ hors liste et **refuse** une salle que
 `levelIO` ne relit pas. Il applique aussi des bornes de taille (une salle
@@ -263,7 +275,8 @@ Il code les maquettes validées au lot 4 bis.
 
 ### Lot 8 — la modération (avant l'ouverture au public)
 
-- Un bouton **SIGNALER** sur chaque création.
+- Un bouton **SIGNALER** sur chaque création — étiquettes comprises :
+  c'est la création entière qu'on signale.
 - Sous clé concepteur : **MASQUER** une création (elle disparaît de la
   liste, sans être effacée) ou la retirer.
 - Débit limité par adresse sur les publications et les records ; textes
@@ -277,15 +290,22 @@ Il code les maquettes validées au lot 4 bis.
   compris. C'est la seule passerelle, et elle est humaine.
 - Le Workshop Steam.
 
-## 5. Les questions ouvertes
+## 5. Les décisions et ce qui reste ouvert
 
-1. **Le magasin** (lot 3) : d'accord pour une base gratuite branchée par
-   le Marketplace Vercel ?
-2. **Les textes libres** : le nom et la description suffisent-ils, ou le
-   joueur peut-il aussi poser des étiquettes dans la salle ? Chaque texte
-   libre est un texte à modérer.
-3. **Le nom affiché** : le nom d'opérateur des records suffit-il ?
-4. **La validation par l'auteur** (atteindre la sortie avant de
-   partager) : on la garde ?
-5. **Les maquettes de l'atelier** (lot 4 bis) : en pages interactives
-   qu'on clique, ou dans Figma ?
+Décidé le 24/11/2026 :
+
+1. **Le magasin** : Blob, sur le plan Pro (lot 3), un document par
+   création et un index en écriture conditionnelle.
+2. **Les textes libres** : le joueur peut écrire dans sa salle
+   (étiquettes), en plus du nom et de la description. On modère (lot 8).
+3. **La validation par l'auteur** : gardée. Une création ne se partage
+   qu'une fois que son auteur a atteint la sortie.
+4. **Les maquettes de l'atelier** : en pages interactives qu'on clique
+   (lot 4 bis).
+
+Encore ouvert :
+
+1. **Le plan de l'équipe Vercel** qui porte `sujet21` : Pro, à confirmer
+   dans Settings › Billing. Il décide du lot 2.
+2. **Le nom affiché** sur une création : le nom d'opérateur des records
+   suffit-il ?
