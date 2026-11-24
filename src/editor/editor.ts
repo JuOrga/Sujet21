@@ -229,12 +229,18 @@ import { aideDe } from './aidesAtelier'
 import { defileLigne } from './defileLigne'
 import { CLE_ATELIER_META, CLE_ATELIER_SALLE, CLE_ATELIER_SALLES } from '../game/clesAtelier'
 import {
+  empreinteSalle,
   etatDeSalle,
   lisSalles,
+  memeVersion,
+  messageRetraits,
   nouvelleCleSalle,
   rangeSalle,
   retireSalle,
+  retraitsPrevus,
   salleDeLaCreation,
+  versEmpreinte,
+  type SalleAtelier,
 } from './sallesAtelier'
 import {
   FAMILLES_JOUEUR,
@@ -770,6 +776,8 @@ export class LevelEditor {
   // LA DERNIÈRE PUBLICATION tentée, et ce qu'elle a donné : l'encart la
   // garde, même si l'écran de fin a été refermé avant la réponse
   private dernierePub: { ok: boolean; message: string } | null = null
+  /** Ce que le dernier rangement a fait sortir de MES SALLES ('' : rien). */
+  private avisRangement = ''
 
   constructor(host: HTMLElement, hooks: EditorHooks) {
     this.host = host
@@ -924,9 +932,10 @@ export class LevelEditor {
   noteCreation(id: string, publiee: LevelDef): void {
     if (!this.joueur) return
     this.openId = id
-    // ce qui est EN LIGNE : l'encart « Votre salle » compare le brouillon à
-    // cette version pour dire si des retouches attendent d'être partagées
-    this.base = serializeLevel(publiee)
+    // ce qui est EN LIGNE, en empreinte : l'encart « Votre salle » compare le
+    // brouillon à cette version pour dire si des retouches attendent d'être
+    // partagées (une copie entière doublait le poids du coffre)
+    this.base = empreinteSalle(serializeLevel(publiee))
     this.persist()
     this.peintEtatSalle()
   }
@@ -981,7 +990,18 @@ export class LevelEditor {
       return
     }
     this.persist()
-    this.chargeSalle(structuredClone(enLigne), nouvelleCleSalle(), creationId, serializeLevel(enLigne))
+    const cle = nouvelleCleSalle()
+    const serialisee = serializeLevel(enLigne)
+    if (!this.accepteRetraits({ cle, nom: enLigne.name, salle: serialisee, creationId, base: '', majLe: new Date().toISOString() })) return
+    this.chargeSalle(structuredClone(enLigne), cle, creationId, empreinteSalle(serialisee))
+  }
+
+  /** AVANT d'ajouter une salle à MES SALLES : si la liste est pleine, dire
+   *  lesquelles en sortiraient, et laisser renoncer. Vrai : on continue. */
+  private accepteRetraits(nouvelle: SalleAtelier): boolean {
+    const sortantes = retraitsPrevus(lisSalles(this.sa().getItem(ATELIER_SALLES_KEY)), nouvelle)
+    if (sortantes.length === 0) return true
+    return confirm(`${messageRetraits(sortantes, true)}\n\nContinuer ?`)
   }
 
   /** Ce qu'a donné la dernière publication — gardé dans l'encart, même si
@@ -1053,7 +1073,7 @@ export class LevelEditor {
     if (!this.openId) {
       partage =
         '<p class="attente">Pas encore publiée.</p><p>Pour la publier : <b>ESSAYER ET PUBLIER</b>, puis atteindre la sortie — une salle se publie quand vous avez prouvé qu’elle se traverse. <b>ESSAYER</b> seul la teste sans rien publier.</p>'
-    } else if (this.base === serializeLevel(this.level)) {
+    } else if (memeVersion(this.base, serializeLevel(this.level))) {
       partage = '<p class="ok">Publiée : elle est dans l’écran CRÉATIONS, à jour.</p>'
     } else {
       partage =
@@ -1062,7 +1082,10 @@ export class LevelEditor {
     const pub = this.dernierePub
       ? `<p class="${this.dernierePub.ok ? 'ok' : 'attente'}">${this.dernierePub.message.replace(/&/g, '&amp;').replace(/</g, '&lt;')}</p>`
       : ''
-    el.innerHTML = enregistree + pub + partage
+    const avis = this.avisRangement
+      ? `<p class="attente">${this.avisRangement.replace(/&/g, '&amp;').replace(/</g, '&lt;')}</p>`
+      : ''
+    el.innerHTML = enregistree + avis + pub + partage
     this.peintMesSalles()
   }
 
@@ -1195,12 +1218,22 @@ export class LevelEditor {
     // la date ne bouge que si la salle a changé : la liste reste dans
     // l'ordre des vraies retouches, pas des ouvertures
     const majLe = avant && avant.salle === salle ? avant.majLe : new Date().toISOString()
-    this.sa().setItem(
-      ATELIER_SALLES_KEY,
-      JSON.stringify(
-        rangeSalle(liste, { cle: this.cleSalle, nom: this.level.name, salle, creationId: this.openId, base: this.base, majLe }),
-      ),
-    )
+    const { liste: rangee, retirees } = rangeSalle(liste, {
+      cle: this.cleSalle,
+      nom: this.level.name,
+      salle,
+      creationId: this.openId,
+      base: this.base,
+      majLe,
+    })
+    this.sa().setItem(ATELIER_SALLES_KEY, JSON.stringify(rangee))
+    // une salle sortie en cours d'édition (la salle ouverte a grossi) : on
+    // le dit dans l'encart, qui reste — un message d'état serait recouvert
+    // par celui du geste
+    if (retirees.length) {
+      this.avisRangement = messageRetraits(retirees)
+      this.peintEtatSalle()
+    }
   }
 
   private restore(): void {
@@ -1234,7 +1267,7 @@ export class LevelEditor {
         cle?: string
       }
       this.openId = typeof meta.openId === 'string' ? meta.openId : ''
-      this.base = typeof meta.base === 'string' ? meta.base : ''
+      this.base = typeof meta.base === 'string' ? versEmpreinte(meta.base) : ''
       this.cleSalle = typeof meta.cle === 'string' ? meta.cle : ''
       const rangee = lisSalles(this.sa().getItem(ATELIER_SALLES_KEY)).find((x) => x.cle === this.cleSalle)
       const raw = rangee?.salle ?? this.sa().getItem(ATELIER_KEY)
@@ -5397,8 +5430,12 @@ export class LevelEditor {
       // aucune question à poser
       if (this.joueur) {
         this.persist()
-        this.cleSalle = nouvelleCleSalle()
+        const vierge = salleJoueurVierge()
+        const cle = nouvelleCleSalle()
+        if (!this.accepteRetraits({ cle, nom: vierge.name, salle: serializeLevel(vierge), creationId: '', base: '', majLe: new Date().toISOString() })) return
+        this.cleSalle = cle
         this.dernierePub = null
+        this.avisRangement = ''
       } else if (!confirm('Repartir d’un tableau vierge ? Le brouillon en cours sera perdu.')) {
         return
       }
