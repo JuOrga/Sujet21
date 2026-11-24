@@ -23,6 +23,7 @@
 
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { ecritDocument, litDocument } from './_magasin.js'
+import { ENTETE_CLE, avisDeJoueur, cleRecue, exigeConcepteur, verdictCle } from './_cle.js'
 
 const DOMAINES = ['plan-voie', 'carte', 'recompenses', 'textes', 'sequences', 'avaries', 'ecoute', 'avis-salles']
 const MAX_OCTETS = 200_000
@@ -58,6 +59,19 @@ export default async function handler(
   res: VercelResponse,
 ): Promise<void> {
   res.setHeader('Cache-Control', 'no-store')
+  // LA VÉRIFICATION DE LA CLÉ (GET ?verifie=cle) : la régie demande « ma
+  // clé passe-t-elle ? » sans rien écrire. Elle loge ici faute de fonction
+  // libre — le plan Hobby en compte douze et elles sont toutes prises.
+  if (req.method === 'GET' && req.query.verifie === 'cle') {
+    const v = verdictCle(cleRecue(req.headers[ENTETE_CLE]), process.env.CLES_CONCEPTEUR)
+    if (v.ok) res.status(200).json({ ok: true, nom: v.nom })
+    else res.status(v.statut).json({ error: v.erreur })
+    return
+  }
+  // écrire ici change ce que tout le monde joue : la clé concepteur
+  // (_cle.ts) — sauf l'avis d'un joueur, qu'il dépose sans clé
+  const domaineEcrit = (req.body as { domaine?: unknown } | null)?.domaine
+  if (!avisDeJoueur(req.method, domaineEcrit) && !exigeConcepteur(req, res)) return
   try {
     if (req.method === 'GET' || req.method === 'DELETE') {
       const domaine = domaineDe(req.query.domaine)

@@ -17,12 +17,16 @@
 // mode HORS LIGNE ne fait que rejeter avant de partir, et le jeu tombe
 // sur ses filets comme s'il n'y avait pas de réseau.
 //
-// Trois poignées, et c'est tout :
+// Quatre poignées, et c'est tout :
 //   · horsLigne — aucun appel ne part (`?horsligne` dans l'URL, ou l'hôte
 //     natif qui le déclare) ;
 //   · base — le préfixe d'URL, vide sur Vercel (même origine), à poser si
 //     une coquille sert le jeu d'ailleurs ;
-//   · dos — le transport, `fetch` par défaut, injectable (tests, hôte).
+//   · dos — le transport, `fetch` par défaut, injectable (tests, hôte) ;
+//   · cle — la CLÉ CONCEPTEUR (cleConcepteur.ts) : posée, elle accompagne
+//     chaque ÉCRITURE (tout sauf GET/HEAD) dans l'en-tête que le serveur
+//     exige (api/_cle.ts). Une lecture ne la porte jamais : rien à prouver
+//     pour lire, et une clé qui voyage moins fuit moins.
 
 export interface DosReseau {
   fetch(entree: string, init?: RequestInit): Promise<Response>
@@ -35,6 +39,8 @@ export interface EtatReseau {
   base: string
   /** Le transport ; null : le fetch global. */
   dos: DosReseau | null
+  /** La clé concepteur, portée par les écritures ; vide : aucune. */
+  cle: string
   /** Ce qui est parti (diagnostic, tests) : le chemin de chaque appel. */
   appels: string[]
   /** Ce qui a été REFUSÉ hors ligne (diagnostic, tests). */
@@ -58,8 +64,22 @@ export const reseau: EtatReseau = {
   horsLigne: horsLigneDemande(),
   base: '',
   dos: null,
+  cle: '',
   appels: [],
   refuses: [],
+}
+
+/** L'en-tête qui porte la clé — le même nom que côté serveur (api/_cle.ts). */
+export const ENTETE_CLE = 'x-cle-concepteur'
+
+/** L'appel tel qu'il part : la clé ajoutée aux écritures, rien d'autre
+ *  touché — sans clé, `init` passe tel quel. */
+function avecCle(init: RequestInit | undefined): RequestInit | undefined {
+  const methode = (init?.method ?? 'GET').toUpperCase()
+  if (!reseau.cle || methode === 'GET' || methode === 'HEAD') return init
+  const entetes = new Headers(init?.headers)
+  entetes.set(ENTETE_CLE, reseau.cle)
+  return { ...init, headers: entetes }
 }
 
 /** Le plafond des journaux de diagnostic : on garde les derniers, pas tout. */
@@ -86,7 +106,8 @@ export function appelle(chemin: string, init?: RequestInit): Promise<Response> {
   }
   note(reseau.appels, chemin)
   const url = reseau.base ? reseau.base + chemin : chemin
+  const parti = avecCle(init)
   const dos = reseau.dos
-  if (dos) return dos.fetch(url, init)
-  return fetch(url, init)
+  if (dos) return dos.fetch(url, parti)
+  return fetch(url, parti)
 }

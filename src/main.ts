@@ -639,6 +639,7 @@ import type { Pane } from 'tweakpane'
 import { amorcePresets } from './bench/amorcePresets'
 import { creeGardeImage, type PanneImage } from './game/gardeBoucle'
 import { appelle } from './game/reseau'
+import { chargeCle, clePosee, rangeCle, verifieCle } from './game/cleConcepteur'
 import {
   audessusDuVide,
   blocsVide,
@@ -660,6 +661,10 @@ import {
 } from './game/iconesPeintes'
 
 const CAPACITY = 4096
+
+// LA CLÉ CONCEPTEUR rangée sur ce poste rejoint la cloison réseau AVANT
+// tout geste : sans elle, le serveur refuse chaque publication (api/_cle.ts).
+chargeCle()
 
 // LES PLANCHES PEINTES (cycle des états, trophées) : guettées dès
 // l'ouverture. Tant qu'elles manquent, chaque pastille montre l'emoji
@@ -8780,6 +8785,7 @@ const regie = new Regie(regieEl, {
     }
   },
   tir: (n) => tirABlanc(journalCourant(), scenario, n),
+  cle: { posee: clePosee, range: rangeCle, verifie: verifieCle },
   fermer: () => regie.close(),
 })
 document.getElementById('home-regie')?.addEventListener('click', () => regie.open())
