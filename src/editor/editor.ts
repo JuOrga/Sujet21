@@ -226,6 +226,7 @@ import { issueChargement, questionChargement, tableauOuvert } from './chargement
 import { Historique, type Pas } from './historique'
 import { iconeOutil } from './iconesAtelier'
 import { defileLigne } from './defileLigne'
+import { CLE_ATELIER_META, CLE_ATELIER_SALLE, CLE_ATELIER_SALLES } from '../game/clesAtelier'
 import {
   etatDeSalle,
   lisSalles,
@@ -262,12 +263,14 @@ const AIDES_KEY = 'projet21.editeur.aides.v1'
 // des éléments réservés (boutique, ancres…) et un lien avec la
 // bibliothèque officielle — rien de cela ne doit passer chez le joueur, ni
 // l'inverse. Son « openId » est l'identifiant de la CRÉATION publiée.
-const ATELIER_KEY = 'projet21.atelier.v1'
-const ATELIER_META_KEY = 'projet21.atelier.meta.v1'
-// MES SALLES (sallesAtelier.ts) : toutes les salles de l'atelier, la salle
-// ouverte y étant rangée à chaque geste — « Nouvelle salle » n'écrase plus
-// rien, et une salle publiée se retrouve pour la retoucher
-const ATELIER_SALLES_KEY = 'projet21.atelier.salles.v1'
+// L'ATELIER DU JOUEUR range ses salles DANS LE COFFRE de l'emplacement
+// (game/clesAtelier.ts) : ce sont des créations du joueur, elles suivent sa
+// partie, l'export et le Steam Cloud. Les clés y sont nommées ; l'éditeur
+// les reçoit par le crochet stockageAtelier (le coffre), le navigateur à
+// défaut (les essais, le banc).
+const ATELIER_KEY = CLE_ATELIER_SALLE
+const ATELIER_META_KEY = CLE_ATELIER_META
+const ATELIER_SALLES_KEY = CLE_ATELIER_SALLES
 
 // Couleurs des matériaux : celles de la légende du jeu, pour qu'on reconnaisse
 // une surface d'un écran à l'autre.
@@ -517,6 +520,9 @@ export interface EditorHooks {
   /** LES BIOMES de la carte de la station (code + nom du module) : le
    * champ Biome du tableau en fait un menu. Absent : le champ se cache. */
   biomes?(): { code: string; nom: string; horsJeu?: true }[]
+  /** Où l'atelier du joueur range ses salles : le COFFRE de l'emplacement
+   *  (coffre.stockage). Absent : le stockage du navigateur. */
+  stockageAtelier?(): { getItem(c: string): string | null; setItem(c: string, v: string): void; removeItem(c: string): void }
 }
 
 /**
@@ -911,7 +917,7 @@ export class LevelEditor {
    *  et l'historique repart (on n'annule pas d'une salle à l'autre). */
   private ouvreSalle(cle: string): void {
     this.persist()
-    const s = lisSalles(localStorage.getItem(ATELIER_SALLES_KEY)).find((x) => x.cle === cle)
+    const s = lisSalles(this.sa().getItem(ATELIER_SALLES_KEY)).find((x) => x.cle === cle)
     if (!s) return
     let level: LevelDef | null = null
     try {
@@ -951,7 +957,7 @@ export class LevelEditor {
    *  dans MES SALLES. */
   ouvreCreation(creationId: string, enLigne: LevelDef): void {
     if (!this.joueur) return
-    const deja = salleDeLaCreation(lisSalles(localStorage.getItem(ATELIER_SALLES_KEY)), creationId)
+    const deja = salleDeLaCreation(lisSalles(this.sa().getItem(ATELIER_SALLES_KEY)), creationId)
     if (deja) {
       this.ouvreSalle(deja.cle)
       return
@@ -977,7 +983,7 @@ export class LevelEditor {
     }
     const esc = (t: string): string =>
       t.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
-    const liste = lisSalles(localStorage.getItem(ATELIER_SALLES_KEY))
+    const liste = lisSalles(this.sa().getItem(ATELIER_SALLES_KEY))
     const mots = { brouillon: 'brouillon', publiee: 'publiée', retouchee: 'publiée · retouches en attente' }
     el.innerHTML =
       `<span class="ed-ms-titre">MES SALLES <small>(${liste.length})</small></span>` +
@@ -1007,7 +1013,7 @@ export class LevelEditor {
         const cle = b.dataset.retirer ?? ''
         const x = liste.find((y) => y.cle === cle)
         if (!x || !confirm(`Retirer « ${x.nom} » de vos salles ?${x.creationId ? ' Elle reste en ligne, dans CRÉATIONS.' : ' Ce brouillon sera perdu.'}`)) return
-        localStorage.setItem(ATELIER_SALLES_KEY, JSON.stringify(retireSalle(liste, cle)))
+        this.sa().setItem(ATELIER_SALLES_KEY, JSON.stringify(retireSalle(liste, cle)))
         this.peintMesSalles()
       })
     }
@@ -1142,31 +1148,36 @@ export class LevelEditor {
   // ——— Persistance locale ————————————————————————————————
   private persist(): void {
     try {
-      localStorage.setItem(this.joueur ? ATELIER_KEY : STORE_KEY, serializeLevel(this.level))
-      localStorage.setItem(
-        this.joueur ? ATELIER_META_KEY : META_KEY,
-        JSON.stringify(
-          this.joueur
-            ? { openId: this.openId, base: this.base, cle: this.cleSalle }
-            : { openId: this.openId, base: this.base },
-        ),
-      )
-      if (this.joueur) this.rangeSalleOuverte()
+      if (this.joueur) {
+        // LE COFFRE se réécrit en entier à chaque écriture : la salle ouverte
+        // n'y est rangée qu'UNE fois, dans MES SALLES — la méta dit laquelle
+        this.rangeSalleOuverte()
+        this.sa().setItem(ATELIER_META_KEY, JSON.stringify({ openId: this.openId, base: this.base, cle: this.cleSalle }))
+      } else {
+        localStorage.setItem(STORE_KEY, serializeLevel(this.level))
+        localStorage.setItem(META_KEY, JSON.stringify({ openId: this.openId, base: this.base }))
+      }
     } catch {
       // stockage indisponible : l'édition continue, sans reprise après coup
     }
   }
 
+  /** Le stockage de l'atelier : le coffre de l'emplacement, sinon le
+   *  navigateur. Les brouillons du CONCEPTEUR, eux, restent au navigateur. */
+  private sa(): { getItem(c: string): string | null; setItem(c: string, v: string): void; removeItem(c: string): void } {
+    return this.hooks.stockageAtelier?.() ?? localStorage
+  }
+
   /** Range la salle ouverte dans MES SALLES (l'atelier seulement). */
   private rangeSalleOuverte(): void {
     if (!this.cleSalle) this.cleSalle = nouvelleCleSalle()
-    const liste = lisSalles(localStorage.getItem(ATELIER_SALLES_KEY))
+    const liste = lisSalles(this.sa().getItem(ATELIER_SALLES_KEY))
     const salle = serializeLevel(this.level)
     const avant = liste.find((x) => x.cle === this.cleSalle)
     // la date ne bouge que si la salle a changé : la liste reste dans
     // l'ordre des vraies retouches, pas des ouvertures
     const majLe = avant && avant.salle === salle ? avant.majLe : new Date().toISOString()
-    localStorage.setItem(
+    this.sa().setItem(
       ATELIER_SALLES_KEY,
       JSON.stringify(
         rangeSalle(liste, { cle: this.cleSalle, nom: this.level.name, salle, creationId: this.openId, base: this.base, majLe }),
@@ -1175,21 +1186,51 @@ export class LevelEditor {
   }
 
   private restore(): void {
+    if (this.joueur) {
+      this.restoreAtelier()
+      return
+    }
     try {
-      const raw = localStorage.getItem(this.joueur ? ATELIER_KEY : STORE_KEY)
+      const raw = localStorage.getItem(STORE_KEY)
       if (!raw) return
       const { level } = parseLevel(JSON.parse(raw))
       if (level) this.level = level
-      const meta = JSON.parse(localStorage.getItem(this.joueur ? ATELIER_META_KEY : META_KEY) ?? '{}') as {
+      const meta = JSON.parse(localStorage.getItem(META_KEY) ?? '{}') as {
+        openId?: string
+        base?: string
+      }
+      this.openId = typeof meta.openId === 'string' ? meta.openId : ''
+      this.base = typeof meta.base === 'string' ? meta.base : ''
+    } catch {
+      // brouillon illisible : on repart d'un tableau vierge
+    }
+  }
+
+  /** La reprise de l'atelier : la salle que la méta désigne, lue dans MES
+   *  SALLES ; à défaut, l'ancien brouillon unique (d'avant la liste). */
+  private restoreAtelier(): void {
+    try {
+      const meta = JSON.parse(this.sa().getItem(ATELIER_META_KEY) ?? '{}') as {
         openId?: string
         base?: string
         cle?: string
       }
       this.openId = typeof meta.openId === 'string' ? meta.openId : ''
       this.base = typeof meta.base === 'string' ? meta.base : ''
-      if (this.joueur) this.cleSalle = typeof meta.cle === 'string' ? meta.cle : ''
+      this.cleSalle = typeof meta.cle === 'string' ? meta.cle : ''
+      const rangee = lisSalles(this.sa().getItem(ATELIER_SALLES_KEY)).find((x) => x.cle === this.cleSalle)
+      const raw = rangee?.salle ?? this.sa().getItem(ATELIER_KEY)
+      if (!raw) return
+      const { level } = parseLevel(JSON.parse(raw))
+      if (level) this.level = level
+      // l'ancien brouillon unique rejoint la liste AVANT de s'effacer :
+      // un atelier refermé sans un geste ne doit pas le perdre
+      if (!rangee && level) {
+        this.rangeSalleOuverte()
+        this.sa().removeItem(ATELIER_KEY)
+      }
     } catch {
-      // brouillon illisible : on repart d'un tableau vierge
+      // salle illisible : on repart d'une salle vierge
     }
   }
 
