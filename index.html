@@ -7109,18 +7109,24 @@
         border-top: 1px solid var(--line);
         background: var(--void);
       }
-      #editor .ed-dock-familles { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+      #editor .ed-dock-familles { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; }
       /* LES OUTILS TRANSVERSES (Sélection, Gomme, Superposer) : toujours à
          portée, à gauche des familles, séparés d'elles par un filet */
       #editor .ed-dock-transverses {
-        display: inline-flex; gap: 6px; margin-right: 6px; padding-right: 12px; border-right: 1px solid var(--line);
+        display: inline-flex; gap: 4px; margin-right: 6px; padding-right: 10px; border-right: 1px solid var(--line);
       }
-      #editor .ed-dock-trans { display: inline-flex; align-items: center; gap: 6px; }
-      #editor .ed-dock-trans svg { width: 20px; height: 20px; flex: 0 0 20px; }
+      #editor .ed-dock-familles .ed-dock-trans { display: inline-flex; align-items: center; gap: 5px; padding: 0 8px; }
+      /* plus spécifique que « .ed-dock-choisir svg » (32 px, plus bas) : la
+         Sélection gardait une case de 32 px pour un dessin de 20 */
+      #editor .ed-dock-familles .ed-dock-trans svg { width: 18px; height: 18px; flex: 0 0 18px; }
       #editor .ed-dock-trans:not(.ed-dock-choisir)[aria-pressed='true'] {
         background: var(--glow); color: #030710; border-color: var(--glow); font-weight: 600;
       }
-      #editor .ed-dock-fam { min-height: 40px; padding: 0 14px; }
+      /* resserrés (espacement des lettres réduit) : les trois outils
+         transverses et les six familles tiennent sur UNE ligne dans une
+         barre de 958 px — un écran de 1 280 px (mesuré le 24/11 ; à 14 px
+         de marge et 6 px d'écart, « Décor » passait à la ligne) */
+      #editor .ed-dock-fam { min-height: 40px; padding: 0 10px; letter-spacing: .03em; }
       #editor .ed-dock-fam[aria-selected='true'] { background: var(--glow); color: #030710; border-color: var(--glow); font-weight: 600; }
       /* UNE SEULE LIGNE d'outils, qui défile de côté (le concepteur, 24/11 :
          « les choix restent sur une seule ligne ») — chaque outil a son
@@ -7151,6 +7157,21 @@
       }
       #editor .ed-dock-choisir[aria-pressed='true'] { opacity: .7; }
       #editor .ed-dock-choisir svg { width: 20px; height: 20px; }
+      /* LA BULLE D'AIDE (editor.ts, brancheAides) : au-dessus de la barre,
+         sur la salle, après un temps d'arrêt sur l'outil */
+      #editor.ed-joueur #ed-dock { position: relative; }
+      #editor .ed-dock-aide {
+        position: absolute; bottom: calc(100% + 8px); z-index: 5;
+        width: min(340px, calc(100% - 16px)); padding: 10px 12px;
+        background: var(--void); border: 1px solid var(--glow); border-radius: 6px;
+        box-shadow: 0 6px 24px rgba(0, 0, 0, .55); pointer-events: none;
+        font-size: 12px; line-height: 1.45; text-align: left;
+      }
+      #editor .ed-dock-aide[hidden] { display: none; }
+      #editor .ed-dock-aide strong { display: block; font-size: 13px; color: var(--glow); margin-bottom: 4px; }
+      #editor .ed-dock-aide p { margin: 0 0 6px; }
+      #editor .ed-dock-aide ul { margin: 0; padding-left: 16px; }
+      #editor .ed-dock-aide li + li { margin-top: 3px; }
       #editor .ed-dock-outil b { display: block; font-size: 13px; font-weight: 600; }
       #editor .ed-dock-outil small {
         display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
