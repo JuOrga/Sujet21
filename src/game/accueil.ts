@@ -50,6 +50,10 @@ export const LIEUX_ACCUEIL = [
   'home-codex',
   'home-station',
   'home-records',
+  // les salles des joueurs : à tous depuis le 24/11 (ils étaient derrière le
+  // mode concepteur, sous l'allure grise des outils de la régie)
+  'home-creations',
+  'home-atelier',
   'home-sauvegardes',
 ] as const
 export type LieuAccueil = (typeof LIEUX_ACCUEIL)[number]
@@ -72,6 +76,10 @@ export interface EtatLieux {
   /** la profondeur du record d'expédition, en salles (0 : aucun) */
   recordSalles: number
   emplacement: number
+  /** les salles de MES SALLES (l'atelier de cet emplacement) */
+  sallesAtelier: number
+  /** les salles publiées depuis cet emplacement */
+  creationsPubliees: number
 }
 
 export interface ValeurLieu {
@@ -96,6 +104,14 @@ export function valeursLieux(e: EtatLieux): Record<LieuAccueil, ValeurLieu> {
     'home-station': { val: e.module.toLowerCase(), neuf: false },
     'home-records': {
       val: e.recordSalles > 0 ? `${e.recordSalles} salle${e.recordSalles > 1 ? 's' : ''}` : '',
+      neuf: false,
+    },
+    'home-creations': {
+      val: e.creationsPubliees > 0 ? `${e.creationsPubliees} publiée${e.creationsPubliees > 1 ? 's' : ''}` : '',
+      neuf: false,
+    },
+    'home-atelier': {
+      val: e.sallesAtelier > 0 ? `${e.sallesAtelier} salle${e.sallesAtelier > 1 ? 's' : ''}` : '',
       neuf: false,
     },
     'home-sauvegardes': { val: `n° ${e.emplacement}`, neuf: false },

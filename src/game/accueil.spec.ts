@@ -59,6 +59,8 @@ describe('les valeurs des lieux', () => {
     module: 'CONDUITS',
     recordSalles: 0,
     emplacement: 2,
+    sallesAtelier: 0,
+    creationsPubliees: 0,
   }
 
   it('a une valeur pour chaque lieu du rail', () => {
@@ -82,6 +84,15 @@ describe('les valeurs des lieux', () => {
     expect(v['home-sauvegardes'].val).toBe('n° 2')
     expect(v['home-records'].val).toBe('12 salles')
     expect(v['home-fioles'].val).toBe('1 / 2')
+  })
+
+  it('compte les salles de l’atelier et les créations publiées, sans rien dire à zéro', () => {
+    expect(valeursLieux(base)['home-atelier'].val).toBe('')
+    expect(valeursLieux(base)['home-creations'].val).toBe('')
+    const v = valeursLieux({ ...base, sallesAtelier: 3, creationsPubliees: 1 })
+    expect(v['home-atelier'].val).toBe('3 salles')
+    expect(v['home-creations'].val).toBe('1 publiée')
+    expect(valeursLieux({ ...base, sallesAtelier: 1 })['home-atelier'].val).toBe('1 salle')
   })
 
   it('laisse les sauvegardes au premier lancement, et seulement elles', () => {
@@ -113,6 +124,18 @@ describe('la fiche dans index.html et main.ts', () => {
       'home-ecoute', // le lecteur vit dans PARAMÈTRES
     ])
       expect(HTML, `id="${id}" manque à index.html`).toContain(`id="${id}"`)
+  })
+
+  it('CRÉATIONS et ATELIER sont des lieux pour tous : ni mode concepteur, ni allure d’outil', () => {
+    for (const id of ['home-creations', 'home-atelier']) {
+      const bouton = new RegExp(`<button id="${id}"[^>]*>`).exec(HTML)?.[0] ?? ''
+      expect(bouton, id).not.toBe('')
+      expect(bouton, id).not.toContain('data-dev')
+      expect(bouton, id).not.toContain('acc-outil')
+      expect(bouton, id).toContain('class="acc-lieu"')
+    }
+    // la RÉGIE, elle, reste au concepteur
+    expect(/<button id="home-regie"[^>]*>/.exec(HTML)?.[0]).toContain('data-dev')
   })
 
   it('n’écrit plus le verbe en dur : majAccueil est la seule source', () => {

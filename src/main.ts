@@ -498,10 +498,17 @@ import {
 } from './game/ceremonie'
 import { cartoucheHTML, iconeDuGlyphe, offreHTML, plaqueHTML, puceHTML } from './game/cartouches'
 import { fmtDuree, fmtL, fmtTime } from './game/formats'
-import { brancheStockageCreations, deposeRecordCreation, publieCreation, raisonCreation } from './game/netCreations'
+import {
+  brancheStockageCreations,
+  deposeRecordCreation,
+  mesCreations,
+  publieCreation,
+  raisonCreation,
+} from './game/netCreations'
 import { EcranCreations } from './game/ecranCreations'
 import { bilanPartie } from './game/creationsVue'
-import { reprendAtelierDuNavigateur } from './game/clesAtelier'
+import { CLE_ATELIER_SALLES, reprendAtelierDuNavigateur } from './game/clesAtelier'
+import { lisSalles } from './editor/sallesAtelier'
 import { cuveHTML, sceauHTML, SCENES_FIN } from './game/ceremonieObjets'
 import {
   finDescenteHTML,
@@ -5834,6 +5841,8 @@ function majAccueil(): void {
     module: etatCarte ? (carte.modules.find((m) => m.id === etatCarte.module)?.nom ?? '') : '',
     recordSalles: records.expedition()?.tableaux ?? 0,
     emplacement: coffre.actif,
+    sallesAtelier: lisSalles(coffre.stockage.getItem(CLE_ATELIER_SALLES)).length,
+    creationsPubliees: mesCreations().length,
   })
   for (const id of LIEUX_ACCUEIL) {
     const b = document.getElementById(id)
