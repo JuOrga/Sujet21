@@ -1050,7 +1050,7 @@ export class LevelEditor {
       b.addEventListener('click', () => {
         const cle = b.dataset.retirer ?? ''
         const x = liste.find((y) => y.cle === cle)
-        if (!x || !confirm(`Retirer « ${x.nom} » de vos salles ?${x.creationId ? ' Elle reste en ligne, dans CRÉATIONS.' : ' Ce brouillon sera perdu.'}`)) return
+        if (!x || !confirm(`Retirer « ${x.nom} » de vos salles ?${x.creationId ? ' Elle reste en ligne, dans les Créations de la communauté.' : ' Ce brouillon sera perdu.'}`)) return
         this.sa().setItem(ATELIER_SALLES_KEY, JSON.stringify(retireSalle(liste, cle)))
         this.peintMesSalles()
       })
@@ -1074,7 +1074,7 @@ export class LevelEditor {
       partage =
         '<p class="attente">Pas encore publiée.</p><p>Pour la publier : <b>ESSAYER ET PUBLIER</b>, puis atteindre la sortie — une salle se publie quand vous avez prouvé qu’elle se traverse. <b>ESSAYER</b> seul la teste sans rien publier.</p>'
     } else if (memeVersion(this.base, serializeLevel(this.level))) {
-      partage = '<p class="ok">Publiée : elle est dans l’écran CRÉATIONS, à jour.</p>'
+      partage = '<p class="ok">Publiée : elle est dans les Créations de la communauté, à jour.</p>'
     } else {
       partage =
         '<p class="attente">Publiée, mais vos retouches ne le sont pas encore.</p><p>Pour les publier : <b>ESSAYER ET PUBLIER</b>, puis atteindre la sortie. Ses records repartiront de votre partie.</p>'
@@ -1152,6 +1152,13 @@ export class LevelEditor {
       if (!b) continue
       b.dataset.libelle ??= b.textContent ?? ''
       b.textContent = j ? libelle : b.dataset.libelle
+    }
+    // le titre : l'écran s'appelle ÉDITEUR dans le menu COMMUNAUTÉ — « de
+    // tableaux » est le mot du concepteur
+    const titre = this.host.querySelector<HTMLElement>('.ed-bar .ed-title')
+    if (titre) {
+      titre.dataset.libelle ??= titre.textContent ?? ''
+      titre.textContent = j ? 'ÉDITEUR — COMMUNAUTÉ' : titre.dataset.libelle
     }
   }
 

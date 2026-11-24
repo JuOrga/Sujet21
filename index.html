@@ -367,6 +367,29 @@
       .acc-lieu:is(:hover, :focus-visible, .pad-focus)::before { left: 0; top: 0; border-top-width: 1.5px; border-left-width: 1.5px; }
       .acc-lieu:is(:hover, :focus-visible, .pad-focus)::after { right: 0; bottom: 0; border-bottom-width: 1.5px; border-right-width: 1.5px; }
       .acc-outil > span { font-size: calc(10px * var(--ui)); color: var(--dim); }
+      /* COMMUNAUTÉ : un lieu qui s'ouvre sur place. Son chevron tourne quand
+         le sous-menu est ouvert ; les deux choix sont des lieux du même
+         dessin, en retrait, tenus par un filet à gauche. */
+      .acc-groupe > span::after {
+        content: '›'; display: inline-block; margin-left: 10px; color: var(--dim);
+        transition: transform 0.15s ease;
+      }
+      .acc-groupe[aria-expanded='true'] > span::after { transform: rotate(90deg); color: var(--glow); }
+      .acc-groupe[aria-expanded='true'] > span { color: var(--glow); }
+      .acc-sous { display: flex; flex-direction: column; margin-left: 14px; border-left: 1px solid var(--line); }
+      .acc-sous[hidden] { display: none; }
+      /* plus bas que les lieux : ouvert, le sous-menu ne pousse le rail que
+         de deux lignes courtes (le rail défile au-delà, overflow-y) */
+      .acc-lieu.acc-sous-lieu { min-height: 34px; }
+      .acc-sous-lieu > span { font-size: calc(10.5px * var(--ui)); }
+      /* les rails à DEUX COLONNES (téléphone tourné ou debout) : le
+         sous-menu prend la rangée entière, ses deux choix côte à côte, et
+         « CRÉATIONS DE LA COMMUNAUTÉ » passe à la ligne plutôt que de
+         déborder sa colonne */
+      @media (max-height: 520px), (max-width: 700px) and (min-height: 521px) {
+        .acc-sous { grid-column: 1 / -1; display: grid; grid-template-columns: 1fr 1fr; column-gap: inherit; margin-left: 0; border-left: 0; }
+        .acc-sous-lieu > span { white-space: normal; line-height: 1.25; }
+      }
 
       /* LES RÉGLAGES : quatre pictogrammes, le nom en infobulle */
       .acc-reglages { display: flex; gap: 4px; margin-left: 4px; }
@@ -502,6 +525,7 @@
         #home { gap: 18px; padding-top: calc(28px + env(safe-area-inset-top)); padding-bottom: 14px; }
         .acc-titre { font-size: calc(30px * var(--ui)); }
         .acc-lieu { min-height: 38px; }
+        .acc-lieu.acc-sous-lieu { min-height: 30px; }
       }
       /* -- téléphone tourné : le rail se resserre, les lieux sur deux colonnes -- */
       @media (max-height: 520px) {
@@ -10225,13 +10249,17 @@
              premier lancement : il n'attend rien de la partie solo. Son écran
              vit entier dans src/multi/ecranMulti.ts. -->
         <button id="home-multi" type="button" class="acc-lieu" title="Jouer à deux : contre l’ordinateur, à deux sur cet écran, ou chacun chez soi"><span>MULTI</span><i class="acc-voyant" hidden></i><small></small></button>
-        <!-- LES SALLES DES JOUEURS (docs/atelier-joueur.md) : CRÉATIONS, celles
-             que les joueurs ont partagées, jouées hors de l'expédition avec
-             leurs records ; ATELIER, bâtir la sienne. Des lieux comme les
-             autres depuis le 24/11 — ils étaient derrière le mode concepteur,
-             sous l'allure grise des outils de la régie. -->
-        <button id="home-creations" type="button" class="acc-lieu" title="Les salles bâties et partagées par les joueurs, jouées hors de l’expédition, avec leurs records"><span>CRÉATIONS</span><i class="acc-voyant" hidden></i><small></small></button>
-        <button id="home-atelier" type="button" class="acc-lieu" title="L’atelier : bâtir sa propre salle, l’essayer, et la partager en atteignant sa sortie"><span>ATELIER</span><i class="acc-voyant" hidden></i><small></small></button>
+        <!-- COMMUNAUTÉ : les salles des joueurs (docs/atelier-joueur.md), un
+             lieu pour tous depuis le 24/11. Il S'OUVRE sur place, dans le même
+             rail : ÉDITEUR (bâtir sa salle) et CRÉATIONS DE LA COMMUNAUTÉ
+             (celles que les joueurs ont partagées, jouées hors de l'expédition
+             avec leurs records). Les identifiants home-atelier et
+             home-creations sont ceux que main.ts branche. -->
+        <button id="home-communaute" type="button" class="acc-lieu acc-groupe" aria-expanded="false" aria-controls="acc-communaute" title="Les salles des joueurs : en bâtir une, jouer celles des autres"><span>COMMUNAUTÉ</span><i class="acc-voyant" hidden></i><small></small></button>
+        <div id="acc-communaute" class="acc-sous" role="group" aria-label="Communauté" hidden>
+          <button id="home-atelier" type="button" class="acc-lieu acc-sous-lieu" title="Bâtir sa propre salle, l’essayer, et la partager en atteignant sa sortie"><span>ÉDITEUR</span><small></small></button>
+          <button id="home-creations" type="button" class="acc-lieu acc-sous-lieu" title="Les salles bâties et partagées par les joueurs, jouées hors de l’expédition, avec leurs records"><span>CRÉATIONS DE LA COMMUNAUTÉ</span><small></small></button>
+        </div>
         <button id="home-sauvegardes" type="button" class="acc-lieu" title="Les trois emplacements : chacun est une partie entière. Le nom d’opérateur s’y change"><span>SAUVEGARDES</span><i class="acc-voyant" hidden></i><small></small></button>
         <!-- LES OUTILS DU CONCEPTEUR ont une seule porte : LA RÉGIE (ses
              sections : carte, descente, planche, récit et fins, montage,

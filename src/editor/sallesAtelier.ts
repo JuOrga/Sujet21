@@ -156,7 +156,7 @@ export function messageRetraits(retirees: readonly SalleAtelier[], prevu = false
   const verbe = prevu ? (plusieurs ? 'en sortiraient' : 'en sortirait') : plusieurs ? 'en sont sorties' : 'en est sortie'
   return (
     `MES SALLES est pleine : ${noms} ${verbe}.` +
-    (publiees ? ' Une salle publiée reste en ligne : rouvrez-la depuis l’écran CRÉATIONS, onglet « Mes créations ».' : '')
+    (publiees ? ' Une salle publiée reste en ligne : rouvrez-la depuis COMMUNAUTÉ › CRÉATIONS DE LA COMMUNAUTÉ, onglet « Mes créations ».' : '')
   )
 }
 

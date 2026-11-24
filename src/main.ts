@@ -608,6 +608,8 @@ import {
   LIEUX_PREMIER_LANCEMENT,
   PICTOS_ACCUEIL,
   valeursLieux,
+  SOUS_LIEUX_COMMUNAUTE,
+  valeursCommunaute,
   verbeAccueil,
 } from './game/accueil'
 import {
@@ -5841,9 +5843,14 @@ function majAccueil(): void {
     module: etatCarte ? (carte.modules.find((m) => m.id === etatCarte.module)?.nom ?? '') : '',
     recordSalles: records.expedition()?.tableaux ?? 0,
     emplacement: coffre.actif,
+  })
+  const communaute = valeursCommunaute({
     sallesAtelier: lisSalles(coffre.stockage.getItem(CLE_ATELIER_SALLES)).length,
     creationsPubliees: mesCreations().length,
   })
+  for (const id of SOUS_LIEUX_COMMUNAUTE) {
+    ecritSiChange(document.getElementById(id)?.querySelector('small') ?? null, communaute[id])
+  }
   for (const id of LIEUX_ACCUEIL) {
     const b = document.getElementById(id)
     if (!b) continue
@@ -8584,7 +8591,7 @@ async function partageDepuisAtelier(
   const raison = raisonCreation() || 'le serveur est injoignable'
   if (p) {
     ed.noteCreation(p.id, salle)
-    ed.notePublication(true, `${deja ? 'Republiée' : 'Publiée'} à ${new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })} : elle est dans l’écran CRÉATIONS.`)
+    ed.notePublication(true, `${deja ? 'Republiée' : 'Publiée'} à ${new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })} : elle est dans les Créations de la communauté.`)
   } else {
     ed.notePublication(false, `La dernière publication a échoué : ${raison}.`)
   }
@@ -8592,10 +8599,10 @@ async function partageDepuisAtelier(
   if (p) {
     showOverlay(
       deja ? 'SALLE REPUBLIÉE' : 'SALLE PUBLIÉE',
-      `« ${echappeHtml(salle.name)} » est en ligne, sous le nom ${echappeHtml(auteur)}, dans l’écran CRÉATIONS. ` +
+      `« ${echappeHtml(salle.name)} » est en ligne, sous le nom ${echappeHtml(auteur)}, dans les Créations de la communauté. ` +
         `${fmtL(litres)} en ${fmtTime(temps)} : ${deja ? 'si la salle a changé, ses records repartent de cette partie' : 'le premier record de la salle'}.`,
       'success',
-      'RETOUR À L’ATELIER',
+      'RETOUR À L’ÉDITEUR',
     )
   } else {
     showOverlay(
@@ -8603,7 +8610,7 @@ async function partageDepuisAtelier(
       `La salle n’a pas pu être publiée : ${echappeHtml(raison)}. ` +
         `Elle reste enregistrée sur ce poste ; « ESSAYER ET PUBLIER » réessaiera.`,
       'danger',
-      'RETOUR À L’ATELIER',
+      'RETOUR À L’ÉDITEUR',
     )
   }
 }
@@ -8940,6 +8947,16 @@ const ecranCreations = new EcranCreations(creationsEl, {
   operateur: () => records.operator(),
 })
 document.getElementById('home-creations')?.addEventListener('click', () => ecranCreations.open())
+// COMMUNAUTÉ s'ouvre SUR PLACE, dans le rail : ses deux choix paraissent
+// dessous (le concepteur, 24/11 : « un sous-menu dans le même style »)
+document.getElementById('home-communaute')?.addEventListener('click', (e) => {
+  const b = e.currentTarget as HTMLButtonElement
+  const sous = document.getElementById('acc-communaute')
+  if (!sous) return
+  const ouvert = b.getAttribute('aria-expanded') !== 'true'
+  b.setAttribute('aria-expanded', String(ouvert))
+  sous.hidden = !ouvert
+})
 
 /** La sortie atteinte dans une création : la partie part dans ses records
  *  (api/_creations.ts), et l'écran de fin dit ce qu'elle y vaut. */
@@ -22004,9 +22021,7 @@ function corpsImage(now: number): boolean {
         : `${surplus.toFixed(2)} L collectés en ${fmtTime(run.tableauTime)} — essai hors expédition : les registres ne bougent pas.${refRecords}`,
       'success',
       fromEditor
-        ? editor?.profil === 'joueur'
-          ? 'RETOUR À L’ATELIER'
-          : 'RETOUR À L’ÉDITEUR'
+        ? 'RETOUR À L’ÉDITEUR'
         : testQueue.length > 0
           ? 'SALLE SUIVANTE'
           : 'RETOUR AU PROTOCOLE',
