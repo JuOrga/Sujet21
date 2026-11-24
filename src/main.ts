@@ -8541,7 +8541,7 @@ async function partageDepuisAtelier(
   // on ne le rouvre pas par-dessus autre chose
   if (!overlay.classList.contains('visible')) return
   if (p) {
-    ed.noteCreation(p.id)
+    ed.noteCreation(p.id, salle)
     showOverlay(
       deja ? 'SALLE REPUBLIÉE' : 'SALLE PARTAGÉE',
       `« ${echappeHtml(salle.name)} » est en ligne, sous le nom ${echappeHtml(auteur)}. ` +

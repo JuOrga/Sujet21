@@ -10,6 +10,7 @@
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import { nettoieCreation } from '../../api/_creation'
+import { ICONES_ATELIER, iconeOutil } from './iconesAtelier'
 import type { LevelDef } from '../game/level'
 import { parseLevel } from '../game/levelIO'
 import {
@@ -184,6 +185,23 @@ describe('la barre de l’atelier : des familles, pas une liste à faire défile
     for (const f of FAMILLES_JOUEUR) for (const o of f.outils) expect(familleDeLOutil(o.outil)).toBe(f.id)
   })
 
+  it('chaque outil de la barre a SON pictogramme', () => {
+    const outils = ['select', ...FAMILLES_JOUEUR.flatMap((f) => f.outils.map((o) => o.outil))]
+    for (const o of outils) {
+      expect(ICONES_ATELIER[o], o).toBeDefined()
+      expect(iconeOutil(o)).toMatch(/^<svg [^>]*aria-hidden="true"/)
+    }
+    // pas deux outils sous le même dessin
+    expect(new Set(outils.map((o) => ICONES_ATELIER[o])).size).toBe(outils.length)
+  })
+
+  it('les outils d’une famille tiennent sur UNE ligne, qui défile de côté', () => {
+    const HTML = readFileSync(new URL('../../index.html', import.meta.url), 'utf-8')
+    const regle = /#editor \.ed-dock-outils \{([^}]*)\}/.exec(HTML)?.[1] ?? ''
+    expect(regle).toContain('flex-wrap: nowrap')
+    expect(regle).toContain('overflow-x: auto')
+  })
+
   it('au profil joueur, la palette latérale cède la place à la barre sous la salle', () => {
     const HTML = readFileSync(new URL('../../index.html', import.meta.url), 'utf-8')
     // la barre vit DANS la scène, sous le canevas
@@ -212,5 +230,14 @@ describe('le câblage de l’atelier (main.ts, index.html)', () => {
 
   it('la sortie atteinte depuis l’atelier partage la salle jouée', () => {
     expect(MAIN).toMatch(/editor\?\.profil === 'joueur' && testLevel\)[\s\S]{0,300}partageDepuisAtelier\(editor, testLevel/)
+    // l'atelier retient la version EN LIGNE : l'encart dit si des retouches attendent
+    expect(MAIN).toMatch(/ed\.noteCreation\(p\.id, salle\)/)
+  })
+
+  it('l’atelier dit où en est la salle, et comment la partager', () => {
+    expect(HTML).toMatch(/<div id="ed-etat-salle"/)
+    const ED = readFileSync(new URL('./editor.ts', import.meta.url), 'utf-8')
+    expect(ED).toContain('Enregistrée sur ce poste')
+    expect(ED).toContain('ESSAYER ET PARTAGER')
   })
 })
