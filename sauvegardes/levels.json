@@ -980,17 +980,19 @@
     },
     {
       "id": "la-membrane",
-      "auteur": "JU",
-      "majAt": "2026-08-26T22:03:54.367Z",
+      "auteur": "BOIZ",
+      "majAt": "2026-11-23T17:19:55.208Z",
+      "codeAuteur": "JU",
+      "codeAt": "2026-08-26T22:03:54.367Z",
       "level": {
         "name": "La membrane",
         "code": "21AF-101",
         "journal": "Cellule 7, cloison osmotique. Gelé, il a heurté la membrane comme un poing frappe une porte. Redevenu liquide, il l’a traversée comme si elle n’existait pas. La cloison choisit son état à sa place — c’est la première paroi qui lui donne un ordre, et il a obéi en trois secondes. — Dr N. Véga",
         "bounds": {
           "minX": -1200,
-          "minY": -750,
+          "minY": -550,
           "maxX": 1200,
-          "maxY": 750
+          "maxY": 550
         },
         "spawn": {
           "x": -950,
@@ -998,60 +1000,278 @@
           "n": 900
         },
         "exit": {
-          "minX": 1040,
-          "minY": -120,
-          "maxX": 1180,
-          "maxY": 120
+          "minX": 770,
+          "minY": 320,
+          "maxX": 910,
+          "maxY": 440
         },
         "boxes": [
           {
-            "minX": -620,
-            "minY": 280,
-            "maxX": -580,
-            "maxY": 520,
+            "minX": -700,
+            "minY": -300,
+            "maxX": -640,
+            "maxY": -40,
             "material": 7
+          },
+          {
+            "minX": -140,
+            "minY": 140,
+            "maxX": -80,
+            "maxY": 400,
+            "material": 7
+          },
+          {
+            "minX": 420,
+            "minY": -550,
+            "maxX": 480,
+            "maxY": -400,
+            "material": 0
+          },
+          {
+            "minX": 420,
+            "minY": -400,
+            "maxX": 480,
+            "maxY": -140,
+            "material": 7
+          },
+          {
+            "minX": 420,
+            "minY": -140,
+            "maxX": 480,
+            "maxY": 400,
+            "material": 0
           },
           {
             "minX": -700,
-            "minY": -400,
-            "maxX": -600,
+            "minY": -40,
+            "maxX": -640,
+            "maxY": 400,
+            "material": 0
+          },
+          {
+            "minX": -700,
+            "minY": -550,
+            "maxX": -640,
             "maxY": -300,
-            "material": 4
-          },
-          {
-            "minX": -40,
-            "minY": -750,
-            "maxX": 0,
-            "maxY": 750,
-            "material": 7
-          },
-          {
-            "minX": 560,
-            "minY": -750,
-            "maxX": 640,
-            "maxY": 180,
             "material": 0
           },
           {
-            "minX": 560,
-            "minY": 180,
-            "maxX": 640,
-            "maxY": 420,
-            "material": 7
+            "minX": -140,
+            "minY": -550,
+            "maxX": -80,
+            "maxY": 140,
+            "material": 0
           },
           {
-            "minX": 560,
-            "minY": 420,
-            "maxX": 640,
-            "maxY": 750,
+            "minX": -140,
+            "minY": 400,
+            "maxX": -80,
+            "maxY": 550,
+            "material": 8
+          },
+          {
+            "minX": -700,
+            "minY": 400,
+            "maxX": -640,
+            "maxY": 550,
+            "material": 8
+          },
+          {
+            "minX": 420,
+            "minY": 400,
+            "maxX": 480,
+            "maxY": 550,
+            "material": 8
+          },
+          {
+            "minX": -640,
+            "minY": -40,
+            "maxX": -340,
+            "maxY": 140,
+            "forme": 3,
             "material": 0
+          },
+          {
+            "minX": -80,
+            "minY": -40,
+            "maxX": 270,
+            "maxY": 140,
+            "forme": 3,
+            "p0": 3,
+            "material": 0
+          },
+          {
+            "minX": 70.4036204055954,
+            "minY": -140,
+            "maxX": 420,
+            "maxY": 40,
+            "angle": 180,
+            "forme": 3,
+            "p0": 3,
+            "material": 0
+          },
+          {
+            "minX": -440,
+            "minY": -40,
+            "maxX": -140,
+            "maxY": 140,
+            "forme": 3,
+            "p0": 2,
+            "material": 0
+          },
+          {
+            "minX": -640,
+            "minY": -550,
+            "maxX": -140,
+            "maxY": -300,
+            "forme": 3,
+            "material": 0
+          },
+          {
+            "minX": -440,
+            "minY": -460,
+            "maxX": -140,
+            "maxY": -300,
+            "forme": 3,
+            "p0": 2,
+            "material": 0
+          },
+          {
+            "minX": -850,
+            "minY": -380,
+            "maxX": -700,
+            "maxY": -300,
+            "forme": 3,
+            "p0": 2,
+            "material": 0
+          },
+          {
+            "minX": -850,
+            "minY": -550,
+            "maxX": -700,
+            "maxY": -470,
+            "forme": 3,
+            "p0": 1,
+            "material": 0
+          },
+          {
+            "minX": -850,
+            "minY": -480,
+            "maxX": -740,
+            "maxY": -425,
+            "forme": 3,
+            "p0": 3,
+            "material": 0
+          },
+          {
+            "minX": -850,
+            "minY": -425,
+            "maxX": -740,
+            "maxY": -370,
+            "forme": 3,
+            "material": 0
+          },
+          {
+            "minX": -1200,
+            "minY": -400,
+            "maxX": -1050,
+            "maxY": -300,
+            "forme": 3,
+            "p0": 3,
+            "material": 0
+          },
+          {
+            "minX": -1200,
+            "minY": -550,
+            "maxX": -1050,
+            "maxY": -450,
+            "forme": 3,
+            "material": 0
+          },
+          {
+            "minX": -1160,
+            "minY": -480,
+            "maxX": -1050,
+            "maxY": -425,
+            "forme": 3,
+            "p0": 2,
+            "material": 0
+          },
+          {
+            "minX": -1160,
+            "minY": -425,
+            "maxX": -1050,
+            "maxY": -370,
+            "forme": 3,
+            "p0": 1,
+            "material": 0
+          },
+          {
+            "minX": -1050,
+            "minY": -480,
+            "maxX": -1000,
+            "maxY": -370,
+            "material": 0
+          },
+          {
+            "minX": -900,
+            "minY": -480,
+            "maxX": -850,
+            "maxY": -370,
+            "material": 0
+          },
+          {
+            "minX": 480.00000000000006,
+            "minY": -140,
+            "maxX": 680.2317127614692,
+            "maxY": 40,
+            "angle": 180,
+            "forme": 3,
+            "material": 0,
+            "p0": 2
+          },
+          {
+            "minX": 679.2091738915287,
+            "minY": -140,
+            "maxX": 879.5999999999999,
+            "maxY": 40,
+            "angle": 180,
+            "forme": 3,
+            "material": 0
+          },
+          {
+            "minX": 1000,
+            "minY": -140,
+            "maxX": 1200,
+            "maxY": -70,
+            "material": 0
+          },
+          {
+            "minX": 680,
+            "minY": 40,
+            "maxX": 880.391,
+            "maxY": 220,
+            "angle": 180,
+            "forme": 3,
+            "material": 0,
+            "p0": 3
+          },
+          {
+            "minX": 480,
+            "minY": 40,
+            "maxX": 680.232,
+            "maxY": 220,
+            "angle": 180,
+            "forme": 3,
+            "material": 0,
+            "p0": 1
           }
         ],
         "sponges": [],
         "labels": [
           {
-            "x": -600,
-            "y": 600,
+            "x": -460,
+            "y": 700,
             "text": "MEMBRANE — SEUL LE LIQUIDE PASSE",
             "tone": "phile",
             "picto": {
@@ -1060,19 +1280,6 @@
               "glace": 0,
               "vapeur": 0
             }
-          },
-          {
-            "x": -650,
-            "y": -480,
-            "text": "PLAQUE FROIDE",
-            "tone": "froid"
-          },
-          {
-            "x": 600,
-            "y": 500,
-            "text": "LA PORTE D’EAU",
-            "tone": "phile",
-            "rang": "secteur"
           },
           {
             "x": 1110,
@@ -1093,30 +1300,56 @@
             "fade": 0.42
           }
         ],
+        "caches": [
+          {
+            "minX": -1200,
+            "minY": -550,
+            "maxX": -700,
+            "maxY": -300
+          },
+          {
+            "minX": -640,
+            "minY": -550,
+            "maxX": -140,
+            "maxY": -300
+          }
+        ],
+        "condensats": [
+          {
+            "x": -1180,
+            "y": -430,
+            "cl": 6
+          },
+          {
+            "x": -720,
+            "y": -420,
+            "cl": 6
+          },
+          {
+            "x": -480,
+            "y": -340,
+            "cl": 6
+          },
+          {
+            "x": -220,
+            "y": -460,
+            "cl": 6
+          },
+          {
+            "x": -400,
+            "y": 480,
+            "cl": 6
+          },
+          {
+            "x": 160,
+            "y": 480,
+            "cl": 6
+          }
+        ],
         "lumieres": [
           {
-            "x": -100,
-            "y": 0,
-            "h": 160,
-            "portee": 880,
-            "intensite": 1.1,
-            "couleur": "#4fae8e",
-            "forme": "bandeau",
-            "longueur": 940,
-            "angle": 90
-          },
-          {
-            "x": 520,
-            "y": 300,
-            "h": 150,
-            "portee": 620,
-            "forme": "bandeau",
-            "longueur": 480,
-            "angle": 90
-          },
-          {
-            "x": 1110,
-            "y": 0,
+            "x": 450,
+            "y": 20,
             "h": 300,
             "portee": 500,
             "couleur": "#3fd69b"
@@ -11555,7 +11788,7 @@
     {
       "id": "travailencours-3",
       "auteur": "BOIZ",
-      "majAt": "2026-08-30T01:36:48.330Z",
+      "majAt": "2026-11-23T16:25:58.565Z",
       "codeAuteur": "BOIZ",
       "codeAt": "2026-08-30T01:36:48.330Z",
       "level": {
@@ -21180,7 +21413,7 @@
     {
       "id": "nouveau-tableau-16",
       "auteur": "BOIZ",
-      "majAt": "2026-11-20T16:53:01.116Z",
+      "majAt": "2026-11-23T16:02:59.747Z",
       "codeAuteur": "BOIZ",
       "codeAt": "2026-10-08T14:15:40.788Z",
       "level": {
@@ -21485,6 +21718,28 @@
             "x": -386,
             "y": 16,
             "couleur": "#f48a8a"
+          }
+        ],
+        "condensats": [
+          {
+            "x": -60,
+            "y": 220,
+            "cl": 6
+          },
+          {
+            "x": -80,
+            "y": -200,
+            "cl": 6
+          },
+          {
+            "x": -1180,
+            "y": -260,
+            "cl": 6
+          },
+          {
+            "x": -1180,
+            "y": 280,
+            "cl": 6
           }
         ]
       }
