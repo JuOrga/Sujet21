@@ -20,6 +20,7 @@ import {
   commandesDe,
   coupeLiens,
   familleDeLOutil,
+  familleDuDock,
   lisPalier,
   outilDeSelection,
   posePalier,
@@ -234,6 +235,50 @@ describe('la barre de l’atelier : des familles, pas une liste à faire défile
   })
 })
 
+describe('changer d’élément à la volée', () => {
+  it('outil en main, une autre famille ouverte RESTE ouverte au rafraîchissement', () => {
+    // l'hydrophobe en main : la barre ouvre « Matières »
+    let etat = familleDuDock({ famille: 'batir', outilVu: '' }, 'box:2')
+    expect(etat.famille).toBe('matieres')
+    // le joueur clique l'onglet « Forces » — l'outil en main n'a pas changé
+    etat = { ...etat, famille: 'forces' }
+    // la barre se repeint (clic, pose, annulation…) : « Forces » tient
+    expect(familleDuDock(etat, 'box:2').famille).toBe('forces')
+    // et il prend le puits directement, sans repasser par la Sélection
+    expect(familleDuDock(etat, 'puits')).toEqual({ famille: 'forces', outilVu: 'puits' })
+  })
+
+  it('un outil pris autrement que par la barre (une annulation) ouvre sa famille', () => {
+    expect(familleDuDock({ famille: 'decor', outilVu: 'label' }, 'laser').famille).toBe('meca')
+    // la Sélection n'a pas de famille : celle ouverte reste
+    expect(familleDuDock({ famille: 'decor', outilVu: 'label' }, 'select').famille).toBe('decor')
+  })
+})
+
+describe('deux essais : pour soi, ou pour publier', () => {
+  const ED = readFileSync(new URL('./editor.ts', import.meta.url), 'utf-8')
+  const MAIN = readFileSync(new URL('../main.ts', import.meta.url), 'utf-8')
+  const HTML = readFileSync(new URL('../../index.html', import.meta.url), 'utf-8')
+
+  it('ESSAYER (masqué au concepteur) et ESSAYER ET PUBLIER', () => {
+    expect(HTML).toMatch(/<button type="button" id="ed-essai-seul" data-hors-profil>/)
+    expect(ED).toContain("this.el('ed-play').addEventListener('click', () => essaie(true))")
+    expect(ED).toContain("this.el('ed-essai-seul').addEventListener('click', () => essaie(false))")
+    expect(ED).toContain("['ed-essai-seul', '▶ ESSAYER']")
+  })
+
+  it('seul l’essai « et publier » publie à la sortie', () => {
+    expect(MAIN).toContain('essaiPublie = opts?.publier === true')
+    expect(MAIN).toMatch(/editor\?\.profil === 'joueur' && testLevel && essaiPublie\) \{[\s\S]{0,200}partageDepuisAtelier/)
+  })
+
+  it('la Sélection s’appelle ainsi, et se met en évidence quand on n’y est pas', () => {
+    expect(ED).toContain('<span>Sélection</span>')
+    expect(ED).not.toContain('Choisir / déplacer')
+    expect(HTML).toMatch(/#editor \.ed-dock-choisir\[aria-pressed='false'\] \{[^}]*var\(--glow\)/)
+  })
+})
+
 describe('la vérification, dite au joueur', () => {
   const vierge = (extra: Partial<LevelDef> = {}): LevelDef => ({
     name: 'Ma salle',
@@ -310,7 +355,7 @@ describe('le câblage de l’atelier (main.ts, index.html)', () => {
   })
 
   it('la sortie atteinte depuis l’atelier partage la salle jouée', () => {
-    expect(MAIN).toMatch(/editor\?\.profil === 'joueur' && testLevel\)[\s\S]{0,300}partageDepuisAtelier\(editor, testLevel/)
+    expect(MAIN).toMatch(/editor\?\.profil === 'joueur' && testLevel && essaiPublie\)[\s\S]{0,300}partageDepuisAtelier\(editor, testLevel/)
     // l'atelier retient la version EN LIGNE : l'encart dit si des retouches attendent
     expect(MAIN).toMatch(/ed\.noteCreation\(p\.id, salle\)/)
   })
@@ -319,6 +364,6 @@ describe('le câblage de l’atelier (main.ts, index.html)', () => {
     expect(HTML).toMatch(/<div id="ed-etat-salle"/)
     const ED = readFileSync(new URL('./editor.ts', import.meta.url), 'utf-8')
     expect(ED).toContain('Enregistrée sur ce poste')
-    expect(ED).toContain('ESSAYER ET PARTAGER')
+    expect(ED).toContain('ESSAYER ET PUBLIER')
   })
 })

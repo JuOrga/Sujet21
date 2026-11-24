@@ -231,7 +231,7 @@ import {
   cleDOutil,
   commandesDe,
   coupeLiens,
-  familleDeLOutil,
+  familleDuDock,
   lisPalier,
   outilDeSelection,
   outilPermis,
@@ -476,8 +476,10 @@ interface Rect {
 const HANDLE_PX = 9 // demi-côté d'une poignée, en pixels écran
 
 export interface EditorHooks {
-  /** Essayer le tableau dans le jeu ; l'éditeur se masque. */
-  play(level: LevelDef): void
+  /** Essayer le tableau dans le jeu ; l'éditeur se masque. Dans l'atelier,
+   *  `publier` dit si la sortie atteinte publie la salle (« ESSAYER ET
+   *  PUBLIER ») ou non (« ESSAYER » : un essai pour soi). */
+  play(level: LevelDef, opts?: { publier?: boolean }): void
   /** Quitter l'éditeur et revenir à la fiche d'essai. */
   quit(): void
   /** Nom de l'opérateur, estampillé sur les tableaux enregistrés. */
@@ -724,6 +726,9 @@ export class LevelEditor {
   private relierVers: Sel = null
   // LA BARRE DE L'ATELIER : la famille dont les outils sont montrés
   private familleDock = 'batir'
+  // l'outil que la barre a vu au dernier tracé : la famille ne le suit
+  // que quand il CHANGE (familleDuDock)
+  private outilVuDock = ''
 
   constructor(host: HTMLElement, hooks: EditorHooks) {
     this.host = host
@@ -898,12 +903,12 @@ export class LevelEditor {
     let partage: string
     if (!this.openId) {
       partage =
-        '<p class="attente">Pas encore partagée.</p><p>Pour la partager : <b>ESSAYER ET PARTAGER</b>, puis atteindre la sortie. Une salle se partage quand vous avez prouvé qu’elle se traverse.</p>'
+        '<p class="attente">Pas encore publiée.</p><p>Pour la publier : <b>ESSAYER ET PUBLIER</b>, puis atteindre la sortie — une salle se publie quand vous avez prouvé qu’elle se traverse. <b>ESSAYER</b> seul la teste sans rien publier.</p>'
     } else if (this.base === serializeLevel(this.level)) {
-      partage = '<p class="ok">Partagée : elle est dans l’écran CRÉATIONS, à jour.</p>'
+      partage = '<p class="ok">Publiée : elle est dans l’écran CRÉATIONS, à jour.</p>'
     } else {
       partage =
-        '<p class="attente">Partagée, mais vos retouches ne le sont pas encore.</p><p>Pour les partager : <b>ESSAYER ET PARTAGER</b>, puis atteindre la sortie. Ses records repartiront de votre partie.</p>'
+        '<p class="attente">Publiée, mais vos retouches ne le sont pas encore.</p><p>Pour les publier : <b>ESSAYER ET PUBLIER</b>, puis atteindre la sortie. Ses records repartiront de votre partie.</p>'
     }
     el.innerHTML = enregistree + partage
   }
@@ -963,7 +968,9 @@ export class LevelEditor {
     this.peintDock()
     this.peintEtatSalle()
     // les libellés que l'atelier renomme : l'original se garde pour le retour
-    for (const [id, libelle] of [['ed-play', '▶ ESSAYER ET PARTAGER'], ['ed-new', 'Nouvelle salle']] as const) {
+    // ESSAYER (pour soi) n'existe qu'au profil joueur
+    cache(this.host.querySelector('#ed-essai-seul'), !j)
+    for (const [id, libelle] of [['ed-play', '▶ ESSAYER ET PUBLIER'], ['ed-essai-seul', '▶ ESSAYER'], ['ed-new', 'Nouvelle salle']] as const) {
       const b = this.host.querySelector<HTMLElement>(`#${id}`)
       if (!b) continue
       b.dataset.libelle ??= b.textContent ?? ''
@@ -4600,7 +4607,7 @@ export class LevelEditor {
     if (this.joueur) this.peintDock()
   }
 
-  /** LA BARRE DE L'ATELIER, sous la salle : « Choisir / déplacer », les six
+  /** LA BARRE DE L'ATELIER, sous la salle : « Sélection », les six
    *  familles en onglets, puis les seuls outils de la famille ouverte, avec
    *  leur phrase. Un outil de la barre CLIQUE le bouton caché de la palette
    *  d'origine : même porte (le filtre du profil), même logique de pose. */
@@ -4614,12 +4621,16 @@ export class LevelEditor {
     const esc = (t: string): string =>
       t.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
     const courant = cleDOutil(this.tool as Parameters<typeof cleDOutil>[0])
-    // l'outil en main ouvre sa famille (pris autrement que par la barre)
-    this.familleDock = familleDeLOutil(courant) ?? this.familleDock
+    // l'outil en main ouvre sa famille quand il CHANGE — pas à chaque
+    // tracé : on doit pouvoir parcourir une autre famille, outil en main
+    ;({ famille: this.familleDock, outilVu: this.outilVuDock } = familleDuDock(
+      { famille: this.familleDock, outilVu: this.outilVuDock },
+      courant,
+    ))
     const fam = FAMILLES_JOUEUR.find((f) => f.id === this.familleDock) ?? FAMILLES_JOUEUR[0]
     dock.innerHTML =
       `<div class="ed-dock-familles" role="tablist" aria-label="Familles">` +
-      `<button type="button" class="ed-dock-fam ed-dock-choisir" data-dock-outil="select" aria-pressed="${courant === 'select'}">${iconeOutil('select')}<span>Choisir / déplacer</span></button>` +
+      `<button type="button" class="ed-dock-fam ed-dock-choisir" data-dock-outil="select" aria-pressed="${courant === 'select'}" title="Sélection : choisir un élément posé pour le régler, le glisser pour le déplacer">${iconeOutil('select')}<span>Sélection</span></button>` +
       FAMILLES_JOUEUR.map(
         (f) =>
           `<button type="button" role="tab" class="ed-dock-fam" aria-selected="${f.id === fam.id}" data-dock-famille="${f.id}" title="${esc(f.phrase)}">${esc(f.nom)}</button>`,
@@ -5232,15 +5243,18 @@ export class LevelEditor {
     )
     this.el('ed-save').addEventListener('click', () => void this.store(false))
     this.el('ed-save-as').addEventListener('click', () => void this.store(true))
-    this.el('ed-play').addEventListener('click', () => {
+    const essaie = (publier: boolean): void => {
       const errs = checkLevel(this.level).filter((v) => v.niveau === 'erreur')
       if (errs.length > 0) {
         this.commit('Corrigez les erreurs avant d’essayer.')
         return
       }
       this.persist()
-      this.hooks.play(structuredClone(this.level))
-    })
+      this.hooks.play(structuredClone(this.level), { publier: this.joueur && publier })
+    }
+    this.el('ed-play').addEventListener('click', () => essaie(true))
+    // l'atelier : essayer pour soi, sans rien publier
+    this.el('ed-essai-seul').addEventListener('click', () => essaie(false))
     this.el('ed-quit').addEventListener('click', () => this.hooks.quit())
     this.el('ed-prevision').addEventListener('click', () => this.lancePrevisionExacte())
 
