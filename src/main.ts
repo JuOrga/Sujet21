@@ -6088,6 +6088,10 @@ let fromEditor = false
 // L'ESSAI DE L'ATELIER publie-t-il la salle à la sortie atteinte ? (le bouton
 // « ESSAYER ET PUBLIER » oui, « ESSAYER » non — un essai pour soi)
 let essaiPublie = false
+// …et LA SALLE TELLE QUE L'ATELIER L'A ENVOYÉE, figée au lancement : c'est
+// elle qui se publie, jamais l'objet que le jeu charge — l'atelier compare
+// son brouillon à la version en ligne, elles doivent être identiques
+let salleAtelier: LevelDef | null = null
 
 // ---- LE CHARGEMENT DE L'ATELIER ------------------------------------------
 // Les outils du concepteur — l'éditeur de tableaux, l'éditeur de la carte,
@@ -6182,6 +6186,7 @@ const chargeEditeur = chargeUneFois('l’éditeur de tableaux', async () => {
         fromEditor = true
         // l'atelier : « ESSAYER ET PUBLIER » publie à la sortie, « ESSAYER » non
         essaiPublie = opts?.publier === true
+        salleAtelier = structuredClone(lvl)
         ouvreEssai()
         hasPlayed = true
         ed.close()
@@ -8535,24 +8540,33 @@ async function partageDepuisAtelier(
   const auteur = records.operator() || 'ANONYME'
   const deja = ed.creationId
   const p = await publieCreation(salle, auteur, { litres, temps }, deja || undefined)
-  // l'overlay de fin a pu être refermé entre-temps (R, retour à l'atelier) :
-  // on ne le rouvre pas par-dessus autre chose
-  if (!overlay.classList.contains('visible')) return
+  // L'ATELIER APPREND TOUJOURS LE RÉSULTAT. Le garde « l'écran de fin
+  // est-il encore ouvert ? » passait AVANT : un retour à l'atelier avant la
+  // réponse (un aperçu qui démarre à froid met une ou deux secondes) et la
+  // salle publiée n'était pas notée, l'échec pas dit — « il ne s'est rien
+  // passé à la fin » (le concepteur, 24/11). Seul l'écran de fin, refermé,
+  // ne se rouvre pas ; l'encart « Votre salle » garde le message.
+  const raison = raisonCreation() || 'le serveur est injoignable'
   if (p) {
     ed.noteCreation(p.id, salle)
+    ed.notePublication(true, `${deja ? 'Republiée' : 'Publiée'} à ${new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })} : elle est dans l’écran CRÉATIONS.`)
+  } else {
+    ed.notePublication(false, `La dernière publication a échoué : ${raison}.`)
+  }
+  if (!overlay.classList.contains('visible')) return
+  if (p) {
     showOverlay(
-      deja ? 'SALLE REPUBLIÉE' : 'SALLE PARTAGÉE',
-      `« ${echappeHtml(salle.name)} » est en ligne, sous le nom ${echappeHtml(auteur)}. ` +
-        `${fmtL(litres)} en ${fmtTime(temps)} : ${deja ? 'si la salle a changé, ses records repartent de cette partie' : 'le premier record de la salle'}. ` +
-        `Chaque essai réussi republie vos retouches.`,
+      deja ? 'SALLE REPUBLIÉE' : 'SALLE PUBLIÉE',
+      `« ${echappeHtml(salle.name)} » est en ligne, sous le nom ${echappeHtml(auteur)}, dans l’écran CRÉATIONS. ` +
+        `${fmtL(litres)} en ${fmtTime(temps)} : ${deja ? 'si la salle a changé, ses records repartent de cette partie' : 'le premier record de la salle'}.`,
       'success',
       'RETOUR À L’ATELIER',
     )
   } else {
     showOverlay(
-      'SORTIE ATTEINTE',
-      `La salle n’a pas pu être partagée : ${echappeHtml(raisonCreation() || 'le serveur est injoignable')}. ` +
-        `Elle reste enregistrée sur ce poste ; un prochain essai réussi réessaiera.`,
+      'SORTIE ATTEINTE — NON PUBLIÉE',
+      `La salle n’a pas pu être publiée : ${echappeHtml(raison)}. ` +
+        `Elle reste enregistrée sur ce poste ; « ESSAYER ET PUBLIER » réessaiera.`,
       'danger',
       'RETOUR À L’ATELIER',
     )
@@ -21883,10 +21897,10 @@ function corpsImage(now: number): boolean {
     const refRecords = bestsLibre
       ? ` Records de la salle : 💧 ${fmtL(bestsLibre.volume.liters)} · ⏱ ${fmtTime(bestsLibre.chrono.time)}.`
       : ''
-    if (fromEditor && editor?.profil === 'joueur' && testLevel && essaiPublie) {
+    if (fromEditor && editor?.profil === 'joueur' && salleAtelier && essaiPublie) {
       // L'ATELIER : la sortie atteinte est la PREUVE de traversée — la salle
-      // se partage (ou se republie) avec cette partie pour premier record
-      void partageDepuisAtelier(editor, testLevel, surplus, run.tableauTime)
+      // se publie (ou se republie) avec cette partie pour premier record
+      void partageDepuisAtelier(editor, salleAtelier, surplus, run.tableauTime)
     }
     showOverlay(
       fromEditor ? 'TABLEAU FRANCHI' : `ESSAI ${level.code} CONCLU`,

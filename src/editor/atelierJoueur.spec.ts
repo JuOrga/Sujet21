@@ -269,7 +269,7 @@ describe('deux essais : pour soi, ou pour publier', () => {
 
   it('seul l’essai « et publier » publie à la sortie', () => {
     expect(MAIN).toContain('essaiPublie = opts?.publier === true')
-    expect(MAIN).toMatch(/editor\?\.profil === 'joueur' && testLevel && essaiPublie\) \{[\s\S]{0,200}partageDepuisAtelier/)
+    expect(MAIN).toMatch(/editor\?\.profil === 'joueur' && salleAtelier && essaiPublie\) \{[\s\S]{0,200}partageDepuisAtelier/)
   })
 
   it('la Sélection s’appelle ainsi, et se met en évidence quand on n’y est pas', () => {
@@ -355,7 +355,7 @@ describe('le câblage de l’atelier (main.ts, index.html)', () => {
   })
 
   it('la sortie atteinte depuis l’atelier partage la salle jouée', () => {
-    expect(MAIN).toMatch(/editor\?\.profil === 'joueur' && testLevel && essaiPublie\)[\s\S]{0,300}partageDepuisAtelier\(editor, testLevel/)
+    expect(MAIN).toMatch(/editor\?\.profil === 'joueur' && salleAtelier && essaiPublie\)[\s\S]{0,300}partageDepuisAtelier\(editor, salleAtelier/)
     // l'atelier retient la version EN LIGNE : l'encart dit si des retouches attendent
     expect(MAIN).toMatch(/ed\.noteCreation\(p\.id, salle\)/)
   })

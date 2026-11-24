@@ -72,8 +72,18 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       depotBlob,
     )
     if (r.statut === 405) res.setHeader('Allow', 'GET, POST, DELETE')
+    // LA TRACE de chaque écriture, lisible dans les journaux du déploiement :
+    // sans elle, une publication refusée ne laissait AUCUNE trace côté
+    // serveur (24/11 : « il ne s'est rien passé », et rien à lire). Ni salle
+    // ni jeton : l'action, le statut, la raison d'un refus.
+    if (req.method !== 'GET') {
+      const action = (req.body as { action?: unknown } | null)?.action
+      const erreur = (r.corps as { error?: unknown } | null)?.error
+      console.info(`[creations] ${req.method} ${typeof action === 'string' ? action : ''} → ${r.statut}${typeof erreur === 'string' ? ` · ${erreur}` : ''}`)
+    }
     res.status(r.statut).json(r.corps)
   } catch (e) {
+    console.error(`[creations] ${req.method} → 500 · ${String(e)}`)
     res.status(500).json({ error: 'stockage indisponible', detail: String(e) })
   }
 }
