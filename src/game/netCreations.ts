@@ -5,24 +5,35 @@
 // poste ; le serveur n'en garde que l'empreinte. C'est lui, et lui seul,
 // qui permet de retoucher ou de retirer ses salles — sans compte. Le
 // perdre (navigateur vidé), c'est perdre la main sur ses salles en ligne :
-// elles restent jouables, mais plus modifiables. Comme la clé concepteur,
-// il se range À PART du coffre des sauvegardes.
+// elles restent jouables, mais plus modifiables. C'est pourquoi il se
+// range DANS LE COFFRE de l'emplacement (game/clesAtelier.ts), avec les
+// salles de l'atelier : il suit la partie, l'export et le Steam Cloud.
 //
 // Tous les appels passent par la cloison réseau (reseau.ts) et savent
 // échouer en silence : hors ligne, ils rendent null.
 
 import { appelle } from './reseau'
+import { CLE_JETON_AUTEUR, CLE_MES_CREATIONS } from './clesAtelier'
 
 const ENDPOINT = '/api/creations'
-const CLE_JETON = 'sujet21.jetonAuteur'
-const CLE_MIENNES = 'sujet21.mesCreations'
+const CLE_JETON = CLE_JETON_AUTEUR
+const CLE_MIENNES = CLE_MES_CREATIONS
 
 interface StockageMin {
   getItem(cle: string): string | null
   setItem(cle: string, valeur: string): void
 }
 
+/** Le stockage branché par main.ts : la façade du coffre. */
+let stockageBranche: StockageMin | null = null
+
+/** Branche le jeton et « Mes créations » sur le coffre de l'emplacement. */
+export function brancheStockageCreations(s: StockageMin | null): void {
+  stockageBranche = s
+}
+
 function stockage(): StockageMin | null {
+  if (stockageBranche) return stockageBranche
   try {
     return typeof localStorage !== 'undefined' ? localStorage : null
   } catch {

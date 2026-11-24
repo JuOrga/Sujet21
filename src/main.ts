@@ -498,9 +498,10 @@ import {
 } from './game/ceremonie'
 import { cartoucheHTML, iconeDuGlyphe, offreHTML, plaqueHTML, puceHTML } from './game/cartouches'
 import { fmtDuree, fmtL, fmtTime } from './game/formats'
-import { deposeRecordCreation, publieCreation, raisonCreation } from './game/netCreations'
+import { brancheStockageCreations, deposeRecordCreation, publieCreation, raisonCreation } from './game/netCreations'
 import { EcranCreations } from './game/ecranCreations'
 import { bilanPartie } from './game/creationsVue'
+import { reprendAtelierDuNavigateur } from './game/clesAtelier'
 import { cuveHTML, sceauHTML, SCENES_FIN } from './game/ceremonieObjets'
 import {
   finDescenteHTML,
@@ -921,6 +922,17 @@ const coupelleFrisson: number[] = []
 
 // Registres du labo (§10) : records par tableau et historique des essais.
 const records = new Records(coffre.stockage)
+// L'ATELIER DU JOUEUR dans le coffre (game/clesAtelier.ts) : ses salles et
+// son jeton d'auteur suivent la partie, l'export et le Steam Cloud. Ce que
+// le navigateur en tenait encore y passe une fois.
+reprendAtelierDuNavigateur(coffre.stockage, (() => {
+  try {
+    return typeof localStorage !== 'undefined' ? localStorage : null
+  } catch {
+    return null
+  }
+})())
+brancheStockageCreations(coffre.stockage)
 
 // ---- LA MÉMOIRE : la monnaie PERSISTANTE de l'Éveil, gravée dans les
 // registres. De l'information, pas de la matière : la purge de fin de run
@@ -6233,6 +6245,8 @@ const chargeEditeur = chargeUneFois('l’éditeur de tableaux', async () => {
       // L2 tenu = Maj : la multi-sélection au Steam Deck (trackpad droit en
       // souris, aucune touche Maj sous la main)
       modMulti: () => manette.ltVal > 0.5,
+      // l'atelier du joueur range ses salles dans le coffre de l'emplacement
+      stockageAtelier: () => coffre.stockage,
     })
     editor = ed
     // la bibliothèque que la planche a déjà reçue du serveur : l'éditeur

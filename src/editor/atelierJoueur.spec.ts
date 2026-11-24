@@ -14,6 +14,7 @@ import { ICONES_ATELIER, iconeOutil } from './iconesAtelier'
 import type { LevelDef } from '../game/level'
 import { checkLevel, parseLevel } from '../game/levelIO'
 import {
+  outilPermis,
   FAMILLES_JOUEUR,
   canalDeCommande,
   cleDOutil,
@@ -52,7 +53,7 @@ function salle(extra: Partial<LevelDef> = {}): LevelDef {
 describe('l’en-tête du panneau : ce qu’est l’élément choisi', () => {
   it('le nom, la phrase et la famille de l’outil du joueur', () => {
     const l = salle()
-    expect(outilDeSelection(l, { kind: 'box', index: 0 })).toMatchObject({ nom: 'Hydrophobe', famille: 'Matières' })
+    expect(outilDeSelection(l, { kind: 'box', index: 0 })).toMatchObject({ nom: 'Hydrophobe', famille: 'Parois' })
     expect(outilDeSelection(l, { kind: 'cible', index: 0 })).toMatchObject({ nom: 'Pastille', famille: 'Mécanismes' })
     expect(outilDeSelection(l, { kind: 'puits', index: 0 })?.phrase).toContain('orbiter')
     expect(outilDeSelection(l, { kind: 'spawn' })?.nom).toBe('Départ')
@@ -169,8 +170,36 @@ describe('relier une commande à une porte, sans numéro', () => {
 })
 
 describe('la barre de l’atelier : des familles, pas une liste à faire défiler', () => {
-  it('chaque famille tient en une rangée : sept outils au plus', () => {
-    for (const f of FAMILLES_JOUEUR) expect(f.outils.length, f.nom).toBeLessThanOrEqual(7)
+  // la rangée défile de côté (defileLigne) : une famille n'a plus à tenir
+  // en sept outils — elle a à tenir ce qui VA ENSEMBLE (le concepteur,
+  // 24/11 : « toutes les parois devraient être ensemble, les zones d'effet
+  // également »)
+  it('toutes les parois dans une famille, toutes les zones d’effet dans une autre', () => {
+    const famille = (id: string): string[] => FAMILLES_JOUEUR.find((f) => f.id === id)?.outils.map((o) => o.outil) ?? []
+    const parois = ['box:0', 'box:1', 'box:2', 'box:4', 'box:5', 'box:6', 'box:7', 'box:8', 'box:9']
+    for (const o of parois) expect(familleDeLOutil(o), o).toBe('parois')
+    for (const o of ['forme:1', 'forme:2', 'forme:3', 'forme:4']) expect(familleDeLOutil(o), o).toBe('parois')
+    for (const o of ['zone:eau', 'zone:glace', 'zone:vapeur', 'puits', 'chasse', 'sponge', 'box:11']) {
+      expect(familleDeLOutil(o), o).toBe('zones')
+    }
+    expect(famille('lumiere')).toEqual(['lumiere', 'bande'])
+    expect(famille('decor')).not.toContain('lumiere')
+  })
+
+  it('ni chambre ni couloir dans l’atelier', () => {
+    expect(outilPermis('struct:0')).toBe(false)
+    expect(outilPermis('struct:1')).toBe(false)
+    expect(familleDeLOutil('struct:0')).toBeNull()
+  })
+
+  it('les outils transverses : sélection, gomme, superposition — et l’alignement visible', () => {
+    for (const o of ['select', 'gomme', 'cut']) expect(outilPermis(o), o).toBe(true)
+    const ED = readFileSync(new URL('./editor.ts', import.meta.url), 'utf-8')
+    // la barre du concepteur ne cache plus la case d'alignement automatique
+    const barre = /const BARRE_CONCEPTEUR = \[([^\]]*)\]/.exec(ED)?.[1] ?? ''
+    expect(barre).toContain('ed-gen')
+    expect(barre).not.toContain('ed-align')
+    expect(ED).toContain("id=\"pj-dupliquer\"")
   })
 
   it('l’outil en main se retrouve dans la barre, et ouvre sa famille', () => {
@@ -180,15 +209,15 @@ describe('la barre de l’atelier : des familles, pas une liste à faire défile
     expect(cleDOutil({ kind: 'decal', sorte: 'tuyaux' })).toBe('decal:tuyaux')
     expect(cleDOutil({ kind: 'bande' })).toBe('bande')
     expect(cleDOutil({ kind: 'select' })).toBe('select')
-    expect(familleDeLOutil('puits')).toBe('forces')
-    expect(familleDeLOutil('box:6')).toBe('chaleur')
+    expect(familleDeLOutil('puits')).toBe('zones')
+    expect(familleDeLOutil('box:6')).toBe('parois')
     expect(familleDeLOutil('select')).toBeNull()
     // chaque outil de la barre a sa famille
     for (const f of FAMILLES_JOUEUR) for (const o of f.outils) expect(familleDeLOutil(o.outil)).toBe(f.id)
   })
 
   it('chaque outil de la barre a SON pictogramme', () => {
-    const outils = ['select', ...FAMILLES_JOUEUR.flatMap((f) => f.outils.map((o) => o.outil))]
+    const outils = ['select', 'gomme', 'cut', ...FAMILLES_JOUEUR.flatMap((f) => f.outils.map((o) => o.outil))]
     for (const o of outils) {
       expect(ICONES_ATELIER[o], o).toBeDefined()
       expect(iconeOutil(o)).toMatch(/^<svg [^>]*aria-hidden="true"/)
@@ -237,15 +266,15 @@ describe('la barre de l’atelier : des familles, pas une liste à faire défile
 
 describe('changer d’élément à la volée', () => {
   it('outil en main, une autre famille ouverte RESTE ouverte au rafraîchissement', () => {
-    // l'hydrophobe en main : la barre ouvre « Matières »
-    let etat = familleDuDock({ famille: 'batir', outilVu: '' }, 'box:2')
-    expect(etat.famille).toBe('matieres')
-    // le joueur clique l'onglet « Forces » — l'outil en main n'a pas changé
-    etat = { ...etat, famille: 'forces' }
-    // la barre se repeint (clic, pose, annulation…) : « Forces » tient
-    expect(familleDuDock(etat, 'box:2').famille).toBe('forces')
+    // l'hydrophobe en main : la barre ouvre « Parois »
+    let etat = familleDuDock({ famille: 'depart', outilVu: '' }, 'box:2')
+    expect(etat.famille).toBe('parois')
+    // le joueur clique l'onglet « Zones d'effet » — l'outil en main n'a pas changé
+    etat = { ...etat, famille: 'zones' }
+    // la barre se repeint (clic, pose, annulation…) : « Zones d'effet » tient
+    expect(familleDuDock(etat, 'box:2').famille).toBe('zones')
     // et il prend le puits directement, sans repasser par la Sélection
-    expect(familleDuDock(etat, 'puits')).toEqual({ famille: 'forces', outilVu: 'puits' })
+    expect(familleDuDock(etat, 'puits')).toEqual({ famille: 'zones', outilVu: 'puits' })
   })
 
   it('un outil pris autrement que par la barre (une annulation) ouvre sa famille', () => {
@@ -273,7 +302,8 @@ describe('deux essais : pour soi, ou pour publier', () => {
   })
 
   it('la Sélection s’appelle ainsi, et se met en évidence quand on n’y est pas', () => {
-    expect(ED).toContain('<span>Sélection</span>')
+    expect(ED).toMatch(/nom: 'Sélection'/)
+    expect(ED).toContain('<span>${esc(t.nom)}</span>')
     expect(ED).not.toContain('Choisir / déplacer')
     expect(HTML).toMatch(/#editor \.ed-dock-choisir\[aria-pressed='false'\] \{[^}]*var\(--glow\)/)
   })
