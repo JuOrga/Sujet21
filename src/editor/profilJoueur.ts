@@ -565,3 +565,74 @@ export function cleDOutil(t: {
 export function familleDeLOutil(outil: string): string | null {
   return FAMILLES_JOUEUR.find((f) => f.outils.some((x) => x.outil === outil))?.id ?? null
 }
+
+// ---- LA VÉRIFICATION, DITE AU JOUEUR -------------------------------------------
+// checkLevel (levelIO.ts) parle au CONCEPTEUR : le journal de bord, la
+// « chimie », l'étiquette du sas, les canaux numérotés, les unités « u ».
+// Le joueur ne voit ni journal, ni canal, ni unité (le concepteur, 24/11 :
+// « je ne comprends pas ces messages »). Chaque message passe donc par
+// cette table : retiré s'il ne concerne que le concepteur, REDIT sinon,
+// avec ce qu'il faut faire. Une ERREUR n'est jamais retirée — elle bloque
+// l'essai, le joueur doit savoir pourquoi ; une erreur sans traduction
+// reste telle quelle plutôt que de disparaître.
+
+interface Traduction {
+  motif: RegExp
+  /** null : un message du concepteur, retiré (avertissements seulement) */
+  dit: string | null | ((m: RegExpExecArray) => string)
+}
+
+const TRADUCTIONS: Traduction[] = [
+  // ce qui ne regarde que le concepteur
+  { motif: /^L’entrée de journal fait moins/, dit: null },
+  { motif: /^Aucune étiquette ne désigne le sas/, dit: null },
+  { motif: /^Aucune chimie ni éponge/, dit: null },
+  { motif: /^Le tableau est vide/, dit: null },
+  { motif: /^Le sas est à moins de 800 u du départ/, dit: null },
+  { motif: /^La carte imposée/, dit: null },
+  { motif: /^Le preset et une carte imposée/, dit: null },
+  { motif: /^Des mires sans le tir de glace/, dit: null }, // l'atelier impose l'Éclateur lui-même
+  // le départ et la sortie
+  { motif: /^Le point de départ est hors de la cuve/, dit: 'Le départ est hors de la salle : ramenez-le à l’intérieur.' },
+  { motif: /^Le point de départ naît dans une surface/, dit: 'Le départ touche une paroi : le corps naîtrait coincé. Écartez-le un peu.' },
+  { motif: /^Le sas déborde de la cuve/, dit: 'La sortie dépasse de la salle : ramenez-la à l’intérieur.' },
+  { motif: /^Le sas est trop petit/, dit: 'La sortie est trop petite : agrandissez-la en tirant ses coins.' },
+  { motif: /^Le départ est posé dans le corps d’un rail/, dit: 'Le départ est posé sur un rail : le corps naîtrait coincé. Écartez-le.' },
+  // les budgets
+  { motif: /^Trop de blocs : (\d+) posés, (\d+)/, dit: (m) => `Trop de parois : ${m[1]} pour ${m[2]} au plus — les dernières seraient invisibles. Retirez-en quelques-unes.` },
+  { motif: /^Trop de lampes : (\d+) posées, (\d+)/, dit: (m) => `Trop de lampes : ${m[1]} pour ${m[2]} au plus — les dernières resteraient éteintes.` },
+  // les liens (le joueur RELIE, il ne voit jamais de numéro de canal)
+  { motif: /^Une porte est asservie au canal/, dit: 'Une porte n’est reliée à aucune commande : elle ne bougera jamais. Choisissez-la, puis « Relier une commande ».' },
+  { motif: /^Une chasse est asservie au canal/, dit: 'Une chasse attend une commande qui n’existe plus. Reliez-la, ou « Couper les liens » pour qu’elle souffle toujours.' },
+  { motif: /^Une coupelle allume le canal/, dit: 'Une coupelle n’ouvre rien : le corps y paierait pour rien. Reliez-la à une porte.' },
+  { motif: /^Une cible sans émetteur laser/, dit: 'Une pastille sans laser : elle ne s’allumera jamais. Posez un laser qui la vise.' },
+  { motif: /^Un émetteur laser sans cible/, dit: 'Un laser sans pastille : son faisceau n’ouvre rien.' },
+  // le reste, redit sans unités ni jargon
+  { motif: /^Une coupelle touche le départ/, dit: 'Une coupelle touche le départ : elle aspirerait le corps dès la première seconde.' },
+  { motif: /^Les coupelles demandent ensemble (\d+) %/, dit: (m) => `Les coupelles demandent ensemble ${m[1]} % du corps : personne ne pourra toutes les payer.` },
+  { motif: /^Un puits a une portée plus courte que son cœur/, dit: 'Un puits a une portée plus courte que son cœur : choisissez une portée plus grande.' },
+  { motif: /^Le corps naît au fond d’un puits/, dit: 'Le départ est au fond d’un puits : le corps n’en sortira qu’en se vidant. Donnez-lui de l’élan, ou éloignez-le.' },
+  { motif: /^Deux cœurs de puits se recouvrent/, dit: 'Deux puits se chevauchent : le corps s’y déchirerait. Écartez-les.' },
+  { motif: /^Un rail magnétique sans émetteur laser/, dit: 'Un rail sans laser : il ne guide rien.' },
+]
+
+/** Les messages de la vérification, dits au joueur. */
+export function verdictsJoueur(verdicts: readonly { niveau: 'erreur' | 'avertissement'; message: string }[]): {
+  niveau: 'erreur' | 'avertissement'
+  message: string
+}[] {
+  const out: { niveau: 'erreur' | 'avertissement'; message: string }[] = []
+  for (const v of verdicts) {
+    let dit: string | null = v.message
+    for (const t of TRADUCTIONS) {
+      const m = t.motif.exec(v.message)
+      if (!m) continue
+      dit = typeof t.dit === 'function' ? t.dit(m) : t.dit
+      break
+    }
+    // une erreur ne disparaît jamais : elle bloque l'essai
+    if (dit === null && v.niveau === 'erreur') dit = v.message
+    if (dit !== null) out.push({ niveau: v.niveau, message: dit })
+  }
+  return out
+}
