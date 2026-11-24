@@ -12,7 +12,7 @@ import { describe, expect, it } from 'vitest'
 import { nettoieCreation } from '../../api/_creation'
 import { ICONES_ATELIER, iconeOutil } from './iconesAtelier'
 import type { LevelDef } from '../game/level'
-import { parseLevel } from '../game/levelIO'
+import { checkLevel, parseLevel } from '../game/levelIO'
 import {
   FAMILLES_JOUEUR,
   canalDeCommande,
@@ -25,6 +25,7 @@ import {
   posePalier,
   reglagesDeSelection,
   relie,
+  verdictsJoueur,
 } from './profilJoueur'
 
 function salle(extra: Partial<LevelDef> = {}): LevelDef {
@@ -208,6 +209,64 @@ describe('la barre de l’atelier : des familles, pas une liste à faire défile
     expect(HTML).toMatch(/<div id="ed-stage">[\s\S]*?<nav id="ed-dock"[\s\S]*?<\/div>/)
     expect(HTML).toMatch(/#editor\.ed-joueur > \.ed-side:not\(\.ed-side--right\) \{ display: none; \}/)
     expect(HTML).toMatch(/#editor\.ed-joueur #ed-dock \{/)
+  })
+})
+
+describe('la vérification, dite au joueur', () => {
+  const vierge = (extra: Partial<LevelDef> = {}): LevelDef => ({
+    name: 'Ma salle',
+    code: 'J-BROUILLON',
+    journal: '',
+    bounds: { minX: -1200, minY: -750, maxX: 1200, maxY: 750 },
+    spawn: { x: -950, y: 0, n: 900 },
+    exit: { minX: 1040, minY: -120, maxX: 1180, maxY: 120 },
+    boxes: [{ minX: -100, minY: 300, maxX: 100, maxY: 330, material: 0 }],
+    sponges: [],
+    labels: [],
+    ...extra,
+  })
+
+  it('les messages du concepteur (journal, chimie, étiquette du sas) ne parviennent pas au joueur', () => {
+    const bruts = checkLevel(vierge()).map((v) => v.message)
+    // le concepteur, lui, les reçoit bien : c'est ce que la capture montrait
+    expect(bruts.some((m) => m.startsWith('L’entrée de journal'))).toBe(true)
+    expect(bruts.some((m) => m.startsWith('Aucune chimie'))).toBe(true)
+    expect(verdictsJoueur(checkLevel(vierge()))).toEqual([])
+  })
+
+  it('une porte non reliée se dit sans numéro de canal, avec ce qu’il faut faire', () => {
+    const l = vierge({ portes: [{ minX: 500, minY: -200, maxX: 530, maxY: 200, canal: 4 }] })
+    const dits = verdictsJoueur(checkLevel(l)).map((v) => v.message)
+    const porte = dits.find((m) => m.includes('porte'))
+    expect(porte).toBeDefined()
+    expect(porte).not.toMatch(/canal|nº/)
+    expect(porte).toContain('Relier une commande')
+  })
+
+  it('le départ dans une paroi : une erreur redite, toujours là', () => {
+    const l = vierge({ boxes: [{ minX: -1000, minY: -100, maxX: -900, maxY: 100, material: 0 }] })
+    const v = verdictsJoueur(checkLevel(l))
+    expect(v.find((x) => x.niveau === 'erreur')?.message).toContain('Le départ touche une paroi')
+    expect(v.map((x) => x.message).join(' ')).not.toMatch(/\bu\b de dégagement/)
+  })
+
+  it('une erreur sans traduction n’est jamais escamotée', () => {
+    const inconnue = { niveau: 'erreur' as const, message: 'Une erreur que la table ne connaît pas.' }
+    const retiree = { niveau: 'erreur' as const, message: 'L’entrée de journal fait moins de 40 caractères.' }
+    expect(verdictsJoueur([inconnue, retiree])).toEqual([inconnue, retiree])
+  })
+})
+
+describe('le masque du profil tient aux réécritures de l’éditeur', () => {
+  it('un attribut, pas une classe : el.className = … ne le fait plus sauter', () => {
+    const ED = readFileSync(new URL('./editor.ts', import.meta.url), 'utf-8')
+    const HTML = readFileSync(new URL('../../index.html', import.meta.url), 'utf-8')
+    // l'éditeur réécrit bien le className de la lecture du code…
+    expect(ED).toMatch(/el\.className = 'ed-code-lecture/)
+    // …donc le masque ne peut pas être une classe
+    expect(ED).toContain("toggleAttribute('data-hors-profil'")
+    expect(ED).not.toContain('ed-hors-profil')
+    expect(HTML).toContain('#editor [data-hors-profil] { display: none !important; }')
   })
 })
 

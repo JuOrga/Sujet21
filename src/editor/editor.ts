@@ -235,6 +235,7 @@ import {
   outilDeSelection,
   outilPermis,
   posePalier,
+  verdictsJoueur,
   reglagesDeSelection,
   relie,
 } from './profilJoueur'
@@ -912,8 +913,12 @@ export class LevelEditor {
   private appliqueProfilDom(): void {
     const j = this.joueur
     this.host.classList.toggle('ed-joueur', j)
+    // un ATTRIBUT, pas une classe : l'éditeur réécrit le className de
+    // certains éléments (la lecture du code : el.className = '…') — la
+    // classe de masque y sautait, et le texte du concepteur réapparaissait
+    // chez le joueur (« Hors convention atelier… », l'aperçu du 24/11)
     const cache = (el: Element | null, oui: boolean): void => {
-      el?.classList.toggle('ed-hors-profil', oui)
+      el?.toggleAttribute('data-hors-profil', oui)
     }
     for (const b of Array.from(this.host.querySelectorAll<HTMLElement>('.ed-tool[data-tool]'))) {
       cache(b, j && !outilPermis(b.dataset.tool ?? ''))
@@ -921,9 +926,10 @@ export class LevelEditor {
     // un groupe de palette dont tous les outils sont cachés se cache aussi
     for (const g of Array.from(this.host.querySelectorAll('.ed-side:not(.ed-side--right) .ed-group'))) {
       const outils = Array.from(g.querySelectorAll('.ed-tool'))
-      cache(g, j && outils.length > 0 && outils.every((o) => o.classList.contains('ed-hors-profil')))
+      cache(g, j && outils.length > 0 && outils.every((o) => o.hasAttribute('data-hors-profil')))
     }
     for (const id of BARRE_CONCEPTEUR) cache(this.host.querySelector(`#${id}`), j)
+    cache(this.host.querySelector('#ed-budget'), j)
     // le panneau de droite : la sélection, le contrôle et, du « Tableau »,
     // le nom et la description seulement
     const droite = this.host.querySelector('.ed-side--right')
@@ -5980,7 +5986,7 @@ export class LevelEditor {
       t.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
     if (!s) {
       host.innerHTML =
-        '<p class="ed-empty">Rien de choisi. Prenez un élément dans la palette, à gauche, puis cliquez ou glissez dans la salle. Cliquez un élément posé pour le régler ; glissez-le pour le déplacer.</p>'
+        '<p class="ed-empty">Rien de choisi. Prenez un élément dans la barre, sous la salle, puis cliquez ou glissez dans la salle. Cliquez un élément posé pour le régler ; glissez-le pour le déplacer.</p>'
       return
     }
     const sj = { kind: s.kind, index: 'index' in s ? s.index : undefined }
@@ -7823,11 +7829,14 @@ export class LevelEditor {
 
   private validate(): void {
     const host = this.el('ed-check')
-    const v = checkLevel(this.level)
+    // l'atelier : les messages du concepteur retirés, les autres redits
+    // pour le joueur (profilJoueur.ts) — et pas de jauge de blocs
+    const v = this.joueur ? verdictsJoueur(checkLevel(this.level)) : checkLevel(this.level)
     this.majJauge()
     if (v.length === 0) {
-      host.innerHTML =
-        '<div class="ed-ok">Tableau valide — prêt à essayer.</div>'
+      host.innerHTML = this.joueur
+        ? '<div class="ed-ok">Rien ne bloque : la salle peut être essayée.</div>'
+        : '<div class="ed-ok">Tableau valide — prêt à essayer.</div>'
       return
     }
     host.innerHTML = v
