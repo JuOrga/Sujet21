@@ -60,8 +60,12 @@ export type LieuAccueil = (typeof LIEUX_ACCUEIL)[number]
 
 /** Ce qui reste visible au tout premier lancement : un nouveau venu n'a
  *  qu'une chose à faire. Les autres lieux paraissent quand la partie leur
- *  a donné quelque chose à montrer. */
-export const LIEUX_PREMIER_LANCEMENT: readonly LieuAccueil[] = ['home-sauvegardes']
+ *  a donné quelque chose à montrer — sauf COMMUNAUTÉ, qui, comme MULTI,
+ *  n'attend rien de la partie solo : jouer la salle d'un autre ne demande
+ *  aucune progression. Caché, il l'était aussi sur chaque nouvel appareil
+ *  (et chaque adresse d'aperçu) : le concepteur, 25/11, au téléphone —
+ *  « je n'ai rien qui s'affiche de nouveau ». */
+export const LIEUX_PREMIER_LANCEMENT: readonly LieuAccueil[] = ['home-communaute', 'home-sauvegardes']
 
 export interface EtatLieux {
   orbes: number

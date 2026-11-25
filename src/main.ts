@@ -5909,10 +5909,12 @@ function majAccueil(): void {
   const devise = document.getElementById('acc-devise')
   if (devise) devise.hidden = progression
   // l'annonce des nouveautés : une fois, quand COMMUNAUTÉ paraît dans le rail
+  // (dès le premier lancement depuis le 25/11 : LIEUX_PREMIER_LANCEMENT)
+  const communauteVisible = progression || LIEUX_PREMIER_LANCEMENT.includes('home-communaute')
   if (
     annonceEl.hidden &&
     !document.body.classList.contains('playing') &&
-    annonceAMontrer(ANNONCE_COMMUNAUTE, { vues: annoncesVues(), lieuVisible: progression, enPause: hasPlayed })
+    annonceAMontrer(ANNONCE_COMMUNAUTE, { vues: annoncesVues(), lieuVisible: communauteVisible, enPause: hasPlayed })
   ) {
     ouvreAnnonce()
   }

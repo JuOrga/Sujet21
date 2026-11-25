@@ -193,9 +193,9 @@ export function marqueAnnonceVue(vues: readonly string[], id: string): string[] 
 export interface EtatAnnonce {
   /** déjà vue sur cet emplacement */
   vues: readonly string[]
-  /** COMMUNAUTÉ paraît dans le rail : la partie a laissé une trace. Au
-   *  tout premier lancement, le rail ne montre que SAUVEGARDES — annoncer
-   *  un lieu invisible n'aurait pas de sens : l'annonce attend qu'il paraisse */
+  /** COMMUNAUTÉ paraît dans le rail (accueil.ts, LIEUX_PREMIER_LANCEMENT) :
+   *  annoncer un lieu invisible n'aurait pas de sens — si un jour il se
+   *  cache encore, l'annonce attendra qu'il paraisse */
   lieuVisible: boolean
   /** une partie tourne derrière la fiche (une pause) : on n'interrompt pas */
   enPause: boolean

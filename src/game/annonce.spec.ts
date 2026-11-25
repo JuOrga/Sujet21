@@ -91,7 +91,9 @@ describe('le câblage', () => {
   })
 
   it('montrée depuis la fiche quand COMMUNAUTÉ paraît, retenue dans le coffre une fois fermée', () => {
-    expect(MAIN).toMatch(/annonceAMontrer\(ANNONCE_COMMUNAUTE, \{ vues: annoncesVues\(\), lieuVisible: progression, enPause: hasPlayed \}\)/)
+    expect(MAIN).toMatch(/annonceAMontrer\(ANNONCE_COMMUNAUTE, \{ vues: annoncesVues\(\), lieuVisible: communauteVisible, enPause: hasPlayed \}\)/)
+    // visible dès le premier lancement : un nouvel appareil la voit aussi
+    expect(MAIN).toContain("const communauteVisible = progression || LIEUX_PREMIER_LANCEMENT.includes('home-communaute')")
     const ferme = MAIN.slice(MAIN.indexOf('function fermeAnnonce'), MAIN.indexOf('function feuillette'))
     expect(ferme).toContain('coffre.stockage.setItem(CLE_ANNONCES_VUES')
   })
