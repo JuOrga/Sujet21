@@ -3348,6 +3348,89 @@
       .rec-ligne.moi { background: rgba(46, 198, 201, 0.14); outline: 1px solid rgba(46, 198, 201, 0.35); }
       .rec-ecart { margin-top: 4px; font-size: calc(11px * var(--ui)); color: var(--dim); font-style: italic; }
       .rec-vide { padding: 6px 4px; font-size: calc(12px * var(--ui)); color: var(--dim); font-style: italic; }
+      /* L'ANNONCE DES NOUVEAUTÉS (game/annonce.ts) : une carte à la fois, le
+         dessin à gauche, les mots à droite ; empilés au téléphone. Au-dessus
+         de la fiche (20) et des notes de version (40). */
+      #annonce[hidden] { display: none; }
+      #annonce {
+        position: fixed; inset: 0; z-index: 45;
+        background: rgba(2, 6, 12, 0.78);
+        display: flex; align-items: center; justify-content: center; padding: 16px;
+        animation: an-voile 0.25s ease-out;
+      }
+      #annonce .an-boite {
+        position: relative; width: min(760px, 100%); max-height: calc(100dvh - 32px); overflow: auto;
+        background: var(--void); border: 1px solid var(--specimen); border-radius: 12px;
+        box-shadow: 0 0 0 1px rgba(99, 183, 230, 0.15), 0 24px 80px rgba(0, 0, 0, 0.6), 0 0 48px rgba(99, 183, 230, 0.12);
+        animation: an-entree 0.35s cubic-bezier(0.2, 0.9, 0.3, 1.15);
+      }
+      #an-corps {
+        display: grid; grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr);
+        gap: 18px 22px; padding: 26px 26px 20px;
+      }
+      #annonce .an-figure { align-self: center; }
+      #annonce .an-dessin { display: block; width: 100%; height: auto; border-radius: 10px; border: 1px solid #1d3448; }
+      #annonce .an-sur {
+        margin: 0 0 6px; font-family: var(--font-mono); font-size: calc(10px * var(--ui));
+        letter-spacing: 0.14em; color: #f2c98e;
+      }
+      #annonce h2 {
+        margin: 0 0 10px; font-family: var(--font-display); font-weight: 400;
+        font-size: calc(19px * var(--ui)); letter-spacing: 0.1em; color: var(--glow);
+      }
+      #annonce .an-texte { margin: 0 0 10px; font-size: calc(13.5px * var(--ui)); line-height: 1.5; color: var(--ink); }
+      #annonce .an-puces { margin: 0; padding: 0; list-style: none; }
+      #annonce .an-puces li {
+        position: relative; padding-left: 18px; margin-top: 6px;
+        font-size: calc(12.5px * var(--ui)); line-height: 1.45; color: #cfe2ef;
+      }
+      #annonce .an-puces li::before { content: '◆'; position: absolute; left: 0; top: 1px; font-size: 9px; color: var(--specimen); }
+      #annonce .an-pied {
+        grid-column: 1 / -1; display: flex; align-items: center; justify-content: space-between;
+        gap: 12px; flex-wrap: wrap; padding-top: 14px; border-top: 1px solid var(--line);
+      }
+      #annonce .an-points { display: flex; gap: 8px; }
+      #annonce .an-point {
+        width: 10px; height: 10px; padding: 0; border-radius: 50%;
+        border: 1px solid var(--specimen); background: transparent; cursor: pointer;
+      }
+      #annonce .an-point[aria-selected='true'] { background: var(--specimen); width: 26px; border-radius: 5px; }
+      #annonce .an-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-left: auto; }
+      #annonce .an-actions button {
+        font-family: var(--font-display); font-size: calc(10.5px * var(--ui)); letter-spacing: 0.12em;
+        min-height: 40px; padding: 0 16px; cursor: pointer;
+        background: transparent; color: var(--glow); border: 1px solid var(--line); border-radius: 4px;
+      }
+      #annonce .an-actions button.primary { background: var(--specimen); color: #030710; border-color: var(--specimen); }
+      #annonce .an-actions button:is(:hover, :focus-visible, .pad-focus) { border-color: var(--glow); outline: none; }
+      #annonce .an-actions button.primary:is(:hover, :focus-visible, .pad-focus) { background: var(--glow); }
+      #an-fermer {
+        position: absolute; top: 10px; right: 10px; width: 34px; height: 34px; padding: 0;
+        background: transparent; color: var(--dim); border: 1px solid transparent; border-radius: 4px;
+        font-size: 16px; cursor: pointer; z-index: 1;
+      }
+      #an-fermer:is(:hover, :focus-visible, .pad-focus) { color: var(--glow); border-color: var(--line); outline: none; }
+      /* le récréatif : la goutte rebondit sur l'hydrophobe, la flèche
+         désigne COMMUNAUTÉ — et tout se tient tranquille pour qui l'a demandé */
+      #annonce .an-goutte { animation: an-rebond 1.6s cubic-bezier(0.3, 0, 0.6, 1) infinite; transform-origin: 60px 96px; }
+      #annonce .an-pointe { animation: an-pointe 1.2s ease-in-out infinite; }
+      @keyframes an-voile { from { opacity: 0; } }
+      @keyframes an-entree { from { opacity: 0; transform: translateY(14px) scale(0.97); } }
+      @keyframes an-rebond {
+        0%, 100% { transform: translateY(0) scale(1, 1); }
+        45% { transform: translateY(-26px) scale(0.92, 1.08); }
+        88% { transform: translateY(0) scale(1.12, 0.86); }
+      }
+      @keyframes an-pointe { 50% { transform: translateX(-8px); } }
+      @media (prefers-reduced-motion: reduce) {
+        #annonce, #annonce .an-boite, #annonce .an-goutte, #annonce .an-pointe { animation: none; }
+      }
+      @media (max-width: 640px) {
+        #an-corps { grid-template-columns: minmax(0, 1fr); padding: 44px 16px 16px; gap: 14px; }
+        #annonce h2 { font-size: calc(16px * var(--ui)); }
+        #annonce .an-actions { width: 100%; }
+        #annonce .an-actions button { flex: 1 1 auto; }
+      }
       #livraisons[hidden] { display: none; }
       #livraisons {
         position: fixed; inset: 0; z-index: 40;
@@ -11290,6 +11373,16 @@
     </div>
 
     <!-- Le voile NOTES DE VERSION : le journal du chantier, sorti du banc -->
+    <!-- L'ANNONCE DES NOUVEAUTÉS (game/annonce.ts) : une fois, par-dessus la
+         fiche d'accueil, trois cartes à feuilleter. main.ts la pose, la
+         ferme et retient qu'elle a été vue. -->
+    <div id="annonce" hidden role="dialog" aria-modal="true" aria-labelledby="an-titre">
+      <div class="an-boite">
+        <button type="button" id="an-fermer" aria-label="Fermer l’annonce">✕</button>
+        <div id="an-corps"></div>
+      </div>
+    </div>
+
     <div id="livraisons" hidden aria-label="Notes de version">
       <div class="salles-boite">
         <div class="salles-tete"><span>NOTES DE VERSION — <span id="liv-version"></span></span>
