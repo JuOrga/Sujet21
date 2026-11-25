@@ -508,6 +508,14 @@ import {
 import { EcranCreations } from './game/ecranCreations'
 import { bilanPartie } from './game/creationsVue'
 import { CLE_ATELIER_SALLES, reprendAtelierDuNavigateur } from './game/clesAtelier'
+import {
+  ANNONCE_COMMUNAUTE,
+  CLE_ANNONCES_VUES,
+  annonceAMontrer,
+  lisAnnoncesVues,
+  marqueAnnonceVue,
+  rendCarteAnnonce,
+} from './game/annonce'
 import { lisSalles } from './editor/sallesAtelier'
 import { cuveHTML, sceauHTML, SCENES_FIN } from './game/ceremonieObjets'
 import {
@@ -5786,6 +5794,79 @@ function majBoutonsRun(): void {
 // tant que la fiche est à l'écran (accueilPerime, ou chaque seconde) : les
 // écrans qu'elle ouvre changent ce qu'elle dit — un orbe tissé, une fiole
 // équipée — et personne ne prévient la fiche en les refermant.
+// ---- L'ANNONCE DES NOUVEAUTÉS (game/annonce.ts) ----------------------------
+// Une fois par emplacement, par-dessus la fiche : trois cartes à feuilleter.
+// Vue = fermée (la croix, B, Échap, le fond, ou l'un des deux boutons qui
+// mènent droit à COMMUNAUTÉ) : on la retient dans le coffre, comme le
+// voyant du codex.
+const annonceEl = document.getElementById('annonce') as HTMLDivElement
+let annonceCarte = 0
+function annoncesVues(): string[] {
+  try {
+    return lisAnnoncesVues(coffre.stockage.getItem(CLE_ANNONCES_VUES))
+  } catch {
+    return []
+  }
+}
+function peintAnnonce(): void {
+  const corps = document.getElementById('an-corps')
+  if (!corps) return
+  corps.innerHTML = rendCarteAnnonce(ANNONCE_COMMUNAUTE, annonceCarte)
+  // le focus sur le bouton qui avance : Entrée, ou A à la manette, feuillette
+  corps.querySelector<HTMLElement>('.an-actions .primary')?.focus({ preventScroll: true })
+}
+function ouvreAnnonce(): void {
+  annonceCarte = 0
+  peintAnnonce()
+  annonceEl.hidden = false
+}
+function fermeAnnonce(): void {
+  if (annonceEl.hidden) return
+  annonceEl.hidden = true
+  try {
+    coffre.stockage.setItem(CLE_ANNONCES_VUES, JSON.stringify(marqueAnnonceVue(annoncesVues(), ANNONCE_COMMUNAUTE.id)))
+  } catch {
+    // stockage refusé : elle reviendra, rien de grave
+  }
+}
+function feuillette(i: number): void {
+  annonceCarte = Math.max(0, Math.min(i, ANNONCE_COMMUNAUTE.cartes.length - 1))
+  peintAnnonce()
+}
+annonceEl.addEventListener('click', (e) => {
+  const cible = e.target as HTMLElement
+  // un clic sur le fond (hors de la boîte) referme
+  if (cible === annonceEl) return fermeAnnonce()
+  const b = cible.closest<HTMLElement>('button')
+  if (!b) return
+  if (b.id === 'an-fermer') fermeAnnonce()
+  else if (b.id === 'an-suiv') feuillette(annonceCarte + 1)
+  else if (b.id === 'an-prec') feuillette(annonceCarte - 1)
+  else if (b.dataset.carte !== undefined) feuillette(Number(b.dataset.carte))
+  else if (b.id === 'an-editeur') {
+    fermeAnnonce()
+    document.getElementById('home-atelier')?.click()
+  } else if (b.id === 'an-creations') {
+    fermeAnnonce()
+    document.getElementById('home-creations')?.click()
+  }
+})
+// au clavier : les flèches feuillettent, Échap referme — en CAPTURE, pour
+// que la fiche (qui écoute Échap) ne réagisse pas en même temps
+window.addEventListener(
+  'keydown',
+  (e) => {
+    if (annonceEl.hidden) return
+    if (e.key === 'Escape') fermeAnnonce()
+    else if (e.key === 'ArrowRight') feuillette(annonceCarte + 1)
+    else if (e.key === 'ArrowLeft') feuillette(annonceCarte - 1)
+    else return
+    e.preventDefault()
+    e.stopImmediatePropagation()
+  },
+  true,
+)
+
 const CLE_CODEX_VU = 'sujet21-accueil-codex-vu'
 function codexVu(): number {
   try {
@@ -5827,6 +5908,14 @@ function majAccueil(): void {
     document.body.classList.contains('concepteur')
   const devise = document.getElementById('acc-devise')
   if (devise) devise.hidden = progression
+  // l'annonce des nouveautés : une fois, quand COMMUNAUTÉ paraît dans le rail
+  if (
+    annonceEl.hidden &&
+    !document.body.classList.contains('playing') &&
+    annonceAMontrer(ANNONCE_COMMUNAUTE, { vues: annoncesVues(), lieuVisible: progression, enPause: hasPlayed })
+  ) {
+    ouvreAnnonce()
+  }
   const etatCarte = enDescente ? carteRun : save?.carte ? litEtatCarteRun(save.carte, carte) : null
   const valeurs = valeursLieux({
     orbes: records.orbes().length,
@@ -9220,6 +9309,8 @@ interface CoucheMenu {
 }
 const COUCHES_MENU: CoucheMenu[] = [
   { id: 'mb-veil' }, // la cérémonie : pas de porte de sortie — on choisit
+  { id: 'annonce', retour: 'an-fermer' }, // les nouveautés, par-dessus la fiche
+  { id: 'creations', retour: 'cr-fermer' }, // les créations de la communauté : sans elles ici, B ne les fermait pas et la fiche dessous volait la croix
   { id: 'codex', retour: 'codex-fermer', pilote: () => ecranCodex.manette(manette, manettePollNow) },
   { id: 'cmds', retour: 'cmds-fermer' },
   { id: 'planche', retour: 'planche-fermer' },
