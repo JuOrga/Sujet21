@@ -50,14 +50,22 @@ export const LIEUX_ACCUEIL = [
   'home-codex',
   'home-station',
   'home-records',
+  // les salles des joueurs : à tous depuis le 24/11 (elles étaient derrière
+  // le mode concepteur, sous l'allure grise des outils de la régie). Un
+  // seul lieu, qui s'ouvre sur ses deux choix (SOUS_LIEUX_COMMUNAUTE)
+  'home-communaute',
   'home-sauvegardes',
 ] as const
 export type LieuAccueil = (typeof LIEUX_ACCUEIL)[number]
 
 /** Ce qui reste visible au tout premier lancement : un nouveau venu n'a
  *  qu'une chose à faire. Les autres lieux paraissent quand la partie leur
- *  a donné quelque chose à montrer. */
-export const LIEUX_PREMIER_LANCEMENT: readonly LieuAccueil[] = ['home-sauvegardes']
+ *  a donné quelque chose à montrer — sauf COMMUNAUTÉ, qui, comme MULTI,
+ *  n'attend rien de la partie solo : jouer la salle d'un autre ne demande
+ *  aucune progression. Caché, il l'était aussi sur chaque nouvel appareil
+ *  (et chaque adresse d'aperçu) : le concepteur, 25/11, au téléphone —
+ *  « je n'ai rien qui s'affiche de nouveau ». */
+export const LIEUX_PREMIER_LANCEMENT: readonly LieuAccueil[] = ['home-communaute', 'home-sauvegardes']
 
 export interface EtatLieux {
   orbes: number
@@ -98,7 +106,29 @@ export function valeursLieux(e: EtatLieux): Record<LieuAccueil, ValeurLieu> {
       val: e.recordSalles > 0 ? `${e.recordSalles} salle${e.recordSalles > 1 ? 's' : ''}` : '',
       neuf: false,
     },
+    'home-communaute': { val: '', neuf: false },
     'home-sauvegardes': { val: `n° ${e.emplacement}`, neuf: false },
+  }
+}
+
+/** Les deux choix de COMMUNAUTÉ, dans l'ordre du sous-menu. */
+export const SOUS_LIEUX_COMMUNAUTE = ['home-atelier', 'home-creations'] as const
+export type SousLieuCommunaute = (typeof SOUS_LIEUX_COMMUNAUTE)[number]
+
+export interface EtatCommunaute {
+  /** les salles de MES SALLES (l'éditeur de cet emplacement) */
+  sallesAtelier: number
+  /** les salles publiées depuis cet emplacement */
+  creationsPubliees: number
+}
+
+/** Leur valeur courte : « 3 salles » dans l'éditeur, « 1 publiée » parmi
+ *  les créations ; rien à zéro. */
+export function valeursCommunaute(e: EtatCommunaute): Record<SousLieuCommunaute, string> {
+  return {
+    'home-atelier': e.sallesAtelier > 0 ? `${e.sallesAtelier} salle${e.sallesAtelier > 1 ? 's' : ''}` : '',
+    'home-creations':
+      e.creationsPubliees > 0 ? `${e.creationsPubliees} publiée${e.creationsPubliees > 1 ? 's' : ''}` : '',
   }
 }
 

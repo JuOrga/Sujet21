@@ -509,6 +509,25 @@ import {
 } from './game/ceremonie'
 import { cartoucheHTML, iconeDuGlyphe, offreHTML, plaqueHTML, puceHTML } from './game/cartouches'
 import { fmtDuree, fmtL, fmtTime } from './game/formats'
+import {
+  brancheStockageCreations,
+  deposeRecordCreation,
+  mesCreations,
+  publieCreation,
+  raisonCreation,
+} from './game/netCreations'
+import { EcranCreations } from './game/ecranCreations'
+import { bilanPartie } from './game/creationsVue'
+import { CLE_ATELIER_SALLES, reprendAtelierDuNavigateur } from './game/clesAtelier'
+import {
+  ANNONCE_COMMUNAUTE,
+  CLE_ANNONCES_VUES,
+  annonceAMontrer,
+  lisAnnoncesVues,
+  marqueAnnonceVue,
+  rendCarteAnnonce,
+} from './game/annonce'
+import { lisSalles } from './editor/sallesAtelier'
 import { cuveHTML, sceauHTML, SCENES_FIN } from './game/ceremonieObjets'
 import {
   finDescenteHTML,
@@ -608,6 +627,8 @@ import {
   LIEUX_PREMIER_LANCEMENT,
   PICTOS_ACCUEIL,
   valeursLieux,
+  SOUS_LIEUX_COMMUNAUTE,
+  valeursCommunaute,
   verbeAccueil,
 } from './game/accueil'
 import {
@@ -929,6 +950,17 @@ const coupelleFrisson: number[] = []
 
 // Registres du labo (§10) : records par tableau et historique des essais.
 const records = new Records(coffre.stockage)
+// L'ATELIER DU JOUEUR dans le coffre (game/clesAtelier.ts) : ses salles et
+// son jeton d'auteur suivent la partie, l'export et le Steam Cloud. Ce que
+// le navigateur en tenait encore y passe une fois.
+reprendAtelierDuNavigateur(coffre.stockage, (() => {
+  try {
+    return typeof localStorage !== 'undefined' ? localStorage : null
+  } catch {
+    return null
+  }
+})())
+brancheStockageCreations(coffre.stockage)
 
 // ---- LA MÉMOIRE : la monnaie PERSISTANTE de l'Éveil, gravée dans les
 // registres. De l'information, pas de la matière : la purge de fin de run
@@ -5584,6 +5616,40 @@ function rendPartie(): void {
   camera.manualPan = v.cam.manualPan
 }
 
+// ---- LES ESCAPADES DE COMMUNAUTÉ : l'éditeur du joueur, une création jouée --
+// Elles passent par les mêmes chemins que les essais du concepteur (l'éditeur,
+// startTest), qui supposent une partie en cours : au retour, la fiche se
+// croyait en PAUSE (REPRENDRE, RECOMMENCER, QUITTER) et la salle essayée —
+// ou celle de l'expédition — restait figée derrière elle, ses pancartes
+// comprises (le concepteur, 25/11). On retient donc à l'aller s'il y avait
+// une partie, et on rend au retour la fiche exactement telle qu'elle était :
+// sans partie, la cuve de l'accueil qui vit, comme au chargement.
+let partieAvantCommunaute: boolean | null = null
+/** À l'aller (éditeur du joueur, création jouée) : la première fois
+ *  seulement — un ESSAYER dans l'éditeur ne doit pas l'écraser. */
+function partCommunaute(): void {
+  if (partieAvantCommunaute === null) partieAvantCommunaute = hasPlayed
+}
+/** Au retour : la fiche d'avant l'escapade. */
+function reviensDeCommunaute(): void {
+  const avant = partieAvantCommunaute ?? hasPlayed
+  partieAvantCommunaute = null
+  fromEditor = false
+  testLevel = null
+  hasPlayed = avant
+  if (!avant) {
+    // comme quitteAuMenu : la cuve de l'accueil, vivante, derrière la fiche
+    document.body.classList.remove('playing')
+    input.paused = false
+    homeRestartBtn.hidden = true
+  }
+  // restart() AVANT openHome() : avec une partie, la fiche la range de côté
+  // et montre la cuve ; sans partie, restart() pose la cuve lui-même
+  restart()
+  majBoutonsRun()
+  openHome()
+}
+
 function openHome(): void {
   document.body.classList.remove('playing')
   appelOeil()
@@ -5598,6 +5664,9 @@ function openHome(): void {
 // LE BOUTON PRINCIPAL : il n'y a qu'UNE descente et qu'une porte. Reprendre
 // celle qui est sauvée, ou rejoindre le module — c'est son sas qui lance.
 startBtn.addEventListener('click', () => {
+  // une VRAIE partie commence (pas la reprise d'une création en pause) :
+  // l'escapade de COMMUNAUTÉ retenue n'a plus cours
+  if (testLevel === null) partieAvantCommunaute = null
   voieDuJourForcee = false // le réglage du plan décide, pas un bouton
   closeHome()
   majVoieHud()
@@ -5778,6 +5847,79 @@ function majBoutonsRun(): void {
 // tant que la fiche est à l'écran (accueilPerime, ou chaque seconde) : les
 // écrans qu'elle ouvre changent ce qu'elle dit — un orbe tissé, une fiole
 // équipée — et personne ne prévient la fiche en les refermant.
+// ---- L'ANNONCE DES NOUVEAUTÉS (game/annonce.ts) ----------------------------
+// Une fois par emplacement, par-dessus la fiche : trois cartes à feuilleter.
+// Vue = fermée (la croix, B, Échap, le fond, ou l'un des deux boutons qui
+// mènent droit à COMMUNAUTÉ) : on la retient dans le coffre, comme le
+// voyant du codex.
+const annonceEl = document.getElementById('annonce') as HTMLDivElement
+let annonceCarte = 0
+function annoncesVues(): string[] {
+  try {
+    return lisAnnoncesVues(coffre.stockage.getItem(CLE_ANNONCES_VUES))
+  } catch {
+    return []
+  }
+}
+function peintAnnonce(): void {
+  const corps = document.getElementById('an-corps')
+  if (!corps) return
+  corps.innerHTML = rendCarteAnnonce(ANNONCE_COMMUNAUTE, annonceCarte)
+  // le focus sur le bouton qui avance : Entrée, ou A à la manette, feuillette
+  corps.querySelector<HTMLElement>('.an-actions .primary')?.focus({ preventScroll: true })
+}
+function ouvreAnnonce(): void {
+  annonceCarte = 0
+  peintAnnonce()
+  annonceEl.hidden = false
+}
+function fermeAnnonce(): void {
+  if (annonceEl.hidden) return
+  annonceEl.hidden = true
+  try {
+    coffre.stockage.setItem(CLE_ANNONCES_VUES, JSON.stringify(marqueAnnonceVue(annoncesVues(), ANNONCE_COMMUNAUTE.id)))
+  } catch {
+    // stockage refusé : elle reviendra, rien de grave
+  }
+}
+function feuillette(i: number): void {
+  annonceCarte = Math.max(0, Math.min(i, ANNONCE_COMMUNAUTE.cartes.length - 1))
+  peintAnnonce()
+}
+annonceEl.addEventListener('click', (e) => {
+  const cible = e.target as HTMLElement
+  // un clic sur le fond (hors de la boîte) referme
+  if (cible === annonceEl) return fermeAnnonce()
+  const b = cible.closest<HTMLElement>('button')
+  if (!b) return
+  if (b.id === 'an-fermer') fermeAnnonce()
+  else if (b.id === 'an-suiv') feuillette(annonceCarte + 1)
+  else if (b.id === 'an-prec') feuillette(annonceCarte - 1)
+  else if (b.dataset.carte !== undefined) feuillette(Number(b.dataset.carte))
+  else if (b.id === 'an-editeur') {
+    fermeAnnonce()
+    document.getElementById('home-atelier')?.click()
+  } else if (b.id === 'an-creations') {
+    fermeAnnonce()
+    document.getElementById('home-creations')?.click()
+  }
+})
+// au clavier : les flèches feuillettent, Échap referme — en CAPTURE, pour
+// que la fiche (qui écoute Échap) ne réagisse pas en même temps
+window.addEventListener(
+  'keydown',
+  (e) => {
+    if (annonceEl.hidden) return
+    if (e.key === 'Escape') fermeAnnonce()
+    else if (e.key === 'ArrowRight') feuillette(annonceCarte + 1)
+    else if (e.key === 'ArrowLeft') feuillette(annonceCarte - 1)
+    else return
+    e.preventDefault()
+    e.stopImmediatePropagation()
+  },
+  true,
+)
+
 const CLE_CODEX_VU = 'sujet21-accueil-codex-vu'
 function codexVu(): number {
   try {
@@ -5819,6 +5961,16 @@ function majAccueil(): void {
     document.body.classList.contains('concepteur')
   const devise = document.getElementById('acc-devise')
   if (devise) devise.hidden = progression
+  // l'annonce des nouveautés : une fois, quand COMMUNAUTÉ paraît dans le rail
+  // (dès le premier lancement depuis le 25/11 : LIEUX_PREMIER_LANCEMENT)
+  const communauteVisible = progression || LIEUX_PREMIER_LANCEMENT.includes('home-communaute')
+  if (
+    annonceEl.hidden &&
+    !document.body.classList.contains('playing') &&
+    annonceAMontrer(ANNONCE_COMMUNAUTE, { vues: annoncesVues(), lieuVisible: communauteVisible, enPause: hasPlayed })
+  ) {
+    ouvreAnnonce()
+  }
   const etatCarte = enDescente ? carteRun : save?.carte ? litEtatCarteRun(save.carte, carte) : null
   const valeurs = valeursLieux({
     orbes: records.orbes().length,
@@ -5831,6 +5983,13 @@ function majAccueil(): void {
     recordSalles: records.expedition()?.tableaux ?? 0,
     emplacement: coffre.actif,
   })
+  const communaute = valeursCommunaute({
+    sallesAtelier: lisSalles(coffre.stockage.getItem(CLE_ATELIER_SALLES)).length,
+    creationsPubliees: mesCreations().length,
+  })
+  for (const id of SOUS_LIEUX_COMMUNAUTE) {
+    ecritSiChange(document.getElementById(id)?.querySelector('small') ?? null, communaute[id])
+  }
   for (const id of LIEUX_ACCUEIL) {
     const b = document.getElementById(id)
     if (!b) continue
@@ -6018,8 +6177,9 @@ function startTest(etapes: (LevelDef | CinematiqueDef)[]): void {
   testQueue = etapes.slice()
   fromEditor = false
   // tout nouveau départ désarme le retour-planche : seule la carte ⏵ le
-  // ré-arme, juste après cet appel
+  // ré-arme, juste après cet appel (et de même le retour aux créations)
   fromPlanche = false
+  fromCreation = null
   document.getElementById('planche-retour')?.setAttribute('hidden', '')
   ouvreEssai()
   hasPlayed = true
@@ -6100,6 +6260,13 @@ document
 // « Essayer » vient-il de l'éditeur ? Si oui, on doit pouvoir y retourner
 // d'un geste, à tout instant — y compris depuis l'écran de fin d'essai.
 let fromEditor = false
+// L'ESSAI DE L'ATELIER publie-t-il la salle à la sortie atteinte ? (le bouton
+// « ESSAYER ET PUBLIER » oui, « ESSAYER » non — un essai pour soi)
+let essaiPublie = false
+// …et LA SALLE TELLE QUE L'ATELIER L'A ENVOYÉE, figée au lancement : c'est
+// elle qui se publie, jamais l'objet que le jeu charge — l'atelier compare
+// son brouillon à la version en ligne, elles doivent être identiques
+let salleAtelier: LevelDef | null = null
 
 // ---- LE CHARGEMENT DE L'ATELIER ------------------------------------------
 // Les outils du concepteur — l'éditeur de tableaux, l'éditeur de la carte,
@@ -6189,9 +6356,12 @@ const chargeEditeur = chargeUneFois('l’éditeur de tableaux', async () => {
     const ed = new LevelEditor(el('editor'), {
       // les portées dessinées (aspiration du sas, auras, rails) suivent le banc
       params: () => params,
-      play: (lvl) => {
+      play: (lvl, opts) => {
         testLevel = lvl
         fromEditor = true
+        // l'atelier : « ESSAYER ET PUBLIER » publie à la sortie, « ESSAYER » non
+        essaiPublie = opts?.publier === true
+        salleAtelier = structuredClone(lvl)
         ouvreEssai()
         hasPlayed = true
         ed.close()
@@ -6203,8 +6373,18 @@ const chargeEditeur = chargeUneFois('l’éditeur de tableaux', async () => {
         ed.close()
         fromEditor = false
         testLevel = null
-        openHome()
+        // le joueur rentre de COMMUNAUTÉ : la fiche telle qu'il l'avait laissée
+        if (ed.profil === 'joueur') {
+          reviensDeCommunaute()
+          return
+        }
+        // L'ORDRE COMPTE : restart() repose la salle, PUIS la fiche range la
+        // partie de côté et montre la cuve (montreCuvePause). Dans l'autre
+        // ordre, restart() effaçait la cuve tout juste posée (rendPartie) et
+        // la salle restait figée derrière la fiche, pancartes comprises (le
+        // concepteur, 25/11 : « l'accueil est tout bugué »)
         restart()
+        openHome()
       },
       operator: () => records.operator(),
       // les menus déroulants de l'éditeur : les VRAIES cinématiques et séquences
@@ -6230,6 +6410,8 @@ const chargeEditeur = chargeUneFois('l’éditeur de tableaux', async () => {
       // L2 tenu = Maj : la multi-sélection au Steam Deck (trackpad droit en
       // souris, aucune touche Maj sous la main)
       modMulti: () => manette.ltVal > 0.5,
+      // l'atelier du joueur range ses salles dans le coffre de l'emplacement
+      stockageAtelier: () => coffre.stockage,
     })
     editor = ed
     // la bibliothèque que la planche a déjà reçue du serveur : l'éditeur
@@ -6393,6 +6575,10 @@ let plancheBusy = false
 // REVIENT là où on en était — bouton « revenir à la planche » en jeu, et
 // retour automatique à la conclusion de l'essai (le miroir de fromEditor).
 let fromPlanche = false
+// LA SALLE D'UN JOUEUR jouée depuis l'écran CRÉATIONS : son identifiant et
+// l'empreinte de la version jouée (un record ne compte que pour elle) —
+// la sortie atteinte y dépose la partie, le retour ramène à l'écran
+let fromCreation: { id: string; empreinte: string } | null = null
 let plancheScroll = 0
 function retournePlanche(): void {
   fromPlanche = false
@@ -6797,7 +6983,7 @@ function renderPlanche(): void {
       e.stopPropagation()
       // la planche ne se replie qu'une fois l'éditeur LÀ : un chargement
       // manqué la laisse ouverte, avec sa bibliothèque et son défilement
-      void openEditor().then((ed) => {
+      void openEditor('concepteur').then((ed) => {
         if (!ed) return
         plancheEl.hidden = true
         sallesEl.hidden = true
@@ -8509,9 +8695,14 @@ fetchLibrary().then((lib) => {
 // écraser le travail en cours par le tableau qu'on vient d'essayer.
 // Il se charge au premier appel : l'écran ne bascule qu'une fois l'outil
 // là — un échec de chargement laisse le jeu exactement où il était.
-async function openEditor(): Promise<LevelEditor | null> {
+/** Ouvre l'éditeur. Avec un profil, il y bascule (concepteur : tout
+ *  l'éditeur ; joueur : l'atelier) ; sans, il garde le sien — c'est le
+ *  retour d'un essai, qui doit rendre l'atelier à l'atelier. */
+async function openEditor(profil?: 'concepteur' | 'joueur'): Promise<LevelEditor | null> {
   const ed = await chargeEditeur()
   if (!ed) return null
+  if (profil) ed.setProfil(profil)
+  if (ed.profil === 'joueur') partCommunaute()
   overlay.classList.remove('visible')
   if (mbFinOuverte()) fermeMiseEnBonbonne() // la scène de fin remplace l'overlay
   document.body.classList.remove('playing')
@@ -8521,6 +8712,59 @@ async function openEditor(): Promise<LevelEditor | null> {
   ed.open()
   return ed
 }
+// ---- L'ATELIER DU JOUEUR : la sortie atteinte partage la salle -------------
+// La partie qui vient d'atteindre la sortie est la PREUVE que la salle se
+// traverse : elle part avec la salle et en devient le premier record
+// (api/_creations.ts). Le serveur trie la salle par la liste blanche
+// (api/_creation.ts) et la range. La première fois, il lui donne un
+// identifiant, que le brouillon de l'atelier retient : les essais réussis
+// suivants RETOUCHENT la même salle au lieu d'en créer une autre — et une
+// salle retouchée repart avec des records vierges.
+const echappeHtml = (t: string): string =>
+  t.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
+
+async function partageDepuisAtelier(
+  ed: LevelEditor,
+  salle: LevelDef,
+  litres: number,
+  temps: number,
+): Promise<void> {
+  const auteur = records.operator() || 'ANONYME'
+  const deja = ed.creationId
+  const p = await publieCreation(salle, auteur, { litres, temps }, deja || undefined)
+  // L'ATELIER APPREND TOUJOURS LE RÉSULTAT. Le garde « l'écran de fin
+  // est-il encore ouvert ? » passait AVANT : un retour à l'atelier avant la
+  // réponse (un aperçu qui démarre à froid met une ou deux secondes) et la
+  // salle publiée n'était pas notée, l'échec pas dit — « il ne s'est rien
+  // passé à la fin » (le concepteur, 24/11). Seul l'écran de fin, refermé,
+  // ne se rouvre pas ; l'encart « Votre salle » garde le message.
+  const raison = raisonCreation() || 'le serveur est injoignable'
+  if (p) {
+    ed.noteCreation(p.id, salle)
+    ed.notePublication(true, `${deja ? 'Republiée' : 'Publiée'} à ${new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })} : elle est dans les Créations de la communauté.`)
+  } else {
+    ed.notePublication(false, `La dernière publication a échoué : ${raison}.`)
+  }
+  if (!overlay.classList.contains('visible')) return
+  if (p) {
+    showOverlay(
+      deja ? 'SALLE REPUBLIÉE' : 'SALLE PUBLIÉE',
+      `« ${echappeHtml(salle.name)} » est en ligne, sous le nom ${echappeHtml(auteur)}, dans les Créations de la communauté. ` +
+        `${fmtL(litres)} en ${fmtTime(temps)} : ${deja ? 'si la salle a changé, ses records repartent de cette partie' : 'le premier record de la salle'}.`,
+      'success',
+      'RETOUR À L’ÉDITEUR',
+    )
+  } else {
+    showOverlay(
+      'SORTIE ATTEINTE — NON PUBLIÉE',
+      `La salle n’a pas pu être publiée : ${echappeHtml(raison)}. ` +
+        `Elle reste enregistrée sur ce poste ; « ESSAYER ET PUBLIER » réessaiera.`,
+      'danger',
+      'RETOUR À L’ÉDITEUR',
+    )
+  }
+}
+
 // ---- L'ÉDITEUR DE LA CARTE DE LA STATION (editor/editeurCarte.ts) ----
 // Même porte que l'éditeur de tableaux : mode concepteur, ou ?carte dans
 // l'URL. Il couvre l'écran et fige la partie derrière lui.
@@ -8726,7 +8970,7 @@ const regie = new Regie(regieEl, {
         'L’éditeur de tableaux : les surfaces, les mécanismes, les zones, le biome et le code atelier d’une salle — publiée dans la bibliothèque partagée, elle entre dans la planche et dans la pioche.',
       domaines: [],
       ouvre: () => {
-        void openEditor().then((ed) => ed && regie.close())
+        void openEditor('concepteur').then((ed) => ed && regie.close())
       },
     },
     {
@@ -8826,6 +9070,61 @@ const ouvreMulti = (code?: string): void => {
   })
 }
 document.getElementById('home-multi')?.addEventListener('click', () => ouvreMulti())
+// LES CRÉATIONS DES JOUEURS (game/ecranCreations.ts) : jouées hors de
+// l'expédition, par le même chemin que les essais de la planche
+const creationsEl = document.getElementById('creations') as HTMLDivElement
+const ecranCreations = new EcranCreations(creationsEl, {
+  jouer: (lvl, c) => {
+    ecranCreations.close()
+    partCommunaute()
+    startTest([lvl])
+    // startTest peut rendre la main à la fiche (nom d'opérateur manquant) :
+    // le retour ne s'arme que si la partie a vraiment démarré
+    if (document.body.classList.contains('playing')) fromCreation = c
+  },
+  creer: () => {
+    ecranCreations.close()
+    void openEditor('joueur')
+  },
+  // une salle publiée depuis ce poste se rouvre dans l'atelier : sa copie
+  // de MES SALLES, sinon la version en ligne
+  modifier: (lvl, id) => {
+    ecranCreations.close()
+    void openEditor('joueur').then((ed) => ed?.ouvreCreation(id, lvl))
+  },
+  fermer: () => ecranCreations.close(),
+  operateur: () => records.operator(),
+})
+document.getElementById('home-creations')?.addEventListener('click', () => ecranCreations.open())
+// COMMUNAUTÉ s'ouvre SUR PLACE, dans le rail : ses deux choix paraissent
+// dessous (le concepteur, 24/11 : « un sous-menu dans le même style »)
+document.getElementById('home-communaute')?.addEventListener('click', (e) => {
+  const b = e.currentTarget as HTMLButtonElement
+  const sous = document.getElementById('acc-communaute')
+  if (!sous) return
+  const ouvert = b.getAttribute('aria-expanded') !== 'true'
+  b.setAttribute('aria-expanded', String(ouvert))
+  sous.hidden = !ouvert
+})
+
+/** La sortie atteinte dans une création : la partie part dans ses records
+ *  (api/_creations.ts), et l'écran de fin dit ce qu'elle y vaut. */
+async function recordDepuisCreation(
+  c: { id: string; empreinte: string },
+  litres: number,
+  temps: number,
+): Promise<void> {
+  const r = await deposeRecordCreation(c.id, c.empreinte, records.operator() || 'ANONYME', litres, temps)
+  // l'écran de fin a pu être refermé entre-temps : on ne le rouvre pas
+  if (!overlay.classList.contains('visible')) return
+  const b = bilanPartie(r ? r.ameliore : null, r ? r.records : null, litres, temps)
+  showOverlay(b.titre, echappeHtml(b.texte), r ? 'success' : 'danger', 'RETOUR AUX CRÉATIONS')
+}
+
+// L'ATELIER DU JOUEUR : l'éditeur, au profil joueur (editor/profilJoueur.ts)
+document.getElementById('home-atelier')?.addEventListener('click', () => {
+  void openEditor('joueur')
+})
 // LE LIEN D'INVITATION : « ?multi=CODE » mène droit dans la partie —
 // l'ami n'a ni bouton à trouver ni code à taper (sur un téléphone, c'est la
 // différence entre rejoindre et renoncer). Comme le bouton, il vaut pour
@@ -8986,7 +9285,7 @@ const input = new Input()
 // module au premier lancement (TDZ) et laissait une page à moitié câblée.
 if (new URLSearchParams(location.search).has('editeur')) {
   hasPlayed = true
-  void openEditor()
+  void openEditor('concepteur')
 }
 if (new URLSearchParams(location.search).has('carte')) {
   hasPlayed = true
@@ -9075,6 +9374,8 @@ interface CoucheMenu {
 }
 const COUCHES_MENU: CoucheMenu[] = [
   { id: 'mb-veil' }, // la cérémonie : pas de porte de sortie — on choisit
+  { id: 'annonce', retour: 'an-fermer' }, // les nouveautés, par-dessus la fiche
+  { id: 'creations', retour: 'cr-fermer' }, // les créations de la communauté : sans elles ici, B ne les fermait pas et la fiche dessous volait la croix
   { id: 'codex', retour: 'codex-fermer', pilote: () => ecranCodex.manette(manette, manettePollNow) },
   { id: 'cmds', retour: 'cmds-fermer' },
   { id: 'planche', retour: 'planche-fermer' },
@@ -11835,6 +12136,7 @@ function lanceRejeu(code: string, cat: CategorieFantome, defDonnee?: FantomeDef)
   testQueue = []
   fromEditor = false
   fromPlanche = false
+  fromCreation = null
   document.getElementById('planche-retour')?.setAttribute('hidden', '')
   run.bonbonneLiters = 0
   run.runTime = 0
@@ -19562,6 +19864,14 @@ function resetAction(): void {
         retournePlanche() // l'essai vient de la planche : on y retourne
         return
       }
+      if (fromCreation) {
+        // la salle venait de l'écran CRÉATIONS : on y retourne, records relus
+        // — et la fiche dessous redevient celle d'avant la partie
+        fromCreation = null
+        reviensDeCommunaute()
+        ecranCreations.open()
+        return
+      }
       // la file d'essai continue : le sas mène à la salle suivante —
       // en jouant d'abord les cinématiques qui la précèdent
       if (testQueue.length > 0) {
@@ -21919,10 +22229,24 @@ function corpsImage(now: number): boolean {
     const refRecords = bestsLibre
       ? ` Records de la salle : 💧 ${fmtL(bestsLibre.volume.liters)} · ⏱ ${fmtTime(bestsLibre.chrono.time)}.`
       : ''
+    if (fromCreation && testLevel) {
+      // une CRÉATION : la partie entre (peut-être) dans ses records — jamais
+      // dans les registres ni le palmarès officiel
+      void recordDepuisCreation(fromCreation, surplus, run.tableauTime)
+    }
+    if (fromEditor && editor?.profil === 'joueur' && salleAtelier && essaiPublie) {
+      // L'ATELIER : la sortie atteinte est la PREUVE de traversée — la salle
+      // se publie (ou se republie) avec cette partie pour premier record
+      void partageDepuisAtelier(editor, salleAtelier, surplus, run.tableauTime)
+    }
     showOverlay(
       fromEditor ? 'TABLEAU FRANCHI' : `ESSAI ${level.code} CONCLU`,
       fromEditor
-        ? `${surplus.toFixed(2)} L collectés en ${fmtTime(run.tableauTime)} — le tableau se termine. Retour à l’éditeur pour l’ajuster.`
+        ? editor?.profil === 'joueur'
+          ? essaiPublie
+            ? `${surplus.toFixed(2)} L collectés en ${fmtTime(run.tableauTime)} — publication de la salle…`
+            : `${surplus.toFixed(2)} L collectés en ${fmtTime(run.tableauTime)} — essai pour vous : la salle n’est pas publiée. « ESSAYER ET PUBLIER » la partage.`
+          : `${surplus.toFixed(2)} L collectés en ${fmtTime(run.tableauTime)} — le tableau se termine. Retour à l’éditeur pour l’ajuster.`
         : `${surplus.toFixed(2)} L collectés en ${fmtTime(run.tableauTime)} — essai hors expédition : les registres ne bougent pas.${refRecords}`,
       'success',
       fromEditor

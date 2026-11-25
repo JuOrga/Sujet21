@@ -367,6 +367,29 @@
       .acc-lieu:is(:hover, :focus-visible, .pad-focus)::before { left: 0; top: 0; border-top-width: 1.5px; border-left-width: 1.5px; }
       .acc-lieu:is(:hover, :focus-visible, .pad-focus)::after { right: 0; bottom: 0; border-bottom-width: 1.5px; border-right-width: 1.5px; }
       .acc-outil > span { font-size: calc(10px * var(--ui)); color: var(--dim); }
+      /* COMMUNAUTÉ : un lieu qui s'ouvre sur place. Son chevron tourne quand
+         le sous-menu est ouvert ; les deux choix sont des lieux du même
+         dessin, en retrait, tenus par un filet à gauche. */
+      .acc-groupe > span::after {
+        content: '›'; display: inline-block; margin-left: 10px; color: var(--dim);
+        transition: transform 0.15s ease;
+      }
+      .acc-groupe[aria-expanded='true'] > span::after { transform: rotate(90deg); color: var(--glow); }
+      .acc-groupe[aria-expanded='true'] > span { color: var(--glow); }
+      .acc-sous { display: flex; flex-direction: column; margin-left: 14px; border-left: 1px solid var(--line); }
+      .acc-sous[hidden] { display: none; }
+      /* plus bas que les lieux : ouvert, le sous-menu ne pousse le rail que
+         de deux lignes courtes (le rail défile au-delà, overflow-y) */
+      .acc-lieu.acc-sous-lieu { min-height: 34px; }
+      .acc-sous-lieu > span { font-size: calc(10.5px * var(--ui)); }
+      /* les rails à DEUX COLONNES (téléphone tourné ou debout) : le
+         sous-menu prend la rangée entière, ses deux choix côte à côte, et
+         « CRÉATIONS DE LA COMMUNAUTÉ » passe à la ligne plutôt que de
+         déborder sa colonne */
+      @media (max-height: 520px), (max-width: 700px) and (min-height: 521px) {
+        .acc-sous { grid-column: 1 / -1; display: grid; grid-template-columns: 1fr 1fr; column-gap: inherit; margin-left: 0; border-left: 0; }
+        .acc-sous-lieu > span { white-space: normal; line-height: 1.25; }
+      }
 
       /* LES RÉGLAGES : quatre pictogrammes, le nom en infobulle */
       .acc-reglages { display: flex; gap: 4px; margin-left: 4px; }
@@ -502,6 +525,7 @@
         #home { gap: 18px; padding-top: calc(28px + env(safe-area-inset-top)); padding-bottom: 14px; }
         .acc-titre { font-size: calc(30px * var(--ui)); }
         .acc-lieu { min-height: 38px; }
+        .acc-lieu.acc-sous-lieu { min-height: 30px; }
       }
       /* -- téléphone tourné : le rail se resserre, les lieux sur deux colonnes -- */
       @media (max-height: 520px) {
@@ -3324,6 +3348,89 @@
       .rec-ligne.moi { background: rgba(46, 198, 201, 0.14); outline: 1px solid rgba(46, 198, 201, 0.35); }
       .rec-ecart { margin-top: 4px; font-size: calc(11px * var(--ui)); color: var(--dim); font-style: italic; }
       .rec-vide { padding: 6px 4px; font-size: calc(12px * var(--ui)); color: var(--dim); font-style: italic; }
+      /* L'ANNONCE DES NOUVEAUTÉS (game/annonce.ts) : une carte à la fois, le
+         dessin à gauche, les mots à droite ; empilés au téléphone. Au-dessus
+         de la fiche (20) et des notes de version (40). */
+      #annonce[hidden] { display: none; }
+      #annonce {
+        position: fixed; inset: 0; z-index: 45;
+        background: rgba(2, 6, 12, 0.78);
+        display: flex; align-items: center; justify-content: center; padding: 16px;
+        animation: an-voile 0.25s ease-out;
+      }
+      #annonce .an-boite {
+        position: relative; width: min(760px, 100%); max-height: calc(100dvh - 32px); overflow: auto;
+        background: var(--void); border: 1px solid var(--specimen); border-radius: 12px;
+        box-shadow: 0 0 0 1px rgba(99, 183, 230, 0.15), 0 24px 80px rgba(0, 0, 0, 0.6), 0 0 48px rgba(99, 183, 230, 0.12);
+        animation: an-entree 0.35s cubic-bezier(0.2, 0.9, 0.3, 1.15);
+      }
+      #an-corps {
+        display: grid; grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr);
+        gap: 18px 22px; padding: 26px 26px 20px;
+      }
+      #annonce .an-figure { align-self: center; }
+      #annonce .an-dessin { display: block; width: 100%; height: auto; border-radius: 10px; border: 1px solid #1d3448; }
+      #annonce .an-sur {
+        margin: 0 0 6px; font-family: var(--font-mono); font-size: calc(10px * var(--ui));
+        letter-spacing: 0.14em; color: #f2c98e;
+      }
+      #annonce h2 {
+        margin: 0 0 10px; font-family: var(--font-display); font-weight: 400;
+        font-size: calc(19px * var(--ui)); letter-spacing: 0.1em; color: var(--glow);
+      }
+      #annonce .an-texte { margin: 0 0 10px; font-size: calc(13.5px * var(--ui)); line-height: 1.5; color: var(--ink); }
+      #annonce .an-puces { margin: 0; padding: 0; list-style: none; }
+      #annonce .an-puces li {
+        position: relative; padding-left: 18px; margin-top: 6px;
+        font-size: calc(12.5px * var(--ui)); line-height: 1.45; color: #cfe2ef;
+      }
+      #annonce .an-puces li::before { content: '◆'; position: absolute; left: 0; top: 1px; font-size: 9px; color: var(--specimen); }
+      #annonce .an-pied {
+        grid-column: 1 / -1; display: flex; align-items: center; justify-content: space-between;
+        gap: 12px; flex-wrap: wrap; padding-top: 14px; border-top: 1px solid var(--line);
+      }
+      #annonce .an-points { display: flex; gap: 8px; }
+      #annonce .an-point {
+        width: 10px; height: 10px; padding: 0; border-radius: 50%;
+        border: 1px solid var(--specimen); background: transparent; cursor: pointer;
+      }
+      #annonce .an-point[aria-selected='true'] { background: var(--specimen); width: 26px; border-radius: 5px; }
+      #annonce .an-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-left: auto; }
+      #annonce .an-actions button {
+        font-family: var(--font-display); font-size: calc(10.5px * var(--ui)); letter-spacing: 0.12em;
+        min-height: 40px; padding: 0 16px; cursor: pointer;
+        background: transparent; color: var(--glow); border: 1px solid var(--line); border-radius: 4px;
+      }
+      #annonce .an-actions button.primary { background: var(--specimen); color: #030710; border-color: var(--specimen); }
+      #annonce .an-actions button:is(:hover, :focus-visible, .pad-focus) { border-color: var(--glow); outline: none; }
+      #annonce .an-actions button.primary:is(:hover, :focus-visible, .pad-focus) { background: var(--glow); }
+      #an-fermer {
+        position: absolute; top: 10px; right: 10px; width: 34px; height: 34px; padding: 0;
+        background: transparent; color: var(--dim); border: 1px solid transparent; border-radius: 4px;
+        font-size: 16px; cursor: pointer; z-index: 1;
+      }
+      #an-fermer:is(:hover, :focus-visible, .pad-focus) { color: var(--glow); border-color: var(--line); outline: none; }
+      /* le récréatif : la goutte rebondit sur l'hydrophobe, la flèche
+         désigne COMMUNAUTÉ — et tout se tient tranquille pour qui l'a demandé */
+      #annonce .an-goutte { animation: an-rebond 1.6s cubic-bezier(0.3, 0, 0.6, 1) infinite; transform-origin: 60px 96px; }
+      #annonce .an-pointe { animation: an-pointe 1.2s ease-in-out infinite; }
+      @keyframes an-voile { from { opacity: 0; } }
+      @keyframes an-entree { from { opacity: 0; transform: translateY(14px) scale(0.97); } }
+      @keyframes an-rebond {
+        0%, 100% { transform: translateY(0) scale(1, 1); }
+        45% { transform: translateY(-26px) scale(0.92, 1.08); }
+        88% { transform: translateY(0) scale(1.12, 0.86); }
+      }
+      @keyframes an-pointe { 50% { transform: translateX(-8px); } }
+      @media (prefers-reduced-motion: reduce) {
+        #annonce, #annonce .an-boite, #annonce .an-goutte, #annonce .an-pointe { animation: none; }
+      }
+      @media (max-width: 640px) {
+        #an-corps { grid-template-columns: minmax(0, 1fr); padding: 44px 16px 16px; gap: 14px; }
+        #annonce h2 { font-size: calc(16px * var(--ui)); }
+        #annonce .an-actions { width: 100%; }
+        #annonce .an-actions button { flex: 1 1 auto; }
+      }
       #livraisons[hidden] { display: none; }
       #livraisons {
         position: fixed; inset: 0; z-index: 40;
@@ -6786,6 +6893,45 @@
         background: radial-gradient(ellipse 60% 50% at 50% 0%, rgba(255, 179, 92, 0.1), transparent 60%), radial-gradient(ellipse 40% 40% at 90% 100%, rgba(224, 104, 92, 0.07), transparent 60%), rgba(2, 5, 10, 0.94);
       }
       #reparations[hidden] { display: none; }
+      /* L'ÉCRAN CRÉATIONS (game/ecranCreations.ts) : la liste à gauche, la
+         salle choisie à droite — vignette, JOUER, ses deux classements. */
+      #creations {
+        position: fixed; inset: 0; z-index: 40; display: flex; align-items: center; justify-content: center; padding: 18px;
+        background: rgba(2, 5, 10, 0.94); color: var(--ink); font-family: var(--font-mono);
+      }
+      #creations[hidden] { display: none; }
+      .cr-boite {
+        width: min(1240px, 100%); height: min(860px, 100%); display: grid; grid-template-rows: auto minmax(0, 1fr);
+        border: 1px solid var(--line); border-radius: 14px; overflow: hidden; background: #0a1420;
+      }
+      .cr-tete { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 20px; padding: 14px 20px; border-bottom: 1px solid var(--line); }
+      .cr-tete h2 { margin: 0; font-family: var(--font-display, sans-serif); font-size: 20px; font-weight: 400; letter-spacing: .05em; }
+      .cr-onglets { display: flex; gap: 16px; }
+      .cr-onglets button { background: none; border: 0; border-bottom: 2px solid transparent; border-radius: 0; color: inherit; opacity: .7; min-height: 44px; padding: 0 4px; font: inherit; cursor: pointer; }
+      .cr-onglets button[aria-selected='true'] { opacity: 1; border-bottom-color: var(--glow); }
+      .cr-ressort { flex: 1; }
+      .cr-tete button { min-height: 44px; }
+      .cr-corps { display: grid; grid-template-columns: minmax(0, 1fr) min(400px, 40%); min-height: 0; }
+      .cr-liste { padding: 18px 20px; display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 12px; align-content: start; overflow: auto; }
+      .cr-carte { display: flex; flex-direction: column; gap: 5px; text-align: left; padding: 14px 16px; min-height: 96px; border: 1px solid var(--line); border-radius: 10px; background: #10151c; color: inherit; font: inherit; cursor: pointer; }
+      .cr-carte:hover { border-color: #9aa3ab; }
+      .cr-carte.on { border-color: var(--glow); box-shadow: inset 0 0 0 1px var(--glow); }
+      .cr-carte b { font-size: 15px; font-weight: 600; }
+      .cr-carte span, .cr-carte small { font-size: 12px; opacity: .8; }
+      .cr-detail { border-left: 1px solid var(--line); padding: 18px 20px; display: flex; flex-direction: column; gap: 10px; overflow: auto; }
+      .cr-detail canvas { width: 100%; height: auto; border-radius: 8px; border: 1px solid var(--line); }
+      .cr-detail h3 { margin: 6px 0 0; font-size: 12px; font-weight: 400; opacity: .75; letter-spacing: .05em; }
+      .cr-detail h3.cr-nom { font-size: 18px; opacity: 1; letter-spacing: 0; }
+      .cr-detail p { margin: 0; line-height: 1.5; }
+      .cr-detail #cr-jouer { min-height: 52px; font-weight: 600; }
+      .cr-records { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+      .cr-records li { display: grid; grid-template-columns: 24px 1fr auto; gap: 10px; font-size: 14px; }
+      .cr-records li.moi { color: var(--glow); }
+      .cr-note, .cr-vide { font-size: 13px; opacity: .8; }
+      @media (max-width: 900px) {
+        .cr-corps { grid-template-columns: 1fr; grid-template-rows: minmax(0, 1fr) auto; }
+        .cr-detail { border-left: 0; border-top: 1px solid var(--line); max-height: 55vh; }
+      }
       .av-boite {
         width: min(1240px, 100%); height: min(860px, 100%); display: grid; grid-template-rows: auto minmax(0, 1fr) auto;
         border: 1px solid rgba(255, 179, 92, 0.22); border-radius: 14px; overflow: hidden;
@@ -7073,6 +7219,138 @@
          déjà — mais RIEN ne le disait. Ombres de défilement (CSS pur) :
          un voile paraît en haut ou en bas seulement quand il reste quelque
          chose à voir de ce côté. On sait qu'il y a une suite. */
+      /* L'ATELIER DU JOUEUR (editor.ts, profil « joueur ») : le même éditeur.
+         Ce que le profil réserve est masqué par une classe, jamais retiré
+         (bindUi et syncForm le lisent sans garde, et le concepteur le
+         retrouve intact) ; les réglages sont des paliers en boutons. */
+      #editor [data-hors-profil] { display: none !important; }
+      /* LA BARRE DE L'ATELIER : la palette latérale (une longue liste à
+         faire défiler) cède la place à une barre sous la salle — six
+         onglets de familles, puis les 3 à 7 outils de la famille choisie,
+         chacun avec sa phrase. La salle gagne la largeur de la colonne. */
+      #ed-dock { display: none; }
+      #editor.ed-joueur {
+        grid-template-columns: 1fr min(calc(322px * var(--ui)), 34vw);
+      }
+      #editor.ed-joueur > .ed-side:not(.ed-side--right) { display: none; }
+      /* LA COLONNE BORNÉE (minmax(0, 1fr)), et pas une colonne implicite :
+         une colonne « auto » s'élargit à la ligne d'outils ENTIÈRE — la
+         barre débordait la salle (1 388 px pour 958, mesuré), la salle la
+         coupait, et la ligne n'avait jamais rien à faire défiler (le
+         concepteur, 24/11 : « je ne peux pas scroller en horizontal »). */
+      #editor.ed-joueur #ed-stage {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr);
+        grid-template-rows: minmax(0, 1fr) auto;
+      }
+      #editor.ed-joueur #ed-dock { min-width: 0; }
+      #editor.ed-joueur #ed-canvas { min-height: 0; }
+      #editor.ed-joueur #ed-coords,
+      #editor.ed-joueur #ed-hint { top: 8px; bottom: auto; }
+      #editor.ed-joueur #ed-dock {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        padding: 10px 12px 12px;
+        border-top: 1px solid var(--line);
+        background: var(--void);
+      }
+      #editor .ed-dock-familles { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; }
+      /* LES OUTILS TRANSVERSES (Sélection, Gomme, Superposer) : toujours à
+         portée, à gauche des familles, séparés d'elles par un filet */
+      #editor .ed-dock-transverses {
+        display: inline-flex; gap: 4px; margin-right: 6px; padding-right: 10px; border-right: 1px solid var(--line);
+      }
+      #editor .ed-dock-familles .ed-dock-trans { display: inline-flex; align-items: center; gap: 5px; padding: 0 8px; }
+      /* plus spécifique que « .ed-dock-choisir svg » (32 px, plus bas) : la
+         Sélection gardait une case de 32 px pour un dessin de 20 */
+      #editor .ed-dock-familles .ed-dock-trans svg { width: 18px; height: 18px; flex: 0 0 18px; }
+      #editor .ed-dock-trans:not(.ed-dock-choisir)[aria-pressed='true'] {
+        background: var(--glow); color: #030710; border-color: var(--glow); font-weight: 600;
+      }
+      /* resserrés (espacement des lettres réduit) : les trois outils
+         transverses et les six familles tiennent sur UNE ligne dans une
+         barre de 958 px — un écran de 1 280 px (mesuré le 24/11 ; à 14 px
+         de marge et 6 px d'écart, « Décor » passait à la ligne) */
+      #editor .ed-dock-fam { min-height: 40px; padding: 0 10px; letter-spacing: .03em; }
+      #editor .ed-dock-fam[aria-selected='true'] { background: var(--glow); color: #030710; border-color: var(--glow); font-weight: 600; }
+      /* UNE SEULE LIGNE d'outils, qui défile de côté (le concepteur, 24/11 :
+         « les choix restent sur une seule ligne ») — chaque outil a son
+         pictogramme (editor/iconesAtelier.ts), son nom, sa phrase. */
+      #editor .ed-dock-rang { display: flex; align-items: stretch; gap: 6px; min-width: 0; }
+      #editor .ed-dock-outils {
+        flex: 1 1 auto; min-width: 0;
+        display: flex; flex-wrap: nowrap; gap: 8px; overflow-x: auto; overflow-y: hidden;
+        scroll-snap-type: x proximity; overscroll-behavior-x: contain; padding-bottom: 6px;
+        scrollbar-width: thin; scrollbar-color: var(--glow) transparent;
+      }
+      #editor .ed-dock-fleche { flex: 0 0 36px; min-height: 0; padding: 0; font-size: 22px; }
+      #editor .ed-dock-fleche:disabled { opacity: .25; cursor: default; }
+      #editor .ed-dock-outil {
+        flex: 0 0 auto; width: 188px; scroll-snap-align: start;
+        display: flex; gap: 10px; align-items: center; text-align: left;
+        min-height: 60px; padding: 8px 10px; white-space: normal; line-height: 1.3;
+      }
+      #editor .ed-dock-outil[aria-pressed='true'] { border-color: var(--glow); box-shadow: inset 0 0 0 1px var(--glow); }
+      #editor .ed-dock-outil svg,
+      #editor .ed-dock-choisir svg { flex: 0 0 32px; }
+      #editor .ed-dock-choisir { display: inline-flex; align-items: center; gap: 6px; }
+      /* SÉLECTION, mise en évidence quand on n'y est PAS (le concepteur,
+         24/11) : un outil en main, c'est elle qui appelle — le chemin du
+         retour pour choisir, déplacer, régler. En sélection, elle se tait. */
+      #editor .ed-dock-choisir[aria-pressed='false'] {
+        border-color: var(--glow); color: var(--glow); box-shadow: inset 0 0 0 1px var(--glow), 0 0 12px rgba(99, 183, 230, .35);
+      }
+      #editor .ed-dock-choisir[aria-pressed='true'] { opacity: .7; }
+      #editor .ed-dock-choisir svg { width: 20px; height: 20px; }
+      /* LA BULLE D'AIDE (editor.ts, brancheAides) : au-dessus de la barre,
+         sur la salle, après un temps d'arrêt sur l'outil */
+      #editor.ed-joueur #ed-dock { position: relative; }
+      #editor .ed-dock-aide {
+        position: absolute; bottom: calc(100% + 8px); z-index: 5;
+        width: min(340px, calc(100% - 16px)); padding: 10px 12px;
+        background: var(--void); border: 1px solid var(--glow); border-radius: 6px;
+        box-shadow: 0 6px 24px rgba(0, 0, 0, .55); pointer-events: none;
+        font-size: 12px; line-height: 1.45; text-align: left;
+      }
+      #editor .ed-dock-aide[hidden] { display: none; }
+      #editor .ed-dock-aide strong { display: block; font-size: 13px; color: var(--glow); margin-bottom: 4px; }
+      #editor .ed-dock-aide p { margin: 0 0 6px; }
+      #editor .ed-dock-aide ul { margin: 0; padding-left: 16px; }
+      #editor .ed-dock-aide li + li { margin-top: 3px; }
+      #editor .ed-dock-outil b { display: block; font-size: 13px; font-weight: 600; }
+      #editor .ed-dock-outil small {
+        display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+        font-size: 11px; opacity: .78; margin-top: 2px;
+      }
+      #editor .ed-pal-tete { display: flex; flex-direction: column; gap: 4px; margin-bottom: 12px; }
+      #editor .ed-pal-tete small { font-size: 11px; letter-spacing: .06em; text-transform: uppercase; opacity: .75; }
+      #editor .ed-pal-tete b { font-size: 15px; }
+      #editor .ed-pal-tete p { margin: 0; line-height: 1.45; }
+      #editor .ed-pal { border: 0; margin: 0 0 12px; padding: 0; min-width: 0; }
+      #editor .ed-etat-salle { display: none; }
+      #editor.ed-joueur .ed-etat-salle { display: flex; flex-direction: column; gap: 6px; padding: 10px 12px; margin-bottom: 8px; border: 1px solid var(--line); border-radius: 8px; line-height: 1.45; }
+      #editor .ed-etat-salle p { margin: 0; }
+      #editor .ed-etat-salle .ok { color: #3fd69b; }
+      #editor .ed-etat-salle .attente { color: #f2c98e; }
+      #editor .ed-mes-salles { display: none; }
+      #editor.ed-joueur .ed-mes-salles { display: flex; flex-direction: column; gap: 6px; margin-bottom: 10px; }
+      #editor .ed-ms-titre { font-size: 12px; letter-spacing: .06em; opacity: .8; }
+      #editor .ed-mes-salles ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; max-height: 220px; overflow-y: auto; }
+      #editor .ed-mes-salles li { display: flex; gap: 4px; }
+      #editor .ed-ms-ouvrir { flex: 1; min-width: 0; display: flex; flex-direction: column; align-items: flex-start; text-align: left; gap: 2px; min-height: 44px; padding: 6px 10px; }
+      #editor .ed-ms-ouvrir b { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%; }
+      #editor .ed-ms-ouvrir small { font-size: 11px; opacity: .75; }
+      #editor .ed-mes-salles li.on .ed-ms-ouvrir { border-color: var(--glow); box-shadow: inset 0 0 0 1px var(--glow); }
+      #editor .ed-ms-retirer { flex: 0 0 36px; min-height: 44px; padding: 0; }
+      #editor .ed-pal legend { font-size: 12px; opacity: .8; margin-bottom: 6px; padding: 0; }
+      #editor .ed-pal-choix { display: flex; gap: 6px; }
+      #editor .ed-pal-btn { flex: 1 1 0; min-width: 0; min-height: 44px; line-height: 1.25; white-space: normal; }
+      #editor .ed-pal-btn.on { background: var(--glow); color: #030710; border-color: var(--glow); font-weight: 600; }
+      #editor .ed-pal-liens { display: flex; flex-direction: column; gap: 6px; border-top: 1px solid var(--line); padding-top: 10px; margin-bottom: 12px; }
+      #editor .ed-pal-liens > span { font-size: 12px; opacity: .8; }
+      #editor .ed-pal-liens p { margin: 0; }
+      #editor.ed-joueur .ed-tool { min-height: 44px; }
       .ed-side {
         border-right: 1px solid var(--line);
         overflow-y: auto;
@@ -7679,6 +7957,9 @@
           border-left: none;
           border-top: 1px solid var(--line);
         }
+        #editor.ed-joueur { grid-template-columns: 1fr; }
+        #editor .ed-dock-outil { width: 150px; }
+        #editor .ed-dock-outil small { display: none; }
       }
 
       @media (prefers-reduced-motion: reduce) {
@@ -10051,6 +10332,17 @@
              premier lancement : il n'attend rien de la partie solo. Son écran
              vit entier dans src/multi/ecranMulti.ts. -->
         <button id="home-multi" type="button" class="acc-lieu" title="Jouer à deux : contre l’ordinateur, à deux sur cet écran, ou chacun chez soi"><span>MULTI</span><i class="acc-voyant" hidden></i><small></small></button>
+        <!-- COMMUNAUTÉ : les salles des joueurs (docs/atelier-joueur.md), un
+             lieu pour tous depuis le 24/11. Il S'OUVRE sur place, dans le même
+             rail : ÉDITEUR (bâtir sa salle) et CRÉATIONS DE LA COMMUNAUTÉ
+             (celles que les joueurs ont partagées, jouées hors de l'expédition
+             avec leurs records). Les identifiants home-atelier et
+             home-creations sont ceux que main.ts branche. -->
+        <button id="home-communaute" type="button" class="acc-lieu acc-groupe" aria-expanded="false" aria-controls="acc-communaute" title="Les salles des joueurs : en bâtir une, jouer celles des autres"><span>COMMUNAUTÉ</span><i class="acc-voyant" hidden></i><small></small></button>
+        <div id="acc-communaute" class="acc-sous" role="group" aria-label="Communauté" hidden>
+          <button id="home-atelier" type="button" class="acc-lieu acc-sous-lieu" title="Bâtir sa propre salle, l’essayer, et la partager en atteignant sa sortie"><span>ÉDITEUR</span><small></small></button>
+          <button id="home-creations" type="button" class="acc-lieu acc-sous-lieu" title="Les salles bâties et partagées par les joueurs, jouées hors de l’expédition, avec leurs records"><span>CRÉATIONS DE LA COMMUNAUTÉ</span><small></small></button>
+        </div>
         <button id="home-sauvegardes" type="button" class="acc-lieu" title="Les trois emplacements : chacun est une partie entière. Le nom d’opérateur s’y change"><span>SAUVEGARDES</span><i class="acc-voyant" hidden></i><small></small></button>
         <!-- LES OUTILS DU CONCEPTEUR ont une seule porte : LA RÉGIE (ses
              sections : carte, descente, planche, récit et fins, montage,
@@ -10223,6 +10515,9 @@
         <label class="ed-f" style="width:auto" title="ALIGNEMENT AUTOMATIQUE : en déplaçant une pièce, elle se colle aux bords, aux centres et aux écarts égaux de ses voisines (traits pointillés). Décochez pour poser exactement où vous lâchez — ou tenez ALT le temps d'un geste. Le réglage est retenu d'une séance à l'autre."><span>Alignement</span>
           <input type="checkbox" id="ed-align" checked style="width:auto" /></label>
         <button type="button" id="ed-prevision" title="LA PRÉVISION EXACTE : le vrai solveur court sur ce tableau, sans écran — le corps né au départ, lancé par l'impulsion, sous les puits — et écrit en trait plein la trajectoire de son centre sur douze secondes. Quelques secondes de calcul, par tranches ; la ligne pointillée, elle, est un point-masse. Seuls les puits et les parois jouent : ni sas, ni chasses, ni vortex.">Prévision exacte</button>
+        <!-- L'ATELIER (profil joueur) : essayer SANS publier — masqué au
+             profil concepteur, où « Essayer » suffit -->
+        <button type="button" id="ed-essai-seul" data-hors-profil>Essayer</button>
         <button type="button" id="ed-play" class="primary">Essayer</button>
         <button type="button" id="ed-quit">↩ Accueil</button>
       </div>
@@ -10320,6 +10615,10 @@
         <canvas id="ed-canvas"></canvas>
         <div id="ed-coords">x 0 · y 0</div>
         <div id="ed-hint"></div>
+        <!-- LA BARRE DE L'ATELIER (profil joueur) : les familles en onglets,
+             et les seuls outils de la famille choisie — au lieu de la grande
+             palette latérale à faire défiler. Peinte par editor.ts. -->
+        <nav id="ed-dock" aria-label="Les éléments de l’atelier"></nav>
       </div>
 
       <!-- Le panneau du GÉNÉRATEUR : les réglages voyagent dans le code (~) -->
@@ -10449,6 +10748,10 @@
         </div>
         <div class="ed-group">
           <span class="k">Tableau</span>
+          <!-- l'atelier du joueur : où en est sa salle (enregistrée, partagée) -->
+          <div id="ed-etat-salle" class="ed-etat-salle" role="status"></div>
+          <!-- l'atelier : toutes les salles de ce poste (editor/sallesAtelier.ts) -->
+          <div id="ed-mes-salles" class="ed-mes-salles"></div>
           <label class="ed-f"><span>Nom</span><input id="ed-name" /></label>
           <label class="ed-f"><span>Code</span><input id="ed-code" /></label>
           <p class="ed-code-lecture" id="ed-code-lecture"></p>
@@ -11034,6 +11337,8 @@
          stations du module — ouvert au menu par aucun bouton, c'est un
          PUPITRE qui l'appelle. Le gabarit est peint par l'écran. -->
     <div id="reparations" hidden aria-label="Tableau des avaries"></div>
+    <!-- LES CRÉATIONS DES JOUEURS (game/ecranCreations.ts, lot 6) -->
+    <div id="creations" hidden role="dialog" aria-label="Les créations des joueurs"></div>
     <!-- Le voile SAUVEGARDES : les trois emplacements du coffre (game/coffre.ts) -->
     <div id="sauvegardes" hidden aria-label="Sauvegardes">
       <div class="salles-boite">
@@ -11068,6 +11373,16 @@
     </div>
 
     <!-- Le voile NOTES DE VERSION : le journal du chantier, sorti du banc -->
+    <!-- L'ANNONCE DES NOUVEAUTÉS (game/annonce.ts) : une fois, par-dessus la
+         fiche d'accueil, trois cartes à feuilleter. main.ts la pose, la
+         ferme et retient qu'elle a été vue. -->
+    <div id="annonce" hidden role="dialog" aria-modal="true" aria-labelledby="an-titre">
+      <div class="an-boite">
+        <button type="button" id="an-fermer" aria-label="Fermer l’annonce">✕</button>
+        <div id="an-corps"></div>
+      </div>
+    </div>
+
     <div id="livraisons" hidden aria-label="Notes de version">
       <div class="salles-boite">
         <div class="salles-tete"><span>NOTES DE VERSION — <span id="liv-version"></span></span>
