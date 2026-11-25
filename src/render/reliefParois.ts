@@ -167,6 +167,34 @@ export function solCache(
   return Math.max(sommet, tranche)
 }
 
+/** LA HAUTEUR VUE DES AUTRES : en un pixel, `z[i]` est la hauteur de la
+ *  surface que la boîte i y dresse (son dessus, ou le point de sa tranche ;
+ *  −1 si elle n'y est pas). Rend, pour la boîte `i`, la plus haute de celles
+ *  des AUTRES boîtes — −1 si seul le sol est derrière.
+ *  POURQUOI sans elle-même : un élément à pièces (chaudière, surchauffeur,
+ *  conduite) a une boîte englobante plus grosse que ses pièces ; sa propre
+ *  hauteur vue, mesurée sur la boîte, cacherait ses pièces à elles-mêmes. Et
+ *  ce qu'une boîte pose au sol ne doit se taire que sous un AUTRE solide.
+ *  Le shader la tient en une passe : la plus haute, sa boîte, la suivante. */
+export function hauteurVueAutres(z: readonly number[], i: number): number {
+  let m = -1
+  for (let j = 0; j < z.length; j++) if (j !== i) m = Math.max(m, z[j])
+  return m
+}
+
+/** DEVANT ? Le point d'une tranche, à la hauteur vue `ht` (0 au pied, 1 au
+ *  sommet) d'un solide de hauteur `h`, se peint si aucune autre surface plus
+ *  haute ne couvre le pixel (`zAutres`, hauteurVueAutres). La règle des
+ *  tranches de boîte, à la demi-unité près : à hauteur égale, l'ordre du
+ *  tableau décide. 1 devant, 0 caché.
+ *  POURQUOI pour les pièces aussi (le concepteur, 24/11) : la tranche d'un
+ *  surchauffeur posé sous un coin hydrophobe se peignait par-dessus le dessus
+ *  du coin — l'appareil semblait traverser la paroi plus haute que lui. Les
+ *  tranches de pièces ne regardaient pas la hauteur vue. */
+export function devantTranche(zAutres: number, ht: number, h: number): number {
+  return ht * h >= zAutres - 0.5 ? 1 : 0
+}
+
 /** LE CORPS A UNE HAUTEUR (relief allumé). Les parois étaient extrudées, le
  *  corps peint à plat : collé à un mur, il s'arrêtait net sur la ligne du
  *  pied, et la tranche — une face verticale vue de biais — se lisait comme
@@ -758,6 +786,9 @@ float solCache(float relief, float d, float dV, float flanc, float w, float opac
   float sommet = (1.0 - smoothstep(-w, 0.0, dV)) * opacite;
   float tranche = d > 0.0 ? flanc : flanc * permeable * smoothstep(0.5 * w, 1.5 * w, -d);
   return max(sommet, tranche);
+}
+float devantTranche(float zAutres, float ht, float h) {
+  return step(zAutres - 0.5, ht * h);
 }
 float lueurCorpsFlanc(float corps, float z, float hCorps) {
   float h = max(hCorps, 1e-3);

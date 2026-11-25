@@ -154,7 +154,7 @@ function dansRectAxe(x: number, y: number, r: Rect): boolean {
  * ce qui n'a pas de physique (sas, vide, baie) n'a pas de matière à opposer.
  * (Le MIROIR FIXE « absorbe » aussi au sens des rails — l'arc guidé s'y
  * éteint — mais la marche libre le RÉFLÉCHIT avant d'en arriver là.) */
-function absorbe(b: ObstacleBox): boolean {
+export function absorbe(b: ObstacleBox): boolean {
   return b.material !== MAT_GRILLE && !sansPhysique(b.material)
 }
 

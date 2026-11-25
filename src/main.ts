@@ -356,10 +356,20 @@ import { chargePiecesModule2d, peintCelluleSeule, peintModule2d, type Pieces } f
 import { MAX_BOXES, Renderer } from './render/renderer'
 import { HAUTEUR_BLOCS } from './render/hauteurs'
 import { fractionSommet, hauteurAppui, pointDuSommet, pointPose } from './render/reliefParois'
-import { PORTE_BLINDEE_URL, decalsDesPortes, dessinePorte, leveeSuivante, type Occultant } from './render/porteBlindee'
+import {
+  PORTE_BLINDEE_URL,
+  decalsDesPortes,
+  dessinePorte,
+  effaceVolumes,
+  fermeCalque,
+  leveeSuivante,
+  ouvreCalque,
+  type Occultant,
+} from './render/porteBlindee'
 import { remetReglagesParDefaut } from './game/remiseReglages'
 import { Motes, VIE_STRIDE, remplitVie, toucheLeCorps } from './render/vie'
 import { panDepuis } from './game/ouie'
+import { corpsBuParLeSas } from './game/sortieSas'
 import { dangerDevant, directionDeMarche, saccade, type Saccade } from './game/regard'
 import { AGONIE_DUREE, agonie, clignement, intervalleClignement } from './game/paupiere'
 import { FixedLoop } from './game/loop'
@@ -398,6 +408,7 @@ import { EcranCodex } from './game/ecranCodex'
 import { EcranMarchand } from './game/ecranMarchand'
 import { EcranAvaries } from './game/ecranAvaries'
 import {
+  absorbe as absorbeLumiere,
   traceLaser,
   creerEtatRecepteurs,
   avancerRecepteurs,
@@ -1011,8 +1022,8 @@ function createSim(level: LevelDef): FluidSim {
   appliqueMoteur(sim)
   // les dashs sont la RÉSERVE DU TABLEAU : N par écran (le tableau peut
   // fixer son propre nombre, sinon celui du banc), pleins dès le chargement.
-  // Changer d'état n'y touche jamais — la chaudière transforme, elle ne
-  // recharge pas — et seul un surchauffeur frôlé en rend un, plafonné au max.
+  // La première vapeur du tableau refait le plein ; ensuite, changer d'état
+  // n'y touche plus, et seul un surchauffeur frôlé en rend un, plafonné au max.
   sim.dashBudgetMax = level.dashBudget ?? params.gasDashBudget
   // Instruments embarqués : la buse calibrée agrandit la réserve d'un dash,
   // l'aimant à rosée bonifie la recondensation
@@ -9814,7 +9825,8 @@ function drawMecanismes(vw: number, vh: number, dpr: number): void {
     fxCanvas.width = Math.round(vw * dprC)
     fxCanvas.height = Math.round(vh * dprC)
   }
-  const g = fxCtx
+  // (variable : le temps des faisceaux, `g` est leur calque — voir plus bas)
+  let g = fxCtx
   g.setTransform(dprC, 0, 0, dprC, 0, 0)
   g.clearRect(0, 0, vw, vh)
   if (!actif || !document.body.classList.contains('playing')) return
@@ -9858,14 +9870,22 @@ function drawMecanismes(vw: number, vh: number, dpr: number): void {
     const [sx, sy] = pointDuSommet(q.sx, q.sy, vw * 0.5, vh * 0.5, f)
     return { sx, sy }
   }
-  const occultantsPres = (r: { minX: number; minY: number; maxX: number; maxY: number }): Occultant[] => {
+  // `garde` : quels solides comptent (les faisceaux ne sont cachés que par
+  // ce qui arrête la lumière)
+  const occultantsPres = (
+    r: { minX: number; minY: number; maxX: number; maxY: number },
+    garde: (box: ObstacleBox) => boolean = () => true,
+  ): Occultant[] => {
     const d = Math.hypot((r.minX + r.maxX) / 2 - camera.x, (r.minY + r.maxY) / 2 - camera.y)
     const portee = Math.hypot(r.maxX - r.minX, r.maxY - r.minY) / 2
     const marge = ((d + portee) * fMurHaut) / Math.max(1e-6, 1 - fMurHaut) + 8
-    return renderer.solidesPres(r.minX, r.minY, r.maxX, r.maxY, marge).map(({ box, hauteur }) => ({
-      contours: contoursOccultant(box),
-      hauteur,
-    }))
+    return renderer
+      .solidesPres(r.minX, r.minY, r.maxX, r.maxY, marge)
+      .filter(({ box }) => garde(box))
+      .map(({ box, hauteur }) => ({
+        contours: contoursOccultant(box),
+        hauteur,
+      }))
   }
   const fractionAppui = (r: { minX: number; minY: number; maxX: number; maxY: number }): number => {
     if (fMurHaut <= 0) return 0 // relief éteint : ni sonde ni calcul
@@ -10813,6 +10833,60 @@ function drawMecanismes(vw: number, vh: number, dpr: number): void {
     }
   })
 
+  // LES FAISCEAUX PASSENT SOUS LE DESSUS DES MURS. Ils se peignent dans la
+  // toile 2D, par-dessus le rendu WebGL : relief allumé, le sommet d'un mur
+  // fuit le centre de l'écran et recouvre le sol au-delà de son pied — mais
+  // le rayon, tracé au sol, se dessinait PAR-DESSUS ce dessus et semblait
+  // traverser la paroi (le concepteur, 25/11 : « on dirait que les lasers
+  // traversent les parois avec l'effet de profondeur » — le rayon du haut
+  // longeait une rangée de cloisons, celui de droite coupait un mur en
+  // biais). Même remède que les portes (render/porteBlindee.ts) : rayons,
+  // sursaut et ionisation se peignent sur un calque, le volume projeté des
+  // solides voisins en est effacé, puis le calque rejoint la toile. Seuls
+  // cachent les solides qui ARRÊTENT la lumière (laser.ts : absorbe) : à
+  // travers une grille ou un sas, le rayon passe, on doit le voir passer.
+  // Relief éteint, rien ne change : pas de calque, pas de sonde.
+  const fxG = g
+  let calqueFaisceaux: {
+    c: CanvasRenderingContext2D
+    rect: { x0: number; y0: number; x1: number; y1: number }
+    occ: Occultant[]
+  } | null = null
+  if (fMurHaut > 0) {
+    let minX = Infinity
+    let minY = Infinity
+    let maxX = -Infinity
+    let maxY = -Infinity
+    const englobe = (pts: readonly { x: number; y: number }[]): void => {
+      for (const q of pts) {
+        minX = Math.min(minX, q.x)
+        minY = Math.min(minY, q.y)
+        maxX = Math.max(maxX, q.x)
+        maxY = Math.max(maxY, q.y)
+      }
+    }
+    for (const t of laserEtat.vues) englobe(t.points)
+    if (faisceauChoix >= 1) for (const im of laserEtat.impacts) englobe(im.points)
+    for (const io of laserEtat.ionisations) englobe(io.points)
+    if (minX <= maxX) {
+      const rMonde = { minX, minY, maxX, maxY }
+      const occ = occultantsPres(rMonde, absorbeLumiere)
+      if (occ.length > 0) {
+        // le plus large de ce qui se peint autour d'un rayon : l'anneau
+        // d'ionisation (84·z) et son trait
+        const marge = 110 * z
+        const a = S(minX, maxY)
+        const b = S(maxX, minY)
+        const rect = { x0: a.sx - marge, y0: a.sy - marge, x1: b.sx + marge, y1: b.sy + marge }
+        const c = ouvreCalque(fxG, rect)
+        if (c) {
+          calqueFaisceaux = { c, rect, occ }
+          g = c
+        }
+      }
+    }
+  }
+
   // faisceaux : halo large + cœur fin, en fusion additive
   g.globalCompositeOperation = 'lighter'
   for (const t of laserEtat.vues) {
@@ -11120,6 +11194,15 @@ function drawMecanismes(vw: number, vh: number, dpr: number): void {
       g.arc(pe.sx, pe.sy, Math.max(3, (14 + 70 * k) * z), 0, Math.PI * 2)
       g.stroke()
     }
+  }
+
+  // le calque des faisceaux rejoint la toile, les murs effacés — en fusion
+  // additive, comme s'ils y avaient été peints
+  if (calqueFaisceaux) {
+    const { c, rect, occ } = calqueFaisceaux
+    g = fxG
+    g.globalCompositeOperation = 'lighter'
+    fermeCalque(g, c, rect, (m) => effaceVolumes(m, occ, projetteRelief))
   }
 
   // ② LA CAPTURE, et ③ LE CUMUL : le champ prend l'arc. Une CRÊTE remonte
@@ -20415,9 +20498,6 @@ let continuerVoulu = false
 // le passage auto à l'état gazeux (chaudière) : armé tant que le corps
 // n'a pas déjà déclenché — réarmé quand il ressort de l'aura
 let autoGazArme = true
-// la prochaine vaporisation est SUBIE (la chaudière vient de la provoquer) :
-// elle se paie comme les autres, mais ne rend pas les dashs
-let gazSubi = false
 // la zone forcée actuellement TENUE par le corps (déclenchée à 95 %,
 // relâchée sous 85 %) — l'état, lui, persiste à la sortie
 let zoneTenue: number | null = null
@@ -20905,26 +20985,22 @@ function corpsImage(now: number): boolean {
   if (level.minijeu?.type === 'palet' && paletEtat.enCours) sim.freezeIntent = true
   // La BASCULE en vapeur — G, chaudière à 95 %, zone forcée : toute cause —
   // se règle à l'instant du basculement : péage de 20 % du volume actif
-  // (gerbe de gouttes récupérables). Le compteur de dashs, lui, dépend de
-  // QUI a décidé : se vaporiser DE SON PROPRE CHEF (touche G, bouton
-  // VAPEUR) refait le plein de la réserve — le péage en est le prix ; une
-  // transformation SUBIE (chaudière à 95 %, zone qui impose la vapeur) ne
-  // rend rien, sinon la salle vaudrait ferme à dashs.
+  // (gerbe de gouttes récupérables). Le compteur de dashs, lui, n'est
+  // rempli que par la PREMIÈRE bascule du tableau, quelle qu'en soit la
+  // cause ; les suivantes ne rendent rien — seul le surchauffeur recharge
+  // (solver.ts, transfoVapeur).
   // Et un tableau qui COMMENCE en vapeur ne bascule pas : c'est son état de
   // départ. Ni péage, ni événement — le corps naît nuage, avec sa réserve
   // (createSim l'a remplie), sans qu'on lui prenne un cinquième de lui-même.
   if (input.gasIntent && !gasIntentAvant && !tableauDone && !input.paused) {
     // l'état de départ, c'est la PREMIÈRE prise de la zone, au tout début du
-    // tableau : une bascule décidée plus tard (touche G) se paie et rend ses
-    // dashs normalement, même dans un tableau né en vapeur
+    // tableau : une bascule décidée plus tard (touche G) se paie normalement,
+    // mais ne rend pas de dashs — naître nuage valait déjà la première vapeur
     const etatDeDepart =
       departEnVapeur && zoneActive === 'vapeur' && run.tableauTime < 3
     departEnVapeur = false
-    const subie = gazSubi || zoneActive === 'vapeur'
-    gazSubi = false
-    if (!etatDeDepart) sim.transfoVapeur(!subie)
+    if (!etatDeDepart) sim.transfoVapeur()
   }
-  if (!input.gasIntent) gazSubi = false // rien à consommer : la marque tombe
   gasIntentAvant = input.gasIntent
 
   sim.chill = chillNow() // le vaisseau refroidit : la physique suit
@@ -21678,8 +21754,21 @@ function corpsImage(now: number): boolean {
   // MAIS seulement celle qui naît de l'emprise : le corps y était il y a
   // moins que le délai de grâce (+ une marge). Dix pour cent bus puis le
   // reste perdu loin du sas, sur un danger, reste une défaite (revue #453).
+  // LE CORPS BU JUSQU'À LA DERNIÈRE GOUTTE (game/sortieSas.ts) : sous la
+  // dernière impulsion, le corps à sec qui dérive dans le sas y disparaît —
+  // mais les gouttes semées ailleurs fermaient « tout bu », et ce qu'il
+  // restait ne suffisait pas à CONTINUER. Le sursis tombait : DÉFAITE, la
+  // salle franchie. Disparu dans l'emprise, il est rattrapé comme ci-dessus.
+  const corpsBu = corpsBuParLeSas({
+    swallowed: sim.swallowed,
+    playerCount: sim.playerCount,
+    empriseRecente:
+      endgame.empriseJusqua >= 0 && run.tableauTime - endgame.empriseJusqua <= 0.5,
+    videPris: vide.prise,
+  })
   const sortieRattrapee =
     endgame.rattrapee ||
+    corpsBu ||
     (aspireAssez &&
       sim.dispersed &&
       endgame.empriseJusqua >= 0 &&
@@ -22790,7 +22879,6 @@ function corpsImage(now: number): boolean {
   ) {
     autoGazArme = false
     if (input.freezeIntent) input.toggleFreeze()
-    gazSubi = true // la salle décide à notre place : pas de plein de dashs
     input.toggleGas() // le même chemin que la touche G : sons et UI suivent
   }
 

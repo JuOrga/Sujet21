@@ -4,13 +4,14 @@ import { fileURLToPath } from 'node:url'
 import { HAUTEUR_BLOCS, HAUTEUR_CORPS } from './hauteurs'
 import { HAUTEUR_DE_RANG, RANG_DE_MATIERE } from './volume'
 import { MAT_GRILLE, MAT_MEMBRANE, MAT_RIDEAU } from '../game/level'
-import { COQUE_EST, COQUE_NORD, FORME_ARC, coqueSdfLocal, formeContact, type FormeContact } from '../game/formes'
+import { COQUE_EST, COQUE_NORD, FORME_ARC, coinSommets, coqueSdfLocal, formeContact, type FormeContact } from '../game/formes'
 import {
   DEVINE_FOND,
   DEVINE_LISERE,
   MATIERES_PERMEABLES,
   RELIEF_PAROIS_GLSL,
   corpsDevine,
+  devantTranche,
   facteurRelief,
   fonduRelief,
   faceFlanc,
@@ -24,6 +25,7 @@ import {
   PAS_AFFINE,
   fractionSommet,
   hauteurAppui,
+  hauteurVueAutres,
   basesDuCorps,
   corpsVu,
   CORPS_RELIEF_GLSL,
@@ -300,7 +302,7 @@ describe('le shader : les flancs absents (hydro, miroir)', () => {
   })
 
   it('l’aura des hydro, l’ombre de contact et l’ombre courte ne se peignent plus sur le sommet de leur propre boîte', () => {
-    expect(epaisseur).toMatch(/float sol = step\(0\.0, d\) \* libre \* \(1\.0 - solPropre\);/)
+    expect(epaisseur).toMatch(/float sol = step\(0\.0, d\) \* libre \* \(1\.0 - solPropre\) \* solVu;/)
     expect(boucle).toMatch(/aura \*= 1\.0 - solPropre;/)
   })
 
@@ -818,7 +820,8 @@ describe('relief allumé, la surface la plus haute cache les autres', () => {
 
   it('la couverture retient la hauteur vue : un dessus franc, sinon une tranche ; relief éteint, rien', () => {
     expect(couverture).toMatch(/float zVis = -1\.0;/)
-    expect(couverture).toMatch(/if \(uRelief > 0\.0\) \{[\s\S]*zVis = max\(zVis, dc < -edgeW \? hb : hauteurTranche\(/)
+    expect(couverture).toMatch(/if \(uRelief > 0\.0\) \{[\s\S]*float zb = dc < -edgeW \? hb : hauteurTranche\(/)
+    expect(couverture).toMatch(/if \(zb > zVis\) \{\s*zVis2 = zVis;\s*zVis = zb;\s*iVis = bi;\s*\} else \{\s*zVis2 = max\(zVis2, zb\);/)
   })
 
   it('une tranche sous une surface plus haute ne se peint pas', () => {
@@ -1502,5 +1505,103 @@ describe('relief allumé, seul le corps a une hauteur : les gouttes éjectées r
     expect(seul).toEqual({ r: 3.2 - TH * GALBE_CORPS, pas: PAS_CORPS })
     // une goutte libre au même étage gonfle r, pas b : même lecture
     expect(corpsVu([0, 0, 0, 4.4], TH, corps)).toEqual(seul)
+  })
+})
+
+// LES PAROIS HYDRO DE « UNSTUCK YOURSELF » (le concepteur, 24/11, une
+// capture). Deux défauts, une même cause : ce qui se peignait sans regarder
+// la hauteur vue des AUTRES boîtes.
+//  1. Un coin hydrophobe posé sur un surchauffeur : la tranche du
+//     surchauffeur (ses pièces) se peignait par-dessus le dessus du coin —
+//     l'appareil semblait traverser la paroi.
+//  2. L'angle d'un coin, d'un mur hydrophobe et d'un mur neutre enterré
+//     dessous : le pied du mur enterré traçait son ombre de contact en
+//     travers des tranches voisines — des arêtes sombres dans l'angle.
+// La géométrie est celle du tableau (y vers le haut), la caméra celle de la
+// capture rejouée au banc : centre (507, 280), zoom 0,75, relief FORT.
+describe('relief allumé, ce qui se peint sous une autre surface plus haute', () => {
+  const H = HAUTEUR_BLOCS // tout le groupe prend la hauteur du surchauffeur
+  const k = fractionSommet(0.07, 0.75, H)
+  const depl = (x: number, y: number): [number, number] => [(x - 507) * k, (y - 280) * k]
+  // la hauteur vue d'une boîte en un pixel : son dessus, sinon sa tranche
+  const zBoite = (x: number, y: number, b: number[]): number => {
+    const [rx, ry] = depl(x, y)
+    const [d, t] = flancBalaye(x, y, b, rx, ry)
+    return d < -1 ? t * H : -1
+  }
+  const zCoin = (x: number, y: number, b: number[], p0: number): number => {
+    const [rx, ry] = depl(x, y)
+    const tri = coinSommets({ minX: b[0], minY: b[1], maxX: b[2], maxY: b[3], p0 })
+    const [d, t] = flancBalayeTriangle(x, y, tri, rx, ry)
+    return d < -1 ? t * H : -1
+  }
+
+  it('la hauteur vue des autres ignore la boîte elle-même', () => {
+    expect(hauteurVueAutres([30, 90, -1], 1)).toBe(30)
+    expect(hauteurVueAutres([30, 90, -1], 0)).toBe(90)
+    expect(hauteurVueAutres([-1, 90], 1)).toBe(-1)
+    expect(hauteurVueAutres([], 0)).toBe(-1)
+  })
+
+  it('la tranche du surchauffeur se tait sous le dessus du coin qui le coiffe', () => {
+    // le surchauffeur (0..300 × −290..−230) et, posé sur lui, le coin
+    // hydrophobe (−700..501 × −230..−170, angle droit en bas à droite)
+    const coin = [-700, -230, 501, -170]
+    // un pixel au-dessus du pied nord du surchauffeur, au milieu : sa tranche
+    // y serait vue (le chemin pied → sommet sort par sa face nord)…
+    const [x, y] = [150, -240]
+    const [rx, ry] = depl(x, y)
+    const [dS, tS] = flancBalaye(x, y, [0, -290, 300, -230], rx, ry)
+    expect(dS).toBeLessThan(0)
+    expect(tS).toBeGreaterThan(0)
+    expect(tS).toBeLessThan(1)
+    // …mais le dessus du coin, déplacé, y passe : il le couvre franchement
+    const tri = coinSommets({ minX: coin[0], minY: coin[1], maxX: coin[2], maxY: coin[3], p0: 1 })
+    const [dC, tC] = flancBalayeTriangle(x, y, tri, rx, ry)
+    expect(dC).toBeLessThan(-1)
+    expect(tC).toBe(1)
+    const zAutres = hauteurVueAutres([tS * H, tC * H], 0)
+    expect(devantTranche(zAutres, tS, H)).toBe(0)
+    // seul, rien ne le cache : sa tranche se peint
+    expect(devantTranche(hauteurVueAutres([tS * H], 0), tS, H)).toBe(1)
+  })
+
+  it('dans l’angle, le pied du mur enterré ne trace plus d’ombre sur les tranches voisines', () => {
+    const mur = [1240, -170, 1300, 355] // hydrophobe, la paroi verticale
+    const enterre = [1240, -810, 1300, -170] // neutre, sous le mur, contre le coin
+    const coin = [870, -230, 1240, -170] // hydrophobe, la pente qui monte au mur
+    // la bande de contact du mur enterré : juste à gauche de son flanc ouest
+    // (x = 1240) et juste au-dessus de son flanc nord (y = −170), au sol —
+    // c'est là qu'il traçait ses deux arêtes
+    for (const [x, y] of [
+      [1238, -185],
+      [1238, -200],
+      [1255, -168],
+      [1270, -167],
+    ]) {
+      expect(zBoite(x, y, enterre)).toBeLessThan(0) // hors de son pied
+      const z = [zBoite(x, y, mur), zCoin(x, y, coin, 1), zBoite(x, y, enterre)]
+      // une tranche voisine se dresse devant ce sol : il n'est pas vu
+      expect(hauteurVueAutres(z, 2)).toBeGreaterThanOrEqual(0)
+    }
+  })
+
+  it('le shader : la tranche des pièces regarde la hauteur vue des autres', () => {
+    expect(RELIEF_PAROIS_GLSL).toContain('float devantTranche(float zAutres, float ht, float h) {\n  return step(zAutres - 0.5, ht * h);')
+    expect(composeFs).toMatch(/float zAutres = bi == iVis \? zVis2 : zVis;/)
+    // la chaudière, le surchauffeur et la conduite : leurs trois tranches
+    for (const sorte of [0, 1, 2]) {
+      expect(composeFs).toMatch(
+        new RegExp(`vec2 fp = flancPieces\\(${sorte}, [^;]*;\\s*fp\\.x \\*= devantTranche\\(zAutres, fp\\.y, hauteurBoite\\(bi\\)\\);`),
+      )
+    }
+  })
+
+  it('le shader : ce qui se pose au sol se tait sous un autre solide dressé', () => {
+    expect(composeFs).toMatch(/float solVu = uRelief > 0\.0 \? 1\.0 - step\(0\.0, zAutres\) : 1\.0;/)
+    // l'ombre de contact et l'ombre courte des boîtes
+    expect(composeFs).toMatch(/float sol = step\(0\.0, d\) \* libre \* \(1\.0 - solPropre\) \* solVu;/)
+    // le sol des pièces : pied, halo, sol chauffé ou givré
+    expect(occurrencesDans(composeFs, 'float surSol = (iCouv == bi || dCouv > 0.0) ? solVu : 0.0;')).toHaveLength(3)
   })
 })
