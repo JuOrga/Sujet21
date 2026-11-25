@@ -5,6 +5,7 @@
 
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { ecritDocument, litDocument } from './_magasin.js'
+import { exigeConcepteur } from './_cle.js'
 
 const PREFIX = 'presets/'
 const MAX_PRESETS = 200
@@ -66,6 +67,8 @@ async function writeAll(library: Library): Promise<void> {
 
 export default async function handler(req: VercelRequest, res: VercelResponse): Promise<void> {
   res.setHeader('Cache-Control', 'no-store')
+  // écrire ici change ce que tout le monde joue : la clé concepteur (_cle.ts)
+  if (!exigeConcepteur(req, res)) return
   try {
     if (req.method === 'GET') {
       res.status(200).json(await readAll())

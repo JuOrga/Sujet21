@@ -15,3 +15,6 @@ jobs:
       - uses: actions/checkout@v4
       - name: Semer la bibliothèque
         run: node ops/seed-levels.mjs
+        # l'API refuse toute écriture sans clé concepteur (api/_cle.ts)
+        env:
+          CLE_CONCEPTEUR: ${{ secrets.CLE_CONCEPTEUR }}

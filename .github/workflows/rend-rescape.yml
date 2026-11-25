@@ -22,3 +22,6 @@ jobs:
       - uses: actions/checkout@v4
       - name: Rendre le rescapé
         run: CONFIRME=oui node ops/rend-rescape.mjs
+        # l'API refuse toute écriture sans clé concepteur (api/_cle.ts)
+        env:
+          CLE_CONCEPTEUR: ${{ secrets.CLE_CONCEPTEUR }}
