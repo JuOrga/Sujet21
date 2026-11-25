@@ -5605,6 +5605,40 @@ function rendPartie(): void {
   camera.manualPan = v.cam.manualPan
 }
 
+// ---- LES ESCAPADES DE COMMUNAUTÉ : l'éditeur du joueur, une création jouée --
+// Elles passent par les mêmes chemins que les essais du concepteur (l'éditeur,
+// startTest), qui supposent une partie en cours : au retour, la fiche se
+// croyait en PAUSE (REPRENDRE, RECOMMENCER, QUITTER) et la salle essayée —
+// ou celle de l'expédition — restait figée derrière elle, ses pancartes
+// comprises (le concepteur, 25/11). On retient donc à l'aller s'il y avait
+// une partie, et on rend au retour la fiche exactement telle qu'elle était :
+// sans partie, la cuve de l'accueil qui vit, comme au chargement.
+let partieAvantCommunaute: boolean | null = null
+/** À l'aller (éditeur du joueur, création jouée) : la première fois
+ *  seulement — un ESSAYER dans l'éditeur ne doit pas l'écraser. */
+function partCommunaute(): void {
+  if (partieAvantCommunaute === null) partieAvantCommunaute = hasPlayed
+}
+/** Au retour : la fiche d'avant l'escapade. */
+function reviensDeCommunaute(): void {
+  const avant = partieAvantCommunaute ?? hasPlayed
+  partieAvantCommunaute = null
+  fromEditor = false
+  testLevel = null
+  hasPlayed = avant
+  if (!avant) {
+    // comme quitteAuMenu : la cuve de l'accueil, vivante, derrière la fiche
+    document.body.classList.remove('playing')
+    input.paused = false
+    homeRestartBtn.hidden = true
+  }
+  // restart() AVANT openHome() : avec une partie, la fiche la range de côté
+  // et montre la cuve ; sans partie, restart() pose la cuve lui-même
+  restart()
+  majBoutonsRun()
+  openHome()
+}
+
 function openHome(): void {
   document.body.classList.remove('playing')
   appelOeil()
@@ -5619,6 +5653,9 @@ function openHome(): void {
 // LE BOUTON PRINCIPAL : il n'y a qu'UNE descente et qu'une porte. Reprendre
 // celle qui est sauvée, ou rejoindre le module — c'est son sas qui lance.
 startBtn.addEventListener('click', () => {
+  // une VRAIE partie commence (pas la reprise d'une création en pause) :
+  // l'escapade de COMMUNAUTÉ retenue n'a plus cours
+  if (testLevel === null) partieAvantCommunaute = null
   voieDuJourForcee = false // le réglage du plan décide, pas un bouton
   closeHome()
   majVoieHud()
@@ -6325,8 +6362,18 @@ const chargeEditeur = chargeUneFois('l’éditeur de tableaux', async () => {
         ed.close()
         fromEditor = false
         testLevel = null
-        openHome()
+        // le joueur rentre de COMMUNAUTÉ : la fiche telle qu'il l'avait laissée
+        if (ed.profil === 'joueur') {
+          reviensDeCommunaute()
+          return
+        }
+        // L'ORDRE COMPTE : restart() repose la salle, PUIS la fiche range la
+        // partie de côté et montre la cuve (montreCuvePause). Dans l'autre
+        // ordre, restart() effaçait la cuve tout juste posée (rendPartie) et
+        // la salle restait figée derrière la fiche, pancartes comprises (le
+        // concepteur, 25/11 : « l'accueil est tout bugué »)
         restart()
+        openHome()
       },
       operator: () => records.operator(),
       // les menus déroulants de l'éditeur : les VRAIES cinématiques et séquences
@@ -8644,6 +8691,7 @@ async function openEditor(profil?: 'concepteur' | 'joueur'): Promise<LevelEditor
   const ed = await chargeEditeur()
   if (!ed) return null
   if (profil) ed.setProfil(profil)
+  if (ed.profil === 'joueur') partCommunaute()
   overlay.classList.remove('visible')
   if (mbFinOuverte()) fermeMiseEnBonbonne() // la scène de fin remplace l'overlay
   document.body.classList.remove('playing')
@@ -9017,6 +9065,7 @@ const creationsEl = document.getElementById('creations') as HTMLDivElement
 const ecranCreations = new EcranCreations(creationsEl, {
   jouer: (lvl, c) => {
     ecranCreations.close()
+    partCommunaute()
     startTest([lvl])
     // startTest peut rendre la main à la fiche (nom d'opérateur manquant) :
     // le retour ne s'arme que si la partie a vraiment démarré
@@ -9024,14 +9073,12 @@ const ecranCreations = new EcranCreations(creationsEl, {
   },
   creer: () => {
     ecranCreations.close()
-    hasPlayed = true
     void openEditor('joueur')
   },
   // une salle publiée depuis ce poste se rouvre dans l'atelier : sa copie
   // de MES SALLES, sinon la version en ligne
   modifier: (lvl, id) => {
     ecranCreations.close()
-    hasPlayed = true
     void openEditor('joueur').then((ed) => ed?.ouvreCreation(id, lvl))
   },
   fermer: () => ecranCreations.close(),
@@ -9065,7 +9112,6 @@ async function recordDepuisCreation(
 
 // L'ATELIER DU JOUEUR : l'éditeur, au profil joueur (editor/profilJoueur.ts)
 document.getElementById('home-atelier')?.addEventListener('click', () => {
-  hasPlayed = true
   void openEditor('joueur')
 })
 // LE LIEN D'INVITATION : « ?multi=CODE » mène droit dans la partie —
@@ -19737,8 +19783,9 @@ function resetAction(): void {
       }
       if (fromCreation) {
         // la salle venait de l'écran CRÉATIONS : on y retourne, records relus
+        // — et la fiche dessous redevient celle d'avant la partie
         fromCreation = null
-        openHome() // fige la partie, comme le retour au menu
+        reviensDeCommunaute()
         ecranCreations.open()
         return
       }

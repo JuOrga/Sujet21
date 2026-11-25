@@ -102,6 +102,6 @@ describe('le câblage de l’écran (main.ts, index.html)', () => {
 
   it('la sortie atteinte dépose le record ; le retour ramène à l’écran', () => {
     expect(MAIN).toMatch(/if \(fromCreation && testLevel\) \{[\s\S]{0,200}recordDepuisCreation\(fromCreation, surplus, run\.tableauTime\)/)
-    expect(MAIN).toMatch(/if \(fromCreation\) \{[\s\S]{0,200}ecranCreations\.open\(\)/)
+    expect(MAIN).toMatch(/if \(fromCreation\) \{[\s\S]{0,400}ecranCreations\.open\(\)/)
   })
 })
