@@ -98,8 +98,8 @@ describe('les valeurs des lieux', () => {
     })
   })
 
-  it('laisse les sauvegardes au premier lancement, et seulement elles', () => {
-    expect(LIEUX_PREMIER_LANCEMENT).toEqual(['home-sauvegardes'])
+  it('au premier lancement : les sauvegardes, et COMMUNAUTÉ (qui n’attend rien de la partie solo)', () => {
+    expect(LIEUX_PREMIER_LANCEMENT).toEqual(['home-communaute', 'home-sauvegardes'])
   })
 })
 
