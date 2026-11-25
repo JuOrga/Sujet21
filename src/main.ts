@@ -356,7 +356,16 @@ import { chargePiecesModule2d, peintCelluleSeule, peintModule2d, type Pieces } f
 import { MAX_BOXES, Renderer } from './render/renderer'
 import { HAUTEUR_BLOCS } from './render/hauteurs'
 import { fractionSommet, hauteurAppui, pointDuSommet, pointPose } from './render/reliefParois'
-import { PORTE_BLINDEE_URL, decalsDesPortes, dessinePorte, leveeSuivante, type Occultant } from './render/porteBlindee'
+import {
+  PORTE_BLINDEE_URL,
+  decalsDesPortes,
+  dessinePorte,
+  effaceVolumes,
+  fermeCalque,
+  leveeSuivante,
+  ouvreCalque,
+  type Occultant,
+} from './render/porteBlindee'
 import { remetReglagesParDefaut } from './game/remiseReglages'
 import { Motes, VIE_STRIDE, remplitVie, toucheLeCorps } from './render/vie'
 import { panDepuis } from './game/ouie'
@@ -398,6 +407,7 @@ import { EcranCodex } from './game/ecranCodex'
 import { EcranMarchand } from './game/ecranMarchand'
 import { EcranAvaries } from './game/ecranAvaries'
 import {
+  absorbe as absorbeLumiere,
   traceLaser,
   creerEtatRecepteurs,
   avancerRecepteurs,
@@ -9808,7 +9818,8 @@ function drawMecanismes(vw: number, vh: number, dpr: number): void {
     fxCanvas.width = Math.round(vw * dprC)
     fxCanvas.height = Math.round(vh * dprC)
   }
-  const g = fxCtx
+  // (variable : le temps des faisceaux, `g` est leur calque — voir plus bas)
+  let g = fxCtx
   g.setTransform(dprC, 0, 0, dprC, 0, 0)
   g.clearRect(0, 0, vw, vh)
   if (!actif || !document.body.classList.contains('playing')) return
@@ -9852,14 +9863,22 @@ function drawMecanismes(vw: number, vh: number, dpr: number): void {
     const [sx, sy] = pointDuSommet(q.sx, q.sy, vw * 0.5, vh * 0.5, f)
     return { sx, sy }
   }
-  const occultantsPres = (r: { minX: number; minY: number; maxX: number; maxY: number }): Occultant[] => {
+  // `garde` : quels solides comptent (les faisceaux ne sont cachés que par
+  // ce qui arrête la lumière)
+  const occultantsPres = (
+    r: { minX: number; minY: number; maxX: number; maxY: number },
+    garde: (box: ObstacleBox) => boolean = () => true,
+  ): Occultant[] => {
     const d = Math.hypot((r.minX + r.maxX) / 2 - camera.x, (r.minY + r.maxY) / 2 - camera.y)
     const portee = Math.hypot(r.maxX - r.minX, r.maxY - r.minY) / 2
     const marge = ((d + portee) * fMurHaut) / Math.max(1e-6, 1 - fMurHaut) + 8
-    return renderer.solidesPres(r.minX, r.minY, r.maxX, r.maxY, marge).map(({ box, hauteur }) => ({
-      contours: contoursOccultant(box),
-      hauteur,
-    }))
+    return renderer
+      .solidesPres(r.minX, r.minY, r.maxX, r.maxY, marge)
+      .filter(({ box }) => garde(box))
+      .map(({ box, hauteur }) => ({
+        contours: contoursOccultant(box),
+        hauteur,
+      }))
   }
   const fractionAppui = (r: { minX: number; minY: number; maxX: number; maxY: number }): number => {
     if (fMurHaut <= 0) return 0 // relief éteint : ni sonde ni calcul
@@ -10807,6 +10826,60 @@ function drawMecanismes(vw: number, vh: number, dpr: number): void {
     }
   })
 
+  // LES FAISCEAUX PASSENT SOUS LE DESSUS DES MURS. Ils se peignent dans la
+  // toile 2D, par-dessus le rendu WebGL : relief allumé, le sommet d'un mur
+  // fuit le centre de l'écran et recouvre le sol au-delà de son pied — mais
+  // le rayon, tracé au sol, se dessinait PAR-DESSUS ce dessus et semblait
+  // traverser la paroi (le concepteur, 25/11 : « on dirait que les lasers
+  // traversent les parois avec l'effet de profondeur » — le rayon du haut
+  // longeait une rangée de cloisons, celui de droite coupait un mur en
+  // biais). Même remède que les portes (render/porteBlindee.ts) : rayons,
+  // sursaut et ionisation se peignent sur un calque, le volume projeté des
+  // solides voisins en est effacé, puis le calque rejoint la toile. Seuls
+  // cachent les solides qui ARRÊTENT la lumière (laser.ts : absorbe) : à
+  // travers une grille ou un sas, le rayon passe, on doit le voir passer.
+  // Relief éteint, rien ne change : pas de calque, pas de sonde.
+  const fxG = g
+  let calqueFaisceaux: {
+    c: CanvasRenderingContext2D
+    rect: { x0: number; y0: number; x1: number; y1: number }
+    occ: Occultant[]
+  } | null = null
+  if (fMurHaut > 0) {
+    let minX = Infinity
+    let minY = Infinity
+    let maxX = -Infinity
+    let maxY = -Infinity
+    const englobe = (pts: readonly { x: number; y: number }[]): void => {
+      for (const q of pts) {
+        minX = Math.min(minX, q.x)
+        minY = Math.min(minY, q.y)
+        maxX = Math.max(maxX, q.x)
+        maxY = Math.max(maxY, q.y)
+      }
+    }
+    for (const t of laserEtat.vues) englobe(t.points)
+    if (faisceauChoix >= 1) for (const im of laserEtat.impacts) englobe(im.points)
+    for (const io of laserEtat.ionisations) englobe(io.points)
+    if (minX <= maxX) {
+      const rMonde = { minX, minY, maxX, maxY }
+      const occ = occultantsPres(rMonde, absorbeLumiere)
+      if (occ.length > 0) {
+        // le plus large de ce qui se peint autour d'un rayon : l'anneau
+        // d'ionisation (84·z) et son trait
+        const marge = 110 * z
+        const a = S(minX, maxY)
+        const b = S(maxX, minY)
+        const rect = { x0: a.sx - marge, y0: a.sy - marge, x1: b.sx + marge, y1: b.sy + marge }
+        const c = ouvreCalque(fxG, rect)
+        if (c) {
+          calqueFaisceaux = { c, rect, occ }
+          g = c
+        }
+      }
+    }
+  }
+
   // faisceaux : halo large + cœur fin, en fusion additive
   g.globalCompositeOperation = 'lighter'
   for (const t of laserEtat.vues) {
@@ -11114,6 +11187,15 @@ function drawMecanismes(vw: number, vh: number, dpr: number): void {
       g.arc(pe.sx, pe.sy, Math.max(3, (14 + 70 * k) * z), 0, Math.PI * 2)
       g.stroke()
     }
+  }
+
+  // le calque des faisceaux rejoint la toile, les murs effacés — en fusion
+  // additive, comme s'ils y avaient été peints
+  if (calqueFaisceaux) {
+    const { c, rect, occ } = calqueFaisceaux
+    g = fxG
+    g.globalCompositeOperation = 'lighter'
+    fermeCalque(g, c, rect, (m) => effaceVolumes(m, occ, projetteRelief))
   }
 
   // ② LA CAPTURE, et ③ LE CUMUL : le champ prend l'arc. Une CRÊTE remonte
