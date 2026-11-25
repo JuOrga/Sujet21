@@ -360,6 +360,7 @@ import { PORTE_BLINDEE_URL, decalsDesPortes, dessinePorte, leveeSuivante, type O
 import { remetReglagesParDefaut } from './game/remiseReglages'
 import { Motes, VIE_STRIDE, remplitVie, toucheLeCorps } from './render/vie'
 import { panDepuis } from './game/ouie'
+import { corpsBuParLeSas } from './game/sortieSas'
 import { dangerDevant, directionDeMarche, saccade, type Saccade } from './game/regard'
 import { AGONIE_DUREE, agonie, clignement, intervalleClignement } from './game/paupiere'
 import { FixedLoop } from './game/loop'
@@ -21672,8 +21673,21 @@ function corpsImage(now: number): boolean {
   // MAIS seulement celle qui naît de l'emprise : le corps y était il y a
   // moins que le délai de grâce (+ une marge). Dix pour cent bus puis le
   // reste perdu loin du sas, sur un danger, reste une défaite (revue #453).
+  // LE CORPS BU JUSQU'À LA DERNIÈRE GOUTTE (game/sortieSas.ts) : sous la
+  // dernière impulsion, le corps à sec qui dérive dans le sas y disparaît —
+  // mais les gouttes semées ailleurs fermaient « tout bu », et ce qu'il
+  // restait ne suffisait pas à CONTINUER. Le sursis tombait : DÉFAITE, la
+  // salle franchie. Disparu dans l'emprise, il est rattrapé comme ci-dessus.
+  const corpsBu = corpsBuParLeSas({
+    swallowed: sim.swallowed,
+    playerCount: sim.playerCount,
+    empriseRecente:
+      endgame.empriseJusqua >= 0 && run.tableauTime - endgame.empriseJusqua <= 0.5,
+    videPris: vide.prise,
+  })
   const sortieRattrapee =
     endgame.rattrapee ||
+    corpsBu ||
     (aspireAssez &&
       sim.dispersed &&
       endgame.empriseJusqua >= 0 &&
