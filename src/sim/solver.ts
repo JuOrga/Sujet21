@@ -391,13 +391,19 @@ export class FluidSim {
   froidFrac = 0
 
   // Impulsions vapeur restantes. La RÉSERVE (dashBudgetMax) est celle du
-  // tableau : pleine au chargement. Se vaporiser DE SON PROPRE CHEF refait
-  // le plein — mais une transformation SUBIE (chaudière, zone qui impose la
-  // vapeur) ne rend rien, sinon la salle serait une ferme à dashs. Le
-  // SURCHAUFFEUR frôlé en gaz en rend UNE, une seule fois par appareil,
-  // sans jamais dépasser la réserve.
+  // tableau : pleine au chargement. La PREMIÈRE transformation en vapeur du
+  // tableau refait le plein, quelle qu'en soit la cause (touche G, bouton
+  // VAPEUR, chaudière, zone forcée) ; les suivantes ne rendent RIEN. Avant,
+  // chaque bascule décidée rechargeait : aller-retour eau ↔ vapeur = réserve
+  // infinie, et le surchauffeur ne servait plus à rien. Désormais seul le
+  // SURCHAUFFEUR frôlé en gaz recharge — UNE impulsion, une seule fois par
+  // appareil, sans jamais dépasser la réserve.
   dashBudget = 0
   dashBudgetMax = 3
+  // La recharge de la première transformation est-elle déjà donnée ? Vit
+  // avec la simulation : un tableau (re)chargé repart d'une sim neuve, donc
+  // la règle se remet à zéro à chaque tableau sans rien d'autre à faire.
+  premiereVapeurRendue = false
   // Bonus de rendement de recondensation (instrument « aimant à rosée ») —
   // posé par le jeu au début de la run, remis à zéro avec la simulation
   recondBonus = 0
@@ -1745,16 +1751,18 @@ export class FluidSim {
   // à grande vitesse dans TOUTES les directions. C'est la même matière que
   // la propulsion : récupérable, elle perlera aussi en rosée au froid. La
   // quantité de mouvement d'ensemble est conservée exactement.
-  // `rendDashs` : une bascule DÉCIDÉE (touche G, bouton VAPEUR) refait le
-  // plein de la réserve — elle se paie en volume, c'est son prix. Une
-  // transformation SUBIE — chaudière, zone qui impose la vapeur — ne rend
-  // RIEN : sinon la salle vaudrait ferme à dashs (aller-retour devant la
-  // chaudière = réserve infinie, sans rien décider).
+  // Les dashs : seule la PREMIÈRE transformation du tableau refait le plein,
+  // décidée ou subie. Les suivantes se paient en volume et ne rendent rien —
+  // sinon l'aller-retour eau ↔ vapeur (ou devant la chaudière) vaudrait
+  // réserve infinie. Recharger ensuite, c'est le rôle du surchauffeur.
   /** Le corps NAÎT nuage. Un tableau qui commence en vapeur n'a pas à
    *  attendre la vaporisation progressive : sans cela, le compteur annonce
    *  ses dashs pendant que le corps est encore liquide — et aucun ne part
    *  (le dash exige de la vapeur). L'état est la condition de départ. */
   naitEnVapeur(): void {
+    // naître nuage AVEC sa réserve pleine, c'est déjà la première vapeur du
+    // tableau : une bascule G plus tard ne doit pas la rendre une 2e fois
+    this.premiereVapeurRendue = true
     for (let i = 0; i < this.count; i++) {
       if (this.kind[i] !== KIND_PLAYER) continue
       this.vapor[i] = 1
@@ -1765,10 +1773,13 @@ export class FluidSim {
     }
   }
 
-  transfoVapeur(rendDashs = true): void {
+  transfoVapeur(): void {
     if (this.dispersed) return
     const p = this.params
-    if (rendDashs) this.dashBudget = this.dashBudgetMax
+    if (!this.premiereVapeurRendue) {
+      this.premiereVapeurRendue = true
+      this.dashBudget = this.dashBudgetMax
+    }
     this.updatePlayerStats()
     const toll = Math.floor(
       this.playerCount * p.vaporTollFrac * this.vaporTollFactor,
