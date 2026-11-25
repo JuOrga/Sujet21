@@ -8,6 +8,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { list } from '@vercel/blob'
 import { ecritDocument, litDocument } from './_magasin.js'
+import { exigeConcepteur } from './_cle.js'
 import { provenanceCode } from './_provenance.js'
 import { refusDeBudget } from './_budget.js'
 
@@ -61,6 +62,8 @@ async function writeLib(lib: Library): Promise<void> {
 
 export default async function handler(req: VercelRequest, res: VercelResponse): Promise<void> {
   res.setHeader('Cache-Control', 'no-store')
+  // écrire ici change ce que tout le monde joue : la clé concepteur (_cle.ts)
+  if (!exigeConcepteur(req, res)) return
   try {
     if (req.method === 'GET') {
       // ?debug=1 : l'état du magasin, blob par blob — chemin, taille, date,

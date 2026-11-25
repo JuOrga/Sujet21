@@ -47,7 +47,7 @@ if (JSON.stringify(entree.level) === JSON.stringify(cible)) {
 
 const r = await fetch(API, {
   method: 'POST',
-  headers: { 'Content-Type': 'application/json' },
+  headers: { 'Content-Type': 'application/json', 'x-cle-concepteur': process.env.CLE_CONCEPTEUR ?? '' },
   body: JSON.stringify({ level: cible, id: entree.id, auteur: 'Claude' }),
 })
 if (!r.ok) throw new Error(`POST ${entree.id} → ${r.status}`)
