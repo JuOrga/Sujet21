@@ -166,8 +166,72 @@ export function dansPolygone(pts: readonly Point[], x: number, y: number): boole
   return dedans
 }
 
-// le calque où la porte se peint avant que les murs n'y soient effacés
+// le calque où la porte (ou un faisceau) se peint avant que les murs n'y
+// soient effacés
 let calque: HTMLCanvasElement | null = null
+
+/** Le rectangle écran (unités de `g`) en pixels de la toile, borné à elle. */
+function rectPixels(
+  g: CanvasRenderingContext2D,
+  rect: { x0: number; y0: number; x1: number; y1: number },
+): { bx0: number; by0: number; bx1: number; by1: number } {
+  const m = g.getTransform()
+  // (la toile des effets n'a qu'une échelle et une translation)
+  return {
+    bx0: Math.max(0, Math.floor(m.a * rect.x0 + m.e) - 2),
+    by0: Math.max(0, Math.floor(m.d * rect.y0 + m.f) - 2),
+    bx1: Math.min(g.canvas.width, Math.ceil(m.a * rect.x1 + m.e) + 2),
+    by1: Math.min(g.canvas.height, Math.ceil(m.d * rect.y1 + m.f) + 2),
+  }
+}
+
+/** OUVRE le calque : vidé dans le rectangle, à la transformation de `g`.
+ *  Ce qu'on y peint ensuite n'atteint `g` qu'à `fermeCalque`. Rend null s'il
+ *  n'y a rien à peindre (hors écran, ou pas de document). Les deux moitiés
+ *  de `surCalque` sont séparées pour le faisceau laser (main.ts) : son dessin
+ *  est long et passe par des aides qui peignent sur la toile du moment. */
+export function ouvreCalque(
+  g: CanvasRenderingContext2D,
+  rect: { x0: number; y0: number; x1: number; y1: number },
+): CanvasRenderingContext2D | null {
+  if (typeof document === 'undefined') return null
+  const W = g.canvas.width
+  const H = g.canvas.height
+  if (!calque) calque = document.createElement('canvas')
+  if (calque.width !== W || calque.height !== H) {
+    calque.width = W
+    calque.height = H
+  }
+  const c = calque.getContext('2d')
+  if (!c) return null
+  const { bx0, by0, bx1, by1 } = rectPixels(g, rect)
+  if (bx1 <= bx0 || by1 <= by0) return null
+  c.setTransform(1, 0, 0, 1, 0, 0)
+  c.clearRect(bx0, by0, bx1 - bx0, by1 - by0)
+  c.setTransform(g.getTransform())
+  c.globalCompositeOperation = 'source-over'
+  return c
+}
+
+/** FERME le calque : en efface ce que `masque` couvre, et pose le résultat
+ *  sur `g` (avec le mode de composition de `g` : le faisceau reste additif). */
+export function fermeCalque(
+  g: CanvasRenderingContext2D,
+  c: CanvasRenderingContext2D,
+  rect: { x0: number; y0: number; x1: number; y1: number },
+  masque: (c: CanvasRenderingContext2D) => void,
+): void {
+  const { bx0, by0, bx1, by1 } = rectPixels(g, rect)
+  if (bx1 <= bx0 || by1 <= by0) return
+  c.save()
+  c.globalCompositeOperation = 'destination-out'
+  masque(c)
+  c.restore()
+  g.save()
+  g.setTransform(1, 0, 0, 1, 0, 0)
+  g.drawImage(c.canvas, bx0, by0, bx1 - bx0, by1 - by0, bx0, by0, bx1 - bx0, by1 - by0)
+  g.restore()
+}
 
 /** Peint `dessine` sur un calque, en efface ce que `masque` couvre, et pose
  *  le résultat sur `g` — dans le rectangle écran (unités de `g`) donné. */
@@ -177,42 +241,16 @@ function surCalque(
   dessine: (c: CanvasRenderingContext2D) => void,
   masque: (c: CanvasRenderingContext2D) => void,
 ): void {
-  if (typeof document === 'undefined') return
-  const W = g.canvas.width
-  const H = g.canvas.height
-  if (!calque) calque = document.createElement('canvas')
-  if (calque.width !== W || calque.height !== H) {
-    calque.width = W
-    calque.height = H
-  }
-  const c = calque.getContext('2d')
+  const c = ouvreCalque(g, rect)
   if (!c) return
-  const m = g.getTransform()
-  // le rectangle en pixels de la toile (la toile des effets n'a qu'une
-  // échelle et une translation)
-  const bx0 = Math.max(0, Math.floor(m.a * rect.x0 + m.e) - 2)
-  const by0 = Math.max(0, Math.floor(m.d * rect.y0 + m.f) - 2)
-  const bx1 = Math.min(W, Math.ceil(m.a * rect.x1 + m.e) + 2)
-  const by1 = Math.min(H, Math.ceil(m.d * rect.y1 + m.f) + 2)
-  if (bx1 <= bx0 || by1 <= by0) return
-  c.setTransform(1, 0, 0, 1, 0, 0)
-  c.clearRect(bx0, by0, bx1 - bx0, by1 - by0)
-  c.setTransform(m)
   c.save()
   dessine(c)
   c.restore()
-  c.save()
-  c.globalCompositeOperation = 'destination-out'
-  masque(c)
-  c.restore()
-  g.save()
-  g.setTransform(1, 0, 0, 1, 0, 0)
-  g.drawImage(calque, bx0, by0, bx1 - bx0, by1 - by0, bx0, by0, bx1 - bx0, by1 - by0)
-  g.restore()
+  fermeCalque(g, c, rect, masque)
 }
 
 /** Efface le volume des occultants (rognés au demi-plan, s'il y en a un). */
-function effaceVolumes(
+export function effaceVolumes(
   c: CanvasRenderingContext2D,
   occ: readonly Occultant[],
   projette: Projette,
