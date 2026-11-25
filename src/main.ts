@@ -1017,8 +1017,8 @@ function createSim(level: LevelDef): FluidSim {
   appliqueMoteur(sim)
   // les dashs sont la RÉSERVE DU TABLEAU : N par écran (le tableau peut
   // fixer son propre nombre, sinon celui du banc), pleins dès le chargement.
-  // Changer d'état n'y touche jamais — la chaudière transforme, elle ne
-  // recharge pas — et seul un surchauffeur frôlé en rend un, plafonné au max.
+  // La première vapeur du tableau refait le plein ; ensuite, changer d'état
+  // n'y touche plus, et seul un surchauffeur frôlé en rend un, plafonné au max.
   sim.dashBudgetMax = level.dashBudget ?? params.gasDashBudget
   // Instruments embarqués : la buse calibrée agrandit la réserve d'un dash,
   // l'aimant à rosée bonifie la recondensation
@@ -20492,9 +20492,6 @@ let continuerVoulu = false
 // le passage auto à l'état gazeux (chaudière) : armé tant que le corps
 // n'a pas déjà déclenché — réarmé quand il ressort de l'aura
 let autoGazArme = true
-// la prochaine vaporisation est SUBIE (la chaudière vient de la provoquer) :
-// elle se paie comme les autres, mais ne rend pas les dashs
-let gazSubi = false
 // la zone forcée actuellement TENUE par le corps (déclenchée à 95 %,
 // relâchée sous 85 %) — l'état, lui, persiste à la sortie
 let zoneTenue: number | null = null
@@ -20982,26 +20979,22 @@ function corpsImage(now: number): boolean {
   if (level.minijeu?.type === 'palet' && paletEtat.enCours) sim.freezeIntent = true
   // La BASCULE en vapeur — G, chaudière à 95 %, zone forcée : toute cause —
   // se règle à l'instant du basculement : péage de 20 % du volume actif
-  // (gerbe de gouttes récupérables). Le compteur de dashs, lui, dépend de
-  // QUI a décidé : se vaporiser DE SON PROPRE CHEF (touche G, bouton
-  // VAPEUR) refait le plein de la réserve — le péage en est le prix ; une
-  // transformation SUBIE (chaudière à 95 %, zone qui impose la vapeur) ne
-  // rend rien, sinon la salle vaudrait ferme à dashs.
+  // (gerbe de gouttes récupérables). Le compteur de dashs, lui, n'est
+  // rempli que par la PREMIÈRE bascule du tableau, quelle qu'en soit la
+  // cause ; les suivantes ne rendent rien — seul le surchauffeur recharge
+  // (solver.ts, transfoVapeur).
   // Et un tableau qui COMMENCE en vapeur ne bascule pas : c'est son état de
   // départ. Ni péage, ni événement — le corps naît nuage, avec sa réserve
   // (createSim l'a remplie), sans qu'on lui prenne un cinquième de lui-même.
   if (input.gasIntent && !gasIntentAvant && !tableauDone && !input.paused) {
     // l'état de départ, c'est la PREMIÈRE prise de la zone, au tout début du
-    // tableau : une bascule décidée plus tard (touche G) se paie et rend ses
-    // dashs normalement, même dans un tableau né en vapeur
+    // tableau : une bascule décidée plus tard (touche G) se paie normalement,
+    // mais ne rend pas de dashs — naître nuage valait déjà la première vapeur
     const etatDeDepart =
       departEnVapeur && zoneActive === 'vapeur' && run.tableauTime < 3
     departEnVapeur = false
-    const subie = gazSubi || zoneActive === 'vapeur'
-    gazSubi = false
-    if (!etatDeDepart) sim.transfoVapeur(!subie)
+    if (!etatDeDepart) sim.transfoVapeur()
   }
-  if (!input.gasIntent) gazSubi = false // rien à consommer : la marque tombe
   gasIntentAvant = input.gasIntent
 
   sim.chill = chillNow() // le vaisseau refroidit : la physique suit
@@ -22880,7 +22873,6 @@ function corpsImage(now: number): boolean {
   ) {
     autoGazArme = false
     if (input.freezeIntent) input.toggleFreeze()
-    gazSubi = true // la salle décide à notre place : pas de plein de dashs
     input.toggleGas() // le même chemin que la touche G : sons et UI suivent
   }
 
