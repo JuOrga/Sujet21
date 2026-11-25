@@ -99,7 +99,7 @@ export const CODEX_EXPERIENCES: CodexDef[] = [
     icone: '🔥',
     titre: 'La chaudière vaporise',
     texte:
-      'Baigner presque entier dans l’aura d’une chaudière transforme le corps en vapeur. Cette transformation est SUBIE : elle ne rend pas les dashs — seule une vaporisation décidée (G) refait le plein de la réserve. La transformation offerte par la salle ne coûte rien.',
+      'Baigner presque entier dans l’aura d’une chaudière transforme le corps en vapeur. Seule la PREMIÈRE vapeur du tableau — chaudière, zone ou touche G, peu importe — refait le plein de la réserve ; les suivantes ne rendent rien, c’est le rôle des surchauffeurs. La transformation offerte par la salle ne coûte rien.',
     mat: MAT_CHAUD,
     etat: 0,
   },

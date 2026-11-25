@@ -135,7 +135,7 @@ describe('FluidSim — la vapeur : se déplacer en gaz (tableau 3)', () => {
     expect(sim.playerCount).toBeGreaterThan(40)
   })
 
-  it('la TRANSFORMATION en vapeur : péage de 20 % en gouttes — et le plein de dashs si elle est DÉCIDÉE', () => {
+  it('la PREMIÈRE transformation en vapeur : péage de 20 % en gouttes — et le plein de dashs', () => {
     const sim = makeSim()
     sim.setLevel([], [])
     sim.spawnDisc(0, 0, 300, KIND_PLAYER)
@@ -144,7 +144,7 @@ describe('FluidSim — la vapeur : se déplacer en gaz (tableau 3)', () => {
     sim.dashBudget = 1 // deux dashs déjà dépensés
     const before = sim.playerCount
     const avant = sim.totalMomentum()
-    sim.transfoVapeur() // se vaporiser DE SON PROPRE CHEF
+    sim.transfoVapeur() // la première vapeur du tableau
     // 20 % du corps part en gouttes LIBRES, éjectées en étoile…
     expect(sim.playerCount).toBe(before - Math.floor(before * sim.params.vaporTollFrac))
     // …récupérables : elles existent toujours, sous délai de réabsorption
@@ -157,7 +157,7 @@ describe('FluidSim — la vapeur : se déplacer en gaz (tableau 3)', () => {
     }
     expect(libres).toBe(before - sim.playerCount)
     expect(rapides).toBe(libres) // la gerbe part à grande vitesse
-    // la bascule décidée refait le PLEIN (jamais au-delà), et la quantité
+    // la première bascule refait le PLEIN (jamais au-delà), et la quantité
     // de mouvement est conservée
     expect(sim.dashBudget).toBe(3)
     const apres = sim.totalMomentum()
@@ -165,20 +165,36 @@ describe('FluidSim — la vapeur : se déplacer en gaz (tableau 3)', () => {
     expect(Math.abs(apres.py - avant.py)).toBeLessThan(5)
   })
 
-  it('une transformation SUBIE (chaudière, zone) se paie mais ne rend RIEN', () => {
+  it('les transformations SUIVANTES (touche G, chaudière, zone) se paient mais ne rendent RIEN', () => {
     const sim = makeSim()
     sim.setLevel([], [])
     sim.spawnDisc(0, 0, 300, KIND_PLAYER)
     sim.relabel()
     sim.dashBudgetMax = 3
-    sim.dashBudget = 1
+    sim.dashBudget = 0
+    sim.transfoVapeur() // la première vapeur du tableau : le plein
+    expect(sim.dashBudget).toBe(3)
+    sim.dashBudget = 1 // deux dashs dépensés depuis
     const before = sim.playerCount
-    sim.transfoVapeur(false) // la salle décide à notre place
+    sim.transfoVapeur() // retour à l'eau, puis vapeur à nouveau
     expect(sim.playerCount).toBeLessThan(before) // le péage, lui, reste dû
     expect(sim.dashBudget).toBe(1) // …et le compteur ne bouge pas
-    // s'y reprendre à dix fois devant la chaudière n'y change rien : la
-    // ferme à dashs est fermée
-    for (let k = 0; k < 3; k++) sim.transfoVapeur(false)
+    // l'aller-retour eau ↔ vapeur répété n'y change rien : la ferme à dashs
+    // est fermée, seul le surchauffeur recharge
+    for (let k = 0; k < 3; k++) sim.transfoVapeur()
+    expect(sim.dashBudget).toBe(1)
+  })
+
+  it('un tableau NÉ en vapeur a déjà eu sa première vapeur : une bascule G ensuite ne recharge pas', () => {
+    const sim = makeSim()
+    sim.setLevel([], [])
+    sim.spawnDisc(0, 0, 300, KIND_PLAYER)
+    sim.relabel()
+    sim.dashBudgetMax = 3
+    sim.dashBudget = 3 // la réserve du chargement
+    sim.naitEnVapeur()
+    sim.dashBudget = 1
+    sim.transfoVapeur()
     expect(sim.dashBudget).toBe(1)
   })
 

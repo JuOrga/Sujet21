@@ -70,7 +70,7 @@ export interface SimParams {
   gasDashSpeed: number // vitesse du dash À PLEINE PUISSANCE (u/s)
   gasDashRange: number // distance (u) du pointeur au corps où la puissance atteint 1
   gasAimSlow: number // facteur de temps pendant la visée (0,06 = 16× plus lent)
-  gasDashBudget: number // dashs rendus à CHAQUE transformation en vapeur (l'éditeur peut le régler par tableau)
+  gasDashBudget: number // réserve de dashs, remplie à la PREMIÈRE vapeur du tableau (l'éditeur peut le régler par tableau)
   // LE SOUFFLE DU DASH : un dash de vapeur n'est plus gratuit en matière. La
   // queue du nuage est CHASSÉE vers l'arrière (troisième loi : on avance
   // parce qu'on rejette). Ce souffle ne vous appartient plus — il se

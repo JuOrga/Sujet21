@@ -681,7 +681,7 @@ export function createBench(
     'Facteur de temps pendant la visée du dash : 0,06 = seize fois plus lent. Le monde continue d’avancer — rien n’est figé, on vise dans un monde au ralenti.',
   )
   describe(
-    fGas.addBinding(params, 'gasDashBudget', { min: 0, max: 9, step: 1, label: 'dashs / transformation' }),
+    fGas.addBinding(params, 'gasDashBudget', { min: 0, max: 9, step: 1, label: 'dashs / tableau' }),
     'Dashs rendus à CHAQUE transformation en vapeur (règle d’or) : se retransformer les rend à nouveau — mais repaie le péage de vaporisation. Chaque tableau peut fixer le sien dans l’éditeur ; un surchauffeur frôlé en rend un.',
   )
   describe(
