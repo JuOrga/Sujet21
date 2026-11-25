@@ -13,6 +13,7 @@
 // prêtés par des crochets.
 
 import { reperesTirABlanc, type RangTirABlanc } from '../game/tirABlanc'
+import type { EtatCle } from '../game/cleConcepteur'
 
 export interface SectionRegie {
   id: string
@@ -40,6 +41,13 @@ export interface HooksRegie {
   sections: SectionRegie[]
   statuts(): Promise<Record<string, StatutPartage>>
   tir(n: number): RangTirABlanc[]
+  /** LA CLÉ CONCEPTEUR de ce poste (game/cleConcepteur.ts) : sans elle,
+   *  le serveur refuse toute publication. */
+  cle: {
+    posee(): boolean
+    range(cle: string): void
+    verifie(): Promise<EtatCle>
+  }
   fermer(): void
 }
 
@@ -51,6 +59,8 @@ export class Regie {
   private statuts: Record<string, StatutPartage> | null = null
   private lecture = false
   private combien = 12
+  private etatCle: EtatCle | null = null
+  private verifCle = false
 
   constructor(
     private host: HTMLElement,
@@ -103,6 +113,7 @@ export class Regie {
     const fixes: [string, string, string][] = [
       ['ensemble', '◈', "VUE D'ENSEMBLE"],
       ['tir', '▶', 'TIR À BLANC'],
+      ['cle', '⚿', 'CLÉ CONCEPTEUR'],
     ]
     rail.innerHTML =
       fixes.map(([id, ic, nom]) => `<button type="button" class="rg-item${id === this.courante ? ' on' : ''}" data-section="${id}"><i>${ic}</i><span>${nom}</span></button>`).join('') +
@@ -118,6 +129,7 @@ export class Regie {
         .join('')
     if (this.courante === 'ensemble') this.peintEnsemble()
     else if (this.courante === 'tir') this.peintTir()
+    else if (this.courante === 'cle') this.peintCle()
     else this.peintSection()
   }
 
@@ -201,6 +213,45 @@ export class Regie {
       `<div class="rg-defil"><table class="rg-table rg-table--tir"><thead><tr><th>Run</th><th>Fragment</th><th>Fin</th><th>Fragments</th><th>Fins</th><th>Révélation</th><th>Dénouement</th><th>Cinématiques</th></tr></thead><tbody>${lignes}</tbody></table></div>`
   }
 
+  private peintCle(): void {
+    const pane = this.el('rg-pane')
+    const e = this.etatCle
+    const etat = this.verifCle
+      ? '<span class="rg-muet">vérification…</span>'
+      : !this.hooks.cle.posee()
+        ? '<i class="rg-rien">aucune clé sur ce poste — les publications seront refusées</i>'
+        : !e
+          ? '<span class="rg-muet">une clé est rangée sur ce poste — VÉRIFIER pour savoir si le serveur la reconnaît</span>'
+          : e.etat === 'reconnue'
+            ? `<b class="rg-ok">RECONNUE</b>${e.nom ? ` — vous publiez sous le nom « ${esc(e.nom)} »` : ''}`
+            : e.etat === 'refusee'
+              ? `<i class="rg-rien">REFUSÉE</i> — ${esc(e.raison)}`
+              : e.etat === 'serveur-sans-cle'
+                ? `<i class="rg-rien">LE SERVEUR N’A AUCUNE CLÉ</i> — ${esc(e.raison)}`
+                : e.etat === 'injoignable'
+                  ? '<span class="rg-muet">serveur injoignable — réessayer plus tard</span>'
+                  : '<i class="rg-rien">aucune clé sur ce poste</i>'
+    pane.innerHTML =
+      `<h3>⚿ LA CLÉ CONCEPTEUR <small>ce qui autorise à publier</small></h3>` +
+      `<p class="rg-texte">Lire ce qui est publié reste libre — le jeu en a besoin pour jouer. <b>Publier</b> (la bibliothèque, la carte, le récit, les réglages…) exige une clé : sans elle, le serveur refuse. Chaque concepteur a la sienne ; elle se range sur ce poste seulement, jamais dans une sauvegarde.</p>` +
+      `<p class="rg-texte">État : ${etat}</p>` +
+      `<div class="rg-outils">` +
+      `<input type="password" id="rg-cle" autocomplete="off" spellcheck="false" placeholder="${this.hooks.cle.posee() ? 'remplacer la clé rangée' : 'coller la clé ici'}" aria-label="Clé concepteur">` +
+      `<button type="button" id="rg-cle-ranger" class="primary">ENREGISTRER</button>` +
+      `<button type="button" id="rg-cle-verifier"${this.hooks.cle.posee() && !this.verifCle ? '' : ' disabled'}>VÉRIFIER</button>` +
+      `<button type="button" id="rg-cle-oublier"${this.hooks.cle.posee() ? '' : ' disabled'}>OUBLIER</button>` +
+      `</div>`
+  }
+
+  private async verifieCle(): Promise<void> {
+    if (this.verifCle) return
+    this.verifCle = true
+    this.render()
+    this.etatCle = await this.hooks.cle.verifie()
+    this.verifCle = false
+    this.render()
+  }
+
   // ---- LES GESTES ------------------------------------------------------------
 
   private clic(e: Event): void {
@@ -217,6 +268,26 @@ export class Regie {
     }
     if (b.id === 'rg-relire') {
       void this.relit()
+      return
+    }
+    if (b.id === 'rg-cle-ranger') {
+      const champ = this.host.querySelector<HTMLInputElement>('#rg-cle')
+      const cle = champ?.value.trim() ?? ''
+      if (!cle) return
+      this.hooks.cle.range(cle)
+      // on vérifie aussitôt : une faute de frappe se voit ici, pas au
+      // premier PUBLIER refusé
+      void this.verifieCle()
+      return
+    }
+    if (b.id === 'rg-cle-verifier') {
+      void this.verifieCle()
+      return
+    }
+    if (b.id === 'rg-cle-oublier') {
+      this.hooks.cle.range('')
+      this.etatCle = null
+      this.render()
       return
     }
     if (b.id === 'rg-ouvrir') {

@@ -4,6 +4,8 @@ import {
   LIEUX_ACCUEIL,
   LIEUX_PREMIER_LANCEMENT,
   PICTOS_ACCUEIL,
+  SOUS_LIEUX_COMMUNAUTE,
+  valeursCommunaute,
   valeursLieux,
   verbeAccueil,
   type EtatLieux,
@@ -84,8 +86,20 @@ describe('les valeurs des lieux', () => {
     expect(v['home-fioles'].val).toBe('1 / 2')
   })
 
-  it('laisse les sauvegardes au premier lancement, et seulement elles', () => {
-    expect(LIEUX_PREMIER_LANCEMENT).toEqual(['home-sauvegardes'])
+  it('COMMUNAUTÉ compte les salles de l’éditeur et les créations publiées, sans rien dire à zéro', () => {
+    expect(valeursCommunaute({ sallesAtelier: 0, creationsPubliees: 0 })).toEqual({ 'home-atelier': '', 'home-creations': '' })
+    expect(valeursCommunaute({ sallesAtelier: 3, creationsPubliees: 1 })).toEqual({
+      'home-atelier': '3 salles',
+      'home-creations': '1 publiée',
+    })
+    expect(valeursCommunaute({ sallesAtelier: 1, creationsPubliees: 2 })).toEqual({
+      'home-atelier': '1 salle',
+      'home-creations': '2 publiées',
+    })
+  })
+
+  it('au premier lancement : les sauvegardes, et COMMUNAUTÉ (qui n’attend rien de la partie solo)', () => {
+    expect(LIEUX_PREMIER_LANCEMENT).toEqual(['home-communaute', 'home-sauvegardes'])
   })
 })
 
@@ -96,6 +110,8 @@ describe('la fiche dans index.html et main.ts', () => {
       'home-restart',
       'start-abandon',
       ...LIEUX_ACCUEIL,
+      ...SOUS_LIEUX_COMMUNAUTE,
+      'acc-communaute',
       'home-regie',
       'home-livraisons',
       'home-cmds',
@@ -113,6 +129,29 @@ describe('la fiche dans index.html et main.ts', () => {
       'home-ecoute', // le lecteur vit dans PARAMÈTRES
     ])
       expect(HTML, `id="${id}" manque à index.html`).toContain(`id="${id}"`)
+  })
+
+  it('COMMUNAUTÉ est un lieu pour tous, qui s’ouvre sur ÉDITEUR et CRÉATIONS DE LA COMMUNAUTÉ', () => {
+    const groupe = /<button id="home-communaute"[^>]*>/.exec(HTML)?.[0] ?? ''
+    expect(groupe).toContain('class="acc-lieu acc-groupe"')
+    expect(groupe).toContain('aria-expanded="false"')
+    expect(groupe).toContain('aria-controls="acc-communaute"')
+    // le sous-menu : fermé au départ, les deux choix nommés pour le joueur
+    const sous = /<div id="acc-communaute"[^>]*>([\s\S]*?)<\/div>/.exec(HTML)
+    expect(sous?.[0]).toMatch(/<div id="acc-communaute"[^>]*hidden>/)
+    expect(sous?.[1]).toMatch(/id="home-atelier"[^>]*><span>ÉDITEUR<\/span>/)
+    expect(sous?.[1]).toMatch(/id="home-creations"[^>]*><span>CRÉATIONS DE LA COMMUNAUTÉ<\/span>/)
+    expect(SOUS_LIEUX_COMMUNAUTE).toEqual(['home-atelier', 'home-creations'])
+    // ni mode concepteur, ni allure d'outil
+    for (const bouton of [groupe, ...(sous?.[1].match(/<button[^>]*>/g) ?? [])]) {
+      expect(bouton).not.toContain('data-dev')
+      expect(bouton).not.toContain('acc-outil')
+    }
+    // main.ts l'ouvre et le referme sur place
+    const clic = MAIN.slice(MAIN.indexOf("getElementById('home-communaute')"))
+    expect(clic.slice(0, 600)).toMatch(/setAttribute\('aria-expanded', String\(ouvert\)\)[\s\S]*sous\.hidden = !ouvert/)
+    // la RÉGIE, elle, reste au concepteur
+    expect(/<button id="home-regie"[^>]*>/.exec(HTML)?.[0]).toContain('data-dev')
   })
 
   it('n’écrit plus le verbe en dur : majAccueil est la seule source', () => {
