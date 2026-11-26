@@ -981,7 +981,7 @@
     {
       "id": "la-membrane",
       "auteur": "BOIZ",
-      "majAt": "2026-11-23T17:19:55.208Z",
+      "majAt": "2026-11-25T15:37:34.563Z",
       "codeAuteur": "JU",
       "codeAt": "2026-08-26T22:03:54.367Z",
       "level": {
@@ -1001,9 +1001,9 @@
         },
         "exit": {
           "minX": 770,
-          "minY": 320,
+          "minY": 325,
           "maxX": 910,
-          "maxY": 440
+          "maxY": 445
         },
         "boxes": [
           {
@@ -1227,8 +1227,8 @@
             "maxY": 40,
             "angle": 180,
             "forme": 3,
-            "material": 0,
-            "p0": 2
+            "p0": 2,
+            "material": 0
           },
           {
             "minX": 679.2091738915287,
@@ -1240,10 +1240,11 @@
             "material": 0
           },
           {
-            "minX": 1000,
+            "minX": 880,
             "minY": -140,
-            "maxX": 1200,
-            "maxY": -70,
+            "maxX": 1040,
+            "maxY": 220,
+            "forme": 3,
             "material": 0
           },
           {
@@ -1253,8 +1254,8 @@
             "maxY": 220,
             "angle": 180,
             "forme": 3,
-            "material": 0,
-            "p0": 3
+            "p0": 3,
+            "material": 0
           },
           {
             "minX": 480,
@@ -1263,8 +1264,17 @@
             "maxY": 220,
             "angle": 180,
             "forme": 3,
-            "material": 0,
-            "p0": 1
+            "p0": 1,
+            "material": 0
+          },
+          {
+            "minX": 1040,
+            "minY": -140,
+            "maxX": 1200,
+            "maxY": 220,
+            "forme": 3,
+            "p0": 2,
+            "material": 0
           }
         ],
         "sponges": [],
@@ -1341,18 +1351,23 @@
             "cl": 6
           },
           {
-            "x": 160,
-            "y": 480,
+            "x": 200,
+            "y": 0,
             "cl": 6
           }
         ],
         "lumieres": [
           {
-            "x": 450,
-            "y": 20,
+            "x": -420,
+            "y": 40,
             "h": 300,
-            "portee": 500,
-            "couleur": "#3fd69b"
+            "portee": 800
+          },
+          {
+            "x": 640,
+            "y": 40,
+            "h": 300,
+            "portee": 750
           }
         ]
       }
@@ -2153,7 +2168,7 @@
     {
       "id": "le-premier-gel-2",
       "auteur": "BOIZ",
-      "majAt": "2026-10-15T14:07:02.253Z",
+      "majAt": "2026-11-25T15:38:58.181Z",
       "codeAuteur": "JU",
       "codeAt": "2026-08-30T20:45:24.471Z",
       "level": {
@@ -5867,7 +5882,7 @@
     {
       "id": "conduis-de-ventillation",
       "auteur": "BOIZ",
-      "majAt": "2026-09-20T17:04:26.813Z",
+      "majAt": "2026-11-25T15:42:09.547Z",
       "codeAuteur": "BOIZ",
       "codeAt": "2026-08-25T14:39:28.644Z",
       "level": {
@@ -5881,8 +5896,8 @@
           "maxY": -100
         },
         "spawn": {
-          "x": 593,
-          "y": -601,
+          "x": -1119,
+          "y": -668,
           "n": 900
         },
         "exit": {
@@ -6131,7 +6146,7 @@
             "material": 0
           },
           {
-            "minX": -1199,
+            "minX": -946,
             "minY": -855,
             "maxX": -389,
             "maxY": -750,
@@ -6149,6 +6164,13 @@
             "minY": -418,
             "maxX": 810,
             "maxY": -100,
+            "material": 0
+          },
+          {
+            "minX": -1200,
+            "minY": -855,
+            "maxX": -946,
+            "maxY": -833,
             "material": 0
           }
         ],
@@ -7118,7 +7140,7 @@
     {
       "id": "travailencours-2",
       "auteur": "BOIZ",
-      "majAt": "2026-09-20T17:03:11.268Z",
+      "majAt": "2026-11-25T15:58:24.136Z",
       "codeAuteur": "BOIZ",
       "codeAt": "2026-08-29T14:37:01.118Z",
       "level": {
@@ -7783,7 +7805,7 @@
     {
       "id": "la-traversee-des-etats",
       "auteur": "BOIZ",
-      "majAt": "2026-09-20T16:54:32.621Z",
+      "majAt": "2026-11-25T16:11:58.088Z",
       "codeAuteur": "BOIZ",
       "codeAt": "2026-09-20T16:52:34.447Z",
       "level": {
@@ -8268,12 +8290,12 @@
                 "y": 336
               },
               {
-                "x": 504,
-                "y": 756
+                "x": 496,
+                "y": 712
               },
               {
                 "x": 819,
-                "y": 756
+                "y": 709
               },
               {
                 "x": 819,
@@ -8286,40 +8308,42 @@
     },
     {
       "id": "l-ecole-des-parois",
-      "auteur": "EXPÉDITION L",
-      "majAt": "2026-08-14T22:36:26.537Z",
+      "auteur": "BOIZ",
+      "majAt": "2026-11-25T16:44:44.097Z",
+      "codeAuteur": "EXPÉDITION L",
+      "codeAt": "2026-08-14T22:36:26.537Z",
       "level": {
         "name": "L’école des parois",
         "code": "21-S1",
         "journal": "Première leçon. La PAROI absorbe tout — même la lumière. L’HYDROPHOBE le repousse : il rebondit sans mouiller. L’HYDROPHILE le retient : il s’y colle, y rampe, et paie une impulsion pour s’en arracher. Trois surfaces, trois caractères. — Dr N. Véga",
         "bounds": {
           "minX": -1200,
-          "minY": -750,
+          "minY": -950,
           "maxX": 1200,
           "maxY": 750
         },
         "spawn": {
-          "x": -950,
-          "y": 0,
+          "x": -919,
+          "y": -516,
           "n": 900
         },
         "exit": {
-          "minX": 1040,
-          "minY": -120,
-          "maxX": 1180,
+          "minX": 1060,
+          "minY": -40,
+          "maxX": 1200,
           "maxY": 120
         },
         "boxes": [
           {
-            "minX": -560,
-            "minY": -750,
-            "maxX": -500,
-            "maxY": -140,
-            "material": 0
+            "minX": -700,
+            "minY": -950,
+            "maxX": -580,
+            "maxY": -450,
+            "material": 8
           },
           {
             "minX": -560,
-            "minY": 140,
+            "minY": 520,
             "maxX": -500,
             "maxY": 750,
             "material": 2
@@ -8337,16 +8361,17 @@
             "maxX": 620,
             "maxY": 380,
             "material": 2
+          },
+          {
+            "minX": -700,
+            "minY": -450,
+            "maxX": -580,
+            "maxY": 50,
+            "material": 0
           }
         ],
         "sponges": [],
         "labels": [
-          {
-            "x": -640,
-            "y": -400,
-            "text": "PAROI — ABSORBE",
-            "tone": "mur"
-          },
           {
             "x": -640,
             "y": 400,
@@ -8370,6 +8395,21 @@
             "y": 160,
             "text": "SAS",
             "tone": "sas"
+          },
+          {
+            "x": -640,
+            "y": -120,
+            "text": "PAROI — BLOQUE",
+            "tone": "mur"
+          }
+        ],
+        "zones": [
+          {
+            "minX": -1200,
+            "minY": -250,
+            "maxX": 300,
+            "maxY": 750,
+            "force": "eau"
           }
         ]
       }
