@@ -9234,6 +9234,35 @@
       .mb-puce .mb-cartouche-alv { grid-row: auto; }
       .mb-puce-nue { grid-template-columns: minmax(0, 1fr); padding-left: 18px; }
       .mb-puce-texte { font-size: calc(13px * var(--ui)); line-height: 1.4; color: var(--mb-encre); }
+      /* LA BULLE D'UNE PUCE : ce qu'est le gain (la jauge, l'instrument), au
+         survol, au tap ou à la tabulation. Elle remplace un `title` natif,
+         qui tardait une seconde et ne paraissait jamais au doigt — le joueur
+         croyait qu'il n'y avait rien à lire (27/11). Le pointillé sous le
+         texte dit qu'il y a quelque chose dessous. */
+      .mb-puce-a-bulle { cursor: help; outline: none; }
+      .mb-puce-a-bulle .mb-puce-texte {
+        text-decoration: underline dotted color-mix(in srgb, var(--mb-encre) 45%, transparent);
+        text-underline-offset: 4px;
+      }
+      .mb-puce-bulle {
+        position: absolute; left: 50%; bottom: calc(100% + 8px); z-index: 5;
+        width: max-content; max-width: min(78vw, calc(320px * var(--ui)));
+        padding: 10px 14px; text-align: left;
+        background: var(--mb-coque); border: 1px solid var(--mb-liseret);
+        font-size: calc(12px * var(--ui)); line-height: 1.5; color: var(--mb-texte);
+        visibility: hidden; transform: translateX(-50%);
+        pointer-events: none;
+      }
+      .mb-puce-bulle b {
+        display: block; margin-bottom: 4px; font-weight: 400; font-family: var(--font-display);
+        font-size: calc(10px * var(--ui)); letter-spacing: 0.14em; color: var(--mb-liseret);
+      }
+      .mb-puce-a-bulle:hover .mb-puce-bulle,
+      .mb-puce-a-bulle:focus .mb-puce-bulle,
+      .mb-puce-a-bulle:focus-visible .mb-puce-bulle {
+        visibility: visible;
+      }
+      .mb-puce-a-bulle:focus-visible { box-shadow: 0 0 0 1px var(--mb-liseret); }
       .mb-cartouche-alv .mb-glyphe { font-style: normal; font-size: 26px; }
       /* le verdict d'un mini-jeu, et ce qu'il ne rend pas */
       .mb-halte-verdict {

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { cartoucheHTML, ICONE_DE_GLYPHE, iconeDuGlyphe, offreHTML, plaqueHTML, puceHTML } from './cartouches'
+import { cartoucheHTML, EXPLIQUE_DE_ICONE, ICONE_DE_GLYPHE, iconeDuGlyphe, offreHTML, plaqueHTML, puceHTML } from './cartouches'
 import { ICONES_CEREMONIE } from './iconesStation'
 import { offreDon, offresRepos } from './descenteCarte'
 import { condensatDuSas, gainsDeModule, gainsDeSalle, memoireDuSas, recolteNeuve } from './recolte'
@@ -111,7 +111,7 @@ describe('la puce d’une issue', () => {
     expect(html).toContain('>réserve +1,5 L<')
     expect(html).not.toContain('🫙')
     expect(html).toContain('--i:2')
-    expect(html).toMatch(/^<li class="mb-cartouche mb-puce"/)
+    expect(html).toMatch(/^<li class="mb-cartouche mb-puce[ "]/)
   })
   it('garde un glyphe inconnu, écrit, dans l’alvéole — jamais une case vide', () => {
     const html = puceHTML('🧲 Aimant à rosée', 0)
@@ -121,11 +121,31 @@ describe('la puce d’une issue', () => {
   // une ligne d'instrument portait toute sa description à l'écran (« Aimant
   // à rosée : La rosée recondensée rend nettement plus de volume. ») : la
   // cartouche dit le nom, l'explication passe dans l'infobulle
-  it('dit le nom d’un instrument et range sa description dans l’infobulle', () => {
-    const html = puceHTML('🧲 Aimant à rosée : la rosée « vient » à vous', 0)
+  // la description passait dans un `title` natif : il tardait, ne
+  // paraissait jamais au doigt, et le joueur ne savait pas ce qu'était la
+  // « Buse calibrée » (27/11) — elle passe dans une bulle dessinée
+  it('dit le nom d’un instrument et range sa description dans la bulle', () => {
+    const html = puceHTML('🧲 Aimant à rosée : la rosée « vient » à vous', 0, () => '<i class="ico-instrument"></i>')
     expect(html).toContain('>Aimant à rosée<')
-    expect(html).toContain('title="la rosée « vient » à vous"')
-    expect(puceHTML('🫙 réserve +1,5 L', 0)).not.toContain('title=')
+    expect(html).toContain('class="mb-puce-bulle" role="tooltip"')
+    expect(html).toContain('INSTRUMENT EMBARQUÉ')
+    expect(html).toContain('la rosée « vient » à vous</span>')
+    expect(html).toContain('tabindex="0"') // un tap l'ouvre aussi
+    expect(html).not.toContain('title=')
+    const contre = puceHTML('💧 CONTREPARTIE — Fuite lente : la bonbonne perd', 0, () => '<i class="ico-instrument"></i>')
+    expect(contre).toContain('<b>CONTREPARTIE')
+  })
+  it('explique chaque jauge de la table — « essence maximale » n’est plus un mystère', () => {
+    const html = puceHTML('🜄 essence maximale -12 % — le corps naîtra à 88 % du plein', 0)
+    expect(html).toContain('<b>ESSENCE MAXIMALE</b>')
+    expect(html).toContain('naît à chaque salle')
+    // toute icône de la table a son explication
+    for (const icone of Object.values(ICONE_DE_GLYPHE)) expect(EXPLIQUE_DE_ICONE[icone], icone).toBeDefined()
+  })
+  it('une ligne sans rien à expliquer n’a ni bulle ni focus', () => {
+    const html = puceHTML('+1 échantillon de secours', 0)
+    expect(html).not.toContain('mb-puce-bulle')
+    expect(html).not.toContain('tabindex')
   })
   // trois instruments partagent un glyphe avec la table (Filtre à
   // condensat 💧, Fuite lente 💧, Bonbonne percée 🫙) : la table passait
