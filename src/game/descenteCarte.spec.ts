@@ -276,22 +276,32 @@ describe('climatDuModule — la température fait le climat des dangers', () => 
 })
 
 describe('offresRepos — l’alcôve, une seule offre', () => {
-  it('trois offres, dans l’ordre souffle · réserve · condensat, toutes possibles quand il y a de la place', () => {
-    const o = offresRepos({ vies: 1, viesMax: 3, bonbonne: 0.2, cap: 2 })
-    expect(o.map((x) => `${x.id}:${x.possible}`)).toEqual(['souffle:true', 'reserve:true', 'condensat:true'])
+  it('trois offres, dans l’ordre souvenir · réserve · condensat, toutes possibles quand il y a de la place', () => {
+    const o = offresRepos({ bonbonne: 0.2, cap: 2 })
+    expect(o.map((x) => `${x.id}:${x.possible}`)).toEqual(['souvenir:true', 'reserve:true', 'condensat:true'])
+    expect(o[0].detail).toBe('+15 mémoire, gardée après la run')
     expect(o[1].detail).toBe('+0,5 L en bonbonne')
     expect(o[2].detail).toBe('+40 cL dans la bourse')
     // CE QU'UNE HALTE REND SE RÈGLE (le plan) : les offres le disent au chiffre
-    const r = offresRepos({ vies: 1, viesMax: 3, bonbonne: 0.2, cap: 2 }, { reserveL: 1.2, condensatCl: 75 })
+    const r = offresRepos({ bonbonne: 0.2, cap: 2 }, { reserveL: 1.2, condensatCl: 75, memoire: 30 })
+    expect(r[0].detail).toBe('+30 mémoire, gardée après la run')
     expect(r[1].detail).toBe('+1,2 L en bonbonne')
     expect(r[2].detail).toBe('+75 cL dans la bourse')
     expect(offreDon({ bonbonne: 0.5, cap: 2 }, { reserveL: 1.2, condensatCl: 75 }).detail).toBe('+1,2 L en bonbonne')
   })
 
+  it('l’alcôve ne rend plus de vie : les échantillons de secours se farment, ils ne se ramassent pas', () => {
+    // le concepteur a retiré le « second souffle » le 27/11 : aucune offre
+    // ne doit plus promettre un échantillon, quelle que soit la run
+    const o = offresRepos({ bonbonne: 0, cap: 2 })
+    expect(o.map((x) => x.id)).not.toContain('souffle')
+    for (const x of o) expect(x.detail).not.toMatch(/échantillon/)
+    expect(o.find((x) => x.icone === '💠')).toBeUndefined()
+  })
+
   it('une offre qui ne donnerait rien reste visible mais impossible, et le dit', () => {
-    const o = offresRepos({ vies: 3, viesMax: 3, bonbonne: 2, cap: 2 })
-    expect(o[0].possible).toBe(false)
-    expect(o[0].detail).toBe('échantillons au plafond')
+    const o = offresRepos({ bonbonne: 2, cap: 2 })
+    expect(o[0].possible).toBe(true) // le souvenir n'a pas de plafond
     expect(o[1].possible).toBe(false)
     expect(o[1].detail).toBe('bonbonne pleine')
     expect(o[2].possible).toBe(true) // la bourse n'a pas de plafond
