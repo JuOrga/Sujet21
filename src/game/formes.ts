@@ -564,7 +564,10 @@ export const SURCHAUFFEUR_ATLAS = {
 } as const
 
 /** LE RIDEAU LAMELLAIRE : une porte de chambre froide à lanières de PVC
- *  givré, tendue entre deux MONTANTS (docs/assets-ia.md §32). Sa physique
+ *  givré, tendue entre deux MONTANTS (docs/assets-ia.md §32). Ses lanières
+ *  et ses montants sont vus de FACE : relief allumé, ils habillent la
+ *  TRANCHE du bloc, et son dessus est le rail vu d'en haut (RIDEAU_DESSUS).
+ *  Relief éteint — pas de tranche —, ils restent sur le dessus. Sa physique
  *  reste le BLOC ENTIER — un filtre troué laisserait passer ce que sa règle
  *  arrête ; seul le dessin change. Les proportions sont MESURÉES sur les
  *  images (tools/images/filtres_atlas.py), en fractions de l'épaisseur T :
@@ -583,11 +586,27 @@ export const RIDEAU = {
   lanieres: 8,
   pince: 110 / 875,
   finLaniere: 831 / 875,
+  /** le FÛT du poteau dans l'image du montant (fractions de sa largeur) :
+   *  ce que montre le BOUT du rideau, sur la tranche de son petit côté */
+  fut: [0.36, 0.76],
+} as const
+
+/** LE DESSUS DU RIDEAU (27/11), relief allumé : le rail vu d'EN HAUT
+ *  (tools/images/blender/rideau_dessus.py, dont ce sont les JUMEAUX). En
+ *  travers du bloc, en fractions de T depuis chaque face : un longeron, une
+ *  FENTE — vide dans l'image : le shader y peint le noir du dessous, et la
+ *  lanière que la glace pousse y paraît —, puis le rail que coiffent les
+ *  lanières repliées. `fente` : ses deux bords, du longeron vers le rail. */
+export const RIDEAU_DESSUS = {
+  longeron: 0.17,
+  fente: [0.2, 0.365],
+  rail: [0.4, 0.6],
 } as const
 
 /** L'ATLAS DES FILTRES (filtres-atlas.webp, 1024 × 2048) : la grille de
  *  l'évent en haut — une tuile de 960 bordée de 32 px de sa propre
- *  répétition —, le rideau en bas. Les cadres de filtres_atlas.py. */
+ *  répétition —, le rideau en bas : de face (corps, montant) et d'en haut
+ *  (dessus, chapeau). Les cadres de filtres_atlas.py. */
 export const FILTRES_ATLAS = {
   taille: 1024,
   hauteur: 2048,
@@ -595,6 +614,11 @@ export const FILTRES_ATLAS = {
   margeGrille: 32,
   corps: [0, 1034, 880, 440],
   montant: [0, 1484, 108, 478],
+  // le DESSUS : une période de huit lanières, bordée de `margeDessus` px
+  // de sa propre répétition le long du rail ; et le chapeau d'un montant
+  dessus: [128, 1494, 880, 266],
+  margeDessus: 8,
+  chapeau: [128, 1770, 60, 266],
 } as const
 
 /** L'ÉLARGISSEMENT des lanières. Aux proportions de l'image, une lanière

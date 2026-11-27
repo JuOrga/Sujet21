@@ -22,6 +22,15 @@
 // La demi-largeur, elle, rejoint la glace en douceur : une lanière qui
 // entre dans la travée s'ouvre, elle ne saute pas.
 //
+// LE SENS DU PASSAGE (27/11). Depuis que le rideau a un DESSUS vu d'en haut
+// (relief allumé : les lanières de face sont sur la tranche), on y voit la
+// lanière poussée sortir de sous son rail, du côté où la glace S'EN VA. Ce
+// côté se lit à la première image du passage — la glace est encore devant
+// la face par où elle entre — et reste FIGÉ, comme le milieu : le ressort
+// qui repasse l'aplomb ramène la lanière de l'autre côté, il ne faut pas
+// qu'une relecture en cours de geste l'y renvoie d'un coup. Il voyage dans
+// le paquet de la travée.
+//
 // Limite connue : deux morceaux de glace qui traversent ensemble loin l'un
 // de l'autre font UNE travée, qui les couvre tous deux — il faudrait un
 // état par lanière, et aucun canal vers le shader n'est libre pour ça.
@@ -42,24 +51,40 @@ export const RIDEAU_RESSORT = {
   elargit: 0.12, // s — la constante de temps de la demi-largeur qui s'étend
 } as const
 
+/** Le poids du SENS dans le paquet de la travée : au-dessus de tout ce que
+ *  le milieu et la demi-largeur peuvent écrire (1 + 1024 · 1023 + 1023 =
+ *  2^20). */
+export const TRAVEE_SENS = 2 ** 21
+
 /** Une travée (milieu c, demi-largeur hw, en fractions de L, 0..1) serrée
- *  dans UN flottant : 1 + 1024 · q(c) + q(hw), q au 1/1023e. 0 : aucune.
- *  Moins de 2^24 : exact en float32. JUMEAU de rdTravee dans le shader. */
-export function paquetTravee(c: number, hw: number): number {
+ *  dans UN flottant : 1 + 1024 · q(c) + q(hw), q au 1/1023e, plus
+ *  TRAVEE_SENS si la glace la traverse vers les t DÉCROISSANTS (sens −1 ;
+ *  t : le travers du bloc, y d'un rideau couché, x d'un rideau debout).
+ *  0 : aucune. Moins de 2^24 : exact en float32. JUMEAU de rdTravee dans
+ *  le shader. */
+export function paquetTravee(c: number, hw: number, sens = 1): number {
   const q = (s: number) => Math.round(Math.max(0, Math.min(1, s)) * 1023)
-  return 1 + 1024 * q(c) + q(hw)
+  return 1 + 1024 * q(c) + q(hw) + (sens < 0 ? TRAVEE_SENS : 0)
 }
 
-export function depaquetTravee(z: number): [number, number] | null {
+export function depaquetTravee(z: number): [number, number, number] | null {
   if (z < 0.5) return null
-  const zz = Math.round(z) - 1
+  let zz = Math.round(z) - 1
+  const sens = zz >= TRAVEE_SENS ? -1 : 1
+  if (sens < 0) zz -= TRAVEE_SENS
   const q0 = Math.floor(zz / 1024)
-  return [q0 / 1023, (zz - q0 * 1024) / 1023]
+  return [q0 / 1023, (zz - q0 * 1024) / 1023, sens]
 }
+
+/** Où la glace traverse : l'étendue [début, fin] le long du rideau, en
+ *  fractions de L — et, s'il est connu, le TRAVERS moyen de cette glace, en
+ *  fractions de T (moins de 0,5 : elle est du côté des t petits). */
+export type Travee = [number, number, number?]
 
 /** Où la GLACE traverse le rideau en ce moment : l'étendue, en fractions
  *  de sa longueur, des grains gelés dans sa bande — un peu avant et après
- *  lui (`marge` × son épaisseur : elle s'ouvre à l'arrivée). null : aucun.
+ *  lui (`marge` × son épaisseur : elle s'ouvre à l'arrivée) — et leur
+ *  travers moyen, qui dit de quel côté elle se présente. null : aucun.
  *  Rotation de la boîte comprise, comme formeContact. */
 export function traveeGlace(
   b: ObstacleBox,
@@ -68,7 +93,7 @@ export function traveeGlace(
   gele: ArrayLike<number>,
   count: number,
   marge = 0.15,
-): [number, number] | null {
+): Travee | null {
   const w = b.maxX - b.minX
   const h = b.maxY - b.minY
   const horiz = w >= h
@@ -86,6 +111,8 @@ export function traveeGlace(
   const r = Math.hypot(w / 2 + m, h / 2 + m)
   let s0 = Infinity
   let s1 = -Infinity
+  let sommeT = 0
+  let n = 0
   for (let i = 0; i < count; i++) {
     if (gele[i] !== 1) continue
     if (Math.abs(posX[i] - cx) > r || Math.abs(posY[i] - cy) > r) continue
@@ -98,14 +125,17 @@ export function traveeGlace(
     if (s < 0 || s > L || t < t0 - m || t > t1 + m) continue
     if (s < s0) s0 = s
     if (s > s1) s1 = s
+    sommeT += t
+    n++
   }
-  return s0 <= s1 ? [s0 / L, s1 / L] : null
+  return s0 <= s1 ? [s0 / L, s1 / L, (sommeT / n - t0) / (t1 - t0)] : null
 }
 
 interface Etat {
   c: number // le milieu de la travée, figé au début du passage
   hw: number // sa demi-largeur, qui rejoint hwCible en douceur
   hwCible: number
+  sens: number // +1 : la glace va vers les t croissants — figé comme le milieu
   x: number // l'ouverture du ressort (négative : au-delà de l'aplomb)
   v: number
   t: number // l'instant du dernier pas
@@ -118,12 +148,22 @@ export class SuiviRideaux {
 
   /** (aux.z, aux.w) du rideau à l'instant t : la travée empaquetée (0 :
    *  aucune) et l'ouverture du ressort. */
-  aux(b: ObstacleBox, travee: [number, number] | null, t: number): [number, number] {
+  aux(b: ObstacleBox, travee: Travee | null, t: number): [number, number] {
     let e = this.etats.get(b)
-    const neuf = (a: number, z: number): Etat => ({ c: (a + z) / 2, hw: (z - a) / 2, hwCible: (z - a) / 2, x: 0, v: 0, t })
+    // (le sens : la glace qui se présente du côté des t petits s'en va vers
+    // les grands ; travers inconnu — ou pile au milieu —, vers les grands)
+    const neuf = (a: number, z: number, travers = 0): Etat => ({
+      c: (a + z) / 2,
+      hw: (z - a) / 2,
+      hwCible: (z - a) / 2,
+      sens: travers > 0.5 ? -1 : 1,
+      x: 0,
+      v: 0,
+      t,
+    })
     if (!e) {
       if (!travee) return [0, 0]
-      e = neuf(travee[0], travee[1])
+      e = neuf(travee[0], travee[1], travee[2])
       this.etats.set(b, e)
     } else if (travee) {
       // un NOUVEAU passage repart de sa travée : le ressort presque au
@@ -138,7 +178,7 @@ export class SuiviRideaux {
         // le ressort garde son élan au repos (les premières images d'un
         // passage) ; il repart de zéro pour une glace ailleurs — sans quoi
         // ses lanières naîtraient déjà ouvertes
-        const n = neuf(travee[0], travee[1])
+        const n = neuf(travee[0], travee[1], travee[2])
         n.t = e.t
         if (!ailleurs) {
           n.x = e.x
@@ -171,6 +211,6 @@ export class SuiviRideaux {
       this.etats.delete(b)
       return [0, 0]
     }
-    return [paquetTravee(e.c, e.hw), e.x]
+    return [paquetTravee(e.c, e.hw, e.sens), e.x]
   }
 }

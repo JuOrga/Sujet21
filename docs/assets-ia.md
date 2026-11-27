@@ -1878,6 +1878,46 @@ Retro-futuristic 1970s orbital laboratory, flat orthographic 2D game asset. Mute
 ## 32. LE RIDEAU LAMELLAIRE — la porte à lanières de chambre froide 🔎 EN APERÇU (27/09)
 **Moitié basse de `filtres-atlas.webp` (1024 × 2048) · assemblé par `tools/images/filtres_atlas.py`**
 
+> **27/11 — LA PORTE EST SUR LA TRANCHE.** Les deux images ci-dessous (le
+> tronçon, le montant) sont vues de FACE. Tant que le jeu se regardait à
+> plat, elles se couchaient sur le dessus du bloc ; depuis le relief 2.5D,
+> le bloc a un dessus ET une paroi verticale, et la porte restait sur le
+> toit, animation comprise, pendant que la paroi ne portait que des rayures
+> tracées (le concepteur, 27/11 : « la partie animée est celle du dessus
+> alors que maintenant cela devrait être la paroi verticale »). Relief
+> allumé :
+> - **la TRANCHE** porte la porte (`rideauTranche`) : le rail sous le
+>   sommet, le seuil au pied, les lanières entre les deux — et c'est là que
+>   joue le ressort décrit plus bas, inchangé. Les deux grandes faces la
+>   montrent ; les deux bouts, le fût du poteau ;
+> - **le DESSUS** est le rideau vu d'EN HAUT (`rideauDessus`), **modélisé
+>   dans Blender** (`tools/images/blender/rideau_dessus.py`, lumière
+>   neutre : le dessus pivote avec le rideau) : deux longerons boulonnés au
+>   ras des faces, au milieu le rail que coiffent les lanières repliées (du
+>   PVC givré, en écailles, une pince à deux rivets chacune), un chapeau à
+>   voyant cyan sur chaque montant. Deux cadres de plus dans l'atlas :
+>   `dessus` (880 × 266, huit lanières, raccordable, bordé de 8 px de sa
+>   répétition) et `chapeau` (60 × 266) ;
+> - **les FENTES** entre le rail et chaque longeron sont vides dans
+>   l'image : le shader y peint le noir du dessous, et **la lanière que la
+>   glace pousse** — elle sort de sous son rail du côté où la glace s'en va
+>   (le sens du passage, lu à l'arrivée et figé : `rideauSuivi.ts`), puis
+>   repasse l'aplomb et paraît de l'autre côté. Le même ressort que sur la
+>   tranche. Pourquoi : la tranche n'a pas de hauteur au centre de l'écran,
+>   et c'est là que le corps traverse — sans cela, le passage ne se lisait
+>   plus.
+>
+> **Relief éteint**, il n'y a pas de tranche : la porte reste couchée sur le
+> dessus, comme décrit ci-dessous. Un rideau À FORME, ou sans atlas, garde
+> ses lamelles tracées, dessus et tranche.
+>
+> **Assemblage du 27/11 :** les sources du 27/09 ne sont pas versionnées ;
+> le dessus et le chapeau ont été GREFFÉS sur l'atlas livré
+> (`filtres_atlas.py --greffe`), que `prepare.py` a ré-encodé (qualité 80,
+> 325 Ko ; la grille, le tronçon et le montant y perdent une génération de
+> WebP : 38,6 à 41,5 dB de PSNR contre l'atlas d'avant, mesuré). Avec les
+> sources, relancer `filtres_atlas.py` sans option refait l'atlas entier.
+
 Le rideau ne laisse passer que la GLACE : c'est une **porte de chambre
 froide à lanières** — des bandes de PVC épais, translucides et givrées,
 pendues à un rail boulonné, fermées à chaque bout par un **montant** (poteau,

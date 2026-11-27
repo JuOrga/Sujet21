@@ -58,7 +58,7 @@ const NOMS: Record<string, string> = {
   'legende-surfaces.webp': 'Légende — pastilles du mur et des deux matières (opaques)',
   'conduite-atlas.webp': 'Conduite d’ammoniac (tronçon, bride, joint, givre du sol)',
   'chaudiere-atlas.webp': 'Chaleurs : la chaudière (rampe, bout, joint, brûleur, compacte, sol chauffé) et le surchauffeur (tube de verre, tête, dôme)',
-  'filtres-atlas.webp': 'Filtres : la grille de l’évent et le rideau lamellaire (tronçon à lanières, montant)',
+  'filtres-atlas.webp': 'Filtres : la grille de l’évent et le rideau lamellaire (de face : tronçon à lanières, montant ; d’en haut : rail, chapeau)',
   'sponge-dry.webp': 'Éponge sèche',
   'sponge-wet.webp': 'Éponge gorgée',
   'zone-hublot.webp': 'Zone — hublot fendu (glace)',
