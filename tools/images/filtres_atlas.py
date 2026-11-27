@@ -17,6 +17,12 @@ refondues à leur tour et viendront y loger.
                                                 sous leur rail boulonné
     masters/images/sources/rideau-montant.png   le poteau qui ferme un bout
     masters/images/sources/grille.webp          l'ancienne grille livrée
+    masters/images/sources/rideau-dessus.png    (27/11) le rail vu d'EN HAUT,
+                                                huit lanières repliées
+    masters/images/sources/rideau-chapeau.png   (27/11) le dessus d'un montant
+  Les deux premières sont vues de FACE : elles habillent la TRANCHE du bloc
+  (relief allumé), où les lanières s'animent. Les deux dernières, rendues
+  dans Blender (tools/images/blender/rideau_dessus.py), sont son DESSUS.
 
 Sortie : masters/images/filtres-atlas.png (1024 × 2048, RGBA), que
 tools/images/prepare.py livre ensuite en public/assets/filtres-atlas.webp.
@@ -26,6 +32,11 @@ RIDEAU dans game/formes.ts). Une nouvelle image impose de remesurer — et de
 mettre les deux à jour.
 
 Usage : python3 tools/images/filtres_atlas.py
+        python3 tools/images/filtres_atlas.py --greffe
+--greffe : sans les sources d'origine (elles ne sont pas versionnées), ne
+colle QUE le dessus et le chapeau, sur l'atlas déjà livré
+(public/assets/filtres-atlas.webp) — la grille, le tronçon et le montant y
+restent tels qu'ils ont été livrés.
 """
 
 from __future__ import annotations
@@ -53,6 +64,13 @@ MARGE_GRILLE = 32
 CADRE_R_CORPS = (0, 1034, 880, 440)
 # le montant : sa hauteur est TOUTE l'épaisseur du bloc
 CADRE_R_MONTANT = (0, 1484, 108, 478)
+# le DESSUS (27/11) : une période de huit lanières (8 × 110 px, le pas du
+# tronçon) sur toute l'épaisseur du bloc, collée avec MARGE_DESSUS px de sa
+# propre répétition de chaque côté — le shader la répète à la main ; et le
+# CHAPEAU d'un montant, à la même échelle (266 px pour l'épaisseur)
+CADRE_R_DESSUS = (128, 1494, 880, 266)
+MARGE_DESSUS = 8
+CADRE_R_CHAPEAU = (128, 1770, 60, 266)
 
 # LES BORDS DES LANIÈRES dans rideau-troncon.png (1774 × 887), mesurés sur
 # le profil de luminance à mi-hauteur : chaque lanière porte un reflet sur
@@ -97,11 +115,39 @@ def grille() -> Image.Image:
     return Image.fromarray(np.pad(a, ((m, m), (m, m), (0, 0)), mode='wrap'), 'RGBA')
 
 
+def dessus() -> Image.Image:
+    """Le rail vu d'en haut (une période, rendue raccordable), à la taille
+    de son cadre et bordé de sa propre répétition le long du rail. Ses
+    FENTES sont transparentes : le shader y peint le dessous du bloc."""
+    _, _, w, h = CADRE_R_DESSUS
+    a = np.asarray(lis('rideau-dessus.png').resize((w, h), Image.LANCZOS))
+    m = MARGE_DESSUS
+    return Image.fromarray(np.pad(a, ((0, 0), (m, m), (0, 0)), mode='wrap'), 'RGBA')
+
+
+def vide(atlas: Image.Image, x0: int, y0: int, x1: int, y1: int) -> None:
+    atlas.paste((0, 0, 0, 0), (x0, y0, x1, y1))
+
+
+def colle_dessus(atlas: Image.Image) -> None:
+    x, y, w, h = CADRE_R_DESSUS
+    vide(atlas, x - MARGE_DESSUS, y, x + w + MARGE_DESSUS, y + h)
+    atlas.alpha_composite(dessus(), (x - MARGE_DESSUS, y))
+    x, y, w, h = CADRE_R_CHAPEAU
+    vide(atlas, x, y, x + w, y + h)
+    colle(atlas, lis('rideau-chapeau.png'), CADRE_R_CHAPEAU)
+
+
 def main() -> None:
-    atlas = Image.new('RGBA', (TAILLE, HAUTEUR), (0, 0, 0, 0))
-    atlas.alpha_composite(grille(), CADRE_GRILLE[:2])
-    atlas.alpha_composite(troncon(), CADRE_R_CORPS[:2])
-    colle(atlas, montant(), CADRE_R_MONTANT)
+    if '--greffe' in sys.argv[1:]:
+        livre = os.path.join(ROOT, 'public', 'assets', 'filtres-atlas.webp')
+        atlas = Image.open(livre).convert('RGBA')
+    else:
+        atlas = Image.new('RGBA', (TAILLE, HAUTEUR), (0, 0, 0, 0))
+        atlas.alpha_composite(grille(), CADRE_GRILLE[:2])
+        atlas.alpha_composite(troncon(), CADRE_R_CORPS[:2])
+        colle(atlas, montant(), CADRE_R_MONTANT)
+    colle_dessus(atlas)
     saigne(atlas).save(DST)
     print('écrit', os.path.relpath(DST, ROOT))
 

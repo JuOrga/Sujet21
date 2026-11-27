@@ -21,7 +21,7 @@ import {
 } from '../game/level'
 import type { DecalDef, LumiereDef, ObstacleBox, ZoneDef } from '../game/level'
 import { rangsDePeinture } from '../game/ordre'
-import { RIDEAU_RESSORT, SuiviRideaux, traveeGlace } from './rideauSuivi'
+import { RIDEAU_RESSORT, SuiviRideaux, TRAVEE_SENS, traveeGlace } from './rideauSuivi'
 import { decalageDe, planchesLivrees, vueCourante, vuesPlanche } from './planche'
 import {
   ARC_EPAISSEUR_DEFAUT,
@@ -36,6 +36,7 @@ import {
   SURCHAUFFEUR,
   SURCHAUFFEUR_ATLAS,
   RIDEAU,
+  RIDEAU_DESSUS,
   RIDEAU_PAS,
   FILTRES_ATLAS,
   CONDUITE,
@@ -635,6 +636,7 @@ float surchSdf(vec2 p, vec4 box, float z) {
 // rideau est un bloc plein, le cuiseur de lumière le lit déjà comme tel.
 const RIDEAU_GLSL = (() => {
   const R = RIDEAU
+  const D = RIDEAU_DESSUS
   const A = FILTRES_ATLAS
   const B = RIDEAU_RESSORT
   const f = (x: number) => (Number.isInteger(x) ? `${x}.0` : `${x}`)
@@ -654,14 +656,22 @@ const float FI_MARGE_GRILLE = ${f(A.margeGrille)};
 const vec4 FI_CORPS = ${v4(A.corps)};
 const vec4 FI_MONTANT = ${v4(A.montant)};
 const float RD_OUVERTURE = ${f(B.ouverture)};
+const vec2 RD_FUT = vec2(${f(R.fut[0])}, ${f(R.fut[1])});
+const vec4 FI_DESSUS = ${v4(A.dessus)};
+const vec4 FI_CHAPEAU = ${v4(A.chapeau)};
+const vec2 RD_FENTE = vec2(${f(D.fente[0])}, ${f(D.fente[1])});
+const float RD_TRAVEE_SENS = ${f(TRAVEE_SENS)};
 
 // JUMEAU de depaquetTravee (rideauSuivi.ts) : où la glace traverse — son
-// milieu et sa demi-largeur, en fractions de L ; (-1, -1) : nulle part
-vec2 rdTravee(float z) {
-  if (z < 0.5) return vec2(-1.0);
+// milieu et sa demi-largeur, en fractions de L, et son SENS en travers du
+// bloc (+1 : vers les t croissants) ; (-1, -1, 1) : nulle part
+vec3 rdTravee(float z) {
+  if (z < 0.5) return vec3(-1.0, -1.0, 1.0);
   float zz = floor(z + 0.5) - 1.0;
+  float sens = zz >= RD_TRAVEE_SENS ? -1.0 : 1.0;
+  if (sens < 0.0) zz -= RD_TRAVEE_SENS;
   float q0 = floor(zz / 1024.0);
-  return vec2(q0, zz - q0 * 1024.0) / 1023.0;
+  return vec3(vec2(q0, zz - q0 * 1024.0) / 1023.0, sens);
 }
 
 // JUMEAU de dispositionRideau (formes.ts) : (largeur d'un montant, nombre
@@ -1675,18 +1685,26 @@ float fuitesNH3(vec2 wb, vec4 box, float code) {
 // d'une pièce la couleur de sa voisine. Hors du cadre : rien. UNE lecture
 // pour l'atlas des chaleurs et celui des filtres (vu en revue, 29/09 : deux
 // copies ligne à ligne ne se corrigent pas ensemble).
-vec4 atlasLit(sampler2D tex, vec2 taille, vec4 cadre, vec2 f, float px, float ppw) {
+// (atlasLitG : le même, le niveau de détail donné PAR AXE, en texels par
+// pixel d'écran — une image posée sur une tranche est vue de biais, tassée
+// dans un sens et pas dans l'autre)
+vec4 atlasLitG(sampler2D tex, vec2 taille, vec4 cadre, vec2 f, vec2 g) {
   if (f.x < 0.0 || f.x > 1.0 || f.y < 0.0 || f.y > 1.0) return vec4(0.0);
   vec2 pa = cadre.xy + clamp(f * cadre.zw, vec2(0.5), cadre.zw - 0.5);
   vec2 uv = vec2(pa.x / taille.x, (taille.y - pa.y) / taille.y);
-  float g = min(px * ppw, 4.0);
-  vec4 c = textureGrad(tex, uv, vec2(g / taille.x, 0.0), vec2(0.0, g / taille.y));
+  vec4 c = textureGrad(tex, uv, vec2(g.x / taille.x, 0.0), vec2(0.0, g.y / taille.y));
   return vec4(c.rgb * c.a, c.a); // prémultiplié
+}
+vec4 atlasLit(sampler2D tex, vec2 taille, vec4 cadre, vec2 f, float px, float ppw) {
+  return atlasLitG(tex, taille, cadre, f, vec2(min(px * ppw, 4.0)));
 }
 
 // L'ATLAS DES FILTRES (filtres-atlas.webp)
 vec4 atlasFiltre(vec4 cadre, vec2 f, float px, float ppw) {
   return atlasLit(uTexGrille, vec2(FI_ATLAS, FI_ATLAS_H), cadre, f, px, ppw);
+}
+vec4 atlasFiltreG(vec4 cadre, vec2 f, vec2 g) {
+  return atlasLitG(uTexGrille, vec2(FI_ATLAS, FI_ATLAS_H), cadre, f, g);
 }
 
 // LA GRILLE DE L'ÉVENT, répétée À LA MAIN : elle avait sa texture, répétée
@@ -1771,23 +1789,26 @@ vec2 rdMonde(float s, float t, vec2 bmin, vec2 bsize, bool horiz, float ca, floa
   return bc + vec2(ca * r.x - sa * r.y, sa * r.x + ca * r.y);
 }
 
-// LE RIDEAU LAMELLAIRE, en couleur prémultipliée : un montant à chaque bout,
-// entre eux un nombre entier de lanières (rideauDispo). Les lanières de la
-// TRAVÉE que la glace traverse s'écartent de son milieu — elles pendent de
-// leur pince, leur bas part le plus loin — puis, la glace sortie, repassent
-// l'aplomb et se balancent. Ce mouvement n'est PAS lu ici dans le champ du
-// fluide (il y suivait le bruit du champ, à-coups compris) : c'est un
-// ressort tenu d'une image à l'autre par le rendu (rideauSuivi.ts), passé
-// en zR (la travée) et wR (son ouverture). L'eau et la vapeur, que le
-// rideau arrête, le font seulement FRÉMIR, lentement ; un souffle d'air le
-// balance à peine au repos. Le rail, les pinces et le seuil ne bougent pas.
-vec4 rideauRendu(vec2 loc, vec2 bsize, vec2 bmin, float px, float ca, float sa, float zR, float wR) {
-  bool horiz = bsize.x >= bsize.y;
-  float L = horiz ? bsize.x : bsize.y;
-  float T = horiz ? bsize.y : bsize.x;
-  float s = horiz ? loc.x : loc.y;
-  // le rail en haut d'un rideau couché, à gauche d'un rideau debout
-  float t = horiz ? 1.0 - loc.y / T : loc.x / T;
+// LE RIDEAU LAMELLAIRE, VU DE FACE, en couleur prémultipliée : un montant à
+// chaque bout, entre eux un nombre entier de lanières (rideauDispo). Les
+// lanières de la TRAVÉE que la glace traverse s'écartent de son milieu —
+// elles pendent de leur pince, leur bas part le plus loin — puis, la glace
+// sortie, repassent l'aplomb et se balancent. Ce mouvement n'est PAS lu ici
+// dans le champ du fluide (il y suivait le bruit du champ, à-coups
+// compris) : c'est un ressort tenu d'une image à l'autre par le rendu
+// (rideauSuivi.ts), passé en zR (la travée) et wR (son ouverture). L'eau et
+// la vapeur, que le rideau arrête, le font seulement FRÉMIR, lentement ; un
+// souffle d'air le balance à peine au repos. Le rail, les pinces et le
+// seuil ne bougent pas.
+// s : l'abscisse le long du rideau (0..L) ; t : 0 au rail, 1 au seuil ;
+// g : le niveau de détail par axe (texels d'atlas par pixel d'écran, le
+// long du rail puis en hauteur) pour UNE unité de densité — le montant et
+// le tronçon le mettent chacun à leur échelle (gM, gC).
+// CETTE FACE SE PEINT OÙ ON LA VOIT (27/11) : sur la TRANCHE du bloc, relief
+// allumé (rideauTranche) ; relief éteint, il n'y a pas de tranche, et elle
+// reste couchée sur le dessus (rideauRendu), comme avant le relief.
+vec4 rideauFace(float s, float t, float L, float T, vec2 gM, vec2 gC, vec2 bmin, vec2 bsize, bool horiz,
+                float ca, float sa, float zR, float wR) {
   vec3 dsp = rideauDispo(L, T);
   float m = dsp.x;
   float n = dsp.y;
@@ -1795,16 +1816,15 @@ vec4 rideauRendu(vec2 loc, vec2 bsize, vec2 bmin, float px, float ca, float sa, 
   // LES MONTANTS : l'image au bout droit, en miroir au bout gauche
   if (s < m || s > L - m) {
     float fx = s < m ? 1.0 - s / m : (s - (L - m)) / m;
-    return atlasFiltre(FI_MONTANT, vec2(fx, t), px, FI_MONTANT.w / T);
+    return atlasFiltreG(FI_MONTANT, vec2(fx, t), gM);
   }
   float ty = (t - RD_HAUT) / (RD_BAS - RD_HAUT);
   if (ty < 0.0 || ty > 1.0) return vec4(0.0);
-  float ppw = FI_CORPS.w / ((RD_BAS - RD_HAUT) * T);
   float sx = s - m;
   float k = floor(sx / p);
   bool pendue = ty > RD_PINCE && ty < RD_FIN_LANIERE + 0.01;
   float pend = clamp((ty - RD_PINCE) / (RD_FIN_LANIERE - RD_PINCE), 0.0, 1.0);
-  vec2 trav = rdTravee(zR) * L; // (milieu, demi-largeur)
+  vec2 trav = rdTravee(zR).xy * L; // (milieu, demi-largeur)
   // l'eau ou la vapeur arrêtées contre ses faces, lues UNE fois par pixel
   // à la lanière du pixel, pas à chacune des trois candidates : la même
   // réponse pour six lectures de moins (vu en revue, 29/09)
@@ -1845,10 +1865,117 @@ vec4 rideauRendu(vec2 loc, vec2 bsize, vec2 bmin, float px, float ca, float sa, 
     // et le niveau de détail (jusqu'à 4 texels) liraient la voisine — une
     // lanière écartée traînait le reflet clair de sa voisine (vu en revue)
     float bordU = 2.5 / (FI_CORPS.z / RD_LANIERES);
-    vec4 c = atlasFiltre(FI_CORPS, vec2((cel + clamp(u, bordU, 1.0 - bordU)) / RD_LANIERES, ty), px, ppw);
+    vec4 c = atlasFiltreG(FI_CORPS, vec2((cel + clamp(u, bordU, 1.0 - bordU)) / RD_LANIERES, ty), gC);
     acc = c + acc * (1.0 - c.a); // la lanière suivante passe par-dessus, comme sur l'image
   }
   return acc;
+}
+
+// RELIEF ÉTEINT : la face, couchée sur le dessus du bloc (le dessin d'avant
+// le relief). loc : le point dans la boîte, depuis son coin bas-gauche.
+vec4 rideauRendu(vec2 loc, vec2 bsize, vec2 bmin, float px, float ca, float sa, float zR, float wR) {
+  bool horiz = bsize.x >= bsize.y;
+  float L = horiz ? bsize.x : bsize.y;
+  float T = horiz ? bsize.y : bsize.x;
+  // le rail en haut d'un rideau couché, à gauche d'un rideau debout
+  float t = horiz ? 1.0 - loc.y / T : loc.x / T;
+  return rideauFace(horiz ? loc.x : loc.y, t, L, T,
+                    vec2(min(px * FI_MONTANT.w / T, 4.0)),
+                    vec2(min(px * FI_CORPS.w / ((RD_BAS - RD_HAUT) * T), 4.0)),
+                    bmin, bsize, horiz, ca, sa, zR, wR);
+}
+
+// RELIEF ALLUMÉ, LA TRANCHE (27/11) : la porte à lanières est une face
+// VERTICALE — elle tombe du dessus du bloc jusqu'à son pied, et c'est là
+// qu'elle s'anime. Elle restait peinte sur le dessus, animation comprise,
+// et la tranche ne portait que des rayures tracées (le concepteur, 27/11).
+// pf : le PIED du point de la tranche, dans la boîte (depuis son coin) ;
+// nL : la normale de la face, dans le repère de la boîte ; ht : la hauteur
+// vue, 0 au pied, 1 au sommet ; tasse : ce dont la hauteur de la face se
+// tasse à l'écran (unités de hauteur par unité d'écran).
+// Les deux GRANDES faces portent la porte, d'un même côté de l'abscisse :
+// une lanière écartée l'est au même endroit, qu'on la voie de devant ou de
+// derrière. Les deux BOUTS montrent le fût du poteau. Entre deux lanières
+// écartées : le noir du dessous du bloc.
+vec3 rideauTranche(vec2 pf, vec2 nL, float ht, vec2 bsize, vec2 bmin, float px, float tasse,
+                   float ca, float sa, float zR, float wR) {
+  bool horiz = bsize.x >= bsize.y;
+  float L = horiz ? bsize.x : bsize.y;
+  float T = horiz ? bsize.y : bsize.x;
+  float gv = px * tasse;
+  vec4 c;
+  if ((horiz ? abs(nL.y) : abs(nL.x)) > 0.5) {
+    float p = rideauDispo(L, T).z;
+    c = rideauFace(clamp(horiz ? pf.x : pf.y, 0.0, L), 1.0 - ht, L, T,
+                   vec2(min(px * FI_MONTANT.z / (RD_MONTANT * T), 4.0), min(gv * FI_MONTANT.w, 8.0)),
+                   vec2(min(px * FI_CORPS.z / (RD_LANIERES * p), 4.0),
+                        min(gv * FI_CORPS.w / (RD_BAS - RD_HAUT), 8.0)),
+                   bmin, bsize, horiz, ca, sa, zR, wR);
+  } else {
+    float a = clamp((horiz ? pf.y : pf.x) / T, 0.0, 1.0);
+    c = atlasFiltreG(FI_MONTANT, vec2(mix(RD_FUT.x, RD_FUT.y, a), 1.0 - ht),
+                     vec2(min(px * FI_MONTANT.z * (RD_FUT.y - RD_FUT.x) / T, 4.0), min(gv * FI_MONTANT.w, 8.0)));
+  }
+  return vec3(0.010, 0.016, 0.024) * (1.0 - c.a) + c.rgb;
+}
+
+// RELIEF ALLUMÉ, LE DESSUS (27/11) : ce qu'on voit d'un rideau en le
+// survolant (tools/images/blender/rideau_dessus.py) — deux longerons
+// boulonnés au ras des faces, au milieu le rail que coiffent les lanières
+// repliées, un chapeau sur chaque montant. Le tronçon se répète à la main
+// toutes les RD_LANIERES lanières (fract ; le cadre est bordé de sa propre
+// répétition, le filtrage ne sort jamais du motif).
+// LES FENTES, entre le rail et chaque longeron, sont VIDES dans l'image : on
+// y voit le noir du dessous — et la lanière que la glace POUSSE. Vue d'en
+// haut, une lanière d'aplomb se cache sous son rail ; poussée, elle en sort
+// du côté où la glace s'en va (le sens du passage, rdTravee), puis, la
+// glace sortie, repasse l'aplomb et paraît de l'autre côté — le MÊME
+// ressort que sur la tranche (wR). Sans cela, le passage ne se lirait plus
+// au centre de l'écran, où la tranche n'a pas de hauteur — c'est là que le
+// corps traverse, la caméra le suit.
+vec4 rideauDessus(vec2 loc, vec2 bsize, float px, float zR, float wR) {
+  bool horiz = bsize.x >= bsize.y;
+  float L = horiz ? bsize.x : bsize.y;
+  float T = horiz ? bsize.y : bsize.x;
+  float s = horiz ? loc.x : loc.y;
+  float t = (horiz ? loc.y : loc.x) / T; // le travers : celui du sens du passage
+  vec3 dsp = rideauDispo(L, T);
+  float m = dsp.x;
+  float n = dsp.y;
+  float p = dsp.z;
+  float g = min(px * FI_DESSUS.w / T, 4.0);
+  if (s < m || s > L - m) {
+    float fx = s < m ? 1.0 - s / m : (s - (L - m)) / m;
+    return atlasFiltreG(FI_CHAPEAU, vec2(fx, 1.0 - t), vec2(g));
+  }
+  float sx = s - m;
+  vec2 pa = FI_DESSUS.xy + vec2(fract(sx / (p * RD_LANIERES)) * FI_DESSUS.z,
+                                clamp((1.0 - t) * FI_DESSUS.w, 0.5, FI_DESSUS.w - 0.5));
+  vec4 c = textureGrad(uTexGrille, vec2(pa.x / FI_ATLAS, (FI_ATLAS_H - pa.y) / FI_ATLAS_H),
+                       vec2(g / FI_ATLAS, 0.0), vec2(0.0, g / FI_ATLAS_H));
+  c.rgb *= c.a;
+  // le dessous, dans les fentes
+  vec3 sous = vec3(0.010, 0.016, 0.024);
+  vec3 trav = rdTravee(zR);
+  float cote = t < 0.5 ? -1.0 : 1.0;           // de quel côté du rail est ce pixel
+  float e = (0.5 - abs(t - 0.5) - RD_FENTE.x) / (RD_FENTE.y - RD_FENTE.x); // 0 au longeron, 1 au rail
+  if (trav.x >= 0.0 && c.a < 0.995 && e > -0.2 && e < 1.2) {
+    float j = clamp(floor(sx / p), 0.0, n - 1.0);
+    float sc = m + (j + 0.5) * p;
+    float dans = 1.0 - smoothstep(0.0, p, abs(sc - trav.x * L) - trav.y * L);
+    float poids = 1.0 - 0.35 * clamp(abs(sc - trav.x * L) / (trav.y * L + p), 0.0, 1.0);
+    // ce dont la lanière sort de sous le rail, de ce côté-ci (0..1 : toute la fente)
+    float sortie = clamp(cote * trav.z * wR * dans * poids * 1.15, 0.0, 1.0);
+    float u = fract(sx / p);
+    float lame = smoothstep(0.0, 0.07, u) * (1.0 - smoothstep(0.93, 1.0, u));
+    float couv = smoothstep(1.0 - sortie - 0.12, 1.0 - sortie + 0.02, e) * step(0.004, sortie) * lame;
+    // le PVC givré, plus clair à son bord libre (le bas de la lanière, givré)
+    float libreB = 1.0 - smoothstep(0.0, 0.30, e - (1.0 - sortie));
+    float reflet = smoothstep(0.0, 0.2, u) * (1.0 - smoothstep(0.1, 0.3, u));
+    vec3 pvc = mix(vec3(0.30, 0.44, 0.54), vec3(0.62, 0.80, 0.90), libreB * 0.8 + 0.2 * reflet);
+    sous = mix(sous, pvc, couv * 0.92);
+  }
+  return vec4(sous * (1.0 - c.a) + c.rgb, 1.0);
 }
 
 // ——— LA CHAUDIÈRE (rampe de résistances) ——————————————————————————————
@@ -2766,8 +2893,10 @@ vec3 matiereFlanc(int mi, float skin, float blendA, vec2 ft, float h, vec2 gx, v
     return vec3(0.05, 0.20, 0.17) + vec3(0.04, 0.15, 0.12) * weave + vec3(0.03, 0.11, 0.09) * drip;
   }
   if (mi == 8) {
-    // RIDEAU : les lanières de PVC givré, vues sur leur tranche
-    // (à garder en phase avec les lamelles tracées du remplissage)
+    // RIDEAU À FORME, ou sans atlas : les lamelles tracées, sur la tranche
+    // comme sur son dessus (à garder en phase avec celles du remplissage).
+    // Le rideau rectangulaire, lui, y porte sa porte à lanières
+    // (rideauTranche, au flanc) et ne passe pas par ici
     float lam = 0.5 + 0.5 * sin(ft.x * 0.55);
     float fente = smoothstep(0.86, 0.97, lam);
     return vec3(0.34, 0.46, 0.60) * (0.72 + 0.38 * lam) * (1.0 - 0.5 * fente);
@@ -3586,8 +3715,9 @@ void main() {
       // formes : le gradient de leur distance, lu au pied.
       vec2 rLF = vec2(bca * relB.x + bsa * relB.y, -bsa * relB.x + bca * relB.y);
       vec2 nrm;
+      vec2 nL = vec2(0.0); // la normale de la face dans le repère de la boîte
       if (dec.y < 0.5) {
-        vec2 nL = faceFlanc(wb, uBoxes[bi], rLF);
+        nL = faceFlanc(wb, uBoxes[bi], rLF);
         nrm = vec2(bca * nL.x - bsa * nL.y, bsa * nL.x + bca * nL.y);
       } else {
         vec2 wbPied = wb - rLF * htFlanc;
@@ -3605,10 +3735,23 @@ void main() {
       float tasse = hB / max(abs(dot(relB, nrm)), pxMonde);
       vec2 gxF = vec2(tng.x, nrm.x * tasse) * pxMonde;
       vec2 gyF = vec2(tng.y, nrm.y * tasse) * pxMonde;
-      vec3 fc = matiereFlanc(int(mat + 0.5), uBoxAux[bi].z, blendWallA, ft, hB, gxF, gyF);
+      // LE RIDEAU porte sa porte à lanières sur sa tranche, animée
+      // (rideauTranche) — pas un rideau À FORME, ni sans atlas : ceux-là
+      // gardent leurs lamelles tracées, sur le dessus comme sur la tranche
+      bool porteR = mat > 7.5 && mat < 8.5 && dec.y < 0.5 && uHasGrille > 0.5;
+      vec3 fc;
+      if (porteR) {
+        vec2 bminR = uBoxes[bi].xy;
+        fc = rideauTranche(wb - rLF * htFlanc - bminR, nL, htFlanc, max(uBoxes[bi].zw - bminR, vec2(1.0)), bminR,
+                           pxMonde, 1.0 / max(abs(dot(relB, nrm)), pxMonde), bca, bsa, uBoxAux[bi].z, uBoxAux[bi].w);
+      } else {
+        fc = matiereFlanc(int(mat + 0.5), uBoxAux[bi].z, blendWallA, ft, hB, gxF, gyF);
+      }
       // sombre au pied (le sol et le voisin y renvoient peu), franche en haut,
       // et le chant clair sous le sommet : l'arête haute attrape la lumière
-      fc *= mix(0.42, 1.0, sqrt(htFlanc));
+      // (le PVC givré de la porte est translucide, et son givre le plus
+      // épais est en bas : il ne s'éteint pas au pied comme une tôle)
+      fc *= porteR ? mix(0.74, 1.0, sqrt(htFlanc)) : mix(0.42, 1.0, sqrt(htFlanc));
       fc += fc * 0.45 * smoothstep(0.82, 0.97, htFlanc);
       // LA TRANCHE REGARDE LA LAMPE. C'est une face verticale : celle qui
       // fait face à la source s'allume, celle qui lui tourne le dos plonge
@@ -4069,8 +4212,13 @@ void main() {
         if (fill > 0.0) {
           vec2 bmin = uBoxes[bi].xy;
           vec2 bsize = max(uBoxes[bi].zw - bmin, vec2(1.0));
-          vec4 rc = rideauRendu(clamp(wbV - bmin, vec2(0.0), bsize), bsize, bmin, pxMonde, bca, bsa,
-                                uBoxAux[bi].z, uBoxAux[bi].w);
+          // relief allumé, la porte est sur la TRANCHE (rideauTranche, au
+          // flanc) : le dessus est le rail vu d'en haut. Relief éteint, pas
+          // de tranche : la porte reste couchée sur le dessus.
+          vec2 locR = clamp(wbV - bmin, vec2(0.0), bsize);
+          vec4 rc = uRelief > 0.0
+            ? rideauDessus(locR, bsize, pxMonde, uBoxAux[bi].z, uBoxAux[bi].w)
+            : rideauRendu(locR, bsize, bmin, pxMonde, bca, bsa, uBoxAux[bi].z, uBoxAux[bi].w);
           col = col * (1.0 - rc.a * fill) + rc.rgb * eclMat * fill;
         }
       } else {

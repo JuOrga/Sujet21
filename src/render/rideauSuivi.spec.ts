@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { readFileSync } from 'node:fs'
-import { SuiviRideaux, depaquetTravee, paquetTravee, traveeGlace } from './rideauSuivi'
+import { SuiviRideaux, TRAVEE_SENS, depaquetTravee, paquetTravee, traveeGlace, type Travee } from './rideauSuivi'
 import { MAT_RIDEAU, type ObstacleBox } from '../game/level'
 
 // LE RESSORT DES LANIÈRES : le shader ne se souvient de rien d'une image à
@@ -51,6 +51,22 @@ describe('rideau — la travée de glace', () => {
     expect(t[0]).toBeCloseTo(0.3, 6)
   })
 
+  it('son TRAVERS moyen dit de quel côté la glace se présente', () => {
+    // un rideau couché, épais de 60 : la glace devant sa face basse (y petit),
+    // puis devant sa face haute — marge comprise, hors de 0..1
+    const b = rideau(100, 0, 500, 60)
+    const bas = grains([
+      [200, -6, 1],
+      [220, 6, 1],
+    ])
+    const haut = grains([[200, 66, 1]])
+    expect(traveeGlace(b, bas.x, bas.y, bas.gele, bas.n)![2]).toBeCloseTo(0, 6)
+    expect(traveeGlace(b, haut.x, haut.y, haut.gele, haut.n)![2]).toBeCloseTo(1.1, 6)
+    // debout : le travers se lit en x
+    const g = grains([[30, 300, 1]])
+    expect(traveeGlace(rideau(0, 0, 40, 1000), g.x, g.y, g.gele, g.n)![2]).toBeCloseTo(0.75, 6)
+  })
+
   it('oblique : la rotation de la boîte est comprise', () => {
     // un rideau de 400 × 40 centré en (0, 0), tourné de 90° : il est debout
     const g = grains([[0, 100, 1]])
@@ -62,7 +78,7 @@ describe('rideau — la travée de glace', () => {
 })
 
 /** Un rideau suivi à 60 images/s ; `glace(k)` : la travée à l'image k. */
-function joue(glace: (k: number) => [number, number] | null, images: number) {
+function joue(glace: (k: number) => Travee | null, images: number) {
   const s = new SuiviRideaux()
   const b = rideau(0, 0, 400, 60)
   const xs: number[] = []
@@ -83,6 +99,32 @@ describe('rideau — le ressort des lanières', () => {
     expect(depaquetTravee(0)).toBeNull()
     // moins de 2^24 : exact en float32
     expect(Math.fround(paquetTravee(1, 1))).toBe(paquetTravee(1, 1))
+  })
+
+  it('le SENS du passage voyage dans le même paquet, sans rien changer au reste', () => {
+    // vers les t croissants : le paquet d'avant, tel quel
+    expect(depaquetTravee(paquetTravee(0.25, 0.8))![2]).toBe(1)
+    expect(paquetTravee(0.25, 0.8, 1)).toBe(paquetTravee(0.25, 0.8))
+    const [c, hw, sens] = depaquetTravee(paquetTravee(0.25, 0.8, -1))!
+    expect(c).toBeCloseTo(0.25, 2)
+    expect(hw).toBeCloseTo(0.8, 2)
+    expect(sens).toBe(-1)
+    // le sens pèse plus que tout ce que le milieu et la demi-largeur écrivent
+    expect(paquetTravee(1, 1)).toBeLessThanOrEqual(TRAVEE_SENS)
+    expect(Math.fround(paquetTravee(1, 1, -1))).toBe(paquetTravee(1, 1, -1))
+  })
+
+  it('le sens se lit à l’ARRIVÉE de la glace, puis reste figé tout le passage', () => {
+    const sens = (zs: number[]) => zs.filter((z) => z > 0).map((z) => depaquetTravee(z)![2])
+    // elle se présente du côté des t petits (travers 0,1) et sort de l'autre
+    // (0,9), puis s'en va : les lanières partent vers les t grands, et le
+    // balancement qui suit ne les renvoie pas d'un coup de l'autre côté
+    const monte = joue((k) => (k < 60 ? [0.4, 0.6, 0.1 + (0.8 * k) / 59] : null), 200)
+    expect(new Set(sens(monte.zs))).toEqual(new Set([1]))
+    const descend = joue((k) => (k < 60 ? [0.4, 0.6, 0.9 - (0.8 * k) / 59] : null), 200)
+    expect(new Set(sens(descend.zs))).toEqual(new Set([-1]))
+    // le ressort, lui, est le même dans les deux sens
+    expect(descend.xs).toEqual(monte.xs)
   })
 
   it('sans glace, rien : ni travée ni ouverture', () => {
@@ -159,11 +201,18 @@ describe('rideau — le ressort des lanières', () => {
   it('le shader lit le ressort, et ne tire plus l’ouverture du champ du fluide', () => {
     const src = readFileSync(new URL('./renderer.ts', import.meta.url), 'utf8')
     expect(src).toMatch(/const float RD_OUVERTURE = \$\{f\(B\.ouverture\)\};/)
-    expect(src).toMatch(/vec2 rdTravee\(float z\)/)
+    expect(src).toMatch(/vec3 rdTravee\(float z\)/)
+    expect(src).toMatch(/const float RD_TRAVEE_SENS = \$\{f\(TRAVEE_SENS\)\};/)
+    // les trois dessins du rideau lisent la même mémoire : la porte sur la
+    // tranche, le dessus vu d'en haut, et la porte couchée du relief éteint
     expect(src).toMatch(/rideauRendu\([^;]*uBoxAux\[bi\]\.z, uBoxAux\[bi\]\.w\)/)
+    expect(src).toMatch(/rideauDessus\([^;]*uBoxAux\[bi\]\.z, uBoxAux\[bi\]\.w\)/)
+    expect(src).toMatch(/rideauTranche\([^;]*uBoxAux\[bi\]\.z, uBoxAux\[bi\]\.w\)/)
     expect(src).toMatch(/this\.suiviRideaux\.aux\(bx, traveeGlace\(/)
-    const f = src.slice(src.indexOf('vec4 rideauRendu('), src.indexOf('vec4 atlasChaud('))
+    const f = src.slice(src.indexOf('vec4 rideauFace('), src.indexOf('vec4 atlasChaud('))
     expect(f).toMatch(/RD_OUVERTURE \* p \* wR/)
     expect(f).not.toMatch(/float glace =/)
+    // vue d'en haut, la lanière sort du côté où la glace s'en va
+    expect(f).toMatch(/cote \* trav\.z \* wR/)
   })
 })
