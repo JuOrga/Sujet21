@@ -33,8 +33,12 @@ export function propositionsSalles(
   niveaux: LevelDef[],
   rang: number,
   totalRun: number,
+  exclus: ReadonlySet<string> = new Set(),
 ): LevelDef[] {
-  const cands = candidatsAuRang(niveaux, rang)
+  // un tableau déjà joué de la run ne se repropose pas, même s'il porte
+  // l'ordre du rang : depuis que la voie pioche, un saut arrière peut
+  // ramener la séquence sur un rang déjà traversé
+  const cands = candidatsAuRang(niveaux, rang).filter((lv) => !exclus.has(lv.code))
   if (cands.length < 2) return []
   const phase = phaseRun(rang, totalRun)
   const code = (lv: LevelDef): Code21 => decodeCode21(lv.code)!
@@ -197,4 +201,37 @@ export function piocheEcrite(
   // battre au hasard — le hasard ne se justifie qu'entre égaux ASSUMÉS.
   if (meilleur === poids.sansCahier) return exAequo[0].lv
   return exAequo[Math.floor(alea() * exAequo.length)].lv
+}
+
+/** LA SALLE QUI SUIT quand aucune porte n'a été choisie (l'enchaînement
+ * linéaire, la sortie d'une halte, la reprise d'un module) : l'index visé
+ * s'il n'a pas déjà été joué de la run — sinon le premier tableau NON VU
+ * après lui, puis avant lui (le saut arrière est permis depuis que la voie
+ * pioche). Sans ce filtre, `index + 1` et le garde-fou de fin de séquence
+ * renvoyaient sur un tableau déjà joué, parfois celui qu'on venait de
+ * finir : deux fois le même tableau de suite (signalé le 27/11).
+ *
+ * LE POOL À SEC (tout vu) ne bloque pas la descente : on rejoue le tableau
+ * vu il y a le plus longtemps — `vues` garde l'ordre des passages (un Set
+ * garde l'ordre d'insertion, et l'appelant replace en queue un tableau
+ * rejoué). Le tout dernier joué ne revient qu'en ultime recours, quand la
+ * séquence n'a qu'un tableau. */
+export function indexNonVu(
+  niveaux: readonly LevelDef[],
+  vise: number,
+  vues: ReadonlySet<string>,
+): number {
+  const n = niveaux.length
+  if (n === 0) return 0
+  const depart = Math.max(0, Math.min(n - 1, vise))
+  for (let k = 0; k < n; k++) {
+    const i = (depart + k) % n
+    if (!vues.has(niveaux[i].code)) return i
+  }
+  // tout est vu : le plus ancien passage d'abord
+  for (const code of vues) {
+    const i = niveaux.findIndex((lv) => lv.code === code)
+    if (i >= 0) return i
+  }
+  return depart
 }
