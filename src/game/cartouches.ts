@@ -75,13 +75,34 @@ function alveoleDuGlyphe(glyphe: string, autre?: string | null): string {
   return `<span class="mb-cartouche-alv">${dedans}</span>`
 }
 
+/** CE QU'EST CHAQUE GAIN D'UNE HALTE, pour qui ne le sait pas encore : le
+ *  nom de la jauge et à quoi elle sert. Le joueur voyait « essence
+ *  maximale −12 % » ou « Buse calibrée » sans savoir ce que c'était
+ *  (retour du 27/11) : l'icône seule ne l'apprend à personne. */
+export const EXPLIQUE_DE_ICONE: Partial<Record<IconeCeremonie, { titre: string; texte: string }>> = {
+  reserve: { titre: 'RÉSERVE', texte: 'L’eau de la bonbonne : le soin du jeu. Elle reverse du volume au corps quand il s’amenuise.' },
+  condensat: { titre: 'CONDENSAT', texte: 'La bourse de la descente, à dépenser à l’économat. Le labo la confisque au retour.' },
+  memoire: { titre: 'MÉMOIRE', texte: 'La monnaie qui survit à la descente : elle paie le comptoir et les réparations du hub.' },
+  secours: { titre: 'ÉCHANTILLON DE SECOURS', texte: 'Une chance de plus : dispersé, le corps se recompose au lieu de finir la descente.' },
+  profondeur: { titre: 'ESSENCE MAXIMALE', texte: 'Le volume avec lequel le corps naît à chaque salle. Une perte ne se rattrape pas avant la fin de la descente.' },
+  carte: { titre: 'PLAN DE LA STATION', texte: 'Les modules « ? » de la carte montrent d’avance ce qu’ils cachent.' },
+  danger: { titre: 'CONFINEMENT', texte: 'La station se méfie : la prochaine salle jouée est plus dure d’un cran.' },
+  orbe: { titre: 'ORBE D’ESSENCE', texte: 'Un fragment de conscience. Il se garde d’une descente à l’autre.' },
+}
+
 /** LA PUCE D'UNE ISSUE : une ligne de ce qu'une rencontre a donné
  *  (« 🫙 réserve +1,5 L »). Le glyphe de tête passe dans l'alvéole, la
  *  phrase reste. Une ligne qui ne commence pas par un glyphe (une lettre, un
  *  chiffre : « +1 échantillon ») se pose sans alvéole. Une ligne
  *  d'instrument (« Aimant à rosée : La rosée recondensée… ») ne garde à
- *  l'écran que ce qui précède « : » ; l'explication passe dans l'infobulle.
- *  `autre` reçoit la ligne entière, nom compris. */
+ *  l'écran que ce qui précède « : ».
+ *
+ *  L'EXPLICATION passe dans une BULLE dessinée (.mb-puce-bulle), pas dans
+ *  un `title` : l'infobulle native met une seconde à paraître, ne paraît
+ *  jamais au doigt, et le joueur concluait qu'il n'y avait rien à lire. La
+ *  puce prend le focus (tabindex) : un tap ou la tabulation l'ouvrent comme
+ *  le survol. `autre` reçoit la ligne entière, nom compris ; s'il reconnaît
+ *  la ligne (un instrument), la bulle le dit. */
 export function puceHTML(
   ligne: string,
   i: number,
@@ -93,10 +114,26 @@ export function puceHTML(
   const coupe = /\s:\s/.exec(texte)
   const dit = coupe ? texte.slice(0, coupe.index) : texte
   const explique = coupe ? texte.slice(coupe.index + coupe[0].length) : ''
+  const rendu = glyphe ? autre?.(glyphe, texte) ?? null : null
+  const icone = glyphe && !rendu ? iconeDuGlyphe(glyphe) : null
+  const bulle = explique
+    ? {
+        titre: rendu ? (/^CONTREPARTIE\b/.test(dit) ? 'CONTREPARTIE — jusqu’à la fin de la descente' : 'INSTRUMENT EMBARQUÉ — pour cette descente') : '',
+        texte: explique,
+      }
+    : icone
+      ? EXPLIQUE_DE_ICONE[icone] ?? null
+      : null
   return (
-    `<li class="mb-cartouche mb-puce${glyphe ? '' : ' mb-puce-nue'}" style="--i:${i}"${explique ? ` title="${echappe(explique)}"` : ''}>` +
-    (glyphe ? alveoleDuGlyphe(glyphe, autre?.(glyphe, texte)) : '') +
-    `<span class="mb-puce-texte">${echappe(dit)}</span></li>`
+    `<li class="mb-cartouche mb-puce${glyphe ? '' : ' mb-puce-nue'}${bulle ? ' mb-puce-a-bulle' : ''}" style="--i:${i}"${bulle ? ' tabindex="0"' : ''}>` +
+    (glyphe ? alveoleDuGlyphe(glyphe, rendu) : '') +
+    `<span class="mb-puce-texte">${echappe(dit)}</span>` +
+    (bulle
+      ? `<span class="mb-puce-bulle" role="tooltip">` +
+        (bulle.titre ? `<b>${echappe(bulle.titre)}</b>` : '') +
+        `${echappe(bulle.texte)}</span>`
+      : '') +
+    `</li>`
   )
 }
 

@@ -62,6 +62,13 @@ export type EffetEvenement =
   | { quoi: 'revele' }
   /** la station se méfie : la prochaine salle jouée monte d'un cran */
   | { quoi: 'confinement'; crans: number }
+  /** UNE STATION DU HUB SE REMET EN MARCHE, pour de bon — la seule trace
+   *  qu'une rencontre laisse APRÈS la run. Les autres effets meurent à la
+   *  purge ; celui-ci se voit au retour : le module Méduse rallumé, une
+   *  aile rouverte. `station` nomme la station visée (reparations.ts) ;
+   *  absente, c'est la première encore en panne, dans l'ordre du catalogue.
+   *  Gratuite côté mémoire — le prix est payé dans l'offre elle-même. */
+  | { quoi: 'station'; station?: string }
   /** rien — et c'est une issue comme une autre */
   | { quoi: 'rien' }
 
@@ -90,6 +97,9 @@ export interface EtatJoueur {
   orbeAPrendre: boolean
   /** reste-t-il un « ? » non révélé sur la carte ? */
   inconnuALire: boolean
+  /** les stations du hub encore en panne, dans l'ordre du catalogue des
+   *  avaries — ce qu'une offre « station » peut encore rallumer */
+  stationsEnPanne: readonly string[]
 }
 
 export interface ChoixEvenement {
@@ -119,6 +129,22 @@ export const ESSENCE_PLANCHER = 0.4
 
 const sacrifiable = (part: number) => (e: EtatJoueur): boolean =>
   e.essence + part >= (e.plancher ?? ESSENCE_PLANCHER) - 1e-9
+
+/** Une offre qui rallume une station se FERME quand il n'y a plus rien à
+ *  rallumer : promettre le hub à qui l'a déjà réparé, c'est un cadeau vide. */
+const enPanne = (station?: string) => (e: EtatJoueur): boolean =>
+  station ? e.stationsEnPanne.includes(station) : e.stationsEnPanne.length > 0
+
+/** LA STATION QU'UN EFFET « station » RALLUME, parmi celles en panne : la
+ *  nommée si elle l'est encore, sinon la première de la liste. Une station
+ *  nommée DÉJÀ debout ne se rabat pas sur une autre — l'offre a promis
+ *  celle-là (et `possible` l'a fermée) ; null, rien à faire. Deux effets
+ *  « station » dans la même issue en rallument deux : main.ts relit la
+ *  liste entre les deux, la première rallumée n'y est plus. */
+export function stationVisee(effet: { station?: string }, stationsEnPanne: readonly string[]): string | null {
+  if (effet.station) return stationsEnPanne.includes(effet.station) ? effet.station : null
+  return stationsEnPanne[0] ?? null
+}
 
 export const EVENEMENTS: readonly EvenementDef[] = [
   // ——— LE SOIN ————————————————————————————————————————————————
@@ -307,6 +333,82 @@ export const EVENEMENTS: readonly EvenementDef[] = [
       },
     ],
   },
+
+  // ——— LE HUB, À DISTANCE ——————————————————————————————————————
+  // Deux rencontres dont l'effet ne meurt pas à la purge : ce qu'on y fait
+  // se VOIT au retour au hub. Le joueur avait demandé « quelque chose de
+  // plus impactant » que des chiffres qui fondent à la fin de la run —
+  // rallumer le module depuis les entrailles de la station en est un.
+  {
+    id: 'sous-station',
+    titre: 'LA SOUS-STATION',
+    lieu: 'Une armoire de disjoncteurs, tous tombés, et un câble qui remonte vers le hub.',
+    texte:
+      'Quand le télescope a lâché, la station a coupé le module Méduse pour se protéger, et les leviers sont restés en bas depuis. Sur le câble, au marqueur : HUB — NE PAS RÉENCLENCHER SANS ORDRE. Personne n’est resté pour donner l’ordre.',
+    choix: [
+      {
+        libelle: 'RALLUMER LE HUB',
+        detail: 'les lumières du hub reviennent pour de bon — la station saura qui a touché à son tableau',
+        possible: enPanne('eclairage'),
+        issues: [
+          {
+            poids: 1,
+            texte: 'Les leviers remontent un à un. Très loin au-dessus, le module Méduse sort du noir — et quelque part, un registre note votre numéro.',
+            effets: [{ quoi: 'station', station: 'eclairage' }, { quoi: 'confinement', crans: 1 }],
+          },
+        ],
+      },
+      {
+        libelle: 'TOUT RÉENCLENCHER',
+        detail: 'deux stations du hub d’un coup — ou le tableau saute, et vous avec',
+        possible: enPanne(),
+        issues: [
+          {
+            poids: 3,
+            texte: 'L’armoire tient. Deux voyants du hub repassent au vert sur le synoptique, et le câble se met à chauffer doucement.',
+            effets: [{ quoi: 'station' }, { quoi: 'station' }, { quoi: 'confinement', crans: 1 }],
+          },
+          {
+            poids: 2,
+            texte: 'Le tableau saute. Le courant vous traverse avant de repartir dans la masse ; il laisse quelque chose en vous qui grésille encore.',
+            effets: [{ quoi: 'instrument', bon: false }, { quoi: 'memoire', n: 6 }],
+          },
+        ],
+      },
+      { libelle: 'PRENDRE LE CUIVRE', detail: 'du condensat, et le hub reste dans le noir', issues: [{ poids: 1, texte: 'Vous arrachez ce qui brille. Le câble pend, définitivement muet.', effets: [{ quoi: 'condensat', cl: 80 }] }] },
+    ],
+  },
+  {
+    id: 'drone',
+    titre: 'LE DRONE D’ENTRETIEN',
+    lieu: 'Un drone de maintenance coincé sous une grille, les bras encore pleins d’outils.',
+    texte:
+      'Son ordre de mission est peint sur la coque : REMETTRE EN ÉTAT LE MODULE MÉDUSE. Il l’a reçu le jour de l’accident et n’a jamais trouvé la route. Ses capteurs vous suivent dès que vous bougez ; il attend qu’on lui montre le chemin.',
+    choix: [
+      {
+        libelle: 'LE GUIDER JUSQU’AU HUB',
+        detail: '−8 % d’essence maximale, semée en balises — une station du hub réparée à votre retour',
+        possible: (e) => sacrifiable(-0.08)(e) && enPanne()(e),
+        issues: [
+          {
+            poids: 1,
+            texte: 'Vous semez des gouttes de vous jusqu’à la coursive. Le drone les suit une à une, et disparaît vers le haut. Quand vous rentrerez, quelque chose tournera de nouveau.',
+            effets: [{ quoi: 'essence', part: -0.08 }, { quoi: 'station' }],
+          },
+        ],
+      },
+      {
+        libelle: 'LE LIBÉRER',
+        detail: 'il trouvera peut-être son chemin tout seul',
+        possible: enPanne(),
+        issues: [
+          { poids: 1, texte: 'Il hésite, puis file droit vers le hub. Il savait la route ; il lui manquait la grille ouverte.', effets: [{ quoi: 'station' }] },
+          { poids: 2, texte: 'Il file dans la mauvaise direction et ne revient pas. Vous gardez son numéro de série.', effets: [{ quoi: 'memoire', n: 10 }] },
+        ],
+      },
+      { libelle: 'LE DÉMONTER', detail: 'ses outils valent un instrument — le hub attendra', issues: [{ poids: 1, texte: 'Le drone se laisse faire. Ce qu’il portait vous ira mieux qu’à lui.', effets: [{ quoi: 'instrument', bon: true }] }] },
+    ],
+  },
 ]
 
 export function evenementParId(id: string): EvenementDef | undefined {
@@ -388,6 +490,8 @@ export function ditEffet(e: EffetEvenement): string {
       return 'la station se lit d’avance'
     case 'confinement':
       return `confinement +${e.crans} à la salle suivante`
+    case 'station':
+      return e.station === 'eclairage' ? 'les lumières du hub se rallument' : 'une station du hub se remet en marche'
     case 'rien':
       return 'rien'
   }

@@ -32,6 +32,7 @@ import {
 import {
   REPARATIONS,
   appliqueReparations,
+  avaries,
   poseAvaries,
   reparationDef,
   stationDebout,
@@ -176,6 +177,7 @@ import {
   ditEffet,
   offresDe,
   resoutChoix,
+  stationVisee,
   tireEvenement,
   type ChoixEvenement,
   type EffetEvenement,
@@ -18533,8 +18535,24 @@ function etatJoueurEvenement(): EtatJoueur {
     inconnuALire: carte.modules.some(
       (m) => m.type === 'inconnu' && !carteRun.revelations[m.id],
     ),
+    stationsEnPanne: stationsEnPanne(),
   }
 }
+
+/** Les stations du hub encore en panne, dans l'ordre du catalogue qui joue
+ *  (la régie peut en retirer : une station retirée est debout d'office). */
+function stationsEnPanne(): string[] {
+  return avaries()
+    .map((r) => r.id)
+    .filter((id) => !stationDebout(id, records.estRepare(id)))
+}
+
+/** LES STATIONS RALLUMÉES DEPUIS LA DESCENTE, à annoncer au retour : la
+ *  réparation est gravée sur-le-champ (records), le hub reconstruit les
+ *  verra de lui-même ; cette liste ne sert qu'à DIRE au joueur, en rentrant,
+ *  que c'est lui. Perdue au rechargement de l'onglet — le hub, lui, reste
+ *  rallumé, et c'est l'essentiel. */
+let stationsRallumeesEnRoute: string[] = []
 
 /** APPLIQUER UNE ISSUE : chaque effet du vocabulaire d'evenements.ts tire
  *  sur un levier réel de la run. Rend les lignes à afficher — ce qu'on a
@@ -18624,6 +18642,20 @@ function appliqueEffets(effets: readonly EffetEvenement[]): string[] {
         run.confinementDu += Math.max(0, Math.round(e.crans))
         lignes.push(`⚠️ confinement +${e.crans} à la prochaine salle`)
         break
+      case 'station': {
+        // la réparation est GRATUITE en mémoire (l'offre a fait payer
+        // autrement) et gravée tout de suite : une run perdue ensuite ne
+        // rééteint pas le hub — c'est tout l'intérêt de l'effet
+        const id = stationVisee(e, stationsEnPanne())
+        const r = id ? reparationDef(id) : null
+        if (!id || !r || !records.repare(id, 0)) {
+          lignes.push('🛠️ le hub n’avait plus rien à rallumer')
+          break
+        }
+        stationsRallumeesEnRoute.push(id)
+        lignes.push(`🛠️ ${r.nom} — rétabli au hub : ${r.detail}`)
+        break
+      }
       case 'rien':
         break
     }
@@ -19699,6 +19731,18 @@ function retourAuLabo(): void {
       sur: 'LE DISTILLATEUR',
     })
   }
+  // LES STATIONS RALLUMÉES EN DESCENTE (salles événement) : le hub les
+  // montre déjà rallumées — on dit au joueur que c'est son œuvre
+  for (const id of stationsRallumeesEnRoute) {
+    const r = reparationDef(id)
+    if (r)
+      toastFile.push({
+        nom: `${r.nom} — ${r.detail}`,
+        icone: r.icone,
+        sur: 'RALLUMÉ PENDANT VOTRE DESCENTE',
+      })
+  }
+  stationsRallumeesEnRoute = []
   voieIntercalaire = null
   voieGenereeChoisie = null
   voieDuJourForcee = false // la descente du jour forcée valait UNE run
