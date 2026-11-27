@@ -6,6 +6,7 @@ import {
   SEUIL_RENFLOUEMENT,
   GAIN_UTILE,
   SEUIL_INVITE,
+  blocsBonbonne,
   bonbonneIllimitee,
   doitSecourir,
   doitVerserAuto,
@@ -187,24 +188,24 @@ const DESCENTE: EtatDescente = {
   alerteL: P.lastCallLiters,
   critiqueL: P.criticalVolumeLiters,
   liquide: true,
+  secoursAcquis: true,
 }
 const descente = (o: Partial<EtatDescente> = {}): EtatDescente => ({ ...DESCENTE, ...o })
 
-describe('Le gain du versement — le chiffre que l’invite annonce', () => {
-  it('rend le creux du corps quand la réserve le couvre', () => {
-    expect(gainVersement(descente({ litres: 3.5 }))).toBeCloseTo(1, 6)
-  })
-  it('est borné à la réserve quand le creux la dépasse', () => {
-    expect(gainVersement(descente({ litres: 1, reserveL: 0.8 }))).toBeCloseTo(0.8, 6)
+describe('Le gain du versement — la bonbonne se vide d’un coup', () => {
+  it('rend TOUTE la réserve, même si le creux du corps est plus petit', () => {
+    // la décision du concepteur : une barre qui garde des blocs après le
+    // geste ne dit pas « c'est fait »
+    expect(gainVersement(descente({ litres: 3.5, reserveL: 2 }))).toBeCloseTo(2, 6)
+    expect(gainVersement(descente({ litres: 4.5, reserveL: 2 }))).toBeCloseTo(2, 6)
   })
   it('compte en gouttes ENTIÈRES : un fond de bonbonne sous la goutte ne rend rien', () => {
-    expect(gainVersement(descente({ litres: 1, reserveL: P.litersPerParticle * 0.9 }))).toBe(0)
+    expect(gainVersement(descente({ reserveL: P.litersPerParticle * 0.9 }))).toBe(0)
     // 0,8 / 0,005 vaut 159,99… en flottant : la goutte ne doit pas se perdre
-    const g = gainVersement(descente({ litres: 1, reserveL: 0.8 }))
+    const g = gainVersement(descente({ reserveL: 0.8 }))
     expect(Math.round(g / P.litersPerParticle)).toBe(160)
   })
-  it('ne rend rien à un corps plein, ni d’une bonbonne vide', () => {
-    expect(gainVersement(descente())).toBe(0)
+  it('ne rend rien d’une bonbonne vide', () => {
     expect(gainVersement(descente({ litres: 1, reserveL: 0 }))).toBe(0)
   })
 })
@@ -243,6 +244,9 @@ describe('Le secours — on ne meurt plus à sec une réserve au dos', () => {
   it('part au seuil critique, réserve disponible', () => {
     expect(doitSecourir(descente({ litres: P.criticalVolumeLiters }))).toBe(true)
   })
+  it('ne part JAMAIS sans la soupape du marchand : sans elle, verser reste un geste', () => {
+    expect(doitSecourir(descente({ litres: 0.1, secoursAcquis: false }))).toBe(false)
+  })
   it('ne part pas d’une bonbonne vide', () => {
     expect(doitSecourir(descente({ litres: 0.2, reserveL: 0 }))).toBe(false)
   })
@@ -275,5 +279,29 @@ describe('La jauge en deux segments — ce que le geste rendrait se voit', () =>
   })
   it('sans volume de départ, rien à dessiner', () => {
     expect(segmentsJauge(1, 0, 1)).toEqual({ corps: 0, reserve: 0 })
+  })
+})
+
+describe('La barre — la réserve se lit en blocs, de gauche à droite', () => {
+  it('pose un bloc par litre de contenance', () => {
+    expect(blocsBonbonne(0, 8)).toHaveLength(8)
+    expect(blocsBonbonne(0, 2)).toHaveLength(2)
+  })
+  it('remplit de gauche à droite, le dernier bloc entamé restant partiel', () => {
+    expect(blocsBonbonne(2.5, 8)).toEqual([1, 1, 0.5, 0, 0, 0, 0, 0])
+  })
+  it('un petit gain se voit : 0,5 L entame le premier bloc', () => {
+    expect(blocsBonbonne(0.5, 8)[0]).toBeCloseTo(0.5, 6)
+  })
+  it('vide : aucun bloc ; pleine : tous', () => {
+    expect(blocsBonbonne(0, 8).every((b) => b === 0)).toBe(true)
+    expect(blocsBonbonne(8, 8).every((b) => b === 1)).toBe(true)
+  })
+  it('ne déborde pas de sa contenance, ni sous zéro', () => {
+    expect(blocsBonbonne(12, 8).every((b) => b === 1)).toBe(true)
+    expect(blocsBonbonne(-1, 8).every((b) => b === 0)).toBe(true)
+  })
+  it('une contenance fractionnaire garde une case pour son reste', () => {
+    expect(blocsBonbonne(0, 6.5)).toHaveLength(7)
   })
 })

@@ -79,7 +79,7 @@ export const MANOEUVRES: Manoeuvre[] = [
   {
     id: 'verser',
     nom: 'Verser la BONBONNE',
-    aide: 'La réserve mise de côté se reverse dans le corps — en liquide seulement. La fiole du bandeau fait le même geste ; à la dernière impulsion, elle se verse toute seule.',
+    aide: 'La réserve mise de côté se reverse dans le corps — en liquide seulement, et d’un coup. La barre du coin haut-gauche fait le même geste.',
     section: 'Les états',
     clavier: 'v',
     manette: 12, // croix ↑

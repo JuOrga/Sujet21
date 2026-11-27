@@ -24,7 +24,7 @@ export interface Amelioration {
   prix: number // en mémoire
 }
 
-/** Les améliorations durables. Trois pour commencer — des provisions du
+/** Les améliorations durables. Trois pour commencer, puis la soupape — des provisions du
  *  comptoir rendues permanentes : ce sont les effets que le joueur connaît
  *  déjà, et le prix dit qu'on les achète une fois pour toutes. À étoffer
  *  avec le concepteur. */
@@ -42,6 +42,16 @@ export const AMELIORATIONS: readonly Amelioration[] = [
     detail: '+1 vie au départ de chaque descente, pour toujours',
     icone: '💠',
     prix: 20,
+  },
+  {
+    // LE SECOURS DE LA BONBONNE (game/bonbonne.ts) : donné d'office, il
+    // retirait sa tension à la descente — c'est un achat (27/11), et le plus
+    // cher du rayon : il rattrape une fin de course à chaque salle.
+    id: 'secours',
+    nom: 'SOUPAPE DE SECOURS',
+    detail: 'à la dernière impulsion, la bonbonne se verse TOUTE SEULE dans le corps — à chaque descente, pour toujours',
+    icone: '🛟',
+    prix: 25,
   },
   {
     id: 'flair',

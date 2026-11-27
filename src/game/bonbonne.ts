@@ -127,13 +127,18 @@ export function doitVerserAuto(e: EtatVersement): boolean {
 //     peut en rendre une part qui compte : la fiole se déplie en bouton
 //     (« V · VERSER +0,80 L »), et la jauge montre en hachures ce que le
 //     geste rendrait. Rien ne presse, mais le geste est NOMMÉ.
+//     LE GESTE VIDE LA BONBONNE D'UN COUP (décision du concepteur, 27/11) :
+//     toute la réserve passe dans le corps, même au-delà de son volume de
+//     départ. Une barre qui garderait trois blocs après qu'on l'a versée
+//     ne dit pas « c'est fait » ; une barre vide, si.
 //  2. PRESSANTE — le corps entre dans la zone d'alerte : la bannière
 //     d'alarme, celle qu'on ne peut pas rater, porte le geste et se touche.
 //  3. LE SECOURS — au seuil de la dernière impulsion, la bonbonne se verse
-//     TOUTE SEULE. Mourir avec une réserve pleine n'apprenait rien ; se
-//     voir sauvé par elle apprend qu'elle existe. Le geste garde son
-//     intérêt : verser TÔT, c'est choisir son moment (avant une traversée,
-//     pas au milieu) — le secours, lui, ne choisit rien.
+//     TOUTE SEULE. C'EST UN ACHAT DURABLE au marchand du hub (la SOUPAPE
+//     DE SECOURS, game/marchand.ts — décision du concepteur, 27/11) : donné
+//     d'office, il faisait de la bonbonne une seconde jauge et retirait sa
+//     tension à la descente. Acheté, il se mérite — et le geste reste la
+//     règle pour qui ne l'a pas.
 //
 // Tout est en fonctions pures : main.ts ne fait qu'obéir, comme au hub.
 
@@ -166,22 +171,20 @@ export interface EtatDescente {
   critiqueL: number
   /** seul l'état liquide absorbe (la glace refuse, le nuage disperserait) */
   liquide: boolean
+  /** la SOUPAPE DE SECOURS est-elle acquise au marchand ? Sans elle, le
+   *  secours ne part jamais : le versement reste un geste. */
+  secoursAcquis: boolean
 }
 
-/** CE QUE LE GESTE RENDRAIT, en litres : le creux du corps, borné à la
- *  réserve, en gouttes ENTIÈRES — c'est le chiffre que l'invite annonce,
- *  il doit être celui que le versement tiendra. */
-export function gainVersement(e: {
-  litres: number
-  litresPleins: number
-  reserveL: number
-  litreParticule: number
-}): number {
+/** CE QUE LE GESTE RENDRAIT, en litres : TOUTE la réserve, en gouttes
+ *  ENTIÈRES — c'est le chiffre que l'invite annonce, il doit être celui que
+ *  le versement tiendra. Le creux du corps ne le borne plus : la bonbonne
+ *  se vide d'un coup, quitte à porter le corps au-delà de son départ. */
+export function gainVersement(e: { reserveL: number; litreParticule: number }): number {
   if (!(e.litreParticule > 0)) return 0
-  const creux = Math.max(0, e.litresPleins - e.litres)
   // l'epsilon rattrape la division flottante (0,8 / 0,005 = 159,99…) sans
   // jamais inventer une goutte
-  const gouttes = Math.floor(Math.min(creux, Math.max(0, e.reserveL)) / e.litreParticule + 1e-6)
+  const gouttes = Math.floor(Math.max(0, e.reserveL) / e.litreParticule + 1e-6)
   return gouttes * e.litreParticule
 }
 
@@ -200,10 +203,11 @@ export function inviteBonbonne(e: EtatDescente): InviteBonbonne {
   return gain >= e.litresPleins * GAIN_UTILE ? 'offerte' : 'aucune'
 }
 
-/** LE SECOURS : faut-il verser tout seul, maintenant ? Au seuil critique,
+/** LE SECOURS : faut-il verser tout seul, maintenant ? Soupape acquise, au seuil critique,
  *  et seulement si le corps peut absorber — en glace ou en vapeur, la
  *  bannière dit de revenir au liquide, et le secours attend. */
 export function doitSecourir(e: EtatDescente): boolean {
+  if (!e.secoursAcquis) return false
   if (!e.actif || !e.liquide) return false
   if (e.litres > e.critiqueL) return false
   return gainVersement(e) >= e.litreParticule
@@ -221,4 +225,29 @@ export function segmentsJauge(
   const corps = Math.max(0, Math.min(1, litres / litresPleins))
   const reserve = Math.max(0, Math.min(1 - corps, gain / litresPleins))
   return { corps, reserve }
+}
+
+// ---- LA BARRE : la bonbonne se lit en BLOCS -----------------------------
+// La fiole de verre (12 px, un niveau qui ondule) ne se lisait pas : ni sa
+// contenance, ni ce qu'elle tenait. La réserve est désormais une BARRE
+// horizontale compartimentée, qui se remplit de gauche à droite — un bloc
+// par litre — et se vide d'un coup. Pas de physique de l'eau : des cases.
+
+/** Ce qu'un bloc de la barre contient, en litres. Un litre : la bonbonne
+ *  d'origine (8 L) tient en huit cases, assez larges pour se compter d'un
+ *  coup d'œil ; au demi-litre, seize cases ne se comptent plus. */
+export const LITRES_PAR_BLOC = 1
+
+/** LE REMPLISSAGE DE CHAQUE BLOC, de gauche à droite, en part (0..1). Le
+ *  dernier bloc entamé est partiel — un gain de 0,5 L doit se VOIR, sinon
+ *  la halte qui le donne semblerait n'avoir rien donné. Une contenance
+ *  fractionnaire (un levier la rogne) garde un dernier bloc entier : on
+ *  dessine des cases, pas des fractions de case. */
+export function blocsBonbonne(reserveL: number, capL: number): number[] {
+  const n = Math.max(1, Math.ceil(capL / LITRES_PAR_BLOC - 1e-9))
+  const r = Math.max(0, Math.min(reserveL, capL))
+  const blocs: number[] = []
+  for (let i = 0; i < n; i++)
+    blocs.push(Math.max(0, Math.min(1, r / LITRES_PAR_BLOC - i)))
+  return blocs
 }

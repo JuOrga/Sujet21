@@ -467,6 +467,7 @@ import {
 } from './game/netLevels'
 import {
   REPOS_VERSEMENT_S,
+  blocsBonbonne,
   bonbonneIllimitee,
   doitSecourir,
   doitVerserAuto,
@@ -2274,7 +2275,9 @@ const hudViesChip = el('hud-vies-chip') as HTMLButtonElement
 const bonbonneEl = el('bonbonne') as HTMLButtonElement
 // le groupe du liquide : on le fait GLISSER dans le verre (translateY en
 // unités du viewBox) — l'intérieur est clippé, le niveau se lit tout seul
-const bbLiquide = document.getElementById('bb-liquide') as SVGGElement | null
+const bbBarre = el('bb-barre')
+// la barre telle qu'elle est dessinée : on ne touche au DOM que si elle change
+let bbBarreSig = ''
 // le niveau AFFICHÉ court après le niveau réel : la réserve monte et descend
 // à vue, jamais d'un coup — c'est là qu'est le plaisir
 let bbAffiche = 0
@@ -13459,7 +13462,8 @@ instrPanel?.addEventListener('click', () => {
 })
 
 /** VERSER LA BONBONNE : la réserve se reverse dans le corps, en jeu — même
- * non pleine. Le corps se regonfle jusqu'à son volume de départ ; l'état
+ * non pleine. En descente elle se vide D'UN COUP ; au hub (réserve
+ * infinie) le corps se regonfle jusqu'à son volume de départ. L'état
  * liquide est requis (la glace n'absorbe pas, le nuage disperserait). */
 function verserBonbonne(
   o: { dose?: number; discret?: boolean } = {},
@@ -13482,13 +13486,17 @@ function verserBonbonne(
   // trait — c'est une décision du joueur, elle a le droit d'être franche.
   const plafond =
     o.dose === undefined ? manque : Math.max(0, Math.floor(o.dose))
-  const nParts = Math.min(
-    manque,
-    plafond,
-    illimitee
-      ? Number.POSITIVE_INFINITY
-      : Math.floor(run.bonbonneLiters / params.litersPerParticle),
-  )
+  // EN DESCENTE, LE GESTE VIDE LA BONBONNE D'UN COUP : toute la réserve
+  // passe dans le corps, même au-delà de son volume de départ (décision du
+  // concepteur — une barre qui garde des blocs après le geste ne dit pas
+  // « c'est fait »). Le creux ne borne que le hub, où la réserve est
+  // infinie : sans lui, on y verserait sans fin.
+  const nParts = illimitee
+    ? Math.min(manque, plafond)
+    : Math.min(
+        o.dose === undefined ? Number.POSITIVE_INFINITY : plafond,
+        Math.floor(run.bonbonneLiters / params.litersPerParticle + 1e-6),
+      )
   if (nParts < 1) return 'rien'
   // le versement s'installe dans les CREUX autour du corps (jamais sur les
   // particules en place) : poser au centroïde faisait exploser la densité —
@@ -13556,6 +13564,8 @@ function etatDescente(): EtatDescente {
     alerteL: params.lastCallLiters,
     critiqueL: params.criticalVolumeLiters,
     liquide: !input.freezeIntent && !input.gasIntent,
+    // la SOUPAPE DE SECOURS, achat durable du marchand (game/marchand.ts)
+    secoursAcquis: records.aAmelioration('secours'),
   }
 }
 /** LE GESTE, NOMMÉ PAR CE QUE LE JOUEUR A EN MAIN : la touche (redéfinie ou
@@ -13580,7 +13590,9 @@ function verseEtDis(): void {
       : r === 'rien'
         ? run.bonbonneLiters < params.litersPerParticle
           ? 'bonbonne vide'
-          : 'le corps est déjà plein'
+          : auHub
+            ? 'le corps est déjà plein'
+            : 'pas de place autour du corps'
         : r === 'etat'
           ? 'seulement en LIQUIDE'
           : r === 'pause'
@@ -22936,23 +22948,31 @@ function corpsImage(now: number): boolean {
   hudBonbonne.textContent = bbInfinie
     ? '∞'
     : `${run.bonbonneLiters.toFixed(2)} / ${capBonbonne()} L`
-  // LE NIVEAU DANS LE VERRE : la part de réserve, poursuivie en douceur.
-  // L'intérieur utile va de y = 8,5 (plein) à y = 57,5 (vide) dans le
-  // viewBox — soit 49 unités de descente pour un verre vide.
+  // LA BARRE (game/bonbonne.ts) : la réserve en BLOCS, de gauche à droite.
+  // Elle MONTE en douceur (un gain se regarde arriver) et se VIDE d'un coup
+  // (le versement est un événement, pas une fuite) : la poursuite ne joue
+  // donc qu'à la hausse.
   const bbCible = bbInfinie
     ? 1
     : Math.max(0, Math.min(1, run.bonbonneLiters / capBonbonne()))
-  bbAffiche += (bbCible - bbAffiche) * Math.min(1, dtReal * 5)
+  if (bbCible < bbAffiche) bbAffiche = bbCible
+  else bbAffiche += (bbCible - bbAffiche) * Math.min(1, dtReal * 5)
   if (Math.abs(bbCible - bbAffiche) < 0.002) bbAffiche = bbCible
-  if (bbLiquide)
-    bbLiquide.setAttribute(
-      'transform',
-      `translate(0 ${((1 - bbAffiche) * 49).toFixed(2)})`,
-    )
+  const blocs = blocsBonbonne(bbAffiche * capBonbonne(), capBonbonne())
+  const sigBarre = blocs.map((b) => Math.round(b * 50)).join(',')
+  if (sigBarre !== bbBarreSig) {
+    bbBarreSig = sigBarre
+    if (bbBarre.childElementCount !== blocs.length)
+      bbBarre.innerHTML = blocs.map(() => '<i><b></b></i>').join('')
+    blocs.forEach((b, i) => {
+      const plein = bbBarre.children[i].firstElementChild as HTMLElement
+      plein.style.width = `${(b * 100).toFixed(0)}%`
+      bbBarre.children[i].classList.toggle('plein', b >= 1)
+    })
+  }
   // le versement est possible : le verre s'ourle de vert pour inviter au geste
   const peutVerser =
     run.bonbonneLiters >= params.litersPerParticle &&
-    sim.playerCount < volumeDepart() &&
     !input.freezeIntent &&
     !input.gasIntent
   bonbonneEl.classList.toggle('verse-ok', peutVerser)
@@ -23110,7 +23130,8 @@ function corpsImage(now: number): boolean {
   const alive = !sim.dispersed && !tableauDone && !run.ended
   if (alive && !endgame.spent && !endgame.enCollecte && !vide.prise) {
     // LE SECOURS : au seuil de la dernière impulsion, la bonbonne se verse
-    // TOUTE SEULE (game/bonbonne.ts) — AVANT que le seuil ne soit constaté,
+    // TOUTE SEULE pour qui a acheté la SOUPAPE au marchand du hub
+    // (game/bonbonne.ts, game/marchand.ts) — AVANT que le seuil ne soit constaté,
     // pour que la dernière impulsion ne soit jamais déclarée sur un corps
     // qui avait de quoi tenir. On mourait à sec, la réserve intacte.
     // Le secours n'est PAS muet, au contraire du hub : c'est un événement,

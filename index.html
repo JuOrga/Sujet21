@@ -8000,11 +8000,11 @@
       #instr-panel .ip-note {
         margin: 10px 0 0; font-size: calc(10px * var(--ui)); letter-spacing: 0.1em; color: #55708c;
       }
-      /* ---- LA BONBONNE DE SECOURS : la réserve, en verre, sous le litrage ----
-         Ce qu'on a mis de côté se VOIT monter dans la fiole : un niveau qui
-         suit la réserve, une surface qui ondule, un éclat qui balaie le verre
-         quand le tableau s'ouvre. Elle bat doucement quand le corps touche à
-         sa dernière goutte : le joueur oublie souvent qu'il a de quoi tenir. */
+      /* ---- LA BONBONNE DE SECOURS : la réserve, en BARRE, à côté du litrage ----
+         Ce qu'on a mis de côté se COMPTE : un bloc par litre, remplis de
+         gauche à droite. Elle a été une fiole de verre, avec son niveau et
+         son onde — jolie, et illisible à 12 px : personne ne s'en servait
+         (signalé). Elle bat quand le corps touche à sa dernière goutte. */
       .bonbonne {
         position: relative;
         /* LE BANDEAU EST TRANSPARENT AUX CLICS (#hud) : seules les pastilles
@@ -8012,16 +8012,30 @@
            au décor et coûtait une goutte au lieu de verser (signalé). */
         pointer-events: auto;
         display: flex; align-items: center; gap: 5px; flex: none;
-        margin: 0; padding: 1px 6px 1px 3px; line-height: 1;
-        background: transparent; border: 1px solid transparent; border-radius: 9px;
+        margin: 0; padding: 3px 7px 3px 4px; line-height: 1;
+        background: transparent; border: 1px solid transparent; border-radius: 5px;
         color: #9fd6f2; font: inherit; font-size: calc(11px * var(--ui)); letter-spacing: 0.04em;
         cursor: pointer; transition: border-color 0.18s ease, box-shadow 0.18s ease;
       }
       .bonbonne[hidden] { display: none; }
-      /* la fiole tient dans la HAUTEUR DE LA LIGNE : le bandeau garde son
-         épaisseur d'avant (signalé) — c'est le niveau qui parle, pas la taille */
-      .bonbonne svg { width: 12px; height: 18px; display: block; overflow: visible; }
-      /* LA CIBLE : la fiole est petite (le bandeau ne doit pas épaissir),
+      /* LA BARRE : horizontale, compartimentée, lisible de loin. La fiole
+         de verre (12 px) tenait dans la ligne mais ne se lisait pas ; la
+         barre prend la LARGEUR qu'il faut (un bloc par litre) et reste dans
+         la hauteur du litrage, pour que le coin n'épaississe pas. */
+      .bb-barre { display: flex; gap: 2px; flex: none; height: calc(14px * var(--ui)); }
+      .bb-barre i {
+        display: block; position: relative; width: calc(15px * var(--ui)); height: 100%;
+        background: rgba(120, 190, 230, 0.1);
+        border: 1px solid rgba(111, 159, 192, 0.55); border-radius: 2px;
+        overflow: hidden;
+      }
+      /* le plein de chaque bloc : de gauche à droite, à plat — pas d'onde */
+      .bb-barre i b {
+        position: absolute; left: 0; top: 0; bottom: 0; width: 0;
+        background: linear-gradient(180deg, #8ad8ff, #3ea6dd);
+      }
+      .bb-barre i.plein { border-color: rgba(138, 216, 255, 0.9); }
+      /* LA CIBLE : la barre reste basse (le coin ne doit pas épaissir),
          alors la zone qui répond DÉBORDE tout autour — un clic à côté
          partait dans la cuve et coûtait une goutte (signalé). */
       .bonbonne::after {
@@ -8038,32 +8052,13 @@
       }
       .bb-mot.visible { opacity: 1; transform: translateY(0); }
       .bb-mot.bb-non { color: #ffb59f; }
-      .bb-verre {
-        fill: rgba(120, 190, 230, 0.07);
-        stroke: #6f9fc0; stroke-width: 1.6; stroke-linejoin: round;
-      }
-      .bb-bouchon { fill: #22384c; stroke: #6f9fc0; stroke-width: 1.4; }
-      .bb-corps { fill: url(#bb-eau); }
-      .bb-vague { fill: #6ec8f2; }
-      .bb-vague2 { fill: rgba(150, 225, 255, 0.5); }
-      .bb-reflet { fill: rgba(220, 245, 255, 0.16); }
-      .bb-eclat { fill: rgba(226, 246, 255, 0.5); opacity: 0; transform: skewX(-16deg); }
-      /* la surface glisse sans fin : deux vagues, deux allures */
-      .bonbonne .bb-vague { animation: bb-onde 3.4s linear infinite; }
-      .bonbonne .bb-vague2 { animation: bb-onde 5.1s linear infinite reverse; }
-      @keyframes bb-onde { from { transform: translateX(0); } to { transform: translateX(22px); } }
-      /* PRÉSENTATION au début du tableau : la fiole se pose, l'éclat balaie */
+      /* PRÉSENTATION au début du tableau : la barre se pose, et ses blocs
+         se remplissent à vue (la poursuite de majHud repart de zéro) */
       .bonbonne.presente { animation: bb-entree 0.9s cubic-bezier(0.22, 1, 0.36, 1); }
-      .bonbonne.presente .bb-eclat { animation: bb-brille 0.9s ease-out; }
       @keyframes bb-entree {
-        0% { transform: translateY(-6px) scale(0.82); opacity: 0; }
-        55% { transform: translateY(0) scale(1.08); opacity: 1; }
+        0% { transform: translateY(-6px) scale(0.92); opacity: 0; }
+        55% { transform: translateY(0) scale(1.04); opacity: 1; }
         100% { transform: translateY(0) scale(1); opacity: 1; }
-      }
-      @keyframes bb-brille {
-        0% { opacity: 0; transform: translateX(0) skewX(-16deg); }
-        35% { opacity: 0.85; }
-        100% { opacity: 0; transform: translateX(70px) skewX(-16deg); }
       }
       /* RAPPEL : la dernière goutte approche et la réserve peut servir */
       .bonbonne.rappel { animation: bb-rappel 1.7s ease-in-out infinite; }
@@ -8071,16 +8066,17 @@
         0%, 100% { transform: translateY(0); filter: drop-shadow(0 0 0 rgba(109, 255, 184, 0)); }
         50% { transform: translateY(-2px); filter: drop-shadow(0 0 7px rgba(109, 255, 184, 0.75)); }
       }
-      /* le versement possible : le verre s'ourle de vert — le geste est offert */
+      /* le versement possible : la plaque s'ourle de vert — le geste est offert */
       .bonbonne.verse-ok { border-color: rgba(109, 255, 184, 0.55); }
-      .bonbonne.verse-ok .bb-verre { stroke: #6dffb8; }
       .bonbonne.verse-ok .v { color: #8fffcf; }
-      .bonbonne.ouvert { animation: bb-verse 0.5s ease-out; }
-      /* L'INVITE : le geste sert, la fiole se DÉPLIE en bouton — une plaque
+      /* LE VERSEMENT : la barre se vide D'UN COUP, et ses cases claquent
+         en vert le temps d'un éclair — c'est parti dans le corps */
+      .bonbonne.ouvert .bb-barre i { animation: bb-verse 0.55s ease-out; }
+      /* L'INVITE : le geste sert, la barre se DÉPLIE en bouton — une plaque
          pleine, la touche en cabochon, le gain en clair. Elle tient dans la
          hauteur de la ligne (le bandeau ne s'épaissit pas) : c'est en
          LARGEUR qu'elle se fait voir, et le litrage de la réserve lui cède
-         la place — le niveau dans le verre continue de le dire. */
+         la place — les blocs de la barre continuent de le dire. */
       .bb-invite { display: none; align-items: center; gap: 5px; white-space: nowrap; letter-spacing: 0.1em; color: #b9ffe0; }
       .bb-invite b { font-weight: 600; color: #6dffb8; letter-spacing: 0.04em; }
       .bb-invite kbd, #hud-danger kbd {
@@ -8090,6 +8086,8 @@
       }
       .bonbonne.invite { background: rgba(14, 44, 36, 0.82); border-color: rgba(109, 255, 184, 0.7); padding-right: 8px; }
       .bonbonne.invite .bb-invite { display: inline-flex; }
+      .bonbonne.invite .bb-barre i { border-color: rgba(109, 255, 184, 0.6); }
+      .bonbonne.invite .bb-barre i b { background: linear-gradient(180deg, #b9ffe0, #4fdc9a); }
       .bonbonne.invite .v { display: none; }
       .bonbonne.invite:hover { background: rgba(22, 66, 52, 0.9); }
       .bonbonne.invite.rappel { box-shadow: 0 0 0 1px rgba(109, 255, 184, 0.35), 0 0 12px rgba(109, 255, 184, 0.35); }
@@ -8098,6 +8096,8 @@
          gain suffisent à dire le geste, et la plaque ne déborde pas. */
       @media (max-width: 700px), (pointer: coarse) and (max-height: 620px) {
         .bb-invite > span { display: none; }
+        .bb-barre i { width: calc(9px * var(--ui)); }
+        .bonbonne .v { display: none; }
       }
       /* LA JAUGE EN DEUX SEGMENTS : à la suite du corps, en hachures vertes,
          ce que la bonbonne lui rendrait. Hachuré parce que ce volume n'est
@@ -8118,15 +8118,13 @@
         color: #c9ffe6; animation: none;
       }
       @keyframes bb-verse {
-        0% { transform: scale(1); }
-        30% { transform: scale(1.14) rotate(-6deg); }
-        100% { transform: scale(1) rotate(0); }
+        0% { background: rgba(109, 255, 184, 0.95); border-color: #c9ffe6; box-shadow: 0 0 8px rgba(109, 255, 184, 0.8); }
+        100% { background: rgba(120, 190, 230, 0.1); border-color: rgba(111, 159, 192, 0.55); box-shadow: none; }
       }
       @media (prefers-reduced-motion: reduce) {
         #gauge-reserve { transition: none; }
-        .bonbonne, .bonbonne .bb-vague, .bonbonne .bb-vague2,
-        .bonbonne.presente, .bonbonne.rappel, .bonbonne.ouvert,
-        .bonbonne.presente .bb-eclat { animation: none; }
+        .bonbonne, .bonbonne.presente, .bonbonne.rappel,
+        .bonbonne.ouvert .bb-barre i { animation: none; }
       }
       /* ---- REDÉFINIR LES COMMANDES : une ligne par manœuvre ---------------- */
       #touches {
@@ -10434,37 +10432,14 @@
       <div class="ath-coin ath-vital">
         <div class="ath-ligne">
           <div id="hud-volume">— <small>L</small></div>
-          <!-- LA BONBONNE DE SECOURS : sous le litrage, une fiole qui se
-               remplit de ce qu'on a mis de côté. Elle se présente au début du
-               tableau et rappelle sa présence quand le corps touche à sa
-               dernière goutte — un toucher la verse. -->
-          <button type="button" id="bonbonne" class="bonbonne" data-nom="bonbonne de secours — toucher, touche V, ou croix ↑ à la manette : la réserve se verse dans le corps (en liquide). À la dernière impulsion, elle se verse toute seule." hidden>
-            <svg viewBox="0 0 44 64" aria-hidden="true">
-              <defs>
-                <clipPath id="bb-dedans">
-                  <rect x="8.6" y="16.5" width="26.8" height="41" rx="6" />
-                  <rect x="19" y="8.5" width="6" height="9" />
-                </clipPath>
-                <linearGradient id="bb-eau" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0" stop-color="#8ad8ff" />
-                  <stop offset="0.45" stop-color="#3ea6dd" />
-                  <stop offset="1" stop-color="#1d6fa5" />
-                </linearGradient>
-              </defs>
-              <!-- le liquide, clippé par l'intérieur du verre -->
-              <g clip-path="url(#bb-dedans)">
-                <g id="bb-liquide">
-                  <path class="bb-vague" d="M-14 9 q 5.5 -2.6 11 0 t 11 0 t 11 0 t 11 0 t 11 0 t 11 0 V 60 H -14 Z" />
-                  <rect class="bb-corps" x="-14" y="9" width="72" height="52" />
-                  <path class="bb-vague bb-vague2" d="M-14 10.5 q 7 2.4 14 0 t 14 0 t 14 0 t 14 0 t 14 0 V 60 H -14 Z" />
-                </g>
-              </g>
-              <!-- le verre : col, épaules, corps, et son reflet -->
-              <path class="bb-verre" d="M17.6 15.4 V 9.2 h 8.8 v 6.2 q 9 3.4 9 12.4 v 22 q 0 7.4 -7.4 7.4 h -12 q -7.4 0 -7.4 -7.4 v -22 q 0 -9 9 -12.4 Z" />
-              <rect class="bb-bouchon" x="15.4" y="2.6" width="13.2" height="6.6" rx="2" />
-              <path class="bb-reflet" d="M13.4 26 q 2.6 -5.4 6.4 -7.2 v 30 q -6.4 -2 -6.4 -9 Z" />
-              <rect class="bb-eclat" x="-16" y="-8" width="9" height="86" />
-            </svg>
+          <!-- LA BONBONNE DE SECOURS : à côté du litrage, une BARRE à blocs
+               qui se remplit de ce qu'on a mis de côté. Elle se présente au
+               début du tableau et se déplie en bouton quand le geste sert —
+               un toucher la verse, d'un coup. -->
+          <button type="button" id="bonbonne" class="bonbonne" data-nom="bonbonne de secours — toucher, touche V, ou croix ↑ à la manette : la réserve se verse dans le corps (en liquide). Avec la SOUPAPE DE SECOURS du marchand, elle se verse toute seule à la dernière impulsion." hidden>
+            <!-- LA BARRE : un bloc par litre, remplis de gauche à droite par
+                 majHud (game/bonbonne.ts) — des cases, pas de l'eau -->
+            <span class="bb-barre" id="bb-barre" aria-hidden="true"></span>
             <span class="v" id="hud-bonbonne">0.00 L</span>
             <!-- L'INVITE : quand le geste sert, la fiole se déplie en bouton
                  qui le NOMME (la touche, le bouton, le doigt) et dit ce
@@ -10909,7 +10884,7 @@
           <kbd>sur le corps</kbd>maintenir SUR le volume : se rassembler (gratuit)<br />
           <kbd>F</kbd>glace : le bloc garde son élan
           <kbd>G</kbd>vapeur : viser (temps ralenti), relâcher = dash<br />
-          <kbd>V</kbd>verser la BONBONNE dans le corps (la fiole du coin haut-gauche se touche aussi) — en liquide seulement ; à la dernière impulsion, elle se verse toute seule<br />
+          <kbd>V</kbd>verser la BONBONNE dans le corps (la barre du coin haut-gauche se touche aussi) — en liquide seulement, et elle se vide d'un coup<br />
           <kbd>molette</kbd>zoom — la caméra continue de suivre le corps
           <kbd>clic droit maintenu</kbd>déplacer la caméra (elle ne suit plus)
           <kbd>X</kbd>recentrer la caméra sur le corps<br />
@@ -10935,7 +10910,7 @@
           <kbd>stick droit</kbd>déplacer la caméra
           <kbd>clic stick</kbd>recadrer (caméra auto)
           <kbd>croix ↓</kbd>CONTINUER, quand il s'offre<br />
-          <kbd>croix ↑</kbd>verser la BONBONNE dans le corps — la réserve mise de côté, en liquide seulement ; à la dernière impulsion, elle se verse toute seule<br />
+          <kbd>croix ↑</kbd>verser la BONBONNE dans le corps — la réserve mise de côté, en liquide seulement, et elle se vide d'un coup<br />
           <kbd>Start ☰</kbd>pause + la fiche
           <kbd>Select</kbd>recommencer<br />
           <kbd>croix / stick</kbd>MENUS : naviguer (le liseré bleu suit)
