@@ -617,3 +617,72 @@ export function dessineDissolutionParoiSobre(
   g.restore()
   return true
 }
+
+// ---- LE VOILE EN RELIEF : une colonne de brouillard, pas une nappe -------
+//
+// Relief allumé, le voile restait une NAPPE AU SOL peinte par-dessus tout
+// (« les cachettes ne gèrent pas la perspective », le concepteur, 27/11) :
+// le dessus des murs cachés, qui fuit le centre de l'écran, débordait du
+// brouillard et vendait le plan de la cachette ; et le dessus d'un mur
+// DEVANT elle, penché sur son pied, passait sous la brume au lieu de la
+// couvrir. Le voile se dresse donc en COLONNE, à la hauteur de ce qu'il
+// cache : le même bitmap posé en couches, du pied (échelle 1) au dessus
+// (l'homothétie du shader, 1 / (1 − f)) — et main.ts efface de la colonne
+// le volume des solides qui sont devant elle, comme pour les portes.
+
+/** Les échelles des couches de la colonne, du pied (1) au dessus (`sHaut`).
+ *  Deux couches voisines se décalent d'au plus une demi-lisière à l'écran
+ *  (`ecart` : le décalage du dessus sur le pied, en pixels) : le cœur plein
+ *  de chacune couvre le fondu intérieur de la précédente, aucune marche ne
+ *  se lit sur le flanc. Plafonné à 12 couches — au-delà, un zoom extrême
+ *  sur un pan immense, le flanc se dessine en marches plutôt qu'en coût. */
+export function echellesColonne(sHaut: number, ecart: number, lisiere: number): number[] {
+  if (!(sHaut > 1) || !(ecart > 0)) return [1]
+  const n = Math.max(1, Math.min(12, Math.ceil(ecart / Math.max(1, lisiere * 0.5))))
+  const out: number[] = []
+  for (let k = 0; k <= n; k++) out.push(1 + ((sHaut - 1) * k) / n)
+  return out
+}
+
+/** LE DEMI-PLAN DE CE QUI EST DEVANT la colonne : sa frontière passe par le
+ *  point du contour le plus proche de l'œil, sa normale pointe vers l'œil
+ *  (la convention de porteBlindee.ts : coupeDemiPlan garde (q − a)·n ≥ 0).
+ *  Un solide de ce côté-là est plus près du centre de l'écran que la
+ *  cachette, son dessus se penche sur elle : il la cache. Au-delà, c'est la
+ *  colonne qui se penche sur lui. Null si l'œil est DANS la cachette : tout
+ *  ce qui l'entoure fuit vers l'extérieur, rien ne la couvre. */
+export function demiPlanDevant(
+  contour: readonly { x: number; y: number }[],
+  oeilX: number,
+  oeilY: number,
+): { a: { x: number; y: number }; n: { x: number; y: number } } | null {
+  if (contour.length < 3) return null
+  let meilleur: { x: number; y: number } | null = null
+  let d2 = Infinity
+  for (let i = 0; i < contour.length; i++) {
+    const p = contour[i]
+    const q = contour[(i + 1) % contour.length]
+    const ux = q.x - p.x
+    const uy = q.y - p.y
+    const l2 = ux * ux + uy * uy
+    const t = l2 > 0 ? Math.max(0, Math.min(1, ((oeilX - p.x) * ux + (oeilY - p.y) * uy) / l2)) : 0
+    const x = p.x + ux * t
+    const y = p.y + uy * t
+    const d = (x - oeilX) ** 2 + (y - oeilY) ** 2
+    if (d < d2) {
+      d2 = d
+      meilleur = { x, y }
+    }
+  }
+  if (!meilleur || d2 < 1e-9) return null
+  // l'œil dedans (pair–impair) : pas de devant
+  let dedans = false
+  for (let i = 0, j = contour.length - 1; i < contour.length; j = i++) {
+    const a = contour[i]
+    const b = contour[j]
+    if (a.y > oeilY !== b.y > oeilY && oeilX < ((b.x - a.x) * (oeilY - a.y)) / (b.y - a.y) + a.x) dedans = !dedans
+  }
+  if (dedans) return null
+  const l = Math.sqrt(d2)
+  return { a: meilleur, n: { x: (oeilX - meilleur.x) / l, y: (oeilY - meilleur.y) / l } }
+}
