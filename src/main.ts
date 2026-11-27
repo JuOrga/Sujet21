@@ -276,10 +276,15 @@ import {
 } from './game/leviers'
 import { FORME_COQUE, FORME_RECT, coquePieces, dansForme, formeOutline, type FormeBox } from './game/formes'
 import {
+  VOILE_DUREE,
+  VOILE_SOBRE_DUREE,
+  demiPlanDevant,
   dessineDissolutionParoi,
   dessineDissolutionParoiSobre,
   dessineVoile,
   dessineVoileSobre,
+  echellesColonne,
+  mesures,
 } from './render/voileCache'
 import {
   DOMAINE_NOMS,
@@ -11591,6 +11596,48 @@ function drawMecanismes(vw: number, vh: number, dpr: number): void {
   }
   g.globalCompositeOperation = 'source-over'
 
+  // LES ÉMETTEURS ET LES CIBLES PASSENT SOUS LE DESSUS DES MURS, comme les
+  // faisceaux qui en partent et y arrivent. Peints à plat par-dessus le
+  // rendu WebGL, ils restaient visibles là où le sommet d'un mur, fuyant le
+  // centre de l'écran, recouvre le sol au-delà de son pied : le rayon
+  // disparaissait sous la paroi, son émetteur la traversait (« émetteur
+  // laser pas caché par la perspective », le concepteur, 27/11). Le même
+  // remède : leur calque, dont le volume des solides voisins qui arrêtent
+  // la lumière est effacé. Relief éteint, rien ne change.
+  let calquePoses: {
+    c: CanvasRenderingContext2D
+    rect: { x0: number; y0: number; x1: number; y1: number }
+    occ: Occultant[]
+  } | null = null
+  if (fMurHaut > 0 && lasers.length + cibles.length > 0) {
+    let minX = Infinity
+    let minY = Infinity
+    let maxX = -Infinity
+    let maxY = -Infinity
+    for (const q of [...lasers, ...cibles]) {
+      minX = Math.min(minX, q.x)
+      minY = Math.min(minY, q.y)
+      maxX = Math.max(maxX, q.x)
+      maxY = Math.max(maxY, q.y)
+    }
+    // le plus large de ce qui se peint autour d'un point : le fût d'un
+    // émetteur (1,7 × 16 unités, 8 px au moins), le rayon d'une cible
+    const rayon = Math.max(30, ...cibles.map((t) => t.r))
+    const rMonde = { minX: minX - rayon, minY: minY - rayon, maxX: maxX + rayon, maxY: maxY + rayon }
+    const occ = occultantsPres(rMonde, absorbeLumiere)
+    if (occ.length > 0) {
+      const a = S(rMonde.minX, rMonde.maxY)
+      const b = S(rMonde.maxX, rMonde.minY)
+      const marge = 16
+      const rect = { x0: a.sx - marge, y0: a.sy - marge, x1: b.sx + marge, y1: b.sy + marge }
+      const c = ouvreCalque(fxG, rect)
+      if (c) {
+        calquePoses = { c, rect, occ }
+        g = c
+      }
+    }
+  }
+
   // émetteurs : un fût court orienté, une bouche lumineuse
   for (const em of lasers) {
     if (dansCacheVoilee(em.x, em.y)) continue
@@ -11708,6 +11755,11 @@ function drawMecanismes(vw: number, vh: number, dpr: number): void {
       g.lineWidth = 1.5
       g.stroke()
     }
+  }
+  if (calquePoses) {
+    const { c, rect, occ } = calquePoses
+    g = fxG
+    fermeCalque(g, c, rect, (m) => effaceVolumes(m, occ, projetteRelief))
   }
 
   // les COUPELLES : une bouche d'aspiration au centre de son OUTRE. Le
@@ -12054,14 +12106,102 @@ function drawMecanismes(vw: number, vh: number, dpr: number): void {
       y: (c.minY + c.maxY) / 2,
     }
     const etat = { levee: cachesLevee[i], entreeX: entree.x, entreeY: entree.y }
-    if (voileSobre) {
-      if (c.style === 'paroi') dessineDissolutionParoiSobre(g, c, etat, elapsed, vue)
-      else dessineVoileSobre(g, c, etat, elapsed, vue, i)
-    } else if (c.style === 'paroi') {
-      dessineDissolutionParoi(g, c, etat, elapsed, vue)
-    } else {
-      dessineVoile(g, c, etat, elapsed, vue, i)
+    const dessine = (gg: CanvasRenderingContext2D): void => {
+      if (voileSobre) {
+        if (c.style === 'paroi') dessineDissolutionParoiSobre(gg, c, etat, elapsed, vue)
+        else dessineVoileSobre(gg, c, etat, elapsed, vue, i)
+      } else if (c.style === 'paroi') {
+        dessineDissolutionParoi(gg, c, etat, elapsed, vue)
+      } else {
+        dessineVoile(gg, c, etat, elapsed, vue, i)
+      }
     }
+    // relief éteint : la nappe au sol, telle qu'avant
+    if (fMurHaut <= 0) {
+      dessine(g)
+      continue
+    }
+    // rien à peindre — la paroi factice encore voilée (le moteur la rend,
+    // en relief), un voile levé depuis longtemps : ni sonde ni calque
+    if (c.style === 'paroi' && etat.levee === Infinity) continue
+    if (etat.levee !== Infinity && elapsed - etat.levee > Math.max(VOILE_DUREE, VOILE_SOBRE_DUREE)) continue
+    // LA COLONNE (voileCache.ts) : à la hauteur du plus haut solide caché,
+    // posée en couches du pied au dessus ; puis le volume des solides
+    // DEVANT elle s'en efface, comme d'une porte. Sans rien de dressé
+    // dedans, elle reste au sol — mais un mur devant la couvre tout de même.
+    const contour = formeOutline(c, 32)
+    let bx0 = Infinity
+    let by0 = Infinity
+    let bx1 = -Infinity
+    let by1 = -Infinity
+    for (const q of contour) {
+      bx0 = Math.min(bx0, q.x)
+      by0 = Math.min(by0, q.y)
+      bx1 = Math.max(bx1, q.x)
+      by1 = Math.max(by1, q.y)
+    }
+    const emprise = { minX: bx0, minY: by0, maxX: bx1, maxY: by1 }
+    const cache = (box: ObstacleBox): boolean =>
+      dansForme(c, (box.minX + box.maxX) / 2, (box.minY + box.maxY) / 2)
+    let hCachee = 0
+    for (const { box, hauteur } of renderer.solidesPres(bx0, by0, bx1, by1, 0))
+      if (cache(box)) hCachee = Math.max(hCachee, hauteur)
+    // la paroi factice a quitté le décor à la révélation : sa dissolution
+    // prend la hauteur du mur que le moteur rendait l'instant d'avant
+    if (c.style === 'paroi') hCachee = Math.max(hCachee, HAUTEUR_BLOCS)
+    const sHaut = hCachee > 0 ? 1 / (1 - fractionSommet(RELIEF_K[reliefChoix], z, hCachee)) : 1
+    const cxE = vw * 0.5
+    const cyE = vh * 0.5
+    let ecart = 0
+    for (const q of contour) {
+      const e = S(q.x, q.y)
+      ecart = Math.max(ecart, Math.hypot(e.sx - cxE, e.sy - cyE) * (sHaut - 1))
+    }
+    const { lisiere } = mesures(z)
+    const couches = echellesColonne(sHaut, ecart, lisiere)
+    const colonne = (gg: CanvasRenderingContext2D): void => {
+      for (const s of couches) {
+        gg.save()
+        gg.translate(cxE, cyE)
+        gg.scale(s, s)
+        gg.translate(-cxE, -cyE)
+        dessine(gg)
+        gg.restore()
+      }
+    }
+    const devant = demiPlanDevant(contour, camera.x, camera.y)
+    // les solides du dehors seulement : ce que la colonne cache, elle le couvre
+    const occ = devant ? occultantsPres(emprise, (box) => absorbeLumiere(box) && !cache(box)) : []
+    if (occ.length === 0) {
+      colonne(g)
+      continue
+    }
+    // l'emprise à l'écran : le contour au pied et au dessus, et la lisière
+    // du brouillard qui déborde des deux
+    const rect = { x0: Infinity, y0: Infinity, x1: -Infinity, y1: -Infinity }
+    for (const q of contour) {
+      const e = S(q.x, q.y)
+      for (const sc of [1, sHaut]) {
+        const x = cxE + (e.sx - cxE) * sc
+        const y = cyE + (e.sy - cyE) * sc
+        rect.x0 = Math.min(rect.x0, x)
+        rect.y0 = Math.min(rect.y0, y)
+        rect.x1 = Math.max(rect.x1, x)
+        rect.y1 = Math.max(rect.y1, y)
+      }
+    }
+    const bord = lisiere * sHaut + 4
+    rect.x0 -= bord
+    rect.y0 -= bord
+    rect.x1 += bord
+    rect.y1 += bord
+    const cq = ouvreCalque(g, rect)
+    if (!cq) {
+      colonne(g)
+      continue
+    }
+    colonne(cq)
+    fermeCalque(g, cq, rect, (m) => effaceVolumes(m, occ, projetteRelief, devant!))
   }
 }
 
