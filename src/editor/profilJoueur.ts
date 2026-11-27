@@ -89,9 +89,13 @@ export const FAMILLES_JOUEUR: FamilleJoueur[] = [
       o('zone:eau', 'Zone liquide', 'Qui y entre redevient eau, et le reste.', 'zones'),
       o('zone:glace', 'Zone glace', 'Qui y entre gèle, et le reste.', 'zones'),
       o('zone:vapeur', 'Zone vapeur', 'Qui y entre s’évapore, et le reste.', 'zones'),
+      // l'ÉPONGE juste après les trois états : la ligne d'outils défile de
+      // côté, et en sixième place elle tombait hors de l'écran — le
+      // concepteur, 27/11 : « les éponges ne sont pas présentes dans
+      // l'éditeur pour joueur »
+      o('sponge', 'Éponge', 'Boit le liquide qui s’attarde.', 'sponges'),
       o('puits', 'Puits de gravité', 'Attire le corps : on peut y orbiter.', 'puits'),
       o('chasse', 'Chasse', 'Un courant qui pousse sans déchirer.', 'chasses'),
-      o('sponge', 'Éponge', 'Boit le liquide qui s’attarde.', 'sponges'),
       o('box:11', 'Vide', 'Le dehors : qui s’y attarde est aspiré.', 'boxes'),
     ],
   },

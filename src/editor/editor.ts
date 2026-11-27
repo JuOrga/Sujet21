@@ -102,6 +102,7 @@ import {
 } from '../game/formes'
 import { aPieces, cleBoite, formesPhysiques } from '../game/conduite'
 import { contourAura, porteesAura, type ContourPieces } from './aura'
+import { grilleEponge } from './eponge'
 import { dessinePorte } from '../render/porteBlindee'
 import {
   deplaceDans,
@@ -1465,11 +1466,11 @@ export class LevelEditor {
         d.h = Math.max(8, norm.maxY - norm.minY)
       }
     } else if (s.kind === 'sponge') {
+      // la grille suit le trait, comme une paroi (editor/eponge.ts)
       const sp = this.level.sponges[s.index]
       sp.minX = norm.minX
       sp.minY = norm.minY
-      sp.cols = Math.max(1, Math.round((norm.maxX - norm.minX) / sp.cellSize))
-      sp.rows = Math.max(1, Math.round((norm.maxY - norm.minY) / sp.cellSize))
+      Object.assign(sp, grilleEponge(norm.maxX - norm.minX, norm.maxY - norm.minY, sp.cellSize))
     }
   }
 
@@ -4196,13 +4197,12 @@ export class LevelEditor {
         : MATERIAL_NAMES[t.material]
       this.commit(`${nom} posé(e). Le matériau se change dans le panneau.`)
     } else if (t.kind === 'sponge') {
-      const cell = 24
+      // des cellules qui pavent EXACTEMENT le rectangle tracé : l'éponge
+      // tombe sur la grille comme le reste, au lieu de sauter par 24 u
       const sp: SpongeDef = {
         minX: r.minX,
         minY: r.minY,
-        cols: Math.max(1, Math.round((r.maxX - r.minX) / cell)),
-        rows: Math.max(1, Math.round((r.maxY - r.minY) / cell)),
-        cellSize: cell,
+        ...grilleEponge(r.maxX - r.minX, r.maxY - r.minY),
         capacityPerCell: 5,
       }
       this.level.sponges.push(sp)
