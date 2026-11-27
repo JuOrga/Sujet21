@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { aleaDeGraine } from './voie'
+import { REPARATIONS } from './reparations'
 import {
   cleOffre,
   DETAIL_VOILE,
@@ -11,6 +12,7 @@ import {
   evenementParId,
   offresDe,
   resoutChoix,
+  stationVisee,
   tireEvenement,
   type EtatJoueur,
 } from './evenements'
@@ -23,6 +25,7 @@ const riche: EtatJoueur = {
   essence: 1,
   orbeAPrendre: true,
   inconnuALire: true,
+  stationsEnPanne: ['eclairage', 'table-depart', 'mur-records'],
 }
 
 describe('le catalogue des rencontres', () => {
@@ -79,7 +82,7 @@ describe('le catalogue des rencontres', () => {
   })
 
   it('une offre qui ne donnerait rien est fermée : la réserve pleine, les vies au plafond', () => {
-    const plein: EtatJoueur = { ...riche, bonbonne: 6, vies: 3, orbeAPrendre: false, inconnuALire: false }
+    const plein: EtatJoueur = { ...riche, bonbonne: 6, vies: 3, orbeAPrendre: false, inconnuALire: false, stationsEnPanne: [] }
     const condenseur = offresDe(evenementParId('condenseur')!, plein)
     expect(condenseur[0].possible).toBe(false)
     expect(condenseur[1].possible).toBe(false)
@@ -176,5 +179,60 @@ describe('le voile des offres — on apprend une offre en la prenant', () => {
   it('chaque offre du catalogue a sa propre clé — le savoir ne déborde pas sur la voisine', () => {
     const cles = EVENEMENTS.flatMap((e) => e.choix.map((c) => cleOffre(e, c)))
     expect(new Set(cles).size).toBe(cles.length)
+  })
+})
+
+// LES RENCONTRES QUI TOUCHENT LE HUB : leur effet survit à la purge et se
+// voit au retour (le module rallumé). La promesse doit donc être tenue à la
+// lettre — rallumer CE QUI EST EN PANNE, et se fermer quand il n'y a plus rien.
+describe('rallumer le hub depuis la descente', () => {
+  it('« RALLUMER LE HUB » rallume l’éclairage, et seulement tant qu’il est en panne', () => {
+    const ev = evenementParId('sous-station')!
+    const offre = ev.choix.find((c) => c.libelle === 'RALLUMER LE HUB')!
+    expect(offre.issues[0].effets).toContainEqual({ quoi: 'station', station: 'eclairage' })
+    const ouvert = offresDe(ev, riche).find((o) => o.choix === offre)!
+    expect(ouvert.possible).toBe(true)
+    // l'éclairage déjà rétabli : l'offre se ferme, même s'il reste d'autres pannes
+    const eclaire: EtatJoueur = { ...riche, stationsEnPanne: ['table-depart'] }
+    expect(offresDe(ev, eclaire).find((o) => o.choix === offre)!.possible).toBe(false)
+  })
+
+  it('toute offre qui promet une station se ferme quand le hub est entièrement réparé', () => {
+    const repare: EtatJoueur = { ...riche, stationsEnPanne: [] }
+    let promesses = 0
+    for (const ev of EVENEMENTS)
+      for (const c of ev.choix) {
+        // une offre dont TOUTES les issues rallument quelque chose, ou dont
+        // la plus probable le fait : sans panne, elle ne tiendrait rien
+        const sures = c.issues.filter((i) => i.effets.some((e) => e.quoi === 'station'))
+        if (sures.length === 0) continue
+        promesses++
+        expect(offresDe(ev, repare).find((o) => o.choix === c)!.possible).toBe(false)
+      }
+    expect(promesses).toBeGreaterThanOrEqual(3)
+    // et chaque rencontre du hub garde une issue de repli, ouverte à tous
+    for (const id of ['sous-station', 'drone'])
+      expect(offresDe(evenementParId(id)!, repare).some((o) => o.possible)).toBe(true)
+  })
+
+  it('stationVisee : la nommée si elle est en panne, sinon la première — jamais une autre que promise', () => {
+    expect(stationVisee({}, ['table-depart', 'bac-sable'])).toBe('table-depart')
+    expect(stationVisee({}, [])).toBeNull()
+    expect(stationVisee({ station: 'eclairage' }, ['table-depart', 'eclairage'])).toBe('eclairage')
+    // l'éclairage déjà debout : on ne se rabat pas sur la table de départ
+    expect(stationVisee({ station: 'eclairage' }, ['table-depart'])).toBeNull()
+  })
+
+  it('chaque station nommée existe au catalogue des avaries — une faute de frappe ne rallumerait rien', () => {
+    const ids = REPARATIONS.map((r) => r.id)
+    for (const ev of EVENEMENTS)
+      for (const c of ev.choix)
+        for (const i of c.issues)
+          for (const e of i.effets) if (e.quoi === 'station' && e.station) expect(ids).toContain(e.station)
+  })
+
+  it('l’effet se dit en une ligne qui nomme le hub', () => {
+    expect(ditEffet({ quoi: 'station', station: 'eclairage' })).toBe('les lumières du hub se rallument')
+    expect(ditEffet({ quoi: 'station' })).toBe('une station du hub se remet en marche')
   })
 })
