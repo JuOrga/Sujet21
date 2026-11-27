@@ -365,38 +365,37 @@ export function climatDuModule(m: ModuleCarte | undefined): OptionsGen['climat']
 
 // ---- L'ALCÔVE DE REPOS -----------------------------------------------------
 // Une halte de la carte, un choix — comme le feu de camp de Slay the Spire
-// oppose soigner et améliorer. Trois offres, une seule se prend : le
-// souvenir (la mémoire, ce qui survit à la run), la réserve (la bonbonne,
-// la livraison), le condensat (la bourse, l'achat). Puis la carte se rouvre.
+// oppose soigner et améliorer. Trois offres, une seule se prend : le repos
+// profond (l'essence maximale, le corps qui renaît), la réserve (la
+// bonbonne, la livraison), le condensat (la bourse, l'achat). Puis la
+// carte se rouvre.
 //
 // L'alcôve rendait UNE VIE (« second souffle ») jusqu'au 27/11 : le
 // concepteur l'a retirée — les échantillons de secours se FARMENT (le banc
 // d'étalonnage, les instruments, la fiole), ils ne se ramassent pas en
-// route. À sa place, le souvenir : la seule offre qui pèse au-delà de la
-// run, donc un vrai dilemme face à deux gains qui ne servent que dedans.
+// route. À sa place, le repos profond : il rachète une part de ce que les
+// salles SACRIFICE rognent (evenements.ts), la seule perte qui, sinon, ne
+// se rattrapait pas en route. Plafonné au plein, comme les événements.
 
 // Ce qu'une halte rend : les défauts d'avant le plan (le plan les règle
 // désormais — halteReserveCl, halteCondensatCl — et les passe en `dons`).
 export const REPOS_RESERVE_L = 0.5
 export const REPOS_CONDENSAT_CL = 40
-/** Le souvenir de l'alcôve : la mémoire gravée (avant la fiole de
- *  SOUVENIR, qui la majore comme tout gain). Une salle d'événement en
- *  grave 25, le codex 10 : l'alcôve se tient entre les deux. */
-export const REPOS_MEMOIRE = 15
+/** Le repos profond : la part d'essence maximale rendue (0,05 = +5 % du
+ *  plein), choisie par le concepteur le 27/11. */
+export const REPOS_ESSENCE = 0.05
 export interface DonsHalte {
   reserveL: number
   condensatCl: number
-  /** absent : REPOS_MEMOIRE */
-  memoire?: number
 }
 export const DONS_HALTE_DEFAUT: DonsHalte = { reserveL: REPOS_RESERVE_L, condensatCl: REPOS_CONDENSAT_CL }
 
 export interface OffreRepos {
-  id: 'souvenir' | 'reserve' | 'condensat'
+  id: 'profond' | 'reserve' | 'condensat'
   nom: string
   detail: string
   icone: string
-  /** false : l'offre ne peut rien donner (bonbonne pleine) */
+  /** false : l'offre ne peut rien donner (essence au plein, bonbonne pleine) */
   possible: boolean
 }
 
@@ -405,19 +404,21 @@ export interface OffreRepos {
  *  il ne ment pas. */
 export function offresRepos(
   run: {
+    /** l'essence maximale, en part du plein (1 = le plein) */
+    essence: number
     bonbonne: number
     cap: number
   },
   dons: DonsHalte = DONS_HALTE_DEFAUT,
 ): OffreRepos[] {
-  const memoire = Math.max(0, Math.round(dons.memoire ?? REPOS_MEMOIRE))
+  const manque = run.essence < 1 - 1e-9
   return [
     {
-      id: 'souvenir',
-      nom: 'SOUVENIR',
-      detail: `+${memoire} mémoire, gardée après la run`,
-      icone: '🧠',
-      possible: memoire > 0,
+      id: 'profond',
+      nom: 'REPOS PROFOND',
+      detail: manque ? `+${Math.round(REPOS_ESSENCE * 100)} % d’essence maximale` : 'essence au plein',
+      icone: '🜄',
+      possible: manque,
     },
     {
       id: 'reserve',
@@ -497,7 +498,7 @@ export function ditProjection(c: CarteStation, p: ProjectionRoute): string {
 /** LE DON — une bonbonne oubliée : de la réserve s'il y a de la place,
  *  sinon du condensat. Une seule offre, on la prend, la carte se rouvre. */
 export function offreDon(run: { bonbonne: number; cap: number }, dons: DonsHalte = DONS_HALTE_DEFAUT): OffreRepos {
-  const [, reserve, condensat] = offresRepos({ bonbonne: run.bonbonne, cap: run.cap }, dons)
+  const [, reserve, condensat] = offresRepos({ essence: 1, bonbonne: run.bonbonne, cap: run.cap }, dons)
   return reserve.possible
     ? { ...reserve, nom: 'UNE BONBONNE OUBLIÉE' }
     : { ...condensat, nom: 'UN FÛT DE CONDENSAT' }

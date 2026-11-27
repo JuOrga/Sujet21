@@ -211,7 +211,7 @@ Ce qui existe, ce qui est proposé.
 | **Salle** | nœud de la mini-carte | un tableau à jouer : sa mécanique, figure ou compartiments, tableau du pool ou générée — générées coupées, un tableau écrit de la mécanique du nœud, généré s'il n'y en a pas | le plan (salles générées, générer si le pool manque, figures, tableaux écrits, pioche) |
 | **Rencontre** | nœud de la mini-carte | du lore, deux ou trois offres, des issues pesées | la part, le rang minimal (LA DESCENTE), le catalogue `evenements.ts` |
 | **Économat** | nœud de la mini-carte | le Semblable troque contre du condensat | économats par module (LA DESCENTE) |
-| **Alcôve (repos)** | nœud de la mini-carte | un souvenir (de la mémoire), de la réserve ou du condensat — un seul des trois ; plus de vie depuis le 27/11 | alcôves par module ; `REPOS_MEMOIRE`, `REPOS_RESERVE_L`, `REPOS_CONDENSAT_CL` |
+| **Alcôve (repos)** | nœud de la mini-carte | un repos profond (+5 % d'essence maximale), de la réserve ou du condensat — un seul des trois ; plus de vie depuis le 27/11 | alcôves par module ; `REPOS_ESSENCE`, `REPOS_RESERVE_L`, `REPOS_CONDENSAT_CL` |
 | **Bonbonne oubliée (don)** | nœud de la mini-carte | de la réserve, ou du condensat si elle est pleine | bonbonnes par module |
 | **Cache** | nœud de la mini-carte | un orbe d'essence, une fois par poste | `orbe` du module (éditeur de carte) |
 | **Salle à prime** | un nœud salle, marqué d'un losange | la salle scellée : plus dure d'un cran, elle paie plus au sas — mémoire ×2, condensat ×2 ou tirage d'instrument garanti ; une par rang au plus, jamais au premier rang | salles à prime (LA DESCENTE) |

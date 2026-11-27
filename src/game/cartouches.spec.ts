@@ -96,7 +96,7 @@ describe('les glyphes des haltes', () => {
   })
   it('a une icône pour chaque offre de l’alcôve et du don', () => {
     const offres = [
-      ...offresRepos({ bonbonne: 1, cap: 8 }),
+      ...offresRepos({ essence: 0.9, bonbonne: 1, cap: 8 }),
       offreDon({ bonbonne: 1, cap: 8 }),
       offreDon({ bonbonne: 8, cap: 8 }),
     ]
