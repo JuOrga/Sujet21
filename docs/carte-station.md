@@ -328,7 +328,7 @@ d'accès plus qu'un lieu.
   sortie, la carte se rouvre. Quand le plan porte un économat,
   l'intercalation automatique de mi-descente se tait — c'est la route
   qui décide. Entrer dans un module `repos` ouvre l'ALCÔVE dans la
-  cérémonie (`offresRepos`) : un second souffle (+1 vie), de la réserve
+  cérémonie (`offresRepos`) : un repos profond (+5 % d'essence maximale, jusqu'au plein), de la réserve
   (+0,5 L en bonbonne) ou du condensat (+40 cL), une seule des trois, les
   offres sans effet grisées ; puis la carte se rouvre. Un module `don`
   offre une bonbonne oubliée (+0,5 L, ou +40 cL de condensat si la

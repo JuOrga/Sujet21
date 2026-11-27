@@ -205,6 +205,7 @@ import {
   projectionDepuis,
   reveleInconnu,
   offresRepos,
+  REPOS_ESSENCE,
   type DonsHalte,
   postureDuModule,
   primeMemoire,
@@ -8316,7 +8317,7 @@ function renderDescente(): void {
     ),
     dscCran(
       'ALCÔVES PAR MODULE',
-      'le repos : un souffle, de la réserve ou du condensat — 0 : aucune',
+      'le repos : de l’essence, de la réserve ou du condensat — 0 : aucune',
       () => voiePlan.reposParModule,
       (v) => {
         voiePlan.reposParModule = v
@@ -17484,8 +17485,8 @@ function entreModuleRun(id: string): void {
 }
 
 /** L'ALCÔVE DE REPOS : trois offres, une seule se prend — un second
- *  souffle (une vie), de la réserve (la bonbonne), du condensat (la
- *  bourse). Le choix se juge sur ce qu'on possède : une offre qui ne
+ *  repos profond (de l'essence maximale), de la réserve (la bonbonne), du
+ *  condensat (la bourse). Le choix se juge sur ce qu'on possède : une offre qui ne
  *  donnerait rien reste visible mais grisée. Puis la carte se rouvre.
  *  L'alcôve rendue en héros, les offres en cartouches (le glyphe de la
  *  donnée traduit par ICONE_DE_GLYPHE) ; prendre claque comme tout choix. */
@@ -17503,8 +17504,7 @@ function mbMontreRepos(m: ModuleCarte, suite: () => void = () => mbMontreCarte('
   mbQuestion('REPOS')
   const offres = offresRepos(
     {
-      vies: run.vies,
-      viesMax: VIES_MAX,
+      essence: run.essence,
       bonbonne: run.bonbonneLiters,
       cap: capBonbonne(),
     },
@@ -17528,7 +17528,7 @@ function mbMontreRepos(m: ModuleCarte, suite: () => void = () => mbMontreCarte('
     btn.addEventListener('click', () => {
       if (elu || gesteTropTot(performance.now(), ouvertA)) return
       elu = true
-      if (o.id === 'souffle') run.vies = Math.min(VIES_MAX, run.vies + 1)
+      if (o.id === 'profond') run.essence = Math.max(essencePlancher(), Math.min(1, run.essence + REPOS_ESSENCE))
       else if (o.id === 'reserve')
         run.bonbonneLiters = Math.min(capBonbonne(), run.bonbonneLiters + donsHalte().reserveL)
       else gagneCondensat(donsHalte().condensatCl)
@@ -18252,8 +18252,8 @@ const NOMS_NOEUD: Record<
   repos: {
     etiquette: 'ALCÔVE',
     titre: 'REPOS',
-    court: 'Un souffle, de la réserve ou du condensat.',
-    texte: 'Une alcôve tiède. Un second souffle, de la réserve ou du condensat — un seul des trois.',
+    court: 'De l’essence, de la réserve ou du condensat.',
+    texte: 'Une alcôve tiède. Un repos profond, de la réserve ou du condensat — un seul des trois.',
     ceremonie: 'repos',
   },
   don: {

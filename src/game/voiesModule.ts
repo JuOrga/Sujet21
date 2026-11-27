@@ -462,7 +462,7 @@ export function cheminDePorte(
  *  paraît ni à la manette ni au doigt (revue du 25/09). */
 const NOMS_HALTE: Record<string, string> = {
   economat: 'l’économat — le Semblable troque contre du condensat',
-  repos: 'l’alcôve de repos — un souffle, de la réserve ou du condensat',
+  repos: 'l’alcôve de repos — de l’essence, de la réserve ou du condensat',
   don: 'une bonbonne oubliée',
   coffre: 'une cache — un orbe d’essence y dort',
   minijeu: 'un mini-jeu — le couperet (laisser dépasser du trait ce que la lame doit trancher), le palet (glisser en glace jusqu’au centre), les rafales (traverser entre deux souffles) ou les orbites (lancé autour de trois puits de gravité)',
