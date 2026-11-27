@@ -8309,7 +8309,7 @@
     {
       "id": "l-ecole-des-parois",
       "auteur": "BOIZ",
-      "majAt": "2026-11-25T16:44:44.097Z",
+      "majAt": "2026-11-26T16:04:29.559Z",
       "codeAuteur": "EXPÉDITION L",
       "codeAt": "2026-08-14T22:36:26.537Z",
       "level": {
@@ -8323,51 +8323,196 @@
           "maxY": 750
         },
         "spawn": {
-          "x": -919,
-          "y": -516,
+          "x": -980,
+          "y": -730,
           "n": 900
         },
         "exit": {
-          "minX": 1060,
-          "minY": -40,
-          "maxX": 1200,
-          "maxY": 120
+          "minX": 950,
+          "minY": -856,
+          "maxX": 1090,
+          "maxY": -696
         },
         "boxes": [
           {
             "minX": -700,
-            "minY": -950,
+            "minY": -890,
             "maxX": -580,
-            "maxY": -450,
+            "maxY": -370,
             "material": 8
           },
           {
-            "minX": -560,
-            "minY": 520,
-            "maxX": -500,
-            "maxY": 750,
+            "minX": -700,
+            "minY": 300,
+            "maxX": -580,
+            "maxY": 630,
             "material": 2
           },
           {
-            "minX": -80,
-            "minY": -160,
-            "maxX": 240,
-            "maxY": -40,
+            "minX": -230,
+            "minY": 300,
+            "maxX": -110,
+            "maxY": 630,
             "material": 1
           },
           {
-            "minX": 480,
-            "minY": 240,
-            "maxX": 620,
-            "maxY": 380,
-            "material": 2
+            "minX": -700,
+            "minY": -370,
+            "maxX": -580,
+            "maxY": 20,
+            "material": 0
           },
           {
             "minX": -700,
-            "minY": -450,
+            "minY": 20,
             "maxX": -580,
-            "maxY": 50,
+            "maxY": 300,
+            "material": 7
+          },
+          {
+            "minX": -1200,
+            "minY": 630,
+            "maxX": 1200,
+            "maxY": 750,
+            "material": 4
+          },
+          {
+            "minX": -580,
+            "minY": -370,
+            "maxX": -230,
+            "maxY": -250,
+            "material": 7
+          },
+          {
+            "minX": -230,
+            "minY": -370,
+            "maxX": -110,
+            "maxY": 300,
             "material": 0
+          },
+          {
+            "minX": -110,
+            "minY": -370,
+            "maxX": 420,
+            "maxY": -250,
+            "material": 8
+          },
+          {
+            "minX": 420,
+            "minY": -370,
+            "maxX": 540,
+            "maxY": -250,
+            "material": 0
+          },
+          {
+            "minX": 50,
+            "minY": -890,
+            "maxX": 420,
+            "maxY": -770,
+            "forme": 3,
+            "p0": 1,
+            "material": 2
+          },
+          {
+            "minX": 420,
+            "minY": -950,
+            "maxX": 540,
+            "maxY": -370,
+            "material": 0
+          },
+          {
+            "minX": -1200,
+            "minY": -950,
+            "maxX": -580,
+            "maxY": -890,
+            "material": 0
+          },
+          {
+            "minX": -345,
+            "minY": -950,
+            "maxX": 5,
+            "maxY": -890,
+            "material": 2
+          },
+          {
+            "minX": 5,
+            "minY": -950,
+            "maxX": 420,
+            "maxY": -890,
+            "material": 0
+          },
+          {
+            "minX": -580,
+            "minY": -950,
+            "maxX": -345,
+            "maxY": -890,
+            "material": 4
+          },
+          {
+            "minX": 1080,
+            "minY": 280,
+            "maxX": 1200,
+            "maxY": 630,
+            "material": 9
+          },
+          {
+            "minX": 1080,
+            "minY": 80,
+            "maxX": 1200,
+            "maxY": 280,
+            "material": 1
+          },
+          {
+            "minX": 340,
+            "minY": 60,
+            "maxX": 540,
+            "maxY": 260,
+            "forme": 1,
+            "material": 2
+          },
+          {
+            "minX": 540,
+            "minY": -950,
+            "maxX": 950,
+            "maxY": -250,
+            "forme": 3,
+            "material": 0
+          },
+          {
+            "minX": 870,
+            "minY": -810,
+            "maxX": 1200,
+            "maxY": -250,
+            "forme": 3,
+            "p0": 2,
+            "material": 0
+          },
+          {
+            "minX": 916.4354889040108,
+            "minY": -1102.0409695204503,
+            "maxX": 1217.6656725403511,
+            "maxY": -634.9367495362881,
+            "angle": -60,
+            "forme": 4,
+            "p0": 0.39,
+            "p1": 95,
+            "material": 0
+          },
+          {
+            "minX": 1080,
+            "minY": -250,
+            "maxX": 1200,
+            "maxY": 80,
+            "material": 0
+          },
+          {
+            "minX": 870,
+            "minY": -250,
+            "maxX": 1080,
+            "maxY": 80,
+            "forme": 3,
+            "material": 9,
+            "p0": 1
           }
         ],
         "sponges": [],
@@ -8379,20 +8524,14 @@
             "tone": "phobe"
           },
           {
-            "x": 80,
-            "y": -230,
+            "x": -170,
+            "y": 450,
             "text": "HYDROPHILE — RETIENT",
             "tone": "phile"
           },
           {
-            "x": 550,
-            "y": 440,
-            "text": "HYDROPHOBE",
-            "tone": "phobe"
-          },
-          {
-            "x": 1110,
-            "y": 160,
+            "x": 870,
+            "y": -740,
             "text": "SAS",
             "tone": "sas"
           },
@@ -8401,15 +8540,68 @@
             "y": -120,
             "text": "PAROI — BLOQUE",
             "tone": "mur"
+          },
+          {
+            "x": -490,
+            "y": 700,
+            "text": "AURA FROIDE",
+            "tone": "mur"
+          },
+          {
+            "x": -470,
+            "y": -920,
+            "text": "COLLE",
+            "tone": "mur"
           }
         ],
         "zones": [
           {
             "minX": -1200,
             "minY": -250,
-            "maxX": 300,
-            "maxY": 750,
+            "maxX": -230,
+            "maxY": 600,
             "force": "eau"
+          },
+          {
+            "minX": -580,
+            "minY": -890,
+            "maxX": 420,
+            "maxY": -370,
+            "force": "glace"
+          },
+          {
+            "minX": -110,
+            "minY": -230,
+            "maxX": 1090,
+            "maxY": 630,
+            "force": "vapeur"
+          }
+        ],
+        "condensats": [
+          {
+            "x": -848,
+            "y": 541,
+            "cl": 6
+          },
+          {
+            "x": -417,
+            "y": 554,
+            "cl": 12
+          },
+          {
+            "x": 1048,
+            "y": 547,
+            "cl": 6
+          },
+          {
+            "x": -168,
+            "y": -422,
+            "cl": 6
+          },
+          {
+            "x": -20,
+            "y": 501,
+            "cl": 6
           }
         ]
       }
