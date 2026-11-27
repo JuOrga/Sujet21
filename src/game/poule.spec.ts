@@ -7,6 +7,7 @@ import {
   candidatsAuRang,
   candidatsPool,
   ecartAuCahier,
+  indexNonVu,
   phaseRun,
   piocheEcrite,
   propositionsSalles,
@@ -189,5 +190,48 @@ describe('LA PIOCHE DU POOL : le trigramme, pas le rang', () => {
     for (const r of [0, 0.5, 0.99])
       tires.add(piocheEcrite(seq, vise(2, 3), vus, tout, () => r)!.code)
     expect(tires.size).toBe(3)
+  })
+})
+
+// Signalé le 27/11 : « deux fois le même tableau de suite ». Sans porte
+// choisie, l'enchaînement prenait `index + 1` (ou, en bout de séquence, la
+// dernière écrite) sans regarder ce que la run avait déjà joué.
+describe('UN TABLEAU JOUÉ QUITTE LE POOL DE LA RUN', () => {
+  const seq = [niveau('21-A'), niveau('21-B'), niveau('21-C'), niveau('21-D')]
+
+  it('la case visée, si elle est neuve, passe telle quelle', () => {
+    expect(indexNonVu(seq, 2, new Set(['21-A']))).toBe(2)
+  })
+
+  it('en bout de séquence, la dernière déjà jouée ne se rejoue pas', () => {
+    // le garde-fou ramenait l'index sur 3 : 21-D, qu'on vient de finir
+    expect(indexNonVu(seq, 3, new Set(['21-A', '21-D']))).toBe(1)
+  })
+
+  it('une case déjà vue cède au premier tableau neuf qui suit', () => {
+    expect(indexNonVu(seq, 1, new Set(['21-B', '21-C']))).toBe(3)
+  })
+
+  it('pool à sec : le passage le plus ancien revient, jamais le dernier', () => {
+    const vues = new Set(['21-C', '21-A', '21-B', '21-D']) // 21-D vient de finir
+    expect(indexNonVu(seq, 3, vues)).toBe(2)
+  })
+
+  it('les salles générées du registre ne trompent pas le pool à sec', () => {
+    const vues = new Set(['GEN-1', '21-B', '21-A', '21-C', '21-D'])
+    expect(indexNonVu(seq, 0, vues)).toBe(1)
+  })
+
+  it('une séquence d’un seul tableau le rejoue plutôt que de mourir', () => {
+    expect(indexNonVu([niveau('21-A')], 0, new Set(['21-A']))).toBe(0)
+    expect(indexNonVu([], 0, new Set())).toBe(0)
+  })
+
+  it('le vieux choix du pool écarte aussi les tableaux déjà joués', () => {
+    const pool = [niveau('21AB-111'), niveau('21AB-121'), niveau('21AB-131')]
+    const props = propositionsSalles(pool, 2, 6, new Set(['21AB-111']))
+    expect(props.map((lv) => lv.code)).not.toContain('21AB-111')
+    expect(props).toHaveLength(2)
+    expect(propositionsSalles(pool, 2, 6, new Set(['21AB-111', '21AB-121']))).toEqual([])
   })
 })

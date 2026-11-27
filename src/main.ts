@@ -67,7 +67,7 @@ import {
   type CodeAtelier,
 } from './game/levelIO'
 import { dessineMiniCarte } from './game/carte'
-import { piocheEcrite, propositionsSalles } from './game/poule'
+import { indexNonVu, piocheEcrite, propositionsSalles } from './game/poule'
 import {
   genereNiveauAtelier,
   OPTIONS_DEFAUT,
@@ -5697,6 +5697,7 @@ interface RunSauvee {
   confinementDu?: number // les crans promis à la prochaine salle
   evenementsVus?: string[] // les rencontres déjà traversées
   primeSalle?: string // la prime de la salle en cours (voiesModule.ts)
+  vues?: string[] // les tableaux déjà joués de la run, dans l'ordre des passages
   recolte?: unknown // la récolte du module en cours (game/recolte.ts, litRecolte)
 }
 function runSauvee(): RunSauvee | null {
@@ -5731,6 +5732,7 @@ function runSauvee(): RunSauvee | null {
         ? d.evenementsVus.filter((x): x is string => typeof x === 'string')
         : undefined,
       primeSalle: typeof d.primeSalle === 'string' ? d.primeSalle : undefined,
+      vues: Array.isArray(d.vues) ? d.vues.filter((x): x is string => typeof x === 'string') : undefined,
       // lue telle quelle : litRecolte la valide à la reprise
       recolte: d.recolte,
     }
@@ -5765,6 +5767,9 @@ function sauveRun(): void {
           essence: run.essence,
           confinementDu: run.confinementDu,
           evenementsVus: run.evenementsVus,
+          // le registre des salles vues survit à la reprise : il ne vivait
+          // qu'en mémoire, et une run reprise reproposait tout le pool
+          vues: [...voieVues],
           primeSalle: run.primeSalle ?? undefined,
           recolte: run.recolte,
         }),
@@ -5813,6 +5818,11 @@ function reprendreRun(save: RunSauvee): void {
   // le compte du module reprend où il en était — ou repart d'ici si la
   // sauvegarde date d'avant lui (le bilan sous-comptera, sans rien inventer)
   run.recolte = litRecolte(save.recolte, carteRun.module, run.instruments, paliersAtteints(run.xp))
+  // LE REGISTRE DES SALLES VUES : celui de la sauvegarde ; à défaut (une
+  // sauvegarde d'avant lui), au moins les salles du module en cours, que
+  // la récolte a retenues — mieux qu'un pool qui repropose tout
+  voieVues.clear()
+  for (const code of save.vues ?? run.recolte.salles.map((x) => x.code)) voieVues.add(code)
   hasPlayed = true
   document.body.classList.add('playing')
   input.paused = false
@@ -16099,7 +16109,11 @@ function avanceSalle(): void {
   // Ce qui interdit la boucle n'est plus la direction mais le REGISTRE des
   // salles vues — un tableau déjà joué n'est jamais repioché de la run.
   const elue = salleChoisie
-  const choix = elue ? playedLevels().indexOf(elue) : -1
+  // par le CODE, pas par la référence : la bibliothèque peut se recharger
+  // entre la porte et le sas (sequenceCache se rebâtit), et l'élue n'était
+  // alors plus « dans » la séquence — l'enchaînement retombait sur
+  // `levelIndex + 1`, un tableau que personne n'avait choisi
+  const choix = elue ? playedLevels().findIndex((t) => t.code === elue.code) : -1
   salleChoisie = null
   const sautLibre = choix >= 0 && elue !== null && !voieVues.has(elue.code)
   levelIndex =
@@ -16113,6 +16127,13 @@ function avanceSalle(): void {
   // garde-fou : séquence écrite épuisée sans salle élue — on ne REboucle
   // jamais sur la salle 1 en pleine descente (la dernière écrite tient)
   levelIndex = Math.min(levelIndex, Math.max(0, playedLevels().length - 1))
+  // … mais ni la case suivante ni ce garde-fou ne savaient ce qui avait
+  // déjà été joué : la dernière écrite « tenait » en se rejouant, et le
+  // joueur reprenait le tableau qu'il venait de finir. Le registre des
+  // salles vues tranche : un tableau joué ne revient pas de la run, sauf
+  // pool à sec (voir indexNonVu). La salle ÉLUE passe telle quelle.
+  if (!sautLibre && choix !== levelIndex)
+    levelIndex = indexNonVu(playedLevels(), levelIndex, voieVues)
   restart()
 }
 
@@ -17146,7 +17167,7 @@ function mbMontreSallesDuModule(): void {
       return
     }
   }
-  const props = propositionsSalles(seq, levelIndex + (premiereSalleDeLaRun ? 1 : 2), seq.length)
+  const props = propositionsSalles(seq, levelIndex + (premiereSalleDeLaRun ? 1 : 2), seq.length, voieVues)
   if (props.length === 2) mbMontreSalles(props)
   else mbMontreFin()
 }
@@ -17654,12 +17675,18 @@ function propositionsVoie(seq: LevelDef[]): CarteVoie[] | null {
   const biomeCourant = moduleEnCours()?.biome ?? ''
   const marqueBiome = (lv: LevelDef): LevelDef =>
     biomeCourant ? { ...lv, biome: biomeCourant } : lv
+  const prisIci = new Set<string>()
   // un tableau qui EXIGE un état non tissé n'est pas jouable
   const jouable = (lv: LevelDef): boolean =>
     (!lv.biome || !biomeCourant || biomeEffectif(carte, lv.biome) === biomeCourant) &&
     (lv.exige ?? []).every((e) => (e === 'glace' ? solidTenue : vapoTenue))
-  const pioche = (): LevelDef | null =>
-    piocheEcrite(seq, { moment, mecanique: 3, difficulte }, voieVues, jouable, alea, jouee, voiePlan.poids)
+  // les portes d'un même rang s'excluent entre elles (prisIci, plus bas) :
+  // deux nœuds « écrits » pouvaient sinon montrer le même tableau
+  const pioche = (): LevelDef | null => {
+    const lv = piocheEcrite(seq, { moment, mecanique: 3, difficulte }, new Set([...voieVues, ...prisIci]), jouable, alea, jouee, voiePlan.poids)
+    if (lv) prisIci.add(lv.code)
+    return lv
+  }
   // SANS SALLES GÉNÉRÉES (le réglage du plan coupé) : la mini-carte est la
   // même — mêmes nœuds, mêmes mécaniques, mêmes figures —, seule la SOURCE
   // change : derrière chaque porte, un tableau DÉJÀ ÉCRIT de la mécanique
@@ -17671,7 +17698,6 @@ function propositionsVoie(seq: LevelDef[]): CarteVoie[] | null {
   // « générer si le pool manque », la porte se génère et LE MANQUE SE NOTE
   // (le relevé de l'écran LA DESCENTE dit au concepteur quoi écrire) ;
   // sinon elle pioche une autre mécanique, et ne se génère que le pool à sec.
-  const prisIci = new Set<string>()
   const piocheDuPool = (
     mec: CodeAtelier['mecanique'],
     diff = difficulte,
@@ -22392,7 +22418,11 @@ function corpsImage(now: number): boolean {
     // la salle s'inscrit à la récolte du module : son code, sa part, ses litres
     const partLivree = surplus / Math.max(0.01, volumeDepart() * params.litersPerParticle)
     run.recolte.salles.push({ code: level.code, pct: partLivree, litres: surplus })
-    voieVues.add(level.code) // la pioche ne la reproposera pas de la run
+    // la pioche ne la reproposera pas de la run ; retirée puis remise, une
+    // salle rejouée (pool à sec) passe en QUEUE du registre — indexNonVu
+    // rejoue d'abord le passage le plus ancien
+    voieVues.delete(level.code)
+    voieVues.add(level.code)
     if (!sasOutil) {
       const p = chargePalmaresVoie()
       if (voieRang === 1) p.descentes += 1
