@@ -8076,12 +8076,54 @@
       .bonbonne.verse-ok .bb-verre { stroke: #6dffb8; }
       .bonbonne.verse-ok .v { color: #8fffcf; }
       .bonbonne.ouvert { animation: bb-verse 0.5s ease-out; }
+      /* L'INVITE : le geste sert, la fiole se DÉPLIE en bouton — une plaque
+         pleine, la touche en cabochon, le gain en clair. Elle tient dans la
+         hauteur de la ligne (le bandeau ne s'épaissit pas) : c'est en
+         LARGEUR qu'elle se fait voir, et le litrage de la réserve lui cède
+         la place — le niveau dans le verre continue de le dire. */
+      .bb-invite { display: none; align-items: center; gap: 5px; white-space: nowrap; letter-spacing: 0.1em; color: #b9ffe0; }
+      .bb-invite b { font-weight: 600; color: #6dffb8; letter-spacing: 0.04em; }
+      .bb-invite kbd, #hud-danger kbd {
+        font: inherit; font-weight: 600; letter-spacing: 0.04em; line-height: 1;
+        padding: 2px 5px 1px; border-radius: 3px;
+        border: 1px solid currentColor; background: rgba(255, 255, 255, 0.08);
+      }
+      .bonbonne.invite { background: rgba(14, 44, 36, 0.82); border-color: rgba(109, 255, 184, 0.7); padding-right: 8px; }
+      .bonbonne.invite .bb-invite { display: inline-flex; }
+      .bonbonne.invite .v { display: none; }
+      .bonbonne.invite:hover { background: rgba(22, 66, 52, 0.9); }
+      .bonbonne.invite.rappel { box-shadow: 0 0 0 1px rgba(109, 255, 184, 0.35), 0 0 12px rgba(109, 255, 184, 0.35); }
+      /* PETIT ÉCRAN : le coin vital partage sa ligne avec la capsule d'état.
+         Le mot « VERSER » cède la place — le cabochon (« TOUCHER ») et le
+         gain suffisent à dire le geste, et la plaque ne déborde pas. */
+      @media (max-width: 700px), (pointer: coarse) and (max-height: 620px) {
+        .bb-invite > span { display: none; }
+      }
+      /* LA JAUGE EN DEUX SEGMENTS : à la suite du corps, en hachures vertes,
+         ce que la bonbonne lui rendrait. Hachuré parce que ce volume n'est
+         PAS encore là — plein, il se lirait comme du corps. */
+      #gauge-reserve {
+        position: absolute; top: 0; bottom: 0; left: 0; width: 0;
+        background: repeating-linear-gradient(90deg, rgba(109, 255, 184, 0.85) 0 2px, rgba(109, 255, 184, 0.22) 2px 4px);
+        transition: left 0.25s ease, width 0.25s ease;
+      }
+      /* L'ALARME QUI OFFRE LE VERSEMENT se touche : elle reprend les
+         pointeurs (elle les laissait passer) et le dit par son curseur */
+      #hud-danger.action { pointer-events: auto; cursor: pointer; }
+      #hud-danger.action b, #hud-danger.secours b { color: #8fffcf; font-weight: 600; }
+      #hud-danger.action kbd { color: #8fffcf; margin: 0 2px; }
+      /* le secours vient de servir : la même bannière, en vert, sans battre */
+      #hud-danger.secours.visible {
+        background: rgba(10, 40, 32, 0.9); border-color: #6dffb8; border-left-color: #6dffb8;
+        color: #c9ffe6; animation: none;
+      }
       @keyframes bb-verse {
         0% { transform: scale(1); }
         30% { transform: scale(1.14) rotate(-6deg); }
         100% { transform: scale(1) rotate(0); }
       }
       @media (prefers-reduced-motion: reduce) {
+        #gauge-reserve { transition: none; }
         .bonbonne, .bonbonne .bb-vague, .bonbonne .bb-vague2,
         .bonbonne.presente, .bonbonne.rappel, .bonbonne.ouvert,
         .bonbonne.presente .bb-eclat { animation: none; }
@@ -10396,7 +10438,7 @@
                remplit de ce qu'on a mis de côté. Elle se présente au début du
                tableau et rappelle sa présence quand le corps touche à sa
                dernière goutte — un toucher la verse. -->
-          <button type="button" id="bonbonne" class="bonbonne" data-nom="bonbonne de secours — toucher, touche V, ou croix ↑ à la manette : la réserve se verse dans le corps (en liquide)" hidden>
+          <button type="button" id="bonbonne" class="bonbonne" data-nom="bonbonne de secours — toucher, touche V, ou croix ↑ à la manette : la réserve se verse dans le corps (en liquide). À la dernière impulsion, elle se verse toute seule." hidden>
             <svg viewBox="0 0 44 64" aria-hidden="true">
               <defs>
                 <clipPath id="bb-dedans">
@@ -10424,12 +10466,18 @@
               <rect class="bb-eclat" x="-16" y="-8" width="9" height="86" />
             </svg>
             <span class="v" id="hud-bonbonne">0.00 L</span>
+            <!-- L'INVITE : quand le geste sert, la fiole se déplie en bouton
+                 qui le NOMME (la touche, le bouton, le doigt) et dit ce
+                 qu'il rend — rempli par majHud, montré par .invite -->
+            <span class="bb-invite" id="bb-invite"></span>
             <span class="bb-mot" id="bb-mot" aria-live="polite"></span>
           </button>
         </div>
         <div class="ath-ligne">
           <div class="gauge">
             <div id="gauge-fill"></div>
+            <!-- ce que la bonbonne rendrait, en hachures à la suite du corps -->
+            <div id="gauge-reserve"></div>
             <div id="gauge-threshold"></div>
           </div>
           <span id="hud-perte"></span>
@@ -10861,7 +10909,7 @@
           <kbd>sur le corps</kbd>maintenir SUR le volume : se rassembler (gratuit)<br />
           <kbd>F</kbd>glace : le bloc garde son élan
           <kbd>G</kbd>vapeur : viser (temps ralenti), relâcher = dash<br />
-          <kbd>V</kbd>verser la BONBONNE dans le corps (la fiole du coin haut-gauche se touche aussi) — en liquide seulement<br />
+          <kbd>V</kbd>verser la BONBONNE dans le corps (la fiole du coin haut-gauche se touche aussi) — en liquide seulement ; à la dernière impulsion, elle se verse toute seule<br />
           <kbd>molette</kbd>zoom — la caméra continue de suivre le corps
           <kbd>clic droit maintenu</kbd>déplacer la caméra (elle ne suit plus)
           <kbd>X</kbd>recentrer la caméra sur le corps<br />
@@ -10887,7 +10935,7 @@
           <kbd>stick droit</kbd>déplacer la caméra
           <kbd>clic stick</kbd>recadrer (caméra auto)
           <kbd>croix ↓</kbd>CONTINUER, quand il s'offre<br />
-          <kbd>croix ↑</kbd>verser la BONBONNE dans le corps — la réserve mise de côté, en liquide seulement<br />
+          <kbd>croix ↑</kbd>verser la BONBONNE dans le corps — la réserve mise de côté, en liquide seulement ; à la dernière impulsion, elle se verse toute seule<br />
           <kbd>Start ☰</kbd>pause + la fiche
           <kbd>Select</kbd>recommencer<br />
           <kbd>croix / stick</kbd>MENUS : naviguer (le liseré bleu suit)

@@ -466,10 +466,17 @@ import {
   type StoredLevel,
 } from './game/netLevels'
 import {
+  REPOS_VERSEMENT_S,
   bonbonneIllimitee,
+  doitSecourir,
   doitVerserAuto,
   doseVersementAuto,
+  gainVersement,
+  inviteBonbonne,
   renflouementEngage,
+  segmentsJauge,
+  type EtatDescente,
+  type InviteBonbonne,
 } from './game/bonbonne'
 import { AudioFx, loadAudioPrefs } from './game/audio'
 import type { VoixCeremonie } from './game/sonsCeremonie'
@@ -2271,6 +2278,9 @@ const bbLiquide = document.getElementById('bb-liquide') as SVGGElement | null
 // le niveau AFFICHÉ court après le niveau réel : la réserve monte et descend
 // à vue, jamais d'un coup — c'est là qu'est le plaisir
 let bbAffiche = 0
+const bbInviteEl = el('bb-invite')
+let bbInviteSig = ''
+const gaugeReserve = el('gauge-reserve')
 let bbPresenteA = -1 // instant de la dernière présentation (début de tableau)
 const hudBonbonne = el('hud-bonbonne')
 const hudCondChip = el('hud-cond-chip') as HTMLButtonElement
@@ -12523,6 +12533,23 @@ let dernierVersementAuto = -99
 // plein. Sans cette mémoire, la première dose repasserait le seuil et le
 // corps vivrait collé à 30 %, à un souffle de l'alerte.
 let renflouementHub = false
+// ---- LA BONBONNE EN DESCENTE : l'invite et le secours (game/bonbonne.ts)
+// où en est l'invite à cette image, et ce que le geste rendrait — la fiole,
+// la jauge et la bannière d'alarme lisent les deux
+let bbInvite: InviteBonbonne = 'aucune'
+let bbGainL = 0
+// le dernier secours tenté (temps de tableau) : même repos qu'au hub, pour
+// qu'un corps qui n'absorbe pas ne relance pas le versement à chaque image
+let dernierSecours = -99
+// jusqu'à quand la bannière DIT que le secours vient de servir, et combien
+// il a rendu : un sauvetage muet n'apprendrait pas que la bonbonne existe
+let bbSecoursJusqua = -1
+let bbSecoursL = 0
+// ce que le dernier versement a réellement posé, en litres (le mot le dit)
+let bbDernierVerseL = 0
+// le joueur a-t-il déjà versé DE LUI-MÊME dans cette run ? Tant que non,
+// la fiole redit son geste à chaque salle où elle arrive chargée.
+let bbGesteConnu = false
 // rails dont le champ est engagé : allumés par un arc, ils ne se relâchent
 // qu'une fois leur bande vidée (le nuage porté jusqu'à l'arrivée)
 const railsEngages = new Set<number>()
@@ -13473,6 +13500,7 @@ function verserBonbonne(
     KIND_PLAYER,
   )
   if (poses < 1) return 'rien'
+  bbDernierVerseL = poses * params.litersPerParticle
   // une réserve infinie ne se débite pas — sinon la jauge du hub tomberait
   // à zéro en montrant « ∞ »
   if (!illimitee)
@@ -13504,14 +13532,54 @@ function manetteFait(id: string): boolean {
   return b !== null && manette.edge(b)
 }
 
+/** L'ÉTAT QUE LA RÈGLE LIT (game/bonbonne.ts), relevé sur le jeu. « Actif »
+ *  = une salle de run se joue là, maintenant : partout ailleurs, ni invite
+ *  ni secours — et quand le SAS BOIT, le volume fond parce qu'il est
+ *  collecté ; y verser la réserve serait la livrer sans l'avoir décidée. */
+function etatDescente(): EtatDescente {
+  return {
+    actif:
+      !auHub &&
+      !testLevel &&
+      !miseEnBonbonne &&
+      !sim.dispersed &&
+      !input.paused &&
+      !run.ended &&
+      run.exitTimer <= 0 &&
+      !endgame.spent &&
+      !endgame.enCollecte &&
+      !vide.prise,
+    litres: sim.liters(),
+    litresPleins: volumeDepart() * params.litersPerParticle,
+    reserveL: run.bonbonneLiters,
+    litreParticule: params.litersPerParticle,
+    alerteL: params.lastCallLiters,
+    critiqueL: params.criticalVolumeLiters,
+    liquide: !input.freezeIntent && !input.gasIntent,
+  }
+}
+/** LE GESTE, NOMMÉ PAR CE QUE LE JOUEUR A EN MAIN : la touche (redéfinie ou
+ *  d'origine), le bouton de la manette si c'est elle qui a parlé en dernier,
+ *  le doigt au tactile. Une invite qui dit « V » à qui tient une manette
+ *  n'invite personne. Vide quand la manœuvre n'a pas de commande. */
+function gesteVerser(): string {
+  if (manette.lastActivity > input.lastPointerAt) {
+    const b = boutonDe('verser')
+    if (b !== null) return nomBouton(b)
+  }
+  if (obTactile()) return 'TOUCHER'
+  const t = toucheDe('verser')
+  return t ? nomTouche(t) : ''
+}
 function verseEtDis(): void {
   const r = verserBonbonne()
+  if (r === 'ok') bbGesteConnu = true
   bbMot(
     r === 'ok'
-      ? 'réserve versée'
+      ? `bonbonne versée · +${bbDernierVerseL.toFixed(2)} L`
       : r === 'rien'
         ? run.bonbonneLiters < params.litersPerParticle
-          ? 'réserve vide'
+          ? 'bonbonne vide'
           : 'le corps est déjà plein'
         : r === 'etat'
           ? 'seulement en LIQUIDE'
@@ -13522,15 +13590,15 @@ function verseEtDis(): void {
   )
 }
 let bbMotTimer = 0
-/** Le mot sous la fiole : deux secondes, puis il s'efface. */
-function bbMot(texte: string, bon: boolean): void {
+/** Le mot sous la fiole : deux secondes (ou la durée dite), puis il s'efface. */
+function bbMot(texte: string, bon: boolean, dureeMs = 2200): void {
   const e = document.getElementById('bb-mot')
   if (!e) return
   e.textContent = texte
   e.classList.toggle('bb-non', !bon)
   e.classList.add('visible')
   window.clearTimeout(bbMotTimer)
-  bbMotTimer = window.setTimeout(() => e.classList.remove('visible'), 2200)
+  bbMotTimer = window.setTimeout(() => e.classList.remove('visible'), dureeMs)
 }
 // le toucher sur la fiole : le même geste — et il ne file JAMAIS au jeu
 // derrière (un clic à côté coûtait une goutte : la cible s'est élargie)
@@ -13540,6 +13608,15 @@ bonbonneEl?.addEventListener('click', (e) => {
   verseEtDis()
 })
 input.onVerser = verseEtDis
+// LA BANNIÈRE D'ALARME PORTE LE GESTE quand la bonbonne peut répondre
+// (classe « action », posée à l'affichage) : la toucher verse. Hors de ce
+// cas elle reste transparente aux pointeurs, comme avant — ces écouteurs ne
+// reçoivent alors rien.
+hudDanger.addEventListener('pointerdown', (e) => e.stopPropagation())
+hudDanger.addEventListener('click', (e) => {
+  e.stopPropagation()
+  if (hudDanger.classList.contains('action')) verseEtDis()
+})
 // LES MANŒUVRES D'ÉCRAN : la table des commandes les nomme, le jeu les
 // exécute — c'est le même chemin pour la touche d'origine et pour celle
 // que le joueur a redéfinie.
@@ -19433,6 +19510,8 @@ function restart(): void {
   // s'affichait au hub, précisément ce que la mécanique promet d'éviter
   dernierVersementAuto = -99
   renflouementHub = false
+  dernierSecours = -99
+  bbSecoursJusqua = -1
   // la BONBONNE se présente : le niveau repart de zéro et remonte à vue,
   // l'éclat balaie le verre — un rappel discret de ce qu'on a en réserve
   bbAffiche = 0
@@ -19440,6 +19519,14 @@ function restart(): void {
   bonbonneEl.classList.remove('presente')
   void bonbonneEl.offsetWidth // relancer l'animation, même deux fois de suite
   if (run.bonbonneLiters > 0) bonbonneEl.classList.add('presente')
+  // ET ELLE DIT SON GESTE, tant que le joueur ne l'a jamais fait de lui-même
+  // dans cette run : la fiole arrivait chargée sans qu'on sache quoi en
+  // faire (signalé : « très peu indiqué »). Dès le premier versement
+  // décidé, elle se tait — on ne répète pas ce qui est su.
+  if (run.bonbonneLiters > 0 && !bbGesteConnu) {
+    const g = gesteVerser()
+    bbMot(`${g ? g + ' · ' : ''}verser la bonbonne dans le corps`, true, 5200)
+  }
   run.ended = false
   ecranDispersion = 'aucun'
   dispersionDelai = 0
@@ -19634,6 +19721,7 @@ function newExpedition(avecCarte = false): void {
   voieRang = 0 // une descente neuve repart du premier rang du plan
   voieVues.clear()
   run.bonbonneLiters = 0
+  bbGesteConnu = false
   run.runTime = 0
   // la fiole de SECOND SOUFFLE ajoute son échantillon de secours au départ
   run.vies = Math.min(VIES_MAX, 1 + (fioleActive('second-souffle') ? 1 : 0))
@@ -22868,16 +22956,24 @@ function corpsImage(now: number): boolean {
     !input.freezeIntent &&
     !input.gasIntent
   bonbonneEl.classList.toggle('verse-ok', peutVerser)
-  // RAPPEL : le corps touche à sa dernière goutte (il approche du seuil
-  // critique) et la réserve peut le renflouer — la fiole bat doucement.
-  // On ne bat pas pour rien : sans réserve utile, elle reste immobile.
-  bonbonneEl.classList.toggle(
-    'rappel',
-    peutVerser &&
-      !tableauDone &&
-      !sim.dispersed &&
-      sim.liters() < params.criticalVolumeLiters * 1.7,
-  )
+  // L'INVITE (game/bonbonne.ts) : sous la moitié du volume, la fiole se
+  // DÉPLIE en bouton qui nomme le geste et ce qu'il rend ; à l'alerte, elle
+  // bat — et la bannière d'alarme, plus bas, porte le même geste. La fiole
+  // seule (12 px, dans un coin) ne se faisait pas remarquer : elle battait
+  // déjà à la dernière goutte, et personne ne versait (signalé).
+  const eDesc = etatDescente()
+  bbInvite = inviteBonbonne(eDesc)
+  bbGainL = gainVersement(eDesc)
+  bonbonneEl.classList.toggle('invite', bbInvite !== 'aucune')
+  bonbonneEl.classList.toggle('rappel', bbInvite === 'pressante')
+  if (bbInvite !== 'aucune') {
+    const g = gesteVerser()
+    const sig = `${g}|${bbGainL.toFixed(2)}`
+    if (sig !== bbInviteSig) {
+      bbInviteSig = sig
+      bbInviteEl.innerHTML = `${g ? `<kbd>${g}</kbd>` : ''}<span>VERSER</span><b>+${bbGainL.toFixed(2)} L</b>`
+    }
+  }
   // PRÉSENTATION : au début du tableau, la fiole se pose et son éclat
   // balaie le verre — le niveau remonte de zéro sous les yeux du joueur
   if (bbPresenteA >= 0 && run.tableauTime - bbPresenteA > 1) {
@@ -22896,6 +22992,17 @@ function corpsImage(now: number): boolean {
   hudVolume.innerHTML = `${sim.liters().toFixed(2)} <small>L</small>`
   hudVolume.title = `${sim.aliveCount()} particules`
   gaugeFill.style.width = `${Math.min(100, fraction * 100).toFixed(1)}%`
+  // CE QUE LA BONBONNE RENDRAIT, en hachures à la suite du corps : la jauge
+  // est l'endroit qu'on regarde quand le volume inquiète — c'est là que la
+  // réserve doit se rappeler, pas dans un coin. Visible dès que le geste
+  // rendrait quelque chose, invite ou non : on sait toujours ce qu'on a.
+  const seg = segmentsJauge(
+    sim.playerCount * params.litersPerParticle,
+    sim.baseVolume * params.litersPerParticle,
+    eDesc.actif ? bbGainL : 0,
+  )
+  gaugeReserve.style.left = `${(seg.corps * 100).toFixed(1)}%`
+  gaugeReserve.style.width = `${(seg.reserve * 100).toFixed(1)}%`
   // Le seuil est un volume ABSOLU : sa position sur la jauge (graduée en % du
   // volume de départ) dépend donc du volume de base de ce tableau.
   const baseLiters = sim.baseVolume * params.litersPerParticle
@@ -23002,6 +23109,30 @@ function corpsImage(now: number): boolean {
   if (vide.prise) endgame.lastCall = false
   const alive = !sim.dispersed && !tableauDone && !run.ended
   if (alive && !endgame.spent && !endgame.enCollecte && !vide.prise) {
+    // LE SECOURS : au seuil de la dernière impulsion, la bonbonne se verse
+    // TOUTE SEULE (game/bonbonne.ts) — AVANT que le seuil ne soit constaté,
+    // pour que la dernière impulsion ne soit jamais déclarée sur un corps
+    // qui avait de quoi tenir. On mourait à sec, la réserve intacte.
+    // Le secours n'est PAS muet, au contraire du hub : c'est un événement,
+    // et c'est lui qui apprend que la bonbonne existe.
+    if (
+      doitSecourir(etatDescente()) &&
+      (run.tableauTime - dernierSecours < 0 ||
+        run.tableauTime - dernierSecours >= REPOS_VERSEMENT_S)
+    ) {
+      // l'horodatage sur TOUTE tentative, comme au hub : un corps qui
+      // n'absorbe pas renvoie 'rien', et le secours repartirait chaque image
+      dernierSecours = run.tableauTime
+      if (verserBonbonne() === 'ok') {
+        bbSecoursL = bbDernierVerseL
+        bbSecoursJusqua = run.tableauTime + 3.2
+        bbMot(`secours · +${bbSecoursL.toFixed(2)} L`, true, 3200)
+        manette.rumble(0.6, 180) // le sauvetage se sent, moins fort que la fin
+        const apres = etatDescente()
+        bbInvite = inviteBonbonne(apres)
+        bbGainL = gainVersement(apres)
+      }
+    }
     endgame.lastCall = sim.liters() <= params.criticalVolumeLiters
     // se rassembler ne dépense rien : ce maintien-là n'est pas une impulsion,
     // il ne consomme pas la dernière
@@ -23056,6 +23187,8 @@ function corpsImage(now: number): boolean {
   // LE VIDE prime sur toute autre alarme : c'est la seule qui laisse un
   // délai, et c'est maintenant qu'il faut le lire
   const menaceDuVide = alive ? menaceVide(vide) : 0
+  // le secours vient-il de servir ? (l'alarme, si elle a encore à dire, prime)
+  const secoursDit = alive && run.tableauTime < bbSecoursJusqua
   const inDanger =
     menaceDuVide > 0 ||
     (alive && !aspireAssez && (endgame.spent || endgame.lastCall || nearLast))
@@ -23066,19 +23199,49 @@ function corpsImage(now: number): boolean {
         : `⚠ AU-DESSUS DU VIDE — QUITTEZ LA BRÈCHE (${Math.ceil(VIDE_DELAI * (1 - menaceDuVide))} s)`,
     )
   } else if (inDanger) {
+    // LA BONBONNE PEUT RÉPONDRE : l'alarme ne se contente plus de constater,
+    // elle PORTE LE GESTE — et se touche. « Réserve basse » parlait du
+    // corps alors que « la réserve » est aussi le nom de la bonbonne : avec
+    // de quoi verser au dos, on lisait une alarme sans issue.
+    const g = gesteVerser()
+    const gain = `+${bbGainL.toFixed(2)} L`
+    const versable = !input.freezeIntent && !input.gasIntent
+    const offre = !versable
+      ? 'LA BONBONNE SE VERSE EN LIQUIDE'
+      : g === 'TOUCHER'
+        ? `TOUCHEZ ICI : VERSER LA BONBONNE <b>${gain}</b>`
+        : `${g ? `<kbd>${g}</kbd> ` : ''}VERSER LA BONBONNE <b>${gain}</b>`
     // la dérive gelée porte l'icône peinte de la glace (l'emoji en repli)
     ecritAlarme(
       endgame.spent
         ? `${iconeEtatHTML('solide')} DERNIÈRE IMPULSION DONNÉE — L’ÉCHANTILLON DÉRIVE`
-        : endgame.lastCall
-          ? '⚠ RÉSERVE À SEC — LA PROCHAINE IMPULSION EST LA DERNIÈRE'
-          : '⚠ RÉSERVE BASSE — LA DERNIÈRE IMPULSION APPROCHE',
+        : bbInvite === 'pressante'
+          ? endgame.lastCall
+            ? `⚠ DERNIÈRE IMPULSION — ${offre}`
+            : `⚠ VOLUME BAS — ${offre}`
+          : endgame.lastCall
+            ? '⚠ RÉSERVE À SEC — LA PROCHAINE IMPULSION EST LA DERNIÈRE'
+            : '⚠ RÉSERVE BASSE — LA DERNIÈRE IMPULSION APPROCHE',
     )
+  } else if (secoursDit) {
+    ecritAlarme(`✚ BONBONNE DE SECOURS VERSÉE <b>+${bbSecoursL.toFixed(2)} L</b>`)
   }
+  const alarmeVisible =
+    (inDanger || secoursDit) && document.body.classList.contains('playing') && !input.paused
+  hudDanger.classList.toggle('visible', alarmeVisible)
+  // la bannière se TOUCHE quand elle offre le versement — et seulement là
   hudDanger.classList.toggle(
-    'visible',
-    inDanger && document.body.classList.contains('playing') && !input.paused,
+    'action',
+    alarmeVisible &&
+      menaceDuVide <= 0 &&
+      inDanger &&
+      !endgame.spent &&
+      bbInvite === 'pressante' &&
+      !input.freezeIntent &&
+      !input.gasIntent,
   )
+  // le secours vient de servir : la bannière le DIT, en vert, trois secondes
+  hudDanger.classList.toggle('secours', alarmeVisible && !inDanger && secoursDit)
   hudDanger.classList.toggle('spent', endgame.spent)
   gaugeFill.classList.toggle(
     'danger',
