@@ -1192,29 +1192,32 @@ describe('la cérémonie — les portes et le plan, habillés', () => {
 // sur ce que ça fait », des cartes « un peu plus grandes », la consigne « en
 // plus visible / grand », et plus de texte « déjà donné sur l'écran d'avant ».
 describe('la cérémonie — le tirage', () => {
+  // la table se pose dans mbPoseTirage (ouverture, relance, bannissement) :
+  // le tirage se lit sur les deux
+  const tirageCorps = (): string => corps('mbMontreDraft') + corps('mbPoseTirage')
   const css = HTML.slice(HTML.indexOf('/* ==== LA CÉRÉMONIE DE FIN DE SALLE'), HTML.indexOf('/* ---- Le panneau du GÉNÉRATEUR'))
   it('le tirage n’est pas surplombé par la jauge et son tampon', () => {
-    expect(corps('mbMontreDraft')).toContain(`mbEl('mb-etal').hidden = true`)
+    expect(tirageCorps()).toContain(`mbEl('mb-etal').hidden = true`)
   })
   it('les cartes du tirage dessinent leur icône, sans émoji', () => {
     expect(corps('carteHTML')).toContain('iconeInstrumentHTML(')
     expect(corps('carteHTML')).not.toMatch(/\$\{d\.icone\}/)
   })
   it('n’obéit pas au geste qui vient de l’ouvrir', () => {
-    const f = corps('mbMontreDraft')
+    const f = tirageCorps()
     expect(f).toMatch(/mbDraftOuvertA = performance\.now\(\)/)
     // le clic d'une carte (souris, Entrée, Espace, A) passe par la garde
     const clic = f.slice(f.indexOf("btn.addEventListener('click'"))
     expect(clic.slice(0, 400)).toContain('if (gesteTropTot(performance.now(), mbDraftOuvertA)) return')
   })
   it('pose le focus sur la première carte offerte, sans l’isoler ni l’incliner', () => {
-    const f = corps('mbMontreDraft')
+    const f = tirageCorps()
     expect(f).toMatch(/mbFocusOuverture = true;?\s*\n\s*[^\n]*button:not\(:disabled\)[^\n]*\.focus\(\{ preventScroll: true \}\);?\s*\n\s*mbFocusOuverture = false/)
     // le focusin isole la carte (visée), sauf celui que le tirage pose lui-même
     expect(f).toMatch(/'focusin'[^\n]*mbFocusOuverture/)
   })
   it('se vise aux flèches du clavier, comme à la croix de la manette', () => {
-    const f = corps('mbMontreDraft')
+    const f = tirageCorps()
     expect(f).toContain("'ArrowLeft'")
     expect(f).toContain("'ArrowRight'")
   })
@@ -1239,7 +1242,7 @@ describe('la cérémonie — le tirage', () => {
     }
   })
   it('pose la consigne en question, en grand, et retire ce que les écrans d’avant ont dit', () => {
-    const f = corps('mbMontreDraft')
+    const f = tirageCorps()
     expect(f).toContain("mbQuestion('CHOISISSEZ VOTRE INSTRUMENT')")
     // le bandeau de la salle (régime, volume, bourse, mémoire) : le bilan
     // et le palier viennent de le dire
@@ -1255,7 +1258,7 @@ describe('la cérémonie — le tirage', () => {
     expect(css).toMatch(/@media \(max-height: 820px\) and \(min-width: 761px\) \{[^}]*\}\s*\.mb-pli, \.mb-pli \.crt-draft \{ min-height: 300px; \}/)
   })
   it('sonne la carte élue de sa voix, et chaque carte posée de la sienne', () => {
-    const f = corps('mbMontreDraft')
+    const f = tirageCorps()
     expect(f).toContain("sonCeremonie('elu'")
     expect(f).toContain("sonCeremonie('cartouche'")
     expect(f).not.toContain('sting-collecte') // les stings restent au rang, au record, au palier
@@ -1264,7 +1267,7 @@ describe('la cérémonie — le tirage', () => {
   it('taille ses cartes au chanfrein, et le dos aussi', () => {
     expect(regle('.mb-pli .crt-draft')).toMatch(/clip-path:\s*polygon\(/)
     expect(regle('.mb-pli-dos')).toMatch(/clip-path:\s*polygon\(/)
-    expect(corps('mbMontreDraft')).toContain('class="mb-pli-dos"')
+    expect(tirageCorps()).toContain('class="mb-pli-dos"')
   })
   // LE DOS. Une opacité sous 1, un filtre, un clip-path… posés sur l'élément
   // qui porte la 3D l'APLATISSENT (CSS Transforms 2, « grouping
@@ -1304,7 +1307,7 @@ describe('la cérémonie — le tirage', () => {
   // (le concepteur, 22/11). La visée, d'où qu'elle vienne, met l'eau en
   // mouvement ; le choix l'arrête.
   it('donne à chaque carte son eau, visée au pointeur, au clavier et à la manette', () => {
-    const f = corps('mbMontreDraft')
+    const f = tirageCorps()
     expect(MAIN).not.toContain('mbIncline')
     expect(f).toContain('ondes.set(pli, ondeCarte(btn, pli, sansAnimation))')
     // l'eau s'installe AVANT les écouteurs de la visée : son pointerenter
@@ -1417,7 +1420,10 @@ describe('la cérémonie — le tirage', () => {
   // que le tirage du jeu lui dise quels états sont ouverts — sans eux, le
   // défaut « tout ouvert » rendait le tirage d'avant, en silence
   it('dit au tirage quels états sont ouverts : ceux que la descente lit déjà', () => {
-    expect(corps('mbMontreDraft')).toMatch(/tirageInstruments\(\s*Math\.random,[\s\S]{0,160}catalogueRecompenses\(\),\s*etatsOuverts\(\),\s*\)/)
+    expect(corps('mbMontreDraft')).toContain('tirage(Math.random, mbContexteTirage())')
+    const ctx = corps('mbContexteTirage')
+    expect(ctx).toContain('catalogue: catalogueRecompenses()')
+    expect(ctx).toContain('ouverts: etatsOuverts()')
     const e = corps('etatsOuverts')
     expect(e).toContain("glace: transfoTenue('solidification', acquis, verrous)")
     expect(e).toContain("vapeur: transfoTenue('vaporisation', acquis, verrous)")
@@ -1463,5 +1469,47 @@ describe('la cérémonie — la question se pose après le porte-cartes', () => 
     expect(HTML).toMatch(/\.mb-scene\.mb-compact\.mb-question \.mb-titre \{[^}]*white-space:\s*nowrap/)
     const petit = HTML.slice(HTML.indexOf('@media (max-width: 760px) {', HTML.indexOf('/* ==== LA CÉRÉMONIE DE FIN DE SALLE')))
     expect(petit.slice(0, petit.indexOf('\n      }\n'))).toMatch(/\.mb-scene\.mb-compact\.mb-question \.mb-titre \{ white-space: normal; \}/)
+  })
+})
+
+// BANNIR ET RELANCER (le concepteur, 28/11). La règle (ce qui se propose,
+// ce qui remplace la bannie) est testée dans instruments.spec.ts ; ici, ce
+// que la cérémonie en fait — et surtout que la run s'en SOUVIENT : un
+// bannissement que la reprise oublierait se rendrait en fermant l'onglet.
+describe('la cérémonie — bannir et relancer', () => {
+  it('le clic en mode BANNIR bannit, il n’emporte ni ne paie', () => {
+    const f = corps('mbPoseTirage')
+    const clic = f.slice(f.indexOf("btn.addEventListener('click'"))
+    expect(clic.indexOf('if (mbModeBannir)')).toBeGreaterThan(-1)
+    expect(clic.indexOf('if (mbModeBannir)')).toBeLessThan(clic.indexOf('depenseCondensat('))
+    expect(clic.slice(clic.indexOf('if (mbModeBannir)'), clic.indexOf('depenseCondensat('))).toContain('mbBannit(cartes, carte.id)')
+  })
+  it('le bannissement entre dans la run, la relance se compte', () => {
+    expect(corps('mbBannit')).toContain('run.bannies.push(id)')
+    expect(corps('mbBannit')).toContain('remplaceBannie(Math.random, mbContexteTirage(), cartes, id)')
+    expect(corps('mbContexteTirage')).toContain('bannies: run.bannies')
+    expect(corps('mbPoseOutils')).toContain('run.relancesFaites += 1')
+    expect(corps('mbPoseOutils')).toContain('relanceTirage(Math.random, mbContexteTirage(), cartes.map((c) => c.id))')
+    // les deux gestes passent par la garde : un double clic ne relance pas deux fois
+    expect(corps('mbPoseOutils').match(/gesteTropTot\(performance\.now\(\), mbDraftOuvertA\)/g)).toHaveLength(2)
+  })
+  it('la sauvegarde écrit les bannies et les relances, la reprise les relit', () => {
+    expect(corps('sauveRun')).toContain('bannies: run.bannies')
+    expect(corps('sauveRun')).toContain('relancesFaites: run.relancesFaites')
+    expect(corps('runSauvee')).toMatch(/bannies: Array\.isArray\(d\.bannies\)/)
+    expect(corps('runSauvee')).toContain('relancesFaites:')
+    expect(corps('reprendreRun')).toContain('run.bannies = (save.bannies ?? []).slice()')
+    expect(corps('reprendreRun')).toContain('run.relancesFaites =')
+  })
+  it('une run neuve, ou le retour au labo, rend tous les gestes', () => {
+    for (const f of ['newExpedition', 'retourAuLabo']) {
+      expect(corps(f), f).toContain('run.bannies = []')
+      expect(corps(f), f).toContain('run.relancesFaites = 0')
+    }
+  })
+  it('les gestes n’appartiennent qu’au tirage : le porte-cartes les éteint', () => {
+    expect(corps('mbCartes')).toContain("mbEl('mb-outils').hidden = true")
+    expect(corps('mbCartes')).toContain("'mb-bannir'")
+    expect(HTML).toContain('id="mb-outils"')
   })
 })

@@ -9093,6 +9093,29 @@
       /* un cran d'avis : son filet d'acier s'efface sous le filet d'eau */
       .mb-avis-cran.mb-liquide { border-color: transparent; }
       .mb-pli .crt-draft.mb-pauvre { opacity: 0.4; cursor: not-allowed; }
+      /* LES GESTES DU TIRAGE : deux boutons SOURDS sous les cartes — un
+         filet, l'encre éteinte. Le verbe de l'écran reste la carte qu'on
+         emporte (UN aplat par écran) ; relancer et bannir sont des
+         recours, ils se lisent sans disputer la table. */
+      .mb-outils {
+        display: flex; justify-content: center; gap: 12px; margin-top: 16px;
+      }
+      .mb-outils[hidden] { display: none; }
+      .mb-outil {
+        min-height: 36px; padding: 0 16px;
+        font-family: var(--font-display); font-size: calc(11px * var(--ui)); letter-spacing: 0.14em;
+        color: var(--dim); background: transparent; border: 1px solid var(--line); cursor: pointer;
+        font-variant-numeric: tabular-nums;
+      }
+      .mb-outil:hover, .mb-outil:focus-visible, .mb-outil.pad-focus {
+        color: var(--ink); border-color: var(--glow); outline: none;
+      }
+      .mb-outil:disabled { opacity: 0.4; cursor: default; border-color: var(--line); color: var(--dim); }
+      /* armé, BANNIR prend la teinte du refus ; les cartes aussi : le clic
+         qui vient retire, il n'emporte pas */
+      .mb-outil-bannir[aria-pressed="true"] { color: #e0685c; border-color: #e0685c; }
+      .mb-cartes.mb-bannir .crt-draft { outline: 2px dashed #e0685c; outline-offset: -6px; }
+      .mb-cartes.mb-bannir .crt-draft.mb-pauvre { opacity: 1; cursor: pointer; }
       /* LE CHOIX : l'élue s'avance et grandit, les autres tombent (le pli
          peut alors s'aplatir : chacun est sur sa face) */
       .mb-cartes.mb-elu .mb-pli:not(.mb-elu-c) {
@@ -11879,6 +11902,9 @@
         <div class="mb-choix" id="mb-choix" hidden>
           <p class="mb-choix-titre" id="mb-choix-titre">OÙ VERSER LE SURPLUS ?</p>
           <div class="mb-cartes" id="mb-cartes"></div>
+          <!-- LES GESTES DU TIRAGE : relancer la table, bannir une carte de
+               la run (main.ts, mbPoseOutils) — le tirage seul les montre -->
+          <div class="mb-outils" id="mb-outils" role="group" aria-label="Relancer ou bannir" hidden></div>
         </div>
         <!-- LE LEVIER : il passe le bilan — au clic, au toucher, à Entrée,
              à Espace et à A (il a le focus dès l'ouverture) -->

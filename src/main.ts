@@ -260,7 +260,14 @@ import {
   levier,
   paliersAtteints,
   prochainPalier,
-  tirageInstruments,
+  tirage,
+  relanceTirage,
+  remplaceBannie,
+  gestesRestants,
+  BANNISSEMENTS_PAR_RUN,
+  RELANCES_PAR_RUN,
+  type CarteTirage,
+  type ContexteTirage,
   instrumentOuvert,
 } from './game/instruments'
 import {
@@ -753,6 +760,11 @@ const run = {
   // Les INSTRUMENTS EMBARQUÉS : les cartes emportées aux mises en bonbonne
   // de cette run — des avantages latéraux, perdus à la fin de la run.
   instruments: [] as string[],
+  // LES CARTES BANNIES de la run : elles ne se proposent plus à aucun
+  // tirage, jusqu'à la fin de la run (instruments.ts, BANNISSEMENTS_PAR_RUN)
+  bannies: [] as string[],
+  // les RELANCES du tirage déjà faites cette run (RELANCES_PAR_RUN)
+  relancesFaites: 0,
   // L'XP D'ÉTALONNAGE : les litres versés côté instruments — chaque palier
   // franchi (PALIERS_XP) ouvre un tirage de cartes.
   xp: 0,
@@ -5687,6 +5699,8 @@ interface RunSauvee {
   vies: number
   conclues: number
   instruments: string[]
+  bannies?: string[] // les cartes bannies de la run (absentes : anciennes sauvegardes)
+  relancesFaites?: number // les relances du tirage déjà faites
   xp: number
   livreTotal: number
   condensat?: number // la bourse de la run (absente : anciennes sauvegardes)
@@ -5715,6 +5729,11 @@ function runSauvee(): RunSauvee | null {
       instruments: Array.isArray(d.instruments)
         ? d.instruments.filter((x): x is string => typeof x === 'string')
         : [],
+      // un bannissement se rendrait en fermant l'onglet s'il n'était pas relu
+      bannies: Array.isArray(d.bannies)
+        ? d.bannies.filter((x): x is string => typeof x === 'string')
+        : undefined,
+      relancesFaites: typeof d.relancesFaites === 'number' ? d.relancesFaites : undefined,
       xp: Math.max(0, Number(d.xp) || 0),
       livreTotal: Math.max(0, Number(d.livreTotal) || 0),
       // ces champs s'écrivaient sans jamais être RELUS : la reprise repartait
@@ -5756,6 +5775,8 @@ function sauveRun(): void {
           vies: run.vies,
           conclues: run.conclues,
           instruments: run.instruments,
+          bannies: run.bannies,
+          relancesFaites: run.relancesFaites,
           xp: run.xp,
           livreTotal: run.livreTotal,
           condensat,
@@ -5795,6 +5816,8 @@ function reprendreRun(save: RunSauvee): void {
   run.vies = save.vies
   run.conclues = save.conclues
   run.instruments = save.instruments.slice()
+  run.bannies = (save.bannies ?? []).slice()
+  run.relancesFaites = Math.max(0, Math.floor(save.relancesFaites ?? 0))
   run.xp = save.xp
   run.livreTotal = save.livreTotal
   condensat = Math.max(0, Math.round(save.condensat ?? 0))
@@ -16885,8 +16908,11 @@ function mbVerseXp(avantXp: number): void {
  * l'étape précédente — ni disposition, ni mise en scène en cours. */
 function mbCartes(): HTMLElement {
   const h = mbEl('mb-cartes')
-  h.classList.remove('mb-draft', 'mb-isole', 'mb-elu', 'mb-station', 'mb-trio')
+  h.classList.remove('mb-draft', 'mb-isole', 'mb-elu', 'mb-station', 'mb-trio', 'mb-bannir')
   h.style.removeProperty('--n')
+  // les gestes du tirage (relancer, bannir) n'appartiennent qu'au tirage
+  mbEl('mb-outils').hidden = true
+  mbModeBannir = false
   mbScene.classList.remove('mb-question')
   return h
 }
@@ -16915,7 +16941,6 @@ function etatsOuverts(): EtatsOuverts {
  * une — certaines payantes en condensat, jamais toutes. */
 function mbMontreDraft(): void {
   mbEtape = 'draft'
-  mbDraftOuvertA = performance.now()
   // LA COLONNE ET SON TAMPON S'EN VONT : en grand au-dessus des cartes, ils
   // poussaient le tirage sous le bas d'un écran de 720 px, sous un tampon
   // « TIRAGE OUVERT » qui n'apprenait plus rien. Le palier les retire déjà
@@ -16927,6 +16952,40 @@ function mbMontreDraft(): void {
   // se juge sur ce qu'on a
   mbEl('mb-choix-titre').textContent =
     `${titreDuTirage(paliersAtteints(run.xp), mbDraftsRestants, mbTirageGaranti)} · EN BOURSE : ${condensat} cL`
+  mbReleveHors()
+  // le CARNET DU SEMBLABLE ouvre une quatrième carte ; une carte d'un état
+  // pas encore tissé ne se propose pas, une carte bannie de la run non plus
+  mbPoseTirage(tirage(Math.random, mbContexteTirage()))
+}
+
+/** Ce que le tirage lit de la run : relu à chaque relance et chaque
+ *  bannissement (une vie prise entre-temps, une bannie de plus). */
+function mbContexteTirage(): ContexteTirage {
+  return {
+    tenus: run.instruments,
+    vies: run.vies,
+    viesMax: VIES_MAX,
+    nbCartes: 3 + lev('cartes'),
+    catalogue: catalogueRecompenses(),
+    ouverts: etatsOuverts(),
+    bannies: run.bannies,
+  }
+}
+
+/** LE MODE BANNIR : armé par son bouton, le prochain clic sur une carte la
+ *  BANNIT au lieu de l'emporter. Un mode plutôt qu'un bouton par carte :
+ *  la carte est déjà un bouton (on n'en niche pas un second dedans), et la
+ *  manette, le clavier et le doigt gardent le même geste sur la même cible. */
+let mbModeBannir = false
+
+/** LA TABLE DU TIRAGE : posée à l'ouverture du palier, reposée à chaque
+ *  relance et à chaque bannissement — le palier, lui, n'est consommé que
+ *  par la carte emportée. */
+function mbPoseTirage(cartes: CarteTirage[]): void {
+  // la garde du geste vaut aussi pour une table reposée : le second clic
+  // d'un double clic sur RELANCER ne doit pas emporter une carte neuve
+  mbDraftOuvertA = performance.now()
+  mbModeBannir = false
   const host = mbCartes()
   host.innerHTML = ''
   // LA QUESTION, EN GRAND, ET RIEN D'AUTRE AU-DESSUS DES CARTES. L'écran
@@ -16938,18 +16997,6 @@ function mbMontreDraft(): void {
   // consigne « en plus visible / grand » (le concepteur, 21/11) : elle
   // devient la question de l'étape, comme celle des salles
   mbQuestion('CHOISISSEZ VOTRE INSTRUMENT')
-  mbReleveHors()
-  // le CARNET DU SEMBLABLE ouvre une quatrième carte ; une carte d'un état
-  // pas encore tissé ne se propose pas
-  const cartes = tirageInstruments(
-    Math.random,
-    run.instruments,
-    run.vies,
-    VIES_MAX,
-    3 + lev('cartes'),
-    catalogueRecompenses(),
-    etatsOuverts(),
-  )
   const suite = (): void => {
     mbDraftsRestants -= 1
     if (mbDraftsRestants > 0) mbMontreDraft()
@@ -16994,6 +17041,15 @@ function mbMontreDraft(): void {
   // une carte trop chère reste hors d'atteinte. Écoutées sur chaque carte,
   // neuves à chaque tirage : le porte-cartes, lui, sert à toutes les étapes
   const fleches = (e: KeyboardEvent): void => {
+    if (e.key === 'ArrowDown' && !elu) {
+      // sous les cartes, les deux gestes de la table (relancer, bannir)
+      const outil = mbEl('mb-outils').querySelector<HTMLButtonElement>('button:not(:disabled)')
+      if (outil) {
+        e.preventDefault()
+        outil.focus({ preventScroll: true })
+      }
+      return
+    }
     const pas = e.key === 'ArrowLeft' ? -1 : e.key === 'ArrowRight' ? 1 : 0
     if (!pas || elu) return
     const offertes = [...host.querySelectorAll<HTMLButtonElement>('.crt-draft:not(:disabled)')]
@@ -17047,8 +17103,14 @@ function mbMontreDraft(): void {
       // précédent) ne choisit pas : le second clic d'un double clic, le A
       // suivant d'une rafale tombent ici
       if (gesteTropTot(performance.now(), mbDraftOuvertA)) return
+      if (mbModeBannir) {
+        mbBannit(cartes, carte.id)
+        return
+      }
       if (!depenseCondensat(carte.prix)) return
       elu = true
+      // la carte est prise : la table ne se relance ni ne se bannit plus
+      for (const b of mbEl('mb-outils').querySelectorAll('button')) b.disabled = true
       // LA CARTE ÉLUE s'embrase, les autres se retirent — puis la suite
       // l'eau se tait d'un coup : l'élan de l'élue est une animation, et le
       // contour qui ondulait encore ne doit rien ajouter à la sienne
@@ -17082,6 +17144,7 @@ function mbMontreDraft(): void {
     })
     host.appendChild(pli)
   })
+  mbPoseOutils(cartes)
   // le levier du palier, qui avait le focus, vient de disparaître : le
   // focus passe à la première carte offerte — Entrée, Espace et la manette
   // trouvent une cible, sans que le geste qui a ouvert ne la presse, et
@@ -17089,6 +17152,99 @@ function mbMontreDraft(): void {
   mbFocusOuverture = true
   host.querySelector<HTMLButtonElement>('button:not(:disabled)')?.focus({ preventScroll: true })
   mbFocusOuverture = false
+}
+
+/** LES DEUX GESTES DE LA TABLE, sous les cartes : RELANCER et BANNIR, chacun
+ *  avec ce qu'il en reste pour la run. Sourds (ce ne sont pas des leviers :
+ *  le verbe de l'écran reste la carte qu'on emporte), éteints une fois
+ *  épuisés plutôt que retirés — le joueur voit qu'il en a eu. */
+function mbPoseOutils(cartes: CarteTirage[]): void {
+  const barre = mbEl('mb-outils')
+  barre.innerHTML = ''
+  barre.hidden = false
+  const relances = gestesRestants(RELANCES_PAR_RUN, run.relancesFaites)
+  const bans = gestesRestants(BANNISSEMENTS_PAR_RUN, run.bannies.length)
+  const outil = (cls: string, texte: string, titre: string, reste: number): HTMLButtonElement => {
+    const b = document.createElement('button')
+    b.type = 'button'
+    b.className = `mb-outil ${cls}`
+    b.textContent = texte
+    b.title = titre
+    b.disabled = reste === 0
+    barre.appendChild(b)
+    return b
+  }
+  const relancer = outil(
+    'mb-outil-relance',
+    `↻ RELANCER · ${relances}`,
+    'Une table neuve pour ce palier — les cartes refusées ne reviennent pas tant qu’il en reste d’autres',
+    relances,
+  )
+  const bannir = outil(
+    'mb-outil-bannir',
+    `⊘ BANNIR · ${bans}`,
+    'Bannir une carte : elle ne se proposera plus de la run, une autre prend sa place',
+    bans,
+  )
+  bannir.setAttribute('aria-pressed', 'false')
+  relancer.addEventListener('click', () => {
+    if (gesteTropTot(performance.now(), mbDraftOuvertA) || mbEtape !== 'draft') return
+    if (gestesRestants(RELANCES_PAR_RUN, run.relancesFaites) === 0) return
+    run.relancesFaites += 1
+    sonCeremonie('cartouche', 0.8)
+    mbPoseTirage(relanceTirage(Math.random, mbContexteTirage(), cartes.map((c) => c.id)))
+  })
+  bannir.addEventListener('click', () => {
+    if (gesteTropTot(performance.now(), mbDraftOuvertA) || mbEtape !== 'draft') return
+    mbBasculeBannir(!mbModeBannir)
+  })
+  // les flèches entre les deux gestes ; HAUT rend la main aux cartes
+  barre.onkeydown = (e: KeyboardEvent): void => {
+    const boutons = [...barre.querySelectorAll<HTMLButtonElement>('button:not(:disabled)')]
+    const ici = boutons.indexOf(e.target as HTMLButtonElement)
+    if (ici < 0) return
+    if (e.key === 'ArrowUp') {
+      e.preventDefault()
+      mbEl('mb-cartes').querySelector<HTMLButtonElement>('.crt-draft:not(:disabled)')?.focus({ preventScroll: true })
+      return
+    }
+    const pas = e.key === 'ArrowLeft' ? -1 : e.key === 'ArrowRight' ? 1 : 0
+    if (!pas) return
+    e.preventDefault()
+    boutons[Math.max(0, Math.min(boutons.length - 1, ici + pas))]?.focus({ preventScroll: true })
+  }
+}
+
+/** Arme ou désarme le mode BANNIR. Armé, la question change (le joueur sait
+ *  ce que son clic va faire), les cartes prennent le liseré du refus, et
+ *  les cartes trop chères redeviennent cliquables : on peut bannir ce
+ *  qu'on ne peut pas s'offrir. */
+function mbBasculeBannir(on: boolean): void {
+  mbModeBannir = on
+  const host = mbEl('mb-cartes')
+  host.classList.toggle('mb-bannir', on)
+  mbQuestion(on ? 'QUELLE CARTE BANNIR DE LA RUN ?' : 'CHOISISSEZ VOTRE INSTRUMENT')
+  for (const b of host.querySelectorAll<HTMLButtonElement>('.crt-draft.mb-pauvre')) b.disabled = !on
+  const bouton = mbEl('mb-outils').querySelector<HTMLButtonElement>('.mb-outil-bannir')
+  if (bouton) {
+    bouton.setAttribute('aria-pressed', String(on))
+    bouton.textContent = on
+      ? '✕ NE PAS BANNIR'
+      : `⊘ BANNIR · ${gestesRestants(BANNISSEMENTS_PAR_RUN, run.bannies.length)}`
+  }
+  if (on) host.querySelector<HTMLButtonElement>('.crt-draft:not(:disabled)')?.focus({ preventScroll: true })
+}
+
+/** LE BANNISSEMENT : la carte quitte le bassin pour la run (la sauvegarde
+ *  l'écrit avec le reste de la run, à l'entrée de la salle suivante), et une
+ *  carte neuve prend sa place sur la table. */
+function mbBannit(cartes: CarteTirage[], id: string): void {
+  if (gestesRestants(BANNISSEMENTS_PAR_RUN, run.bannies.length) === 0) return
+  if (!run.bannies.includes(id)) run.bannies.push(id)
+  mbModeBannir = false
+  mbSecousse(0.3)
+  sonCeremonie('cartouche', 0.8)
+  mbPoseTirage(remplaceBannie(Math.random, mbContexteTirage(), cartes, id))
 }
 
 // ---- Le POOL de salles : le choix de la prochaine, après la récompense --
@@ -19639,6 +19795,9 @@ function newExpedition(avecCarte = false): void {
   run.vies = Math.min(VIES_MAX, 1 + (fioleActive('second-souffle') ? 1 : 0))
   run.conclues = 0
   run.instruments = []
+  // les bannissements et les relances valent pour UNE run
+  run.bannies = []
+  run.relancesFaites = 0
   run.xp = 0
   run.livreTotal = 0
   run.memoireGagnee = 0
@@ -19710,6 +19869,8 @@ function retourAuLabo(): void {
   run.vies = 1
   run.conclues = 0
   run.instruments = []
+  run.bannies = []
+  run.relancesFaites = 0
   run.xp = 0
   run.livreTotal = 0
   run.ended = false
