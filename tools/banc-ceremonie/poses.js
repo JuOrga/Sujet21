@@ -67,6 +67,7 @@
     h.style.removeProperty('--n')
     h.innerHTML = ''
     scene.classList.remove('mb-question')
+    $('mb-outils').hidden = true // les gestes du tirage n'appartiennent qu'à lui
     return h
   }
   function question(t) { // main.ts:16613 mbQuestion
@@ -397,6 +398,22 @@
       btn.addEventListener('pointerleave', () => isole(null))
       btn.addEventListener('focusout', () => isole(null))
     })
+    // LES GESTES DE LA TABLE (main.ts mbPoseOutils) : relancer, bannir
+    const barre = $('mb-outils')
+    barre.hidden = false
+    barre.innerHTML =
+      '<button type="button" class="mb-outil mb-outil-relance">↻ RELANCER · 2</button>' +
+      '<button type="button" class="mb-outil mb-outil-bannir" aria-pressed="false">⊘ BANNIR · 1</button>'
+    if (etat === 'bannir') {
+      // le mode armé (main.ts mbBasculeBannir) : la question change, les
+      // cartes prennent le liseré du refus, les trop chères redeviennent cliquables
+      host.classList.add('mb-bannir')
+      question('QUELLE CARTE BANNIR DE LA RUN ?')
+      for (const b of host.querySelectorAll('.crt-draft.mb-pauvre')) b.disabled = false
+      const b = barre.querySelector('.mb-outil-bannir')
+      b.setAttribute('aria-pressed', 'true')
+      b.textContent = '✕ NE PAS BANNIR'
+    }
     if (etat === 'elue') {
       host.classList.add('mb-elu')
       host.children[1].classList.add('mb-elu-c')

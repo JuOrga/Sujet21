@@ -9,6 +9,13 @@ import {
   paliersAtteints,
   prochainPalier,
   tirageInstruments,
+  tirage,
+  relanceTirage,
+  remplaceBannie,
+  gestesRestants,
+  BANNISSEMENTS_PAR_RUN,
+  RELANCES_PAR_RUN,
+  type ContexteTirage,
 } from './instruments'
 import type { InstrumentDef } from './instruments'
 import { LEVIERS } from './leviers'
@@ -216,5 +223,91 @@ describe('Bonbonne et XP d’étalonnage', () => {
   })
   it('la capacité de la bonbonne est bien posée', () => {
     expect(BONBONNE_CAP).toBeGreaterThan(0)
+  })
+})
+
+describe('Bannir et relancer — les deux gestes de la table du tirage', () => {
+  const ctx = (bannies: string[] = [], tenus: string[] = [], vies = 3): ContexteTirage => ({
+    tenus,
+    vies,
+    viesMax: 3,
+    nbCartes: 3,
+    catalogue: INSTRUMENTS,
+    ouverts: TOUS_ETATS_OUVERTS,
+    bannies,
+  })
+
+  it('une carte bannie ne se propose plus, sur aucun tirage de la run', () => {
+    const banni = INSTRUMENTS.find((d) => !d.contrepartie && !d.effets.some((e) => e.levier === 'vies'))!.id
+    for (let seed = 1; seed < 300; seed++)
+      expect(tirage(lcg(seed), ctx([banni])).map((c) => c.id)).not.toContain(banni)
+  })
+
+  it('bannir l’échantillon de secours tient même quand il manque une vie', () => {
+    // la règle des vies le ramènerait au premier échantillon perdu : bannir
+    // passe avant elle
+    let vu = false
+    for (let seed = 1; seed < 300; seed++) {
+      vu ||= tirage(lcg(seed), ctx([], [], 1)).some((c) => c.id === 'echantillon-secours')
+      expect(tirage(lcg(seed), ctx(['echantillon-secours'], [], 1)).map((c) => c.id)).not.toContain('echantillon-secours')
+    }
+    expect(vu).toBe(true) // sans bannissement, il paraît bel et bien
+  })
+
+  it('la bannie laisse sa place à une carte neuve ; les autres ne bougent pas', () => {
+    for (let seed = 1; seed < 200; seed++) {
+      const table = tirage(lcg(seed), ctx())
+      const banni = table[1].id
+      const apres = remplaceBannie(lcg(seed + 7), ctx([banni]), table, banni)
+      expect(apres).toHaveLength(3)
+      expect(apres.map((c) => c.id)).not.toContain(banni)
+      // à la même place : seul le prix peut changer, si plus rien n'était offert
+      expect(apres[0].id).toBe(table[0].id)
+      expect(apres[2].id).toBe(table[2].id)
+      expect(new Set(apres.map((c) => c.id)).size).toBe(3)
+      expect(apres.some((c) => c.prix === 0)).toBe(true)
+    }
+  })
+
+  it('bassin épuisé : la table compte une carte de moins, sans doublon', () => {
+    const cat = INSTRUMENTS.filter((d) => !d.contrepartie && !d.effets.some((e) => e.levier === 'vies')).slice(0, 3)
+    const c: ContexteTirage = { ...ctx(), catalogue: cat }
+    const table = tirage(lcg(3), c)
+    expect(table).toHaveLength(3)
+    const apres = remplaceBannie(lcg(4), { ...c, bannies: [table[0].id] }, table, table[0].id)
+    expect(apres.map((x) => x.id).sort()).toEqual(table.slice(1).map((x) => x.id).sort())
+    expect(apres.some((x) => x.prix === 0)).toBe(true)
+  })
+
+  it('la relance pose une table neuve tant que le bassin le permet', () => {
+    for (let seed = 1; seed < 200; seed++) {
+      const table = tirage(lcg(seed), ctx())
+      const neuve = relanceTirage(lcg(seed + 11), ctx(), table.map((c) => c.id))
+      expect(neuve).toHaveLength(3)
+      for (const c of neuve) expect(table.map((x) => x.id)).not.toContain(c.id)
+      expect(neuve.some((c) => c.prix === 0)).toBe(true)
+    }
+  })
+
+  it('bassin trop court pour une table neuve : elle se complète avec les refusées, bannies exclues', () => {
+    const cat = INSTRUMENTS.filter((d) => !d.contrepartie && !d.effets.some((e) => e.levier === 'vies')).slice(0, 5)
+    const c: ContexteTirage = { ...ctx([cat[4].id]), catalogue: cat }
+    const table = tirage(lcg(9), c)
+    const neuve = relanceTirage(lcg(10), c, table.map((x) => x.id)).map((x) => x.id)
+    expect(neuve).toHaveLength(3)
+    expect(new Set(neuve).size).toBe(3)
+    expect(neuve).not.toContain(cat[4].id)
+    // la seule carte jamais montrée y est
+    const jamais = cat.slice(0, 4).map((d) => d.id).find((id) => !table.some((x) => x.id === id))!
+    expect(neuve).toContain(jamais)
+  })
+
+  it('les gestes se comptent par run, jamais sous zéro — et il y en a', () => {
+    expect(BANNISSEMENTS_PAR_RUN).toBeGreaterThan(0)
+    expect(RELANCES_PAR_RUN).toBeGreaterThan(0)
+    expect(gestesRestants(2, 0)).toBe(2)
+    expect(gestesRestants(2, 2)).toBe(0)
+    expect(gestesRestants(2, 5)).toBe(0)
+    expect(gestesRestants(2, -3)).toBe(2)
   })
 })

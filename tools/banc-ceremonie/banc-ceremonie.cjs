@@ -57,6 +57,7 @@ const PRISES = [
   ['05-tirage-retournement-t550ms', 'draft', null, 'retourne', 0],
   ['06-tirage', 'draft', null, 'vise', 2600, '.mb-pli:first-child .crt-draft'],
   ['06b-tirage-elue-t250ms', 'draft', 'elue', 'elue', 0],
+  ['06c-tirage-bannir', 'draft', 'bannir', null, 2600, '.mb-pli:nth-child(2) .crt-draft'],
   ['07-salles', 'salles', null, null, 2000, '.mb-porte'],
   ['07b-salles-noeud', 'salles', 'noeud', null, 2000],
   ['07c-salles-porte-ouverte-t260ms', 'salles', null, 'porte', 1500],

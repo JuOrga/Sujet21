@@ -379,10 +379,32 @@ export function tirageInstruments(
   nbCartes = 3,
   catalogue: InstrumentDef[] = INSTRUMENTS,
   ouverts: EtatsOuverts = TOUS_ETATS_OUVERTS,
+  exclues: readonly string[] = [],
 ): CarteTirage[] {
+  const pool = bassinDuTirage(rand, tenus, vies, viesMax, catalogue, ouverts, exclues)
+  return garantitUneOfferte(
+    pool.slice(0, Math.max(1, nbCartes)).map((id) => ({ id, prix: prixAuHasard(rand) })),
+    rand,
+  )
+}
+
+/** Le bassin d'un tirage, mélangé : tout ce qui PEUT se proposer. Les
+ *  `exclues` (bannies de la run, cartes déjà sur la table) passent AVANT la
+ *  règle des vies : une carte de secours bannie ne revient pas parce qu'il
+ *  manque une vie — bannir, c'est pour la run. */
+function bassinDuTirage(
+  rand: () => number,
+  tenus: readonly string[],
+  vies: number,
+  viesMax: number,
+  catalogue: InstrumentDef[],
+  ouverts: EtatsOuverts,
+  exclues: readonly string[],
+): string[] {
   const pool = catalogue.filter((d) => {
     // une CONTREPARTIE ne se propose jamais : elle s'attrape, elle ne se choisit pas
     if (d.contrepartie) return false
+    if (exclues.includes(d.id)) return false
     if (!instrumentOuvert(d, ouverts)) return false
     // une carte qui donne une VIE ne paraît que s'il en manque une — peu
     // importe son nom : c'est son levier qui la range là
@@ -396,14 +418,96 @@ export function tirageInstruments(
     pool[i] = pool[j]
     pool[j] = t
   }
-  const cartes = pool.slice(0, Math.max(1, nbCartes)).map((id) => ({
-    id,
-    prix: rand() < 1 / 3 ? PRIX_CARTE : 0,
-  }))
+  return pool
+}
+
+/** Environ une carte sur trois est payante. */
+function prixAuHasard(rand: () => number): number {
+  return rand() < 1 / 3 ? PRIX_CARTE : 0
+}
+
+/** Jamais toutes payantes : une carte au hasard redevient offerte. */
+function garantitUneOfferte(cartes: CarteTirage[], rand: () => number): CarteTirage[] {
   if (cartes.length > 0 && cartes.every((c) => c.prix > 0)) {
     cartes[Math.floor(rand() * cartes.length)].prix = 0
   }
   return cartes
+}
+
+// ---- BANNIR ET RELANCER -----------------------------------------------------
+// Deux gestes sur la table du tirage, comptés PAR RUN : BANNIR une carte la
+// retire du bassin jusqu'à la fin de la run (elle ne se proposera plus, et
+// une carte neuve prend sa place sur la table) ; RELANCER rebat les cartes
+// du palier sans le consommer. « Il faut la possibilité de bannir une carte
+// récompense pour la run, et une relance du tirage » (le concepteur, 28/11).
+// Les deux sont GRATUITS et comptés : le condensat paie déjà les cartes
+// payantes, une seconde dépense dans le même écran les mettrait en
+// concurrence. Le réglage se tient ici, en deux nombres.
+export const BANNISSEMENTS_PAR_RUN = 2
+export const RELANCES_PAR_RUN = 2
+
+/** Ce qu'il faut savoir pour (re)tirer : l'état de la run au tirage. */
+export interface ContexteTirage {
+  tenus: string[]
+  vies: number
+  viesMax: number
+  nbCartes: number
+  catalogue: InstrumentDef[]
+  ouverts: EtatsOuverts
+  /** les cartes bannies de la run : elles ne se proposent plus */
+  bannies: readonly string[]
+}
+
+/** Le tirage d'un palier, bannies écartées. */
+export function tirage(rand: () => number, ctx: ContexteTirage): CarteTirage[] {
+  return tirageInstruments(rand, ctx.tenus, ctx.vies, ctx.viesMax, ctx.nbCartes, ctx.catalogue, ctx.ouverts, ctx.bannies)
+}
+
+/**
+ * LA RELANCE : une table neuve. Les cartes qu'on vient de refuser ne
+ * reviennent pas tant que le bassin en a d'autres — une relance qui
+ * reposerait la même table aurait coûté un geste pour rien ; s'il n'en a
+ * pas assez, la table se complète avec elles.
+ */
+export function relanceTirage(
+  rand: () => number,
+  ctx: ContexteTirage,
+  surLaTable: readonly string[],
+): CarteTirage[] {
+  const nb = Math.max(1, ctx.nbCartes)
+  const neuves = bassinDuTirage(rand, ctx.tenus, ctx.vies, ctx.viesMax, ctx.catalogue, ctx.ouverts, [...ctx.bannies, ...surLaTable]).slice(0, nb)
+  const reprises = bassinDuTirage(rand, ctx.tenus, ctx.vies, ctx.viesMax, ctx.catalogue, ctx.ouverts, [...ctx.bannies, ...neuves])
+    .slice(0, nb - neuves.length)
+  return garantitUneOfferte(
+    [...neuves, ...reprises].map((id) => ({ id, prix: prixAuHasard(rand) })),
+    rand,
+  )
+}
+
+/**
+ * LE BANNISSEMENT, sur la table : la carte bannie s'en va, une carte neuve
+ * du bassin prend SA place (les autres ne bougent pas, leur prix non plus).
+ * Bassin épuisé : la table compte une carte de moins. `ctx.bannies` doit
+ * déjà compter la bannie.
+ */
+export function remplaceBannie(
+  rand: () => number,
+  ctx: ContexteTirage,
+  cartes: readonly CarteTirage[],
+  idBannie: string,
+): CarteTirage[] {
+  const i = cartes.findIndex((c) => c.id === idBannie)
+  if (i < 0) return cartes.map((c) => ({ ...c }))
+  const restes = cartes.filter((c) => c.id !== idBannie).map((c) => ({ ...c }))
+  const exclues = [...ctx.bannies, idBannie, ...restes.map((c) => c.id)]
+  const neuve = bassinDuTirage(rand, ctx.tenus, ctx.vies, ctx.viesMax, ctx.catalogue, ctx.ouverts, exclues)[0]
+  if (neuve) restes.splice(i, 0, { id: neuve, prix: prixAuHasard(rand) })
+  return garantitUneOfferte(restes, rand)
+}
+
+/** Ce qui reste d'un geste compté, jamais sous zéro. */
+export function gestesRestants(parRun: number, faits: number): number {
+  return Math.max(0, parRun - Math.max(0, Math.floor(faits)))
 }
 
 // ---- La BONBONNE et l'XP d'étalonnage ----
