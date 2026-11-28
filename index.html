@@ -8069,7 +8069,7 @@
       /* le versement possible : la plaque s'ourle de vert — le geste est offert */
       .bonbonne.verse-ok { border-color: rgba(109, 255, 184, 0.55); }
       .bonbonne.verse-ok .v { color: #8fffcf; }
-      /* LE VERSEMENT : la barre se vide D'UN COUP, et ses cases claquent
+      /* LE VERSEMENT : la barre perd D'UN COUP ce qu'on verse, et ses cases claquent
          en vert le temps d'un éclair — c'est parti dans le corps */
       .bonbonne.ouvert .bb-barre i { animation: bb-verse 0.55s ease-out; }
       /* L'INVITE : le geste sert, la barre se DÉPLIE en bouton — une plaque
@@ -10435,7 +10435,7 @@
           <!-- LA BONBONNE DE SECOURS : à côté du litrage, une BARRE à blocs
                qui se remplit de ce qu'on a mis de côté. Elle se présente au
                début du tableau et se déplie en bouton quand le geste sert —
-               un toucher la verse, d'un coup. -->
+               un toucher la verse. -->
           <button type="button" id="bonbonne" class="bonbonne" data-nom="bonbonne de secours — toucher, touche V, ou croix ↑ à la manette : la réserve se verse dans le corps (en liquide). Avec la SOUPAPE DE SECOURS du marchand, elle se verse toute seule à la dernière impulsion." hidden>
             <!-- LA BARRE : un bloc par litre, remplis de gauche à droite par
                  majHud (game/bonbonne.ts) — des cases, pas de l'eau -->
@@ -10884,7 +10884,7 @@
           <kbd>sur le corps</kbd>maintenir SUR le volume : se rassembler (gratuit)<br />
           <kbd>F</kbd>glace : le bloc garde son élan
           <kbd>G</kbd>vapeur : viser (temps ralenti), relâcher = dash<br />
-          <kbd>V</kbd>verser la BONBONNE dans le corps (la barre du coin haut-gauche se touche aussi) — en liquide seulement, et elle se vide d'un coup<br />
+          <kbd>V</kbd>verser la BONBONNE dans le corps (la barre du coin haut-gauche se touche aussi) — en liquide seulement ; le corps reprend son volume de départ, le surplus reste en réserve<br />
           <kbd>molette</kbd>zoom — la caméra continue de suivre le corps
           <kbd>clic droit maintenu</kbd>déplacer la caméra (elle ne suit plus)
           <kbd>X</kbd>recentrer la caméra sur le corps<br />
@@ -10910,7 +10910,7 @@
           <kbd>stick droit</kbd>déplacer la caméra
           <kbd>clic stick</kbd>recadrer (caméra auto)
           <kbd>croix ↓</kbd>CONTINUER, quand il s'offre<br />
-          <kbd>croix ↑</kbd>verser la BONBONNE dans le corps — la réserve mise de côté, en liquide seulement, et elle se vide d'un coup<br />
+          <kbd>croix ↑</kbd>verser la BONBONNE dans le corps — la réserve mise de côté, en liquide seulement ; le corps reprend son volume de départ, le surplus reste en réserve<br />
           <kbd>Start ☰</kbd>pause + la fiche
           <kbd>Select</kbd>recommencer<br />
           <kbd>croix / stick</kbd>MENUS : naviguer (le liseré bleu suit)

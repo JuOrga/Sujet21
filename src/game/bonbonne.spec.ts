@@ -192,20 +192,23 @@ const DESCENTE: EtatDescente = {
 }
 const descente = (o: Partial<EtatDescente> = {}): EtatDescente => ({ ...DESCENTE, ...o })
 
-describe('Le gain du versement — la bonbonne se vide d’un coup', () => {
-  it('rend TOUTE la réserve, même si le creux du corps est plus petit', () => {
-    // la décision du concepteur : une barre qui garde des blocs après le
-    // geste ne dit pas « c'est fait »
-    expect(gainVersement(descente({ litres: 3.5, reserveL: 2 }))).toBeCloseTo(2, 6)
-    expect(gainVersement(descente({ litres: 4.5, reserveL: 2 }))).toBeCloseTo(2, 6)
+describe('Le gain du versement — le chiffre que l’invite annonce', () => {
+  it('rend le creux du corps quand la réserve le couvre : LE SURPLUS RESTE EN RÉSERVE', () => {
+    // la décision du concepteur : 2 L au dos, 1 L de creux — on verse 1 L,
+    // et le litre en trop reste dans la barre
+    expect(gainVersement(descente({ litres: 3.5, reserveL: 2 }))).toBeCloseTo(1, 6)
+  })
+  it('vide la bonbonne quand le creux la dépasse', () => {
+    expect(gainVersement(descente({ litres: 1, reserveL: 0.8 }))).toBeCloseTo(0.8, 6)
   })
   it('compte en gouttes ENTIÈRES : un fond de bonbonne sous la goutte ne rend rien', () => {
-    expect(gainVersement(descente({ reserveL: P.litersPerParticle * 0.9 }))).toBe(0)
+    expect(gainVersement(descente({ litres: 1, reserveL: P.litersPerParticle * 0.9 }))).toBe(0)
     // 0,8 / 0,005 vaut 159,99… en flottant : la goutte ne doit pas se perdre
-    const g = gainVersement(descente({ reserveL: 0.8 }))
+    const g = gainVersement(descente({ litres: 1, reserveL: 0.8 }))
     expect(Math.round(g / P.litersPerParticle)).toBe(160)
   })
-  it('ne rend rien d’une bonbonne vide', () => {
+  it('ne rend rien à un corps plein, ni d’une bonbonne vide', () => {
+    expect(gainVersement(descente())).toBe(0)
     expect(gainVersement(descente({ litres: 1, reserveL: 0 }))).toBe(0)
   })
 })

@@ -127,10 +127,12 @@ export function doitVerserAuto(e: EtatVersement): boolean {
 //     peut en rendre une part qui compte : la fiole se déplie en bouton
 //     (« V · VERSER +0,80 L »), et la jauge montre en hachures ce que le
 //     geste rendrait. Rien ne presse, mais le geste est NOMMÉ.
-//     LE GESTE VIDE LA BONBONNE D'UN COUP (décision du concepteur, 27/11) :
-//     toute la réserve passe dans le corps, même au-delà de son volume de
-//     départ. Une barre qui garderait trois blocs après qu'on l'a versée
-//     ne dit pas « c'est fait » ; une barre vide, si.
+//     LE GESTE REND AU CORPS SON VOLUME DE DÉPART, d'un coup, et LE
+//     SURPLUS RESTE EN RÉSERVE (décision du concepteur, 28/11). On a essayé
+//     de tout verser, même au-delà du départ : la barre tombait toujours à
+//     zéro, mais 8 L dans un corps de 4,5 L en faisaient un corps de
+//     12,5 L, et le recul se divise par le volume. Les blocs en trop
+//     restent donc dans la barre — ce qu'on n'a pas pu prendre, on le garde.
 //  2. PRESSANTE — le corps entre dans la zone d'alerte : la bannière
 //     d'alarme, celle qu'on ne peut pas rater, porte le geste et se touche.
 //  3. LE SECOURS — au seuil de la dernière impulsion, la bonbonne se verse
@@ -176,15 +178,21 @@ export interface EtatDescente {
   secoursAcquis: boolean
 }
 
-/** CE QUE LE GESTE RENDRAIT, en litres : TOUTE la réserve, en gouttes
- *  ENTIÈRES — c'est le chiffre que l'invite annonce, il doit être celui que
- *  le versement tiendra. Le creux du corps ne le borne plus : la bonbonne
- *  se vide d'un coup, quitte à porter le corps au-delà de son départ. */
-export function gainVersement(e: { reserveL: number; litreParticule: number }): number {
+/** CE QUE LE GESTE RENDRAIT, en litres : le creux du corps (jusqu'à son
+ *  volume de départ), borné à la réserve, en gouttes ENTIÈRES — c'est le
+ *  chiffre que l'invite annonce, il doit être celui que le versement
+ *  tiendra. Le surplus de la réserve y reste. */
+export function gainVersement(e: {
+  litres: number
+  litresPleins: number
+  reserveL: number
+  litreParticule: number
+}): number {
   if (!(e.litreParticule > 0)) return 0
+  const creux = Math.max(0, e.litresPleins - e.litres)
   // l'epsilon rattrape la division flottante (0,8 / 0,005 = 159,99…) sans
   // jamais inventer une goutte
-  const gouttes = Math.floor(Math.max(0, e.reserveL) / e.litreParticule + 1e-6)
+  const gouttes = Math.floor(Math.min(creux, Math.max(0, e.reserveL)) / e.litreParticule + 1e-6)
   return gouttes * e.litreParticule
 }
 
@@ -231,7 +239,8 @@ export function segmentsJauge(
 // La fiole de verre (12 px, un niveau qui ondule) ne se lisait pas : ni sa
 // contenance, ni ce qu'elle tenait. La réserve est désormais une BARRE
 // horizontale compartimentée, qui se remplit de gauche à droite — un bloc
-// par litre — et se vide d'un coup. Pas de physique de l'eau : des cases.
+// par litre — et perd d'un coup ce qu'on en verse. Pas de physique de
+// l'eau : des cases.
 
 /** Ce qu'un bloc de la barre contient, en litres. Un litre : la bonbonne
  *  d'origine (8 L) tient en huit cases, assez larges pour se compter d'un

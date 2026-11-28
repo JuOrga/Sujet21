@@ -13462,8 +13462,8 @@ instrPanel?.addEventListener('click', () => {
 })
 
 /** VERSER LA BONBONNE : la réserve se reverse dans le corps, en jeu — même
- * non pleine. En descente elle se vide D'UN COUP ; au hub (réserve
- * infinie) le corps se regonfle jusqu'à son volume de départ. L'état
+ * non pleine. Le corps se regonfle d'un coup jusqu'à son volume de
+ * départ ; ce que la réserve tient en plus y reste. L'état
  * liquide est requis (la glace n'absorbe pas, le nuage disperserait). */
 function verserBonbonne(
   o: { dose?: number; discret?: boolean } = {},
@@ -13486,17 +13486,16 @@ function verserBonbonne(
   // trait — c'est une décision du joueur, elle a le droit d'être franche.
   const plafond =
     o.dose === undefined ? manque : Math.max(0, Math.floor(o.dose))
-  // EN DESCENTE, LE GESTE VIDE LA BONBONNE D'UN COUP : toute la réserve
-  // passe dans le corps, même au-delà de son volume de départ (décision du
-  // concepteur — une barre qui garde des blocs après le geste ne dit pas
-  // « c'est fait »). Le creux ne borne que le hub, où la réserve est
-  // infinie : sans lui, on y verserait sans fin.
-  const nParts = illimitee
-    ? Math.min(manque, plafond)
-    : Math.min(
-        o.dose === undefined ? Number.POSITIVE_INFINITY : plafond,
-        Math.floor(run.bonbonneLiters / params.litersPerParticle + 1e-6),
-      )
+  // LE CORPS REVIENT À SON VOLUME DE DÉPART, pas au-delà : le surplus
+  // RESTE EN RÉSERVE (décision du concepteur, 28/11). Tout verser portait
+  // un corps de 4,5 L à 12,5 L, et le recul se divise par le volume.
+  const nParts = Math.min(
+    manque,
+    plafond,
+    illimitee
+      ? Number.POSITIVE_INFINITY
+      : Math.floor(run.bonbonneLiters / params.litersPerParticle + 1e-6),
+  )
   if (nParts < 1) return 'rien'
   // le versement s'installe dans les CREUX autour du corps (jamais sur les
   // particules en place) : poser au centroïde faisait exploser la densité —
@@ -13590,9 +13589,7 @@ function verseEtDis(): void {
       : r === 'rien'
         ? run.bonbonneLiters < params.litersPerParticle
           ? 'bonbonne vide'
-          : auHub
-            ? 'le corps est déjà plein'
-            : 'pas de place autour du corps'
+          : 'le corps est déjà plein'
         : r === 'etat'
           ? 'seulement en LIQUIDE'
           : r === 'pause'
@@ -22949,8 +22946,8 @@ function corpsImage(now: number): boolean {
     ? '∞'
     : `${run.bonbonneLiters.toFixed(2)} / ${capBonbonne()} L`
   // LA BARRE (game/bonbonne.ts) : la réserve en BLOCS, de gauche à droite.
-  // Elle MONTE en douceur (un gain se regarde arriver) et se VIDE d'un coup
-  // (le versement est un événement, pas une fuite) : la poursuite ne joue
+  // Elle MONTE en douceur (un gain se regarde arriver) et PERD d'un coup
+  // ce qu'on en verse (le versement est un événement, pas une fuite) : la poursuite ne joue
   // donc qu'à la hausse.
   const bbCible = bbInfinie
     ? 1
@@ -22973,6 +22970,7 @@ function corpsImage(now: number): boolean {
   // le versement est possible : le verre s'ourle de vert pour inviter au geste
   const peutVerser =
     run.bonbonneLiters >= params.litersPerParticle &&
+    sim.aliveCount() < volumeDepart() &&
     !input.freezeIntent &&
     !input.gasIntent
   bonbonneEl.classList.toggle('verse-ok', peutVerser)
