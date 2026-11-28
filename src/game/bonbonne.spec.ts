@@ -4,10 +4,18 @@ import {
   DOSE_AUTO,
   REPOS_VERSEMENT_S,
   SEUIL_RENFLOUEMENT,
+  GAIN_UTILE,
+  SEUIL_INVITE,
+  blocsBonbonne,
   bonbonneIllimitee,
+  doitSecourir,
   doitVerserAuto,
   doseVersementAuto,
+  gainVersement,
+  inviteBonbonne,
   renflouementEngage,
+  segmentsJauge,
+  type EtatDescente,
   type EtatVersement,
 } from './bonbonne'
 import { DEFAULT_PARAMS } from '../sim/params'
@@ -163,5 +171,140 @@ describe('Le versement automatique — ce qu’il ne fait pas', () => {
     expect(doitVerserAuto(etat({ depuisDernier: 0 }))).toBe(false)
     expect(doitVerserAuto(etat({ depuisDernier: REPOS_VERSEMENT_S - 0.01 }))).toBe(false)
     expect(doitVerserAuto(etat({ depuisDernier: REPOS_VERSEMENT_S }))).toBe(true)
+  })
+})
+
+// ---- EN DESCENTE : L'INVITE, PUIS LE SECOURS ---------------------------
+// LE DÉFAUT RAPPORTÉ : « on ne l'utilise jamais, et très peu indiqué ». Le
+// geste existait, rien ne le proposait. Ces essais tiennent les trois
+// marches — offerte, pressante, secours — aux volumes RÉELS du jeu.
+const P = DEFAULT_PARAMS
+const DESCENTE: EtatDescente = {
+  actif: true,
+  litres: 4.5,
+  litresPleins: 4.5,
+  reserveL: 2,
+  litreParticule: P.litersPerParticle,
+  alerteL: P.lastCallLiters,
+  critiqueL: P.criticalVolumeLiters,
+  liquide: true,
+  secoursAcquis: true,
+}
+const descente = (o: Partial<EtatDescente> = {}): EtatDescente => ({ ...DESCENTE, ...o })
+
+describe('Le gain du versement — le chiffre que l’invite annonce', () => {
+  it('rend le creux du corps quand la réserve le couvre : LE SURPLUS RESTE EN RÉSERVE', () => {
+    // la décision du concepteur : 2 L au dos, 1 L de creux — on verse 1 L,
+    // et le litre en trop reste dans la barre
+    expect(gainVersement(descente({ litres: 3.5, reserveL: 2 }))).toBeCloseTo(1, 6)
+  })
+  it('vide la bonbonne quand le creux la dépasse', () => {
+    expect(gainVersement(descente({ litres: 1, reserveL: 0.8 }))).toBeCloseTo(0.8, 6)
+  })
+  it('compte en gouttes ENTIÈRES : un fond de bonbonne sous la goutte ne rend rien', () => {
+    expect(gainVersement(descente({ litres: 1, reserveL: P.litersPerParticle * 0.9 }))).toBe(0)
+    // 0,8 / 0,005 vaut 159,99… en flottant : la goutte ne doit pas se perdre
+    const g = gainVersement(descente({ litres: 1, reserveL: 0.8 }))
+    expect(Math.round(g / P.litersPerParticle)).toBe(160)
+  })
+  it('ne rend rien à un corps plein, ni d’une bonbonne vide', () => {
+    expect(gainVersement(descente())).toBe(0)
+    expect(gainVersement(descente({ litres: 1, reserveL: 0 }))).toBe(0)
+  })
+})
+
+describe('L’invite — le geste est proposé quand il sert', () => {
+  it('se tait tant que le corps garde plus de la moitié de son volume', () => {
+    expect(inviteBonbonne(descente({ litres: 4.5 * SEUIL_INVITE + 0.1 }))).toBe('aucune')
+  })
+  it('est OFFERTE sous la moitié du volume de départ', () => {
+    expect(inviteBonbonne(descente({ litres: 4.5 * SEUIL_INVITE - 0.1 }))).toBe('offerte')
+  })
+  it('est PRESSANTE dès le volume d’alerte', () => {
+    expect(inviteBonbonne(descente({ litres: P.lastCallLiters }))).toBe('pressante')
+  })
+  it('se tait sans réserve : on n’invite pas à un geste qui ne rendrait rien', () => {
+    expect(inviteBonbonne(descente({ litres: 0.4, reserveL: 0 }))).toBe('aucune')
+  })
+  it('ne s’offre pas pour un fond de bonbonne — mais presse quand même à l’alerte', () => {
+    const fond = 4.5 * GAIN_UTILE * 0.5
+    expect(inviteBonbonne(descente({ litres: 2, reserveL: fond }))).toBe('aucune')
+    expect(inviteBonbonne(descente({ litres: 0.5, reserveL: fond }))).toBe('pressante')
+  })
+  it('hors liquide : pas offerte (le geste serait refusé), mais pressante à l’alerte', () => {
+    expect(inviteBonbonne(descente({ litres: 2, liquide: false }))).toBe('aucune')
+    expect(inviteBonbonne(descente({ litres: 0.5, liquide: false }))).toBe('pressante')
+  })
+  it('se tait hors d’une salle de run', () => {
+    expect(inviteBonbonne(descente({ litres: 0.4, actif: false }))).toBe('aucune')
+  })
+})
+
+describe('Le secours — on ne meurt plus à sec une réserve au dos', () => {
+  it('ne part pas au-dessus du seuil critique : jusque-là, c’est un geste', () => {
+    expect(doitSecourir(descente({ litres: P.criticalVolumeLiters + 0.05 }))).toBe(false)
+  })
+  it('part au seuil critique, réserve disponible', () => {
+    expect(doitSecourir(descente({ litres: P.criticalVolumeLiters }))).toBe(true)
+  })
+  it('ne part JAMAIS sans la soupape du marchand : sans elle, verser reste un geste', () => {
+    expect(doitSecourir(descente({ litres: 0.1, secoursAcquis: false }))).toBe(false)
+  })
+  it('ne part pas d’une bonbonne vide', () => {
+    expect(doitSecourir(descente({ litres: 0.2, reserveL: 0 }))).toBe(false)
+  })
+  it('attend le liquide : la glace n’absorbe pas, le nuage disperserait', () => {
+    expect(doitSecourir(descente({ litres: 0.2, liquide: false }))).toBe(false)
+  })
+  it('ne part pas hors d’une salle de run (hub, essai, sas qui boit…)', () => {
+    expect(doitSecourir(descente({ litres: 0.2, actif: false }))).toBe(false)
+  })
+  it('le seuil du secours est SOUS celui de l’invite pressante : on est prévenu avant d’être sauvé', () => {
+    expect(P.criticalVolumeLiters).toBeLessThan(P.lastCallLiters)
+    const entre = (P.criticalVolumeLiters + P.lastCallLiters) / 2
+    expect(inviteBonbonne(descente({ litres: entre }))).toBe('pressante')
+    expect(doitSecourir(descente({ litres: entre }))).toBe(false)
+  })
+})
+
+describe('La jauge en deux segments — ce que le geste rendrait se voit', () => {
+  it('pose la réserve à la suite du corps', () => {
+    const s = segmentsJauge(1.5, 4.5, 1)
+    expect(s.corps).toBeCloseTo(1 / 3, 6)
+    expect(s.reserve).toBeCloseTo(1 / 4.5, 6)
+  })
+  it('ne dépasse jamais le plein', () => {
+    const s = segmentsJauge(4, 4.5, 3)
+    expect(s.corps + s.reserve).toBeLessThanOrEqual(1 + 1e-9)
+  })
+  it('un corps au-dessus du départ (prime) ne laisse aucune place à la réserve', () => {
+    expect(segmentsJauge(5, 4.5, 1)).toEqual({ corps: 1, reserve: 0 })
+  })
+  it('sans volume de départ, rien à dessiner', () => {
+    expect(segmentsJauge(1, 0, 1)).toEqual({ corps: 0, reserve: 0 })
+  })
+})
+
+describe('La barre — la réserve se lit en blocs, de gauche à droite', () => {
+  it('pose un bloc par litre de contenance', () => {
+    expect(blocsBonbonne(0, 8)).toHaveLength(8)
+    expect(blocsBonbonne(0, 2)).toHaveLength(2)
+  })
+  it('remplit de gauche à droite, le dernier bloc entamé restant partiel', () => {
+    expect(blocsBonbonne(2.5, 8)).toEqual([1, 1, 0.5, 0, 0, 0, 0, 0])
+  })
+  it('un petit gain se voit : 0,5 L entame le premier bloc', () => {
+    expect(blocsBonbonne(0.5, 8)[0]).toBeCloseTo(0.5, 6)
+  })
+  it('vide : aucun bloc ; pleine : tous', () => {
+    expect(blocsBonbonne(0, 8).every((b) => b === 0)).toBe(true)
+    expect(blocsBonbonne(8, 8).every((b) => b === 1)).toBe(true)
+  })
+  it('ne déborde pas de sa contenance, ni sous zéro', () => {
+    expect(blocsBonbonne(12, 8).every((b) => b === 1)).toBe(true)
+    expect(blocsBonbonne(-1, 8).every((b) => b === 0)).toBe(true)
+  })
+  it('une contenance fractionnaire garde une case pour son reste', () => {
+    expect(blocsBonbonne(0, 6.5)).toHaveLength(7)
   })
 })
