@@ -980,8 +980,8 @@
     },
     {
       "id": "la-membrane",
-      "auteur": "BOIZ",
-      "majAt": "2026-11-25T15:37:34.563Z",
+      "auteur": "JU",
+      "majAt": "2026-11-27T20:40:43.793Z",
       "codeAuteur": "JU",
       "codeAt": "2026-08-26T22:03:54.367Z",
       "level": {
@@ -1275,6 +1275,15 @@
             "forme": 3,
             "p0": 2,
             "material": 0
+          },
+          {
+            "minX": -80,
+            "minY": -550,
+            "maxX": 420,
+            "maxY": -400,
+            "forme": 3,
+            "p0": 1,
+            "material": 0
           }
         ],
         "sponges": [],
@@ -1302,12 +1311,19 @@
         "ambiante": 0,
         "decals": [
           {
-            "x": 1090,
-            "y": -560,
+            "x": -985,
+            "y": 497.5,
             "w": 150,
             "h": 225,
             "kind": "vanne",
             "fade": 0.42
+          },
+          {
+            "x": -955,
+            "y": 267.5,
+            "w": 270,
+            "h": 235,
+            "kind": "tuyaux"
           }
         ],
         "caches": [
@@ -1322,6 +1338,12 @@
             "minY": -550,
             "maxX": -140,
             "maxY": -300
+          },
+          {
+            "minX": -80,
+            "minY": -550,
+            "maxX": 420,
+            "maxY": -400
           }
         ],
         "condensats": [
@@ -1351,8 +1373,8 @@
             "cl": 6
           },
           {
-            "x": 200,
-            "y": 0,
+            "x": -30,
+            "y": -480,
             "cl": 6
           }
         ],
@@ -5881,8 +5903,8 @@
     },
     {
       "id": "conduis-de-ventillation",
-      "auteur": "BOIZ",
-      "majAt": "2026-11-25T15:42:09.547Z",
+      "auteur": "JU",
+      "majAt": "2026-11-27T17:34:59.580Z",
       "codeAuteur": "BOIZ",
       "codeAt": "2026-08-25T14:39:28.644Z",
       "level": {
@@ -6123,20 +6145,6 @@
             "maxX": 462,
             "maxY": -649,
             "material": 0
-          },
-          {
-            "minX": -1200,
-            "minY": -102,
-            "maxX": -917,
-            "maxY": -101,
-            "material": 1
-          },
-          {
-            "minX": -1200,
-            "minY": -156,
-            "maxX": -1199,
-            "maxY": -101,
-            "material": 1
           },
           {
             "minX": -331,
@@ -18565,8 +18573,8 @@
     },
     {
       "id": "nouveau-tableau-9",
-      "auteur": "BOIZ",
-      "majAt": "2026-09-24T14:22:42.339Z",
+      "auteur": "JU",
+      "majAt": "2026-11-27T16:09:32.350Z",
       "codeAuteur": "BOIZ",
       "codeAt": "2026-09-20T14:15:56.581Z",
       "level": {
@@ -18643,7 +18651,7 @@
           },
           {
             "minX": 500,
-            "minY": 626.75,
+            "minY": 590,
             "maxX": 625,
             "maxY": 690,
             "forme": 3,
@@ -18654,7 +18662,7 @@
             "minX": 1180,
             "minY": 355,
             "maxX": 1240,
-            "maxY": 565,
+            "maxY": 690,
             "forme": 3,
             "p0": 2,
             "material": 2
@@ -18766,13 +18774,6 @@
             "maxX": -401,
             "maxY": -490,
             "material": 0
-          },
-          {
-            "minX": 1180,
-            "minY": 563.5,
-            "maxX": 1240,
-            "maxY": 690,
-            "material": 2
           },
           {
             "minX": 520.25,
